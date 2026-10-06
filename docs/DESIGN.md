@@ -23,8 +23,9 @@ Try again.", "Bali couldn't lock your apps. Try again."). In
 badges); `api-client.ts` (`UnauthorizedError`'s words; a `NetworkError` is
 said as `errors.ts`'s `CANT_REACH`, its own message a log line, D2c-2);
 `recap.ts` ("No reason given", the reasons, and the session's "9:05 AM to
-9:30 AM"). `blocks.ts`, `reports.ts` and `invite.ts` hold none: their words
-are in `blocks.tsx`, the reports page, `invite-code.tsx` and `errors.ts`. In
+9:30 AM"). `blocks.ts`, `classes.ts`, `reports.ts` and `invite.ts` hold none:
+their words are in `blocks.tsx`, the classes home (`app/page.tsx`), the
+reports page, `invite-code.tsx` and `errors.ts`. In
 `ios/Bali/` outside `UI/`: the NFC sheet's words in `BlockReader.swift`
 ("Hold the top of your iPhone to your teacher's Bali block.", "This isn't a
 Bali block.", "Bali block read.", "A scan is under way."); the `problem` a
@@ -66,15 +67,18 @@ and as Tailwind's theme (`bg-surface-page`, `text-text-secondary`,
 and JetBrains Mono self-hosted through `next/font` (`fonts.ts`); lucide
 (`lucide-react`) as the icon set; the buttons (`components/button.tsx`), the
 mark and the lockup (`components/mark.tsx`), a link in running text
-(`components/text-link.tsx`) and the labelled text field
-(`components/field.tsx`); the focus ring on every control and all
+(`components/text-link.tsx`), the labelled text field
+(`components/field.tsx`) and the tray and its cards (`components/tray.ts`);
+the focus ring on every control and all
 animation off under reduced motion, both global rules. The entry pages are in
 the picked style (D2c): the bar and `/login` (D2c-1), and the callback,
-`/support`, the two policy pages and the invite-code screen (D2c-2), held to
-the tokens' utilities by `tokens.test.ts`; the classes home, the grid, the recap and reports keep
-their Tailwind classes on the new base (the page colour, the font, the ring,
-and the radii: their `rounded-lg` is now 20 px) until D2e–D2g, which also
-retire Tailwind's default colours and sizes, kept in the theme only for them. **A portal page uses the tokens' utilities and no
+`/support`, the two policy pages and the invite-code screen (D2c-2); so are
+the classes home and its "Your block" (D2e). All of them are held to the
+tokens' utilities by `tokens.test.ts`; the class page, the grid, the recap and
+reports keep their Tailwind classes on the new base (the page colour, the
+font, the ring, and the radii: their `rounded-lg` is now 20 px) until D2f and
+D2g, which also retire Tailwind's default colours and sizes, kept in the theme
+only for them. **A portal page uses the tokens' utilities and no
 Tailwind default** (no `slate-*`, no `text-sm`): a value the tokens lack is a
 question for the owner.
 
@@ -204,8 +208,10 @@ not-joined pair.
 - **Families:** Instrument Sans on the web, self-hosted through `next/font`
   (the CSP has no `font-src`; D2c); the system font (SF Pro) on iOS at
   the same sizes, scaled with Dynamic Type (`docs/DECISIONS.md`: the shield
-  takes no custom font, so the app matches it). JetBrains Mono for join codes
-  only. Large numerals: ui-rounded / SF Pro Rounded.
+  takes no custom font, so the app matches it). JetBrains Mono for codes only,
+  whatever is read symbol by symbol: join codes and teacher invite codes alike
+  (the owner's ruling, 2026-10-05), and a block's ID. Large numerals:
+  ui-rounded / SF Pro Rounded.
 - **Numerals:** every data and countdown numeral is `tabular-nums`.
 
 | Style | Size / line | Weight | Use |
@@ -220,7 +226,18 @@ not-joined pair.
 | label | 12 / 16, +0.06em, uppercase | 600 | Chips and micro-labels |
 | data | 14 / 20 | 500 | Tables and stats, tabular |
 | data-lg | 28 / 32, rounded | 600 | Medium countdowns, tabular |
-| code | 14 / 20, mono | 500 | Join codes only |
+| code | 14 / 20, mono | 500 | Codes only: join codes, invite codes, block IDs |
+| input | 16 / 24 | 400 | Text typed in a field, on the web; a code typed in one is mono at 500 |
+
+**The input size** is the owner's ruling (2026-10-05): iPhone Safari zooms
+into a field whose text is under 16 px when it is tapped, so every portal
+field types at 16 px, through the one field component (`components/field.tsx`),
+the invite code, the block ID and the class name included; a code typed in one
+keeps the code style's face and weight. It is for inputs only, never for text
+around them, and it is not in the tokens yet: the next export of the design
+system should gain it (`bali-tokens.json` is that export, byte for byte, so it
+is never edited by hand), as it should the Present view's sizes (§5). The
+class page's minutes field takes it when D2f redraws that page.
 
 ## 4. Component stylings
 
@@ -262,7 +279,9 @@ not-joined pair.
   hairline and `text-primary` ink, at `radius-sm`: the grid is honest, not
   alarmed.
 - **Inputs:** `surface-sunken` well, label above, helper and error text below;
-  focus shows the focus ring.
+  focus shows the focus ring. What is typed is the input size (§3), 16 px, so
+  iPhone Safari never zooms in; a label is always a real label, never a
+  placeholder standing in for one.
 - **The mark:** the session arc as emblem: a green-200 track ring and a
   green-600 arc (~330° with its round caps), open at the upper left. Never
   recolour it, never close the arc. D1 uses it without its stone-50 tile.

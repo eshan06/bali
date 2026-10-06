@@ -198,6 +198,20 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     }
   });
 
+  it('beside them, only the input size the owner ruled (DESIGN.md §3), and every field types in it', () => {
+    // 16 px, so iPhone Safari never zooms into a field when it is tapped (2026-10-05), its line
+    // height on the 4-pt grid; the design system gains it at the owner's next export.
+    const sizes = [...theme.keys()]
+      .filter((k) => k.startsWith('--text-') && !k.slice(2).includes('--'))
+      .map((k) => k.slice('--text-'.length));
+    const styles = tokens.type.groups.flatMap((g) => g.styles.map((s) => s.name));
+    expect(sizes.sort()).toEqual([...styles, 'input'].sort());
+    expect(theme.get('--text-input')).toBe('16px');
+    expect(theme.get('--text-input--line-height')).toBe('24px');
+    expect(theme.get('--text-input--font-weight')).toBe('400');
+    expect(read('../components/field.tsx')).toMatch(/<input[^]*className=\{`[^`]*\btext-input\b/);
+  });
+
   it('the families are the tokens’ stacks: the self-hosted face first, then its fallbacks', () => {
     const stack = (family: string) =>
       tokens.type.families[family as 'sans' | 'mono']
@@ -246,21 +260,24 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
 });
 
 describe('the pages in Soft premium use the tokens’ utilities, never a Tailwind default', () => {
-  // DESIGN.md: no `slate-*`, no `text-sm`. D2c's pages and the pieces they share; D2e to D2g add
-  // theirs as they redraw them, until the theme's default colours and sizes can go.
+  // DESIGN.md: no `slate-*`, no `text-sm`. D2c's and D2e's pages and the pieces they share; D2f
+  // and D2g add theirs as they redraw them, until the theme's default colours and sizes can go.
   const DRAWN = [
     'app/login/page.tsx',
     'app/auth/callback/page.tsx',
     'app/support/page.tsx',
     'app/privacy/page.tsx',
     'app/terms/page.tsx',
+    'app/page.tsx',
     'components/portal-bar.tsx',
     'components/button.tsx',
     'components/mark.tsx',
     'components/text-link.tsx',
     'components/field.tsx',
+    'components/tray.ts',
     'components/policy-draft.tsx',
     'components/invite-code.tsx',
+    'components/blocks.tsx',
   ];
   const COLOUR =
     /\b(?:bg|text|border|ring|outline|divide|decoration|placeholder|fill|stroke|from|via|to|accent|caret)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|black|white)\b/;
@@ -273,5 +290,7 @@ describe('the pages in Soft premium use the tokens’ utilities, never a Tailwin
     expect(source).not.toMatch(COLOUR);
     expect(source).not.toMatch(SIZE);
     expect(source).not.toMatch(TYPE);
+    // A field is the Field, so what is typed in it is the input size (the owner's ruling).
+    if (file !== 'components/field.tsx') expect(source).not.toMatch(/<input\b/);
   });
 });

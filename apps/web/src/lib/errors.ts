@@ -37,6 +37,12 @@ export const CANT_REACH = "Couldn't reach Bali. Check your connection, then try 
 /** A 5xx or a timeout on the register (P3): the API's own message is written for a log. */
 export const CANT_REGISTER = "Bali couldn't register the block just now. Try again.";
 
+/** A class's name left empty (D2e): said before anything is sent. */
+export const NO_CLASS_NAME = 'Enter a name for the class.';
+
+/** A 5xx or a timeout on a create (D2e): the API's own message is written for a log. */
+export const CANT_CREATE = "Bali couldn't create the class just now. Try again.";
+
 /** A session length typed under Other (P10): said before a Start is sent with it. */
 export const NOT_A_SESSION_LENGTH = `A session runs 1 to ${MAX_SESSION_MINUTES} minutes. Enter a whole number of minutes.`;
 

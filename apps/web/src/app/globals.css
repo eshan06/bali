@@ -4,7 +4,8 @@
  * The Bali Design System's tokens (ios/Bali/UI/bali-tokens.json; DESIGN.md §2 to §6) as CSS
  * variables, `--bali-<token>`: the light values on :root, the dark ones under the device's dark
  * mode, so a page reads the same token in both. tokens.test.ts pins every value here to the JSON,
- * so the two cannot drift; a value the tokens lack is a question for the owner, never written here.
+ * so the two cannot drift; a value the tokens lack is a question for the owner, written here only
+ * once the owner rules on it (the input size, in the type scale below).
  * Every semantic token is here; of the primitives, only the ones a semantic token or the mark
  * reference (a page uses semantic tokens, never a primitive).
  */
@@ -130,7 +131,7 @@
  * The tokens as Tailwind's theme, so a page writes `bg-surface-page`, `text-text-secondary`,
  * `rounded-md`, `p-4`, `text-h1`. Tailwind's own radii and shadows go: the tokens' five radii and
  * three shadows are the whole set. Its default colours and sizes stay until the screens still on
- * them are redrawn (D2e to D2g); the entry pages use none of them.
+ * them are redrawn (D2f, D2g); the pages already redrawn use none of them.
  */
 @theme {
   /* §5: the 4-point grid, px on the web: `p-4` is space-4, 16 px. */
@@ -186,6 +187,13 @@
   --text-code: 14px;
   --text-code--line-height: 20px;
   --text-code--font-weight: 500;
+
+  /* The input size, the owner's ruling (2026-10-05): what is typed in a field is 16 px, so iPhone
+     Safari never zooms into a field when it is tapped. For inputs only, through the Field. Not in
+     the tokens yet: the design system gains it at the owner's next export (DESIGN.md §3). */
+  --text-input: 16px;
+  --text-input--line-height: 24px;
+  --text-input--font-weight: 400;
 }
 
 @theme inline {
@@ -231,7 +239,7 @@
   --color-arc-final2: var(--bali-arc-final2);
   --color-focus-ring: var(--bali-focus-ring-color);
 
-  /* A bridge for the screens D2e to D2g redraw: their `text-slate-500` helper lines sit on the
+  /* A bridge for the screens D2f and D2g redraw: their `text-slate-500` helper lines sit on the
      stone page now, below AA; text-tertiary is the pre-solved ink for them. It recolours every
      slate-500 utility, the Unknown chip's `border-slate-500` dashed edge included (the state still
      reads from its label and edge). Goes with the last `slate-` class. */

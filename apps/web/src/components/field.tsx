@@ -3,9 +3,11 @@ import type { ComponentProps } from 'react';
 /**
  * A text field (DESIGN.md §4, Inputs): its label above, the input a `surface-sunken` well at
  * `radius-sm` with a hairline edge, its help below in `caption`, the focus ring from globals.css.
- * `mono` sets what is typed in the code style (§3), for a code read symbol by symbol. A refusal
- * sets `aria-invalid`, which draws the edge in `text-primary`, never red; its words are the
- * page's, said after the help, and reach the input through `aria-describedby`, beside the help.
+ * What is typed is the input size, 16 px (§3, the owner's ruling of 2026-10-05), so iPhone Safari
+ * never zooms into the field when it is tapped: every portal input is this one. `mono` sets it in
+ * the code style's face and weight (§3), for a code read symbol by symbol. A refusal sets
+ * `aria-invalid`, which draws the edge in `text-primary`, never red; its words are the page's,
+ * said after the help, and reach the input through `aria-describedby`, beside the help.
  */
 export type FieldProps = Omit<ComponentProps<'input'>, 'className'> & {
   id: string;
@@ -33,7 +35,7 @@ export function Field({
         id={id}
         {...props}
         aria-describedby={describes || undefined}
-        className={`mt-2 block h-10 w-full rounded-sm border border-border-default bg-surface-sunken px-3 text-text-primary aria-[invalid=true]:border-text-primary ${mono ? 'font-mono text-code' : 'text-body'}`}
+        className={`mt-2 block h-10 w-full rounded-sm border border-border-default bg-surface-sunken px-3 text-input text-text-primary aria-[invalid=true]:border-text-primary ${mono ? 'font-mono font-medium' : ''}`}
       />
       {help ? (
         <p id={helpId} className="mt-2 text-caption text-text-tertiary">

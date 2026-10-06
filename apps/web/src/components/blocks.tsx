@@ -3,6 +3,9 @@
 import type { BlockDetail, BlockListResponse } from '@bali/shared';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
+import { Button } from '@/components/button';
+import { Field } from '@/components/field';
+import { CARD, EMPTY_TRAY, TRAY } from '@/components/tray';
 import { blockIdOf, loadProblem, type RegisterAnswer, registerBlock } from '@/lib/blocks';
 import { NOT_A_BLOCK_ID } from '@/lib/errors';
 import { useApi } from '@/lib/use-api';
@@ -14,10 +17,11 @@ const registeredOn = (iso: string) =>
   new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 
 /**
- * The teacher's blocks on the classes page (P3): the ones registered to them, and a field to
- * register one by the ID written on it. The ID is checked as the phone reads a tag before a try is
- * spent on it; each refusal is said under the field, with the way on; an answer that never came is
- * sent again as it was by Try again, which is safe: one's own tag registers once.
+ * The teacher's blocks on the classes home (P3; in Soft premium, D2e): the ones registered to
+ * them as cards in a tray, each ID in the code style, and a field to register one by the ID
+ * written on it. The ID is checked as the phone reads a tag before a try is spent on it; each
+ * refusal is said under the field, with the way on; an answer that never came is sent again as it
+ * was by Try again, which is safe: one's own tag registers once.
  */
 export function Blocks() {
   const api = useApi();
@@ -75,51 +79,45 @@ export function Blocks() {
   }
 
   return (
-    <section
-      aria-labelledby={`${id}-title`}
-      className="mt-12 border-t border-slate-200 pt-8 dark:border-slate-800"
-    >
-      <h2 id={`${id}-title`} className="text-lg font-semibold">
+    <section aria-labelledby={`${id}-title`} className="mt-12 border-t border-border-default pt-10">
+      <h2 id={`${id}-title`} className="text-h2">
         {blocks && blocks.length > 1 ? 'Your blocks' : 'Your block'}
       </h2>
-      <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+      <p className="mt-2 text-body text-text-secondary">
         Students tap your block with their phone to join your session.
       </p>
 
       {blocks === null ? (
         loadError !== null ? (
-          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
-            <p role="alert" className="text-sm">
-              Couldn't load your blocks.{' '}
-              <span className="text-slate-600 dark:text-slate-300">{loadError}</span>
+          <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-3">
+            <p role="alert" className="text-body">
+              Couldn&apos;t load your blocks.{' '}
+              <span className="text-text-secondary">{loadError}</span>
             </p>
-            <button
-              type="button"
-              onClick={load}
-              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm transition-colors hover:bg-slate-100 motion-reduce:transition-none dark:border-slate-700 dark:hover:bg-slate-900"
-            >
+            <Button variant="secondary" onClick={load}>
               Try again
-            </button>
+            </Button>
           </div>
         ) : (
-          <p role="status" className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+          <p role="status" className="mt-6 text-body text-text-secondary">
             Loading…
           </p>
         )
       ) : (
         <>
           {blocks.length === 0 ? (
-            <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
-              No block registered yet.
-            </p>
+            <p className={`mt-6 text-body ${EMPTY_TRAY}`}>No block registered yet.</p>
           ) : (
-            <ul className="mt-4 divide-y divide-slate-200 dark:divide-slate-800">
+            <ul className={`mt-6 ${TRAY}`}>
               {blocks.map((b) => (
-                <li key={b.id} className="flex items-baseline justify-between gap-4 py-2">
-                  <span translate="no" className="font-mono text-sm tracking-wide">
+                <li
+                  key={b.id}
+                  className={`flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 ${CARD}`}
+                >
+                  <span translate="no" className="font-mono text-code break-all">
                     {b.tagId}
                   </span>
-                  <span className="text-xs text-slate-500 tabular-nums dark:text-slate-400">
+                  <span className="text-caption text-text-tertiary">
                     Registered {registeredOn(b.createdAt)}
                   </span>
                 </li>
@@ -127,13 +125,13 @@ export function Blocks() {
             </ul>
           )}
 
-          <form onSubmit={(e) => void onSubmit(e)} className="mt-6 max-w-md">
-            <label htmlFor={`${id}-id`} className="block text-sm font-medium">
-              Block ID
-            </label>
-            <input
+          <form onSubmit={(e) => void onSubmit(e)} className="mt-8 max-w-md">
+            <Field
               ref={field}
               id={`${id}-id`}
+              label="Block ID"
+              help="10 letters and digits, written on your block."
+              mono
               name="block-id"
               value={typed}
               onChange={(e) => {
@@ -147,31 +145,22 @@ export function Blocks() {
               spellCheck={false}
               translate="no"
               aria-invalid={refused}
-              aria-describedby={`${id}-help${said ? ` ${id}-said` : ''}`}
-              className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-mono text-base tracking-wide aria-[invalid=true]:border-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:aria-[invalid=true]:border-slate-100"
+              aria-describedby={said ? `${id}-said` : undefined}
             />
-            <p id={`${id}-help`} className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-              10 letters and digits, written on your block.
-            </p>
             {said ? (
               <p
                 id={`${id}-said`}
                 role={said.kind === 'done' ? 'status' : 'alert'}
-                className="mt-4 text-sm font-medium"
+                className="mt-4 text-body"
               >
                 {said.message}
               </p>
             ) : null}
 
             {/* One button throughout, so focus stays on it whatever it comes to say. */}
-            <button
-              type="submit"
-              aria-disabled={busy}
-              aria-busy={busy}
-              className="mt-6 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-800 aria-disabled:opacity-60 motion-reduce:transition-none"
-            >
+            <Button type="submit" aria-disabled={busy} aria-busy={busy} className="mt-6">
               {busy ? 'Registering…' : said?.kind === 'failed' ? 'Try again' : 'Register block'}
-            </button>
+            </Button>
           </form>
         </>
       )}

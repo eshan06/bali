@@ -1,23 +1,51 @@
 'use client';
 
-import type { ClassDetail, MeResponse } from '@bali/shared';
+import type { MeResponse } from '@bali/shared';
+import { ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 import { Blocks } from '@/components/blocks';
+import { Button } from '@/components/button';
+import { Field } from '@/components/field';
 import { InviteCode } from '@/components/invite-code';
+import { TextLink } from '@/components/text-link';
+import { CARD, EMPTY_TRAY, TRAY } from '@/components/tray';
 import { getAccessToken } from '@/lib/auth';
-import { errText } from '@/lib/errors';
+import { CLASS_NAME_MAX, createClass } from '@/lib/classes';
+import { errText, NO_CLASS_NAME } from '@/lib/errors';
 import { useApi } from '@/lib/use-api';
 
+/** What the create form last said under its field. */
+type Said =
+  /** Nothing sent: the name is the thing to put right. */
+  | { kind: 'refused'; message: string }
+  /** No class to show: Try again sends it again. */
+  | { kind: 'failed'; message: string }
+  | { kind: 'created'; id: string; name: string };
+
+/** The page's column, under the bar: its gutters the bar's, 40 px from the desktop width (§5). */
+const PAGE = 'mx-auto max-w-2xl px-4 pt-10 pb-16 sm:px-10';
+
+/**
+ * The classes home (D2e, in Soft premium): the teacher's classes as cards in a tray, each opening
+ * its class page; the create form under them, its name's refusals and failures said under the
+ * field with the way on; then the teacher's block. An account that doesn't teach yet gets the
+ * invite code in place of all of it.
+ */
 export default function HomePage() {
   const api = useApi();
   const router = useRouter();
+  const id = useId();
+  const field = useRef<HTMLInputElement>(null);
+  // A create under way: a second Enter before the page redraws sends nothing.
+  const sending = useRef(false);
   const [me, setMe] = useState<MeResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
+  const [said, setSaid] = useState<Said | null>(null);
   // Set by a redeem (T2): the classes heading takes focus once the account is read as a teacher.
   const redeemed = useRef(false);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -48,46 +76,61 @@ export default function HomePage() {
     heading.current?.focus();
   }, [me]);
 
-  function onCreate(e: React.FormEvent) {
+  async function onCreate(e: React.FormEvent) {
     e.preventDefault();
+    if (sending.current) return;
     const trimmed = name.trim();
-    if (!trimmed) return;
+    if (!trimmed) {
+      setSaid({ kind: 'refused', message: NO_CLASS_NAME });
+      field.current?.focus();
+      return;
+    }
+    sending.current = true;
     setBusy(true);
-    api.post<ClassDetail>('/v1/classes', { name: trimmed }).then(
-      () => {
-        setName('');
-        setBusy(false);
-        load();
-      },
-      (err: unknown) => {
-        setBusy(false);
-        setError(errText(err));
-      },
+    setSaid(null);
+    const answer = await createClass(api, trimmed);
+    sending.current = false;
+    setBusy(false);
+    if (answer.kind === 'failed') return setSaid(answer);
+    const { klass } = answer;
+    // The server's answer is the class: listed at once, as `/v1/me` lists a teacher's own.
+    setMe(
+      (m) =>
+        m && {
+          ...m,
+          classes: [
+            ...m.classes,
+            {
+              id: klass.id,
+              name: klass.name,
+              teacher: { displayName: m.user.displayName },
+              enrollmentId: null,
+              liveSession: null,
+            },
+          ],
+        },
     );
+    setName('');
+    setSaid({ kind: 'created', id: klass.id, name: klass.name });
   }
 
   if (me === null || me.user.role !== 'teacher') {
     return (
-      <main className="mx-auto max-w-2xl px-4 py-10">
+      <main className={PAGE}>
         {me ? (
           // Not a teacher yet, as `/v1/me` says: the invite code, in place of the classes or a 403.
           <InviteCode onTeacher={onTeacher} />
         ) : error ? (
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <p role="alert" className="text-sm">
-              Couldn't load your account.{' '}
-              <span className="text-slate-600 dark:text-slate-300">{error}</span>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+            <p role="alert" className="text-body">
+              Couldn&apos;t load your account. <span className="text-text-secondary">{error}</span>
             </p>
-            <button
-              type="button"
-              onClick={load}
-              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm transition-colors hover:bg-slate-100 motion-reduce:transition-none dark:border-slate-700 dark:hover:bg-slate-900"
-            >
+            <Button variant="secondary" onClick={load}>
               Try again
-            </button>
+            </Button>
           </div>
         ) : (
-          <p role="status" className="text-sm text-slate-500">
+          <p role="status" className="text-body text-text-secondary">
             Loading…
           </p>
         )}
@@ -96,45 +139,76 @@ export default function HomePage() {
   }
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-10">
-      <h1 ref={heading} tabIndex={-1} className="mb-6 text-2xl font-semibold">
+    <main className={PAGE}>
+      <h1 ref={heading} tabIndex={-1} className="text-h1 text-balance">
         Your classes
       </h1>
 
-      <form onSubmit={onCreate} className="mb-6 flex gap-2">
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="New class name"
-          className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
-        />
-        <button
-          type="submit"
-          disabled={busy || !name.trim()}
-          className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900"
-        >
-          Create
-        </button>
-      </form>
-
-      {error ? <p className="mb-4 text-sm text-red-600">{error}</p> : null}
-
       {me.classes.length === 0 ? (
-        <p className="text-sm text-slate-500">No classes yet. Create one above.</p>
+        <p className={`mt-6 text-body ${EMPTY_TRAY}`}>
+          No classes yet. Create your first one below.
+        </p>
       ) : (
-        <ul className="divide-y divide-slate-200 dark:divide-slate-800">
+        <ul className={`mt-6 ${TRAY}`}>
           {me.classes.map((c) => (
             <li key={c.id}>
+              {/* The whole card opens the class; its edge firms and the chevron moves on hover. */}
               <Link
                 href={`/classes/${c.id}`}
-                className="block px-1 py-3 text-sm hover:text-slate-500"
+                className={`group flex items-center justify-between gap-4 transition-colors hover:border-border-strong dark:hover:border-border-strong ${CARD}`}
               >
-                {c.name}
+                <span className="min-w-0 text-h3 break-words">{c.name}</span>
+                <ChevronRight
+                  size={20}
+                  aria-hidden="true"
+                  className="shrink-0 text-text-tertiary transition-transform group-hover:translate-x-0.5"
+                />
               </Link>
             </li>
           ))}
         </ul>
       )}
+
+      <form onSubmit={(e) => void onCreate(e)} className="mt-8 max-w-md">
+        <Field
+          ref={field}
+          id={`${id}-name`}
+          label="New class name"
+          help="Your students see this name in the Bali app."
+          name="class-name"
+          value={name}
+          onChange={(e) => {
+            setName(e.target.value);
+            setSaid(null);
+          }}
+          readOnly={busy}
+          maxLength={CLASS_NAME_MAX}
+          autoComplete="off"
+          aria-invalid={said?.kind === 'refused'}
+          aria-describedby={said ? `${id}-said` : undefined}
+        />
+        {said ? (
+          <p
+            id={`${id}-said`}
+            role={said.kind === 'created' ? 'status' : 'alert'}
+            className="mt-4 text-body break-words"
+          >
+            {said.kind === 'created' ? (
+              <>
+                {said.name} is ready. <TextLink href={`/classes/${said.id}`}>Open it</TextLink> to
+                see its join code.
+              </>
+            ) : (
+              said.message
+            )}
+          </p>
+        ) : null}
+
+        {/* One button throughout, so focus stays on it whatever it comes to say. */}
+        <Button type="submit" aria-disabled={busy} aria-busy={busy} className="mt-6">
+          {busy ? 'Creating…' : said?.kind === 'failed' ? 'Try again' : 'Create class'}
+        </Button>
+      </form>
 
       <Blocks />
     </main>

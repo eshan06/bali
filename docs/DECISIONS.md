@@ -8,6 +8,39 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-05** — **D2e: the classes home and "Your block" in Soft premium, and the owner's two
+  rulings: codes in mono, and a 16 px size for what is typed in a field.** **The rulings (the
+  owner, 2026-10-05):** JetBrains Mono is for every code, join codes and teacher invite codes
+  alike, so DESIGN.md §3's "join codes only" reads "codes only" (D2c-2 had read it so for the
+  invite code and asked; this answers it), a block's ID among them. And a new style on the type
+  scale for inputs only, `input`, 16 / 24 (the line height on the 4-pt grid) at 400: iPhone Safari
+  zooms into a field whose text is under 16 px when it is tapped. It goes through the one field
+  component (`components/field.tsx`), so every portal field takes it, the invite code, the block ID
+  and the class name included; a code typed in one keeps the code style's face and weight. Not
+  written into `bali-tokens.json`, the design system's byte-for-byte export: DESIGN.md says the
+  next export should gain it, as it should the Present view's sizes. `tokens.test.ts` holds the
+  theme to the tokens' eleven sizes and this one, no other, and fails a redrawn page that types
+  into an input of its own instead of the Field; the class page's minutes field takes it in D2f.
+  **The page, within DESIGN.md, nothing invented:** the classes as cards in the soft tray (its
+  `space-2` inset), each card a link to its class, the name in `h3` beside a chevron; hovered, the
+  card's edge firms to `border-strong` and the chevron moves 2 px (`fast`, off under reduced
+  motion). The create form sits under the list, so the list a teacher comes for each day comes
+  first: a real label, "New class name" (the audit's placeholder-as-label, the same words), a help
+  line saying students see the name in the Bali app, and "Create class". The block's ID is in the
+  code style on a card in a tray, as the classes are. An empty list is its tray with the words
+  centred in it, so it never reads as a field, its edge a hairline in dark, where the sunken
+  colour barely shows on the page. **Every failure said under its field, with the way on:** an
+  empty name before anything is sent; the connection and the budget's wait in `errText`'s words;
+  a 5xx or a timeout as `CANT_CREATE`, never the API's log line (`createClass`, `lib/classes.ts`,
+  answered in words as `regenerateCode` is). The field holds a name to the API's 120 characters
+  itself (`maxLength`; a test pins the number to the route's `CreateBody`), so the create's 400,
+  whose message is a log line, is never met. A created class is listed from the create's own
+  answer, as a registered block is, and said with a way on: "… is ready. Open it to see its join
+  code." The tray, its cards and the empty tray are shared (`components/tray.ts`) for D2f and D2g.
+  The em-dash cleanup found none in these strings. **Known, not changed here:** `POST /v1/classes`
+  takes no `eventId`, so Try again after a lost answer can make a second class of the same name,
+  as a second press always could; that is a backend step if it matters.
+
 - **2026-10-05** — **C2-app: the app's policy links open the production portal in an in-app Safari
   sheet, from one build setting.** The intro's last page, Sign in and Me each carry two quiet text
   links, "Privacy policy" and "Terms" (the portal's own labels on `/login`), that open `/privacy`
