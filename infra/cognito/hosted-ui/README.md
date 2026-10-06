@@ -13,7 +13,8 @@ list of class names (`docs/DESIGN.md`; D2d in `docs/PLAN.md`). These are Bali's:
   10 KB each. `make-logo.mjs` draws them (its header says how); the mark's one source is
   `apps/web/public/icon.svg`.
 - `hosted-ui.test.mjs` (`npm run test:infra`): fails on a selector Cognito doesn't allow, an
-  at-rule, a logo over 100 KB, or an upload over Cognito's cap.
+  at-rule, a logo over 100 KB, an upload over Cognito's cap, or a field's edge under 3:1
+  against the field or the card.
 
 A pool's version is its logo plus the shared CSS. Upload the two together: Cognito never takes
 one alone, and the per-client override is not used, so both app clients take the pool's default.

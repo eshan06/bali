@@ -35,7 +35,7 @@
   height: 44px; /* a thumb's target on the phone */
   color: #211f1b; /* text-primary */
   background-color: #efece7; /* surface-sunken */
-  border: 1px solid #e3dfd8; /* border-default */
+  border: 1px solid #8a847a; /* border-input */
   border-radius: 10px; /* radius-sm, if kept */
   font-size: 16px; /* if kept: under 16 px, iPhone Safari zooms into the field */
   margin-bottom: 12px; /* space-3, if kept */
