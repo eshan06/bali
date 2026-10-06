@@ -6,7 +6,7 @@ import { useId, useRef, useState } from 'react';
 import { Button } from '@/components/button';
 import { CARD } from '@/components/tray';
 import { NEW_CODE_MADE } from '@/lib/errors';
-import { regenerateCode } from '@/lib/session-controls';
+import { codeMoved, regenerateCode } from '@/lib/session-controls';
 import { useApi } from '@/lib/use-api';
 
 /** What the control last said: a failure in the confirm, or the new code beside the code. */
@@ -61,6 +61,22 @@ export function JoinCode({
     onClass(answer.klass);
   }
 
+  /**
+   * Close the confirm unmade. After a failed mint the class is read once more (santa's round 1): a
+   * mint can commit after the read that followed its lost answer, and its code shows then, said.
+   */
+  function dismiss() {
+    if (said?.kind === 'failed') {
+      void codeMoved(api, classId, code).then((klass) => {
+        if (!klass) return;
+        setSaid({ kind: 'made', message: NEW_CODE_MADE });
+        onClass(klass);
+      });
+    }
+    setSaid(null);
+    close();
+  }
+
   return (
     // Beside the class's name, the code stays put as the confirm opens under it.
     <div className="flex max-w-md flex-col items-start sm:items-end">
@@ -78,7 +94,8 @@ export function JoinCode({
           aria-expanded={confirming}
           onClick={() => {
             if (sending.current) return;
-            setConfirming((open) => !open);
+            if (confirming) return dismiss();
+            setConfirming(true);
             setSaid(null);
           }}
           className="aria-expanded:bg-surface-sunken"
@@ -102,9 +119,7 @@ export function JoinCode({
             <Button
               variant="secondary"
               onClick={() => {
-                if (sending.current) return;
-                setSaid(null);
-                close();
+                if (!sending.current) dismiss();
               }}
               aria-disabled={busy}
             >

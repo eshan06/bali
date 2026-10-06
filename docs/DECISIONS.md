@@ -19,8 +19,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   /v1/classes/{id}` takes no `eventId` (2026-09-20), so a 5xx, a timeout or a dropped connection
   may follow a code that was made; a code other than the one on screen is the one Bali holds, said
   as made (another tab's mint reads the same, and is as true). A refusal (a 4xx, the budget's 429
-  included) minted nothing and reads nothing again; a read that fails too leaves the failure
-  standing, and Try again mints a code the page then shows. **No school:** the create's 409 for a
+  included) minted nothing and reads nothing again. A read that fails too, or reaches the server
+  before the mint commits, leaves the failure said, Try again minting a code the page then shows;
+  and the confirm closed after a failure reads the class once more (`codeMoved`, santa's round 1),
+  so a mint that committed late still shows its code, said. Only with every read failing can a dead
+  code stay on screen, its failure said first; an `eventId` on the route would close that, a
+  backend step. **No school:** the create's 409 for a
   teacher with no school carries no `reason`, so the portal keys on "this route's 409 with no
   reason" (the create's other 409, `account_deleted`, carries one), as the block register keys on
   its route's 409; a test pins the route to that one reasonless 409. The proper key, a `reason` on

@@ -144,8 +144,9 @@ export type NewCodeAnswer =
  * Mint the class a new join code (`PATCH /v1/classes/{id}`, `regenerateCode`); `shown` is the code
  * on screen. The route takes no `eventId`, so a resend mints once more, and any failure may be sent
  * again as it was. An answer that never came may still be a new code, minted before the answer was
- * lost: the class is read again then (#247's review), and a code other than `shown` is the one Bali
- * holds now, answered as made, so a dead code never stays on screen as the class's.
+ * lost: the class is read again then (#247's review, `codeMoved`), and a code other than `shown` is
+ * the one Bali holds now, answered as made. A read that fails too, or reaches the server before the
+ * mint commits, leaves the failure said; the control reads once more if the teacher cancels then.
  */
 export async function regenerateCode(
   api: Pick<ApiClient, 'patch' | 'get'>,
@@ -163,13 +164,25 @@ export async function regenerateCode(
     }
     message = e instanceof NetworkError ? CANT_REACH : CANT_MAKE_CODE;
   }
+  const klass = await codeMoved(api, classId, shown);
+  return klass ? { kind: 'made', klass } : { kind: 'failed', message };
+}
+
+/**
+ * The class as Bali holds it, when its code is no longer `shown` (a mint landed, this tab's or
+ * another's); null while it still is, or when the read fails, which is never thrown.
+ */
+export async function codeMoved(
+  api: Pick<ApiClient, 'get'>,
+  classId: string,
+  shown: string,
+): Promise<ClassDetail | null> {
   try {
     const klass = await api.get<ClassDetail>(`/v1/classes/${classId}`);
-    if (klass.joinCode !== shown) return { kind: 'made', klass };
+    return klass.joinCode === shown ? null : klass;
   } catch {
-    // Unread too: the failure stands, and Try again mints a code the page then shows.
+    return null;
   }
-  return { kind: 'failed', message };
 }
 
 /** The bell as the page shows it beside the grid, "9:30 AM", in the viewer's locale and zone. */

@@ -5,6 +5,7 @@ import { createApiClient } from './api-client';
 import { CANT_ADD_TIME, CANT_MAKE_CODE, CANT_REACH, TOO_MANY_TRIES } from './errors';
 import {
   bellTime,
+  codeMoved,
   DEFAULT_MINUTES,
   EXTEND_PRESETS,
   extendAttemptFor,
@@ -315,6 +316,17 @@ describe('regenerateCode', () => {
     });
     await regenerateCode(client, CLASS, 'OLDCDE');
     expect(sent.map((s) => s.init?.method)).toEqual(['PATCH']);
+  });
+
+  it('reads the class once more on its own (a cancel after a failure): its code only if moved', async () => {
+    expect(await codeMoved(api(200, klass).client, CLASS, 'OLDCDE')).toEqual(klass);
+    const still = api(200, { ...klass, joinCode: 'OLDCDE' });
+    expect(await codeMoved(still.client, CLASS, 'OLDCDE')).toBeNull();
+    expect(still.sent[0]?.url).toBe(`http://api/v1/classes/${CLASS}`);
+    // Unread, never thrown: the code on screen stays as it was.
+    expect(await codeMoved(unreachable, CLASS, 'OLDCDE')).toBeNull();
+    const down = api(503, { error: { code: 'unavailable', message: 'unavailable' } });
+    expect(await codeMoved(down.client, CLASS, 'OLDCDE')).toBeNull();
   });
 });
 
