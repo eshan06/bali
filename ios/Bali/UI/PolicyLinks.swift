@@ -45,14 +45,17 @@ struct PolicyLinks: View {
         }
     }
 
-    /// Each page's link: caption text in the brand's ink (DESIGN.md's links), in a 44-pt target,
-    /// read by VoiceOver as the link it is, as the portal's own are.
+    /// Each page's link, as the portal draws a link (`TEXT_LINK`, D2c): caption text in the brand's
+    /// ink (DESIGN.md's links), medium and underlined so it never rests on colour alone (D2h), in a
+    /// 44-pt target, read by VoiceOver as the link it is, as the portal's own are.
     private var links: some View {
         ForEach(Page.allCases) { page in
             Button {
                 opened = page
             } label: {
-                Text(page.title).textStyle(.caption).foregroundStyle(Theme.brand)
+                Text(page.title).underline()
+                    .textStyle(TextStyle(size: 13, line: 18, weight: .medium))
+                    .foregroundStyle(Theme.brand)
                     .frame(minWidth: 44, minHeight: 44).contentShape(.rect)
             }
             .buttonStyle(.plain)

@@ -242,7 +242,8 @@
             "homeTapRefusedThenTapped": State(sync: refusedTap(standing(.out), tappedSince: true)),
             "sessionOver": State(sync: standing(.inSession(periodOver, .focused))),
             "storage": State(
-                problem: "The outbox could not be opened: SQLite error 14: unable to open database",
+                problem:
+                    "Bali couldn't open its storage on this phone (SQLite error 14: unable to open database). Try again, or ask your teacher.",
                 signedIn: nil, protection: nil, sync: nil),
         ]
 

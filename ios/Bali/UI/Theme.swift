@@ -2,13 +2,16 @@ import SwiftUI
 
 // The Bali Design System as the student app draws it (D1, approved 2026-09-24; `docs/DECISIONS.md`,
 // 2026-09-26): its light tokens only — D1 is light, and `RootView` renders light in every
-// appearance — in the system font at D1's sizes, and only the atoms the screens use.
+// appearance (the owner's pick, 2026-10-04) — in the system font at D1's sizes, in the Soft premium
+// shapes from D2h (DESIGN.md §1: pill buttons and chips, inputs as sunken wells at `radius-sm` under
+// the focus ring, cards at `radius-lg` with shadow-1), and only the atoms the screens use.
 
 enum Theme {
     // Colours, D1's light values in `bali-tokens.json`, beside this file — `AppTests.tokens` pins
     // each, the chips' too, and a colour added here joins its list: the page and cards; the
     // borders; the inks; the brand and its pressed shade; the countdown arc's fill, its last two
-    // minutes' and its track, and the mark's own track — which D1's Focus ring draws too.
+    // minutes' and its track, and the mark's own track — which D1's Focus ring draws too; and the
+    // focus ring's, the arc's colour.
     static let page = Color(hex: 0xF7F5F2)
     static let card = Color.white
     static let sunken = Color(hex: 0xEFECE7)
@@ -28,6 +31,8 @@ enum Theme {
     /// the next red primitive stands in (`docs/DECISIONS.md`, C4b).
     static let destructive = Color(hex: 0xA93D31)
     static let destructivePressed = Color(hex: 0x8C342B)
+    /// focus-ring-color, green-600: the arc's own, ringing a focused input (`focusRing`).
+    static let focusRing = arc
     /// shadow-1, a resting card's: 0 1px 2px, warm black at 6 %.
     static let shadow = Color(hex: 0x211C15).opacity(0.06)
 
@@ -103,9 +108,10 @@ private struct Styled: ViewModifier {
     }
 }
 
-/// D1's primary action: 56 pt tall, radius 14, the brand's fill — pressed, its darker shade — and a
-/// white 17 semibold label; dimmed while disabled, as a busy one is. `destructive`, the same in
-/// DESIGN.md's destructive red: Delete account's confirm (C4b), and nothing else.
+/// The primary action, a pill (D2h) at D1's 56 pt: the brand's fill — pressed, its darker shade —
+/// and a white 17 semibold label, 20 pt in from the round ends so a long label that wraps stays
+/// clear of the curve (santa's round 1); dimmed while disabled, as a busy one is. `destructive`,
+/// the same in DESIGN.md's destructive red: Delete account's confirm (C4b), and nothing else.
 struct PrimaryButtonStyle: ButtonStyle {
     var destructive = false
     @Environment(\.isEnabled) private var enabled
@@ -114,27 +120,44 @@ struct PrimaryButtonStyle: ButtonStyle {
         let (fill, pressed) =
             destructive
             ? (Theme.destructive, Theme.destructivePressed) : (Theme.brand, Theme.brandPressed)
-        configuration.label.textStyle(.button).foregroundStyle(.white)
-            .frame(maxWidth: .infinity, minHeight: 56)
-            .background(configuration.isPressed ? pressed : fill, in: .rect(cornerRadius: Theme.Radius.md))
+        configuration.label.pillLabel().foregroundStyle(.white)
+            .background(configuration.isPressed ? pressed : fill, in: .capsule)
             .opacity(enabled ? 1 : 0.6)
     }
 }
 
-/// D1's secondary action: the primary's shape, white with a strong border and the primary ink —
+/// The secondary action: the primary's shape, white with a strong border and the primary ink —
 /// pressed, the sunken fill; dimmed while disabled, as the primary is.
 struct SecondaryButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var enabled
 
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label.textStyle(.button).foregroundStyle(Theme.text)
-            .frame(maxWidth: .infinity, minHeight: 56)
-            .background(
-                configuration.isPressed ? Theme.sunken : Theme.card,
-                in: .rect(cornerRadius: Theme.Radius.md))
-            .overlay(
-                RoundedRectangle(cornerRadius: Theme.Radius.md).stroke(Theme.borderStrong))
+        configuration.label.pillLabel().foregroundStyle(Theme.text)
+            .background(configuration.isPressed ? Theme.sunken : Theme.card, in: .capsule)
+            .overlay(Capsule().stroke(Theme.borderStrong))
             .opacity(enabled ? 1 : 0.6)
+    }
+}
+
+extension View {
+    /// A pill button's label: the button style, centred when it wraps, 20 pt in from the ends, in
+    /// a full-width 56-pt pill.
+    fileprivate func pillLabel() -> some View {
+        textStyle(.button).multilineTextAlignment(.center).padding(.horizontal, 20)
+            .frame(maxWidth: .infinity, minHeight: 56)
+    }
+
+    /// DESIGN.md's focus ring, `shown` while an input is focused: a 2-pt gap in the page's colour
+    /// — drawn, so the ring reads the same on a card — then a 2-pt ring in `focus-ring-color`,
+    /// around a shape of `radius`.
+    func focusRing(_ shown: Bool, radius: CGFloat) -> some View {
+        overlay(
+            RoundedRectangle(cornerRadius: radius + 1)
+                .stroke(shown ? Theme.page : .clear, lineWidth: 2).padding(-1)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: radius + 3)
+                .stroke(shown ? Theme.focusRing : .clear, lineWidth: 2).padding(-3))
     }
 }
 
@@ -154,8 +177,8 @@ struct Card<Content: View>: View {
 }
 
 /// A state chip, as every surface shows a student's state: its colour, an icon and a label,
-/// never the colour alone. D1's fill and ink per kind; 6 × 12 padding, radius 14, the label style
-/// in uppercase.
+/// never the colour alone. D1's fill and ink per kind; 6 × 12 padding, a pill (D2h), the label
+/// style in uppercase.
 struct Chip: View {
     enum Kind {
         case focused, unlocked, protectionOff, ended, notIn
@@ -184,7 +207,7 @@ struct Chip: View {
         }
         .textStyle(.label).textCase(.uppercase).foregroundStyle(kind.look.ink)
         .padding(.vertical, 6).padding(.horizontal, 12)
-        .background(kind.look.fill, in: .rect(cornerRadius: Theme.Radius.md))
+        .background(kind.look.fill, in: .capsule)
     }
 }
 

@@ -1473,7 +1473,7 @@ struct AppTests {
             ("action-primary-bg", Theme.brand), ("action-primary-bg-hover", Theme.brandPressed),
             ("action-destructive-bg", Theme.destructive), ("red-700", Theme.destructivePressed),
             ("arc-fill", Theme.arc), ("arc-final2", Theme.arcFinal), ("arc-track", Theme.arcTrack),
-            ("green-200", Theme.markTrack),
+            ("green-200", Theme.markTrack), ("focus-ring-color", Theme.focusRing),
             ("state-focused-bg", Chip.Kind.focused.look.fill),
             ("state-focused-fg", Chip.Kind.focused.look.ink),
             ("state-emergency-bg", Chip.Kind.unlocked.look.fill),
@@ -1758,8 +1758,8 @@ struct AppTests {
             defer { window.isHidden = true }
             window.layoutIfNeeded()
             let scrolls = scrollViews(in: window)
-            // Every screen scrolls once its text outgrows it, but the starting mark and Storage.
-            #expect(scrolls.isEmpty == ["starting", "storage"].contains(name), "\(name)")
+            // Every screen scrolls once its text outgrows it, but the starting mark.
+            #expect(scrolls.isEmpty == (name == "starting"), "\(name)")
             expectEdges(of: scrolls, in: window, name)
             // The page a pager shows is among those checked: its own scroll view.
             for pager in scrolls where pager.isPagingEnabled {
@@ -1796,10 +1796,10 @@ struct AppTests {
             .sizeThatFits(in: CGSize(width: 390, height: 1000))
         #expect(row.height >= 44, "\(row)")
         // The intro, drawn at the phone's size at its first and last pages: under Continue — the
-        // brand-filled button, its flat bottom found from the bottom up past its rounded corner,
-        // clear of the centred links (santa's round 1: at the corner, the button's own last rows
-        // counted as ink) — a strip at least the row and its padding tall, with the links' ink in
-        // it on the last page alone.
+        // brand-filled pill, its flat bottom found from the bottom up past its round end (twice its
+        // 28-pt radius in from the gutter, D2h), clear of the centred links (santa's round 1: at
+        // the curve, the button's own last rows counted as ink) — a strip at least the row and its
+        // padding tall, with the links' ink in it on the last page alone.
         let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         func brand(_ pixel: [Int]) -> Bool {
             zip(pixel, [0x24, 0x5A, 0x43]).allSatisfy { abs($0 - $1) <= 24 }
@@ -1817,7 +1817,7 @@ struct AppTests {
             let scale = Int(window.screen.scale)
             let width = Int(image.size.width)
             let bottom = Int(image.size.height) - Int(window.safeAreaInsets.bottom) * scale
-            let column = Int(Theme.gutter + 2 * Theme.Radius.md) * scale
+            let column = Int(Theme.gutter + 56) * scale
             var button = bottom - 1
             while button > 0, !brand(pixel(column, button)) { button -= 1 }
             let strip = (button + 1)..<bottom

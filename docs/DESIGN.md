@@ -29,8 +29,7 @@ reports page, `invite-code.tsx` and `errors.ts`. In
 `ios/Bali/` outside `UI/`: the NFC sheet's words in `BlockReader.swift`
 ("Hold the top of your iPhone to your teacher's Bali block.", "This isn't a
 Bali block.", "Bali block read.", "A scan is under way."); the `problem` a
-start that failed shows in `BaliApp.swift` (RootView's "Bali couldn't start";
-its two values still read as a developer's, D2h's to reword); and
+start that failed shows in `BaliApp.swift` (RootView's "Bali couldn't start"); and
 `Info.plist`'s `NFCReaderUsageDescription`, iOS's own NFC prompt. The
 Debug readout's words are not user-facing. Their voice follows this file;
 their logic does not. It never
@@ -57,8 +56,9 @@ of it is the owner's call, made on a design canvas, never a side effect of a
 PR.
 
 **Where it stands today:** the iOS app draws from the tokens (`Theme.swift`,
-pinned by `AppTests.tokens`), in D1's shapes; its screens take the Soft
-premium style in D2h–D2k. The portal draws from them too, from D2c on
+pinned by `AppTests.tokens`) in the Soft premium shapes from D2h, pill buttons
+and chips, sunken inputs under the focus ring; its screens take the style
+group by group, D2h–D2k. The portal draws from them too, from D2c on
 (`apps/web/src/app/globals.css`, pinned by `tokens.test.ts`): every semantic
 token as a `--bali-*` variable (and the primitives they and the mark
 reference), light on `:root` and dark under the device's dark mode,
@@ -244,9 +244,9 @@ class page's minutes field takes it when D2f redraws that page.
 - **Primary button:** `action-primary-bg`, `action-primary-fg` label, hover
   or pressed `action-primary-bg-hover`, no shadow; a pill (`radius-full`) in
   Soft premium. On iOS: full width, 56 pt tall, a 17 semibold label, dimmed
-  to 60% while disabled or busy (D1's `radius-md` holds on a shipped screen
-  until its D2 step). On the web: 40 px tall, `space-4` side padding, a
-  `body` semibold label.
+  to 60% while disabled or busy (a pill on every iOS screen from D2h, through
+  `Theme.swift`). On the web: 40 px tall, `space-4` side padding, a `body`
+  semibold label.
 - **Secondary button:** the primary's shape, `surface-card` with a
   `border-strong` stroke and `text-primary` ink; pressed, `surface-sunken`.
 - **Destructive button:** `action-destructive-*`, only for removing a student
@@ -279,9 +279,14 @@ class page's minutes field takes it when D2f redraws that page.
   hairline and `text-primary` ink, at `radius-sm`: the grid is honest, not
   alarmed.
 - **Inputs:** `surface-sunken` well, label above, helper and error text below;
-  focus shows the focus ring. What is typed is the input size (§3), 16 px, so
-  iPhone Safari never zooms in; a label is always a real label, never a
-  placeholder standing in for one.
+  focus shows the focus ring (on iOS, `focusRing` in `Theme.swift`). What is
+  typed is the input size (§3), 16 px, so iPhone Safari never zooms in; a label
+  is always a real label, never a placeholder standing in for one. A menu drawn
+  as a field (the app's age screen) takes the well and no ring: nothing is typed
+  into it.
+- **Links:** `text-brand`, medium, underlined, so a link never rests on colour
+  alone: the portal's `TextLink` (`components/text-link.tsx`) and the app's
+  policy links (`PolicyLinks`, D2h).
 - **The mark:** the session arc as emblem: a green-200 track ring and a
   green-600 arc (~330° with its round caps), open at the upper left. Never
   recolour it, never close the arc. D1 uses it without its stone-50 tile.

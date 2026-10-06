@@ -8,6 +8,34 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-05** — **D2h: the app's theme in Soft premium, and the first-run screens (#115).**
+  `Theme.swift`'s `PrimaryButtonStyle`, `SecondaryButtonStyle` and `Chip` are pills
+  (`radius-full`). The theme is shared, so every screen's buttons and chips take the shape at
+  once, D2i–D2k's included: one button shape in the app beats two living side by side between
+  steps (DESIGN.md §4's shape lock), and the owner looks at each later group's screens anyway.
+  Inputs are `surface-sunken` wells at `radius-sm` under DESIGN.md's focus ring, a 2-pt gap of the
+  page's colour and a 2-pt green-600 ring, drawn by `focusRing`: Join's code field takes it now,
+  leaving D1's white field with a green border for the picked style's input (Me's name field,
+  D2j's, is a sunken well already and takes the ring then); the field's caret is the brand's, not
+  iOS's blue. The cards keep D1's shape, a card standing alone at `radius-lg` with 20 pt and
+  shadow-1, and no tray is drawn yet: none of these screens groups cards, and D2i's Home is the
+  first to. The strings: the em-dash cleanup for the five screens' words (Sign in, the intro's
+  first and third pages, Join's lead and the consent list's first line, which the help page
+  mirrors word for word now), Screen Time's quotes typographic, and the two start-failure
+  sentences in the student's words with the error kept in parentheses, since a support request
+  needs it and the readout is not there before the engine starts. No token changed;
+  `focus-ring-color` joins `AppTests.tokens`'s pins. Shots in `~/bali-notes/d2/d2h/`, on the
+  iPhone 17 simulator, the owner's device for D2's app steps. **Finished on main's later screens**
+  (the owner's rulings: D2's PRs into `main`, no sign-off wait, the recommended option on a taste
+  call): the 13+ age screen (C7) draws its month and year menus as Join's sunken well at
+  `radius-sm`, with no focus ring since nothing is typed into them, and its stop screen's words sit
+  on the gutter as Sign in's do, where they had been centred as a narrower block; the policy links
+  (C2-app) are drawn as the portal's links (`TEXT_LINK`), medium and underlined in the brand's ink, so
+  a link never rests on colour alone (DESIGN.md §4, Links); Delete account (C4b) takes the pills
+  through the theme, its confirm a red one. The start failure for a build not set up says "This
+  copy of Bali isn't set up right.", not "isn't set up to sign in": since C2-app a build missing the
+  portal's address fails there too. Shots in `~/bali-notes/d2/d2h-final/`.
+
 - **2026-10-05** — **D2e: the classes home and "Your block" in Soft premium, and the owner's two
   rulings: codes in mono, and a 16 px size for what is typed in a field.** **The rulings (the
   owner, 2026-10-05):** JetBrains Mono is for every code, join codes and teacher invite codes

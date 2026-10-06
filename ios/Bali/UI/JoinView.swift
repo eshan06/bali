@@ -39,7 +39,7 @@ struct JoinView: View {
                         .foregroundStyle(Theme.textTertiary)
                     Text("Enter your class code").textStyle(.h1)
                     Text(
-                        "Six letters and numbers — your teacher has it on their screen or the board."
+                        "Six letters and numbers. Your teacher has it on their screen or the board."
                     )
                     .textStyle(.bodyLg).foregroundStyle(Theme.textSecondary)
                 }
@@ -48,7 +48,7 @@ struct JoinView: View {
                         .foregroundStyle(Theme.textSecondary).accessibilityHidden(true)
                     TextField("Class code", text: $text, prompt: Text(""))
                         .font(.system(.title, design: .monospaced, weight: .medium)).tracking(10)
-                        .multilineTextAlignment(.center).foregroundStyle(Theme.text)
+                        .multilineTextAlignment(.center).foregroundStyle(Theme.text).tint(Theme.brand)
                         .textInputAutocapitalization(.characters).autocorrectionDisabled()
                         .keyboardType(.asciiCapable).submitLabel(.continue)
                         // Fixed while its look-up is under way; the keyboard back once it is over.
@@ -59,13 +59,10 @@ struct JoinView: View {
                             text = phone.joining.code
                         }
                         .onSubmit { if phone.joining.complete { run(phone.lookUp) } }
+                        // DESIGN.md's input (D2h): a sunken well, the focus ring while typing.
                         .frame(minHeight: 64)
-                        .background(Theme.card, in: .rect(cornerRadius: Theme.Radius.md))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: Theme.Radius.md)
-                                .stroke(typing ? Theme.arc : Theme.borderStrong, lineWidth: 2)
-                        )
-                        .shadow(color: Theme.shadow, radius: 1, y: 1)
+                        .background(Theme.sunken, in: .rect(cornerRadius: Theme.Radius.sm))
+                        .focusRing(typing, radius: Theme.Radius.sm)
                     Text("Codes never use 0, O, 1, I or L, so there's nothing to mix up.")
                         .textStyle(.caption).foregroundStyle(Theme.textTertiary)
                 }
@@ -143,7 +140,7 @@ struct ConsentCard: View {
 
     /// The whole of it — the grid's silence and last-seen time too (owner, 2026-09-27).
     static let sees = [
-        "Your focus status — focused, unlocked, or Screen Time off",
+        "Your focus status: focused, unlocked, or Screen Time off",
         "If Bali stops hearing from your phone during class, and when it last did",
         "When you tap in, and when class ends for you",
         "When you unlock, and the reason if you share one",
