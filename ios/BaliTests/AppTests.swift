@@ -1979,8 +1979,9 @@ struct AppTests {
 private final class TestsBundle {}
 
 /// Bali's shield as its extension, compiled into the tests too (`ios/project.yml`), hands it to
-/// iOS: over an app and over a website, each with what it is over. The two shields of a category
-/// take a token no test can make, and say the same.
+/// iOS: over an app and over a website, each with what it is over. A category's two, the ones a
+/// phone asks for, since Bali shields by category, take a token no test can make: each hands over
+/// to one of these two by the type of what it shields.
 private func shields() -> [(ShieldConfiguration, ShieldWords.Over)] {
     let shield = ShieldConfigurationExtension()
     return [

@@ -26,15 +26,17 @@ a real decision? Add a dated entry at the top: what was decided and why.
   (B5c-2), passed in round 3 on the owner's iPhone 15 Pro (2026-10-01) with no note of it cut
   short, so it stays, and the phone check looks for it whole at the default and a larger text
   size (`ios/README.md`, round 3, step 1); cut short there, a shorter line is the owner's pick in
-  a follow-up. **The pin:** C1c
-  left the extension's hexes unpinned as another target's; its file is now compiled into
-  `BaliTests` too (`ios/project.yml`; an extension's code is no module to import), so
-  `AppTests.tokens` holds each colour the real configuration hands iOS, over an app and over a
-  website, to `bali-tokens.json`, and `AppTests.shield` its words (`ShieldWords`' own), the
-  light material and its one button. Alternatives: a Linux test reading the hexes out of the
-  extension's source (a regex over code, where the simulator test reads the real object); the
-  hexes moved into BaliOutbox beside the words (design values in the outbox package, which
-  DESIGN.md keeps to strings). **The words:** "OK" moves into `ShieldWords` (`button`), so every
+  a follow-up. **The pin:** C1c left the extension's hexes unpinned as another target's; its file
+  is now compiled into `BaliTests` too (`ios/project.yml`; an extension's code is no module to
+  import), so `AppTests.tokens` holds each colour the real configuration hands iOS, over an app
+  and over a website, to `bali-tokens.json`, and `AppTests.shield` its words (`ShieldWords`'
+  own), the light material and its one button. A category's two configurations, the ones a phone
+  asks for since Bali shields by category, take a token no test can make, so each now hands over
+  to the app's or the website's by the type of what it shields (santa's round 1): a website's
+  shield in a category says what the tested one says. Alternatives: a Linux test reading the
+  hexes out of the extension's source (a regex over code, where the simulator test reads the
+  real object); the hexes moved into BaliOutbox beside the words (design values in the outbox
+  package, which DESIGN.md keeps to strings). **The words:** "OK" moves into `ShieldWords` (`button`), so every
   word the shield shows lives where DESIGN.md lists them and is tested on Linux
   (`ShieldWordsTests.words`); none changed, and none had an em-dash. Of four mutations (the
   title's ink, the label, the material, the website's words), each turns a test red.

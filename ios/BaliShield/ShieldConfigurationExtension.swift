@@ -9,8 +9,9 @@ import UIKit
 // spacing and type are iOS's to draw here. What it says is `ShieldWords`, tested on Linux; this
 // only carries it out, reading nothing: iOS's sandbox refuses it the outbox file (B5c-2). The
 // shield blocks every app and website a third party can (`.all()`), so iOS asks for each of these
-// four. Its principal class, named in its Info.plist; the app's tests compile it too, to hold what
-// it hands iOS to the words and the tokens (`AppTests.shield`, `AppTests.tokens`).
+// four, a category's two by what they shield. Its principal class, named in its Info.plist; the
+// app's tests compile it too, to hold what it hands iOS to the words and the tokens
+// (`AppTests.shield`, `AppTests.tokens`), a category's two through the two they hand over to.
 final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
     override func configuration(shielding application: Application) -> ShieldConfiguration {
         shield(over: .app)
@@ -19,7 +20,7 @@ final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
     override func configuration(
         shielding application: Application, in category: ActivityCategory
     ) -> ShieldConfiguration {
-        shield(over: .app)
+        configuration(shielding: application)
     }
 
     override func configuration(shielding webDomain: WebDomain) -> ShieldConfiguration {
@@ -29,7 +30,7 @@ final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
     override func configuration(
         shielding webDomain: WebDomain, in category: ActivityCategory
     ) -> ShieldConfiguration {
-        shield(over: .website)
+        configuration(shielding: webDomain)
     }
 
     private func shield(over: ShieldWords.Over) -> ShieldConfiguration {
