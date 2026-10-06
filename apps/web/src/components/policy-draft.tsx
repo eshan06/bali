@@ -38,7 +38,7 @@ export function PolicyDraft({
   return (
     <main className="mx-auto max-w-2xl px-4 py-12 text-body sm:px-10 sm:py-16">
       <Lockup />
-      <h1 className="mt-8 text-h1">{title}</h1>
+      <h1 className="mt-8 text-h1 text-balance">{title}</h1>
       <p className="mt-6 rounded-sm border border-border-default bg-surface-sunken px-4 py-3 text-body-lg">
         <strong className="font-semibold">{notice.lead}</strong> {notice.body}
       </p>
