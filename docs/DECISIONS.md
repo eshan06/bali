@@ -16,8 +16,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   alone: "Unlocked", "Left · unlocked", and on a protection-off chip "unlocked" with no reason.
   The teacher's standard view keeps the reason. One guard in `unlockNote` (`grid-state.ts`), where
   every chip's note comes from, so a changed reason (A20) or a snapshot's reads the same; a test
-  pins it for every reason. The rest of Present stays as drawn: Silent's minutes, "last seen" and
-  Clock off are about the phone (its contact, its clock), not something the student chose to share.
+  pins it for every reason. The rest of Present stays as drawn. Each student's state, "Unlocked"
+  included, is what Present exists to show the room (the owner's pick, Q4), and whether a projector
+  shows states at all is the owner's call; Silent's minutes, "last seen" and Clock off are about the
+  phone (its contact, its clock). The reason is the one detail a student adds for the teacher alone.
   **Not covered:** a session that ends while the page is projected leaves the recap card and How
   it ended on the screen, both showing reasons as the teacher's view does; the recap is D2g's,
   and what the page shows at the bell after Present is the owner's call.
