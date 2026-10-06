@@ -48,6 +48,14 @@ export const NO_CLASS_NAME = 'Enter a name for the class.';
 export const CANT_CREATE =
   "Bali couldn't finish creating the class. If it isn't in your list above, try again.";
 
+/**
+ * `POST /v1/classes`'s 409 for a teacher whose account has no school (#260's review): the API's
+ * own sentence is a log line, and its 409 carries no `reason` (the create's other 409,
+ * `account_deleted`, carries one), so `createClass` keys on that. The way on is the invite's sender.
+ */
+export const NO_SCHOOL =
+  "Your account isn't part of a school yet, so it can't create classes. Ask whoever sent your invite code to add you to one.";
+
 /** A session length typed under Other (P10): said before a Start is sent with it. */
 export const NOT_A_SESSION_LENGTH = `A session runs 1 to ${MAX_SESSION_MINUTES} minutes. Enter a whole number of minutes.`;
 

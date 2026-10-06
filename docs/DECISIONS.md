@@ -8,6 +8,24 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-06** — **D2f-3: the join code in Soft premium; a lost mint shows the code Bali holds;
+  no school said in Bali's words.** Two review WARNs ridden along (#247's, #260's). **New code is a
+  disclosure** (`aria-expanded`) that stays where it is while its confirm, a card, opens under it,
+  so pressing it never drops focus; whenever the confirm closes with focus inside it (Cancel, a
+  code made) focus comes back to New code, where it fell to the page. The made code is said in a
+  status line kept mounted, which a screen reader announces, where one inserted with its words may
+  not be. Beside the class's name the code stays put as the confirm opens (the column aligns to its
+  end from the small width up). **A mint whose answer never came reads the class again**: `PATCH
+  /v1/classes/{id}` takes no `eventId` (2026-09-20), so a 5xx, a timeout or a dropped connection
+  may follow a code that was made; a code other than the one on screen is the one Bali holds, said
+  as made (another tab's mint reads the same, and is as true). A refusal (a 4xx, the budget's 429
+  included) minted nothing and reads nothing again; a read that fails too leaves the failure
+  standing, and Try again mints a code the page then shows. **No school:** the create's 409 for a
+  teacher with no school carries no `reason`, so the portal keys on "this route's 409 with no
+  reason" (the create's other 409, `account_deleted`, carries one), as the block register keys on
+  its route's 409; a test pins the route to that one reasonless 409. The proper key, a `reason` on
+  that 409 in `API_ERROR_REASONS`, is a backend step left for a cloud session (the brief: UI only).
+
 - **2026-10-06** — **D2f-2: the class page and Present in Soft premium.** The calls the picks left
   open, taken on the conductor's "your recommended options": **The page is 1400 px wide at most**,
   the B artboard's width, not the home's narrow column: the grid is the page's main object, and

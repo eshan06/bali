@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes } from 'react';
+import type { ComponentProps } from 'react';
 
 /**
  * The portal's buttons (DESIGN.md §4): a pill 40 px tall with space-4 side padding and a body
@@ -22,7 +22,8 @@ export function buttonClass(variant: Variant = 'primary', className = ''): strin
   return `inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-full px-4 text-body font-semibold transition-colors disabled:cursor-default disabled:opacity-60 aria-disabled:cursor-default aria-disabled:opacity-60 motion-reduce:transition-none ${VARIANTS[variant]} ${className}`;
 }
 
-export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant };
+/** A button's own props, its `ref` included (React 19 passes it as one), so focus can come back. */
+export type ButtonProps = ComponentProps<'button'> & { variant?: Variant };
 
 export function Button({ variant = 'primary', className = '', ...props }: ButtonProps) {
   return <button type="button" {...props} className={buttonClass(variant, className)} />;
