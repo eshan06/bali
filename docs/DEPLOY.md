@@ -172,9 +172,10 @@ console → Cognito → that user pool:
   checks). A build with any of them empty says sign-in is not set up.
 - **The portal the app links (C2b):** `BALI_PORTAL_URL`, production's portal
   (`https://bali-portal.vercel.app`) for every build, since the privacy policy and
-  terms live only there: set once in `ios/project.yml`, with no TestFlight override
-  (`AppConfigTests.agree` fails on a second). A build without it fails its start as
-  one without the sign-in's settings does, in the same words.
+  terms live only there: set once in `ios/project.yml` (`AppConfigTests.agree` fails
+  on a second there), and the TestFlight workflow overrides it for no environment. A
+  build without it fails its start as one without the sign-in's settings does, in the
+  same words.
 - **The client id, again:** appended to that environment's `AUTH_AUDIENCE`,
   after the id already there (`<that id>,<the phone's>`) — **only once B4a is
   deployed there.** Before it, the API reads `AUTH_AUDIENCE` as a single id,
