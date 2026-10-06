@@ -41,6 +41,43 @@ a real decision? Add a dated entry at the top: what was decided and why.
   owner's): the tokens' dark `text-tertiary` on a dark card is 4.2:1, under AA's 4.5 for small
   text.
 
+- **2026-10-06** — **D2j: History and Me in Soft premium; History's "Screen Time back on" decided;
+  Me's hierarchy (#165); no sentence quotes a label the teacher doesn't see.** The owner's rulings
+  stand (D2's PRs into `main`, no sign-off wait, the recommended option on a taste call, said in
+  the PR); D1's composition kept but where D2a's audit or #165 found a problem. **History's "Screen
+  Time back on"** has its look (`Chip.Kind.protectionOn`, pinned by `AppTests.tokens`): not in's
+  pair, never focus's green, because the moment puts the student back where they stood, in focus
+  or unlocked (#167); its icon `checkmark.shield` (lucide `shield-check`), Screen Time off's red
+  slashed shield made whole and checked. Considered: the plain shield as built (protection in
+  general, not its return) and the ended pair (it reads as an end). **Me (#165, whose details the
+  owner left to the recommended option):** the name its teachers see is the page's hero, in
+  DESIGN.md's tray as Home's is, at `h3` where D1's 17/26 semibold sat off the type scale, its edit
+  button round as every button has been since D2h, and its field the sunken well under
+  `focusRing` that D2h left for D2j. Whose sign-in this is (#147) and Sign out sit together in a
+  card of their own under "Account", Sign out a row with its icon in the brand's ink, where a plain
+  grey line under the cards read as a heading (the audit); held and said as before. The policy
+  links stay above it and never beside Delete account (C2b); Delete account stays last and the
+  screen's one red (C4b), its question on a card of its own, at `h3`, the owner's consequence line
+  in `body` (five sentences in a caption were small for an act that can't be undone). Sections sit
+  `space-6` apart. Join's Sign out, the router's own Join's, keeps its look; the hold's rule lives
+  once, `Phone.signOutHeld` and `signOutFailure`. Considered: Sign out as a secondary pill (a
+  full-width pill for a rare act outweighs Join a class) and Delete account as a row of the account
+  card (beside Sign out, a mis-tap from it). The Deleting screens keep Sign in's layout, which D2h
+  drew, and D2h's pills. **The honesty fix (the conductor's call):** Protection off told the
+  student their teacher sees “Screen Time off”, but the teacher's grid says "Protection off"; both
+  labels are the owner's rulings (DESIGN.md's states table) and stay, so the sentences say what the
+  teacher sees in plain words and quote neither: "…so your teacher sees that Screen Time is off.",
+  "Until then, your teacher sees Screen Time as off." (Screen Time back on, the re-tap still to
+  come), "Until Screen Time is back on, your teacher sees that it's off." (checking), each "will
+  see" while the report is on its way. The Screen Time screen's two sentences carried the same
+  quote and say "your teacher sees that it's off" now. `ProtectionOffScreenTests.noLabelQuoted`
+  and `ScreenTests.screenTimeWords` hold every one to it, and DESIGN.md says it as a voice rule.
+  Left as they are, outside this step: the App Store review notes (`docs/APP-STORE.md`) and the
+  portal's `/support`, which say the teacher sees Screen Time off. **The words:** the em-dash
+  cleanup for these screens' strings, History's "The same moments your teachers see, and nothing
+  more." and Me's "…always work, because iOS keeps them on.", and the new "Account". No token
+  changed. Shots in `~/bali-notes/d2/d2j/`.
+
 - **2026-10-06** — **Present never shows an unlock's reason.** D2f-2 gave Present the grid's own
   words, so a projected grid read "Unlocked · nurse" beside a student's name, while the consent
   card (`ConsentCard`, which `/support` lists word for word) promises the reason to the teacher:
