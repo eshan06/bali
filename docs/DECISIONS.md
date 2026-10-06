@@ -8,6 +8,39 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-06** — **D2i: the in-class screens in Soft premium: Home, Waiting, Focus, Unlocked,
+  Protection off and Session over.** The owner's rulings stand (D2's PRs into `main`, no sign-off
+  wait, the recommended option on a taste call, said in the PR); D1's composition kept but where
+  D2a's audit found a problem. **Home's hero card sits in a tray** (`Tray`, `Theme.swift`:
+  `surface-sunken` at `radius-lg`, inset 8, the card at `radius-md` with 16-pt padding, DESIGN.md
+  §4's numbers over the B artboard's 6 and 20), whichever card holds the hero's place: Tap in, a
+  class in session, the wait, or no classes. Home's other cards (a read that failed, a refused tap)
+  and Your classes stand alone as before, as the B artboard drew them. **Focus's ring sits on a
+  raised disc** (`RaisedDisc`: white under shadow-2, the B artboard's Focus), and so does Waiting's,
+  D1's ring and dot kept: the ring a student watches fill at the Start is the same object before
+  it (recommended; the canvas drew only Focus's). **Home's Waiting chip** keeps its built look,
+  the not-joined pair with a clock, now a kind of its own (`Chip.Kind.waiting`, pinned by
+  `AppTests.tokens`): a waiting phone has no shield on yet, so it takes not in's colour and never
+  focus's green, and the clock and the word say the tap counted and the lock comes with the
+  Start. Considered: an outlined white chip, a new chip anatomy too near Unknown's dashed edge.
+  **Emergency Unlock's words** (the audit: D1's one sentence wrapped mid-phrase at the default
+  size; in the system font at D1's 16 pt it needs about 300 pt where the pill leaves 254 on a
+  390-pt phone): D1's words on two lines, "Hold to unlock" in the button's style (17 semibold,
+  on the scale where 16 was not) and "Your teacher will see it" under it in `body` (`UnlockWords`),
+  each one line at the default size down to a 375-pt phone (`AppTests.unlockFits`); each line
+  keeps its whole height, since offered a share of the pill's the first was cut short at the
+  largest text size. The hold, the orange, the pill, the ring and the spring are unchanged. Considered: "Hold to unlock" alone, its
+  teacher line moved to the caption (three lines offline, and a failed press's words take the
+  caption's place, which would hide it). **Unlocked's three reasons are pills**, as every button
+  is since D2h. **The words:** the em-dash cleanup for these screens' strings — Waiting's
+  "Ready, waiting for your teacher" (ARCHITECTURE's and BaliCore's quotes of it follow),
+  Unlocked's "Saved on your phone first. It reaches your teacher as soon as there's signal.", and
+  Focus's offline card and caption — and Protection off's quoted state typographic, “Screen Time
+  off”, as D2h made Screen Time's (the audit's straight quotes). Session over and Protection off
+  keep D1's composition: the theme's pills were all they lacked. No token changed; shadow-2 joins
+  `AppTests.tokens`'s pins. Left as drawn: Home's wordmark at 20/28, off the type scale, which D1
+  and the B artboard both draw. Shots in `~/bali-notes/d2/d2i/`.
+
 - **2026-10-05** — **D2f-1: the live grid in Soft premium; `bali-softpulse` only for an unlock
   that lands live.** The owner's D2 picks (DESIGN.md §2, §4, §5, §7), drawn as the B artboards
   show them; the calls the picks left open, taken on the conductor's "your recommended options":

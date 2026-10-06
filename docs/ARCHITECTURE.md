@@ -159,7 +159,7 @@ into another session switches nothing when it lands after it (A14; rule 1's orde
 7:58, the bell hasn't rung, and a student taps the block walking to their seat — no
 session exists yet. Rejecting the tap punishes normal behavior; shielding now locks the
 phone before class starts. So the server just saves "this student tapped this teacher's
-block" and the phone shows "Ready — waiting for your teacher." When the teacher presses
+block" and the phone shows "Ready, waiting for your teacher." When the teacher presses
 Start, every waiting tap becomes a participation and those phones shield — nobody taps
 twice. Two exceptions. A tap that was already honoured (ruled 2026-09-22): a waiting tap
 whose `event_id` is already recorded as that student's own `tap_in` is the retry of a tap

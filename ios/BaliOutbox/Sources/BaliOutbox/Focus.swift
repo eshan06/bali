@@ -109,14 +109,14 @@ public struct FocusWords: Sendable, Hashable {
             ? nil
             : capped
                 ? "Your tap is saved on this phone and reaches your teacher as soon as Bali is back online."
-                : "Focus still ends at \(at) — this phone keeps time without Wi-Fi, and Bali catches up when it's back online. Your teacher sees when this phone last checked in."
+                : "Focus still ends at \(at). This phone keeps time without Wi-Fi, and Bali catches up when it's back online. Your teacher sees when this phone last checked in."
         unscheduled =
             protection?.unscheduled == true || protection?.monitorUnscheduled != nil
             ? "iOS didn't let Bali schedule when focus ends. If your apps are still paused after class, open Bali."
             : nil
         caption =
             unreachable
-            ? "Works without Wi-Fi — an unlock is saved on this phone first. Letting go early does nothing."
+            ? "Works without Wi-Fi. An unlock is saved on this phone first. Letting go early does nothing."
             : "Works without Wi-Fi. Letting go early does nothing."
     }
 

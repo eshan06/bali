@@ -157,6 +157,8 @@ private struct Ring: View {
             .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         }
         .padding(12).frame(width: 240, height: 240)
+        // On a raised disc (Soft premium: the B artboard's Focus, D2i), 6 pt clear of the ring.
+        .background(RaisedDisc())
         .accessibilityElement(children: .ignore)
         // Spoken as a length of time — "1 minute, 52 seconds" — never as a clock's "one fifty-two".
         .accessibilityLabel(
@@ -192,9 +194,7 @@ struct UnlockControl: View {
                         .stroke(look.ink, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                 }
-            Text("Hold to unlock — your teacher will see it")
-                .textStyle(TextStyle(size: 16, line: 22, weight: .semibold))
-                .frame(maxWidth: .infinity).padding(.trailing, 12)
+            UnlockWords().frame(maxWidth: .infinity).padding(.trailing, 12)
         }
         .multilineTextAlignment(.center).foregroundStyle(look.ink)
         .padding(10).frame(minHeight: 64)
@@ -210,6 +210,20 @@ struct UnlockControl: View {
         .accessibilityInputLabels(["Hold to unlock", "Emergency Unlock"])
         .accessibilityAddTraits(.isButton)
         .accessibilityAction { unlock() }
+    }
+}
+
+/// Emergency Unlock's words, D1's on two lines (D2i): the action in a button's label, who sees it
+/// under it, each one line at the default text size, where the one sentence wrapped mid-phrase.
+/// Each line keeps its whole height: offered a share of the pill's, the first was cut short at the
+/// largest text size.
+struct UnlockWords: View {
+    var body: some View {
+        VStack(spacing: 0) {
+            Text("Hold to unlock").textStyle(.button).fixedSize(horizontal: false, vertical: true)
+            Text("Your teacher will see it").textStyle(.body)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 }
 

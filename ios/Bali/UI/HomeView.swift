@@ -99,10 +99,11 @@ struct HomeView: View {
         }
     }
 
-    /// A class in session, the student not focused in it (C3c), in D1's look: the state's chip and
-    /// what is true, then the way on — Tap in, or Lock my apps again — gone at the bell.
+    /// A class in session, the student not focused in it (C3c), in D1's look, in the hero's tray
+    /// (D2i): the state's chip and what is true, then the way on — Tap in, or Lock my apps again —
+    /// gone at the bell.
     private func inSession(_ card: InSessionCard) -> some View {
-        Card {
+        Tray {
             VStack(alignment: .leading, spacing: 12) {
                 Chip(
                     kind: card.unlocked ? .unlocked : .notIn,
@@ -137,13 +138,13 @@ struct HomeView: View {
     }
 
     /// Waiting for the teacher's Start (#151; the owner's decision, 2026-10-01), in C3c's look: the
-    /// wait's chip, what is true — the tap counted, and when the phone locks — and Tap in,
+    /// wait's chip (D2i), what is true — the tap counted, and when the phone locks — and Tap in,
     /// secondary: only a Start or another tap ends the wait, so a block tapped by mistake, or a
     /// Start that never comes, is never a dead end.
     private func waitingCard(_ words: String) -> some View {
-        Card {
+        Tray {
             VStack(alignment: .leading, spacing: 12) {
-                Chip(kind: .notIn, icon: "clock", text: "Waiting")
+                Chip(kind: .waiting, text: "Waiting")
                 Text(words).textStyle(.bodyLg).fixedSize(horizontal: false, vertical: true)
                 TapIn(phone: phone, primary: false)
             }
@@ -155,7 +156,7 @@ struct HomeView: View {
     /// class, no state): what is true and how back in, and Join a class, opened over Home with its
     /// way back (C3b). No Tap in: a tap joins only a class the student is in.
     private func noClasses(_ words: String) -> some View {
-        Card {
+        Tray {
             VStack(alignment: .leading, spacing: 12) {
                 Text(words).textStyle(.bodyLg).fixedSize(horizontal: false, vertical: true)
                 Button {
@@ -169,9 +170,10 @@ struct HomeView: View {
         }
     }
 
-    /// D1's hero card: the block's scan, and why the last one recorded no tap.
+    /// D1's hero card, in its tray (Soft premium, D2i): the block's scan, and why the last one
+    /// recorded no tap.
     private var tapIn: some View {
-        Card {
+        Tray {
             VStack(spacing: 8) {
                 Image(systemName: "wave.3.right").font(.system(size: 40))
                     .foregroundStyle(Theme.brand).frame(width: 120, height: 120)

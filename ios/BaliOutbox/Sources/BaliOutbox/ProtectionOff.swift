@@ -53,7 +53,7 @@ public struct ProtectionOffWords: Sendable, Hashable {
             body =
                 untold
                 ? "Bali can't keep you focused without it. It couldn't tell your teacher yet, and keeps trying."
-                : "Bali can't keep you focused without it, so your teacher \(sees) 'Screen Time off'."
+                : "Bali can't keep you focused without it, so your teacher \(sees) “Screen Time off”."
         case .retap:
             headline = "Screen Time is back on"
             // On again, the check reports nothing more: no "keeps trying".
@@ -61,13 +61,13 @@ public struct ProtectionOffWords: Sendable, Hashable {
                 "Tap your teacher's block again to rejoin class. "
                 + (untold
                     ? "Bali couldn't tell your teacher that Screen Time was off."
-                    : "Until then, your teacher \(sees) 'Screen Time off'.")
+                    : "Until then, your teacher \(sees) “Screen Time off”.")
         case .checking:
             headline = "Checking Screen Time…"
             body =
                 untold
                 ? "Bali couldn't tell your teacher that Screen Time was off. It keeps trying."
-                : "Your teacher \(sees) 'Screen Time off' until it's back on."
+                : "Your teacher \(sees) “Screen Time off” until it's back on."
         }
         steps = [
             "Turn Screen Time back on for Bali",

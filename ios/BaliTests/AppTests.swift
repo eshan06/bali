@@ -1484,6 +1484,9 @@ struct AppTests {
             ("state-ended-fg", Chip.Kind.ended.look.ink),
             ("state-notjoined-bg", Chip.Kind.notIn.look.fill),
             ("state-notjoined-fg", Chip.Kind.notIn.look.ink),
+            // Home's Waiting (D2i): not in's pair, never focus's green.
+            ("state-notjoined-bg", Chip.Kind.waiting.look.fill),
+            ("state-notjoined-fg", Chip.Kind.waiting.look.ink),
         ]
         for (token, colour) in pinned {
             let found = drawn(colour)
@@ -1496,6 +1499,34 @@ struct AppTests {
         let resting = try #require((shadows["shadow-1"] as? [String: Any])?["light"] as? String)
         let rgba = shadow.bytes.map(String.init) + [String(format: "%g", shadow.opacity)]
         #expect(resting.hasSuffix("rgba(\(rgba.joined(separator: ",")))"), "\(resting): \(rgba)")
+        // shadow-2, a raised disc's (D2i): "0 2px 8px rgba(33,28,21,0.08), 0 1px 2px rgba(…,0.05)".
+        let raised = try #require((shadows["shadow-2"] as? [String: Any])?["light"] as? String)
+        for (layer, colour) in [("0 2px 8px", Theme.raised.wide), ("0 1px 2px", Theme.raised.close)] {
+            let found = drawn(colour)
+            let rgba = found.bytes.map(String.init) + [String(format: "%g", found.opacity)]
+            #expect(raised.contains("\(layer) rgba(\(rgba.joined(separator: ",")))"), "\(raised): \(rgba)")
+        }
+    }
+
+    @Test(
+        "Emergency Unlock's words fit D1's 64-pt pill at the default text size on the narrowest iPhone the app runs on, 375 pt less the gutters: the action and who sees it, a line each, where D1's one sentence wrapped mid-phrase (D2i; D2a's audit). At the largest text size the pill grows with them, and its words, offered less height than they need, still keep every line whole — the first was cut short there before"
+    )
+    func unlockFits() {
+        let narrowest = 375 - 2 * Theme.gutter
+        let whole = UIHostingController(
+            rootView: UnlockControl {}.fixedSize().environment(\.dynamicTypeSize, .large)
+        ).sizeThatFits(in: CGSize(width: 10_000, height: 10_000))
+        #expect(whole.width <= narrowest && abs(whole.height - 64) < 0.5, "\(whole)")
+        let grown = UIHostingController(
+            rootView: UnlockControl {}.environment(\.dynamicTypeSize, .accessibility5)
+        ).sizeThatFits(in: CGSize(width: narrowest, height: 10_000))
+        #expect(grown.height > 100, "\(grown)")
+        /// The words' height at the largest text size, 200 pt wide, offered `room`.
+        func words(_ room: CGFloat) -> CGFloat {
+            UIHostingController(rootView: UnlockWords().environment(\.dynamicTypeSize, .accessibility5))
+                .sizeThatFits(in: CGSize(width: 200, height: room)).height
+        }
+        #expect(abs(words(44) - words(10_000)) < 0.5, "\(words(44)) of \(words(10_000))")
     }
 
     @Test(
