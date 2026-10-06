@@ -8,6 +8,28 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-06** — **Present is kept for the browser tab.** D2f-2 left Present "per tab and not
+  remembered", so a reload or a return from Reports opened the class page in the teacher's view,
+  every unlock's reason on the projector, and `docs/PILOT.md` told teachers to stop projecting
+  first. The owner's standing instruction took the recommended option: the page keeps Present in
+  `sessionStorage` under the class's id (`rememberPresent`, `rememberedPresent`,
+  `session-controls.ts`), read once the page is in the browser, before the class's read can show
+  a grid or the recap, so it comes back in Present until the teacher turns it off. **The tab's, not
+  the computer's:** a new tab or window, the teacher's own view beside the projector's, opens
+  without it, where `localStorage` would open every tab in Present; a duplicated tab copies its
+  storage and comes up in Present, its toggle pressed. **Class by class** (the brief's key):
+  another class's page opened in the projected tab opens in the teacher's view, its reasons shown,
+  as PILOT says; one key for the whole tab would carry Present there too (both santa reviewers'
+  note), left to the owner. Storage refused or switched off loses only the memory: the page opens
+  off, as before. **The recap carries the toggle when it stands alone**
+  (the worker's call): back in Present with no session running, the page shows the recap and no
+  grid, so no toggle, a mode with nothing on screen to say so or to leave it. So the recap's
+  header takes the toggle then, and keeps it for the page's life once pressed off, so focus stays
+  on it. Considered: the toggle on every recap (on the idle page, a pill that only hides reasons,
+  and the B artboard changed for everyone) and no toggle (no way out until the next Start). Not
+  changed: the reports page is always the teacher's view, a session opened there showing its
+  reasons, as PILOT now says.
+
 - **2026-10-06** — **The app's Soft premium redesign is rolled back, and every screen is now
   designed and approved before it is built.** The owner, after seeing D2h, D2i and D2j (#233,
   #262, #266) in the app: "I don't like the app redesign either. remove those PRs" (the shield's,

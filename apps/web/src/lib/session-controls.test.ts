@@ -1,5 +1,5 @@
 import { MAX_SESSION_MINUTES } from '@bali/shared';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createApiClient } from './api-client';
 import { CANT_ADD_TIME, CANT_MAKE_CODE, CANT_REACH, TOO_MANY_TRIES } from './errors';
@@ -17,7 +17,9 @@ import {
   pickFor,
   regenerateCode,
   rememberedMinutes,
+  rememberedPresent,
   rememberMinutes,
+  rememberPresent,
 } from './session-controls';
 
 /** The API client over a fetch that answers `status` with `body`, every request recorded. */
@@ -131,6 +133,81 @@ describe('the remembered pick', () => {
     } as unknown as Storage;
     expect(rememberedMinutes(CLASS, refusing)).toBeNull();
     expect(() => rememberMinutes(CLASS, 50, refusing)).not.toThrow();
+  });
+});
+
+describe('Present, kept for the tab', () => {
+  /** One tab's sessionStorage: what is set is read back, and a removed key is gone. */
+  const tab = () => {
+    const items = new Map<string, string>();
+    return {
+      getItem: (k: string) => items.get(k) ?? null,
+      setItem: (k: string, v: string) => void items.set(k, v),
+      removeItem: (k: string) => void items.delete(k),
+      items,
+    } as unknown as Storage & { items: Map<string, string> };
+  };
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('a reload in Present stays in Present, until the teacher turns it off', () => {
+    const storage = tab();
+    expect(rememberedPresent(CLASS, storage)).toBe(false);
+    rememberPresent(CLASS, true, storage);
+    expect(rememberedPresent(CLASS, storage)).toBe(true);
+    rememberPresent(CLASS, false, storage);
+    expect(rememberedPresent(CLASS, storage)).toBe(false);
+    expect(storage.items.size).toBe(0);
+  });
+
+  it('keeps each class apart', () => {
+    const storage = tab();
+    rememberPresent(CLASS, true, storage);
+    expect(rememberedPresent(SESSION, storage)).toBe(false);
+  });
+
+  it('is this tab’s alone: another tab, or the teacher’s own window, opens off', () => {
+    const projector = tab();
+    const computer = tab();
+    vi.stubGlobal('sessionStorage', projector);
+    vi.stubGlobal('localStorage', computer);
+    rememberPresent(CLASS, true);
+    expect(rememberedPresent(CLASS)).toBe(true);
+    expect([...projector.items.keys()]).toEqual([`bali.present.${CLASS}`]);
+    expect(computer.items.size).toBe(0);
+    vi.stubGlobal('sessionStorage', tab());
+    expect(rememberedPresent(CLASS)).toBe(false);
+  });
+
+  it('opens off without storage, when storage throws, and when the browser refuses it', () => {
+    expect(rememberedPresent(CLASS, null)).toBe(false);
+    expect(() => rememberPresent(CLASS, true, null)).not.toThrow();
+    const refusing = {
+      getItem: () => {
+        throw new DOMException('denied', 'SecurityError');
+      },
+      setItem: () => {
+        throw new DOMException('quota', 'QuotaExceededError');
+      },
+      removeItem: () => {
+        throw new DOMException('denied', 'SecurityError');
+      },
+    } as unknown as Storage;
+    expect(rememberedPresent(CLASS, refusing)).toBe(false);
+    expect(() => rememberPresent(CLASS, true, refusing)).not.toThrow();
+    expect(() => rememberPresent(CLASS, false, refusing)).not.toThrow();
+    // Site data blocked: reading `sessionStorage` itself throws.
+    Object.defineProperty(globalThis, 'sessionStorage', {
+      configurable: true,
+      get: () => {
+        throw new DOMException('denied', 'SecurityError');
+      },
+    });
+    try {
+      expect(rememberedPresent(CLASS)).toBe(false);
+      expect(() => rememberPresent(CLASS, true)).not.toThrow();
+    } finally {
+      delete (globalThis as { sessionStorage?: Storage }).sessionStorage;
+    }
   });
 });
 

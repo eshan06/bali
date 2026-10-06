@@ -5,7 +5,10 @@ import { CANT_ADD_TIME, CANT_MAKE_CODE, CANT_REACH, errText } from './errors';
 import { newEventId } from './event-id';
 import type { RecapFormat } from './recap';
 
-/* The class page's controls, tested: the session's length and adding time (P10), a new code (P11). */
+/*
+ * The class page's controls, tested: the session's length and adding time (P10), a new code (P11),
+ * and Present kept for the tab.
+ */
 
 /** The lengths offered as presets, in minutes, and the pick when this computer remembers none. */
 export const LENGTH_PRESETS = [25, 50, 75] as const;
@@ -45,10 +48,13 @@ export function pickFor(minutes: number | null): LengthPick {
 /** Where a class's last pick is kept on this computer: a key of its own, so classes share none. */
 const lengthKey = (classId: string) => `bali.session-minutes.${classId}`;
 
-/** The browser's localStorage, or none: reading it can throw (a private window, storage off). */
-function store(): Storage | null {
+/**
+ * The browser's localStorage (this computer's) or sessionStorage (this tab's), or none: reading
+ * either can throw (a private window, site data blocked).
+ */
+function store(kind: 'localStorage' | 'sessionStorage' = 'localStorage'): Storage | null {
   try {
-    return typeof localStorage === 'undefined' ? null : localStorage;
+    return typeof globalThis[kind] === 'undefined' ? null : globalThis[kind];
   } catch {
     return null;
   }
@@ -69,6 +75,38 @@ export function rememberMinutes(classId: string, minutes: number, storage = stor
     storage?.setItem(lengthKey(classId), String(minutes));
   } catch {
     // The page works without it: the default is picked next time.
+  }
+}
+
+/** Where a class's Present is kept for the tab: a key of its own, so classes share none. */
+const presentKey = (classId: string) => `bali.present.${classId}`;
+
+/**
+ * Whether this tab left the class's page in Present (DESIGN.md §5), so a reload or a return from
+ * Reports comes back in it; off when none is kept or it can't be read.
+ */
+export function rememberedPresent(classId: string, storage = store('sessionStorage')): boolean {
+  try {
+    return storage?.getItem(presentKey(classId)) === 'on';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Keep Present for this tab alone (sessionStorage), so a new tab or window opens in the teacher's
+ * view; a storage that refuses loses only the memory.
+ */
+export function rememberPresent(
+  classId: string,
+  on: boolean,
+  storage = store('sessionStorage'),
+): void {
+  try {
+    if (on) storage?.setItem(presentKey(classId), 'on');
+    else storage?.removeItem(presentKey(classId));
+  } catch {
+    // The page works without it: a reload opens off, as before.
   }
 }
 

@@ -33,7 +33,9 @@ import {
   parseMinutes,
   pickFor,
   rememberedMinutes,
+  rememberedPresent,
   rememberMinutes,
+  rememberPresent,
 } from '@/lib/session-controls';
 import { useApi } from '@/lib/use-api';
 
@@ -89,8 +91,12 @@ export default function ClassDetailPage() {
   const otherField = useRef<HTMLInputElement>(null);
   // A Start that failed, said under its button; the button sends it again.
   const [startSaid, setStartSaid] = useState<string | null>(null);
-  // The projector view (DESIGN.md §5), toggled in the grid's header.
+  // The projector view (DESIGN.md §5), toggled in the grid's header and kept for this tab, so a
+  // reload or a return from Reports comes back in it; a new tab or window opens without it.
   const [present, setPresent] = useState(false);
+  // The page opened in Present: with no session to show, the recap carries the toggle, so the
+  // teacher can always leave it.
+  const [openedInPresent, setOpenedInPresent] = useState(false);
   // Extend (P10): the last attempt whose answer never came, resent by Try again; and what is said
   // beside the grid: a failure (with Try again), a refusal or an End that failed (its button is
   // the retry), or a note on the session shown.
@@ -128,12 +134,16 @@ export default function ClassDetailPage() {
     load();
   }, [load, router]);
 
-  // The class's last pick on this computer, read once the page is in the browser (never at render,
-  // where the server has no storage); a length that isn't a preset reopens Other with it.
+  // The class's last pick on this computer, and Present as this tab left it, read once the page is
+  // in the browser (never at render, where the server has no storage), so before the class's read
+  // can show a grid or the recap; a length that isn't a preset reopens Other with it.
   useEffect(() => {
     const remembered = pickFor(rememberedMinutes(classId));
     setPick(remembered.pick);
     setOther(remembered.other);
+    const kept = rememberedPresent(classId);
+    setPresent(kept);
+    setOpenedInPresent(kept);
   }, [classId]);
 
   // The grid says when the server marks its session over (the bell's sweep, an End from another
@@ -235,7 +245,10 @@ export default function ClassDetailPage() {
     <Button
       variant="secondary"
       aria-pressed={present}
-      onClick={() => setPresent((on) => !on)}
+      onClick={() => {
+        rememberPresent(classId, !present);
+        setPresent(!present);
+      }}
       className="aria-pressed:border-text-primary aria-pressed:bg-surface-sunken"
     >
       {present ? (
@@ -350,8 +363,15 @@ export default function ClassDetailPage() {
               </div>
             </form>
             {/* The last session's recap (R4) until a new one starts; only once the class is read,
-                so a session already running never shows it. */}
-            {klass ? <RecapCard classId={classId} present={present} /> : null}
+                so a session already running never shows it. Opened in Present with no grid under
+                it, the recap carries the toggle. */}
+            {klass ? (
+              <RecapCard
+                classId={classId}
+                present={present}
+                toggle={grid === null && openedInPresent ? presentToggle : null}
+              />
+            ) : null}
             {/* As it ended, until the next Start (R5): who was still unlocked stays in view. */}
             {grid ? (
               <section aria-labelledby={`${id}-ended`} className="flex flex-col gap-4">

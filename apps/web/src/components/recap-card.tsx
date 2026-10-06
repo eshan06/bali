@@ -1,7 +1,7 @@
 'use client';
 
 import type { SessionReportSummary as Summary } from '@bali/shared';
-import { useEffect, useId, useState } from 'react';
+import { type ReactNode, useEffect, useId, useState } from 'react';
 
 import { Button } from '@/components/button';
 import {
@@ -25,16 +25,19 @@ const LABEL = 'text-label text-text-tertiary uppercase';
  * `data-lg` on sunken tiles, laid out by the card's own width. Given a `session` (R5's opened row),
  * it reads that one's report inside the row's card, so it draws no card of its own, and its
  * heading is for screen readers. In `present` (the class page's Present, which the class can see)
- * it lists each unlock by who and when, never with its reason.
+ * it lists each unlock by who and when, never with its reason; `toggle`, Present's own, goes at the
+ * end of its header.
  */
 export function RecapCard({
   classId,
   session,
   present = false,
+  toggle = null,
 }: {
   classId: string;
   session?: Summary;
   present?: boolean;
+  toggle?: ReactNode;
 }) {
   const api = useApi();
   const headingId = useId();
@@ -69,15 +72,18 @@ export function RecapCard({
     >
       <div
         className={
-          session ? 'sr-only' : 'flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1'
+          session ? 'sr-only' : 'flex flex-wrap items-center justify-between gap-x-6 gap-y-3'
         }
       >
-        <h2 id={headingId} className="text-h3">
-          {session ? sessionTimes(session) : 'Last session'}
-        </h2>
-        {shown && !session ? (
-          <p className="text-caption text-text-tertiary tabular-nums">{sessionTimes(shown)}</p>
-        ) : null}
+        <div className="flex grow flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <h2 id={headingId} className="text-h3">
+            {session ? sessionTimes(session) : 'Last session'}
+          </h2>
+          {shown && !session ? (
+            <p className="text-caption text-text-tertiary tabular-nums">{sessionTimes(shown)}</p>
+          ) : null}
+        </div>
+        {toggle}
       </div>
       {state.kind === 'loading' ? (
         <p role="status" className="mt-4 text-body text-text-secondary">
