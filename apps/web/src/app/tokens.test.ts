@@ -163,6 +163,22 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     glow('dark', 'orange-300');
   });
 
+  it('bali-softpulse is a 6 px glow ring, 1.2 s twice on the standard easing, and only the grid’s', () => {
+    expect(css).toMatch(
+      /@keyframes bali-softpulse\s*\{\s*0%,\s*100%\s*\{\s*box-shadow: 0 0 0 0 transparent;\s*\}\s*50%\s*\{\s*box-shadow: 0 0 0 6px var\(--bali-softpulse-glow\);\s*\}\s*\}/,
+    );
+    // Exactly twice, never `infinite`: the one pulse never loops (§7).
+    expect(css).toMatch(
+      /@utility animate-softpulse\s*\{\s*animation: bali-softpulse 1\.2s cubic-bezier\(0\.2, 0, 0, 1\) 2;\s*\}/,
+    );
+    const users = sources(fileURLToPath(new URL('../', import.meta.url))).filter(
+      (file) => file.endsWith('.tsx') && readFileSync(file, 'utf8').includes('animate-softpulse'),
+    );
+    expect(users.map((file) => file.slice(file.indexOf('/src/') + 5))).toEqual([
+      'components/live-grid.tsx',
+    ]);
+  });
+
   it('the radii are the tokens’ five and no other', () => {
     expect(theme.get('--radius-*')).toBe('initial');
     const radii = [...theme.keys()].filter((k) => k.startsWith('--radius-') && k !== '--radius-*');
@@ -278,6 +294,7 @@ describe('the pages in Soft premium use the tokens’ utilities, never a Tailwin
     'components/policy-draft.tsx',
     'components/invite-code.tsx',
     'components/blocks.tsx',
+    'components/live-grid.tsx',
   ];
   const COLOUR =
     /\b(?:bg|text|border|ring|outline|divide|decoration|placeholder|fill|stroke|from|via|to|accent|caret)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|black|white)\b/;

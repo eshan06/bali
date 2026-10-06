@@ -6,8 +6,20 @@ import {
   type SessionView,
   STREAM_HEARTBEAT_MS,
 } from '@bali/shared';
+import {
+  Circle,
+  CircleCheck,
+  CircleHelp,
+  Flag,
+  LockOpen,
+  type LucideIcon,
+  ShieldOff,
+  WifiOff,
+} from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
+import { Button } from '@/components/button';
+import { CARD, EMPTY_TRAY, TRAY } from '@/components/tray';
 import { getAccessToken } from '@/lib/auth';
 import { config } from '@/lib/config';
 import { errText } from '@/lib/errors';
@@ -17,41 +29,87 @@ import {
   fromSnapshot,
   gridDisplay,
   type GridDisplay,
+  landsLive,
+  lastSeenNote,
   mergeSnapshot,
+  silentNote,
   snapshotIsFresh,
+  softpulses,
   staleness,
+  staleWords,
   type Students,
   unlockNote,
 } from '@/lib/grid-state';
 import { createSseClient, type SseClient, type SseStatus } from '@/lib/sse-client';
 import { useApi, useSignOut } from '@/lib/use-api';
 
-/**
- * The server's own heartbeat interval (`apps/api/src/sse/hub.ts`). The grid
- * measures silence against it rather than a number of its own, so the two
- * cannot drift into a banner that flaps or one that never fires.
- */
+/** A state's edge: none to see on a tinted chip; Silent's and Unknown's dashed (Q3 A). */
+const SOLID = 'border-transparent';
+const DASHED = 'border-dashed border-border-strong';
+const EMERGENCY = `${SOLID} bg-state-emergency-bg text-state-emergency-fg`;
+const REVOKED = `${SOLID} bg-state-revoked-bg text-state-revoked-fg`;
 
-const CHIP: Record<GridDisplay, { label: string; cls: string }> = {
-  focused: { label: 'Focused', cls: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
-  unlocked: { label: 'Unlocked', cls: 'bg-amber-100 text-amber-900 border-amber-400' },
-  protection_off: { label: 'Protection off', cls: 'bg-red-100 text-red-800 border-red-400' },
-  silent: { label: 'Silent', cls: 'bg-slate-200 text-slate-600 border-slate-400' },
-  ended: { label: 'Left', cls: 'bg-slate-100 text-slate-400 border-slate-200' },
-  // Left the session AND unshielded — the ISSUES #2 case. Loud on purpose: it
-  // must not read as the quiet "Left" chip.
-  left_unprotected: { label: 'Left · unlocked', cls: 'bg-red-100 text-red-800 border-red-400' },
-  // The same, for a phone whose Screen Time permission was off: never an unlock.
-  left_protection_off: {
-    label: 'Left · protection off',
-    cls: 'bg-red-100 text-red-800 border-red-400',
+/**
+ * Each state's chip (DESIGN.md §2 and §4): its tint, its icon and its label, never colour alone.
+ * The two Left chips take their state's colour, the flag first and the state's icon after it
+ * (Q2 A); Silent is the ended pair with a dashed edge, Unknown dashed with no fill (Q3 A).
+ */
+const CHIP: Record<GridDisplay, { label: string; icons: LucideIcon[]; tone: string }> = {
+  focused: {
+    label: 'Focused',
+    icons: [CircleCheck],
+    tone: `${SOLID} bg-state-focused-bg text-state-focused-fg`,
   },
-  absent: { label: 'Not here', cls: 'bg-white text-slate-400 border-dashed border-slate-300' },
+  unlocked: { label: 'Unlocked', icons: [LockOpen], tone: EMERGENCY },
+  protection_off: { label: 'Protection off', icons: [ShieldOff], tone: REVOKED },
+  silent: {
+    label: 'Silent',
+    icons: [WifiOff],
+    tone: `${DASHED} bg-state-ended-bg text-state-ended-fg`,
+  },
+  ended: { label: 'Left', icons: [Flag], tone: `${SOLID} bg-state-ended-bg text-state-ended-fg` },
+  // Left the session AND unshielded, the ISSUES #2 case: it must never read as the quiet "Left".
+  left_unprotected: { label: 'Left · unlocked', icons: [Flag, LockOpen], tone: EMERGENCY },
+  // The same, for a phone whose Screen Time permission was off: never an unlock.
+  left_protection_off: { label: 'Left · protection off', icons: [Flag, ShieldOff], tone: REVOKED },
+  absent: {
+    label: 'Not here',
+    icons: [Circle],
+    tone: `${SOLID} bg-state-notjoined-bg text-state-notjoined-fg`,
+  },
   unknown: {
     label: 'Unknown · refresh',
-    cls: 'bg-white text-slate-700 border-dashed border-slate-500',
+    icons: [CircleHelp],
+    tone: `${DASHED} bg-state-nodevice-bg text-text-primary`,
   },
 };
+
+/**
+ * A state chip: a pill in the state's tint, padded `space-2` × `space-3`, its label in the `label`
+ * style (DESIGN.md §4). What the chip carries rides after the label, never replacing it: an
+ * unlock's reason, or how long a Silent phone has been quiet. `pulse` is `bali-softpulse` (§7).
+ */
+function Chip({
+  display,
+  note,
+  pulse,
+}: {
+  display: GridDisplay;
+  note: string | null;
+  pulse: boolean;
+}) {
+  const chip = CHIP[display];
+  return (
+    <span
+      className={`inline-flex max-w-full items-center gap-2 rounded-full border px-3 py-2 text-label uppercase ${chip.tone} ${pulse ? 'animate-softpulse' : ''}`}
+    >
+      {chip.icons.map((Icon, i) => (
+        <Icon key={i} size={14} aria-hidden="true" className="shrink-0" />
+      ))}
+      <span className="min-w-0">{note === null ? chip.label : `${chip.label} · ${note}`}</span>
+    </span>
+  );
+}
 
 export function LiveGrid({
   sessionId,
@@ -80,6 +138,8 @@ export function LiveGrid({
   const [status, setStatus] = useState<SseStatus>('connecting');
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0); // a boot that failed, tried again (rule 5)
+  // The unlocks that landed while the grid was open, by event id: their chips pulse (§7).
+  const [liveUnlocks, setLiveUnlocks] = useState<ReadonlySet<string>>(() => new Set());
   // Any sign of life from the server: an event, a heartbeat comment, or a
   // snapshot refresh that came back. A heartbeat is freshness and not just
   // liveness — a quiet class emits no events, so nothing arriving is normal
@@ -119,6 +179,9 @@ export function LiveGrid({
           overlap: EVENT_RESUME_OVERLAP,
           onEvent: (e) => {
             setStudents((prev) => (prev ? applyEvent(prev, e) : prev));
+            if (landsLive(e, snap.latestSeq)) {
+              setLiveUnlocks((prev) => new Set(prev).add(e.eventId));
+            }
             if (e.seq > appliedSeq.current) appliedSeq.current = e.seq;
             lastStreamActivity.current = Date.now();
             lastGridActivity.current = Date.now();
@@ -183,15 +246,23 @@ export function LiveGrid({
 
   if (error) {
     return (
-      <p role="alert" className="text-sm text-red-600">
-        {error}{' '}
-        <button type="button" onClick={() => setAttempt((n) => n + 1)} className="underline">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <p role="alert" className="text-body">
+          {error}
+        </p>
+        <Button variant="secondary" onClick={() => setAttempt((n) => n + 1)}>
           Try again
-        </button>
+        </Button>
+      </div>
+    );
+  }
+  if (!students) {
+    return (
+      <p role="status" className="text-body text-text-secondary">
+        Loading grid…
       </p>
     );
   }
-  if (!students) return <p className="text-sm text-slate-500">Loading grid…</p>;
 
   const stale = staleness({
     status,
@@ -203,44 +274,55 @@ export function LiveGrid({
   const rows = Object.values(students);
 
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col gap-3">
+      {/* The grid's health (§4): stone, never amber; honest, not alarmed. */}
       {stale && !over ? (
-        <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          {stale.reason === 'reconnecting' ? 'Reconnecting' : 'Live feed has gone quiet'} — last
-          updated {stale.secondsAgo}s ago
+        <p className="rounded-sm border border-border-default bg-surface-sunken px-4 py-3 text-body text-text-primary tabular-nums">
+          {staleWords(stale)}
         </p>
       ) : null}
       {rows.length === 0 ? (
-        <p className="text-sm text-slate-500">No students enrolled yet.</p>
+        <p className={`text-body ${EMPTY_TRAY}`}>No students enrolled yet.</p>
       ) : (
-        <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-          {rows.map((s) => {
-            const display = gridDisplay(s, now);
-            const chip = CHIP[display];
-            // The unlock the chip carries — its reason, or on a protection-off
-            // chip the unlock itself — rides after the label, never replacing it.
-            const note = unlockNote(s, display);
-            return (
-              <li key={s.studentId} className={`rounded-lg border px-3 py-2 text-sm ${chip.cls}`}>
-                <div className="flex items-start justify-between gap-2">
-                  <span className="font-medium">{s.displayName ?? s.studentId.slice(0, 8)}</span>
-                  {/* S9: a badge beside the state, in the chip's own ink, never a colour of its own. */}
-                  {s.clockOff ? (
-                    <span
-                      title="This phone's clock is set ahead. Bali records the time by its own clock."
-                      className="shrink-0 rounded-md border border-current px-1.5 text-xs leading-5"
-                    >
-                      Clock off
+        // Six columns at the desktop width, fewer as the grid narrows, never smaller type (§5).
+        <div className="@container">
+          <ul
+            className={`${TRAY} grid-cols-2 @xl:grid-cols-3 @3xl:grid-cols-4 @5xl:grid-cols-5 @6xl:grid-cols-6`}
+          >
+            {rows.map((s) => {
+              const display = gridDisplay(s, now);
+              const seen = lastSeenNote(s, display, now);
+              return (
+                <li key={s.studentId} className={`flex flex-col gap-3 ${CARD}`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="min-w-0 text-body font-semibold break-words">
+                      {s.displayName ?? s.studentId.slice(0, 8)}
                     </span>
-                  ) : null}
-                </div>
-                <div className="text-xs opacity-80">
-                  {note === null ? chip.label : `${chip.label} · ${note}`}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+                    {/* S9: advice beside the name, never a colour of its own; it changes no state. */}
+                    {s.clockOff ? (
+                      <span
+                        title="This phone's clock is set ahead. Bali records the time by its own clock."
+                        className="shrink-0 rounded-xs border border-current px-2 text-caption text-text-tertiary"
+                      >
+                        Clock off
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <Chip
+                      display={display}
+                      note={display === 'silent' ? silentNote(s, now) : unlockNote(s, display)}
+                      pulse={softpulses(s, display, liveUnlocks)}
+                    />
+                    {seen === null ? null : (
+                      <span className="text-caption text-text-tertiary tabular-nums">{seen}</span>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       )}
     </div>
   );

@@ -8,6 +8,27 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-05** — **D2f-1: the live grid in Soft premium; `bali-softpulse` only for an unlock
+  that lands live.** The owner's D2 picks (DESIGN.md §2, §4, §5, §7), drawn as the B artboards
+  show them; the calls the picks left open, taken on the conductor's "your recommended options":
+  **Columns by the grid's own width** (container queries): six from 72 rem, five from 64, four
+  from 48, three from 36, two below, so the grid reflows by column count wherever it sits and
+  never by smaller type; a long label ("Protection off · unlocked · nurse") wraps inside its pill,
+  as it did on the canvas's six-column board. **The chip:** the canvas's 14 px icon, and a
+  `space-2` gap where it drew 6 px, off the 4-pt grid. **The pulse fires on an unlock the stream
+  brings after the boot** (its `seq` above the boot snapshot's `latestSeq`), keyed by the
+  unlock's event id: the stream's first connect replays the boot's last events, and a replayed
+  unlock must not flash a whole room's worth of old unlocks; an unlock left on a protection-off
+  chip (red) or a late one the chip never took stays still. A late-committing unlock whose `seq`
+  sits under the boot's misses its pulse, never its chip. **"last seen N min ago"** (DESIGN.md §2's
+  staleness caption) beside a focused, unlocked or protection-off chip once its phone has gone a
+  whole minute unheard: a phone checks in every 30 s and the grid reads check-ins from its 15 s
+  refresh, so under a minute is normal; a focused phone reads Silent at 90 s, its label carrying
+  the minutes from then. **Clock off** is a hairline badge at `radius-xs` (§5's small badges,
+  over the canvas's pill), in `caption` and `text-tertiary`, never a colour of its own (S9). **The
+  health line** loses its em-dash ("Reconnecting… last updated 40s ago"; "Live feed has gone
+  quiet. Last updated 61s ago."), and says minutes from the first minute, where it said "437s".
+
 - **2026-10-05** — **D2h: the app's theme in Soft premium, and the first-run screens (#115).**
   `Theme.swift`'s `PrimaryButtonStyle`, `SecondaryButtonStyle` and `Chip` are pills
   (`radius-full`). The theme is shared, so every screen's buttons and chips take the shape at
