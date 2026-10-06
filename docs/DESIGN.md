@@ -57,8 +57,9 @@ PR.
 
 **Where it stands today:** the iOS app draws from the tokens (`Theme.swift`,
 pinned by `AppTests.tokens`) in the Soft premium shapes from D2h, pill buttons
-and chips, sunken inputs under the focus ring; its screens take the style
-group by group, D2h–D2k. The portal draws from them too, from D2c on
+and chips, sunken inputs under the focus ring, and from D2i Home's hero card in
+a tray and the ring on Focus and Waiting on a raised disc; its screens take the
+style group by group, D2h–D2k. The portal draws from them too, from D2c on
 (`apps/web/src/app/globals.css`, pinned by `tokens.test.ts`): every semantic
 token as a `--bali-*` variable (and the primitives they and the mark
 reference), light on `:root` and dark under the device's dark mode,
@@ -112,7 +113,8 @@ In this file's terms:
   carries the edge.
 - **Pills.** State chips, buttons and Emergency Unlock are `radius-full`;
   inputs keep `radius-sm`. Three radii do the work: 20 / 14 / full (§5).
-- **A soft warm shadow.** `shadow-1` at rest, `shadow-2` on a raised disc or
+- **A soft warm shadow.** `shadow-1` at rest, `shadow-2` on a raised disc (the
+  app's ring on Focus and Waiting, D2i) or
   popover, `shadow-3` on sheets: warm black, never blue-grey, never a hard
   drop (§6).
 - **Tinted chips on plain cells** (Q5 A). The chip is filled with its state's
@@ -166,6 +168,7 @@ portal's `GridDisplay` (`apps/web/src/lib/grid-state.ts`).
 | `ended` | ended | `state-ended-*` | flag / flag | grid "Left" |
 | `silent` (derived, never stored) | none: the design system has staleness as a badge only | `state-ended-*` fill and ink, with a 1 px dashed `border-strong` edge (Q3 A) | wifi-off / wifi.slash | grid "Silent · 2 min" (D2f): the whole minutes since the last check-in, in the label |
 | grid `absent` / app "not in" | not_joined | `state-notjoined-*` | circle / circle | grid "Not here"; app "Not in" |
+| app waiting (a tap before the Start, decision 5) | none | `state-notjoined-*` (D2i): no shield is on yet, so never green | clock / clock | Home's "Waiting" |
 | grid `left_unprotected` | none | `state-emergency-*` (Q2 A) | flag, then lock-open | "Left · unlocked" |
 | grid `left_protection_off` | none | `state-revoked-*` (Q2 A) | flag, then shield-off | "Left · protection off" |
 | grid `unknown` | none | no fill (`state-nodevice-bg`), a 1 px dashed `border-strong` edge, `text-primary` ink (Q3 A) | circle-help / questionmark.circle | "Unknown · refresh": refresh is the action |
@@ -188,9 +191,11 @@ each take their state's own colour (the owner's pick, 2026-10-04, Q2 A), and
 ISSUES #2's reason still stands: a phone that left the roster while unshielded
 must never read as the quiet "Left", so the icon and the label carry it, the
 flag first and the state's icon after it. Two app chips the canvas did not
-draw get their look in their screen group's step: Home's Waiting (D2i) and
-History's "Screen Time back on" (D2j); until then they stay as built, on the
-not-joined pair.
+draw get their look in their screen group's step: Home's Waiting has its own
+since D2i, the not-joined pair with a clock (a waiting phone is not in yet, so
+it takes not in's colour, and the clock and the word say the tap counted and
+the lock comes with the Start); History's "Screen Time back on" gets its look
+in D2j and stays as built, on the not-joined pair, until then.
 
 **Colour rules (law):**
 
@@ -261,7 +266,9 @@ class page's minutes field takes it when D2f redraws that page.
   second. VoiceOver's action unlocks in one step, so the hold never stands
   between anyone and the exit. Warm orange, `radius-full`; the hold's progress
   is a ring, and the `spring` easing is its spring-back on an early release.
-  Always reachable when the shields are on.
+  Always reachable when the shields are on. Its words are D1's on two lines
+  (D2i): "Hold to unlock" in the button's label style, "Your teacher will see
+  it" under it in `body`, each one line at the default text size.
 - **Card and tray:** a card is `surface-card` with `shadow-1` at rest and, in
   dark, a `border-default` hairline instead. A group of cards sits in a tray:
   `surface-sunken` at `radius-lg` with a `space-2` inset, the cards inside at
