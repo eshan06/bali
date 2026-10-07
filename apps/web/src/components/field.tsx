@@ -10,12 +10,14 @@ import type { ComponentProps, ReactNode } from 'react';
  * acts on the field (the classes home's Create class), sits on the input's row and wraps under it
  * on a narrow form. A refusal sets `aria-invalid`, which draws the edge in `text-primary`, never
  * red; its words are the page's, said after the help, and reach the input through
- * `aria-describedby`, beside the help.
+ * `aria-describedby`, beside the help. `refusal` says them right under the input instead, before
+ * the help, and sets `aria-invalid` itself: the invite code's refusal of the code (Entry & info).
  */
 export type FieldProps = Omit<ComponentProps<'input'>, 'className'> & {
   id: string;
   label: string;
   help?: string;
+  refusal?: string;
   mono?: boolean;
   trailing?: ReactNode;
 };
@@ -24,13 +26,18 @@ export function Field({
   id,
   label,
   help,
+  refusal,
   mono = false,
   trailing,
   'aria-describedby': describedBy,
+  'aria-invalid': invalid,
   ...props
 }: FieldProps) {
   const helpId = `${id}-help`;
-  const describes = [help ? helpId : null, describedBy].filter(Boolean).join(' ');
+  const refusalId = `${id}-refusal`;
+  const describes = [help ? helpId : null, refusal ? refusalId : null, describedBy]
+    .filter(Boolean)
+    .join(' ');
   return (
     <div>
       <label htmlFor={id} className="block text-body font-medium">
@@ -43,12 +50,18 @@ export function Field({
           <input
             id={id}
             {...props}
+            aria-invalid={refusal ? true : invalid}
             aria-describedby={describes || undefined}
             className={`block h-10 w-full rounded-sm border border-border-input bg-surface-sunken px-3 text-input text-text-primary aria-[invalid=true]:border-text-primary ${mono ? 'font-mono font-medium' : ''}`}
           />
         </div>
         {trailing}
       </div>
+      {refusal ? (
+        <p id={refusalId} role="alert" className="mt-2 text-body text-pretty">
+          {refusal}
+        </p>
+      ) : null}
       {help ? (
         <p id={helpId} className="mt-2 text-caption text-text-tertiary">
           {help}

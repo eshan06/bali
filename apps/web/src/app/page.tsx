@@ -9,6 +9,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Blocks } from '@/components/blocks';
 import { Button } from '@/components/button';
 import { CARD } from '@/components/card';
+import { EntryPage } from '@/components/entry-page';
 import { Field } from '@/components/field';
 import { InviteCode } from '@/components/invite-code';
 import { TextLink } from '@/components/text-link';
@@ -100,12 +101,17 @@ export default function HomePage() {
   }
 
   if (me === null || me.user.role !== 'teacher') {
+    // Not a teacher yet, as `/v1/me` says: the invite code, in place of the classes or a 403.
+    if (me) {
+      return (
+        <EntryPage signedIn>
+          <InviteCode onTeacher={onTeacher} />
+        </EntryPage>
+      );
+    }
     return (
       <main className={PAGE}>
-        {me ? (
-          // Not a teacher yet, as `/v1/me` says: the invite code, in place of the classes or a 403.
-          <InviteCode onTeacher={onTeacher} />
-        ) : error ? (
+        {error ? (
           <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
             <p role="alert" className="text-body">
               Couldn&apos;t load your account. <span className="text-text-secondary">{error}</span>

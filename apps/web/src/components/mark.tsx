@@ -18,12 +18,17 @@ export function Mark({ size = 24 }: { size?: number }) {
   );
 }
 
-/** The lockup that opens a page with no bar (/login, the callback, the help and policy pages). */
-export function Lockup() {
+/**
+ * The bar that opens a page with no Sign out bar (/login, the callback, the help and policy
+ * pages): the lockup alone, where the signed-in bar holds it, 56 px tall at the bar's gutters.
+ */
+export function LockupBar() {
   return (
-    <p translate="no" className="inline-flex items-center gap-2 text-body font-semibold">
-      <Mark size={28} />
-      Bali
-    </p>
+    <header className="flex h-14 shrink-0 items-center px-4 sm:px-10">
+      <p translate="no" className="inline-flex items-center gap-2 text-body font-semibold">
+        <Mark size={24} />
+        Bali
+      </p>
+    </header>
   );
 }

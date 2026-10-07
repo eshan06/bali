@@ -48,9 +48,10 @@ describe('the policy pages are a marked draft outline', () => {
   });
 
   it('every section is rendered through the one place that marks it as a placeholder', () => {
-    // The map over `sections` and the marker sit in the same renderer: a section can't skip it.
-    expect(draft).toMatch(/sections\.map\([\s\S]*Placeholder\.[\s\S]*<\/section>/);
-    expect(draft.match(/Placeholder\./g)).toHaveLength(1);
+    // The map over `sections` and its Placeholder badge sit in the same renderer: a section
+    // can't skip it.
+    expect(draft).toMatch(/sections\.map\([\s\S]*>\s*Placeholder\s*<\/span>[\s\S]*<\/section>/);
+    expect(draft.match(/>\s*Placeholder\s*</g)).toHaveLength(1);
   });
 
   it('has the sections the owner named, then Contact with the support address as a mailto link', () => {
