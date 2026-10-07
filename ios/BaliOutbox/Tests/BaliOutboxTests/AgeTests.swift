@@ -119,7 +119,7 @@ struct AgeTests {
     }
 
     @Test(
-        "Sign in pressed asks the check (the owner's decision, 2026-10-06): not passed, the question shows and no sign-in page may open, however often it is pressed; answered 13 or older, the page may open; under 13, none may and the stop screen stays"
+        "Sign up pressed asks the check (the approved Sign in & sign up design): not passed, the question shows and no page may open, however often it is pressed; answered 13 or older, the way to the page goes on; under 13, none may and the stop screen stays"
     )
     func asks() {
         var check = AgeCheck(.unanswered)

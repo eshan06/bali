@@ -46,9 +46,9 @@
         /// Each named for the screen it shows, then a state of it (`AppTests.fixtures` pins that).
         static let all: [String: State] = [
             "starting": State(signedIn: nil, protection: nil, sync: nil),
-            // The 13+ check (C7) once Sign in is pressed: the question, nothing picked; both
+            // The 13+ check (C7) once Sign up is pressed: the question, nothing picked; both
             // picked, Continue ready; and the stop screen an answer under 13 gets. Sign in with
-            // the check not asked yet, as a first launch has it after the intro.
+            // the check not asked yet, as a first launch has it.
             "age": State(age: .asked, signedIn: false),
             "agePicked": State(age: .asked, birth: Birth(month: 3, year: 2009), signedIn: false),
             "tooYoung": State(age: .tooYoung, signedIn: false),
