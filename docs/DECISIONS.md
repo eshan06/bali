@@ -8,13 +8,27 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
-- **2026-10-06** — **The portal's four new designs approved; B1 builds what they share: no grey
+- **2026-10-06** — **PB2, the entry and info pages, built to the Entry & info canvas; where the
+  canvas's render and its CSS disagree, the CSS wins; the portal's steps renamed PB1–PB5.** The
+  built pages match the canvas's boards in a pixel diff, but in two places the board's own CSS
+  says one thing and its render shows another: its reset `.bali ul{margin:0}` outranks
+  `.jump{margin-top:24px}` and `.foot{margin-top:48px}`, so the render drops both margins and
+  sets Help's jump links flush under the lead and the policy pages' foot links' hairline flush
+  under Contact. The pages take the margins the CSS declares (24 px, 48 px): a slip of
+  specificity, not a choice the canvas made. The invite code's two answer places are the
+  canvas's own (its note, point 5): a refusal of the code right under the field, before the help,
+  any other answer right above the button that retries it, so an error never reads as help (the
+  Field's `refusal`; `placeAnswer`). And the portal's build steps are PB1–PB5 from here (they were
+  B1–B5): the app's finished steps in PLAN.md are B1a–B5b, and the same letters for two step
+  lists read as one (PB1's review).
+
+- **2026-10-06** — **The portal's four new designs approved; PB1 builds what they share: no grey
   tray, `border-input`, `code-lg`.** The owner judged D2's portal look (D2c–D2g) poor, had four
   designs drawn in Claude Design and approved all four: [Entry & info](https://claude.ai/artifact/K7vJUJLDNpHgtZV9cYcXbF),
   [Classes home](https://claude.ai/artifact/Shc2dz4xn8Qc9iDHDuYT2N),
   [Class page & live grid](https://claude.ai/artifact/662Zkg7urbM64BXvNbq2GX) and
   [Recap & reports](https://claude.ai/artifact/BuiyWgXpVNkhPR8osDBcHZ). No undo of D2's portal:
-  B1–B5 build them on its code, one PR each (B1 the shared pieces, then the entry pages, the
+  PB1–PB5 build them on its code, one PR each (PB1 the shared pieces, then the entry pages, the
   classes home, the class page, the recap and reports). **The rulings that came with them:**
   (1) **No grey tray, anywhere** ("I don't like the little gray boxes that show up behind stuff…
   it wasn't there in the original design"): a card sits straight on the page with its own
@@ -34,7 +48,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   and a phone only where students arrive from the app (Cognito's pages, Help, the policy pages);
   no page may break on a phone or a tablet. (5) **A design shows what is real:** only what the
   backend does today, and only the screens Phases 2 to 6 ask for. The bar stays as shipped.
-  **B1's own calls:** the secondary Button draws pressed and open (`aria-pressed`,
+  **PB1's own calls:** the secondary Button draws pressed and open (`aria-pressed`,
   `aria-expanded`) as a sunken fill with a `text-primary` edge, as the class page canvas's
   buttons do, so Present and New code take it from the Button rather than each page; the length
   picker, its track gone, is a pill per length with the pick pressed the same way and a check;
