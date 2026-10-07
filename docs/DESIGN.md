@@ -99,7 +99,10 @@ centred under a bar that holds the lockup, `components/entry-page.tsx`; Help
 and the policy pages under the same bar), PB3 the classes home (the classes
 and their create row in one column, the block's card beside it), PB4a the
 class page's live session (the bell's card, the grid's cells, Present's folded
-header), and PB4b–PB5 redraw the rest. Every
+header), PB4b the class page before a session (the length picker and Start in
+one card, New code's confirm a raised card under the header, a Loading or Error
+card in the session's place until the class is read), and PB5 redraws the rest.
+Every
 portal source file is held to the tokens' utilities by `tokens.test.ts`, and
 since D2g the theme holds none of Tailwind's own colours, type sizes,
 tracking or leading, so a default draws nothing. **A portal page uses the

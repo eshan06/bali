@@ -8,6 +8,26 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-07** — **PB4b: until the class is read, the class page holds the session's place, never
+  the Start form** (the owner's ruling, with the approved Class page & live grid design). The page
+  drew the Start form whenever it knew of no running session, so it showed while the class was
+  still being read: even mid-lesson, a reload flashed the length picker and Start before the live
+  grid replaced them, and a Start pressed then could only answer "a session was already running".
+  Now the session's place is the canvas's Loading card ("Loading…") until the class is read, and
+  its Error card if the read failed ("Couldn't load this class." with the reason and Try again, as
+  before), with no roster under it; the Start form shows only for a class read with no session
+  running. A class read whose roster failed keeps the line under the header it had, the canvas
+  drawing no board for it. Built with it, from the canvas: the length picker and Start on one row
+  of a card standing alone, Start at its end and a failed Start said in the card; New code's confirm
+  a raised card on a line of its own under the header (last in the header, so Present's row keeps
+  its controls), a failed mint said in it; the roster in four columns with no hairlines. **Where
+  the build differs from the boards, on purpose:** a made code's line sits under the code
+  right-aligned, as before, so the code keeps its place as the line widens its column (the canvas
+  draws the line alone, left-aligned); the Field keeps PB1's `border-input` edge where the canvas
+  drew `border-default`; and the name sits 1 px higher, the header top-aligned so that line never
+  moves it. In Present, a made code's line makes the code's column taller, so the header's row
+  re-centres while it shows.
+
 - **2026-10-07** — **PB4a, the class page's live session, built to the Class page & live grid
   canvas; six columns at the desktop width, where the canvas's render drew five.** The canvas sets
   each column at 216 px or more and says "six to a row at 1440", but its 1400 px page less two 40 px
