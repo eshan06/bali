@@ -69,6 +69,13 @@ export const SESSION_ALREADY_RUNNING =
   "A session was already running, so the length you picked wasn't used. It ends at the time shown.";
 
 /**
+ * A create, a register or a redeem reached an account deleted on its way (C3, `account_deleted`):
+ * nothing was made, and the way on is a fresh sign-in (PB3's review).
+ */
+export const ACCOUNT_DELETED =
+  'This account was deleted, so nothing changed. Sign out, then sign in again.';
+
+/**
  * The refusals a person can act on, in their words (T2): keyed on the error's `reason`, never its
  * message, which is written for a log. Each says what happened and what to do next.
  */
@@ -87,6 +94,8 @@ const REFUSALS = new Map<string | undefined, string>(
       'This account is a student in a class. Use a separate account for teaching, and enter your code there.',
     // Any mutation: its `event_id` already names another event (rule 4). Nothing was changed.
     event_id_conflict: "That didn't go through, so nothing changed. Try again.",
+    // A class or block create, or a redeem, that reached an account deleted on its way (C3).
+    account_deleted: ACCOUNT_DELETED,
     // POST /v1/sessions/{id}/extend (P10): past the bell, or ended, no time is added (decision
     // 12). An End in that gap ends it at its bell and shows the recap, and a Start then works.
     session_not_running:

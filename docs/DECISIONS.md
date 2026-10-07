@@ -8,6 +8,24 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-07** — **PB5b: the reports list as the canvas draws it; a deleted account said in Bali's
+  words.** The list keeps D2g's one markup (a card per session, a `dt`/`dd` per figure, the column
+  names `aria-hidden` above it, never a table) and takes the canvas's look: the list 72 rem in the
+  class page's 1400 px column (it was centred alone), each session's day over its times, the
+  figures right-aligned under the canvas's column widths from a 56 rem list, "min" beside the
+  minutes in `text-secondary`, **a zero quiet** in the small grey words' ink, and an unlock or
+  protection-off count above zero in its state's ink with its icon (lock-open, shield-off), so a
+  count that needs a look reads at a glance and never by colour alone. "No reports yet." is a lead
+  line over when one will show, and "Couldn't load the sessions." says its reason on its own line,
+  Try again under both, as the recap's failure does. An opened session shows PB5a-2's timeline
+  under a hairline in its card. **No student page, no names that link** (the owner dropped them
+  until the backend can serve one). **The ride-along** (PB3's review): the API's sentence for a
+  deleted account's refusal, "this account was deleted", is a log line, and the create showed it as
+  it was; `errText` now says "This account was deleted, so nothing changed. Sign out, then sign in
+  again." for `account_deleted` wherever it reaches (the class create, an invite's redeem), and a
+  block's register, which said any 409 as another teacher's tag, says it too: the ID was never the
+  problem, so it is no refusal of the ID.
+
 - **2026-10-07** — **PB5a-2: the recap card shows the timeline; its figures never without it.**
   The card reads the session's report (R2) and its events together, and either read failing is
   the card's one failure, "Couldn't load the last session." with Try again: the timeline is where

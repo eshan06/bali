@@ -38,8 +38,13 @@ export async function registerBlock(
     return { kind: 'registered', block, already: owned.some((b) => b.id === block.id) };
   } catch (e) {
     if (e instanceof NetworkError) return { kind: 'failed', message: CANT_REACH };
-    // The route's one 409 and its one 400: another teacher's tag, and an ID it can't take.
-    if (e instanceof ApiError && e.status === 409) return { kind: 'refused', message: BLOCK_TAKEN };
+    // The route's 409s and its one 400: another teacher's tag, an account deleted on its way (said
+    // as errText says it, the ID being fine), and an ID it can't take.
+    if (e instanceof ApiError && e.status === 409) {
+      return e.reason === undefined
+        ? { kind: 'refused', message: BLOCK_TAKEN }
+        : { kind: 'failed', message: errText(e) };
+    }
     if (e instanceof ApiError && e.status === 400) {
       return { kind: 'refused', message: NOT_A_BLOCK_ID };
     }

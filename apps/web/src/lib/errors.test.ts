@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { ApiError, createApiClient, NetworkError } from './api-client';
 import {
+  ACCOUNT_DELETED,
   CANT_ADD_TIME,
   CANT_MAKE_CODE,
   CANT_REACH,
@@ -139,6 +140,8 @@ describe('errText for a redeem’s refusals (T2)', () => {
       'student_in_class',
       'This account is a student in a class. Use a separate account for teaching, and enter your code there.',
     ],
+    // An account deleted on its way (C3): the API's own sentence is a log line (PB3's review).
+    [409, 'conflict', 'account_deleted', ACCOUNT_DELETED],
   ] as const;
 
   it('says each in its words, keyed on the reason, whatever the message', () => {

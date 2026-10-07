@@ -365,6 +365,7 @@ describe('every page and piece uses the tokens’ utilities, never a Tailwind de
     expect(DRAWN.length).toBeGreaterThan(30);
     expect(DRAWN).toContain(join('components', 'recap-card.tsx'));
     expect(DRAWN).toContain(join('app', 'classes', '[id]', 'reports', 'page.tsx'));
+    expect(DRAWN).toContain(join('components', 'reports-list.tsx'));
   });
 
   // A side's border, a ring's offset and a shadow take a colour too (`border-t-slate-200`).
@@ -441,7 +442,7 @@ describe('the reports list reflows by its own width (D2g)', () => {
   // At ~600 px the table ran off the right edge (DESIGN.md §8: a layout reflows by column count,
   // never by smaller type). Each session is a card whose figures sit under their own names when
   // the list is narrow, so no column is ever out of view in a box that scrolls sideways.
-  const page = read('./classes/[id]/reports/page.tsx');
+  const page = read('./classes/[id]/reports/page.tsx') + read('../components/reports-list.tsx');
 
   it('is no table, and nothing in it scrolls sideways or refuses to wrap', () => {
     expect(page).not.toMatch(/<table\b|overflow-x-(?:auto|scroll)|whitespace-nowrap/);

@@ -101,7 +101,9 @@ and their create row in one column, the block's card beside it), PB4a the
 class page's live session (the bell's card, the grid's cells, Present's folded
 header), PB4b the class page before a session (the length picker and Start in
 one card, New code's confirm a raised card under the header, a Loading or Error
-card in the session's place until the class is read), and PB5 redraws the rest.
+card in the session's place until the class is read), and PB5 the recap and the reports (the
+session after the bell as a timeline of marks, `components/timeline.tsx`; the reports list a card
+per session with its counts in their states' inks), which finished the four designs.
 Every
 portal source file is held to the tokens' utilities by `tokens.test.ts`, and
 since D2g the theme holds none of Tailwind's own colours, type sizes,
@@ -187,6 +189,12 @@ sign-in fields take it too (`infra/cognito/hosted-ui/hosted-ui.css`, PB2a).
 `globals.css` holds it, pinned by `tokens.test.ts`, until the design system's
 next export carries it (`bali-tokens.json` is that export, byte for byte, never
 edited by hand).
+
+**Small grey words in dark:** the Recap & reports design draws captions and
+labels in `text-tertiary` in light and `text-secondary` in dark, where the
+tokens' dark `text-tertiary` is 4.2:1 on a card, under AA's 4.5 (PB5,
+`dark:text-text-secondary`). The other screens keep `text-tertiary` in dark, as
+their designs drew it; making it portal-wide is the owner's call.
 
 **The states** are the heart of the product: every surface shows a student's
 state with a chip, always colour + icon + label, never colour alone. The design
@@ -511,11 +519,13 @@ a red chip.
   layout but where students arrive from the app), and no page may break on a
   phone or a tablet. The grid reflows by column count, never by
   shrinking chips or text below the type scale. Mobile collapse is declared per
-  layout, not assumed. The reports list (D2g) is a card per session: one row
+  layout, not assumed. The reports list (D2g, PB5b) is a card per session: one row
   under the column names where the session and its six figures
   fit (the list 56 rem wide, a 1024 px window included); narrower, each figure
   sits under its own name, three to a row and then two. Never a table that
-  scrolls sideways.
+  scrolls sideways. The recap's timeline (PB5a) keeps each name beside its row
+  from a 40 rem card, and over it narrower; its axis shows every other time
+  under 64 rem and only its ends under 28 rem, so no two labels touch.
 
 ## 9. Agent prompt guide
 
