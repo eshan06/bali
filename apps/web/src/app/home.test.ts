@@ -25,8 +25,11 @@ describe('the classes home’s create row', () => {
   it('says nothing for an empty name, and nothing for a made class but the list', () => {
     expect(Object.keys(errors)).not.toContain('NO_CLASS_NAME');
     expect(page).not.toMatch(/Enter a name|is ready/);
-    // What the row does say: a create's failure, under the field, and Try again on its button.
-    expect(page).toContain("{busy ? 'Creating…' : failed ? 'Try again' : 'Create class'}");
+    // What the row does say: a create's failure, under the field, and Try again on its button,
+    // but after a final refusal (a deleted account), which no resend can change (PB5's review).
+    expect(page).toContain(
+      "{busy ? 'Creating…' : failed?.kind === 'failed' ? 'Try again' : 'Create class'}",
+    );
     // The list says a made class out loud too: it sits in a polite live region, the empty line
     // with it, so a first class replacing that line is heard as well; the form stays outside it,
     // its failure already an alert of its own.
@@ -38,5 +41,16 @@ describe('the classes home’s create row', () => {
       expect(page.indexOf(inside), inside).toBeLessThan(end);
     }
     expect(page.indexOf('<form')).toBeGreaterThan(end);
+  });
+
+  it('offers Try again on the block’s register only for an answer that never came (PB5’s review)', () => {
+    // A refusal, of the ID or a deleted account's (`final`), keeps the button's own words.
+    const blocks = readFileSync(
+      fileURLToPath(new URL('../components/blocks.tsx', import.meta.url)),
+      'utf8',
+    );
+    expect(blocks).toContain(
+      "{busy ? 'Registering…' : said?.kind === 'failed' ? 'Try again' : 'Register block'}",
+    );
   });
 });

@@ -13,7 +13,7 @@ import { EntryPage } from '@/components/entry-page';
 import { Field } from '@/components/field';
 import { InviteCode } from '@/components/invite-code';
 import { getAccessToken } from '@/lib/auth';
-import { CLASS_NAME_MAX, createClass } from '@/lib/classes';
+import { CLASS_NAME_MAX, type CreateAnswer, createClass } from '@/lib/classes';
 import { errText } from '@/lib/errors';
 import { useApi } from '@/lib/use-api';
 
@@ -37,8 +37,9 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
-  // The last create's failure, said under the field; Try again sends the name again.
-  const [failed, setFailed] = useState<string | null>(null);
+  // The last create's failure, said under the field; Try again sends the name again, but after a
+  // final refusal (a deleted account), which no resend can change.
+  const [failed, setFailed] = useState<Exclude<CreateAnswer, { kind: 'created' }> | null>(null);
   // Set by a redeem (T2): the classes heading takes focus once the account is read as a teacher.
   const redeemed = useRef(false);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -83,7 +84,7 @@ export default function HomePage() {
     // The list as the server has it, whatever the answer: a class made before its answer was lost
     // shows before Try again, and beside a second one after it (DECISIONS, 2026-09-20: visible).
     load();
-    if (answer.kind === 'failed') return setFailed(answer.message);
+    if (answer.kind !== 'created') return setFailed(answer);
     setName('');
   }
 
@@ -189,13 +190,13 @@ export default function HomePage() {
                   // empty name disables it by `aria-disabled`, which keeps it focusable when a
                   // made class empties the field under it.
                   <Button type="submit" aria-disabled={busy || !name.trim()} aria-busy={busy}>
-                    {busy ? 'Creating…' : failed ? 'Try again' : 'Create class'}
+                    {busy ? 'Creating…' : failed?.kind === 'failed' ? 'Try again' : 'Create class'}
                   </Button>
                 }
               />
               {failed ? (
                 <p id={`${id}-said`} role="alert" className="mt-4 text-body break-words">
-                  {failed}
+                  {failed.message}
                 </p>
               ) : null}
             </form>

@@ -172,6 +172,9 @@ describe('redeemInvite', () => {
       [409, 'conflict', 'invite_expired'],
       [409, 'conflict', 'already_teacher'],
       [409, 'conflict', 'student_in_class'],
+      // An account deleted on its way: no Try again either (PB5's review), the screen's button
+      // offering it to a failure alone (invite-code.test.ts).
+      [409, 'conflict', 'account_deleted'],
     ] as const) {
       const { client } = api(status, { error: { code, reason, message: 'a log line' } });
       const message = errText(new ApiError(status, code, 'a log line', reason));

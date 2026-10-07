@@ -20,6 +20,8 @@ export type RegisterAnswer =
   | { kind: 'registered'; block: BlockDetail; already: boolean }
   /** Refused, nothing changed: the ID is the thing to put right. */
   | { kind: 'refused'; message: string }
+  /** Refused for the account, never the ID (a deleted one, C3): nothing to put right or resend. */
+  | { kind: 'final'; message: string }
   /** No answer to go by (unreachable, a timeout, a 5xx, over the budget): Try again resends it. */
   | { kind: 'failed'; message: string };
 
@@ -43,7 +45,7 @@ export async function registerBlock(
     if (e instanceof ApiError && e.status === 409) {
       return e.reason === undefined
         ? { kind: 'refused', message: BLOCK_TAKEN }
-        : { kind: 'failed', message: errText(e) };
+        : { kind: 'final', message: errText(e) };
     }
     if (e instanceof ApiError && e.status === 400) {
       return { kind: 'refused', message: NOT_A_BLOCK_ID };
