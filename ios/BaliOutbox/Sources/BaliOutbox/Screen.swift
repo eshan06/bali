@@ -23,10 +23,11 @@ public enum Screen: Sendable, Hashable {
     /// The screen for what the phone knows at `now`: `problem`, why the app could not start;
     /// `deleting`, whether Me's Delete account has its own screen to show (C4b, `Deleting.shows`),
     /// before everything but a start that failed — nothing else is offered from the press to the
-    /// end; `age`, the 13+ check's answer (C7) — its question in place of Sign in once Sign in
-    /// was pressed with it not passed (the owner's decision, 2026-10-06), the stop screen there
-    /// once answered under 13, and, signed in with it not passed, the question before anything
-    /// but a session's screens; `introSeen`, the phone's own flag (C1);
+    /// end; `age`, the 13+ check's answer (C7) — its question in place of Sign in once Sign up
+    /// was pressed with it not passed (the approved Sign in & sign up design), the stop screen
+    /// there once answered under 13, and, signed in with it not passed, the question before
+    /// anything but a session's screens; `intro`, whether Sign up shows the intro next, before its
+    /// page (C1) — a first launch opens on Sign in, and Sign in shows none;
     /// `signedIn`, nil until the Keychain could be read;
     /// `protection`, what rule 3's check found, nil until the enforcer runs and unchecked until its
     /// first pass; `everApproved`, whether a pass has ever read the permission approved (C1b) —
@@ -49,7 +50,7 @@ public enum Screen: Sendable, Hashable {
     /// honoured — in the same answer, at the same `now`, so the screen and its bar never disagree,
     /// at a bell either (C6a's review).
     public static func choose(
-        problem: String?, deleting: Bool, age: AgeCheck.Answer, introSeen: Bool, signedIn: Bool?,
+        problem: String?, deleting: Bool, age: AgeCheck.Answer, intro: Bool, signedIn: Bool?,
         protection: Protection?, everApproved: Bool, everInClass: Bool, sync: SyncState?,
         hasClasses: Bool?, sessionOverClosed: SessionView?, opened: [Screen], tab: Screen, now: Date
     ) -> (screen: Screen, tabbed: Bool) {
@@ -61,24 +62,23 @@ public enum Screen: Sendable, Hashable {
         // The shields on — the enforcer's own rule, so the screen and the shields agree: focused in
         // a session the phone's own clock says still runs (decision 6), or a tap not yet answered
         // holding them (decision 7, to its cap; not after decision 11's unlock, nor refused) — is
-        // focus before anything else, the intro seen or not, signed out or not: the focus screen
-        // holds Emergency Unlock, always allowed.
+        // focus before anything else, signed out or not: the focus screen holds Emergency Unlock,
+        // always allowed.
         if let sync, sync.shieldedUntil(now) != nil { return (.focus, false) }
         // Where the phone stood not read, the last run's shields kept on (B6b): home, which holds
-        // Emergency Unlock there, before the intro and the sign-in too.
+        // Emergency Unlock there, before the sign-in too.
         if sync?.standing == .unread, protection?.shielded == true { return (.home, false) }
-        if !introSeen { return (.intro, false) }
         guard let signedIn, let protection, protection.checked, let sync else {
             return (.starting, false)
         }
-        // Signed out: Sign in — or, pressed with the 13+ check not passed (C7), its question in
-        // place, and the stop screen once answered under 13. The shields' screens above keep
-        // Emergency Unlock before them.
+        // Signed out: Sign in — or, Sign up pressed with the 13+ check not passed (C7), its
+        // question in place, the stop screen once answered under 13, then the intro where Sign up
+        // shows it. The shields' screens above keep Emergency Unlock before them.
         if !signedIn {
             switch age {
             case .asked: return (.age, false)
             case .tooYoung: return (.tooYoung, false)
-            case .unanswered, .passed: return (.signIn, false)
+            case .unanswered, .passed: return (intro ? .intro : .signIn, false)
             }
         }
         // Signed in on a phone that has not passed the check (the gap's fallback, the owner's
@@ -356,14 +356,16 @@ extension BlockRead {
 }
 
 extension SignInError {
-    /// What the Sign in screen says under its button when a sign-in did not finish (rule 5): the
-    /// kind of failure in plain words, and another try as the way — nil for a sign-in the student
-    /// closed: nothing changed, nothing to say. A refusal's OAuth code is never shown: the codes
-    /// that mean something to a student have their own words, the rest one line (the readout has
-    /// the code).
-    public var words: String? {
+    /// What the Sign in screen says under its buttons when a sign-in through `page` did not finish
+    /// (rule 5): the kind of failure in plain words, and another try as the way — nil for a page
+    /// the student closed: nothing changed, nothing to say. A refusal's OAuth code is never shown:
+    /// the codes that mean something to a student have their own words, the rest one line (the
+    /// readout has the code). Only a page that could not open names its page.
+    public func words(on page: HostedPage) -> String? {
         switch self {
         case .cancelled: nil
+        case .notOpened where page == .signUp:
+            "The sign-up page couldn't open. Try again, or ask your teacher."
         case .notOpened: "The sign-in page couldn't open. Try again, or ask your teacher."
         case .unreachable: "Can't reach the sign-in server. Check your connection and try again."
         case .refused("access_denied"?):

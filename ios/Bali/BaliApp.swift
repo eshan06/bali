@@ -57,10 +57,10 @@ final class Phone {
     /// A fixture's, frozen as it was made (Debug): never started.
     private var frozen = false
     /// The 13+ check (C7), as the phone's own defaults say — passed before, or not yet — and, this
-    /// run, whether Sign in asked it and what the student answered: under 13 is held here alone,
-    /// never written anywhere (`AgeCheck`). Asked at Sign in (`signIn(through:)`), and after a
-    /// sign-in on a phone that has not passed it (the gap's fallback), the sign-in giving Bali's
-    /// API nothing until it is answered.
+    /// run, whether Sign up asked it and what the student answered: under 13 is held here alone,
+    /// never written anywhere (`AgeCheck`). Asked at Sign up (`signIn(.signUp, through:)`), and
+    /// after a sign-in on a phone that has not passed it (the gap's fallback), the sign-in giving
+    /// Bali's API nothing until it is answered.
     private(set) var age = AgeCheck(defaults: .standard)
     /// The age screen's picks, the birth month and year, until Continue answers with them.
     var birth = Birth()
@@ -68,14 +68,19 @@ final class Phone {
     /// starts it, and nothing else does — the same deletion as Me's, said in the approved canvas's
     /// words where it drew them (santa's round 1).
     var underThirteen: Bool { age.answer == .tooYoung }
-    /// Sign in's (C1a): a sign-in under way, and why the last did not finish, as the sign-in said
-    /// it — the screen says its `words` (rule 5), the readout all of it.
+    /// Sign in's (C1a): a Cognito page under way — `hostedPage`, which its button's busy words name
+    /// — and why the last did not finish, as the sign-in said it: the screen says its `words` for
+    /// that page (rule 5), the readout all of it.
     private(set) var signingIn = false
+    private(set) var hostedPage = HostedPage.signIn
     private(set) var signInFailed: SignInError?
     /// Whether the student has seen the intro (C1): the phone's own flag, in its own defaults —
-    /// not the app group's, which the extensions read.
+    /// not the app group's, which the extensions read. Sign up shows the intro before its page
+    /// until it has been: `introShows`, in Sign in's place, until the page it opens ends without a
+    /// sign-in, or the sign-in it made lands (`signed`), so no Sign in shows between the two.
     private(set) var introSeen = UserDefaults.standard.bool(forKey: Phone.introSeenKey)
     static let introSeenKey = "introSeen"
+    private(set) var introShows = false
     /// Whether a pass has ever read the Screen Time permission approved (C1b), kept as `introSeen`
     /// is: Family Controls can read not determined for a moment after a launch (B5a-2), and with
     /// this set the router routes such a read as approved, so no Screen Time screen flashes on a
@@ -180,6 +185,8 @@ final class Phone {
     #if DEBUG
         init(fixture: PreviewFixtures.State) {
             (problem, introSeen, signedIn) = (fixture.problem, fixture.introSeen, fixture.signedIn)
+            (introShows, signingIn) = (fixture.introShows, fixture.signingIn)
+            (hostedPage, signInFailed) = (fixture.hostedPage, fixture.signInFailed)
             (age, birth) = (AgeCheck(fixture.age), fixture.birth)
             (protection, sync, frozen) = (fixture.protection, fixture.sync, true)
             (everApproved, askFailed, joining) = (false, fixture.askFailed, fixture.joining)
@@ -210,7 +217,7 @@ final class Phone {
     /// The router's answer over what the phone knows, with `opened` as the screens opened.
     private func choose(_ opened: [Screen]) -> (screen: Screen, tabbed: Bool) {
         Screen.choose(
-            problem: problem, deleting: deleting.shows, age: age.answer, introSeen: introSeen,
+            problem: problem, deleting: deleting.shows, age: age.answer, intro: introShows,
             signedIn: signedIn,
             protection: protection, everApproved: everApproved, everInClass: everInClass, sync: sync,
             hasClasses: hasClasses, sessionOverClosed: sessionOverClosed, opened: opened, tab: tab,
@@ -316,7 +323,8 @@ final class Phone {
     /// deletion's question or stop goes with the change too, while one under way, waiting for
     /// DeleteUser or done holds (`Deleting.signInChanged`); `pending`, the API has deleted the
     /// account and its Cognito sign-in waits to be — a relaunch (C4b) — so the deletion's screen
-    /// shows at once, Try again its one way on.
+    /// shows at once, Try again its one way on. The intro Sign up showed goes with a change too:
+    /// the sign-in its page made has landed.
     func signed(
         in signedIn: Bool?, as account: String? = nil, email: String? = nil, pending: Bool = false
     ) {
@@ -325,7 +333,7 @@ final class Phone {
             ?? (signedIn == true && self.signedIn == false)
         let changed = signedIn != self.signedIn || another
         if changed {
-            tab = .home
+            (tab, introShows) = (.home, false)
             forgetHistory()
             (naming, signOutFailed, leaving) = (Naming(), nil, Leaving())
             (joining, signIns) = (Joining(), signIns + 1)
@@ -595,38 +603,51 @@ final class Phone {
     /// the page at a URL, and where it sent the student back to the scheme given.
     typealias Browser = @MainActor @Sendable (URL, String) async throws(SignInError) -> URL
 
-    /// Sign in (C1a), the one way to the hosted UI — the screen's button, the age screen's
-    /// Continue and the readout's alike: with the 13+ check not passed on this phone, no page
-    /// opens and its question shows in Sign in's place (C7, the owner's decision, 2026-10-06);
-    /// else the hosted UI through `browser`, what did not finish kept (`signInFailed`). One at a
-    /// time. On a phone not started — a frozen one too — no page can open, which is said.
-    func signIn(through browser: Browser) async {
-        guard !signingIn, age.ask() else { return }
-        guard let signIn else { return signInFailed = .notOpened(Joining.notStarted) }
+    /// The one way to Cognito's hosted UI (C1a) — Sign in's two buttons, the age screen's
+    /// Continue, the intro's Sign up and the readout's alike — opening `page` (the approved Sign in
+    /// & sign up design). Sign in opens its page at once: a sign-in that comes back to a phone not
+    /// past the 13+ check is asked it then (the gap's fallback). Sign up asks the check first where
+    /// it has not passed (C7), then shows the intro where it has not been seen, each in Sign in's
+    /// place with no page opened; its page opens once both are behind it. After an answer under 13
+    /// no page opens this run, as the stop screen says. Through `browser`, one at a time, what did
+    /// not finish kept (`signInFailed`); a page that ends with no sign-in — closed, or not opened —
+    /// leaves the intro for Sign in, and one that signs the student in leaves it until the sign-in
+    /// lands (`signed`). On a phone not started — a frozen one too — no page can open, which is
+    /// said.
+    func signIn(_ page: HostedPage = .signIn, through browser: Browser) async {
+        guard !signingIn, age.answer != .tooYoung else { return }
+        if page == .signUp {
+            guard age.ask() else { return }
+            guard introSeen else { return introShows = true }
+        }
+        hostedPage = page
+        guard let signIn else {
+            return (introShows, signInFailed) = (false, .notOpened(Joining.notStarted))
+        }
         (signingIn, signInFailed) = (true, nil)
         defer { signingIn = false }
         let scheme = signIn.cognito.redirectURI.scheme ?? ""
         do {
-            try await signIn.signIn { @MainActor url throws(SignInError) in
+            try await signIn.signIn(page) { @MainActor url throws(SignInError) in
                 try await browser(url, scheme)
             }
         } catch {
-            signInFailed = error
+            (introShows, signInFailed) = (false, error)
         }
     }
 
     /// The age screen's Continue (C7): the picks answer the check, judged by the phone's clock and
     /// calendar today — passed, kept in the phone's own defaults (never on a frozen fixture, which
-    /// keeps nothing for another), and the sign-in page opens at once through `browser`, with no
-    /// second press of Sign in; under 13, kept nowhere, in memory until the app is reopened — and
-    /// the picks are let go either way. Nothing until both are picked. Signed in (the gap's
-    /// fallback), no page opens: 13 or older lets the sign-in reach Bali's API, everything queued
-    /// sent and the truth read at once; under 13 deletes the account, as Delete account does.
+    /// keeps nothing for another), and Sign up goes on at once, with no second press: the intro, or
+    /// its page; under 13, kept nowhere, in memory until the app is reopened — and the picks are
+    /// let go either way. Nothing until both are picked. Signed in (the gap's fallback), no page
+    /// opens: 13 or older lets the sign-in reach Bali's API, everything queued sent and the truth
+    /// read at once; under 13 deletes the account, as Delete account does.
     func answerAge(through browser: Browser) async {
         guard let month = birth.month, let year = birth.year else { return }
         age.answered(month: month, year: year, defaults: frozen ? nil : .standard)
         birth = Birth()
-        guard signedIn == true else { return await signIn(through: browser) }
+        guard signedIn == true else { return await signIn(.signUp, through: browser) }
         guard age.answer == .passed else {
             deleting.ask()
             return await deleteAccount()
@@ -634,9 +655,13 @@ final class Phone {
         await retry()
     }
 
-    func sawIntro() {
+    /// The intro's Sign up, on its last page (C1): the intro seen, kept in the phone's own
+    /// defaults — a frozen fixture's in itself only — and Sign up's page opened through the one
+    /// gate, the intro staying, Signing up… on its button, while the page is open.
+    func sawIntro(through browser: Browser) async {
         introSeen = true
-        UserDefaults.standard.set(true, forKey: Phone.introSeenKey)
+        if !frozen { UserDefaults.standard.set(true, forKey: Phone.introSeenKey) }
+        await signIn(.signUp, through: browser)
     }
 
     /// Keeps `id` as the student listed in a class on this phone, in its own defaults — a frozen
@@ -998,13 +1023,10 @@ final class Phone {
                 ?? "not joined: \(joined.result) \(joined.error?.error.message ?? "")"
         }
 
-        /// Signs in as Sign in does (`Phone.signIn`), the 13+ check first: what happened.
+        /// Signs in as Sign in does (`Phone.signIn`): what happened.
         private func signingIn() async -> String {
             guard !phone.signingIn else { return "A sign-in is under way already" }
             await phone.signIn(through: browser.hostedUI)
-            if phone.age.answer != .passed {
-                return "Not opened: the 13+ check comes first, in Sign in's place"
-            }
             return phone.signInFailed.map { "Sign-in didn't finish: \($0)" } ?? "Signed in"
         }
 

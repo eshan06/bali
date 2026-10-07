@@ -8,6 +8,30 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-07** — **The Sign in screen and the sign-up path, the Sign in & sign up design's second
+  half.** Built as the owner approved it (the entry below, decisions 1–3 and 5); its Your name row
+  (the owner's decision, 2026-10-07) is the next step. How, where the canvas left it open:
+  **(1) The sign-up page is the classic hosted UI's `/signup`, given the sign-in page's own
+  parameters** (client, scope, redirect, state, PKCE challenge; `HostedPage`,
+  `SignIn.signIn(_:through:)`): Cognito's sign-up answers at the same redirect with a code for the
+  same attempt, so a new account is signed in exactly as a sign-in is (the gate, the Keychain, the
+  engine told), one code path for both. Dev's `/signup` opened from the app in the simulator with
+  them; no account was made there. **(2) One gate, one call:** `Phone.signIn(_:through:)` takes the
+  page; Sign in's two buttons, the age screen's Continue, the intro's Sign up and the Debug readout
+  all go through it. For Sign up it asks the check, then shows the intro where the phone has not
+  seen it, each in Sign in's place with no page opened; Sign in opens its page at once. **(3) The
+  intro seen is kept when its Sign up is pressed** (`introSeen`, the phone's own flag, kept at
+  Continue before), so Sign up again, this run or a later one, opens the page at once: "the
+  question passed, the intro seen". Showing it is memory only (`introShows`): a relaunch opens on
+  Sign in, as a first launch does. **(4) The intro stays until the page's sign-in lands**
+  (`Phone.signed`), so no Sign in shows between it and Screen Time; a page that closes or could not
+  open leaves it for Sign in at once. Clearing it as the page returned would have shown Sign in for
+  a moment before the sign-in landed (`AppTests.signUpLands`, which failed on that version).
+  **(5) Only a page that could not open names its page** ("The sign-up page couldn't open. Try
+  again, or ask your teacher."); every other failure is said in today's words for both pages,
+  since the canvas adds only that line ("Every other word is today's"). **(6) The title keeps each
+  way's two words on one line** with no-break spaces, as the canvas's `nowrap` spans do.
+
 - **2026-10-07** — **The app's Sign in & sign up, and the gap's fallback.** The owner approved the
   [Sign in & sign up design](https://claude.ai/artifact/McyYhpX1UTq1nU6oCCwPwG) on 2026-10-06, with
   five decisions. **(1)** A first launch opens on Sign in, titled "Sign up or sign in", with Sign up

@@ -1,8 +1,8 @@
 import Foundation
 
 /// The 13+ check (C7; the owner's rulings, 2026-10-04 and 2026-10-05): asked when the student taps
-/// Sign in with it not passed on the phone — after the intro, before the sign-in page opens (the
-/// owner's decision, 2026-10-06) — the birth month and year, neutrally, by the FTC's COPPA
+/// Sign up with it not passed on the phone — before the intro and the sign-up page (the approved
+/// Sign in & sign up design) — the birth month and year, neutrally, by the FTC's COPPA
 /// guidance: nothing on it says 13, hints at the cutoff or preselects an answer. 13 or older keeps
 /// one flag in the phone's own defaults, that the check passed, never the date, and is not asked
 /// again. Under 13 keeps nothing anywhere — no flag, no date, no counter, on the phone, in the app
@@ -17,7 +17,7 @@ public struct AgeCheck: Sendable, Hashable {
         /// Never passed on this phone and not asked this run: Sign in shows — signed in, the
         /// question.
         case unanswered
-        /// Sign in pressed, not answered yet: the question shows.
+        /// Sign up pressed, not answered yet: the question shows.
         case asked
         /// 13 or older: kept, and never asked again.
         case passed
@@ -69,7 +69,7 @@ public struct AgeCheck: Sendable, Hashable {
         return calendar
     }
 
-    /// Sign in pressed: whether its sign-in page may open — the check passed on this phone. Else
+    /// Sign up pressed: whether the way to its page goes on — the check passed on this phone. Else
     /// the question shows, or the stop screen an answer under 13 got stays.
     public mutating func ask() -> Bool {
         if answer == .unanswered { answer = .asked }

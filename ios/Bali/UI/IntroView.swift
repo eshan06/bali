@@ -1,20 +1,23 @@
 import SwiftUI
 
-/// The intro (C1b): the privacy contract, three pages before anything else — what Bali does, what
-/// the teacher sees and never sees, how a class starts — swiped, or advanced with Continue, whose
-/// last press is `done` (`Phone.sawIntro()`). D1's reference onboarding sheet in its light tokens;
-/// the words are v3's: every app pauses, no allow-list (ARCHITECTURE, "What Bali is"), and the
-/// list is the consent preview's own (`ConsentCard`, C2b), so the two never say different things.
-/// The last page links the portal's privacy policy and terms under Continue (`PolicyLinks`).
+/// The intro (C1b): the privacy contract, three pages Sign up shows before its page, where this
+/// phone has not seen them (the approved Sign in & sign up design) — what Bali does, what the
+/// teacher sees and never sees, how a class starts — swiped, or advanced with Continue; the last
+/// page's button is Sign up, which opens Cognito's sign-up page over it (`Phone.sawIntro`), saying
+/// so while it opens. D1's reference onboarding sheet in its light tokens; the words are v3's:
+/// every app pauses, no allow-list (ARCHITECTURE, "What Bali is"), and the list is the consent
+/// preview's own (`ConsentCard`, C2b), so the two never say different things. The last page links
+/// the portal's privacy policy and terms under its button (`PolicyLinks`).
 struct IntroView: View {
-    let done: () -> Void
+    let phone: Phone
+    @Environment(\.webAuthenticationSession) private var browser
     /// The pages' tags, first to last.
     static let pages = 0...2
     @State private var page: Int
 
     /// Opened on `page` — the first, or a Debug launch's — as a test opens each (#135's review).
-    init(page: Int = IntroView.opening, done: @escaping () -> Void) {
-        (_page, self.done) = (State(initialValue: page), done)
+    init(phone: Phone, page: Int = IntroView.opening) {
+        (self.phone, _page) = (phone, State(initialValue: page))
     }
 
     #if DEBUG
@@ -50,13 +53,18 @@ struct IntroView: View {
             }
             .frame(maxWidth: .infinity).padding(.bottom, 24)
             .accessibilityHidden(true)
-            Button("Continue") {
-                if page < Self.pages.upperBound { withAnimation { page += 1 } } else { done() }
-            }
-            .buttonStyle(PrimaryButtonStyle())
-            // The portal's policy pages, under Continue on the last page alone — their room kept
-            // on every page, so Continue never moves as the pages turn.
             let last = page == Self.pages.upperBound
+            let opening = last && phone.signingIn
+            Button(last ? (opening ? "Signing up…" : "Sign up") : "Continue") {
+                if last {
+                    Task { await phone.sawIntro(through: browser.hostedUI) }
+                } else {
+                    withAnimation { page += 1 }
+                }
+            }
+            .buttonStyle(PrimaryButtonStyle()).disabled(opening)
+            // The portal's policy pages, under the button on the last page alone — their room kept
+            // on every page, so the button never moves as the pages turn.
             PolicyLinks().padding(.top, 8)
                 .opacity(last ? 1 : 0).accessibilityHidden(!last).allowsHitTesting(last)
         }

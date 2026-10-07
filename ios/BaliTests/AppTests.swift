@@ -1574,9 +1574,46 @@ struct AppTests {
     }
 
     @Test(
-        "The 13+ check (C7) is asked at Sign in (the owner's decision, 2026-10-06): a first launch opens on the intro, never the question; Sign in with no answer on the phone opens no sign-in page and shows the question in its place; through the phone's own sign-in, Continue at 13 or older opens the page at once — no second press — to come back to the sign-in's scheme, and Sign in opens it straight away from then on, after a relaunch too, never asking again; a page that did not open is said under the button, and gone at the next press; under 13 no page opens, then or at a later Sign in. The flags as they were before are put back after"
+        "Sign in and sign up, routed (the approved Sign in & sign up design): a first launch opens on Sign in, never the intro or the question; Sign up asks the 13+ question where the phone has not passed it, then shows the intro where it has not been seen — each in Sign in's place, no page opened, no tab bar — and the intro's Sign up opens the sign-up page; with the check passed and the intro not seen, Sign up shows the intro first; Sign in opens its page at once, never the question; a page that did not open lands on Sign in, which says which page it was. The flags as they were before are put back after"
     )
-    func ageAtSignIn() async throws {
+    func signUpRouted() async throws {
+        let defaults = UserDefaults.standard
+        let before = (defaults.object(forKey: Phone.introSeenKey), defaults.object(forKey: AgeCheck.key))
+        defer {
+            defaults.set(before.0, forKey: Phone.introSeenKey)
+            defaults.set(before.1, forKey: AgeCheck.key)
+        }
+        let (pages, notOpened) = (Pages(), "couldn't open. Try again, or ask your teacher.")
+        // A first launch, signed out, nothing answered or seen: Sign in.
+        let first = PreviewFixtures.State(age: .unanswered, introSeen: false, signedIn: false)
+        let routed = Phone(fixture: first)
+        #expect(routed.shown == (.signIn, false))
+        await routed.signIn(.signUp, through: pages.browser)
+        #expect(routed.shown == (.age, false))
+        routed.birth = Birth(month: 1, year: 2000)
+        await routed.answerAge(through: pages.browser)
+        #expect(routed.shown == (.intro, false) && routed.age.answer == .passed)
+        // A frozen phone opens no page: Sign in again, saying the sign-up page did not open.
+        await routed.sawIntro(through: pages.browser)
+        #expect(routed.shown == (.signIn, false) && routed.introSeen)
+        #expect(routed.signInFailed?.words(on: routed.hostedPage) == "The sign-up page \(notOpened)")
+        // Sign in: its page, never the question nor the intro.
+        let signingIn = Phone(fixture: first)
+        await signingIn.signIn(through: pages.browser)
+        #expect(signingIn.shown == (.signIn, false) && signingIn.age.answer == .unanswered)
+        #expect(
+            signingIn.signInFailed?.words(on: signingIn.hostedPage) == "The sign-in page \(notOpened)")
+        // The check passed on this phone, the intro not seen: Sign up shows the intro first.
+        let passed = Phone(fixture: PreviewFixtures.State(introSeen: false, signedIn: false))
+        await passed.signIn(.signUp, through: pages.browser)
+        #expect(passed.shown == (.intro, false) && passed.signInFailed == nil)
+        #expect(pages.opened.isEmpty)
+    }
+
+    @Test(
+        "Sign in and sign up through the phone's own sign-in (the approved Sign in & sign up design): Sign in opens Cognito's sign-in page at once, no question, no intro; Sign up asks the question, then shows the intro, opening no page, and the intro's Sign up opens the sign-up page, `/signup`, to come back to the sign-in's scheme — the intro showing until the page closes, which lands on Sign in; Sign up again opens the page at once, this run or after a relaunch; with the check passed and the intro not seen, the intro, then the page; a page that did not open is said under the buttons, naming its page, and gone at the next press; under 13, no page opens this run, Sign up's or Sign in's. The flags as they were before are put back after"
+    )
+    func signUpAndSignIn() async throws {
         let defaults = UserDefaults.standard
         let before = (defaults.object(forKey: Phone.introSeenKey), defaults.object(forKey: AgeCheck.key))
         defer {
@@ -1585,47 +1622,134 @@ struct AppTests {
         }
         defaults.removeObject(forKey: Phone.introSeenKey)
         defaults.removeObject(forKey: AgeCheck.key)
-        #expect(Phone().shown == (.intro, false))
-        // Routed as a first launch has it after the intro, signed out: Sign in, then the question.
         let pages = Pages()
-        let routed = Phone(fixture: try #require(PreviewFixtures.all["signIn"]))
-        #expect(routed.shown == (.signIn, false))
-        await routed.signIn(through: pages.browser)
-        #expect(routed.shown == (.age, false) && pages.opened.isEmpty)
-        // The phone's own sign-in, nobody signed in.
+        /// The path of the page opened last, and the scheme it was to come back to.
+        func last() -> (String?, String?) {
+            (pages.opened.last?.url.path(), pages.opened.last?.scheme)
+        }
         let signedOut = { try standIn(StandIn(), keychain: Keychain(account: nil)).0 }
         let live = try signedOut()
         await live.signIn(through: pages.browser)
-        #expect(live.age.answer == .asked && pages.opened.isEmpty && live.signInFailed == nil)
-        live.birth = Birth(month: 1, year: 2000)
-        await live.answerAge(through: pages.browser)
-        let page = try #require(pages.opened.first)
-        #expect(pages.opened.count == 1 && live.age.answer == .passed)
-        #expect(page.url.absoluteString.hasPrefix("https://bali.auth.test/"))
-        #expect(page.scheme == "bali")
+        #expect(pages.opened.count == 1 && last() == ("/oauth2/authorize", "bali"))
+        #expect(live.age.answer == .unanswered && !live.introShows && !live.signingIn)
         // Closed by the student: kept as the sign-in said it, for the readout; the screen says
         // nothing.
-        #expect(live.signInFailed == .cancelled && live.signInFailed?.words == nil)
-        #expect(!live.signingIn)
-        pages.answer = .notOpened("no window")
-        await live.signIn(through: pages.browser)
-        #expect(pages.opened.count == 2 && live.signInFailed == .notOpened("no window"))
-        #expect(live.signInFailed?.words != nil)
-        pages.answer = .cancelled
+        #expect(live.signInFailed == .cancelled)
+        #expect(live.signInFailed?.words(on: live.hostedPage) == nil)
+        await live.signIn(.signUp, through: pages.browser)
+        #expect(live.age.answer == .asked && pages.opened.count == 1)
+        live.birth = Birth(month: 1, year: 2000)
+        await live.answerAge(through: pages.browser)
+        #expect(live.age.answer == .passed && live.introShows && pages.opened.count == 1)
+        await live.sawIntro(through: pages.browser)
+        #expect(pages.opened.count == 2 && last() == ("/signup", "bali"))
+        #expect(live.introSeen && !live.introShows && live.hostedPage == .signUp)
+        #expect(live.signInFailed?.words(on: live.hostedPage) == nil)
+        await live.signIn(.signUp, through: pages.browser)
+        #expect(pages.opened.count == 3 && last().0 == "/signup" && !live.introShows)
         let relaunched = try signedOut()
-        #expect(relaunched.age.answer == .passed)
-        await relaunched.signIn(through: pages.browser)
+        await relaunched.signIn(.signUp, through: pages.browser)
+        #expect(pages.opened.count == 4 && last().0 == "/signup")
+        pages.answer = .notOpened("no window")
+        await live.signIn(.signUp, through: pages.browser)
+        #expect(
+            live.signInFailed?.words(on: live.hostedPage)
+                == "The sign-up page couldn't open. Try again, or ask your teacher.")
         await live.signIn(through: pages.browser)
-        #expect(pages.opened.count == 4 && live.signInFailed?.words == nil)
+        #expect(
+            live.signInFailed?.words(on: live.hostedPage)
+                == "The sign-in page couldn't open. Try again, or ask your teacher.")
+        pages.answer = .cancelled
+        await live.signIn(.signUp, through: pages.browser)
+        #expect(pages.opened.count == 7 && live.signInFailed?.words(on: live.hostedPage) == nil)
+        defaults.removeObject(forKey: Phone.introSeenKey)
+        let unseen = try signedOut()
+        await unseen.signIn(.signUp, through: pages.browser)
+        #expect(unseen.introShows && pages.opened.count == 7)
+        await unseen.sawIntro(through: pages.browser)
+        #expect(pages.opened.count == 8 && last().0 == "/signup" && !unseen.introShows)
         defaults.removeObject(forKey: AgeCheck.key)
         let young = try signedOut()
-        await young.signIn(through: pages.browser)
+        await young.signIn(.signUp, through: pages.browser)
         let now = Calendar(identifier: .gregorian).dateComponents([.year, .month], from: Date())
         young.birth = Birth(month: now.month, year: now.year)
         await young.answerAge(through: pages.browser)
+        await young.signIn(.signUp, through: pages.browser)
         await young.signIn(through: pages.browser)
-        #expect(young.age.answer == .tooYoung && pages.opened.count == 4)
+        #expect(young.age.answer == .tooYoung && pages.opened.count == 8)
         #expect(defaults.object(forKey: AgeCheck.key) == nil)
+    }
+
+    @Test(
+        "A sign-up page that signs the student in keeps the intro until the sign-in lands, so no Sign in shows between the two, and lets it go then: a sign-out later shows Sign in, never the intro (the approved Sign in & sign up design). The flags as they were before are put back after"
+    )
+    func signUpLands() async throws {
+        let defaults = UserDefaults.standard
+        let before = (defaults.object(forKey: Phone.introSeenKey), defaults.object(forKey: AgeCheck.key))
+        defer {
+            defaults.set(before.0, forKey: Phone.introSeenKey)
+            defaults.set(before.1, forKey: AgeCheck.key)
+        }
+        defaults.removeObject(forKey: Phone.introSeenKey)
+        defaults.set(true, forKey: AgeCheck.key)
+        let keychain = Keychain(account: nil)
+        let (phone, _) = try standIn(
+            StandIn(grant: #"{"access_token":"a1","refresh_token":"r1"}"#), keychain: keychain)
+        let pages = Pages()
+        pages.signsIn = true
+        await phone.signIn(.signUp, through: pages.browser)
+        #expect(phone.introShows && pages.opened.isEmpty)
+        await phone.sawIntro(through: pages.browser)
+        #expect(pages.opened.map { $0.url.path() } == ["/signup"] && !keychain.empty)
+        #expect(phone.introShows && phone.signInFailed == nil && !phone.signingIn)
+        phone.signed(in: true, as: "ana")
+        #expect(!phone.introShows)
+        phone.signed(in: false)
+        #expect(!phone.introShows)
+    }
+
+    @Test(
+        "Sign in as the approved Sign in & sign up design draws it: its title, then Sign up and Sign in, each a button; while a page opens its button says so and neither takes a press; a page that could not open is said under the buttons, naming its page, before the caption; and the intro's last page's button is Sign up, Signing up… and dimmed while its page opens"
+    )
+    func signInScreen() async throws {
+        let title = "Sign\u{A0}up or sign\u{A0}in"
+        let cases: [(String, String, String, Bool, String?)] = [
+            ("signIn", "Sign up", "Sign in", false, nil),
+            ("signInSigningIn", "Sign up", "Signing in…", true, nil),
+            ("signInSigningUp", "Signing up…", "Sign in", true, nil),
+            (
+                "signInNotOpened", "Sign up", "Sign in", false,
+                "The sign-in page couldn't open. Try again, or ask your teacher."
+            ),
+            (
+                "signInSignUpNotOpened", "Sign up", "Sign in", false,
+                "The sign-up page couldn't open. Try again, or ask your teacher."
+            ),
+        ]
+        for (name, up, inside, busy, failure) in cases {
+            let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))
+            let read = try await elements(of: RootView(phone: phone), once: title)
+            let labels = read.map { $0.label ?? "" }
+            let order =
+                [title, up, inside] + (failure.map { [$0] } ?? [])
+                + ["Trouble signing in? Ask your teacher."]
+            let at = order.compactMap { labels.firstIndex(of: $0) }
+            #expect(at.count == order.count && at == at.sorted(), "\(name): \(labels)")
+            for button in [up, inside] {
+                let traits = try #require(read.first { $0.label == button }, "\(name)").traits
+                #expect(traits.contains(.button), "\(name): \(button)")
+                #expect(traits.contains(.notEnabled) == busy, "\(name): \(button)")
+            }
+        }
+        for (name, page, label, busy) in [
+            ("intro", 0, "Continue", false), ("intro", 2, "Sign up", false),
+            ("introSigningUp", 2, "Signing up…", true),
+        ] {
+            let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))
+            let read = try await elements(of: IntroView(phone: phone, page: page), once: label)
+            let button = try #require(read.first { $0.label == label }, "\(name)")
+            #expect(button.traits.contains(.notEnabled) == busy, "\(name), page \(page)")
+        }
     }
 
     @Test(
@@ -1760,7 +1884,9 @@ struct AppTests {
         /// Where `title` starts across the screen `fixture` draws.
         func start(_ fixture: String, _ title: String) async throws -> CGFloat {
             let phone = Phone(fixture: try #require(PreviewFixtures.all[fixture]))
-            let found = try await elements(of: phone, once: title).first { $0.label == title }
+            let found = try await elements(of: RootView(phone: phone), once: title).first {
+                $0.label == title
+            }
             return try #require(found, "\(fixture)").frame.minX
         }
         let gutter = try await start("tooYoung", AgeCheck.notYet)
@@ -1776,7 +1902,9 @@ struct AppTests {
     func deletingUnderThirteenShielded() async throws {
         /// Whether the screen `phone` shows offers Back, read once its title is.
         func backs(_ phone: Phone) async throws -> Bool {
-            try await elements(of: phone, once: AgeCheck.notYet).contains { $0.label == "Back" }
+            try await elements(of: RootView(phone: phone), once: AgeCheck.notYet).contains {
+                $0.label == "Back"
+            }
         }
         let calm = Phone(
             fixture: try #require(PreviewFixtures.all["deletingUnderThirteenNotDeleted"]))
@@ -1944,16 +2072,16 @@ struct AppTests {
     }
 
     @Test(
-        "The intro seen is kept in the phone's own defaults: a fresh Phone reads it back (C1a); the flag as it was before is put back after"
+        "The intro seen is kept in the phone's own defaults, once its Sign up is pressed: a fresh Phone reads it back (C1a); a first launch, not seen, never opens on it — Sign up shows it (the approved Sign in & sign up design); the flag as it was before is put back after"
     )
-    func introSeen() {
+    func introSeen() async {
         let defaults = UserDefaults.standard
         let before = defaults.object(forKey: Phone.introSeenKey)
         defer { defaults.set(before, forKey: Phone.introSeenKey) }
         defaults.removeObject(forKey: Phone.introSeenKey)
         let phone = Phone()
-        #expect(!phone.introSeen && phone.shown.screen == .intro)
-        phone.sawIntro()
+        #expect(!phone.introSeen && phone.shown.screen == .starting)
+        await phone.sawIntro(through: Pages().browser)
         #expect(phone.introSeen && Phone().introSeen)
         #expect(phone.shown.screen == .starting)
     }
@@ -1995,7 +2123,10 @@ struct AppTests {
         // The intro's paging lays out only the page shown, so it is opened at each of its pages
         // (`IntroView.pages`; #135's review: paged by hand, the pager's slots were checked, not
         // its pages, and a pager with no width would have stopped the suite).
-        let intro = IntroView.pages.map { ("intro, page \($0)", AnyView(IntroView(page: $0) {})) }
+        let shown = Phone(fixture: try #require(PreviewFixtures.all["intro"]))
+        let intro = IntroView.pages.map {
+            ("intro, page \($0)", AnyView(IntroView(phone: shown, page: $0)))
+        }
         let screens =
             PreviewFixtures.all.map { ($0.key, AnyView(RootView(phone: Phone(fixture: $0.value)))) }
             + [("consentSheet", AnyView(ConsentSheet()))] + intro
@@ -2025,7 +2156,7 @@ struct AppTests {
     }
 
     @Test(
-        "The portal's privacy policy and terms are linked (C2b) from the intro, Sign in and Me — read from each screen's type, as `historyLazy` reads History's — each link's row a 44-pt target; on the intro, drawn under Continue on the last page alone, and read by VoiceOver there alone, as links, in a strip kept at least that row tall on the first page too, so Continue never moves; and each opens this build's portal's own page, `/privacy` and `/terms`"
+        "The portal's privacy policy and terms are linked (C2b) from the intro, Sign in and Me — read from each screen's type, as `historyLazy` reads History's — each link's row a 44-pt target; on the intro, drawn under its button on the last page alone, and read by VoiceOver there alone, as links, in a strip kept at least that row tall on the first page too, so the button never moves; and each opens this build's portal's own page, `/privacy` and `/terms`"
     )
     func policyLinks() throws {
         let portal = try #require(PolicyLinks.portal)
@@ -2036,7 +2167,7 @@ struct AppTests {
                 == ["https://bali-portal.vercel.app/privacy", "https://bali-portal.vercel.app/terms"])
         let me = Phone(fixture: try #require(PreviewFixtures.all["me"]))
         for (name, screen) in [
-            ("intro", String(reflecting: type(of: IntroView {}.body))),
+            ("intro", String(reflecting: type(of: IntroView(phone: me).body))),
             ("signIn", String(reflecting: type(of: SignInView(phone: me).body))),
             ("me", String(reflecting: type(of: MeView(phone: me).body))),
         ] {
@@ -2045,7 +2176,7 @@ struct AppTests {
         let row = UIHostingController(rootView: PolicyLinks())
             .sizeThatFits(in: CGSize(width: 390, height: 1000))
         #expect(row.height >= 44, "\(row)")
-        // The intro, drawn at the phone's size at its first and last pages: under Continue — the
+        // The intro, drawn at the phone's size at its first and last pages: under its button — the
         // brand-filled button, its flat bottom found from the bottom up past its rounded corner,
         // clear of the centred links (santa's round 1: at the corner, the button's own last rows
         // counted as ink) — a strip at least the row and its padding tall, with the links' ink in
@@ -2054,10 +2185,12 @@ struct AppTests {
         func brand(_ pixel: [Int]) -> Bool {
             zip(pixel, [0x24, 0x5A, 0x43]).allSatisfy { abs($0 - $1) <= 24 }
         }
+        let intro = Phone(fixture: try #require(PreviewFixtures.all["intro"]))
         for (page, linked) in [(IntroView.pages.lowerBound, false), (IntroView.pages.upperBound, true)] {
             let window = UIWindow(windowScene: scene)
             window.frame = scene.screen.bounds
-            window.rootViewController = UIHostingController(rootView: IntroView(page: page) {})
+            window.rootViewController = UIHostingController(
+                rootView: IntroView(phone: intro, page: page))
             window.isHidden = false
             defer { window.isHidden = true }
             window.layoutIfNeeded()
@@ -2075,12 +2208,13 @@ struct AppTests {
             let inked = strip.reduce(0) { count, y in
                 count + (0..<width).filter { brand(pixel($0, y)) }.count
             }
-            #expect((inked > 0) == linked, "page \(page): \(inked) brand pixels under Continue")
+            #expect((inked > 0) == linked, "page \(page): \(inked) brand pixels under its button")
             // VoiceOver: the links there on the last page alone — never invisible ones before it
-            // — each a link, not a button, as the portal's are; Continue read on every page, so a
-            // walk that finds nothing can't pass for the links hidden.
+            // — each a link, not a button, as the portal's are; the button read on every page,
+            // Continue then Sign up, so a walk that finds nothing can't pass for the links hidden.
             let elements = try voiceOver(in: window)
-            #expect(elements.contains { $0.accessibilityLabel == "Continue" }, "page \(page)")
+            let label = linked ? "Sign up" : "Continue"
+            #expect(elements.contains { $0.accessibilityLabel == label }, "page \(page)")
             let titles = PolicyLinks.Page.allCases.map(\.title)
             let read = elements.filter { titles.contains($0.accessibilityLabel ?? "") }
             #expect(read.map(\.accessibilityLabel) == (linked ? titles : []), "page \(page)")
@@ -2190,17 +2324,17 @@ private func voiceOver(in window: UIWindow) throws -> [NSObject] {
     return walk(window)
 }
 
-/// What VoiceOver reads on the screen `phone` shows, at the phone's own size — each element's label
-/// and frame — once it reads `title`: a simulator's first walk can come before SwiftUI has built the
+/// What VoiceOver reads on `screen`, at the phone's own size — each element's label, frame and
+/// traits — once it reads `title`: a simulator's first walk can come before SwiftUI has built the
 /// elements (CI's, made fresh for each run).
 @MainActor
-private func elements(of phone: Phone, once title: String) async throws -> [(
-    label: String?, frame: CGRect
+private func elements(of screen: some View, once title: String) async throws -> [(
+    label: String?, frame: CGRect, traits: UIAccessibilityTraits
 )] {
     let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
     let window = UIWindow(windowScene: scene)
     window.frame = scene.screen.bounds
-    window.rootViewController = UIHostingController(rootView: RootView(phone: phone))
+    window.rootViewController = UIHostingController(rootView: screen)
     window.isHidden = false
     defer { window.isHidden = true }
     window.layoutIfNeeded()
@@ -2209,7 +2343,7 @@ private func elements(of phone: Phone, once title: String) async throws -> [(
         read = (try? voiceOver(in: window)) ?? []
         return read.contains { $0.accessibilityLabel == title }
     }
-    return read.map { ($0.accessibilityLabel, $0.accessibilityFrame) }
+    return read.map { ($0.accessibilityLabel, $0.accessibilityFrame, $0.accessibilityTraits) }
 }
 
 /// Every scroll view in `view`, itself among them, outermost first — of a pager's pages, only the
@@ -2253,16 +2387,24 @@ private func expectEdges(of scrolls: [UIScrollView], in window: UIWindow, _ name
 }
 
 /// A browser of the test's own for `Phone.signIn(through:)`: each page it was asked to open, with
-/// the scheme it was to come back to, answered with `answer` — the student closing it, unless set.
+/// the scheme it was to come back to, answered with `answer` — the student closing it, unless set
+/// — or, where it `signsIn`, sent back to the redirect with a code for the page's own attempt.
 @MainActor
 private final class Pages {
     private(set) var opened: [(url: URL, scheme: String)] = []
     var answer = SignInError.cancelled
+    var signsIn = false
 
     var browser: Phone.Browser {
         { url, scheme throws(SignInError) in
             self.opened.append((url, scheme))
-            throw self.answer
+            guard self.signsIn else { throw self.answer }
+            let state = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
+                .first { $0.name == "state" }?.value ?? ""
+            guard let back = URL(string: "bali://auth/callback?code=the-code&state=\(state)") else {
+                throw .notOpened("no callback")
+            }
+            return back
         }
     }
 }
