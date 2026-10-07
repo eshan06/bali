@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { ApiError, createApiClient, NetworkError } from './api-client';
 import { blockIdOf, loadProblem, registerBlock } from './blocks';
 import {
+  ACCOUNT_DELETED,
   BLOCK_TAKEN,
   CANT_REACH,
   CANT_REGISTER,
@@ -84,6 +85,14 @@ describe('registerBlock', () => {
     expect(await registerBlock(taken.client, 'T7XK2M9QPF', [])).toEqual({
       kind: 'refused',
       message: BLOCK_TAKEN,
+    });
+    // An account deleted on its way: the ID is fine, so it is no refusal of the ID (PB3's review).
+    const gone = api(409, {
+      error: { code: 'conflict', reason: 'account_deleted', message: 'this account was deleted' },
+    });
+    expect(await registerBlock(gone.client, 'T7XK2M9QPF', [])).toEqual({
+      kind: 'failed',
+      message: ACCOUNT_DELETED,
     });
     const bad = api(400, { error: { code: 'bad_input', message: 'invalid request' } });
     expect(await registerBlock(bad.client, 'T7XK2M9QPF', [])).toEqual({

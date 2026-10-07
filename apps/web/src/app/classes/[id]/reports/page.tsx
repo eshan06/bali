@@ -1,35 +1,24 @@
 'use client';
 
-import { ArrowLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
 import { Button } from '@/components/button';
-import { CARD } from '@/components/card';
-import { RecapCard } from '@/components/recap-card';
+import { COLUMNS, QUIET, ROW, Row } from '@/components/reports-list';
 import { NAV_LINK } from '@/components/text-link';
 import { getAccessToken } from '@/lib/auth';
-import { FIRST_READ, type ReadAt, readSessions, sessionRow, startRead } from '@/lib/reports';
+import { FIRST_READ, type ReadAt, readSessions, startRead } from '@/lib/reports';
 import { useApi } from '@/lib/use-api';
 
-/** The page's column, under the bar: room for a session and its six figures on one row (§5). */
-const PAGE = 'mx-auto max-w-6xl px-4 pt-10 pb-16 sm:px-10';
+/** The class page's column, 1400 px at most, and in it the list's, 72 rem (the Recap & reports design). */
+const PAGE = 'mx-auto max-w-[1400px] px-4 pt-10 pb-16 sm:px-10 *:max-w-6xl';
 
 /**
- * A session's row, from the list's width where the session and its six figures fit side by side
- * (a 1024 px window included), under the column names; narrower, each figure sits under its own
- * name, three to a row and then two, so no column is ever off the edge or smaller than the scale.
- */
-const ROW = '@4xl:grid-cols-[minmax(0,1fr)_repeat(6,5.5rem)]';
-/** The figures' names, in the columns' order: the column names and each figure's own say these. */
-const COLUMNS = ['Joined', 'Focus time', 'Average', 'Silent', 'Unlocks', 'Protection off'] as const;
-const [JOINED, FOCUS, AVERAGE, SILENT, UNLOCKS, PROTECTION_OFFS] = COLUMNS;
-
-/**
- * A class's reports (R5; in Soft premium, D2g): R3's sessions, a page at a time, each a card that
- * opens its recap (R4's card fed by R2) inside it. A list, not a table, so it reflows by its own
- * width (DESIGN.md §8): never a table that scrolls sideways.
+ * A class's reports (R5; the Recap & reports design): R3's sessions, a page of 20 at a time, each
+ * a card whose row opens its recap's timeline inside it. A list, not a table, so it reflows by its
+ * own width (DESIGN.md §8): never a table that scrolls sideways.
  */
 export default function ReportsPage() {
   const api = useApi();
@@ -86,11 +75,22 @@ export default function ReportsPage() {
             ? 'Bali lost your place in the list, so it starts again from the newest session.'
             : null}
       </p>
-      {retry('newest', "Couldn't load the sessions.")}
+      {list.failure?.at === 'newest' ? (
+        <div className="mt-6">
+          <div role="alert" className="text-body">
+            <p className="font-semibold">Couldn&apos;t load the sessions.</p>
+            <p className="text-text-secondary">{list.failure.message}</p>
+          </div>
+          <Button variant="secondary" onClick={() => void read(list, 'newest')} className="mt-4">
+            Try again
+          </Button>
+        </div>
+      ) : null}
 
       {list.loaded && list.sessions.length === 0 && list.nextBefore === null ? (
-        <p className="mt-6 text-body text-text-secondary">
-          No reports yet. When a session ends, its report shows here.
+        <p className="mt-6 flex flex-col text-body text-text-secondary">
+          <span className="font-semibold text-text-primary">No reports yet.</span>
+          <span>When a session ends, its report shows here.</span>
         </p>
       ) : null}
       {list.sessions.length > 0 ? (
@@ -99,7 +99,7 @@ export default function ReportsPage() {
               edge and `space-4`; each figure carries its own for a screen reader. */}
           <div
             aria-hidden="true"
-            className={`hidden gap-x-3 px-[17px] pb-3 text-label text-text-tertiary uppercase @4xl:grid @4xl:items-end ${ROW}`}
+            className={`hidden px-[17px] pb-2 text-label uppercase @4xl:grid @4xl:items-end ${QUIET} ${ROW}`}
           >
             <span>Session</span>
             {COLUMNS.map((name) => (
@@ -109,53 +109,15 @@ export default function ReportsPage() {
             ))}
           </div>
           <ul aria-label="Sessions, newest first" className="grid gap-2">
-            {list.sessions.map((session) => {
-              const row = sessionRow(session);
-              const isOpen = open === session.id;
-              return (
-                <li key={session.id} className={CARD}>
-                  <div className={`grid gap-3 @4xl:items-center ${ROW}`}>
-                    <button
-                      type="button"
-                      aria-expanded={isOpen}
-                      aria-controls={isOpen ? `recap-${session.id}` : undefined}
-                      onClick={() => setOpen(isOpen ? null : session.id)}
-                      className="flex min-h-10 w-full cursor-pointer items-center gap-2 rounded-sm text-left text-body font-semibold tabular-nums hover:underline"
-                    >
-                      <ChevronRight
-                        size={16}
-                        aria-hidden="true"
-                        className={`shrink-0 text-text-tertiary transition-transform ${isOpen ? 'rotate-90' : ''}`}
-                      />
-                      {row.when}
-                    </button>
-                    <dl className="grid grid-cols-2 gap-3 @sm:grid-cols-3 @4xl:col-span-6 @4xl:grid-cols-subgrid @4xl:items-center">
-                      {row.figures ? (
-                        <>
-                          <Figure label={JOINED} value={row.figures.joined} />
-                          <Figure label={FOCUS} value={`${row.figures.focus} min`} />
-                          <Figure label={AVERAGE} value={`${row.figures.average} min`} />
-                          <Figure label={SILENT} value={`${row.figures.silent} min`} />
-                        </>
-                      ) : (
-                        // No zeros for a session nobody joined, as its recap says (R5).
-                        <div className="col-span-full @4xl:col-span-4">
-                          <dt className="sr-only">{JOINED}</dt>
-                          <dd className="text-body text-text-secondary">Nobody joined</dd>
-                        </div>
-                      )}
-                      <Figure label={UNLOCKS} value={row.unlocks} />
-                      <Figure label={PROTECTION_OFFS} value={row.protectionOffs} />
-                    </dl>
-                  </div>
-                  {isOpen ? (
-                    <div id={`recap-${session.id}`} className="mt-4 border-t border-border-default">
-                      <RecapCard classId={classId} session={session} />
-                    </div>
-                  ) : null}
-                </li>
-              );
-            })}
+            {list.sessions.map((session) => (
+              <Row
+                key={session.id}
+                classId={classId}
+                session={session}
+                open={open === session.id}
+                onToggle={() => setOpen(open === session.id ? null : session.id)}
+              />
+            ))}
           </ul>
         </div>
       ) : null}
@@ -176,18 +138,5 @@ export default function ReportsPage() {
           ))
         : null}
     </main>
-  );
-}
-
-/**
- * A session's figure in `data`: its name above it on a narrow row, and on a wide one only for a
- * screen reader, the column names above the list saying it for the eye.
- */
-function Figure({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="@4xl:text-right">
-      <dt className="text-label text-text-tertiary uppercase @4xl:sr-only">{label}</dt>
-      <dd className="mt-1 text-data tabular-nums @4xl:mt-0">{value}</dd>
-    </div>
   );
 }

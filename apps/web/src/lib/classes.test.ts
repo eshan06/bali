@@ -7,7 +7,13 @@ import { describe, expect, it } from 'vitest';
 import { createApiClient } from './api-client';
 import { CLASS_NAME_MAX, createClass } from './classes';
 import * as errors from './errors';
-import { CANT_CREATE, CANT_REACH, TOO_MANY_TRIES, TOO_MANY_TRIES_MINUTE } from './errors';
+import {
+  ACCOUNT_DELETED,
+  CANT_CREATE,
+  CANT_REACH,
+  TOO_MANY_TRIES,
+  TOO_MANY_TRIES_MINUTE,
+} from './errors';
 
 /** The API client over a fetch that answers `status` with `body`, every request recorded. */
 function api(status: number, body: unknown, headers: Record<string, string> = {}) {
@@ -98,14 +104,19 @@ describe('createClass', () => {
       });
     }
     expect(Object.keys(errors)).not.toContain('NO_SCHOOL');
-    // The route's other 409 carries its reason, and is said as errText says it.
+    // The route's other 409 carries its reason, and is said in Bali's words, never the API's
+    // own sentence, written for a log (PB3's review).
     const gone = api(409, {
-      error: { code: 'conflict', reason: 'account_deleted', message: 'account deleted' },
+      error: { code: 'conflict', reason: 'account_deleted', message: 'this account was deleted' },
     });
     expect(await createClass(gone.client, 'Period 4')).toEqual({
       kind: 'failed',
-      message: 'account deleted',
+      message: ACCOUNT_DELETED,
     });
+    expect(ACCOUNT_DELETED).toBe(
+      'This account was deleted, so nothing changed. Sign out, then sign in again.',
+    );
+    expect(ACCOUNT_DELETED).not.toMatch(/[—–!]/);
   });
 
   it('holds a name to the API’s own limit, so its 400 for a longer one is never met', () => {

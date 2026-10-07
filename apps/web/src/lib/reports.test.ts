@@ -225,8 +225,9 @@ describe('startRead', () => {
 describe('sessionRow', () => {
   it('says when the session ran, and the class’s figures as its recap says them', () => {
     const row = sessionRow(MON, NY);
-    expect({ ...row, when: row.when.replace(/\s/g, ' ') }).toEqual({
-      when: 'Mon, Oct 5, 9:05 AM to 9:30 AM',
+    expect({ ...row, times: row.times.replace(/\s/g, ' ') }).toEqual({
+      day: 'Mon, Oct 5',
+      times: '9:05 AM to 9:30 AM',
       figures: { joined: '4', focus: '83', average: '21', silent: '2' },
       unlocks: '3',
       protectionOffs: '1',

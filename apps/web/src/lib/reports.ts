@@ -2,7 +2,7 @@ import type { ClassDetail, SessionReportsPage, SessionReportSummary } from '@bal
 
 import { type ApiClient, ApiError } from './api-client';
 import { errText } from './errors';
-import { classFigures, type RecapFormat, sessionTimes } from './recap';
+import { classFigures, type RecapFormat, sessionWhen } from './recap';
 
 /* The reports page's logic (R5), tested: R3's sessions a page at a time, and each row's words. */
 
@@ -83,11 +83,11 @@ function settled(list: SessionList, kept: SessionReportSummary[], page: SessionR
   return { ...list, sessions, nextBefore: page.nextBefore, reading: null, failure: null };
 }
 
-/** A row's words, its figures as its recap says them (null: nobody joined). */
+/** A row's words: its day, its times, and its figures as its recap says them (null: nobody joined). */
 export function sessionRow(session: SessionReportSummary, format: RecapFormat = {}) {
   const count = new Intl.NumberFormat(format.locale);
   return {
-    when: sessionTimes(session, format),
+    ...sessionWhen(session, format),
     figures: session.joinedCount ? classFigures(session.joinedCount, session, format.locale) : null,
     unlocks: count.format(session.unlockCount),
     protectionOffs: count.format(session.protectionOffCount),

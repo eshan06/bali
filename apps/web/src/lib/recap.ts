@@ -101,11 +101,11 @@ export interface RecapFormat {
   timeZone?: string;
 }
 
-/** When the session ran, its start to its end: "Sun, Oct 4, 9:05 AM to 9:30 AM". */
-export function sessionTimes(
+/** When the session ran: its day, "Sun, Oct 4", and its start to its end, "9:05 AM to 9:30 AM". */
+export function sessionWhen(
   session: SessionReportSummary,
   { locale, timeZone }: RecapFormat = {},
-): string {
+): { day: string; times: string } {
   const day = new Intl.DateTimeFormat(locale, {
     weekday: 'short',
     month: 'short',
@@ -115,7 +115,13 @@ export function sessionTimes(
   const clock = new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit', timeZone });
   const start = new Date(session.startedAt);
   const end = new Date(session.endedAt ?? session.endsAt);
-  return `${day.format(start)}, ${clock.format(start)} to ${clock.format(end)}`;
+  return { day: day.format(start), times: `${clock.format(start)} to ${clock.format(end)}` };
+}
+
+/** When the session ran, its start to its end: "Sun, Oct 4, 9:05 AM to 9:30 AM". */
+export function sessionTimes(session: SessionReportSummary, format: RecapFormat = {}): string {
+  const { day, times } = sessionWhen(session, format);
+  return `${day}, ${times}`;
 }
 
 /** The reasons as the student's phone shows them to pick. */
