@@ -4,21 +4,21 @@ import type { ClassDetail } from '@bali/shared';
 import { useId, useRef, useState } from 'react';
 
 import { Button } from '@/components/button';
-import { CARD } from '@/components/card';
 import { NEW_CODE_MADE } from '@/lib/errors';
 import { codeMoved, regenerateCode } from '@/lib/session-controls';
 import { useApi } from '@/lib/use-api';
 
-/** What the control last said: a failure in the confirm, or the new code beside the code. */
+/** What the control last said: a failure in the confirm, or the new code under the code. */
 type Said = { kind: 'failed' | 'made'; message: string };
 
 /**
- * The class's join code with its New code control (P11; in Soft premium, D2f): the code in the
- * code style, and New code opening a confirm under it, since the old code stops working the moment
- * the new one is made; then the new code in its place, said beside it. Each failure is said in the
- * confirm, and Try again sends it again. `onClass` gets the class as the answer gives it, its new
- * code included. Focus goes back to New code whenever the confirm closes. `large` sets the code in
- * `code-lg`, for Present, read from the back of the room (the owner's ruling).
+ * The class's join code with its New code control (P11; the Class page design): the code in the
+ * code style, and New code opening a confirm under the page's header, since the old code stops
+ * working the moment the new one is made; then the new code in its place, said under it. Each
+ * failure is said in the confirm, and Try again sends it again. `onClass` gets the class as the
+ * answer gives it, its new code included. Focus goes back to New code whenever the confirm closes.
+ * `large` sets the code in `code-lg`, for Present, read from the back of the room (the owner's
+ * ruling). It renders two items of a wrapping flex row: the page's header.
  */
 export function JoinCode({
   classId,
@@ -81,64 +81,76 @@ export function JoinCode({
   }
 
   return (
-    // Beside the class's name, the code stays put as the confirm opens under it.
-    <div className="flex max-w-md flex-col items-start sm:items-end">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <p className="flex items-baseline gap-2">
-          <span className="text-caption text-text-tertiary">Join code</span>
-          <span translate="no" className={`font-mono ${large ? 'text-code-lg' : 'text-code'}`}>
-            {code}
-          </span>
+    // Two of the header's items (the Class page design): the code with New code, a made code said
+    // under it; and, while open, the confirm, a raised card on a line of its own under the header's
+    // row (last, so Present's controls keep that row), the code staying put as it opens.
+    <>
+      {/* At the header's end, the code keeps its place when a made code's line grows the column. */}
+      <div className="flex flex-col items-start sm:items-end">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <p className="flex items-baseline gap-2">
+            <span className="text-caption text-text-tertiary">Join code</span>
+            <span translate="no" className={`font-mono ${large ? 'text-code-lg' : 'text-code'}`}>
+              {code}
+            </span>
+          </p>
+          {/* A disclosure: it stays where it is while the confirm under it is open. */}
+          <Button
+            ref={toggle}
+            variant="secondary"
+            aria-expanded={confirming}
+            onClick={() => {
+              if (sending.current) return;
+              if (confirming) return dismiss();
+              setConfirming(true);
+              setSaid(null);
+            }}
+          >
+            New code
+          </Button>
+        </div>
+        {/* Mounted while empty, so a screen reader hears the new code said when it lands. */}
+        <p role="status" className="mt-2 text-body empty:mt-0 sm:text-right">
+          {said?.kind === 'made' ? said.message : null}
         </p>
-        {/* A disclosure: it stays where it is while the confirm under it is open. */}
-        <Button
-          ref={toggle}
-          variant="secondary"
-          aria-expanded={confirming}
-          onClick={() => {
-            if (sending.current) return;
-            if (confirming) return dismiss();
-            setConfirming(true);
-            setSaid(null);
-          }}
-        >
-          New code
-        </Button>
       </div>
       {confirming ? (
-        <div ref={group} role="group" aria-labelledby={`${id}-ask`} className={`mt-3 ${CARD}`}>
-          <p id={`${id}-ask`} className="text-body">
-            Make a new code?{' '}
-            <span translate="no" className="font-mono text-code">
-              {code}
-            </span>{' '}
-            stops working right away.
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Button onClick={() => void make()} aria-disabled={busy} aria-busy={busy}>
-              {busy ? 'Making…' : said?.kind === 'failed' ? 'Try again' : 'Make new code'}
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                if (!sending.current) dismiss();
-              }}
-              aria-disabled={busy}
-            >
-              Cancel
-            </Button>
+        <div
+          ref={group}
+          role="group"
+          aria-labelledby={`${id}-ask`}
+          className="order-last basis-full rounded-lg border border-border-default bg-surface-raised py-4 pr-4 pl-6 shadow-2"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
+            <p id={`${id}-ask`} className="text-body">
+              Make a new code?{' '}
+              <span translate="no" className="font-mono text-code">
+                {code}
+              </span>{' '}
+              stops working right away.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => void make()} aria-disabled={busy} aria-busy={busy}>
+                {busy ? 'Making…' : said?.kind === 'failed' ? 'Try again' : 'Make new code'}
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  if (!sending.current) dismiss();
+                }}
+                aria-disabled={busy}
+              >
+                Cancel
+              </Button>
+            </div>
           </div>
           {said?.kind === 'failed' ? (
-            <p role="alert" className="mt-4 text-body">
+            <p role="alert" className="mt-3 text-body">
               {said.message}
             </p>
           ) : null}
         </div>
       ) : null}
-      {/* Mounted while empty, so a screen reader hears the new code said when it lands. */}
-      <p role="status" className="mt-2 text-body empty:mt-0 sm:text-right">
-        {said?.kind === 'made' ? said.message : null}
-      </p>
-    </div>
+    </>
   );
 }

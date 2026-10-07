@@ -56,7 +56,7 @@ const DIVIDER = 'h-10 w-px shrink-0 bg-border-default';
  * check, never colour alone.
  */
 const LENGTH =
-  'inline-flex h-10 cursor-pointer items-center gap-2 rounded-full border border-border-strong bg-surface-card px-4 text-body text-text-primary tabular-nums transition-colors select-none hover:bg-surface-sunken has-checked:border-text-primary has-checked:bg-surface-sunken has-checked:font-semibold has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-focus-ring';
+  'inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-full border border-border-strong bg-surface-card px-4 text-body text-text-primary tabular-nums transition-colors select-none hover:bg-surface-sunken has-checked:border-text-primary has-checked:bg-surface-sunken has-checked:font-semibold has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-focus-ring';
 
 /**
  * A class's page (the Class page design): its name and join code; while no session runs, the
@@ -315,9 +315,13 @@ export default function ClassDetailPage() {
 
       {/* One header in both views, so the code and its confirm stay put as Present turns on. */}
       <header
-        className={`flex flex-wrap gap-x-8 gap-y-4 ${projecting ? 'mt-4 items-center' : 'mt-5 items-start justify-between'}`}
+        className={`flex min-h-10 flex-wrap gap-x-8 gap-y-4 ${projecting ? 'mt-4 items-center' : 'mt-5 items-start justify-between'}`}
       >
-        <h1 className="min-w-0 text-h1 text-balance break-words">{klass?.name ?? '…'}</h1>
+        <h1
+          className={`min-w-0 text-h1 text-balance break-words ${klass ? '' : 'text-text-tertiary'}`}
+        >
+          {klass?.name ?? '…'}
+        </h1>
         {projecting ? endsAt : null}
         {projecting ? <div className="grow" /> : null}
         {klass ? (
@@ -332,7 +336,8 @@ export default function ClassDetailPage() {
         ) : null}
       </header>
 
-      {error ? (
+      {/* The class is read and its roster isn't (or a read again failed): said under the header. */}
+      {error && klass ? (
         <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-3">
           <p role="alert" className="text-body">
             Couldn&apos;t load this class. <span className="text-text-secondary">{error}</span>
@@ -344,31 +349,70 @@ export default function ClassDetailPage() {
       ) : null}
 
       <div>
-        {grid === null || grid.over ? (
-          <div className="mt-10 flex flex-col gap-10">
+        {klass === null ? (
+          // Until the class is read, the session's place holds no Start: one may already be live.
+          error ? (
+            <section
+              className={`mt-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-4 ${CARD_ALONE}`}
+            >
+              <p role="alert" className="max-w-[65ch] text-body">
+                Couldn&apos;t load this class. <span className="text-text-secondary">{error}</span>
+              </p>
+              <Button variant="secondary" onClick={load}>
+                Try again
+              </Button>
+            </section>
+          ) : (
+            <section
+              aria-label="Session"
+              className={`mt-6 flex min-h-30.5 items-center ${CARD_ALONE}`}
+            >
+              <p role="status" className="text-body text-text-secondary">
+                Loading…
+              </p>
+            </section>
+          )
+        ) : grid === null || grid.over ? (
+          <div className="mt-6 flex flex-col gap-10">
             {/* noValidate: the length is checked here and said in Bali's words under the field,
                 never by the browser's own bubble over the number input. */}
-            <form onSubmit={startSession} noValidate className="flex flex-col items-start gap-6">
+            <form onSubmit={startSession} noValidate className={CARD_ALONE}>
               <fieldset>
                 <legend className="text-body font-medium">Session length</legend>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {[...LENGTH_PRESETS, 'other' as const].map((option) => (
-                    <label key={option} className={LENGTH}>
-                      <input
-                        type="radio"
-                        name="session-length"
-                        value={option}
-                        checked={pick === option}
-                        onChange={() => {
-                          setPick(option);
-                          setLengthSaid(false);
-                        }}
-                        className="sr-only"
-                      />
-                      {pick === option ? <Check size={16} aria-hidden="true" /> : null}
-                      {option === 'other' ? 'Other…' : `${option} min`}
-                    </label>
-                  ))}
+                {/* The lengths on the left, Start on the right, as the bell and End sit live. */}
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
+                  <div className="flex flex-wrap gap-2 max-sm:grid max-sm:basis-full max-sm:grid-cols-2">
+                    {[...LENGTH_PRESETS, 'other' as const].map((option) => (
+                      <label key={option} className={LENGTH}>
+                        <input
+                          type="radio"
+                          name="session-length"
+                          value={option}
+                          checked={pick === option}
+                          onChange={() => {
+                            setPick(option);
+                            setLengthSaid(false);
+                          }}
+                          className="sr-only"
+                        />
+                        {pick === option ? <Check size={16} aria-hidden="true" /> : null}
+                        {option === 'other' ? 'Other…' : `${option} min`}
+                      </label>
+                    ))}
+                  </div>
+                  {/* One button throughout, so focus stays on it whatever it comes to say. */}
+                  <Button
+                    type="submit"
+                    aria-disabled={busy !== null}
+                    aria-busy={busy === 'start'}
+                    className="max-sm:basis-full"
+                  >
+                    {busy === 'start'
+                      ? 'Starting…'
+                      : minutes === null
+                        ? 'Start session'
+                        : `Start ${minutes}-minute session`}
+                  </Button>
                 </div>
                 {pick === 'other' ? (
                   <div className="mt-4 max-w-xs">
@@ -400,33 +444,22 @@ export default function ClassDetailPage() {
                     {NOT_A_SESSION_LENGTH}
                   </p>
                 ) : null}
-              </fieldset>
-              <div>
-                {/* One button throughout, so focus stays on it whatever it comes to say. */}
-                <Button type="submit" aria-disabled={busy !== null} aria-busy={busy === 'start'}>
-                  {busy === 'start'
-                    ? 'Starting…'
-                    : minutes === null
-                      ? 'Start session'
-                      : `Start ${minutes}-minute session`}
-                </Button>
+                {/* A Start that failed, said in its card; Start sends it again. */}
                 {startSaid ? (
-                  <p role="alert" className="mt-3 text-body">
+                  <p role="alert" className="mt-4 text-body">
                     {startSaid}
                   </p>
                 ) : null}
-              </div>
+              </fieldset>
             </form>
             {/* The last session's recap (R4) until a new one starts; only once the class is read,
                 so a session already running never shows it. Opened in Present with no grid under
                 it, the recap carries the toggle. */}
-            {klass ? (
-              <RecapCard
-                classId={classId}
-                present={present}
-                toggle={grid === null && openedInPresent ? presentToggle : null}
-              />
-            ) : null}
+            <RecapCard
+              classId={classId}
+              present={present}
+              toggle={grid === null && openedInPresent ? presentToggle : null}
+            />
             {/* As it ended, until the next Start (R5): who was still unlocked stays in view. */}
             {grid ? (
               <section aria-labelledby={`${id}-ended`} className="flex flex-col gap-4">
@@ -498,35 +531,35 @@ export default function ClassDetailPage() {
         )}
       </div>
 
-      <section
-        aria-labelledby={`${id}-roster`}
-        className="mt-12 border-t border-border-default pt-10"
-      >
-        <h2 id={`${id}-roster`} className="text-h2">
-          Roster
-        </h2>
-        {/* Unread, it says so under the class's name with Try again, never "Loading…" here. */}
-        {roster === null ? (
-          error ? null : (
-            <p role="status" className="mt-4 text-body text-text-secondary">
-              Loading…
-            </p>
-          )
-        ) : roster.students.length === 0 ? (
-          <p className="mt-4 text-body text-text-secondary">No students have joined yet.</p>
-        ) : (
-          <ul className="mt-4 columns-1 gap-x-10 sm:columns-2 lg:columns-3">
-            {roster.students.map((s) => (
-              <li
-                key={s.enrollmentId}
-                className="break-inside-avoid border-b border-border-default py-2 text-body break-words"
-              >
-                {s.displayName ?? s.studentId.slice(0, 8)}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      {/* A class that didn't load has no roster to show: its card says so, with Try again. */}
+      {klass === null && error ? null : (
+        <section
+          aria-labelledby={`${id}-roster`}
+          className="mt-14 border-t border-border-default pt-8"
+        >
+          <h2 id={`${id}-roster`} className="text-h2">
+            Roster
+          </h2>
+          {/* Unread, it says so under the class's name with Try again, never "Loading…" here. */}
+          {roster === null ? (
+            error ? null : (
+              <p role="status" className="mt-4 text-body text-text-secondary">
+                Loading…
+              </p>
+            )
+          ) : roster.students.length === 0 ? (
+            <p className="mt-4 text-body text-text-secondary">No students have joined yet.</p>
+          ) : (
+            <ul className="mt-4 columns-2 gap-x-6 sm:columns-3 sm:gap-x-10 lg:columns-4">
+              {roster.students.map((s) => (
+                <li key={s.enrollmentId} className="break-inside-avoid py-2 text-body break-words">
+                  {s.displayName ?? s.studentId.slice(0, 8)}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
     </main>
   );
 }
