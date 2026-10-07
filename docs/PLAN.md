@@ -537,7 +537,7 @@ Researched 2026-10-05; findings in [`docs/ROADMAP-RESEARCH.md`](ROADMAP-RESEARCH
 
 **Decisions from the 2026-10-05 overnight investigation** (each the owner's call):
 
-1. S8 least-privilege DB roles: grant the runtime role column-level `UPDATE(payload)` on `events` (C3, C6a and C6b de-identify through it, guarded by migrations 0015/0016's trigger), and decide whether migrations get their own role and a `MIGRATION_DATABASE_URL` (that changes `railway.json`'s start command, so a prod deploy).
+1. S8 least-privilege DB roles: grant the runtime role column-level `UPDATE(payload)` on `events` (C3, C6a and C6b de-identify through it, guarded by migrations 0015/0016's trigger), and decide whether migrations get their own role and a `MIGRATION_DATABASE_URL` (that changes the `Dockerfile`'s `CMD`, so a prod deploy).
 2. S6, pinning the Claude workflows: the PR is open and its code done; merging it needs the owner's ruleset toggle (`docs/GOTCHAS.md`): disarm other open PRs' auto-merge, remove "Claude Review" from `protect-main`'s required checks, merge the S6 PR, re-add the check at once, re-arm the others.
 3. P8, Railway's config-as-code migration (`railway.json` deprecated, works until 2026-12-01): `.railway/railway.ts` is in; the owner runs runbook 8 (`docs/RUNBOOKS.md`) on dev, then prod.
 4. A nightly `pg_dump` to an encrypted S3 bucket, built ready to enable (needs a bucket and an IAM user); the owner declined backups for the pilot.
