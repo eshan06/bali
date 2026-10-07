@@ -115,8 +115,10 @@ project for the API (its DSN).
      daily snapshots for the pilot), not something to settle in the console alone.
    - **Check:** the next day, the Backups tab lists one backup with a time.
 5. **The API service.** In `production`: **+ Create** → **GitHub Repo** →
-   `eshan06/bali`. Railway reads `railway.json`: Dockerfile build, `npm run migrate &&
-   npm start`, health check `/healthz`. *(Until P8: once runbook 8 is done these settings
+   `eshan06/bali`. Railway reads `railway.json`: Dockerfile build, health check `/healthz`.
+   The `Dockerfile`'s `CMD` migrates, then starts the API. **Never set a Custom Start
+   Command:** Railway runs it without a shell, so `npm run migrate && npm start` stops after
+   the migration and every deploy fails its health check (production, 2026-10-06). *(Until P8: once runbook 8 is done these settings
    come from `.railway/railway.ts`, applied with `railway config apply`, and a new service
    is added to that file first.)*
    - **Settings → Source** *(wording unsure)*: branch `main`. If Railway offers
@@ -759,7 +761,7 @@ Holder or Admin role, and the Railway project.
 What it does: hands the API services' build and deploy settings from Config as Code
 (`railway.json`, deprecated, no longer read after **2026-12-01**) to Infrastructure as Code
 (`.railway/railway.ts`, PLAN's P8). The file declares the same settings: the `Dockerfile`
-build, `npm run migrate && npm start`, the `/healthz` check, restart on failure up to 3
+build (its `CMD` migrates, then starts; no start command is set), the `/healthz` check, restart on failure up to 3
 times. It manages only dev's `bali` and production's `bali prod` (the named partial
 `bali-api`); the Postgres services and the sweep crons stay as they are. `railway.json`
 stays in the repo until both environments are done (step 7).
@@ -817,8 +819,8 @@ delete gets added to `PRESERVED`, and a `source` change (its branch, or **Wait f
    nothing else.
 6. **Verify dev.** Redeploy `bali` if the apply didn't start a deploy. The build log builds
    from the `Dockerfile`; the deploy log shows the migrations, then the server listening and
-   `sweeping every minute`. The deployment's details show the start command, the health
-   check `/healthz` and the restart policy On Failure, 3 retries.
+   `sweeping every minute`. The deployment's details show no custom start command, the
+   health check `/healthz` and the restart policy On Failure, 3 retries.
    **Check:** `curl -sS https://bali-production-09a2.up.railway.app/healthz` →
    `{"status":"ok",…}`, and a second `railway config plan` says the configuration is up to
    date.

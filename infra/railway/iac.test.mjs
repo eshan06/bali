@@ -17,7 +17,7 @@ test('scoped by a named partial, so other services are never claimed or deleted'
 });
 
 for (const [environment, name] of Object.entries({ dev: 'bali', production: 'bali prod' })) {
-  test(`${environment} declares only the API service ${name}, with railway.json's settings`, async () => {
+  test(`${environment} declares only the API service ${name}, with its build and deploy settings`, async () => {
     const definition = await evaluate(environment);
     assert.equal(definition.name, 'Bali');
     assert.equal(definition.resources.length, 1);
@@ -32,8 +32,10 @@ for (const [environment, name] of Object.entries({ dev: 'bali', production: 'bal
       checkSuites: true,
     });
     assert.deepEqual(api.build, { builder: 'DOCKERFILE', dockerfilePath: 'Dockerfile' });
+    // No startCommand: Railway runs a Dockerfile service's start command without a shell, so
+    // `npm run migrate && npm start` ran only the migration and the API never started
+    // (production, 2026-10-06). The Dockerfile's CMD runs both through `sh -c`.
     assert.deepEqual(api.deploy, {
-      startCommand: 'npm run migrate && npm start',
       healthcheckPath: '/healthz',
       restartPolicyType: 'ON_FAILURE',
       restartPolicyMaxRetries: 3,
@@ -66,4 +68,21 @@ test('every variable the API reads is preserved, or an apply would delete it', (
   const platform = new Set(['RAILWAY_GIT_COMMIT_SHA']);
   const missing = read.filter((key) => !platform.has(key) && !PRESERVED.includes(key));
   assert.deepEqual(missing, [], `add to PRESERVED in .railway/railway.ts: ${missing.join(', ')}`);
+});
+
+// The PR that deletes railway.json (P8's follow-up) deletes this test with it.
+test('railway.json and the IaC agree on build and deploy while both exist (and neither sets a start command)', async () => {
+  const json = JSON.parse(readFileSync(new URL('../../railway.json', import.meta.url), 'utf8'));
+  const [api] = (await evaluate('production')).resources;
+  assert.deepEqual(json.build, api.build);
+  assert.deepEqual(json.deploy, api.deploy);
+  assert.equal(json.deploy.startCommand, undefined);
+});
+
+// With no start command in either file, the image's CMD alone migrates and starts the API,
+// through a shell; without `sh -c` the `&&` would end it after the migration.
+test("the Dockerfile's CMD migrates, then starts, through a shell", () => {
+  const dockerfile = readFileSync(new URL('../../Dockerfile', import.meta.url), 'utf8');
+  const cmds = dockerfile.split('\n').filter((line) => line.startsWith('CMD '));
+  assert.deepEqual(cmds, ['CMD ["sh", "-c", "npm run migrate && npm start"]']);
 });
