@@ -10,13 +10,8 @@ import './globals.css';
 // Rendered per request, so each page carries its CSP nonce (src/middleware.ts).
 export const dynamic = 'force-dynamic';
 
-/** The browser's own chrome in the page colour, light and dark (surface-page; tokens.test.ts). */
-export const viewport: Viewport = {
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#f7f5f2' },
-    { media: '(prefers-color-scheme: dark)', color: '#141312' },
-  ],
-};
+/** The browser's own chrome in the page colour (surface-page; tokens.test.ts): always light. */
+export const viewport: Viewport = { themeColor: '#f7f5f2' };
 
 export const metadata: Metadata = {
   title: 'Bali teacher portal',

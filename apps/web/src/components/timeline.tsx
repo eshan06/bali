@@ -98,14 +98,14 @@ export function Timeline({ view, label }: { view: View; label: string }) {
         <p className="mt-3 text-body text-text-secondary">No unlocks.</p>
       )}
       <div className={`mt-5 items-end pb-2 ${ROW}`}>
-        <span className="text-caption text-text-tertiary dark:text-text-secondary">Who joined</span>
+        <span className="text-caption text-text-tertiary">Who joined</span>
         {/* Narrower, every other time between the ends, then none, so no two labels touch. */}
         <div aria-hidden="true" className="relative h-4.5">
           {view.ticks.map((t, i) => (
             <span
               key={i}
               style={{ left: `${t.x}%` }}
-              className={`absolute top-0 text-caption whitespace-nowrap text-text-tertiary dark:text-text-secondary ${i === 0 ? '' : i === last ? '-translate-x-full' : `-translate-x-1/2 @max-[28rem]:hidden ${i % 2 ? '@max-[64rem]:hidden' : ''}`}`}
+              className={`absolute top-0 text-caption whitespace-nowrap text-text-tertiary ${i === 0 ? '' : i === last ? '-translate-x-full' : `-translate-x-1/2 @max-[28rem]:hidden ${i % 2 ? '@max-[64rem]:hidden' : ''}`}`}
             >
               {t.label}
             </span>

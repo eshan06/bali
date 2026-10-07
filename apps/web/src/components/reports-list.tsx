@@ -24,8 +24,8 @@ export const COLUMNS = [
   'Protection off',
 ] as const;
 const [JOINED, FOCUS, AVERAGE, SILENT, UNLOCKS, PROTECTION_OFFS] = COLUMNS;
-/** Small grey words, and a figure that is zero: `text-secondary` in dark, as the canvas draws them. */
-export const QUIET = 'text-text-tertiary dark:text-text-secondary';
+/** Small grey words, and a figure that is zero, in the captions' ink. */
+export const QUIET = 'text-text-tertiary';
 
 /**
  * A session's card in the reports list: its day over its times, which open its recap's timeline
@@ -137,9 +137,7 @@ function Figure({
 }) {
   return (
     <div className="@4xl:text-right">
-      <dt className="text-label text-text-tertiary uppercase @4xl:sr-only dark:text-text-secondary">
-        {label}
-      </dt>
+      <dt className="text-label text-text-tertiary uppercase @4xl:sr-only">{label}</dt>
       <dd className="mt-1 text-data @4xl:mt-0">
         {Icon && !zero ? (
           <span className={`inline-flex items-center gap-1 ${ink}`}>
