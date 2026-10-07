@@ -6,14 +6,8 @@ import { describe, expect, it } from 'vitest';
 
 import { createApiClient } from './api-client';
 import { CLASS_NAME_MAX, createClass } from './classes';
-import {
-  CANT_CREATE,
-  CANT_REACH,
-  NO_CLASS_NAME,
-  NO_SCHOOL,
-  TOO_MANY_TRIES,
-  TOO_MANY_TRIES_MINUTE,
-} from './errors';
+import * as errors from './errors';
+import { CANT_CREATE, CANT_REACH, TOO_MANY_TRIES, TOO_MANY_TRIES_MINUTE } from './errors';
 
 /** The API client over a fetch that answers `status` with `body`, every request recorded. */
 function api(status: number, body: unknown, headers: Record<string, string> = {}) {
@@ -90,15 +84,20 @@ describe('createClass', () => {
     });
   });
 
-  it('says a teacher with no school in Bali’s words, never the API’s log line (#260’s review)', async () => {
-    const conflict = api(409, {
-      error: { code: 'conflict', message: 'teacher is not assigned to a school' },
-    });
-    expect(await createClass(conflict.client, 'Period 4')).toEqual({
-      kind: 'failed',
-      message: NO_SCHOOL,
-    });
-    expect(NO_SCHOOL).not.toMatch(/[—–!]/);
+  it('says a refusal with no reason as the create’s own words, the no-school 409 included (PB3)', async () => {
+    // A teacher with no school: no account reaches it (a redeemed invite always sets one), and no
+    // one can add an account to a school, so it has no words of its own, never the API's log line.
+    for (const [status, code, message] of [
+      [409, 'conflict', 'teacher is not assigned to a school'],
+      [403, 'forbidden', 'teacher access required'],
+    ] as const) {
+      const refused = api(status, { error: { code, message } });
+      expect(await createClass(refused.client, 'Period 4'), String(status)).toEqual({
+        kind: 'failed',
+        message: CANT_CREATE,
+      });
+    }
+    expect(Object.keys(errors)).not.toContain('NO_SCHOOL');
     // The route's other 409 carries its reason, and is said as errText says it.
     const gone = api(409, {
       error: { code: 'conflict', reason: 'account_deleted', message: 'account deleted' },
@@ -107,16 +106,6 @@ describe('createClass', () => {
       kind: 'failed',
       message: 'account deleted',
     });
-  });
-
-  it('keys the no-school words on the route’s one 409 that carries no reason', () => {
-    // A reason added to it one day would fail this, and the words would key on that instead.
-    const route = readFileSync(
-      fileURLToPath(new URL('../../../api/src/routes/classes.ts', import.meta.url)),
-      'utf8',
-    );
-    expect(route).toContain("throw ApiError.conflict('teacher is not assigned to a school');");
-    expect(route.match(/ApiError\.conflict\(/g)).toHaveLength(1);
   });
 
   it('holds a name to the API’s own limit, so its 400 for a longer one is never met', () => {
@@ -130,10 +119,9 @@ describe('createClass', () => {
   });
 
   it('holds the form’s words (D2e): no em-dash, no exclamation mark, a way on', () => {
-    expect(NO_CLASS_NAME).toBe('Enter a name for the class.');
     expect(CANT_CREATE).toBe(
       "Bali couldn't finish creating the class. If it isn't in your list above, try again.",
     );
-    for (const words of [NO_CLASS_NAME, CANT_CREATE]) expect(words).not.toMatch(/[—–!]/);
+    expect(CANT_CREATE).not.toMatch(/[—–!]/);
   });
 });

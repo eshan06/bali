@@ -24,9 +24,12 @@ export const NOT_AN_INVITE_CODE =
 export const NOT_A_BLOCK_ID =
   'A block ID is 10 letters and digits. Check it against the one written on your block.';
 
-/** `POST /v1/blocks`'s one 409 (P3): a live block of another teacher's holds the tag. */
+/**
+ * `POST /v1/blocks`'s one 409 (P3): a live block of another teacher's holds the tag. Nothing moves
+ * a block between teachers today, so the way on is the ID itself (the Classes home design).
+ */
 export const BLOCK_TAKEN =
-  'That block is registered to another teacher. If the ID matches the one on your block, ask whoever sent your invite code to move it to you.';
+  'That block is registered to another teacher. Check the ID against the one written on your block.';
 
 /**
  * No answer from the API (P3), and so every `NetworkError` a page shows (D2c-2): the connection,
@@ -37,24 +40,14 @@ export const CANT_REACH = "Couldn't reach Bali. Check your connection, then try 
 /** A 5xx or a timeout on the register (P3): the API's own message is written for a log. */
 export const CANT_REGISTER = "Bali couldn't register the block just now. Try again.";
 
-/** A class's name left empty (D2e): said before anything is sent. */
-export const NO_CLASS_NAME = 'Enter a name for the class.';
-
 /**
- * A 5xx or a timeout on a create (D2e): the API's own message is written for a log. The class may
- * have been made before the answer was lost (the route takes no `eventId`), and the page reads the
- * list again, so the words send the teacher there before a second press makes a second class.
+ * A create with no words of its own to say (D2e): a 5xx, a timeout, or a refusal with no reason,
+ * whose message is written for a log. The class may have been made before the answer was lost (the
+ * route takes no `eventId`), and the page reads the list again, so the words send the teacher
+ * there before a second press makes a second class.
  */
 export const CANT_CREATE =
   "Bali couldn't finish creating the class. If it isn't in your list above, try again.";
-
-/**
- * `POST /v1/classes`'s 409 for a teacher whose account has no school (#260's review): the API's
- * own sentence is a log line, and its 409 carries no `reason` (the create's other 409,
- * `account_deleted`, carries one), so `createClass` keys on that. The way on is the invite's sender.
- */
-export const NO_SCHOOL =
-  "Your account isn't part of a school yet, so it can't create classes. Ask whoever sent your invite code to add you to one.";
 
 /** A session length typed under Other (P10): said before a Start is sent with it. */
 export const NOT_A_SESSION_LENGTH = `A session runs 1 to ${MAX_SESSION_MINUTES} minutes. Enter a whole number of minutes.`;
