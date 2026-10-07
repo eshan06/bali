@@ -24,7 +24,13 @@ for (const [environment, name] of Object.entries({ dev: 'bali', production: 'bal
     const [api] = definition.resources;
     assert.equal(api.type, 'service');
     assert.equal(api.name, name);
-    assert.deepEqual(api.source, { type: 'github', repo: 'eshan06/bali', branch: 'main' });
+    // checkSuites is the dashboard's "Wait for CI": an apply that leaves it out turns it off.
+    assert.deepEqual(api.source, {
+      type: 'github',
+      repo: 'eshan06/bali',
+      branch: 'main',
+      checkSuites: true,
+    });
     assert.deepEqual(api.build, { builder: 'DOCKERFILE', dockerfilePath: 'Dockerfile' });
     assert.deepEqual(api.deploy, {
       startCommand: 'npm run migrate && npm start',
