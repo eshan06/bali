@@ -8,6 +8,17 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-07** — **PB5a-2: the recap card shows the timeline; its figures never without it.**
+  The card reads the session's report (R2) and its events together, and either read failing is
+  the card's one failure, "Couldn't load the last session." with Try again: the timeline is where
+  every unlock now shows (the lists of who joined, unlocks and protection offs went into it), so a
+  card with figures and no marks would hide them. "Nobody joined this session." replaces the figures
+  as before, and a timeline still follows for anyone who unlocked or turned protection off there,
+  so no unlock goes unshown. An opened report draws the same timeline with no figures of its own,
+  its row saying them, as the canvas draws it. From the canvas, unchanged in meaning: "Last session"
+  over its times in `body` (the times were a caption beside it), each figure's "min" in `body`
+  beside its number, and a failure's reason on its own line, Try again under both.
+
 - **2026-10-07** — **PB5a-1: the recap as the session's timeline, from today's endpoints, marks only.**
   The owner's Recap & reports design draws the session after the bell as a timeline: who joined
   down the side, the session's own time across, each moment a mark at its time, never a bar, so no

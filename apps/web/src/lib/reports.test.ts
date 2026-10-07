@@ -227,7 +227,7 @@ describe('sessionRow', () => {
     const row = sessionRow(MON, NY);
     expect({ ...row, when: row.when.replace(/\s/g, ' ') }).toEqual({
       when: 'Mon, Oct 5, 9:05 AM to 9:30 AM',
-      figures: { joined: '4', focus: '83 min', average: '21 min', silent: '2 min' },
+      figures: { joined: '4', focus: '83', average: '21', silent: '2' },
       unlocks: '3',
       protectionOffs: '1',
     });
@@ -241,7 +241,7 @@ describe('sessionRow', () => {
       protectionOffs: [],
     };
     const joined = Array.from({ length: 4 }, (_, i) => ({ id: `u${i}`, displayName: null }));
-    expect(row.figures).toEqual(recapView({ ...report, joined }, NY).stats);
+    expect(row.figures).toEqual(recapView(MON, { ...report, joined }, [], NY).stats);
   });
 
   it('has no figures when nobody joined, and still counts what was recorded', () => {
@@ -263,6 +263,6 @@ describe('sessionRow', () => {
   it('writes large counts in the viewer’s own format', () => {
     const big = lesson('s9', 2, { focusMinutes: 1250, unlockCount: 1200 });
     expect(sessionRow(big, NY)).toMatchObject({ unlocks: '1,200' });
-    expect(sessionRow(big, NY).figures?.focus).toBe('1,250 min');
+    expect(sessionRow(big, NY).figures?.focus).toBe('1,250');
   });
 });

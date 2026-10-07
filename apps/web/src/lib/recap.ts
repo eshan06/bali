@@ -35,7 +35,12 @@ export type RecapState =
   | { kind: 'none' }
   /** Its report on the way; the session is null on a retry, until it is found again. */
   | { kind: 'loading'; session: SessionReportSummary | null }
-  | { kind: 'ready'; session: SessionReportSummary; report: SessionReportResponse }
+  | {
+      kind: 'ready';
+      session: SessionReportSummary;
+      report: SessionReportResponse;
+      events: FeedEvent[];
+    }
   | { kind: 'error'; message: string };
 
 /**
@@ -62,8 +67,9 @@ export async function readEvents(
 }
 
 /**
- * The class's last session (R3, one row), or `known` (R5's opened row): read its report (R2),
- * telling `show` each step after the first. Every failure ends in `error`, for Try again.
+ * The class's last session (R3, one row), or `known` (R5's opened row): read its report (R2) and
+ * its events, telling `show` each step after the first. Every failure ends in `error`, for Try
+ * again: the timeline is the recap, so its figures are never shown without it.
  */
 export async function loadRecap(
   api: Pick<ApiClient, 'get'>,
@@ -79,10 +85,11 @@ export async function loadRecap(
       return;
     }
     show({ kind: 'loading', session });
-    const report = await api.get<SessionReportResponse>(
-      `${reports}/${encodeURIComponent(session.id)}`,
-    );
-    show({ kind: 'ready', session, report });
+    const [report, events] = await Promise.all([
+      api.get<SessionReportResponse>(`${reports}/${encodeURIComponent(session.id)}`),
+      readEvents(api, session.id),
+    ]);
+    show({ kind: 'ready', session, report, events });
   } catch (e) {
     show({ kind: 'error', message: errText(e) });
   }
@@ -123,69 +130,22 @@ function nameOf(s: ReportStudent): string {
   return s.displayName ?? s.id.slice(0, 8);
 }
 
-/** One moment in a list: who, when, and for an unlock its reason. */
-export interface RecapMoment {
-  key: string;
-  name: string;
-  time: string;
-  reason?: string;
-}
-
-/** The class's figures in words, as the card and the reports list (R5) both say them. */
+/**
+ * The class's figures, each a number in the viewer's format, as the card and the reports list (R5)
+ * both say them; their unit, "min", is the page's.
+ */
 export function classFigures(
   joined: number,
   minutes: Pick<SessionReportSummary, 'focusMinutes' | 'averageFocusMinutes' | 'silentMinutes'>,
   locale?: string,
 ) {
-  const min = new Intl.NumberFormat(locale, { style: 'unit', unit: 'minute' }); // "83 min"
+  const n = new Intl.NumberFormat(locale);
   return {
-    joined: new Intl.NumberFormat(locale).format(joined),
-    focus: min.format(minutes.focusMinutes),
+    joined: n.format(joined),
+    focus: n.format(minutes.focusMinutes),
     // Null only when nobody joined (R2), when there are no figures at all.
-    average: min.format(minutes.averageFocusMinutes ?? 0),
-    silent: min.format(minutes.silentMinutes),
-  };
-}
-
-export interface RecapView {
-  /** The class's figures; null when nobody joined, which the card says instead of zeros. */
-  stats: ReturnType<typeof classFigures> | null;
-  /** Who joined, in the order they first did (R2's). */
-  joined: { key: string; name: string }[];
-  /** Oldest first, every one R2 lists, whatever it changed. */
-  unlocks: RecapMoment[];
-  protectionOffs: RecapMoment[];
-}
-
-/**
- * The card's words and numbers, from R2's report. In Present (`present`), the projector the class
- * can see, every unlock is still listed by who and when, but never with its reason: the student
- * shares it with the teacher alone (#265's rule, `unlockNote`).
- */
-export function recapView(
-  report: SessionReportResponse,
-  { locale, timeZone }: RecapFormat = {},
-  present = false,
-): RecapView {
-  const clock = new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit', timeZone });
-  const moment = (e: { eventId: string; student: ReportStudent; occurredAt: string }) => ({
-    key: e.eventId,
-    name: nameOf(e.student),
-    time: clock.format(new Date(e.occurredAt)),
-  });
-  return {
-    stats: report.joined.length === 0 ? null : classFigures(report.joined.length, report, locale),
-    joined: report.joined.map((s) => ({ key: s.id, name: nameOf(s) })),
-    unlocks: report.unlocks.map((u) => ({
-      ...moment(u),
-      // A reason this build doesn't know reads as none (API decision 4).
-      reason: present
-        ? undefined
-        : isUnlockReason(u.reason)
-          ? REASON_TEXT[u.reason]
-          : 'No reason given',
-    })),
-    protectionOffs: report.protectionOffs.map(moment),
+    average: n.format(minutes.averageFocusMinutes ?? 0),
+    silent: n.format(minutes.silentMinutes),
   };
 }
 
@@ -352,5 +312,30 @@ export function sessionTimeline(
     moments: MOMENTS.filter((m) => all.some((f) => f.moment === m)),
     rows,
     ...axis(start, end, clock),
+  };
+}
+
+export interface RecapView {
+  /** The class's figures; null when nobody joined, which the card says instead of zeros. */
+  stats: ReturnType<typeof classFigures> | null;
+  timeline: Timeline;
+}
+
+/**
+ * The card's figures and its timeline, from R2's report and the session's events. In Present
+ * (`present`), the projector the class can see, every unlock is still marked, but never with its
+ * reason: the student shares it with the teacher alone (#265's rule, `unlockNote`).
+ */
+export function recapView(
+  session: SessionReportSummary,
+  report: SessionReportResponse,
+  events: readonly FeedEvent[],
+  format: RecapFormat = {},
+  present = false,
+): RecapView {
+  return {
+    stats:
+      report.joined.length === 0 ? null : classFigures(report.joined.length, report, format.locale),
+    timeline: sessionTimeline(session, report, events, format, present),
   };
 }
