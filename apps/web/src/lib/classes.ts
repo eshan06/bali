@@ -32,7 +32,8 @@ export async function createClass(
     return { kind: 'created', klass: await api.post<ClassDetail>('/v1/classes', { name }) };
   } catch (e) {
     if (e instanceof NetworkError) return { kind: 'failed', message: CANT_REACH };
-    // A refusal with words of its own: the budget's wait, or one its `reason` names.
+    // A refusal that carries something to go by, said as errText says it: the budget's wait, or a
+    // `reason` (the route's `account_deleted`).
     if (e instanceof ApiError && e.status < 500 && (e.status === 429 || e.reason !== undefined)) {
       return { kind: 'failed', message: errText(e) };
     }

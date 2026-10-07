@@ -27,5 +27,16 @@ describe('the classes home’s create row', () => {
     expect(page).not.toMatch(/Enter a name|is ready/);
     // What the row does say: a create's failure, under the field, and Try again on its button.
     expect(page).toContain("{busy ? 'Creating…' : failed ? 'Try again' : 'Create class'}");
+    // The list says a made class out loud too: it sits in a polite live region, the empty line
+    // with it, so a first class replacing that line is heard as well; the form stays outside it,
+    // its failure already an alert of its own.
+    const live = page.indexOf('<div aria-live="polite">');
+    const end = page.indexOf('</div>', page.indexOf('</ul>'));
+    expect(live).toBeGreaterThan(-1);
+    for (const inside of ['No classes yet.', '{me.classes.map(']) {
+      expect(page.indexOf(inside), inside).toBeGreaterThan(live);
+      expect(page.indexOf(inside), inside).toBeLessThan(end);
+    }
+    expect(page.indexOf('<form')).toBeGreaterThan(end);
   });
 });

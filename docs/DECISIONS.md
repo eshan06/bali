@@ -13,10 +13,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   no school is said as any create that failed** (`CANT_CREATE`), no longer as `NO_SCHOOL` (#260's
   review). An account teaches only by redeeming an invite, which always sets its school, so no
   account meets that 409, and no one can "add you to a school" as `NO_SCHOOL` asked the teacher to
-  have done. `createClass` now says a refusal in words of its own only when it has some: the
-  budget's wait, or a `reason` `errText` knows. Anything else, a reason-less 409 or 403 included,
-  is `CANT_CREATE`, never the API's log line, so no special case keys on the route's one
-  reason-less 409 any more. (2) **Another teacher's block sends the teacher back to the ID:**
+  have done. `createClass` now keys on what a refusal carries: the budget's wait and a refusal with
+  a `reason` are said as `errText` says them, as before; one with no reason, the no-school 409 and a
+  403 included, is `CANT_CREATE`, never the API's log line, so no special case keys on the route's
+  one reason-less 409 any more. (2) **Another teacher's block sends the teacher back to the ID:**
   "That block is registered to another teacher. Check the ID against the one written on your
   block." Nothing moves a block between teachers today (ARCHITECTURE, how a tap works, step 9), so
   asking the invite's sender to move it promised what no one can do. (3) **An empty name leaves

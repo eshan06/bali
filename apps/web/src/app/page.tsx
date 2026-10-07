@@ -141,30 +141,33 @@ export default function HomePage() {
           ) : null}
 
           <div className="flex flex-col gap-4">
-            {me.classes.length === 0 ? (
-              <p className="text-body text-text-secondary">
-                No classes yet. Create your first one below.
-              </p>
-            ) : (
-              <ul className="grid gap-2">
-                {me.classes.map((c) => (
-                  <li key={c.id}>
-                    {/* The whole card opens the class; its edge firms and the chevron moves on hover. */}
-                    <Link
-                      href={`/classes/${c.id}`}
-                      className={`group flex items-center justify-between gap-4 transition-colors hover:border-border-strong ${CARD}`}
-                    >
-                      <span className="min-w-0 text-h3 break-words">{c.name}</span>
-                      <ChevronRight
-                        size={20}
-                        aria-hidden="true"
-                        className="shrink-0 text-text-tertiary transition-transform group-hover:translate-x-0.5"
-                      />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
+            {/* A made class is said by the list: a screen reader hears its name as it appears. */}
+            <div aria-live="polite">
+              {me.classes.length === 0 ? (
+                <p className="text-body text-text-secondary">
+                  No classes yet. Create your first one below.
+                </p>
+              ) : (
+                <ul className="grid gap-2">
+                  {me.classes.map((c) => (
+                    <li key={c.id}>
+                      {/* The whole card opens the class; its edge firms and the chevron moves on hover. */}
+                      <Link
+                        href={`/classes/${c.id}`}
+                        className={`group flex items-center justify-between gap-4 transition-colors hover:border-border-strong ${CARD}`}
+                      >
+                        <span className="min-w-0 text-h3 break-words">{c.name}</span>
+                        <ChevronRight
+                          size={20}
+                          aria-hidden="true"
+                          className="shrink-0 text-text-tertiary transition-transform group-hover:translate-x-0.5"
+                        />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
 
             <form onSubmit={(e) => void onCreate(e)} className={CARD}>
               <Field
