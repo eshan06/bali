@@ -36,4 +36,10 @@ EXPOSE 3001
 # Apply migrations, then start the API. A single dev instance runs migrations on
 # boot; a multi-instance deploy should move `npm run migrate` to a release phase
 # so only one runner applies them.
-CMD ["sh", "-c", "npm run migrate && npm start"]
+# The shell runs the `&&`; `exec` then replaces it with the server's own node
+# process, so the API is PID 1 and receives Railway's SIGTERM (sh as PID 1 ignores
+# it, and a restart then SIGKILLs the API mid-request). `node --import tsx` is what
+# `npm start` runs (`tsx src/server.ts`) with no npm or tsx wrapper process between
+# the signal and the server, from apps/api as `npm start -w` would. This CMD is
+# the only start command: Railway's is never set.
+CMD ["sh", "-c", "npm run migrate && cd apps/api && exec node --import tsx src/server.ts"]

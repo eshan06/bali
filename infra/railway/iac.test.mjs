@@ -32,9 +32,9 @@ for (const [environment, name] of Object.entries({ dev: 'bali', production: 'bal
       checkSuites: true,
     });
     assert.deepEqual(api.build, { builder: 'DOCKERFILE', dockerfilePath: 'Dockerfile' });
-    // No startCommand: Railway runs a Dockerfile service's start command without a shell, so
-    // `npm run migrate && npm start` ran only the migration and the API never started
-    // (production, 2026-10-06). The Dockerfile's CMD runs both through `sh -c`.
+    // No startCommand: one applied through IaC on this Dockerfile service ran without a
+    // shell, so `npm run migrate && npm start` ran only the migration and the API never
+    // started (production, 2026-10-06). The Dockerfile's CMD is the only start command.
     assert.deepEqual(api.deploy, {
       healthcheckPath: '/healthz',
       restartPolicyType: 'ON_FAILURE',
@@ -70,19 +70,14 @@ test('every variable the API reads is preserved, or an apply would delete it', (
   assert.deepEqual(missing, [], `add to PRESERVED in .railway/railway.ts: ${missing.join(', ')}`);
 });
 
-// The PR that deletes railway.json (P8's follow-up) deletes this test with it.
-test('railway.json and the IaC agree on build and deploy while both exist (and neither sets a start command)', async () => {
-  const json = JSON.parse(readFileSync(new URL('../../railway.json', import.meta.url), 'utf8'));
-  const [api] = (await evaluate('production')).resources;
-  assert.deepEqual(json.build, api.build);
-  assert.deepEqual(json.deploy, api.deploy);
-  assert.equal(json.deploy.startCommand, undefined);
-});
-
-// With no start command in either file, the image's CMD alone migrates and starts the API,
-// through a shell; without `sh -c` the `&&` would end it after the migration.
-test("the Dockerfile's CMD migrates, then starts, through a shell", () => {
+// With no start command in the IaC, the image's CMD alone migrates and starts the API. The
+// shell runs the `&&` (without it only the migration would run); `exec` then makes the
+// server's node process PID 1, so Railway's SIGTERM reaches makeShutdown (sh as PID 1
+// ignores it, and a restart SIGKILLs the API mid-request).
+test("the Dockerfile's CMD migrates, then execs the server, through a shell", () => {
   const dockerfile = readFileSync(new URL('../../Dockerfile', import.meta.url), 'utf8');
   const cmds = dockerfile.split('\n').filter((line) => line.startsWith('CMD '));
-  assert.deepEqual(cmds, ['CMD ["sh", "-c", "npm run migrate && npm start"]']);
+  assert.deepEqual(cmds, [
+    'CMD ["sh", "-c", "npm run migrate && cd apps/api && exec node --import tsx src/server.ts"]',
+  ]);
 });

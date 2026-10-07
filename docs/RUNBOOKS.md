@@ -13,8 +13,8 @@ uses values the one before it produced:
    runs with `SENTRY_DSN` set.
 7. [Push: the APNs key](#7-push-the-apns-key), any time; its end-to-end check once the
    app half of the push ships.
-8. [Railway: from `railway.json` to `.railway/railway.ts`](#8-railway-from-railwayjson-to-railwayrailwayts),
-   dev then production, before 2026-12-01.
+8. [Railway: settings from `.railway/railway.ts`](#8-railway-settings-from-railwayrailwayts),
+   done on both (2026-10-06); again whenever the file changes.
 
 **Where production stands** (the owner, 2026-10-05; its values are in `docs/DEPLOY.md`,
 "The phone's sign-in", none secret):
@@ -115,12 +115,13 @@ project for the API (its DSN).
      daily snapshots for the pilot), not something to settle in the console alone.
    - **Check:** the next day, the Backups tab lists one backup with a time.
 5. **The API service.** In `production`: **+ Create** → **GitHub Repo** →
-   `eshan06/bali`. Railway reads `railway.json`: Dockerfile build, health check `/healthz`.
+   `eshan06/bali`. Its settings come from `.railway/railway.ts`: a session adds the
+   environment and service name to `SERVICE_BY_ENVIRONMENT` in a PR, then you plan and apply
+   it (runbook 8's commands): Dockerfile build, health check `/healthz`, Wait for CI.
    The `Dockerfile`'s `CMD` migrates, then starts the API. **Never set a Custom Start
-   Command:** Railway runs it without a shell, so `npm run migrate && npm start` stops after
-   the migration and every deploy fails its health check (production, 2026-10-06). *(Until P8: once runbook 8 is done these settings
-   come from `.railway/railway.ts`, applied with `railway config apply`, and a new service
-   is added to that file first.)*
+   Command:** `npm run migrate && npm start` applied as one ran without a shell on this
+   Dockerfile service, so it stopped after the migration and every deploy failed its health
+   check (production, 2026-10-06).
    - **Settings → Source** *(wording unsure)*: branch `main`. If Railway offers
      **Wait for CI**, turn it on, so a red `main` never deploys to prod.
    - **Settings → Networking → Generate Domain** for the public HTTPS URL (or add
@@ -593,12 +594,11 @@ All on `github.com/eshan06/bali` → **Settings**, as the owner.
 
 1. **2FA on the GitHub account.** Avatar → **Settings → Password and
    authentication → Two-factor authentication**. **Check:** the page says enabled.
-2. **The owner on `.github/**`, `Dockerfile`, `railway.json` and `.railway/`.** Two parts:
+2. **The owner on `.github/**`, `Dockerfile` and `.railway/`.** Two parts:
    - **CODEOWNERS.** Ask a session for a PR adding `.github/CODEOWNERS`:
      ```
      /.github/      @eshan06
      /Dockerfile    @eshan06
-     /railway.json  @eshan06
      /.railway/     @eshan06
      ```
    - **The ruleset.** **Settings → Rules → Rulesets → `protect-main`** → **Require a
@@ -756,18 +756,25 @@ Holder or Admin role, and the Railway project.
 
 ---
 
-## 8. Railway: from `railway.json` to `.railway/railway.ts`
 
-What it does: hands the API services' build and deploy settings from Config as Code
-(`railway.json`, deprecated, no longer read after **2026-12-01**) to Infrastructure as Code
-(`.railway/railway.ts`, PLAN's P8). The file declares the same settings: the `Dockerfile`
-build (its `CMD` migrates, then starts; no start command is set), the `/healthz` check, restart on failure up to 3
-times. It manages only dev's `bali` and production's `bali prod` (the named partial
-`bali-api`); the Postgres services and the sweep crons stay as they are. `railway.json`
-stays in the repo until both environments are done (step 7).
+## 8. Railway: settings from `.railway/railway.ts`
 
-Railway never reads `.railway/` on a deploy: nothing changes until you `apply`. `plan`,
-`railway config migrate status` and `railway config partials list` only read.
+**Done on both environments, 2026-10-06** (dev `bali`, production `bali prod`; PLAN's P8).
+`railway.json` (Config as Code, no longer read after 2026-12-01) is deleted; the API
+services' settings live only in `.railway/railway.ts` (Infrastructure as Code): the source
+(`main`, **Wait for CI** on, `checkSuites`, now on dev too), the `Dockerfile` build (its
+`CMD` migrates, then starts the server; no start command is set), the `/healthz` check,
+restart on failure up to 3 times. It manages only dev's `bali` and production's `bali prod`
+(the named partial `bali-api`); the Postgres services and the sweep crons stay as they are.
+
+Run this again whenever the file changes (a session's PR) or a new environment's service
+is added to it. Railway never reads `.railway/` on a deploy: nothing changes until you
+`apply`. `plan` and `railway config partials list` only read.
+
+**An apply resets every setting the file leaves out.** A setting you change in the
+dashboard (a toggle, a deploy option) is undone by the next apply unless a
+session adds it to the file first; that is how the first production apply turned Wait for
+CI off (2026-10-06).
 
 **Before you start:**
 
@@ -775,61 +782,42 @@ Railway never reads `.railway/` on a deploy: nothing changes until you `apply`. 
   another name: an unlinked CLI names the project and the service after the folder (the
   first dry run's `bali-railway`). `git switch main && git pull && npm ci`: `npm ci`
   installs the `railway` package the CLI runs the file with.
-- `railway upgrade`, then `railway --version`: 5.63 or newer. These steps follow that
-  version's commands; an older CLI may lack `migrate cutover` (step 3 says what to do then).
+- `railway upgrade`, then `railway --version`: 5.63 or newer. (5.63.1 has no
+  `railway config migrate cutover`; it isn't needed.)
 - Never run `railway config migrate --apply`, `--delete-files`, `railway config init` or
-  `railway config pull` here: they overwrite the checked file or delete `railway.json`.
-  Never pass `--yes` or `--confirm-destructive`.
+  `railway config pull` here: they overwrite the checked file. Never pass `--yes` or
+  `--confirm-destructive`.
 
 **Stop and paste the output to a session** if a plan shows anything **created**,
 **deleted** or **renamed**, any variable deleted, any service but the one you're on, or a
-change to its `source`. Expected: `0 to add` and `0 to destroy`, and the changes, if any,
-only to that service's build and deploy settings. A session fixes the file in a PR; pull it
-and plan again. The fix is always in the file, never in Railway: a variable the plan would
-delete gets added to `PRESERVED`, and a `source` change (its branch, or **Wait for CI**,
-`checkSuites`) gets the file matched to what the service has today.
+change to its `source` you didn't ask for. Expected: `0 to add` and `0 to destroy`, and the
+changes, if any, only the ones the PR meant. A session fixes the file in a PR; pull it and
+plan again. The fix is always in the file, never in Railway: a variable the plan would
+delete gets added to `PRESERVED`, and a setting the plan would change back gets the file
+matched to what the service should have.
 
-**Dev first:**
+**Dev first, then production:**
 
 1. **Link.** `railway link` → the Bali project → environment `dev` (any service, or none).
    **Check:** `railway status` names the project and `dev`.
-2. **What still reads `railway.json`.** `railway config migrate status`.
-   **Check:** it lists `bali` under "Still on Config as Code", declared in IaC. If it says
-   no service reads Config as Code, skip step 3.
-3. **Switch `bali` off Config as Code.** `railway config migrate cutover --service bali`;
-   it lists the one service and asks first. This clears `bali`'s **Config File** setting in
-   the dashboard, so `railway.json` stops being read for it, and saves the old path in
-   `.railway/.cac-migration.json` (git ignores it): `railway config migrate undo` puts it
-   back. Railway redeploys `bali`; the `Dockerfile` itself runs migrations then the server,
-   so it comes up as before. Go on to step 4 right away: until the apply, the dashboard's
-   own build and deploy settings are the ones in force.
-   *(An older CLI with no `cutover`: the service → **Settings** → **Config-as-code** →
-   **Railway Config File** *(wording unsure)* → clear it.)*
-   **Check:** the redeploy goes green and
-   `curl -sS https://bali-production-09a2.up.railway.app/healthz` answers
-   `{"status":"ok",…}`.
-4. **Plan.** `railway config plan`, from the repo's root. Copy the whole output into a
-   session: "P8: check this plan for dev." If it says the service "is already managed by
-   railway.json", step 3 didn't take: stop there.
+2. **Plan.** `railway config plan`, from the repo's root. Copy the whole output into a
+   session: "P8: check this plan for dev." If it refuses because the service still reads a
+   config file (it "is already managed by railway.json", or similar): the service →
+   **Settings** → the **Config File** / config-as-code path *(wording unsure)* → clear it,
+   then plan again.
    **Check:** the session says it's clean (the stop list above).
-5. **Apply.** `railway config apply`. It plans again and asks: confirm only if what it
-   shows matches what the session checked. "Already up to date" still applies once, to
-   record that `bali-api` owns `bali`.
+3. **Apply.** `railway config apply`. It plans again and asks: confirm only if what it
+   shows matches what the session checked.
    **Check:** `railway config partials list` shows `bali-api` owning `service.bali`, and
    nothing else.
-6. **Verify dev.** Redeploy `bali` if the apply didn't start a deploy. The build log builds
+4. **Verify.** Redeploy `bali` if the apply didn't start a deploy. The build log builds
    from the `Dockerfile`; the deploy log shows the migrations, then the server listening and
    `sweeping every minute`. The deployment's details show no custom start command, the
-   health check `/healthz` and the restart policy On Failure, 3 retries.
+   health check `/healthz`, the restart policy On Failure, 3 retries, and Wait for CI on.
    **Check:** `curl -sS https://bali-production-09a2.up.railway.app/healthz` →
    `{"status":"ok",…}`, and a second `railway config plan` says the configuration is up to
    date.
 
-**Then production,** the same way: `railway link` → environment `production`; step 2;
-step 3 as `railway config migrate cutover --service "bali prod"`; steps 4 to 6 with the
-session told "for production", `service.bali prod` in the partials list, and
+**Production** the same way: `railway link` → environment `production`; the session told
+"for production", `service.bali prod` in the partials list, and
 `https://bali-prod-production.up.railway.app/healthz`.
-
-7. **Tell a session it's done:** "P8: `railway config apply` verified on dev and prod;
-   open the follow-up PR that deletes `railway.json`." Both services must be through step 6
-   first, and all of it before 2026-12-01.
