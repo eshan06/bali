@@ -8,6 +8,42 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-07** — **PB5a-1: the recap as the session's timeline, from today's endpoints, marks only.**
+  The owner's Recap & reports design draws the session after the bell as a timeline: who joined
+  down the side, the session's own time across, each moment a mark at its time, never a bar, so no
+  student's minutes are shown (R2's rule). **No API change** (the owner's condition): the marks come
+  from the catch-up feed the live grid already reads (`GET /v1/sessions/{id}/events`, the class's own
+  teacher only), every page of it, 200 events a request, a cursor that doesn't move ending the read
+  so a misbehaving answer can't loop it; each page is a request on the teacher's budget, so a
+  session of thousands of events can meet a 429, said as any failure, with Try again. Names (the
+  display name now) and each unlock's reason now (A20) are R2's, so the recap never disagrees with
+  the report; one R2 doesn't list yet, landing between the two reads, says its record's own.
+  **What draws a mark** is what the consent card says a teacher sees: tapped in, an unlock (with its
+  reason), back in focus, protection off and back on, silent and checked in again, and leaving
+  (a switch to another class, a leave, a removal: "Left", the grid's word); the owner approved
+  "Tapped in", "Back in focus", "Protection back on" and "Checked in again" on the canvas
+  (2026-10-06). A late tap, return to focus or Screen Time back on (noted `superseded`, A12–A14)
+  changed nothing, so it draws no mark; every unlock and protection off draws one, whatever it
+  changed, as R2 lists and counts them, so a row's count and its marks agree. **Who has a row:**
+  who joined, in R2's order, then anyone else with an unlock or protection off there, in the order
+  of their first: an unlock is never left out of the recap, joined or not. **The axis** runs from
+  the start to the end `sessionTimes` says, stretched only when a record clamped after an early
+  End (rule 1 clamps to the bell) lands later, so every mark sits at its own time; ticks each 5,
+  10, 15, 30, 60 or 120 minutes, the least that leaves 12 gaps or fewer, none within a gap of the
+  end so no label runs into the end's; on a narrow axis every other time between the ends is
+  hidden, and on a phone all of them. **The line** under each row runs from its first mark to the
+  end, the same for everyone, so it shows no one's minutes. **A mark** is a button whose label says
+  what, who, when and, but in Present, the reason; hovered or focused it opens the canvas's card,
+  which the pointer can rest on and Escape closes from anywhere (WCAG 1.4.13), opening toward the
+  axis's middle on a narrow axis so it never runs off a phone. Marks a minute apart overlap at
+  desktop widths; Tab still reaches each. **Present never says a reason** (#265, #269): not in a
+  label, not in a card. **Small grey words** (the axis, "Who joined", the figures' names, the
+  note) are `text-secondary` in dark, as this canvas draws them, where the tokens' dark
+  `text-tertiary` is 4.2:1 (D2g's finding); the other pages keep `text-tertiary`, as their canvases
+  drew it, a portal-wide change being the owner's call. **Three PRs, not two:** the recap's change
+  came to about 640 lines where the rule is about 400, so PB5a-1 lands the timeline's data and
+  drawing, PB5a-2 the card that shows it, and PB5b the reports.
+
 - **2026-10-07** — **PB4b: until the class is read, the class page holds the session's place, never
   the Start form** (the owner's ruling, with the approved Class page & live grid design). The page
   drew the Start form whenever it knew of no running session, so it showed while the class was
