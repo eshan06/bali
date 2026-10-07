@@ -38,4 +38,30 @@ describe('the Field', () => {
       expect(html).toMatch(/<input[^>]*class="[^"]*\bborder-border-input\b/);
     }
   });
+
+  it('says a refusal right under the input, before the help, the input invalid and described by both', () => {
+    const html = renderToStaticMarkup(
+      createElement(Field, {
+        id: 'code',
+        label: 'Invite code',
+        help: '25 letters and digits.',
+        refusal: 'That code has already been used.',
+      }),
+    );
+    expect(html).toMatch(/<input[^>]*aria-invalid="true"/);
+    expect(html).toMatch(/<input[^>]*aria-describedby="code-help code-refusal"/);
+    expect(html).toMatch(
+      /<input[^>]*\/><\/div><\/div><p id="code-refusal" role="alert"[^>]*>That code has already been used\.<\/p><p id="code-help"/,
+    );
+  });
+
+  it('with no refusal, leaves aria-invalid to the page', () => {
+    const field = (invalid?: boolean) =>
+      renderToStaticMarkup(
+        createElement(Field, { id: 'name', label: 'New class name', 'aria-invalid': invalid }),
+      );
+    expect(field(true)).toMatch(/<input[^>]*aria-invalid="true"/);
+    expect(field()).not.toContain('aria-invalid');
+    expect(field()).not.toContain('role="alert"');
+  });
 });
