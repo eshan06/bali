@@ -32,8 +32,10 @@ for (const [environment, name] of Object.entries({ dev: 'bali', production: 'bal
       checkSuites: true,
     });
     assert.deepEqual(api.build, { builder: 'DOCKERFILE', dockerfilePath: 'Dockerfile' });
+    // No startCommand: Railway runs a Dockerfile service's start command without a shell, so
+    // `npm run migrate && npm start` ran only the migration and the API never started
+    // (production, 2026-10-06). The Dockerfile's CMD runs both through `sh -c`.
     assert.deepEqual(api.deploy, {
-      startCommand: 'npm run migrate && npm start',
       healthcheckPath: '/healthz',
       restartPolicyType: 'ON_FAILURE',
       restartPolicyMaxRetries: 3,

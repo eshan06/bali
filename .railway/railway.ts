@@ -52,14 +52,16 @@ export default defineRailway((ctx) => {
     );
   }
 
-  // The same settings railway.json holds: the Dockerfile build, migrations before the
-  // server starts, the /healthz check, and three restarts after a crash.
+  // railway.json's settings, but its start command: the Dockerfile build, the /healthz
+  // check, and three restarts after a crash. The Dockerfile's CMD migrates, then starts.
   const api = service(name, {
     // checkSuites is the dashboard's "Wait for CI": a deploy waits for main's checks to
     // pass. Left out, an apply turns it off (it did on production, 2026-10-06).
     source: github('eshan06/bali', { branch: 'main', checkSuites: true }),
     build: { builder: 'DOCKERFILE', dockerfilePath: 'Dockerfile' },
-    start: 'npm run migrate && npm start',
+    // No start command on purpose: Railway runs a Dockerfile service's start command without
+    // a shell, so `npm run migrate && npm start` ran only the migration and the API never
+    // started (production, 2026-10-06). The Dockerfile's CMD runs both through `sh -c`.
     healthcheck: '/healthz',
     deploy: { restartPolicyType: 'ON_FAILURE', restartPolicyMaxRetries: 3 },
     env: Object.fromEntries(PRESERVED.map((key) => [key, preserve()])),
