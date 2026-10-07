@@ -517,9 +517,10 @@ a red chip.
   scrolls sideways. The recap's timeline (PB5a) keeps each name beside its row
   from a 40 rem card, and over it narrower; its axis shows every other time
   under 64 rem and only its ends under 28 rem, so no two labels touch. Its marks
-  never overlap at any width: one too close to the mark before it sits right
-  after it, moved no further than it must be (`lefts`, 2026-10-07), so each is
-  seen and hovered on its own.
+  never overlap while the row has room for them, at any width: one too close to
+  the mark before it sits right after it, moved no further than it must be
+  (`lefts`, 2026-10-07), so each is seen and hovered on its own, and its card
+  opens toward the middle from where the mark sits.
 
 ## 9. Agent prompt guide
 

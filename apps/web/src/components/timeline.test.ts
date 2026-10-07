@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 import type {
   FeedEvent,
   ReportStudent,
@@ -9,7 +12,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
 import { sessionTimeline } from '../lib/recap';
-import { Timeline } from './timeline';
+import { lefts, Timeline } from './timeline';
 
 /*
  * The session's timeline (the Recap & reports design), rendered: a legend of the marks it shows,
@@ -311,5 +314,32 @@ describe('marks under a minute apart (PB5’s review)', () => {
   it('draws a row’s line from its first mark as placed', () => {
     const line = /<span style="left:([^"]+)" class="[^"]*\bright-0\b/.exec(html)?.[1] ?? '';
     expect(px(line, 300)).toBe(rows(300)[0]?.[0]?.centre);
+  });
+
+  it('keeps every mark of a row too full for its axis on the axis, its first ones at its start', () => {
+    // A phone that keeps dropping out: a tap and 19 silent and back marks in two minutes, on a
+    // phone's 300 px axis, where 20 marks need 392 px.
+    const crowded = [
+      { moment: 'in' as const, x: 50 },
+      ...Array.from({ length: 19 }, (_, i) => ({
+        moment: i % 2 ? ('back' as const) : ('silent' as const),
+        x: 50 + i * 0.2,
+      })),
+    ];
+    const centres = lefts(crowded).map((left) => px(left, 300));
+    expect(Math.min(...centres)).toBe(0);
+    expect(Math.max(...centres)).toBe(300);
+    // In order, and side by side from the end back as far as the axis holds them.
+    centres.forEach((c, i) => expect(c).toBeGreaterThanOrEqual(centres[i - 1] ?? 0));
+    expect(centres.slice(-3)).toEqual([260, 280, 300]);
+  });
+
+  it('opens a moved mark’s card toward the middle from where the mark sits, not its time', () => {
+    // So a mark `lefts` moved past the middle never opens its card past the axis's end. Read from
+    // the source: where the mark sits takes a browser to know.
+    const source = readFileSync(fileURLToPath(new URL('./timeline.tsx', import.meta.url)), 'utf8');
+    expect(source).toContain('const at = placedAt[m.key] ?? m.x;');
+    expect(source).toContain("${at > 70 ? FLIP : at > 50 ? FLIP_NARROW : ''}");
+    expect(source.match(/opening\(m\.key, e\.currentTarget\);/g)).toHaveLength(2);
   });
 });

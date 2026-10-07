@@ -31,8 +31,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the marks before it, packed edge to edge by their drawn widths, whichever is later, and never past
   the end less the room the marks after it take. CSS works it out (`min()` and `max()` at the
   axis's own width), so nothing is measured and a mark with room sits exactly at its time; its time
-  is in its label and card either way. Marks only, never a bar. A row with more marks than its axis
-  has room for still overlaps, at its start (a ponytail ceiling).
+  is in its label and card either way, and its card opens toward the axis's middle from where the
+  mark sits (read when it opens), not from its time, so a moved mark never opens one past an end.
+  Marks only, never a bar. A row with more marks than its axis has room for piles its first ones
+  up at its start, and a row's styles grow with the square of its marks (ponytail ceilings).
 
 - **2026-10-07** — **PB5b: the reports list as the canvas draws it; a deleted account said in Bali's
   words.** The list keeps D2g's one markup (a card per session, a `dt`/`dd` per figure, the column

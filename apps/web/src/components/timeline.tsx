@@ -51,7 +51,9 @@ function look(moment: Moment): string {
  * sit side by side, each seen and hovered on its own at any width, nudged no further than they
  * must be; a mark's time is in its label and its card all the same. CSS works it out at the
  * axis's own width, so nothing is measured. Marks only, never a bar.
- * ponytail: a row with more marks than its axis has room for still overlaps, at its start.
+ * ponytail: a row with more marks than its axis has room for piles its first ones up, overlapping,
+ * at its start; and each mark's style names every mark before it, so a row's styles grow with the
+ * square of its marks (~30 KB for 50). Drop the terms that can't bind if either ever shows.
  */
 export function lefts(marks: readonly Pick<Mark, 'moment' | 'x'>[]): string[] {
   let edge = 0;
@@ -66,7 +68,7 @@ export function lefts(marks: readonly Pick<Mark, 'moment' | 'x'>[]): string[] {
     const after = packed.slice(0, i).map((p) => `calc(${p.x}% + ${centre - p.centre}px)`);
     const at = after.length > 0 ? `max(${x}%, ${after.join(', ')})` : `${x}%`;
     const room = end - centre;
-    return `min(${at}, ${room > 0 ? `calc(100% - ${room}px)` : '100%'})`;
+    return `min(${at}, ${room > 0 ? `max(0%, calc(100% - ${room}px))` : '100%'})`;
   });
 }
 
@@ -93,6 +95,15 @@ export function Timeline({ view, label }: { view: View; label: string }) {
   const [hovered, setHovered] = useState<string | null>(null);
   const [focused, setFocused] = useState<string | null>(null);
   const open = hovered ?? focused;
+  // Where each mark whose card opened sits, in percent of its axis: `lefts` may have moved it off
+  // its time, and its card opens toward the axis's middle from where the mark is, never past an end.
+  const [placedAt, setPlacedAt] = useState<Record<string, number>>({});
+  const opening = (key: string, mark: HTMLElement) => {
+    const axis = mark.offsetParent?.clientWidth;
+    if (!axis) return;
+    const at = ((mark.offsetLeft + mark.offsetWidth / 2) / axis) * 100;
+    setPlacedAt((p) => ({ ...p, [key]: at }));
+  };
   const last = view.ticks.length - 1;
   const hover = (key: string | null) => () => setHovered(key);
   // Escape closes the open card wherever focus is, without moving the pointer (WCAG 1.4.13).
@@ -176,15 +187,22 @@ export function Timeline({ view, label }: { view: View; label: string }) {
                   {row.marks.map((m, i) => {
                     const [words, , , ink] = MOMENT[m.moment];
                     const left = placed.get(row.key)?.[i];
+                    const at = placedAt[m.key] ?? m.x;
                     return (
                       <Fragment key={m.key}>
                         <button
                           type="button"
                           aria-label={`${row.name}, ${words.toLowerCase()} at ${m.time}${m.reason ? `, ${m.reason}` : ''}`}
                           style={{ left }}
-                          onMouseEnter={hover(m.key)}
+                          onMouseEnter={(e) => {
+                            opening(m.key, e.currentTarget);
+                            setHovered(m.key);
+                          }}
                           onMouseLeave={hover(null)}
-                          onFocus={() => setFocused(m.key)}
+                          onFocus={(e) => {
+                            opening(m.key, e.currentTarget);
+                            setFocused(m.key);
+                          }}
                           onBlur={() => setFocused(null)}
                           className={`absolute z-1 cursor-pointer before:absolute before:inset-x-0 before:bottom-full before:h-2.5 ${m.moment === 'in' ? 'top-3 -ml-1.5' : 'top-2 -ml-2.5'} ${look(m.moment)} ${open === m.key ? 'outline-2 outline-offset-2 outline-focus-ring' : ''}`}
                         >
@@ -196,7 +214,7 @@ export function Timeline({ view, label }: { view: View; label: string }) {
                             style={{ left }}
                             onMouseEnter={hover(m.key)}
                             onMouseLeave={hover(null)}
-                            className={`absolute bottom-[calc(100%_-_4px)] z-2 -ml-4.5 w-max max-w-[min(16rem,calc(50%_+_18px))] rounded-md border border-border-default bg-surface-raised px-4 py-3 text-body break-words shadow-2 @min-[56rem]:max-w-[min(16rem,calc(30%_+_18px))] ${m.x > 70 ? FLIP : m.x > 50 ? FLIP_NARROW : ''}`}
+                            className={`absolute bottom-[calc(100%_-_4px)] z-2 -ml-4.5 w-max max-w-[min(16rem,calc(50%_+_18px))] rounded-md border border-border-default bg-surface-raised px-4 py-3 text-body break-words shadow-2 @min-[56rem]:max-w-[min(16rem,calc(30%_+_18px))] ${at > 70 ? FLIP : at > 50 ? FLIP_NARROW : ''}`}
                           >
                             <p className={`flex items-center gap-2 font-semibold ${ink}`}>
                               <Glyph moment={m.moment} size={14} />
