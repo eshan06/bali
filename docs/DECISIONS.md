@@ -8,6 +8,39 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-06** — **The portal's four new designs approved; B1 builds what they share: no grey
+  tray, `border-input`, `code-lg`.** The owner judged D2's portal look (D2c–D2g) poor, had four
+  designs drawn in Claude Design and approved all four: [Entry & info](https://claude.ai/artifact/K7vJUJLDNpHgtZV9cYcXbF),
+  [Classes home](https://claude.ai/artifact/Shc2dz4xn8Qc9iDHDuYT2N),
+  [Class page & live grid](https://claude.ai/artifact/662Zkg7urbM64BXvNbq2GX) and
+  [Recap & reports](https://claude.ai/artifact/BuiyWgXpVNkhPR8osDBcHZ). No undo of D2's portal:
+  B1–B5 build them on its code, one PR each (B1 the shared pieces, then the entry pages, the
+  classes home, the class page, the recap and reports). **The rulings that came with them:**
+  (1) **No grey tray, anywhere** ("I don't like the little gray boxes that show up behind stuff…
+  it wasn't there in the original design"): a card sits straight on the page with its own
+  `border-default` hairline, light and dark, and `shadow-1` in light; nothing grey takes the
+  tray's place, so an empty list is a plain line, the recap's figures lose their tiles and the
+  length picker its track. Grey stays where the designs keep it: a field's well, the chips'
+  fills, the stale-feed banner, a button's hover and pressed states, the policy draft's banner
+  and badge. The Classes home canvas draws its cards' hairline in dark only; the other three
+  canvases, and the Entry canvas's note on the ruling, draw it in light too, so it is in both.
+  (2) **`border-input`** (stone-500 `#8A847A`; dark `#837D74`, dark `text-tertiary`'s value): a
+  text field's edge at 3:1 against the card, the page and the field's own well, where
+  `border-default` is 1.3:1 (WCAG 1.4.11); a refused field keeps its `text-primary` edge.
+  (3) **`code-lg`** (24/32, JetBrains Mono 500): the join code in Present, read from the back of
+  the room. Both stay out of `bali-tokens.json`, the design system's export byte for byte, as the
+  input size did (2026-10-05): `globals.css` holds them and `tokens.test.ts` pins them until the
+  next export carries them. (4) **Desktop-first:** the designs draw the portal at desktop width,
+  and a phone only where students arrive from the app (Cognito's pages, Help, the policy pages);
+  no page may break on a phone or a tablet. (5) **A design shows what is real:** only what the
+  backend does today, and only the screens Phases 2 to 6 ask for. The bar stays as shipped.
+  **B1's own calls:** the secondary Button draws pressed and open (`aria-pressed`,
+  `aria-expanded`) as a sunken fill with a `text-primary` edge, as the class page canvas's
+  buttons do, so Present and New code take it from the Button rather than each page; the length
+  picker, its track gone, is a pill per length with the pick pressed the same way and a check;
+  the Field takes a `trailing` button for the classes home's inline Create class row; the nav
+  link is shared (`NAV_LINK`). `high-end-visual-design`'s Bali block no longer offers the tray.
+
 - **2026-10-06** — **P8: `.railway/railway.ts` by hand, one partial, every variable preserved.**
   Railway's Config as Code (`railway.json`) is no longer read after 2026-12-01; its
   replacement, Infrastructure as Code, is a TypeScript file the owner's CLI plans and applies

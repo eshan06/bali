@@ -19,7 +19,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 
 import { Button } from '@/components/button';
-import { CARD, EMPTY_TRAY, TRAY } from '@/components/tray';
+import { CARD } from '@/components/card';
 import { getAccessToken } from '@/lib/auth';
 import { config } from '@/lib/config';
 import { errText } from '@/lib/errors';
@@ -296,13 +296,13 @@ export function LiveGrid({
         </p>
       ) : null}
       {rows.length === 0 ? (
-        <p className={`text-body ${EMPTY_TRAY}`}>No students enrolled yet.</p>
+        <p className="text-body text-text-secondary">No students enrolled yet.</p>
       ) : (
         // Six columns at the desktop width, four in Present, fewer as the grid narrows, never
-        // smaller type (§5).
+        // smaller type (§5); the cells straight on the page.
         <div className="@container">
           <ul
-            className={`${TRAY} ${present ? 'grid-cols-2 @2xl:grid-cols-3 @4xl:grid-cols-4' : 'grid-cols-2 @xl:grid-cols-3 @3xl:grid-cols-4 @5xl:grid-cols-5 @6xl:grid-cols-6'}`}
+            className={`grid gap-2 ${present ? 'grid-cols-2 @2xl:grid-cols-3 @4xl:grid-cols-4' : 'grid-cols-2 @xl:grid-cols-3 @3xl:grid-cols-4 @5xl:grid-cols-5 @6xl:grid-cols-6'}`}
           >
             {rows.map((s) => {
               const display = gridDisplay(s, now);

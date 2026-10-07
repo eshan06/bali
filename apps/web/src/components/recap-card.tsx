@@ -4,6 +4,7 @@ import type { SessionReportSummary as Summary } from '@bali/shared';
 import { type ReactNode, useEffect, useId, useState } from 'react';
 
 import { Button } from '@/components/button';
+import { CARD_ALONE } from '@/components/card';
 import {
   loadRecap,
   type RecapMoment,
@@ -22,7 +23,7 @@ const LABEL = 'text-label text-text-tertiary uppercase';
  * it over, as R2 reports it. The class page shows it while no session runs, so a Start takes it
  * away, and it reads the report each time it is shown. Class aggregates only: never one student's
  * minutes. A card standing alone (DESIGN.md §4): `radius-lg`, `space-6` padding, its figures in
- * `data-lg` on sunken tiles, laid out by the card's own width. Given a `session` (R5's opened row),
+ * `data-lg` under their names, laid out by the card's own width. Given a `session` (R5's opened row),
  * it reads that one's report inside the row's card, so it draws no card of its own, and its
  * heading is for screen readers. In `present` (the class page's Present, which the class can see)
  * it lists each unlock by who and when, never with its reason; `toggle`, Present's own, goes at the
@@ -68,7 +69,7 @@ export function RecapCard({
     <section
       aria-labelledby={headingId}
       aria-busy={state.kind === 'loading'}
-      className={`@container ${session ? '' : 'rounded-lg border border-transparent bg-surface-card p-6 shadow-1 dark:border-border-default'}`}
+      className={`@container ${session ? '' : CARD_ALONE}`}
     >
       <div
         className={
@@ -112,8 +113,8 @@ function Recap({ view }: { view: RecapView }) {
         <p className="mt-4 text-body">Nobody joined this session.</p>
       ) : (
         <>
-          {/* Two tiles a row on a narrow card, four from the width where each label fits. */}
-          <dl className="mt-4 grid grid-cols-2 gap-3 @2xl:grid-cols-4">
+          {/* Two figures a row on a narrow card, four from the width where each label fits. */}
+          <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4 @2xl:grid-cols-4">
             <Stat label="Joined" value={view.stats.joined} />
             <Stat label="Class focus time" value={view.stats.focus} />
             <Stat label="Average per student" value={view.stats.average} />
@@ -144,12 +145,12 @@ function Recap({ view }: { view: RecapView }) {
 }
 
 /**
- * One of the class's figures on its sunken tile: its name, then the figure in `data-lg`, at the
- * tile's foot, so a row's figures line up when one name wraps.
+ * One of the class's figures, with no grey tile behind it (the owner, 2026-10-06): its name, then
+ * the figure in `data-lg` at its foot, so a row's figures line up when one name wraps.
  */
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col justify-between rounded-md bg-surface-sunken px-4 py-3">
+    <div className="flex flex-col justify-between">
       <dt className={LABEL}>{label}</dt>
       <dd className="mt-1 font-num text-data-lg tabular-nums">{value}</dd>
     </div>

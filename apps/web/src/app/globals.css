@@ -5,7 +5,7 @@
  * variables, `--bali-<token>`: the light values on :root, the dark ones under the device's dark
  * mode, so a page reads the same token in both. tokens.test.ts pins every value here to the JSON,
  * so the two cannot drift; a value the tokens lack is a question for the owner, written here only
- * once the owner rules on it (the input size, in the type scale below).
+ * once the owner rules on it (border-input below; the input size and code-lg in the type scale).
  * Every semantic token is here; of the primitives, only the ones a semantic token or the mark
  * reference (a page uses semantic tokens, never a primitive).
  */
@@ -24,6 +24,7 @@
   --bali-stone-200: #e3dfd8;
   --bali-stone-300: #d2ccc2;
   --bali-stone-400: #aba59a;
+  --bali-stone-500: #8a847a;
   --bali-stone-600: #6b665d;
   --bali-stone-700: #524e47;
   --bali-orange-100: #f7e6d2;
@@ -45,6 +46,10 @@
   --bali-surface-brand: var(--bali-green-700);
   --bali-border-default: var(--bali-stone-200);
   --bali-border-strong: var(--bali-stone-300);
+  /* A text field's edge, the owner's ruling (2026-10-06): 3:1 against the card, the page and the
+     field's own well (WCAG 1.4.11), where border-default is 1.3:1; dark text-tertiary's value in
+     dark. Not in the tokens yet: the design system gains it at the owner's next export. */
+  --bali-border-input: var(--bali-stone-500);
   --bali-text-primary: #211f1b;
   --bali-text-secondary: #5b564e;
   --bali-text-tertiary: var(--bali-stone-600);
@@ -92,6 +97,7 @@
     --bali-surface-brand: var(--bali-green-800);
     --bali-border-default: #2e2b27;
     --bali-border-strong: #3c3934;
+    --bali-border-input: #837d74;
     --bali-text-primary: #f1efeb;
     --bali-text-secondary: #b0aaa1;
     --bali-text-tertiary: #837d74;
@@ -200,6 +206,13 @@
   --text-input--line-height: 24px;
   --text-input--font-weight: 400;
 
+  /* code-lg, the owner's ruling (2026-10-06): the join code in Present, read from the back of the
+     room; `font-mono` at the code style's weight, its line height on the 4-pt grid. Not in the
+     tokens yet (DESIGN.md §3). */
+  --text-code-lg: 24px;
+  --text-code-lg--line-height: 32px;
+  --text-code-lg--font-weight: 500;
+
   /* The Present view's two sizes, the owner's ruling (2026-10-05): names 20 px and chip labels
      14 px as D2a's canvas drew them, their line heights on the 4-pt grid (26 and 18 drawn, taken
      up to 28 and 20). The live grid's only. Not in the tokens yet (DESIGN.md §5). */
@@ -225,6 +238,7 @@
   --color-surface-brand: var(--bali-surface-brand);
   --color-border-default: var(--bali-border-default);
   --color-border-strong: var(--bali-border-strong);
+  --color-border-input: var(--bali-border-input);
   --color-text-primary: var(--bali-text-primary);
   --color-text-secondary: var(--bali-text-secondary);
   --color-text-tertiary: var(--bali-text-tertiary);
