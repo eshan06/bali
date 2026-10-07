@@ -9,6 +9,9 @@ public enum Screen: Sendable, Hashable {
     case starting
     /// The 13+ check (C7): the question, and the stop screen an answer under 13 gets.
     case age, tooYoung
+    /// Your name (the approved Sign in & sign up design; the owner's decision, 2026-10-07): a
+    /// student's account with no name names itself, so a teacher always sees a real one.
+    case name
     case intro, signIn, screenTime, join, home, waiting, focus, unlocked, protectionOff, sessionOver
     /// Home's neighbours in D1's tab bar (C6): the student's own history, and Me.
     case history, me
@@ -35,8 +38,9 @@ public enum Screen: Sendable, Hashable {
     /// set such a read routes as approved, while denied never does; `everInClass`, whether the
     /// student `/v1/me` names has been in a class on this phone (#143) — in none now, removed from
     /// their last or having left it, Home and its empty state, where one never in a class here gets
-    /// Join; `sync`, the engine's truth, nil until it runs; `hasClasses`, nil while `/v1/me` has not
-    /// answered (C2); `sessionOverClosed`,
+    /// Join; `sync`, the engine's truth, nil until it runs — its `me` naming a student's account
+    /// with no name, Your name where the question would show; `hasClasses`, nil while `/v1/me`
+    /// has not answered (C2); `sessionOverClosed`,
     /// the session whose Session over the student closed, as it was then — its bell moved since, an
     /// extension, it is another's to close (C5b; its review); `opened`, the
     /// screens the student opened over the one chosen, in order (C3) — Home over Waiting (Waiting's
@@ -81,18 +85,23 @@ public enum Screen: Sendable, Hashable {
             case .unanswered, .passed: return (intro ? .intro : .signIn, false)
             }
         }
-        // Signed in on a phone that has not passed the check (the gap's fallback, the owner's
-        // decision 2026-10-06): a sign-in Cognito's own pages made around the question gets it
-        // first, before Screen Time, Join or Home, and reaches Bali's API with nothing until it is
-        // answered (`SignIn`'s `cleared`). Never over a session's screens — one whose bell has not
-        // rung, or past it with Session over not closed — nor the home a standing not read keeps.
-        if age != .passed {
-            switch sync.standing {
-            case .inSession(let session, _)
-            where session.endsAt > now || !session.rings(as: sessionOverClosed):
-                break
-            case .unread: break
-            case .inSession, .waiting, .out: return (age == .tooYoung ? .tooYoung : .age, false)
+        // Signed in, before Screen Time, Join or Home — never over a session's screens, one whose
+        // bell has not rung or past it with Session over not closed, nor the home a standing not
+        // read keeps: on a phone that has not passed the check (the gap's fallback, the owner's
+        // decision 2026-10-06), the question, a sign-in Cognito's own pages made around it
+        // reaching Bali's API with nothing until it is answered (`SignIn`'s `cleared`); then Your
+        // name (the owner's decision, 2026-10-07), for a student's account `GET /v1/me` names with
+        // no name. Not known until a read answers: with Bali not reached, the screens go on, and
+        // it shows once one does.
+        switch sync.standing {
+        case .inSession(let session, _)
+        where session.endsAt > now || !session.rings(as: sessionOverClosed):
+            break
+        case .unread: break
+        case .inSession, .waiting, .out:
+            if age != .passed { return (age == .tooYoung ? .tooYoung : .age, false) }
+            if let user = sync.me?.user, user.role.known == .student, user.displayName == nil {
+                return (.name, false)
             }
         }
         let joinFirst = hasClasses == false && !everInClass

@@ -820,12 +820,21 @@ never covers or delays Emergency Unlock, and its answers never enter the outbox.
   Home. The shields' Focus and the home a standing not read keeps, which hold the exit, come
   before both, and so do a session's own screens: Unlocked, Protection off and Session over.
   Every way to the hosted UI goes through one call (`Phone.signIn`), which, for the sign-up page,
-  asks the check first and then shows the intro where the phone has not seen it; the sign-in page
+  asks the check first and then shows the intro where this run has not shown it (once per account,
+  not per phone: the owner's ruling, 2026-10-07); the sign-in page
   opens at once, and after an answer under 13 neither opens that run. A first launch opens on
   Sign in. The sign-in gives Bali's API no token until the check has passed (`SignIn`'s
   `cleared`, read from the phone's own flag), but an account deletion's (`deletionToken`): Delete
   account's steps, the outbox and then `DELETE /v1/me`, go whether or not it has.
   The check counts in the Gregorian calendar whatever calendar the phone shows its dates in.
+- **A teacher always sees a real name** (the owner's decision, 2026-10-07; the approved Sign in &
+  sign up design's Your name). A student's account `GET /v1/me` names with no name, as
+  production's sign-up leaves every new one, gets "What's your name?" after any sign-up or
+  sign-in: where the 13+ question would show, after it, so before Screen Time, Join and Home and
+  never over a session's screens nor the home a standing not read keeps. Required: Continue saves
+  the name as Me does (`PATCH /v1/me`, its refusals Me's), and Sign out is the only other way on.
+  Known only from a read: with Bali not reached, the screens go on, and it shows once a read names
+  none. A teacher's account never gets it.
 - **A changed phone clock is detected, not prevented.** iOS scheduling follows wall-clock
   time, so a clock change is a real bypass family; the server compares against its own clock
   (rule 1) and surfaces it to the teacher rather than trusting it. Which of a student's own

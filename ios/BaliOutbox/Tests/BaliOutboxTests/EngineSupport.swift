@@ -376,16 +376,18 @@ enum Answer {
     static let gone = #"{"status":"gone","state":null,"session":null}"#
     /// `GET /v1/me`'s answer: the live session `view` in `state`, `classes`, and — since #166 —
     /// whether a tap of the student's waits for a Start, `armed`; nil, an older API's, says none.
+    /// The student named `name`, or nothing.
     static func me(
         _ view: SessionView? = session(), state: String = "focused", classes: [String] = [],
-        armed: Bool? = nil
+        armed: Bool? = nil, name: String? = nil
     ) -> String {
         let live = view.map {
             #"{"id":"\#($0.id)","classId":"\#($0.classId)","endsAt":"\#(iso($0.endsAt))","state":"\#(state)"}"#
         }
         let waits = armed.map { #","armed":\#($0)"# } ?? ""
+        let named = name.map { #""\#($0)""# } ?? "null"
         return
-            #"{"user":{"id":"u","role":"student","displayName":null},"classes":[\#(classes.joined(separator: ","))],"session":\#(live ?? "null")\#(waits)}"#
+            #"{"user":{"id":"u","role":"student","displayName":\#(named)},"classes":[\#(classes.joined(separator: ","))],"session":\#(live ?? "null")\#(waits)}"#
     }
     /// Class `id` as `GET /v1/me` names it, with its teacher — and, since A19, the enrollment
     /// leaving it deletes, `enrollment`.

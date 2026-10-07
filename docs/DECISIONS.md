@@ -8,6 +8,41 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-07** — **The intro once per account, not per phone** (the owner's ruling): the intro's
+  seen flag lives for the app's run alone, in memory (`Phone.introSeen`), and the phone's defaults
+  key `introSeen` is no longer read or written, so every new run's Sign up shows the intro again (a
+  second account's, and one whose page closed or could not open, too); Sign up again in the same
+  run still opens the page at once, as the design draws it. It replaces point (3) of the entry
+  below.
+
+- **2026-10-07** — **Your name, the Sign in & sign up design's last row.** The owner's decision of
+  2026-10-07: a student with no name shows on the teacher's portal as the first 8 characters of
+  their account id, so a student's account with no name gets "What's your name?" after any sign-up
+  or sign-in, before Screen Time, Join or Home; required, Sign out its only other way on, as on
+  Join; never a teacher's account; a running class's Focus first; with Bali not reached just after
+  the sign-in, the app goes on to Screen Time and asks once Bali answers. Built as drawn (no
+  backend change). How, where the canvas left it open: **(1) One rule in the router, where the
+  gap's 13+ question already stands** (`Screen.choose`): signed in, a student's account the last
+  `GET /v1/me` names with no name (`displayName` null, role `student`) gets `.name` after the
+  question where that shows, in place of Screen Time, Join, Home, Waiting and the tabs and over a
+  screen opened, and never over a session's screens (Focus, Unlocked, Protection off, Session over
+  not closed) nor the home a standing not read keeps: the question's own exceptions, so "a running
+  class first" reads as it already does there, and nothing a session holds, Emergency Unlock
+  first, waits behind a required field. **(2) Known only from a read:** with no read answered,
+  Bali not reached since the sign-in, the router goes on as before, and the read that names none
+  shows the screen wherever the student is among those screens. A teacher's account, or a role
+  this build does not know, never gets it: only a student sets a name (`PATCH /v1/me` refuses
+  anyone else). **(3) The save is Me's** (`Naming`, `Phone.saveName`, `SyncEngine.rename`, A8's
+  `PATCH /v1/me`): the same typing rules, the same event id while the name is unchanged (a
+  Continue after no answer is its replay), the same refusals in Me's words; set, the name is `me`'s
+  at once and the router moves on. **(4) Sign out is Join's** (`SignOutButton`, held while an
+  Emergency Unlock is unsent, its failures said), dimmed while a save runs, as the canvas's saving
+  board draws it. **(5) The keyboard's return is Continue,** so a blank name says "Type a name to
+  save it." (the canvas's Blank refusal), which the disabled Continue cannot. **(6) The field gets
+  the label "Name" for VoiceOver:** with an empty prompt, the field read no label of its own
+  (`AppTests.nameScreen` found it blank). Dev's pool names a new account after its Cognito username
+  at its first `/v1/me`, so dev never shows the screen; fixtures and tests cover it.
+
 - **2026-10-07** — **The Sign in screen and the sign-up path, the Sign in & sign up design's second
   half.** Built as the owner approved it (the entry below, decisions 1–3 and 5); its Your name row
   (the owner's decision, 2026-10-07) is the next step. How, where the canvas left it open:

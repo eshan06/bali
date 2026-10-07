@@ -74,20 +74,21 @@ final class Phone {
     private(set) var signingIn = false
     private(set) var hostedPage = HostedPage.signIn
     private(set) var signInFailed: SignInError?
-    /// Whether the student has seen the intro (C1): the phone's own flag, in its own defaults —
-    /// not the app group's, which the extensions read. Sign up shows the intro before its page
-    /// until it has been: `introShows`, in Sign in's place, until the page it opens ends without a
-    /// sign-in, or the sign-in it made lands (`signed`), so no Sign in shows between the two.
-    private(set) var introSeen = UserDefaults.standard.bool(forKey: Phone.introSeenKey)
-    static let introSeenKey = "introSeen"
+    /// Whether the student has seen the intro this run (C1): in memory only, never in the phone's
+    /// defaults — once per account, not per phone (the owner's ruling, 2026-10-07): a later run's
+    /// Sign up shows it again, a second account's too, and one whose page closed or could not open.
+    /// Sign up shows the intro before its page until it has been: `introShows`, in Sign in's place,
+    /// until the page it opens ends without a sign-in, or the sign-in it made lands (`signed`), so
+    /// no Sign in shows between the two.
+    private(set) var introSeen = false
     private(set) var introShows = false
-    /// Whether a pass has ever read the Screen Time permission approved (C1b), kept as `introSeen`
-    /// is: Family Controls can read not determined for a moment after a launch (B5a-2), and with
-    /// this set the router routes such a read as approved, so no Screen Time screen flashes on a
-    /// phone that gave it. The check judging the permission off clears it — denied, the marker
-    /// gone (F1b), or not determined for `Enforcer.grace`: a grant taken back, or one that did not
-    /// come back with a restored backup, which restores these defaults — so the grant screen
-    /// returns.
+    /// Whether a pass has ever read the Screen Time permission approved (C1b), kept in the phone's
+    /// own defaults — not the app group's, which the extensions read: Family Controls can read not
+    /// determined for a moment after a launch (B5a-2), and with this set the router routes such a
+    /// read as approved, so no Screen Time screen flashes on a phone that gave it. The check
+    /// judging the permission off clears it — denied, the marker gone (F1b), or not determined for
+    /// `Enforcer.grace`: a grant taken back, or one that did not come back with a restored backup,
+    /// which restores these defaults — so the grant screen returns.
     private(set) var everApproved = UserDefaults.standard.bool(forKey: Phone.everApprovedKey)
     static let everApprovedKey = "screenTimeApproved"
     /// The student `GET /v1/me` last listed in a class on this phone, by their id, kept as
@@ -478,8 +479,9 @@ final class Phone {
     /// Whether the screen shown offers Sign out (C6b): Me, and Join where it is the router's own —
     /// shown to a student in no class and never in one on this phone (#143), who reaches no tab
     /// bar, so not Me: signed in with the wrong account, it is their way out (the riders). One
-    /// once in a class here lands on Home with its tab bar, Me among it.
-    var offersSignOut: Bool { screen == .me || screen == .join && !canGoBack }
+    /// once in a class here lands on Home with its tab bar, Me among it. And Your name, whose only
+    /// other way on is a name (the approved Sign in & sign up design).
+    var offersSignOut: Bool { screen == .me || screen == .name || screen == .join && !canGoBack }
 
     /// Back from the screen opened last, the one under it fading back in (#150) — the keyboard let
     /// go first, at once, so it goes down with the screen it was up for, never left over the next:
@@ -655,12 +657,11 @@ final class Phone {
         await retry()
     }
 
-    /// The intro's Sign up, on its last page (C1): the intro seen, kept in the phone's own
-    /// defaults — a frozen fixture's in itself only — and Sign up's page opened through the one
-    /// gate, the intro staying, Signing up… on its button, while the page is open.
+    /// The intro's Sign up, on its last page (C1): the intro seen for this run, in memory only, and
+    /// Sign up's page opened through the one gate, the intro staying, Signing up… on its button,
+    /// while the page is open.
     func sawIntro(through browser: Browser) async {
         introSeen = true
-        if !frozen { UserDefaults.standard.set(true, forKey: Phone.introSeenKey) }
         await signIn(.signUp, through: browser)
     }
 

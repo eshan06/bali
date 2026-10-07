@@ -76,6 +76,24 @@
                 age: .unanswered, signInFailed: .notOpened("no window"), signedIn: false),
             "signInSignUpNotOpened": State(
                 hostedPage: .signUp, signInFailed: .notOpened("no window"), signedIn: false),
+            // Your name (the approved Sign in & sign up design): a new student's account with no
+            // name — empty, Continue waiting; typed; saving; each refusal Me says (taken, not
+            // usable, blank); and a save that could not reach Bali.
+            "name": State(sync: standing(.out, me: nameless)),
+            "nameTyping": State(sync: standing(.out, me: nameless), naming: naming(anaTyped)),
+            "nameSaving": State(
+                sync: standing(.out, me: nameless), naming: naming(anaTyped, saving: true)),
+            "nameTaken": State(
+                sync: standing(.out, me: nameless),
+                naming: naming("Ana", failure: Naming.words(.status(409), .displayNameTaken))),
+            "nameInvalid": State(
+                sync: standing(.out, me: nameless),
+                naming: naming("Ana", failure: Naming.words(.status(400), .displayNameInvalid))),
+            "nameBlank": State(
+                sync: standing(.out, me: nameless), naming: naming("", failure: Naming.blank)),
+            "nameCantSave": State(
+                sync: standing(.out, me: nameless),
+                naming: naming(anaTyped, failure: Naming.words(.networkError, nil))),
             "screenTime": State(protection: permission(.notDetermined)),
             "screenTimeDenied": State(protection: permission(.denied)),
             "screenTimeError": State(
@@ -334,10 +352,14 @@
             return deleting
         }
 
-        /// Me's name card editing, `name` typed — and why its save failed: `failure`.
-        private static func naming(_ name: String, failure: String? = nil) -> Naming {
+        /// A name being edited — Me's card, or Your name's field — `name` typed, `saving` it, and
+        /// why its save failed: `failure`.
+        private static func naming(_ name: String, saving: Bool = false, failure: String? = nil)
+            -> Naming
+        {
             var naming = Naming()
             naming.edit(name)
+            if saving { _ = naming.save(at: Date()) }
             naming.failure = failure
             return naming
         }
@@ -592,13 +614,17 @@
 
         /// Ana as D1's Me names her.
         private static let anaRodriguez = ana(name: "Ana Rodríguez")
+        /// Ana new, in no class and with no name yet, as production's sign-up leaves an account;
+        /// and the name the canvas has her type.
+        private static let nameless = ana(newcomer: true, name: nil)
+        private static let anaTyped = "Ana Rodriguez"
         /// Her sign-in's email, as her ID token names it (#147).
         private static let anaEmail = "ana.rodriguez@bali.test"
 
         /// Ana, as `GET /v1/me` answers her: in Period 3 with Ms. Rivera and Period 5 with Mr.
         /// Okafor, each with the enrollment leaving it deletes — or, a `newcomer`, in no class yet —
-        /// named `name`.
-        private static func ana(newcomer: Bool = false, name: String = "Ana", inSession: Bool = false)
+        /// named `name`, or nothing.
+        private static func ana(newcomer: Bool = false, name: String? = "Ana", inSession: Bool = false)
             -> MeResponse?
         {
             // Period 3's lesson, as the server names it under the class (C3c).
@@ -611,7 +637,7 @@
             return try? BaliJSON.makeDecoder().decode(
                 MeResponse.self,
                 from: Data(
-                    #"{"user":{"id":"ana","role":"student","displayName":"\#(name)"},"classes":[\#(classes)],"session":null}"#
+                    #"{"user":{"id":"ana","role":"student","displayName":\#(name.map { #""\#($0)""# } ?? "null")},"classes":[\#(classes)],"session":null}"#
                         .utf8))
         }
     }
