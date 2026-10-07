@@ -8,7 +8,7 @@ import type {
   SessionReportSummary,
   UnlockReason,
 } from '@bali/shared';
-import { EVENT_PAGE_LIMIT, isUnlockReason } from '@bali/shared';
+import { isUnlockReason } from '@bali/shared';
 
 import type { ApiClient } from './api-client';
 import { errText } from './errors';
@@ -39,7 +39,8 @@ export type RecapState =
   | { kind: 'error'; message: string };
 
 /**
- * Every event of a session, oldest first, as the catch-up feed pages them: 200 a request.
+ * Every event of a session, oldest first, as the catch-up feed pages them (200 a request), until a
+ * page comes back empty.
  * ponytail: each page is a request on the teacher's budget, so a session of thousands of events
  * can meet a 429, said as any failure, with Try again; cap the pages if one ever does.
  */
@@ -53,8 +54,9 @@ export async function readEvents(
       `/v1/sessions/${encodeURIComponent(sessionId)}/events?after=${after}`,
     );
     events.push(...page.events);
-    // A short page is the last; a cursor that didn't move would read the same page forever.
-    if (page.events.length < EVENT_PAGE_LIMIT || page.nextAfter <= after) return events;
+    // An empty page is the end, whatever size the server pages by; a cursor that didn't move would
+    // read the same page forever.
+    if (page.events.length === 0 || page.nextAfter <= after) return events;
     after = page.nextAfter;
   }
 }
@@ -286,15 +288,34 @@ export function sessionTimeline(
   ];
   const names = new Map(named.map((s) => [s.id, nameOf(s)]));
   const reasons = new Map(report.unlocks.map((u) => [u.eventId, u.reason]));
+  // Every unlock and protection off R2 lists is marked, one the feed's read missed included (it
+  // landed between the two reads): never left out.
+  const read = new Set(events.map((e) => e.eventId));
+  const feed: FeedEvent[] = [
+    ...events,
+    ...[
+      ...report.unlocks.map((u) => ({ ...u, type: 'unlock' as const })),
+      ...report.protectionOffs.map((p) => ({ ...p, type: 'protection_off' as const })),
+    ]
+      .filter((r) => !read.has(r.eventId))
+      .map(({ eventId, type, student, occurredAt }) => ({
+        seq: 0,
+        eventId,
+        type,
+        userId: student.id,
+        occurredAt,
+        payload: {},
+      })),
+  ];
   const found = new Map(
     report.joined.map((s) => [s.id, [] as { e: FeedEvent; moment: Moment; at: number }[]]),
   );
-  // An unlock or protection off is never left out: its student has a row, joined or not.
-  for (const e of events) {
+  // Its student has a row, joined or not.
+  for (const e of feed) {
     const counted = e.type === 'unlock' || e.type === 'protection_off';
     if (counted && e.userId !== null && !found.has(e.userId)) found.set(e.userId, []);
   }
-  for (const e of events) {
+  for (const e of feed) {
     const moment = MARK[e.type];
     const late = LATE.has(e.type) && (payloadOf(e.payload).recorded_as ?? null) !== null;
     if (moment === undefined || late || e.userId === null) continue;

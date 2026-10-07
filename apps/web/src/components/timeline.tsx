@@ -149,7 +149,7 @@ export function Timeline({ view, label }: { view: View; label: string }) {
                         style={{ left: `${m.x}%` }}
                         onMouseEnter={hover(m.key)}
                         onMouseLeave={hover(null)}
-                        className={`absolute bottom-[calc(100%_-_4px)] z-2 -ml-4.5 w-max max-w-[min(16rem,calc(50%_+_18px))] rounded-md border border-border-default bg-surface-raised px-4 py-3 text-body shadow-2 @min-[56rem]:max-w-[min(16rem,calc(30%_+_18px))] ${m.x > 70 ? FLIP : m.x > 50 ? FLIP_NARROW : ''}`}
+                        className={`absolute bottom-[calc(100%_-_4px)] z-2 -ml-4.5 w-max max-w-[min(16rem,calc(50%_+_18px))] rounded-md border border-border-default bg-surface-raised px-4 py-3 text-body break-words shadow-2 @min-[56rem]:max-w-[min(16rem,calc(30%_+_18px))] ${m.x > 70 ? FLIP : m.x > 50 ? FLIP_NARROW : ''}`}
                       >
                         <p className={`flex items-center gap-2 font-semibold ${ink}`}>
                           <Glyph moment={m.moment} size={14} />

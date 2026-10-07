@@ -13,8 +13,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   down the side, the session's own time across, each moment a mark at its time, never a bar, so no
   student's minutes are shown (R2's rule). **No API change** (the owner's condition): the marks come
   from the catch-up feed the live grid already reads (`GET /v1/sessions/{id}/events`, the class's own
-  teacher only), every page of it, 200 events a request, a cursor that doesn't move ending the read
-  so a misbehaving answer can't loop it; each page is a request on the teacher's budget, so a
+  teacher only), every page of it, 200 events a request, until a page comes back empty (a short
+  page ends nothing, so a server paging by fewer loses no event), a cursor that doesn't move ending
+  it too, so a misbehaving answer can't loop it; each page is a request on the teacher's budget, so a
   session of thousands of events can meet a 429, said as any failure, with Try again. Names (the
   display name now) and each unlock's reason now (A20) are R2's, so the recap never disagrees with
   the report; one R2 doesn't list yet, landing between the two reads, says its record's own.
@@ -24,7 +25,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   "Tapped in", "Back in focus", "Protection back on" and "Checked in again" on the canvas
   (2026-10-06). A late tap, return to focus or Screen Time back on (noted `superseded`, A12–A14)
   changed nothing, so it draws no mark; every unlock and protection off draws one, whatever it
-  changed, as R2 lists and counts them, so a row's count and its marks agree. **Who has a row:**
+  changed, as R2 lists and counts them, so a row's count and its marks agree; one R2 lists that the
+  feed's read missed (recorded after the end, between the two reads) is drawn from R2. **Who has a row:**
   who joined, in R2's order, then anyone else with an unlock or protection off there, in the order
   of their first: an unlock is never left out of the recap, joined or not. **The axis** runs from
   the start to the end `sessionTimes` says, stretched only when a record clamped after an early

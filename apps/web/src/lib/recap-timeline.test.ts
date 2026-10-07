@@ -134,15 +134,17 @@ describe('readEvents', () => {
       eventId: `m${from + i}`,
     }));
 
-  it('reads every page of the feed, oldest first, until a short one', async () => {
+  it('reads every page of the feed, oldest first, until one comes back empty', async () => {
+    // A short page ends nothing: a server paging by fewer than this build's 200 loses no event.
     const first = many(1, EVENT_PAGE_LIMIT);
     const rest = many(EVENT_PAGE_LIMIT + 1, 3);
     const api = fakeApi({
       [FEED]: { events: first, nextAfter: EVENT_PAGE_LIMIT },
       [`/v1/sessions/s1/events?after=${EVENT_PAGE_LIMIT}`]: { events: rest, nextAfter: 203 },
+      '/v1/sessions/s1/events?after=203': { events: [], nextAfter: 203 },
     });
     expect(await readEvents(api, 's1')).toEqual([...first, ...rest]);
-    expect(api.asked).toHaveLength(2);
+    expect(api.asked).toHaveLength(3);
   });
 
   it('stops at a page that leaves its cursor where it was, never reading it again', async () => {
@@ -190,6 +192,12 @@ describe('the timeline', () => {
     expect(view.rows.some((r) => r.key === zed)).toBe(false);
   });
 
+  it('marks every unlock and protection off R2 lists, one the feed’s read missed included', () => {
+    // Recorded after the end, between the two reads: R2 has them, the feed's read doesn't.
+    const missed = EVENTS.filter((e) => e.eventId !== 'u4' && e.eventId !== 'p1');
+    expect(marks(timeline({}, missed))).toEqual(marks());
+  });
+
   it('keeps a row for each student with an unlock or protection off when nobody joined', () => {
     const view = timeline({ joined: [] });
     expect(view.rows.map((r) => r.name)).toEqual(['Maya', 'Theo', 'Priya', 'Ines']);
@@ -221,7 +229,7 @@ describe('the timeline', () => {
       'left',
     ]);
     const taps = EVENTS.filter((e) => e.type === 'tap_in' && e.userId !== zed);
-    expect(timeline({ unlocks: [] }, taps).moments).toEqual(['in']);
+    expect(timeline({ unlocks: [], protectionOffs: [] }, taps).moments).toEqual(['in']);
   });
 
   it('runs its axis from the start to the end, a tick each 5 minutes, AM or PM at its ends', () => {
