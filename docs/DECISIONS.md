@@ -8,6 +8,34 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-07** — **PB4a, the class page's live session, built to the Class page & live grid
+  canvas; six columns at the desktop width, where the canvas's render drew five.** The canvas sets
+  each column at 216 px or more and says "six to a row at 1440", but its 1400 px page less two 40 px
+  gutters leaves 1320 px, where 216 px fits five (its Main board renders five; its Chips board, with
+  no page around it, six). Its notes, DESIGN.md §5 (the owner's density pick) and the grid as it
+  shipped all say six, so the grid takes 212 px, the least that holds every chip on one line but two:
+  "Left · protection off", which wraps after its dot at six columns (the owner's ruling), and
+  "Unknown · refresh", which now does the same (a tab older than the server; rare). A label breaks
+  after a dot, never before it (a no-break space before each dot). **The chip says only its state**
+  (the canvas's note 1): an unlock's reason ("Bathroom", or "Unlocked · nurse" under a protection-off
+  chip) and "last seen 5 min ago" sit on the line under it, never in Present, so a row's chips line
+  up; Silent keeps its minutes in its label. Where the reason and "last seen" don't fit one line,
+  "last seen" goes under the reason and its dot is clipped away (CSS, by the line's own width), where
+  the canvas counted 31 characters, which overflows a 213 px cell. **The bell** is the page's biggest
+  number, in a card with +5 min and +10 min beside it and End set apart (End still sends at once; no
+  confirm, as today), "…" until an answer or a snapshot gives it; each answer is said right under
+  the card. **Present** folds the bell, the code in `code-lg` and the controls into the header's one
+  row, so 28 students fit 1920 × 1080 (the last cell ends at 1063 px); it is one header in both
+  views, so the code stays put, and the grid neither reboots nor reconnects as Present turns on.
+  On one column (a phone) the chip sits beside the name, the canvas's container rule, from where a
+  second column stops fitting (432 px) rather than its 455. **Where the build differs from the
+  boards, on purpose:** +5 min and +10 min keep tabular numerals (the canvas's `.btn` font
+  shorthand drops its own `.tnum`), a few pixels wider; the class's name sits 1 px higher (the
+  header stays top-aligned, so a made code's line under the code never moves the name); and every
+  board sits 1 px lower under the shared bar, which is 57 px with its hairline where the canvas
+  draws 56. The web tests resolve `@/` as tsconfig does, so a component that imports through it can
+  be rendered in a test (`live-grid.test.ts`).
+
 - **2026-10-07** — **P8 closed: `.railway/railway.ts` is Railway's only config, the start
   command lives only in the `Dockerfile`'s `CMD`, and `railway.json` is deleted.** The owner
   applied the file to production and dev on 2026-10-06; both deploy, `/healthz` answers. What

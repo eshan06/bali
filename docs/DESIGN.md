@@ -97,8 +97,9 @@ share (no grey tray, `border-input`, `code-lg`, the field, the buttons'
 pressed look, the nav link), PB2 redrew the entry and info pages (one card
 centred under a bar that holds the lockup, `components/entry-page.tsx`; Help
 and the policy pages under the same bar), PB3 the classes home (the classes
-and their create row in one column, the block's card beside it), and PB4–PB5
-redraw the rest. Every
+and their create row in one column, the block's card beside it), PB4a the
+class page's live session (the bell's card, the grid's cells, Present's folded
+header), and PB4b–PB5 redraw the rest. Every
 portal source file is held to the tokens' utilities by `tokens.test.ts`, and
 since D2g the theme holds none of Tailwind's own colours, type sizes,
 tracking or leading, so a default draws nothing. **A portal page uses the
@@ -213,10 +214,12 @@ The words for a state are decided per surface, and several are owner rulings
 off"). `silent` is a real display state, derived from the last check-in and
 never stored (data-model decision 7), so it is never green, and neither is
 `unknown`; staleness short of silence ("last seen 4 min ago") is a `caption` in
-`text-tertiary` beside any chip, never a colour change: on the grid (D2f), beside
+`text-tertiary` under any chip, never a colour change: on the grid, under
 a focused, unlocked or protection-off chip whose phone hasn't checked in for a
 whole minute, and a focused one reads Silent from 90 s, its label carrying the
-time from then (`lastSeenNote`, `grid-state.ts`). Unknown's dashed edge
+time from then (`lastSeenNote`, `grid-state.ts`). A grid chip says its state
+alone; an unlock's reason sits on that line too, before "last seen" (PB4a, the
+Class page design). Unknown's dashed edge
 is `border-strong` on purpose, the pick's (Q3 A), where the borrowed
 `state-nodevice-bg` token's own note says `border-default`. The two Left chips
 each take their state's own colour (the owner's pick, 2026-10-04, Q2 A), and
@@ -398,11 +401,14 @@ class page's minutes field types in it too, on the Field since D2f-2.
   28 and 20, never tighter than drawn, 14/20 being the scale's own pair for
   14 px: `text-present-name`, `text-present-label`), and the design system
   gains them when the owner next exports it. The grid reflows by column count
-  below the desktop width, never by shrinking type: by the grid's own width
-  (container queries), the class page 1400 px wide at most, as the B artboard
-  drew it.
+  below the desktop width, never by shrinking type: as many columns as fit,
+  each at least 212 px (320 in Present), so six at 1440, in the class page
+  1400 px wide at most (PB4a). In Present the page's header folds the bell, the
+  join code in `code-lg` and the controls into one row, so a class of 28 fits
+  one 1080p screen.
 - **Present never shows an unlock's reason**, because the class can see it:
-  "Unlocked" alone where the teacher's view says "Unlocked · nurse" (2026-10-06).
+  no line under "Unlocked" where the teacher's view says "Nurse" there
+  (2026-10-06).
 - **A session that ends in Present stays so** (D2g): the recap lists each unlock
   by who and when with no reason, How it ended is the projector view, and the
   toggle beside it leaves Present, the reasons back.
