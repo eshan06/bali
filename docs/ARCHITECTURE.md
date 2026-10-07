@@ -302,6 +302,20 @@ an archived class never reserves its code forever; a teacher can regenerate it (
   phone when the answer is 13 or older (never the date) and nothing at all when it is not: the
   student sees a stop screen, and the server never learns the question was asked. Under-13
   consent itself stays a later decision, for the K-12 pilot.
+  *Amended 2026-10-07 (the owner's decision of 2026-10-06, the gap's fallback):* Cognito's own
+  sign-in page links to its sign-up, and the classic hosted UI cannot hide that link for the app
+  alone, so an account can be made around the question. A sign-in that comes back to a phone that
+  has not passed the check gets the question first, and the sign-in gives Bali's API no token
+  until it is answered. 13 or older carries on as after any sign-in. Under 13 deletes the account
+  by Delete account's own steps (C4): what the phone queued goes first, every Emergency Unlock
+  first, and one the server has not recorded holds the deletion back, never let go; then `DELETE
+  /v1/me`, then Cognito's DeleteUser; then the outbox lets go of the rest, so nothing is ever
+  filed under whoever signs in next, whose account is always another (amended 2026-10-07, Claude
+  Review). With nothing queued, as a sign-up made around the question comes back, the server
+  never sees the account: `DELETE /v1/me` looks its caller up and creates no one. A record queued
+  under a sign-in the server never saw makes the account as it lands, and the deletion
+  de-identifies it a moment later, as C3 de-identifies any. An existing student on a new phone
+  answers it once.
 
 ## API surface
 
@@ -800,12 +814,15 @@ never covers or delays Emergency Unlock, and its answers never enter the outbox.
   honest promise "off within ~15 minutes", not instant.
 - **The 13+ check never stands between a student and Emergency Unlock** (C7, 2026-10-05; at
   Sign in since 2026-10-06). The router shows the age screen, and the stop screen under 13
-  gets, only in Sign in's place: signed out, once Sign in was pressed with the check not
-  passed. So a student signed in never sees either, and the shields' Focus and the home a
-  standing not read keeps, which hold the exit, come before them. Every way to the hosted UI
-  goes through the one call that asks the check first (`Phone.signIn`), so no sign-in or
-  sign-up page opens around it. The check counts in the Gregorian calendar whatever calendar
-  the phone shows its dates in.
+  gets, in Sign in's place once Sign in was pressed with the check not passed, and, signed in on
+  a phone that has not passed it (the gap's fallback, 2026-10-06), before Screen Time, Join and
+  Home. The shields' Focus and the home a standing not read keeps, which hold the exit, come
+  before both, and so do a session's own screens: Unlocked, Protection off and Session over.
+  Every way to the hosted UI goes through one call (`Phone.signIn`), which asks the check first
+  where the app can. The sign-in gives Bali's API no token until the check has passed (`SignIn`'s
+  `cleared`, read from the phone's own flag), but an account deletion's (`deletionToken`): Delete
+  account's steps, the outbox and then `DELETE /v1/me`, go whether or not it has.
+  The check counts in the Gregorian calendar whatever calendar the phone shows its dates in.
 - **A changed phone clock is detected, not prevented.** iOS scheduling follows wall-clock
   time, so a clock change is a real bypass family; the server compares against its own clock
   (rule 1) and surfaces it to the teacher rather than trusting it. Which of a student's own

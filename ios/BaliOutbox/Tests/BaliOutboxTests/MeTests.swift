@@ -305,6 +305,55 @@ struct DeletingTests {
             #expect(!words.contains("—") && !words.contains("!") && !words.isEmpty, "\(words)")
         }
     }
+
+    @Test(
+        "The gap's fallback (a sign-in around the 13+ question, answered under 13): the stop screen's title over the deletion under way, a deletion that could not reach Bali — Try again its way on — and done, final for the run, in the approved canvas's words; every other stop, the server's own answers and the sign-in still to go among them, as Me's says it in C4b's words and ways on: a sign-in from before C4's scope and a teacher's account Back alone, never a Try again that cannot help (Claude Review; santa's round 1)"
+    )
+    func underThirteen() {
+        func answered(_ answer: AccountDeletion, young: Bool) -> Deleting {
+            var deleting = Deleting.busy
+            deleting.answered(answer, underThirteen: young)
+            return deleting
+        }
+        #expect(AgeCheck.notYet == "Bali isn't available for you yet")
+        #expect(Deleting.none.saidUnderThirteen == nil && Deleting.asking.saidUnderThirteen == nil)
+        #expect(Deleting.busy.saidUnderThirteen?.title == AgeCheck.notYet)
+        #expect(
+            Deleting.busy.saidUnderThirteen?.body
+                == "Bali is deleting your account. This takes a moment.")
+        var unfinished = answered(.notDeleted(.networkError), young: true)
+        #expect(unfinished.saidUnderThirteen?.title == AgeCheck.notYet)
+        #expect(
+            unfinished.saidUnderThirteen?.body
+                == "Bali couldn't finish deleting your account. Check your connection and try again."
+        )
+        let retried = unfinished.start()
+        #expect(retried && unfinished == .busy)
+        for answer in [
+            AccountDeletion.unlockUnsent, .unread, .signInFirst, .teacherHasClasses,
+            .signInNotDeleted(.networkError), .notDeleted(.status(500)), .notDeleted(.status(429)),
+        ] {
+            let young = answered(answer, young: true)
+            let me = answered(answer, young: false)
+            #expect(young == me, "\(answer)")
+            #expect(young.saidUnderThirteen?.title == me.said?.title, "\(answer)")
+            #expect(young.saidUnderThirteen?.body == me.said?.body, "\(answer)")
+        }
+        for answer in [AccountDeletion.signInFirst, .teacherHasClasses] {
+            var stopped = answered(answer, young: true)
+            let began = stopped.start()
+            #expect(!began, "\(answer)")
+        }
+        #expect(
+            answered(.signInNotDeleted(.networkError), young: true).saidUnderThirteen?.title
+                == "Your account is deleted")
+        let done = answered(.deleted, young: true)
+        #expect(done == .done && done.saidUnderThirteen?.title == AgeCheck.notYet)
+        #expect(
+            done.saidUnderThirteen?.body
+                == "Bali deleted your account. Ask your teacher how to take part in class without the app."
+        )
+    }
 }
 
 private let renameRoute = "PATCH /v1/me"

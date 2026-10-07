@@ -12,8 +12,10 @@ import UIKit
 // The app target's own tests (B5b-2), hosted in the app on the iOS Simulator: what only the app
 // holds. Everything the app only wires up is tested in its packages, on Linux too.
 
+// One test at a time: several set the phone's own defaults (`ageChecked`, `introSeen`, `inClass`)
+// across their awaits, which another test running between them would read (Claude Review).
 @MainActor
-@Suite("The app")
+@Suite("The app", .serialized)
 struct AppTests {
     @Test(
         "This build's Info.plist gives the config reader every value ios/project.yml sets: sign-in is set up (#84's review)"
@@ -840,6 +842,11 @@ struct AppTests {
         "Delete account through the phone's own sign-in and engine (C4b): confirmed, the deletion's screen shows and nothing else until the answer; Cognito's DeleteUser answering nothing leaves the account deleted and the sign-in waiting, said with Try again alone — and a relaunch over the same Keychain lands on that screen at once, before any press; Try again finishes it, the sign-in gone, the done screen holding over Sign in until OK",
         .timeLimit(.minutes(3)))
     func deleteAccountWiring() async throws {
+        // Me's, past the 13+ check (the gap's fallback is `ageAfterSignInWiring`'s).
+        let defaults = UserDefaults.standard
+        let before = defaults.object(forKey: AgeCheck.key)
+        defer { defaults.set(before, forKey: AgeCheck.key) }
+        defaults.set(true, forKey: AgeCheck.key)
         let server = Deleter(deleteUser: [nil, 200], holdsDeletion: true)
         let keychain = Keychain(account: "ana", scoped: true)
         let (phone, engine) = try standIn(server, keychain: keychain)
@@ -1622,6 +1629,170 @@ struct AppTests {
     }
 
     @Test(
+        "The gap's fallback, routed (the owner's decision, 2026-10-06): a sign-in come back to a phone that has not passed the 13+ check shows the question first, no tab bar; 13 or older carries on as after any sign-in, no page opened; under 13 lands on the account's deletion under the stop screen's title — a frozen phone's, not started, a stop with Try again alone; each fixture of it says the approved words. The flag as it was before is put back after"
+    )
+    func ageAfterSignIn() async throws {
+        let defaults = UserDefaults.standard
+        let before = defaults.object(forKey: AgeCheck.key)
+        defer { defaults.set(before, forKey: AgeCheck.key) }
+        let pages = Pages()
+        let passing = Phone(fixture: try #require(PreviewFixtures.all["ageAfterSignIn"]))
+        #expect(passing.shown == (.age, false))
+        passing.birth = Birth(month: 1, year: 2000)
+        await passing.answerAge(through: pages.browser)
+        #expect(passing.age.answer == .passed && passing.shown == (.home, true))
+        let young = Phone(fixture: try #require(PreviewFixtures.all["ageAfterSignIn"]))
+        let now = Calendar(identifier: .gregorian).dateComponents([.year, .month], from: Date())
+        young.birth = Birth(month: now.month, year: now.year)
+        await young.answerAge(through: pages.browser)
+        #expect(young.underThirteen && young.shown == (.deleting, false))
+        // Not started, said as Me's says it, Try again its way on.
+        #expect(young.deleting.saidUnderThirteen?.title == Deleting.notDeleted)
+        guard case .stopped(_, _, retries: true) = young.deleting else {
+            Issue.record("\(young.deleting)")
+            return
+        }
+        #expect(pages.opened.isEmpty)
+        let unfinished =
+            "Bali couldn't finish deleting your account. Check your connection and try again."
+        for (name, body) in [
+            ("deletingUnderThirteen", "Bali is deleting your account. This takes a moment."),
+            ("deletingUnderThirteenNotDeleted", unfinished),
+            (
+                "deletingUnderThirteenDone",
+                "Bali deleted your account. Ask your teacher how to take part in class without the app."
+            ),
+        ] {
+            let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))
+            #expect(phone.shown == (.deleting, false), "\(name)")
+            #expect(phone.deleting.saidUnderThirteen?.body == body, "\(name)")
+        }
+    }
+
+    @Test(
+        "The gap's fallback through the phone's own sign-in and engine: signed in on a phone that has not passed the 13+ check, nothing reaches Bali's API — the engine's sends and reads find no token; 13 or older sends it all at once, no page opened; under 13 deletes the account as Delete account does (C4) — what the gate held goes first, the Emergency Unlock ahead of the tap queued before it, then DELETE /v1/me, then Cognito's DeleteUser, no read of the truth first — the outbox left empty for whoever signs in next, done final for the run under the stop screen's title. The flag as it was before is put back after",
+        .timeLimit(.minutes(3)))
+    func ageAfterSignInWiring() async throws {
+        let defaults = UserDefaults.standard
+        let before = defaults.object(forKey: AgeCheck.key)
+        defer { defaults.set(before, forKey: AgeCheck.key) }
+        /// Signed in on a phone that has not passed the check, the engine running: the phone, its
+        /// engine and the stand-in, once the engine has found no token to send.
+        func signedInAround() async throws
+            -> (Phone, SyncEngine, Recorder, Keychain, Task<Void, Never>)
+        {
+            defaults.removeObject(forKey: AgeCheck.key)
+            let server = Recorder()
+            let keychain = Keychain(account: "ana", scoped: true)
+            let (phone, engine) = try gatedStandIn(server, keychain: keychain)
+            let running = Task { await engine.run() }
+            phone.signed(in: true, as: "ana")
+            await engine.retryNow()
+            try await until { await engine.state.meFailed == .networkError }
+            #expect(await engine.state.link == .signIn)
+            #expect(await server.asked.isEmpty)
+            return (phone, engine, server, keychain, running)
+        }
+        let pages = Pages()
+        let (passing, engine, server, _, running) = try await signedInAround()
+        passing.birth = Birth(month: 1, year: 2000)
+        await passing.answerAge(through: pages.browser)
+        try await until { await server.asked.contains("GET /v1/me") }
+        #expect(await server.asked == ["GET /v1/me"] && pages.opened.isEmpty)
+        running.cancel()
+        _ = engine
+
+        let (young, held, deleter, keychain, deleting) = try await signedInAround()
+        try await held.record(.tap(tagId: "tag"))
+        try await held.record(.unlock(session: "s", reason: nil))
+        try await until {
+            let state = await held.state
+            return state.queued.count == 2 && state.link == .signIn
+        }
+        #expect(await deleter.asked.isEmpty)
+        let now = Calendar(identifier: .gregorian).dateComponents([.year, .month], from: Date())
+        young.birth = Birth(month: now.month, year: now.year)
+        await young.answerAge(through: pages.browser)
+        #expect(young.deleting == .done && young.shown == (.deleting, false))
+        #expect(
+            young.deleting.saidUnderThirteen?.body
+                == "Bali deleted your account. Ask your teacher how to take part in class without the app."
+        )
+        #expect(
+            await deleter.asked
+                == ["POST /v1/sessions/s/unlock", "POST /v1/taps", "DELETE /v1/me", "POST /"])
+        #expect(await held.state.queued.isEmpty && keychain.empty)
+        #expect(defaults.object(forKey: AgeCheck.key) == nil && pages.opened.isEmpty)
+        deleting.cancel()
+    }
+
+    @Test(
+        "Me's Delete account on a phone whose 13+ check has not passed — signed in on a build from before C7, Me reached through a session's Home or the home a standing not read keeps — is C4's own, said as Me's, never the fallback's (santa's round 1): the outbox goes first, under the deletion's own token, and an Emergency Unlock the server has not recorded holds the deletion back in C4b's words, with Back; DELETE /v1/me is never sent. The flag as it was before is put back after",
+        .timeLimit(.minutes(3)))
+    func deleteFromMeUnchecked() async throws {
+        let defaults = UserDefaults.standard
+        let before = defaults.object(forKey: AgeCheck.key)
+        defer { defaults.set(before, forKey: AgeCheck.key) }
+        defaults.removeObject(forKey: AgeCheck.key)
+        let server = Recorder()
+        let (phone, engine) = try gatedStandIn(
+            server, keychain: Keychain(account: "ana", scoped: true))
+        phone.signed(in: true, as: "ana")
+        // A session the stand-in never answers an unlock in.
+        try await engine.record(.unlock(session: "t", reason: nil))
+        phone.deleting.ask()
+        await phone.deleteAccount()
+        guard case .stopped(let title, _, retries: true) = phone.deleting else {
+            Issue.record("\(phone.deleting)")
+            return
+        }
+        #expect(title == Deleting.notFinished && !phone.underThirteen)
+        #expect(
+            phone.deleting.said?.body.hasPrefix("Your Emergency Unlock hasn't reached your teacher")
+                == true)
+        #expect(await server.asked == ["POST /v1/sessions/t/unlock"])
+    }
+
+    @Test(
+        "Delete account's own screens look as C4b's were approved, the gap's fallback's gutter its own alone (Claude Review): C4b's deletion under way, nothing under its words, sits where the page centres it; the fallback's steps sit on the gutter, as the stop screen's words do (the approved Sign in & sign up design)"
+    )
+    func deletingLayout() async throws {
+        /// Where `title` starts across the screen `fixture` draws.
+        func start(_ fixture: String, _ title: String) async throws -> CGFloat {
+            let phone = Phone(fixture: try #require(PreviewFixtures.all[fixture]))
+            let found = try await elements(of: phone, once: title).first { $0.label == title }
+            return try #require(found, "\(fixture)").frame.minX
+        }
+        let gutter = try await start("tooYoung", AgeCheck.notYet)
+        #expect(try await start("deletingUnderThirteen", AgeCheck.notYet) == gutter)
+        #expect(try await start("deletingUnderThirteenDone", AgeCheck.notYet) == gutter)
+        let busy = try await start("deleting", "Deleting your account…")
+        #expect(busy > gutter + 0.5, "\(busy) at a gutter of \(gutter)")
+    }
+
+    @Test(
+        "The gap's fallback never keeps a shielded phone from Emergency Unlock (santa's round 1): stopped where another try can help, its screen has Try again alone, as the canvas draws it; but with the shields on — a record the deletion sent first put the phone back in its class — Back too, as C4b's stops have it, and Back leads to Focus"
+    )
+    func deletingUnderThirteenShielded() async throws {
+        /// Whether the screen `phone` shows offers Back, read once its title is.
+        func backs(_ phone: Phone) async throws -> Bool {
+            try await elements(of: phone, once: AgeCheck.notYet).contains { $0.label == "Back" }
+        }
+        let calm = Phone(
+            fixture: try #require(PreviewFixtures.all["deletingUnderThirteenNotDeleted"]))
+        #expect(calm.shown == (.deleting, false))
+        #expect(try await !backs(calm))
+        var state = try #require(PreviewFixtures.all["deletingShielded"])
+        state.age = .tooYoung
+        state.deleting.answered(.notDeleted(.networkError), underThirteen: true)
+        let shielded = Phone(fixture: state)
+        #expect(shielded.shown == (.deleting, false))
+        #expect(try await backs(shielded))
+        shielded.deleting.close()
+        #expect(shielded.shown.screen == .focus)
+    }
+
+    @Test(
         "The permission once read approved is kept in the phone's own defaults (C1b) — set at a read of approved, cleared once the check judges the permission off (denied, or not determined for the grace), left at a read not determined for a moment — and a fresh Phone reads it back; with it, not determined routes as approved. The flag as it was before is put back after"
     )
     func everApproved() throws {
@@ -2019,6 +2190,28 @@ private func voiceOver(in window: UIWindow) throws -> [NSObject] {
     return walk(window)
 }
 
+/// What VoiceOver reads on the screen `phone` shows, at the phone's own size — each element's label
+/// and frame — once it reads `title`: a simulator's first walk can come before SwiftUI has built the
+/// elements (CI's, made fresh for each run).
+@MainActor
+private func elements(of phone: Phone, once title: String) async throws -> [(
+    label: String?, frame: CGRect
+)] {
+    let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+    let window = UIWindow(windowScene: scene)
+    window.frame = scene.screen.bounds
+    window.rootViewController = UIHostingController(rootView: RootView(phone: phone))
+    window.isHidden = false
+    defer { window.isHidden = true }
+    window.layoutIfNeeded()
+    var read: [NSObject] = []
+    try await until {
+        read = (try? voiceOver(in: window)) ?? []
+        return read.contains { $0.accessibilityLabel == title }
+    }
+    return read.map { ($0.accessibilityLabel, $0.accessibilityFrame) }
+}
+
 /// Every scroll view in `view`, itself among them, outermost first — of a pager's pages, only the
 /// one it shows: the others it lays out lie off screen.
 @MainActor
@@ -2093,6 +2286,59 @@ private func standIn(_ server: any HTTPTransport, keychain: Keychain = Keychain(
         redirectURI: URL(string: "bali://auth/callback")!)
     let signIn = SignIn(cognito: cognito, store: keychain, transport: server)
     return (Phone(signIn: signIn, engine: engine), engine)
+}
+
+/// A phone of the test's own as `Phone.start` makes it, over `server` and a sign-in over
+/// `keychain`: its engine made over the sign-in, which gives Bali's API a token only once the 13+
+/// check has passed in the phone's own defaults (C7's fallback).
+@MainActor
+private func gatedStandIn(_ server: any HTTPTransport, keychain: Keychain) throws -> (
+    Phone, SyncEngine
+) {
+    let url = FileManager.default.temporaryDirectory.appending(
+        path: "phone-\(UUID().uuidString).sqlite")
+    let cognito = Cognito(
+        domain: URL(string: "https://bali.auth.test")!, clientId: "phone",
+        redirectURI: URL(string: "bali://auth/callback")!)
+    let signIn = SignIn(
+        cognito: cognito, store: keychain, transport: server,
+        cleared: { AgeCheck(defaults: .standard).answer == .passed })
+    let engine = SyncEngine(
+        outbox: try Outbox(at: url),
+        client: APIClient(
+            baseURL: URL(string: "https://api.bali.test")!, tokens: signIn, transport: server),
+        refresh: { await signIn.refresh() })
+    return (Phone(signIn: signIn, engine: engine), engine)
+}
+
+/// The API and Cognito as a stand-in answers the gap's fallback, each request kept as its method
+/// and path: `GET /v1/me` with a student in no class, an unlock in session `s` recorded, a tap
+/// waiting for a Start, `DELETE /v1/me` with no account there, and Cognito's DeleteUser done;
+/// anything else gets no answer.
+private actor Recorder: HTTPTransport {
+    private(set) var asked: [String] = []
+
+    func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        guard let url = request.url else { throw URLError(.badURL) }
+        let route = "\(request.httpMethod ?? "") \(url.path())"
+        asked.append(route)
+        let body: String
+        switch route {
+        case "GET /v1/me":
+            body = #"{"user":{"id":"ana","role":"student","displayName":"Ana"},"classes":[],"session":null}"#
+        case "POST /v1/sessions/s/unlock":
+            body = #"{"outcome":"recorded","recordedAs":"no_live_participation","state":null,"session":null,"reason":null}"#
+        case "POST /v1/taps": body = #"{"outcome":"armed","session":null,"state":null}"#
+        case "DELETE /v1/me": body = #"{"outcome":"already_deleted"}"#
+        case "POST /" where url.host() == "cognito-idp.us-east-1.amazonaws.com": body = "{}"
+        default: throw URLError(.notConnectedToInternet)
+        }
+        guard
+            let response = HTTPURLResponse(
+                url: url, statusCode: 200, httpVersion: nil, headerFields: nil)
+        else { throw URLError(.badURL) }
+        return (Data(body.utf8), response)
+    }
 }
 
 /// The API as a stand-in answers a phone of the test's own: `GET /v1/me` once, with `me` — after

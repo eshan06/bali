@@ -23,6 +23,22 @@ public protocol TokenProvider: Sendable {
     /// that would earn a `401` nobody said — and never refreshes one: a `401` comes back as a
     /// value, and the caller's `reauth` path asks B4 for a fresh token.
     func accessToken() async -> String?
+
+    /// The token an account deletion sends under (C4: the outbox first, then `DELETE /v1/me`;
+    /// `APIClient.forDeletion`). `accessToken()`'s, unless a provider gives this one where that
+    /// gives none: the sign-in does while the phone's 13+ check has not passed (C7), so a sign-in
+    /// made around the question and answered under 13 deletes its account as Delete account does.
+    func deletionToken() async -> String?
+}
+
+extension TokenProvider {
+    public func deletionToken() async -> String? { await accessToken() }
+}
+
+/// A provider's deletion token, as every token it gives (`APIClient.forDeletion`).
+private struct DeletionTokens: TokenProvider {
+    let tokens: any TokenProvider
+    func accessToken() async -> String? { await tokens.deletionToken() }
 }
 
 /// Why a call has no answer: `SendResult.networkError`, which every outbox table reads as retry.
@@ -147,6 +163,14 @@ public struct APIClient: Sendable {
     ) {
         (self.baseURL, self.tokens, self.transport, self.timeout) =
             (baseURL, tokens, transport, timeout)
+    }
+
+    /// This client with every request under `deletionToken()`: what an account deletion sends (C4),
+    /// the outbox first, then `DELETE /v1/me`.
+    public var forDeletion: APIClient {
+        APIClient(
+            baseURL: baseURL, tokens: DeletionTokens(tokens: tokens), transport: transport,
+            timeout: timeout)
     }
 
     /// `GET /v1/me` — the boot call; a read of the truth, for `readMayReconcile`.

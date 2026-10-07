@@ -7,23 +7,33 @@ import Foundation
 /// one flag in the phone's own defaults, that the check passed, never the date, and is not asked
 /// again. Under 13 keeps nothing anywhere — no flag, no date, no counter, on the phone, in the app
 /// group, the Keychain or the server — and sees a kind stop screen, with no way back to the
-/// question until the app is reopened: held here, in memory, for the run. The rules, so they run
-/// on Linux; the app's `Phone` keeps one and the screens call it.
+/// question until the app is reopened: held here, in memory, for the run. A sign-in that comes back
+/// to a phone that has not passed it — made on Cognito's own pages around the question — is asked
+/// first too, and gives Bali's API nothing until answered; under 13 there, the account is deleted
+/// (the gap's fallback, the owner's decision 2026-10-06). The rules, so they run on Linux; the
+/// app's `Phone` keeps one and the screens call it.
 public struct AgeCheck: Sendable, Hashable {
     public enum Answer: Sendable, Hashable {
-        /// Never passed on this phone and not asked this run: Sign in shows.
+        /// Never passed on this phone and not asked this run: Sign in shows — signed in, the
+        /// question.
         case unanswered
         /// Sign in pressed, not answered yet: the question shows.
         case asked
         /// 13 or older: kept, and never asked again.
         case passed
-        /// Under 13, this run: the stop screen, until the app is reopened.
+        /// Under 13, this run: the stop screen, until the app is reopened — signed in, its account
+        /// deleted first.
         case tooYoung
     }
 
     public private(set) var answer: Answer
     /// The one key the check writes, in the phone's own defaults: true once passed.
     public static let key = "ageChecked"
+    /// The stop screen's title and line (the owner's words, 2026-10-05): an answer under 13's, and
+    /// the title of each step of the account's deletion after a sign-in
+    /// (`Deleting.saidUnderThirteen`).
+    public static let notYet = "Bali isn't available for you yet"
+    public static let askTeacher = "Ask your teacher how to take part in class without the app."
 
     public init(_ answer: Answer) { self.answer = answer }
 

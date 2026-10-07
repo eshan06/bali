@@ -47,6 +47,16 @@
             "age": State(age: .asked, signedIn: false),
             "agePicked": State(age: .asked, birth: Birth(month: 3, year: 2009), signedIn: false),
             "tooYoung": State(age: .tooYoung, signedIn: false),
+            // The gap's fallback: a sign-in come back to a phone that has not passed the check —
+            // the question first, Bali's API sent nothing — and, answered under 13, the account's
+            // deletion under way, stopped (no answer) and done, under the stop screen's title.
+            "ageAfterSignIn": State(age: .unanswered, sync: waitingOnSignIn(standing(.out, me: nil))),
+            "deletingUnderThirteen": State(
+                age: .tooYoung, sync: waitingOnSignIn(standing(.out, me: nil)), deleting: .busy),
+            "deletingUnderThirteenNotDeleted": State(
+                age: .tooYoung, sync: waitingOnSignIn(standing(.out, me: nil)),
+                deleting: stopped(.notDeleted(.networkError), underThirteen: true)),
+            "deletingUnderThirteenDone": State(age: .tooYoung, signedIn: false, deleting: .done),
             "intro": State(introSeen: false),
             "signIn": State(age: .unanswered, signedIn: false),
             "screenTime": State(protection: permission(.notDetermined)),
@@ -297,10 +307,13 @@
             return leaving
         }
 
-        /// Delete account stopped as the engine answered `answer` (C4b): its screen's words and way on.
-        private static func stopped(_ answer: AccountDeletion) -> Deleting {
+        /// Delete account stopped as the engine answered `answer` (C4b) — the gap's fallback's,
+        /// `underThirteen`: its screen's words and way on.
+        private static func stopped(_ answer: AccountDeletion, underThirteen: Bool = false)
+            -> Deleting
+        {
             var deleting = Deleting.busy
-            deleting.answered(answer)
+            deleting.answered(answer, underThirteen: underThirteen)
             return deleting
         }
 

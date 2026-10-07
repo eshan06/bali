@@ -58,10 +58,16 @@ final class Phone {
     private var frozen = false
     /// The 13+ check (C7), as the phone's own defaults say — passed before, or not yet — and, this
     /// run, whether Sign in asked it and what the student answered: under 13 is held here alone,
-    /// never written anywhere (`AgeCheck`). Asked at Sign in (`signIn(through:)`).
+    /// never written anywhere (`AgeCheck`). Asked at Sign in (`signIn(through:)`), and after a
+    /// sign-in on a phone that has not passed it (the gap's fallback), the sign-in giving Bali's
+    /// API nothing until it is answered.
     private(set) var age = AgeCheck(defaults: .standard)
     /// The age screen's picks, the birth month and year, until Continue answers with them.
     var birth = Birth()
+    /// Whether Delete account is the gap's fallback's: an answer under 13 this run, signed in,
+    /// starts it, and nothing else does — the same deletion as Me's, said in the approved canvas's
+    /// words where it drew them (santa's round 1).
+    var underThirteen: Bool { age.answer == .tooYoung }
     /// Sign in's (C1a): a sign-in under way, and why the last did not finish, as the sign-in said
     /// it — the screen says its `words` (rule 5), the readout all of it.
     private(set) var signingIn = false
@@ -401,14 +407,17 @@ final class Phone {
     /// `SyncEngine.deleteAccount` — the outbox first, then `DELETE /v1/me`, then Cognito's DeleteUser
     /// (C4a) — the deletion's screen showing meanwhile and its answer put in words there
     /// (`Deleting.answered`). Nothing where no try can help, nor while one runs. A phone whose
-    /// engine has not started — a frozen one too — says so (rule 5).
+    /// engine has not started — a frozen one too — says so (rule 5). After an answer under 13 this
+    /// run, signed in, it is the gap's fallback's, which that answer started: the same steps, said
+    /// as the approved canvas draws them (`Deleting.saidUnderThirteen`).
     func deleteAccount() async {
         guard deleting.start() else { return }
+        let young = underThirteen
         guard let engine, let signIn else {
             return deleting = .stopped(
                 title: Deleting.notDeleted, why: Joining.notStarted, retries: true)
         }
-        deleting.answered(await engine.deleteAccount(signIn))
+        deleting.answered(await engine.deleteAccount(signIn), underThirteen: young)
     }
 
     /// The bell of the session the phone stands in, where the router chooses again (C5a).
@@ -610,12 +619,19 @@ final class Phone {
     /// calendar today — passed, kept in the phone's own defaults (never on a frozen fixture, which
     /// keeps nothing for another), and the sign-in page opens at once through `browser`, with no
     /// second press of Sign in; under 13, kept nowhere, in memory until the app is reopened — and
-    /// the picks are let go either way. Nothing until both are picked.
+    /// the picks are let go either way. Nothing until both are picked. Signed in (the gap's
+    /// fallback), no page opens: 13 or older lets the sign-in reach Bali's API, everything queued
+    /// sent and the truth read at once; under 13 deletes the account, as Delete account does.
     func answerAge(through browser: Browser) async {
         guard let month = birth.month, let year = birth.year else { return }
         age.answered(month: month, year: year, defaults: frozen ? nil : .standard)
         birth = Birth()
-        await signIn(through: browser)
+        guard signedIn == true else { return await signIn(through: browser) }
+        guard age.answer == .passed else {
+            deleting.ask()
+            return await deleteAccount()
+        }
+        await retry()
     }
 
     func sawIntro() {
@@ -717,8 +733,11 @@ final class Phone {
         }
         problem = nil
         let transport = URLSessionTransport()
+        // Bali's API gets no token until the 13+ check has passed on this phone, read from its own
+        // defaults at each ask (the gap's fallback; C7).
         let signIn = SignIn(
-            cognito: config.cognito, store: KeychainTokenStore(), transport: transport)
+            cognito: config.cognito, store: KeychainTokenStore(), transport: transport,
+            cleared: { AgeCheck(defaults: .standard).answer == .passed })
         let engine = await SyncEngine.make(
             outbox: outbox, api: config.api, signIn: signIn, transport: transport)
         #if DEBUG

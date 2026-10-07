@@ -1208,6 +1208,22 @@ describe('DELETE /v1/me (C3)', () => {
     expect(deletions).toHaveLength(1);
   });
 
+  it('answers a sign-in that never called before with no account, and makes none (C7’s fallback)', async () => {
+    // A sign-in made around the 13+ question and answered under 13 sends this first and alone:
+    // looked up, never created, so Bali stores nothing of the account.
+    const before = await db.select().from(users);
+    const token = await ctx.tokenFor('del-never-called');
+
+    for (const id of [randomUUID(), randomUUID()]) {
+      const res = await deleteAs(token, id);
+      expect(res.statusCode).toBe(200);
+      expect(res.json<DeleteMeResponse>()).toEqual({ outcome: 'already_deleted' });
+    }
+    expect(await findUserByCognitoId(db, 'del-never-called')).toBeUndefined();
+    expect(await db.select().from(users)).toEqual(before);
+    expect(await db.select().from(events).where(eq(events.type, 'account_deleted'))).toEqual([]);
+  });
+
   it('deletes the account a boot call made between the deletion and its retry', async () => {
     const { student } = await seedClassroom(db, 'del-reborn');
     const token = await ctx.tokenFor(student.cognitoId);

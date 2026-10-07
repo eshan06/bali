@@ -743,6 +743,36 @@ struct TokenTests {
         #expect(await signIn.refresh() == true)
         #expect(await signIn.accessToken() == jwt("a2"))
     }
+
+    @Test(
+        "until the phone's 13+ check has passed, the API is given no token — not even a renewed one, nothing renewed for it — but an account deletion's; once passed, both, asked afresh each time; an account the API deleted gives neither (C7's fallback)"
+    )
+    func cleared() async throws {
+        final class Passed: @unchecked Sendable {
+            private let lock = NSLock()
+            private var passed = false
+            var value: Bool {
+                get { lock.withLock { passed } }
+                set { lock.withLock { passed = newValue } }
+            }
+        }
+        let endpoint = TransportDouble { _ in (200, Data(granted(jwt("a2")).utf8)) }
+        let (now, passed) = (Now(), Passed())
+        let signIn = SignIn(
+            cognito: cognito, store: try MemoryStore.holding(jwt("a1")), transport: endpoint,
+            now: { now() }, cleared: { passed.value })
+        #expect(await signIn.accessToken() == nil)
+        #expect(await signIn.deletionToken() == jwt("a1"))
+        now.set(3600)  // a1 has expired
+        #expect(await signIn.accessToken() == nil)
+        #expect(await endpoint.sent.isEmpty)
+        #expect(await signIn.deletionToken() == jwt("a2"))
+        passed.value = true
+        #expect(await signIn.accessToken() == jwt("a2"))
+        await signIn.accountDeleted()
+        #expect(await signIn.deletionToken() == nil)
+        #expect(await signIn.accessToken() == nil)
+    }
 }
 
 /// The token endpoint's next answer — nil for none at all — which a test changes as it goes.

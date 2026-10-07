@@ -390,6 +390,35 @@ struct APIClientTests {
         #expect(await transport.sent.isEmpty)
     }
 
+    @Test(
+        "An account deletion's client sends every request under the deletion's own token, the plain client under the access token: a provider giving only the first sends nothing but through `forDeletion`, a queued record and DELETE /v1/me alike (C7's fallback)"
+    )
+    func deletionToken() async throws {
+        struct DeletionOnly: TokenProvider {
+            func accessToken() async -> String? { nil }
+            func deletionToken() async -> String? { "deletion" }
+        }
+        let transport = TransportDouble(status: 200, body: #"{"outcome":"already_deleted"}"#)
+        let client = APIClient(baseURL: Self.base, tokens: DeletionOnly(), transport: transport)
+        let tap = TapRequest(tagId: "TAG-1", eventId: "e1", deviceTime: Self.at)
+        #expect(await client.me().noAnswer == .noToken)
+        #expect(await client.tap(tap).noAnswer == .noToken)
+        #expect(await client.deleteMe(DeleteMeRequest(eventId: "e2")).noAnswer == .noToken)
+        #expect(await transport.sent.isEmpty)
+        _ = await client.forDeletion.tap(tap)
+        let deleted = await client.forDeletion.deleteMe(DeleteMeRequest(eventId: "e2"))
+        #expect(deleted.answer?.outcome.known == .alreadyDeleted)
+        let sent = await transport.sent
+        #expect(sent.map(\.httpMethod) == ["POST", "DELETE"])
+        let tokens = sent.map { $0.value(forHTTPHeaderField: "Authorization") }
+        #expect(tokens == ["Bearer deletion", "Bearer deletion"])
+        // A provider of one token gives it to a deletion too.
+        let plain = TransportDouble(status: 200, body: #"{"outcome":"deleted"}"#)
+        let fixed = APIClient(baseURL: Self.base, tokens: FixedToken(token: "t"), transport: plain)
+        _ = await fixed.forDeletion.deleteMe(DeleteMeRequest(eventId: "e3"))
+        #expect(await plain.sent.first?.value(forHTTPHeaderField: "Authorization") == "Bearer t")
+    }
+
     @Test("Each request asks for the token afresh, so a refreshed one goes on the next")
     func freshToken() async throws {
         let transport = TransportDouble(status: 200)
