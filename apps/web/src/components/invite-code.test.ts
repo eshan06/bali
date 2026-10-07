@@ -20,4 +20,9 @@ describe('the invite-code screen', () => {
     expect(above).toBeGreaterThan(source.indexOf('<Field'));
     expect(above).toBeLessThan(source.indexOf('<Button'));
   });
+
+  it('takes focus back to the field by the same rule, never a copy of it (PB2’s review)', () => {
+    expect(source).toContain('if (placeAnswer(answer).underField) field.current?.focus();');
+    expect(source).not.toContain('CODE_REFUSALS');
+  });
 });

@@ -8,7 +8,6 @@ import { Field } from '@/components/field';
 import {
   type Attempt,
   attemptFor,
-  CODE_REFUSALS,
   codeProblem,
   placeAnswer,
   redeemInvite,
@@ -81,7 +80,8 @@ export function InviteCode({ onTeacher }: { onTeacher: () => void }) {
     sending.current = false;
     setBusy(false);
     setSaid(answer);
-    if (answer.kind === 'refused' && CODE_REFUSALS.has(answer.reason)) field.current?.focus();
+    // Back to the field when the answer is said under it: the code is the thing to put right.
+    if (placeAnswer(answer).underField) field.current?.focus();
   }
 
   return (

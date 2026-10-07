@@ -92,6 +92,14 @@ describe('registerBlock', () => {
     });
   });
 
+  it('sends a teacher whose ID is taken back to the ID itself, the Classes home design’s words (PB3)', () => {
+    // Nothing moves a block between teachers today, so no one can be asked to move it.
+    expect(BLOCK_TAKEN).toBe(
+      'That block is registered to another teacher. Check the ID against the one written on your block.',
+    );
+    expect(BLOCK_TAKEN).not.toMatch(/[—–!]|move it/);
+  });
+
   it('keeps an answer that never came, a timeout, a server error or the budget’s 429, to try again', async () => {
     const unreachable = createApiClient({
       baseUrl: 'http://api',

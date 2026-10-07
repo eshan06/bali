@@ -8,6 +8,30 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-06** — **PB3, the classes home, built to the Classes home canvas; three behaviour
+  changes the design and the owner's rulings ask for.** (1) **The create's 409 for a teacher with
+  no school is said as any create that failed** (`CANT_CREATE`), no longer as `NO_SCHOOL` (#260's
+  review). An account teaches only by redeeming an invite, which always sets its school, so no
+  account meets that 409, and no one can "add you to a school" as `NO_SCHOOL` asked the teacher to
+  have done. `createClass` now keys on what a refusal carries: the budget's wait and a refusal with
+  a `reason` are said as `errText` says them, as before; one with no reason, the no-school 409 and a
+  403 included, is `CANT_CREATE`, never the API's log line, so no special case keys on the route's
+  one reason-less 409 any more. (2) **Another teacher's block sends the teacher back to the ID:**
+  "That block is registered to another teacher. Check the ID against the one written on your
+  block." Nothing moves a block between teachers today (ARCHITECTURE, how a tap works, step 9), so
+  asking the invite's sender to move it promised what no one can do. (3) **An empty name leaves
+  Create disabled and says nothing**, Phase 2's behaviour: the approved design draws no board for
+  D2e's "Enter a name for the class." The button is disabled by `aria-disabled`, not `disabled`, so
+  it keeps focus when a made class empties the field under it (D2e's one button throughout); the
+  Web Interface Guidelines' "submit stays enabled until the request starts" gives way to the
+  owner's ruling. And from the canvas: a made class is said by the list, read again, with no line
+  of its own (D2e's "… is ready. Open it to see its join code." is gone). **Where the build
+  differs from the boards, on purpose:** the light cards keep their `border-default` hairline (PB1's
+  ruling: this canvas drew it in dark only, the other three in both), and Create shows dimmed on
+  the boards' empty field. Rode along from PB2's review: the invite code takes focus back to its
+  field by `placeAnswer`, not a copy of its rule; the entry pages and the layout's body fill the
+  window that shows (`dvh`), where iPhone Safari's `vh` is the window behind its toolbars.
+
 - **2026-10-06** — **PB2, the entry and info pages, built to the Entry & info canvas; where the
   canvas's render and its CSS disagree, the CSS wins; the portal's steps renamed PB1–PB5.** The
   built pages match the canvas's boards in a pixel diff, but in two places the board's own CSS

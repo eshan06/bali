@@ -96,7 +96,9 @@ judged that look poor and approved four new designs (above): PB1 laid what they
 share (no grey tray, `border-input`, `code-lg`, the field, the buttons'
 pressed look, the nav link), PB2 redrew the entry and info pages (one card
 centred under a bar that holds the lockup, `components/entry-page.tsx`; Help
-and the policy pages under the same bar), and PB3–PB5 redraw the rest. Every
+and the policy pages under the same bar), PB3 the classes home (the classes
+and their create row in one column, the block's card beside it), and PB4–PB5
+redraw the rest. Every
 portal source file is held to the tokens' utilities by `tokens.test.ts`, and
 since D2g the theme holds none of Tailwind's own colours, type sizes,
 tracking or leading, so a default draws nothing. **A portal page uses the
@@ -317,10 +319,11 @@ class page's minutes field types in it too, on the Field since D2f-2.
   `components/card.ts`). Grey stays only where the approved designs keep it: a
   text field's well, the state chips' fills, the grid's stale banner, a
   button's hover and pressed states, and the policy draft's banner and badge.
-  Cards in a list (the grid's cells, the classes, the blocks, the reports) are
+  Cards in a list (the grid's cells, the classes, the reports) are
   `radius-md` with `space-4` padding, `space-2` apart; a card standing alone
-  (sign-in, the invite code, the recap, a sheet) is `radius-lg` with `space-6`
-  padding (`space-5` on iOS). An empty list says so in a plain line in
+  (sign-in, the invite code, the block's card, the recap, a sheet) is
+  `radius-lg` with `space-6` padding (`space-5` on iOS); inside one, a list is
+  rows between hairlines (the blocks). An empty list says so in a plain line in
   `text-secondary`, never in a box. The app draws no tray either: its cards
   stand alone as D1 drew them. Use a card only when elevation means hierarchy;
   otherwise group with spacing or a hairline.

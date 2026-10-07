@@ -4,7 +4,7 @@ import type { BlockDetail, BlockListResponse } from '@bali/shared';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 import { Button } from '@/components/button';
-import { CARD } from '@/components/card';
+import { CARD_ALONE } from '@/components/card';
 import { Field } from '@/components/field';
 import { blockIdOf, loadProblem, type RegisterAnswer, registerBlock } from '@/lib/blocks';
 import { NOT_A_BLOCK_ID } from '@/lib/errors';
@@ -17,11 +17,11 @@ const registeredOn = (iso: string) =>
   new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 
 /**
- * The teacher's blocks on the classes home (P3; in Soft premium, D2e): the ones registered to
- * them as cards, each ID in the code style, and a field to register one by the ID
- * written on it. The ID is checked as the phone reads a tag before a try is spent on it; each
- * refusal is said under the field, with the way on; an answer that never came is sent again as it
- * was by Try again, which is safe: one's own tag registers once.
+ * The teacher's blocks on the classes home (P3; the approved Classes home design): a card of its
+ * own, the ones registered to them as rows between hairlines, each ID in the code style, and a
+ * field to register one by the ID written on it. The ID is checked as the phone reads a tag before
+ * a try is spent on it; each refusal is said under the field, with the way on; an answer that
+ * never came is sent again as it was by Try again, which is safe: one's own tag registers once.
  */
 export function Blocks() {
   const api = useApi();
@@ -79,8 +79,8 @@ export function Blocks() {
   }
 
   return (
-    <section aria-labelledby={`${id}-title`} className="mt-12 border-t border-border-default pt-10">
-      <h2 id={`${id}-title`} className="text-h2">
+    <section aria-labelledby={`${id}-title`} className={CARD_ALONE}>
+      <h2 id={`${id}-title`} className="text-h3">
         {blocks && blocks.length > 1 ? 'Your blocks' : 'Your block'}
       </h2>
       <p className="mt-2 text-body text-text-secondary">
@@ -89,12 +89,12 @@ export function Blocks() {
 
       {blocks === null ? (
         loadError !== null ? (
-          <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-3">
+          <div className="mt-6">
             <p role="alert" className="text-body">
               Couldn&apos;t load your blocks.{' '}
               <span className="text-text-secondary">{loadError}</span>
             </p>
-            <Button variant="secondary" onClick={load}>
+            <Button variant="secondary" onClick={load} className="mt-4">
               Try again
             </Button>
           </div>
@@ -106,13 +106,15 @@ export function Blocks() {
       ) : (
         <>
           {blocks.length === 0 ? (
-            <p className="mt-6 text-body text-text-secondary">No block registered yet.</p>
+            <p className="mt-6 border-y border-border-default py-3 text-body text-text-secondary">
+              No block registered yet.
+            </p>
           ) : (
-            <ul className="mt-6 grid gap-2">
+            <ul className="mt-6 border-b border-border-default">
               {blocks.map((b) => (
                 <li
                   key={b.id}
-                  className={`flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 ${CARD}`}
+                  className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-border-default py-3"
                 >
                   <span translate="no" className="font-mono text-code break-all">
                     {b.tagId}
@@ -125,7 +127,7 @@ export function Blocks() {
             </ul>
           )}
 
-          <form onSubmit={(e) => void onSubmit(e)} className="mt-8 max-w-md">
+          <form onSubmit={(e) => void onSubmit(e)} className="mt-6">
             <Field
               ref={field}
               id={`${id}-id`}
@@ -151,14 +153,20 @@ export function Blocks() {
               <p
                 id={`${id}-said`}
                 role={said.kind === 'done' ? 'status' : 'alert'}
-                className="mt-4 text-body"
+                className="mt-4 text-body break-words"
               >
                 {said.message}
               </p>
             ) : null}
 
             {/* One button throughout, so focus stays on it whatever it comes to say. */}
-            <Button type="submit" aria-disabled={busy} aria-busy={busy} className="mt-6">
+            <Button
+              variant="secondary"
+              type="submit"
+              aria-disabled={busy}
+              aria-busy={busy}
+              className="mt-4"
+            >
               {busy ? 'Registering…' : said?.kind === 'failed' ? 'Try again' : 'Register block'}
             </Button>
           </form>

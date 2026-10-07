@@ -35,7 +35,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={`${instrumentSans.variable} ${jetBrainsMono.variable}`}>
-      <body className="min-h-screen bg-surface-page font-sans text-text-primary antialiased tabular-nums">
+      <body className="min-h-dvh bg-surface-page font-sans text-text-primary antialiased tabular-nums">
         <PortalBar />
         {children}
       </body>
