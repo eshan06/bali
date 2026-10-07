@@ -47,6 +47,29 @@ describe('the class page in Present', () => {
     expect(press).toMatch(/setPresent\(!present\)/);
   });
 
+  it('folds the bell, the code in code-lg and the controls into the header while a session runs', () => {
+    // The Present board: one row, so a class of 28 fits one 1080p screen; the session's card goes.
+    expect(page).toMatch(/const projecting = present && grid !== null && !grid\.over;/);
+    const header = page.slice(page.indexOf('<header'), page.indexOf('</header>'));
+    expect(header).toMatch(/\{projecting \? endsAt : null\}/);
+    expect(header).toMatch(/<JoinCode[^>]*\blarge=\{projecting\}/);
+    expect(header).toMatch(/\{projecting \? \([^]*\{extend\}\s*\{end\(\)\}/);
+    const start = page.indexOf('{projecting ? null : (');
+    const card = page.slice(start, page.indexOf('</section>', start));
+    expect(card).toMatch(/aria-label="Session"[^]*\{endsAt\}[^]*\{extend\}\s*\{end\('ml-auto'\)\}/);
+    expect(read('../components/join-code.tsx')).toMatch(/large \? 'text-code-lg' : 'text-code'/);
+  });
+
+  it('keeps the live grid in one place as Present turns on, so it never reboots or reconnects', () => {
+    // React keeps a child by its place: the card's slot holds a null in Present, the said line's
+    // slot one when nothing is said, and the grid's section sits in neither.
+    expect(page.slice(page.indexOf('{projecting ? null : ('))).toMatch(
+      /^\{projecting \? null : \([^]*?\)\}\s*\{\/\*[^*]*\*\/\}\s*\{said \? \([^]*?\) : null\}\s*<section\s+aria-labelledby=\{`\$\{id\}-live`\}/,
+    );
+    const live = tags('LiveGrid').find((tag) => tag.includes('onEnded'));
+    expect(live).not.toMatch(/\bkey=/);
+  });
+
   it('puts the toggle on the recap when the page comes back in Present with no session to show', () => {
     expect(opening()).toMatch(
       /const (\w+) = rememberedPresent\(classId\);[^]*setOpenedInPresent\(\1\);/,

@@ -332,7 +332,7 @@ export function silentNote(s: Student, now: Date): string {
 }
 
 /**
- * Staleness short of silence (DESIGN.md §2): beside a live chip whose phone hasn't been heard from
+ * Staleness short of silence (DESIGN.md §2): under a live chip whose phone hasn't been heard from
  * for a minute or more, how long ago it was, as a caption, never a colour change. A focused phone
  * reads Silent at 90 s, its label saying how long from then; an unlocked or protection-off phone
  * never does, so for those this is the one place it shows.
@@ -372,9 +372,9 @@ const REASON_TEXT: Record<UnlockReason, string> = {
 };
 
 /**
- * What a chip adds, after its label, for the unlock it carries (A9): the reason
- * on a chip that already says unlocked, and on a protection-off chip the
- * unlock itself — a detail beside the state, never the state, so protection
+ * What the line under a chip says of the unlock it carries (A9): the reason
+ * under a chip that already says unlocked, and under a protection-off chip the
+ * unlock itself — a detail under the state, never the state, so protection
  * off is never relabelled an unlock nor shown green. Null when it adds nothing.
  * In Present (`present`), the projector the class can see, never the reason: the
  * consent card promises it to the teacher alone (A1).
