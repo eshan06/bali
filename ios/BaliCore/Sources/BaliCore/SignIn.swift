@@ -198,6 +198,12 @@ public actor SignIn: TokenProvider {
     let store: any TokenStore
     let transport: any HTTPTransport
     let now: @Sendable () -> Date
+    /// Whether the phone's 13+ check has passed (C7), asked at each token the API is to be given:
+    /// until it has, none is, but an account deletion's (`deletionToken`). So a sign-in made around
+    /// the question — on Cognito's own pages, whose sign-in page links to its sign-up — reaches
+    /// Bali's API with nothing until it is answered, and an answer under 13 deletes its account as
+    /// Delete account does (the owner's decision, 2026-10-06).
+    let cleared: @Sendable () -> Bool
     /// The tokens, once the store could be read (`loaded`); nil when nobody is signed in.
     private var tokens: Tokens?
     private var loaded = false
@@ -216,9 +222,11 @@ public actor SignIn: TokenProvider {
     public init(
         cognito: Cognito, store: any TokenStore,
         transport: any HTTPTransport = URLSessionTransport(),
-        now: @escaping @Sendable () -> Date = { Date() }
+        now: @escaping @Sendable () -> Date = { Date() },
+        cleared: @escaping @Sendable () -> Bool = { true }
     ) {
         (self.cognito, self.store, self.transport, self.now) = (cognito, store, transport, now)
+        self.cleared = cleared
     }
 
     /// Runs `action` after every token but one the engine's `refresh` asked for — a sign-in, a
@@ -229,8 +237,15 @@ public actor SignIn: TokenProvider {
 
     /// The access token to send now. Nil when nobody is signed in, when the Keychain cannot be read
     /// right now (the phone locked), when an expired one could not be renewed — never a sign-out,
-    /// and never a token it knows has expired — and once the API has deleted the account (C4).
+    /// and never a token it knows has expired — once the API has deleted the account (C4), and
+    /// while the phone's 13+ check has not passed (`cleared`).
     public func accessToken() async -> String? {
+        cleared() ? await deletionToken() : nil
+    }
+
+    /// An account deletion's token (`TokenProvider.deletionToken`): the access token, the 13+ check
+    /// passed or not.
+    public func deletionToken() async -> String? {
         guard let tokens = current(), tokens.deleted != true else { return nil }
         if now() < tokens.until { return tokens.access }
         return await renew(telling: true) ? self.tokens?.access : nil

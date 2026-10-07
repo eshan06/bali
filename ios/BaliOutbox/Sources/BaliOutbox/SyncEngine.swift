@@ -620,6 +620,11 @@ public actor SyncEngine {
     /// What the student does while it runs, or while DeleteUser waits — a tap, Back to focus, a
     /// join, a rename — is C4b's to keep from happening: none reaches an account the server keeps,
     /// and an Emergency Unlock made under such a tap would wait for the next sign-in.
+    ///
+    /// Everything it sends goes under the sign-in's deletion token (`APIClient.forDeletion`), given
+    /// whether or not the phone's 13+ check has passed: the gap's fallback (C7), a sign-in made
+    /// around the question and answered under 13, deletes its account by these same steps, so
+    /// nothing it queued is ever filed under whoever signs in next.
     public func deleteAccount(_ signIn: SignIn) async -> AccountDeletion {
         if let deletion { return await deletion.value }
         let task = Task { await self.delete(signIn) }
@@ -765,7 +770,9 @@ public actor SyncEngine {
                 tried.insert(record.eventId)
                 state.sending.insert(record.eventId)
                 // No token, nothing went (the drain's rule): said as no answer, nothing settled.
-                guard let sent = await record.send(through: client), sent.noAnswer != .noToken else {
+                guard let sent = await record.send(through: client.forDeletion),
+                    sent.noAnswer != .noToken
+                else {
                     state.sending.remove(record.eventId)
                     break
                 }
@@ -797,7 +804,7 @@ public actor SyncEngine {
         let eventId = deletionId ?? EventID.mint(at: clock.now())
         deletionId = eventId
         return await Joining.send(renewing: refresh) {
-            await client.deleteMe(DeleteMeRequest(eventId: eventId))
+            await client.forDeletion.deleteMe(DeleteMeRequest(eventId: eventId))
         }
     }
 

@@ -8,6 +8,81 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-07** — **The app's Sign in & sign up, and the gap's fallback.** The owner approved the
+  [Sign in & sign up design](https://claude.ai/artifact/McyYhpX1UTq1nU6oCCwPwG) on 2026-10-06, with
+  five decisions. **(1)** A first launch opens on Sign in, titled "Sign up or sign in", with Sign up
+  filled (every student's first launch is a sign-up) and Sign in outlined. **(2)** Sign up asks the
+  13+ question where the phone has not passed it, shows the intro (its last button now Sign up),
+  then opens Cognito's sign-up page directly: the classic hosted UI's `/signup`, with the sign-in's
+  client, scope, redirect and PKCE challenge (dev's page opens with them, and its form posts every
+  one back). Sign up again in the same run goes straight to the page; closing a page lands on Sign
+  in. **(3)** Sign in opens Cognito's sign-in page directly: no question, no intro. **(4)** The gap's
+  fallback, below. **(5)** One call still opens every Cognito page (`Phone.signIn(through:)`), and
+  the rest of C7 stands: only "passed" is kept, never the date; never over a session; the shields'
+  screens first. **The gap:** Cognito's sign-in page has its own "Need an account? Sign up" link,
+  so a student who taps Sign in can make an account there and never see the question. The
+  stylesheet can't hide it: the link has no class of its own, its line shares
+  `.redirect-customizable` with "Forgot your password?", AWS lists no property that hides that
+  class and ignores keys outside its template, and the one stylesheet serves the portal's sign-in
+  too. Nothing else in today's setup closes it: self sign-up is one switch for the whole pool (off,
+  the app's own Sign up stops too), classic Cognito has no sign-up switch per app client, the page
+  opens in iOS's sign-in sheet, which the app can't reach into, and what comes back looks the same
+  for a new account and an old one. **So the fallback:** when any sign-in comes back to a phone
+  that has not passed the question, the question comes first, and the app makes no call to Bali's
+  API until it is answered, so Bali's server never stores an account that answers under 13. 13 or
+  older carries on as after any sign-in; under 13 deletes the account with Delete account's engine.
+  **How:** the gate is the token, not the loops: `SignIn.accessToken()` gives none while the phone's
+  own flag says not passed (`cleared`), one place every request the engine and the screens make goes
+  through, so no caller can be missed; a record waits as for any missing token, never dropped.
+  **Under 13, Delete account's own steps (C4), not a variant of them** (Claude Review's blocker on
+  this PR's first version, which sent nothing queued and left the outbox as it was): everything the
+  phone queued goes first, every Emergency Unlock first, and an unlock the server has not recorded
+  holds the deletion back (`unlockUnsent`), never let go; then `DELETE /v1/me`, then DeleteUser;
+  then the outbox lets go of the rest, as C4's does. All of it goes under the sign-in's deletion
+  token (`TokenProvider.deletionToken`, `APIClient.forDeletion`), which the gate gives whatever the
+  check, so Me's Delete account works on a phone the gate holds too; the fallback's own words are
+  the deletion's that an answer under 13 starts, never Me's, which a session's screens and the home
+  a standing not read keep reachable with the check not passed (santa's round 1). **Why not leave the queue for
+  the next sign-in:** the deletion takes the Cognito user with it, so the next sign-in on that phone
+  is always someone else, and every record left would be filed as theirs: a tap made from the home
+  a standing not read keeps would show a classmate tapped in, and an unlock would land as an orphan
+  against them, the student who pressed it with no record of it with their teacher. **Its cost,
+  plainly:** with nothing queued, as a sign-up made around the question comes back, the server never
+  sees the account: `DELETE /v1/me` looks its caller up and creates no one (`already_deleted`, a
+  test pins it). With something queued under a sign-in the server never saw, the first record sent
+  makes the account (the API makes a caller's row at its first request), and the deletion
+  de-identifies it a moment later, as C3 de-identifies any: no name, no Cognito subject. That edge
+  departs from the decision's "never stores": an Emergency Unlock is never discarded and never filed
+  under another account, so it can only land under its own, which then exists; the owner may rule
+  otherwise. A phone signed in on a build from before C7, held mid-session by the gate, gets C4's
+  promise whole: its Emergency Unlock reaches its teacher before the account goes. **Its screen:**
+  the canvas's words where the canvas drew them (deleting; a deletion that could not reach Bali,
+  "couldn't finish" with Try again alone; deleted, final for the run), under the stop screen's title
+  and on its gutter. A stop shows Back too while the shields are on, as C4b's stops do, since a
+  record the deletion sent first can put the phone back in its class and this screen covers Focus:
+  Back leads to Focus and its Emergency Unlock (santa's round 1). Every other stop as Me's says it,
+  in C4b's approved words and ways on, since one "check your connection" line misstated three of
+  them (Claude Review): a server's own answer to the deletion; an unsent Emergency
+  Unlock and an unread file with Try again; the account deleted and its sign-in not yet, said as
+  deleted, with Try again; a sign-in from before C4's scope and a teacher's account, which no try
+  fixes, with Back, which leaves to the stop screen for the run, and a reopened app asks again. C4b's
+  own screens keep their approved look: the gutter is the fallback's alone. Known misfit: C4b's line
+  for a sign-in from before C4's scope says to sign out and sign in again, which the stop screen
+  doesn't offer; only a sign-in made on a build from before C4 (2026-10-05) can reach it there.
+  Nothing of the answer is kept, so a reopen while DeleteUser still waits (`DELETE /v1/me`
+  answered) finishes the deletion as Me's would, in C4b's words. **Weak spot, plainly:** weaker for COPPA than hiding the link,
+  since Cognito already holds the child's email and password when the question is asked. **Cost:**
+  the app can't tell a new account from an old one, so an existing student on a new or reset phone
+  answers once (the owner accepted it), and a phone signed in on a build from before C7 is asked at
+  its next launch out of a session, its API held until then. So an Emergency Unlock such a phone
+  makes in class waits in its outbox, never lost, and reaches the teacher only once the question is
+  answered, after the class: until then the teacher's grid shows the student focused (Claude
+  Review). Letting an unlock through the gate would make the account the gate keeps from the
+  server, so that is the owner's ruling, not a code fix. **Open:** C7-server (PLAN), a
+  per-account flag the server keeps so the app asks only a new account. **Two PRs**, the work past
+  the ~400-line step size: the fallback first, so the gap is never open on `main` without it, then
+  the Sign in screen and the sign-up path.
+
 - **2026-10-07** — **The portal is always light (the owner: "remove dark mode for now. just leave it
   at always light"), and PB5's three review fixes.** The portal stops following the device's dark
   mode, like the app: `globals.css` declares `color-scheme: light`, so native controls and

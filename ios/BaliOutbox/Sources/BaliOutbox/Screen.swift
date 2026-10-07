@@ -25,7 +25,8 @@ public enum Screen: Sendable, Hashable {
     /// before everything but a start that failed — nothing else is offered from the press to the
     /// end; `age`, the 13+ check's answer (C7) — its question in place of Sign in once Sign in
     /// was pressed with it not passed (the owner's decision, 2026-10-06), the stop screen there
-    /// once answered under 13; `introSeen`, the phone's own flag (C1);
+    /// once answered under 13, and, signed in with it not passed, the question before anything
+    /// but a session's screens; `introSeen`, the phone's own flag (C1);
     /// `signedIn`, nil until the Keychain could be read;
     /// `protection`, what rule 3's check found, nil until the enforcer runs and unchecked until its
     /// first pass; `everApproved`, whether a pass has ever read the permission approved (C1b) —
@@ -71,13 +72,27 @@ public enum Screen: Sendable, Hashable {
             return (.starting, false)
         }
         // Signed out: Sign in — or, pressed with the 13+ check not passed (C7), its question in
-        // place, and the stop screen once answered under 13. Here alone, so a student signed in
-        // never sees either, and the shields' screens above keep Emergency Unlock before them.
+        // place, and the stop screen once answered under 13. The shields' screens above keep
+        // Emergency Unlock before them.
         if !signedIn {
             switch age {
             case .asked: return (.age, false)
             case .tooYoung: return (.tooYoung, false)
             case .unanswered, .passed: return (.signIn, false)
+            }
+        }
+        // Signed in on a phone that has not passed the check (the gap's fallback, the owner's
+        // decision 2026-10-06): a sign-in Cognito's own pages made around the question gets it
+        // first, before Screen Time, Join or Home, and reaches Bali's API with nothing until it is
+        // answered (`SignIn`'s `cleared`). Never over a session's screens — one whose bell has not
+        // rung, or past it with Session over not closed — nor the home a standing not read keeps.
+        if age != .passed {
+            switch sync.standing {
+            case .inSession(let session, _)
+            where session.endsAt > now || !session.rings(as: sessionOverClosed):
+                break
+            case .unread: break
+            case .inSession, .waiting, .out: return (age == .tooYoung ? .tooYoung : .age, false)
             }
         }
         let joinFirst = hasClasses == false && !everInClass

@@ -78,8 +78,11 @@ public enum Deleting: Sendable, Hashable {
         }
     }
 
-    /// The engine's answer to the deletion under way; one to no deletion is dropped.
-    public mutating func answered(_ answer: AccountDeletion) {
+    /// The engine's answer to the deletion under way; one to no deletion is dropped. The gap's
+    /// fallback's (`underThirteen`: a sign-in around the 13+ question, answered under 13) says one
+    /// that could not reach Bali in the approved canvas's words, under the stop screen's title;
+    /// every other stop as Me's says it, its words and its way on.
+    public mutating func answered(_ answer: AccountDeletion, underThirteen: Bool = false) {
         guard case .busy = self else { return }
         switch answer {
         case .deleted: self = .done
@@ -94,6 +97,8 @@ public enum Deleting: Sendable, Hashable {
         case .unlockUnsent:
             self = .stopped(title: Self.notFinished, why: Self.unlockUnsent, retries: true)
         case .unread: self = .stopped(title: Self.notFinished, why: Self.unread, retries: true)
+        case .notDeleted(.networkError) where underThirteen:
+            self = .stopped(title: AgeCheck.notYet, why: Self.unfinished, retries: true)
         case .notDeleted(let result):
             self = .stopped(title: Self.notFinished, why: Joining.words(result, nil), retries: true)
         }
@@ -141,6 +146,18 @@ public enum Deleting: Sendable, Hashable {
         }
     }
 
+    /// What its screen says for the gap's fallback (the owner's words, 2026-10-06): a sign-in made
+    /// around the 13+ question and answered under 13, its account deleted as this deletes one —
+    /// the stop screen's title over the deletion under way and done, final for the run; a stop, or
+    /// its sign-in still to go, as `said` says it; nil while no screen shows.
+    public var saidUnderThirteen: (title: String, body: String)? {
+        switch self {
+        case .busy: (AgeCheck.notYet, "Bali is deleting your account. This takes a moment.")
+        case .done: (AgeCheck.notYet, "Bali deleted your account. " + AgeCheck.askTeacher)
+        case .none, .asking, .stopped, .pending: said
+        }
+    }
+
     /// The question asked under Me's button (the owner's words, 2026-10-05).
     public static let question = "Delete your account?"
     public static let consequence =
@@ -152,6 +169,10 @@ public enum Deleting: Sendable, Hashable {
     /// The title of every other stop: a deletion sent by a try before, its answer lost, may have
     /// landed (C4a), so this claims neither.
     public static let notFinished = "Bali couldn't finish deleting your account"
+    /// The gap's fallback's line for a deletion that could not reach Bali, under the stop screen's
+    /// title.
+    static let unfinished =
+        "Bali couldn't finish deleting your account. Check your connection and try again."
 
     /// The sign-in was made before the phone asked for the scope Cognito's DeleteUser needs: a
     /// fresh one first. Nothing sent, nothing deleted.

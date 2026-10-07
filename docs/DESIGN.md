@@ -16,7 +16,8 @@ grep, 2026-10-05; a new one joins this list). In
 `Focus.swift`; `UnlockedWords` in `Unlocked.swift`; `ProtectionOffWords` in
 `ProtectionOff.swift`; History's row labels and refusals in `History.swift`;
 Me's name, leave and `SignOutWords` sentences in `Me.swift`; Delete account's
-question, its screen's titles and lines in `Deleting` (`Deletion.swift`); and the two
+question, its screen's titles and lines in `Deleting` (`Deletion.swift`), the gap's fallback's
+included; the 13+ stop screen's title and line in `AgeCheck` (`Age.swift`); and the two
 refusals `SyncEngine.swift` hands a screen ("Bali couldn't save your reason.
 Try again.", "Bali couldn't lock your apps. Try again."). In
 `apps/web/src/lib`: `errors.ts`; `grid-state.ts` (the grid's notes and
@@ -50,7 +51,10 @@ pick on the
 (2026-10-04; `docs/DECISIONS.md`, 2026-10-05): its B artboards and its answers
 to Q2–Q7 are the reference for what this file says about it. The approved
 screen designs win over both for the screens they draw: D1 for the student app
-(`docs/PLAN.md`), and for the portal the four canvases below. Changing any of
+(`docs/PLAN.md`), with the app's
+[Sign in & sign up](https://claude.ai/artifact/McyYhpX1UTq1nU6oCCwPwG) for Sign in, the 13+
+question, the intro and the gap's fallback (the owner, 2026-10-06; drawn in D1's look), and for
+the portal the four canvases below. Changing any of
 it is the owner's call, never a side effect of a PR: every user-facing screen
 is designed in Claude Design and approved by the owner before it is built
 (CLAUDE.md, Working rules).

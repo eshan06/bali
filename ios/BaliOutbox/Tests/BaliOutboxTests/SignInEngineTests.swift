@@ -57,13 +57,16 @@ struct SignedRig {
     let keychain = MemoryKeychain()
     let running: Task<Void, Never>
 
-    init() async throws {
+    /// `cleared`, the sign-in's: whether the phone's 13+ check has passed (C7's fallback).
+    init(cleared: @escaping @Sendable () -> Bool = { true }) async throws {
         outbox = try makeOutbox().outbox
         let cognito = Cognito(
             domain: URL(string: "https://bali-dev.auth.us-east-1.amazoncognito.com")!,
             clientId: "phone-client", redirectURI: URL(string: "bali://auth/callback")!)
         let clock = clock
-        signIn = SignIn(cognito: cognito, store: keychain, transport: server, now: { clock.now() })
+        signIn = SignIn(
+            cognito: cognito, store: keychain, transport: server, now: { clock.now() },
+            cleared: cleared)
         let engine = await SyncEngine.make(
             outbox: outbox, api: URL(string: "https://api.bali.test")!, signIn: signIn,
             transport: server, clock: clock)

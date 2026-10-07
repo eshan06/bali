@@ -94,7 +94,7 @@ struct ScreenTests {
     }
 
     @Test(
-        "The 13+ check (C7) is asked at Sign in (the owner's decision, 2026-10-06): a first launch opens on the intro, never the question, whatever the answer; signed out, Sign in until it is pressed with the check not passed, then the question in its place, and the stop screen there once answered under 13 this run; a student signed in never sees either, whatever the answer; and never over a session's screens: the shields on are Focus, and the home a standing not read keeps holds Emergency Unlock, before either. No tab bar on either screen"
+        "The 13+ check (C7) is asked at Sign in (the owner's decision, 2026-10-06): a first launch opens on the intro, never the question, whatever the answer; signed out, Sign in until it is pressed with the check not passed, then the question in its place, and the stop screen there once answered under 13 this run; a student signed in past it never sees either; and never over a session's screens: the shields on are Focus, and the home a standing not read keeps holds Emergency Unlock, before either. No tab bar on either screen"
     )
     func ageAtSignIn() throws {
         let (outbox, _) = try makeOutbox()
@@ -106,12 +106,12 @@ struct ScreenTests {
                 screen(age: age, introSeen: false, signedIn: nil, permission: nil, standing: nil)
                     == .intro, "\(age)")
             #expect(screen(age: age, signedIn: nil) == .starting, "\(age)")
-            #expect(screen(age: age) == .home, "\(age)")
-            #expect(screen(age: age, standing: .waiting) == .waiting, "\(age)")
-            #expect(screen(age: age, standing: .inSession(session(), .unlocked)) == .unlocked)
-            #expect(screen(age: age, permission: .denied) == .screenTime, "\(age)")
-            #expect(screen(age: age, hasClasses: false) == .join, "\(age)")
         }
+        #expect(screen() == .home)
+        #expect(screen(standing: .waiting) == .waiting)
+        #expect(screen(standing: .inSession(session(), .unlocked)) == .unlocked)
+        #expect(screen(permission: .denied) == .screenTime)
+        #expect(screen(hasClasses: false) == .join)
         let gates: [(AgeCheck.Answer, Screen)] = [
             (.unanswered, .signIn), (.passed, .signIn), (.asked, .age), (.tooYoung, .tooYoung),
         ]
@@ -137,6 +137,58 @@ struct ScreenTests {
                 hasClasses: true, sessionOverClosed: nil, opened: [], tab: .history, now: t0)
             #expect(shown.screen == gate && !shown.tabbed, "\(age)")
         }
+    }
+
+    @Test(
+        "Signed in on a phone that has not passed the 13+ check — a sign-in Cognito's own pages made around the question, the gap's fallback (the owner's decision, 2026-10-06) — the question comes first: in Home's place, Waiting's, Screen Time's and Join's, over a Join or a tab opened, after the bell once Session over is closed; the stop screen there once answered under 13. Never over a session's screens: the shields' Focus, Unlocked, Protection off, Session over not closed, nor the home a standing not read keeps; Delete account's screen and a start that failed come first. No tab bar; passed, none of it"
+    )
+    func ageAfterSignIn() throws {
+        let (outbox, _) = try makeOutbox()
+        try record(outbox, .tap(tagId: "tag"))
+        let held = try outbox.records()
+        let (rung, ended) = (Standing.inSession(session(), .focused), at(3000))
+        for (age, asked) in [
+            (AgeCheck.Answer.unanswered, Screen.age), (.asked, .age), (.tooYoung, .tooYoung),
+        ] {
+            #expect(screen(age: age) == asked, "\(age)")
+            #expect(screen(age: age, standing: .waiting) == asked, "\(age)")
+            #expect(screen(age: age, permission: .denied) == asked, "\(age)")
+            #expect(screen(age: age, permission: .notDetermined) == asked, "\(age)")
+            #expect(screen(age: age, hasClasses: false) == asked, "\(age)")
+            #expect(screen(age: age, everInClass: true, hasClasses: true) == asked, "\(age)")
+            #expect(screen(age: age, opened: [.join], tab: .me) == asked, "\(age)")
+            #expect(
+                screen(age: age, standing: rung, sessionOverClosed: session(), now: ended) == asked)
+            // Never over a session's screens, the shields' or the last run's.
+            #expect(screen(age: age, standing: rung) == .focus, "\(age)")
+            #expect(screen(age: age, queued: held) == .focus, "\(age)")
+            #expect(screen(age: age, shielded: true, standing: .unread) == .home, "\(age)")
+            #expect(screen(age: age, standing: .unread) == .home, "\(age)")
+            #expect(screen(age: age, standing: .inSession(session(), .unlocked)) == .unlocked)
+            let off = Standing.inSession(session(), .protectionOff)
+            #expect(screen(age: age, permission: .denied, standing: off) == .protectionOff)
+            #expect(screen(age: age, standing: rung, now: ended) == .sessionOver, "\(age)")
+            #expect(
+                screen(age: age, permission: .denied, standing: rung, now: ended) == .screenTime)
+            #expect(screen(deleting: true, age: age) == .deleting, "\(age)")
+            #expect(screen(problem: "why", age: age) == .storage("why"), "\(age)")
+            #expect(screen(age: age, signedIn: nil) == .starting, "\(age)")
+            // Those keep their own ways on, a tab among them: Me's Delete account is reachable
+            // there, so the fallback's deletion is the one an answer under 13 starts, never any
+            // made with the check not passed (santa's round 1).
+            let unlocked = Standing.inSession(session(), .unlocked)
+            #expect(screen(age: age, standing: unlocked, opened: [.home], tab: .me) == .me)
+            #expect(screen(age: age, standing: .unread, tab: .me) == .me, "\(age)")
+            var (protection, out) = (Protection(), SyncState())
+            (protection.checked, protection.permission, out.standing) = (true, .approved, .out)
+            let shown = Screen.choose(
+                problem: nil, deleting: false, age: age, introSeen: true, signedIn: true,
+                protection: protection, everApproved: false, everInClass: true, sync: out,
+                hasClasses: true, sessionOverClosed: nil, opened: [], tab: .history, now: t0)
+            #expect(shown.screen == asked && !shown.tabbed, "\(age)")
+        }
+        #expect(screen(age: .passed) == .home)
+        #expect(screen(age: .passed, hasClasses: false) == .join)
     }
 
     @Test("The app could not start: storage, with why, over everything else")
