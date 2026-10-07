@@ -80,4 +80,7 @@ test("the Dockerfile's CMD migrates, then execs the server, through a shell", ()
   assert.deepEqual(cmds, [
     'CMD ["sh", "-c", "npm run migrate && cd apps/api && exec node --import tsx src/server.ts"]',
   ]);
+  // The CMD runs what `npm start` runs, minus the wrapper; a changed start script fails here.
+  const api = JSON.parse(readFileSync(new URL('../../apps/api/package.json', import.meta.url)));
+  assert.equal(api.scripts.start, 'tsx src/server.ts');
 });

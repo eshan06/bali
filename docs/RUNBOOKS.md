@@ -804,7 +804,8 @@ matched to what the service should have.
    session: "P8: check this plan for dev." If it refuses because the service still reads a
    config file (it "is already managed by railway.json", or similar): the service →
    **Settings** → the **Config File** / config-as-code path *(wording unsure)* → clear it,
-   then plan again.
+   then plan again. `railway.json` is deleted now, so a service whose Config File still
+   names it reads a missing file: clear that setting the same way.
    **Check:** the session says it's clean (the stop list above).
 3. **Apply.** `railway config apply`. It plans again and asks: confirm only if what it
    shows matches what the session checked.
