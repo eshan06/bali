@@ -29,12 +29,13 @@ public struct Cognito: Sendable, Hashable {
         (self.domain, self.clientId, self.redirectURI) = (domain, clientId, redirectURI)
     }
 
-    /// The hosted UI's sign-in page for `attempt`: its challenge and state, never its verifier. Its
+    /// The hosted UI's `page` for `attempt`: its challenge and state, never its verifier. Its
     /// scopes are OpenID's and the one Cognito's DeleteUser needs (C4), which the phone's app client
-    /// must allow, or the sign-in is refused.
-    func authorizeURL(_ attempt: Attempt) -> URL? {
+    /// must allow, or the sign-in is refused. The sign-up page takes the sign-in's parameters as
+    /// they are, so a new account comes back at the same redirect, for the same attempt.
+    func authorizeURL(_ attempt: Attempt, page: HostedPage = .signIn) -> URL? {
         URL(
-            string: endpoint("oauth2/authorize") + "?"
+            string: endpoint(page == .signUp ? "signup" : "oauth2/authorize") + "?"
                 + form([
                     ("response_type", "code"), ("client_id", clientId),
                     ("redirect_uri", redirectURI.absoluteString),
@@ -63,6 +64,13 @@ public struct Cognito: Sendable, Hashable {
         while root.hasSuffix("/") { root.removeLast() }
         return root + "/" + path
     }
+}
+
+/// Which of the hosted UI's pages a sign-in opens (the approved Sign in & sign up design): its
+/// sign-in page, or its sign-up page — the classic hosted UI's `/signup` — where a new account is
+/// made, which then answers as the sign-in page does.
+public enum HostedPage: Sendable, Hashable {
+    case signIn, signUp
 }
 
 /// One sign-in attempt's secrets (RFC 7636): the verifier, which leaves the phone only for the
@@ -262,17 +270,17 @@ public actor SignIn: TokenProvider {
     }
 
     /// Signs the student in through Cognito's hosted UI, replacing any tokens the phone had.
-    /// `browser` opens the sign-in page and returns where the hosted UI sent the student back —
-    /// C1's ephemeral `ASWebAuthenticationSession` — or throws why it did not, in its own words:
-    /// the student's close `cancelled`, anything else `notOpened`; the code in that answer is
-    /// exchanged for tokens.
-    public func signIn(through browser: @Sendable (URL) async throws(SignInError) -> URL)
-        async throws(SignInError)
-    {
+    /// `browser` opens `page` — the sign-in page, or the sign-up page, whose new account comes back
+    /// signed in — and returns where the hosted UI sent the student back — C1's ephemeral
+    /// `ASWebAuthenticationSession` — or throws why it did not, in its own words: the student's
+    /// close `cancelled`, anything else `notOpened`; the code in that answer is exchanged for tokens.
+    public func signIn(
+        _ page: HostedPage = .signIn, through browser: @Sendable (URL) async throws(SignInError) -> URL
+    ) async throws(SignInError) {
         let attempt = Attempt()
         // It cannot fail — the domain is a URL and the rest is escaped — but were it to, nothing
         // is sent.
-        guard let url = cognito.authorizeURL(attempt) else { throw .unreachable }
+        guard let url = cognito.authorizeURL(attempt, page: page) else { throw .unreachable }
         let callback = try await browser(url)
         let code = try cognito.code(from: callback, for: attempt)
         let grant = try await exchange([

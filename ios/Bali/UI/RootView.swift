@@ -53,7 +53,7 @@ struct RootView: View {
             }
         case .age: AgeView(phone: phone)
         case .tooYoung: TooYoungView()
-        case .intro: IntroView { phone.sawIntro() }
+        case .intro: IntroView(phone: phone)
         case .signIn: SignInView(phone: phone)
         case .screenTime: ScreenTimeView(phone: phone)
         case .join: JoinView(phone: phone)

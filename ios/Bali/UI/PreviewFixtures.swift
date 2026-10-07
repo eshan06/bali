@@ -9,7 +9,8 @@
     /// syncs or shields, and its Try again does nothing. Debug builds only.
     enum PreviewFixtures {
         /// What `Phone` publishes, as a fixture has it: the 13+ check passed with nothing picked on
-        /// its screen (C7), signed in, the permission approved, out of
+        /// its screen (C7), the intro seen and not shown, no Cognito page opening or failed, signed
+        /// in, the permission approved, out of
         /// any session and in two classes, no ask for the permission failed, nothing typed to join,
         /// no screen opened over another, Home's tab chosen and no history read, no name being
         /// edited, no sign-out failed, no class being left, no account being deleted, no reason
@@ -20,6 +21,10 @@
             var age = AgeCheck.Answer.passed
             var birth = Birth()
             var introSeen = true
+            var introShows = false
+            var signingIn = false
+            var hostedPage = HostedPage.signIn
+            var signInFailed: SignInError?
             var signedIn: Bool? = true
             var protection: Protection? = permission(.approved)
             var sync: SyncState? = standing(.out)
@@ -57,8 +62,20 @@
                 age: .tooYoung, sync: waitingOnSignIn(standing(.out, me: nil)),
                 deleting: stopped(.notDeleted(.networkError), underThirteen: true)),
             "deletingUnderThirteenDone": State(age: .tooYoung, signedIn: false, deleting: .done),
-            "intro": State(introSeen: false),
+            // Sign up (the approved Sign in & sign up design): the intro it shows, the 13+ check
+            // passed, and its last page's Sign up opening the page (`-bali-intro-page 2`).
+            "intro": State(introSeen: false, introShows: true, signedIn: false),
+            "introSigningUp": State(
+                introShows: true, signingIn: true, hostedPage: .signUp, signedIn: false),
+            // Sign in, as a first launch opens it; each button's page opening; and each page that
+            // could not open, said under the buttons.
             "signIn": State(age: .unanswered, signedIn: false),
+            "signInSigningIn": State(age: .unanswered, signingIn: true, signedIn: false),
+            "signInSigningUp": State(signingIn: true, hostedPage: .signUp, signedIn: false),
+            "signInNotOpened": State(
+                age: .unanswered, signInFailed: .notOpened("no window"), signedIn: false),
+            "signInSignUpNotOpened": State(
+                hostedPage: .signUp, signInFailed: .notOpened("no window"), signedIn: false),
             "screenTime": State(protection: permission(.notDetermined)),
             "screenTimeDenied": State(protection: permission(.denied)),
             "screenTimeError": State(

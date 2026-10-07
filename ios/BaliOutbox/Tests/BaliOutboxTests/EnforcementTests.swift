@@ -1506,7 +1506,7 @@ struct LaunchGraceTests {
         for claim in await claims.value where claim.checked {
             #expect(!claim.permissionOff)
             let shown = Screen.choose(
-                problem: nil, deleting: false, age: .passed, introSeen: true, signedIn: true, protection: claim,
+                problem: nil, deleting: false, age: .passed, intro: false, signedIn: true, protection: claim,
                 everApproved: true, everInClass: true, sync: sync, hasClasses: true,
                 sessionOverClosed: nil, opened: [], tab: .home, now: rig.clock.now())
             #expect(shown.screen == (standing == .out ? .home : .focus))

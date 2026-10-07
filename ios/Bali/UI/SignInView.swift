@@ -3,17 +3,20 @@ import BaliCore
 import BaliOutbox
 import SwiftUI
 
-/// Sign in (D1's Main artboard; C1a), shown until someone is signed in: Cognito's hosted UI in an
-/// ephemeral browser session — no cookie kept, so a sign-out asks the password again — through
-/// `Phone.signIn`, which asks the 13+ check first where it has not passed (C7). A sign-in that did
-/// not finish is said under the button, in `SignInError.words` (rule 5); one the student closed
-/// changed nothing, and says nothing. Under its caption, the portal's privacy policy and terms
+/// Sign in (C1a; the approved Sign in & sign up design), a first launch's screen and shown until
+/// someone is signed in: Sign up, filled, and Sign in, outlined — each Cognito's hosted UI in an
+/// ephemeral browser session (no cookie kept, so a sign-out asks the password again) through
+/// `Phone.signIn`, the one gate, which asks the 13+ check and shows the intro first for Sign up.
+/// While a page opens its button says so, and neither takes a press. A page that did not finish
+/// is said under the buttons, in `SignInError.words` (rule 5); one the student closed changed
+/// nothing, and says nothing. Under its caption, the portal's privacy policy and terms
 /// (`PolicyLinks`, C2b).
 struct SignInView: View {
     let phone: Phone
     @Environment(\.webAuthenticationSession) private var browser
 
     var body: some View {
+        let opening = phone.signingIn ? phone.hostedPage : nil
         ScreenScaffold {
             PageScroll {
                 VStack(alignment: .leading, spacing: 0) {
@@ -21,20 +24,23 @@ struct SignInView: View {
                     VStack(alignment: .leading, spacing: 24) {
                         BaliMark(size: 72)
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Sign in").textStyle(.h1)
-                            Text(
-                                "Use the account your school gave you. You only do this once. After that, Bali remembers you."
-                            )
-                            .textStyle(.bodyLg).foregroundStyle(Theme.textSecondary)
+                            // Each way's two words kept on one line, as the canvas keeps them.
+                            Text("Sign\u{A0}up or sign\u{A0}in").textStyle(.h1)
+                            Text("You only do this once. After that, Bali remembers you.")
+                                .textStyle(.bodyLg).foregroundStyle(Theme.textSecondary)
                         }
                     }
                     Spacer()
                     VStack(spacing: 12) {
-                        Button(phone.signingIn ? "Signing in…" : "Sign in") {
-                            Task { await phone.signIn(through: browser.hostedUI) }
+                        Button(opening == .signUp ? "Signing up…" : "Sign up") {
+                            Task { await phone.signIn(.signUp, through: browser.hostedUI) }
                         }
-                        .buttonStyle(PrimaryButtonStyle()).disabled(phone.signingIn)
-                        if let failure = phone.signInFailed?.words {
+                        .buttonStyle(PrimaryButtonStyle()).disabled(opening != nil)
+                        Button(opening == .signIn ? "Signing in…" : "Sign in") {
+                            Task { await phone.signIn(.signIn, through: browser.hostedUI) }
+                        }
+                        .buttonStyle(SecondaryButtonStyle()).disabled(opening != nil)
+                        if let failure = phone.signInFailed?.words(on: phone.hostedPage) {
                             Text(failure).textStyle(.body)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }

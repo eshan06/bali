@@ -175,6 +175,14 @@ struct SignInTests {
                 + "&scope=openid%20email%20profile%20aws%2Ecognito%2Esignin%2Euser%2Eadmin"
                 + "&state=st&code_challenge=\(rfcChallenge)&code_challenge_method=S256")
         #expect(!url.absoluteString.contains(rfcVerifier))
+        // The sign-up page (the approved Sign in & sign up design): the classic hosted UI's own,
+        // given the sign-in page's parameters as they are, so it answers at the same redirect.
+        let signUp = try #require(
+            cognito.authorizeURL(Attempt(verifier: rfcVerifier, state: "st"), page: .signUp))
+        #expect(
+            signUp.absoluteString
+                == url.absoluteString.replacingOccurrences(of: "/oauth2/authorize?", with: "/signup?"))
+        #expect(signUp.path() == "/signup")
         // A domain set with a trailing slash names the same endpoints.
         let slashed = Cognito(
             domain: try #require(URL(string: "https://bali-dev.auth.us-east-1.amazoncognito.com/")),
@@ -244,6 +252,35 @@ struct SignInTests {
         #expect(await signIn.accessToken() == jwt("a1"))
         #expect(await first(signIn.signedIn()) == true)
         #expect(await told.count == 1)  // the engine sends what waited on the sign-in at once
+    }
+
+    @Test(
+        "a sign-up opens the hosted UI's sign-up page, and the new account it sends back is signed in as a sign-in's is: its code and verifier exchanged at the token endpoint, both tokens kept, the engine told (the approved Sign in & sign up design)"
+    )
+    func signUp() async throws {
+        let endpoint = TransportDouble { _ in
+            (200, Data(granted(jwt("a1"), refresh: "refresh-1").utf8))
+        }
+        let (store, told, opened) = (MemoryStore(), Told(), Opened())
+        let signIn = await signIn(store, endpoint, told: told)
+
+        try await signIn.signIn(.signUp) { url throws(SignInError) in
+            await opened.set(url)
+            return try await signsIn(url)
+        }
+
+        let page = try #require(await opened.url)
+        #expect(page.path() == "/signup")
+        let form = fields(try #require(await endpoint.sent.first).httpBody)
+        #expect(form["grant_type"] == "authorization_code" && form["code"] == "the-code")
+        let challenge = URLComponents(url: page, resolvingAgainstBaseURL: false)?.queryItems?
+            .first { $0.name == "code_challenge" }?.value
+        #expect(
+            challenge == Attempt(verifier: try #require(form["code_verifier"]), state: "").challenge
+        )
+        #expect(store.tokens?.access == jwt("a1") && store.tokens?.refresh == "refresh-1")
+        #expect(await signIn.accessToken() == jwt("a1"))
+        #expect(await told.count == 1)
     }
 
     @Test(

@@ -295,9 +295,10 @@ an archived class never reserves its code forever; a teacher can regenerate it (
   address, slowing requests down before ever blocking them (ISSUES.md #1).
 - **Under 13: not yet.** Accounts for young students carry legal requirements (parental
   consent). *Decided 2026-10-04 (C7, the owner's ruling; built 2026-10-05):* 13+ is the
-  school's agreement plus a neutral in-app age screen — shown when the student taps Sign in
-  with the check not passed on the phone, after the intro and before the sign-in page opens
-  (moved there 2026-10-06, the owner's decision), asking the birth month and year by the FTC's
+  school's agreement plus a neutral in-app age screen — shown when the student taps Sign up
+  with the check not passed on the phone, before the intro and Cognito's sign-up page (the
+  approved Sign in & sign up design, built 2026-10-07; at Sign in from 2026-10-06, a first
+  launch's first screen before that), asking the birth month and year by the FTC's
   COPPA guidance — that keeps one flag on the
   phone when the answer is 13 or older (never the date) and nothing at all when it is not: the
   student sees a stop screen, and the server never learns the question was asked. Under-13
@@ -813,13 +814,15 @@ never covers or delays Emergency Unlock, and its answers never enter the outbox.
   (b), a watchdog turning the shields off after a force-quit: iOS's coarse wake clock makes its
   honest promise "off within ~15 minutes", not instant.
 - **The 13+ check never stands between a student and Emergency Unlock** (C7, 2026-10-05; at
-  Sign in since 2026-10-06). The router shows the age screen, and the stop screen under 13
-  gets, in Sign in's place once Sign in was pressed with the check not passed, and, signed in on
+  Sign up since 2026-10-07). The router shows the age screen, and the stop screen under 13
+  gets, in Sign in's place once Sign up was pressed with the check not passed, and, signed in on
   a phone that has not passed it (the gap's fallback, 2026-10-06), before Screen Time, Join and
   Home. The shields' Focus and the home a standing not read keeps, which hold the exit, come
   before both, and so do a session's own screens: Unlocked, Protection off and Session over.
-  Every way to the hosted UI goes through one call (`Phone.signIn`), which asks the check first
-  where the app can. The sign-in gives Bali's API no token until the check has passed (`SignIn`'s
+  Every way to the hosted UI goes through one call (`Phone.signIn`), which, for the sign-up page,
+  asks the check first and then shows the intro where the phone has not seen it; the sign-in page
+  opens at once, and after an answer under 13 neither opens that run. A first launch opens on
+  Sign in. The sign-in gives Bali's API no token until the check has passed (`SignIn`'s
   `cleared`, read from the phone's own flag), but an account deletion's (`deletionToken`): Delete
   account's steps, the outbox and then `DELETE /v1/me`, go whether or not it has.
   The check counts in the Gregorian calendar whatever calendar the phone shows its dates in.
