@@ -8,6 +8,27 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-07** — **P8 closed: `.railway/railway.ts` is Railway's only config, the start
+  command lives only in the `Dockerfile`'s `CMD`, and `railway.json` is deleted.** The owner
+  applied the file to production and dev on 2026-10-06; both deploy, `/healthz` answers. What
+  the two applies taught, now rules: (1) **The start command is the image's `CMD`, never a
+  Railway setting.** `npm run migrate && npm start`, applied through IaC as the start command,
+  ran without a shell on this Dockerfile service, so only the migration ran and the API never
+  started; `railway.json`'s identical start command had worked, so what was observed is the
+  IaC/dashboard path, not a claim about every Railway start command. The rule stays: set none.
+  (2) **The `CMD` execs the server:** `sh -c "npm run migrate && cd apps/api && exec node
+  --import tsx src/server.ts"`. The shell runs the `&&`; `exec` replaces it with the server's
+  node process, so the API is PID 1 and gets Railway's SIGTERM. Before, `sh` was PID 1 and
+  ignored it, so a restart SIGKILLed the API mid-request and `makeShutdown` never ran (#278's
+  review). `node --import tsx` is what `npm start` runs (`tsx src/server.ts`) with no npm or
+  tsx wrapper process in the signal's way; tsx is a production dependency already. (3) **`source.checkSuites` (Wait for CI) must be declared:** left out, the
+  first production apply turned it off (#277). (4) **An apply resets every setting the file
+  leaves out**, so a setting changed in the dashboard goes into the file or the next apply
+  undoes it (runbook 8). (5) **No `cutover`:** CLI 5.63.1 has no `railway config migrate
+  cutover`; plan then apply worked without it, and a plan that refuses over a config-file path
+  is cleared in the dashboard. With both environments applied, `railway.json` and the test that
+  held it equal to the IaC are deleted.
+
 - **2026-10-06** — **PB3, the classes home, built to the Classes home canvas; three behaviour
   changes the design and the owner's rulings ask for.** (1) **The create's 409 for a teacher with
   no school is said as any create that failed** (`CANT_CREATE`), no longer as `NO_SCHOOL` (#260's

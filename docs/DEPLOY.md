@@ -9,21 +9,25 @@ also works on Render or plain Docker.
 ## What runs
 
 - **Build:** `docker build` → `npm ci` for the whole workspace, then the source.
-- **Release/start:** the image's `CMD`, `sh -c "npm run migrate && npm start"` (`Dockerfile`).
-  Neither config file sets a start command: Railway runs a Dockerfile service's start command
-  without a shell, so `&&` would end it after the migration (production, 2026-10-06). `migrate` applies the
+- **Release/start:** the image's `CMD`,
+  `sh -c "npm run migrate && cd apps/api && exec node --import tsx src/server.ts"`
+  (`Dockerfile`). The shell runs the `&&`; `exec` replaces it with the server's node process
+  (what `npm start` runs, in one process), so the API is PID 1 and Railway's SIGTERM reaches
+  its graceful shutdown. **Set no custom start command** in Railway: one applied through IaC
+  on this Dockerfile service ran without a shell, so only the migration ran and the API never
+  started (production, 2026-10-06; `railway.json`'s identical start command had worked). `migrate` applies the
   committed `packages/db/migrations` to `DATABASE_URL` using drizzle-orm's
   migrator (no drizzle-kit in production); it records and skips already-applied
   migrations, so it is safe to re-run.
 - **Health check:** `GET /healthz`.
-- **Where Railway gets these:** `railway.json` (Config as Code) today; P8 moves them to
-  `.railway/railway.ts` (Infrastructure as Code), which also holds the restart policy (on
-  failure, 3 retries). Railway stops reading `railway.json` on 2026-12-01. The `.ts` file
-  manages only the API's services, dev's `bali` and production's `bali prod`, scoped by the
-  named partial `bali-api`; it lists every variable as `preserve()` (values stay in
-  Railway); Railway never reads it on a deploy: the owner applies it with
-  `railway config apply` (`docs/RUNBOOKS.md`, runbook 8). Until the follow-up PR deletes
-  `railway.json`, change a setting in both files.
+- **Where Railway gets these:** `.railway/railway.ts` (Infrastructure as Code, P8; applied to
+  both environments 2026-10-06): the source (`main`, Wait for CI on), the Dockerfile build,
+  `/healthz`, and the restart policy (on failure, 3 retries). It manages only the API's
+  services, dev's `bali` and production's `bali prod`, scoped by the named partial
+  `bali-api`, and lists every variable as `preserve()` (values stay in Railway). Railway
+  never reads it on a deploy: the owner plans and applies it by hand (`docs/RUNBOOKS.md`,
+  runbook 8). An apply resets any setting the file leaves out, so a setting changed in the
+  dashboard goes into the file too, or the next apply undoes it.
 - **Sweep:** the API runs it itself every minute — the tick that expires ended
   sessions and opens silence episodes for phones gone quiet (hosting decision 3).
   A scheduled `POST /internal/sweep` with the `x-internal-key` header (step 4
@@ -76,10 +80,10 @@ check after each.
    Railway's backups need its **Pro** plan: on Hobby there are none, and prod runs
    without them for the Vanderbilt pilot (the owner's ruling, 2026-10-05;
    `docs/RUNBOOKS.md`, runbook 1, step 4).
-3. **Deploy the service** — connect this repo; Railway reads `railway.json` and
-   builds from the `Dockerfile`. Set all environment variables above. Once P8 is applied
-   (runbook 8), a new service takes its settings from `.railway/railway.ts` instead: add
-   its environment and service name to `SERVICE_BY_ENVIRONMENT` there, plan, then apply.
+3. **Deploy the service** — connect this repo. Its settings come from
+   `.railway/railway.ts`: add the environment and service name to `SERVICE_BY_ENVIRONMENT`
+   there (a PR), then plan and apply (runbook 8); it builds from the `Dockerfile`. Set all
+   environment variables above.
 4. **Sweep cron, the backup** — the API sweeps every minute by itself; add a
    Railway cron that runs **every 5 minutes** (`*/5 * * * *`) and POSTs to
    `/internal/sweep` with `x-internal-key: $INTERNAL_API_KEY`, so sessions still
