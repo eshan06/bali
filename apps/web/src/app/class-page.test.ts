@@ -43,7 +43,13 @@ describe('the class page before its class is read', () => {
     expect(page).toMatch(
       /\{klass === null && error \? null : \(\s*<section\s+aria-labelledby=\{`\$\{id\}-roster`\}/,
     );
-    // The line under the header is for a class that loaded and a read that didn't.
-    expect(page).toMatch(/\{error && klass \? \(/);
+  });
+
+  it('keeps a roster that didn’t load out of the class’s card: said under the header', () => {
+    // Only the class's own read sets `error`, so a roster failing first never says the class
+    // failed while it is still on its way (santa's review).
+    expect(page.match(/setError\(errText\(e\)\)/g)).toHaveLength(1);
+    expect(page).toMatch(/\/roster`\)\s*\.then\(setRoster, \(e: unknown\) => setRosterError\(/);
+    expect(page).toMatch(/\{klass && \(error \?\? rosterError\) \? \(/);
   });
 });

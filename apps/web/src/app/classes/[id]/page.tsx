@@ -79,8 +79,10 @@ export default function ClassDetailPage() {
   const [grid, setGrid] = useState<{ id: string; over: boolean; endsAt: string | null } | null>(
     null,
   );
-  // The class or its roster didn't load: said under the name, with Try again.
+  // The class didn't load: said in the session's place, with Try again. Its roster didn't, or a
+  // read again of the class failed: said under the header, with Try again.
   const [error, setError] = useState<string | null>(null);
+  const [rosterError, setRosterError] = useState<string | null>(null);
   // Which send is under way, if any: every control holds while one is, and only a Start's own
   // button says "Starting…" (an End's answer can come after the grid already says it ended).
   const [busy, setBusy] = useState<'start' | 'end' | 'extend' | null>(null);
@@ -109,6 +111,7 @@ export default function ClassDetailPage() {
 
   const load = useCallback(() => {
     setError(null);
+    setRosterError(null);
     api.get<ClassDetail>(`/v1/classes/${classId}`).then(
       (c) => {
         setKlass(c);
@@ -125,7 +128,7 @@ export default function ClassDetailPage() {
     );
     api
       .get<RosterResponse>(`/v1/classes/${classId}/roster`)
-      .then(setRoster, (e: unknown) => setError(errText(e)));
+      .then(setRoster, (e: unknown) => setRosterError(errText(e)));
   }, [api, classId]);
 
   useEffect(() => {
@@ -337,10 +340,11 @@ export default function ClassDetailPage() {
       </header>
 
       {/* The class is read and its roster isn't (or a read again failed): said under the header. */}
-      {error && klass ? (
+      {klass && (error ?? rosterError) ? (
         <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-3">
           <p role="alert" className="text-body">
-            Couldn&apos;t load this class. <span className="text-text-secondary">{error}</span>
+            Couldn&apos;t load this class.{' '}
+            <span className="text-text-secondary">{error ?? rosterError}</span>
           </p>
           <Button variant="secondary" onClick={load}>
             Try again
@@ -540,9 +544,9 @@ export default function ClassDetailPage() {
           <h2 id={`${id}-roster`} className="text-h2">
             Roster
           </h2>
-          {/* Unread, it says so under the class's name with Try again, never "Loading…" here. */}
+          {/* Unread, it says so under the header with Try again, never "Loading…" here. */}
           {roster === null ? (
-            error ? null : (
+            rosterError ? null : (
               <p role="status" className="mt-4 text-body text-text-secondary">
                 Loading…
               </p>
