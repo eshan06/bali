@@ -228,6 +228,8 @@ export interface Timeline {
   moments: Moment[];
   /** Who joined, in R2's order; then anyone else with an unlock or protection off there. */
   rows: { key: string; name: string; marks: Mark[] }[];
+  /** How many of `rows`, from the first, joined: the rest never did, so no one calls them so. */
+  joined: number;
   ticks: { x: number; label: string }[];
   /** The gap between ticks, in percent of the axis: a gridline each. */
   step: number;
@@ -276,6 +278,7 @@ export function sessionTimeline(
   const found = new Map(
     report.joined.map((s) => [s.id, [] as { e: FeedEvent; moment: Moment; at: number }[]]),
   );
+  const joined = found.size;
   // Its student has a row, joined or not.
   for (const e of feed) {
     const counted = e.type === 'unlock' || e.type === 'protection_off';
@@ -317,6 +320,7 @@ export function sessionTimeline(
   return {
     moments: MOMENTS.filter((m) => all.some((f) => f.moment === m)),
     rows,
+    joined,
     ...axis(start, end, clock),
   };
 }

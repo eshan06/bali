@@ -139,3 +139,58 @@ describe('the session’s timeline', () => {
     expect(render()).not.toContain('shadow-2');
   });
 });
+
+describe('who joined, and who didn’t (PB5’s review)', () => {
+  // Ines unlocked without tapping in: R2 lists her unlock, and not her among who joined.
+  const ines: ReportStudent = { id: 'u3', displayName: 'Ines Moreau' };
+  const unjoined = {
+    ...REPORT,
+    unlocks: [
+      ...REPORT.unlocks,
+      {
+        eventId: 'e4',
+        student: ines,
+        occurredAt: AT(41),
+        reason: 'nurse' as const,
+        recordedAs: 'no_live_participation' as const,
+      },
+    ],
+  };
+  const events = [
+    ...EVENTS,
+    {
+      ...feed(4, 'unlock', ines.id, 41),
+      payload: { reason: 'nurse', recorded_as: 'no_live_participation' },
+    },
+  ];
+  /** Each list of rows: the words that name it (its `aria-labelledby`), then its students. */
+  const lists = (html: string) =>
+    [...html.matchAll(/<ul aria-labelledby="([^"]+)"[^>]*>(.*?)<\/ul>/g)].map((m) => [
+      html.split(`id="${m[1]}"`)[1]?.match(/^[^>]*>([^<]*)</)?.[1],
+      ...[...(m[2] ?? '').matchAll(/<span class="[^"]*\bbreak-words\b[^"]*">([^<]*)</g)].map(
+        (n) => n[1],
+      ),
+    ]);
+
+  it('lists under Who joined only who joined, and one who unlocked without joining apart', () => {
+    const html = render(events, false, unjoined);
+    expect(lists(html)).toEqual([
+      ['Who joined', 'Ana Rodríguez', 'Lucas Ferreira'],
+      ["Didn't join", 'Ines Moreau'],
+    ]);
+    // Her unlock is on the timeline all the same, at its time.
+    expect(marks(html)).toContain('Ines Moreau, unlocked at 9:41 AM, Nurse @72');
+  });
+
+  it('never says Who joined over a session nobody joined', () => {
+    const nobody = { ...unjoined, joined: [], unlocks: unjoined.unlocks.slice(1) };
+    const html = render(events.slice(3), false, nobody);
+    expect(lists(html)).toEqual([["Didn't join", 'Ines Moreau']]);
+    expect(html).not.toContain('Who joined');
+  });
+
+  it('draws one list, under Who joined, when everyone with a mark joined', () => {
+    expect(lists(render())).toEqual([['Who joined', 'Ana Rodríguez', 'Lucas Ferreira']]);
+    expect(render()).not.toContain('Didn');
+  });
+});

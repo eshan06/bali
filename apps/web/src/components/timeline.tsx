@@ -10,7 +10,7 @@ import {
   Wifi,
   WifiOff,
 } from 'lucide-react';
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useId, useState } from 'react';
 
 import type { Moment, Timeline as View } from '@/lib/recap';
 
@@ -63,6 +63,7 @@ const FLIP_NARROW = '@max-[56rem]:-translate-x-[calc(100%_-_36px)]';
  * ponytail: marks a minute apart overlap at desktop widths; each is still reached by Tab.
  */
 export function Timeline({ view, label }: { view: View; label: string }) {
+  const id = useId();
   const [hovered, setHovered] = useState<string | null>(null);
   const [focused, setFocused] = useState<string | null>(null);
   const open = hovered ?? focused;
@@ -79,6 +80,14 @@ export function Timeline({ view, label }: { view: View; label: string }) {
     document.addEventListener('keydown', close);
     return () => document.removeEventListener('keydown', close);
   }, [open]);
+  // Who joined, then anyone with a mark there who never did, under words of their own: one who
+  // unlocked without joining is never listed as one who joined.
+  const groups = (
+    [
+      ['Who joined', view.rows.slice(0, view.joined)],
+      ["Didn't join", view.rows.slice(view.joined)],
+    ] as const
+  ).filter(([, rows]) => rows.length > 0);
   return (
     <section aria-label={label} className="mt-6">
       <ul
@@ -98,7 +107,9 @@ export function Timeline({ view, label }: { view: View; label: string }) {
         <p className="mt-3 text-body text-text-secondary">No unlocks.</p>
       )}
       <div className={`mt-5 items-end pb-2 ${ROW}`}>
-        <span className="text-caption text-text-tertiary">Who joined</span>
+        <span id={`${id}-0`} className="text-caption text-text-tertiary">
+          {groups[0]?.[0]}
+        </span>
         {/* Narrower, every other time between the ends, then none, so no two labels touch. */}
         <div aria-hidden="true" className="relative h-4.5">
           {view.ticks.map((t, i) => (
@@ -112,62 +123,71 @@ export function Timeline({ view, label }: { view: View; label: string }) {
           ))}
         </div>
       </div>
-      <ul>
-        {view.rows.map((row) => (
-          <li key={row.key} className={`items-center ${ROW}`}>
-            <span className="min-w-0 text-body break-words">{row.name}</span>
-            <div
-              style={{ backgroundSize: `${view.step}% 100%` }}
-              className="relative h-9 border-r border-border-default bg-[linear-gradient(to_right,var(--bali-border-default)_1px,transparent_1px)]"
-            >
-              {/* From the first mark to the end, the same for everyone: never a student's minutes. */}
-              {row.marks.length > 0 ? (
-                <span
-                  style={{ left: `${row.marks[0]?.x}%` }}
-                  className="absolute top-[17px] right-0 h-0.5 rounded-full bg-border-strong"
-                />
-              ) : null}
-              {row.marks.map((m) => {
-                const [words, , , ink] = MOMENT[m.moment];
-                return (
-                  <Fragment key={m.key}>
-                    <button
-                      type="button"
-                      aria-label={`${row.name}, ${words.toLowerCase()} at ${m.time}${m.reason ? `, ${m.reason}` : ''}`}
-                      style={{ left: `${m.x}%` }}
-                      onMouseEnter={hover(m.key)}
-                      onMouseLeave={hover(null)}
-                      onFocus={() => setFocused(m.key)}
-                      onBlur={() => setFocused(null)}
-                      className={`absolute z-1 cursor-pointer before:absolute before:inset-x-0 before:bottom-full before:h-2.5 ${m.moment === 'in' ? 'top-3 -ml-1.5' : 'top-2 -ml-2.5'} ${look(m.moment)} ${open === m.key ? 'outline-2 outline-offset-2 outline-focus-ring' : ''}`}
-                    >
-                      <Glyph moment={m.moment} />
-                    </button>
-                    {open === m.key ? (
-                      <div
-                        aria-hidden="true"
-                        style={{ left: `${m.x}%` }}
-                        onMouseEnter={hover(m.key)}
-                        onMouseLeave={hover(null)}
-                        className={`absolute bottom-[calc(100%_-_4px)] z-2 -ml-4.5 w-max max-w-[min(16rem,calc(50%_+_18px))] rounded-md border border-border-default bg-surface-raised px-4 py-3 text-body break-words shadow-2 @min-[56rem]:max-w-[min(16rem,calc(30%_+_18px))] ${m.x > 70 ? FLIP : m.x > 50 ? FLIP_NARROW : ''}`}
-                      >
-                        <p className={`flex items-center gap-2 font-semibold ${ink}`}>
-                          <Glyph moment={m.moment} size={14} />
-                          {words}
-                        </p>
-                        <p className="mt-0.5 text-caption text-text-secondary">
-                          {row.name} · {m.time}
-                        </p>
-                        {m.reason ? <p className="mt-1">{m.reason}</p> : null}
-                      </div>
-                    ) : null}
-                  </Fragment>
-                );
-              })}
-            </div>
-          </li>
-        ))}
-      </ul>
+      {groups.map(([heading, rows], g) => (
+        <Fragment key={heading}>
+          {g > 0 ? (
+            <p id={`${id}-${g}`} className="mt-4 pb-2 text-caption text-text-tertiary">
+              {heading}
+            </p>
+          ) : null}
+          <ul aria-labelledby={`${id}-${g}`}>
+            {rows.map((row) => (
+              <li key={row.key} className={`items-center ${ROW}`}>
+                <span className="min-w-0 text-body break-words">{row.name}</span>
+                <div
+                  style={{ backgroundSize: `${view.step}% 100%` }}
+                  className="relative h-9 border-r border-border-default bg-[linear-gradient(to_right,var(--bali-border-default)_1px,transparent_1px)]"
+                >
+                  {/* From the first mark to the end, the same for everyone: never a student's minutes. */}
+                  {row.marks.length > 0 ? (
+                    <span
+                      style={{ left: `${row.marks[0]?.x}%` }}
+                      className="absolute top-[17px] right-0 h-0.5 rounded-full bg-border-strong"
+                    />
+                  ) : null}
+                  {row.marks.map((m) => {
+                    const [words, , , ink] = MOMENT[m.moment];
+                    return (
+                      <Fragment key={m.key}>
+                        <button
+                          type="button"
+                          aria-label={`${row.name}, ${words.toLowerCase()} at ${m.time}${m.reason ? `, ${m.reason}` : ''}`}
+                          style={{ left: `${m.x}%` }}
+                          onMouseEnter={hover(m.key)}
+                          onMouseLeave={hover(null)}
+                          onFocus={() => setFocused(m.key)}
+                          onBlur={() => setFocused(null)}
+                          className={`absolute z-1 cursor-pointer before:absolute before:inset-x-0 before:bottom-full before:h-2.5 ${m.moment === 'in' ? 'top-3 -ml-1.5' : 'top-2 -ml-2.5'} ${look(m.moment)} ${open === m.key ? 'outline-2 outline-offset-2 outline-focus-ring' : ''}`}
+                        >
+                          <Glyph moment={m.moment} />
+                        </button>
+                        {open === m.key ? (
+                          <div
+                            aria-hidden="true"
+                            style={{ left: `${m.x}%` }}
+                            onMouseEnter={hover(m.key)}
+                            onMouseLeave={hover(null)}
+                            className={`absolute bottom-[calc(100%_-_4px)] z-2 -ml-4.5 w-max max-w-[min(16rem,calc(50%_+_18px))] rounded-md border border-border-default bg-surface-raised px-4 py-3 text-body break-words shadow-2 @min-[56rem]:max-w-[min(16rem,calc(30%_+_18px))] ${m.x > 70 ? FLIP : m.x > 50 ? FLIP_NARROW : ''}`}
+                          >
+                            <p className={`flex items-center gap-2 font-semibold ${ink}`}>
+                              <Glyph moment={m.moment} size={14} />
+                              {words}
+                            </p>
+                            <p className="mt-0.5 text-caption text-text-secondary">
+                              {row.name} · {m.time}
+                            </p>
+                            {m.reason ? <p className="mt-1">{m.reason}</p> : null}
+                          </div>
+                        ) : null}
+                      </Fragment>
+                    );
+                  })}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Fragment>
+      ))}
     </section>
   );
 }
