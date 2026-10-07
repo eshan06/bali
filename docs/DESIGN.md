@@ -61,7 +61,7 @@ callback, the invite code, Cognito's pages, Help and the policy pages),
 [Classes home](https://claude.ai/artifact/Shc2dz4xn8Qc9iDHDuYT2N),
 [Class page & live grid](https://claude.ai/artifact/662Zkg7urbM64BXvNbq2GX) and
 [Recap & reports](https://claude.ai/artifact/BuiyWgXpVNkhPR8osDBcHZ). They
-replace D2's look of the portal, built on its code in B1–B5 (`docs/PLAN.md`).
+replace D2's look of the portal, built on its code in PB1–PB5 (`docs/PLAN.md`).
 A design draws only what the backend does today, and only the screens Phases 2
 to 6 ask for: it never promises what the API lacks. The portal is designed
 desktop-first: no phone layout is drawn but where students arrive from the app
@@ -92,9 +92,11 @@ the classes home and its "Your block" (D2e), the live grid (D2f-1: its
 chips, states, `bali-softpulse`, badges and standard columns), the class
 page with Present, its controls and its join code (D2f-2, D2f-3), and the
 recap card and the reports page (D2g), which finished the portal. The owner
-judged that look poor and approved four new designs (above): B1 laid what they
+judged that look poor and approved four new designs (above): PB1 laid what they
 share (no grey tray, `border-input`, `code-lg`, the field, the buttons'
-pressed look, the nav link), and B2–B5 redraw the pages. Every
+pressed look, the nav link), PB2 redrew the entry and info pages (one card
+centred under a bar that holds the lockup, `components/entry-page.tsx`; Help
+and the policy pages under the same bar), and PB3–PB5 redraw the rest. Every
 portal source file is held to the tokens' utilities by `tokens.test.ts`, and
 since D2g the theme holds none of Tailwind's own colours, type sizes,
 tracking or leading, so a default draws nothing. **A portal page uses the
@@ -175,7 +177,7 @@ Use the semantic tokens; the primitives (green, stone, orange, blue, red,
 every text field's edge, 3:1 against the card, the page and the field's own
 well (WCAG 1.4.11), where `border-default` is 1.3:1; in dark it is dark
 `text-tertiary`'s value. A refused field's edge stays `text-primary`. Cognito's
-sign-in fields take it too (`infra/cognito/hosted-ui/hosted-ui.css`, B2a).
+sign-in fields take it too (`infra/cognito/hosted-ui/hosted-ui.css`, PB2a).
 `globals.css` holds it, pinned by `tokens.test.ts`, until the design system's
 next export carries it (`bali-tokens.json` is that export, byte for byte, never
 edited by hand).
@@ -340,7 +342,10 @@ class page's minutes field types in it too, on the Field since D2f-2.
   iPhone Safari never zooms in; a label is always a real label, never a
   placeholder standing in for one. A button that acts on one field (the
   classes home's Create class) may sit on the input's row, wrapping under it
-  on a narrow form (the Field's `trailing`). The app keeps D1's fields (2026-10-06's
+  on a narrow form (the Field's `trailing`). A refusal of what was typed sits
+  right under the input, before the help (the Field's `refusal`), and any
+  other answer right above the button that retries it: the invite code (PB2),
+  so an error never reads as help. The app keeps D1's fields (2026-10-06's
   rollback): Join's code a white field whose border turns green while typing,
   the age screen's menus drawn as that field, Me's name a sunken well with the
   same green edge.

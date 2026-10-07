@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 
 import { buttonClass } from '@/components/button';
 import { CARD_ALONE } from '@/components/card';
-import { Lockup } from '@/components/mark';
+import { EntryPage } from '@/components/entry-page';
 import { completeLogin } from '@/lib/auth';
 
 /**
@@ -27,12 +27,11 @@ export default function CallbackPage() {
   }, [router]);
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-10 sm:px-10">
+    <EntryPage>
       <div className={CARD_ALONE}>
-        <Lockup />
         {failed ? (
           <>
-            <p role="alert" className="mt-6 text-body-lg">
+            <p role="alert" className="text-body-lg text-pretty">
               Bali couldn&apos;t finish signing you in.
             </p>
             <Link href="/login" className={buttonClass('primary', 'mt-6 w-full')}>
@@ -40,11 +39,11 @@ export default function CallbackPage() {
             </Link>
           </>
         ) : (
-          <p role="status" className="mt-6 text-body-lg text-text-secondary">
+          <p role="status" className="text-body-lg text-pretty text-text-secondary">
             Signing in…
           </p>
         )}
       </div>
-    </main>
+    </EntryPage>
   );
 }
