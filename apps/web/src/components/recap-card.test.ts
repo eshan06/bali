@@ -103,10 +103,18 @@ describe('the recap card on the class page, after the bell', () => {
     expect(text(html)).toBe(`|Last session|${TIMES}|Nobody joined this session.|`);
   });
 
+  it('still marks an unlock from a student who never joined, under "Nobody joined"', () => {
+    // An unlock with no live participation (R2 lists it, no tap of theirs joined): never hidden.
+    const nobody = { ...REPORT, joined: [], averageFocusMinutes: null };
+    const html = render({ ...READY, report: nobody, events: EVENTS.slice(2) });
+    expect(text(html)).toMatch(/^\|Last session\|[^|]*\|Nobody joined this session\.\|Unlocked\|/);
+    expect(marks(html)).toEqual([`Lucas Ferreira, unlocked at ${clock(37)}, Nurse`]);
+  });
+
   it('gives the class’s figures, then the session as a timeline of marks', () => {
     const html = render(READY);
     expect(text(html)).toContain(
-      `|Joined|2|Class focus time|1,214|min|Average per student|45|min|Silent|23|min|${NOTE}|`,
+      `|Joined|2|Class focus time|${new Intl.NumberFormat().format(1214)}|min|Average per student|45|min|Silent|23|min|${NOTE}|`,
     );
     expect(html).toContain(`<section aria-label="Timeline, ${TIMES}"`);
     // The legend says only the marks it shows; "No unlocks." only when there are none.
