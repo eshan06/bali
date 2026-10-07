@@ -25,8 +25,9 @@ export const NOT_A_BLOCK_ID =
   'A block ID is 10 letters and digits. Check it against the one written on your block.';
 
 /**
- * `POST /v1/blocks`'s one 409 (P3): a live block of another teacher's holds the tag. Nothing moves
- * a block between teachers today, so the way on is the ID itself (the Classes home design).
+ * `POST /v1/blocks`'s 409 with no reason (P3): a live block of another teacher's holds the tag.
+ * Nothing moves a block between teachers today, so the way on is the ID itself (the Classes home
+ * design).
  */
 export const BLOCK_TAKEN =
   'That block is registered to another teacher. Check the ID against the one written on your block.';
