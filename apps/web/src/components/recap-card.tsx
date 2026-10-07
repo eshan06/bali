@@ -138,7 +138,7 @@ function Recap({
               <Stat label="Silent" value={view.stats.silent} unit="min" />
             </dl>
           )}
-          <p className="text-caption text-text-tertiary dark:text-text-secondary">
+          <p className="text-caption text-text-tertiary">
             A phone is silent when it stops checking in. Silent time doesn&apos;t count as focus.
           </p>
         </>
@@ -159,7 +159,7 @@ function Recap({
 function Stat({ label, value, unit }: { label: string; value: string; unit?: string }) {
   return (
     <div className="flex flex-col justify-between gap-1">
-      <dt className="text-label text-text-tertiary dark:text-text-secondary uppercase">{label}</dt>
+      <dt className="text-label text-text-tertiary uppercase">{label}</dt>
       <dd>
         <span className="font-num text-data-lg">{value}</span>
         {unit ? (

@@ -8,9 +8,10 @@ import { CARD, CARD_ALONE } from '../components/card';
 
 /*
  * The portal's tokens are the design system's own file, ios/Bali/UI/bali-tokens.json, as
- * AppTests.tokens pins Theme.swift to it: every `--bali-*` variable globals.css sets, light and
- * dark, each radius, the spacing unit and each type style in its @theme, and the families in
- * fonts.ts, so the two cannot drift apart unnoticed. A value the tokens lack has no place here.
+ * AppTests.tokens pins Theme.swift to it: every `--bali-*` variable globals.css sets (their light
+ * values: the portal is always light), each radius, the spacing unit and each type style in its
+ * @theme, and the families in fonts.ts, so the two cannot drift apart unnoticed. A value the tokens
+ * lack has no place here.
  */
 interface Token {
   name: string;
@@ -54,10 +55,6 @@ function declarations(block: string | undefined): Map<string, string> {
   return new Map(entries as [string, string][]);
 }
 const light = declarations(/^:root\s*\{([^}]*)\}/m.exec(css)?.[1]);
-// The dark values hold only under the device's dark mode: the :root inside that media query.
-const dark = declarations(
-  /@media \(prefers-color-scheme: dark\)\s*\{\s*:root\s*\{([^}]*)\}/.exec(css)?.[1],
-);
 const theme = declarations(/@theme\s*\{([^}]*)\}/.exec(css)?.[1]);
 const inline = declarations(/@theme inline\s*\{([^}]*)\}/.exec(css)?.[1]);
 
@@ -121,16 +118,16 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     }
   });
 
-  it('the dark block holds each token’s dark value, every one whose dark differs included', () => {
-    for (const [name, value] of dark) {
-      if (RULED.has(name)) continue;
-      const token = colours.get(name.slice(7)) ?? shadows.get(name.slice(7));
-      expect(token, name).toBeDefined();
-      expect(value, name).toBe(side(token as Token, 'dark'));
-    }
-    for (const token of [...semantic(tokens.color.tokens), ...semantic(tokens.shadow.tokens)]) {
-      if (token.name === 'focus-ring' || side(token, 'dark') === side(token, 'light')) continue;
-      expect(dark.has(`--bali-${token.name}`), token.name).toBe(true);
+  it('is always light (the owner, 2026-10-07): light declared, nothing for the device’s dark mode', () => {
+    // Light alone, so native controls and scrollbars stay light whatever the device's mode.
+    expect(css).toMatch(/:root\s*\{\s*color-scheme: light;/);
+    // No dark override anywhere: no media query on the scheme (the stylesheet's, or the layout's
+    // second chrome colour), and no `dark:` variant on any page or piece.
+    const src = fileURLToPath(new URL('../', import.meta.url));
+    for (const file of sources(src)) {
+      const source = readFileSync(file, 'utf8');
+      expect(source, relative(src, file)).not.toMatch(/prefers-color-scheme/);
+      expect(source, relative(src, file)).not.toMatch(/\bdark:[\w[@-]/);
     }
   });
 
@@ -145,13 +142,11 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
         `:focus-visible\\s*\\{\\s*outline: ${Number(edge) - Number(gap)}px solid var\\(--bali-focus-ring-color\\);\\s*outline-offset: ${gap}px;`,
       ),
     );
-    // The ring's colour is focus-ring-color's: green-600 in light, green-300 in dark.
+    // The ring's colour is focus-ring-color's: green-600.
     const colour = colours.get('focus-ring-color') as Token;
-    for (const mode of ['light', 'dark'] as const) {
-      const primitive = /\{([\w-]+)\}/.exec((colour.value as Record<string, string>)[mode] ?? '');
-      const hex = (colours.get(primitive?.[1] ?? '') as Token).value as string;
-      expect(side(ring, mode).endsWith(hex.toLowerCase()), mode).toBe(true);
-    }
+    const primitive = /\{([\w-]+)\}/.exec((colour.value as Record<string, string>).light ?? '');
+    const hex = (colours.get(primitive?.[1] ?? '') as Token).value as string;
+    expect(side(ring, 'light').endsWith(hex.toLowerCase())).toBe(true);
   });
 
   it('the three shadows are utilities of the tokens’ names; reduced motion stops everything', () => {
@@ -179,28 +174,19 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     for (const ref of refs) expect(light.has(ref), ref).toBe(true);
   });
 
-  it('bali-softpulse’s glow is orange-400 at 35 %, orange-300 in dark (DESIGN.md §7)', () => {
-    const glow = (mode: 'light' | 'dark', primitive: string) => {
-      const value = (mode === 'light' ? light : dark).get('--bali-softpulse-glow') ?? '';
-      const hex = (colours.get(primitive) as Token).value as string;
-      expect(value, mode).toBe(`rgba(${bytes(hex).join(',')},0.35)`);
-    };
-    glow('light', 'orange-400');
-    glow('dark', 'orange-300');
+  it('bali-softpulse’s glow is orange-400 at 35 % (DESIGN.md §7)', () => {
+    const hex = (colours.get('orange-400') as Token).value as string;
+    expect(light.get('--bali-softpulse-glow')).toBe(`rgba(${bytes(hex).join(',')},0.35)`);
   });
 
   it('border-input, a text field’s edge, is the owner’s: 3:1 on the card, the page and the well', () => {
-    // The owner's ruling (2026-10-06): stone-500 in light, dark text-tertiary's value in dark,
-    // where border-default is 1.3:1, under WCAG 1.4.11's 3:1 for a control's edge.
+    // The owner's ruling (2026-10-06): stone-500, where border-default is 1.3:1, under WCAG
+    // 1.4.11's 3:1 for a control's edge.
     expect(light.get('--bali-border-input')).toBe('var(--bali-stone-500)');
-    expect(dark.get('--bali-border-input')).toBe(hexOf('text-tertiary', 'dark').toLowerCase());
     expect(inline.get('--color-border-input')).toBe('var(--bali-border-input)');
-    const edge = { light: hexOf('stone-500', 'light'), dark: hexOf('text-tertiary', 'dark') };
-    for (const mode of ['light', 'dark'] as const) {
-      for (const surface of ['surface-card', 'surface-page', 'surface-sunken']) {
-        const ratio = contrast(edge[mode], hexOf(surface, mode));
-        expect(ratio, `${surface}, ${mode}`).toBeGreaterThanOrEqual(3);
-      }
+    for (const surface of ['surface-card', 'surface-page', 'surface-sunken']) {
+      const ratio = contrast(hexOf('stone-500', 'light'), hexOf(surface, 'light'));
+      expect(ratio, surface).toBeGreaterThanOrEqual(3);
     }
     // Every field's, through the one Field; a refused field's edge stays `text-primary`.
     expect(read('../components/field.tsx')).toMatch(
@@ -330,19 +316,11 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     );
   });
 
-  it('the browser’s own chrome takes surface-page, light and dark (the layout’s viewport)', () => {
-    const page = colours.get('surface-page') as Token;
-    const hex = (mode: 'light' | 'dark') => {
-      const raw = (page.value as Record<string, string>)[mode] ?? '';
-      const ref = /\{([\w-]+)\}/.exec(raw)?.[1];
-      return (ref ? ((colours.get(ref) as Token).value as string) : raw).toLowerCase();
-    };
-    const layout = read('./layout.tsx');
-    for (const mode of ['light', 'dark'] as const) {
-      expect(layout).toContain(
-        `{ media: '(prefers-color-scheme: ${mode})', color: '${hex(mode)}' }`,
-      );
-    }
+  it('the browser’s own chrome takes surface-page, one colour (the layout’s viewport)', () => {
+    const page = hexOf('surface-page', 'light').toLowerCase();
+    expect(read('./layout.tsx')).toContain(
+      `export const viewport: Viewport = { themeColor: '${page}' };`,
+    );
   });
 
   it('every semantic colour token is a Tailwind colour of the same name', () => {
@@ -424,16 +402,11 @@ describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
     });
   });
 
-  it('a card keeps its own hairline in light and dark, never one for dark alone', () => {
+  it('a card keeps its own hairline and soft shadow', () => {
     for (const card of [CARD, CARD_ALONE]) {
       expect(card).toMatch(/\bbg-surface-card\b/);
       expect(card).toMatch(/\bborder border-border-default\b/);
       expect(card).toMatch(/\bshadow-1\b/);
-    }
-    for (const file of files) {
-      expect(readFileSync(file, 'utf8'), relative(src, file)).not.toMatch(
-        /\bdark:(?:[\w-]+:)*border-border-default\b/,
-      );
     }
   });
 });

@@ -125,8 +125,9 @@ describe('the recap card on the class page, after the bell', () => {
       `Lucas Ferreira, tapped in at ${clock(12)}`,
       `Lucas Ferreira, unlocked at ${clock(37)}, Nurse`,
     ]);
-    // Each at its time, as a share of the session: 9:37 is 64 % of 9:05 to 9:55.
-    expect(html).toMatch(/aria-label="Lucas Ferreira, unlocked[^"]*" style="left:64%"/);
+    // Each at its time, as a share of the session: 9:37 is 64 % of 9:05 to 9:55 (moved only off
+    // a mark it would overlap, timeline.test.ts).
+    expect(html).toMatch(/aria-label="Lucas Ferreira, unlocked[^"]*" style="left:min\(max\(64%, /);
   });
 
   it('never says an unlock’s reason in Present, the projector the class can see', () => {

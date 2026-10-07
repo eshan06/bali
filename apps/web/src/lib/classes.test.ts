@@ -105,12 +105,13 @@ describe('createClass', () => {
     }
     expect(Object.keys(errors)).not.toContain('NO_SCHOOL');
     // The route's other 409 carries its reason, and is said in Bali's words, never the API's
-    // own sentence, written for a log (PB3's review).
+    // own sentence, written for a log (PB3's review). It is final: sending the name again can't
+    // undo a deleted account, so the form offers no Try again (PB5's review).
     const gone = api(409, {
       error: { code: 'conflict', reason: 'account_deleted', message: 'this account was deleted' },
     });
     expect(await createClass(gone.client, 'Period 4')).toEqual({
-      kind: 'failed',
+      kind: 'final',
       message: ACCOUNT_DELETED,
     });
     expect(ACCOUNT_DELETED).toBe(

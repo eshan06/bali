@@ -2,19 +2,19 @@
 
 /*
  * The Bali Design System's tokens (ios/Bali/UI/bali-tokens.json; DESIGN.md §2 to §6) as CSS
- * variables, `--bali-<token>`: the light values on :root, the dark ones under the device's dark
- * mode, so a page reads the same token in both. tokens.test.ts pins every value here to the JSON,
- * so the two cannot drift; a value the tokens lack is a question for the owner, written here only
- * once the owner rules on it (border-input below; the input size and code-lg in the type scale).
+ * variables, `--bali-<token>`: their light values on :root, and only those. The portal is always
+ * light, like the app, whatever the device's mode (the owner, 2026-10-07), its native controls and
+ * scrollbars too. tokens.test.ts pins every value here to the JSON, so the two cannot drift; a
+ * value the tokens lack is a question for the owner, written here only once the owner rules on it
+ * (border-input below; the input size and code-lg in the type scale).
  * Every semantic token is here; of the primitives, only the ones a semantic token or the mark
  * reference (a page uses semantic tokens, never a primitive).
  */
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 
   --bali-green-100: #dcede3;
   --bali-green-200: #bcdcca;
-  --bali-green-300: #92c3a9;
   --bali-green-400: #62a483;
   --bali-green-600: #2c6f51;
   --bali-green-700: #245a43;
@@ -28,14 +28,10 @@
   --bali-stone-600: #6b665d;
   --bali-stone-700: #524e47;
   --bali-orange-100: #f7e6d2;
-  --bali-orange-300: #e5af6f;
   --bali-orange-800: #6f3f1b;
   --bali-blue-100: #e0ebfa;
-  --bali-blue-300: #8fb4e8;
   --bali-blue-700: #28528e;
   --bali-red-100: #fae3e0;
-  --bali-red-300: #e89b92;
-  --bali-red-500: #c44a3c;
   --bali-red-600: #a93d31;
   --bali-red-700: #8c342b;
 
@@ -47,8 +43,8 @@
   --bali-border-default: var(--bali-stone-200);
   --bali-border-strong: var(--bali-stone-300);
   /* A text field's edge, the owner's ruling (2026-10-06): 3:1 against the card, the page and the
-     field's own well (WCAG 1.4.11), where border-default is 1.3:1; dark text-tertiary's value in
-     dark. Not in the tokens yet: the design system gains it at the owner's next export. */
+     field's own well (WCAG 1.4.11), where border-default is 1.3:1. Not in the tokens yet: the
+     design system gains it at the owner's next export. */
   --bali-border-input: var(--bali-stone-500);
   --bali-text-primary: #211f1b;
   --bali-text-secondary: #5b564e;
@@ -84,53 +80,8 @@
   --bali-shadow-2: 0 2px 8px rgba(33, 28, 21, 0.08), 0 1px 2px rgba(33, 28, 21, 0.05);
   --bali-shadow-3: 0 8px 24px rgba(33, 28, 21, 0.12), 0 2px 6px rgba(33, 28, 21, 0.06);
 
-  /* bali-softpulse's glow ring (DESIGN.md §7): orange-400 at 35 %, orange-300 in dark. */
+  /* bali-softpulse's glow ring (DESIGN.md §7): orange-400 at 35 %. */
   --bali-softpulse-glow: rgba(219, 147, 71, 0.35);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bali-surface-page: #141312;
-    --bali-surface-card: #1d1b19;
-    --bali-surface-sunken: #100f0e;
-    --bali-surface-raised: #262421;
-    --bali-surface-brand: var(--bali-green-800);
-    --bali-border-default: #2e2b27;
-    --bali-border-strong: #3c3934;
-    --bali-border-input: #837d74;
-    --bali-text-primary: #f1efeb;
-    --bali-text-secondary: #b0aaa1;
-    --bali-text-tertiary: #837d74;
-    --bali-text-disabled: #5c574f;
-    --bali-text-brand: var(--bali-green-300);
-    --bali-action-primary-bg: var(--bali-green-400);
-    --bali-action-primary-bg-hover: var(--bali-green-300);
-    --bali-action-primary-fg: #06130d;
-    --bali-action-destructive-bg: var(--bali-red-500);
-    --bali-state-notjoined-fg: #b0aaa1;
-    --bali-state-notjoined-bg: #242220;
-    --bali-state-focused-fg: var(--bali-green-300);
-    --bali-state-focused-bg: #1e2f27;
-    --bali-state-pass-fg: var(--bali-blue-300);
-    --bali-state-pass-bg: #1d2938;
-    --bali-state-emergency-fg: var(--bali-orange-300);
-    --bali-state-emergency-bg: #38291a;
-    --bali-state-revoked-fg: var(--bali-red-300);
-    --bali-state-revoked-bg: #341f1c;
-    --bali-state-nodevice-fg: #a39d94;
-    --bali-state-ended-fg: #a39d94;
-    --bali-state-ended-bg: #242220;
-    --bali-arc-track: #2e2b27;
-    --bali-arc-fill: var(--bali-green-400);
-    --bali-arc-final2: var(--bali-green-300);
-    --bali-focus-ring-color: var(--bali-green-300);
-
-    --bali-shadow-1: none;
-    --bali-shadow-2: 0 2px 8px rgba(0, 0, 0, 0.4);
-    --bali-shadow-3: 0 8px 24px rgba(0, 0, 0, 0.5);
-
-    --bali-softpulse-glow: rgba(229, 175, 111, 0.35);
-  }
 }
 
 /*
@@ -270,7 +221,7 @@
   --color-focus-ring: var(--bali-focus-ring-color);
 }
 
-/* §6: the three shadows, by name; shadow-1 is none in dark, so a card's edge is its hairline. */
+/* §6: the three shadows, by name. */
 @utility shadow-1 {
   box-shadow: var(--bali-shadow-1);
 }

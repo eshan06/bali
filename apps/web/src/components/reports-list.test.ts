@@ -91,9 +91,7 @@ describe('a session’s card in the reports', () => {
       /text-state-emergency-fg|text-state-revoked-fg|lucide-lock|lucide-shield/,
     );
     // Silent 0 min, Unlocks 0 and Protection off 0: each quiet, the unit too.
-    expect(mon.match(/<span class="text-text-tertiary dark:text-text-secondary">0/g)).toHaveLength(
-      3,
-    );
+    expect(mon.match(/<span class="text-text-tertiary">0/g)).toHaveLength(3);
   });
 
   it('says nobody joined in the four figures’ place, never zeros', () => {

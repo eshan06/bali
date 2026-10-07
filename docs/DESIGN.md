@@ -76,8 +76,9 @@ look for any of them waits for a design the owner approves. The words and the
 fixes those steps made stayed (`docs/PLAN.md`, D2). The portal draws from them too, from D2c on
 (`apps/web/src/app/globals.css`, pinned by `tokens.test.ts`): every semantic
 token as a `--bali-*` variable (and the primitives they and the mark
-reference), light on `:root` and dark under the device's dark mode,
-and as Tailwind's theme (`bg-surface-page`, `text-text-secondary`,
+reference), their light values on `:root` and only those (the portal is
+always light since 2026-10-07, §1), and as Tailwind's theme
+(`bg-surface-page`, `text-text-secondary`,
 `rounded-md`, `p-4` for `space-4`, `text-h1`, `shadow-1`); Instrument Sans
 and JetBrains Mono self-hosted through `next/font` (`fonts.ts`); lucide
 (`lucide-react`) as the icon set; the buttons (`components/button.tsx`), the
@@ -136,9 +137,8 @@ rolled back on 2026-10-06, and it keeps D1's look. In this file's terms:
 
 - **Cards straight on the page, no grey tray** (the owner's ruling,
   2026-10-06, which retired D2's tray). A card is `surface-card` with its own
-  `border-default` hairline and `shadow-1`; in dark the shadow goes and the
-  hairline alone carries the edge (§4, Card). No grey frame takes the tray's
-  place.
+  `border-default` hairline and `shadow-1` (§4, Card). No grey frame takes the
+  tray's place.
 - **Pills.** State chips, buttons and Emergency Unlock are `radius-full`;
   inputs keep `radius-sm`. Three radii do the work: 20 / 14 / full (§5).
 - **A soft warm shadow.** `shadow-1` at rest, `shadow-2` on a raised disc or
@@ -151,11 +151,12 @@ rolled back on 2026-10-06, and it keeps D1's look. In this file's terms:
   inside §7's budget. Where the skill and this file disagree, this file wins.
 
 Density: the teacher's live grid is dense (many students at a glance); the
-student app is airy and simple. Theme: **light** for the app and the shield
-(D1 was approved light-only, and the owner kept it so on 2026-10-04, Q6 A):
-the app renders light in every appearance. **The portal follows the device's
-light and dark**, with the tokens' dark values from D2c on (today's Tailwind
-dark variants until then).
+student app is airy and simple. Theme: **light, everywhere.** The app and the
+shield were approved light-only (D1; the owner kept them so on 2026-10-04,
+Q6 A), and **the portal is light only too** (the owner, 2026-10-07: "remove
+dark mode for now"): each renders light whatever the device's appearance,
+native controls and scrollbars included. The portal followed the device's dark
+mode from D2c to PB5; the approved canvases' dark boards no longer apply.
 
 ## 2. Colour palette and roles
 
@@ -170,7 +171,7 @@ Use the semantic tokens; the primitives (green, stone, orange, blue, red,
 | Brand block | `surface-brand` | green-700 `#245A43` |
 | Hairlines, card edges | `border-default` | stone-200 `#E3DFD8` |
 | Emphasis borders | `border-strong` | stone-300 `#D2CCC2` |
-| Text field edges | `border-input` | stone-500 `#8A847A` (dark `#837D74`) |
+| Text field edges | `border-input` | stone-500 `#8A847A` |
 | Primary ink | `text-primary` | `#211F1B` |
 | Supporting ink | `text-secondary` | `#5B564E` |
 | Captions, labels | `text-tertiary` | stone-600 `#6B665D` |
@@ -183,18 +184,12 @@ Use the semantic tokens; the primitives (green, stone, orange, blue, red,
 
 **`border-input`** is the owner's ruling (2026-10-06), not in the tokens yet:
 every text field's edge, 3:1 against the card, the page and the field's own
-well (WCAG 1.4.11), where `border-default` is 1.3:1; in dark it is dark
-`text-tertiary`'s value. A refused field's edge stays `text-primary`. Cognito's
-sign-in fields take it too (`infra/cognito/hosted-ui/hosted-ui.css`, PB2a).
+well (WCAG 1.4.11), where `border-default` is 1.3:1. A refused field's edge
+stays `text-primary`. Cognito's sign-in fields take it too
+(`infra/cognito/hosted-ui/hosted-ui.css`, PB2a).
 `globals.css` holds it, pinned by `tokens.test.ts`, until the design system's
 next export carries it (`bali-tokens.json` is that export, byte for byte, never
 edited by hand).
-
-**Small grey words in dark:** the Recap & reports design draws captions and
-labels in `text-tertiary` in light and `text-secondary` in dark, where the
-tokens' dark `text-tertiary` is 4.2:1 on a card, under AA's 4.5 (PB5,
-`dark:text-text-secondary`). The other screens keep `text-tertiary` in dark, as
-their designs drew it; making it portal-wide is the owner's call.
 
 **The states** are the heart of the product: every surface shows a student's
 state with a chip, always colour + icon + label, never colour alone. The design
@@ -327,9 +322,9 @@ class page's minutes field types in it too, on the Field since D2f-2.
   (D2i, kept in the rollback): "Hold to unlock" in the button's label style, "Your teacher will see
   it" under it in `body`, each one line at the default text size.
 - **Card:** `surface-card` straight on the page, with its own
-  `border-default` hairline and `shadow-1` at rest; in dark the hairline alone
-  (`shadow-1` is none). **No grey tray** behind a card or a group of cards, and
-  no other grey frame in its place (the owner's ruling, 2026-10-06;
+  `border-default` hairline and `shadow-1` at rest. **No grey tray** behind a
+  card or a group of cards, and no other grey frame in its place (the owner's
+  ruling, 2026-10-06;
   `components/card.ts`). Grey stays only where the approved designs keep it: a
   text field's well, the state chips' fills, the grid's stale banner, a
   button's hover and pressed states, and the policy draft's banner and badge.
@@ -442,10 +437,8 @@ class page's minutes field types in it too, on the Field since D2f-2.
   and sheets.
 - **Focus ring, everywhere, no exceptions:** a 2 px page-colour gap, then a
   2 px `focus-ring-color` ring.
-- Dark values (the portal, from D2c on): elevation from lighter surfaces and
-  hairlines, not shadows (`shadow-1` is none; a card takes a `border-default`
-  edge); state inks move to the 300 step; tints are hand-mixed, never alpha
-  overlays. The app and the shield never render them.
+- Dark values: the tokens carry them, and nothing renders them. The app, the
+  shield and, since 2026-10-07, the portal are light only (§1).
 
 ## 7. Do's and don'ts
 
@@ -485,15 +478,13 @@ class page's minutes field types in it too, on the Field since D2f-2.
 an Emergency Unlock lands on the grid, its chip's ring swells and fades, 1.2 s
 × 2, then is still: a `box-shadow` ring of orange-400 at 35%
 (`rgba(219,147,71,0.35)`; the token's own note names it the soft-pulse glow),
-from 0 to 6 px at the midpoint and back; in dark the ring is orange-300
-(`rgba(229,175,111,0.35)`). Nothing moves and the chip's shape stays. Easing
-`standard`, exactly two iterations, never a loop, and nothing at all under
+from 0 to 6 px at the midpoint and back. Nothing moves and the chip's shape
+stays. Easing `standard`, exactly two iterations, never a loop, and nothing at all under
 reduced motion. The student's own Unlocked chip never pulses: the pulse is
 the teacher's cue.
 
 ```css
 :root { --bali-softpulse-glow: rgba(219, 147, 71, 0.35); } /* orange-400 */
-@media (prefers-color-scheme: dark) { :root { --bali-softpulse-glow: rgba(229, 175, 111, 0.35); } } /* orange-300 */
 @keyframes bali-softpulse {
   0%, 100% { box-shadow: 0 0 0 0 transparent; }
   50% { box-shadow: 0 0 0 6px var(--bali-softpulse-glow); }
@@ -502,8 +493,8 @@ the teacher's cue.
 @media (prefers-reduced-motion: reduce) { .chip-emergency.just-unlocked { animation: none; } }
 ```
 
-(D2c's theme variables carry the two glow values; the snippet names them so it
-stands alone.) In the portal (D2f-1) it is the `animate-softpulse` utility
+(D2c's theme variables carry the glow; the snippet names it so it stands
+alone.) In the portal (D2f-1) it is the `animate-softpulse` utility
 (`globals.css`, pinned by `tokens.test.ts`), on the chip of an unlock the stream
 brings while the grid is open, orange only (`softpulses`, `grid-state.ts`), once
 per unlock: never one the grid booted with or the stream's overlap replays, never
@@ -525,7 +516,11 @@ a red chip.
   sits under its own name, three to a row and then two. Never a table that
   scrolls sideways. The recap's timeline (PB5a) keeps each name beside its row
   from a 40 rem card, and over it narrower; its axis shows every other time
-  under 64 rem and only its ends under 28 rem, so no two labels touch.
+  under 64 rem and only its ends under 28 rem, so no two labels touch. Its marks
+  never overlap while the row has room for them, at any width: one too close to
+  the mark before it sits right after it, moved no further than it must be
+  (`lefts`, 2026-10-07), so each is seen and hovered on its own, and its card
+  opens toward the middle from where the mark sits.
 
 ## 9. Agent prompt guide
 

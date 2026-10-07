@@ -183,6 +183,8 @@ describe('the timeline', () => {
       'Ines: unlock@9:26 AM Nurse',
     ]);
     expect(timeline().rows[0]?.marks.map((m) => m.x)).toEqual([0, 52, 60, 76]);
+    // Who joined are the first rows, and only those: Ines is no one who joined (PB5's review).
+    expect(timeline().joined).toBe(4);
   });
 
   it('draws no mark for a late tap, return or Screen Time back on, nor a row for its student', () => {
@@ -201,6 +203,7 @@ describe('the timeline', () => {
   it('keeps a row for each student with an unlock or protection off when nobody joined', () => {
     const view = timeline({ joined: [] });
     expect(view.rows.map((r) => r.name)).toEqual(['Maya', 'Theo', 'Priya', 'Ines']);
+    expect(view.joined).toBe(0);
   });
 
   it('says each unlock’s reason as R2 does now, else as its record does', () => {

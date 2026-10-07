@@ -86,12 +86,13 @@ describe('registerBlock', () => {
       kind: 'refused',
       message: BLOCK_TAKEN,
     });
-    // An account deleted on its way: the ID is fine, so it is no refusal of the ID (PB3's review).
+    // An account deleted on its way: the ID is fine, so it is no refusal of the ID (PB3's review),
+    // and final, so nothing offers to send it again (PB5's review).
     const gone = api(409, {
       error: { code: 'conflict', reason: 'account_deleted', message: 'this account was deleted' },
     });
     expect(await registerBlock(gone.client, 'T7XK2M9QPF', [])).toEqual({
-      kind: 'failed',
+      kind: 'final',
       message: ACCOUNT_DELETED,
     });
     const bad = api(400, { error: { code: 'bad_input', message: 'invalid request' } });

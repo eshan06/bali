@@ -21,6 +21,11 @@ describe('the invite-code screen', () => {
     expect(above).toBeLessThan(source.indexOf('<Button'));
   });
 
+  it('offers Try again only for an answer that never came, never after a refusal (PB5’s review)', () => {
+    // A refusal, a deleted account's included, changed nothing a resend could: Redeem code stays.
+    expect(source).toMatch(/: said\?\.kind === 'failed'\s*\? 'Try again'\s*: 'Redeem code'\}/);
+  });
+
   it('takes focus back to the field by the same rule, never a copy of it (PB2’s review)', () => {
     expect(source).toContain('if (placeAnswer(answer).underField) field.current?.focus();');
     expect(source).not.toContain('CODE_REFUSALS');
