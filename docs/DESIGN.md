@@ -402,8 +402,8 @@ class page's minutes field types in it too, on the Field since D2f-2.
   14 px: `text-present-name`, `text-present-label`), and the design system
   gains them when the owner next exports it. The grid reflows by column count
   below the desktop width, never by shrinking type: as many columns as fit,
-  each at least 212 px (320 in Present), so six at 1440, in the class page
-  1400 px wide at most (PB4a). In Present the page's header folds the bell, the
+  each at least 212 px, so six at 1440, in the class page 1400 px wide at most
+  (PB4a); Present's four from a 56 rem grid, three and then two narrower. In Present the page's header folds the bell, the
   join code in `code-lg` and the controls into one row, so a class of 28 fits
   one 1080p screen.
 - **Present never shows an unlock's reason**, because the class can see it:

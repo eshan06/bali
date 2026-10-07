@@ -90,15 +90,26 @@ describe('a cell on the live grid', () => {
 });
 
 describe('the grid’s columns', () => {
-  // The class page's column at the desktop width: 1400 px less its two 40 px gutters, the cells
-  // 8 px apart. The canvas's 216 px fitted five there, where its notes and DESIGN.md §5 say six.
-  const fit = (columns: string, width: number) => {
-    const min = Number(/minmax\(min\((\d+)px/.exec(columns)?.[1]);
-    return Math.floor((width + 8) / (min + 8));
-  };
+  it('fits six at the desktop width', () => {
+    // The class page's column there: 1400 px less its two 40 px gutters, the cells 8 px apart.
+    // The canvas's 216 px fitted five, where its notes and DESIGN.md §5 say six.
+    const min = Number(/minmax\(min\((\d+)px/.exec(COLUMNS)?.[1]);
+    expect(Math.floor((1320 + 8) / (min + 8))).toBe(6);
+  });
 
-  it('fits six at the desktop width, and four in Present', () => {
-    expect(fit(COLUMNS, 1320)).toBe(6);
-    expect(fit(PRESENT_COLUMNS, 1320)).toBe(4);
+  it('keeps Present’s four from a 56 rem grid, so a 1024 px projector still shows four', () => {
+    expect(PRESENT_COLUMNS.split(' ')).toEqual([
+      'grid-cols-2',
+      '@2xl:grid-cols-3',
+      '@4xl:grid-cols-4',
+    ]);
+  });
+
+  it('sets the chip beside the name only on the standard grid’s one column', () => {
+    // Under 432 px the standard grid is one column; Present still has two there, too narrow for
+    // a name beside its chip (it broke the names letter by letter).
+    const cell = (present: boolean) => /<li class="([^"]*)"/.exec(render(student(), present))?.[1];
+    expect(cell(false)).toContain('@max-[432px]:grid');
+    expect(cell(true)).not.toContain('@max-[432px]');
   });
 });

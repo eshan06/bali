@@ -27,6 +27,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the card. **Present** folds the bell, the code in `code-lg` and the controls into the header's one
   row, so 28 students fit 1920 × 1080 (the last cell ends at 1063 px); it is one header in both
   views, so the code stays put, and the grid neither reboots nor reconnects as Present turns on.
+  Present keeps its four columns from a 56 rem grid, as it shipped (the owner's "four columns",
+  DESIGN.md §5), not the canvas's 320 px, which draws the same four at 1920 but would leave a
+  1280 px projector three and a 1024 px one two (santa's review).
   On one column (a phone) the chip sits beside the name, the canvas's container rule, from where a
   second column stops fitting (432 px) rather than its 455. **Where the build differs from the
   boards, on purpose:** +5 min and +10 min keep tabular numerals (the canvas's `.btn` font

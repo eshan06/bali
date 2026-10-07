@@ -60,6 +60,16 @@ describe('the class page in Present', () => {
     expect(read('../components/join-code.tsx')).toMatch(/large \? 'text-code-lg' : 'text-code'/);
   });
 
+  it('keeps the live grid in one place as Present turns on, so it never reboots or reconnects', () => {
+    // React keeps a child by its place: the card's slot holds a null in Present, the said line's
+    // slot one when nothing is said, and the grid's section sits in neither.
+    expect(page.slice(page.indexOf('{projecting ? null : ('))).toMatch(
+      /^\{projecting \? null : \([^]*?\)\}\s*\{\/\*[^*]*\*\/\}\s*\{said \? \([^]*?\) : null\}\s*<section\s+aria-labelledby=\{`\$\{id\}-live`\}/,
+    );
+    const live = tags('LiveGrid').find((tag) => tag.includes('onEnded'));
+    expect(live).not.toMatch(/\bkey=/);
+  });
+
   it('puts the toggle on the recap when the page comes back in Present with no session to show', () => {
     expect(opening()).toMatch(
       /const (\w+) = rememberedPresent\(classId\);[^]*setOpenedInPresent\(\1\);/,

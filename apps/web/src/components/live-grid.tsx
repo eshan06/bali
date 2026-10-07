@@ -88,11 +88,12 @@ const CHIP: Record<GridDisplay, { label: string; icons: LucideIcon[]; tone: stri
 /**
  * The grid's columns (the Class page design): as many as fit, each at least 212 px, so six fill
  * the class page's 1320 px column at the desktop width, every chip on one line but Unknown's and
- * "Left · protection off", which wrap after their dot; in Present at least 320 px, so four do.
- * Never wider than the grid (`min`), on a phone.
+ * "Left · protection off", which wrap after their dot; never wider than the grid (`min`), on a
+ * phone. Present keeps its four columns (DESIGN.md §5) from a 56 rem grid, as it shipped: the
+ * canvas's 320 px would leave a 1280 px projector three, a 1024 px one two.
  */
 export const COLUMNS = 'grid-cols-[repeat(auto-fill,minmax(min(212px,100%),1fr))]';
-export const PRESENT_COLUMNS = 'grid-cols-[repeat(auto-fill,minmax(min(320px,100%),1fr))]';
+export const PRESENT_COLUMNS = 'grid-cols-2 @2xl:grid-cols-3 @4xl:grid-cols-4';
 
 /**
  * A state chip: a pill in the state's tint, padded `space-2` × `space-3`, its label in the `label`
@@ -145,11 +146,17 @@ const AFTER_REASON =
   "-ml-2.5 before:inline-block before:w-2.5 before:text-center before:content-['·']";
 
 /**
+ * The standard grid on one column (a phone, under 432 px, where a second column stops fitting):
+ * the chip beside the name, the line under both, as the canvas's container rule draws it.
+ */
+const ONE_COLUMN =
+  '@max-[432px]:grid @max-[432px]:min-h-0 @max-[432px]:grid-cols-[minmax(0,1fr)_auto] @max-[432px]:items-center @max-[432px]:gap-x-3 @max-[432px]:gap-y-1';
+
+/**
  * One student's cell (the Class page design): the name, then the chip, then the line under it: the
  * unlock's reason (`unlockNote`, never in Present) and how long since the phone was heard from
  * (`lastSeenNote`), so a row's chips line up. Every cell is as tall as one with that line. In
- * Present the line sits beside the chip when it fits; on one column (a phone) the chip sits beside
- * the name, the line under both.
+ * Present the line sits beside the chip when it fits.
  */
 export function Cell({
   student: s,
@@ -169,7 +176,7 @@ export function Cell({
   const seen = lastSeenNote(s, display, now);
   return (
     <li
-      className={`flex flex-col gap-2 ${present ? 'min-h-22' : 'min-h-31'} ${CARD} @max-[432px]:grid @max-[432px]:min-h-0 @max-[432px]:grid-cols-[minmax(0,1fr)_auto] @max-[432px]:items-center @max-[432px]:gap-x-3 @max-[432px]:gap-y-1`}
+      className={`flex flex-col gap-2 ${CARD} ${present ? 'min-h-22' : `min-h-31 ${ONE_COLUMN}`}`}
     >
       <div className="flex items-start justify-between gap-2">
         <span
@@ -188,7 +195,11 @@ export function Cell({
         ) : null}
       </div>
       <div
-        className={`${present ? 'flex flex-wrap items-center gap-x-3 gap-y-1' : 'flex flex-col items-start gap-2'} @max-[432px]:contents`}
+        className={
+          present
+            ? 'flex flex-wrap items-center gap-x-3 gap-y-1'
+            : 'flex flex-col items-start gap-2 @max-[432px]:contents'
+        }
       >
         {/* Keyed by its unlock, so each new one pulses from the start; once it has pulsed it
             leaves the set, so a chip that turns red and back stays still. */}
