@@ -8,6 +8,32 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-07** — **The portal is always light (the owner: "remove dark mode for now. just leave it
+  at always light"), and PB5's three review fixes.** The portal stops following the device's dark
+  mode, like the app: `globals.css` declares `color-scheme: light`, so native controls and
+  scrollbars stay light too, and holds only the tokens' light values (its dark block and the
+  primitives only that block used are gone); the layout gives the browser's chrome one colour.
+  The few `dark:` variants were removed rather than made unreachable, the smaller and clearer diff,
+  and with them PB5's dark-only small grey words (`dark:text-text-secondary`, for a dark
+  `text-tertiary` of 4.2:1). `tokens.test.ts` pins that nothing overrides for dark: no
+  `prefers-color-scheme` and no `dark:` variant in any portal source. The approved canvases' dark
+  boards no longer apply; the tokens keep their dark values, and a dark portal comes back only as
+  a designed step the owner approves. **A deleted account's refusal offers no Try again:** "This
+  account was deleted, so nothing changed. Sign out, then sign in again." is final (`kind:
+  'final'` from `createClass` and `registerBlock`), so Create class and Register block keep their
+  own words; Try again is for an answer that never came. The invite's redeem already said it as a
+  refusal under Redeem code. **"Who joined" lists only who joined:** a student with an unlock (or
+  a protection off) in the session who never tapped in, whom R2 never counts as joined, has a row
+  under a label of their own, "Didn't join", in the axis label's caption style, each group a list
+  named by its label; a session nobody joined says "Didn't join" alone. The canvas draws no such
+  student, so that label is new, the least an honest fix needs; their marks are drawn as before.
+  **Marks under a minute apart sit side by side:** each mark's `left` is its time, or right after
+  the marks before it, packed edge to edge by their drawn widths, whichever is later, and never past
+  the end less the room the marks after it take. CSS works it out (`min()` and `max()` at the
+  axis's own width), so nothing is measured and a mark with room sits exactly at its time; its time
+  is in its label and card either way. Marks only, never a bar. A row with more marks than its axis
+  has room for still overlaps, at its start (a ponytail ceiling).
+
 - **2026-10-07** — **PB5b: the reports list as the canvas draws it; a deleted account said in Bali's
   words.** The list keeps D2g's one markup (a card per session, a `dt`/`dd` per figure, the column
   names `aria-hidden` above it, never a table) and takes the canvas's look: the list 72 rem in the
