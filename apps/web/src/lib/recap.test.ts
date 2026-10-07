@@ -1,4 +1,5 @@
 import type {
+  FeedEvent,
   ReportStudent,
   SessionReportResponse,
   SessionReportsPage,
@@ -70,6 +71,18 @@ const REPORT: SessionReportResponse = {
   ],
 };
 
+/** The session's feed, as the catch-up read pages it: one page, then an empty one. */
+const EVENTS: FeedEvent[] = [
+  {
+    seq: 1,
+    eventId: 'e1',
+    type: 'tap_in',
+    userId: theo.id,
+    occurredAt: '2026-10-04T13:05:00.000Z',
+    payload: {},
+  },
+];
+
 /** Intl puts a narrow no-break space before AM and PM; the tests read every space as one. */
 const plain = (s: string) => s.replace(/\s/g, ' ');
 
@@ -99,6 +112,9 @@ async function states(api: ReturnType<typeof fakeApi>, classId = 'c1'): Promise<
 
 const LIST = '/v1/classes/c1/reports/sessions?limit=1';
 const ONE = '/v1/classes/c1/reports/sessions/s1';
+const FEED = '/v1/sessions/s1/events?after=0';
+const FEED_END = '/v1/sessions/s1/events?after=1';
+const READ = { [FEED]: { events: EVENTS, nextAfter: 1 }, [FEED_END]: { events: [], nextAfter: 1 } };
 
 describe('latestEnded', () => {
   it('is the newest session once the server has marked it over', () => {
@@ -112,13 +128,13 @@ describe('latestEnded', () => {
 });
 
 describe('loadRecap', () => {
-  it('reads the newest session, then its report', async () => {
-    const api = fakeApi({ [LIST]: page(SESSION), [ONE]: REPORT });
+  it('reads the newest session, then its report and its events together', async () => {
+    const api = fakeApi({ [LIST]: page(SESSION), [ONE]: REPORT, ...READ });
     expect(await states(api)).toEqual([
       { kind: 'loading', session: SESSION },
-      { kind: 'ready', session: SESSION, report: REPORT },
+      { kind: 'ready', session: SESSION, report: REPORT, events: EVENTS },
     ]);
-    expect(api.asked).toEqual([LIST, ONE]);
+    expect(api.asked).toEqual([LIST, ONE, FEED, FEED_END]);
   });
 
   it('shows nothing for a class with no session over, and reads no report', async () => {
@@ -129,29 +145,43 @@ describe('loadRecap', () => {
     }
   });
 
-  it('says why either read failed, for the card’s Try again', async () => {
+  it('says why any read failed, the events’ included, for the card’s Try again', async () => {
     const noList = fakeApi({ [LIST]: new NetworkError() });
     expect(await states(noList)).toEqual([{ kind: 'error', message: CANT_REACH }]);
 
     const busy = new ApiError(429, 'rate_limited', 'too many requests from this account');
-    const noReport = fakeApi({ [LIST]: page(SESSION), [ONE]: busy });
+    const noReport = fakeApi({ [LIST]: page(SESSION), [ONE]: busy, ...READ });
     expect(await states(noReport)).toEqual([
       { kind: 'loading', session: SESSION },
       { kind: 'error', message: TOO_MANY_TRIES },
     ]);
+
+    // The timeline is the recap: its events unread, its figures are never shown without it.
+    for (const failing of [FEED, FEED_END]) {
+      const noEvents = fakeApi({
+        [LIST]: page(SESSION),
+        [ONE]: REPORT,
+        ...READ,
+        [failing]: new NetworkError(),
+      });
+      expect(await states(noEvents)).toEqual([
+        { kind: 'loading', session: SESSION },
+        { kind: 'error', message: CANT_REACH },
+      ]);
+    }
   });
 
-  it('reads a session the reports page opened, its report alone (R5)', async () => {
-    const api = fakeApi({ [ONE]: REPORT });
+  it('reads a session the reports page opened, its report and events alone (R5)', async () => {
+    const api = fakeApi({ [ONE]: REPORT, ...READ });
     const shown: RecapState[] = [];
     await loadRecap(api, 'c1', SESSION, (s) => shown.push(s));
     expect(shown).toEqual([
       { kind: 'loading', session: SESSION },
-      { kind: 'ready', session: SESSION, report: REPORT },
+      { kind: 'ready', session: SESSION, report: REPORT, events: EVENTS },
     ]);
-    expect(api.asked).toEqual([ONE]);
+    expect(api.asked).toEqual([ONE, FEED, FEED_END]);
 
-    const failing = fakeApi({ [ONE]: new NetworkError() });
+    const failing = fakeApi({ [ONE]: REPORT, [FEED]: new NetworkError() });
     const failed: RecapState[] = [];
     await loadRecap(failing, 'c1', SESSION, (s) => failed.push(s));
     expect(failed.at(-1)).toEqual({ kind: 'error', message: CANT_REACH });
@@ -176,82 +206,37 @@ describe('sessionTimes', () => {
 });
 
 describe('recapView', () => {
-  const view = recapView(REPORT, NY);
-
-  it('gives the class’s figures and nothing per student', () => {
-    expect(view.stats).toEqual({
+  it('gives the class’s figures, each a number in the viewer’s format, nothing per student', () => {
+    expect(recapView(SESSION, REPORT, EVENTS, NY).stats).toEqual({
       joined: '4',
-      focus: '83 min',
-      average: '21 min',
-      silent: '2 min',
+      focus: '83',
+      average: '21',
+      silent: '2',
     });
-  });
-
-  it('names who joined in R2’s order, an account with no name by the start of its id', () => {
-    expect(view.joined.map((s) => s.name)).toEqual(['Theo', 'Maya', '0199b0a1', 'Priya']);
-  });
-
-  it('lists every unlock with its time and reason, one with none or an unknown one said so', () => {
-    expect(view.unlocks.map((u) => [u.key, u.name, plain(u.time), u.reason])).toEqual([
-      ['u1', 'Maya', '9:11 AM', 'Bathroom'],
-      ['u2', 'Theo', '9:18 AM', 'No reason given'],
-      ['u3', 'Theo', '9:24 AM', 'No reason given'],
-    ]);
-  });
-
-  it('lists every protection off with its time, and no reason', () => {
-    expect(view.protectionOffs.map((p) => [p.key, p.name, plain(p.time), p.reason])).toEqual([
-      ['p1', 'Priya', '9:22 AM', undefined],
-    ]);
-  });
-
-  it('has no figures when nobody joined, and still lists what was recorded', () => {
-    const empty = recapView(
-      {
-        ...REPORT,
-        joined: [],
-        focusMinutes: 0,
-        averageFocusMinutes: null,
-        silentMinutes: 0,
-        protectionOffs: [],
-      },
-      NY,
+    expect(recapView(SESSION, { ...REPORT, focusMinutes: 1214 }, EVENTS, NY).stats?.focus).toBe(
+      '1,214',
     );
-    expect(empty.stats).toBeNull();
-    expect(empty.joined).toEqual([]);
-    expect(empty.unlocks).toHaveLength(3);
   });
 
-  it('reads the reasons a student can pick as their phone shows them', () => {
-    const reasons = (['bathroom', 'nurse', 'other'] as const).map(
-      (reason) =>
-        recapView({ ...REPORT, unlocks: [{ ...REPORT.unlocks[0], reason }] }, NY).unlocks[0].reason,
-    );
-    expect(reasons).toEqual(['Bathroom', 'Nurse', 'Other']);
+  it('has no figures when nobody joined, and still marks what was recorded', () => {
+    const nobody = { ...REPORT, joined: [], averageFocusMinutes: null };
+    const view = recapView(SESSION, nobody, [], NY);
+    expect(view.stats).toBeNull();
+    // Every unlock and protection off R2 lists keeps its row (the timeline's own tests say more).
+    expect(view.timeline.rows.map((r) => r.name)).toEqual(['Maya', 'Theo', 'Priya']);
   });
-});
 
-describe('the recap in Present, the projector the class can see (D2g)', () => {
-  // A session that ends while the page is projected shows its recap on the projector: a reason
-  // is the student's to the teacher alone (#265), so it stays off, and nothing else changes.
-  it('lists every unlock by who and when, never its reason; the rest as the teacher sees it', () => {
-    const teacher = recapView(REPORT, NY);
-    const projected = recapView(REPORT, NY, true);
-    expect(projected.unlocks.map((u) => [u.key, u.name, plain(u.time), u.reason])).toEqual([
-      ['u1', 'Maya', '9:11 AM', undefined],
-      ['u2', 'Theo', '9:18 AM', undefined],
-      ['u3', 'Theo', '9:24 AM', undefined],
-    ]);
+  it('gives Present the same figures and the same marks, never an unlock’s reason (#265)', () => {
+    const teacher = recapView(SESSION, REPORT, EVENTS, NY);
+    const projected = recapView(SESSION, REPORT, EVENTS, NY, true);
     expect(projected.stats).toEqual(teacher.stats);
-    expect(projected.joined).toEqual(teacher.joined);
-    expect(projected.protectionOffs).toEqual(teacher.protectionOffs);
-  });
-
-  it('keeps every reason a student can pick off it', () => {
+    const reasons = (view: typeof teacher) =>
+      view.timeline.rows.flatMap((r) => r.marks.map((m) => m.reason)).filter(Boolean);
+    expect(reasons(teacher)).toEqual(['No reason given', 'No reason given', 'Bathroom']);
+    expect(reasons(projected)).toEqual([]);
     for (const reason of UNLOCK_REASONS) {
       const report = { ...REPORT, unlocks: [{ ...REPORT.unlocks[0], reason }] };
-      expect(recapView(report, NY, true).unlocks[0].reason).toBeUndefined();
-      expect(recapView(report, NY).unlocks[0].reason).toBeDefined();
+      expect(reasons(recapView(SESSION, report, EVENTS, NY, true))).toEqual([]);
     }
   });
 });

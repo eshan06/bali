@@ -133,9 +133,9 @@ export default function ReportsPage() {
                       {row.figures ? (
                         <>
                           <Figure label={JOINED} value={row.figures.joined} />
-                          <Figure label={FOCUS} value={row.figures.focus} />
-                          <Figure label={AVERAGE} value={row.figures.average} />
-                          <Figure label={SILENT} value={row.figures.silent} />
+                          <Figure label={FOCUS} value={`${row.figures.focus} min`} />
+                          <Figure label={AVERAGE} value={`${row.figures.average} min`} />
+                          <Figure label={SILENT} value={`${row.figures.silent} min`} />
                         </>
                       ) : (
                         // No zeros for a session nobody joined, as its recap says (R5).
