@@ -759,7 +759,7 @@ Holder or Admin role, and the Railway project.
 What it does: hands the API services' build and deploy settings from Config as Code
 (`railway.json`, deprecated, no longer read after **2026-12-01**) to Infrastructure as Code
 (`.railway/railway.ts`, PLAN's P8). The file declares the same settings: the `Dockerfile`
-build, `npm run migrate && npm start`, the `/healthz` check, restart on failure up to 3
+build (its `CMD` migrates, then starts; no start command is set), the `/healthz` check, restart on failure up to 3
 times. It manages only dev's `bali` and production's `bali prod` (the named partial
 `bali-api`); the Postgres services and the sweep crons stay as they are. `railway.json`
 stays in the repo until both environments are done (step 7).

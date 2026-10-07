@@ -9,7 +9,9 @@ also works on Render or plain Docker.
 ## What runs
 
 - **Build:** `docker build` → `npm ci` for the whole workspace, then the source.
-- **Release/start:** `npm run migrate && npm start`. `migrate` applies the
+- **Release/start:** the image's `CMD`, `sh -c "npm run migrate && npm start"` (`Dockerfile`).
+  Neither config file sets a start command: Railway runs a Dockerfile service's start command
+  without a shell, so `&&` would end it after the migration (production, 2026-10-06). `migrate` applies the
   committed `packages/db/migrations` to `DATABASE_URL` using drizzle-orm's
   migrator (no drizzle-kit in production); it records and skips already-applied
   migrations, so it is safe to re-run.
