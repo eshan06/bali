@@ -390,7 +390,8 @@ describe('every page and piece uses the tokens’ utilities, never a Tailwind de
 describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
   // Cards sit straight on the page with their own hairline (DESIGN.md §4). Grey stays only where
   // the approved designs keep it: a field's well, the grid's stale banner, the policy draft's
-  // banner, and a control's hover, pressed or open state; a chip's fill is its state's own tint.
+  // banner and badge, and a control's hover, pressed or open state; a chip's fill is its state's
+  // own tint.
   const src = fileURLToPath(new URL('../', import.meta.url));
   const files = sources(src).filter((file) => /\.tsx?$/.test(file));
 
@@ -411,15 +412,15 @@ describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
       }
     }
     const bare = (file: string) => fills(file).filter((v) => v === '').length;
-    const filled = files.filter((file) => bare(file) > 0).map((file) => relative(src, file));
-    expect(filled.sort()).toEqual(
-      [
-        join('components', 'field.tsx'),
-        join('components', 'live-grid.tsx'),
-        join('components', 'policy-draft.tsx'),
-      ].sort(),
+    const filled = Object.fromEntries(
+      files.filter((file) => bare(file) > 0).map((file) => [relative(src, file), bare(file)]),
     );
-    for (const file of filled) expect(bare(join(src, file)), file).toBe(1);
+    // A field's well, the stale banner, and the policy draft's banner and Placeholder badge.
+    expect(filled).toEqual({
+      [join('components', 'field.tsx')]: 1,
+      [join('components', 'live-grid.tsx')]: 1,
+      [join('components', 'policy-draft.tsx')]: 2,
+    });
   });
 
   it('a card keeps its own hairline in light and dark, never one for dark alone', () => {

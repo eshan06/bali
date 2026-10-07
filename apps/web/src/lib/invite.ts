@@ -69,6 +69,9 @@ export type RedeemAnswer =
   /** No answer to go by (unreachable, a timeout, a 5xx, over the budget): Try again resends it. */
   | { kind: 'failed'; message: string };
 
+/** An answer the screen says: any but `teacher`, which leaves the screen. */
+export type SaidAnswer = Exclude<RedeemAnswer, { kind: 'teacher' }>;
+
 /** The refusals the code itself answers for, so the field is where the person puts it right. */
 export const CODE_REFUSALS: ReadonlySet<string | undefined> = new Set([
   'invite_code_invalid',
@@ -76,6 +79,20 @@ export const CODE_REFUSALS: ReadonlySet<string | undefined> = new Set([
   'invite_used',
   'invite_expired',
 ]);
+
+/**
+ * Where the screen says `said` (the approved Entry & info design): a refusal of the code right
+ * under the field, any other answer right above the button that retries it.
+ */
+export function placeAnswer(said: SaidAnswer | null): {
+  underField: string | null;
+  aboveButton: SaidAnswer | null;
+} {
+  if (said?.kind === 'refused' && CODE_REFUSALS.has(said.reason)) {
+    return { underField: said.message, aboveButton: null };
+  }
+  return { underField: null, aboveButton: said };
+}
 
 /** Redeem `attempt` (T1b's `POST /v1/teacher-invites/redeem`), its answer in words. */
 export async function redeemInvite(

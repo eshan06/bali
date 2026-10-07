@@ -8,7 +8,15 @@ import {
   TOO_MANY_TRIES,
   TOO_MANY_TRIES_MINUTE,
 } from './errors';
-import { attemptFor, CODE_REFUSALS, codeProblem, redeemInvite, typedCode } from './invite';
+import {
+  attemptFor,
+  CODE_REFUSALS,
+  codeProblem,
+  placeAnswer,
+  redeemInvite,
+  type SaidAnswer,
+  typedCode,
+} from './invite';
 
 // A code as the owner's command prints it (T1a), and its symbols as minted.
 const SHOWN = 'ABCDE-FGHJK-MNPQR-STUVW-XYZ23';
@@ -183,6 +191,24 @@ describe('redeemInvite', () => {
       'invite_not_found',
       'invite_used',
     ]);
+  });
+
+  it('says a refusal of the code under the field, and any other answer above the button', () => {
+    for (const reason of CODE_REFUSALS) {
+      const said: SaidAnswer = { kind: 'refused', message: 'the code', reason };
+      expect(placeAnswer(said), reason).toEqual({ underField: 'the code', aboveButton: null });
+    }
+    const others: SaidAnswer[] = [
+      { kind: 'refused', message: 'a student', reason: 'student_in_class' },
+      { kind: 'refused', message: 'teaches', reason: 'already_teacher' },
+      { kind: 'refused', message: 'no reason', reason: undefined },
+      { kind: 'failed', message: CANT_REACH },
+      { kind: 'failed', message: TOO_MANY_TRIES_MINUTE },
+    ];
+    for (const said of others) {
+      expect(placeAnswer(said), said.message).toEqual({ underField: null, aboveButton: said });
+    }
+    expect(placeAnswer(null)).toEqual({ underField: null, aboveButton: null });
   });
 
   it('keeps an answer that never came, a timeout, a server error or the budget’s 429, to try again', async () => {

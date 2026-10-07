@@ -10,8 +10,9 @@ import {
   attemptFor,
   CODE_REFUSALS,
   codeProblem,
-  type RedeemAnswer,
+  placeAnswer,
   redeemInvite,
+  type SaidAnswer,
   typedCode,
 } from '@/lib/invite';
 import { useApi } from '@/lib/use-api';
@@ -34,8 +35,8 @@ export function InviteCode({ onTeacher }: { onTeacher: () => void }) {
   const sending = useRef(false);
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
-  const [said, setSaid] = useState<Exclude<RedeemAnswer, { kind: 'teacher' }> | null>(null);
-  const codeRefused = said?.kind === 'refused' && CODE_REFUSALS.has(said.reason);
+  const [said, setSaid] = useState<SaidAnswer | null>(null);
+  const { underField, aboveButton } = placeAnswer(said);
   const teaches = said?.kind === 'refused' && said.reason === 'already_teacher';
 
   // The caret back after the symbols it followed, once the grouped code is in the field.
@@ -85,18 +86,19 @@ export function InviteCode({ onTeacher }: { onTeacher: () => void }) {
 
   return (
     // A card on its own (DESIGN.md §4), as /login's: one step, one card, centred under the bar.
-    <div className={`mx-auto max-w-md ${CARD_ALONE}`}>
+    <div className={CARD_ALONE}>
       <h1 className="text-h1 text-balance">Enter your invite code</h1>
       <p className="mt-2 text-body-lg text-pretty text-text-secondary">
         You need it once, to set up this account for teaching.
       </p>
 
-      <form onSubmit={(e) => void onSubmit(e)} className="mt-6">
+      <form onSubmit={(e) => void onSubmit(e)} className="mt-8">
         <Field
           ref={field}
           id={`${id}-code`}
           label="Invite code"
           help="25 letters and digits. Paste it, or type it with or without dashes."
+          refusal={underField ?? undefined}
           mono
           name="invite-code"
           value={code}
@@ -107,12 +109,11 @@ export function InviteCode({ onTeacher }: { onTeacher: () => void }) {
           autoCorrect="off"
           spellCheck={false}
           translate="no"
-          aria-invalid={codeRefused}
-          aria-describedby={said ? `${id}-said` : undefined}
+          aria-describedby={aboveButton ? `${id}-said` : undefined}
         />
-        {said ? (
-          <p id={`${id}-said`} role="alert" className="mt-4 text-body">
-            {said.message}
+        {aboveButton ? (
+          <p id={`${id}-said`} role="alert" className="mt-6 text-body text-pretty">
+            {aboveButton.message}
           </p>
         ) : null}
 

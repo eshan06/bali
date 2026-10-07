@@ -2,9 +2,8 @@ import { Eye, EyeOff } from 'lucide-react';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 
-import { buttonClass } from '@/components/button';
-import { CARD } from '@/components/card';
-import { Lockup } from '@/components/mark';
+import { CARD_ALONE } from '@/components/card';
+import { LockupBar } from '@/components/mark';
 import { TEXT_LINK, TextLink } from '@/components/text-link';
 
 /*
@@ -41,17 +40,18 @@ const SECTIONS = [
   { id: 'help', title: 'Get help' },
 ];
 
+/** A section: its title on the left spine from a laptop's width, its questions beside it. */
 function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
     <section
       id={id}
       aria-labelledby={`${id}-title`}
-      className="scroll-mt-6 border-t border-border-default pt-10"
+      className="mt-12 grid scroll-mt-6 grid-cols-1 gap-x-16 gap-y-6 border-t border-border-default pt-8 sm:mt-16 sm:pt-10 lg:grid-cols-[240px_minmax(0,1fr)]"
     >
       <h2 id={`${id}-title`} className="text-h2">
         {title}
       </h2>
-      <div className="mt-6 space-y-8">{children}</div>
+      <div className="flex min-w-0 flex-col gap-8">{children}</div>
     </section>
   );
 }
@@ -60,35 +60,36 @@ function Question({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div>
       <h3 className="text-h3">{title}</h3>
-      <div className="mt-2 max-w-prose space-y-3 text-text-secondary">{children}</div>
+      <div className="mt-2 flex max-w-[62ch] flex-col gap-3 text-text-secondary">{children}</div>
     </div>
   );
 }
 
 export default function SupportPage() {
   return (
-    <main className="mx-auto max-w-2xl px-4 py-12 text-body sm:px-10 sm:py-16">
-      <Lockup />
-      <h1 className="mt-8 text-h1">Help</h1>
-      <p className="mt-4 max-w-prose text-body-lg text-text-secondary">
-        Bali keeps your iPhone out of the way during class. You tap your phone on your
-        teacher&apos;s Bali block, your apps go quiet until the bell, and Emergency Unlock gets you
-        out any time.
-      </p>
+    <>
+      <LockupBar />
+      <main className="mx-auto max-w-280 px-4 pt-8 pb-16 text-body sm:px-10 sm:pt-12 sm:pb-24">
+        <div className="max-w-180">
+          <h1 className="text-h1 text-balance">Help</h1>
+          <p className="mt-4 max-w-160 text-body-lg text-pretty text-text-secondary">
+            Bali keeps your iPhone out of the way during class. You tap your phone on your
+            teacher&apos;s Bali block, your apps go quiet until the bell, and Emergency Unlock gets
+            you out any time.
+          </p>
+          <nav aria-label="On this page">
+            <ul className="mt-6 flex flex-wrap gap-x-6 gap-y-2">
+              {SECTIONS.map((s) => (
+                <li key={s.id}>
+                  <a href={`#${s.id}`} className={TEXT_LINK}>
+                    {s.title}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        </div>
 
-      <nav aria-label="On this page" className="mt-8">
-        <ul className="flex flex-wrap gap-2">
-          {SECTIONS.map((s) => (
-            <li key={s.id}>
-              <a href={`#${s.id}`} className={buttonClass('secondary')}>
-                {s.title}
-              </a>
-            </li>
-          ))}
-        </ul>
-      </nav>
-
-      <div className="mt-12 space-y-12">
         <Section id="students" title="For students">
           <Question title="Join a class">
             <p>
@@ -129,9 +130,12 @@ export default function SupportPage() {
               Settings any time. If you do during class, your teacher sees Screen Time off.
             </p>
           </Question>
-          {/* The app's consent card's two lists (ConsentCard), as two cards. */}
-          <div id="teacher-sees" className="grid scroll-mt-6 gap-2">
-            <div className={CARD}>
+          {/* The app's consent card's two lists (ConsentCard), as two cards side by side. */}
+          <div
+            id="teacher-sees"
+            className="grid scroll-mt-6 grid-cols-1 items-start gap-4 sm:grid-cols-2"
+          >
+            <div className={CARD_ALONE}>
               <h3 className="flex items-center gap-2 text-h3">
                 <Eye size={20} aria-hidden="true" className="shrink-0 text-text-brand" />
                 What your teacher sees
@@ -142,7 +146,7 @@ export default function SupportPage() {
                 ))}
               </ul>
             </div>
-            <div className={CARD}>
+            <div className={CARD_ALONE}>
               <h3 className="flex items-center gap-2 text-h3">
                 <EyeOff size={20} aria-hidden="true" className="shrink-0 text-text-brand" />
                 What your teacher never sees
@@ -159,8 +163,8 @@ export default function SupportPage() {
         <Section id="teachers" title="For teachers">
           <Question title="Get an invite code">
             <p>
-              A teacher account needs an invite code. Email us at the address under Get help and
-              we&apos;ll send you one. Sign in to the{' '}
+              A teacher account needs an invite code made for your school. To ask for one, email us
+              at the address under Get help. Sign in to the{' '}
               <TextLink href="/login">teacher portal</TextLink> and enter it once to set up your
               account for teaching. A code works once, and expires 14 days after we make it.
             </p>
@@ -212,17 +216,15 @@ export default function SupportPage() {
         </Section>
 
         <Section id="help" title="Get help">
-          <div className="max-w-prose text-text-secondary">
-            <p>
-              Email{' '}
-              <a href={`mailto:${SUPPORT_EMAIL}`} className={`${TEXT_LINK} break-all`}>
-                {SUPPORT_EMAIL}
-              </a>
-              . Tell us whether you&apos;re a student or a teacher, and what happened.
-            </p>
-          </div>
+          <p className="max-w-[62ch] text-body-lg text-pretty">
+            Email{' '}
+            <a href={`mailto:${SUPPORT_EMAIL}`} className={`${TEXT_LINK} break-all`}>
+              {SUPPORT_EMAIL}
+            </a>
+            . Tell us whether you&apos;re a student or a teacher, and what happened.
+          </p>
         </Section>
-      </div>
-    </main>
+      </main>
+    </>
   );
 }

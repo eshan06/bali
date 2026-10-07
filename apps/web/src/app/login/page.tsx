@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 
 import { Button } from '@/components/button';
 import { CARD_ALONE } from '@/components/card';
-import { Lockup } from '@/components/mark';
+import { EntryPage } from '@/components/entry-page';
 import { TextLink } from '@/components/text-link';
 import { type SignedOut, signedOut, startLogin } from '@/lib/auth';
 
@@ -35,28 +35,29 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-10 sm:px-10">
+    <EntryPage>
       {/* A card on its own (DESIGN.md §4): radius-lg, space-6 padding, its own hairline edge. */}
       <div className={CARD_ALONE}>
-        <Lockup />
-        <h1 className="mt-6 text-h1 text-balance">Teacher portal</h1>
-        <p className="mt-2 text-body-lg text-text-secondary">Sign in to see your classes.</p>
+        <h1 className="text-h1 text-balance">Teacher portal</h1>
+        <p className="mt-2 text-body-lg text-pretty text-text-secondary">
+          Sign in to see your classes.
+        </p>
         {left ? (
-          <p role="status" className="mt-6 text-body">
+          <p role="status" className="mt-6 text-body text-pretty">
             {SIGNED_OUT[left]}
           </p>
         ) : null}
-        <Button onClick={onSignIn} className="mt-6 w-full">
+        <Button onClick={onSignIn} className="mt-8 w-full">
           Sign in
         </Button>
         {error ? (
-          <p role="alert" className="mt-4 text-body">
+          <p role="alert" className="mt-4 text-body text-pretty">
             {error}
           </p>
         ) : null}
       </div>
       {/* The public pages, under the card and in line with its text: the card keeps to signing in. */}
-      <nav aria-label="Help and policies" className="mt-6 px-6">
+      <nav aria-label="Help and policies" className="mt-4 px-6">
         <ul className="flex flex-wrap gap-x-5 gap-y-2 text-body">
           {PUBLIC_PAGES.map((page) => (
             <li key={page.href}>
@@ -65,6 +66,6 @@ export default function LoginPage() {
           ))}
         </ul>
       </nav>
-    </main>
+    </EntryPage>
   );
 }
