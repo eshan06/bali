@@ -12,8 +12,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   seen flag lives for the app's run alone, in memory (`Phone.introSeen`), and the phone's defaults
   key `introSeen` is no longer read or written, so every new run's Sign up shows the intro again (a
   second account's, and one whose page closed or could not open, too); Sign up again in the same
-  run still opens the page at once, as the design draws it. It replaces point (3) of the entry
-  below.
+  run still opens the page at once, as the design draws it. It replaces point (3) of the entry on
+  the Sign in screen and the sign-up path, below.
 
 - **2026-10-07** — **Your name, the Sign in & sign up design's last row.** The owner's decision of
   2026-10-07: a student with no name shows on the teacher's portal as the first 8 characters of
