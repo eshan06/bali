@@ -17,16 +17,19 @@ type Said = { kind: 'failed' | 'made'; message: string };
  * code style, and New code opening a confirm under it, since the old code stops working the moment
  * the new one is made; then the new code in its place, said beside it. Each failure is said in the
  * confirm, and Try again sends it again. `onClass` gets the class as the answer gives it, its new
- * code included. Focus goes back to New code whenever the confirm closes.
+ * code included. Focus goes back to New code whenever the confirm closes. `large` sets the code in
+ * `code-lg`, for Present, read from the back of the room (the owner's ruling).
  */
 export function JoinCode({
   classId,
   code,
   onClass,
+  large = false,
 }: {
   classId: string;
   code: string;
   onClass: (klass: ClassDetail) => void;
+  large?: boolean;
 }) {
   const api = useApi();
   const id = useId();
@@ -83,7 +86,7 @@ export function JoinCode({
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <p className="flex items-baseline gap-2">
           <span className="text-caption text-text-tertiary">Join code</span>
-          <span translate="no" className="font-mono text-code">
+          <span translate="no" className={`font-mono ${large ? 'text-code-lg' : 'text-code'}`}>
             {code}
           </span>
         </p>

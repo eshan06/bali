@@ -37,6 +37,7 @@ import {
   softpulses,
   staleness,
   staleWords,
+  type Student,
   type Students,
   unlockNote,
 } from '@/lib/grid-state';
@@ -85,36 +86,134 @@ const CHIP: Record<GridDisplay, { label: string; icons: LucideIcon[]; tone: stri
 };
 
 /**
+ * The grid's columns (the Class page design): as many as fit, each at least 212 px, so six fill
+ * the class page's 1320 px column at the desktop width, every chip on one line but Unknown's and
+ * "Left · protection off", which wrap after their dot; in Present at least 320 px, so four do.
+ * Never wider than the grid (`min`), on a phone.
+ */
+export const COLUMNS = 'grid-cols-[repeat(auto-fill,minmax(min(212px,100%),1fr))]';
+export const PRESENT_COLUMNS = 'grid-cols-[repeat(auto-fill,minmax(min(320px,100%),1fr))]';
+
+/**
  * A state chip: a pill in the state's tint, padded `space-2` × `space-3`, its label in the `label`
- * style (DESIGN.md §4). What the chip carries rides after the label, never replacing it: an
- * unlock's reason (never in Present), or how long a Silent phone has been quiet. `pulse` is
- * `bali-softpulse` (§7), and `onPulseEnd` hears it finish. In Present the label takes the
- * projector's size (§5).
+ * style (DESIGN.md §4). It says the state alone, the same words on the teacher's screen and on the
+ * projector (the Class page design); only Silent carries how long the phone has been quiet. A label
+ * too long for its cell wraps balanced, after the dot ("Left ·" over "protection off", the
+ * owner's ruling), at `radius-lg`, which draws a pill on one line. `pulse` is `bali-softpulse`
+ * (§7), and `onPulseEnd` hears it finish. In Present the label takes the projector's size (§5).
  */
 function Chip({
   display,
-  note,
+  silent,
   pulse,
   onPulseEnd,
   present,
 }: {
   display: GridDisplay;
-  note: string | null;
+  silent: string | null;
   pulse: boolean;
-  onPulseEnd: () => void;
+  onPulseEnd?: () => void;
   present: boolean;
 }) {
   const chip = CHIP[display];
   return (
     <span
       onAnimationEnd={pulse ? onPulseEnd : undefined}
-      className={`inline-flex max-w-full items-center gap-2 rounded-full border px-3 py-2 uppercase ${present ? 'text-present-label' : 'text-label'} ${chip.tone} ${pulse ? 'animate-softpulse' : ''}`}
+      className={`inline-flex max-w-full items-start gap-1 rounded-lg border px-3 py-2 text-balance uppercase ${present ? 'text-present-label' : 'text-label'} ${chip.tone} ${pulse ? 'animate-softpulse' : ''}`}
     >
       {chip.icons.map((Icon, i) => (
-        <Icon key={i} size={present ? 16 : 14} aria-hidden="true" className="shrink-0" />
+        <Icon
+          key={i}
+          size={present ? 16 : 14}
+          aria-hidden="true"
+          className={`shrink-0 ${present ? 'mt-0.5' : 'mt-px'}`}
+        />
       ))}
-      <span className="min-w-0">{note === null ? chip.label : `${chip.label} · ${note}`}</span>
+      {/* A no-break space before each dot, so a label breaks after it, never before. */}
+      <span className="min-w-0">
+        {(silent === null ? chip.label : `${chip.label} · ${silent}`).replaceAll(' · ', '\u00a0· ')}
+      </span>
     </span>
+  );
+}
+
+/**
+ * The dot between an unlock's reason and "last seen", as wide as " · ", clipped away when "last
+ * seen" wraps under the reason (the line's `overflow-hidden`), so a line never starts with it.
+ */
+const AFTER_REASON =
+  "-ml-2.5 before:inline-block before:w-2.5 before:text-center before:content-['·']";
+
+/**
+ * One student's cell (the Class page design): the name, then the chip, then the line under it: the
+ * unlock's reason (`unlockNote`, never in Present) and how long since the phone was heard from
+ * (`lastSeenNote`), so a row's chips line up. Every cell is as tall as one with that line. In
+ * Present the line sits beside the chip when it fits; on one column (a phone) the chip sits beside
+ * the name, the line under both.
+ */
+export function Cell({
+  student: s,
+  now,
+  present,
+  pulse,
+  onPulseEnd,
+}: {
+  student: Student;
+  now: Date;
+  present: boolean;
+  pulse: boolean;
+  onPulseEnd?: () => void;
+}) {
+  const display = gridDisplay(s, now);
+  const reason = unlockNote(s, display, present);
+  const seen = lastSeenNote(s, display, now);
+  return (
+    <li
+      className={`flex flex-col gap-2 ${present ? 'min-h-22' : 'min-h-31'} ${CARD} @max-[432px]:grid @max-[432px]:min-h-0 @max-[432px]:grid-cols-[minmax(0,1fr)_auto] @max-[432px]:items-center @max-[432px]:gap-x-3 @max-[432px]:gap-y-1`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <span
+          className={`min-w-0 break-words ${present ? 'text-present-name' : 'text-body font-semibold'}`}
+        >
+          {s.displayName ?? s.studentId.slice(0, 8)}
+        </span>
+        {/* S9: advice beside the name, never a colour of its own; it changes no state. */}
+        {s.clockOff ? (
+          <span
+            title="This phone's clock is set ahead. Bali records the time by its own clock."
+            className="shrink-0 rounded-xs border border-current px-2 text-caption whitespace-nowrap text-text-tertiary"
+          >
+            Clock off
+          </span>
+        ) : null}
+      </div>
+      <div
+        className={`${present ? 'flex flex-wrap items-center gap-x-3 gap-y-1' : 'flex flex-col items-start gap-2'} @max-[432px]:contents`}
+      >
+        {/* Keyed by its unlock, so each new one pulses from the start; once it has pulsed it
+            leaves the set, so a chip that turns red and back stays still. */}
+        <Chip
+          key={s.unlock?.eventId ?? 'none'}
+          display={display}
+          silent={display === 'silent' ? silentNote(s, now) : null}
+          pulse={pulse}
+          present={present}
+          onPulseEnd={onPulseEnd}
+        />
+        {reason === null && seen === null ? null : (
+          <p className="flex flex-wrap overflow-hidden text-caption tabular-nums @max-[432px]:col-span-full">
+            {reason === null ? null : (
+              <span className="mr-2.5 text-text-secondary first-letter:uppercase">{reason}</span>
+            )}
+            {seen === null ? null : (
+              <span className={`text-text-tertiary ${reason === null ? '' : AFTER_REASON}`}>
+                {seen}
+              </span>
+            )}
+          </p>
+        )}
+      </div>
+    </li>
   );
 }
 
@@ -298,61 +397,26 @@ export function LiveGrid({
       {rows.length === 0 ? (
         <p className="text-body text-text-secondary">No students enrolled yet.</p>
       ) : (
-        // Six columns at the desktop width, four in Present, fewer as the grid narrows, never
-        // smaller type (§5); the cells straight on the page.
+        // Fewer columns as the grid narrows, never smaller type (§5); the cells straight on the page.
         <div className="@container">
-          <ul
-            className={`grid gap-2 ${present ? 'grid-cols-2 @2xl:grid-cols-3 @4xl:grid-cols-4' : 'grid-cols-2 @xl:grid-cols-3 @3xl:grid-cols-4 @5xl:grid-cols-5 @6xl:grid-cols-6'}`}
-          >
+          <ul className={`grid gap-2 ${present ? PRESENT_COLUMNS : COLUMNS}`}>
             {rows.map((s) => {
-              const display = gridDisplay(s, now);
-              const seen = lastSeenNote(s, display, now);
               const unlock = s.unlock?.eventId;
               return (
-                <li
+                <Cell
                   key={s.studentId}
-                  className={`flex flex-col gap-3 ${present ? 'min-h-22' : ''} ${CARD}`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <span
-                      className={`min-w-0 break-words ${present ? 'text-present-name' : 'text-body font-semibold'}`}
-                    >
-                      {s.displayName ?? s.studentId.slice(0, 8)}
-                    </span>
-                    {/* S9: advice beside the name, never a colour of its own; it changes no state. */}
-                    {s.clockOff ? (
-                      <span
-                        title="This phone's clock is set ahead. Bali records the time by its own clock."
-                        className="shrink-0 rounded-xs border border-current px-2 text-caption text-text-tertiary"
-                      >
-                        Clock off
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                    {/* Keyed by its unlock, so each new one pulses from the start; once it has
-                        pulsed it leaves the set, so a chip that turns red and back stays still. */}
-                    <Chip
-                      key={unlock ?? 'none'}
-                      display={display}
-                      note={
-                        display === 'silent' ? silentNote(s, now) : unlockNote(s, display, present)
-                      }
-                      pulse={softpulses(s, display, liveUnlocks)}
-                      present={present}
-                      onPulseEnd={() =>
-                        setLiveUnlocks((prev) => {
-                          const next = new Set(prev);
-                          if (unlock !== undefined) next.delete(unlock);
-                          return next;
-                        })
-                      }
-                    />
-                    {seen === null ? null : (
-                      <span className="text-caption text-text-tertiary tabular-nums">{seen}</span>
-                    )}
-                  </div>
-                </li>
+                  student={s}
+                  now={now}
+                  present={present}
+                  pulse={softpulses(s, gridDisplay(s, now), liveUnlocks)}
+                  onPulseEnd={() =>
+                    setLiveUnlocks((prev) => {
+                      const next = new Set(prev);
+                      if (unlock !== undefined) next.delete(unlock);
+                      return next;
+                    })
+                  }
+                />
               );
             })}
           </ul>

@@ -13,6 +13,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 import { Button } from '@/components/button';
+import { CARD_ALONE } from '@/components/card';
 import { Field } from '@/components/field';
 import { JoinCode } from '@/components/join-code';
 import { LiveGrid } from '@/components/live-grid';
@@ -40,10 +41,13 @@ import {
 import { useApi } from '@/lib/use-api';
 
 /**
- * The page's column: as wide as D2a's B artboard drew it (1400 px), since the live grid is its
- * main object and six columns need the room; 40 px gutters from the desktop width (§5).
+ * The page's column: 1400 px at most, as the Class page design draws it, since the live grid is
+ * its main object and six columns need the room; 40 px gutters from the desktop width (§5).
  */
-const PAGE = 'mx-auto max-w-[1400px] px-4 pt-10 pb-16 sm:px-10';
+const PAGE = 'mx-auto max-w-[1400px] px-4 pb-16 sm:px-10';
+
+/** A hairline between the bell and the controls, 40 px tall as the buttons are. */
+const DIVIDER = 'h-10 w-px shrink-0 bg-border-default';
 
 /**
  * A length in the picker: a pill per length, no grey track behind them (the owner, 2026-10-06),
@@ -55,10 +59,11 @@ const LENGTH =
   'inline-flex h-10 cursor-pointer items-center gap-2 rounded-full border border-border-strong bg-surface-card px-4 text-body text-text-primary tabular-nums transition-colors select-none hover:bg-surface-sunken has-checked:border-text-primary has-checked:bg-surface-sunken has-checked:font-semibold has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-focus-ring';
 
 /**
- * A class's page (in Soft premium, D2f): its name and join code; while no session runs, the length
- * picker and Start, the last session's recap and how it ended, with Present; while one runs, the
- * live grid with its bell, Present, Extend and End; then the roster. Each failure is said where it
- * happened.
+ * A class's page (the Class page design): its name and join code; while no session runs, the
+ * length picker and Start, the last session's recap and how it ended, with Present; while one runs,
+ * the session's card (the bell, Extend, and End set apart), then the live grid with Present; then
+ * the roster. In Present the header folds the bell, the code and the controls into one row, so a
+ * class of 28 fits one 1080p screen. Each failure is said where it happened.
  */
 export default function ClassDetailPage() {
   const api = useApi();
@@ -257,8 +262,46 @@ export default function ClassDetailPage() {
     </Button>
   );
 
+  // In Present while a session runs, the projector's page (the Present board): the header folds the
+  // bell, the code and the controls into one row, so a class of 28 fits one 1080p screen.
+  const projecting = present && grid !== null && !grid.over;
+  // The bell, the page's biggest number; "…" until an answer or a snapshot says it.
+  const endsAt = (
+    <p className="flex flex-col">
+      <span className="text-caption text-text-tertiary">Ends at</span>
+      {grid?.endsAt ? (
+        <time dateTime={grid.endsAt} className="font-num text-data-lg tabular-nums">
+          {bellTime(grid.endsAt)}
+        </time>
+      ) : (
+        <span className="font-num text-data-lg text-text-tertiary">…</span>
+      )}
+    </p>
+  );
+  const extend = EXTEND_PRESETS.map((add) => (
+    <Button
+      key={add}
+      variant="secondary"
+      onClick={() => addTime(extendAttemptFor(unanswered.current, add))}
+      aria-disabled={busy !== null}
+      className="tabular-nums"
+    >
+      +{add} min
+    </Button>
+  ));
+  const end = (className = '') => (
+    <Button
+      variant="secondary"
+      onClick={endSession}
+      aria-disabled={busy !== null}
+      className={className}
+    >
+      End session
+    </Button>
+  );
+
   return (
-    <main className={PAGE}>
+    <main className={`${PAGE} ${projecting ? 'pt-5' : 'pt-8'}`}>
       <nav aria-label="Class" className="flex justify-between gap-4">
         <Link href="/" className={NAV_LINK}>
           <ArrowLeft size={16} aria-hidden="true" />
@@ -270,9 +313,23 @@ export default function ClassDetailPage() {
         </Link>
       </nav>
 
-      <header className="mt-6 flex flex-wrap items-start justify-between gap-x-8 gap-y-4">
+      {/* One header in both views, so the code and its confirm stay put as Present turns on. */}
+      <header
+        className={`flex flex-wrap gap-x-8 gap-y-4 ${projecting ? 'mt-4 items-center' : 'mt-5 items-start justify-between'}`}
+      >
         <h1 className="min-w-0 text-h1 text-balance break-words">{klass?.name ?? '…'}</h1>
-        {klass ? <JoinCode classId={classId} code={klass.joinCode} onClass={setKlass} /> : null}
+        {projecting ? endsAt : null}
+        {projecting ? <div className="grow" /> : null}
+        {klass ? (
+          <JoinCode classId={classId} code={klass.joinCode} onClass={setKlass} large={projecting} />
+        ) : null}
+        {projecting ? <div aria-hidden="true" className={`${DIVIDER} max-lg:hidden`} /> : null}
+        {projecting ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {extend}
+            {end()}
+          </div>
+        ) : null}
       </header>
 
       {error ? (
@@ -286,9 +343,9 @@ export default function ClassDetailPage() {
         </div>
       ) : null}
 
-      <div className="mt-10">
+      <div>
         {grid === null || grid.over ? (
-          <div className="flex flex-col gap-10">
+          <div className="mt-10 flex flex-col gap-10">
             {/* noValidate: the length is checked here and said in Bali's words under the field,
                 never by the browser's own bubble over the number input. */}
             <form onSubmit={startSession} noValidate className="flex flex-col items-start gap-6">
@@ -384,38 +441,25 @@ export default function ClassDetailPage() {
             ) : null}
           </div>
         ) : (
-          <section aria-labelledby={`${id}-live`} className="flex flex-col gap-4">
-            <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <h2 id={`${id}-live`} className="text-h2">
-                  Live grid
-                </h2>
-                {grid.endsAt ? (
-                  <p className="text-body text-text-secondary tabular-nums">
-                    Ends at <time dateTime={grid.endsAt}>{bellTime(grid.endsAt)}</time>
-                  </p>
-                ) : null}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {presentToggle}
-                {EXTEND_PRESETS.map((add) => (
-                  <Button
-                    key={add}
-                    variant="secondary"
-                    onClick={() => addTime(extendAttemptFor(unanswered.current, add))}
-                    aria-disabled={busy !== null}
-                    className="tabular-nums"
-                  >
-                    +{add} min
-                  </Button>
-                ))}
-                <Button variant="secondary" onClick={endSession} aria-disabled={busy !== null}>
-                  End session
-                </Button>
-              </div>
-            </div>
+          // The same three places in both views, so the grid never restarts as Present turns on.
+          <>
+            {/* The session's card: the bell, adding time, and End set apart (End sends at once). */}
+            {projecting ? null : (
+              <section
+                aria-label="Session"
+                className={`mt-6 flex flex-wrap items-center gap-x-6 gap-y-4 ${CARD_ALONE}`}
+              >
+                {endsAt}
+                <div aria-hidden="true" className={`${DIVIDER} max-sm:hidden`} />
+                <div className="flex grow flex-wrap items-center gap-2 max-sm:basis-full">
+                  {extend}
+                  {end('ml-auto')}
+                </div>
+              </section>
+            )}
+            {/* Said right under the controls, where they are. */}
             {said ? (
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+              <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-3">
                 <p role={said.kind === 'note' ? 'status' : 'alert'} className="text-body">
                   {said.message}
                 </p>
@@ -433,13 +477,24 @@ export default function ClassDetailPage() {
                 ) : null}
               </div>
             ) : null}
-            <LiveGrid
-              sessionId={grid.id}
-              onEnded={onEnded}
-              onSession={onSession}
-              present={present}
-            />
-          </section>
+            <section
+              aria-labelledby={`${id}-live`}
+              className={`flex flex-col ${projecting ? 'mt-5 gap-3' : 'mt-8 gap-4'}`}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+                <h2 id={`${id}-live`} className="text-h2">
+                  Live grid
+                </h2>
+                {presentToggle}
+              </div>
+              <LiveGrid
+                sessionId={grid.id}
+                onEnded={onEnded}
+                onSession={onSession}
+                present={present}
+              />
+            </section>
+          </>
         )}
       </div>
 
