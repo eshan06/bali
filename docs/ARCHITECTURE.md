@@ -831,10 +831,12 @@ never covers or delays Emergency Unlock, and its answers never enter the outbox.
   Screen Time and Home. The shields' Focus and the home a standing not read keeps, which hold the
   exit, come before both, and so do a session's own screens: Unlocked, Protection off and Session
   over.
-  Every way to the hosted UI goes through one call (`Phone.signIn`), which, for the sign-up page,
-  asks the check first, every time, and then shows the intro where this run has not shown it
-  since its last sign-out (once per account, not per phone: the owner's rulings, 2026-10-07); the
-  sign-in page opens at once, and after an answer under 13 neither opens that run. A first launch
+  Every way to the hosted UI starts at one call (`Phone.signIn`), which, for the sign-up page,
+  asks the check first, every time; only that question's Continue and then the intro, shown where
+  this run has not shown it since its last sign-out (once per account, not per phone: the owner's
+  rulings, 2026-10-07), go on to the page, after an answer of 13 or older that same time
+  (`Phone.answerAge`, `sawIntro`, through the private `Phone.open`); the sign-in page opens at
+  once, and after an answer under 13 neither opens that run. A first launch
   opens on Sign in. The sign-in gives Bali's API no token until its account has passed the check
   on this phone (`SignIn`'s `cleared`, asked with the account's Cognito id and read from the
   phone's own defaults), but an account deletion's (`deletionToken`): Delete account's steps, the
