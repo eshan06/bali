@@ -8,6 +8,15 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-07** — **Two fixes from the Your name PR's review** (#292's Claude Review warns, the
+  owner's approval). **(1) The intro once per account holds within a run too:** a sign-out forgets
+  the run's intro seen (`Phone.signed`, every way out: Sign out, a deleted account, Cognito
+  refusing the sign-in), so after A signs out, B's Sign up that run shows the intro first; Sign up
+  again with no sign-out between still opens the page at once, as the design draws it. **(2) Your
+  name's keyboard comes back only after a save that failed**, as on Me, never for a moment once the
+  name is set and the router moves on. Me's own guard keys on `Naming.editing`, which Your name
+  never sets, so Your name's keys on the save's failure.
+
 - **2026-10-07** — **No screen flashes before Your name** (the owner's ruling on the Your name PR's
   review: warn 1 fixed, warn 2 left as is). Right after a sign-in `me` is unknown until the first
   `GET /v1/me` answers, so for that round trip the router showed Screen Time or Home, then Your
