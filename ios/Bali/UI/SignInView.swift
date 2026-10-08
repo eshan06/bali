@@ -16,7 +16,9 @@ struct SignInView: View {
     @Environment(\.webAuthenticationSession) private var browser
 
     var body: some View {
-        let opening = phone.signingIn ? phone.hostedPage : nil
+        // Signed in, Sign in only ever waits for Bali or leaves (`RootView`): its page's button
+        // stays busy, as the screen under the page holds still (the approved motion spec).
+        let opening = phone.signingIn || phone.signedIn == true ? phone.hostedPage : nil
         ScreenScaffold {
             PageScroll {
                 VStack(alignment: .leading, spacing: 0) {

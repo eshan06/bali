@@ -1,3 +1,4 @@
+import BaliOutbox
 import SwiftUI
 
 // The Bali Design System as the student app draws it (D1, approved 2026-09-24; `docs/DECISIONS.md`,
@@ -36,12 +37,36 @@ enum Theme {
     enum Radius {
         static let xs: CGFloat = 6, sm: CGFloat = 10, md: CGFloat = 14, lg: CGFloat = 20
     }
+}
+
+/// The design system's motion (DESIGN.md §7; the approved Sign in & sign up design's motion spec):
+/// every move on its `standard` easing, `fast` 150 ms, `base` 200 ms, `slow` 300 ms. Under Reduce
+/// Motion nothing moves, and a fade stays a fade: 200 ms (the owner's ruling, 2026-10-08).
+enum Motion {
+    /// The `standard` easing, `cubic-bezier(0.2, 0, 0, 1)`, over `seconds`.
+    static func standard(_ seconds: Double) -> Animation {
+        .timingCurve(0.2, 0, 0, 1, duration: seconds)
+    }
+
+    /// The `standard` easing as a keyframe's curve.
+    static let curve = UnitCurve.bezier(
+        startControlPoint: UnitPoint(x: 0.2, y: 0), endControlPoint: UnitPoint(x: 0, y: 1))
 
     /// A screen the student opens over another fading in, and the one under it fading back in as
-    /// they go back (#150): the design system's `base`, 200 ms, on its `standard` easing. None under
-    /// Reduce Motion, where every animation is off and a fade is instant (DESIGN.md).
-    static func fade(reduceMotion: Bool) -> Animation? {
-        reduceMotion ? nil : .timingCurve(0.2, 0, 0, 1, duration: 0.2)
+    /// they go back (#150): `base`, with Reduce Motion too.
+    static let fade = standard(0.2)
+
+    /// A busy button dimming as its words change: `fast`, at once under Reduce Motion.
+    static func dim(reduceMotion: Bool) -> Animation? { reduceMotion ? nil : standard(0.15) }
+
+    /// How long `move` plays: a step or an arrival `slow`, the mark `base`; under Reduce Motion
+    /// each a `base` fade.
+    static func seconds(_ move: Screen.Move, reduceMotion: Bool) -> Double {
+        switch move {
+        case .cut: 0
+        case .mark: 0.2
+        case .forward, .back, .arrive: reduceMotion ? 0.2 : 0.3
+        }
     }
 }
 
@@ -117,7 +142,7 @@ struct PrimaryButtonStyle: ButtonStyle {
         configuration.label.textStyle(.button).foregroundStyle(.white)
             .frame(maxWidth: .infinity, minHeight: 56)
             .background(configuration.isPressed ? pressed : fill, in: .rect(cornerRadius: Theme.Radius.md))
-            .opacity(enabled ? 1 : 0.6)
+            .modifier(Dimmed(on: !enabled))
     }
 }
 
@@ -134,7 +159,18 @@ struct SecondaryButtonStyle: ButtonStyle {
                 in: .rect(cornerRadius: Theme.Radius.md))
             .overlay(
                 RoundedRectangle(cornerRadius: Theme.Radius.md).stroke(Theme.borderStrong))
-            .opacity(enabled ? 1 : 0.6)
+            .modifier(Dimmed(on: !enabled))
+    }
+}
+
+/// A control dimmed to 60 % while `on` — disabled, or busy with its words changed at once —
+/// over `Motion.dim`: only the dim moves, never the words.
+struct Dimmed: ViewModifier {
+    let on: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content.animation(Motion.dim(reduceMotion: reduceMotion)) { $0.opacity(on ? 0.6 : 1) }
     }
 }
 

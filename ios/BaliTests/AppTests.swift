@@ -1364,45 +1364,42 @@ struct AppTests {
     }
 
     @Test(
-        "A screen the student opens over another fades in, and the one under it fades back in as they go back (#150): the design system's base 200 ms on its standard easing — and under Reduce Motion no animation at all, the fade instant (DESIGN.md)"
+        "A screen the student opens over another fades in, and the one under it fades back in as they go back (#150): the design system's base 200 ms on its standard easing, under Reduce Motion too — a fade stays a fade there, nothing moves (the owner's ruling, 2026-10-08; DESIGN.md §7)"
     )
     func fade() {
-        #expect(Theme.fade(reduceMotion: false) == .timingCurve(0.2, 0, 0, 1, duration: 0.2))
-        #expect(Theme.fade(reduceMotion: true) == nil)
+        #expect(Motion.fade == .timingCurve(0.2, 0, 0, 1, duration: 0.2))
+        #expect(Motion.standard(0.3) == .timingCurve(0.2, 0, 0, 1, duration: 0.3))
     }
 
     @Test(
         "A screen fading in (#150) starts as the page's own colour alone, opaque — so the screen it replaces, which SwiftUI keeps until the fade ends and which draws itself anew from the next screen's state, is gone at once — and ends as itself over that colour"
     )
     func opening() throws {
-        func drawn(_ shown: Bool) throws -> [Int] {
+        func drawn(_ moving: Moving) throws -> [Int] {
             let renderer = ImageRenderer(
-                content: Rectangle().fill(Theme.text).frame(width: 8, height: 8)
-                    .modifier(Opening(shown: shown)))
+                content: Rectangle().fill(Theme.text).frame(width: 8, height: 8).modifier(moving))
             renderer.scale = 1
             return try pixels(of: try #require(renderer.uiImage))(4, 4)
         }
-        #expect(try drawn(false) == [0xF7, 0xF5, 0xF2, 255])
-        #expect(try drawn(true) == [0x21, 0x1F, 0x1B, 255])
+        let opening = Stage.moving(.cut, reduceMotion: false).arriving
+        #expect(try drawn(opening) == [0xF7, 0xF5, 0xF2, 255])
+        #expect(try drawn(opening.shown) == [0x21, 0x1F, 0x1B, 255])
     }
 
     @Test(
-        "A screen leaving takes no touch (#161's review): a tap where its code field was lands elsewhere at once — under the fade's own transition, and kept on screen for the whole of a slow fade under its removal's modifier (`Opening.Replaced`), as SwiftUI may keep a screen leaving — so a fast tap meant for the screen arriving never starts what the one leaving would have. The fade's removal is that modifier, as its type says (santa's round 1)"
+        "A screen leaving takes no touch (#161's review), whatever its move (the approved motion spec; Reduce Motion's too): a tap where its code field was lands elsewhere from the move's first frame, the field kept on screen for the whole of a slow move as SwiftUI keeps a screen leaving, so a fast tap meant for the screen arriving never starts what the one leaving would have"
     )
     func leavingTakesNoTouch() async throws {
-        // Read from its type, as `historyLazy` reads History's.
-        #expect(String(reflecting: Opening.transition).contains("Opening.Replaced"))
         let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
-        let kept = AnyTransition.asymmetric(
-            insertion: .identity,
-            removal: .modifier(
-                active: Opening.Replaced(gone: true), identity: Opening.Replaced(gone: false)))
-        for (transition, keeps) in [(Opening.transition, false), (kept, true)] {
+        let moves: [(Screen.Move, Bool)] =
+            [.cut, .forward, .back, .arrive, .mark].map { ($0, false) } + [(.forward, true)]
+        for (move, reduceMotion) in moves {
             let shown = Shown()
             let window = UIWindow(windowScene: scene)
             window.frame = scene.screen.bounds
             window.rootViewController = UIHostingController(
-                rootView: Switching(shown: shown, transition: transition))
+                rootView: Switching(
+                    shown: shown, transition: Stage.transition(move, reduceMotion: reduceMotion)))
             window.isHidden = false
             defer { window.isHidden = true }
             try await until { textFields(in: window).first != nil }
@@ -1411,15 +1408,155 @@ struct AppTests {
             let center = CGPoint(x: frame.midX, y: frame.midY)
             #expect(window.hitTest(center, with: nil)?.isDescendant(of: field) == true)
             withAnimation(.linear(duration: 60)) { shown.field = false }
-            // A render later, the fade a minute from its end.
+            // A render later, the move a minute from its end.
             try await Task.sleep(for: .milliseconds(100))
-            if keeps { #expect(field.window != nil) }
-            #expect(window.hitTest(center, with: nil)?.isDescendant(of: field) != true, "\(keeps)")
+            #expect(field.window != nil, "\(move), \(reduceMotion)")
+            #expect(
+                window.hitTest(center, with: nil)?.isDescendant(of: field) != true,
+                "\(move), \(reduceMotion)")
         }
     }
 
     @Test(
-        "Back lets the keyboard go before the screen moves (#150): Join's code field, focused as Join shows, types in nothing once Back is pressed — the keyboard going down with Join, never left over Home as Home fades back in — nor takes it back while Join fades out and after: looked at after each render, past the fade's end (#161's review)"
+        "Every move as the approved motion spec times it, on the standard easing: a step and an arrival 300 ms, the mark 200 ms, a cut none; a busy button dims in 150 ms. Under Reduce Motion (the owner's ruling, 2026-10-08): every move a 200 ms fade, nothing slides — the student's own opening too — and a busy button dims at once"
+    )
+    func motion() {
+        for move in [Screen.Move.forward, .back, .arrive] {
+            #expect(Motion.seconds(move, reduceMotion: false) == 0.3, "\(move)")
+            #expect(Motion.seconds(move, reduceMotion: true) == 0.2, "\(move)")
+        }
+        #expect(Motion.seconds(.mark, reduceMotion: false) == 0.2)
+        #expect(Motion.seconds(.mark, reduceMotion: true) == 0.2)
+        #expect(Motion.seconds(.cut, reduceMotion: false) == 0)
+        #expect(Motion.dim(reduceMotion: false) == .timingCurve(0.2, 0, 0, 1, duration: 0.15))
+        #expect(Motion.dim(reduceMotion: true) == nil)
+        // The two halves of each move: a step slides 24 pt and the screen it replaces is gone by
+        // its first 100 ms; under Reduce Motion nothing slides, and the two cross-fade.
+        let step = Stage.moving(.forward, reduceMotion: false)
+        #expect(step.arriving.slide == 24 && step.leaving.slide == -24)
+        #expect(step.leaving.fadesBy == 0.73 && step.leaving.away && !step.arriving.away)
+        #expect(Stage.moving(.back, reduceMotion: false).arriving.slide == -24)
+        #expect(Stage.moving(.arrive, reduceMotion: false).leaving.fadesBy == 0.88)
+        for move in [Screen.Move.forward, .back, .arrive, .mark] {
+            let (arriving, leaving) = Stage.moving(move, reduceMotion: true)
+            #expect(arriving.slide == 0 && leaving.slide == 0, "\(move)")
+            #expect(arriving.fadesBy == 1 && leaving.fadesBy == 1 && !arriving.page, "\(move)")
+        }
+        let opening = Stage.moving(.cut, reduceMotion: true)
+        #expect(opening.arriving.page && opening.leaving.fadesBy == 0)
+    }
+
+    @Test(
+        "What RootView draws as the router moves on (the approved motion spec): the screen showing, held and leaving by its move, until the move plays, then the router's own, carrying the move that brought it; a cut at once — Focus, a session's screens, Waiting and the home a standing not read keeps, over a held screen or the mark alike, and a screen the student opens — and at launch, nothing shown yet, the router's first answer"
+    )
+    func stage() {
+        func at(_ screen: Screen, tabbed: Bool = false) -> Routed { Routed((screen, tabbed)) }
+        #expect(Stage().showing(at(.starting), signedIn: false) == (at(.starting), .cut))
+        let signIn = Stage(shown: at(.signIn))
+        #expect(signIn.showing(at(.starting), signedIn: true) == (at(.signIn), .mark))
+        #expect(signIn.showing(at(.age), signedIn: false) == (at(.signIn), .forward))
+        #expect(signIn.showing(at(.age), signedIn: true) == (at(.signIn), .arrive))
+        let mark = Stage(shown: at(.starting))
+        #expect(mark.showing(at(.name), signedIn: true) == (at(.starting), .arrive))
+        let sessions: [Screen] = [.focus, .unlocked, .protectionOff, .sessionOver, .waiting, .home]
+        for held in [signIn, mark] {
+            for session in sessions {
+                let shows = held.showing(at(session), signedIn: true)
+                #expect(shows == (at(session), .cut), "\(session)")
+            }
+        }
+        let home = Stage(shown: at(.home, tabbed: true))
+        #expect(home.showing(at(.join), signedIn: true) == (at(.join), .cut))
+        let history = at(.history, tabbed: true)
+        #expect(home.showing(history, signedIn: true) == (history, .cut))
+        let played = Stage(shown: at(.name), move: .arrive)
+        #expect(played.showing(at(.name), signedIn: true) == (at(.name), .arrive))
+    }
+
+    @Test(
+        "The starting mark while Bali is asked after a sign-in (the approved motion spec): Sign in held as it was, its button still busy, until the router has waited 0.3 s; then the mark, alone, staying at least 0.5 s once shown before the next screen arrives — so fast Wi-Fi never sees it, and it never blinks",
+        .timeLimit(.minutes(1)))
+    func markWaits() async throws {
+        let (phone, labels, window) = try landing()
+        defer { window.isHidden = true }
+        let title = "Sign\u{A0}up or sign\u{A0}in"
+        /// The mark alone on screen: no screen's words.
+        func markAlone() -> Bool {
+            let read = (try? labels()) ?? []
+            return read.contains("Bali") && !read.contains(title) && !read.contains("Hi, Ana")
+        }
+        try await until { (try? labels())?.contains("Signing in…") == true }
+        let landed = ContinuousClock.now
+        phone.signed(in: true, as: "ana")
+        #expect(phone.shown == (.starting, false))
+        let held = try labels()
+        #expect(held.contains(title) && held.contains("Signing in…"), "\(held)")
+        try await until { markAlone() }
+        let marked = ContinuousClock.now
+        #expect(marked - landed >= .milliseconds(300))
+        phone.synced(try #require(PreviewFixtures.all["home"]?.sync))
+        #expect(phone.shown == (.home, true) && markAlone())
+        try await until { (try? labels())?.contains("Hi, Ana") == true }
+        // At least the mark's 0.5 s since it showed, less the polls' lag in seeing it (a slow
+        // simulator's too).
+        #expect(ContinuousClock.now - marked >= .milliseconds(400))
+    }
+
+    @Test(
+        "Focus never waits for a move, nor fades in (the approved motion spec): over Sign in held for the mark, and over the mark held for its 0.5 s, the router's Focus shows in its own render, Emergency Unlock there at once",
+        .timeLimit(.minutes(1)))
+    func focusNeverWaits() async throws {
+        let unlock = "Emergency Unlock. Your teacher will see it."
+        let focus = try #require(PreviewFixtures.all["focus"]?.sync)
+        for overMark in [false, true] {
+            let (phone, labels, window) = try landing()
+            defer { window.isHidden = true }
+            try await until { (try? labels())?.contains("Signing in…") == true }
+            phone.signed(in: true, as: "ana")
+            if overMark {
+                try await until {
+                    let read = (try? labels()) ?? []
+                    return !read.contains("Signing in…") && read.contains("Bali")
+                }
+                phone.synced(try #require(PreviewFixtures.all["home"]?.sync))
+            }
+            phone.synced(focus)
+            #expect(phone.shown == (.focus, false))
+            let read = try labels()
+            #expect(read.contains(unlock) && !read.contains("Signing in…"), "\(overMark): \(read)")
+        }
+    }
+
+    @Test(
+        "The gap's question holds still while Bali is asked (the approved motion spec: the screen under the busy button holds still): answered 13 or older after a sign-in, the router waits for Bali, the phone lets the picks go, and the question keeps showing them until the mark comes"
+    )
+    func ageHoldsStill() async throws {
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        var state = try #require(PreviewFixtures.all["ageAfterSignIn"])
+        state.birth = Birth(month: 3, year: 2009)
+        let phone = Phone(fixture: state)
+        let window = UIWindow(windowScene: scene)
+        window.frame = scene.screen.bounds
+        window.rootViewController = UIHostingController(rootView: RootView(phone: phone))
+        window.isHidden = false
+        defer { window.isHidden = true }
+        /// What VoiceOver reads for the month's menu now.
+        func month() throws -> String? {
+            window.layoutIfNeeded()
+            return try voiceOver(in: window).first { $0.accessibilityLabel == "Month" }?
+                .accessibilityValue
+        }
+        try await until { (try? month()) == Birth.monthName(3) }
+        await phone.answerAge(through: Pages().browser)
+        #expect(phone.shown == (.starting, false) && phone.birth == Birth())
+        #expect(try month() == Birth.monthName(3))
+        // Its Continue dimmed, as a busy button is: it only waits for Bali now.
+        let continued = try voiceOver(in: window).first { $0.accessibilityLabel == "Continue" }
+        #expect(continued?.accessibilityTraits.contains(.notEnabled) == true)
+    }
+
+    @Test(
+        "Back lets the keyboard go as the screen moves (#150), in the same press, after the move (`reduceMotionBack`): Join's code field, focused as Join shows, types in nothing once Back is pressed — the keyboard going down with Join, never left over Home as Home fades back in — nor takes it back while Join fades out and after: looked at after each render, past the fade's end (#161's review)"
     )
     func backLetsKeyboardGo() async throws {
         let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
@@ -1448,6 +1585,55 @@ struct AppTests {
                 field.isFirstResponder || textFields(in: window).contains { $0.isFirstResponder }
         }
         #expect(!taken)
+    }
+
+    @Test(
+        "Under Reduce Motion, Back from Join opened over a Home that arrived by a move shows Home, never Join left drawn (found on the simulator): Back lets the keyboard go after its move, never before — that change of focus drew the root at once, and a move made after it was never drawn — and the root reads Reduce Motion as the phone has it now, never from its environment, which drew it again at that change of focus",
+        .timeLimit(.minutes(1)))
+    func reduceMotionBack() async throws {
+        // Reduce Motion on for this test alone, as Settings turns it on.
+        let library = try #require(dlopen("/usr/lib/libAccessibility.dylib", RTLD_NOW))
+        let (read, write) = (
+            try #require(dlsym(library, "_AXSReduceMotionEnabled")),
+            try #require(dlsym(library, "_AXSSetReduceMotionEnabled"))
+        )
+        let set = unsafeBitCast(write, to: (@convention(c) (Bool) -> Void).self)
+        let was = unsafeBitCast(read, to: (@convention(c) () -> Bool).self)()
+        set(true)
+        defer { set(was) }
+        try await until { UIAccessibility.isReduceMotionEnabled }
+        let defaults = UserDefaults.standard
+        let approvedBefore = defaults.object(forKey: Phone.everApprovedKey)
+        defer { defaults.set(approvedBefore, forKey: Phone.everApprovedKey) }
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let (phone, key) = (
+            Phone(fixture: try #require(PreviewFixtures.all["screenTime"])), scene.keyWindow
+        )
+        let window = UIWindow(windowScene: scene)
+        window.frame = scene.screen.bounds
+        window.rootViewController = UIHostingController(rootView: RootView(phone: phone))
+        window.makeKeyAndVisible()
+        defer {
+            window.isHidden = true
+            key?.makeKey()
+        }
+        let labels = {
+            window.layoutIfNeeded()
+            return try voiceOver(in: window).compactMap(\.accessibilityLabel)
+        }
+        // Screen Time granted: Home arrives, a fade.
+        try await until { (try? labels())?.contains("Let Bali pause apps during class") == true }
+        var approved = Protection()
+        (approved.checked, approved.permission) = (true, .approved)
+        phone.remember(approved)
+        try await until { (try? labels())?.contains("Hi, Ana") == true }
+        try await Task.sleep(for: .milliseconds(500))
+        phone.open(.join)
+        try await until { textFields(in: window).first?.isFirstResponder == true }
+        phone.back()
+        try await Task.sleep(for: .seconds(1))
+        let shown = try labels()
+        #expect(shown.contains("Hi, Ana") && !shown.contains("Enter your class code"), "\(shown)")
     }
 
     @Test(
@@ -1659,9 +1845,12 @@ struct AppTests {
         }
         let signedOut = { try standIn(StandIn(), keychain: Keychain(account: nil)).0 }
         let live = try signedOut()
+        #expect(live.pageEnded == nil)
         await live.signIn(through: pages.browser)
         #expect(pages.opened.count == 1 && last() == ("/oauth2/authorize", "bali"))
         #expect(live.age.answer == .unanswered && !live.introShows && !live.signingIn)
+        // Its end kept, so no screen moves while iOS's sheet goes (the approved motion spec).
+        #expect(live.pageEnded.map { Date().timeIntervalSince($0) < 5 } == true)
         // Closed by the student: kept as the sign-in said it, for the readout; the screen says
         // nothing.
         #expect(live.signInFailed == .cancelled)
@@ -1709,7 +1898,7 @@ struct AppTests {
     }
 
     @Test(
-        "A sign-up page that signs the student in files that account as passed on this phone — its Cognito id alone — as the sign-in lands, before it reaches anything, so Bali's API is given its token at once; and keeps the intro, or the question whose Continue opened the page, until the sign-in lands, so no Sign in shows between, letting them go then: a sign-out later shows Sign in, never the intro nor the question (the approved Sign in & sign up design; the owner's ruling, 2026-10-07). A page closed files nothing. The key as it was before is put back after"
+        "A sign-up page that signs the student in files that account as passed on this phone — its Cognito id alone — as the sign-in lands, before it reaches anything, so Bali's API is given its token at once; and keeps the intro, or the question whose Continue opened the page, its button busy, until the sign-in lands, so no Sign in shows between and the screen under the page holds still (the approved motion spec), letting them go then: a sign-out later shows Sign in, never the intro nor the question (the approved Sign in & sign up design; the owner's ruling, 2026-10-07). A page closed files nothing. The key as it was before is put back after"
     )
     func signUpLands() async throws {
         let defaults = UserDefaults.standard
@@ -1736,9 +1925,9 @@ struct AppTests {
         #expect(pages.opened.map { $0.url.path() } == ["/signup"] && !keychain.empty)
         #expect(AgeCheck.passed("ana", in: defaults) && !AgeCheck.passed("bea", in: defaults))
         #expect(await phone.signIn?.accessToken() != nil)
-        #expect(phone.introShows && phone.signInFailed == nil && !phone.signingIn)
+        #expect(phone.introShows && phone.signInFailed == nil && phone.signingIn)
         phone.signed(in: true, as: "ana")
-        #expect(!phone.introShows && phone.ageNow == .passed)
+        #expect(!phone.introShows && phone.ageNow == .passed && !phone.signingIn)
         phone.signed(in: false)
         #expect(!phone.introShows && phone.age.answer != .asked)
         // Bea's Sign up: the intro again after the sign-out, its page closed — nothing filed —
@@ -1753,9 +1942,9 @@ struct AppTests {
         await signUp()
         #expect(pages.opened.map { $0.url.path() } == ["/signup", "/signup", "/signup"])
         #expect(AgeCheck.passed("bea", in: defaults) && !phone.introShows)
-        #expect(phone.age.answer == .asked && phone.birth.complete && !phone.signingIn)
+        #expect(phone.age.answer == .asked && phone.birth.complete && phone.signingIn)
         phone.signed(in: true, as: "bea")
-        #expect(phone.age.answer == .unanswered && phone.birth == Birth())
+        #expect(phone.age.answer == .unanswered && phone.birth == Birth() && !phone.signingIn)
         #expect(phone.ageNow == .passed)
         phone.signed(in: false)
         #expect(!phone.introShows && phone.age.answer == .unanswered)
@@ -1814,7 +2003,7 @@ struct AppTests {
     }
 
     @Test(
-        "Sign in as the approved Sign in & sign up design draws it: its title, then Sign up and Sign in, each a button; while a page opens its button says so and neither takes a press; a page that could not open is said under the buttons, naming its page, before the caption; and the intro's last page's button is Sign up, Signing up… and dimmed while its page opens"
+        "Sign in as the approved Sign in & sign up design draws it: its title, then Sign up and Sign in, each a button; while a page opens its button says so and neither takes a press; a page that could not open is said under the buttons, naming its page, before the caption; and the intro's last page's button is Sign up, Signing up… and dimmed while its page opens, and still once the router has gone on from it, the page closed, so the intro held under the sheet holds still (the approved motion spec)"
     )
     func signInScreen() async throws {
         let title = "Sign\u{A0}up or sign\u{A0}in"
@@ -1848,7 +2037,7 @@ struct AppTests {
         }
         for (name, page, label, busy) in [
             ("intro", 0, "Continue", false), ("intro", 2, "Sign up", false),
-            ("introSigningUp", 2, "Signing up…", true),
+            ("introSigningUp", 2, "Signing up…", true), ("signIn", 2, "Signing up…", true),
         ] {
             let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))
             let read = try await elements(of: IntroView(phone: phone, page: page), once: label)
@@ -2266,7 +2455,7 @@ struct AppTests {
     }
 
     @Test(
-        "Your name's keyboard as a save ends (#292's review): down while the save runs, back once one that set no name is over, as on Me — and never back once the name is set, so it never pops up for a moment before the router moves on. The name typed as Your name's field types it, never edited as on Me (`Naming.editing` stays false): looked at after each render, for a while past the save"
+        "Your name's keyboard: up only once the screen's arrival has faded in, never moving with it (the approved motion spec); and as a save ends (#292's review), down while the save runs, back once one that set no name is over, as on Me — and never back once the name is set, so it never pops up for a moment before the router moves on. The name typed as Your name's field types it, never edited as on Me (`Naming.editing` stays false): looked at after each render, for a while past the save"
     )
     func nameKeyboard() async throws {
         let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
@@ -2282,7 +2471,12 @@ struct AppTests {
             key?.makeKey()
         }
         let typing = { textFields(in: window).contains { $0.isFirstResponder } }
+        window.layoutIfNeeded()
+        let shown = ContinuousClock.now
+        #expect(!typing())
         try await until { typing() }
+        // The arrival's 300 ms, less a render's lag in starting the clock.
+        #expect(ContinuousClock.now - shown >= .milliseconds(250))
         /// A save of the name typed, answered by `PATCH /v1/me` with `status` and `body` once the
         /// keyboard is down for it.
         func save(_ status: Int, _ body: String) async throws {
@@ -2784,6 +2978,26 @@ private func elements(of screen: some View, once title: String) async throws -> 
         return read.contains { $0.accessibilityLabel == title }
     }
     return read.map { ($0.accessibilityLabel, $0.accessibilityFrame, $0.accessibilityTraits) }
+}
+
+/// Sign in shown in a window of its own, its page's sign-in about to land — Sign in's button busy,
+/// nothing read of `GET /v1/me` yet: the phone, what VoiceOver reads there now (the window laid out
+/// first, so whatever SwiftUI has to draw is drawn), and the window.
+@MainActor
+private func landing() throws -> (Phone, () throws -> [String], UIWindow) {
+    let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+    var state = PreviewFixtures.State(signingIn: true, signedIn: false)
+    state.sync = try #require(PreviewFixtures.all["homeLoading"]).sync
+    let phone = Phone(fixture: state)
+    let window = UIWindow(windowScene: scene)
+    window.frame = scene.screen.bounds
+    window.rootViewController = UIHostingController(rootView: RootView(phone: phone))
+    window.isHidden = false
+    let labels = {
+        window.layoutIfNeeded()
+        return try voiceOver(in: window).compactMap(\.accessibilityLabel)
+    }
+    return (phone, labels, window)
 }
 
 /// Every scroll view in `view`, itself among them, outermost first — of a pager's pages, only the

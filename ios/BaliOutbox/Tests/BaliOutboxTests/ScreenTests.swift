@@ -1152,6 +1152,104 @@ struct ScreenTests {
     }
 }
 
+@Suite("How the screens move (the approved Sign in & sign up design's motion spec)")
+struct MoveTests {
+    /// The move from `shown` to `next`, each with its tab bar where `tabbed`, the phone signed in
+    /// where `signedIn`.
+    private func move(
+        _ shown: Screen, _ next: Screen, tabbed: (Bool, Bool) = (false, false),
+        signedIn: Bool = false
+    ) -> Screen.Move {
+        Screen.Move(from: (shown, tabbed.0), to: (next, tabbed.1), signedIn: signedIn)
+    }
+
+    @Test(
+        "The onboarding path's moves, as the spec's table has them: Sign up's question, the intro and Screen Time after Your name are steps forward; a Cognito page closed or not opened is a step back to Sign in; app open, Your name, the question after a sign-in, Screen Time after one and Home with its tab bar are arrivals; under 13, the stop screen or the account's deletion, a stop, never a step; waiting for Bali, the mark"
+    )
+    func onboarding() {
+        #expect(move(.signIn, .age) == .forward)
+        #expect(move(.age, .intro) == .forward)
+        #expect(move(.name, .screenTime, signedIn: true) == .forward)
+        #expect(move(.age, .signIn) == .back && move(.intro, .signIn) == .back)
+        #expect(move(.starting, .signIn) == .arrive)
+        #expect(move(.signIn, .age, signedIn: true) == .arrive)
+        for shown in [Screen.starting, .signIn, .age, .intro, .screenTime] {
+            #expect(move(shown, .name, signedIn: true) == .arrive, "\(shown)")
+            let home = move(shown, .home, tabbed: (false, true), signedIn: true)
+            #expect(home == .arrive, "\(shown)")
+        }
+        #expect(move(.signIn, .screenTime, signedIn: true) == .arrive)
+        #expect(move(.age, .tooYoung) == .arrive)
+        #expect(move(.age, .deleting, signedIn: true) == .arrive)
+        for shown in [Screen.signIn, .age, .intro] {
+            #expect(move(shown, .starting, signedIn: true) == .mark, "\(shown)")
+        }
+    }
+
+    @Test(
+        "Never a move to or from Focus, a session's screens, Waiting, the home a standing not read keeps — which hold Emergency Unlock — or any screen off the onboarding path: a cut, at once. Nor between Home's tabs, nor a screen the student opens (#150 fades it its own way), nor a sign-out, nor to a screen the router keeps"
+    )
+    func cuts() {
+        let path: [(Screen, Bool)] = [
+            (.starting, false), (.signIn, false), (.age, false), (.intro, false), (.name, false),
+            (.screenTime, false), (.home, true),
+        ]
+        let held: [(Screen, Bool)] = [
+            (.focus, false), (.unlocked, false), (.protectionOff, false), (.sessionOver, false),
+            (.waiting, false), (.home, false), (.deleting, false), (.storage("why"), false),
+            (.history, true), (.me, true), (.join, false), (.tooYoung, false),
+        ]
+        for (screen, tabbed) in path {
+            for (other, otherTabbed) in held where (screen, other) != (.age, .deleting)
+                && (screen, other) != (.age, .tooYoung)
+            {
+                for signedIn in [false, true] {
+                    let (there, back) = ((tabbed, otherTabbed), (otherTabbed, tabbed))
+                    #expect(
+                        move(screen, other, tabbed: there, signedIn: signedIn) == .cut,
+                        "\(screen) to \(other)")
+                    #expect(
+                        move(other, screen, tabbed: back, signedIn: signedIn) == .cut,
+                        "\(other) to \(screen)")
+                }
+            }
+            #expect(move(screen, screen, tabbed: (tabbed, tabbed)) == .cut, "\(screen)")
+        }
+        #expect(move(.name, .signIn) == .cut)
+        #expect(move(.home, .home, tabbed: (true, false)) == .cut)
+    }
+
+    @Test(
+        "When a move may play: none while a Cognito page's sheet is still going, 0.35 s from the page's end, so the screen under it holds still; the mark only once the router has waited 0.3 s for Bali — from the sheet gone, if later — so fast Wi-Fi never sees it; once shown, the mark gives way only after 0.5 s, so it never blinks; any other move at once; and a cut always at once, the mark showing or the sheet going or not"
+    )
+    func due() {
+        let shownAt = Date(timeIntervalSince1970: 1000)
+        let routedAt = shownAt + 10
+        #expect(Screen.Move.markWaits == 0.3 && Screen.Move.markStays == 0.5)
+        #expect(Screen.Move.sheetGoes == 0.35)
+        /// How long after the router's answer `move` from `shown`, shown at `at`, is due, the page
+        /// having ended at `page`: in milliseconds, whole.
+        func due(_ move: Screen.Move, _ shown: Screen, at: Date = shownAt, page: Date? = nil)
+            -> Int
+        {
+            let due = move.due(from: shown, shownAt: at, routedAt: routedAt, pageEnded: page)
+            return Int((due.timeIntervalSince(routedAt) * 1000).rounded())
+        }
+        #expect(due(.mark, .signIn) == 300)
+        let fresh = routedAt - 0.1
+        for move in [Screen.Move.arrive, .forward, .back] {
+            #expect(due(move, .starting, at: fresh) == 400)
+            #expect(due(move, .starting) == 0)
+            #expect(due(move, .signIn, at: fresh) == 0)
+            // A page closed just now: not before its sheet has gone.
+            #expect(due(move, .intro, page: routedAt - 0.1) == 250)
+            #expect(due(move, .intro, page: routedAt - 1) == 0)
+        }
+        #expect(due(.mark, .signIn, page: routedAt - 0.15) == 500)
+        #expect(due(.cut, .starting, at: fresh, page: routedAt) == 0)
+    }
+}
+
 @Suite("Home's Tap in (C3b)", .timeLimit(.minutes(3)))
 struct TapInTests {
     @Test(

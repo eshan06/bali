@@ -8,6 +8,48 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-08** — **The onboarding path's motion, and Reduce Motion fades** (the owner-approved
+  [Sign in & sign up design](https://claude.ai/artifact/McyYhpX1UTq1nU6oCCwPwG), version 8, its
+  motion spec; the owner's ruling on Reduce Motion). The screens the router picks cut in at once
+  (only a screen the student opens faded, #150), the mark blinked between Cognito's sheet and Your
+  name, and the keyboard rose while the screen changed: "a little choppy", the owner said. Now one
+  calm vocabulary (DESIGN.md §7): a step slides 24 pt and fades, an arrival or a stop only fades, the
+  mark shows only after 0.3 s of waiting for Bali and then stays 0.5 s. **Reduce Motion: 200 ms
+  fades, nothing moves** (the owner's ruling, Apple's own rule; DESIGN.md §7 said instant): every
+  slide a fade, every fade 200 ms, Join's over Home too; a busy button's dim, the arc and Emergency
+  Unlock's ring don't play. How: **(1) The screens' alone.** The router (`Screen.choose`) and the
+  shields never wait on motion: `RootView` holds the screen showing until its move is due
+  (`Screen.Move` and `due`, in BaliOutbox, so on Linux too) and plays it (`Stage`). **(2) Cuts.** Any
+  change to or from Focus, a session's screens, Waiting, the home a standing not read keeps, or a
+  screen off the onboarding path shows in the router's own render, never held, never faded; at app
+  open, the router's first answer at once. **(3) One transition shape for every move**, its values
+  set by the move (`Moving`): SwiftUI keeps the transition a screen was inserted with unless a later
+  one has the same shape (found on the simulator: a held screen left at once, by the transition it
+  came in with). **(4) The screen under the page holds still.** No move plays until Cognito's sheet
+  has gone, 0.35 s after its page ends (`Phone.pageEnded`, the prototype's 350 ms). A page's busy
+  button stays busy until its sign-in lands (`signingIn` now let go by `signed`, no longer as the
+  page returns); signed in, Sign in only waits for Bali or leaves, so it keeps its page's busy
+  words, and so does the intro once the router has gone on from it, its page closed or its sign-in
+  landed; the question keeps the picks and Signing up… it last showed while the router showed it
+  (the phone still lets the picks go at once), and answered after a sign-in its Continue dims as a
+  busy one does, as the prototype has it. **(5) The mark** is due 0.3 s after the router
+  began waiting, and no sooner than 0.3 s after the sheet has gone; the router begins as the
+  sign-in lands, after the code's exchange, so a slow exchange shows the busy button that much
+  longer before the mark. Shown, it stays 0.5 s, at app open too; a cut never waits for it.
+  **(6) Your name's keyboard** once its arrival has faded in. **(7) The tab bar** sits in each
+  screen's own unit, a VStack under it so VoiceOver still reads it last, and Home and its bar
+  arrive together. **(8) Back lets the keyboard go after its move, never before** (#150 had it
+  before): found recording the Reduce Motion video, Back from Join over a Home that had arrived by
+  a move left Join drawn, without its Back. Letting the keyboard go drew the root at once, the move
+  not yet made, and the move made right after was never drawn; the keyboard still goes down at
+  once. The root, Your name and the intro read Reduce Motion as the phone has it now
+  (`UIAccessibility`, as `Phone.fade` did), never from the environment, which drew the root again
+  at every change of focus. Not drawn: under Reduce Motion the intro's next page fades in where the
+  page view would slide (the page view jumps), where the prototype cross-fades two pages. Tests:
+  `MoveTests` (BaliOutbox); `AppTests.motion`, `stage`, `markWaits`, `focusNeverWaits`,
+  `ageHoldsStill`, `leavingTakesNoTouch` (every move's leaving screen), `nameKeyboard`,
+  `signUpLands`, `reduceMotionBack`, `signInScreen` (the intro held).
+
 - **2026-10-07** — **The 13+ question per account, and every Sign up asks it** (the owner's
   rulings of 2026-10-07; the approved
   [Sign in & sign up design](https://claude.ai/artifact/McyYhpX1UTq1nU6oCCwPwG), version 8, its age

@@ -16,10 +16,22 @@ import SwiftUI
 struct AgeView: View {
     let phone: Phone
     @Environment(\.webAuthenticationSession) private var browser
+    /// What the question last showed while the router showed it: once the router has gone on, it
+    /// holds still as it waits for Bali or leaves (the motion spec); the phone lets the picks go.
+    @State private var still = Asked()
+
+    /// What the question shows of the phone: the picks, and whether a page opens from Continue.
+    private struct Asked: Equatable {
+        var birth = Birth()
+        var busy = false
+    }
 
     var body: some View {
         let today = Date()
-        let picks = phone.birth
+        let live = Asked(birth: phone.birth, busy: phone.signingIn)
+        let asking = phone.shown.screen == .age
+        let shows = asking ? live : still
+        let picks = shows.birth
         ScreenScaffold {
             PageScroll {
                 VStack(alignment: .leading, spacing: 0) {
@@ -45,13 +57,16 @@ struct AgeView: View {
                         }
                     }
                     Spacer()
-                    Button(phone.signingIn ? "Signing up…" : "Continue") {
+                    // Answered signed in, it only waits for Bali or leaves: Continue dims, as busy.
+                    Button(shows.busy ? "Signing up…" : "Continue") {
                         Task { await phone.answerAge(through: browser.hostedUI) }
                     }
-                    .buttonStyle(PrimaryButtonStyle()).disabled(!picks.complete || phone.signingIn)
+                    .buttonStyle(PrimaryButtonStyle())
+                    .disabled(!picks.complete || shows.busy || (!asking && phone.signedIn == true))
                 }
             }
         }
+        .onChange(of: live, initial: true) { _, live in if asking { still = live } }
     }
 
     /// A menu drawn as a field (D1's input look): `label` above, the pick or "Choose" inside,

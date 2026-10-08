@@ -48,10 +48,17 @@ struct NameView: View {
                     .padding(.top, 12)
             }
             // Dimmed with Continue while a save runs, as the canvas draws it.
-            SignOutButton(phone: phone).disabled(naming.busy).opacity(naming.busy ? 0.6 : 1)
+            SignOutButton(phone: phone).disabled(naming.busy).modifier(Dimmed(on: naming.busy))
                 .frame(maxWidth: .infinity).padding(.top, 8)
         }
-        .onAppear { typing = true }
+        // The keyboard once the screen has faded in, so the two never move together (the approved
+        // motion spec).
+        .task {
+            let reduce = UIAccessibility.isReduceMotionEnabled
+            let arrival = Motion.seconds(.arrive, reduceMotion: reduce)
+            guard (try? await Task.sleep(for: .seconds(arrival))) != nil else { return }
+            typing = true
+        }
         // Fixed while its save runs; the keyboard back once a save that failed is over, as on Me,
         // never once one set the name: the router moves on (#292's review).
         .onChange(of: naming.busy) { _, busy in
