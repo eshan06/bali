@@ -3696,8 +3696,8 @@ export interface DeleteAccountResult {
  * session too, since a deletion never waits for a lesson; the row loses its
  * name and its Cognito subject and is marked removed; each rename it made
  * loses the names it carried (the one rewrite of `events` the database allows,
- * migration 0015); its phones' device tokens are deleted (N4); and
- * `account_deleted` is recorded under `eventId`, with no payload. Its other events stay, so each class's reports count as before,
+ * migration 0015); its phones' device tokens (N4) and its 13+ yes (C7-server)
+ * are deleted; and `account_deleted` is recorded under `eventId`, with no payload. Its other events stay, so each class's reports count as before,
  * under a row that names no one.
  *
  * A teacher with a live class or block is refused `TEACHER_HAS_CLASSES`:
@@ -3902,7 +3902,7 @@ class RetentionPreview extends Error {
  * subject, removed; a rename's names emptied); its enrollments end; its classes
  * are removed and lose their names; its teachers' blocks are removed; the taps
  * waiting on them and its people's are deleted, as are its people's device
- * tokens (N4) and its open invites; the
+ * tokens (N4), their 13+ yes (C7-server) and its open invites; the
  * school is marked removed; and `school_disposed` records it with the school's
  * id and counts. What stays names no one: the lessons, their participations and
  * events, under rows that name no one, so counts still add up.
@@ -4292,7 +4292,7 @@ export function yearOverAt(day: string): Date {
  * whose records all lie in it is de-identified as an account deletion leaves
  * one (C3): no name, no Cognito subject, removed, a rename's names emptied;
  * each live enrollment ended as a removal ends it; their pre-bell taps and
- * their phones' device tokens (N4) deleted; a de-identified teacher's removed classes lose their names. Their
+ * their phones' device tokens (N4) and their 13+ yes (C7-server) deleted; a de-identified teacher's removed classes lose their names. Their
  * lessons, participations and events stay, so every count still adds up.
  *
  * Kept named, and reported by id (`continuing`): an account with a record
