@@ -85,51 +85,35 @@ struct AgeTests {
     }
 
     @Test(
-        "13 or older keeps one flag, that the check passed, in the defaults given — never the month or the year — and a fresh check reads it back as passed; under 13 keeps nothing at all: no key of any kind is written, the next launch reads not answered, and the answer stands in memory alone; a check given no defaults, a frozen fixture's, writes nowhere either"
+        "An answer writes nothing at all — 13 or older or under 13, no key of any kind, the answer in memory alone; passed is kept per account, its Cognito id alone in the defaults given — never the month or the year — once for each account, read back for that account and no other, nor for none; the phone-wide flag a build before kept vouches for no account (the owner's ruling, 2026-10-07)"
     )
     func keeps() throws {
         let suite = "BaliOutboxTests.age.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let before = Set(defaults.dictionaryRepresentation().keys)
-        #expect(AgeCheck(defaults: defaults).answer == .unanswered)
 
-        var young = AgeCheck(defaults: defaults)
-        young.answered(month: 10, year: 2014, today: day(2026, 10, 15), defaults: defaults)
-        #expect(young.answer == .tooYoung)
-        #expect(Set(defaults.dictionaryRepresentation().keys) == before)
-        #expect(defaults.object(forKey: AgeCheck.key) == nil)
-        #expect(AgeCheck(defaults: defaults).answer == .unanswered)
-
-        var frozen = AgeCheck(.unanswered)
-        frozen.answered(month: 10, year: 2000, today: day(2026, 10, 15), defaults: nil)
-        #expect(frozen.answer == .passed)
-        #expect(Set(defaults.dictionaryRepresentation().keys) == before)
-
-        var passed = AgeCheck(defaults: defaults)
-        passed.answered(month: 10, year: 2000, today: day(2026, 10, 15), defaults: defaults)
-        #expect(passed.answer == .passed)
-        #expect(Set(defaults.dictionaryRepresentation().keys) == before.union([AgeCheck.key]))
-        #expect(defaults.bool(forKey: AgeCheck.key))
-        #expect(AgeCheck(defaults: defaults).answer == .passed)
-        for key in defaults.dictionaryRepresentation().keys where !before.contains(key) {
-            let kept = String(describing: defaults.object(forKey: key) ?? "")
-            #expect(!kept.contains("2000") && !kept.contains("10"), "\(key): \(kept)")
-        }
-    }
-
-    @Test(
-        "Sign up pressed asks the check (the approved Sign in & sign up design): not passed, the question shows and no page may open, however often it is pressed; answered 13 or older, the way to the page goes on; under 13, none may and the stop screen stays"
-    )
-    func asks() {
-        var check = AgeCheck(.unanswered)
-        #expect(!check.ask() && check.answer == .asked)
-        #expect(!check.ask() && check.answer == .asked)
-        check.answered(month: 10, year: 2000, today: day(2026, 10, 15), defaults: nil)
-        #expect(check.ask() && check.answer == .passed)
         var young = AgeCheck(.asked)
-        young.answered(month: 10, year: 2014, today: day(2026, 10, 15), defaults: nil)
-        #expect(!young.ask() && young.answer == .tooYoung)
+        young.answered(month: 10, year: 2014, today: day(2026, 10, 15))
+        var old = AgeCheck(.asked)
+        old.answered(month: 10, year: 2000, today: day(2026, 10, 15))
+        #expect(young.answer == .tooYoung && old.answer == .passed)
+        #expect(Set(defaults.dictionaryRepresentation().keys) == before)
+
+        // A build before kept one flag for the whole phone: it vouches for no account.
+        defaults.set(true, forKey: "ageChecked")
+        #expect(!AgeCheck.passed("ana", in: defaults) && !AgeCheck.passed(nil, in: defaults))
+        defaults.removeObject(forKey: "ageChecked")
+
+        AgeCheck.pass("ana-sub", in: defaults)
+        AgeCheck.pass("ana-sub", in: defaults)
+        AgeCheck.pass("bea-sub", in: defaults)
+        #expect(Set(defaults.dictionaryRepresentation().keys) == before.union([AgeCheck.key]))
+        #expect(defaults.stringArray(forKey: AgeCheck.key) == ["ana-sub", "bea-sub"])
+        #expect(AgeCheck.passed("ana-sub", in: defaults) && AgeCheck.passed("bea-sub", in: defaults))
+        #expect(!AgeCheck.passed("cara-sub", in: defaults) && !AgeCheck.passed(nil, in: defaults))
+        let kept = String(describing: defaults.object(forKey: AgeCheck.key) ?? "")
+        #expect(!kept.contains("2000") && !kept.contains("10"), "\(kept)")
     }
 
     @Test(

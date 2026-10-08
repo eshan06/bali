@@ -1,25 +1,28 @@
 import Foundation
 
-/// The 13+ check (C7; the owner's rulings, 2026-10-04 and 2026-10-05): asked when the student taps
-/// Sign up with it not passed on the phone — before the intro and the sign-up page (the approved
-/// Sign in & sign up design) — the birth month and year, neutrally, by the FTC's COPPA
-/// guidance: nothing on it says 13, hints at the cutoff or preselects an answer. 13 or older keeps
-/// one flag in the phone's own defaults, that the check passed, never the date, and is not asked
-/// again. Under 13 keeps nothing anywhere — no flag, no date, no counter, on the phone, in the app
-/// group, the Keychain or the server — and sees a kind stop screen, with no way back to the
-/// question until the app is reopened: held here, in memory, for the run. A sign-in that comes back
-/// to a phone that has not passed it — made on Cognito's own pages around the question — is asked
-/// first too, and gives Bali's API nothing until answered; under 13 there, the account is deleted
-/// (the gap's fallback, the owner's decision 2026-10-06). The rules, so they run on Linux; the
-/// app's `Phone` keeps one and the screens call it.
+/// The 13+ check (C7; the owner's rulings, 2026-10-04, 2026-10-05 and 2026-10-07): asked at every
+/// Sign up — before the intro and the sign-up page (the approved Sign in & sign up design), no
+/// account existing yet to have passed it — the birth month and year, neutrally, by the FTC's
+/// COPPA guidance: nothing on it says 13, hints at the cutoff or preselects an answer. 13 or older
+/// keeps "passed" per account, in the phone's own defaults under the account's Cognito id, never the
+/// date: the account a Sign up's page signs in is filed as it lands. Under 13 keeps nothing
+/// anywhere — no flag, no date, no counter, on the phone, in the app group, the Keychain or the
+/// server — and sees a kind stop screen, with no way back to the question until the app is
+/// reopened: held here, in memory, for the run. A sign-in into an account that has not passed on
+/// this phone — made on Cognito's own pages around the question, or an existing account new to the
+/// phone — is asked first too, and gives Bali's API nothing until answered; under 13 there, the
+/// account is deleted (the gap's fallback, the owner's decision 2026-10-06). The rules, so they run
+/// on Linux; the app's `Phone` keeps one and the screens call it.
 public struct AgeCheck: Sendable, Hashable {
+    /// The question as it stands this run, in memory only.
     public enum Answer: Sendable, Hashable {
-        /// Never passed on this phone and not asked this run: Sign in shows — signed in, the
-        /// question.
+        /// Not asked: Sign in shows — signed in, the question, where the account has not passed.
         case unanswered
-        /// Sign up pressed, not answered yet: the question shows.
+        /// Sign up pressed: the question shows — and stays, answered 13 or older, while the
+        /// sign-up page it opens is open.
         case asked
-        /// 13 or older: kept, and never asked again.
+        /// 13 or older, this run: the Sign up under way goes on, and an account it was answered
+        /// under is filed as passed.
         case passed
         /// Under 13, this run: the stop screen, until the app is reopened — signed in, its account
         /// deleted first.
@@ -27,8 +30,11 @@ public struct AgeCheck: Sendable, Hashable {
     }
 
     public private(set) var answer: Answer
-    /// The one key the check writes, in the phone's own defaults: true once passed.
-    public static let key = "ageChecked"
+    /// The one key the check writes, in the phone's own defaults: the Cognito ids of the accounts
+    /// that passed on this phone. The single phone-wide flag builds before kept (`ageChecked`)
+    /// is no longer read or written: it said someone on the phone passed, never which account, so
+    /// it vouches for none (the owner's ruling, 2026-10-07).
+    public static let key = "ageCheckedAccounts"
     /// The stop screen's title and line (the owner's words, 2026-10-05): an answer under 13's, and
     /// the title of each step of the account's deletion after a sign-in
     /// (`Deleting.saidUnderThirteen`).
@@ -37,10 +43,16 @@ public struct AgeCheck: Sendable, Hashable {
 
     public init(_ answer: Answer) { self.answer = answer }
 
-    /// As the phone's own defaults say: passed before, or not yet — never under 13, which no
-    /// launch ever kept.
-    public init(defaults: UserDefaults) {
-        answer = defaults.bool(forKey: Self.key) ? .passed : .unanswered
+    /// Whether `account`, a Cognito id, has passed on this phone, as `defaults` keep it; no account
+    /// named never has.
+    public static func passed(_ account: String?, in defaults: UserDefaults) -> Bool {
+        account.map { defaults.stringArray(forKey: key)?.contains($0) == true } ?? false
+    }
+
+    /// Files `account` as passed on this phone, in `defaults`: its Cognito id alone.
+    public static func pass(_ account: String, in defaults: UserDefaults) {
+        let accounts = defaults.stringArray(forKey: key) ?? []
+        if !accounts.contains(account) { defaults.set(accounts + [account], forKey: key) }
     }
 
     /// Whether someone born in `month` of `year` is 13 or older on `today`, at month precision:
@@ -69,26 +81,15 @@ public struct AgeCheck: Sendable, Hashable {
         return calendar
     }
 
-    /// Sign up pressed: whether the way to its page goes on — the check passed on this phone. Else
-    /// the question shows, or the stop screen an answer under 13 got stays.
-    public mutating func ask() -> Bool {
-        if answer == .unanswered { answer = .asked }
-        return answer == .passed
-    }
-
-    /// The question answered with `month` and `year`, judged at `today`: passed, the one flag is
-    /// written to `defaults` — nil writes nowhere, a frozen fixture's — and under 13 writes
-    /// nothing at all, anywhere.
+    /// The question answered with `month` and `year`, judged at `today`: passed or under 13, in
+    /// memory alone. Nothing is written here: an account is filed where it is known (`pass`), and
+    /// an answer under 13 is written nowhere, ever.
     public mutating func answered(
-        month: Int, year: Int, today: Date = Date(), calendar: Calendar = .current,
-        defaults: UserDefaults?
+        month: Int, year: Int, today: Date = Date(), calendar: Calendar = .current
     ) {
-        if Self.passes(month: month, year: year, today: today, calendar: calendar) {
-            answer = .passed
-            defaults?.set(true, forKey: Self.key)
-        } else {
-            answer = .tooYoung
-        }
+        answer =
+            Self.passes(month: month, year: year, today: today, calendar: calendar)
+            ? .passed : .tooYoung
     }
 }
 

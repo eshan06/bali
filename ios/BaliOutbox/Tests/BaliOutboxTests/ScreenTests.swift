@@ -102,7 +102,7 @@ struct ScreenTests {
     }
 
     @Test(
-        "The 13+ check (C7) is asked at Sign up (the approved Sign in & sign up design): a first launch opens on Sign in, never the question or the intro, whatever the answer; signed out, Sign in until Sign up is pressed with the check not passed, then the question in its place, and the stop screen there once answered under 13 this run; past it, the intro where Sign up shows it; a student signed in past the check sees none of them, in no class too; and never over a session's screens: the shields on are Focus, and the home a standing not read keeps holds Emergency Unlock, before all of them. No tab bar on any"
+        "The 13+ check (C7) is asked at Sign up (the approved Sign in & sign up design): a first launch opens on Sign in, never the question or the intro, whatever the answer; signed out, Sign in until Sign up is pressed, then the question in its place, and the stop screen there once answered under 13 this run; past it, the intro where Sign up shows it; a student signed in past the check sees none of them, in no class too; and never over a session's screens: the shields on are Focus, and the home a standing not read keeps holds Emergency Unlock, before all of them. No tab bar on any"
     )
     func ageAtSignIn() throws {
         let (outbox, _) = try makeOutbox()
@@ -158,7 +158,7 @@ struct ScreenTests {
     }
 
     @Test(
-        "Signed in on a phone that has not passed the 13+ check — a sign-in Cognito's own pages made around the question, the gap's fallback (the owner's decision, 2026-10-06) — the question comes first: in Home's place, its empty state's too, Waiting's and Screen Time's, over a Join or a tab opened, after the bell once Session over is closed; the stop screen there once answered under 13. Never over a session's screens: the shields' Focus, Unlocked, Protection off, Session over not closed, nor the home a standing not read keeps; Delete account's screen and a start that failed come first. No tab bar; passed, none of it"
+        "Signed in, an account that has not passed the 13+ check on this phone — a sign-in Cognito's own pages made around the question, or an account new to the phone: the gap's fallback (the owner's decisions, 2026-10-06 and 2026-10-07) — the question comes first: in Home's place, its empty state's too, Waiting's and Screen Time's, over a Join or a tab opened, after the bell once Session over is closed; the stop screen there once answered under 13. Never over a session's screens: the shields' Focus, Unlocked, Protection off, Session over not closed, nor the home a standing not read keeps; Delete account's screen and a start that failed come first. No tab bar; passed, none of it"
     )
     func ageAfterSignIn() throws {
         let (outbox, _) = try makeOutbox()
@@ -210,7 +210,7 @@ struct ScreenTests {
     }
 
     @Test(
-        "Your name (the owner's decision, 2026-10-07): signed in, a student's account `GET /v1/me` names with no name gets it first — after a sign-up, before Screen Time and Home, in Waiting's place too, over a Join or a tab opened, after the bell once Session over is closed — with no tab bar; named, or a teacher's account, or a role this build does not know, never. Not known until a read answers: Bali not reached, Screen Time and Home as before. After the 13+ question on a phone that has not passed it, and never over a session's screens: the shields' Focus, Unlocked, Protection off, Session over not closed, nor the home a standing not read keeps; Delete account's screen, a start that failed and Sign in come first"
+        "Your name (the owner's decision, 2026-10-07): signed in, a student's account `GET /v1/me` names with no name gets it first — after a sign-up, before Screen Time and Home, in Waiting's place too, over a Join or a tab opened, after the bell once Session over is closed — with no tab bar; named, or a teacher's account, or a role this build does not know, never. Not known until a read answers: Bali not reached, Screen Time and Home as before. After the 13+ question for an account that has not passed it on this phone, and never over a session's screens: the shields' Focus, Unlocked, Protection off, Session over not closed, nor the home a standing not read keeps; Delete account's screen, a start that failed and Sign in come first"
     )
     func name() throws {
         let (outbox, _) = try makeOutbox()
@@ -240,7 +240,7 @@ struct ScreenTests {
         // on (`nameHeld`: one made this run holds the starting screen).
         #expect(screen(permission: .notDetermined) == .screenTime)
         #expect(screen() == .home)
-        // The question first, on a phone that has not passed it.
+        // The question first, for an account that has not passed it here.
         #expect(screen(age: .unanswered, me: none) == .age)
         #expect(screen(age: .tooYoung, me: none) == .tooYoung)
         // Never over a session's screens, the shields' or the last run's.

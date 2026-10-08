@@ -8,6 +8,39 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-07** — **The 13+ question per account, and every Sign up asks it** (the owner's
+  rulings of 2026-10-07; the approved
+  [Sign in & sign up design](https://claude.ai/artifact/McyYhpX1UTq1nU6oCCwPwG), version 8, its age
+  boards and notes). The phone kept one phone-wide "passed": once anyone answered 13 or older,
+  every later Sign up and every account signing in skipped the question. Now: **every Sign up asks
+  it**, a second in the same run too, since no account exists yet to have passed it and a second
+  person must never sign up unasked; its Continue says "Signing up…" while Cognito's page opens,
+  as the Age board draws it. **"Passed" is kept per account**, the Cognito id (`sub`) of each
+  account that passed on this phone, in its own defaults, never the date; under 13 keeps nothing,
+  as before. **Sign in skips the question only for an account that passed on this phone**; any
+  other gets #287's fallback right after the sign-in, Bali's API given nothing until it answers.
+  How: **(1) The id is the sign-in's own**, the access token's `sub` read unverified as
+  `SignIn.account()` reads it: no call to Bali's API. **(2) A Sign up's account is filed as its
+  sign-in lands** (`SignIn.signIn`'s `landing`): once the tokens are kept, before a token is given,
+  a watcher hears or the engine is told. Filed after the page returned, the engine's first read
+  would race it, find no token, fail, and end the starting screen's hold before Your name.
+  **(3) A Sign up's answer vouches for the account its page signs in**: the one made there, or one
+  signed into from it through Cognito's "Already have an account? Sign in", since the person
+  holding the phone just answered. **(4) The answer is that attempt's alone**: a page closed or not
+  opened lets it go, and the picks, so the next Sign up asks again; with the intro seen this run,
+  Continue opens the page at once, and the question stays, its picks too, until the sign-in lands
+  (`Phone.signed`), as the intro does (#291). **(5) The router reads the account signed in now**
+  (`Phone.ageNow`, from the defaults; never the last student's; a fixture's its own): the run's
+  answer counts only while signed out, so one account's pass never vouches for the next.
+  **(6) The phone-wide flag builds before kept (`ageChecked`) vouches for no account** and is no
+  longer read or written: it said someone on the phone passed, never which account. So an account
+  signed in across the update is asked once, at its next launch out of a session, its API held
+  until then: the limit #287 named for builds before C7, now for builds before this one; the
+  pilot's phones are fresh installs. **(7) An account's id stays filed after the account is
+  deleted**, as `inClass` keeps a student's: it names no one once Cognito's user is gone. Cost: an
+  existing student answers once on each new phone, and each account on a shared phone once there;
+  C7-server (open) would spare it.
+
 - **2026-10-07** — **Home, never a forced Join** (the owner's ruling of 2026-10-07; the approved
   [Sign in & sign up design](https://claude.ai/artifact/McyYhpX1UTq1nU6oCCwPwG), version 8, its
   Home boards). A student in no class lands on Home with its tab bar, past Your name and Screen

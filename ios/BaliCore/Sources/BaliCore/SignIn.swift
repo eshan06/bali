@@ -206,12 +206,14 @@ public actor SignIn: TokenProvider {
     let store: any TokenStore
     let transport: any HTTPTransport
     let now: @Sendable () -> Date
-    /// Whether the phone's 13+ check has passed (C7), asked at each token the API is to be given:
-    /// until it has, none is, but an account deletion's (`deletionToken`). So a sign-in made around
-    /// the question — on Cognito's own pages, whose sign-in page links to its sign-up — reaches
-    /// Bali's API with nothing until it is answered, and an answer under 13 deletes its account as
-    /// Delete account does (the owner's decision, 2026-10-06).
-    let cleared: @Sendable () -> Bool
+    /// Whether the account signed in — its `sub`, nil where the tokens name none — has passed the
+    /// phone's 13+ check (C7), asked at each token the API is to be given: until it has, none is,
+    /// but an account deletion's (`deletionToken`). So a sign-in made around the question — on
+    /// Cognito's own pages, whose sign-in page links to its sign-up — or into an account that never
+    /// answered it on this phone, reaches Bali's API with nothing until it is answered, and an
+    /// answer under 13 deletes its account as Delete account does (the owner's decisions,
+    /// 2026-10-06 and 2026-10-07: the question per account).
+    let cleared: @Sendable (String?) -> Bool
     /// The tokens, once the store could be read (`loaded`); nil when nobody is signed in.
     private var tokens: Tokens?
     private var loaded = false
@@ -231,7 +233,7 @@ public actor SignIn: TokenProvider {
         cognito: Cognito, store: any TokenStore,
         transport: any HTTPTransport = URLSessionTransport(),
         now: @escaping @Sendable () -> Date = { Date() },
-        cleared: @escaping @Sendable () -> Bool = { true }
+        cleared: @escaping @Sendable (String?) -> Bool = { _ in true }
     ) {
         (self.cognito, self.store, self.transport, self.now) = (cognito, store, transport, now)
         self.cleared = cleared
@@ -246,9 +248,9 @@ public actor SignIn: TokenProvider {
     /// The access token to send now. Nil when nobody is signed in, when the Keychain cannot be read
     /// right now (the phone locked), when an expired one could not be renewed — never a sign-out,
     /// and never a token it knows has expired — once the API has deleted the account (C4), and
-    /// while the phone's 13+ check has not passed (`cleared`).
+    /// while the account has not passed the phone's 13+ check (`cleared`).
     public func accessToken() async -> String? {
-        cleared() ? await deletionToken() : nil
+        cleared(account()) ? await deletionToken() : nil
     }
 
     /// An account deletion's token (`TokenProvider.deletionToken`): the access token, the 13+ check
@@ -274,8 +276,12 @@ public actor SignIn: TokenProvider {
     /// signed in — and returns where the hosted UI sent the student back — C1's ephemeral
     /// `ASWebAuthenticationSession` — or throws why it did not, in its own words: the student's
     /// close `cancelled`, anything else `notOpened`; the code in that answer is exchanged for tokens.
+    /// `landing` is told the account they are for — their `sub`, nil where they name none — once
+    /// they are kept, before anything else hears of them: a token given, a watcher, the engine. So
+    /// the app files what it knows of that account first: a Sign up's 13+ answer (C7).
     public func signIn(
-        _ page: HostedPage = .signIn, through browser: @Sendable (URL) async throws(SignInError) -> URL
+        _ page: HostedPage = .signIn, landing: @Sendable (String?) -> Void = { _ in },
+        through browser: @Sendable (URL) async throws(SignInError) -> URL
     ) async throws(SignInError) {
         let attempt = Attempt()
         // It cannot fail — the domain is a URL and the rest is escaped — but were it to, nothing
@@ -291,6 +297,7 @@ public actor SignIn: TokenProvider {
         guard let refresh = grant.refresh else { throw .refused(nil) }
         let tokens = Tokens(access: grant.access, refresh: refresh, email: grant.email, at: now())
         guard keep(tokens) else { throw .notKept }
+        landing(Tokens.subject(of: tokens.access))
         adopt(tokens)
         await tokenArrived?()
     }

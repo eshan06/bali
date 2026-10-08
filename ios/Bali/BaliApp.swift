@@ -59,13 +59,19 @@ final class Phone {
     private var starting = false
     /// A fixture's, frozen as it was made (Debug): never started.
     private var frozen = false
-    /// The 13+ check (C7), as the phone's own defaults say — passed before, or not yet — and, this
-    /// run, whether Sign up asked it and what the student answered: under 13 is held here alone,
-    /// never written anywhere (`AgeCheck`). Asked at Sign up (`signIn(.signUp, through:)`), and
-    /// after a sign-in on a phone that has not passed it (the gap's fallback), the sign-in giving
-    /// Bali's API nothing until it is answered.
-    private(set) var age = AgeCheck(defaults: .standard)
-    /// The age screen's picks, the birth month and year, until Continue answers with them.
+    /// The 13+ check (C7) this run: whether Sign up asked it and what the student answered — under
+    /// 13 held here alone, never written anywhere (`AgeCheck`). Asked at every Sign up
+    /// (`signIn(.signUp, through:)`), and after a sign-in into an account that has not passed on
+    /// this phone (the gap's fallback), the sign-in giving Bali's API nothing until it is
+    /// answered. What an account passed is the phone's defaults' (`AgeCheck.passed`), read by
+    /// `ageNow`.
+    private(set) var age = AgeCheck(.unanswered)
+    /// The account signed in now, as its tokens name it (`SignIn.account`): the one the 13+ check
+    /// is read and filed under — nil signed out or where the tokens name none, never the last
+    /// student's, as `email` is.
+    private var checking: String?
+    /// The age screen's picks, the birth month and year, until Continue answers with them — kept
+    /// while the sign-up page it opens is open, as the screen still shows them.
     var birth = Birth()
     /// Whether Delete account is the gap's fallback's: an answer under 13 this run, signed in,
     /// starts it, and nothing else does — the same deletion as Me's, said in the approved canvas's
@@ -219,10 +225,22 @@ final class Phone {
     /// The router's answer over what the phone knows, with `opened` as the screens opened.
     private func choose(_ opened: [Screen]) -> (screen: Screen, tabbed: Bool) {
         Screen.choose(
-            problem: problem, deleting: deleting.shows, age: age.answer, intro: introShows,
+            problem: problem, deleting: deleting.shows, age: ageNow, intro: introShows,
             signedIn: signedIn, signedInThisRun: signedInThisRun, protection: protection,
             everApproved: everApproved, sync: sync, sessionOverClosed: sessionOverClosed,
             opened: opened, tab: tab, now: Date())
+    }
+
+    /// The 13+ check as the router reads it (C7): signed in, the account's — passed where it passed
+    /// on this phone (`AgeCheck.passed`, by its Cognito id: never another account's, nor the
+    /// phone-wide flag builds before kept), else the question, or the stop screen an answer under
+    /// 13 got this run; signed out, Sign up's question as it stands. A fixture's is its own, never
+    /// the phone's defaults. Read each time, so what the defaults file is never kept twice: each
+    /// filing comes with a change the screens follow, `checking` at a sign-up's landing, `age` at an
+    /// answer.
+    var ageNow: AgeCheck.Answer {
+        guard signedIn == true, !frozen, age.answer != .tooYoung else { return age.answer }
+        return AgeCheck.passed(checking, in: .standard) ? .passed : .unanswered
     }
 
     private var screen: Screen { shown.screen }
@@ -324,10 +342,11 @@ final class Phone {
     /// deletion's question or stop goes with the change too, while one under way, waiting for
     /// DeleteUser or done holds (`Deleting.signInChanged`); `pending`, the API has deleted the
     /// account and its Cognito sign-in waits to be — a relaunch (C4b) — so the deletion's screen
-    /// shows at once, Try again its one way on. The intro Sign up showed goes with a change too:
-    /// the sign-in its page made has landed; and at a sign-out, the intro seen, so the next Sign up
-    /// this run shows it again (#292's review). A sign-in made this run with no `me` known forgets
-    /// too: a read that failed before it, with no token to send, is not its read (`forgetMe`).
+    /// shows at once, Try again its one way on. The intro Sign up showed goes with a change too,
+    /// and so does its question kept while its page was open, with the picks: the sign-in its page
+    /// made has landed; and at a sign-out, the intro seen, so the next Sign up this run shows it
+    /// again (#292's review). A sign-in made this run with no `me` known forgets too: a read that
+    /// failed before it, with no token to send, is not its read (`forgetMe`).
     func signed(
         in signedIn: Bool?, as account: String? = nil, email: String? = nil, pending: Bool = false
     ) {
@@ -336,7 +355,8 @@ final class Phone {
             ?? (signedIn == true && self.signedIn == false)
         let changed = signedIn != self.signedIn || another
         if changed {
-            (tab, introShows) = (.home, false)
+            (tab, introShows, birth) = (.home, false, Birth())
+            if age.answer == .asked { age = AgeCheck(.unanswered) }
             if signedIn == false { introSeen = false }
             forgetHistory()
             (naming, signOutFailed, leaving) = (Naming(), nil, Leaving())
@@ -348,7 +368,7 @@ final class Phone {
         let made = changed && signedIn == true && self.signedIn != nil
         if another || made && sync?.me == nil { forgetMe() }
         if let account { self.account = account }
-        (self.signedIn, self.email) = (signedIn, email)
+        (self.signedIn, self.email, checking) = (signedIn, email, signedIn == true ? account : nil)
         if changed { historyDue = signedIn == true && !frozen }
         readDueHistory()
     }
@@ -614,66 +634,88 @@ final class Phone {
     /// the page at a URL, and where it sent the student back to the scheme given.
     typealias Browser = @MainActor @Sendable (URL, String) async throws(SignInError) -> URL
 
-    /// The one way to Cognito's hosted UI (C1a) — Sign in's two buttons, the age screen's
-    /// Continue, the intro's Sign up and the readout's alike — opening `page` (the approved Sign in
-    /// & sign up design). Sign in opens its page at once: a sign-in that comes back to a phone not
-    /// past the 13+ check is asked it then (the gap's fallback). Sign up asks the check first where
-    /// it has not passed (C7), then shows the intro where it has not been seen, each in Sign in's
-    /// place with no page opened; its page opens once both are behind it. After an answer under 13
-    /// no page opens this run, as the stop screen says. Through `browser`, one at a time, what did
-    /// not finish kept (`signInFailed`); a page that ends with no sign-in — closed, or not opened —
-    /// leaves the intro for Sign in, and one that signs the student in leaves it until the sign-in
-    /// lands (`signed`). On a phone not started — a frozen one too — no page can open, which is
-    /// said.
+    /// The one way to Cognito's hosted UI (C1a) — Sign in's two buttons and the readout's, then the
+    /// age screen's Continue and the intro's Sign up, which carry Sign up on — opening `page` (the
+    /// approved Sign in & sign up design). Sign in opens its page at once: a sign-in into an account
+    /// that has not passed the 13+ check on this phone is asked it then (the gap's fallback). Sign
+    /// up asks the check first, every time (C7; the owner's ruling, 2026-10-07: no account exists
+    /// yet to have passed it, and a second person must never sign up unasked), in Sign in's place
+    /// with no page opened; its Continue goes on (`answerAge`). After an answer under 13 no page
+    /// opens this run, as the stop screen says.
     func signIn(_ page: HostedPage = .signIn, through browser: Browser) async {
         guard !signingIn, age.answer != .tooYoung else { return }
-        if page == .signUp {
-            guard age.ask() else { return }
-            guard introSeen else { return introShows = true }
-        }
+        guard page == .signIn else { return (age, birth) = (AgeCheck(.asked), Birth()) }
+        await open(.signIn, vouched: false, through: browser)
+    }
+
+    /// Opens `page` through `browser`, one at a time, what did not finish kept (`signInFailed`).
+    /// `vouched`, Sign up's page after a 13 or older answer this time: the account it signs in —
+    /// made there, or one signed into from it — is filed as passed on this phone as it lands,
+    /// before anything hears of the sign-in (`SignIn.signIn`'s `landing`), so it is never asked
+    /// again here. A page that ends with no sign-in — closed, or not opened — leaves the intro or
+    /// the question for Sign in, the answer and the picks let go, so the next Sign up asks again;
+    /// one that signs the student in leaves them until the sign-in lands (`signed`). On a phone not
+    /// started — a frozen one too — no page can open, which is said.
+    private func open(_ page: HostedPage, vouched: Bool, through browser: Browser) async {
         hostedPage = page
-        guard let signIn else {
-            return (introShows, signInFailed) = (false, .notOpened(Joining.notStarted))
-        }
+        guard let signIn else { return notOpened(.notOpened(Joining.notStarted)) }
         (signingIn, signInFailed) = (true, nil)
         defer { signingIn = false }
         let scheme = signIn.cognito.redirectURI.scheme ?? ""
         do {
-            try await signIn.signIn(page) { @MainActor url throws(SignInError) in
-                try await browser(url, scheme)
-            }
+            try await signIn.signIn(
+                page,
+                landing: { account in
+                    if vouched, let account { AgeCheck.pass(account, in: .standard) }
+                }
+            ) { @MainActor url throws(SignInError) in try await browser(url, scheme) }
         } catch {
-            (introShows, signInFailed) = (false, error)
+            notOpened(error)
         }
     }
 
+    /// A page that ended with no sign-in: Sign in, saying why (rule 5).
+    private func notOpened(_ error: SignInError) {
+        (age, birth, introShows, signInFailed) = (AgeCheck(.unanswered), Birth(), false, error)
+    }
+
     /// The age screen's Continue (C7): the picks answer the check, judged by the phone's clock and
-    /// calendar today — passed, kept in the phone's own defaults (never on a frozen fixture, which
-    /// keeps nothing for another), and Sign up goes on at once, with no second press: the intro, or
-    /// its page; under 13, kept nowhere, in memory until the app is reopened — and the picks are
-    /// let go either way. Nothing until both are picked. Signed in (the gap's fallback), no page
-    /// opens: 13 or older lets the sign-in reach Bali's API, everything queued sent and the truth
-    /// read at once — the starting screen held until it answers (`forgetMe`); under 13 deletes the
-    /// account, as Delete account does.
+    /// calendar today. Nothing until both are picked. Sign up's, 13 or older goes on at once, with
+    /// no second press: the intro, where this run has not shown it, the picks let go — or its page,
+    /// the question kept with its picks and Signing up… on Continue while the page is open (the
+    /// approved design's age board). Under 13, kept nowhere, in memory until the app is reopened,
+    /// the picks let go. Signed in (the gap's fallback), no page opens: 13 or older files the
+    /// account as passed on this phone (never a frozen fixture's, which keeps nothing for another)
+    /// and lets its sign-in reach Bali's API, everything queued sent and the truth read at once —
+    /// the starting screen held until it answers (`forgetMe`); under 13 deletes the account, as
+    /// Delete account does.
     func answerAge(through browser: Browser) async {
-        guard let month = birth.month, let year = birth.year else { return }
-        age.answered(month: month, year: year, defaults: frozen ? nil : .standard)
+        guard let month = birth.month, let year = birth.year, !signingIn else { return }
+        let today = Date()
+        let passes = AgeCheck.passes(month: month, year: year, today: today)
+        if signedIn != true, passes, introSeen {
+            return await open(.signUp, vouched: true, through: browser)
+        }
+        age.answered(month: month, year: year, today: today)
         birth = Birth()
-        guard signedIn == true else { return await signIn(.signUp, through: browser) }
-        guard age.answer == .passed else {
+        guard signedIn == true else { return introShows = passes }
+        guard passes else {
             deleting.ask()
             return await deleteAccount()
         }
+        if !frozen, let checking { AgeCheck.pass(checking, in: .standard) }
         forgetMe()
         await retry()
     }
 
     /// The intro's Sign up, on its last page (C1): the intro seen for this run, in memory only, and
-    /// Sign up's page opened through the one gate, the intro staying, Signing up… on its button,
-    /// while the page is open.
+    /// Sign up's page opened, vouched by the answer that showed the intro, the intro staying,
+    /// Signing up… on its button, while the page is open. Only after that answer: no Sign up page
+    /// opens unasked.
     func sawIntro(through browser: Browser) async {
+        guard !signingIn, age.answer == .passed else { return }
         introSeen = true
-        await signIn(.signUp, through: browser)
+        await open(.signUp, vouched: true, through: browser)
     }
 
     /// Keeps `id` as the student listed in a class on this phone, in its own defaults — a frozen
@@ -770,11 +812,11 @@ final class Phone {
         }
         problem = nil
         let transport = URLSessionTransport()
-        // Bali's API gets no token until the 13+ check has passed on this phone, read from its own
-        // defaults at each ask (the gap's fallback; C7).
+        // Bali's API gets no token until the account signed in has passed the 13+ check on this
+        // phone, read from its own defaults at each ask (the gap's fallback; C7).
         let signIn = SignIn(
             cognito: config.cognito, store: KeychainTokenStore(), transport: transport,
-            cleared: { AgeCheck(defaults: .standard).answer == .passed })
+            cleared: { AgeCheck.passed($0, in: .standard) })
         let engine = await SyncEngine.make(
             outbox: outbox, api: config.api, signIn: signIn, transport: transport)
         #if DEBUG
