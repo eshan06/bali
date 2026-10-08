@@ -3,11 +3,11 @@ import SwiftUI
 
 /// Your name (the approved Sign in & sign up design; the owner's decision, 2026-10-07), where the
 /// router sends a student's account `GET /v1/me` names with no name, after any sign-up or sign-in
-/// and before Screen Time, Join or Home: a teacher always sees a real name, never part of an
-/// account's id. Required: Continue saves it as Me's card does (`Naming`, A8's `PATCH /v1/me`),
-/// Saving… while it runs, and the router moves on once `me` has it; Sign out, as on Join, is the
-/// only other way on. A save that set no name is said under Continue in Me's words, Continue the
-/// way to try again (rule 5).
+/// and before Screen Time or Home: a teacher always sees a real name, never part of an account's
+/// id. Required: Continue saves it as Me's card does (`Naming`, A8's `PATCH /v1/me`), Saving…
+/// while it runs, and the router moves on once `me` has it; Sign out, Me's, is the only other way
+/// on. A save that set no name is said under Continue in Me's words, Continue the way to try again
+/// (rule 5).
 struct NameView: View {
     let phone: Phone
     /// The field's text, kept as `Naming.type` keeps a name, at every keystroke.

@@ -83,15 +83,22 @@ struct AppTests {
         let previewing = Phone(fixture: try #require(PreviewFixtures.all["joinPreview"]))
         #expect(previewing.joining.preview?.teacher.displayName == "Ms. Rivera")
         await previewing.join()
-        #expect(previewing.joining.preview != nil && previewing.hasClasses == false)
+        #expect(previewing.joining.preview != nil && previewing.sync?.hasClasses == false)
         #expect(previewing.joining.failure == Joining.notStarted && !previewing.joining.busy)
         let refused = Phone(fixture: try #require(PreviewFixtures.all["joinError"]))
         #expect(refused.joining.preview == nil && refused.joining.code == "KWX49Q")
         await refused.lookUp()
         #expect(refused.joining.failure == Joining.notStarted && refused.joining.preview == nil)
-        #expect(Phone(fixture: try #require(PreviewFixtures.all["home"])).hasClasses == true)
+        #expect(Phone(fixture: try #require(PreviewFixtures.all["home"])).sync?.hasClasses == true)
         let fromHome = Phone(fixture: try #require(PreviewFixtures.all["joinFromHome"]))
         #expect(fromHome.opened == [.join])
+        // Join is only ever opened over Home (the owner's ruling, 2026-10-07), its way back there.
+        for name in ["join", "joinPreview", "joinError", "joinFromHome"] {
+            let join = Phone(fixture: try #require(PreviewFixtures.all[name]))
+            #expect(join.shown == (.join, false) && join.opened == [.join], "\(name)")
+            join.back()
+            #expect(join.shown == (.home, true), "\(name)")
+        }
         // Focus (C4): a frozen phone's Emergency Unlock says it has not started, never nothing;
         // the held tap's fixtures hold one, and the one over no shields claims none.
         #expect(
@@ -155,15 +162,19 @@ struct AppTests {
         #expect(homeWaiting.shown == (.home, true) && !homeWaiting.canGoBack)
         #expect(homeWaiting.sync?.waitingCard != nil)
         #expect(homeWaiting.sync?.inSessionCard(at: Date()) == nil)
-        // In no class any more (#143): Home, its tab bar and no Back, its card in the hero's
-        // place, never C3c's or the wait's; a newcomer in no class gets Join.
-        let noClasses = Phone(fixture: try #require(PreviewFixtures.all["homeNoClasses"]))
-        #expect(noClasses.shown == (.home, true) && !noClasses.canGoBack)
-        #expect(noClasses.everInClass && noClasses.sync?.noClassesCard != nil)
-        #expect(noClasses.sync?.inSessionCard(at: Date()) == nil)
-        #expect(noClasses.sync?.waitingCard == nil && !noClasses.offersSignOut)
-        let newcomer = Phone(fixture: try #require(PreviewFixtures.all["join"]))
-        #expect(newcomer.shown.screen == .join && !newcomer.everInClass)
+        // In no class (#143; the owner's ruling, 2026-10-07): Home, its tab bar and no Back, its
+        // card in the hero's place, never C3c's or the wait's — a newcomer's too, never a Join of
+        // the router's own; Sign out is Me's.
+        for (name, ever) in [("homeNoClasses", true), ("homeNew", false)] {
+            let noClasses = Phone(fixture: try #require(PreviewFixtures.all[name]))
+            #expect(noClasses.shown == (.home, true) && !noClasses.canGoBack, "\(name)")
+            #expect(noClasses.everInClass == ever, "\(name)")
+            #expect(noClasses.sync?.noClassesCard(everInClass: ever) != nil, "\(name)")
+            #expect(noClasses.sync?.inSessionCard(at: Date()) == nil, "\(name)")
+            #expect(noClasses.sync?.waitingCard == nil && !noClasses.offersSignOut, "\(name)")
+            noClasses.select(.me)
+            #expect(noClasses.shown == (.me, true) && noClasses.offersSignOut, "\(name)")
+        }
         // A pick told to wait for the unlock may go once it lands: those words go then, and no
         // other failure's do (santa's round 2).
         var standing = SyncState()
@@ -242,7 +253,8 @@ struct AppTests {
         // In no class, a tap refused for anything but an unknown block (#160's review): its way on
         // the Try again beside it, as this Home has no Tap in.
         let noClassStuck = Phone(fixture: try #require(PreviewFixtures.all["homeNoClassesTapStuck"]))
-        #expect(noClassStuck.shown == (.home, true) && noClassStuck.sync?.noClassesCard != nil)
+        #expect(noClassStuck.shown == (.home, true))
+        #expect(noClassStuck.sync?.noClassesCard(everInClass: true) != nil)
         #expect(
             noClassStuck.sync?.refusedTapWords
                 == "Bali couldn't record a tap. Try again, or ask your teacher.")
@@ -397,7 +409,7 @@ struct AppTests {
             [
                 "home", "homeLoading", "homeError", "homeUnread", "homeRefused", "homeFromUnlocked",
                 "homeFromUnlockedRetap", "homeInSession", "homeTapRefused", "homeTapRefusedThenTapped",
-                "homeWaiting", "homeNoClasses", "homeNoClassesTapStuck",
+                "homeWaiting", "homeNew", "homeNoClasses", "homeNoClassesTapStuck",
             ],
             ["meEditing", "meNameError"]
         )
@@ -624,21 +636,17 @@ struct AppTests {
         #expect(unlocked.sync.flatMap(SignOutWords.held) != nil)
         await unlocked.signOut()
         #expect(unlocked.signOutFailed == nil)
-        // Sign out is Me's, and the router's own Join's — a student in no class reaches nothing
-        // else, the wrong account's way out (the riders) — held there as on Me; never on a Join
-        // opened over Home or Me, whose way back reaches Me, nor elsewhere.
+        // Sign out is Me's — every student in no class lands on Home with its tab bar, so Me is the
+        // wrong account's way out (the owner's ruling, 2026-10-07) — and Your name's; never on a
+        // Join, opened over Home or Me, whose way back reaches Me, nor elsewhere.
         for (name, offers) in [
-            ("me", true), ("join", true), ("joinSignOutHeld", true), ("joinFromHome", false),
+            ("me", true), ("join", false), ("joinFromHome", false), ("homeNew", false),
             ("home", false), ("focus", false), ("signIn", false), ("deleting", false),
             ("deletingPending", false), ("name", true),
         ] {
             let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))
             #expect(phone.offersSignOut == offers, "\(name)")
         }
-        let joinHeld = Phone(fixture: try #require(PreviewFixtures.all["joinSignOutHeld"]))
-        #expect(joinHeld.shown.screen == .join && joinHeld.sync.flatMap(SignOutWords.held) != nil)
-        await joinHeld.signOut()
-        #expect(joinHeld.signOutFailed == nil)
         // Signed out from Join: the code typed goes with who typed it.
         let typed = Phone(fixture: try #require(PreviewFixtures.all["joinError"]))
         typed.signed(in: false)
@@ -987,7 +995,7 @@ struct AppTests {
         // Bea signs in: nothing of Ana's, at once — and none from the state still on its way.
         phone.signed(in: false)
         phone.signed(in: true, as: "bea")
-        #expect(phone.sync?.me == nil && phone.hasClasses == nil && !phone.everInClass)
+        #expect(phone.sync?.me == nil && phone.sync?.hasClasses == nil && !phone.everInClass)
         phone.synced(anas)
         #expect(phone.sync?.me == nil && !phone.everInClass)
         // The engine has forgotten Ana's: Bea's own, once read, show.
@@ -1227,7 +1235,8 @@ struct AppTests {
         #expect(waiting.opened.isEmpty && waiting.shown.screen == .waiting)
         #expect(waiting.joining.code.isEmpty)
         // No classes: waiting, Home and Join over it stay — an armed tap needs no enrollment;
-        // out, Join is the router's own, keeping what was typed there (santa's round 2).
+        // out, Home is the router's own in no class too (the owner's ruling, 2026-10-07), so
+        // Join opened over it stays, keeping what was typed there (santa's round 2).
         let none = try BaliJSON.makeDecoder().decode(
             MeResponse.self,
             from: Data(#"{"user":{"id":"u","role":"student","displayName":"Ana"},"classes":[],"session":null}"#.utf8))
@@ -1243,8 +1252,10 @@ struct AppTests {
         var noClasses = try #require(reading.sync)
         noClasses.me = none
         reading.synced(noClasses)
-        #expect(reading.opened.isEmpty && reading.shown.screen == .join)
+        #expect(reading.opened == [.join] && reading.shown.screen == .join && reading.canGoBack)
         #expect(reading.joining.code == "KWX")
+        reading.back()
+        #expect(reading.shown == (.home, true))
         await home.tapIn()
         #expect(home.tapFailed == Joining.notStarted && !home.scanning)
     }
@@ -1741,6 +1752,34 @@ struct AppTests {
     }
 
     @Test(
+        "Home in no class as the approved Sign in & sign up design draws it: the student greeted, then its card's words — not in a class yet for a new student, in none any more for one removed from their last (#143) — and Join a class, a button, then the tab bar, with no classes list and no Sign out; Join opened from it has Back and no Sign out"
+    )
+    func homeInNoClass() async throws {
+        for (name, words) in [
+            ("homeNew", "You're not in a class yet. Join one with the class code from your teacher."),
+            (
+                "homeNoClasses",
+                "You're not in any classes. Join one with the class code from your teacher."
+            ),
+        ] {
+            let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))
+            let read = try await elements(of: RootView(phone: phone), once: words)
+            let labels = read.map { $0.label ?? "" }
+            let order = ["Hi, Ana", words, "Join a class", "Home", "History", "Me"]
+            let at = order.compactMap { labels.firstIndex(of: $0) }
+            #expect(at.count == order.count && at == at.sorted(), "\(name): \(labels)")
+            let join = try #require(read.first { $0.label == "Join a class" }, "\(name)")
+            #expect(join.traits.contains(.button) && !join.traits.contains(.notEnabled))
+            #expect(labels.filter { $0 == "Join a class" }.count == 1, "\(name): \(labels)")
+            #expect(!labels.contains("Your classes") && !labels.contains("Sign out"), "\(name)")
+        }
+        let join = Phone(fixture: try #require(PreviewFixtures.all["join"]))
+        let opened = try await elements(of: RootView(phone: join), once: "Enter your class code")
+        #expect(opened.contains { $0.label == "Back" && $0.traits.contains(.button) })
+        #expect(!opened.contains { $0.label == "Sign out" || $0.label == "Home" })
+    }
+
+    @Test(
         "The gap's fallback, routed (the owner's decision, 2026-10-06): a sign-in come back to a phone that has not passed the 13+ check shows the question first, no tab bar; 13 or older carries on as after any sign-in, no page opened; under 13 lands on the account's deletion under the stop screen's title — a frozen phone's, not started, a stop with Try again alone; each fixture of it says the approved words. The flag as it was before is put back after"
     )
     func ageAfterSignIn() async throws {
@@ -1923,7 +1962,7 @@ struct AppTests {
     }
 
     @Test(
-        "Your name, routed (the owner's decision, 2026-10-07): with Bali not reached yet on a sign-in kept from the last run, Screen Time as before; once a read names a student's account with no name, Your name in its place, no tab bar, Sign out its other way on; named, the router moves on, to Screen Time, then Join; a teacher's account never gets it"
+        "Your name, routed (the owner's decision, 2026-10-07): with Bali not reached yet on a sign-in kept from the last run, Screen Time as before; once a read names a student's account with no name, Your name in its place, no tab bar, Sign out its other way on; named, the router moves on, to Screen Time, then Home in no class, never a Join of its own; a teacher's account never gets it"
     )
     func nameRouted() throws {
         /// `GET /v1/me`'s answer: an account of `role` named `name` — JSON's, null for none — in
@@ -1947,11 +1986,11 @@ struct AppTests {
         phone.synced(state)
         #expect(phone.shown == (.screenTime, false))
         protection.permission = .approved
-        let joining = Phone(fixture: PreviewFixtures.State(protection: protection, sync: state))
-        #expect(joining.shown == (.join, false))
+        let inNone = Phone(fixture: PreviewFixtures.State(protection: protection, sync: state))
+        #expect(inNone.shown == (.home, true))
         state.me = try user("null", "teacher")
-        joining.synced(state)
-        #expect(joining.shown == (.join, false))
+        inNone.synced(state)
+        #expect(inNone.shown == (.home, true))
     }
 
     @Test(
@@ -2179,7 +2218,7 @@ struct AppTests {
     }
 
     @Test(
-        "Whose classes `GET /v1/me` has listed on this phone is kept in its own defaults (#143), as the permission once approved is, and a fresh Phone reads it back; a frozen fixture's stays its own (santa's round 1). In no class later, removed from their last, the student lands on Home, its tab bar and its card, and nothing they opened closes for it: Join opened over Home stays, its code typed, as it does over the empty Home at a read saying none again, and so does a tab chosen there, Me after the Leave of the last class too. Keyed on the student: the same student signing back in is still known; another student in no class gets Join, a late read of the last one's classes included, until listed in a class herself. The key as it was before is put back after"
+        "Whose classes `GET /v1/me` has listed on this phone is kept in its own defaults (#143), as the permission once approved is, and a fresh Phone reads it back; a frozen fixture's stays its own (santa's round 1). In no class later, removed from their last, the student lands on Home, its tab bar and its card saying they are in none any more, and nothing they opened closes for it: Join opened over Home stays, its code typed, as it does over the empty Home at a read saying none again, and so does a tab chosen there, Me after the Leave of the last class too. Keyed on the student: the same student signing back in is still known; another student in no class gets Home too, its card saying she is not in one yet (the owner's ruling, 2026-10-07), a late read of the last one's classes included, until listed in a class herself. The key as it was before is put back after"
     )
     func everInClass() throws {
         let defaults = UserDefaults.standard
@@ -2212,8 +2251,12 @@ struct AppTests {
         phone.synced(state)
         #expect(phone.shown.screen == .join && phone.canGoBack && phone.joining.code == "KWX")
         phone.back()
-        #expect(phone.shown == (.home, true) && !phone.canGoBack)
-        #expect(phone.everInClass && phone.sync?.noClassesCard != nil)
+        #expect(phone.shown == (.home, true) && !phone.canGoBack && phone.everInClass)
+        let (none, notYet) = (
+            "You're not in any classes. Join one with the class code from your teacher.",
+            "You're not in a class yet. Join one with the class code from your teacher."
+        )
+        #expect(phone.sync?.noClassesCard(everInClass: phone.everInClass) == none)
         // Its own Join a class, then History chosen: a read saying none again, as each return to
         // the front makes, closes neither.
         phone.open(.join)
@@ -2232,14 +2275,15 @@ struct AppTests {
         phone.signed(in: true, as: "ana")
         phone.synced(state)
         #expect(phone.shown == (.home, true) && phone.inClass == "ana")
-        // Bea signs in, in no class: Join, a late read of Ana's classes landing after her
-        // sign-in included; listed in a class herself, Bea is the one kept.
+        // Bea signs in, in no class: Home, not in a class yet, a late read of Ana's classes landing
+        // after her sign-in included; listed in a class herself, Bea is the one kept.
         phone.signed(in: true, as: "bea")
         state.me = try me("ana", period3)
         phone.synced(state)
         state.me = try me("bea")
         phone.synced(state)
-        #expect(phone.shown == (.join, false) && phone.inClass == "ana")
+        #expect(phone.shown == (.home, true) && phone.inClass == "ana" && !phone.everInClass)
+        #expect(phone.sync?.noClassesCard(everInClass: phone.everInClass) == notYet)
         state.me = try me("bea", period3)
         phone.synced(state)
         #expect(phone.inClass == "bea")
@@ -2251,7 +2295,8 @@ struct AppTests {
         leaving.synced(left)
         #expect(leaving.shown == (.me, true))
         leaving.select(.home)
-        #expect(leaving.shown.screen == .home && leaving.sync?.noClassesCard != nil)
+        #expect(leaving.shown.screen == .home)
+        #expect(leaving.sync?.noClassesCard(everInClass: leaving.everInClass) == none)
     }
 
     @Test(

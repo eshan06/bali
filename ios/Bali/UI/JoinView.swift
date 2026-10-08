@@ -2,12 +2,12 @@ import BaliCore
 import BaliOutbox
 import SwiftUI
 
-/// Join (C2b; D1's JoinCode and ConsentPreview artboards), where the router sends a phone that
-/// knows it has no classes — and which Home's Join a class opens (C3): the student types their
-/// class's code, sees what it opens before anything is joined — the class, its teacher, and what
-/// that teacher sees, the intro's own list — and joins it. A look or a join that did not finish is
-/// said under its button, which is the way on (rule 5). The rules are `Joining`'s (BaliOutbox),
-/// the calls `Phone`'s.
+/// Join (C2b; D1's JoinCode and ConsentPreview artboards), which Home's and Me's Join a class open
+/// over them with a way back (C3) — never a screen of the router's own: in no class, a student lands
+/// on Home (the owner's ruling, 2026-10-07): the student types their class's code, sees what it
+/// opens before anything is joined — the class, its teacher, and what that teacher sees, the
+/// intro's own list — and joins it. A look or a join that did not finish is said under its button,
+/// which is the way on (rule 5). The rules are `Joining`'s (BaliOutbox), the calls `Phone`'s.
 struct JoinView: View {
     let phone: Phone
     /// The field's text, kept as a code is written (`Joining.type`) at every keystroke.
@@ -28,8 +28,7 @@ struct JoinView: View {
         }
     }
 
-    /// The code (D1's JoinCode): back to Home when Home opened it (C3) — at the router's root, a
-    /// phone in no class, there is nowhere to go back to.
+    /// The code (D1's JoinCode): back to the screen that opened it (C3).
     @ViewBuilder private var entry: some View {
         if phone.canGoBack { back { phone.back() } }
         ScrollView {
@@ -75,11 +74,6 @@ struct JoinView: View {
         .scrollBounceBehavior(.basedOnSize).screenWide()
         .onAppear { typing = true }
         action(busy ? "Checking…" : "Continue", enabled: phone.joining.complete, phone.lookUp)
-        // The router's own Join — a student in no class — reaches no tab bar, so not Me's: signed
-        // in with the wrong account, this is the way out (the riders).
-        if phone.offersSignOut {
-            SignOutButton(phone: phone).disabled(busy).frame(maxWidth: .infinity).padding(.top, 8)
-        }
     }
 
     /// What the code opens, before anything is joined (D1's ConsentPreview): "your teacher" when
