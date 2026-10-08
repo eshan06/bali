@@ -8,6 +8,39 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-08** — **A reinstalled Bali starts fresh** (the owner's ruling, found on TestFlight build
+  8; the approved [Sign in & sign up design](https://claude.ai/artifact/McyYhpX1UTq1nU6oCCwPwG)'s
+  flow map, version 10: a fresh install, a reinstall and a new phone all open on Sign up or sign
+  in). The owner deleted Bali, reinstalled it, and the first screen was the 13+ question, not Sign
+  up or sign in. Why: the sign-in's tokens live in the Keychain (`KeychainTokenStore`), and iOS
+  keeps an app's Keychain items after the app is deleted, while it deletes the app's own container
+  (its defaults, the per-account age note among them) and its app group's (the outbox). So the
+  reinstall read a student signed in, as an account that had not passed the question on this
+  phone, and #287/#295's fallback asked it first. **The ruling:** unless the student signed in on
+  this install, the first screen is Sign up or sign in. **How an install's first start is told
+  from an update: no outbox file** (`outbox.sqlite` in the app group's container). It lives as long
+  as the defaults do (deleted with the app, the group's only one; kept through an update), and it
+  is complete where the defaults are not: every build that signs anyone in (since B4c) makes it at
+  its start, before its sign-in exists, so an update from build 8 or earlier with a student signed
+  in always finds it, whatever the student did. The defaults' keys (`screenTimeApproved`,
+  `inClass`, `ageCheckedAccounts`, the old `ageChecked` and `introSeen`) are written only once a
+  student allowed Screen Time, was listed in a class, passed the question or saw a build's kept
+  intro, so a student signed in who did none of them has none, and a check of them would sign that
+  student out at the update. And it is precise: with no file, no sign-in can have been made on
+  this install, so whatever the Keychain holds is a deleted install's, and forgetting it is never
+  a guess. **No new marker:** the file, made right after the forget, marks the install (A12 already
+  names the install by it), so the forget happens once. A forget that fails (the Keychain refusing
+  while the app is in front, not seen) throws before the file is made, shows the storage problem
+  with its Try again, and the next start forgets. The forget is `SignIn`'s own Sign out, on the
+  phone alone, before the router reads the sign-in and before the engine and the enforcer exist, so
+  it never touches Focus, the shields, Emergency Unlock or the outbox (`Phone.outbox(at:forgetting:)`).
+  **Known limit, by the rule that an update signs no one out:** a phone that reinstalled build 8
+  or earlier, its old sign-in taken up again there, keeps it through the update to build 9; a
+  delete and reinstall clears it. Proven on the simulator: signed in, the app deleted (`simctl
+  uninstall`), its group container gone and its Keychain item kept, then reinstalled: Sign up or
+  sign in, the item gone. Not changed: the age logic (C7-server's app half, the yes read from
+  Bali's server, is its own step). Tests: `AppTests.reinstall`.
+
 - **2026-10-08** — **The 13+ yes kept per account, on the server (C7-server)** (the owner's
   decision, 2026-10-08). The phone kept "passed" per account in its own defaults (2026-10-07), so
   an existing student was asked again on every new phone and after a reinstall, and the app could

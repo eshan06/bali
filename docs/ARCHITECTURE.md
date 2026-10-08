@@ -273,8 +273,9 @@ signature. The app attaches it to every request, and any of our servers verifies
 signature with math alone — no database lookup — which matters when every student's
 phone checks in every 30 seconds. A JWT can't be taken back early, so it expires after
 about an hour and a refresh token quietly fetches the next one; a student signs in
-roughly once, ever. Our `users` table stores each row's Cognito ID, linking "who Cognito
-says this is" to our data about them.
+roughly once on each install of the app (a reinstall starts signed out: rules, below). Our
+`users` table stores each row's Cognito ID, linking "who Cognito says this is" to our data
+about them.
 
 **3. Students join a class with a join code.** The teacher's class screen shows a short
 code; a student types it in once, and the server creates their `enrollments` row. No
@@ -291,6 +292,15 @@ an archived class never reserves its code forever; a teacher can regenerate it (
   retry." Only a definitive `401 Unauthorized` (Cognito rejecting the token) ends a
   session. v2 got this wrong: one network blip signed the teacher out into a login page
   that then rejected their correct password.
+- **A reinstall starts signed out** (the owner's ruling, 2026-10-08, found on TestFlight
+  build 8). iOS keeps the Keychain, where the phone keeps its sign-in, after an app is
+  deleted, while it deletes the app's own files and its app group's: a reinstall opened
+  signed in as whoever used the deleted copy, and asked them the 13+ question first. So an
+  install's first start forgets that sign-in, on the phone alone, before any screen reads
+  it: a fresh install, a reinstall and a new phone all open on Sign up or sign in, and an
+  update keeps its sign-in. The phone tells the two apart by its outbox file in the app
+  group, which every build makes at its start before any sign-in, and an update keeps:
+  with none there, nothing in the Keychain is this install's.
 - **A saved emergency unlock outlives an expired token.** If a student's token expired
   while they were offline, the app refreshes the token first and then sends the queued
   record. An auth problem is never a reason to throw a record away.

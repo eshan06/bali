@@ -938,6 +938,58 @@ struct AppTests {
     }
 
     @Test(
+        "A reinstall starts fresh (the owner's ruling, 2026-10-08; the approved Sign in & sign up design, version 10): iOS keeps the Keychain after Bali is deleted, so an install's first start, with no outbox file yet (every build makes it at its first start, before any sign-in), forgets the sign-in a deleted Bali left, through the sign-in's own Sign out, then makes the file: signed out, the router opens on Sign up or sign in. A Keychain that cannot forget now throws and makes no file, so the next start forgets. An update finds its file and keeps the sign-in and an Emergency Unlock queued there, whatever the phone's defaults hold; so does every start after the first",
+        .timeLimit(.minutes(3)))
+    func reinstall() async throws {
+        let made = { (url: URL) in
+            FileManager.default.fileExists(atPath: url.path(percentEncoded: false))
+        }
+        let fresh = FileManager.default.temporaryDirectory.appending(
+            path: "phone-\(UUID().uuidString).sqlite")
+        // A deleted Bali left Ana's sign-in in the Keychain, locked at the first try.
+        let left = Keychain(account: "ana")
+        left.locked = true
+        let (phone, _) = try standIn(StandIn(), keychain: left)
+        let signIn = try #require(phone.signIn)
+        await #expect(throws: Keychain.Locked.self) {
+            try await Phone.outbox(at: fresh, forgetting: signIn)
+        }
+        #expect(!made(fresh) && !left.empty)
+        left.locked = false
+        _ = try await Phone.outbox(at: fresh, forgetting: signIn)
+        #expect(made(fresh) && left.empty)
+        let following = Task { await phone.follow(signIn) }
+        defer { following.cancel() }
+        try await until { phone.signedIn == false }
+        // The router over what the phone knows now (a phone of the test's own runs no enforcer).
+        var checked = Protection()
+        checked.checked = true
+        let first = Screen.choose(
+            problem: nil, deleting: false, age: phone.ageNow, intro: phone.introShows,
+            signedIn: phone.signedIn, signedInThisRun: phone.signedInThisRun, protection: checked,
+            everApproved: false, sync: SyncState(), sessionOverClosed: nil, opened: [], tab: .home,
+            now: Date())
+        #expect(first == (.signIn, false))
+        // The next start: Bea signed in since, over the file this install made, is kept.
+        let bea = Keychain(account: "bea")
+        let (relaunched, _) = try standIn(StandIn(), keychain: bea)
+        let relaunchedSignIn = try #require(relaunched.signIn)
+        _ = try await Phone.outbox(at: fresh, forgetting: relaunchedSignIn)
+        #expect(await relaunchedSignIn.account() == "bea" && !bea.empty)
+        // An update: build 8's start made its file, an Emergency Unlock is queued in it and Ana is
+        // signed in; both kept.
+        let updated = FileManager.default.temporaryDirectory.appending(
+            path: "phone-\(UUID().uuidString).sqlite")
+        try Outbox(at: updated).record(.unlock(session: "s", reason: nil), now: Date())
+        let kept = Keychain(account: "ana")
+        let (update, _) = try standIn(StandIn(), keychain: kept)
+        let updateSignIn = try #require(update.signIn)
+        let outbox = try await Phone.outbox(at: updated, forgetting: updateSignIn)
+        #expect(await updateSignIn.account() == "ana" && !kept.empty)
+        #expect(try outbox.records().count == 1)
+    }
+
+    @Test(
         "Another student's sign-in forgets the last one's name and classes, keyed on the account (C6b-1's review): the sign-out between the two not seen — a stream that keeps its newest value only can let it go by — the tabs start over and the engine's `me` goes; the same student again forgets nothing"
     )
     func forgetsAnother() async throws {
