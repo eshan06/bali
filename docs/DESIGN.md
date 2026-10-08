@@ -457,8 +457,26 @@ class page's minutes field types in it too, on the Field since D2f-2.
   the countdown arc drawing in).
   Easing `standard` `cubic-bezier(0.2, 0, 0, 1)`; `spring`
   `cubic-bezier(0.34, 1.3, 0.64, 1)` for Emergency Unlock's spring-back.
-- Turn all animation off under `prefers-reduced-motion` (on iOS, Reduce
-  Motion): fades become instant.
+- Under Reduce Motion (iOS), nothing moves and a fade stays a fade: a slide
+  becomes a 200 ms fade, and every fade takes 200 ms, a screen the student
+  opens included (the owner's ruling, 2026-10-08, Apple's own rule; it was
+  instant before). Motion that is only motion doesn't play: the countdown arc
+  drawing in, Emergency Unlock's ring and spring-back, a busy button's dim.
+  The portal keeps its global rule under `prefers-reduced-motion`: all
+  animation off (`globals.css`).
+- **The app's screens move in one calm vocabulary** (the approved Sign in &
+  sign up design's motion spec, 2026-10-08; `Stage` and `Moving`,
+  `RootView.swift`). A step forward slides 24 pt (`space-6`) and fades in
+  over `slow`, the screen leaving gone within 100 ms; a step back is its
+  mirror; an arrival or a stop only fades, over `slow`; the starting mark
+  fades in over `base`, and only once Bali has been waited for 0.3 s, then
+  stays at least 0.5 s. The intro's pages turn by the page view's own slide,
+  its dots cross-fading over `fast`; a busy button's words change at once and
+  it dims over `fast`; iOS's sheet, prompt and keyboard keep their own motion,
+  and the screen under the sheet holds still. A screen the student opens over
+  another fades in over `base` (#150). Focus, a session's screens and
+  Emergency Unlock never wait for a move, nor fade: any change to or from them
+  cuts, as does any screen off the onboarding path.
 - Write short, warm, second-person copy: "You're in." Never blame, never alarm,
   never an exclamation mark. The student always holds the exit, and the copy
   sounds like it.

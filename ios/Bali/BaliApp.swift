@@ -78,11 +78,14 @@ final class Phone {
     /// words where it drew them (santa's round 1).
     var underThirteen: Bool { age.answer == .tooYoung }
     /// Sign in's (C1a): a Cognito page under way — `hostedPage`, which its button's busy words name
-    /// — and why the last did not finish, as the sign-in said it: the screen says its `words` for
-    /// that page (rule 5), the readout all of it.
+    /// — until it ends with no sign-in or the one it made lands (`signed`); and why the last did
+    /// not finish, as the sign-in said it: the screen says its `words` (rule 5), the readout all.
     private(set) var signingIn = false
     private(set) var hostedPage = HostedPage.signIn
     private(set) var signInFailed: SignInError?
+    /// When the last Cognito page ended — closed, not opened, or sending the student back signed
+    /// in — as iOS's sheet starts to go: no screen moves while it does (`Screen.Move.due`).
+    @ObservationIgnored private(set) var pageEnded: Date?
     /// Whether the student has seen the intro this run (C1): in memory only, never in the phone's
     /// defaults — once per account, not per phone (the owner's ruling, 2026-10-07): a later run's
     /// Sign up shows it again, a second account's too, and one whose page closed or could not open;
@@ -344,7 +347,8 @@ final class Phone {
     /// account and its Cognito sign-in waits to be — a relaunch (C4b) — so the deletion's screen
     /// shows at once, Try again its one way on. The intro Sign up showed goes with a change too,
     /// and so does its question kept while its page was open, with the picks: the sign-in its page
-    /// made has landed; and at a sign-out, the intro seen, so the next Sign up this run shows it
+    /// made has landed, and so its button's busy words end (`signingIn`), at any sign-in; and at a
+    /// sign-out, the intro seen, so the next Sign up this run shows it
     /// again (#292's review). A sign-in made this run with no `me` known forgets too: a read that
     /// failed before it, with no token to send, is not its read (`forgetMe`).
     func signed(
@@ -364,6 +368,7 @@ final class Phone {
             deleting.signInChanged()
         }
         if pending, deleting == .none { deleting = .pending }
+        if signedIn == true { signingIn = false }
         // Made here, not the Keychain read at launch (nil before it).
         let made = changed && signedIn == true && self.signedIn != nil
         if another || made && sync?.me == nil { forgetMe() }
@@ -490,14 +495,9 @@ final class Phone {
         select(.history)
     }
 
-    /// Opens `screen` over what shows, fading in (#150).
-    func open(_ screen: Screen) { withAnimation(Phone.fade) { opened.append(screen) } }
-
-    /// How a screen the student opens comes and goes (#150), as Reduce Motion is set now. Only the
-    /// student's own moves fade: the router's — Focus at the Start — are never animated.
-    private static var fade: Animation? {
-        Theme.fade(reduceMotion: UIAccessibility.isReduceMotionEnabled)
-    }
+    /// Opens `screen` over what shows, fading in (#150): the student's own move, never the
+    /// router's, whose moves are `RootView`'s and never touch Focus at the Start.
+    func open(_ screen: Screen) { withAnimation(Motion.fade) { opened.append(screen) } }
 
     /// Whether the screen shown was opened over another, so it draws a way back to it (C3): only
     /// where Back leads to another screen — never from a Home its Unlocked became after the bell
@@ -515,13 +515,15 @@ final class Phone {
     var offersSignOut: Bool { screen == .me || screen == .name }
 
     /// Back from the screen opened last, the one under it fading back in (#150) — the keyboard let
-    /// go first, at once, so it goes down with the screen it was up for, never left over the next:
-    /// Join raises one as it shows. A Join closed starts over, unless a try is under way.
+    /// go at once, so it goes down with the screen it was up for, never left over the next: Join
+    /// raises one as it shows. Let go after the move, never before: its focus change draws the root
+    /// at once, before the move, and the move was then never drawn (`AppTests.reduceMotionBack`). A
+    /// Join closed starts over, unless a try is under way.
     func back() {
         guard !opened.isEmpty else { return }
+        let closed = withAnimation(Motion.fade) { opened.removeLast() }
         UIApplication.shared.sendAction(
             #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-        let closed = withAnimation(Phone.fade) { opened.removeLast() }
         if closed == .join, !joining.busy { joining = Joining() }
     }
 
@@ -654,13 +656,12 @@ final class Phone {
     /// before anything hears of the sign-in (`SignIn.signIn`'s `landing`), so it is never asked
     /// again here. A page that ends with no sign-in — closed, or not opened — leaves the intro or
     /// the question for Sign in, the answer and the picks let go, so the next Sign up asks again;
-    /// one that signs the student in leaves them until the sign-in lands (`signed`). On a phone not
-    /// started — a frozen one too — no page can open, which is said.
+    /// one that signs the student in leaves them, its button busy, until the sign-in lands
+    /// (`signed`). On a phone not started — a frozen one too — no page can open, which is said.
     private func open(_ page: HostedPage, vouched: Bool, through browser: Browser) async {
         hostedPage = page
         guard let signIn else { return notOpened(.notOpened(Joining.notStarted)) }
         (signingIn, signInFailed) = (true, nil)
-        defer { signingIn = false }
         let scheme = signIn.cognito.redirectURI.scheme ?? ""
         do {
             try await signIn.signIn(
@@ -668,7 +669,10 @@ final class Phone {
                 landing: { account in
                     if vouched, let account { AgeCheck.pass(account, in: .standard) }
                 }
-            ) { @MainActor url throws(SignInError) in try await browser(url, scheme) }
+            ) { @MainActor url throws(SignInError) in
+                defer { self.pageEnded = Date() }
+                return try await browser(url, scheme)
+            }
         } catch {
             notOpened(error)
         }
@@ -677,6 +681,7 @@ final class Phone {
     /// A page that ended with no sign-in: Sign in, saying why (rule 5).
     private func notOpened(_ error: SignInError) {
         (age, birth, introShows, signInFailed) = (AgeCheck(.unanswered), Birth(), false, error)
+        signingIn = false
     }
 
     /// The age screen's Continue (C7): the picks answer the check, judged by the phone's clock and

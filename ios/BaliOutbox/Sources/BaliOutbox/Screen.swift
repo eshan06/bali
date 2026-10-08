@@ -166,6 +166,81 @@ public enum Screen: Sendable, Hashable {
     }
 }
 
+extension Screen {
+    /// How the screen showing gives way to the router's next (the approved Sign in & sign up
+    /// design's motion spec): the onboarding path in one calm vocabulary, all else a cut. The
+    /// screens' alone: the router's answer, and the shields, never wait on it.
+    public enum Move: Sendable, Hashable {
+        /// At once: to or from Focus, a session's screens, Waiting, the home a standing not read
+        /// keeps — which hold Emergency Unlock — or any screen off the path. A screen the student
+        /// opens over another still fades in (#150).
+        case cut
+        /// A step (Sign up's question, the intro, Screen Time after Your name), or back to Sign in
+        /// as a Cognito page closed or could not open: a slide and a fade.
+        case forward, back
+        /// An arrival or a stop: a fade alone.
+        case arrive
+        /// The starting mark, while the router waits for Bali.
+        case mark
+
+        /// The mark shows only once the router has waited this long, so fast Wi-Fi never sees it,
+        /// and stays at least `markStays`, so it never blinks; nothing moves while iOS's sheet goes
+        /// (the prototype's 350 ms; about the same on the simulator).
+        public static let markWaits: TimeInterval = 0.3
+        public static let markStays: TimeInterval = 0.5
+        public static let sheetGoes: TimeInterval = 0.35
+
+        /// The move from `shown` to `next`, each a screen and whether its tab bar shows, with the
+        /// phone `signedIn` now: Sign up's question is a step forward from Sign in, and the
+        /// question a sign-in asks (the gap's fallback) an arrival.
+        public init(
+            from shown: (screen: Screen, tabbed: Bool), to next: (screen: Screen, tabbed: Bool),
+            signedIn: Bool
+        ) {
+            switch (shown.screen, next.screen) {
+            case _ where shown.screen == next.screen: self = .cut
+            // A stop, under 13: the stop screen, or after a sign-in the deletion under its title.
+            case (.age, .tooYoung), (.age, .deleting): self = .arrive
+            case _ where !Self.onPath(shown) || !Self.onPath(next): self = .cut
+            case (.signIn, .age) where !signedIn, (.age, .intro), (.name, .screenTime):
+                self = .forward
+            case (.age, .signIn), (.intro, .signIn): self = .back
+            case (_, .starting): self = .mark
+            // App open, and after a sign-in: Your name, the question, Screen Time, Home.
+            case (.starting, .signIn), (_, .name), (_, .age), (_, .screenTime), (_, .home):
+                self = .arrive
+            default: self = .cut
+            }
+        }
+
+        /// Whether `shown` is on the onboarding path: Home only with its tab bar, as the home a
+        /// standing not read keeps, with Emergency Unlock, has none.
+        private static func onPath(_ shown: (screen: Screen, tabbed: Bool)) -> Bool {
+            switch shown.screen {
+            case .starting, .signIn, .age, .intro, .name, .screenTime: true
+            case .home: shown.tabbed
+            default: false
+            }
+        }
+
+        /// When this move from `shown` (since `shownAt`) may play, the router having answered at
+        /// `routedAt` and the last Cognito page ended at `pageEnded`: once that page's sheet has
+        /// gone, the mark `markWaits` later, a move from the mark once shown `markStays`; a cut at
+        /// once.
+        public func due(from shown: Screen, shownAt: Date, routedAt: Date, pageEnded: Date?)
+            -> Date
+        {
+            let start = max(routedAt, (pageEnded ?? .distantPast) + Self.sheetGoes)
+            return switch self {
+            case .cut: routedAt
+            case .mark: start + Self.markWaits
+            case .forward, .back, .arrive:
+                shown == .starting ? max(start, shownAt + Self.markStays) : start
+            }
+        }
+    }
+}
+
 extension SessionView {
     /// Whether `other` is this session with the same bell: to the second — an extension moves it
     /// by minutes, while the copy the file keeps is written to the millisecond, rounded down, so

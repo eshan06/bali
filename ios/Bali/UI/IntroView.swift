@@ -14,6 +14,9 @@ struct IntroView: View {
     /// The pages' tags, first to last.
     static let pages = 0...2
     @State private var page: Int
+    /// Continue's turns of the page under Reduce Motion, each the next page fading in where the
+    /// page view would slide (the approved motion spec).
+    @State private var turns = 0
 
     /// Opened on `page` — the first, or a Debug launch's — as a test opens each (#135's review).
     init(phone: Phone, page: Int = IntroView.opening) {
@@ -45,28 +48,47 @@ struct IntroView: View {
                 PageScroll { third }.padding(.horizontal, Theme.gutter).tag(2)
             }
             .tabViewStyle(.page(indexDisplayMode: .never)).padding(.horizontal, -Theme.gutter)
+            .keyframeAnimator(initialValue: 1.0, trigger: turns) { pages, shown in
+                pages.opacity(shown)
+            } keyframes: { _ in
+                LinearKeyframe(0, duration: 0)
+                LinearKeyframe(1, duration: 0.2, timingCurve: Motion.curve)
+            }
             HStack(spacing: 8) {
                 ForEach(Self.pages, id: \.self) { dot in
                     Circle().fill(dot == page ? Theme.brand : Theme.borderStrong)
                         .frame(width: 8, height: 8)
                 }
             }
+            // The dots cross-fade as the page turns: `fast`.
+            .animation(Motion.standard(0.15), value: page)
             .frame(maxWidth: .infinity).padding(.bottom, 24)
             .accessibilityHidden(true)
             let last = page == Self.pages.upperBound
-            let opening = last && phone.signingIn
-            Button(last ? (opening ? "Signing up…" : "Sign up") : "Continue") {
+            // Held, the router gone on, the intro only waits for Bali or leaves: still busy.
+            let opening = last && (phone.signingIn || phone.shown.screen != .intro)
+            Button {
                 if last {
                     Task { await phone.sawIntro(through: browser.hostedUI) }
+                } else if UIAccessibility.isReduceMotionEnabled {
+                    (page, turns) = (page + 1, turns + 1)
                 } else {
-                    withAnimation { page += 1 }
+                    // The page view's own slide, as a swipe plays it: `slow`.
+                    withAnimation(Motion.standard(0.3)) { page += 1 }
                 }
+            } label: {
+                // Its words change at once as the page turns, never cross-fading, under the
+                // press's own release too.
+                Text(last ? (opening ? "Signing up…" : "Sign up") : "Continue")
+                    .transaction { $0.animation = nil }
             }
             .buttonStyle(PrimaryButtonStyle()).disabled(opening)
             // The portal's policy pages, under the button on the last page alone — their room kept
             // on every page, so the button never moves as the pages turn.
             PolicyLinks().padding(.top, 8)
                 .opacity(last ? 1 : 0).accessibilityHidden(!last).allowsHitTesting(last)
+                // As the button's words, at once: only the page slides.
+                .animation(nil, value: page)
         }
     }
 
