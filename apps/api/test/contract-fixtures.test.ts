@@ -209,6 +209,13 @@ const SCENARIOS: Record<string, string> = {
   'push-token/not-registered':
     'The retry of that removal: the caller holds no such token now, and nothing changes.',
   'push-token/remove-403-teacher': 'A teacher removing a token: students only, for now.',
+  'age-check/not-passed':
+    'A sign-in the server has no account for, read before the 13+ question (C7-server): no yes, and no account made.',
+  'age-check/recorded': 'That student answers 13 or older: the yes recorded, the account made.',
+  'age-check/passed': 'The read on their next phone: passed, so the question is never asked again.',
+  'age-check/409-event-id-conflict': 'A yes under an eventId another account’s yes holds.',
+  'age-check/400-invalid': 'A yes whose eventId is not a UUID: a client bug.',
+  'age-check/401-unauthorized': 'A read sent with no bearer token.',
   'account/deleted':
     'A student deletes their account (C3): every class left, their name and sign-in gone.',
   'account/already-deleted': 'The retry of that deletion: this sign-in has no account now.',
@@ -851,6 +858,26 @@ async function captureAll() {
   const teacherRemoves = unregister(pushTeacher);
   await capture('push-token/remove-403-teacher', teacherRemoves, 403, { code: 'forbidden' });
 
+  // The 13+ yes (C7-server): read before the question, recorded, read again on a new phone.
+  const ageCheck = '/v1/me/age-check';
+  const answer = (as: string | null, eventId: string = newUuidV7()): Call => ({
+    as,
+    method: 'PUT',
+    path: ageCheck,
+    body: { eventId },
+  });
+  const asker = await token('student-fx-age');
+  await capture('age-check/not-passed', get(asker, ageCheck), 200, { passed: false });
+  const yes = answer(asker);
+  await capture('age-check/recorded', yes, 200, { passed: true });
+  await capture('age-check/passed', get(asker, ageCheck), 200, { passed: true });
+  const ageEventId = (yes.body as { eventId: string }).eventId;
+  const taken = answer(await token('student-fx-age-other'), ageEventId);
+  await capture('age-check/409-event-id-conflict', taken, 409, { reason: 'event_id_conflict' });
+  await capture('age-check/400-invalid', answer(asker, 'x'), 400, { code: 'bad_input' });
+  const unsigned: Call = { as: null, method: 'GET', path: ageCheck };
+  await capture('age-check/401-unauthorized', unsigned, 401, { code: 'unauthorized' });
+
   // The account's deletion (C3), last: it leaves Eve's classes and her row named to no one.
   const deletion = del(eve, '/v1/me');
   await capture('account/deleted', deletion, 200, { outcome: 'deleted' });
@@ -913,6 +940,7 @@ describe('the contract fixtures (contracts/fixtures)', () => {
     expect(environments).toEqual(new Set(PUSH_ENVIRONMENTS));
     const removals = valuesOf('RemovePushTokenResponse', 'outcome');
     expect(removals).toEqual(new Set(REMOVE_PUSH_TOKEN_OUTCOMES));
+    expect(valuesOf('AgeCheckResponse', 'passed')).toEqual(new Set([true, false]));
     const reasonChanges = valuesOf('UnlockReasonResponse', 'outcome');
     expect(reasonChanges).toEqual(new Set(UNLOCK_REASON_OUTCOMES));
     const joins = valuesOf('EnrollmentJoinResponse', 'outcome');

@@ -8,6 +8,7 @@
 export { createDb, type Db } from './client.js';
 export { newUuidV7 } from './ids.js';
 export { runMigrations } from './migrate.js';
+export * from './age-checks.js';
 export * from './device-tokens.js';
 export * from './management.js';
 export { MIGRATIONS_DIR } from './paths.js';

@@ -2,6 +2,7 @@ import { and, asc, eq, inArray, isNull, or } from 'drizzle-orm';
 import { validate as isUuid } from 'uuid';
 
 import {
+  ageChecks,
   armedTaps,
   classes,
   deviceTokens,
@@ -38,6 +39,7 @@ export const STUDENT_RECORD_COVERAGE = {
     'armed_taps.student_id': 'armedTaps',
     'teacher_invites.redeemed_by': 'invitesRedeemed',
     'device_tokens.user_id': 'deviceTokens',
+    'age_checks.user_id': 'ageCheck',
   },
   notTheirs: {
     'classes.teacher_id': "a teacher's classes: the school's records, with other students in them",
@@ -106,6 +108,8 @@ export async function exportStudentRecord(db: Database, who: string, now: Date =
         .from(deviceTokens)
         .where(eq(deviceTokens.userId, id))
         .orderBy(asc(deviceTokens.createdAt), asc(deviceTokens.token));
+      // Their 13+ yes (C7-server), if recorded: that they confirmed 13 or older, and when.
+      const [ageCheck] = await tx.select().from(ageChecks).where(eq(ageChecks.userId, id));
 
       // What those rows point at, named: never another student, only the
       // class, its teacher's display name, its school, a session's window.
@@ -189,6 +193,7 @@ export async function exportStudentRecord(db: Database, who: string, now: Date =
         armedTaps: armed,
         invitesRedeemed,
         deviceTokens: tokens,
+        ageCheck: ageCheck ?? null,
         classes: classRows,
         sessions: sessionRows,
         sessionEvents,

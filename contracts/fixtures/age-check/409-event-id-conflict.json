@@ -1,0 +1,19 @@
+{
+  "endpoint": "PUT /v1/me/age-check",
+  "scenario": "A yes under an eventId another account’s yes holds.",
+  "request": {
+    "path": "/v1/me/age-check",
+    "body": {
+      "eventId": "00000000-0000-7000-8000-000000000001"
+    }
+  },
+  "status": 409,
+  "type": "ApiErrorBody",
+  "body": {
+    "error": {
+      "code": "conflict",
+      "reason": "event_id_conflict",
+      "message": "event_id already used by another event"
+    }
+  }
+}

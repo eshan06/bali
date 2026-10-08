@@ -1,0 +1,12 @@
+{
+  "endpoint": "GET /v1/me/age-check",
+  "scenario": "A sign-in the server has no account for, read before the 13+ question (C7-server): no yes, and no account made.",
+  "request": {
+    "path": "/v1/me/age-check"
+  },
+  "status": 200,
+  "type": "AgeCheckResponse",
+  "body": {
+    "passed": false
+  }
+}

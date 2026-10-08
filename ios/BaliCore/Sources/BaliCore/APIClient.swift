@@ -186,6 +186,19 @@ public struct APIClient: Sendable {
         await send("DELETE", "/v1/me", request)
     }
 
+    /// `GET /v1/me/age-check` — whether this account passed the 13+ check (C7-server): a read that
+    /// makes no account, for right after a sign-in.
+    public func ageCheck() async -> APIResponse<AgeCheckResponse> {
+        await send("GET", "/v1/me/age-check")
+    }
+
+    /// `PUT /v1/me/age-check` — this account's yes to the 13+ check, recorded (C7-server).
+    public func recordAgeCheck(_ request: RecordAgeCheckRequest) async
+        -> APIResponse<AgeCheckResponse>
+    {
+        await send("PUT", "/v1/me/age-check", request)
+    }
+
     /// `PUT /v1/me/push-token` — the student registers its phone's APNs token (N3).
     public func registerPushToken(_ request: RegisterPushTokenRequest) async
         -> APIResponse<RegisterPushTokenResponse>

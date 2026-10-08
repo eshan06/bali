@@ -90,6 +90,8 @@ const MATRIX = {
   'GET /v1/me/history':                     [401, 401, 200,     200,     403,     403],
   'PUT /v1/me/push-token':                  [401, 401, 200,     200,     403,     403],
   'DELETE /v1/me/push-token':               [401, 401, 200,     200,     403,     403],
+  'GET /v1/me/age-check':                   [401, 401, 200,     200,     200,     200],
+  'PUT /v1/me/age-check':                   [401, 401, 200,     200,     200,     200],
   'POST /v1/taps':                          [401, 401, 200,     200,     200,     200],
   'POST /v1/taps/:eventId/unlock':          [401, 401, 200,     200,     200,     200],
   'PATCH /v1/unlocks/:eventId':             [401, 401, 200,     404,     404,     404],
@@ -172,6 +174,9 @@ const REQUESTS: Record<RouteKey, (w: World) => Sent | Promise<Sent>> = {
     url: '/v1/me/push-token',
     body: { token: pushToken(), eventId: randomUUID() },
   }),
+  // Anyone's own (C7-server): a teacher's is always passed, and records nothing.
+  'GET /v1/me/age-check': () => ({ url: '/v1/me/age-check' }),
+  'PUT /v1/me/age-check': () => ({ url: '/v1/me/age-check', body: { eventId: randomUUID() } }),
   'POST /v1/taps': (w) => ({ url: '/v1/taps', body: { tagId: w.block.tagId, ...stamped() } }),
   'POST /v1/taps/:eventId/unlock': (w) => ({ url: `/v1/taps/${w.tapId}/unlock`, body: stamped() }),
   'PATCH /v1/unlocks/:eventId': (w) => ({

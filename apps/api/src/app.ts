@@ -12,6 +12,7 @@ import { createLimiter, type LimitOptions } from './limits.js';
 import { apnsConfig, type ApnsTransport, createApnsClient, http2Transport } from './push/apns.js';
 import { classStartedNotifier } from './push/class-started.js';
 import { LOG_REDACT, serializeError } from './redact.js';
+import { registerAgeCheckRoutes } from './routes/age-check.js';
 import { registerBlocksRoutes } from './routes/blocks.js';
 import { registerClassesRoutes } from './routes/classes.js';
 import { registerEnrollmentsRoutes } from './routes/enrollments.js';
@@ -130,6 +131,7 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
   const clock = deps.clock ?? (() => new Date());
   registerMeRoute(app, deps.db, clock);
   registerPushTokenRoutes(app, deps.db);
+  registerAgeCheckRoutes(app, deps.db);
   registerHistoryRoute(app, deps.db);
   registerTapsRoute(app, deps.db, clock);
   const apns = apnsConfig(env);

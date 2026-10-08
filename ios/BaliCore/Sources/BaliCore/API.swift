@@ -113,6 +113,20 @@ public struct DeleteMeResponse: Codable, Sendable, Hashable {
     public let outcome: OrUnknown<Outcome>
 }
 
+/// `GET /v1/me/age-check` and `PUT /v1/me/age-check` (C7-server): whether this account confirmed
+/// it is 13 or older, kept on the server, never the date. The read makes no account: no account
+/// there is `false`. A teacher's account is always `true`.
+public struct AgeCheckResponse: Codable, Sendable, Hashable {
+    public let passed: Bool
+}
+
+/// `PUT /v1/me/age-check` — the account's yes, recorded; answered `passed`. Sent only for an answer
+/// of 13 or older: under 13, nothing is sent.
+public struct RecordAgeCheckRequest: Codable, Sendable, Hashable {
+    public let eventId: String
+    public init(eventId: String) { self.eventId = eventId }
+}
+
 /// `PUT /v1/me/push-token` — a student registers its phone's APNs device token (N3). One phone, one
 /// current owner: a token another account registered moves to this one. A teacher is `403`.
 public struct RegisterPushTokenRequest: Codable, Sendable, Hashable {
