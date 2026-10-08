@@ -108,7 +108,7 @@ struct ScreenTests {
         let (outbox, _) = try makeOutbox()
         try record(outbox, .tap(tagId: "tag"))
         let held = try outbox.records()
-        for age in [AgeCheck.Answer.unanswered, .asked, .passed, .tooYoung] {
+        for age in [AgeCheck.Answer.unanswered, .asked, .passed, .tooYoung, .checking] {
             #expect(screen(age: age, intro: true, signedIn: nil) == .starting, "\(age)")
             #expect(
                 screen(age: age, intro: true, signedIn: nil, permission: nil, standing: nil)
@@ -124,7 +124,7 @@ struct ScreenTests {
         #expect(screen(me: try inNone()) == .home)
         let gates: [(AgeCheck.Answer, Screen, Screen)] = [
             (.unanswered, .signIn, .intro), (.passed, .signIn, .intro), (.asked, .age, .age),
-            (.tooYoung, .tooYoung, .tooYoung),
+            (.tooYoung, .tooYoung, .tooYoung), (.checking, .signIn, .intro),
         ]
         for (age, gate, signingUp) in gates {
             let focused = Standing.inSession(session(), .focused)
@@ -158,7 +158,7 @@ struct ScreenTests {
     }
 
     @Test(
-        "Signed in, an account that has not passed the 13+ check on this phone — a sign-in Cognito's own pages made around the question, or an account new to the phone: the gap's fallback (the owner's decisions, 2026-10-06 and 2026-10-07) — the question comes first: in Home's place, its empty state's too, Waiting's and Screen Time's, over a Join or a tab opened, after the bell once Session over is closed; the stop screen there once answered under 13. Never over a session's screens: the shields' Focus, Unlocked, Protection off, Session over not closed, nor the home a standing not read keeps; Delete account's screen and a start that failed come first. No tab bar; passed, none of it"
+        "Signed in, a sign-in not through the 13+ check — a sign-in Cognito's own pages made around the question, or into an account Bali's server holds no yes for: the gap's fallback (the owner's decisions, 2026-10-06 and 2026-10-08) — the starting mark while Bali's server is asked (C7-server), then, with no yes, the question: in Home's place, its empty state's too, Waiting's and Screen Time's, over a Join or a tab opened, after the bell once Session over is closed; the stop screen there once answered under 13. Never over a session's screens: the shields' Focus, Unlocked, Protection off, Session over not closed, nor the home a standing not read keeps; Delete account's screen and a start that failed come first. No tab bar; passed, none of it"
     )
     func ageAfterSignIn() throws {
         let (outbox, _) = try makeOutbox()
@@ -167,6 +167,7 @@ struct ScreenTests {
         let (rung, ended) = (Standing.inSession(session(), .focused), at(3000))
         for (age, asked) in [
             (AgeCheck.Answer.unanswered, Screen.age), (.asked, .age), (.tooYoung, .tooYoung),
+            (.checking, .starting),
         ] {
             #expect(screen(age: age) == asked, "\(age)")
             #expect(screen(age: age, standing: .waiting) == asked, "\(age)")

@@ -782,98 +782,90 @@ struct TokenTests {
     }
 
     @Test(
-        "until the account signed in has passed the phone's 13+ check, the API is given no token — not even a renewed one, nothing renewed for it — but an account deletion's; once passed, both, asked afresh each time with the account the tokens name, so another account's pass gives nothing; an account the API deleted gives neither (C7's fallback, per account)"
+        "gated, until the sign-in is through the 13+ check the API is given no token — not even a renewed one, nothing renewed for it — but an account deletion's and the check's own read's (C7-server); `passed` for the account its tokens name lets it through, kept with the tokens, through a renewal and a relaunch; for another account, or with nobody signed in, it changes nothing; an account the API deleted gives neither token"
     )
-    func cleared() async throws {
+    func checked() async throws {
         let endpoint = TransportDouble { _ in (200, Data(granted(jwt("a2")).utf8)) }
-        let (now, passed) = (Now(), Accounts())
+        let now = Now()
+        let store = try MemoryStore.holding(jwt("a1"))
         let signIn = SignIn(
-            cognito: cognito, store: try MemoryStore.holding(jwt("a1")), transport: endpoint,
-            now: { now() }, cleared: { passed.has($0) })
+            cognito: cognito, store: store, transport: endpoint, now: { now() }, gated: true)
         #expect(await signIn.accessToken() == nil)
+        #expect(await !signIn.checked())
         #expect(await signIn.deletionToken() == jwt("a1"))
         now.set(3600)  // a1 has expired
         #expect(await signIn.accessToken() == nil)
         #expect(await endpoint.sent.isEmpty)
         #expect(await signIn.deletionToken() == jwt("a2"))
-        passed.add("b1")  // another account's pass
+        await signIn.passed("b1")  // another account's
         #expect(await signIn.accessToken() == nil)
-        passed.add("a2")  // the renewed token's account: its sub
-        #expect(await signIn.accessToken() == jwt("a2"))
-        #expect(passed.asked.allSatisfy { $0 == "a1" || $0 == "a2" } && !passed.asked.isEmpty)
+        #expect(await !signIn.checked())
+        await signIn.passed("a2")  // the renewed token's account: its sub
+        #expect(await signIn.accessToken() == jwt("a2") && store.tokens?.checked == true)
+        #expect(await signIn.yes() == nil)
+        // Through a renewal, and a relaunch over the same Keychain.
+        #expect(await signIn.refresh() && store.tokens?.checked == true)
+        let relaunched = SignIn(
+            cognito: cognito, store: store, transport: endpoint, now: { now() }, gated: true)
+        #expect(await relaunched.checked())
+        #expect(await relaunched.accessToken() == jwt("a2"))
         await signIn.accountDeleted()
         #expect(await signIn.deletionToken() == nil)
         #expect(await signIn.accessToken() == nil)
-        // Tokens naming no account are never cleared.
-        let opaque = SignIn(
-            cognito: cognito, store: try MemoryStore.holding("opaque"), transport: endpoint,
-            cleared: { passed.has($0) })
-        #expect(await opaque.accessToken() == nil && passed.asked.last == .some(nil))
+        // Nobody signed in: nothing to let through.
+        let nobody = SignIn(cognito: cognito, store: MemoryStore(), transport: endpoint, gated: true)
+        await nobody.passed(nil)
+        #expect(await !nobody.checked())
+        #expect(await nobody.accessToken() == nil)
     }
 
     @Test(
-        "a sign-in tells `landing` the account its tokens are for once they are kept, before anything else hears of them — no watcher yet, no token given, the engine not told — so the app files a Sign up's 13+ answer under it first (C7, per account); a sign-in that does not finish tells it nothing, and tokens naming no account tell it none"
+        "a Sign up's yes (C7-server): its sign-in is kept through the 13+ check with the yes's event id before anything else hears of it — the tokens in the store as the engine is told and a watcher hears — so its token is given at once, gated; the yes waits until settled, `recorded` letting go of that yes alone, and an answer of 13 or older after a sign-in keeps one as `passed` does; a sign-in that does not finish keeps nothing"
     )
-    func landing() async throws {
+    func signUpYes() async throws {
         let endpoint = TransportDouble { _ in
             (200, Data(granted(jwt("new"), refresh: "refresh-1").utf8))
         }
         let (store, heard) = (MemoryStore(), Accounts())
-        let signIn = SignIn(cognito: cognito, store: store, transport: endpoint)
-        await signIn.whenTokenArrives { heard.add("told") }
+        let signIn = SignIn(cognito: cognito, store: store, transport: endpoint, gated: true)
+        await signIn.whenTokenArrives {
+            heard.add(store.tokens.map { "told \($0.checked == true) \($0.yes ?? "none")" } ?? "")
+        }
         let watcher = await signIn.signedIn()
         let watching = Task {
-            for await signed in watcher where signed { return heard.add("watched") }
-        }
-        try await signIn.signIn(
-            .signUp,
-            landing: { account in
-                heard.add("landing \(account ?? "none")")
-                heard.add(store.tokens?.access == jwt("new") ? "kept" : "not kept")
-            }, through: signsIn)
-        await watching.value
-        let order = heard.added
-        #expect(order.prefix(2) == ["landing new", "kept"], "\(order)")
-        #expect(Set(order.dropFirst(2)) == ["told", "watched"], "\(order)")
-        #expect(await signIn.accessToken() == jwt("new"))
-
-        let failing = SignIn(cognito: cognito, store: MemoryStore(), transport: endpoint)
-        let silent = Accounts()
-        await #expect(throws: SignInError.cancelled) {
-            try await failing.signIn(landing: { silent.add($0 ?? "none") }) {
-                _ throws(SignInError) in throw .cancelled
+            for await signed in watcher where signed {
+                return heard.add(store.tokens?.checked == true ? "watched, kept" : "not kept")
             }
         }
-        #expect(silent.added.isEmpty)
+        try await signIn.signIn(.signUp, yes: "y1", through: signsIn)
+        await watching.value
+        #expect(Set(heard.added) == ["told true y1", "watched, kept"], "\(heard.added)")
+        #expect(await signIn.accessToken() == jwt("new"))
+        #expect(await signIn.yes() == "y1")
+        await signIn.recorded("y0")  // another yes: this one waits on
+        #expect(await signIn.yes() == "y1")
+        await signIn.recorded("y1")
+        #expect(await signIn.yes() == nil && store.tokens?.yes == nil)
+        #expect(await signIn.checked())
+        // After a sign-in, the question answered 13 or older.
+        await signIn.passed("new", recording: "y2")
+        #expect(await signIn.yes() == "y2" && store.tokens?.yes == "y2")
 
-        let opaque = TransportDouble { _ in (200, Data(granted("opaque", refresh: "r").utf8)) }
-        let unnamed = SignIn(cognito: cognito, store: MemoryStore(), transport: opaque)
-        try await unnamed.signIn(landing: { silent.add($0 ?? "none") }, through: signsIn)
-        #expect(silent.added == ["none"])
+        let failing = SignIn(cognito: cognito, store: MemoryStore(), transport: endpoint, gated: true)
+        await #expect(throws: SignInError.cancelled) {
+            try await failing.signIn(.signUp, yes: "y3") { _ throws(SignInError) in throw .cancelled }
+        }
+        #expect(await failing.yes() == nil)
+        #expect(await !failing.checked())
     }
 }
 
-/// The accounts a test passes, and every one the sign-in asked about — nil for tokens naming none;
-/// or, `added`, what a test heard, in order.
+/// What a test heard, in order (`added`).
 final class Accounts: @unchecked Sendable {
     private let lock = NSLock()
-    private var passed: Set<String> = []
-    private var asks: [String?] = []
     private var heard: [String] = []
-    var asked: [String?] { lock.withLock { asks } }
     var added: [String] { lock.withLock { heard } }
-    func add(_ value: String) {
-        lock.withLock {
-            passed.insert(value)
-            heard.append(value)
-        }
-    }
-    func has(_ account: String?) -> Bool {
-        lock.withLock {
-            asks.append(account)
-            return account.map { passed.contains($0) } ?? false
-        }
-    }
+    func add(_ value: String) { lock.withLock { heard.append(value) } }
 }
 
 /// The token endpoint's next answer — nil for none at all — which a test changes as it goes.

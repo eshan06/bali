@@ -12,8 +12,8 @@ import UIKit
 // The app target's own tests (B5b-2), hosted in the app on the iOS Simulator: what only the app
 // holds. Everything the app only wires up is tested in its packages, on Linux too.
 
-// One test at a time: several set the phone's own defaults (`AgeCheck.key`, `inClass`) across their
-// awaits, which another test running between them would read (Claude Review).
+// One test at a time: several set the phone's own defaults (`AgeCheck.notes`, `inClass`) across
+// their awaits, which another test running between them would read (Claude Review).
 @MainActor
 @Suite("The app", .serialized)
 struct AppTests {
@@ -853,11 +853,7 @@ struct AppTests {
         "Delete account through the phone's own sign-in and engine (C4b): confirmed, the deletion's screen shows and nothing else until the answer; Cognito's DeleteUser answering nothing leaves the account deleted and the sign-in waiting, said with Try again alone — and a relaunch over the same Keychain lands on that screen at once, before any press; Try again finishes it, the sign-in gone, the done screen holding over Sign in until OK",
         .timeLimit(.minutes(3)))
     func deleteAccountWiring() async throws {
-        // Me's, Ana's account past the 13+ check (the gap's fallback is `ageAfterSignInWiring`'s).
-        let defaults = UserDefaults.standard
-        let before = defaults.object(forKey: AgeCheck.key)
-        defer { defaults.set(before, forKey: AgeCheck.key) }
-        defaults.set(["ana"], forKey: AgeCheck.key)
+        // Me's (the gap's fallback is `ageAfterSignInWiring`'s).
         let server = Deleter(deleteUser: [nil, 200], holdsDeletion: true)
         let keychain = Keychain(account: "ana", scoped: true)
         let (phone, engine) = try standIn(server, keychain: keychain)
@@ -865,9 +861,8 @@ struct AppTests {
         let following = Task { await phone.follow(signIn) }
         defer { following.cancel() }
         try await until { phone.signedIn == true }
-        // A phone of the test's own runs no enforcer: the router shows the intro, or Starting where
-        // the host's defaults hold its flag, so only the deletion's screen is asked after here,
-        // never Me.
+        // A phone of the test's own runs no enforcer: the router shows Starting, so only the
+        // deletion's screen is asked after here, never Me.
         #expect(phone.deleting == .none && phone.shown.screen != .deleting)
         phone.deleting.ask()
         #expect(phone.shown.screen != .deleting)
@@ -1785,28 +1780,23 @@ struct AppTests {
     }
 
     @Test(
-        "The 13+ check (C7) as the phone keeps it: an answer writes nothing — 13 or older or under 13, never the month or the year — the picks going with it, and Continue with nothing picked changes nothing; a fresh Phone starts with the question unanswered, whatever the phone's defaults hold — the phone-wide flag a build before kept vouches for no account (the owner's ruling, 2026-10-07); a frozen fixture's answer writes nothing for another, and each fixture of the check shows its screen with no tab bar — the intro seen, a pass opens the page at once, the question kept with Signing up… while it opens, a frozen phone's landing on Sign in, the page not opened. The keys as they were before are put back after"
+        "The 13+ check (C7) as the phone keeps it: an answer writes nothing to the phone's defaults — 13 or older or under 13, no age note of any kind, never the month or the year (the yes is Bali's server's, C7-server) — the picks going with it, and Continue with nothing picked changes nothing; a fresh Phone starts with the question unanswered; each fixture of the check shows its screen with no tab bar — the intro seen, a pass opens the page at once, the question kept with Signing up… while it opens, a frozen phone's landing on Sign in, the page not opened"
     )
     func ageCheck() async throws {
-        let (defaults, old) = (UserDefaults.standard, "ageChecked")
-        let before = (defaults.object(forKey: AgeCheck.key), defaults.object(forKey: old))
-        defer {
-            defaults.set(before.0, forKey: AgeCheck.key)
-            defaults.set(before.1, forKey: old)
-        }
-        defaults.removeObject(forKey: AgeCheck.key)
-        defaults.set(true, forKey: old)
+        let defaults = UserDefaults.standard
+        let noted = { AgeCheck.notes.contains { defaults.object(forKey: $0) != nil } }
+        for note in AgeCheck.notes { defaults.removeObject(forKey: note) }
         let pages = Pages()
         let live = Phone()
         #expect(live.age.answer == .unanswered && !live.birth.complete)
         await live.answerAge(through: pages.browser)
-        #expect(live.age.answer == .unanswered && defaults.object(forKey: AgeCheck.key) == nil)
+        #expect(live.age.answer == .unanswered && !noted())
         await live.signIn(.signUp, through: pages.browser)
         #expect(live.age.answer == .asked)
         live.birth = Birth(month: 1, year: 2000)
         await live.answerAge(through: pages.browser)
         #expect(live.age.answer == .passed && live.birth == Birth() && live.introShows)
-        #expect(defaults.object(forKey: AgeCheck.key) == nil && Phone().age.answer == .unanswered)
+        #expect(!noted() && Phone().age.answer == .unanswered)
         let young = Phone()
         // This month, Gregorian: the rule counts in it whatever calendar the phone shows.
         let now = Calendar(identifier: .gregorian).dateComponents([.year, .month], from: Date())
@@ -1814,7 +1804,7 @@ struct AppTests {
         young.birth = Birth(month: now.month, year: now.year)
         await young.answerAge(through: pages.browser)
         #expect(young.age.answer == .tooYoung && young.birth == Birth() && !young.introShows)
-        #expect(defaults.object(forKey: AgeCheck.key) == nil && Phone().age.answer == .unanswered)
+        #expect(!noted() && Phone().age.answer == .unanswered)
         // The fixtures: the question, nothing picked and both picked — the intro seen, so its pass
         // opens the page at once: not opened on a frozen phone, Sign in says so, the answer and the
         // picks let go — the page opening from Continue, and the stop screen.
@@ -1825,7 +1815,7 @@ struct AppTests {
         await picked.answerAge(through: pages.browser)
         #expect(picked.age.answer == .unanswered && picked.shown == (.signIn, false))
         #expect(picked.signInFailed == .notOpened(Joining.notStarted) && picked.birth == Birth())
-        #expect(defaults.object(forKey: AgeCheck.key) == nil)
+        #expect(!noted())
         let opening = Phone(fixture: try #require(PreviewFixtures.all["ageSigningUp"]))
         #expect(opening.shown == (.age, false) && opening.signingIn && opening.birth.complete)
         let stopped = Phone(fixture: try #require(PreviewFixtures.all["tooYoung"]))
@@ -1876,13 +1866,12 @@ struct AppTests {
     }
 
     @Test(
-        "Sign in and sign up through the phone's own sign-in (the approved Sign in & sign up design): Sign in opens Cognito's sign-in page at once, no question, no intro; Sign up asks the question, then shows the intro, opening no page, and the intro's Sign up opens the sign-up page, `/signup`, to come back to the sign-in's scheme — the intro showing until the page closes, which lands on Sign in, the answer let go; Sign up again this run asks the question again (the owner's ruling, 2026-10-07: a second person never signs up unasked), and its Continue opens the page at once, the intro seen; a new run's shows the question, the intro, then the page (once per account); a page that did not open is said under the buttons, naming its page, and gone at the next press; under 13, no page opens this run, Sign up's or Sign in's, and nothing is kept. The key as it was before is put back after"
+        "Sign in and sign up through the phone's own sign-in (the approved Sign in & sign up design): Sign in opens Cognito's sign-in page at once, no question, no intro; Sign up asks the question, then shows the intro, opening no page, and the intro's Sign up opens the sign-up page, `/signup`, to come back to the sign-in's scheme — the intro showing until the page closes, which lands on Sign in, the answer let go; Sign up again this run asks the question again (the owner's ruling, 2026-10-07: a second person never signs up unasked), and its Continue opens the page at once, the intro seen; a new run's shows the question, the intro, then the page (once per account); a page that did not open is said under the buttons, naming its page, and gone at the next press; under 13, no page opens this run, Sign up's or Sign in's, and nothing is kept"
     )
     func signUpAndSignIn() async throws {
         let defaults = UserDefaults.standard
-        let before = defaults.object(forKey: AgeCheck.key)
-        defer { defaults.set(before, forKey: AgeCheck.key) }
-        defaults.removeObject(forKey: AgeCheck.key)
+        let noted = { AgeCheck.notes.contains { defaults.object(forKey: $0) != nil } }
+        for note in AgeCheck.notes { defaults.removeObject(forKey: note) }
         let pages = Pages()
         /// The path of the page opened last, and the scheme it was to come back to.
         func last() -> (String?, String?) {
@@ -1946,19 +1935,17 @@ struct AppTests {
         await young.signIn(.signUp, through: pages.browser)
         await young.signIn(through: pages.browser)
         #expect(young.age.answer == .tooYoung && pages.opened.count == 7)
-        #expect(defaults.object(forKey: AgeCheck.key) == nil)
+        #expect(!noted())
     }
 
     @Test(
-        "A sign-up page that signs the student in files that account as passed on this phone — its Cognito id alone — as the sign-in lands, before it reaches anything, so Bali's API is given its token at once; and keeps the intro, or the question whose Continue opened the page, its button busy, until the sign-in lands, so no Sign in shows between and the screen under the page holds still (the approved motion spec), letting them go then: a sign-out later shows Sign in, never the intro nor the question (the approved Sign in & sign up design; the owner's ruling, 2026-10-07). A page closed files nothing. The key as it was before is put back after"
+        "A sign-up page that signs the student in keeps that sign-in through the 13+ check as it lands, with a yes for Bali's server to record (C7-server), before it reaches anything, so Bali's API is given its token at once and nothing is kept on the phone's own defaults; and keeps the intro, or the question whose Continue opened the page, its button busy, until the sign-in lands, so no Sign in shows between and the screen under the page holds still (the approved motion spec), letting them go then: a sign-out later shows Sign in, never the intro nor the question (the approved Sign in & sign up design; the owner's ruling, 2026-10-07). A page closed keeps nothing"
     )
     func signUpLands() async throws {
         let defaults = UserDefaults.standard
-        let before = defaults.object(forKey: AgeCheck.key)
-        defer { defaults.set(before, forKey: AgeCheck.key) }
-        defaults.removeObject(forKey: AgeCheck.key)
+        let noted = { AgeCheck.notes.contains { defaults.object(forKey: $0) != nil } }
         let keychain = Keychain(account: nil)
-        let (phone, _) = try gatedStandIn(Grants(["ana", "bea"]), keychain: keychain)
+        let (phone, _) = try await gatedStandIn(Grants(["ana", "bea"]), keychain: keychain)
         let pages = Pages()
         /// Sign up pressed, and its question answered 13 or older.
         func signUp() async {
@@ -1975,27 +1962,33 @@ struct AppTests {
         #expect(phone.introShows && pages.opened.isEmpty)
         await phone.sawIntro(through: pages.browser)
         #expect(pages.opened.map { $0.url.path() } == ["/signup"] && !keychain.empty)
-        #expect(AgeCheck.passed("ana", in: defaults) && !AgeCheck.passed("bea", in: defaults))
-        #expect(await phone.signIn?.accessToken() != nil)
+        let signIn = try #require(phone.signIn)
+        let anas = await signIn.yes()
+        #expect(await signIn.checked() && anas != nil && !noted())
+        #expect(await signIn.accessToken() != nil)
         #expect(phone.introShows && phone.signInFailed == nil && phone.signingIn)
-        phone.signed(in: true, as: "ana")
+        phone.signed(in: true, as: "ana", checked: true)
         #expect(!phone.introShows && phone.ageNow == .passed && !phone.signingIn)
         phone.signed(in: false)
         #expect(!phone.introShows && phone.age.answer != .asked)
-        // Bea's Sign up: the intro again after the sign-out, its page closed — nothing filed —
-        // then Sign up again, the question's Continue opening the page, the question and its
-        // picks kept until her sign-in lands.
+        // Bea's Sign up: the intro again after the sign-out, its page closed — nothing kept, Ana's
+        // sign-in as it was — then Sign up again, the question's Continue opening the page, the
+        // question and its picks kept until her sign-in lands.
         pages.signsIn = false
         await signUp()
         #expect(phone.introShows)
         await phone.sawIntro(through: pages.browser)
-        #expect(pages.opened.count == 2 && defaults.stringArray(forKey: AgeCheck.key) == ["ana"])
+        #expect(pages.opened.count == 2)
+        #expect(await signIn.account() == "ana")
         pages.signsIn = true
         await signUp()
         #expect(pages.opened.map { $0.url.path() } == ["/signup", "/signup", "/signup"])
-        #expect(AgeCheck.passed("bea", in: defaults) && !phone.introShows)
+        #expect(await signIn.account() == "bea")
+        #expect(await signIn.checked())
+        let beas = await signIn.yes()
+        #expect(beas != nil && beas != anas && !phone.introShows && !noted())
         #expect(phone.age.answer == .asked && phone.birth.complete && phone.signingIn)
-        phone.signed(in: true, as: "bea")
+        phone.signed(in: true, as: "bea", checked: true)
         #expect(phone.age.answer == .unanswered && phone.birth == Birth() && !phone.signingIn)
         #expect(phone.ageNow == .passed)
         phone.signed(in: false)
@@ -2003,55 +1996,114 @@ struct AppTests {
     }
 
     @Test(
-        "The 13+ check per account (the owner's ruling, 2026-10-07), through the phone's own sign-in: Sign in into an account that passed on this phone is never asked, Bali's API given its token; another account on the same phone is asked, its sign-in reaching Bali's API with nothing until it answers, then filed; the phone-wide flag a build before kept vouches for neither; under 13 files nothing. The keys as they were before are put back after"
-    )
-    func agePerAccount() async throws {
-        let (defaults, old) = (UserDefaults.standard, "ageChecked")
-        let before = (defaults.object(forKey: AgeCheck.key), defaults.object(forKey: old))
-        defer {
-            defaults.set(before.0, forKey: AgeCheck.key)
-            defaults.set(before.1, forKey: old)
-        }
-        defaults.set(["ana"], forKey: AgeCheck.key)
-        defaults.set(true, forKey: old)
-        let keychain = Keychain(account: nil)
-        let (phone, _) = try gatedStandIn(Grants(["ana", "bea", "cara"]), keychain: keychain)
+        "The 13+ check through Bali's server (C7-server; the owner's decision, 2026-10-08), through the phone's own sign-in and engine: right after a Sign in, `GET /v1/me/age-check` is the one call the sign-in makes — the starting mark meanwhile — and an account Bali holds a yes for, a teacher's too, is never asked: Bali's API given its token, the truth read; one Bali holds no yes for is asked, nothing more sent until it answers, and 13 or older lets it through, its yes recorded under one event id; Bali not reached is asked too — the safe side — its yes kept until Bali answers, then recorded under the same id; under 13 deletes the account, no yes sent",
+        .timeLimit(.minutes(3)))
+    func ageFromServer() async throws {
         let pages = Pages()
         pages.signsIn = true
-        /// Signed in through Sign in's page, as Cognito's tokens name `account`.
-        func signIn(_ account: String) async {
+        var running: [Task<Void, Never>] = []
+        defer { for task in running { task.cancel() } }
+        /// Signed in through Sign in's page over `server`, the phone following its sign-in and its
+        /// engine running.
+        func signedIn(_ server: AgeServer) async throws -> (Phone, SignIn) {
+            let (phone, engine) = try await gatedStandIn(server, keychain: Keychain(account: nil))
+            let signIn = try #require(phone.signIn)
+            running += [Task { await engine.run() }, Task { await phone.follow(signIn) }]
             await phone.signIn(through: pages.browser)
-            phone.signed(in: true, as: account)
+            return (phone, signIn)
         }
-        /// Signed out, as Me's Sign out does it.
-        func signOut() async {
-            await phone.signOut()
-            phone.signed(in: false)
+        // Passed: a student's account, and a teacher's, which Bali always says passed.
+        for role in ["student", "teacher"] {
+            let server = AgeServer(passed: true, role: role)
+            let (phone, signIn) = try await signedIn(server)
+            try await until { await server.holding }
+            #expect(phone.ageNow == .checking, "\(role)")
+            #expect(await server.asked == ["POST /oauth2/token", "GET /v1/me/age-check"], "\(role)")
+            await server.letGo()
+            try await until { await server.asked.contains("GET /v1/me") }
+            #expect(phone.ageNow == .passed && phone.signedInThisRun, "\(role)")
+            #expect(await signIn.checked(), "\(role)")
+            #expect(await signIn.yes() == nil, "\(role)")
+            #expect(await !server.asked.contains("PUT /v1/me/age-check"), "\(role)")
         }
-        await signIn("ana")
-        #expect(phone.ageNow == .passed && phone.age.answer == .unanswered)
-        #expect(await phone.signIn?.accessToken() != nil)
-        await signOut()
-        #expect(keychain.empty && phone.ageNow == .unanswered)
-        // Bea, on the same phone: the question, and Bali's API nothing until she answers.
-        await signIn("bea")
-        #expect(phone.ageNow == .unanswered && !AgeCheck.passed("bea", in: defaults))
-        #expect(await phone.signIn?.accessToken() == nil)
-        phone.birth = Birth(month: 1, year: 2000)
-        await phone.answerAge(through: pages.browser)
-        let given = await phone.signIn?.accessToken()
-        #expect(phone.ageNow == .passed && given != nil)
-        #expect(defaults.stringArray(forKey: AgeCheck.key) == ["ana", "bea"])
-        await signOut()
-        // Cara under 13: nothing filed, and the fallback's deletion started.
-        await signIn("cara")
-        #expect(phone.ageNow == .unanswered)
+        // No yes: the question, nothing more sent; 13 or older lets it through, its yes recorded.
+        let none = AgeServer(passed: false)
+        await none.letGo()
+        let (asked, askedSignIn) = try await signedIn(none)
+        try await until { asked.signedIn == true && asked.ageNow == .unanswered }
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(await none.asked == ["POST /oauth2/token", "GET /v1/me/age-check"])
+        asked.birth = Birth(month: 1, year: 2000)
+        await asked.answerAge(through: pages.browser)
+        #expect(asked.ageNow == .passed)
+        try await until { await askedSignIn.yes() == nil }
+        let yes = await none.yeses
+        #expect(yes.count == 1 && yes.allSatisfy { UUID(uuidString: $0) != nil }, "\(yes)")
+        #expect(await none.asked.contains("GET /v1/me"))
+        // Bali not reached: the question all the same, its yes kept until Bali answers.
+        let away = AgeServer(passed: true, reachable: false)
+        await away.letGo()
+        let (offline, offlineSignIn) = try await signedIn(away)
+        try await until { offline.signedIn == true && offline.ageNow == .unanswered }
+        offline.birth = Birth(month: 1, year: 2000)
+        await offline.answerAge(through: pages.browser)
+        try await until { await !away.yeses.isEmpty }
+        let kept = try #require(await offlineSignIn.yes())
+        await away.reach()
+        await offline.retry()
+        try await until { await offlineSignIn.yes() == nil }
+        #expect(Set(await away.yeses) == [kept])
+        // Under 13: the account deleted, and no yes sent.
+        let young = AgeServer(passed: false)
+        await young.letGo()
+        let (stopped, _) = try await signedIn(young)
+        try await until { stopped.signedIn == true && stopped.ageNow == .unanswered }
         let now = Calendar(identifier: .gregorian).dateComponents([.year, .month], from: Date())
-        phone.birth = Birth(month: now.month, year: now.year)
-        await phone.answerAge(through: pages.browser)
-        #expect(phone.ageNow == .tooYoung && phone.underThirteen)
-        #expect(defaults.stringArray(forKey: AgeCheck.key) == ["ana", "bea"])
+        stopped.birth = Birth(month: now.month, year: now.year)
+        await stopped.answerAge(through: pages.browser)
+        #expect(stopped.deleting == .done && stopped.underThirteen)
+        let sent = await young.asked
+        #expect(sent.contains("DELETE /v1/me") && !sent.contains("PUT /v1/me/age-check"), "\(sent)")
         #expect(pages.opened.allSatisfy { $0.url.path() == "/oauth2/authorize" })
+    }
+
+    @Test(
+        "Build 8's age note, once (the owner's decision, 2026-10-08: the phone keeps no age note any more): signed in across the update, an account the note lists is let through at once — no question, no read of Bali's server — its yes recorded on Bali's server under one event id; one it does not list is asked Bali, as after any sign-in; signed out, nothing sent; the note deleted each time",
+        .timeLimit(.minutes(3)))
+    func ageNoteMigrated() async throws {
+        let defaults = UserDefaults.standard
+        let noted = { AgeCheck.notes.contains { defaults.object(forKey: $0) != nil } }
+        defer { for note in AgeCheck.notes { defaults.removeObject(forKey: note) } }
+        var running: [Task<Void, Never>] = []
+        defer { for task in running { task.cancel() } }
+        /// A launch over build 8's note, `account` signed in: the phone following its sign-in and
+        /// its engine running.
+        func launched(_ account: String?, over server: AgeServer) async throws -> (Phone, SignIn) {
+            defaults.set(["ana"], forKey: "ageCheckedAccounts")
+            defaults.set(true, forKey: "ageChecked")
+            let (phone, engine) = try await gatedStandIn(server, keychain: Keychain(account: account))
+            let signIn = try #require(phone.signIn)
+            running += [Task { await engine.run() }, Task { await phone.follow(signIn) }]
+            return (phone, signIn)
+        }
+        let listed = AgeServer(passed: false)
+        await listed.letGo()
+        let (ana, anaSignIn) = try await launched("ana", over: listed)
+        try await until { ana.ageNow == .passed }
+        #expect(!noted() && ana.signedIn == true)
+        try await until { await anaSignIn.yes() == nil }
+        #expect(await listed.yeses.count == 1)
+        #expect(await !listed.asked.contains("GET /v1/me/age-check"))
+        let unlisted = AgeServer("bea", passed: false)
+        await unlisted.letGo()
+        let (bea, beaSignIn) = try await launched("bea", over: unlisted)
+        try await until { bea.signedIn == true && bea.ageNow == .unanswered }
+        #expect(!noted())
+        #expect(await unlisted.asked == ["GET /v1/me/age-check"])
+        #expect(await !beaSignIn.checked())
+        let (nobody, _) = try await launched(nil, over: AgeServer(passed: false))
+        try await until { nobody.signedIn == false }
+        #expect(!noted())
     }
 
     @Test(
@@ -2142,11 +2194,11 @@ struct AppTests {
     }
 
     @Test(
-        "The gap's fallback, routed (the owner's decision, 2026-10-06): a sign-in into an account that has not passed the 13+ check on this phone shows the question first, no tab bar; 13 or older carries on as after any sign-in, no page opened; under 13 lands on the account's deletion under the stop screen's title — a frozen phone's, not started, a stop with Try again alone; each fixture of it says the approved words. A frozen phone writes nothing to the phone's defaults"
+        "The gap's fallback, routed (the owner's decision, 2026-10-06): a sign-in into an account Bali's server holds no 13+ yes for shows the question first, no tab bar; 13 or older carries on as after any sign-in, no page opened; under 13 lands on the account's deletion under the stop screen's title — a frozen phone's, not started, a stop with Try again alone; each fixture of it says the approved words. Nothing is written to the phone's defaults"
     )
     func ageAfterSignIn() async throws {
         let defaults = UserDefaults.standard
-        let before = defaults.object(forKey: AgeCheck.key)
+        let noted = { AgeCheck.notes.contains { defaults.object(forKey: $0) != nil } }
         let pages = Pages()
         // Gated, every read found no token to send: none answered, one failed.
         var gated = try #require(PreviewFixtures.all["ageAfterSignIn"])
@@ -2157,7 +2209,7 @@ struct AppTests {
         await passing.answerAge(through: pages.browser)
         // The sign-in reaches Bali now: the starting screen until a read answers (warn 1's fix).
         #expect(passing.age.answer == .passed && passing.shown == (.starting, false))
-        #expect(defaults.stringArray(forKey: AgeCheck.key) == before as? [String])
+        #expect(!noted())
         var read = try #require(gated.sync)
         read.meFailed = nil
         read.me = try BaliJSON.makeDecoder().decode(
@@ -2196,27 +2248,27 @@ struct AppTests {
     }
 
     @Test(
-        "The gap's fallback through the phone's own sign-in and engine: signed in, an account that has not passed the 13+ check on this phone, nothing reaches Bali's API — the engine's sends and reads find no token; 13 or older files the account and sends it all at once, no page opened; under 13 deletes the account as Delete account does (C4) — what the gate held goes first, the Emergency Unlock ahead of the tap queued before it, then DELETE /v1/me, then Cognito's DeleteUser, no read of the truth first — the outbox left empty for whoever signs in next, done final for the run under the stop screen's title, nothing filed. The key as it was before is put back after",
+        "The gap's fallback through the phone's own sign-in and engine: signed in, an account Bali's server holds no 13+ yes for, nothing reaches Bali's API but the check's own read — the engine's sends and reads find no token; 13 or older lets the sign-in through, sends it all at once and records its yes, no page opened; under 13 deletes the account as Delete account does (C4) — what the gate held goes first, the Emergency Unlock ahead of the tap queued before it, then DELETE /v1/me, then Cognito's DeleteUser, no read of the truth first and no yes — the outbox left empty for whoever signs in next, done final for the run under the stop screen's title, nothing written to the phone's defaults",
         .timeLimit(.minutes(3)))
     func ageAfterSignInWiring() async throws {
         let defaults = UserDefaults.standard
-        let before = defaults.object(forKey: AgeCheck.key)
-        defer { defaults.set(before, forKey: AgeCheck.key) }
-        /// Signed in, an account that has not passed the check on this phone, the engine running:
-        /// the phone, its engine and the stand-in, once the engine has found no token to send.
+        let noted = { AgeCheck.notes.contains { defaults.object(forKey: $0) != nil } }
+        /// Signed in, an account Bali holds no yes for, the engine running: the phone, its engine
+        /// and the stand-in, once the question shows and the engine has found no token to send.
         func signedInAround() async throws
             -> (Phone, SyncEngine, Recorder, Keychain, Task<Void, Never>)
         {
-            defaults.removeObject(forKey: AgeCheck.key)
             let server = Recorder()
             let keychain = Keychain(account: "ana", scoped: true)
-            let (phone, engine) = try gatedStandIn(server, keychain: keychain)
+            let (phone, engine) = try await gatedStandIn(server, keychain: keychain)
             let running = Task { await engine.run() }
             phone.signed(in: true, as: "ana")
+            #expect(phone.ageNow == .checking)
+            try await until { phone.ageNow == .unanswered }
             await engine.retryNow()
             try await until { await engine.state.meFailed == .networkError }
             #expect(await engine.state.link == .signIn)
-            #expect(await server.asked.isEmpty)
+            #expect(await server.asked == ["GET /v1/me/age-check"])
             return (phone, engine, server, keychain, running)
         }
         let pages = Pages()
@@ -2224,8 +2276,11 @@ struct AppTests {
         passing.birth = Birth(month: 1, year: 2000)
         await passing.answerAge(through: pages.browser)
         try await until { await server.asked.contains("GET /v1/me") }
+        try await until { await server.asked.contains("PUT /v1/me/age-check") }
         // Its read once or twice: the failure forgotten reads it again (warn 1's fix).
-        #expect(Set(await server.asked) == ["GET /v1/me"] && pages.opened.isEmpty)
+        let asked = Set(await server.asked)
+        #expect(asked == ["GET /v1/me/age-check", "GET /v1/me", "PUT /v1/me/age-check"])
+        #expect(pages.opened.isEmpty)
         running.cancel()
         _ = engine
 
@@ -2236,7 +2291,7 @@ struct AppTests {
             let state = await held.state
             return state.queued.count == 2 && state.link == .signIn
         }
-        #expect(await deleter.asked.isEmpty)
+        #expect(await deleter.asked == ["GET /v1/me/age-check"])
         let now = Calendar(identifier: .gregorian).dateComponents([.year, .month], from: Date())
         young.birth = Birth(month: now.month, year: now.year)
         await young.answerAge(through: pages.browser)
@@ -2247,24 +2302,24 @@ struct AppTests {
         )
         #expect(
             await deleter.asked
-                == ["POST /v1/sessions/s/unlock", "POST /v1/taps", "DELETE /v1/me", "POST /"])
+                == [
+                    "GET /v1/me/age-check", "POST /v1/sessions/s/unlock", "POST /v1/taps",
+                    "DELETE /v1/me", "POST /",
+                ])
         #expect(await held.state.queued.isEmpty && keychain.empty)
-        #expect(defaults.object(forKey: AgeCheck.key) == nil && pages.opened.isEmpty)
+        #expect(!noted() && pages.opened.isEmpty)
         deleting.cancel()
     }
 
     @Test(
-        "Me's Delete account for an account that has not passed the 13+ check on this phone — signed in on a build that kept no per-account pass, Me reached through a session's Home or the home a standing not read keeps — is C4's own, said as Me's, never the fallback's (santa's round 1): the outbox goes first, under the deletion's own token, and an Emergency Unlock the server has not recorded holds the deletion back in C4b's words, with Back; DELETE /v1/me is never sent. The key as it was before is put back after",
+        "Me's Delete account for a sign-in not through the 13+ check — Bali's server holding no yes for its account, Me reached through a session's Home or the home a standing not read keeps — is C4's own, said as Me's, never the fallback's (santa's round 1): the outbox goes first, under the deletion's own token, and an Emergency Unlock the server has not recorded holds the deletion back in C4b's words, with Back; DELETE /v1/me is never sent",
         .timeLimit(.minutes(3)))
     func deleteFromMeUnchecked() async throws {
-        let defaults = UserDefaults.standard
-        let before = defaults.object(forKey: AgeCheck.key)
-        defer { defaults.set(before, forKey: AgeCheck.key) }
-        defaults.removeObject(forKey: AgeCheck.key)
         let server = Recorder()
-        let (phone, engine) = try gatedStandIn(
+        let (phone, engine) = try await gatedStandIn(
             server, keychain: Keychain(account: "ana", scoped: true))
         phone.signed(in: true, as: "ana")
+        try await until { phone.ageNow == .unanswered }
         // A session the stand-in never answers an unlock in.
         try await engine.record(.unlock(session: "t", reason: nil))
         phone.deleting.ask()
@@ -2277,7 +2332,7 @@ struct AppTests {
         #expect(
             phone.deleting.said?.body.hasPrefix("Your Emergency Unlock hasn't reached your teacher")
                 == true)
-        #expect(await server.asked == ["POST /v1/sessions/t/unlock"])
+        #expect(await server.asked == ["GET /v1/me/age-check", "POST /v1/sessions/t/unlock"])
     }
 
     @Test(
@@ -2394,15 +2449,11 @@ struct AppTests {
     }
 
     @Test(
-        "The hold through the phone's own sign-in and engine (the PR's warn 1): signed out, the engine's read finds no token and fails; once the sign-in lands — an account past the 13+ check on this phone — that failure is forgotten — a state the engine sent before it shows none — and the engine reads `GET /v1/me` with the new token, its answer the phone's. The key as it was before is put back after",
+        "The hold through the phone's own sign-in and engine (the PR's warn 1): signed out, the engine's read finds no token and fails; once the sign-in lands — through the 13+ check — that failure is forgotten — a state the engine sent before it shows none — and the engine reads `GET /v1/me` with the new token, its answer the phone's",
         .timeLimit(.minutes(3)))
     func nameHeldWiring() async throws {
-        let defaults = UserDefaults.standard
-        let before = defaults.object(forKey: AgeCheck.key)
-        defer { defaults.set(before, forKey: AgeCheck.key) }
-        defaults.set(["ana"], forKey: AgeCheck.key)
         let server = Names([])
-        let (phone, engine) = try gatedStandIn(server, keychain: Keychain(account: nil))
+        let (phone, engine) = try await gatedStandIn(server, keychain: Keychain(account: nil))
         let running = Task { await engine.run() }
         defer { running.cancel() }
         phone.signed(in: false)
@@ -2411,16 +2462,18 @@ struct AppTests {
         let stale = await engine.state
         phone.synced(stale)
         let pages = Pages()
+        await signUp(phone, through: pages)
         pages.signsIn = true
-        await phone.signIn(through: pages.browser)
-        phone.signed(in: true, as: "ana")
+        await phone.sawIntro(through: pages.browser)
+        phone.signed(in: true, as: "ana", checked: true)
         #expect(phone.signedInThisRun && phone.sync?.meFailed == nil)
         phone.synced(stale)
         #expect(phone.sync?.meFailed == nil)
         try await until { await engine.state.me != nil }
         phone.synced(await engine.state)
         #expect(phone.sync?.me?.user.displayName == nil && phone.sync?.meFailed == nil)
-        #expect(await server.reads == 1)
+        // Once or twice: the sign-in's own read, and the forget's where it came after it began.
+        #expect((1...2).contains(await server.reads))
     }
 
     @Test(
@@ -2738,12 +2791,9 @@ struct AppTests {
     }
 
     @Test(
-        "The intro once per account within a run too (#292's review): an account signed up, then signed out — Your name's Sign out — and the next Sign up this run shows the question, then the intro again before its page; Sign up again with no sign-out between asks the question again (the owner's ruling, 2026-10-07), its Continue opening the page at once, as the approved design draws it. Through the phone's own sign-in, its Sign out and the Keychain's word. The key as it was before is put back after",
+        "The intro once per account within a run too (#292's review): an account signed up, then signed out — Your name's Sign out — and the next Sign up this run shows the question, then the intro again before its page; Sign up again with no sign-out between asks the question again (the owner's ruling, 2026-10-07), its Continue opening the page at once, as the approved design draws it. Through the phone's own sign-in, its Sign out and the Keychain's word",
         .timeLimit(.minutes(3)))
     func introAfterSignOut() async throws {
-        let defaults = UserDefaults.standard
-        let before = defaults.object(forKey: AgeCheck.key)
-        defer { defaults.set(before, forKey: AgeCheck.key) }
         let (phone, _) = try standIn(Names([]), keychain: Keychain(account: nil))
         let signIn = try #require(phone.signIn)
         let following = Task { await phone.follow(signIn) }
@@ -3145,10 +3195,10 @@ private func standIn(_ server: any HTTPTransport, keychain: Keychain = Keychain(
 }
 
 /// A phone of the test's own as `Phone.start` makes it, over `server` and a sign-in over
-/// `keychain`: its engine made over the sign-in, which gives Bali's API a token only once the
-/// account signed in has passed the 13+ check in the phone's own defaults (C7's fallback).
+/// `keychain`: its sign-in gated as the app's is — Bali's API given a token only once it is through
+/// the 13+ check (C7-server) — and its engine made over it as the app makes it (`SyncEngine.make`).
 @MainActor
-private func gatedStandIn(_ server: any HTTPTransport, keychain: Keychain) throws -> (
+private func gatedStandIn(_ server: any HTTPTransport, keychain: Keychain) async throws -> (
     Phone, SyncEngine
 ) {
     let url = FileManager.default.temporaryDirectory.appending(
@@ -3156,14 +3206,10 @@ private func gatedStandIn(_ server: any HTTPTransport, keychain: Keychain) throw
     let cognito = Cognito(
         domain: URL(string: "https://bali.auth.test")!, clientId: "phone",
         redirectURI: URL(string: "bali://auth/callback")!)
-    let signIn = SignIn(
-        cognito: cognito, store: keychain, transport: server,
-        cleared: { AgeCheck.passed($0, in: .standard) })
-    let engine = SyncEngine(
-        outbox: try Outbox(at: url),
-        client: APIClient(
-            baseURL: URL(string: "https://api.bali.test")!, tokens: signIn, transport: server),
-        refresh: { await signIn.refresh() })
+    let signIn = SignIn(cognito: cognito, store: keychain, transport: server, gated: true)
+    let engine = await SyncEngine.make(
+        outbox: try Outbox(at: url), api: URL(string: "https://api.bali.test")!, signIn: signIn,
+        transport: server)
     return (Phone(signIn: signIn, engine: engine), engine)
 }
 
@@ -3185,9 +3231,13 @@ private actor Grants: HTTPTransport {
 }
 
 /// An access token as Cognito's names its account, by its `sub`, read unverified as the phone
-/// reads it.
-private func token(naming account: String) -> String {
-    let claims = #"{"sub":"\#(account)","iat":1000000000,"exp":1000003600}"#
+/// reads it; `scoped`, with the scope and the pool Cognito's DeleteUser needs (C4).
+private func token(naming account: String, scoped: Bool = false) -> String {
+    let scope =
+        scoped
+        ? #","scope":"openid email profile aws.cognito.signin.user.admin","iss":"https://cognito-idp.us-east-1.amazonaws.com/us-east-1_YTloqilwT""#
+        : ""
+    let claims = #"{"sub":"\#(account)","iat":1000000000,"exp":1000003600\#(scope)}"#
     let payload = Data(claims.utf8).base64EncodedString()
         .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_")
         .replacingOccurrences(of: "=", with: "")
@@ -3195,9 +3245,9 @@ private func token(naming account: String) -> String {
 }
 
 /// The API and Cognito as a stand-in answers the gap's fallback, each request kept as its method
-/// and path: `GET /v1/me` with a student in no class, an unlock in session `s` recorded, a tap
-/// waiting for a Start, `DELETE /v1/me` with no account there, and Cognito's DeleteUser done;
-/// anything else gets no answer.
+/// and path: Bali's server with no 13+ yes for the account, and recording one; `GET /v1/me` with a
+/// student in no class, an unlock in session `s` recorded, a tap waiting for a Start, `DELETE
+/// /v1/me` with no account there, and Cognito's DeleteUser done; anything else gets no answer.
 private actor Recorder: HTTPTransport {
     private(set) var asked: [String] = []
 
@@ -3207,6 +3257,8 @@ private actor Recorder: HTTPTransport {
         asked.append(route)
         let body: String
         switch route {
+        case "GET /v1/me/age-check": body = #"{"passed":false}"#
+        case "PUT /v1/me/age-check": body = #"{"passed":true}"#
         case "GET /v1/me":
             body = #"{"user":{"id":"ana","role":"student","displayName":"Ana"},"classes":[],"session":null}"#
         case "POST /v1/sessions/s/unlock":
@@ -3214,6 +3266,68 @@ private actor Recorder: HTTPTransport {
         case "POST /v1/taps": body = #"{"outcome":"armed","session":null,"state":null}"#
         case "DELETE /v1/me": body = #"{"outcome":"already_deleted"}"#
         case "POST /" where url.host() == "cognito-idp.us-east-1.amazonaws.com": body = "{}"
+        default: throw URLError(.notConnectedToInternet)
+        }
+        guard
+            let response = HTTPURLResponse(
+                url: url, statusCode: 200, httpVersion: nil, headerFields: nil)
+        else { throw URLError(.badURL) }
+        return (Data(body.utf8), response)
+    }
+}
+
+/// Bali's API and Cognito as a stand-in answers the 13+ check through Bali's server (C7-server),
+/// each request kept as its method and path: Cognito's token endpoint with `account`'s sign-in,
+/// scoped as DeleteUser needs it; `GET /v1/me/age-check` with `passed`, held until the test lets it
+/// go; `PUT /v1/me/age-check` recorded, every event id it carried kept; `GET /v1/me` with an
+/// account of `role`; `DELETE /v1/me` with no account there, and Cognito's DeleteUser done. While
+/// not `reachable`, Bali's API gives no answer at all.
+private actor AgeServer: HTTPTransport {
+    private(set) var asked: [String] = []
+    private(set) var yeses: [String] = []
+    private let (account, passed, role): (String, Bool, String)
+    private var reachable: Bool
+    private var holds = true
+    private var held: CheckedContinuation<Void, Never>?
+
+    init(_ account: String = "ana", passed: Bool, role: String = "student", reachable: Bool = true)
+    {
+        (self.account, self.passed, self.role, self.reachable) = (account, passed, role, reachable)
+    }
+
+    /// Whether a read of the yes waits for `letGo`.
+    var holding: Bool { held != nil }
+
+    /// The read of the yes held, answered now, and none held from now on.
+    func letGo() {
+        holds = false
+        held?.resume()
+        held = nil
+    }
+
+    func reach() { reachable = true }
+
+    func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        struct Yes: Decodable { let eventId: String }
+        guard let url = request.url else { throw URLError(.badURL) }
+        let route = "\(request.httpMethod ?? "") \(url.path())"
+        asked.append(route)
+        if route == "PUT /v1/me/age-check" {
+            yeses.append(try JSONDecoder().decode(Yes.self, from: request.httpBody ?? Data()).eventId)
+        }
+        let body: String
+        switch route {
+        case "POST /oauth2/token":
+            body = #"{"access_token":"\#(token(naming: account, scoped: true))","refresh_token":"r"}"#
+        case "POST /" where url.host() == "cognito-idp.us-east-1.amazonaws.com": body = "{}"
+        case _ where !reachable: throw URLError(.notConnectedToInternet)
+        case "GET /v1/me/age-check":
+            if holds { await withCheckedContinuation { held = $0 } }
+            body = #"{"passed":\#(passed)}"#
+        case "PUT /v1/me/age-check": body = #"{"passed":true}"#
+        case "GET /v1/me":
+            body = #"{"user":{"id":"\#(account)","role":"\#(role)","displayName":"Ana"},"classes":[],"session":null}"#
+        case "DELETE /v1/me": body = #"{"outcome":"already_deleted"}"#
         default: throw URLError(.notConnectedToInternet)
         }
         guard

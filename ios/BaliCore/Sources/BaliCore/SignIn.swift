@@ -140,6 +140,16 @@ struct Tokens: Codable, Sendable {
     /// API from then on — a request there makes a fresh account under the same sign-in — and only
     /// Cognito's DeleteUser takes one. Kept through a renewal; nil in tokens kept before it.
     var deleted: Bool?
+    /// Whether this sign-in is through the 13+ check (C7-server): Bali's server holds its account's
+    /// yes, or the student answered 13 or older on this phone. Until then the API is given no token
+    /// but the check's own read and a deletion's (`deletionToken`). Kept with the tokens through a
+    /// renewal and a relaunch, so neither asks Bali again nor holds a record back, and forgotten
+    /// with them: the phone keeps no age note of its own. Nil in tokens kept before it, so a
+    /// sign-in an earlier build made is checked as a new one is.
+    var checked: Bool?
+    /// The yes Bali's server is still to record for this sign-in's account (`PUT
+    /// /v1/me/age-check`): the event id it goes under, until it is settled (`SignIn.recorded`).
+    var yes: String?
 
     init(access: String, refresh: String, email: String?, at now: Date) {
         (self.access, self.refresh, self.email) = (access, refresh, email)
@@ -206,14 +216,9 @@ public actor SignIn: TokenProvider {
     let store: any TokenStore
     let transport: any HTTPTransport
     let now: @Sendable () -> Date
-    /// Whether the account signed in — its `sub`, nil where the tokens name none — has passed the
-    /// phone's 13+ check (C7), asked at each token the API is to be given: until it has, none is,
-    /// but an account deletion's (`deletionToken`). So a sign-in made around the question — on
-    /// Cognito's own pages, whose sign-in page links to its sign-up — or into an account that never
-    /// answered it on this phone, reaches Bali's API with nothing until it is answered, and an
-    /// answer under 13 deletes its account as Delete account does (the owner's decisions,
-    /// 2026-10-06 and 2026-10-07: the question per account).
-    let cleared: @Sendable (String?) -> Bool
+    /// Whether Bali's API waits on the 13+ check (C7): the app's sign-in does (`Tokens.checked`);
+    /// a test's of the tokens alone need not.
+    let gated: Bool
     /// The tokens, once the store could be read (`loaded`); nil when nobody is signed in.
     private var tokens: Tokens?
     private var loaded = false
@@ -232,11 +237,10 @@ public actor SignIn: TokenProvider {
     public init(
         cognito: Cognito, store: any TokenStore,
         transport: any HTTPTransport = URLSessionTransport(),
-        now: @escaping @Sendable () -> Date = { Date() },
-        cleared: @escaping @Sendable (String?) -> Bool = { _ in true }
+        now: @escaping @Sendable () -> Date = { Date() }, gated: Bool = false
     ) {
         (self.cognito, self.store, self.transport, self.now) = (cognito, store, transport, now)
-        self.cleared = cleared
+        self.gated = gated
     }
 
     /// Runs `action` after every token but one the engine's `refresh` asked for — a sign-in, a
@@ -247,14 +251,18 @@ public actor SignIn: TokenProvider {
 
     /// The access token to send now. Nil when nobody is signed in, when the Keychain cannot be read
     /// right now (the phone locked), when an expired one could not be renewed — never a sign-out,
-    /// and never a token it knows has expired — once the API has deleted the account (C4), and
-    /// while the account has not passed the phone's 13+ check (`cleared`).
+    /// and never a token it knows has expired — once the API has deleted the account (C4), and,
+    /// `gated`, while the sign-in is not through the 13+ check (`Tokens.checked`): a sign-in made
+    /// around the question, on Cognito's own pages, or into an account Bali's server holds no yes
+    /// for, reaches Bali's API with nothing but the check's own read until it is answered, and an
+    /// answer under 13 deletes its account as Delete account does (the owner's decisions,
+    /// 2026-10-06 and 2026-10-08).
     public func accessToken() async -> String? {
-        cleared(account()) ? await deletionToken() : nil
+        !gated || current()?.checked == true ? await deletionToken() : nil
     }
 
-    /// An account deletion's token (`TokenProvider.deletionToken`): the access token, the 13+ check
-    /// passed or not.
+    /// An account deletion's token (`TokenProvider.deletionToken`), and the 13+ check's own read's
+    /// (C7-server): the access token, the check passed or not — neither call makes an account.
     public func deletionToken() async -> String? {
         guard let tokens = current(), tokens.deleted != true else { return nil }
         if now() < tokens.until { return tokens.access }
@@ -276,11 +284,11 @@ public actor SignIn: TokenProvider {
     /// signed in — and returns where the hosted UI sent the student back — C1's ephemeral
     /// `ASWebAuthenticationSession` — or throws why it did not, in its own words: the student's
     /// close `cancelled`, anything else `notOpened`; the code in that answer is exchanged for tokens.
-    /// `landing` is told the account they are for — their `sub`, nil where they name none — once
-    /// they are kept, before anything else hears of them: a token given, a watcher, the engine. So
-    /// the app files what it knows of that account first: a Sign up's 13+ answer (C7).
+    /// `yes`, a Sign up's answer of 13 or older (C7-server): the tokens are kept through the 13+
+    /// check, with the event id the account's yes is recorded under, before anything else hears of
+    /// them — a token given, a watcher, the engine — so the account it made is never asked.
     public func signIn(
-        _ page: HostedPage = .signIn, landing: @Sendable (String?) -> Void = { _ in },
+        _ page: HostedPage = .signIn, yes: String? = nil,
         through browser: @Sendable (URL) async throws(SignInError) -> URL
     ) async throws(SignInError) {
         let attempt = Attempt()
@@ -295,11 +303,38 @@ public actor SignIn: TokenProvider {
             ("code_verifier", attempt.verifier),
         ]).get()
         guard let refresh = grant.refresh else { throw .refused(nil) }
-        let tokens = Tokens(access: grant.access, refresh: refresh, email: grant.email, at: now())
+        var tokens = Tokens(access: grant.access, refresh: refresh, email: grant.email, at: now())
+        if let yes { (tokens.checked, tokens.yes) = (true, yes) }
         guard keep(tokens) else { throw .notKept }
-        landing(Tokens.subject(of: tokens.access))
         adopt(tokens)
         await tokenArrived?()
+    }
+
+    /// The sign-in held now — `account`'s, as its tokens name it, or nothing changes — is through
+    /// the 13+ check (C7-server): Bali's server holds the account's yes, or the student answered 13
+    /// or older on this phone, `yes` the event id that yes is recorded under. Kept with the tokens;
+    /// the caller then sends what waited (`SyncEngine.retryNow`).
+    public func passed(_ account: String?, recording yes: String? = nil) {
+        guard current() != nil, self.account() == account else { return }
+        tokens?.checked = true
+        if let yes { tokens?.yes = yes }
+        unsaved = !keep(tokens)
+    }
+
+    /// Whether the sign-in kept now is through the 13+ check; false when nobody is signed in or the
+    /// Keychain cannot be read now.
+    public func checked() -> Bool { current()?.checked == true }
+
+    /// The yes Bali's server is still to record for this sign-in's account, by its event id; nil
+    /// when none waits. The engine sends it (`SyncEngine`'s read loop).
+    public func yes() -> String? { current()?.yes }
+
+    /// The yes `eventId` names, settled — recorded, or refused for good — let go, while it is still
+    /// this sign-in's.
+    public func recorded(_ eventId: String) {
+        guard current()?.yes == eventId else { return }
+        tokens?.yes = nil
+        unsaved = !keep(tokens)
     }
 
     /// Signs the student out of this phone: the tokens are forgotten — never a queued record, which
@@ -463,7 +498,8 @@ public actor SignIn: TokenProvider {
             var fresh = Tokens(
                 access: grant.access, refresh: grant.refresh ?? refresh,
                 email: grant.email ?? tokens?.email, at: now())
-            fresh.deleted = tokens?.deleted
+            (fresh.deleted, fresh.checked, fresh.yes) =
+                (tokens?.deleted, tokens?.checked, tokens?.yes)
             adopt(fresh, saved: keep(fresh))
             if telling { await tokenArrived?() }
             return true

@@ -9,7 +9,7 @@
     /// syncs or shields, and its Try again does nothing. Debug builds only.
     enum PreviewFixtures {
         /// What `Phone` publishes, as a fixture has it: the 13+ check passed — signed in, by the
-        /// fixture's account, never one the phone's defaults name — with nothing picked on its
+        /// fixture's own answer, never Bali's server — with nothing picked on its
         /// screen (C7), the intro seen and not shown, no Cognito page opening or failed, signed
         /// in, the permission approved, out of
         /// any session and in two classes, no ask for the permission failed, nothing typed to join,

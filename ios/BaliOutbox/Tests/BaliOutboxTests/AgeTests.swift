@@ -85,7 +85,7 @@ struct AgeTests {
     }
 
     @Test(
-        "An answer writes nothing at all — 13 or older or under 13, no key of any kind, the answer in memory alone; passed is kept per account, its Cognito id alone in the defaults given — never the month or the year — once for each account, read back for that account and no other, nor for none; the phone-wide flag a build before kept vouches for no account (the owner's ruling, 2026-10-07)"
+        "An answer writes nothing at all — 13 or older or under 13, no key of any kind, the answer in memory alone. Build 8's notes are let go (the owner's decision, 2026-10-08: the phone keeps no age note any more): a yes listed for the account signed in now is the one the phone keeps to send, and then both notes are deleted, whoever is signed in — another account, none — nothing else touched; the phone-wide flag before them vouches for no account"
     )
     func keeps() throws {
         let suite = "BaliOutboxTests.age.\(UUID().uuidString)"
@@ -100,20 +100,22 @@ struct AgeTests {
         #expect(young.answer == .tooYoung && old.answer == .passed)
         #expect(Set(defaults.dictionaryRepresentation().keys) == before)
 
-        // A build before kept one flag for the whole phone: it vouches for no account.
+        let signedIn: [(String?, Bool)] = [
+            ("ana-sub", true), ("bea-sub", true), ("cara-sub", false), (nil, false),
+        ]
+        for (account, kept) in signedIn {
+            // As build 8 left them, beside a key of another kind.
+            defaults.set(["ana-sub", "bea-sub"], forKey: "ageCheckedAccounts")
+            defaults.set(true, forKey: "ageChecked")
+            defaults.set("u", forKey: "inClass")
+            #expect(AgeCheck.forgetNotes(in: defaults, keeping: account) == kept, "\(account ?? "")")
+            #expect(Set(defaults.dictionaryRepresentation().keys) == before.union(["inClass"]))
+            #expect(AgeCheck.notes.allSatisfy { defaults.object(forKey: $0) == nil })
+        }
+        #expect(!AgeCheck.forgetNotes(in: defaults, keeping: "ana-sub"))
         defaults.set(true, forKey: "ageChecked")
-        #expect(!AgeCheck.passed("ana", in: defaults) && !AgeCheck.passed(nil, in: defaults))
-        defaults.removeObject(forKey: "ageChecked")
-
-        AgeCheck.pass("ana-sub", in: defaults)
-        AgeCheck.pass("ana-sub", in: defaults)
-        AgeCheck.pass("bea-sub", in: defaults)
-        #expect(Set(defaults.dictionaryRepresentation().keys) == before.union([AgeCheck.key]))
-        #expect(defaults.stringArray(forKey: AgeCheck.key) == ["ana-sub", "bea-sub"])
-        #expect(AgeCheck.passed("ana-sub", in: defaults) && AgeCheck.passed("bea-sub", in: defaults))
-        #expect(!AgeCheck.passed("cara-sub", in: defaults) && !AgeCheck.passed(nil, in: defaults))
-        let kept = String(describing: defaults.object(forKey: AgeCheck.key) ?? "")
-        #expect(!kept.contains("2000") && !kept.contains("10"), "\(kept)")
+        #expect(!AgeCheck.forgetNotes(in: defaults, keeping: "ana-sub"))
+        #expect(defaults.object(forKey: "ageChecked") == nil)
     }
 
     @Test(

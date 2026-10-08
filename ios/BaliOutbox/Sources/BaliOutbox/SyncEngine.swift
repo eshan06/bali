@@ -259,6 +259,9 @@ public actor SyncEngine {
     let outbox: Outbox
     let clock: any SyncClock
     let refresh: @Sendable () async -> Bool
+    /// The sign-in whose account's 13+ yes the read loop records on Bali's server (C7-server):
+    /// the app's, as `make` makes the engine; nil in an engine a test makes without one.
+    let signIn: SignIn?
 
     /// The standing is kept in the outbox file as it changes, so a relaunch starts where the phone
     /// stood — shielded still, offline too — and the extensions can read it (B5); never while it is
@@ -321,9 +324,10 @@ public actor SyncEngine {
     /// a sign-in, a refresh of its own — is followed by `retryNow()`.
     public init(
         outbox: Outbox, client: APIClient, clock: any SyncClock = SystemClock(),
-        refresh: @escaping @Sendable () async -> Bool = { false }
+        refresh: @escaping @Sendable () async -> Bool = { false }, signIn: SignIn? = nil
     ) {
         (self.outbox, self.client, self.clock, self.refresh) = (outbox, client, clock, refresh)
+        self.signIn = signIn
         // Where the phone stood, and what it queued, each read on its own: enforcement follows
         // this state from the start, so it must never begin from nothing.
         let queued = try? outbox.records()
@@ -344,15 +348,16 @@ public actor SyncEngine {
     }
 
     /// The app's one engine, over the student's sign-in (B4): the API client's tokens are the
-    /// sign-in's, and so is a 401's `refresh`; every token it gets otherwise — a sign-in, a renewal
-    /// of its own — sends everything again at once.
+    /// sign-in's, and so is a 401's `refresh`, and the 13+ yes it keeps; every token it gets
+    /// otherwise — a sign-in, a renewal of its own — sends everything again at once.
     public static func make(
         outbox: Outbox, api: URL, signIn: SignIn,
         transport: any HTTPTransport = URLSessionTransport(), clock: any SyncClock = SystemClock()
     ) async -> SyncEngine {
         let client = APIClient(baseURL: api, tokens: signIn, transport: transport)
         let engine = SyncEngine(
-            outbox: outbox, client: client, clock: clock, refresh: { await signIn.refresh() })
+            outbox: outbox, client: client, clock: clock, refresh: { await signIn.refresh() },
+            signIn: signIn)
         await signIn.whenTokenArrives { [weak engine] in await engine?.retryNow() }
         return engine
     }
@@ -518,6 +523,14 @@ public actor SyncEngine {
     /// newest: the History screen's own call (C6a), its token renewed once on a 401.
     public func history(before: String?) async -> APIResponse<HistoryPage> {
         await Joining.send(renewing: refresh) { await client.history(before: before) }
+    }
+
+    /// Whether Bali's server holds the 13+ yes of the account signed in (`GET /v1/me/age-check`,
+    /// C7-server): the one call a sign-in makes before its age is settled — it makes no account —
+    /// so under the token the sign-in gives whatever the check (`forDeletion`), renewed once on a
+    /// 401. The app's own call, right after a sign-in not yet through the check.
+    public func ageCheck() async -> APIResponse<AgeCheckResponse> {
+        await Joining.send(renewing: refresh) { await client.forDeletion.ageCheck() }
     }
 
     /// Joins the class a code opens (`POST /v1/enrollments`): the Join screen's own call (C2b), its
@@ -967,7 +980,29 @@ public actor SyncEngine {
                     }
                 }
             }
+            // The account's 13+ yes, kept with its sign-in until Bali's server has it (C7-server):
+            // at each wake. Never during an account deletion — landing after its `DELETE /v1/me`,
+            // it would make a fresh account — and counted, so a deletion waits it out.
+            if let yes = await signIn?.yes(), !deleting { await record(yes: yes) }
             await pause(.read, until: nextRead)
+        }
+    }
+
+    /// The account's 13+ yes, sent (`PUT /v1/me/age-check`) under its event id, its token renewed
+    /// once on a 401. Recorded, or refused for good — a 4xx but 401, 408 and 429, which only a
+    /// deletion meanwhile or a spent id can earn — its sign-in lets it go: at worst the account is
+    /// asked once more, at a sign-in where Bali's server has no yes for it. Else kept for the next
+    /// wake.
+    private func record(yes eventId: String) async {
+        let answer = await counted {
+            await Joining.send(renewing: refresh) {
+                await client.recordAgeCheck(RecordAgeCheckRequest(eventId: eventId))
+            }
+        }
+        switch answer.result {
+        case .status(401), .status(408), .status(429): return
+        case .status(200..<300), .status(400..<500): await signIn?.recorded(eventId)
+        default: return
         }
     }
 
