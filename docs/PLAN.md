@@ -4,8 +4,12 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-10-07 (Central) — the app's Sign in & sign up design (owner-approved
-2026-10-06) is fully built: its Your name row landed (the owner's decision, 2026-10-07). A
+_Last updated: 2026-10-07 (Central) — two fixes from #292's review (the owner's approval): Your
+name's keyboard comes back only after a save that failed, never for a moment once the name is set;
+and a sign-out forgets the run's intro seen, so the next Sign up that run shows the intro again,
+while Sign up again with no sign-out between still opens its page at once. Before them, the app's
+Sign in & sign up design (owner-approved 2026-10-06) is fully built: its Your name row landed (the
+owner's decision, 2026-10-07). A
 student's account `GET /v1/me` names with no name gets "What's your name?" after any sign-up or
 sign-in, before Screen Time, Join or Home: after the 13+ question where that shows, never over a
 session's screens; Continue saves the name as Me does, Sign out its only other way on; a teacher's

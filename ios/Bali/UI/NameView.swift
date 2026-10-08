@@ -52,8 +52,11 @@ struct NameView: View {
                 .frame(maxWidth: .infinity).padding(.top, 8)
         }
         .onAppear { typing = true }
-        // Fixed while its save runs; the keyboard back once a save that failed is over, as on Me.
-        .onChange(of: naming.busy) { _, busy in if !busy { typing = true } }
+        // Fixed while its save runs; the keyboard back once a save that failed is over, as on Me,
+        // never once one set the name: the router moves on (#292's review).
+        .onChange(of: naming.busy) { _, busy in
+            if !busy, phone.naming.failure != nil { typing = true }
+        }
         // Said to VoiceOver too, whose focus stays on Continue (rule 5).
         .onChange(of: naming.failure) { _, words in
             if let words { AccessibilityNotification.Announcement(words).post() }

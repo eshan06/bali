@@ -79,7 +79,8 @@ final class Phone {
     private(set) var signInFailed: SignInError?
     /// Whether the student has seen the intro this run (C1): in memory only, never in the phone's
     /// defaults — once per account, not per phone (the owner's ruling, 2026-10-07): a later run's
-    /// Sign up shows it again, a second account's too, and one whose page closed or could not open.
+    /// Sign up shows it again, a second account's too, and one whose page closed or could not open;
+    /// so does this run's after a sign-out (`signed`).
     /// Sign up shows the intro before its page until it has been: `introShows`, in Sign in's place,
     /// until the page it opens ends without a sign-in, or the sign-in it made lands (`signed`), so
     /// no Sign in shows between the two.
@@ -328,7 +329,8 @@ final class Phone {
     /// DeleteUser or done holds (`Deleting.signInChanged`); `pending`, the API has deleted the
     /// account and its Cognito sign-in waits to be — a relaunch (C4b) — so the deletion's screen
     /// shows at once, Try again its one way on. The intro Sign up showed goes with a change too:
-    /// the sign-in its page made has landed. A sign-in made this run with no `me` known forgets
+    /// the sign-in its page made has landed; and at a sign-out, the intro seen, so the next Sign up
+    /// this run shows it again (#292's review). A sign-in made this run with no `me` known forgets
     /// too: a read that failed before it, with no token to send, is not its read (`forgetMe`).
     func signed(
         in signedIn: Bool?, as account: String? = nil, email: String? = nil, pending: Bool = false
@@ -339,6 +341,7 @@ final class Phone {
         let changed = signedIn != self.signedIn || another
         if changed {
             (tab, introShows) = (.home, false)
+            if signedIn == false { introSeen = false }
             forgetHistory()
             (naming, signOutFailed, leaving) = (Naming(), nil, Leaving())
             (joining, signIns) = (Joining(), signIns + 1)

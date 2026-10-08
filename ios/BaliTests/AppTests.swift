@@ -2106,6 +2106,47 @@ struct AppTests {
     }
 
     @Test(
+        "Your name's keyboard as a save ends (#292's review): down while the save runs, back once one that set no name is over, as on Me — and never back once the name is set, so it never pops up for a moment before the router moves on. The name typed as Your name's field types it, never edited as on Me (`Naming.editing` stays false): looked at after each render, for a while past the save"
+    )
+    func nameKeyboard() async throws {
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let (phone, key) = (
+            Phone(fixture: try #require(PreviewFixtures.all["name"])), scene.keyWindow
+        )
+        let window = UIWindow(windowScene: scene)
+        window.frame = scene.screen.bounds
+        window.rootViewController = UIHostingController(rootView: RootView(phone: phone))
+        window.makeKeyAndVisible()
+        defer {
+            window.isHidden = true
+            key?.makeKey()
+        }
+        let typing = { textFields(in: window).contains { $0.isFirstResponder } }
+        try await until { typing() }
+        /// A save of the name typed, answered by `PATCH /v1/me` with `status` and `body` once the
+        /// keyboard is down for it.
+        func save(_ status: Int, _ body: String) async throws {
+            let request = phone.naming.save(at: Date())
+            try await until { !typing() }
+            phone.naming.saved(await client(status, body).updateMe(request), for: request)
+        }
+        phone.naming.type("Ana")
+        try await save(
+            409, #"{"error":{"code":"conflict","reason":"display_name_taken","message":"taken"}}"#)
+        try await until { typing() }
+        try await save(
+            200, #"{"outcome":"applied","user":{"id":"ana","role":"student","displayName":"Ana"}}"#)
+        #expect(phone.naming == Naming() && phone.shown.screen == .name)
+        var back = false
+        let end = ContinuousClock.now + .milliseconds(600)
+        while ContinuousClock.now < end, !back {
+            try await Task.sleep(for: .milliseconds(5))
+            back = typing()
+        }
+        #expect(!back)
+    }
+
+    @Test(
         "The permission once read approved is kept in the phone's own defaults (C1b) — set at a read of approved, cleared once the check judges the permission off (denied, or not determined for the grace), left at a read not determined for a moment — and a fresh Phone reads it back; with it, not determined routes as approved. The flag as it was before is put back after"
     )
     func everApproved() throws {
@@ -2286,6 +2327,39 @@ struct AppTests {
         let relaunched = try signedOut()
         await relaunched.signIn(.signUp, through: pages.browser)
         #expect(relaunched.introShows && !relaunched.introSeen && pages.opened.count == 2)
+    }
+
+    @Test(
+        "The intro once per account within a run too (#292's review): an account signed up, then signed out — Your name's Sign out — and the next Sign up this run shows the intro again before its page; Sign up again with no sign-out between still opens the page at once, as the approved design draws it. Through the phone's own sign-in, its Sign out and the Keychain's word. The flag as it was before is put back after",
+        .timeLimit(.minutes(3)))
+    func introAfterSignOut() async throws {
+        let defaults = UserDefaults.standard
+        let before = defaults.object(forKey: AgeCheck.key)
+        defer { defaults.set(before, forKey: AgeCheck.key) }
+        defaults.set(true, forKey: AgeCheck.key)
+        let (phone, _) = try standIn(Names([]), keychain: Keychain(account: nil))
+        let signIn = try #require(phone.signIn)
+        let following = Task { await phone.follow(signIn) }
+        defer { following.cancel() }
+        try await until { phone.signedIn == false }
+        // Ana signs up: the intro, then her page, which signs her in.
+        let pages = Pages()
+        await phone.signIn(.signUp, through: pages.browser)
+        #expect(phone.introShows && pages.opened.isEmpty)
+        pages.signsIn = true
+        await phone.sawIntro(through: pages.browser)
+        try await until { phone.signedIn == true }
+        #expect(!phone.introShows && pages.opened.count == 1)
+        // She signs out; Bea's Sign up, the same run: the intro, no page yet.
+        await phone.signOut()
+        try await until { phone.signedIn == false }
+        await phone.signIn(.signUp, through: pages.browser)
+        #expect(phone.introShows && pages.opened.count == 1)
+        // Bea closes her page: Sign up again opens it at once.
+        pages.signsIn = false
+        await phone.sawIntro(through: pages.browser)
+        await phone.signIn(.signUp, through: pages.browser)
+        #expect(!phone.introShows && pages.opened.count == 3)
     }
 
     @Test(
