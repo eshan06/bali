@@ -436,7 +436,10 @@ struct AppTests {
         signedOut.signed(in: false)
         #expect(signedOut.shown.screen == .signIn && signedOut.history == History())
         signedOut.signed(in: true)
-        #expect(signedOut.shown.screen == .home && signedOut.tab == .home)
+        // The starting screen until a read names who signed in (warn 1's fix), then Home.
+        #expect(signedOut.shown.screen == .starting && signedOut.tab == .home)
+        signedOut.synced(try #require(PreviewFixtures.all["history"]?.sync))
+        #expect(signedOut.shown.screen == .home)
         // Me's Join a class opens Join over it — no tab bar there — and Back returns to Me.
         let fromMe = Phone(fixture: try #require(PreviewFixtures.all["me"]))
         fromMe.open(.join)
@@ -1745,11 +1748,24 @@ struct AppTests {
         let before = defaults.object(forKey: AgeCheck.key)
         defer { defaults.set(before, forKey: AgeCheck.key) }
         let pages = Pages()
-        let passing = Phone(fixture: try #require(PreviewFixtures.all["ageAfterSignIn"]))
+        // Gated, every read found no token to send: none answered, one failed.
+        var gated = try #require(PreviewFixtures.all["ageAfterSignIn"])
+        gated.sync?.meFailed = .networkError
+        let passing = Phone(fixture: gated)
         #expect(passing.shown == (.age, false))
         passing.birth = Birth(month: 1, year: 2000)
         await passing.answerAge(through: pages.browser)
-        #expect(passing.age.answer == .passed && passing.shown == (.home, true))
+        // The sign-in reaches Bali now: the starting screen until a read answers (warn 1's fix).
+        #expect(passing.age.answer == .passed && passing.shown == (.starting, false))
+        var read = try #require(gated.sync)
+        read.meFailed = nil
+        read.me = try BaliJSON.makeDecoder().decode(
+            MeResponse.self,
+            from: Data(
+                #"{"user":{"id":"ana","role":"student","displayName":"Ana"},"classes":[{"id":"p3","name":"Period 3","teacher":{"displayName":"Ms. Rivera"},"enrollmentId":"e3"}],"session":null}"#
+                    .utf8))
+        passing.synced(read)
+        #expect(passing.shown == (.home, true))
         let young = Phone(fixture: try #require(PreviewFixtures.all["ageAfterSignIn"]))
         let now = Calendar(identifier: .gregorian).dateComponents([.year, .month], from: Date())
         young.birth = Birth(month: now.month, year: now.year)
@@ -1807,7 +1823,8 @@ struct AppTests {
         passing.birth = Birth(month: 1, year: 2000)
         await passing.answerAge(through: pages.browser)
         try await until { await server.asked.contains("GET /v1/me") }
-        #expect(await server.asked == ["GET /v1/me"] && pages.opened.isEmpty)
+        // Its read once or twice: the failure forgotten reads it again (warn 1's fix).
+        #expect(Set(await server.asked) == ["GET /v1/me"] && pages.opened.isEmpty)
         running.cancel()
         _ = engine
 
@@ -1906,7 +1923,7 @@ struct AppTests {
     }
 
     @Test(
-        "Your name, routed (the owner's decision, 2026-10-07): with Bali not reached since the sign-in, Screen Time as before; once a read names a student's account with no name, Your name in its place, no tab bar, Sign out its other way on; named, the router moves on, to Screen Time, then Join; a teacher's account never gets it"
+        "Your name, routed (the owner's decision, 2026-10-07): with Bali not reached yet on a sign-in kept from the last run, Screen Time as before; once a read names a student's account with no name, Your name in its place, no tab bar, Sign out its other way on; named, the router moves on, to Screen Time, then Join; a teacher's account never gets it"
     )
     func nameRouted() throws {
         /// `GET /v1/me`'s answer: an account of `role` named `name` — JSON's, null for none — in
@@ -1935,6 +1952,74 @@ struct AppTests {
         state.me = try user("null", "teacher")
         joining.synced(state)
         #expect(joining.shown == (.join, false))
+    }
+
+    @Test(
+        "No screen flashes before Your name (the owner's ruling, 2026-10-07; the PR's warn 1): a sign-in made this run holds the starting screen, a read that failed before it forgotten, until a read answers — Your name for an account with no name — or fails, when the screens go on; a launch signed in holds nothing, as before"
+    )
+    func nameHeld() throws {
+        let nameless = try BaliJSON.makeDecoder().decode(
+            MeResponse.self,
+            from: Data(
+                #"{"user":{"id":"ana","role":"student","displayName":null},"classes":[],"session":null}"#
+                    .utf8))
+        var protection = Protection()
+        (protection.checked, protection.permission) = (true, .notDetermined)
+        // Signed out, a read made with no token to send: failed.
+        var failed = SyncState()
+        failed.meFailed = .networkError
+        var answered = SyncState()
+        answered.me = nameless
+        let signingUp = Phone(
+            fixture: PreviewFixtures.State(signedIn: false, protection: protection, sync: failed))
+        #expect(signingUp.shown == (.signIn, false))
+        signingUp.signed(in: true, as: "ana")
+        #expect(signingUp.shown == (.starting, false) && signingUp.sync?.meFailed == nil)
+        signingUp.synced(answered)
+        #expect(signingUp.shown == (.name, false))
+        // A read that fails since the sign-in: the screens go on, Your name once one answers.
+        let offline = Phone(
+            fixture: PreviewFixtures.State(signedIn: false, protection: protection, sync: failed))
+        offline.signed(in: true, as: "ana")
+        offline.synced(failed)
+        #expect(offline.shown == (.screenTime, false))
+        offline.synced(answered)
+        #expect(offline.shown == (.name, false))
+        // A launch, the Keychain read signed in: nothing held, as before.
+        let launched = Phone(
+            fixture: PreviewFixtures.State(signedIn: nil, protection: protection, sync: SyncState()))
+        launched.signed(in: true, as: "ana")
+        #expect(launched.shown == (.screenTime, false))
+    }
+
+    @Test(
+        "The hold through the phone's own sign-in and engine (the PR's warn 1): signed out, the engine's read finds no token and fails; once the sign-in lands, that failure is forgotten — a state the engine sent before it shows none — and the engine reads `GET /v1/me` with the new token, its answer the phone's. The flag as it was before is put back after",
+        .timeLimit(.minutes(3)))
+    func nameHeldWiring() async throws {
+        let defaults = UserDefaults.standard
+        let before = defaults.object(forKey: AgeCheck.key)
+        defer { defaults.set(before, forKey: AgeCheck.key) }
+        defaults.set(true, forKey: AgeCheck.key)
+        let server = Names([])
+        let (phone, engine) = try gatedStandIn(server, keychain: Keychain(account: nil))
+        let running = Task { await engine.run() }
+        defer { running.cancel() }
+        phone.signed(in: false)
+        await engine.retryNow()
+        try await until { await engine.state.meFailed == .networkError }
+        let stale = await engine.state
+        phone.synced(stale)
+        let pages = Pages()
+        pages.signsIn = true
+        await phone.signIn(through: pages.browser)
+        phone.signed(in: true, as: "ana")
+        #expect(phone.signedInThisRun && phone.sync?.meFailed == nil)
+        phone.synced(stale)
+        #expect(phone.sync?.meFailed == nil)
+        try await until { await engine.state.me != nil }
+        phone.synced(await engine.state)
+        #expect(phone.sync?.me?.user.displayName == nil && phone.sync?.meFailed == nil)
+        #expect(await server.reads == 1)
     }
 
     @Test(
@@ -2784,7 +2869,8 @@ private actor Deleter: HTTPTransport {
 /// The API as a stand-in answers Your name: `GET /v1/me` with a new student in no class, named as
 /// the last name set — none at first — counting each read; and each `PATCH /v1/me` from `answers`,
 /// in turn — a status and body, or no answer at all when nil — keeping what it carried, a 200 the
-/// name set as A8 answers it. Anything else gets no answer.
+/// name set as A8 answers it; and Cognito's token endpoint with a sign-in's tokens. Anything else
+/// gets no answer.
 private actor Names: HTTPTransport {
     private var answers: [(status: Int, body: String)?]
     private var name: String?
@@ -2816,6 +2902,7 @@ private actor Names: HTTPTransport {
                 name = sent.displayName
                 body = #"{"outcome":"applied","user":\#(user)}"#
             }
+        case ("POST", "/oauth2/token"): body = #"{"access_token":"a1","refresh_token":"r1"}"#
         default: throw URLError(.notConnectedToInternet)
         }
         guard

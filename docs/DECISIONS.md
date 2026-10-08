@@ -8,6 +8,27 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-07** — **No screen flashes before Your name** (the owner's ruling on the Your name PR's
+  review: warn 1 fixed, warn 2 left as is). Right after a sign-in `me` is unknown until the first
+  `GET /v1/me` answers, so for that round trip the router showed Screen Time or Home, then Your
+  name: every new production account's first sign-in. Now a sign-in made this run, or one the 13+
+  check lets through (the gap's fallback), holds the starting screen (the mark) where Your name
+  could show until that read answers or fails; never over a session's screens nor the home a
+  standing not read keeps, so Emergency Unlock never waits on it. It refines point (2) of the Your
+  name entry below. How: **(1) Only a sign-in made this run** (the router's `signedInThisRun`), never
+  a launch signed in: `me` lives in memory, so a hold at every launch would keep a class's cold
+  launch on the mark for a round trip (up to the 15 s request timeout on a dead connection) before
+  Home and its Tap in, which work offline. A nameless account's later launch still shows its screens
+  for that round trip, then Your name, until it is named. **(2) A read that failed before the
+  sign-in is forgotten** (`Phone.forgetMe`, the engine's `forgetMe`, as another student's sign-in
+  already forgot `me`): signed out, every read finds no token and fails, and without this the hold
+  would never start. The sign-in's own retry may read `GET /v1/me` a second time; harmless. **(3) A
+  failed read lets the screens go on**: offline at once, a dead connection after the 15 s request
+  timeout, or the phone's storage failing so no read can be tried, never a mark held with nothing
+  said; Your name shows once a read answers, as before. **Warn 2, accepted by the owner:** a
+  nameless student whose read answered and who then goes offline stays on Your name (Continue can't
+  save, Sign out the other way on) until the network is back or the app is reopened.
+
 - **2026-10-07** — **The intro once per account, not per phone** (the owner's ruling): the intro's
   seen flag lives for the app's run alone, in memory (`Phone.introSeen`), and the phone's defaults
   key `introSeen` is no longer read or written, so every new run's Sign up shows the intro again (a

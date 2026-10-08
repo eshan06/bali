@@ -833,8 +833,10 @@ never covers or delays Emergency Unlock, and its answers never enter the outbox.
   sign-in: where the 13+ question would show, after it, so before Screen Time, Join and Home and
   never over a session's screens nor the home a standing not read keeps. Required: Continue saves
   the name as Me does (`PATCH /v1/me`, its refusals Me's), and Sign out is the only other way on.
-  Known only from a read: with Bali not reached, the screens go on, and it shows once a read names
-  none. A teacher's account never gets it.
+  Known only from a read: after a sign-in made this run, or one the 13+ check let through, the
+  starting screen holds until the first read answers or fails, so no other screen flashes before it
+  (the owner's ruling, 2026-10-07); a failed read, or a sign-in kept from the last run, lets the
+  screens go on, and it shows once a read names none. A teacher's account never gets it.
 - **A changed phone clock is detected, not prevented.** iOS scheduling follows wall-clock
   time, so a clock change is a real bypass family; the server compares against its own clock
   (rule 1) and surfaces it to the teacher rather than trusting it. Which of a student's own

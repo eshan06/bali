@@ -31,7 +31,10 @@ public enum Screen: Sendable, Hashable {
     /// there once answered under 13, and, signed in with it not passed, the question before
     /// anything but a session's screens; `intro`, whether Sign up shows the intro next, before its
     /// page (C1) — a first launch opens on Sign in, and Sign in shows none;
-    /// `signedIn`, nil until the Keychain could be read;
+    /// `signedIn`, nil until the Keychain could be read; `signedInThisRun`, whether a sign-in
+    /// reached Bali's API this run — made here, or let through by the 13+ check passed under it —
+    /// rather than kept from the last: the starting screen then holds where Your name could show
+    /// until `sync`'s read of `GET /v1/me` answers or fails;
     /// `protection`, what rule 3's check found, nil until the enforcer runs and unchecked until its
     /// first pass; `everApproved`, whether a pass has ever read the permission approved (C1b) —
     /// Family Controls can read not determined for a moment after a launch (B5a-2), and with this
@@ -55,6 +58,7 @@ public enum Screen: Sendable, Hashable {
     /// at a bell either (C6a's review).
     public static func choose(
         problem: String?, deleting: Bool, age: AgeCheck.Answer, intro: Bool, signedIn: Bool?,
+        signedInThisRun: Bool,
         protection: Protection?, everApproved: Bool, everInClass: Bool, sync: SyncState?,
         hasClasses: Bool?, sessionOverClosed: SessionView?, opened: [Screen], tab: Screen, now: Date
     ) -> (screen: Screen, tabbed: Bool) {
@@ -91,8 +95,11 @@ public enum Screen: Sendable, Hashable {
         // decision 2026-10-06), the question, a sign-in Cognito's own pages made around it
         // reaching Bali's API with nothing until it is answered (`SignIn`'s `cleared`); then Your
         // name (the owner's decision, 2026-10-07), for a student's account `GET /v1/me` names with
-        // no name. Not known until a read answers: with Bali not reached, the screens go on, and
-        // it shows once one does.
+        // no name. Not known until a read answers: a sign-in made this run holds the starting
+        // screen until one answers or fails — the phone's storage failing, none can be tried — so
+        // no other screen flashes before Your name (the owner's ruling, 2026-10-07); a failed one,
+        // or a sign-in kept from the last run, lets the screens go on, and Your name shows once a
+        // read answers.
         switch sync.standing {
         case .inSession(let session, _)
         where session.endsAt > now || !session.rings(as: sessionOverClosed):
@@ -100,6 +107,9 @@ public enum Screen: Sendable, Hashable {
         case .unread: break
         case .inSession, .waiting, .out:
             if age != .passed { return (age == .tooYoung ? .tooYoung : .age, false) }
+            if signedInThisRun, sync.me == nil, sync.meFailed == nil, sync.link != .storageFailed {
+                return (.starting, false)
+            }
             if let user = sync.me?.user, user.role.known == .student, user.displayName == nil {
                 return (.name, false)
             }
