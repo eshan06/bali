@@ -8,8 +8,9 @@
     /// renders that fixture in place of the live phone (`BaliApp`), frozen — nothing signs in,
     /// syncs or shields, and its Try again does nothing. Debug builds only.
     enum PreviewFixtures {
-        /// What `Phone` publishes, as a fixture has it: the 13+ check passed with nothing picked on
-        /// its screen (C7), the intro seen and not shown, no Cognito page opening or failed, signed
+        /// What `Phone` publishes, as a fixture has it: the 13+ check passed — signed in, by the
+        /// fixture's account, never one the phone's defaults name — with nothing picked on its
+        /// screen (C7), the intro seen and not shown, no Cognito page opening or failed, signed
         /// in, the permission approved, out of
         /// any session and in two classes, no ask for the permission failed, nothing typed to join,
         /// no screen opened over another, Home's tab chosen and no history read, no name being
@@ -47,10 +48,14 @@
         static let all: [String: State] = [
             "starting": State(signedIn: nil, protection: nil, sync: nil),
             // The 13+ check (C7) once Sign up is pressed: the question, nothing picked; both
-            // picked, Continue ready; and the stop screen an answer under 13 gets. Sign in with
-            // the check not asked yet, as a first launch has it.
+            // picked, Continue ready; a second Sign up this run, the intro seen, its page opening
+            // from Continue; and the stop screen an answer under 13 gets. Sign in with the check
+            // not asked yet, as a first launch has it.
             "age": State(age: .asked, signedIn: false),
             "agePicked": State(age: .asked, birth: Birth(month: 3, year: 2009), signedIn: false),
+            "ageSigningUp": State(
+                age: .asked, birth: Birth(month: 3, year: 2009), signingIn: true,
+                hostedPage: .signUp, signedIn: false),
             "tooYoung": State(age: .tooYoung, signedIn: false),
             // The gap's fallback: a sign-in come back to a phone that has not passed the check —
             // the question first, Bali's API sent nothing — and, answered under 13, the account's

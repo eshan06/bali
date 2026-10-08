@@ -57,8 +57,9 @@ struct SignedRig {
     let keychain = MemoryKeychain()
     let running: Task<Void, Never>
 
-    /// `cleared`, the sign-in's: whether the phone's 13+ check has passed (C7's fallback).
-    init(cleared: @escaping @Sendable () -> Bool = { true }) async throws {
+    /// `cleared`, the sign-in's: whether the account signed in has passed the phone's 13+ check
+    /// (C7's fallback).
+    init(cleared: @escaping @Sendable (String?) -> Bool = { _ in true }) async throws {
         outbox = try makeOutbox().outbox
         let cognito = Cognito(
             domain: URL(string: "https://bali-dev.auth.us-east-1.amazoncognito.com")!,

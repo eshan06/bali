@@ -2,14 +2,15 @@ import AuthenticationServices
 import BaliOutbox
 import SwiftUI
 
-/// The 13+ check (C7), in Sign in's place once Sign up is pressed with the check not passed on this
-/// phone (the approved Sign in & sign up design) — and first after a sign-in on such a phone, the
-/// gap's fallback: the birth month and year, asked neutrally by the
+/// The 13+ check (C7), in Sign in's place at every Sign up (the approved Sign in & sign up design)
+/// — and first after a sign-in into an account that has not passed it on this phone, the gap's
+/// fallback: the birth month and year, asked neutrally by the
 /// FTC's COPPA guidance — nothing here says 13, hints at the cutoff or preselects an answer, so
 /// each menu starts empty and offers every month and a hundred years (`Birth`, Gregorian whatever
 /// calendar the phone shows, the names in its language). Continue answers once both are picked
-/// (`Phone.answerAge(through:)`): 13 or older goes on at once to the intro or the sign-up page, or
-/// signed in carries on, and the check is never asked again; under 13 lands on `TooYoungView`, or signed in on the
+/// (`Phone.answerAge(through:)`): 13 or older goes on at once to the intro, or to the sign-up page,
+/// Continue saying Signing up… and taking no press while it opens; signed in it carries on, the
+/// account never asked again on this phone. Under 13 lands on `TooYoungView`, or signed in on the
 /// account's deletion (`DeletingView`). The rules are `AgeCheck`'s and `Birth`'s
 /// (BaliOutbox); the look is the Sign in screen's, in D1's light tokens.
 struct AgeView: View {
@@ -44,8 +45,10 @@ struct AgeView: View {
                         }
                     }
                     Spacer()
-                    Button("Continue") { Task { await phone.answerAge(through: browser.hostedUI) } }
-                        .buttonStyle(PrimaryButtonStyle()).disabled(!picks.complete)
+                    Button(phone.signingIn ? "Signing up…" : "Continue") {
+                        Task { await phone.answerAge(through: browser.hostedUI) }
+                    }
+                    .buttonStyle(PrimaryButtonStyle()).disabled(!picks.complete || phone.signingIn)
                 }
             }
         }

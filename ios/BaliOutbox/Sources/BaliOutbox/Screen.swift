@@ -26,11 +26,11 @@ public enum Screen: Sendable, Hashable {
     /// The screen for what the phone knows at `now`: `problem`, why the app could not start;
     /// `deleting`, whether Me's Delete account has its own screen to show (C4b, `Deleting.shows`),
     /// before everything but a start that failed — nothing else is offered from the press to the
-    /// end; `age`, the 13+ check's answer (C7) — its question in place of Sign in once Sign up
-    /// was pressed with it not passed (the approved Sign in & sign up design), the stop screen
-    /// there once answered under 13, and, signed in with it not passed, the question before
-    /// anything but a session's screens; `intro`, whether Sign up shows the intro next, before its
-    /// page (C1) — a first launch opens on Sign in, and Sign in shows none;
+    /// end; `age`, the 13+ check (C7) — its question in place of Sign in once Sign up was pressed
+    /// (every Sign up asks it: the approved Sign in & sign up design), the stop screen there once
+    /// answered under 13, and, signed in, the account's: not passed on this phone, the question
+    /// before anything but a session's screens; `intro`, whether Sign up shows the intro next,
+    /// before its page (C1) — a first launch opens on Sign in, and Sign in shows none;
     /// `signedIn`, nil until the Keychain could be read; `signedInThisRun`, whether a sign-in
     /// reached Bali's API this run — made here, or let through by the 13+ check passed under it —
     /// rather than kept from the last: the starting screen then holds where Your name could show
@@ -77,9 +77,9 @@ public enum Screen: Sendable, Hashable {
         guard let signedIn, let protection, protection.checked, let sync else {
             return (.starting, false)
         }
-        // Signed out: Sign in — or, Sign up pressed with the 13+ check not passed (C7), its
-        // question in place, the stop screen once answered under 13, then the intro where Sign up
-        // shows it. The shields' screens above keep Emergency Unlock before them.
+        // Signed out: Sign in — or, Sign up pressed (C7), its question in place, the stop screen
+        // once answered under 13, then the intro where Sign up shows it. The shields' screens
+        // above keep Emergency Unlock before them.
         if !signedIn {
             switch age {
             case .asked: return (.age, false)
@@ -89,9 +89,9 @@ public enum Screen: Sendable, Hashable {
         }
         // Signed in, before Screen Time or Home — never over a session's screens, one whose bell
         // has not rung or past it with Session over not closed, nor the home a standing not read
-        // keeps: on a phone that has not passed the check (the gap's fallback, the owner's
-        // decision 2026-10-06), the question, a sign-in Cognito's own pages made around it
-        // reaching Bali's API with nothing until it is answered (`SignIn`'s `cleared`); then Your
+        // keeps: an account that has not passed the check on this phone (the gap's fallback, the
+        // owner's decisions 2026-10-06 and 2026-10-07) gets the question, its sign-in reaching
+        // Bali's API with nothing until it is answered (`SignIn`'s `cleared`); then Your
         // name (the owner's decision, 2026-10-07), for a student's account `GET /v1/me` names with
         // no name. Not known until a read answers: a sign-in made this run holds the starting
         // screen until one answers or fails — the phone's storage failing, none can be tried — so

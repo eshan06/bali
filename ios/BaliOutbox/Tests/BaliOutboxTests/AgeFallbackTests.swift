@@ -26,7 +26,7 @@ struct AgeFallbackTests {
     )
     func nothingBeforeTheAnswer() async throws {
         let passed = Passed()
-        let rig = try await SignedRig(cleared: { passed.value })
+        let rig = try await SignedRig(cleared: { _ in passed.value })
         let unlock = try #require(try await rig.engine.record(.unlock(session: "s", reason: nil)))
         try await rig.signStudentIn(accessToken("a1"))
         // The sign-in sends everything and reads the truth at once: each finds no token to send.
@@ -48,7 +48,7 @@ struct AgeFallbackTests {
     )
     func deletedUnderThirteen() async throws {
         let passed = Passed()
-        let rig = try await SignedRig(cleared: { passed.value })
+        let rig = try await SignedRig(cleared: { _ in passed.value })
         let tap = try #require(try await rig.engine.record(.tap(tagId: "tag")))
         let unlock = try #require(try await rig.engine.record(.unlock(session: "s", reason: nil)))
         try await rig.signStudentIn(scoped("a1"))

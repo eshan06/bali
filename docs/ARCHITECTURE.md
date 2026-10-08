@@ -295,12 +295,13 @@ an archived class never reserves its code forever; a teacher can regenerate it (
   address, slowing requests down before ever blocking them (ISSUES.md #1).
 - **Under 13: not yet.** Accounts for young students carry legal requirements (parental
   consent). *Decided 2026-10-04 (C7, the owner's ruling; built 2026-10-05):* 13+ is the
-  school's agreement plus a neutral in-app age screen — shown when the student taps Sign up
-  with the check not passed on the phone, before the intro and Cognito's sign-up page (the
+  school's agreement plus a neutral in-app age screen — shown when the student taps Sign up,
+  before the intro and Cognito's sign-up page (the
   approved Sign in & sign up design, built 2026-10-07; at Sign in from 2026-10-06, a first
   launch's first screen before that), asking the birth month and year by the FTC's
-  COPPA guidance — that keeps one flag on the
-  phone when the answer is 13 or older (never the date) and nothing at all when it is not: the
+  COPPA guidance — that keeps "passed" on the
+  phone when the answer is 13 or older (never the date; per account since 2026-10-07, below) and
+  nothing at all when it is not: the
   student sees a stop screen, and the server never learns the question was asked. Under-13
   consent itself stays a later decision, for the K-12 pilot.
   *Amended 2026-10-07 (the owner's decision of 2026-10-06, the gap's fallback):* Cognito's own
@@ -317,6 +318,16 @@ an archived class never reserves its code forever; a teacher can regenerate it (
   under a sign-in the server never saw makes the account as it lands, and the deletion
   de-identifies it a moment later, as C3 de-identifies any. An existing student on a new phone
   answers it once.
+  *Amended 2026-10-07 (the owner's rulings; the approved design's version 8): the question per
+  account.* Every Sign up asks it, a second in the same run too, since no account exists yet to
+  have passed it and a second person must never sign up unasked. The phone keeps "passed" per
+  account, the Cognito ids (`sub`) of the accounts that passed on it, never the date: a Sign up's
+  answer files the account its page signs in as the sign-in lands, before Bali's API gets its
+  token, and an answer after a sign-in files that account. A sign-in skips the question only for an
+  account that passed on this phone; any other — another student on a shared phone, an existing
+  student on a new phone, an account made around the question — is asked by the fallback above.
+  The single phone-wide flag builds before kept vouches for no account. A server-side flag that
+  would spare an existing student's new phone is open (PLAN, C7-server).
 
 ## API surface
 
@@ -815,17 +826,19 @@ never covers or delays Emergency Unlock, and its answers never enter the outbox.
   honest promise "off within ~15 minutes", not instant.
 - **The 13+ check never stands between a student and Emergency Unlock** (C7, 2026-10-05; at
   Sign up since 2026-10-07). The router shows the age screen, and the stop screen under 13
-  gets, in Sign in's place once Sign up was pressed with the check not passed, and, signed in on
-  a phone that has not passed it (the gap's fallback, 2026-10-06), before Screen Time and
-  Home. The shields' Focus and the home a standing not read keeps, which hold the exit, come
-  before both, and so do a session's own screens: Unlocked, Protection off and Session over.
+  gets, in Sign in's place once Sign up was pressed, and, signed in with an account that has not
+  passed it on this phone (the gap's fallback, 2026-10-06; per account since 2026-10-07), before
+  Screen Time and Home. The shields' Focus and the home a standing not read keeps, which hold the
+  exit, come before both, and so do a session's own screens: Unlocked, Protection off and Session
+  over.
   Every way to the hosted UI goes through one call (`Phone.signIn`), which, for the sign-up page,
-  asks the check first and then shows the intro where this run has not shown it since its last
-  sign-out (once per account, not per phone: the owner's rulings, 2026-10-07); the sign-in page
-  opens at once, and after an answer under 13 neither opens that run. A first launch opens on
-  Sign in. The sign-in gives Bali's API no token until the check has passed (`SignIn`'s
-  `cleared`, read from the phone's own flag), but an account deletion's (`deletionToken`): Delete
-  account's steps, the outbox and then `DELETE /v1/me`, go whether or not it has.
+  asks the check first, every time, and then shows the intro where this run has not shown it
+  since its last sign-out (once per account, not per phone: the owner's rulings, 2026-10-07); the
+  sign-in page opens at once, and after an answer under 13 neither opens that run. A first launch
+  opens on Sign in. The sign-in gives Bali's API no token until its account has passed the check
+  on this phone (`SignIn`'s `cleared`, asked with the account's Cognito id and read from the
+  phone's own defaults), but an account deletion's (`deletionToken`): Delete account's steps, the
+  outbox and then `DELETE /v1/me`, go whether or not it has.
   The check counts in the Gregorian calendar whatever calendar the phone shows its dates in.
 - **A teacher always sees a real name** (the owner's decision, 2026-10-07; the approved Sign in &
   sign up design's Your name). A student's account `GET /v1/me` names with no name, as
