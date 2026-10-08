@@ -805,10 +805,16 @@ final class Phone {
             problem = "This copy of Bali isn't set up right. Ask your teacher."
             return
         }
+        let transport = URLSessionTransport()
+        // Bali's API gets no token until the account signed in has passed the 13+ check on this
+        // phone, read from its own defaults at each ask (the gap's fallback; C7).
+        let signIn = SignIn(
+            cognito: config.cognito, store: KeychainTokenStore(), transport: transport,
+            cleared: { AgeCheck.passed($0, in: .standard) })
         let outbox: Outbox
         do {
             guard let url = Outbox.appGroupURL else { throw CocoaError(.fileNoSuchFile) }
-            outbox = try Outbox(at: url)
+            outbox = try await Self.outbox(at: url, forgetting: signIn)
         } catch {
             // The error stays, in parentheses: it is what a support request needs.
             problem =
@@ -816,12 +822,6 @@ final class Phone {
             return
         }
         problem = nil
-        let transport = URLSessionTransport()
-        // Bali's API gets no token until the account signed in has passed the 13+ check on this
-        // phone, read from its own defaults at each ask (the gap's fallback; C7).
-        let signIn = SignIn(
-            cognito: config.cognito, store: KeychainTokenStore(), transport: transport,
-            cleared: { AgeCheck.passed($0, in: .standard) })
         let engine = await SyncEngine.make(
             outbox: outbox, api: config.api, signIn: signIn, transport: transport)
         #if DEBUG
@@ -843,6 +843,23 @@ final class Phone {
         }
         Task { await self.follow(signIn) }
         await engine.setForeground(foreground)
+    }
+
+    /// The outbox at `url`, an install's first start forgetting first the sign-in a deleted Bali
+    /// left, through `signIn`'s own Sign out (the owner's ruling, 2026-10-08): iOS keeps the
+    /// Keychain after an app is deleted, never its files, so a reinstall opened signed in as
+    /// whoever used the deleted one. No file at `url` is that first start: the outbox lives in the
+    /// app group's container, which iOS deletes with the app and keeps through an update, and
+    /// every build that signs anyone in makes it at its start, before its sign-in exists. So an
+    /// update finds it, whatever the student did, and without it the Keychain holds no sign-in of
+    /// this install's. The file made next marks the install; a forget that fails throws before it
+    /// is made, so the next start forgets. Nothing else is touched: no engine or enforcer exists
+    /// yet, so Focus, the shields and Emergency Unlock are out of its reach.
+    static func outbox(at url: URL, forgetting signIn: SignIn) async throws -> Outbox {
+        if !FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) {
+            try await signIn.signOut()
+        }
+        return try Outbox(at: url)
     }
 
     /// The scene's phase (`behind`: gone to the background): the engine checks in only in the

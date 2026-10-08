@@ -272,6 +272,8 @@ public struct Outbox: Sendable {
 
     #if canImport(Darwin)
         /// Where the apps keep it: the app group's container, which the extensions can open too.
+        /// No file here is an install's first start (`Phone.outbox(at:forgetting:)`), which forgets
+        /// a deleted install's sign-in: moved, every update would sign its student out.
         public static var appGroupURL: URL? {
             FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup)?
                 .appending(path: "outbox.sqlite")
