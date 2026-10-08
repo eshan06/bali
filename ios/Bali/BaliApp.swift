@@ -38,6 +38,9 @@ final class Phone {
     private(set) var enforcer: Enforcer?
     /// Whether someone is signed in; nil until the Keychain can be read (the phone locked).
     private(set) var signedIn: Bool?
+    /// Whether a sign-in reached Bali's API this run (`forgetMe`), not only kept from the last: the
+    /// router holds the starting screen until `GET /v1/me` answers or fails for it.
+    private(set) var signedInThisRun = false
     /// The engine's state, for the screens; nil until it starts.
     private(set) var sync: SyncState?
     /// What a screen may claim of the shields (rule 3); nil until the enforcer starts.
@@ -74,20 +77,21 @@ final class Phone {
     private(set) var signingIn = false
     private(set) var hostedPage = HostedPage.signIn
     private(set) var signInFailed: SignInError?
-    /// Whether the student has seen the intro (C1): the phone's own flag, in its own defaults —
-    /// not the app group's, which the extensions read. Sign up shows the intro before its page
-    /// until it has been: `introShows`, in Sign in's place, until the page it opens ends without a
-    /// sign-in, or the sign-in it made lands (`signed`), so no Sign in shows between the two.
-    private(set) var introSeen = UserDefaults.standard.bool(forKey: Phone.introSeenKey)
-    static let introSeenKey = "introSeen"
+    /// Whether the student has seen the intro this run (C1): in memory only, never in the phone's
+    /// defaults — once per account, not per phone (the owner's ruling, 2026-10-07): a later run's
+    /// Sign up shows it again, a second account's too, and one whose page closed or could not open.
+    /// Sign up shows the intro before its page until it has been: `introShows`, in Sign in's place,
+    /// until the page it opens ends without a sign-in, or the sign-in it made lands (`signed`), so
+    /// no Sign in shows between the two.
+    private(set) var introSeen = false
     private(set) var introShows = false
-    /// Whether a pass has ever read the Screen Time permission approved (C1b), kept as `introSeen`
-    /// is: Family Controls can read not determined for a moment after a launch (B5a-2), and with
-    /// this set the router routes such a read as approved, so no Screen Time screen flashes on a
-    /// phone that gave it. The check judging the permission off clears it — denied, the marker
-    /// gone (F1b), or not determined for `Enforcer.grace`: a grant taken back, or one that did not
-    /// come back with a restored backup, which restores these defaults — so the grant screen
-    /// returns.
+    /// Whether a pass has ever read the Screen Time permission approved (C1b), kept in the phone's
+    /// own defaults — not the app group's, which the extensions read: Family Controls can read not
+    /// determined for a moment after a launch (B5a-2), and with this set the router routes such a
+    /// read as approved, so no Screen Time screen flashes on a phone that gave it. The check
+    /// judging the permission off clears it — denied, the marker gone (F1b), or not determined for
+    /// `Enforcer.grace`: a grant taken back, or one that did not come back with a restored backup,
+    /// which restores these defaults — so the grant screen returns.
     private(set) var everApproved = UserDefaults.standard.bool(forKey: Phone.everApprovedKey)
     static let everApprovedKey = "screenTimeApproved"
     /// The student `GET /v1/me` last listed in a class on this phone, by their id, kept as
@@ -218,7 +222,7 @@ final class Phone {
     private func choose(_ opened: [Screen]) -> (screen: Screen, tabbed: Bool) {
         Screen.choose(
             problem: problem, deleting: deleting.shows, age: age.answer, intro: introShows,
-            signedIn: signedIn,
+            signedIn: signedIn, signedInThisRun: signedInThisRun,
             protection: protection, everApproved: everApproved, everInClass: everInClass, sync: sync,
             hasClasses: hasClasses, sessionOverClosed: sessionOverClosed, opened: opened, tab: tab,
             now: Date())
@@ -324,7 +328,8 @@ final class Phone {
     /// DeleteUser or done holds (`Deleting.signInChanged`); `pending`, the API has deleted the
     /// account and its Cognito sign-in waits to be — a relaunch (C4b) — so the deletion's screen
     /// shows at once, Try again its one way on. The intro Sign up showed goes with a change too:
-    /// the sign-in its page made has landed.
+    /// the sign-in its page made has landed. A sign-in made this run with no `me` known forgets
+    /// too: a read that failed before it, with no token to send, is not its read (`forgetMe`).
     func signed(
         in signedIn: Bool?, as account: String? = nil, email: String? = nil, pending: Bool = false
     ) {
@@ -340,18 +345,27 @@ final class Phone {
             deleting.signInChanged()
         }
         if pending, deleting == .none { deleting = .pending }
-        if another {
-            sync?.me = nil
-            sync?.meFailed = nil
-            if let engine {
-                forgets += 1
-                Task { await engine.forgetMe() }
-            }
-        }
+        // Made here, not the Keychain read at launch (nil before it).
+        let made = changed && signedIn == true && self.signedIn != nil
+        if another || made && sync?.me == nil { forgetMe() }
         if let account { self.account = account }
         (self.signedIn, self.email) = (signedIn, email)
         if changed { historyDue = signedIn == true && !frozen }
         readDueHistory()
+    }
+
+    /// A sign-in reaching Bali's API this run — made here, or let through by the 13+ check (the
+    /// gap's fallback): what the phone knew of `me`, another student's or a read that failed before
+    /// it, is forgotten and read again (the engine's `forgetMe`), and the router holds the starting
+    /// screen until that read answers or fails, so no screen flashes before Your name
+    /// (`signedInThisRun`; the owner's ruling, 2026-10-07).
+    private func forgetMe() {
+        signedInThisRun = true
+        sync?.me = nil
+        sync?.meFailed = nil
+        guard let engine else { return }
+        forgets += 1
+        Task { await engine.forgetMe() }
     }
 
     /// The history due at a sign-in, read once `me` names who is signed in: a student's, never a
@@ -478,8 +492,9 @@ final class Phone {
     /// Whether the screen shown offers Sign out (C6b): Me, and Join where it is the router's own —
     /// shown to a student in no class and never in one on this phone (#143), who reaches no tab
     /// bar, so not Me: signed in with the wrong account, it is their way out (the riders). One
-    /// once in a class here lands on Home with its tab bar, Me among it.
-    var offersSignOut: Bool { screen == .me || screen == .join && !canGoBack }
+    /// once in a class here lands on Home with its tab bar, Me among it. And Your name, whose only
+    /// other way on is a name (the approved Sign in & sign up design).
+    var offersSignOut: Bool { screen == .me || screen == .name || screen == .join && !canGoBack }
 
     /// Back from the screen opened last, the one under it fading back in (#150) — the keyboard let
     /// go first, at once, so it goes down with the screen it was up for, never left over the next:
@@ -642,7 +657,8 @@ final class Phone {
     /// its page; under 13, kept nowhere, in memory until the app is reopened — and the picks are
     /// let go either way. Nothing until both are picked. Signed in (the gap's fallback), no page
     /// opens: 13 or older lets the sign-in reach Bali's API, everything queued sent and the truth
-    /// read at once; under 13 deletes the account, as Delete account does.
+    /// read at once — the starting screen held until it answers (`forgetMe`); under 13 deletes the
+    /// account, as Delete account does.
     func answerAge(through browser: Browser) async {
         guard let month = birth.month, let year = birth.year else { return }
         age.answered(month: month, year: year, defaults: frozen ? nil : .standard)
@@ -652,15 +668,15 @@ final class Phone {
             deleting.ask()
             return await deleteAccount()
         }
+        forgetMe()
         await retry()
     }
 
-    /// The intro's Sign up, on its last page (C1): the intro seen, kept in the phone's own
-    /// defaults — a frozen fixture's in itself only — and Sign up's page opened through the one
-    /// gate, the intro staying, Signing up… on its button, while the page is open.
+    /// The intro's Sign up, on its last page (C1): the intro seen for this run, in memory only, and
+    /// Sign up's page opened through the one gate, the intro staying, Signing up… on its button,
+    /// while the page is open.
     func sawIntro(through browser: Browser) async {
         introSeen = true
-        if !frozen { UserDefaults.standard.set(true, forKey: Phone.introSeenKey) }
         await signIn(.signUp, through: browser)
     }
 

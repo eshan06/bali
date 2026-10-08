@@ -12,8 +12,8 @@ import UIKit
 // The app target's own tests (B5b-2), hosted in the app on the iOS Simulator: what only the app
 // holds. Everything the app only wires up is tested in its packages, on Linux too.
 
-// One test at a time: several set the phone's own defaults (`ageChecked`, `introSeen`, `inClass`)
-// across their awaits, which another test running between them would read (Claude Review).
+// One test at a time: several set the phone's own defaults (`ageChecked`, `inClass`) across their
+// awaits, which another test running between them would read (Claude Review).
 @MainActor
 @Suite("The app", .serialized)
 struct AppTests {
@@ -436,7 +436,10 @@ struct AppTests {
         signedOut.signed(in: false)
         #expect(signedOut.shown.screen == .signIn && signedOut.history == History())
         signedOut.signed(in: true)
-        #expect(signedOut.shown.screen == .home && signedOut.tab == .home)
+        // The starting screen until a read names who signed in (warn 1's fix), then Home.
+        #expect(signedOut.shown.screen == .starting && signedOut.tab == .home)
+        signedOut.synced(try #require(PreviewFixtures.all["history"]?.sync))
+        #expect(signedOut.shown.screen == .home)
         // Me's Join a class opens Join over it — no tab bar there — and Back returns to Me.
         let fromMe = Phone(fixture: try #require(PreviewFixtures.all["me"]))
         fromMe.open(.join)
@@ -627,7 +630,7 @@ struct AppTests {
         for (name, offers) in [
             ("me", true), ("join", true), ("joinSignOutHeld", true), ("joinFromHome", false),
             ("home", false), ("focus", false), ("signIn", false), ("deleting", false),
-            ("deletingPending", false),
+            ("deletingPending", false), ("name", true),
         ] {
             let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))
             #expect(phone.offersSignOut == offers, "\(name)")
@@ -1227,7 +1230,7 @@ struct AppTests {
         // out, Join is the router's own, keeping what was typed there (santa's round 2).
         let none = try BaliJSON.makeDecoder().decode(
             MeResponse.self,
-            from: Data(#"{"user":{"id":"u","role":"student","displayName":null},"classes":[],"session":null}"#.utf8))
+            from: Data(#"{"user":{"id":"u","role":"student","displayName":"Ana"},"classes":[],"session":null}"#.utf8))
         var armed = state
         armed.me = none
         waiting.open(.home)
@@ -1574,15 +1577,12 @@ struct AppTests {
     }
 
     @Test(
-        "Sign in and sign up, routed (the approved Sign in & sign up design): a first launch opens on Sign in, never the intro or the question; Sign up asks the 13+ question where the phone has not passed it, then shows the intro where it has not been seen — each in Sign in's place, no page opened, no tab bar — and the intro's Sign up opens the sign-up page; with the check passed and the intro not seen, Sign up shows the intro first; Sign in opens its page at once, never the question; a page that did not open lands on Sign in, which says which page it was. The flags as they were before are put back after"
+        "Sign in and sign up, routed (the approved Sign in & sign up design): a first launch opens on Sign in, never the intro or the question; Sign up asks the 13+ question where the phone has not passed it, then shows the intro where it has not been seen — each in Sign in's place, no page opened, no tab bar — and the intro's Sign up opens the sign-up page; with the check passed and the intro not seen, Sign up shows the intro first; Sign in opens its page at once, never the question; a page that did not open lands on Sign in, which says which page it was. The flag as it was before is put back after"
     )
     func signUpRouted() async throws {
         let defaults = UserDefaults.standard
-        let before = (defaults.object(forKey: Phone.introSeenKey), defaults.object(forKey: AgeCheck.key))
-        defer {
-            defaults.set(before.0, forKey: Phone.introSeenKey)
-            defaults.set(before.1, forKey: AgeCheck.key)
-        }
+        let before = defaults.object(forKey: AgeCheck.key)
+        defer { defaults.set(before, forKey: AgeCheck.key) }
         let (pages, notOpened) = (Pages(), "couldn't open. Try again, or ask your teacher.")
         // A first launch, signed out, nothing answered or seen: Sign in.
         let first = PreviewFixtures.State(age: .unanswered, introSeen: false, signedIn: false)
@@ -1611,16 +1611,12 @@ struct AppTests {
     }
 
     @Test(
-        "Sign in and sign up through the phone's own sign-in (the approved Sign in & sign up design): Sign in opens Cognito's sign-in page at once, no question, no intro; Sign up asks the question, then shows the intro, opening no page, and the intro's Sign up opens the sign-up page, `/signup`, to come back to the sign-in's scheme — the intro showing until the page closes, which lands on Sign in; Sign up again opens the page at once, this run or after a relaunch; with the check passed and the intro not seen, the intro, then the page; a page that did not open is said under the buttons, naming its page, and gone at the next press; under 13, no page opens this run, Sign up's or Sign in's. The flags as they were before are put back after"
+        "Sign in and sign up through the phone's own sign-in (the approved Sign in & sign up design): Sign in opens Cognito's sign-in page at once, no question, no intro; Sign up asks the question, then shows the intro, opening no page, and the intro's Sign up opens the sign-up page, `/signup`, to come back to the sign-in's scheme — the intro showing until the page closes, which lands on Sign in; Sign up again this run opens the page at once, and a new run's, the check passed, shows the intro, then the page (once per account, the owner's ruling of 2026-10-07); a page that did not open is said under the buttons, naming its page, and gone at the next press; under 13, no page opens this run, Sign up's or Sign in's. The flag as it was before is put back after"
     )
     func signUpAndSignIn() async throws {
         let defaults = UserDefaults.standard
-        let before = (defaults.object(forKey: Phone.introSeenKey), defaults.object(forKey: AgeCheck.key))
-        defer {
-            defaults.set(before.0, forKey: Phone.introSeenKey)
-            defaults.set(before.1, forKey: AgeCheck.key)
-        }
-        defaults.removeObject(forKey: Phone.introSeenKey)
+        let before = defaults.object(forKey: AgeCheck.key)
+        defer { defaults.set(before, forKey: AgeCheck.key) }
         defaults.removeObject(forKey: AgeCheck.key)
         let pages = Pages()
         /// The path of the page opened last, and the scheme it was to come back to.
@@ -1649,7 +1645,9 @@ struct AppTests {
         #expect(pages.opened.count == 3 && last().0 == "/signup" && !live.introShows)
         let relaunched = try signedOut()
         await relaunched.signIn(.signUp, through: pages.browser)
-        #expect(pages.opened.count == 4 && last().0 == "/signup")
+        #expect(relaunched.introShows && !relaunched.introSeen && pages.opened.count == 3)
+        await relaunched.sawIntro(through: pages.browser)
+        #expect(pages.opened.count == 4 && last().0 == "/signup" && !relaunched.introShows)
         pages.answer = .notOpened("no window")
         await live.signIn(.signUp, through: pages.browser)
         #expect(
@@ -1662,12 +1660,6 @@ struct AppTests {
         pages.answer = .cancelled
         await live.signIn(.signUp, through: pages.browser)
         #expect(pages.opened.count == 7 && live.signInFailed?.words(on: live.hostedPage) == nil)
-        defaults.removeObject(forKey: Phone.introSeenKey)
-        let unseen = try signedOut()
-        await unseen.signIn(.signUp, through: pages.browser)
-        #expect(unseen.introShows && pages.opened.count == 7)
-        await unseen.sawIntro(through: pages.browser)
-        #expect(pages.opened.count == 8 && last().0 == "/signup" && !unseen.introShows)
         defaults.removeObject(forKey: AgeCheck.key)
         let young = try signedOut()
         await young.signIn(.signUp, through: pages.browser)
@@ -1676,21 +1668,17 @@ struct AppTests {
         await young.answerAge(through: pages.browser)
         await young.signIn(.signUp, through: pages.browser)
         await young.signIn(through: pages.browser)
-        #expect(young.age.answer == .tooYoung && pages.opened.count == 8)
+        #expect(young.age.answer == .tooYoung && pages.opened.count == 7)
         #expect(defaults.object(forKey: AgeCheck.key) == nil)
     }
 
     @Test(
-        "A sign-up page that signs the student in keeps the intro until the sign-in lands, so no Sign in shows between the two, and lets it go then: a sign-out later shows Sign in, never the intro (the approved Sign in & sign up design). The flags as they were before are put back after"
+        "A sign-up page that signs the student in keeps the intro until the sign-in lands, so no Sign in shows between the two, and lets it go then: a sign-out later shows Sign in, never the intro (the approved Sign in & sign up design). The flag as it was before is put back after"
     )
     func signUpLands() async throws {
         let defaults = UserDefaults.standard
-        let before = (defaults.object(forKey: Phone.introSeenKey), defaults.object(forKey: AgeCheck.key))
-        defer {
-            defaults.set(before.0, forKey: Phone.introSeenKey)
-            defaults.set(before.1, forKey: AgeCheck.key)
-        }
-        defaults.removeObject(forKey: Phone.introSeenKey)
+        let before = defaults.object(forKey: AgeCheck.key)
+        defer { defaults.set(before, forKey: AgeCheck.key) }
         defaults.set(true, forKey: AgeCheck.key)
         let keychain = Keychain(account: nil)
         let (phone, _) = try standIn(
@@ -1760,11 +1748,24 @@ struct AppTests {
         let before = defaults.object(forKey: AgeCheck.key)
         defer { defaults.set(before, forKey: AgeCheck.key) }
         let pages = Pages()
-        let passing = Phone(fixture: try #require(PreviewFixtures.all["ageAfterSignIn"]))
+        // Gated, every read found no token to send: none answered, one failed.
+        var gated = try #require(PreviewFixtures.all["ageAfterSignIn"])
+        gated.sync?.meFailed = .networkError
+        let passing = Phone(fixture: gated)
         #expect(passing.shown == (.age, false))
         passing.birth = Birth(month: 1, year: 2000)
         await passing.answerAge(through: pages.browser)
-        #expect(passing.age.answer == .passed && passing.shown == (.home, true))
+        // The sign-in reaches Bali now: the starting screen until a read answers (warn 1's fix).
+        #expect(passing.age.answer == .passed && passing.shown == (.starting, false))
+        var read = try #require(gated.sync)
+        read.meFailed = nil
+        read.me = try BaliJSON.makeDecoder().decode(
+            MeResponse.self,
+            from: Data(
+                #"{"user":{"id":"ana","role":"student","displayName":"Ana"},"classes":[{"id":"p3","name":"Period 3","teacher":{"displayName":"Ms. Rivera"},"enrollmentId":"e3"}],"session":null}"#
+                    .utf8))
+        passing.synced(read)
+        #expect(passing.shown == (.home, true))
         let young = Phone(fixture: try #require(PreviewFixtures.all["ageAfterSignIn"]))
         let now = Calendar(identifier: .gregorian).dateComponents([.year, .month], from: Date())
         young.birth = Birth(month: now.month, year: now.year)
@@ -1822,7 +1823,8 @@ struct AppTests {
         passing.birth = Birth(month: 1, year: 2000)
         await passing.answerAge(through: pages.browser)
         try await until { await server.asked.contains("GET /v1/me") }
-        #expect(await server.asked == ["GET /v1/me"] && pages.opened.isEmpty)
+        // Its read once or twice: the failure forgotten reads it again (warn 1's fix).
+        #expect(Set(await server.asked) == ["GET /v1/me"] && pages.opened.isEmpty)
         running.cancel()
         _ = engine
 
@@ -1921,6 +1923,189 @@ struct AppTests {
     }
 
     @Test(
+        "Your name, routed (the owner's decision, 2026-10-07): with Bali not reached yet on a sign-in kept from the last run, Screen Time as before; once a read names a student's account with no name, Your name in its place, no tab bar, Sign out its other way on; named, the router moves on, to Screen Time, then Join; a teacher's account never gets it"
+    )
+    func nameRouted() throws {
+        /// `GET /v1/me`'s answer: an account of `role` named `name` — JSON's, null for none — in
+        /// no class.
+        func user(_ name: String, _ role: String = "student") throws -> MeResponse {
+            try BaliJSON.makeDecoder().decode(
+                MeResponse.self,
+                from: Data(
+                    #"{"user":{"id":"ana","role":"\#(role)","displayName":\#(name)},"classes":[],"session":null}"#
+                        .utf8))
+        }
+        var protection = Protection()
+        (protection.checked, protection.permission) = (true, .notDetermined)
+        var state = SyncState()
+        let phone = Phone(fixture: PreviewFixtures.State(protection: protection, sync: state))
+        #expect(phone.shown == (.screenTime, false))
+        state.me = try user("null")
+        phone.synced(state)
+        #expect(phone.shown == (.name, false) && phone.offersSignOut)
+        state.me = try user(#""Ana Rodriguez""#)
+        phone.synced(state)
+        #expect(phone.shown == (.screenTime, false))
+        protection.permission = .approved
+        let joining = Phone(fixture: PreviewFixtures.State(protection: protection, sync: state))
+        #expect(joining.shown == (.join, false))
+        state.me = try user("null", "teacher")
+        joining.synced(state)
+        #expect(joining.shown == (.join, false))
+    }
+
+    @Test(
+        "No screen flashes before Your name (the owner's ruling, 2026-10-07; the PR's warn 1): a sign-in made this run holds the starting screen, a read that failed before it forgotten, until a read answers — Your name for an account with no name — or fails, when the screens go on; a launch signed in holds nothing, as before"
+    )
+    func nameHeld() throws {
+        let nameless = try BaliJSON.makeDecoder().decode(
+            MeResponse.self,
+            from: Data(
+                #"{"user":{"id":"ana","role":"student","displayName":null},"classes":[],"session":null}"#
+                    .utf8))
+        var protection = Protection()
+        (protection.checked, protection.permission) = (true, .notDetermined)
+        // Signed out, a read made with no token to send: failed.
+        var failed = SyncState()
+        failed.meFailed = .networkError
+        var answered = SyncState()
+        answered.me = nameless
+        let signingUp = Phone(
+            fixture: PreviewFixtures.State(signedIn: false, protection: protection, sync: failed))
+        #expect(signingUp.shown == (.signIn, false))
+        signingUp.signed(in: true, as: "ana")
+        #expect(signingUp.shown == (.starting, false) && signingUp.sync?.meFailed == nil)
+        signingUp.synced(answered)
+        #expect(signingUp.shown == (.name, false))
+        // A read that fails since the sign-in: the screens go on, Your name once one answers.
+        let offline = Phone(
+            fixture: PreviewFixtures.State(signedIn: false, protection: protection, sync: failed))
+        offline.signed(in: true, as: "ana")
+        offline.synced(failed)
+        #expect(offline.shown == (.screenTime, false))
+        offline.synced(answered)
+        #expect(offline.shown == (.name, false))
+        // A launch, the Keychain read signed in: nothing held, as before.
+        let launched = Phone(
+            fixture: PreviewFixtures.State(signedIn: nil, protection: protection, sync: SyncState()))
+        launched.signed(in: true, as: "ana")
+        #expect(launched.shown == (.screenTime, false))
+    }
+
+    @Test(
+        "The hold through the phone's own sign-in and engine (the PR's warn 1): signed out, the engine's read finds no token and fails; once the sign-in lands, that failure is forgotten — a state the engine sent before it shows none — and the engine reads `GET /v1/me` with the new token, its answer the phone's. The flag as it was before is put back after",
+        .timeLimit(.minutes(3)))
+    func nameHeldWiring() async throws {
+        let defaults = UserDefaults.standard
+        let before = defaults.object(forKey: AgeCheck.key)
+        defer { defaults.set(before, forKey: AgeCheck.key) }
+        defaults.set(true, forKey: AgeCheck.key)
+        let server = Names([])
+        let (phone, engine) = try gatedStandIn(server, keychain: Keychain(account: nil))
+        let running = Task { await engine.run() }
+        defer { running.cancel() }
+        phone.signed(in: false)
+        await engine.retryNow()
+        try await until { await engine.state.meFailed == .networkError }
+        let stale = await engine.state
+        phone.synced(stale)
+        let pages = Pages()
+        pages.signsIn = true
+        await phone.signIn(through: pages.browser)
+        phone.signed(in: true, as: "ana")
+        #expect(phone.signedInThisRun && phone.sync?.meFailed == nil)
+        phone.synced(stale)
+        #expect(phone.sync?.meFailed == nil)
+        try await until { await engine.state.me != nil }
+        phone.synced(await engine.state)
+        #expect(phone.sync?.me?.user.displayName == nil && phone.sync?.meFailed == nil)
+        #expect(await server.reads == 1)
+    }
+
+    @Test(
+        "Your name as the approved Sign in & sign up design draws it: its title, its line, the field, its help, then Continue — waiting for a name, Saving… and dimmed while it saves — any refusal or failure under it in Me's words, then Sign out, dimmed while it saves"
+    )
+    func nameScreen() async throws {
+        let title = "What's your name?"
+        let cases: [(String, String, Bool, String?)] = [
+            ("name", "Continue", false, nil), ("nameTyping", "Continue", true, nil),
+            ("nameSaving", "Saving…", false, nil),
+            (
+                "nameTaken", "Continue", true,
+                "A classmate already uses that name. Try another, like adding your last initial."
+            ),
+            ("nameInvalid", "Continue", true, "Bali can't use that name. Try another."),
+            ("nameBlank", "Continue", false, "Type a name to save it."),
+            (
+                "nameCantSave", "Continue", true,
+                "Can't reach the server. Check your connection and try again."
+            ),
+        ]
+        for (name, button, enabled, failure) in cases {
+            let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))
+            #expect(phone.shown == (.name, false), "\(name)")
+            let read = try await elements(of: RootView(phone: phone), once: title)
+            let labels = read.map { $0.label ?? "" }
+            let order =
+                [
+                    title, "Add the name your teachers know you by.", "Name",
+                    "Your teachers see this name.", button,
+                ] + (failure.map { [$0] } ?? []) + ["Sign out"]
+            let at = order.compactMap { labels.firstIndex(of: $0) }
+            #expect(at.count == order.count && at == at.sorted(), "\(name): \(labels)")
+            let action = try #require(read.first { $0.label == button }, "\(name)").traits
+            #expect(action.contains(.button) && action.contains(.notEnabled) == !enabled, "\(name)")
+            let signOut = try #require(read.first { $0.label == "Sign out" }, "\(name)").traits
+            #expect(signOut.contains(.notEnabled) == (name == "nameSaving"), "\(name)")
+        }
+    }
+
+    @Test(
+        "Your name through the phone's own engine: Continue saves the name as Me's card does, `PATCH /v1/me` — a name a classmate uses, or one Bali can't use, said in Me's words, nothing set; a blank one said with nothing sent; no answer said as the Join screen says it, and Continue again goes under the same event id, its replay (rule 4); set, the name is `me`'s at once, the field let go, and the truth read again",
+        .timeLimit(.minutes(3)))
+    func nameWiring() async throws {
+        let taken =
+            #"{"error":{"code":"conflict","reason":"display_name_taken","message":"a classmate already uses that name"}}"#
+        let invalid =
+            #"{"error":{"code":"bad_input","reason":"display_name_invalid","message":"invalid request"}}"#
+        let server = Names([(409, taken), (400, invalid), nil, (200, "")])
+        let (phone, engine) = try standIn(server)
+        let running = Task { await engine.run() }
+        defer { running.cancel() }
+        phone.signed(in: true, as: "ana")
+        await engine.retryNow()
+        try await until { await engine.state.me != nil }
+        phone.synced(await engine.state)
+        #expect(phone.sync?.me?.user.displayName == nil)
+        phone.naming.type("Ana")
+        await phone.saveName()
+        #expect(
+            phone.naming.failure
+                == "A classmate already uses that name. Try another, like adding your last initial.")
+        phone.naming.type("Ana R")
+        await phone.saveName()
+        #expect(phone.naming.failure == "Bali can't use that name. Try another.")
+        phone.naming.type("  ")
+        await phone.saveName()
+        #expect(phone.naming.failure == Naming.blank && !phone.naming.busy)
+        #expect(await server.renames.count == 2)
+        phone.naming.type("Ana Rodriguez")
+        await phone.saveName()
+        #expect(
+            phone.naming.failure == "Can't reach the server. Check your connection and try again.")
+        #expect(phone.naming.name == "Ana Rodriguez" && !phone.naming.busy)
+        await phone.saveName()
+        #expect(phone.naming == Naming())
+        let renames = await server.renames
+        #expect(renames.map(\.displayName) == ["Ana", "Ana R", "Ana Rodriguez", "Ana Rodriguez"])
+        #expect(renames[2].eventId == renames[3].eventId && renames[1].eventId != renames[2].eventId)
+        #expect(await engine.state.me?.user.displayName == "Ana Rodriguez")
+        try await until { await server.reads == 2 }
+        phone.synced(await engine.state)
+        #expect(phone.sync?.me?.user.displayName == "Ana Rodriguez")
+    }
+
+    @Test(
         "The permission once read approved is kept in the phone's own defaults (C1b) — set at a read of approved, cleared once the check judges the permission off (denied, or not determined for the grace), left at a read not determined for a moment — and a fresh Phone reads it back; with it, not determined routes as approved. The flag as it was before is put back after"
     )
     func everApproved() throws {
@@ -1960,12 +2145,12 @@ struct AppTests {
         let before = defaults.object(forKey: Phone.inClassKey)
         defer { defaults.set(before, forKey: Phone.inClassKey) }
         defaults.removeObject(forKey: Phone.inClassKey)
-        /// `GET /v1/me` as it answers student `id`, in `classes`.
+        /// `GET /v1/me` as it answers student `id`, named, in `classes`.
         func me(_ id: String, _ classes: String = "") throws -> MeResponse {
             try BaliJSON.makeDecoder().decode(
                 MeResponse.self,
                 from: Data(
-                    #"{"user":{"id":"\#(id)","role":"student","displayName":null},"classes":[\#(classes)],"session":null}"#
+                    #"{"user":{"id":"\#(id)","role":"student","displayName":"\#(id)"},"classes":[\#(classes)],"session":null}"#
                         .utf8))
         }
         let period3 = #"{"id":"p3","name":"Period 3 — Algebra II","enrollmentId":"e3"}"#
@@ -2072,18 +2257,35 @@ struct AppTests {
     }
 
     @Test(
-        "The intro seen is kept in the phone's own defaults, once its Sign up is pressed: a fresh Phone reads it back (C1a); a first launch, not seen, never opens on it — Sign up shows it (the approved Sign in & sign up design); the flag as it was before is put back after"
+        "The intro is seen once per account, not per phone (the owner's ruling, 2026-10-07): its Sign up keeps it seen for this run alone, in memory, so Sign up again this run opens the page at once, and writes nothing to the phone's defaults, a page closed or not opened alike; a new run's Sign up shows it again, the key a build before kept in the phone's defaults never read; a first launch never opens on it (the approved Sign in & sign up design). The keys as they were before are put back after"
     )
-    func introSeen() async {
-        let defaults = UserDefaults.standard
-        let before = defaults.object(forKey: Phone.introSeenKey)
-        defer { defaults.set(before, forKey: Phone.introSeenKey) }
-        defaults.removeObject(forKey: Phone.introSeenKey)
-        let phone = Phone()
+    func introSeen() async throws {
+        let (defaults, old) = (UserDefaults.standard, "introSeen")
+        let before = (defaults.object(forKey: old), defaults.object(forKey: AgeCheck.key))
+        defer {
+            defaults.set(before.0, forKey: old)
+            defaults.set(before.1, forKey: AgeCheck.key)
+        }
+        // A build before kept the intro seen in the phone's defaults; the 13+ check passed.
+        defaults.set(true, forKey: old)
+        defaults.set(true, forKey: AgeCheck.key)
+        let pages = Pages()
+        let signedOut = { try standIn(StandIn(), keychain: Keychain(account: nil)).0 }
+        let phone = try signedOut()
         #expect(!phone.introSeen && phone.shown.screen == .starting)
-        await phone.sawIntro(through: Pages().browser)
-        #expect(phone.introSeen && Phone().introSeen)
-        #expect(phone.shown.screen == .starting)
+        await phone.signIn(.signUp, through: pages.browser)
+        #expect(phone.introShows && pages.opened.isEmpty)
+        // Its page closed, then one that could not open: the page at once, nothing kept.
+        defaults.removeObject(forKey: old)
+        await phone.sawIntro(through: pages.browser)
+        #expect(phone.introSeen && !phone.introShows && pages.opened.count == 1)
+        pages.answer = .notOpened("no window")
+        await phone.signIn(.signUp, through: pages.browser)
+        #expect(!phone.introShows && pages.opened.count == 2)
+        #expect(defaults.object(forKey: old) == nil)
+        let relaunched = try signedOut()
+        await relaunched.signIn(.signUp, through: pages.browser)
+        #expect(relaunched.introShows && !relaunched.introSeen && pages.opened.count == 2)
     }
 
     @Test(
@@ -2654,6 +2856,53 @@ private actor Deleter: HTTPTransport {
                 throw URLError(.notConnectedToInternet)
             }
             (status, body) = (answer, "{}")
+        default: throw URLError(.notConnectedToInternet)
+        }
+        guard
+            let response = HTTPURLResponse(
+                url: url, statusCode: status, httpVersion: nil, headerFields: nil)
+        else { throw URLError(.badURL) }
+        return (Data(body.utf8), response)
+    }
+}
+
+/// The API as a stand-in answers Your name: `GET /v1/me` with a new student in no class, named as
+/// the last name set — none at first — counting each read; and each `PATCH /v1/me` from `answers`,
+/// in turn — a status and body, or no answer at all when nil — keeping what it carried, a 200 the
+/// name set as A8 answers it; and Cognito's token endpoint with a sign-in's tokens. Anything else
+/// gets no answer.
+private actor Names: HTTPTransport {
+    private var answers: [(status: Int, body: String)?]
+    private var name: String?
+    private(set) var renames: [UpdateMeRequest] = []
+    private(set) var reads = 0
+
+    init(_ answers: [(status: Int, body: String)?]) { self.answers = answers }
+
+    func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        guard let url = request.url else { throw URLError(.badURL) }
+        /// The student, named as the server holds them now.
+        var user: String {
+            let named = name.map { #""\#($0)""# } ?? "null"
+            return #"{"id":"ana","role":"student","displayName":\#(named)}"#
+        }
+        var (status, body) = (200, "")
+        switch (request.httpMethod ?? "", url.path()) {
+        case ("GET", "/v1/me"):
+            reads += 1
+            body = #"{"user":\#(user),"classes":[],"session":null}"#
+        case ("PATCH", "/v1/me"):
+            let sent = try JSONDecoder().decode(UpdateMeRequest.self, from: request.httpBody ?? Data())
+            renames.append(sent)
+            guard !answers.isEmpty, let answer = answers.removeFirst() else {
+                throw URLError(.notConnectedToInternet)
+            }
+            (status, body) = answer
+            if status == 200 {
+                name = sent.displayName
+                body = #"{"outcome":"applied","user":\#(user)}"#
+            }
+        case ("POST", "/oauth2/token"): body = #"{"access_token":"a1","refresh_token":"r1"}"#
         default: throw URLError(.notConnectedToInternet)
         }
         guard

@@ -182,8 +182,8 @@ struct MeView: View {
 }
 
 /// D1's Sign out — held while an Emergency Unlock is unsent, said why with Try again — and why the
-/// last did not finish (C6b): Me's, and Join's where a student in no class reaches nothing else
-/// (`Phone.offersSignOut`). On Me, whose sign-in it ends, under it (#147).
+/// last did not finish (C6b): Me's, Join's where a student in no class reaches nothing else, and
+/// Your name's (`Phone.offersSignOut`). On Me, whose sign-in it ends, under it (#147).
 struct SignOutButton: View {
     let phone: Phone
     /// The email of the sign-in Sign out ends, said under it as its helper (Me's, #147); nil says
