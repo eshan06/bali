@@ -3,6 +3,7 @@ import { and, eq, inArray, sql } from 'drizzle-orm';
 import { getTableConfig, PgTable } from 'drizzle-orm/pg-core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { recordAgeCheck } from '../src/age-checks.js';
 import { registerPushToken } from '../src/device-tokens.js';
 import { newUuidV7 } from '../src/ids.js';
 import { createBlock } from '../src/management.js';
@@ -10,6 +11,7 @@ import { getSessionEvents } from '../src/queries.js';
 import { parseSchoolCommand } from '../src/school-command.js';
 import * as schema from '../src/schema.js';
 import {
+  ageChecks,
   armedTaps,
   blocks,
   classes,
@@ -81,7 +83,7 @@ const LATER = () => fromNow(3 * DAY);
  * that is over, unlocked in it, and has a tap waiting; Ben is in a lesson
  * running past the year's end; Cara is in a class at another school too; Eve's
  * account was made after the year ended. Another school's Dan is untouched.
- * Ana's, Ben's and Dan's phones are registered for pushes.
+ * Ana's, Ben's and Dan's phones are registered for pushes, and the three passed the 13+ check.
  */
 async function seed(tag: string) {
   const [school, other] = await db
@@ -194,6 +196,7 @@ async function seed(tag: string) {
       environment: 'production',
       eventId: newUuidV7(),
     });
+    await recordAgeCheck(db, { userId: student.id, eventId: newUuidV7() });
   }
   return { school, other, rivera, old, ana, ben, cara, dan, eve, bio, art, past: past.session };
 }
@@ -201,6 +204,8 @@ async function seed(tag: string) {
 const userRow = async (id: string) => one(await db.select().from(users).where(eq(users.id, id)));
 const tokensOf = (userId: string) =>
   db.select().from(deviceTokens).where(eq(deviceTokens.userId, userId));
+const ageChecksOf = (userId: string) =>
+  db.select().from(ageChecks).where(eq(ageChecks.userId, userId));
 
 describe('the retention run’s coverage of the schema', () => {
   it('handles every foreign key to users', () => {
@@ -278,6 +283,10 @@ describe('applyRetention (C6b)', () => {
     expect(await tokensOf(s.ana.id)).toEqual([]);
     expect(await tokensOf(s.ben.id)).toHaveLength(1);
     expect(await tokensOf(s.dan.id)).toHaveLength(1);
+    // And her 13+ yes (C7-server); theirs stay.
+    expect(await ageChecksOf(s.ana.id)).toEqual([]);
+    expect(await ageChecksOf(s.ben.id)).toHaveLength(1);
+    expect(await ageChecksOf(s.dan.id)).toHaveLength(1);
     // Mr Old's removed class loses its name; Biology, still taught, keeps its.
     expect(one(await db.select().from(classes).where(eq(classes.id, s.art.id))).name).toBe('');
     expect(one(await db.select().from(classes).where(eq(classes.id, s.bio.id))).name).toBe(
@@ -341,6 +350,7 @@ describe('applyRetention (C6b)', () => {
       events: await db.$count(events),
       armed: await db.$count(armedTaps),
       tokens: await db.$count(deviceTokens),
+      ageChecks: await db.$count(ageChecks),
       classes: await db.select().from(classes).where(eq(classes.schoolId, s.school.id)),
     });
     const before = await snapshot();

@@ -4,6 +4,7 @@ import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { getTableConfig, PgTable } from 'drizzle-orm/pg-core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { recordAgeCheck } from '../src/age-checks.js';
 import { registerPushToken } from '../src/device-tokens.js';
 import { newUuidV7 } from '../src/ids.js';
 import { createBlock } from '../src/management.js';
@@ -11,6 +12,7 @@ import { findOrCreateStudent } from '../src/queries.js';
 import { parseSchoolCommand, shellQuote } from '../src/school-command.js';
 import * as schema from '../src/schema.js';
 import {
+  ageChecks,
   armedTaps,
   blocks,
   classes,
@@ -73,7 +75,7 @@ function one<T>(rows: T[]): T {
  * A school whose teacher came by an invite, with a block, a second invite still
  * open, two classes, Ana (renamed) and Ben in a lesson that is over, Ana's
  * unlock in it, and Ben's tap waiting for the teacher's next Start; both
- * students' phones registered for pushes.
+ * students' phones registered for pushes, and both past the 13+ check.
  */
 async function seed(tag: string) {
   const school = one(
@@ -157,6 +159,7 @@ async function seed(tag: string) {
       environment: 'sandbox',
       eventId: newUuidV7(),
     });
+    await recordAgeCheck(db, { userId: student.id, eventId: newUuidV7() });
   }
   return { school, teacher, block, ana, ben, first, second, past: session, lesson: lesson.session };
 }
@@ -202,6 +205,7 @@ async function rowsOf(s: { school: { id: string }; teacher: { id: string } }) {
     invites: await db.select().from(teacherInvites).where(eq(teacherInvites.schoolId, s.school.id)),
     armed: await db.select().from(armedTaps).where(eq(armedTaps.teacherId, s.teacher.id)),
     tokens: await db.select().from(deviceTokens).where(inArray(deviceTokens.userId, peopleIds)),
+    ageChecks: await db.select().from(ageChecks).where(inArray(ageChecks.userId, peopleIds)),
   };
 }
 
@@ -264,6 +268,9 @@ describe('disposeSchool (C6a)', () => {
     // Its people's phones' tokens are gone (N4).
     expect(before.tokens).toHaveLength(2);
     expect(after.tokens).toEqual([]);
+    // And their 13+ yes (C7-server).
+    expect(before.ageChecks).toHaveLength(2);
+    expect(after.ageChecks).toEqual([]);
     // The redeemed invite stays, the record of who became a teacher; the open one goes.
     expect(after.invites).toHaveLength(1);
     expect(after.invites[0]?.redeemedBy).toBe(s.teacher.id);

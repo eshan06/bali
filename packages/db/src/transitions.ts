@@ -38,6 +38,7 @@ import {
 import { newUuidV7 } from './ids.js';
 import { changedReasons, latestTurn, liveClassWithCode, type UserRow } from './queries.js';
 import {
+  ageChecks,
   armedTaps,
   blocks,
   classes,
@@ -3783,6 +3784,8 @@ export async function deleteAccount(
       // Its phones' device tokens (N4): personal data, and no record of anything, so
       // deleted, not kept. A register behind this finds the account deleted.
       await tx.delete(deviceTokens).where(eq(deviceTokens.userId, me.id));
+      // Its 13+ yes (C7-server), likewise: a yes behind this finds the account deleted.
+      await tx.delete(ageChecks).where(eq(ageChecks.userId, me.id));
 
       await tx
         .update(users)
@@ -3830,6 +3833,7 @@ export const SCHOOL_DISPOSAL_COVERAGE = {
   'teacher_invites.school_id': 'an open invite deleted; a redeemed one kept, naming no one',
   'teacher_invites.redeemed_by': 'kept, its teacher de-identified',
   'device_tokens.user_id': 'deleted: the device tokens of its people (N4)',
+  'age_checks.user_id': 'deleted: the 13+ yes of each person it de-identifies (C7-server)',
 } as const;
 
 export interface DisposeSchoolInput {
@@ -4080,11 +4084,12 @@ async function disposeOnce(tx: Database, input: DisposeSchoolInput): Promise<Dis
 
 /**
  * The accounts `ids` de-identified as a deletion leaves one (C3): no name, no
- * Cognito subject, removed; each rename's names emptied (migration 0015's one
- * rewrite of `events`). The caller holds their rows.
+ * Cognito subject, removed, no 13+ yes; each rename's names emptied (migration
+ * 0015's one rewrite of `events`). The caller holds their rows.
  */
 async function deIdentify(tx: Database, ids: string[], at: Date): Promise<void> {
   if (ids.length === 0) return;
+  await tx.delete(ageChecks).where(inArray(ageChecks.userId, ids));
   await tx
     .update(users)
     // `deletedCognitoId`'s format, set-based: a change to one changes both.
@@ -4220,6 +4225,8 @@ export const RETENTION_COVERAGE = {
     'kept, its teacher de-identified; one redeemed after the year keeps its teacher named',
   'device_tokens.user_id':
     'deleted: the device tokens of a person it de-identifies (N4); a continuing one keeps theirs',
+  'age_checks.user_id':
+    'deleted: the 13+ yes of a person it de-identifies (C7-server); a continuing one keeps theirs',
 } as const;
 
 export interface ApplyRetentionInput {

@@ -1,4 +1,5 @@
 import {
+  type AgeCheckResponse,
   API_ERROR_REASONS,
   API_ERROR_STATUS,
   type ApiErrorBody,
@@ -84,6 +85,7 @@ interface Contract {
   DeleteMeResponse: DeleteMeResponse;
   RegisterPushTokenResponse: RegisterPushTokenResponse;
   RemovePushTokenResponse: RemovePushTokenResponse;
+  AgeCheckResponse: AgeCheckResponse;
   ApiErrorBody: ApiErrorBody;
 }
 export type FixtureType = keyof Contract;
@@ -224,6 +226,7 @@ export const SCHEMAS = {
   RemovePushTokenResponse: object<RemovePushTokenResponse>()({
     outcome: z.enum(REMOVE_PUSH_TOKEN_OUTCOMES),
   }),
+  AgeCheckResponse: object<AgeCheckResponse>()({ passed: z.boolean() }),
   ApiErrorBody: object<ApiErrorBody>()({
     error: object<ApiErrorBody['error']>()({
       code: z.enum(Object.keys(API_ERROR_STATUS) as ApiErrorCode[]),
@@ -275,6 +278,9 @@ export const ENDPOINTS: Record<
   'DELETE /v1/me': { type: 'DeleteMeResponse' },
   'PUT /v1/me/push-token': { type: 'RegisterPushTokenResponse' },
   'DELETE /v1/me/push-token': { type: 'RemovePushTokenResponse' },
+  // The 13+ yes, read right after a sign-in and recorded once answered (C7-server).
+  'GET /v1/me/age-check': { type: 'AgeCheckResponse' },
+  'PUT /v1/me/age-check': { type: 'AgeCheckResponse' },
   // A change of an unlock's reason, keyed by the unlock's own id (A20).
   'PATCH /v1/unlocks/{eventId}': { type: 'UnlockReasonResponse' },
 };

@@ -2,12 +2,14 @@ import type { EventType } from '@bali/shared';
 import { and, asc, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { recordAgeCheck, type RecordAgeCheckResult } from '../src/age-checks.js';
 import { registerPushToken } from '../src/device-tokens.js';
 import { newUuidV7 } from '../src/ids.js';
 import { createBlock, createClass } from '../src/management.js';
 import { findOrCreateStudent, findUserByCognitoId } from '../src/queries.js';
 import { hasSqlState } from '../src/sql-errors.js';
 import {
+  ageChecks,
   armedTaps,
   blocks,
   classes,
@@ -4129,4 +4131,60 @@ describe.runIf(REAL_PG)('device tokens registered under contention (real Postgre
       expect(row, `round ${round}`).toMatchObject({ userId: b.id, eventId: newerId });
     }
   }, 30_000);
+});
+
+describe.runIf(REAL_PG)('the 13+ yes beside a deletion (real Postgres, C7-server)', () => {
+  const student = async (tag: string) =>
+    one(
+      await db
+        .insert(users)
+        .values({ cognitoId: `race-age-${tag}-${newUuidV7()}`, role: 'student' })
+        .returning(),
+    );
+  const checksOf = (userId: string) =>
+    db.select().from(ageChecks).where(eq(ageChecks.userId, userId));
+
+  it('a yes behind a deletion is refused and records nothing; one ahead of it goes with the account', async () => {
+    // Behind: the deletion holds the row (NO KEY UPDATE), so the yes's FOR SHARE
+    // waits, then reads it removed.
+    const late = await student('behind');
+    const deletion = await heldDeletion(late.id);
+    const behind = recordAgeCheck(db, { userId: late.id, eventId: newUuidV7() });
+    behind.catch(() => undefined);
+    try {
+      await waitForBlockedBackend();
+    } finally {
+      deletion.release();
+      await deletion.committed;
+    }
+    expect(await behind).toBe('account_deleted');
+    expect(await checksOf(late.id)).toEqual([]);
+
+    // Ahead: the yes holds the row FOR SHARE until it commits, so the deletion
+    // waits, then deletes the yes it finds.
+    const early = await student('ahead');
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let ran!: (result: RecordAgeCheckResult) => void;
+    const recorded = new Promise<RecordAgeCheckResult>((resolve) => {
+      ran = resolve;
+    });
+    const committed = db.transaction(async (tx) => {
+      ran(await recordAgeCheck(tx, { userId: early.id, eventId: newUuidV7() }));
+      await held;
+    });
+    expect(await recorded).toBe('passed');
+    const deleting = deleteAccount(db, { userId: early.id, eventId: newUuidV7(), at: new Date() });
+    deleting.catch(() => undefined);
+    try {
+      await waitForBlockedBackend();
+    } finally {
+      release();
+      await committed;
+    }
+    expect(await deleting).toEqual({ outcome: 'deleted' });
+    expect(await checksOf(early.id)).toEqual([]);
+  });
 });

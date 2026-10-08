@@ -417,3 +417,19 @@ export const deviceTokens = pgTable(
     check('device_tokens_environment', sql`${t.environment} IN ('sandbox', 'production')`),
   ],
 );
+
+/*
+ * The 13+ check's yes (C7-server; ARCHITECTURE, Auth, "Under 13"): one row per account that
+ * confirmed it is 13 or older, never a birth date or an age, and none for an answer under 13, which
+ * the phone never sends. Written beside the transition engine (`age-checks.ts`). Never unset: only
+ * the account's deletion (C3), a school's disposal (C6a) or the retention run (C6b) deletes it.
+ */
+export const ageChecks = pgTable('age_checks', {
+  userId: uuid('user_id')
+    .primaryKey()
+    .references(() => users.id),
+  /** The eventId of the request that recorded it: a replay finds its own here. */
+  eventId: uuid('event_id').notNull().unique(),
+  /** When the server recorded it, by its own clock. */
+  createdAt: createdAt(),
+});

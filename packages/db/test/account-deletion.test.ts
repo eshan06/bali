@@ -2,12 +2,14 @@ import { sessionReport } from '@bali/shared';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { recordAgeCheck } from '../src/age-checks.js';
 import { registerPushToken } from '../src/device-tokens.js';
 import { newUuidV7 } from '../src/ids.js';
 import { createBlock, createClass } from '../src/management.js';
 import { mintTeacherInvite, recordAgreement, redeemTeacherInvite } from '../src/schools.js';
 import { getSessionEvents, getSessionRoster } from '../src/queries.js';
 import {
+  ageChecks,
   armedTaps,
   blocks,
   classes,
@@ -325,6 +327,24 @@ describe('deleteAccount (C3)', () => {
     });
     expect(late).toEqual({ outcome: 'account_deleted' });
     expect(await tokensOf(ana.id)).toEqual([]);
+  });
+
+  it('deletes its 13+ yes, and leaves a classmate’s (C7-server)', async () => {
+    const { ana, ben } = await seed('c3-age');
+    for (const student of [ana, ben]) {
+      expect(await recordAgeCheck(db, { userId: student.id, eventId: newUuidV7() })).toBe('passed');
+    }
+    const checksOf = (userId: string) =>
+      db.select().from(ageChecks).where(eq(ageChecks.userId, userId));
+
+    await deleteAccount(db, { userId: ana.id, eventId: newUuidV7(), at: new Date() });
+
+    expect(await checksOf(ana.id)).toEqual([]);
+    expect(await checksOf(ben.id)).toHaveLength(1);
+    // A yes that reaches the deleted account records none back.
+    const late = await recordAgeCheck(db, { userId: ana.id, eventId: newUuidV7() });
+    expect(late).toBe('account_deleted');
+    expect(await checksOf(ana.id)).toEqual([]);
   });
 
   it('refuses a teacher with a class or a block, and deletes one with neither', async () => {

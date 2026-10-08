@@ -1,0 +1,24 @@
+{
+  "endpoint": "PUT /v1/me/age-check",
+  "scenario": "A yes whose eventId is not a UUID: a client bug.",
+  "request": {
+    "path": "/v1/me/age-check",
+    "body": {
+      "eventId": "x"
+    }
+  },
+  "status": 400,
+  "type": "ApiErrorBody",
+  "body": {
+    "error": {
+      "code": "bad_input",
+      "message": "invalid request",
+      "details": [
+        {
+          "path": "eventId",
+          "message": "Invalid UUID"
+        }
+      ]
+    }
+  }
+}

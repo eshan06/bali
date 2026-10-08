@@ -1,6 +1,7 @@
 import { getTableConfig, PgTable } from 'drizzle-orm/pg-core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { recordAgeCheck } from '../src/age-checks.js';
 import { registerPushToken } from '../src/device-tokens.js';
 import { newUuidV7 } from '../src/ids.js';
 import { parseSchoolCommand } from '../src/school-command.js';
@@ -63,7 +64,7 @@ const newToken = () => newUuidV7().replace(/-/g, '').repeat(2);
 
 /**
  * Ana in two classes, renamed, in a lesson she unlocked in, armed for the next,
- * her phone registered for pushes; Ben beside her, his registered too.
+ * her phone registered for pushes, past the 13+ check; Ben beside her, his too.
  */
 async function seed(tag: string) {
   const school = one(
@@ -152,7 +153,10 @@ async function seed(tag: string) {
       eventId: newUuidV7(),
     });
   }
-  return { school, teacher, ana, ben, first, second, session, tokens };
+  const ages = { ana: newUuidV7(), ben: newUuidV7() };
+  await recordAgeCheck(db, { userId: ana.id, eventId: ages.ana });
+  await recordAgeCheck(db, { userId: ben.id, eventId: ages.ben });
+  return { school, teacher, ana, ben, first, second, session, tokens, ages };
 }
 
 async function exported(who: string, now = new Date()): Promise<StudentRecord> {
@@ -191,7 +195,7 @@ describe('the export’s coverage of the schema', () => {
 
 describe('exportStudentRecord (C5)', () => {
   it('holds the student’s whole record, and names the classes and lesson it points at', async () => {
-    const { ana, first, second, session, school, tokens } = await seed('c5-whole');
+    const { ana, first, second, session, school, tokens, ages } = await seed('c5-whole');
     const record = await exported(ana.id);
 
     expect(record.format).toBe(STUDENT_RECORD_FORMAT);
@@ -212,6 +216,7 @@ describe('exportStudentRecord (C5)', () => {
     expect(record.deviceTokens).toMatchObject([
       { token: tokens.ana, userId: ana.id, environment: 'production' },
     ]);
+    expect(record.ageCheck).toMatchObject({ userId: ana.id, eventId: ages.ana });
     expect(record.classes).toMatchObject([
       { id: first.id, name: 'Biology', teacherDisplayName: 'Ms Rivera' },
       { id: second.id, name: 'Chemistry', teacherDisplayName: 'Ms Rivera' },
@@ -224,9 +229,10 @@ describe('exportStudentRecord (C5)', () => {
   });
 
   it('carries nothing of another student’s', async () => {
-    const { ana, ben, tokens } = await seed('c5-others');
+    const { ana, ben, tokens, ages } = await seed('c5-others');
     const text = JSON.stringify(await exported(ana.id));
     expect(text).not.toContain(tokens.ben);
+    expect(text).not.toContain(ages.ben);
     expect(text).not.toContain(ben.id);
     expect(text).not.toContain(ben.cognitoId);
     expect(text).not.toContain('Ben c5-others');
@@ -273,6 +279,7 @@ describe('exportStudentRecord (C5)', () => {
     ]) {
       expect(section).toEqual([]);
     }
+    expect(record.ageCheck).toBeNull();
   });
 
   it('exports a deleted account as the deletion left it, by its id only', async () => {
@@ -286,8 +293,9 @@ describe('exportStudentRecord (C5)', () => {
     expect(record.events.map((e) => e.type)).toContain('account_deleted');
     expect(record.events.find((e) => e.type === 'display_name_changed')?.payload).toBeNull();
     expect(record.enrollments.every((e) => e.removedAt !== null)).toBe(true);
-    // Its phone's token went with it (N4).
+    // Its phone's token went with it (N4), and its 13+ yes (C7-server).
     expect(record.deviceTokens).toEqual([]);
+    expect(record.ageCheck).toBeNull();
     expect(JSON.stringify(record)).not.toContain('Ana');
   });
 

@@ -104,6 +104,10 @@ never stored here, no screen can ever show it.
 - `teacher_invites` — one row per invite code the owner mints for a school (Phase 4, T1a):
   the code's hash, never the code, its expiry 14 days on, and the one account that redeemed
   it, once (T1b) — after which the row is never changed or deleted.
+- `age_checks` — one row per account that confirmed it is 13 or older (C7-server, 2026-10-08):
+  the request's `event_id` and when the server recorded it, never a birth date or an age, and none
+  for an answer under 13, which the phone never sends. Never unset: it goes only with the account
+  (C3, C6a, C6b), and is in the student's export (C5).
 - `questions`, `responses`, `decks`, `session_presentations` — a live lesson's questions,
   each student's answer now, the teacher's PDF decks and the slide a session shows (Phase 7;
   "Live lesson", decision 4). Written only by the transition engine, except `decks.object_deleted_at`,
@@ -326,8 +330,18 @@ an archived class never reserves its code forever; a teacher can regenerate it (
   token, and an answer after a sign-in files that account. A sign-in skips the question only for an
   account that passed on this phone; any other — another student on a shared phone, an existing
   student on a new phone, an account made around the question — is asked by the fallback above.
-  The single phone-wide flag builds before kept vouches for no account. A server-side flag that
-  would spare an existing student's new phone is open (PLAN, C7-server).
+  The single phone-wide flag builds before kept vouches for no account.
+  *Amended 2026-10-08 (the owner's decision, C7-server): the yes kept per account, on the server.*
+  So that Sign up or sign in can always be the app's first screen and a student is never asked
+  again on a new phone or after a reinstall, the server keeps, per account, only that the account
+  confirmed 13 or older, never the date or an age: recorded by `PUT /v1/me/age-check`, read by
+  `GET /v1/me/age-check` (API surface). The read makes no account. The app asks it right after a
+  sign-in, one made through Cognito's own sign-up link too, before the question; an account the
+  server has no row for reads not passed, so an under-13 leaves no record in Bali. A teacher's
+  account always reads passed and records nothing: it comes from the school's invite, and the app
+  asks before it knows the role. Once recorded, the yes is never unset; it goes only with the
+  account (C3, C6a, C6b). The app's half, reading it after a sign-in and recording a yes, is the Mac
+  session's; until it ships, the phone keeps "passed" per account as above.
 
 ## API surface
 
@@ -394,6 +408,16 @@ Student app:
   teacher to see. Recorded as a `display_name_changed` event (the name and the one it
   replaced) with no session: a grid shows the new name at its next snapshot. A replay
   applies nothing and answers the name now; a teacher is `403`.
+- `GET /v1/me/age-check` — whether the caller's account confirmed it is 13 or older (C7-server,
+  added 2026-10-08, additive): `{ passed }`. A read that creates nothing: a sign-in the server has
+  no account for, a deleted account's too, is `false`, so the app asks it right after any sign-in,
+  before the 13+ question. A teacher's account is always `true`.
+- `PUT /v1/me/age-check` — the caller's yes, recorded: `{ eventId }`, answered `{ passed: true }`,
+  the account's row made as the boot call makes it. Only that the account passed is kept, with the
+  `eventId` and the server's time, never a birth date or an age. Idempotent on the `eventId`; an
+  account that passed already, under any `eventId`, keeps its first; a teacher's records nothing.
+  An `eventId` another account's yes holds is `409 event_id_conflict`, and one reaching an account
+  deleted on its way `409 account_deleted`, nothing recorded.
 - `POST /v1/taps` — the tap; the response says which outcome happened: joined, armed,
   or switched sessions.
 - **The order the phone acted in** (A12): every record the phone's outbox sends — the

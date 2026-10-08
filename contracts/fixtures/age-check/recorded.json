@@ -1,0 +1,15 @@
+{
+  "endpoint": "PUT /v1/me/age-check",
+  "scenario": "That student answers 13 or older: the yes recorded, the account made.",
+  "request": {
+    "path": "/v1/me/age-check",
+    "body": {
+      "eventId": "00000000-0000-7000-8000-000000000001"
+    }
+  },
+  "status": 200,
+  "type": "AgeCheckResponse",
+  "body": {
+    "passed": true
+  }
+}

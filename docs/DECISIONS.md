@@ -8,6 +8,42 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-08** — **The 13+ yes kept per account, on the server (C7-server)** (the owner's
+  decision, 2026-10-08). The phone kept "passed" per account in its own defaults (2026-10-07), so
+  an existing student was asked again on every new phone and after a reinstall, and the app could
+  not open on Sign up or sign in for everyone. Now the server keeps it: **only that the account
+  confirmed 13 or older**, with the `eventId` that recorded it and the server's time, never a birth
+  date or an age. **Under 13 nothing is ever stored**: the phone sends nothing then. Two additive
+  routes: `GET /v1/me/age-check` → `{ passed }`, and `PUT /v1/me/age-check` `{ eventId }` →
+  `{ passed: true }`. How: **(1) The read makes no account.** The app calls it right after a
+  sign-in, before the question, one made through Cognito's own sign-up link too, so it looks the
+  caller up and creates nothing: no account here reads `false`, a deleted one's too (its subject
+  is gone), and an under-13 leaves no record in Bali. **(2) A teacher's account reads `true`, and
+  its `PUT` records nothing** (a default; the owner's brief said nothing of teachers): a teacher's
+  account comes from the school's invite, and the app asks before `GET /v1/me`, so it cannot know
+  the role first. A teacher is never asked. **(3) Its own table, `age_checks`, beside the engine**
+  (`packages/db/src/age-checks.ts`, as N3's device tokens), keyed by the account (one yes each,
+  never unset) with its `eventId` unique. Not columns on `users`, so the coverage maps, which place
+  every key to `users`, hold it to C3, C5, C6a and C6b as they hold the rest. **(4) Idempotent on
+  the `eventId`.** The yes it recorded is a replay. An account that
+  passed already, under any `eventId`, keeps its first and is answered `passed`. An `eventId`
+  another account's yes holds is `409 event_id_conflict`, checked in this table alone, as N3 checks
+  its own. Two writes meeting at either key are settled by the insert's `ON CONFLICT DO NOTHING`
+  and one read, never a `500`. **(5) Beside a deletion.** The write holds the caller's row `FOR
+  SHARE`, so a deletion (C3) runs wholly before it (`409 account_deleted`, nothing recorded) or
+  after it, and deletes the yes. A `PUT` makes the account's row as the boot call does, so a
+  deleted account's still-valid token makes a fresh one (#289, filed separately). **(6) Personal
+  data.** The account's deletion (C3) deletes it, and so do the school's disposal (C6a) and the
+  retention run (C6b) for each account they de-identify (`deIdentify`), which no sign-in reaches
+  again; a continuing account keeps its yes, and a yes recorded after the year's end keeps no one
+  named (a device token's rule). C5's export carries it as `ageCheck` (additive to
+  `bali.student-record/1`). **(7) The App Store's privacy answers:** no new data type. Apple lists
+  no age type, so the yes rides **Other Data Types**, already declared linked, App Functionality,
+  not tracking, and the privacy manifest needs no change; ⚖️ the lawyer to confirm that reading
+  (`docs/APP-STORE.md`). The age rating's "Age assurance" answer is unchanged: the screen is still
+  self-declared. The app's half is the Mac session's: read it after every sign-in, skip the
+  question when `passed`, and record a yes after an answer of 13 or older.
+
 - **2026-10-08** — **The onboarding path's motion, and Reduce Motion fades** (the owner-approved
   [Sign in & sign up design](https://claude.ai/artifact/McyYhpX1UTq1nU6oCCwPwG), version 8, its
   motion spec; the owner's ruling on Reduce Motion). The screens the router picks cut in at once

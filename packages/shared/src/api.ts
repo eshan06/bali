@@ -151,6 +151,23 @@ export interface DeleteMeResponse {
   outcome: DeleteMeOutcome;
 }
 
+// GET /v1/me/age-check — whether the caller's account confirmed it is 13 or older
+// (C7-server): a read that creates nothing, so the app asks it right after any
+// sign-in, before the 13+ question. PUT /v1/me/age-check records the yes. Only
+// that the account passed is kept, never a birth date or an age.
+export interface AgeCheckResponse {
+  /**
+   * true once the account's yes is recorded, and always for a teacher's, which
+   * comes from the school's invite; false for an account here with none, or no
+   * account here at all.
+   */
+  passed: boolean;
+}
+export interface RecordAgeCheckRequest {
+  /** Client idempotency key (rule 4). */
+  eventId: string;
+}
+
 // PUT /v1/me/push-token — a student registers its phone's APNs device token
 // (N3; ARCHITECTURE, "Push: a doorbell for students"). One phone, one current
 // owner: a token another account registered moves to the caller. Students only
