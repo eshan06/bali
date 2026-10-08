@@ -99,19 +99,18 @@
             "screenTimeError": State(
                 protection: permission(.notDetermined),
                 askFailed: .failed("FamilyControlsError.networkError")),
-            "join": State(sync: standing(.out, me: ana(newcomer: true)), joining: joining()),
+            // Join, only ever opened over Home or Me (the owner's ruling, 2026-10-07): a new
+            // student's from Home's empty state, nothing typed yet (the design's Join board); the
+            // code looked up; refused; and from the Home of one in classes, a code typed.
+            "join": State(sync: standing(.out, me: ana(newcomer: true)), opened: [.join]),
             "joinPreview": State(
                 sync: standing(.out, me: ana(newcomer: true)),
-                joining: joining(opens: period3Preview)),
+                joining: joining(opens: period3Preview), opened: [.join]),
             "joinError": State(
                 sync: standing(.out, me: ana(newcomer: true)),
-                joining: joining(failure: Joining.words(.status(404), .classNotFound))),
+                joining: joining(failure: Joining.words(.status(404), .classNotFound)),
+                opened: [.join]),
             "joinFromHome": State(joining: joining(), opened: [.join]),
-            // In no class, an unlock the bell rang on before it was sent: Sign out waits for it.
-            "joinSignOutHeld": State(
-                sync: queued(
-                    standing(.out, me: ana(newcomer: true)),
-                    .unlock(session: "session", reason: nil))),
             "home": State(),
             "homeLoading": State(sync: standing(.out, me: nil)),
             "homeError": State(sync: standing(.out, me: nil, failed: .networkError)),
@@ -168,8 +167,10 @@
                 sync: reported(standing(.inSession(period3, .unlocked))), opened: [.home]),
             // Period 3 in session, the student not in it (C3c): its card in the hero's place.
             "homeInSession": State(sync: standing(.out, me: ana(inSession: true))),
-            // Removed from her last class (#143): Ana, in a class on this phone before, is in none
-            // now. Home, its card in the hero's place; a newcomer gets Join.
+            // In no class, Home with its card in the hero's place (the approved Sign in & sign up
+            // design): Ana new, never in a class here, not in one yet; and removed from her last
+            // class (#143), in a class on this phone before, in none any more.
+            "homeNew": State(sync: standing(.out, me: ana(newcomer: true))),
             "homeNoClasses": State(sync: standing(.out, me: ana(newcomer: true)), everInClass: true),
             // There, a tap refused for anything but an unknown block (#160's review): the way on
             // is the Try again beside it, as this Home has no Tap in.

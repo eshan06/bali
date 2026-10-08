@@ -8,6 +8,24 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-07** — **Home, never a forced Join** (the owner's ruling of 2026-10-07; the approved
+  [Sign in & sign up design](https://claude.ai/artifact/McyYhpX1UTq1nU6oCCwPwG), version 8, its
+  Home boards). A student in no class lands on Home with its tab bar, past Your name and Screen
+  Time, where the router used to send a student never in a class on this phone to a Join of its own
+  (#143 had already spared one removed from their last class). Why: the forced Join was a dead end
+  with no tabs, and Me holds Sign out, the wrong account's way out. How: **(1) The router has no
+  Join of its own**, so `Screen.choose` no longer takes the classes (`hasClasses`, `everInClass`),
+  and a read saying none closes nothing the student opened (`keepsOpened`): Join opened over Home,
+  its code typed, and a tab chosen stay, as they did for #143's student. **(2) Home's card says
+  which** (`SyncState.noClassesCard(everInClass:)`): never in a class on this phone, "You're not in
+  a class yet. Join one with the class code from your teacher.", the design's new words; removed
+  from their last, or having left it, #143's "You're not in any classes. …". Same card, same Join
+  a class, as the two boards draw it. **(3) Join's Sign out is gone** (`Phone.offersSignOut`): Join
+  is only ever opened over Home or Me now, and Me's Sign out is a tab away. Known limit: the words
+  key on the student last listed in a class on this phone (`inClass`), so on a shared phone where
+  another student was listed since, a removed student reads "not in a class yet". The age question
+  per account, the design's other change, is its own step, for size.
+
 - **2026-10-07** — **Two fixes from the Your name PR's review** (#292's Claude Review warns, the
   owner's approval). **(1) The intro once per account holds within a run too:** a sign-out forgets
   the run's intro seen (`Phone.signed`, every way out: Sign out, a deleted account, Cognito

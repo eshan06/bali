@@ -53,8 +53,8 @@ to Q2–Q7 are the reference for what this file says about it. The approved
 screen designs win over both for the screens they draw: D1 for the student app
 (`docs/PLAN.md`), with the app's
 [Sign in & sign up](https://claude.ai/artifact/McyYhpX1UTq1nU6oCCwPwG) for Sign in, the 13+
-question, the intro, the gap's fallback and Your name (the owner, 2026-10-06 and 2026-10-07;
-drawn in D1's look), and for
+question, the intro, the gap's fallback, Your name and Home in no class (the owner, 2026-10-06
+and 2026-10-07; drawn in D1's look), and for
 the portal the four canvases below. Changing any of
 it is the owner's call, never a side effect of a PR: every user-facing screen
 is designed in Claude Design and approved by the owner before it is built

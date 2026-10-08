@@ -96,12 +96,13 @@ final class Phone {
     private(set) var everApproved = UserDefaults.standard.bool(forKey: Phone.everApprovedKey)
     static let everApprovedKey = "screenTimeApproved"
     /// The student `GET /v1/me` last listed in a class on this phone, by their id, kept as
-    /// `everApproved` is (#143): in no class later, removed from their last or having left it, they
-    /// land on Home and its empty state, never the first-run Join, which a student never in a class
-    /// here still gets. Keyed on the student, so another student signing in never inherits it, a
-    /// late read of the last one's classes included; kept across a sign-out, as the engine keeps
-    /// their classes then (C6b-1), and replaced once another student is listed in a class. A
-    /// fixture's is its own, never the phone's defaults.
+    /// `everApproved` is (#143): in no class later, removed from their last or having left it,
+    /// Home's empty state says they are in none any more, where a student never in a class here is
+    /// told they are not in one yet (the owner's ruling, 2026-10-07: Home for both, never a forced
+    /// Join). Keyed on the student, so another student signing in never inherits it, a late read of
+    /// the last one's classes included; kept across a sign-out, as the engine keeps their classes
+    /// then (C6b-1), and replaced once another student is listed in a class. A fixture's is its
+    /// own, never the phone's defaults.
     private(set) var inClass = UserDefaults.standard.string(forKey: Phone.inClassKey)
     static let inClassKey = "inClass"
     /// The last ask for the Screen Time permission that did not finish (C1b), said on its screen
@@ -165,12 +166,8 @@ final class Phone {
     /// left says and sends nothing more (#140, santa's round 1).
     private var cards = 0
 
-    /// Whether the student is in any class, as the engine's `GET /v1/me` says — a join made since
-    /// counted at once — nil until a read answers (C3). The router shows Join while it is false,
-    /// unless `everInClass`.
-    var hasClasses: Bool? { sync?.hasClasses }
-
-    /// Whether the student `GET /v1/me` names has been listed in a class on this phone (#143).
+    /// Whether the student `GET /v1/me` names has been listed in a class on this phone (#143):
+    /// which words Home's empty state says.
     var everInClass: Bool { listed(sync?.me) }
 
     /// Whether the student `me` names is the one listed in a class on this phone (#143).
@@ -223,10 +220,9 @@ final class Phone {
     private func choose(_ opened: [Screen]) -> (screen: Screen, tabbed: Bool) {
         Screen.choose(
             problem: problem, deleting: deleting.shows, age: age.answer, intro: introShows,
-            signedIn: signedIn, signedInThisRun: signedInThisRun,
-            protection: protection, everApproved: everApproved, everInClass: everInClass, sync: sync,
-            hasClasses: hasClasses, sessionOverClosed: sessionOverClosed, opened: opened, tab: tab,
-            now: Date())
+            signedIn: signedIn, signedInThisRun: signedInThisRun, protection: protection,
+            everApproved: everApproved, sync: sync, sessionOverClosed: sessionOverClosed,
+            opened: opened, tab: tab, now: Date())
     }
 
     private var screen: Screen { shown.screen }
@@ -492,12 +488,11 @@ final class Phone {
         return opened.last == screen && under != screen && under != .waiting
     }
 
-    /// Whether the screen shown offers Sign out (C6b): Me, and Join where it is the router's own —
-    /// shown to a student in no class and never in one on this phone (#143), who reaches no tab
-    /// bar, so not Me: signed in with the wrong account, it is their way out (the riders). One
-    /// once in a class here lands on Home with its tab bar, Me among it. And Your name, whose only
-    /// other way on is a name (the approved Sign in & sign up design).
-    var offersSignOut: Bool { screen == .me || screen == .name || screen == .join && !canGoBack }
+    /// Whether the screen shown offers Sign out (C6b): Me — every student in no class lands on Home
+    /// with its tab bar, so Me is the wrong account's way out (the approved Sign in & sign up
+    /// design), where a Join of the router's own once offered it — and Your name, whose only other
+    /// way on is a name.
+    var offersSignOut: Bool { screen == .me || screen == .name }
 
     /// Back from the screen opened last, the one under it fading back in (#150) — the keyboard let
     /// go first, at once, so it goes down with the screen it was up for, never left over the next:
@@ -511,17 +506,16 @@ final class Phone {
     }
 
     /// The engine's state as it comes: the screens opened over another end as `keepsOpened` says,
-    /// a Join among them starting over unless it still shows, the router's own now (santa, 2) —
-    /// and the tab chosen with them, Home again (C6a). A student listed in a class is kept as
-    /// one (#143). One sent before the engine forgot the last student's `me` comes without it
-    /// (`signed`; #160's review).
+    /// a Join among them starting over unless a try is under way — and the tab chosen with them,
+    /// Home again (C6a). A student listed in a class is kept as one (#143). One sent before the
+    /// engine forgot the last student's `me` comes without it (`signed`; #160's review).
     func synced(_ state: SyncState) {
         var state = state
         if state.forgets < forgets { (state.me, state.meFailed) = (nil, nil) }
         if let me = state.me, !me.classes.isEmpty, me.user.id != inClass {
             keepInClass(me.user.id)
         }
-        let keeps = state.keepsOpened(from: sync, at: Date(), everInClass: listed(state.me))
+        let keeps = state.keepsOpened(from: sync, at: Date())
         let wasHeld = sync.flatMap(SignOutWords.held) != nil
         // The unlock landed: a pick said to wait for it may go now (santa's round 1).
         if pickFailed == UnlockedWords.onItsWay, state.recordedUnlock != sync?.recordedUnlock {
@@ -559,9 +553,8 @@ final class Phone {
         pickFailed = nil
         select(.home)
         guard !opened.isEmpty else { return }
-        let hadJoin = opened.contains(.join)
+        if opened.contains(.join), !joining.busy { joining = Joining() }
         opened = []
-        if hadJoin, screen != .join, !joining.busy { joining = Joining() }
     }
 
     /// Home's Tap in (B6's scan, `SyncEngine.tapIn`): a Bali block's code is the tap — recorded,

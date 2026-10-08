@@ -816,7 +816,7 @@ never covers or delays Emergency Unlock, and its answers never enter the outbox.
 - **The 13+ check never stands between a student and Emergency Unlock** (C7, 2026-10-05; at
   Sign up since 2026-10-07). The router shows the age screen, and the stop screen under 13
   gets, in Sign in's place once Sign up was pressed with the check not passed, and, signed in on
-  a phone that has not passed it (the gap's fallback, 2026-10-06), before Screen Time, Join and
+  a phone that has not passed it (the gap's fallback, 2026-10-06), before Screen Time and
   Home. The shields' Focus and the home a standing not read keeps, which hold the exit, come
   before both, and so do a session's own screens: Unlocked, Protection off and Session over.
   Every way to the hosted UI goes through one call (`Phone.signIn`), which, for the sign-up page,
@@ -830,7 +830,7 @@ never covers or delays Emergency Unlock, and its answers never enter the outbox.
 - **A teacher always sees a real name** (the owner's decision, 2026-10-07; the approved Sign in &
   sign up design's Your name). A student's account `GET /v1/me` names with no name, as
   production's sign-up leaves every new one, gets "What's your name?" after any sign-up or
-  sign-in: where the 13+ question would show, after it, so before Screen Time, Join and Home and
+  sign-in: where the 13+ question would show, after it, so before Screen Time and Home and
   never over a session's screens nor the home a standing not read keeps. Required: Continue saves
   the name as Me does (`PATCH /v1/me`, its refusals Me's), and Sign out is the only other way on.
   Known only from a read: after a sign-in made this run, or one the 13+ check let through, the

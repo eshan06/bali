@@ -1508,7 +1508,7 @@ struct LaunchGraceTests {
             let shown = Screen.choose(
                 problem: nil, deleting: false, age: .passed, intro: false, signedIn: true,
                 signedInThisRun: false, protection: claim,
-                everApproved: true, everInClass: true, sync: sync, hasClasses: true,
+                everApproved: true, sync: sync,
                 sessionOverClosed: nil, opened: [], tab: .home, now: rig.clock.now())
             #expect(shown.screen == (standing == .out ? .home : .focus))
         }
