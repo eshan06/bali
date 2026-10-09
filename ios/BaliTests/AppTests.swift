@@ -2107,6 +2107,84 @@ struct AppTests {
     }
 
     @Test(
+        "The 13+ check Bali could not be reached for, asked again in class (#300's review; the owner's approval, 2026-10-09), through the phone's own sign-in and engine: signed in over a session's Focus with Bali not reached, the question cannot show, so Bali is asked again at the engine's wakes — its first, a Try again — and a yes lets the sign-in through before the bell, the Emergency Unlock made meanwhile sent at once; no yes is asked no more, everything held, the unlock too, and the question shows once the session is over; out of a session the question shows, the way on there, and Bali is not asked again",
+        .timeLimit(.minutes(3)))
+    func ageAgainInClass() async throws {
+        var running: [Task<Void, Never>] = []
+        defer { for task in running { task.cancel() } }
+        var protection = Protection()
+        (protection.checked, protection.permission) = (true, .approved)
+        /// Signed in over `server`, which cannot reach Bali at first: the phone — in class until
+        /// `bell`, where one is given — wired as `start` wires it, its sign-in followed and the
+        /// engine telling it; the engine run, asking the check again at each wake, only once the
+        /// sign-in's own ask has found Bali not reached and the router has the engine's state.
+        func signedIn(_ server: AgeServer, focusedUntil bell: Date?) async throws -> (
+            Phone, SyncEngine
+        ) {
+            await server.letGo()
+            let (phone, engine) = try await gatedStandIn(
+                server, keychain: Keychain(account: "ana"), focusedUntil: bell,
+                protection: protection)
+            let signIn = try #require(phone.signIn)
+            await engine.askAgeAtEachWake { await phone.askAgeAgain() }
+            running += [
+                Task { await phone.follow(signIn) },
+                Task { for await state in await engine.updates() { phone.synced(state) } },
+            ]
+            try await until { phone.ageNow == .unanswered && phone.sync != nil }
+            running.append(Task { await engine.run() })
+            return (phone, engine)
+        }
+        /// How many times `server` was asked for the account's yes.
+        func asks(_ server: AgeServer) async -> Int {
+            await server.asked.filter { $0 == "GET /v1/me/age-check" }.count
+        }
+        let unlock = "POST /v1/sessions/s/unlock"
+
+        // Bali back with a yes: let through in class, before the bell, the unlock sent at once.
+        let back = AgeServer(passed: true, reachable: false)
+        let (inClass, _) = try await signedIn(back, focusedUntil: Date() + 3600)
+        try await until { await asks(back) == 2 }
+        #expect(inClass.ageNow == .unanswered && inClass.shown.screen == .focus)
+        #expect(await inClass.emergencyUnlock() == nil)
+        try await until { inClass.shown.screen == .unlocked }
+        await back.reach()
+        await inClass.retry()
+        try await until { await back.asked.contains(unlock) }
+        #expect(inClass.ageNow == .passed && inClass.shown.screen == .unlocked)
+        #expect(inClass.bell.map { $0 > Date() } == true)
+        #expect(await asks(back) == 3)
+
+        // Bali back with no yes: asked no more, nothing sent, the unlock held; the question once
+        // the session is over.
+        let none = AgeServer(passed: false, reachable: false)
+        let (held, heldEngine) = try await signedIn(none, focusedUntil: Date() + 8)
+        try await until { await asks(none) == 2 }
+        #expect(await held.emergencyUnlock() == nil)
+        await none.reach()
+        await held.retry()
+        try await until { await asks(none) == 3 }
+        await held.retry()
+        try await until { held.shown.screen == .sessionOver }
+        #expect(await asks(none) == 3 && held.ageNow == .unanswered)
+        #expect(Set(await none.asked) == ["GET /v1/me/age-check"])
+        #expect(
+            await heldEngine.state.queued.contains {
+                if case .unlock = $0.change { true } else { false }
+            })
+        #expect(held.closeSessionOver())
+        #expect(held.shown == (.age, false))
+
+        // Out of a session the question shows, the way on there: a wake asks Bali nothing.
+        let away = AgeServer(passed: true, reachable: false)
+        let (out, outEngine) = try await signedIn(away, focusedUntil: nil)
+        await away.reach()
+        await out.retry()
+        try await until { await outEngine.state.meFailed == .networkError }
+        #expect(await asks(away) == 1 && out.shown == (.age, false))
+    }
+
+    @Test(
         "Sign in as the approved Sign in & sign up design draws it: its title, then Sign up and Sign in, each a button; while a page opens its button says so and neither takes a press; a page that could not open is said under the buttons, naming its page, before the caption; and the intro's last page's button is Sign up, Signing up… and dimmed while its page opens, and still once the router has gone on from it, the page closed, so the intro held under the sheet holds still (the approved motion spec)"
     )
     func signInScreen() async throws {
@@ -3197,20 +3275,28 @@ private func standIn(_ server: any HTTPTransport, keychain: Keychain = Keychain(
 /// A phone of the test's own as `Phone.start` makes it, over `server` and a sign-in over
 /// `keychain`: its sign-in gated as the app's is — Bali's API given a token only once it is through
 /// the 13+ check (C7-server) — and its engine made over it as the app makes it (`SyncEngine.make`).
+/// In class where `bell` is given: focused in session `s` until it, a Back to focus queued, as the
+/// file keeps them; and `protection`, what rule 3's check found, where given.
 @MainActor
-private func gatedStandIn(_ server: any HTTPTransport, keychain: Keychain) async throws -> (
-    Phone, SyncEngine
-) {
+private func gatedStandIn(
+    _ server: any HTTPTransport, keychain: Keychain, focusedUntil bell: Date? = nil,
+    protection: Protection? = nil
+) async throws -> (Phone, SyncEngine) {
     let url = FileManager.default.temporaryDirectory.appending(
         path: "phone-\(UUID().uuidString).sqlite")
     let cognito = Cognito(
         domain: URL(string: "https://bali.auth.test")!, clientId: "phone",
         redirectURI: URL(string: "bali://auth/callback")!)
     let signIn = SignIn(cognito: cognito, store: keychain, transport: server, gated: true)
+    let outbox = try Outbox(at: url)
+    if let bell {
+        let focused = Standing.inSession(SessionView(id: "s", classId: "p3", endsAt: bell), .focused)
+        try outbox.record(.refocus(session: "s"), now: Date(), standing: focused)
+    }
     let engine = await SyncEngine.make(
-        outbox: try Outbox(at: url), api: URL(string: "https://api.bali.test")!, signIn: signIn,
+        outbox: outbox, api: URL(string: "https://api.bali.test")!, signIn: signIn,
         transport: server)
-    return (Phone(signIn: signIn, engine: engine), engine)
+    return (Phone(signIn: signIn, engine: engine, protection: protection), engine)
 }
 
 /// Cognito's token endpoint as a stand-in answers each sign-in: with the next of `accounts`'

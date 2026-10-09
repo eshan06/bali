@@ -68,6 +68,9 @@ final class Phone {
     /// `ageNow` reads it: nil while Bali's server is asked for its account's yes (`askAge`), false
     /// once the question shows — no yes, or Bali not reached — and true once through.
     private var cleared: Bool?
+    /// Whether the last ask of Bali's server for that yes got no answer, so it is asked again at
+    /// the engine's wakes while the question cannot show (`askAgeAgain`).
+    private var unreached = false
     /// The age screen's picks, the birth month and year, until Continue answers with them — kept
     /// while the sign-up page it opens is open, as the screen still shows them.
     var birth = Birth()
@@ -208,8 +211,11 @@ final class Phone {
 
         /// A phone over a sign-in and an engine a test made, never started (BaliTests): the calls
         /// `start` wires between them and the screens, tested over stand-ins for the Keychain and
-        /// the server (C6a-2's and C6b-1's reviews).
-        init(signIn: SignIn, engine: SyncEngine) { (self.signIn, self.engine) = (signIn, engine) }
+        /// the server (C6a-2's and C6b-1's reviews) — and, given, what rule 3's check found, so the
+        /// router routes as over a running enforcer.
+        init(signIn: SignIn, engine: SyncEngine, protection: Protection? = nil) {
+            (self.signIn, self.engine, self.protection) = (signIn, engine, protection)
+        }
     #endif
 
     /// The screen to show now, and whether D1's tab bar shows under it (C6a): `Screen.choose`, the
@@ -400,18 +406,30 @@ final class Phone {
     /// read at once, the mark holding until that read answers (`forgetMe`). No — an account made
     /// through Cognito's own sign-up link, or one never confirmed — or Bali not reached, the safe
     /// side, with no screen of its own (the owner's decision, 2026-10-08): the question. Dropped
-    /// once who is signed in has changed.
+    /// once who is signed in has changed, the check passed or answered meanwhile.
     private func askAge() async {
         guard let engine, let signIn else { return }
         let (signIns, account) = (self.signIns, await signIn.account())
-        let passed = await engine.ageCheck().answer?.passed == true
-        guard signIns == self.signIns, cleared == nil else { return }
-        guard passed else { return cleared = false }
+        let answer = await engine.ageCheck().answer
+        guard signIns == self.signIns, cleared != true, !underThirteen else { return }
+        unreached = answer == nil
+        guard answer?.passed == true else { return cleared = false }
         await signIn.passed(account)
-        guard signIns == self.signIns, cleared == nil else { return }
+        guard signIns == self.signIns, cleared != true, !underThirteen else { return }
         cleared = true
         forgetMe()
         await retry()
+    }
+
+    /// At each of the engine's wakes (`SyncEngine.askAgeAtEachWake`) — every 30 s in front, a
+    /// return to the front, a Try again: Bali's server asked again for the account's 13+ yes while
+    /// the last ask could not reach it and the question cannot show — Focus, a session's screens,
+    /// come first — so a yes lets the sign-in through at once, and what it held goes before the
+    /// bell, an Emergency Unlock with it (#300's review; the owner's approval, 2026-10-09). No yes,
+    /// as before: the question once it may show. Never while the question shows: the way on there.
+    func askAgeAgain() async {
+        guard unreached, cleared == false, !underThirteen, screen != .age else { return }
+        await askAge()
     }
 
     /// A sign-in reaching Bali's API this run — made here, or let through by the 13+ check (the
@@ -862,6 +880,7 @@ final class Phone {
         #if DEBUG
             await engine.setTapCap(Bell.deviceCheckCap)
         #endif
+        await engine.askAgeAtEachWake { [weak self] in await self?.askAgeAgain() }
         // The shields follow the engine from its first state — where the phone stood when the app
         // last ran, kept in the app group — so a relaunch never takes them off (B5).
         let enforcer = Enforcer(engine: engine, screenTime: PhoneScreenTime())

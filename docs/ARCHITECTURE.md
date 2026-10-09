@@ -354,7 +354,10 @@ an archived class never reserves its code forever; a teacher can regenerate it (
   account (C3, C6a, C6b). **The app reads and records the server's yes; the phone keeps none**
   (built 2026-10-08). Right after a sign-in not yet through the check, the app reads it, the one
   Bali call a sign-in makes before its age is settled, the starting mark meanwhile: passed, it goes
-  on; not passed, or the server not reached (the safe side, no screen of its own), the question. A
+  on; not passed, or the server not reached (the safe side, no screen of its own), the question.
+  The server not reached while the question cannot show (Focus, a session's screens), the read is
+  asked again at each of the engine's wakes until the server answers, so a yes lets the sign-in
+  through before the bell (2026-10-09, #300's review). A
   Sign up's answer of 13 or older, or the question's after a sign-in, is recorded by `PUT`, kept
   with the sign-in until the server answers it, sent at the engine's wakes and never during an
   account deletion; under 13 sends nothing. What the phone holds is the sign-in's own: whether it is

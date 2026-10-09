@@ -8,6 +8,25 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-09** — **The 13+ check Bali could not be reached for is asked again in class** (#300's
+  review, Reviewer A's warn; the owner's approval). After a sign-in the app asks `GET /v1/me/age-check`
+  before any other Bali call; Bali not reached, it falls back to the question, which never shows
+  over Focus or a session's screens, so in class the check waited for the bell and the sign-in's
+  sends (check-ins, Back to focus, an Emergency Unlock's record) waited with it, reaching the
+  teacher after class. Now, while the last ask got no answer and the question cannot show, the app
+  asks again at each wake of the engine's read loop: every 30 s in front, a return to the front, a
+  Try again, a token come (`SyncEngine.askAgeAtEachWake`, `Phone.askAgeAgain`). A yes lets the
+  sign-in through at once and everything held goes, before the bell. No yes changes nothing from
+  before: asked no more, nothing sent, the question once it may show. **Scoped to while the
+  question cannot show:** out of a session the question shows and is the way on, so a yes arriving
+  there would replace it unasked, a flow no design draws. **Bounded by the engine's own cadence:**
+  one ask per wake, awaited in the loop after rule 3's check, never during an account deletion; no
+  loop or timer of its own, and no network watcher: a network coming back is found at the next
+  wake, within 30 s in front, as every other send finds it. The guard drops an answer once who is
+  signed in changed, the check passed, or the student answered under 13 meanwhile. Emergency Unlock
+  is untouched: acted on at once, its record sent once the sign-in is through. Tests:
+  `AgeFallbackTests.askAgeAtEachWake` (BaliOutbox), `AppTests.ageAgainInClass`.
+
 - **2026-10-09** — **Live lesson: the screens drafted, the defaults confirmed, and saved
   questions** (the owner's picks; Phase 7 stays on hold). Two draft canvases, awaiting the owner's
   sign-off: [Live lesson app screens](https://claude.ai/artifact/CZpFbFuxnRrLcuywtJGfVQ) and
@@ -28,6 +47,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   within a running session" (a draft is never shown to a student) and add steps L3b, L7b and L7c.
   Still the owner's: the canvases' sign-off, the storage provider, backups before answers reach
   prod, and ARCHITECTURE's "Still open" (ARCHITECTURE, "Live lesson", decisions 11 and 12).
+
 - **2026-10-08** — **C7-server's app half: the app reads and records the 13+ yes on Bali's server,
   and the phone keeps no age note** (the owner's decision; the approved [Sign in & sign up
   design](https://claude.ai/artifact/McyYhpX1UTq1nU6oCCwPwG)'s flow map, version 10, which the owner
