@@ -1,4 +1,5 @@
 import {
+  type CognitoSignIn,
   type Database,
   deleteAccount,
   findOrCreateStudent,
@@ -7,6 +8,7 @@ import {
   getLiveParticipation,
   getTaughtClasses,
   hasArmedTap,
+  queueCognitoDeletion,
   renameStudent,
   sessionRunning,
 } from '@bali/db';
@@ -20,7 +22,8 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import { requireAuth } from '../auth/plugin.js';
-import { displayNameFromClaims } from '../auth/verify.js';
+import { type AuthedIdentity, displayNameFromClaims } from '../auth/verify.js';
+import type { SignInDeletions } from '../cognito/sign-in-deletion.js';
 import { DisplayName } from '../display-name.js';
 import { ApiError, parse, parseRequest } from '../errors.js';
 import { mapTransitionError } from './errors.js';
@@ -28,6 +31,15 @@ import { mapTransitionError } from './errors.js';
 const UpdateBody = z.object({ displayName: z.string(), eventId: z.string().uuid() });
 const NewName = z.object({ displayName: DisplayName });
 const DeleteBody = z.object({ eventId: z.string().uuid() });
+
+/** The caller's sign-in (the verifier checked `iss`); a federated one's username is not its sub. */
+function signInOf({ sub, claims: { iss, username } }: AuthedIdentity): CognitoSignIn {
+  return {
+    issuer: iss ?? '',
+    sub,
+    username: typeof username === 'string' && username ? username : sub,
+  };
+}
 
 /**
  * GET /v1/me — the boot call: who am I, my classes, my live session, and
@@ -42,10 +54,16 @@ const DeleteBody = z.object({ eventId: z.string().uuid() });
  *
  * DELETE /v1/me — the caller deletes their own account (C3): the engine's
  * `deleteAccount`, idempotent on `eventId`. A teacher with a class or a block
- * is refused `409 teacher_has_classes`. The Cognito sign-in is the phone's to
- * delete once this answers (C4): this API holds no credential for it.
+ * is refused `409 teacher_has_classes`. The Cognito sign-in goes too
+ * (2026-10-09): queued with the deletion, tried once after it commits, and
+ * retried by the sweep until done; the phone's own DeleteUser (C4) is a first try.
  */
-export function registerMeRoute(app: FastifyInstance, db: Database, clock: () => Date): void {
+export function registerMeRoute(
+  app: FastifyInstance,
+  db: Database,
+  clock: () => Date,
+  signIns: SignInDeletions,
+): void {
   app.get('/v1/me', { preHandler: app.authenticate }, async (request): Promise<MeResponse> => {
     const identity = requireAuth(request);
     const user = await findOrCreateStudent(
@@ -140,12 +158,24 @@ export function registerMeRoute(app: FastifyInstance, db: Database, clock: () =>
     async (request): Promise<DeleteMeResponse> => {
       const identity = requireAuth(request);
       const { eventId } = parseRequest(request, 'body', DeleteBody);
+      const signIn = signInOf(identity);
       // Looked up, never created: a deleted account's sign-in matches no row
       // (`deleteAccount` takes its subject away), so its retry is told the
-      // truth, that there is no account, and never makes a new one.
+      // truth, that there is no account, and never makes a new one. Its
+      // sign-in is queued all the same — a retry's, or one the server never
+      // saw (C7's under-13 fallback) — since that is the caller's to delete.
       const user = await findUserByCognitoId(db, identity.sub);
-      if (!user) return { outcome: 'already_deleted' };
-      return mapTransitionError(() => deleteAccount(db, { userId: user.id, eventId, at: clock() }));
+      let answer: DeleteMeResponse = { outcome: 'already_deleted' };
+      if (user) {
+        answer = await mapTransitionError(() =>
+          deleteAccount(db, { userId: user.id, eventId, at: clock(), signIn }),
+        );
+      } else {
+        await queueCognitoDeletion(db, signIn, clock());
+      }
+      // After the commit, as the Start's push: the sweep retries what this misses.
+      signIns.now();
+      return answer;
     },
   );
 }

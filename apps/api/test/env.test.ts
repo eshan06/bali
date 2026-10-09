@@ -123,3 +123,57 @@ describe('APNS_*: the "class started" push key (N5)', () => {
     );
   });
 });
+
+describe('COGNITO_DELETER_*: the key that deletes a deleted account’s sign-in (2026-10-09)', () => {
+  const keyed = {
+    AUTH_ISSUER: 'https://cognito-idp.us-east-1.amazonaws.com/us-east-1_C55e0fhX8',
+    COGNITO_DELETER_ACCESS_KEY_ID: 'AKIAIOSFODNN7EXAMPLE',
+    COGNITO_DELETER_SECRET_ACCESS_KEY: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
+  };
+  const unset = { COGNITO_DELETER_ACCESS_KEY_ID: '', COGNITO_DELETER_SECRET_ACCESS_KEY: '' };
+
+  async function bootWithDeleter(vars: Record<string, string>) {
+    vi.resetModules();
+    for (const [name, value] of Object.entries({ ...testEnvVars, ...unset, ...vars })) {
+      vi.stubEnv(name, value);
+    }
+    return (await import('../src/env.js')).env;
+  }
+
+  it('unset (or blank) is deletion off, and boots, whatever the issuer', async () => {
+    const env = await bootWithDeleter({});
+    expect([env.COGNITO_DELETER_ACCESS_KEY_ID, env.COGNITO_DELETER_SECRET_ACCESS_KEY]).toEqual([
+      undefined,
+      undefined,
+    ]);
+  });
+
+  it('the two together boot, beside a Cognito pool’s issuer', async () => {
+    expect((await bootWithDeleter(keyed)).COGNITO_DELETER_ACCESS_KEY_ID).toBe(
+      'AKIAIOSFODNN7EXAMPLE',
+    );
+  });
+
+  it('one of the two fails the boot, and the error never echoes the secret', async () => {
+    for (const missing of ['COGNITO_DELETER_ACCESS_KEY_ID', 'COGNITO_DELETER_SECRET_ACCESS_KEY']) {
+      const message = await bootWithDeleter({ ...keyed, [missing]: '' }).then(
+        () => 'booted',
+        (e: Error) => e.message,
+      );
+      expect(message, missing).toMatch(/set together, beside a Cognito pool’s AUTH_ISSUER/);
+      expect(message).not.toContain(keyed.COGNITO_DELETER_SECRET_ACCESS_KEY);
+    }
+  });
+
+  it('beside an issuer that names no Cognito pool, the key fails the boot: it has no pool', async () => {
+    await expect(
+      bootWithDeleter({ ...keyed, AUTH_ISSUER: testEnvVars.AUTH_ISSUER! }),
+    ).rejects.toThrow(/set together, beside a Cognito pool’s AUTH_ISSUER, or not at all/);
+  });
+
+  it('a key id that is no AWS access key id fails the boot', async () => {
+    await expect(
+      bootWithDeleter({ ...keyed, COGNITO_DELETER_ACCESS_KEY_ID: 'aws-key' }),
+    ).rejects.toThrow(/COGNITO_DELETER_ACCESS_KEY_ID: is an AWS access key id/);
+  });
+});

@@ -5,6 +5,8 @@ import Fastify, { type FastifyInstance, type onRouteHookHandler } from 'fastify'
 
 import { registerAuth } from './auth/plugin.js';
 import { createCognitoVerifier, type TokenVerifier } from './auth/verify.js';
+import { cognitoDeleter } from './cognito/admin.js';
+import { signInDeletions } from './cognito/sign-in-deletion.js';
 import type { Env } from './env.js';
 import { registerErrors, routerRefusal } from './errors.js';
 import { registerSecurityHeaders } from './headers.js';
@@ -26,6 +28,7 @@ import { registerSessionsRoute } from './routes/sessions.js';
 import { registerTapsRoute } from './routes/taps.js';
 import { registerTeacherInvitesRoute } from './routes/teacher-invites.js';
 import type { StreamHubOptions } from './sse/hub.js';
+import { sweep } from './sweep.js';
 
 export interface AppDeps {
   /** The database handle. Injected in tests (PGlite); server.ts builds it from DATABASE_URL. */
@@ -64,6 +67,11 @@ export interface AppDeps {
    * over HTTP/2; tests send to a fake.
    */
   apnsTransport?: ApnsTransport;
+  /**
+   * Where Cognito's admin calls go when sign-in deletion is configured (2026-10-09). Unset, the
+   * real fetch; tests answer for Cognito.
+   */
+  cognitoFetch?: typeof fetch;
 }
 
 /**
@@ -129,7 +137,11 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
 
   app.get('/healthz', (): HealthzResponse => ({ status: 'ok', version: API_VERSION }));
   const clock = deps.clock ?? (() => new Date());
-  registerMeRoute(app, deps.db, clock);
+  const deleter = cognitoDeleter(env, deps.cognitoFetch);
+  const signIns = signInDeletions(app, deps.db, deleter, env.AUTH_ISSUER, clock);
+  // Run every minute by the process entry (server.ts), and by the internal route on the cron's call.
+  app.decorate('sweep', (now?: Date) => sweep(deps.db, now, signIns));
+  registerMeRoute(app, deps.db, clock, signIns);
   registerPushTokenRoutes(app, deps.db);
   registerAgeCheckRoutes(app, deps.db);
   registerHistoryRoute(app, deps.db);
@@ -147,7 +159,7 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
   registerReportsRoutes(app, deps.db, clock);
   registerBlocksRoutes(app, deps.db);
   registerFeedRoutes(app, deps.db, deps.stream);
-  registerInternalRoutes(app, deps.db, env.INTERNAL_API_KEY);
+  registerInternalRoutes(app, env.INTERNAL_API_KEY);
 
   return app;
 }

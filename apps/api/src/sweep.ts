@@ -1,7 +1,15 @@
 import { type Database, expireDueSessions, markSilentParticipations } from '@bali/db';
 import type { FastifyInstance } from 'fastify';
 
+import type { SignInDeletions } from './cognito/sign-in-deletion.js';
 import { captureFailure, withSweepMonitor } from './monitoring.js';
+
+declare module 'fastify' {
+  interface FastifyInstance {
+    /** The sweep on this app's database, its sign-in deletions included (`buildApp`). */
+    sweep: (now?: Date) => ReturnType<typeof sweep>;
+  }
+}
 
 /** How often the API sweeps by itself: every minute (hosting decision 3). */
 export const SWEEP_INTERVAL_MS = 60_000;
@@ -9,19 +17,24 @@ export const SWEEP_INTERVAL_MS = 60_000;
 /**
  * The sweep, the minute-tick that keeps derived truth honest: it ends every
  * session past its end time (decision 6), then opens a silence episode for
- * every focused phone gone quiet (decision 7). Both duties are idempotent, so
- * any number may run at once — each API process's own, every minute, and the
- * Railway cron's backup call to `/internal/sweep` (hosting decision 3). By the
- * server's clock; the load gate's timed sweep alone passes its own `now`.
+ * every focused phone gone quiet (decision 7), then tries each deleted
+ * account's Cognito sign-in that is due (`signIns`, 2026-10-09). Each duty is
+ * idempotent, so any number may run at once — each API process's own, every
+ * minute, and the Railway cron's backup call to `/internal/sweep` (hosting
+ * decision 3). By the server's clock; the load gate's timed sweep alone passes
+ * its own `now`.
  */
 export async function sweep(
   db: Database,
   now = new Date(),
+  signIns?: SignInDeletions,
 ): Promise<{ expired: number; wentSilent: number }> {
   // Expire first: a session ending here also ends its live participations, so
   // the silence pass never opens an episode on a phone that just left.
   const expired = await expireDueSessions(db, now);
   const wentSilent = await markSilentParticipations(db, now);
+  // Last: a bell never waits on Cognito.
+  await signIns?.due(now);
   return { expired: expired.length, wentSilent };
 }
 

@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { config } from 'dotenv';
 import { z } from 'zod';
 
+import { COGNITO_ISSUER } from './cognito/admin.js';
+
 // One .env for the whole monorepo, at the repo root (same convention as v2).
 // DOTENV_CONFIG_PATH (dotenv's own convention) overrides it — used by the
 // boot-contract tests, and available for odd deploy layouts.
@@ -125,6 +127,18 @@ const envSchema = z
     APNS_TEAM_ID: blankIsUnset(z.string().regex(APPLE_ID, 'is 10 capitals or numerals').optional()),
     /** The app's bundle id, the push's `apns-topic`; unset, `com.bali.Bali`. */
     APNS_TOPIC: blankIsUnset(z.string().min(1).optional()),
+    /*
+     * Deleting a deleted account's Cognito sign-in (cognito/, 2026-10-09): an IAM user's access
+     * key, allowed only AdminGetUser and AdminDeleteUser on AUTH_ISSUER's pool — both or none.
+     * Unset — the default, and always in tests and dev — the queue waits and nothing is deleted.
+     */
+    COGNITO_DELETER_ACCESS_KEY_ID: blankIsUnset(
+      z
+        .string()
+        .regex(/^[A-Z0-9]{16,128}$/, 'is an AWS access key id')
+        .optional(),
+    ),
+    COGNITO_DELETER_SECRET_ACCESS_KEY: blankIsUnset(z.string().min(16).optional()),
   })
   .superRefine((env, ctx) => {
     const set = [env.APNS_KEY_P8, env.APNS_KEY_ID, env.APNS_TEAM_ID].filter((v) => v !== undefined);
@@ -133,6 +147,17 @@ const envSchema = z
         code: 'custom',
         path: ['APNS_KEY_P8'],
         message: 'APNS_KEY_P8, APNS_KEY_ID and APNS_TEAM_ID are set together or not at all',
+      });
+    }
+    const keyed = [env.COGNITO_DELETER_ACCESS_KEY_ID, env.COGNITO_DELETER_SECRET_ACCESS_KEY].filter(
+      (v) => v !== undefined,
+    ).length;
+    if (keyed === 1 || (keyed === 2 && !COGNITO_ISSUER.test(env.AUTH_ISSUER))) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['COGNITO_DELETER_ACCESS_KEY_ID'],
+        message:
+          'COGNITO_DELETER_ACCESS_KEY_ID and COGNITO_DELETER_SECRET_ACCESS_KEY are set together, beside a Cognito pool’s AUTH_ISSUER, or not at all',
       });
     }
   });
