@@ -8,6 +8,26 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-09** — **Live lesson: the screens drafted, the defaults confirmed, and saved
+  questions** (the owner's picks; Phase 7 stays on hold). Two draft canvases, awaiting the owner's
+  sign-off: [Live lesson app screens](https://claude.ai/artifact/CZpFbFuxnRrLcuywtJGfVQ) and
+  [Live lesson portal screens](https://claude.ai/artifact/BxHbGud1xMeyXLUUvsewHM). The owner picked
+  each recommended option. On the phone: while a question or a slide shows, the ring becomes a
+  strip and Emergency Unlock stays pinned at the bottom; a tap answers and can change until the
+  close, with no Submit; a revealed answer is marked, never red, and no counts reach a phone; a
+  closed question can be hidden; the question comes before the slide; the slide-and-question
+  screen simply scrolls (the class and the time left are not pinned); the consent list gains two
+  lines, and a one-time screen keeps its "never grows without asking you again"; no push and no
+  shield change. On the portal: a "Questions and slides" card on the class page; Present shows the
+  question or the slide, the counts per option only once the question closes; one teacher-wide
+  "Your slides" page; a deck's removal is a plain button and a confirm line (red stays for removing
+  a student or deleting a class); a Questions section in the recap. ARCHITECTURE's decisions 3 and
+  8 stand as written. **Saved questions**, at the owner's request: a teacher writes questions ahead
+  and asks one with a click, from any of their classes; asking sends a copy, so editing a draft
+  changes no result; no editing and no "save for later" in class. They amend decision 2's "only
+  within a running session" (a draft is never shown to a student) and add steps L3b, L7b and L7c.
+  Still the owner's: the canvases' sign-off, the storage provider, backups before answers reach
+  prod, and ARCHITECTURE's "Still open" (ARCHITECTURE, "Live lesson", decisions 11 and 12).
 - **2026-10-08** — **C7-server's app half: the app reads and records the 13+ yes on Bali's server,
   and the phone keeps no age note** (the owner's decision; the approved [Sign in & sign up
   design](https://claude.ai/artifact/McyYhpX1UTq1nU6oCCwPwG)'s flow map, version 10, which the owner

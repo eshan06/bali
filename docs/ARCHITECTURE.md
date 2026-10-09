@@ -966,7 +966,9 @@ slides (Slice 2); each student follows on their own phone, on Bali's own screen.
 2026-10-05 from the research in `docs/ROADMAP-RESEARCH.md` (B); the build is Phase 7 in
 `docs/PLAN.md`, and its decision entry is `docs/DECISIONS.md`, 2026-10-05. **The build is on
 hold by the owner (2026-10-05):** nothing starts until the owner says so; when resumed,
-backend only first (no UI, app or portal changes).
+backend only first (no UI, app or portal changes). The owner's picks of 2026-10-09 (the
+screens' design, the defaults confirmed, and saved questions) follow the ten decisions
+(decisions 11 and 12).
 
 ### The decisions (2026-10-05)
 
@@ -991,9 +993,11 @@ nothing of a live lesson sits in the outbox ahead of an unlock (decision 5).
 - **Any student enrolled in the class whose session is running may answer**: tapped in or
   not, unlocked or focused, protection off included.
 - **Questions and presenting exist only within a running session**, for now: nothing is
-  opened or shown outside one, and a session's end closes what it had open.
+  opened or shown outside one, and a session's end closes what it had open. A teacher's saved
+  questions (decision 12) are drafts kept outside any session, never shown to a student until
+  one is asked.
 
-**3. Defaults recorded as decisions (the owner may change them; PLAN's Open owner items).**
+**3. Defaults recorded as decisions (confirmed by the owner, 2026-10-09).**
 - **One question kind in Slice 1: single choice**, 2–6 options, with an optional correct
   option the teacher may reveal when closing it. The prompt is at most 500 characters, each
   option at most 200; plain text.
@@ -1016,7 +1020,8 @@ nothing of a live lesson sits in the outbox ahead of an unlock (decision 5).
   watching the live counts change while watching one student answer in the room can
   attribute that one step, and 3 answers all on one option tell everyone's. The guard removes
   the trivial cases; showing the breakdown only once the question closes would remove the
-  live one too, and is the owner's option (PLAN's Open owner items).
+  live one too. The owner kept the live breakdown on the teacher's own screen and took it off
+  the projector, which shows the counts only once the question closes (2026-10-09, decision 11).
 
 **4. The data model (additive).** Four tables, each row's id a UUIDv7 (data-model decision 2):
 - `questions` — one row per question: `id`, `session_id`, `prompt`, `options` (jsonb, an
@@ -1233,6 +1238,80 @@ your teacher never sees your answer).
 changes behaviour. Old app builds can't answer and don't poll, so the count is only ever of
 who answered: the portal never calls the rest "didn't answer" or implies the whole class
 could.
+
+### The owner's picks (2026-10-09)
+
+The owner confirmed decision 3's defaults and decision 8's limits as written (the guard at 3
+answers; the reveal at the teacher's choice on each close; the live breakdown on the teacher's
+own screen once the guard allows; decks of at most 25 MB and 200 pages), picked the screens
+below, and added saved questions (decision 12). The screens are drafts on two Claude Design
+canvases, built only once the owner signs them off (CLAUDE.md, Working rules):
+[Live lesson app screens](https://claude.ai/artifact/CZpFbFuxnRrLcuywtJGfVQ) and
+[Live lesson portal screens](https://claude.ai/artifact/BxHbGud1xMeyXLUUvsewHM).
+
+**11. What the screens do.**
+- **The phone.** While a question or a slide shows, the Focus screen's ring becomes a strip
+  under the class's name (the time left and the state's chip), and Emergency Unlock stays
+  pinned at the bottom with the rest scrolling above it, at every text size (decision 1's
+  "where it is"). A tap on an answer sends it, and another tap changes it until the close;
+  there is no Submit. Once revealed, the correct option is marked with a check and the
+  student's own as "Your answer", never red and never an X; no count ever reaches a phone. A
+  closed question stays until another opens (decision 6's "last closed one"), with a Hide
+  that only this phone keeps. With a question and a slide both showing, the question comes
+  first. The same card shows on Unlocked, Screen Time off, and Home for an enrolled student
+  not tapped in. Phones stay foreground-only: no push for a question, and the shield is
+  unchanged.
+- **The consent list** gains two lines: "Your answers to questions, counted only in the
+  class's totals" under Sees, and "Which answer is yours, or whether you answered" under Never
+  sees. The list promises it "never grows without asking you again", so a student who saw the
+  old list sees a one-time screen after the update with the two new lines and Continue.
+- **The portal.** One "Questions and slides" card between the session card and the live grid.
+  While a question or a slide shows, Present shows it in place of the live grid; **while a
+  question is open the projector shows only "N of M answered", and the counts per option only
+  once it closes**, which removes the guard's known limit (decision 3) for the room while the
+  teacher's own screen keeps the live breakdown. Decks live on one teacher-wide "Your slides"
+  page; removing one is a plain button and a confirm line, never red (DESIGN.md keeps red for
+  removing a student or deleting a class). The recap gains a Questions section: totals only,
+  the guard applied.
+
+**12. Saved questions.** A teacher may write questions ahead of class and ask one with a
+click. They amend decision 2's "only within a running session": a saved question is the
+teacher's own draft, kept outside any session and never shown to a student. Asking one opens a
+question through `POST /v1/sessions/{id}/questions` with a copy of its text, so the asked
+question is a snapshot and editing the draft later changes no result. Nothing on the phone
+changes.
+- **Data.** `saved_questions`: `id`, `teacher_id`, `prompt`, `options` (jsonb, 2–6
+  strings), `correct_option` (nullable), `event_id` (unique: the mutation that last wrote it),
+  `created_at`, `updated_at`, `removed_at`. The teacher's, usable in any of their classes;
+  a question's limits (decision 3).
+- **Writers.** The transition engine, as for decks: idempotent on `event_id`, a write locking
+  the draft's row alone.
+- **API** (the teacher's own drafts only; anyone else `403`): `GET /v1/saved-questions` (never a
+  removed one, newest first); `POST /v1/saved-questions` `{ eventId, prompt, options,
+  correctOption? }`; `PUT /v1/saved-questions/{id}` (the same body, replacing the draft whole);
+  `DELETE /v1/saved-questions/{id}` `{ eventId }`. A new refusal, `saved_question_not_found`.
+  S1 matrix rows and the OpenAPI snapshot, as for every route.
+- **Privacy.** The teacher's words, like a question's prompt: the account deletion of a teacher
+  removes their drafts; the disposal and the retention run empty a draft's texts and set
+  `removed_at`; never in a student's export. The coverage guards place `teacher_id`.
+- **In class** the ask card lists the drafts, each with a one-click Ask (no preview: a wrong
+  one is closed), and "Write a new question". Drafts are edited only on the "Your questions"
+  page, and a question written in class is not saved for later.
+
+**Still open** (the owner's, settled before L1 is cut; the recommendation first):
+- `event_id` uniqueness in both directions (PLAN's open design questions): every route that
+  records an `eventId` refuses one that any `responses` or `saved_questions` row holds, as the
+  answers route already checks `events`.
+- The guard wherever counts are read: the recap and the reports read counts through the same
+  guard as the results route.
+- The portal checks a deck's `sha256` as the phone does, refusing a mismatch.
+- The PDF check runs in a separate worker under a hard time limit, so a hostile file can stall
+  only itself, never the API.
+- The load gate measures several classes polling at once behind one school's address, not one
+  class.
+- Production backups are on before answers, education records, are stored on prod (none for
+  the pilot today).
+- The storage provider (decision 8): AWS S3.
 
 ## The six rules
 
