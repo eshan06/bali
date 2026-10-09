@@ -30,7 +30,14 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `sub` is the queued one: not found is done (the phone's own `DeleteUser`, or a hand, got there
   first), another `sub` is done with nothing deleted; anything else is retried. The window between
   the read and the delete is named in a `ponytail:` comment: Cognito has no conditional delete, and
-  closing it would take a person deleting and signing up again within milliseconds. Only rows whose
+  closing it would take a person deleting and signing up again within milliseconds. **Nor a sign-in
+  its person came back to** (santa's round 1, both reviewers; the owner's ruling): deleted with the
+  row left waiting, the phone's own `DeleteUser` lost to a reinstall, the same sign-in signed in
+  again and its first call made a new account, so deleting it later would lock a live student out
+  and strand that account. At every try, before Cognito is called, a live account holding the
+  queued `sub` (a `users` row with it as `cognito_id`) finishes the row with nothing deleted
+  (`came_back`); a sign-in whose first call lands between that read and the delete, milliseconds
+  apart, is a window named in a `ponytail:` comment. Only rows whose
   issuer is this deploy's `AUTH_ISSUER` are tried, and the pool id and region come from
   `AUTH_ISSUER` alone; a pool switch leaves the old pool's rows untried (the owner's to clear).
   **The phone keeps its own `DeleteUser` as a first try**: whichever comes second finds the user gone
@@ -59,7 +66,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the three coverage maps (`STUDENT_RECORD_COVERAGE`, `SCHOOL_DISPOSAL_COVERAGE`,
   `RETENTION_COVERAGE`), which place every foreign key, do not list it. It is deleted once done,
   never exported (C5: not the student's record, and not keyed to the account the export finds),
-  and while the keys are unset it holds those ids until they are set. **C6a and C6b stay as they
+  and while the keys are unset it holds those ids until they are set. While a row waits, its
+  timestamps can link the queued Cognito ids to the deleted account for anyone with database access;
+  this ends when the row is done, so runbook 9 done soon closes it. **C6a and C6b stay as they
   are.** A school's disposal knows each person's `sub`, not their username: AdminGetUser takes a
   local user's `sub` as its username, but a federated user's only by their username, which only
   `ListUsers` (a read of every user) could find; and the runbook's console step, every user at the

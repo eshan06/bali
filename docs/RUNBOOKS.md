@@ -885,7 +885,8 @@ pool), `arn:aws:cognito-idp:us-east-1:<account id>:userpool/<pool id>`, where `<
    **Check:** the deploy's log says `Cognito sign-in deletion is on`, no longer `… is off`, and
    `https://bali-production-09a2.up.railway.app/healthz` answers ok. Within a minute the log may
    show `Cognito sign-in deletion done` lines: sign-ins queued while it was off, deleted now
-   (`"outcome":"deleted"`, or `"gone"` where the phone got there first).
+   (`"outcome":"deleted"`, `"gone"` where the phone got there first, or `"came_back"` where its
+   person signed in again since and the sign-in is kept).
 4. **Check it on dev, end to end,** with a throwaway sign-in deleted through the API alone, so the
    phone's own DeleteUser can't do it instead. In your terminal (`$DEMO_COGNITO_CLIENT_ID` is the
    dev app client the remote demo signs in with, which allows `USER_PASSWORD_AUTH`; the password

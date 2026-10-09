@@ -163,7 +163,8 @@ queues it (`cognito_deletions`: the access token's issuer, username and `sub`), 
 /v1/me` from a sign-in with no account here; after the commit the API deletes it from the pool
 with a key of its own, and its minute sweep retries what is left, a row that keeps failing put off
 longer each time. It never deletes another sign-in: the user is read first and deleted only while
-its `sub` is the one queued, since a username can come back with a new `sub`.
+its `sub` is the one queued, since a username can come back with a new `sub`; nor one its person
+came back to: a live account holding that `sub` again (its first call since made one) keeps it.
 
 **4. A student can be in only one session at a time.** If a student in one session taps
 into another, their first participation is ended and recorded in the `events` table as
@@ -436,7 +437,8 @@ Student app:
   Its key is an IAM user's of its own per environment, allowed only `AdminGetUser` and
   `AdminDeleteUser` on that environment's pool, which `AUTH_ISSUER` names; unset, the queue waits.
   The phone's own `DeleteUser` with its access token (C4) stays a first try: whichever lands second
-  finds the sign-in gone. A refused deletion queues nothing. From that answer the phone sends the API
+  finds the sign-in gone. A sign-in a live account holds again is kept: its person came back. A
+  refused deletion queues nothing. From that answer the phone sends the API
   nothing more — any request would make a fresh account under the same sign-in — and leaves its
   session with no Emergency Unlock (the owner's ruling).
 - `PATCH /v1/me` — the student sets their own display name (A8): `{ displayName, eventId }`,
