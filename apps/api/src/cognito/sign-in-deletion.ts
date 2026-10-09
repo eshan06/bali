@@ -2,6 +2,7 @@ import {
   claimCognitoDeletions,
   type CognitoDeletion,
   type Database,
+  findUserByCognitoId,
   finishCognitoDeletion,
 } from '@bali/db';
 import type { FastifyInstance } from 'fastify';
@@ -47,18 +48,25 @@ export function signInDeletions(
 
   /** One claimed row, tried. A failure of Cognito's is said here; one of ours rejects. */
   const attempt = async (row: CognitoDeletion): Promise<void> => {
-    let outcome: Outcome;
-    try {
-      outcome = await deleteSignIn(row, AbortSignal.timeout(SIGN_IN_DELETION_TIMEOUT_MS));
-    } catch (err) {
-      // Its words name no one: a CognitoError carries Cognito's type and status, never its message.
-      const persistent = row.attempts >= PERSISTENT_FAILURE_TRIES;
-      app.log[persistent ? 'error' : 'warn'](
-        { err, deletion: row.id, attempts: row.attempts },
-        'Cognito sign-in deletion failed; it is tried again later',
-      );
-      if (persistent) captureFailure(err, 'cognito sign-in deletion');
-      return;
+    let outcome: Outcome | 'came_back' = 'came_back';
+    // Its person came back (the owner's ruling, 2026-10-09): a live account holds the sign-in
+    // again, made by its first call since, so the sign-in is theirs to keep. Asked at every try,
+    // before Cognito is called. ponytail: read, then deleted: a sign-in whose first call lands
+    // between this read and AdminDeleteUser (milliseconds apart) still loses it; closing that
+    // would take a lock a sign-in's first call never takes.
+    if (!(await findUserByCognitoId(db, row.sub))) {
+      try {
+        outcome = await deleteSignIn(row, AbortSignal.timeout(SIGN_IN_DELETION_TIMEOUT_MS));
+      } catch (err) {
+        // Its words name no one: a CognitoError carries Cognito's type and status, never its message.
+        const persistent = row.attempts >= PERSISTENT_FAILURE_TRIES;
+        app.log[persistent ? 'error' : 'warn'](
+          { err, deletion: row.id, attempts: row.attempts },
+          'Cognito sign-in deletion failed; it is tried again later',
+        );
+        if (persistent) captureFailure(err, 'cognito sign-in deletion');
+        return;
+      }
     }
     await finishCognitoDeletion(db, row.id);
     const done = { deletion: row.id, attempts: row.attempts, outcome };

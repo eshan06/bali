@@ -1,5 +1,5 @@
 import { cognitoDeletions, type Database, queueCognitoDeletion, users } from '@bali/db';
-import type { DeleteMeResponse } from '@bali/shared';
+import type { DeleteMeResponse, MeResponse } from '@bali/shared';
 import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
@@ -196,6 +196,39 @@ describe('a deleted account’s Cognito sign-in (2026-10-09)', () => {
     expect(calls.filter((call) => call.action === 'AdminDeleteUser')).toHaveLength(1);
     expect(pool.size).toBe(0);
     expect(await queue()).toEqual([]);
+  });
+
+  it('is never deleted once its person came back: a live account holds it again, and the row is done', async () => {
+    // Deleted while the key is unset: the row waits.
+    await settle(deleterOff);
+    const { student } = await seedClassroom(db, 'came-back');
+    pool.set('Google_9009', student.cognitoId);
+    expect((await deleteMe(student.cognitoId, 'Google_9009')).statusCode).toBe(200);
+    await settle(deleterOff);
+    expect(await queue()).toHaveLength(1);
+
+    // The phone's own DeleteUser never landed (a reinstall): the same sign-in comes back, and its
+    // first call makes it a new account.
+    const token = await issuer.sign({
+      sub: student.cognitoId,
+      issuer: POOL,
+      extraClaims: { username: 'Google_9009' },
+    });
+    const me = await app.inject({
+      method: 'GET',
+      url: '/v1/me',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(me.json<MeResponse>().user.id).not.toBe(student.id);
+
+    // The key set, the queued deletion runs: the login stays, and the row is done.
+    await settle(deleterOn);
+    await app.sweep();
+
+    expect(calls).toEqual([]);
+    expect(pool.get('Google_9009')).toBe(student.cognitoId);
+    expect(await queue()).toEqual([]);
+    expect(logged('Cognito sign-in deletion done')).toMatchObject([{ outcome: 'came_back' }]);
   });
 
   it('is not queued for a deletion refused, and Cognito is never called', async () => {
