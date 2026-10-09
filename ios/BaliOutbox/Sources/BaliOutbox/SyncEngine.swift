@@ -284,6 +284,9 @@ public actor SyncEngine {
     /// Rule 3's check of the shields, run at each wake in the foreground — before each check-in,
     /// and out of a session too (C1c): the enforcer's (B5).
     private var check: (@Sendable () async -> Void)?
+    /// The app's own ask of Bali for its sign-in's 13+ yes, again, run at each wake (C7-server):
+    /// `askAgeAtEachWake`.
+    private var ageAgain: (@Sendable () async -> Void)?
     /// `ReconcileStamp.changes`: each change the phone makes, and each answer to one.
     private var changes = 0
     private var foreground = false
@@ -692,6 +695,13 @@ public actor SyncEngine {
         self.check = check
     }
 
+    /// Runs `ask` at each wake of the read loop, behind the app or in front — every 30 s in front,
+    /// a return to the front, a Try again, a token come — but never while an account deletion runs
+    /// (C4): the app's own ask of Bali for its sign-in's 13+ yes, again, while the last could not
+    /// reach Bali and the question cannot show (C7-server; #300's review). One at a time, each
+    /// wake's, so it never runs in a loop of its own.
+    public func askAgeAtEachWake(_ ask: @escaping @Sendable () async -> Void) { ageAgain = ask }
+
     /// A shorter cap than decision 7's on a tap not yet answered — nil: decision 7's — for B5b's
     /// device check, which a Debug build runs at the floor, 15 minutes, rather than wait out 50.
     public func setTapCap(_ cap: TimeInterval?) { state.cap = cap ?? SyncState.tapCap }
@@ -938,6 +948,10 @@ public actor SyncEngine {
             // left open there, a grant taken back is found at a wake, not at the app's next return
             // to the front — and reported nowhere, which the check's own rules see to.
             if foreground { await check?() }
+            // The app's ask of Bali for its sign-in's 13+ yes, again (C7-server; #300's review): a
+            // yes lets the sign-in through, so what it held goes now, the read of the truth below
+            // with it. Never during an account deletion, as nothing of the loops' goes then.
+            if !deleting { await ageAgain?() }
             // Decision 6, the owner's ruling (2026-09-29; C3a): waiting for the teacher's Start,
             // the phone reads the truth at each wake in the foreground — the check-in's cadence —
             // since no answer of its own brings the Start, and no feed does. And out of a session,

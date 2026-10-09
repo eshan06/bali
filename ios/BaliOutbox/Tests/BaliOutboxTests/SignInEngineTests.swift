@@ -57,8 +57,9 @@ struct SignedRig {
     let keychain = MemoryKeychain()
     let running: Task<Void, Never>
 
-    /// `gated`, the sign-in's: whether Bali's API waits on the 13+ check, as the app's does (C7).
-    init(gated: Bool = false) async throws {
+    /// `gated`, the sign-in's: whether Bali's API waits on the 13+ check, as the app's does (C7);
+    /// `age`, the app's ask of that check again, run at each wake of the read loop from its first.
+    init(gated: Bool = false, age: (@Sendable () async -> Void)? = nil) async throws {
         outbox = try makeOutbox().outbox
         let cognito = Cognito(
             domain: URL(string: "https://bali-dev.auth.us-east-1.amazoncognito.com")!,
@@ -70,6 +71,7 @@ struct SignedRig {
         let engine = await SyncEngine.make(
             outbox: outbox, api: URL(string: "https://api.bali.test")!, signIn: signIn,
             transport: server, clock: clock)
+        if let age { await engine.askAgeAtEachWake(age) }
         self.engine = engine
         running = Task { await engine.run() }
     }
