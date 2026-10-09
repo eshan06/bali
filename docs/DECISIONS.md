@@ -8,6 +8,68 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-09** — **The server deletes a deleted account's Cognito sign-in, durably (C3-cognito)**
+  (the owner's decision). Before, the phone's own `DeleteUser` after `DELETE /v1/me` (C4) was the
+  only way the sign-in went: offline at that second, then reinstalled (#299 forgets the old sign-in)
+  or moved to a new phone, the Cognito user stayed for good, the under-13 fallback's (#287) too.
+  **The shape: a queue the deletion writes, and the API drains.** `cognito_deletions` (migration
+  0020) holds the issuer, username and `sub` from the caller's verified access token. `deleteAccount`
+  writes the row in its own transaction, so no deletion commits without it; a `DELETE /v1/me` from a
+  sign-in with no account here (a retry, or C7's under-13 fallback, which the server never saw)
+  queues it from the route, since that sign-in is still the caller's to delete. After the commit the
+  request runs a pass at once, in the background as the Start's push (N5b); the API's minute sweep,
+  and Railway's cron through `/internal/sweep`, run one too. A pass claims up to 10 due rows in one
+  `UPDATE … WHERE id IN (SELECT … FOR UPDATE SKIP LOCKED)` that also counts the try and puts the next
+  off (a minute, doubling, at most an hour), so two instances never take one row, a crash mid-try is
+  retried, and a row that keeps failing stops calling Cognito every minute. Each try is bounded at 5 s.
+  *Weighed:* deleting in the request alone (lost on a crash or a Cognito blip, and with the keys
+  unset); a Cognito-side Lambda (no trigger fires on Bali's deletion); keeping it the phone's alone
+  (the gap the owner closed). **Never another sign-in:** a username can come back (a Google sign-in's
+  `Google_<id>` is the same when its person signs up again, with a new `sub`), and a late retry is
+  likely while the keys are unset. So a try reads the user (AdminGetUser) and deletes only while its
+  `sub` is the queued one: not found is done (the phone's own `DeleteUser`, or a hand, got there
+  first), another `sub` is done with nothing deleted; anything else is retried. The window between
+  the read and the delete is named in a `ponytail:` comment: Cognito has no conditional delete, and
+  closing it would take a person deleting and signing up again within milliseconds. Only rows whose
+  issuer is this deploy's `AUTH_ISSUER` are tried, and the pool id and region come from
+  `AUTH_ISSUER` alone; a pool switch leaves the old pool's rows untried (the owner's to clear).
+  **The phone keeps its own `DeleteUser` as a first try**: whichever comes second finds the user gone
+  (the phone's C4a reads `UserNotFoundException`, and `NotAuthorizedException` then a refused
+  renewal, as done). **Credentials:** `COGNITO_DELETER_ACCESS_KEY_ID` and
+  `COGNITO_DELETER_SECRET_ACCESS_KEY`, both or none, beside a Cognito `AUTH_ISSUER` (else the boot
+  fails), read like `APNS_*`, passed to the signer explicitly and never through AWS's default
+  credential chain, which on a developer's Mac would find an admin profile. Unset — the default,
+  dev and prod until the owner's runbook 9 — the API boots as before, keeps the queue and says so
+  in one boot warning. **One IAM user per environment, each allowed only `cognito-idp:AdminGetUser`
+  and `cognito-idp:AdminDeleteUser` on its own pool's ARN**, over one user for both pools: a leaked
+  dev key can't touch prod, as hosting decision 2 keeps every other key apart; the cost is one more
+  user and key to rotate. **The signing: Node's own crypto, no dependency**, over the AWS SDK's
+  `@aws-sdk/client-cognito-identity-provider` (24 packages and 17 MB, the whole credential-provider
+  chain among them, for two calls). Clearly smaller — about 30 lines of Signature Version 4 — and
+  safe: the secret is only an HMAC key and never logged; a wrong signature fails closed (refused,
+  retried, reported, nothing deleted); the signer reproduces AWS's published `get-vanilla` vector,
+  and matched `@smithy/signature-v4`'s signature for a real AdminGetUser request byte for byte (that
+  vector is pinned in the test). The APNs client (N5a) set the precedent; Phase 7's S3 presigned
+  URLs, if built, take the SDK, and this signer may give way to it then. **Failures:** a try's
+  failure is logged at warn with Cognito's error type and status, never its message, the username,
+  the `sub` or an email (a row is named by its own id); from the third in a row, at error and to
+  Sentry (an AccessDenied from a wrong policy keeps failing, so it is seen); our own database's
+  failure is an error like a 500. **Personal data:** the row is keyed to the Cognito user, not to a
+  `users` row, since a sign-in the server never saw is queued too; so no foreign key to `users`, and
+  the three coverage maps (`STUDENT_RECORD_COVERAGE`, `SCHOOL_DISPOSAL_COVERAGE`,
+  `RETENTION_COVERAGE`), which place every foreign key, do not list it. It is deleted once done,
+  never exported (C5: not the student's record, and not keyed to the account the export finds),
+  and while the keys are unset it holds those ids until they are set. **C6a and C6b stay as they
+  are.** A school's disposal knows each person's `sub`, not their username: AdminGetUser takes a
+  local user's `sub` as its username, but a federated user's only by their username, which only
+  `ListUsers` (a read of every user) could find; and the runbook's console step, every user at the
+  school's email domain, also catches sign-ins that never made a Bali account. Recommended
+  follow-up, its own step: the disposal queues each person it de-identifies by `sub` (every local
+  sign-in goes by itself), the console step kept for what that leaves. The retention run keeps the
+  sign-ins on purpose: it de-identifies a year's records, and a student who continues signs in
+  again with the same sign-in (runbook 1, step 12). Teachers' refusal (`teacher_has_classes`)
+  is unchanged: a refused deletion queues nothing.
+
 - **2026-10-09** — **Live lesson: the screens drafted, the defaults confirmed, and saved
   questions** (the owner's picks; Phase 7 stays on hold). Two draft canvases, awaiting the owner's
   sign-off: [Live lesson app screens](https://claude.ai/artifact/CZpFbFuxnRrLcuywtJGfVQ) and
