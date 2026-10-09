@@ -8,6 +8,49 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-08** — **C7-server's app half: the app reads and records the 13+ yes on Bali's server,
+  and the phone keeps no age note** (the owner's decision; the approved [Sign in & sign up
+  design](https://claude.ai/artifact/McyYhpX1UTq1nU6oCCwPwG)'s flow map, version 10, which the owner
+  approved as the spec). **Sign in:** right after the sign-in, the starting mark while the app asks
+  `GET /v1/me/age-check`, the one Bali call a sign-in makes before its age is settled (it makes no
+  account). Passed, a teacher's account too, on to Your name, Screen Time and Home. Not passed (an
+  account made through Cognito's own Sign up link, or one never confirmed), the question; 13 or
+  older records the yes, under 13 deletes the account as before and sends nothing. **Bali not
+  reached for the check: the question** (the flow map's decision 1 as drawn: the safe side, no new
+  screen), the yes recorded once Bali answers. **Sign up:** the question every time before Cognito's
+  page, as before; its sign-in lands already through the check, with a yes to record. How: **(1)
+  The gate is the sign-in's own.** `SignIn` (`gated`, the app's) gives Bali's API no token until
+  the sign-in is through the check (`Tokens.checked`), but the check's own read and a deletion's
+  (`deletionToken`, `APIClient.forDeletion`, both calls that make no account). It replaces
+  `cleared`, which read the per-account list in the phone's defaults. **(2) What the phone holds is
+  the sign-in's, never an age note.** Whether the sign-in held now is through the check, and a yes
+  not yet sent, live in the Keychain with its tokens: kept through a renewal and a relaunch, so a
+  relaunch neither asks Bali again nor holds a record back, an Emergency Unlock's included, and an
+  offline launch is never asked the question; gone with the sign-in, at a sign-out or a reinstall
+  (#299). No list of who passed, nothing in the defaults, nothing for another account. Keeping
+  nothing at all was weighed: every launch would ask Bali before any record could go, one round
+  trip ahead of an unlock, with a broken read holding them all, and an offline launch would ask the
+  question again; the brief's "never delay Emergency Unlock" rules it out. Yours to rule otherwise.
+  **(3) The yes is durable, and only ever its own account's.** Kept with the sign-in until Bali
+  answers, sent by the engine's read loop at each wake (`PUT /v1/me/age-check` under its one event
+  id, idempotent), so a yes made offline goes when Bali can be reached. Not in the outbox: a record
+  there goes under whoever is signed in when it is sent, and a yes must never be another account's.
+  Never during an account deletion, and counted, so a deletion waits out one on its way: a yes
+  landing after `DELETE /v1/me` would make a fresh account. A refusal for good (a 4xx but 401, 408
+  and 429; only a deletion meanwhile or a spent id can earn one) lets it go, said nowhere: the
+  account is at worst asked once more, at a sign-in where Bali has no yes for it, and the yes is no
+  record a student acted on. **(4) Build 8's note, once** (the flow map's decision 2 as drawn): at
+  the first launch with the Keychain readable, a yes `ageCheckedAccounts` holds for the account
+  signed in is kept with its sign-in to send, then the list and the older phone-wide `ageChecked`
+  are deleted, whoever is signed in; another account listed is asked once at its next sign-in.
+  **Known limits:** a yes not yet sent when its student signs out is forgotten with the sign-in, so
+  that account is asked once more where Bali has no yes for it; a phone signed in on a build before
+  2026-10-07 whose account build 8's note does not list is asked at its next launch out of a
+  session, its API held till then, as build 8 did. Tests: `SignInTests.checked`, `signUpYes`
+  (BaliCore); `AgeFallbackTests`, `AgeTests.keeps`, `ScreenTests` (BaliOutbox);
+  `AppTests.ageFromServer`, `ageNoteMigrated`, `ageAfterSignInWiring`, `signUpLands`,
+  `deleteFromMeUnchecked`.
+
 - **2026-10-08** — **A reinstalled Bali starts fresh** (the owner's ruling, found on TestFlight build
   8; the approved [Sign in & sign up design](https://claude.ai/artifact/McyYhpX1UTq1nU6oCCwPwG)'s
   flow map, version 10: a fresh install, a reinstall and a new phone all open on Sign up or sign

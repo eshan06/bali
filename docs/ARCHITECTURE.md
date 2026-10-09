@@ -333,7 +333,8 @@ an archived class never reserves its code forever; a teacher can regenerate it (
   de-identifies it a moment later, as C3 de-identifies any. An existing student on a new phone
   answers it once.
   *Amended 2026-10-07 (the owner's rulings; the approved design's version 8): the question per
-  account.* Every Sign up asks it, a second in the same run too, since no account exists yet to
+  account* (where the phone kept "passed", superseded 2026-10-08, below). Every Sign up asks it, a
+  second in the same run too, since no account exists yet to
   have passed it and a second person must never sign up unasked. The phone keeps "passed" per
   account, the Cognito ids (`sub`) of the accounts that passed on it, never the date: a Sign up's
   answer files the account its page signs in as the sign-in lands, before Bali's API gets its
@@ -350,8 +351,17 @@ an archived class never reserves its code forever; a teacher can regenerate it (
   server has no row for reads not passed, so an under-13 leaves no record in Bali. A teacher's
   account always reads passed and records nothing: it comes from the school's invite, and the app
   asks before it knows the role. Once recorded, the yes is never unset; it goes only with the
-  account (C3, C6a, C6b). The app's half, reading it after a sign-in and recording a yes, is the Mac
-  session's; until it ships, the phone keeps "passed" per account as above.
+  account (C3, C6a, C6b). **The app reads and records the server's yes; the phone keeps none**
+  (built 2026-10-08). Right after a sign-in not yet through the check, the app reads it, the one
+  Bali call a sign-in makes before its age is settled, the starting mark meanwhile: passed, it goes
+  on; not passed, or the server not reached (the safe side, no screen of its own), the question. A
+  Sign up's answer of 13 or older, or the question's after a sign-in, is recorded by `PUT`, kept
+  with the sign-in until the server answers it, sent at the engine's wakes and never during an
+  account deletion; under 13 sends nothing. What the phone holds is the sign-in's own: whether it is
+  through the check, and a yes not yet sent, in the Keychain with its tokens, so a relaunch neither
+  asks the server again nor holds a record back, and both go with the sign-in (Sign out, a
+  reinstall). Build 8's per-account list is read once: a yes it holds for the account signed in is
+  kept to send, then the list is deleted, whoever is signed in.
 
 ## API surface
 
@@ -860,21 +870,21 @@ never covers or delays Emergency Unlock, and its answers never enter the outbox.
   honest promise "off within ~15 minutes", not instant.
 - **The 13+ check never stands between a student and Emergency Unlock** (C7, 2026-10-05; at
   Sign up since 2026-10-07). The router shows the age screen, and the stop screen under 13
-  gets, in Sign in's place once Sign up was pressed, and, signed in with an account that has not
-  passed it on this phone (the gap's fallback, 2026-10-06; per account since 2026-10-07), before
-  Screen Time and Home. The shields' Focus and the home a standing not read keeps, which hold the
-  exit, come before both, and so do a session's own screens: Unlocked, Protection off and Session
-  over.
+  gets, in Sign in's place once Sign up was pressed, and, signed in with a sign-in not through it
+  (the gap's fallback, 2026-10-06; read from Bali's server since 2026-10-08, the starting mark while
+  it is asked), before Screen Time and Home. The shields' Focus and the home a standing not read
+  keeps, which hold the exit, come before both, and so do a session's own screens: Unlocked,
+  Protection off and Session over.
   Every way to the hosted UI starts at one call (`Phone.signIn`), which, for the sign-up page,
   asks the check first, every time; only that question's Continue and then the intro, shown where
   this run has not shown it since its last sign-out (once per account, not per phone: the owner's
   rulings, 2026-10-07), go on to the page, after an answer of 13 or older that same time
   (`Phone.answerAge`, `sawIntro`, through the private `Phone.open`); the sign-in page opens at
   once, and after an answer under 13 neither opens that run. A first launch
-  opens on Sign in. The sign-in gives Bali's API no token until its account has passed the check
-  on this phone (`SignIn`'s `cleared`, asked with the account's Cognito id and read from the
-  phone's own defaults), but an account deletion's (`deletionToken`): Delete account's steps, the
-  outbox and then `DELETE /v1/me`, go whether or not it has.
+  opens on Sign in. The sign-in gives Bali's API no token until it is through the check (`SignIn`'s
+  `Tokens.checked`: the server's yes read, or 13 or older answered), but the check's own read and
+  an account deletion's (`deletionToken`): Delete account's steps, the outbox and then `DELETE
+  /v1/me`, go whether or not it is.
   The check counts in the Gregorian calendar whatever calendar the phone shows its dates in.
 - **A teacher always sees a real name** (the owner's decision, 2026-10-07; the approved Sign in &
   sign up design's Your name). A student's account `GET /v1/me` names with no name, as

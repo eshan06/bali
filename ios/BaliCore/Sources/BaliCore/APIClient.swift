@@ -26,8 +26,9 @@ public protocol TokenProvider: Sendable {
 
     /// The token an account deletion sends under (C4: the outbox first, then `DELETE /v1/me`;
     /// `APIClient.forDeletion`). `accessToken()`'s, unless a provider gives this one where that
-    /// gives none: the sign-in does while the phone's 13+ check has not passed (C7), so a sign-in
-    /// made around the question and answered under 13 deletes its account as Delete account does.
+    /// gives none: the sign-in does while it is not through the 13+ check (C7), so a sign-in made
+    /// around the question and answered under 13 deletes its account as Delete account does, and
+    /// the check's own read, `GET /v1/me/age-check`, which makes no account either, goes first.
     func deletionToken() async -> String?
 }
 
@@ -166,7 +167,8 @@ public struct APIClient: Sendable {
     }
 
     /// This client with every request under `deletionToken()`: what an account deletion sends (C4),
-    /// the outbox first, then `DELETE /v1/me`.
+    /// the outbox first, then `DELETE /v1/me` — and the 13+ check's read (C7-server), the one call
+    /// a sign-in makes before its age is settled.
     public var forDeletion: APIClient {
         APIClient(
             baseURL: baseURL, tokens: DeletionTokens(tokens: tokens), transport: transport,

@@ -28,8 +28,9 @@ public enum Screen: Sendable, Hashable {
     /// before everything but a start that failed — nothing else is offered from the press to the
     /// end; `age`, the 13+ check (C7) — its question in place of Sign in once Sign up was pressed
     /// (every Sign up asks it: the approved Sign in & sign up design), the stop screen there once
-    /// answered under 13, and, signed in, the account's: not passed on this phone, the question
-    /// before anything but a session's screens; `intro`, whether Sign up shows the intro next,
+    /// answered under 13, and, signed in, the sign-in's: Bali's server asked whether the account
+    /// has its yes, the starting mark, and no yes, the question, before anything but a session's
+    /// screens (C7-server); `intro`, whether Sign up shows the intro next,
     /// before its page (C1) — a first launch opens on Sign in, and Sign in shows none;
     /// `signedIn`, nil until the Keychain could be read; `signedInThisRun`, whether a sign-in
     /// reached Bali's API this run — made here, or let through by the 13+ check passed under it —
@@ -84,14 +85,15 @@ public enum Screen: Sendable, Hashable {
             switch age {
             case .asked: return (.age, false)
             case .tooYoung: return (.tooYoung, false)
-            case .unanswered, .passed: return (intro ? .intro : .signIn, false)
+            case .unanswered, .passed, .checking: return (intro ? .intro : .signIn, false)
             }
         }
         // Signed in, before Screen Time or Home — never over a session's screens, one whose bell
         // has not rung or past it with Session over not closed, nor the home a standing not read
-        // keeps: an account that has not passed the check on this phone (the gap's fallback, the
-        // owner's decisions 2026-10-06 and 2026-10-07) gets the question, its sign-in reaching
-        // Bali's API with nothing until it is answered (`SignIn`'s `cleared`); then Your
+        // keeps: a sign-in not through the check holds the starting mark while Bali's server is
+        // asked for its account's yes (C7-server), and gets the question with none (the gap's
+        // fallback, the owner's decisions 2026-10-06 and 2026-10-08), its sign-in reaching Bali's
+        // API with nothing until it is answered (`SignIn`'s `Tokens.checked`); then Your
         // name (the owner's decision, 2026-10-07), for a student's account `GET /v1/me` names with
         // no name. Not known until a read answers: a sign-in made this run holds the starting
         // screen until one answers or fails — the phone's storage failing, none can be tried — so
@@ -104,6 +106,7 @@ public enum Screen: Sendable, Hashable {
             break
         case .unread: break
         case .inSession, .waiting, .out:
+            if age == .checking { return (.starting, false) }
             if age != .passed { return (age == .tooYoung ? .tooYoung : .age, false) }
             if signedInThisRun, sync.me == nil, sync.meFailed == nil, sync.link != .storageFailed {
                 return (.starting, false)

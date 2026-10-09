@@ -57,9 +57,8 @@ struct SignedRig {
     let keychain = MemoryKeychain()
     let running: Task<Void, Never>
 
-    /// `cleared`, the sign-in's: whether the account signed in has passed the phone's 13+ check
-    /// (C7's fallback).
-    init(cleared: @escaping @Sendable (String?) -> Bool = { _ in true }) async throws {
+    /// `gated`, the sign-in's: whether Bali's API waits on the 13+ check, as the app's does (C7).
+    init(gated: Bool = false) async throws {
         outbox = try makeOutbox().outbox
         let cognito = Cognito(
             domain: URL(string: "https://bali-dev.auth.us-east-1.amazoncognito.com")!,
@@ -67,7 +66,7 @@ struct SignedRig {
         let clock = clock
         signIn = SignIn(
             cognito: cognito, store: keychain, transport: server, now: { clock.now() },
-            cleared: cleared)
+            gated: gated)
         let engine = await SyncEngine.make(
             outbox: outbox, api: URL(string: "https://api.bali.test")!, signIn: signIn,
             transport: server, clock: clock)
@@ -75,10 +74,15 @@ struct SignedRig {
         running = Task { await engine.run() }
     }
 
-    /// The student signs in, Cognito answering with `access`.
-    func signStudentIn(_ access: String, refresh: String = "refresh-1") async throws {
+    /// The student signs in, Cognito answering with `access` — through Sign up's page with `yes`,
+    /// its 13+ answer's (C7-server).
+    func signStudentIn(_ access: String, refresh: String = "refresh-1", yes: String? = nil)
+        async throws
+    {
         let signIn = self.signIn
-        let signingIn = Task { try await signIn.signIn(through: hostedUI) }
+        let signingIn = Task {
+            try await signIn.signIn(yes.map { _ in .signUp } ?? .signIn, yes: yes, through: hostedUI)
+        }
         try await server.next(tokenRoute).reply(200, grant(access, refresh: refresh))
         try await signingIn.value
     }
