@@ -147,6 +147,49 @@ struct AgeFallbackTests {
         #expect(await rig.server.waiting.isEmpty && rig.keychain.isEmpty)
         await rig.stop()
     }
+
+    @Test(
+        "The app's own ask of the 13+ check, again (#300's review; the owner's approval, 2026-10-09), runs at each wake of the read loop, behind the app or in front — its first, a sign-in's token, a Try again, a return to the front, each 30 s in front — never while an account deletion runs, when nothing of the loops' goes; and again once it is over"
+    )
+    func askAgeAtEachWake() async throws {
+        final class Count: @unchecked Sendable {
+            private let lock = NSLock()
+            private var count = 0
+            func add() { lock.withLock { count += 1 } }
+            var value: Int { lock.withLock { count } }
+        }
+        let (asks, checks) = (Count(), Count())
+        let rig = try await SignedRig(gated: true, age: { asks.add() })
+        await rig.engine.atEachWake { checks.add() }
+        try await eventually { asks.value == 1 }
+        try await rig.signStudentIn(scoped("a1"))
+        try await eventually { asks.value == 2 }
+        await rig.engine.retryNow()
+        try await eventually { asks.value == 3 }
+        await rig.engine.setForeground(true)
+        try await eventually { asks.value == 4 }
+        try await eventually { rig.clock.deadlines == [at(30)] }
+        rig.clock.advance(by: 30)
+        try await eventually { asks.value == 5 }
+
+        // Delete account, held at the unlock it sends first: two wakes meanwhile, rule 3's check
+        // run at each, the first over before the second begins, and nothing asked at either.
+        try await rig.engine.record(.unlock(session: "s", reason: nil))
+        let deletion = rig.deleting()
+        let unlock = try await rig.server.next(unlockRoute)
+        let woken = checks.value
+        for wake in 1...2 {
+            await rig.engine.retryNow()
+            try await eventually { checks.value == woken + wake }
+        }
+        #expect(asks.value == 5)
+        unlock.reply(200, Answer.unlockNoted)
+        try await rig.server.next(deleteMeRoute).reply(200, deletedAnswer)
+        try await rig.server.next(deleteUserRoute).reply(200, "{}")
+        #expect(await deletion.value == .deleted)
+        try await eventually { asks.value > 5 }
+        await rig.stop()
+    }
 }
 
 /// The yes the engine sends, answered in turn from `answered` — a status and a body, nil no answer
