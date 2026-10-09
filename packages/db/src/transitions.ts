@@ -35,6 +35,7 @@ import {
   sql,
 } from 'drizzle-orm';
 
+import { type CognitoSignIn, queueCognitoDeletion } from './cognito-deletions.js';
 import { newUuidV7 } from './ids.js';
 import { changedReasons, latestTurn, liveClassWithCode, type UserRow } from './queries.js';
 import {
@@ -3682,6 +3683,12 @@ export interface DeleteAccountInput {
   eventId: string;
   /** The server's clock: when it happened. */
   at: Date;
+  /**
+   * The caller's sign-in, from their verified access token: queued in this transaction for the API
+   * to delete from Cognito once it commits (2026-10-09), so no deletion commits without it. The
+   * route always passes it.
+   */
+  signIn?: CognitoSignIn;
 }
 export interface DeleteAccountResult {
   /** 'deleted' this call deleted it; 'already_deleted' it was gone (idempotent no-op). */
@@ -3697,7 +3704,8 @@ export interface DeleteAccountResult {
  * name and its Cognito subject and is marked removed; each rename it made
  * loses the names it carried (the one rewrite of `events` the database allows,
  * migration 0015); its phones' device tokens (N4) and its 13+ yes (C7-server)
- * are deleted; and `account_deleted` is recorded under `eventId`, with no payload. Its other events stay, so each class's reports count as before,
+ * are deleted; its Cognito sign-in is queued for the API to delete (2026-10-09);
+ * and `account_deleted` is recorded under `eventId`, with no payload. Its other events stay, so each class's reports count as before,
  * under a row that names no one.
  *
  * A teacher with a live class or block is refused `TEACHER_HAS_CLASSES`:
@@ -3786,6 +3794,9 @@ export async function deleteAccount(
       await tx.delete(deviceTokens).where(eq(deviceTokens.userId, me.id));
       // Its 13+ yes (C7-server), likewise: a yes behind this finds the account deleted.
       await tx.delete(ageChecks).where(eq(ageChecks.userId, me.id));
+      // Its Cognito sign-in (2026-10-09): queued with the deletion, so it goes even when the
+      // phone's own DeleteUser never lands; the API deletes it from the pool after the commit.
+      if (input.signIn) await queueCognitoDeletion(tx, input.signIn, input.at);
 
       await tx
         .update(users)

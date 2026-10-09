@@ -3,6 +3,7 @@ import { and, asc, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { recordAgeCheck, type RecordAgeCheckResult } from '../src/age-checks.js';
+import { claimCognitoDeletions, queueCognitoDeletion } from '../src/cognito-deletions.js';
 import { registerPushToken } from '../src/device-tokens.js';
 import { newUuidV7 } from '../src/ids.js';
 import { createBlock, createClass } from '../src/management.js';
@@ -4188,3 +4189,32 @@ describe.runIf(REAL_PG)('the 13+ yes beside a deletion (real Postgres, C7-server
     expect(await checksOf(early.id)).toEqual([]);
   });
 });
+
+describe.runIf(REAL_PG)(
+  'deleted sign-ins claimed by two sweeps at once (real Postgres, 2026-10-09)',
+  () => {
+    it('two claims at once never take the same row, and between them take every row due', async () => {
+      for (let round = 0; round < 10; round += 1) {
+        const issuer = `https://cognito-idp.us-east-1.amazonaws.com/us-east-1_race${round}`;
+        const now = new Date();
+        for (let i = 0; i < 6; i += 1) {
+          const sub = `race-${round}-${i}-${newUuidV7()}`;
+          await queueCognitoDeletion(db, { issuer, username: sub, sub }, now);
+        }
+        // Two API instances' sweeps: each skips what the other holds, and a row claimed is no
+        // longer due, so no sign-in is tried twice and none is left behind.
+        const [a, b] = await Promise.all([
+          claimCognitoDeletions(db, { issuer, now, limit: 4 }),
+          claimCognitoDeletions(db, { issuer, now, limit: 4 }),
+        ]);
+        const claimed = [...a, ...b].map((row) => row.id);
+        expect(new Set(claimed).size, `round ${round}`).toBe(claimed.length);
+        expect(claimed, `round ${round}`).toHaveLength(6);
+        expect(
+          [...a, ...b].every((row) => row.attempts === 1),
+          `round ${round}`,
+        ).toBe(true);
+      }
+    }, 30_000);
+  },
+);
