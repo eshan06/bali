@@ -1,6 +1,6 @@
 # Owner runbooks — production
 
-Eight runbooks for the consoles only the owner can reach: Railway, AWS (Cognito),
+Nine runbooks for the consoles only the owner can reach: Railway, AWS (Cognito, IAM),
 Vercel, GitHub, Sentry and Apple's developer site. Phase 5's P6. Do them in this order the first time — each one
 uses values the one before it produced:
 
@@ -15,6 +15,8 @@ uses values the one before it produced:
    app half of the push ships.
 8. [Railway: settings from `.railway/railway.ts`](#8-railway-settings-from-railwayrailwayts),
    done on both (2026-10-06); again whenever the file changes.
+9. [Cognito: the API deletes a deleted account's sign-in](#9-cognito-the-api-deletes-a-deleted-accounts-sign-in),
+   any time, dev first.
 
 **Where production stands** (the owner, 2026-10-05; its values are in `docs/DEPLOY.md`,
 "The phone's sign-in", none secret):
@@ -51,6 +53,9 @@ uses values the one before it produced:
 - **Runbook 8, Railway's IaC:** open (added 2026-10-06, P8); due before 2026-12-01.
 - **Runbook 7, push:** open (added 2026-10-06, N6). Until it's done the API logs
   `push is off` at boot and sends no "class started" alert.
+- **Runbook 9, the Cognito sign-in deleter:** open (added 2026-10-09). Until it's done the API
+  logs `Cognito sign-in deletion is off` at boot and only queues each deleted account's sign-in;
+  the phone's own DeleteUser still deletes one when it lands.
 
 **Prod's data so far:** the school "Vanderbilt" (id `01a10a81-4ac0-7698-a1d4-fc0487865082`),
 its data agreement recorded 2026-10-05 and its year's end `2026-12-18`; the owner is a
@@ -238,8 +243,9 @@ project for the API (its DSN).
       name single-quoted, so an apostrophe or `$` in it reaches the command as typed).
       It prints one line, `disposed of school <id> on <time>: teachers …`, with no name: keep
       it with the school's request. Running it again says it was disposed of already.
-    - **Delete the school's sign-ins in Cognito.** The disposal can't reach them (the API
-      holds no AWS credential), and each still holds an email address. In the production
+    - **Delete the school's sign-ins in Cognito.** The disposal doesn't reach them (the API
+      deletes the sign-in of an account that deletes itself, runbook 9, never a disposal's),
+      and each still holds an email address. In the production
       pool's **Users**, delete every user whose email is at the school's domain. A sign-in
       left there only ever makes a new, empty account.
     - **Backups:** Railway's backups (step 4) still hold the school's data until they age
@@ -822,3 +828,111 @@ matched to what the service should have.
 **Production** the same way: `railway link` → environment `production`; the session told
 "for production", `service.bali prod` in the partials list, and
 `https://bali-prod-production.up.railway.app/healthz`.
+
+---
+
+## 9. Cognito: the API deletes a deleted account's sign-in
+
+What it makes: the API deleting each deleted account's Cognito sign-in from the pool (the owner's
+decision, 2026-10-09; ARCHITECTURE, data-model decision 3's amendment; PLAN's C3-cognito). The API
+already queues every deleted account's sign-in; until a deploy holds this key it deletes none, and
+its boot log says `Cognito sign-in deletion is off`. Each environment gets an IAM user of its own,
+allowed two calls on its own pool and nothing else, so a leaked dev key can't touch production.
+
+**Before you start:** the AWS console, signed in as an IAM or IAM Identity Center user that may
+manage IAM (never root; runbook 2, step 1), the AWS CLI signed in to the same account, and the
+Railway project. The pools (`docs/DEPLOY.md`): dev `us-east-1_YTloqilwT`, production
+`us-east-1_C55e0fhX8`. Each pool's **ARN** is on its overview page (Cognito → User pools → the
+pool), `arn:aws:cognito-idp:us-east-1:<account id>:userpool/<pool id>`, where `<account id>` is the
+12 digits under the console's account menu, top right. Not a secret, but keep it out of the repo.
+
+1. **The dev policy.** AWS console → **IAM** → **Policies** → **Create policy** → **JSON**, and
+   replace the editor's contents with this, the ARN copied from dev's pool:
+
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Sid": "DeleteDeletedAccountsSignIns",
+         "Effect": "Allow",
+         "Action": ["cognito-idp:AdminGetUser", "cognito-idp:AdminDeleteUser"],
+         "Resource": "arn:aws:cognito-idp:us-east-1:<account id>:userpool/us-east-1_YTloqilwT"
+       }
+     ]
+   }
+   ```
+
+   **Next** → name `bali-cognito-deleter-dev` → **Create policy**.
+   **Check:** the policy's **Permissions** list one service, Cognito User Pools, with the two
+   actions above and that one pool as its resource.
+2. **The dev user and its key.** **IAM** → **Users** → **Create user**: name
+   `bali-cognito-deleter-dev`, no console access → **Next** → **Attach policies directly** → tick
+   `bali-cognito-deleter-dev` → **Next** → **Create user**. Open the user → **Security
+   credentials** → **Access keys** → **Create access key** → **Application running outside AWS** →
+   **Next** → description `Railway dev bali` → **Create access key**. Copy the **Access key ID**
+   and the **Secret access key** into your password manager: AWS shows the secret once. Never in
+   the repo, a chat or an issue.
+   **Check:** the user's **Permissions** list that one policy, and **Access keys** one Active key.
+3. **Railway, dev.** Railway → the project → environment `dev` → service `bali` → **Variables** →
+   add:
+   - `COGNITO_DELETER_ACCESS_KEY_ID`: the Access key ID (`AKIA…`).
+   - `COGNITO_DELETER_SECRET_ACCESS_KEY`: the Secret access key.
+
+   Both or neither: one alone, or the key beside an `AUTH_ISSUER` that names no Cognito pool,
+   stops the boot with a message naming them. The pool and its region come from `AUTH_ISSUER`;
+   there is nothing else to set. **Deploy** the staged changes.
+   **Check:** the deploy's log says `Cognito sign-in deletion is on`, no longer `… is off`, and
+   `https://bali-production-09a2.up.railway.app/healthz` answers ok. Within a minute the log may
+   show `Cognito sign-in deletion done` lines: sign-ins queued while it was off, deleted now
+   (`"outcome":"deleted"`, `"gone"` where the phone got there first, or `"came_back"` where its
+   person signed in again since and the sign-in is kept).
+4. **Check it on dev, end to end,** with a throwaway sign-in deleted through the API alone, so the
+   phone's own DeleteUser can't do it instead. In your terminal (`$DEMO_COGNITO_CLIENT_ID` is the
+   dev app client the remote demo signs in with, which allows `USER_PASSWORD_AUTH`; the password
+   any that meets dev's password policy):
+
+   ```bash
+   aws cognito-idp admin-create-user --user-pool-id us-east-1_YTloqilwT \
+     --username bali-deletion-check@bali.test --message-action SUPPRESS \
+     --user-attributes Name=email,Value=bali-deletion-check@bali.test Name=email_verified,Value=true
+   aws cognito-idp admin-set-user-password --user-pool-id us-east-1_YTloqilwT \
+     --username bali-deletion-check@bali.test --password '<a throwaway password>' --permanent
+   TOKEN=$(aws cognito-idp initiate-auth --client-id "$DEMO_COGNITO_CLIENT_ID" \
+     --auth-flow USER_PASSWORD_AUTH \
+     --auth-parameters 'USERNAME=bali-deletion-check@bali.test,PASSWORD=<the same password>' \
+     --query AuthenticationResult.AccessToken --output text)
+   curl -sS -X DELETE https://bali-production-09a2.up.railway.app/v1/me \
+     -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+     -d "{\"eventId\":\"$(uuidgen)\"}"
+   ```
+
+   The curl answers `{"outcome":"already_deleted"}`: the sign-in never made a Bali account, and its
+   deletion is queued all the same.
+   **Check:** within seconds dev's pool (Cognito → the pool → **Users**) no longer lists
+   `bali-deletion-check@bali.test`, and `aws cognito-idp admin-get-user --user-pool-id
+   us-east-1_YTloqilwT --username bali-deletion-check@bali.test` says `UserNotFoundException`;
+   dev's log shows `Cognito sign-in deletion done` with `"outcome":"deleted"`. A `Cognito sign-in
+   deletion failed` line instead carries Cognito's reason: `AccessDeniedException` means the policy
+   names another pool or action (fix step 1, and the row is tried again within the hour);
+   `UnrecognizedClientException` or `InvalidSignatureException`, a key pasted wrong (step 3).
+5. **Production's policy, user and key.** Steps 1 and 2 again, with production's pool
+   `us-east-1_C55e0fhX8` in the ARN, the policy and the user named `bali-cognito-deleter-prod`,
+   and the key described `Railway production bali prod`. Never dev's user or key for production.
+   **Check:** as in steps 1 and 2.
+6. **Railway, production.** The same two variables, production's key, on environment
+   `production`, service `bali prod`. Deploy.
+   **Check:** prod's deploy log says `Cognito sign-in deletion is on`, and
+   `https://bali-prod-production.up.railway.app/healthz` answers ok. Step 4 is for dev only: on
+   prod, the next account deleted (Me → Delete account, or the under-13 fallback) shows `Cognito
+   sign-in deletion done` in the log.
+7. **Rotate a key: at once if it leaks, else yearly.** IAM → that environment's user → **Security
+   credentials** → **Create access key** (a user holds two at most); put it on that environment's
+   service (step 3 or 6) and deploy; then the old key → **Deactivate**, and once the log says
+   `Cognito sign-in deletion is on` with no failed line since, **Delete**. A leaked key can only read
+   and delete that one pool's users: after rotating, look in CloudTrail's **Event history** for
+   `AdminDeleteUser` calls you can't account for.
+   **Check:** the user lists one Active key, and the log no `Cognito sign-in deletion failed` line.
+
+To switch it off again, remove the two variables and deploy: the API keeps queuing, deletes none,
+and its boot log says `… is off`.

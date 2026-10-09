@@ -141,6 +141,13 @@
       "when": 1791496515576,
       "tag": "0019_age_checks",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1791568060186,
+      "tag": "0020_cognito_deletions",
+      "breakpoints": true
     }
   ]
 }

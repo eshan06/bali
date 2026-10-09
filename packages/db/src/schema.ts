@@ -11,6 +11,7 @@ import {
   check,
   date,
   index,
+  integer,
   jsonb,
   pgTable,
   text,
@@ -433,3 +434,30 @@ export const ageChecks = pgTable('age_checks', {
   /** When the server recorded it, by its own clock. */
   createdAt: createdAt(),
 });
+
+/*
+ * A deleted account's Cognito sign-in, waiting for the API to delete it from the pool (the owner's
+ * decision, 2026-10-09): queued by `deleteAccount` in its own transaction, or by `DELETE /v1/me` for
+ * a sign-in with no account here, and written beside the engine (`cognito-deletions.ts`). Keyed to
+ * the Cognito user, not to a `users` row, since a sign-in the server never saw is queued too; really
+ * deleted once its sign-in is gone. Its three ids are personal data: never logged, not exported (C5).
+ */
+export const cognitoDeletions = pgTable(
+  'cognito_deletions',
+  {
+    id: id(),
+    /** The access token's `iss`: the pool. Only rows of this deploy's `AUTH_ISSUER` are tried. */
+    issuer: text('issuer').notNull(),
+    /** The access token's `username`: the name AdminGetUser and AdminDeleteUser take. */
+    username: text('username').notNull(),
+    /** The access token's `sub`: the user is deleted only while `username` still names it. */
+    sub: text('sub').notNull(),
+    /** Tries claimed so far. */
+    attempts: integer('attempts').notNull().default(0),
+    /** When it may be tried next: when queued, then later after each claim (a backoff). */
+    nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }).notNull(),
+    createdAt: createdAt(),
+  },
+  // One per sign-in: a deletion's retry queues nothing more.
+  (t) => [uniqueIndex('cognito_deletions_sign_in_unique').on(t.issuer, t.sub)],
+);

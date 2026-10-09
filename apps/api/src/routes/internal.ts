@@ -1,9 +1,7 @@
-import type { Database } from '@bali/db';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 
 import { ApiError } from '../errors.js';
-import { sweep } from '../sweep.js';
 
 /**
  * Constant-time secret comparison. Both sides are hashed to a fixed length
@@ -22,13 +20,13 @@ function secretMatches(presented: string, expected: string): boolean {
  * runs itself every minute — for the Railway cron, its backup (hosting decision
  * 3). Idempotent, so a run beside the API's own, or a double-fire, is harmless.
  */
-export function registerInternalRoutes(app: FastifyInstance, db: Database, apiKey: string): void {
+export function registerInternalRoutes(app: FastifyInstance, apiKey: string): void {
   const handler = async (request: { headers: Record<string, unknown> }) => {
     const presented = request.headers['x-internal-key'];
     if (typeof presented !== 'string' || !secretMatches(presented, apiKey)) {
       throw ApiError.unauthorized('invalid internal key');
     }
-    return sweep(db);
+    return app.sweep();
   };
 
   app.post('/internal/sweep', handler);

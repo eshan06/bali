@@ -108,6 +108,11 @@ never stored here, no screen can ever show it.
   the request's `event_id` and when the server recorded it, never a birth date or an age, and none
   for an answer under 13, which the phone never sends. Never unset: it goes only with the account
   (C3, C6a, C6b), and is in the student's export (C5).
+- `cognito_deletions` — one row per deleted account's Cognito sign-in waiting for the API to delete
+  it from the pool (2026-10-09; decision 3's amendment): the access token's issuer, username and
+  `sub`, how many tries, and when the next is due. Keyed to the Cognito user, not to a `users` row;
+  deleted once the sign-in is gone, never exported. Not an engine table: written by the deletion's
+  transaction and beside the engine.
 - `questions`, `responses`, `decks`, `session_presentations` — a live lesson's questions,
   each student's answer now, the teacher's PDF decks and the slide a session shows (Phase 7;
   "Live lesson", decision 4). Written only by the transition engine, except `decks.object_deleted_at`,
@@ -152,6 +157,14 @@ event with no personal data records it. So the history stays answerable in count
 names no one. A teacher with a class or a block is refused: that account goes through the
 school. "Never lost" keeps its meaning from the phone to the server — the phone sends its
 outbox before it deletes (C4).
+*Amended 2026-10-09 (the owner's decision):* the account's Cognito sign-in goes too, by the
+server, so it goes even when the phone's own `DeleteUser` never lands. The deletion's transaction
+queues it (`cognito_deletions`: the access token's issuer, username and `sub`), as does a `DELETE
+/v1/me` from a sign-in with no account here; after the commit the API deletes it from the pool
+with a key of its own, and its minute sweep retries what is left, a row that keeps failing put off
+longer each time. It never deletes another sign-in: the user is read first and deleted only while
+its `sub` is the one queued, since a username can come back with a new `sub`; nor one its person
+came back to: a live account holding that `sub` again (its first call since made one) keeps it.
 
 **4. A student can be in only one session at a time.** If a student in one session taps
 into another, their first participation is ended and recorded in the `events` table as
@@ -328,7 +341,8 @@ an archived class never reserves its code forever; a teacher can regenerate it (
   /v1/me`, then Cognito's DeleteUser; then the outbox lets go of the rest, so nothing is ever
   filed under whoever signs in next, whose account is always another (amended 2026-10-07, Claude
   Review). With nothing queued, as a sign-up made around the question comes back, the server
-  never sees the account: `DELETE /v1/me` looks its caller up and creates no one. A record queued
+  never sees the account: `DELETE /v1/me` looks its caller up and creates no one, and keeps only
+  its sign-in's deletion until Cognito's user is gone (2026-10-09, decision 3's amendment). A record queued
   under a sign-in the server never saw makes the account as it lands, and the deletion
   de-identifies it a moment later, as C3 de-identifies any. An existing student on a new phone
   answers it once.
@@ -416,8 +430,15 @@ Student app:
   none — a retry reaching an account a boot call made since deletes that one too. A teacher
   with a live class or block is `409 teacher_has_classes`. A join, rename, tap (joining or
   arming), invite redeem, or class or block create still on its way under the deleted account is
-  `409 account_deleted`; an unlock is recorded, never refused. The Cognito sign-in is the phone's to delete with its own access token once this
-  answers (C4): the API holds no AWS credential. From that answer the phone sends the API
+  `409 account_deleted`; an unlock is recorded, never refused. The Cognito sign-in goes too (the
+  owner's decision, 2026-10-09; data-model decision 3's amendment): queued in the deletion's
+  transaction, or by the request for a sign-in with no account here (a retry, C7's under-13
+  fallback), and deleted from the pool by the API after the commit, retried by the sweep until done.
+  Its key is an IAM user's of its own per environment, allowed only `AdminGetUser` and
+  `AdminDeleteUser` on that environment's pool, which `AUTH_ISSUER` names; unset, the queue waits.
+  The phone's own `DeleteUser` with its access token (C4) stays a first try: whichever lands second
+  finds the sign-in gone. A sign-in a live account holds again is kept: its person came back. A
+  refused deletion queues nothing. From that answer the phone sends the API
   nothing more — any request would make a fresh account under the same sign-in — and leaves its
   session with no Emergency Unlock (the owner's ruling).
 - `PATCH /v1/me` — the student sets their own display name (A8): `{ displayName, eventId }`,
@@ -771,7 +792,8 @@ bad change can never touch a real school's data.
 
 **3. The API runs the sweep itself, every minute; a Railway cron is its backup** (amended
 2026-09-29, A15). The sweep ends each session past its end time and opens a silence episode
-for each phone gone quiet, so it must run every minute — and Railway's cron runs at most every
+for each phone gone quiet (and, last, tries each deleted account's Cognito sign-in still due,
+2026-10-09), so it must run every minute — and Railway's cron runs at most every
 5 minutes, and not to the minute (a session on dev closed 19 minutes after its bell). So each
 API process sweeps every 60 s on its own clock: a run still going when the next is due makes
 that tick skip, a failed run is logged and the next tick runs as usual, and shutdown stops the
@@ -1220,10 +1242,9 @@ and no count below the guard ever enters the stream.
 Cognito account recommended; M0), with no public access and CORS for the portal's origins
 only. Uploads go by presigned PUT; clients read by short-lived presigned GET (minutes),
 minted by the download route for a caller allowed to see the deck, never in the polled body. It sits behind a storage interface
-in the API with an in-memory fake, so CI and `npm run demo` need no AWS. This is the API's
-first AWS credential (C3's "the API holds no AWS credential" was about Cognito): an IAM
-identity allowed only to put, get and delete objects in that one bucket, its keys Railway
-secrets. The portal renders with PDF.js ≥ 4.2.67 (the fix for CVE-2024-4367),
+in the API with an in-memory fake, so CI and `npm run demo` need no AWS. Its AWS credential is
+its own, beside the Cognito sign-in deleter's (2026-10-09): an IAM identity allowed only to put,
+get and delete objects in that one bucket, its keys Railway secrets. The portal renders with PDF.js ≥ 4.2.67 (the fix for CVE-2024-4367),
 `isEvalSupported: false`, its worker self-hosted (the CSP's `worker-src 'self'`, and the
 bucket's origin in `connect-src`). The phone renders with PDFKit, a deck cached by its
 `sha256` for the session and deleted when the session ends; links inside a deck are not

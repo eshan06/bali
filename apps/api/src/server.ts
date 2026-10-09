@@ -4,7 +4,7 @@ import { buildApp } from './app.js';
 import { env } from './env.js';
 import { captureFailure, flushMonitoring, initMonitoring } from './monitoring.js';
 import { makeShutdown } from './shutdown.js';
-import { startSweeping, sweep } from './sweep.js';
+import { startSweeping } from './sweep.js';
 
 // Before the app, so a failure to start is reported too (a bad env fails the
 // import above, before Sentry could start). A no-op without SENTRY_DSN.
@@ -17,7 +17,7 @@ const app = buildApp(env, { db });
 // The sweep every minute, run by this process itself (hosting decision 3):
 // sessions end at their bell and a quiet phone shows within the minute.
 // Railway's cron, at most every five minutes, is only its backup.
-startSweeping(app, () => sweep(db));
+startSweeping(app, () => app.sweep());
 
 // SIGTERM is how deploy platforms ask a process to stop; the shutdown handler
 // drains in-flight requests instead of dropping them mid-response.

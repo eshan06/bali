@@ -57,6 +57,7 @@ with notes. The ones a deploy must set:
 | `SENTRY_ENVIRONMENT` | Optional. The environment Sentry files events under (`dev`, `production`); unset, `NODE_ENV`, which reads `production` on every deploy. Railway's `RAILWAY_GIT_COMMIT_SHA` is the release, nothing to set. |
 | `APNS_KEY_P8` / `APNS_KEY_ID` / `APNS_TEAM_ID` | Optional, all three or none (the API refuses to boot on one or two). The APNs auth key's `.p8` contents (line breaks as they are or written `\n`), its 10-character key id, and the team id (`H535678UF8`). Unset, the "class started" push is off (`apps/api/src/push/apns.ts`; wired to the Start in N5b; the console steps: N6). |
 | `APNS_TOPIC` | Optional. The app's bundle id, sent as `apns-topic`; unset, `com.bali.Bali`. |
+| `COGNITO_DELETER_ACCESS_KEY_ID` / `COGNITO_DELETER_SECRET_ACCESS_KEY` | Optional, both or none, and only beside a Cognito pool's `AUTH_ISSUER` (else the API refuses to boot). An IAM user's access key, that environment's own, allowed only `cognito-idp:AdminGetUser` and `cognito-idp:AdminDeleteUser` on the pool `AUTH_ISSUER` names, which also gives the region. Unset, a deleted account's Cognito sign-in waits in the API's queue and the boot log says `Cognito sign-in deletion is off` (`apps/api/src/cognito/`; the console steps: `docs/RUNBOOKS.md`, runbook 9). |
 | `RAILWAY_DEPLOYMENT_DRAINING_SECONDS` | Set above `SHUTDOWN_DEADLINE_MS` (8s) so graceful shutdown finishes before SIGKILL. |
 
 `PORT`/`HOST` are provided by the platform; `NODE_ENV` defaults to `production`.

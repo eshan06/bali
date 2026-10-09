@@ -137,6 +137,8 @@ describe('the stream route logs its teardown race where it said it would', () =>
     const address = app.server.address();
     if (address === null || typeof address === 'string') throw new Error('no port');
     port = address.port;
+    // What the boot said (a warning that Cognito sign-in deletion is off) is not the stream's.
+    lines.length = 0;
   });
 
   afterEach(async () => {
