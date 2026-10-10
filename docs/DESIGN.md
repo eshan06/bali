@@ -246,7 +246,12 @@ checked (`Chip.Kind.protectionOn`): it puts the student back where they stood,
 in focus or unlocked, so it is never focus's green. A sentence that tells the
 student what their teacher sees says it in its own words and quotes neither
 label (D2j): "your teacher sees that Screen Time is off", never "your teacher
-sees “Screen Time off”", which the grid never says.
+sees “Screen Time off”", which the grid never says. The student web (Phase 7's
+Slice 3, drafted 2026-10-10, not built) shows a student their own phone in the
+app's chips and words ("Not in", "Screen Time off"), and Silent as the grid
+draws and words it, with its minutes: only the server can tell a student their
+phone went quiet. Any state but Focused takes one line under the page's head,
+saying what it means and what to do on the phone.
 
 **Colour rules (law):**
 

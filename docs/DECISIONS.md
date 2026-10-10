@@ -8,6 +8,27 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-10** — **Live lesson: students on the web (Slice 3), built web first, and the open
+  questions settled** (the owner's picks). Students mostly have a laptop open in class, so the
+  portal becomes where a student follows a lesson first: the slide beside the question card,
+  answered there, while the phone shows the same lesson and keeps tap in, focus, Emergency Unlock
+  and Screen Time. *Weighed:* the phone alone (the plan of 2026-10-05: a small screen beside a
+  laptop already open), and the web alone (a shielded phone would then show nothing of the
+  lesson). **Who sees what:** one sign-in, the app's account; the portal's home sends a teacher to
+  their classes, a student whose account said 13+ in the app to theirs, and anyone else to
+  today's invite-code page with one line for students, so a new teacher's path is unchanged.
+  *Weighed:* a separate address for students, which they would have to know; asking every new
+  account to pick, one more screen. **The phone's state on the page** (the owner's ask): the app's
+  chip and words beside the class's name, read from an additive field of the presentation read,
+  derived at the server's clock, so the page never shows a phone greener than the teacher's grid.
+  **Web first:** the student pages are built right after their server steps and the teacher's
+  side they answer, before the phone's lesson screens. **The open questions, settled as
+  recommended:** `event_id` refused both ways, the guard wherever counts are read, the portal's
+  `sha256` check, the PDF check in its own worker, a load gate of several classes on phones and
+  laptops, production backups on before answers reach prod, and S3. Design: ARCHITECTURE, "Live
+  lesson", decision 13 and "Settled"; steps L0b and W1–W6 in `docs/PLAN.md`; the student boards
+  on the portal canvas, a draft until the owner signs them off.
+
 - **2026-10-09** — **The server deletes a deleted account's Cognito sign-in, durably (C3-cognito)**
   (the owner's decision). Before, the phone's own `DeleteUser` after `DELETE /v1/me` (C4) was the
   only way the sign-in went: offline at that second, then reinstalled (#299 forgets the old sign-in)

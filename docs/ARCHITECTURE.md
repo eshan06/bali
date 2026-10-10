@@ -813,7 +813,7 @@ school's: bell times render in it (carried over from v2) and an armed tap's
 so this must be set explicitly per environment.
 
 **6. Uploaded decks live in a private bucket per environment** (Phase 7, Slice 2; "Live
-lesson", decision 8): AWS S3 recommended, reached by presigned URLs, behind a storage
+lesson", decision 8): AWS S3 (settled 2026-10-10), reached by presigned URLs, behind a storage
 interface with an in-memory fake for CI and the demo. The API's credential reaches that one
 bucket only.
 
@@ -982,18 +982,22 @@ has its own cursor; capped at 5 per account), and a tab left open across a deplo
 
 **6. Live lesson's screens are the portal's too** (Phase 7): asking a question and its
 results, the projector's view, the deck library and the presenter — thin client screens on
-the same `/v1` API, under the rules of "Live lesson (Phase 7)" below.
+the same `/v1` API, under the rules of "Live lesson (Phase 7)" below. Students follow a
+running lesson there too (Slice 3, Live lesson decision 13): their classes, the question and the
+slide, and their own phone's state, never a control that changes the phone.
 
 ## Live lesson (Phase 7)
 
 During a running session the teacher can ask the class a question (Slice 1) and present
-slides (Slice 2); each student follows on their own phone, on Bali's own screen. Planned
-2026-10-05 from the research in `docs/ROADMAP-RESEARCH.md` (B); the build is Phase 7 in
-`docs/PLAN.md`, and its decision entry is `docs/DECISIONS.md`, 2026-10-05. **The build is on
+slides (Slice 2); each student follows on the web from a laptop (Slice 3) and on their own
+phone, on Bali's own screen. Planned 2026-10-05 from the research in
+`docs/ROADMAP-RESEARCH.md` (B); the build is Phase 7 in `docs/PLAN.md`, and its decision
+entries are `docs/DECISIONS.md`, 2026-10-05, 2026-10-09 and 2026-10-10. **The build is on
 hold by the owner (2026-10-05):** nothing starts until the owner says so; when resumed,
 backend only first (no UI, app or portal changes). The owner's picks of 2026-10-09 (the
 screens' design, the defaults confirmed, and saved questions) follow the ten decisions
-(decisions 11 and 12).
+(decisions 11 and 12), and those of 2026-10-10 (students on the web, decision 13, and the open
+questions settled) after them.
 
 ### The decisions (2026-10-05)
 
@@ -1014,7 +1018,7 @@ nothing of a live lesson sits in the outbox ahead of an unlock (decision 5).
   counts. The one record that holds a student's answers by name is the student's own export
   (C5), which shows that student their own.
 - **Phones follow by foreground polling**, about every 2 s with an ETag and `304`, not by a
-  student stream (Live updates stays teacher-only).
+  student stream (Live updates stays teacher-only); so does the student web (decision 13).
 - **Any student enrolled in the class whose session is running may answer**: tapped in or
   not, unlocked or focused, protection off included.
 - **Questions and presenting exist only within a running session**, for now: nothing is
@@ -1065,7 +1069,11 @@ nothing of a live lesson sits in the outbox ahead of an unlock (decision 5).
   than A12's counter, on purpose: a phone whose clock was turned back, or a second device,
   can mint an id that sorts first, and that answer is then not taken. It harms only the
   student's own answer, and never silently: the card shows the answer the server holds, and
-  answer now carries its own `event_id`, so the phone's retry mints one after it. A replaced answer's id is no longer kept, so
+  answer now carries its own `event_id`, so the phone's retry mints one after it. The
+  presentation read carries it too (decision 6), so each of a student's devices, a laptop and a
+  phone (decision 13), mints its next answer after the one held, and a pick on one after the
+  other's counts; two picks within one poll of each other are ordered by the devices' own
+  clocks. A replaced answer's id is no longer kept, so
   only a stored id is checked against another student's.
 - `decks` (Slice 2) — one row per uploaded PDF: `id`, `teacher_id`, `school_id`, `title`,
   `storage_key`, `sha256`, `bytes`, `page_count`, `status` (`pending` / `ready` /
@@ -1177,13 +1185,18 @@ Teacher (the class's own teacher only; another teacher and a student `403`):
   Slice 2 the presentation, as optional fields, so a reloaded portal finds them.
 
 Student (enrolled in the session's class now; anyone else `403`, an unknown id `404`):
-- `GET /v1/sessions/{id}/presentation` — what the phone shows: whether the session is
-  running (false tells the phone to stop polling); the current question — the open one, or
-  the last closed one until another opens — with its prompt and options, the correct option
-  only once revealed, and never anyone's counts; the caller's own answer, if any; and in
-  Slice 2 the slide (deck id, `sha256`, `page`, `page_count`), **never a URL**. A read that
-  writes nothing. A strong ETag over the body; `If-None-Match` answers `304`. The body holds
-  nothing minted per request, so an unchanged lesson is `304` on every poll.
+- `GET /v1/sessions/{id}/presentation` — what the phone and the student web show: whether
+  the session is running (false tells the client to stop polling); the current question — the
+  open one, or the last closed one until another opens — with its prompt and options, the
+  correct option only once revealed, and never anyone's counts; the caller's own answer, if
+  any, with its `eventId` (decision 4); in Slice 2 the slide (deck id, `sha256`, `page`,
+  `page_count`), **never a URL**; and in Slice 3 the caller's own phone in this session
+  (decision 13): its state as the shared state function derives it at the server's clock
+  (`focused`, `unlocked`, `protection_off` or `silent`, or none when the caller has no live
+  participation), and the time of its last check-in once silent. A read that writes nothing.
+  A strong ETag over the body; `If-None-Match` answers `304`. The body holds nothing minted per
+  request, and no check-in's time short of silence, so an unchanged lesson is `304` on every
+  poll until something in it changes.
 - `GET /v1/decks/{id}/download` (Slice 2) — a short-lived presigned GET, for the deck's own
   teacher (the presenter), or for a student while a running session of their class shows
   that deck (anyone else `403`, a removed deck `404 deck_not_found`): what the phone calls only
@@ -1212,9 +1225,10 @@ Slice 2, teacher:
   reason and its object deleted. One-way: a deck `ready` or `rejected` is never checked
   again, and its replay answers the verdict. The PUT expires in 5 minutes; a PUT over a
   `ready` deck's object before then changes bytes no client takes, since every client checks
-  the `sha256` the server verified. The checks are bounded: the size cap first, the parse
-  under a time limit, a PDF that exceeds either `rejected`. A deck left `pending` 24 hours is
-  rejected by the sweep.
+  the `sha256` the server verified. The checks are bounded: the size cap first, then the
+  parse in a separate worker under a hard time limit, so a hostile file stalls only that
+  worker, never the API (settled 2026-10-10); a PDF that exceeds either is `rejected`. A deck
+  left `pending` 24 hours is rejected by the sweep.
 - `GET /v1/decks` — the caller's own decks, never a removed one; `DELETE /v1/decks/{id}` —
   remove one (`409 deck_in_use` while a running session shows it).
 - `POST /v1/sessions/{id}/slide` — `{ eventId, deckId | null, page }`: show a page of one of
@@ -1226,11 +1240,13 @@ Authorization: every new route gets its rows in S1's matrix
 another student, a teacher who isn't the owner, the owner — and its request schema in
 `contracts/openapi.json`; the student routes get fixtures in `contracts/fixtures/` that
 BaliCore decodes. **Rate limits** (ISSUES #1): the 2 s poll is 30 requests a minute per
-account, inside the 120-a-minute budget beside the check-in's two, and the poller stops at a
+device, so a student following on a phone and a laptop at once spends 60 of the account's
+120-a-minute budget beside the check-in's two, and each poller stops at a
 `429` until its `Retry-After`, so the poll never spends the headroom an Emergency Unlock
-needs (an unlock refused `429` is still kept and resent, never lost); the portal polls results
-from its one visible tab. L4 measures a class of polling phones in the load gate and adds a
-dedicated budget only if it must.
+needs (an unlock refused `429` is still kept and resent, never lost); the portal polls results,
+and the student web the presentation, from its one visible tab. L4's load gate measures several
+classes polling at once behind one school's address, each student on a phone and a laptop
+(settled 2026-10-10), and adds a dedicated budget only if it must.
 
 **7. Live updates are amended, not replaced.** Students still have no stream; the poll is
 their own request and its answer is the truth (Live updates' opening paragraph). The teacher
@@ -1239,14 +1255,16 @@ about every 2 s while a question is open, from the results endpoint, so no per-s
 and no count below the guard ever enters the stream.
 
 **8. Storage (Slice 2).** A private bucket per environment, made by the owner (AWS S3 in the
-Cognito account recommended; M0), with no public access and CORS for the portal's origins
+Cognito account, settled 2026-10-10; M0), with no public access and CORS for the portal's origins
 only. Uploads go by presigned PUT; clients read by short-lived presigned GET (minutes),
 minted by the download route for a caller allowed to see the deck, never in the polled body. It sits behind a storage interface
 in the API with an in-memory fake, so CI and `npm run demo` need no AWS. Its AWS credential is
 its own, beside the Cognito sign-in deleter's (2026-10-09): an IAM identity allowed only to put,
 get and delete objects in that one bucket, its keys Railway secrets. The portal renders with PDF.js ≥ 4.2.67 (the fix for CVE-2024-4367),
 `isEvalSupported: false`, its worker self-hosted (the CSP's `worker-src 'self'`, and the
-bucket's origin in `connect-src`). The phone renders with PDFKit, a deck cached by its
+bucket's origin in `connect-src`), for the presenter and the student web alike, and checks the
+bytes against the slide's `sha256` before rendering them, refusing a mismatch as the phone does
+(settled 2026-10-10). The phone renders with PDFKit, a deck cached by its
 `sha256` for the session and deleted when the session ends; links inside a deck are not
 opened. Each page's text layer is its VoiceOver label (a page with none says which slide it
 is).
@@ -1322,20 +1340,80 @@ changes.
   one is closed), and "Write a new question". Drafts are edited only on the "Your questions"
   page, and a question written in class is not saved for later.
 
-**Still open** (the owner's, settled before L1 is cut; the recommendation first):
-- `event_id` uniqueness in both directions (PLAN's open design questions): every route that
-  records an `eventId` refuses one that any `responses` or `saved_questions` row holds, as the
-  answers route already checks `events`.
-- The guard wherever counts are read: the recap and the reports read counts through the same
-  guard as the results route.
-- The portal checks a deck's `sha256` as the phone does, refusing a mismatch.
+### The owner's picks (2026-10-10)
+
+The owner added students on the web as Slice 3 (decision 13), to be built web first, and took
+the recommendation on each question left open (Settled, below). The student pages are drafts on
+the [portal canvas](https://claude.ai/artifact/BxHbGud1xMeyXLUUvsewHM) (its two student rows),
+built only once the owner signs them off.
+
+**13. Students on the web (Slice 3).** Students mostly have a laptop open in class, so the
+portal is where a student follows a lesson first; the phone shows the same lesson (decision 11)
+and keeps everything that enforces focus.
+- **What it is.** While a session of their class runs, a student signed in on the portal sees
+  the slide beside the question card and answers there: the phone's card (decision 11) in the
+  portal's look, under its rules (a tap answers and changes the answer until the close, no
+  Submit, the revealed answer marked and never red, "Your teacher sees the class's totals,
+  never which answer is yours"). Slides and questions only while the session runs (decision
+  2): after the bell the page says class is over and keeps none of it. Following needs no tap
+  in (decision 2), and the page says the student isn't tapped in until they are.
+- **What it is not.** Tapping in, focus, Emergency Unlock and Screen Time stay on the phone: no
+  web page records or offers a tap, an unlock, a return to focus or Screen Time back on. The
+  web reads the phone's state and never changes it. No one joins a class on the web: joining
+  shows the consent preview, which lives in the app.
+- **Who sees what** (the owner's pick). One sign-in, the account the student uses in the app;
+  the API already takes the portal's access token for any role and each route checks its own,
+  so auth is unchanged. The portal's home reads `/v1/me` and `GET /v1/me/age-check`: a teacher
+  sees their classes, as today; a student whose account said 13+ in the app sees theirs; any
+  other account sees today's invite-code page, with one added line telling a student to set up
+  in the Bali app first. The student pages keep a quiet "Have a teacher invite code?" link for
+  a teacher who used the app first.
+- **The phone's state on the page** (the owner's ask). Beside the class's name, the student's
+  own phone in this session as the server knows it, in the app's chips and words (DESIGN.md):
+  Focused, Not in, Unlocked, Screen Time off, or Silent with its minutes, as the grid shows it
+  from 90 s without a check-in. Any state but Focused adds one line under the head saying what
+  it means and what to do, always on the phone. Read from the presentation read (decision 6),
+  derived at the server's clock by the shared state function (rules 1 and 2), so the page never
+  shows a phone greener than the teacher's grid. When the page can't reach Bali, the chip keeps
+  its last state with "as of" and its time, beside the page's own can't-reach line.
+- **Polling.** As the phone: the presentation read about every 2 s from the one visible tab,
+  with `If-None-Match`, stopped when the session isn't running and at a `429` until its
+  `Retry-After` (decision 6's rate limits).
+- **Two devices, one answer.** A student's answer is theirs whichever device sent it: each
+  device mints its next answer after the held one (decision 4), and both screens show the
+  answer Bali holds.
+- **Slides.** Rendered by PDF.js as the presenter's are (decision 8), the bytes checked against
+  the slide's `sha256` first; fetched through `GET /v1/decks/{id}/download` as the phone fetches
+  them, its presigned GET asking the bucket for `Cache-Control: no-store`, so the browser keeps
+  no copy past the page; each page's text layer readable by a screen reader; a full-screen view.
+- **A shared laptop.** The portal's sign-in already lives in the tab (`sessionStorage`), and its
+  signed-out page says to close the browser before someone else uses the computer; the student
+  pages keep both, with Sign out on every page.
+- **Privacy.** Nothing new reaches a teacher, and totals-only stands (decision 2): a student's
+  pages show only their own answer and their own phone. The consent list is unchanged (it lists
+  what the teacher sees); the privacy policy names the student pages (W3).
+- **Compatibility.** Additive: the presentation read gains a field old phones ignore, and the
+  teacher's pages change only in the home's routing and the invite page's one line.
+- **Before the owner signs it off**, the canvas still needs: the sign-in page's words for
+  students too (its heading today is "Teacher portal"), the invite page's line for students, the
+  student pages' teacher link, the student home with no classes, each page's loading state, and
+  the lesson page at 200% zoom (one column, the question above the slide, as on the phone).
+
+**Settled** (the owner, 2026-10-10, each as recommended; PLAN's step for each in parentheses):
+- `event_id` uniqueness in both directions: every route that records an `eventId` refuses one
+  that any `responses` or `saved_questions` row holds, as the answers route already checks
+  `events` (L1, L3b).
+- The guard wherever counts are read: one guarded count that the results route, the recap and
+  any report read (L3, L7c).
+- The portal checks a deck's `sha256` as the phone does, refusing a mismatch, for the presenter
+  and the student web alike (M6, W5).
 - The PDF check runs in a separate worker under a hard time limit, so a hostile file can stall
-  only itself, never the API.
-- The load gate measures several classes polling at once behind one school's address, not one
-  class.
-- Production backups are on before answers, education records, are stored on prod (none for
-  the pilot today).
-- The storage provider (decision 8): AWS S3.
+  only itself, never the API (M2).
+- The load gate measures several classes polling at once behind one school's address, each
+  student on a phone and a laptop (L4, M9).
+- Production backups are on before answers, education records, are stored on prod (L0b, the
+  owner's console step).
+- The storage provider (decision 8): AWS S3, in the Cognito account (M0).
 
 ## The six rules
 
@@ -1391,7 +1469,8 @@ Each exists because v2 broke it and shipped a real bug
   environments); iOS app structure (native, app + extension, mirror-not-cage); web portal
   (Next.js thin client on Vercel); the items in [ISSUES.md](ISSUES.md) are requirements;
   the live lesson (Phase 7, 2026-10-05: questions and slides within a running session,
-  totals only, phones polling), planned and not yet built; the Start's push to waiting
+  totals only, phones polling; 2026-10-10: students on the web too, Slice 3), planned and not
+  yet built; the Start's push to waiting
   students (2026-10-06, a visible doorbell, never the truth), planned and not yet built.
 - **Open:** one design question, Phase 6: ISSUES #3's fallback, should Apple's answer
   call for one (the issue ranks the fallback designs, best fit first). Next: the build plan (what gets coded
