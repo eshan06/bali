@@ -1366,8 +1366,9 @@ and keeps everything that enforces focus.
   so auth is unchanged. The portal's home reads `/v1/me` and `GET /v1/me/age-check`: a teacher
   sees their classes, as today; a student whose account said 13+ in the app sees theirs; any
   other account sees today's invite-code page, with one added line telling a student to set up
-  in the Bali app first. The student pages keep a quiet "Have a teacher invite code?" link for
-  a teacher who used the app first.
+  in the Bali app first. The student home with no classes keeps a quiet link to the invite page
+  ("Setting up a teacher account?"), for a teacher who used the app first; only there, since a
+  student in a class can't redeem a code (the invite's own refusal).
 - **The phone's state on the page** (the owner's ask). Beside the class's name, the student's
   own phone in this session as the server knows it, in the app's chips and words (DESIGN.md):
   Focused, Not in, Unlocked, Screen Time off, or Silent with its minutes, as the grid shows it
@@ -1394,10 +1395,11 @@ and keeps everything that enforces focus.
   what the teacher sees); the privacy policy names the student pages (W3).
 - **Compatibility.** Additive: the presentation read gains a field old phones ignore, and the
   teacher's pages change only in the home's routing and the invite page's one line.
-- **Before the owner signs it off**, the canvas still needs: the sign-in page's words for
-  students too (its heading today is "Teacher portal"), the invite page's line for students, the
-  student pages' teacher link, the student home with no classes, each page's loading state, and
-  the lesson page at 200% zoom (one column, the question above the slide, as on the phone).
+- **Drawn** (2026-10-10, the canvas's three student rows): the sign-in page for both ("Sign in
+  to Bali", where it said "Teacher portal"), the invite page's line for students, the student
+  home with classes and with none, the lesson in each state of the phone, loading, every said
+  line, and 200% zoom (one column under 1024 px, the question first, as on the phone; the card
+  first in the page's order at every width).
 
 **Settled** (the owner, 2026-10-10, each as recommended; PLAN's step for each in parentheses):
 - `event_id` uniqueness in both directions: every route that records an `eventId` refuses one
