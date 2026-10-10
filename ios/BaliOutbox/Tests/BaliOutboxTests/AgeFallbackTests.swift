@@ -80,13 +80,15 @@ struct AgeFallbackTests {
         #expect(rig.keychain.isEmpty)
         #expect(try rig.outbox.records().isEmpty)
 
-        // Another student signs in on this phone, through the check: nothing of the last one's goes.
+        // Another student signs in on this phone, through the check: nothing of the last one's goes,
+        // only reads of the truth — a second one when the read their sign-in's own wake sends asks
+        // for its token only once the check has passed, as on a busy machine it can.
         try await rig.signStudentIn(accessToken("b1"))
         await rig.signIn.passed("b1")
         await rig.engine.retryNow()
         try await rig.server.next(meRoute).reply(200, Answer.me(nil))
         await rig.until { $0.me != nil }
-        #expect(await rig.server.waiting.isEmpty)
+        #expect(await rig.server.waiting.allSatisfy { $0 == meRoute })
         await rig.stop()
     }
 
