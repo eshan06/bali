@@ -8,6 +8,18 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-10** — **Live lesson: the build resumes, both canvases approved, and no screen before
+  backups and the bucket** (the owner, in chat). The owner lifted the hold of 2026-10-05 and
+  approved the screens on both canvases, the [app's](https://claude.ai/artifact/CZpFbFuxnRrLcuywtJGfVQ) and the
+  [portal's](https://claude.ai/artifact/BxHbGud1xMeyXLUUvsewHM) with its student pages. Their order: no
+  screen is built until production backups are on (L0b) and the S3 bucket exists (M0). That is
+  stricter than the plan's gates, which held only the steps that answer for L0b and only the slide
+  steps for M0: now every UI step waits for both. So the steps with no screen run first, and M1,
+  the storage interface, goes ahead of L1, because its PR writes M0's runbook, which the owner
+  needs to make the bucket. Merging the backend before backups is safe: `main` deploys to prod with
+  its migrations, but the new tables stay empty until a screen sends an answer, and every screen
+  waits for L0b.
+
 - **2026-10-10** — **Live lesson: students on the web (Slice 3), built web first, and the open
   questions settled** (the owner's picks). Students mostly have a laptop open in class, so the
   portal becomes where a student follows a lesson first: the slide beside the question card,
