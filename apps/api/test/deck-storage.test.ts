@@ -1,6 +1,9 @@
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { Writable } from 'node:stream';
+import { gzipSync } from 'node:zlib';
 
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { checkDeckBucket } from '../scripts/deck-bucket-check.js';
 import { buildApp } from '../src/app.js';
@@ -137,6 +140,59 @@ describe('the S3 adapter', () => {
       expect(s3DeckStorage({ ...testEnv, ...BUCKET, [name]: undefined }), name).toBeUndefined();
     }
   });
+
+  it('refuses, unread, an answer still labelled encoded: decoding it could outgrow any cap', async () => {
+    const encoded = { status: 206, headers: { 'content-encoding': 'gzip' } };
+    const { storage, sent } = s3(() => new Response('%PDF-1.7 a deck', encoded));
+    await expect(storage.read(KEY, 1_000)).rejects.toMatchObject({
+      name: 'StorageError',
+      code: 'EncodedAnswer',
+      status: 206,
+    });
+    expect(sent[0]!.init.signal?.aborted).toBe(true);
+  });
+});
+
+describe('an object a crafted upload labelled gzip (santa’s round 1)', () => {
+  // S3 keeps a Content-Encoding a presigned PUT sends unsigned, and answers it on a GET unless the
+  // request asks for another. Node's fetch, a browser and URLSession decode what it names: here,
+  // about 1 KB stored that decodes to 1 MiB, past a 64 KiB cap.
+  const stored = new Uint8Array(gzipSync(Buffer.alloc(1024 * 1024)));
+  let server: Server;
+  let origin: string;
+
+  beforeAll(async () => {
+    server = createServer((request, response) => {
+      const asked = new URL(request.url ?? '/', 'http://s3.test').searchParams;
+      const range = /^bytes=0-(\d+)$/.exec(request.headers.range ?? '');
+      const body = range ? stored.subarray(0, Number(range[1]) + 1) : stored;
+      response.writeHead(range ? 206 : 200, {
+        'content-type': 'application/pdf',
+        'content-encoding': asked.get('response-content-encoding') ?? 'gzip',
+        'content-length': String(body.byteLength),
+      });
+      response.end(body);
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  });
+  afterAll(() => new Promise<void>((resolve) => server.close(() => resolve())));
+
+  /** Node's own fetch, sent to that server in S3's place. */
+  const local = (url: string) => `${origin}${new URL(url).pathname}${new URL(url).search}`;
+  const nodeFetch = ((url: string, init?: RequestInit) => fetch(local(url), init)) as typeof fetch;
+
+  it('never decodes it on the API’s read: the bytes as stored, within the cap', async () => {
+    const storage = s3DeckStorage({ ...testEnv, ...BUCKET }, nodeFetch)!;
+    expect(await storage.read(KEY, 64 * 1024)).toEqual(stored);
+  });
+
+  it('downloads it as stored: the URL asks S3 to answer Content-Encoding: identity', async () => {
+    const storage = s3DeckStorage({ ...testEnv, ...BUCKET }, nodeFetch)!;
+    const got = await fetch(local(storage.downloadUrl(KEY)));
+    expect(got.headers.get('content-encoding')).toBe('identity');
+    expect(new Uint8Array(await got.arrayBuffer())).toEqual(stored);
+  });
 });
 
 describe('the in-memory stand-in', () => {
@@ -191,6 +247,20 @@ describe('the in-memory stand-in', () => {
       expect(answer.status).toBe(403);
       expect(await answer.text()).toContain('<Code>AccessDenied</Code>');
     }
+  });
+
+  it('gives back as stored a file its uploader labelled gzip, the answer saying identity', async () => {
+    const storage = memoryDeckStorage();
+    const labelled = await storage.fetch(storage.uploadUrl(KEY, file.byteLength), {
+      method: 'PUT',
+      headers: { 'content-type': 'application/pdf', 'content-encoding': 'gzip' },
+      body: file,
+    });
+    expect(labelled.status).toBe(200);
+    expect(await storage.read(KEY, file.byteLength)).toEqual(file);
+    const got = await storage.fetch(storage.downloadUrl(KEY));
+    expect(got.headers.get('content-encoding')).toBe('identity');
+    expect(new Uint8Array(await got.arrayBuffer())).toEqual(file);
   });
 
   it('reads none as missing and a larger one as too_large, and deletes, as often as asked', async () => {
