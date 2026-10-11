@@ -91,6 +91,12 @@ export const API_ERROR_REASONS = [
   // that reached an account deleted on the way — a 409; nothing recorded.
   'teacher_has_classes',
   'account_deleted',
+  // A live lesson's question (Phase 7; the engine answers each as an outcome):
+  // no question has the id (a 404); an answer past its close or the bell (a
+  // 409); an option the question lacks (a 400). Nothing was recorded.
+  'question_not_found',
+  'question_closed',
+  'invalid_option',
 ] as const;
 export type ApiErrorReason = (typeof API_ERROR_REASONS)[number];
 

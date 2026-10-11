@@ -3291,6 +3291,21 @@ export interface QuestionResult {
   /** 'opened' or 'closed' by this call; 'replay' changed nothing, and carries the question now. */
   outcome: 'opened' | 'closed' | 'replay';
   question: QuestionRow;
+  /** The question's session as this transaction read it: what `questionOpen` judges it by. */
+  session: SessionRow;
+}
+
+/**
+ * Whether a question is open at `now`: never closed, and its session running by the server's
+ * clock (A17), so past the bell it is closed though the sweep has not yet stamped it. The one rule
+ * for an answer, a close, and every answer the API gives about a question.
+ */
+export function questionOpen(
+  question: Pick<QuestionRow, 'closedAt'>,
+  session: Pick<SessionRow, 'endedAt' | 'endsAt'>,
+  now: Date,
+): boolean {
+  return question.closedAt === null && sessionRunning(session, now);
 }
 
 /**
@@ -3401,7 +3416,9 @@ export function openQuestion(db: Database, input: OpenQuestionInput): Promise<Qu
         if (held.createdBy !== input.teacherId) {
           throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
         }
-        return { outcome: 'replay', question: held };
+        // Judged by its own session, which a retry sent under another session's URL does not name.
+        const own = held.sessionId === session.id ? session : await loadSession(tx, held.sessionId);
+        return { outcome: 'replay', question: held, session: own! };
       }
       const now = input.now ?? new Date();
       if (!sessionRunning(session, now)) {
@@ -3429,7 +3446,7 @@ export function openQuestion(db: Database, input: OpenQuestionInput): Promise<Qu
         occurredAt: now,
         payload: { question_id: question!.id },
       });
-      return { outcome: 'opened', question: question! };
+      return { outcome: 'opened', question: question!, session };
     }),
   );
 }
@@ -3458,8 +3475,8 @@ export function closeQuestion(
     if (!locked) return { outcome: 'question_not_found' as const };
     const { session, question } = locked;
     const now = input.now ?? new Date();
-    if (question.closedAt !== null || !sessionRunning(session, now)) {
-      return { outcome: 'replay' as const, question };
+    if (!questionOpen(question, session, now)) {
+      return { outcome: 'replay' as const, question, session };
     }
     const revealed = input.reveal === true && question.correctOption !== null;
     const closed = await closeQuestionRow(tx, session, question.id, {
@@ -3468,7 +3485,7 @@ export function closeQuestion(
       eventId: input.eventId,
       revealed,
     });
-    return { outcome: 'closed' as const, question: closed };
+    return { outcome: 'closed' as const, question: closed, session };
   });
 }
 
@@ -3515,7 +3532,7 @@ export function answerQuestion(db: Database, input: AnswerInput): Promise<Answer
         throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
       }
       const now = input.now ?? new Date();
-      if (question.closedAt !== null || !sessionRunning(session, now)) {
+      if (!questionOpen(question, session, now)) {
         return { outcome: 'question_closed' };
       }
       if (

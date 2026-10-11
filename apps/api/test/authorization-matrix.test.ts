@@ -4,6 +4,8 @@ import {
   enrollments,
   formatInviteCode,
   mintTeacherInvite,
+  newUuidV7,
+  openQuestion,
   protectionOff,
   recordAgreement,
   startSession,
@@ -119,6 +121,8 @@ const MATRIX = {
   'POST /v1/sessions/:id/refocus':          [401, 401, 200,     409,     409,     409],
   'POST /v1/sessions/:id/protection-off':   [401, 401, 200,     409,     409,     409],
   'POST /v1/sessions/:id/protection-on':    [401, 401, 200,     409,     409,     409],
+  'POST /v1/sessions/:id/questions':        [401, 401, 403,     403,     403,     200],
+  'POST /v1/questions/:id/close':           [401, 401, 403,     403,     403,     200],
 } as const satisfies Record<string, readonly number[]>;
 type RouteKey = keyof typeof MATRIX;
 
@@ -151,6 +155,18 @@ const stamped = () => ({ eventId: randomUUID(), deviceTime: new Date().toISOStri
 
 /** An APNs device token no phone has registered: 64 hex digits. */
 const pushToken = () => randomUUID().replace(/-/g, '').repeat(2);
+
+/** A question the owner asked in the world's session (Phase 7, L3): its id. */
+async function asked(w: World): Promise<string> {
+  const { question } = await openQuestion(db, {
+    sessionId: w.sessionId,
+    teacherId: w.owner.id,
+    eventId: newUuidV7(),
+    prompt: 'Which?',
+    options: ['a', 'b'],
+  });
+  return question.id;
+}
 
 /** Each route's request, against a row's world. A HEAD sends its GET's. */
 const REQUESTS: Record<RouteKey, (w: World) => Sent | Promise<Sent>> = {
@@ -261,6 +277,15 @@ const REQUESTS: Record<RouteKey, (w: World) => Sent | Promise<Sent>> = {
     });
     return { url: `/v1/sessions/${w.sessionId}/protection-on`, body: stamped() };
   },
+  // A live lesson's question (L3): the class's own teacher only.
+  'POST /v1/sessions/:id/questions': (w) => ({
+    url: `/v1/sessions/${w.sessionId}/questions`,
+    body: { eventId: newUuidV7(), prompt: 'Which?', options: ['a', 'b'] },
+  }),
+  'POST /v1/questions/:id/close': async (w) => ({
+    url: `/v1/questions/${await asked(w)}/close`,
+    body: { eventId: newUuidV7() },
+  }),
 };
 
 /** The matrix's key for `route`: a HEAD is its GET's. */

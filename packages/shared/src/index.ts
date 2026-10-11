@@ -223,6 +223,15 @@ export const QUESTION_CLOSED_BY = ['teacher', 'newer_question', 'session_end'] a
 export type QuestionClosedBy = (typeof QUESTION_CLOSED_BY)[number];
 
 /**
+ * A live lesson's question as decision 3 bounds it, in code points, plain text:
+ * what the open checks (L3), and what the portal's Ask holds to.
+ */
+export const QUESTION_PROMPT_MAX_LENGTH = 500;
+export const QUESTION_OPTION_MAX_LENGTH = 200;
+export const QUESTION_OPTIONS_MIN = 2;
+export const QUESTION_OPTIONS_MAX = 6;
+
+/**
  * The events a student's own history shows (`GET /v1/me/history`, A7): the
  * moments the consent screen says a teacher sees. `armed_tap_skipped` is a tap
  * a Start declined because it had already counted elsewhere — never a join.

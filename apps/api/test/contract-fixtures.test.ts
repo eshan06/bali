@@ -1014,7 +1014,12 @@ describe('the contract fixtures (contracts/fixtures)', () => {
     // Only a race reaches it: a join, rename or tap whose route found the
     // account just before its deletion (C3); in sequence, the sign-in is a new account.
     const raceOnly = new Set<string>(['account_deleted']);
-    const phones = API_ERROR_REASONS.filter((r) => !portal.has(r) && !raceOnly.has(r));
+    // A live lesson's question refusals: the portal's for now (L3); the answer route gives a
+    // phone each, its fixtures with it (L4), which takes them out of here.
+    const answer = new Set<string>(['question_not_found', 'question_closed', 'invalid_option']);
+    const phones = API_ERROR_REASONS.filter(
+      (r) => !portal.has(r) && !raceOnly.has(r) && !answer.has(r),
+    );
     expect(new Set(reasons)).toEqual(new Set(phones));
   });
 

@@ -759,6 +759,55 @@ export interface SessionSnapshot {
    * class — so each chip's name and state come back with every snapshot.
    */
   students: SnapshotStudent[];
+  /**
+   * The session's open question (Phase 7, L3), so a reloaded portal finds it: null when none is
+   * open by the server's clock, so past the bell too. Additive: an older server omits it.
+   */
+  question?: TeacherQuestion | null;
+}
+
+// POST /v1/sessions/{id}/questions — open a question; POST /v1/questions/{id}/close — close it
+// (Phase 7, L3; "Live lesson", decision 6). The class's own teacher only.
+/** A live lesson's question as its teacher sees it. */
+export interface TeacherQuestion {
+  id: string;
+  prompt: string;
+  /** 2–6; an answer names one by its index. */
+  options: string[];
+  /** The correct option's index, when the teacher gave one. */
+  correctOption: number | null;
+  /** Whether its close showed students the correct option. */
+  revealed: boolean;
+  /**
+   * Never closed, and its session running by the server's clock (A17): past the bell it is
+   * closed, though the sweep has not yet marked it.
+   */
+  open: boolean;
+}
+export interface OpenQuestionRequest {
+  eventId: string;
+  /** Trimmed, at most `QUESTION_PROMPT_MAX_LENGTH` code points; line breaks allowed. */
+  prompt: string;
+  /** `QUESTION_OPTIONS_MIN`–`QUESTION_OPTIONS_MAX`, each trimmed, at most `QUESTION_OPTION_MAX_LENGTH`. */
+  options: string[];
+  correctOption?: number | null;
+}
+export interface CloseQuestionRequest {
+  eventId: string;
+  /** Show students the correct option, when the question has one. */
+  reveal?: boolean;
+}
+/**
+ * Every outcome an open or a close answers with (`QuestionResponse.outcome`): `opened`, `closed`,
+ * or `replay`, which changed nothing — the open's own retry, or a close of a question already
+ * closed (by the teacher, a newer question, or its session's end, the bell included).
+ */
+export const QUESTION_OUTCOMES = ['opened', 'closed', 'replay'] as const;
+export type QuestionOutcome = (typeof QUESTION_OUTCOMES)[number];
+export interface QuestionResponse {
+  outcome: QuestionOutcome;
+  /** The question now. */
+  question: TeacherQuestion;
 }
 
 /**

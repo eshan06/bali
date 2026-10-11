@@ -1,4 +1,10 @@
-import { type Database, getEventsSince, getLatestSeq, getSessionRoster } from '@bali/db';
+import {
+  type Database,
+  findUnclosedQuestion,
+  getEventsSince,
+  getLatestSeq,
+  getSessionRoster,
+} from '@bali/db';
 import { EVENT_PAGE_LIMIT, type EventsPage, type SessionSnapshot } from '@bali/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -8,6 +14,7 @@ import { ApiError, parseRequest } from '../errors.js';
 import { SECURITY_HEADERS } from '../headers.js';
 import { toFeedEvent } from '../sse/frame.js';
 import { createStreamHub, type StreamHubOptions } from '../sse/hub.js';
+import { teacherQuestion } from './questions.js';
 
 const Params = z.object({ id: z.string().uuid() });
 const AfterQuery = z.object({ after: z.coerce.number().int().min(0).default(0) });
@@ -51,7 +58,7 @@ export function streamErrorLog(code: string | undefined): {
 
 /**
  * The teacher grid's read + live sides (decision 5), all owner-only:
- * - GET /v1/sessions/:id — boot snapshot (session, roster, latest seq).
+ * - GET /v1/sessions/:id — boot snapshot (session, roster, latest seq, the open question).
  * - GET /v1/sessions/:id/events?after=seq — catch-up page, seq-ascending.
  * - GET /v1/sessions/:id/stream — SSE live feed (Authorization header only, no
  *   token in the query string; the portal uses fetch, never EventSource).
@@ -59,6 +66,7 @@ export function streamErrorLog(code: string | undefined): {
 export function registerFeedRoutes(
   app: FastifyInstance,
   db: Database,
+  clock: () => Date,
   streamOptions: StreamHubOptions = {},
 ): void {
   const hub = createStreamHub(db, streamOptions);
@@ -82,6 +90,9 @@ export function registerFeedRoutes(
       // under-state the roster, which the guard handles safely.
       const latestSeq = await getLatestSeq(db, session.id);
       const roster = await getSessionRoster(db, session.id, session.classId);
+      // After the cursor too, as the roster: the stream brings whatever closes it since.
+      const unclosed = await findUnclosedQuestion(db, session.id);
+      const question = unclosed && teacherQuestion(unclosed, session, clock());
 
       return {
         session: {
@@ -104,6 +115,7 @@ export function registerFeedRoutes(
           protectionOffAfterEnd: r.protectionOffAfterEnd,
           clockOff: r.clockOff,
         })),
+        question: question?.open ? question : null,
       };
     },
   );
