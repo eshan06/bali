@@ -172,6 +172,13 @@ struct APIClientFixtureTests {
             let response = await client.history(before: fixture.query("before"), limit: limit)
             return try answered(response, fixture)
         },
+        "GET /v1/sessions/{id}/presentation": { client, fixture in
+            try answered(await client.presentation(session: fixture.parameter), fixture)
+        },
+        "POST /v1/questions/{id}/answers": { client, fixture in
+            let request = try fixture.sent(AnswerRequest.self)
+            return try answered(await client.answer(question: fixture.parameter, request), fixture)
+        },
     ]
 
     /// Checks `response` is the fixture's answer — its status, and its body as the app decodes it:

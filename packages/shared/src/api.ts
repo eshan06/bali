@@ -864,6 +864,62 @@ export interface QuestionResults {
   counts: number[] | null;
 }
 
+// GET /v1/sessions/{id}/presentation — what a student's phone and the student web show of a live
+// lesson (Phase 7, L4; "Live lesson", decision 6), polled about every 2 s; a student enrolled in the
+// session's class now. A strong ETag over the body, and `If-None-Match` answers `304`. Slides (M3)
+// and the student's own phone (W1) join it as fields of their own.
+export interface Presentation {
+  /** The session runs by the server's clock: false tells the client to stop polling. */
+  running: boolean;
+  /**
+   * The open question, or the last closed one until another opens; null when none was asked, and
+   * once the session is over: nothing is shown outside one (decision 2).
+   */
+  question: StudentQuestion | null;
+}
+/** A live lesson's question as a student sees it: never anyone's counts. */
+export interface StudentQuestion {
+  id: string;
+  prompt: string;
+  /** 2–6; an answer names one by its index. */
+  options: string[];
+  /** As `TeacherQuestion.open`: an answer counts only while it is. */
+  open: boolean;
+  /** The correct option's index once its close revealed it; null until then, and when none. */
+  correctOption: number | null;
+  /** The caller's own answer now, if they gave one. */
+  answer: StudentAnswer | null;
+}
+/** A student's answer now. */
+export interface StudentAnswer {
+  option: number;
+  /**
+   * The id it was sent under. An answer replaces it only when its `eventId` sorts after this one
+   * (UUIDv7 order: decision 4), so a client mints its next answer after it.
+   */
+  eventId: string;
+}
+
+// POST /v1/questions/{id}/answers — a student answers a live lesson's question (Phase 7, L4;
+// "Live lesson", decisions 4–6), sent once and never queued.
+export interface AnswerRequest {
+  /** A UUIDv7. */
+  eventId: string;
+  /** The option's index. */
+  option: number;
+}
+/**
+ * Every outcome an answer is answered with (`AnswerResponse.outcome`): `answered`, or `replay`,
+ * which changed nothing — its own retry, or an answer older than the one held.
+ */
+export const ANSWER_OUTCOMES = ['answered', 'replay'] as const;
+export type AnswerOutcome = (typeof ANSWER_OUTCOMES)[number];
+export interface AnswerResponse {
+  outcome: AnswerOutcome;
+  /** The caller's answer now. */
+  answer: StudentAnswer;
+}
+
 /**
  * One event as the catch-up feed and the live stream carry it. On the SSE stream
  * this JSON is the `data:` frame, with `seq` echoed in the SSE `id:` line so a

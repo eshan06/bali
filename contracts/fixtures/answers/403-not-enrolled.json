@@ -1,0 +1,19 @@
+{
+  "endpoint": "POST /v1/questions/{id}/answers",
+  "scenario": "An answer from someone not in the class.",
+  "request": {
+    "path": "/v1/questions/00000000-0000-7000-8000-000000000001/answers",
+    "body": {
+      "eventId": "00000000-0000-7000-8000-000000000002",
+      "option": 1
+    }
+  },
+  "status": 403,
+  "type": "ApiErrorBody",
+  "body": {
+    "error": {
+      "code": "forbidden",
+      "message": "not in this class"
+    }
+  }
+}

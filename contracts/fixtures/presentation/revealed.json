@@ -1,0 +1,27 @@
+{
+  "endpoint": "GET /v1/sessions/{id}/presentation",
+  "scenario": "That question closed with its correct option shown, and the student’s answer: it stays until another opens.",
+  "request": {
+    "path": "/v1/sessions/00000000-0000-7000-8000-000000000001/presentation"
+  },
+  "status": 200,
+  "type": "Presentation",
+  "body": {
+    "running": true,
+    "question": {
+      "id": "00000000-0000-7000-8000-000000000002",
+      "prompt": "Which planet is the largest?",
+      "options": [
+        "Mars",
+        "Jupiter",
+        "Venus"
+      ],
+      "open": false,
+      "correctOption": 1,
+      "answer": {
+        "option": 1,
+        "eventId": "00000000-0000-7000-8000-000000000003"
+      }
+    }
+  }
+}

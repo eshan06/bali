@@ -1,0 +1,20 @@
+{
+  "endpoint": "POST /v1/questions/{id}/answers",
+  "scenario": "An answer under an id the student’s own tap holds (a bug).",
+  "request": {
+    "path": "/v1/questions/00000000-0000-7000-8000-000000000001/answers",
+    "body": {
+      "eventId": "00000000-0000-7000-8000-000000000002",
+      "option": 0
+    }
+  },
+  "status": 409,
+  "type": "ApiErrorBody",
+  "body": {
+    "error": {
+      "code": "conflict",
+      "reason": "event_id_conflict",
+      "message": "event_id already used by another event"
+    }
+  }
+}

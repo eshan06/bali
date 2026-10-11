@@ -1,13 +1,16 @@
 import {
+  closeQuestion,
   type Database,
   endSession,
   enrollments,
   newUuidV7,
+  openQuestion,
   startSession,
   tapIn,
   users,
 } from '@bali/db';
 import {
+  ANSWER_OUTCOMES,
   API_ERROR_REASONS,
   type ApiErrorBody,
   CHECK_IN_STATUSES,
@@ -17,6 +20,7 @@ import {
   HISTORY_EVENT_TYPES,
   type HistoryPage,
   type MeResponse,
+  type Presentation,
   PROTECTION_OFF_OUTCOMES,
   PROTECTION_ON_OUTCOMES,
   PUSH_ENVIRONMENTS,
@@ -221,6 +225,22 @@ const SCENARIOS: Record<string, string> = {
   'account/already-deleted': 'The retry of that deletion: this sign-in has no account now.',
   'account/409-teacher-has-classes':
     'A teacher with a class deleting their account: theirs goes through the school.',
+  'presentation/nothing-asked':
+    'A live lesson polled (Phase 7, L4) before the teacher asks anything: the session runs.',
+  'presentation/open':
+    'The question the teacher opened: the student’s to answer, its correct option hidden.',
+  'presentation/revealed':
+    'That question closed with its correct option shown, and the student’s answer: it stays until another opens.',
+  'presentation/over': 'The poll once the session is over: stop polling; nothing shows.',
+  'presentation/403-not-enrolled': 'A poll of a lesson in a class the caller is not in.',
+  'presentation/404-session-not-found': 'A poll of a session the server does not know.',
+  'answers/answered': 'A student answers the open question: recorded, and never an event.',
+  'answers/replay': 'The retry of that answer: the answer now, recorded once.',
+  'answers/400-invalid-option': 'An answer naming an option the question lacks.',
+  'answers/403-not-enrolled': 'An answer from someone not in the class.',
+  'answers/404-question-not-found': 'An answer to a question the server does not know.',
+  'answers/409-question-closed': 'An answer after the teacher closed the question: not recorded.',
+  'answers/409-event-id-conflict': 'An answer under an id the student’s own tap holds (a bug).',
 };
 
 interface Call {
@@ -878,6 +898,54 @@ async function captureAll() {
   const unsigned: Call = { as: null, method: 'GET', path: ageCheck };
   await capture('age-check/401-unauthorized', unsigned, 401, { code: 'unauthorized' });
 
+  // A live lesson (Phase 7, L4): what a student's phone polls of it, and their answers.
+  const quiz = await seedClassroom(db, 'fx-quiz');
+  const lessonNow = await start(quiz.klass.id);
+  const kim = await token(quiz.student.cognitoId);
+  const poll = (as: string, sessionId = lessonNow.id) =>
+    get(as, `/v1/sessions/${sessionId}/presentation`);
+  const nothing = { running: true, question: null };
+  await capture('presentation/nothing-asked', poll(kim), 200, nothing);
+  const { question } = await openQuestion(db, {
+    sessionId: lessonNow.id,
+    teacherId: quiz.teacher.id,
+    eventId: newUuidV7(),
+    prompt: 'Which planet is the largest?',
+    options: ['Mars', 'Jupiter', 'Venus'],
+    correctOption: 1,
+  });
+  await capture('presentation/open', poll(kim), 200, { running: true });
+  const answerTo = (as: string, questionId: string, option: number, eventId = newUuidV7()) =>
+    post(as, `/v1/questions/${questionId}/answers`, { eventId, option });
+  const jupiter = answerTo(kim, question.id, 1);
+  await capture('answers/answered', jupiter, 200, { outcome: 'answered' });
+  await capture('answers/replay', jupiter, 200, { outcome: 'replay' });
+  const noSuch = { reason: 'invalid_option' };
+  await capture('answers/400-invalid-option', answerTo(kim, question.id, 3), 400, noSuch);
+  const notIn = { code: 'forbidden' };
+  await capture('answers/403-not-enrolled', answerTo(newcomer, question.id, 1), 403, notIn);
+  const noQuestion = { reason: 'question_not_found' };
+  const unasked = answerTo(kim, randomUUID(), 1);
+  await capture('answers/404-question-not-found', unasked, 404, noQuestion);
+  const kimsTap = newUuidV7();
+  await tapIn(db, {
+    sessionId: lessonNow.id,
+    studentId: quiz.student.id,
+    eventId: kimsTap,
+    deviceTime: new Date(),
+  });
+  const tapsId = answerTo(kim, question.id, 0, kimsTap);
+  await capture('answers/409-event-id-conflict', tapsId, 409, { reason: 'event_id_conflict' });
+  await closeQuestion(db, { questionId: question.id, eventId: newUuidV7(), reveal: true });
+  await capture('presentation/revealed', poll(kim), 200, { running: true });
+  const shut = { reason: 'question_closed' };
+  await capture('answers/409-question-closed', answerTo(kim, question.id, 0), 409, shut);
+  await capture('presentation/403-not-enrolled', poll(newcomer), 403, notIn);
+  const noSession = { reason: 'session_not_found' };
+  await capture('presentation/404-session-not-found', poll(kim, randomUUID()), 404, noSession);
+  await end(lessonNow.id);
+  await capture('presentation/over', poll(kim), 200, { running: false, question: null });
+
   // The account's deletion (C3), last: it leaves Eve's classes and her row named to no one.
   const deletion = del(eve, '/v1/me');
   await capture('account/deleted', deletion, 200, { outcome: 'deleted' });
@@ -947,6 +1015,16 @@ describe('the contract fixtures (contracts/fixtures)', () => {
     expect(joins).toEqual(new Set(ENROLLMENT_JOIN_OUTCOMES));
     const leaves = valuesOf('EndEnrollmentResponse', 'outcome');
     expect(leaves).toEqual(new Set(END_ENROLLMENT_OUTCOMES));
+    expect(valuesOf('AnswerResponse', 'outcome')).toEqual(new Set(ANSWER_OUTCOMES));
+    // A live lesson's poll (L4), running and over, with a question and none; that question open
+    // and closed, its correct option hidden and shown, answered and not: BaliCore decodes each.
+    const polls = all.filter((f) => f.type === 'Presentation').map((f) => f.body as Presentation);
+    expect(new Set(polls.map((p) => p.running))).toEqual(new Set([true, false]));
+    expect(new Set(polls.map((p) => p.question === null))).toEqual(new Set([true, false]));
+    const shown = polls.flatMap((p) => (p.question === null ? [] : [p.question]));
+    expect(new Set(shown.map((q) => q.open))).toEqual(new Set([true, false]));
+    expect(new Set(shown.map((q) => q.correctOption === null))).toEqual(new Set([true, false]));
+    expect(new Set(shown.map((q) => q.answer === null))).toEqual(new Set([true, false]));
     // A leave that ended the student's participation too — past the bell, before the sweep —
     // and one that ended only the enrollment (A19; #132's review).
     const endedHere = valuesOf('EndEnrollmentResponse', 'endedParticipation');
@@ -1013,15 +1091,10 @@ describe('the contract fixtures (contracts/fixtures)', () => {
       'student_in_class',
       'saved_question_not_found',
     ]);
-    // Only a race reaches it: a join, rename or tap whose route found the
+    // Only a race reaches it: a join, rename, tap or answer whose route found the
     // account just before its deletion (C3); in sequence, the sign-in is a new account.
     const raceOnly = new Set<string>(['account_deleted']);
-    // A live lesson's question refusals: the portal's for now (L3); the answer route gives a
-    // phone each, its fixtures with it (L4), which takes them out of here.
-    const answer = new Set<string>(['question_not_found', 'question_closed', 'invalid_option']);
-    const phones = API_ERROR_REASONS.filter(
-      (r) => !portal.has(r) && !raceOnly.has(r) && !answer.has(r),
-    );
+    const phones = API_ERROR_REASONS.filter((r) => !portal.has(r) && !raceOnly.has(r));
     expect(new Set(reasons)).toEqual(new Set(phones));
   });
 

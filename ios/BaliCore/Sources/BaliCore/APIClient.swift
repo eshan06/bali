@@ -303,6 +303,18 @@ public struct APIClient: Sendable {
         return await send("GET", "/v1/me/history" + (query.isEmpty ? "" : "?" + query))
     }
 
+    /// `GET /v1/sessions/{id}/presentation` — what the phone shows of a live lesson (Phase 7, L4).
+    public func presentation(session id: String) async -> APIResponse<Presentation> {
+        await send("GET", "/v1/sessions/\(escaped(id))/presentation")
+    }
+
+    /// `POST /v1/questions/{id}/answers` — the student's answer, sent once: no outbox table reads it.
+    public func answer(question id: String, _ request: AnswerRequest) async
+        -> APIResponse<AnswerResponse>
+    {
+        await send("POST", "/v1/questions/\(escaped(id))/answers", request)
+    }
+
     /// One request, sent once, and its answer as the tables take it.
     private func send<Answer: Decodable & Sendable>(
         _ method: String, _ path: String, _ body: (any Encodable & Sendable)? = nil

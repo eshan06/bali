@@ -1,0 +1,20 @@
+{
+  "endpoint": "POST /v1/questions/{id}/answers",
+  "scenario": "An answer after the teacher closed the question: not recorded.",
+  "request": {
+    "path": "/v1/questions/00000000-0000-7000-8000-000000000001/answers",
+    "body": {
+      "eventId": "00000000-0000-7000-8000-000000000002",
+      "option": 0
+    }
+  },
+  "status": 409,
+  "type": "ApiErrorBody",
+  "body": {
+    "error": {
+      "code": "conflict",
+      "reason": "question_closed",
+      "message": "the question is closed"
+    }
+  }
+}
