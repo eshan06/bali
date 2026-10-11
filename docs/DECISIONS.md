@@ -17,8 +17,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   where a class name goes:** the disposal empties the prompt and option texts of every question
   in the school's lessons, the retention run those of a teacher it de-identifies, each keeping
   its count of options (an array of empty strings) and its correct option, so every answer still
-  names an option by its index. The account deletion leaves them, as it leaves a deleted
-  teacher's removed classes their names (found: `deleteAccount` never touches `classes.name`).
+  names an option by its index. The disposal picks its lessons' questions by a subquery, never a
+  list of the lessons' ids, which a school outgrows: postgres.js binds at most 65,534 parameters a
+  statement (santa's round-1 blocker on #311, fixed on the owner's ruling). The account deletion
+  leaves them, as it leaves a deleted teacher's removed classes their names (found:
+  `deleteAccount` never touches `classes.name`); one decision for all of a teacher's words at
+  their own deletion, deck titles included, is #313, to make with M4.
   **An answer takes its student's row FOR SHARE first, and one reaching a deleted account is
   refused `ACCOUNT_DELETED`, nothing recorded**, as a tap, a join or the 13+ yes is: an answer is
   no must-never-lose record (Live lesson, decision 5). The lock is for the retention run: it

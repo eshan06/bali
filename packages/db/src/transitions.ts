@@ -4369,8 +4369,12 @@ async function disposeOnce(tx: Database, input: DisposeSchoolInput): Promise<Dis
       .set({ removedAt: input.at })
       .where(and(inArray(classes.id, classIds), isNull(classes.removedAt)));
   }
-  const lessonIds = lessons.map((s) => s.id);
-  if (lessonIds.length) await emptyQuestions(tx, inArray(questions.sessionId, lessonIds));
+  // Its lessons by a subquery, never a list of their ids: they outgrow what one statement binds.
+  const ofSchool = tx
+    .select({ id: sessions.id })
+    .from(sessions)
+    .where(inArray(sessions.classId, classIds));
+  if (lessons.length) await emptyQuestions(tx, inArray(questions.sessionId, ofSchool));
   const armed = peopleIds.length
     ? await tx
         .delete(armedTaps)
