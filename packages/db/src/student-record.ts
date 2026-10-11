@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull, or } from 'drizzle-orm';
+import { and, asc, eq, getTableColumns, inArray, isNull, or } from 'drizzle-orm';
 import { validate as isUuid } from 'uuid';
 
 import {
@@ -9,6 +9,8 @@ import {
   enrollments,
   events,
   participations,
+  questions,
+  responses,
   schools,
   sessions,
   teacherInvites,
@@ -40,11 +42,14 @@ export const STUDENT_RECORD_COVERAGE = {
     'teacher_invites.redeemed_by': 'invitesRedeemed',
     'device_tokens.user_id': 'deviceTokens',
     'age_checks.user_id': 'ageCheck',
+    'responses.student_id': 'responses',
   },
   notTheirs: {
     'classes.teacher_id': "a teacher's classes: the school's records, with other students in them",
     'blocks.teacher_id': "a teacher's blocks: the school's equipment",
     'armed_taps.teacher_id': "the taps other students made on a teacher's block",
+    'questions.created_by':
+      "a teacher's questions: in the record only as the one a response answers",
   },
 } as const;
 
@@ -110,12 +115,27 @@ export async function exportStudentRecord(db: Database, who: string, now: Date =
         .orderBy(asc(deviceTokens.createdAt), asc(deviceTokens.token));
       // Their 13+ yes (C7-server), if recorded: that they confirmed 13 or older, and when.
       const [ageCheck] = await tx.select().from(ageChecks).where(eq(ageChecks.userId, id));
+      // Their answers to a live lesson's questions, each with the question it answers.
+      const answered = await tx
+        .select({
+          ...getTableColumns(responses),
+          question: {
+            sessionId: questions.sessionId,
+            prompt: questions.prompt,
+            options: questions.options,
+          },
+        })
+        .from(responses)
+        .innerJoin(questions, eq(questions.id, responses.questionId))
+        .where(eq(responses.studentId, id))
+        .orderBy(asc(responses.answeredAt), asc(responses.id));
 
       // What those rows point at, named: never another student, only the
       // class, its teacher's display name, its school, a session's window.
       const sessionIds = unique([
         ...participated.map((p) => p.sessionId),
         ...happened.map((e) => e.sessionId),
+        ...answered.map((r) => r.question.sessionId),
       ]);
       const sessionRows = sessionIds.length
         ? await tx
@@ -194,6 +214,7 @@ export async function exportStudentRecord(db: Database, who: string, now: Date =
         invitesRedeemed,
         deviceTokens: tokens,
         ageCheck: ageCheck ?? null,
+        responses: answered,
         classes: classRows,
         sessions: sessionRows,
         sessionEvents,

@@ -186,6 +186,14 @@ describe('grid-state', () => {
     expect(applyEvent(s, evt(6, 'unlock', null))).toBe(s);
   });
 
+  it('leaves the roster untouched for a live lesson’s question, opened or closed (Phase 7)', () => {
+    const s = fromSnapshot(snapshot(5, [{ id: 'ana' }]));
+    const closed = { question_id: 'q1', revealed: true, closed_by: 'session_end' };
+    expect(applyEvent(s, evt(6, 'question_opened', null, T1, { question_id: 'q1' }))).toBe(s);
+    expect(applyEvent(s, evt(7, 'question_closed', null, T1, closed))).toBe(s);
+    expect(endsSession(evt(7, 'question_closed', null, T1, closed))).toBe(false);
+  });
+
   it('surfaces a student the snapshot never carried rather than dropping the event', () => {
     // A mid-session joiner, or one removed whose phone then unlocks: the record
     // is durable either way, so the grid must not stay silent about it.

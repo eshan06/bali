@@ -23,10 +23,12 @@ import {
 } from '../src/student-record.js';
 import { makeTestDb } from '../src/testing.js';
 import {
+  answerQuestion,
   armTap,
   deleteAccount,
   endSession,
   extendSession,
+  openQuestion,
   renameStudent,
   startSession,
   tapIn,
@@ -252,6 +254,49 @@ describe('exportStudentRecord (C5)', () => {
     expect(record.participations).toMatchObject([{ endedReason: 'session_ended' }]);
   });
 
+  it('carries each answer of theirs with the question it answers, and names its lesson (Live lesson)', async () => {
+    const { ana, ben, teacher, second, session } = await seed('c5-answers');
+    const { session: chemistry } = await startSession(db, {
+      classId: second.id,
+      startedAt: fromNow(-5 * MIN),
+      endsAt: fromNow(30 * MIN),
+    });
+    const ask = async (sessionId: string, prompt: string) =>
+      (
+        await openQuestion(db, {
+          sessionId,
+          teacherId: teacher.id,
+          eventId: newUuidV7(),
+          prompt,
+          options: ['yes', 'no'],
+        })
+      ).question;
+    const hers = await ask(chemistry.id, 'Ready?');
+    const his = await ask(session.id, 'Done?');
+    const eventId = newUuidV7();
+    await answerQuestion(db, { questionId: hers.id, studentId: ana.id, eventId, option: 1 });
+    await answerQuestion(db, {
+      questionId: his.id,
+      studentId: ben.id,
+      eventId: newUuidV7(),
+      option: 0,
+    });
+
+    const record = await exported(ana.id);
+    expect(record.responses).toMatchObject([
+      {
+        questionId: hers.id,
+        studentId: ana.id,
+        option: 1,
+        eventId,
+        question: { sessionId: chemistry.id, prompt: 'Ready?', options: ['yes', 'no'] },
+      },
+    ]);
+    // She never tapped into Chemistry's lesson, and answered in it: it is named all the same.
+    expect(record.sessions.map((s) => s.id)).toContain(chemistry.id);
+    expect(JSON.stringify(record)).not.toContain('Done?');
+  });
+
   it('finds the account by its Cognito subject too, and none for a stranger', async () => {
     const { ana } = await seed('c5-sub');
     expect((await exported(ana.cognitoId)).account.id).toBe(ana.id);
@@ -272,6 +317,7 @@ describe('exportStudentRecord (C5)', () => {
       record.armedTaps,
       record.invitesRedeemed,
       record.deviceTokens,
+      record.responses,
       record.classes,
       record.sessions,
       record.sessionEvents,
