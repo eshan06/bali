@@ -25,8 +25,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   only while the draft is as that write left it (a create: a live draft of the caller's with its
   words; a replace: the draft live with its words; a removal: the draft removed), else it is another
   write's, `EVENT_ID_CONFLICT`, as an event reused for another type is. A draft keeps only its last
-  write's id, as an answer does, so a create's retry landing after the draft was replaced or removed
-  writes a new draft: the portal resends a save only while it is that draft's newest write (L7b).
+  write's id, as an answer keeps only its own, but with no order between writes, as an answer has
+  (decision 4): a create's retry landing after the draft was replaced or removed writes a new draft,
+  and an older replace landing after a newer one puts its words back. So the portal sends a draft's
+  saves one at a time, and resends one only while it is that draft's newest write (L7b).
   **`event_id` both ways in one statement:** `idHeldBy` reads in one `UNION ALL` the holders a writer
   does not read itself, so a tap's `insertEvent` still pays one read for answers and drafts together.
   The writers beside the engine (the 13+ yes, push tokens, an invite's redeem) check their own table
