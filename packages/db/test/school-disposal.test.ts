@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { getTableConfig, PgTable } from 'drizzle-orm/pg-core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -180,7 +180,18 @@ async function seed(tag: string) {
     });
     await recordAgeCheck(db, { userId: student.id, eventId: newUuidV7() });
   }
-  return { school, teacher, block, ana, ben, first, second, past: session, lesson: lesson.session };
+  return {
+    school,
+    teacher,
+    block,
+    ana,
+    ben,
+    first,
+    second,
+    past: session,
+    lesson: lesson.session,
+    question,
+  };
 }
 
 /** End a lesson the seed left running, by moving its bell into the past (the sweep's case). */
@@ -503,6 +514,28 @@ describe('disposeSchool (C6a)', () => {
     });
     expect(await rowsOf(s)).toEqual(before);
   });
+
+  it('empties the questions of a school with more lessons than one statement can bind', async () => {
+    const s = await seed('c6a-many');
+    await pastBell(s.lesson.id);
+    // Past the 65,534 parameters postgres.js binds in one statement, made in one statement.
+    const lessons = 65_600;
+    await db.execute(sql`insert into ${sessions} (id, class_id, started_at, ends_at, ended_at)
+      select gen_random_uuid(), ${s.first.id}, now() - interval '2 days',
+        now() - interval '2 days', now() - interval '2 days'
+      from generate_series(1, ${lessons})`);
+
+    const done = await disposeSchool(db, {
+      schoolId: s.school.id,
+      at: new Date(),
+      confirmName: s.school.name,
+    });
+
+    expect(done).toMatchObject({ outcome: 'disposed', counts: { sessions: lessons + 2 } });
+    expect(
+      one(await db.select().from(questions).where(eq(questions.id, s.question.id))),
+    ).toMatchObject({ prompt: '', options: ['', '', ''] });
+  }, 120_000);
 
   it('a student the school already deleted (C3) is counted out, and nothing of theirs moves', async () => {
     const s = await seed('c6a-deleted');
