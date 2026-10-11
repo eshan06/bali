@@ -1,59 +1,16 @@
-import { type BinaryLike, createHash, createHmac } from 'node:crypto';
-
 import type { Env } from '../env.js';
+import { signV4 } from '../sigv4.js';
 
 /*
  * Deleting a deleted account's Cognito sign-in (2026-10-09): AdminGetUser, then AdminDeleteUser,
- * signed with AWS Signature Version 4 by Node's own crypto, no dependency (DECISIONS, 2026-10-09).
- * The pool and its region are AUTH_ISSUER's; the key is an IAM user's allowed only these two calls
- * there. `fetch` is a seam, so tests answer for Cognito.
+ * signed with AWS Signature Version 4 by Node's own crypto (`sigv4.ts`), no dependency (DECISIONS,
+ * 2026-10-09). The pool and its region are AUTH_ISSUER's; the key is an IAM user's allowed only
+ * these two calls there. `fetch` is a seam, so tests answer for Cognito.
  */
 
 /** A Cognito pool's issuer (`AUTH_ISSUER`): its region, then its pool id. */
 export const COGNITO_ISSUER =
   /^https:\/\/cognito-idp\.([a-z0-9-]+)\.amazonaws\.com\/([a-z0-9-]+_[0-9A-Za-z]+)$/;
-
-const hmac = (key: BinaryLike, data: string) => createHmac('sha256', key).update(data).digest();
-const sha256 = (data: string) => createHash('sha256').update(data).digest('hex');
-
-/**
- * AWS Signature Version 4 for a request with no query string: the headers to send, its own (lower
- * case) plus `x-amz-date` and `authorization`. `host` is signed, not returned: fetch sets it.
- */
-export function signV4(
-  request: { method: string; host: string; path: string; headers: Record<string, string> },
-  payload: string,
-  scope: { region: string; service: string },
-  key: { accessKeyId: string; secretAccessKey: string },
-  now: Date,
-): Record<string, string> {
-  const amzDate = now.toISOString().replace(/[-:]|\.\d{3}/g, '');
-  const day = amzDate.slice(0, 8);
-  const headers = { ...request.headers, 'x-amz-date': amzDate };
-  const signed: Record<string, string> = { ...headers, host: request.host };
-  const names = Object.keys(signed).sort();
-  const lines = names.map((name) => `${name}:${signed[name]}`);
-  const canonical = [
-    request.method,
-    request.path,
-    '',
-    ...lines,
-    '',
-    names.join(';'),
-    sha256(payload),
-  ];
-  const credential = `${day}/${scope.region}/${scope.service}/aws4_request`;
-  const toSign = ['AWS4-HMAC-SHA256', amzDate, credential, sha256(canonical.join('\n'))].join('\n');
-  const signingKey = [day, scope.region, scope.service, 'aws4_request'].reduce<BinaryLike>(
-    hmac,
-    `AWS4${key.secretAccessKey}`,
-  );
-  const signature = createHmac('sha256', signingKey).update(toSign).digest('hex');
-  return {
-    ...headers,
-    authorization: `AWS4-HMAC-SHA256 Credential=${key.accessKeyId}/${credential}, SignedHeaders=${names.join(';')}, Signature=${signature}`,
-  };
-}
 
 /** Cognito's refusal: its error type and HTTP status, never its words. */
 export class CognitoError extends Error {

@@ -7,6 +7,7 @@ import { registerAuth } from './auth/plugin.js';
 import { createCognitoVerifier, type TokenVerifier } from './auth/verify.js';
 import { cognitoDeleter } from './cognito/admin.js';
 import { signInDeletions } from './cognito/sign-in-deletion.js';
+import { type DeckStorage, s3DeckStorage } from './deck-storage.js';
 import type { Env } from './env.js';
 import { registerErrors, routerRefusal } from './errors.js';
 import { registerSecurityHeaders } from './headers.js';
@@ -72,6 +73,11 @@ export interface AppDeps {
    * real fetch; tests answer for Cognito.
    */
   cognitoFetch?: typeof fetch;
+  /**
+   * Where decks' PDFs are kept (M1): tests and the demo inject `memoryDeckStorage()`. Unset, the
+   * S3 bucket `DECK_BUCKET` names, or none while that is unset.
+   */
+  deckStorage?: DeckStorage;
 }
 
 /**
@@ -153,6 +159,14 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
     apns && createApnsClient(apns, deps.apnsTransport ?? http2Transport()),
   );
   registerSessionsRoute(app, deps.db, clock, notifyClassStarted);
+  // Said once, at start, as push says it. No route reads it before M2's.
+  const deckStorage = deps.deckStorage ?? s3DeckStorage(env);
+  app.log.info(
+    deckStorage
+      ? 'deck storage is on'
+      : 'deck storage is off: DECK_BUCKET, DECK_BUCKET_REGION, DECK_BUCKET_ACCESS_KEY_ID and DECK_BUCKET_SECRET_ACCESS_KEY are unset',
+  );
+  app.decorate('deckStorage', deckStorage);
   registerEnrollmentsRoutes(app, deps.db, clock, limits);
   registerTeacherInvitesRoute(app, deps.db, limits);
   registerClassesRoutes(app, deps.db);
