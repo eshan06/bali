@@ -3509,7 +3509,8 @@ export function answerQuestion(db: Database, input: AnswerInput): Promise<Answer
         return { outcome: 'replay', response: held };
       }
       // `responses` is read once, above: a duplicate of this answer committed since meets its row
-      // at the upsert below, which answers it as the replay, never as a conflict.
+      // at the upsert below, or trips its `event_id` and is run again, so the read above finds it:
+      // the replay either way, never a conflict.
       if (held || (await idIsSpent(tx, input.eventId))) {
         throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
       }
