@@ -142,8 +142,9 @@ export function registerQuestionsRoutes(
     async (request, reply) => {
       const { id } = parseRequest(request, 'params', Params);
       const { question, session } = await requireOwnQuestion(db, request, id);
-      // Counted after the question is read, never before: a close commits after every answer it
-      // lets count, so a question read closed is answered with its final counts.
+      // Counted after the question is read, never before: a recorded close commits after every
+      // answer it lets count, so a question read closed by one is answered with its final counts.
+      // Past the bell, before the sweep, an answer begun before the bell may land after this read.
       const counted = await questionCounts(db, id);
       // Found by the guard, and a question is never deleted.
       if (!counted) throw questionNotFound();
