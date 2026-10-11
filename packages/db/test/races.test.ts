@@ -18,6 +18,8 @@ import {
   enrollments,
   events,
   participations,
+  questions,
+  responses,
   schools,
   sessions,
   teacherInvites,
@@ -33,10 +35,12 @@ import {
 } from '../src/schools.js';
 import { makeTestDb } from '../src/testing.js';
 import {
+  answerQuestion,
   applyRetention,
   armTap,
   changeUnlockReason,
   checkIn,
+  closeQuestion,
   deleteAccount,
   disposeSchool,
   endEnrollment,
@@ -45,6 +49,7 @@ import {
   extendSession,
   joinClassByCode,
   markSilentParticipations,
+  openQuestion,
   protectionOff,
   protectionOn,
   refocus,
@@ -4218,3 +4223,243 @@ describe.runIf(REAL_PG)(
     }, 30_000);
   },
 );
+
+describe.runIf(REAL_PG)('live lesson questions under contention (real Postgres, L1)', () => {
+  beforeAll(async () => {
+    await Promise.all(Array.from({ length: 5 }, () => db.execute(sql`select 1`)));
+  });
+
+  const ask = (sessionId: string, teacherId: string, eventId = newUuidV7()) =>
+    openQuestion(db, { sessionId, teacherId, eventId, prompt: 'Which?', options: ['a', 'b'] });
+
+  /** A running lesson of `seed`'s with a question open in it. */
+  async function asking(tag: string) {
+    const s = await seed(tag);
+    const session = await openSession(s.classId);
+    const { question } = await ask(session.id, s.teacherId);
+    return { ...s, session, question };
+  }
+
+  const questionNow = async (id: string) =>
+    one(await db.select().from(questions).where(eq(questions.id, id)));
+  const answersTo = (questionId: string) =>
+    db.select().from(responses).where(eq(responses.questionId, questionId));
+
+  /**
+   * What `call` answers behind a holder that writes with `write`, sits on it uncommitted until
+   * `call` parks on a lock, then commits: the interleaving staged, not hoped for.
+   */
+  async function behindCommit<T>(
+    write: (tx: Database) => Promise<unknown>,
+    call: () => Promise<T>,
+  ): Promise<PromiseSettledResult<T>> {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let wrote!: () => void;
+    const hasRow = new Promise<void>((resolve) => {
+      wrote = resolve;
+    });
+    const holder = db.transaction(async (tx) => {
+      await write(tx);
+      wrote();
+      await held;
+    });
+    await hasRow;
+    const calling = call();
+    let unstaged: Error | null = null;
+    try {
+      await waitForBlockedBackend();
+    } catch (err) {
+      unstaged = err instanceof Error ? err : new Error(String(err));
+    } finally {
+      release();
+    }
+    await holder;
+    const [settled] = await Promise.allSettled([calling]);
+    if (unstaged !== null) throw unstaged;
+    return settled;
+  }
+
+  it('an answer racing the close either counts before it or sees it closed', async () => {
+    for (let round = 0; round < 12; round += 1) {
+      const { studentId, question } = await asking(`race-answer-close-${round}`);
+
+      const [answered] = await Promise.all([
+        answerQuestion(db, { questionId: question.id, studentId, eventId: newUuidV7(), option: 1 }),
+        closeQuestion(db, { questionId: question.id, eventId: newUuidV7() }),
+      ]);
+
+      const { closedAt } = await questionNow(question.id);
+      const rows = await answersTo(question.id);
+      if (answered.outcome === 'answered') {
+        // Counted, before the close: the close waited for it.
+        expect(one(rows).answeredAt.getTime()).toBeLessThanOrEqual(closedAt!.getTime());
+      } else {
+        expect(answered).toEqual({ outcome: 'question_closed' });
+        expect(rows).toEqual([]);
+      }
+    }
+  });
+
+  it('an answer racing the end of its session either counts before it or sees it closed', async () => {
+    for (let round = 0; round < 12; round += 1) {
+      const { studentId, session, question } = await asking(`race-answer-end-${round}`);
+
+      const [answered] = await Promise.all([
+        answerQuestion(db, { questionId: question.id, studentId, eventId: newUuidV7(), option: 0 }),
+        endSession(db, { sessionId: session.id, at: new Date(), reason: 'ended' }),
+      ]);
+
+      expect((await questionNow(question.id)).closedAt).not.toBeNull();
+      expect(await eventsOfType(session.id, 'question_closed')).toMatchObject([
+        { payload: { closed_by: 'session_end' } },
+      ]);
+      const rows = await answersTo(question.id);
+      if (answered.outcome === 'answered') {
+        expect(rows).toHaveLength(1);
+      } else {
+        expect(answered).toEqual({ outcome: 'question_closed' });
+        expect(rows).toEqual([]);
+      }
+    }
+  });
+
+  it('two deliveries of one answer at once are one answer, never a 500', async () => {
+    for (let round = 0; round < 12; round += 1) {
+      const { studentId, question } = await asking(`race-answer-twice-${round}`);
+      const answer = { questionId: question.id, studentId, eventId: newUuidV7(), option: 1 };
+
+      const both = await Promise.all([answerQuestion(db, answer), answerQuestion(db, answer)]);
+
+      expect(both.map((r) => r.outcome).sort()).toEqual(['answered', 'replay']);
+      expect(await answersTo(question.id)).toMatchObject([{ eventId: answer.eventId, option: 1 }]);
+    }
+  });
+
+  it('two opens at once run one after the other: the later closes the earlier, neither fails', async () => {
+    for (let round = 0; round < 12; round += 1) {
+      const { classId, teacherId } = await seed(`race-open-twice-${round}`);
+      const session = await openSession(classId);
+
+      const both = await Promise.all([ask(session.id, teacherId), ask(session.id, teacherId)]);
+
+      expect(both.map((r) => r.outcome)).toEqual(['opened', 'opened']);
+      const asked = await db.select().from(questions).where(eq(questions.sessionId, session.id));
+      const open = one(asked.filter((q) => q.closedAt === null));
+      const earlier = one(asked.filter((q) => q.closedAt !== null));
+      expect(earlier.closedAt).toEqual(open.openedAt);
+      expect(await eventsOfType(session.id, 'question_closed')).toMatchObject([
+        { payload: { question_id: earlier.id, closed_by: 'newer_question' } },
+      ]);
+    }
+  });
+
+  it('an open whose eventId a rival takes meanwhile is its replay, another teacher’s a conflict, never a 500', async () => {
+    for (const own of [true, false]) {
+      const a = await seed(`race-open-eventid-${own}-a`);
+      const b = await seed(`race-open-eventid-${own}-b`);
+      const [mine, theirs] = [await openSession(a.classId), await openSession(b.classId)];
+      const eventId = newUuidV7();
+      let rivalId = '';
+
+      // The rival opened under the same eventId in the other lesson, uncommitted: the open's
+      // replay check misses it, and its insert parks on `questions.event_id`.
+      const settled = await behindCommit(
+        async (tx) => {
+          const [rival] = await tx
+            .insert(questions)
+            .values({
+              sessionId: theirs.id,
+              prompt: 'Rival?',
+              options: ['x', 'y'],
+              eventId,
+              openedAt: new Date(),
+              createdBy: own ? a.teacherId : b.teacherId,
+            })
+            .returning();
+          rivalId = rival!.id;
+        },
+        () => ask(mine.id, a.teacherId, eventId),
+      );
+
+      if (own) {
+        if (settled.status === 'rejected') throw settled.reason as Error;
+        expect(settled.value).toMatchObject({ outcome: 'replay', question: { id: rivalId } });
+      } else {
+        expect(settled.status).toBe('rejected');
+        expect((settled as PromiseRejectedResult).reason).toMatchObject({
+          code: 'EVENT_ID_CONFLICT',
+        });
+      }
+      expect(await db.select().from(questions).where(eq(questions.sessionId, mine.id))).toEqual([]);
+    }
+  }, 40_000);
+
+  it('an open that meets an open question it could not see is retried, and closes it', async () => {
+    // Unreachable through the engine: any insert of a question takes its key-share lock on the
+    // session, which waits for an open's FOR UPDATE. So the rival is a raw insert with its foreign
+    // keys' triggers off (the lane's superuser), uncommitted: the open's read misses it, and its
+    // insert parks on `questions_one_open_per_session`.
+    const { classId, teacherId } = await seed('race-open-index');
+    const session = await openSession(classId);
+    let rivalId = '';
+
+    const settled = await behindCommit(
+      async (tx) => {
+        await tx.execute(sql`set local session_replication_role = replica`);
+        const [rival] = await tx
+          .insert(questions)
+          .values({
+            sessionId: session.id,
+            prompt: 'Rival?',
+            options: ['x', 'y'],
+            eventId: newUuidV7(),
+            openedAt: new Date(),
+            createdBy: teacherId,
+          })
+          .returning();
+        rivalId = rival!.id;
+      },
+      () => ask(session.id, teacherId),
+    );
+
+    if (settled.status === 'rejected') throw settled.reason as Error;
+    expect(settled.value.outcome).toBe('opened');
+    expect((await questionNow(rivalId)).closedAt).toEqual(settled.value.question.openedAt);
+    expect(await eventsOfType(session.id, 'question_closed')).toMatchObject([
+      { payload: { question_id: rivalId, closed_by: 'newer_question' } },
+    ]);
+  }, 20_000);
+
+  it('an answer whose eventId another student’s answer takes meanwhile is refused as taken, never a 500', async () => {
+    const { classId, studentId, question } = await asking('race-answer-eventid');
+    const other = one(
+      await db
+        .insert(users)
+        .values({ cognitoId: 'student-race-answer-eventid-2', role: 'student' })
+        .returning(),
+    );
+    await db.insert(enrollments).values({ classId, studentId: other.id });
+    const eventId = newUuidV7();
+
+    // Uncommitted, the rival is missed by the answer's checks, and its insert parks on
+    // `responses.event_id`: the violation is read again, as the conflict it is.
+    const settled = await behindCommit(
+      (tx) =>
+        tx.insert(responses).values({
+          questionId: question.id,
+          studentId: other.id,
+          option: 0,
+          eventId,
+          answeredAt: new Date(),
+        }),
+      () => answerQuestion(db, { questionId: question.id, studentId, eventId, option: 1 }),
+    );
+
+    expect(settled.status).toBe('rejected');
+    expect((settled as PromiseRejectedResult).reason).toMatchObject({ code: 'EVENT_ID_CONFLICT' });
+    expect(await answersTo(question.id)).toMatchObject([{ studentId: other.id }]);
+  }, 20_000);
+});

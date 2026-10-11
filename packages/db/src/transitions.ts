@@ -4,6 +4,7 @@ import type {
   ParticipationEndedReason,
   ParticipationState,
   ProtectionOffRecordedAs,
+  QuestionClosedBy,
   ReturnRecordedAs,
   UnlockReason,
   UnlockRecordedAs,
@@ -47,6 +48,8 @@ import {
   enrollments,
   events,
   participations,
+  questions,
+  responses,
   schools,
   sessions,
   teacherInvites,
@@ -224,6 +227,12 @@ async function insertEvent(
     deviceTime?: Date;
   },
 ): Promise<boolean> {
+  // An answer's id is spent too (Live lesson, settled 2026-10-10), though only `responses` holds
+  // it: an answer writes no event. Refused before the insert, as the reuse below is after it, so a
+  // caller that catches the refusal (`convertArmedTaps`) has written nothing under the id.
+  if (await answerHolds(tx, e.eventId)) {
+    throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by an answer');
+  }
   const ahead = e.deviceTime ? clockAheadSeconds(e.deviceTime, heardNow()) : null;
   const payload =
     ahead === null
@@ -849,7 +858,7 @@ async function ownerOfEventId(
   return { kind: 'own', row: owner };
 }
 
-/** Is this `event_id` already on record in `events`? */
+/** Is this `event_id` already on record: in `events`, or held by an answer? */
 async function idIsSpent(tx: Database, eventId: string): Promise<boolean> {
   return (
     firstOrUndefined(
@@ -858,8 +867,18 @@ async function idIsSpent(tx: Database, eventId: string): Promise<boolean> {
         .from(events)
         .where(eq(events.eventId, eventId))
         .limit(1),
-    ) !== undefined
+    ) !== undefined || (await answerHolds(tx, eventId))
   );
+}
+
+/** Is this `event_id` held by an answer? It writes no event, so only `responses` holds its id. */
+async function answerHolds(tx: Database, eventId: string): Promise<boolean> {
+  const held = await tx
+    .select({ id: responses.id })
+    .from(responses)
+    .where(eq(responses.eventId, eventId))
+    .limit(1);
+  return held.length > 0;
 }
 
 /**
@@ -1109,6 +1128,10 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
         throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
       }
       return { outcome: 'replay' };
+    }
+    // An answer's id likewise: never this phone's tap (Live lesson, settled 2026-10-10).
+    if (await answerHolds(tx, input.eventId)) {
+      throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by an answer');
     }
 
     // Same rule, one table over: a row in `armed_taps` under this id is this
@@ -1515,6 +1538,8 @@ async function endHeldSession(
     .set({ endedAt, endedReason: participationReason })
     .where(and(eq(participations.sessionId, session.id), isNull(participations.endedAt)))
     .returning({ id: participations.id });
+  // Its open question closes with it, at its end: the bell, for the sweep and a Start past it.
+  await closeOpenQuestion(tx, session, endedAt, 'session_end');
 
   await insertEvent(tx, {
     eventId: newUuidV7(),
@@ -3251,6 +3276,276 @@ export async function checkIn(db: Database, input: CheckInInput): Promise<CheckI
   );
 }
 
+/*
+ * A live lesson's questions (Phase 7; ARCHITECTURE, "Live lesson", decisions 2–5): one open per
+ * session, asked and answered only while it runs by the server's clock. Locks go session row
+ * first, then question row: an open takes the session FOR UPDATE, so opens run one at a time; an
+ * answer takes both FOR SHARE; a close and the session's end take the question FOR UPDATE, so an
+ * answer racing either counts before it or sees it closed.
+ */
+
+export type QuestionRow = typeof questions.$inferSelect;
+export type ResponseRow = typeof responses.$inferSelect;
+
+export interface QuestionResult {
+  /** 'opened' or 'closed' by this call; 'replay' changed nothing, and carries the question now. */
+  outcome: 'opened' | 'closed' | 'replay';
+  question: QuestionRow;
+}
+
+/**
+ * Run `fn`, and once more after a unique violation: the re-run reads what the rival committed — an
+ * open's eventId is its replay, an open question one to close; an answer's eventId a replay or a
+ * conflict — so neither backstop is ever a 500 (decision 5).
+ */
+async function onceMoreOnUnique<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    if (!isUniqueViolation(err)) throw err;
+    return fn();
+  }
+}
+
+/** A question and its session, locked in the engine's order: the session FOR SHARE, then it. */
+async function lockQuestion(tx: Database, questionId: string, mode: 'share' | 'update') {
+  const [found] = await tx
+    .select({ sessionId: questions.sessionId })
+    .from(questions)
+    .where(eq(questions.id, questionId));
+  if (!found) return undefined;
+  const [session] = await tx
+    .select()
+    .from(sessions)
+    .where(eq(sessions.id, found.sessionId))
+    .for('share');
+  const [question] = await tx
+    .select()
+    .from(questions)
+    .where(eq(questions.id, questionId))
+    .for(mode);
+  return { session: session!, question: question! };
+}
+
+/** Close a question at `at`, recorded as `question_closed` under `eventId`. */
+async function closeQuestionRow(
+  tx: Database,
+  session: SessionRow,
+  questionId: string,
+  close: { at: Date; by: QuestionClosedBy; eventId: string; revealed: boolean },
+): Promise<QuestionRow> {
+  const isNew = await insertEvent(tx, {
+    eventId: close.eventId,
+    type: 'question_closed',
+    sessionId: session.id,
+    classId: session.classId,
+    occurredAt: close.at,
+    payload: { question_id: questionId, revealed: close.revealed, closed_by: close.by },
+  });
+  // Another question's close in this session: `insertEvent` compares only type and session.
+  if (!isNew) {
+    throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
+  }
+  const [closed] = await tx
+    .update(questions)
+    .set({ closedAt: close.at, revealed: close.revealed })
+    .where(eq(questions.id, questionId))
+    .returning();
+  return closed!;
+}
+
+/** Close the session's open question, if it has one, under an id of the server's, revealing nothing. */
+async function closeOpenQuestion(
+  tx: Database,
+  session: SessionRow,
+  at: Date,
+  by: QuestionClosedBy,
+): Promise<void> {
+  const [open] = await tx
+    .select({ id: questions.id })
+    .from(questions)
+    .where(and(eq(questions.sessionId, session.id), isNull(questions.closedAt)))
+    .for('update');
+  if (open) {
+    await closeQuestionRow(tx, session, open.id, { at, by, eventId: newUuidV7(), revealed: false });
+  }
+}
+
+export interface OpenQuestionInput {
+  sessionId: string;
+  /** The class's teacher, as the route checks (L3): the question's `created_by`. */
+  teacherId: string;
+  /** The open's idempotency key (rule 4), and its `question_opened` event's id. */
+  eventId: string;
+  /** The route validates these (decision 3): a prompt of at most 500 characters, 2–6 options. */
+  prompt: string;
+  options: string[];
+  correctOption?: number | null;
+  /** The server's clock, which the session must be running at (`sessionRunning`); now by default. */
+  now?: Date;
+}
+
+/**
+ * Open a question in a running session (decision 3), closing the one open there in the same
+ * transaction, by a newer question. The replay of an open — its eventId held by a question of the
+ * caller's — answers that question, whatever has happened since; another teacher's is
+ * EVENT_ID_CONFLICT.
+ */
+export function openQuestion(db: Database, input: OpenQuestionInput): Promise<QuestionResult> {
+  return onceMoreOnUnique(() =>
+    db.transaction(async (tx): Promise<QuestionResult> => {
+      const session = await loadSession(tx, input.sessionId, { forUpdate: true });
+      if (!session) throw new TransitionError('SESSION_NOT_FOUND', 'no such session');
+      const [held] = await tx.select().from(questions).where(eq(questions.eventId, input.eventId));
+      if (held) {
+        if (held.createdBy !== input.teacherId) {
+          throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
+        }
+        return { outcome: 'replay', question: held };
+      }
+      const now = input.now ?? new Date();
+      if (!sessionRunning(session, now)) {
+        throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');
+      }
+
+      await closeOpenQuestion(tx, session, now, 'newer_question');
+      const [question] = await tx
+        .insert(questions)
+        .values({
+          sessionId: session.id,
+          prompt: input.prompt,
+          options: input.options,
+          correctOption: input.correctOption ?? null,
+          eventId: input.eventId,
+          openedAt: now,
+          createdBy: input.teacherId,
+        })
+        .returning();
+      await insertEvent(tx, {
+        eventId: input.eventId,
+        type: 'question_opened',
+        sessionId: session.id,
+        classId: session.classId,
+        occurredAt: now,
+        payload: { question_id: question!.id },
+      });
+      return { outcome: 'opened', question: question! };
+    }),
+  );
+}
+
+export interface CloseQuestionInput {
+  questionId: string;
+  /** The close's idempotency key, kept only when its `question_closed` is recorded. */
+  eventId: string;
+  /** Show the correct option, when the question has one. */
+  reveal?: boolean;
+  /** The server's clock; now by default. */
+  now?: Date;
+}
+
+/**
+ * The teacher closes a question, revealing its correct option when asked and one exists. A close
+ * of one already closed — this close's replay among them — or past the bell, where the session's
+ * end has closed it by the server's clock (A17), answers the question now and records nothing.
+ */
+export function closeQuestion(
+  db: Database,
+  input: CloseQuestionInput,
+): Promise<QuestionResult | { outcome: 'question_not_found' }> {
+  return db.transaction(async (tx) => {
+    const locked = await lockQuestion(tx, input.questionId, 'update');
+    if (!locked) return { outcome: 'question_not_found' as const };
+    const { session, question } = locked;
+    const now = input.now ?? new Date();
+    if (question.closedAt !== null || !sessionRunning(session, now)) {
+      return { outcome: 'replay' as const, question };
+    }
+    const revealed = input.reveal === true && question.correctOption !== null;
+    const closed = await closeQuestionRow(tx, session, question.id, {
+      at: now,
+      by: 'teacher',
+      eventId: input.eventId,
+      revealed,
+    });
+    return { outcome: 'closed' as const, question: closed };
+  });
+}
+
+export interface AnswerInput {
+  questionId: string;
+  /** Enrolled in the session's class now, as the route checks (L4). */
+  studentId: string;
+  /** The answer's idempotency key (rule 4): a UUIDv7, which orders it against their others. */
+  eventId: string;
+  /** The index of the option chosen. */
+  option: number;
+  /** The server's clock; now by default. */
+  now?: Date;
+}
+export type AnswerResult =
+  /** 'answered' recorded this answer; 'replay' changed nothing, and carries the answer now. */
+  | { outcome: 'answered' | 'replay'; response: ResponseRow }
+  | { outcome: 'question_not_found' | 'question_closed' | 'invalid_option' };
+
+/**
+ * A student answers, writing no event (decision 5: totals only). It counts only while the question
+ * is open and its session running by the server's clock (A17), else `question_closed`, nothing
+ * recorded. It replaces their answer only when its eventId sorts after the one held — a UUIDv7
+ * begins with the phone's time — so a slow first answer never undoes the second: an older one
+ * changes nothing and, while the question is open, is answered with the answer now. A replay is
+ * answered so past the close too.
+ * The eventId is matched alone: one any other response or any event holds is EVENT_ID_CONFLICT,
+ * nothing recorded (decision 6).
+ */
+export function answerQuestion(db: Database, input: AnswerInput): Promise<AnswerResult> {
+  return onceMoreOnUnique(() =>
+    db.transaction(async (tx): Promise<AnswerResult> => {
+      const locked = await lockQuestion(tx, input.questionId, 'share');
+      if (!locked) return { outcome: 'question_not_found' };
+      const { session, question } = locked;
+      const [held] = await tx.select().from(responses).where(eq(responses.eventId, input.eventId));
+      if (held?.questionId === question.id && held.studentId === input.studentId) {
+        return { outcome: 'replay', response: held };
+      }
+      if (held || (await idIsSpent(tx, input.eventId))) {
+        throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
+      }
+      const now = input.now ?? new Date();
+      if (question.closedAt !== null || !sessionRunning(session, now)) {
+        return { outcome: 'question_closed' };
+      }
+      if (
+        !Number.isInteger(input.option) ||
+        input.option < 0 ||
+        input.option >= question.options.length
+      ) {
+        return { outcome: 'invalid_option' };
+      }
+
+      const answer = { option: input.option, eventId: input.eventId, answeredAt: now };
+      const [written] = await tx
+        .insert(responses)
+        .values({ questionId: question.id, studentId: input.studentId, ...answer })
+        .onConflictDoUpdate({
+          target: [responses.questionId, responses.studentId],
+          set: answer,
+          // Postgres orders uuids by their bytes: a UUIDv7's leading timestamp first.
+          setWhere: sql`${responses.eventId} < excluded.event_id`,
+        })
+        .returning();
+      if (written) return { outcome: 'answered', response: written };
+      const [kept] = await tx
+        .select()
+        .from(responses)
+        .where(
+          and(eq(responses.questionId, question.id), eq(responses.studentId, input.studentId)),
+        );
+      return { outcome: 'replay', response: kept! };
+    }),
+  );
+}
+
 export interface JoinClassInput {
   studentId: string;
   joinCode: string;
@@ -3845,6 +4140,8 @@ export const SCHOOL_DISPOSAL_COVERAGE = {
   'teacher_invites.redeemed_by': 'kept, its teacher de-identified',
   'device_tokens.user_id': 'deleted: the device tokens of its people (N4)',
   'age_checks.user_id': 'deleted: the 13+ yes of each person it de-identifies (C7-server)',
+  'questions.created_by': 'kept with its lesson, under its teacher de-identified',
+  'responses.student_id': 'kept, under a person de-identified',
 } as const;
 
 export interface DisposeSchoolInput {
@@ -4238,6 +4535,8 @@ export const RETENTION_COVERAGE = {
     'deleted: the device tokens of a person it de-identifies (N4); a continuing one keeps theirs',
   'age_checks.user_id':
     'deleted: the 13+ yes of a person it de-identifies (C7-server); a continuing one keeps theirs',
+  'questions.created_by': 'kept with its lesson, under a teacher it de-identifies',
+  'responses.student_id': 'kept, under a person it de-identifies',
 } as const;
 
 export interface ApplyRetentionInput {
