@@ -177,3 +177,67 @@ describe('COGNITO_DELETER_*: the key that deletes a deleted account’s sign-in 
     ).rejects.toThrow(/COGNITO_DELETER_ACCESS_KEY_ID: is an AWS access key id/);
   });
 });
+
+describe('DECK_BUCKET*: where decks are kept (Phase 7, M1)', () => {
+  const bucketed = {
+    DECK_BUCKET: 'bali-decks-dev',
+    DECK_BUCKET_REGION: 'us-east-1',
+    DECK_BUCKET_ACCESS_KEY_ID: 'AKIAIOSFODNN7EXAMPLE',
+    DECK_BUCKET_SECRET_ACCESS_KEY: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
+  };
+  const unset = Object.fromEntries(Object.keys(bucketed).map((name) => [name, '']));
+
+  async function bootWithBucket(vars: Record<string, string>) {
+    vi.resetModules();
+    for (const [name, value] of Object.entries({ ...testEnvVars, ...unset, ...vars })) {
+      vi.stubEnv(name, value);
+    }
+    return (await import('../src/env.js')).env;
+  }
+
+  it('unset (or blank) is storage off, and boots', async () => {
+    const env = await bootWithBucket({});
+    expect(Object.keys(bucketed).map((name) => env[name as keyof typeof env])).toEqual([
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+    ]);
+  });
+
+  it('the four together boot', async () => {
+    expect(await bootWithBucket(bucketed)).toMatchObject(bucketed);
+  });
+
+  it('one to three of the four fail the boot, and the error never echoes the secret', async () => {
+    for (const missing of Object.keys(bucketed)) {
+      const message = await bootWithBucket({ ...bucketed, [missing]: '' }).then(
+        () => 'booted',
+        (e: Error) => e.message,
+      );
+      expect(message, missing).toMatch(/DECK_BUCKET: .* are set together or not at all/);
+      expect(message).not.toContain(bucketed.DECK_BUCKET_SECRET_ACCESS_KEY);
+    }
+    await expect(bootWithBucket({ DECK_BUCKET: 'bali-decks-dev' })).rejects.toThrow(
+      /set together or not at all/,
+    );
+  });
+
+  it('a bucket name, region or key id of the wrong shape fails the boot', async () => {
+    // A dot breaks the bucket's certificate: its host is <bucket>.s3.<region>.amazonaws.com.
+    for (const name of ['bali.decks', 'Bali-Decks', 'b', '-bali', 'https://bali-decks']) {
+      await expect(bootWithBucket({ ...bucketed, DECK_BUCKET: name }), name).rejects.toThrow(
+        /DECK_BUCKET: is an S3 bucket’s name/,
+      );
+    }
+    for (const region of ['us-east', 'US-EAST-1', 'east-1', 'us-east-1a']) {
+      await expect(
+        bootWithBucket({ ...bucketed, DECK_BUCKET_REGION: region }),
+        region,
+      ).rejects.toThrow(/DECK_BUCKET_REGION: is an AWS region/);
+    }
+    await expect(
+      bootWithBucket({ ...bucketed, DECK_BUCKET_ACCESS_KEY_ID: 'aws-key' }),
+    ).rejects.toThrow(/DECK_BUCKET_ACCESS_KEY_ID: is an AWS access key id/);
+  });
+});

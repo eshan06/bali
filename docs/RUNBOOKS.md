@@ -1,6 +1,6 @@
 # Owner runbooks — production
 
-Nine runbooks for the consoles only the owner can reach: Railway, AWS (Cognito, IAM),
+Ten runbooks for the consoles only the owner can reach: Railway, AWS (Cognito, IAM, S3),
 Vercel, GitHub, Sentry and Apple's developer site. Phase 5's P6. Do them in this order the first time — each one
 uses values the one before it produced:
 
@@ -17,6 +17,8 @@ uses values the one before it produced:
    done on both (2026-10-06); again whenever the file changes.
 9. [Cognito: the API deletes a deleted account's sign-in](#9-cognito-the-api-deletes-a-deleted-accounts-sign-in),
    any time, dev first.
+10. [S3: the bucket for decks](#10-s3-the-bucket-for-decks), dev first; before any Phase 7
+    screen is built (the owner's order, 2026-10-10).
 
 **Where production stands** (the owner, 2026-10-05; its values are in `docs/DEPLOY.md`,
 "The phone's sign-in", none secret):
@@ -56,6 +58,8 @@ uses values the one before it produced:
 - **Runbook 9, the Cognito sign-in deleter:** open (added 2026-10-09). Until it's done the API
   logs `Cognito sign-in deletion is off` at boot and only queues each deleted account's sign-in;
   the phone's own DeleteUser still deletes one when it lands.
+- **Runbook 10, the deck bucket:** open (added 2026-10-10, PLAN's M0). Until it's done the API
+  logs `deck storage is off` at boot, and no Phase 7 screen is built (the owner's order).
 
 **Prod's data so far:** the school "Vanderbilt" (id `01a10a81-4ac0-7698-a1d4-fc0487865082`),
 its data agreement recorded 2026-10-05 and its year's end `2026-12-18`; the owner is a
@@ -936,3 +940,142 @@ pool), `arn:aws:cognito-idp:us-east-1:<account id>:userpool/<pool id>`, where `<
 
 To switch it off again, remove the two variables and deploy: the API keeps queuing, deletes none,
 and its boot log says `… is off`.
+
+---
+
+## 10. S3: the bucket for decks
+
+What it makes: per environment, a private S3 bucket the API keeps teachers' PDF decks in, its CORS
+letting only the portal's origins upload and download, and an IAM user allowed only to put, get and
+delete files in that bucket (ARCHITECTURE, hosting decision 6 and "Live lesson" decision 8; PLAN's
+M0). The API already holds the code (M1): until a deploy holds the bucket's four variables, its
+boot log says `deck storage is off`. No Phase 7 screen is built until this and production backups
+(L0b) are done (the owner's order, 2026-10-10). Each environment gets its own bucket and user, so a
+leaked dev key can't touch production's decks.
+
+**Before you start:** the AWS console, signed in as an IAM or IAM Identity Center user that may
+manage S3 and IAM (never root; runbook 2, step 1), in the account that holds the Cognito pools; the
+Railway CLI, linked from your clone of the repo (runbook 8, "Before you start"); and each
+environment's `CORS_ORIGINS`, copied from Railway → the environment → the API service →
+**Variables** (production's is `https://bali-portal.vercel.app`; dev's is the portal you run
+locally, `http://localhost:3000`, unless you added more).
+
+1. **The dev bucket.** AWS console → **S3** → **Create bucket**:
+   - **AWS Region:** US East (N. Virginia) `us-east-1`, the pools' region.
+   - **Bucket type:** General purpose.
+   - **Bucket name:** `bali-decks-dev-<a suffix of your own>`. Names are shared by every AWS
+     account, so the plain one is likely taken. Lower-case letters, numerals and hyphens only,
+     **no dots**: the API reaches the bucket at `<name>.s3.us-east-1.amazonaws.com`, and a dotted
+     name breaks that address's certificate (the API refuses to boot with one).
+   - **Object Ownership:** ACLs disabled (the default).
+   - **Block all public access:** on, all four boxes (the default).
+   - **Bucket Versioning:** Disable (the default), so deleting a deck really deletes it.
+   - **Default encryption:** SSE-S3 (the default). Not SSE-KMS: the API's key couldn't read the
+     files without a KMS permission too.
+
+   **Create bucket**. Note the name in your password manager.
+   **Check:** the bucket's **Permissions** tab shows Block all public access **On**, and its
+   **Properties** tab Bucket Versioning **Disabled**.
+2. **Its CORS.** The bucket → **Permissions** → **Cross-origin resource sharing (CORS)** →
+   **Edit**, and replace the editor's contents with this, `AllowedOrigins` exactly as dev's
+   `CORS_ORIGINS` lists them (`https://` or `http://`, the host, the port if any, no path, no
+   trailing slash), and never `*`:
+
+   ```json
+   [
+     {
+       "AllowedOrigins": ["http://localhost:3000"],
+       "AllowedMethods": ["PUT", "GET"],
+       "AllowedHeaders": ["content-type"],
+       "MaxAgeSeconds": 3000
+     }
+   ]
+   ```
+
+   **Save changes**. A teacher's browser uploads a deck straight to the bucket, and the portal reads
+   one from it; the API's own calls need no CORS.
+   **Check:** the CORS box shows those origins, `PUT` and `GET`.
+3. **The dev policy.** **IAM** → **Policies** → **Create policy** → **JSON**, and replace the
+   editor's contents with this, the dev bucket's name filled in:
+
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Sid": "KeepDecks",
+         "Effect": "Allow",
+         "Action": ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"],
+         "Resource": "arn:aws:s3:::<the dev bucket's name>/*"
+       }
+     ]
+   }
+   ```
+
+   **Next** → name `bali-decks-dev` → **Create policy**. No `s3:ListBucket`, on purpose: the key
+   can't list the bucket. Without it S3 answers a missing file "access denied", which the API reads
+   as missing.
+   **Check:** the policy's **Permissions** list one service, S3, with the three actions above and
+   that bucket's files as their resource.
+4. **The dev user and its key.** **IAM** → **Users** → **Create user**: name `bali-decks-dev`, no
+   console access → **Next** → **Attach policies directly** → tick `bali-decks-dev` → **Next** →
+   **Create user**. Open the user → **Security credentials** → **Access keys** → **Create access
+   key** → **Application running outside AWS** → **Next** → description `Railway dev bali` →
+   **Create access key**. Copy the **Access key ID** and the **Secret access key** into your
+   password manager: AWS shows the secret once. Never in the repo, a chat or an issue.
+   **Check:** the user's **Permissions** list that one policy, and **Access keys** one Active key.
+5. **Railway, dev.** Railway → the project → environment `dev` → service `bali` → **Variables** →
+   add:
+   - `DECK_BUCKET`: the bucket's name.
+   - `DECK_BUCKET_REGION`: `us-east-1`.
+   - `DECK_BUCKET_ACCESS_KEY_ID`: the Access key ID (`AKIA…`).
+   - `DECK_BUCKET_SECRET_ACCESS_KEY`: the Secret access key.
+
+   All four or none: one to three of them, or a name with a dot or a capital, stops the boot with a
+   message naming the variable. **Deploy** the staged changes.
+   **Check:** the deploy's log says `deck storage is on`, no longer `deck storage is off`, and
+   `https://bali-production-09a2.up.railway.app/healthz` answers ok.
+6. **The check, on dev.** In your terminal, in your clone:
+
+   ```bash
+   railway link    # the Bali project, environment dev
+   railway ssh --service bali -- npm run --silent deck-bucket:check
+   ```
+
+   It runs inside dev's API with its variables, so the key never reaches your computer. As a
+   browser would, it uploads a small PDF by a presigned PUT and takes it back by a presigned GET;
+   it checks the bucket refuses a file of another length or type, and lets each of `CORS_ORIGINS`,
+   and no other origin, upload and download; then the API reads the file and deletes it.
+   **Check:** every line starts `ok`, and the last says `PASS: the deck bucket works.` A `FAIL`
+   line names what failed:
+   - `a presigned PUT uploads a PDF`, `a presigned GET gives it back` or `the API reads it`: the
+     policy (step 3) names another bucket, or lacks `s3:PutObject` or `s3:GetObject`. A last line
+     `FAIL: S3 refused: InvalidAccessKeyId (403)` or `SignatureDoesNotMatch (403)` means a key
+     pasted wrong (step 5).
+   - `one of another length is refused` or `one of another type is refused`: stop and tell a
+     session; S3 took a file the signing should have kept out.
+   - `its answer says Cache-Control: no-store and Content-Encoding: identity`: stop and tell a
+     session; S3 didn't answer as the download URL asks, so a browser could keep a copy or decode
+     a file before Bali checks it.
+   - `<origin> may upload (CORS)` or `may download (CORS)`: that origin is missing from step 2's
+     `AllowedOrigins`, or written there differently from `CORS_ORIGINS`.
+     `https://example.com, any other origin, may not`: step 2 allows `*`.
+   - `the API deletes it`: the policy lacks `s3:DeleteObject`.
+   - `FAIL: deck storage is off`: step 5's variables are not on this deploy.
+7. **Production.** Steps 1 to 5 again, never with dev's bucket, user or key: the bucket
+   `bali-decks-prod-<a suffix>`, its CORS with production's `CORS_ORIGINS`
+   (`https://bali-portal.vercel.app`), the policy and the user `bali-decks-prod` with production's
+   bucket in the policy, the key described `Railway production bali prod`, and the four variables
+   on environment `production`, service `bali prod`. Deploy.
+   **Check:** prod's deploy log says `deck storage is on`, and the check run there, `railway link`
+   (environment `production`) then `railway ssh --service "bali prod" -- npm run --silent
+   deck-bucket:check`, ends `PASS`. It leaves nothing in the bucket.
+8. **Rotate a key: at once if it leaks, else yearly.** IAM → that environment's user →
+   **Security credentials** → **Create access key** (a user holds two at most); put it on that
+   environment's service (step 5) and deploy; run the check (step 6); then the old key →
+   **Deactivate**, and once the check passes again, **Delete**. A leaked key can only read, write
+   and delete that one bucket's decks.
+   **Check:** the user lists one Active key, and the check ends `PASS`.
+
+To switch it off again, remove the four variables and deploy: the boot log says `deck storage is
+off`. Never delete a bucket a class has used: its decks go with it.

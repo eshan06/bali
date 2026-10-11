@@ -35,6 +35,8 @@ function blankIsUnset<T extends z.ZodType>(schema: T) {
 
 /** An Apple key id or team id: ten capitals or numerals. */
 const APPLE_ID = /^[A-Z0-9]{10}$/;
+/** An AWS access key's id. */
+const AWS_KEY_ID = /^[A-Z0-9]{16,128}$/;
 
 /** Whether `pem` is an EC P-256 private key, the kind APNs signs with (ES256). */
 function isP256PrivateKey(pem: string): boolean {
@@ -133,12 +135,33 @@ const envSchema = z
      * Unset — the default, and always in tests and dev — the queue waits and nothing is deleted.
      */
     COGNITO_DELETER_ACCESS_KEY_ID: blankIsUnset(
-      z
-        .string()
-        .regex(/^[A-Z0-9]{16,128}$/, 'is an AWS access key id')
-        .optional(),
+      z.string().regex(AWS_KEY_ID, 'is an AWS access key id').optional(),
     ),
     COGNITO_DELETER_SECRET_ACCESS_KEY: blankIsUnset(z.string().min(16).optional()),
+    /*
+     * Where decks' PDFs are kept (Phase 7, M1; deck-storage.ts): an S3 bucket, its region, and an
+     * IAM user's access key allowed only s3:PutObject, s3:GetObject and s3:DeleteObject in it — all
+     * four or none. Unset — the default, and always in tests and dev — deck storage is off.
+     */
+    DECK_BUCKET: blankIsUnset(
+      z
+        .string()
+        .regex(
+          /^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/,
+          'is an S3 bucket’s name: 3 to 63 lower-case letters, numerals and hyphens, no dots',
+        )
+        .optional(),
+    ),
+    DECK_BUCKET_REGION: blankIsUnset(
+      z
+        .string()
+        .regex(/^[a-z]{2}(-[a-z]+)+-\d+$/, 'is an AWS region, such as us-east-1')
+        .optional(),
+    ),
+    DECK_BUCKET_ACCESS_KEY_ID: blankIsUnset(
+      z.string().regex(AWS_KEY_ID, 'is an AWS access key id').optional(),
+    ),
+    DECK_BUCKET_SECRET_ACCESS_KEY: blankIsUnset(z.string().min(16).optional()),
   })
   .superRefine((env, ctx) => {
     const set = [env.APNS_KEY_P8, env.APNS_KEY_ID, env.APNS_TEAM_ID].filter((v) => v !== undefined);
@@ -158,6 +181,20 @@ const envSchema = z
         path: ['COGNITO_DELETER_ACCESS_KEY_ID'],
         message:
           'COGNITO_DELETER_ACCESS_KEY_ID and COGNITO_DELETER_SECRET_ACCESS_KEY are set together, beside a Cognito pool’s AUTH_ISSUER, or not at all',
+      });
+    }
+    const bucket = [
+      env.DECK_BUCKET,
+      env.DECK_BUCKET_REGION,
+      env.DECK_BUCKET_ACCESS_KEY_ID,
+      env.DECK_BUCKET_SECRET_ACCESS_KEY,
+    ].filter((v) => v !== undefined).length;
+    if (bucket !== 0 && bucket !== 4) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['DECK_BUCKET'],
+        message:
+          'DECK_BUCKET, DECK_BUCKET_REGION, DECK_BUCKET_ACCESS_KEY_ID and DECK_BUCKET_SECRET_ACCESS_KEY are set together or not at all',
       });
     }
   });
