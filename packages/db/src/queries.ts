@@ -22,6 +22,7 @@ import {
   participations,
   questions,
   responses,
+  savedQuestions,
   sessions,
   users,
 } from './schema.js';
@@ -313,6 +314,26 @@ export async function findUnclosedQuestion(db: Database, sessionId: string) {
       .where(and(eq(questions.sessionId, sessionId), isNull(questions.closedAt)))
       .limit(1),
   );
+}
+
+/** A teacher's draft by id, removed or not (Phase 7, L3b), so a route can authorize its teacher. */
+export async function findSavedQuestion(db: Database, id: string) {
+  return first(
+    await db
+      .select({ teacherId: savedQuestions.teacherId })
+      .from(savedQuestions)
+      .where(eq(savedQuestions.id, id))
+      .limit(1),
+  );
+}
+
+/** A teacher's drafts ("Live lesson", decision 12): theirs alone, none removed, newest first. */
+export function listSavedQuestions(db: Database, teacherId: string) {
+  return db
+    .select()
+    .from(savedQuestions)
+    .where(and(eq(savedQuestions.teacherId, teacherId), isNull(savedQuestions.removedAt)))
+    .orderBy(desc(savedQuestions.createdAt), desc(savedQuestions.id));
 }
 
 /** A session by id (any state), so the lifecycle routes can authorize the teacher. */

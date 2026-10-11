@@ -590,6 +590,16 @@ describe('a deleted teacher (C3)', () => {
         options: ['a', 'b'],
       }),
     ).rejects.toMatchObject({ code: 'ACCOUNT_DELETED' });
+    // A create's retry finds the draft it made removed, under its id still: another write's.
+    await expect(
+      createSavedQuestion(db, {
+        teacherId: teacher!.id,
+        eventId: live.eventId,
+        prompt: 'Is Ana back?',
+        options: ['Yes', 'No', 'Not yet'],
+        correctOption: 0,
+      }),
+    ).rejects.toMatchObject({ code: 'EVENT_ID_CONFLICT' });
     expect(
       await db.select().from(savedQuestions).where(eq(savedQuestions.teacherId, teacher!.id)),
     ).toHaveLength(2);

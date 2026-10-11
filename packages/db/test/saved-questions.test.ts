@@ -189,6 +189,32 @@ describe('a teacher’s drafts (decision 12)', () => {
     expect(await draftsOf(teacher.id)).toEqual([now]);
   });
 
+  it('lets no save undo a later one: an older save landing after it changes nothing and answers the draft now (decision 4’s order)', async () => {
+    const { teacher } = await lesson('d-order');
+    const beforeIt = newUuidV7();
+    const draft = await written(write(teacher.id, 5));
+    // Minted in this order, as a teacher's two saves; landing the other way round.
+    const [older, newer] = [newUuidV7(), newUuidV7()];
+    const save = (eventId: string, prompt: string, minute: number) =>
+      replaceSavedQuestion(db, {
+        savedQuestionId: draft.id,
+        eventId,
+        prompt,
+        options: ['a', 'b'],
+        now: at(minute),
+      });
+
+    const kept = await written(save(newer, 'Later?', 7));
+    const late = await save(older, 'Earlier?', 8);
+
+    expect(kept).toMatchObject({ prompt: 'Later?', eventId: newer, updatedAt: at(7) });
+    expect(late).toEqual({ outcome: 'replay', savedQuestion: kept });
+    // Nor a save minted before the draft itself, nor the later save's own retry.
+    expect(await save(beforeIt, 'First?', 9)).toEqual({ outcome: 'replay', savedQuestion: kept });
+    expect(await save(newer, 'Later?', 9)).toEqual({ outcome: 'replay', savedQuestion: kept });
+    expect(await draftsOf(teacher.id)).toEqual([kept]);
+  });
+
   it('removes one, keeping its words; its replay answers so, and any later write finds none', async () => {
     const { teacher } = await lesson('d-remove');
     const draft = await written(write(teacher.id, 5));

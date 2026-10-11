@@ -97,6 +97,9 @@ export const API_ERROR_REASONS = [
   'question_not_found',
   'question_closed',
   'invalid_option',
+  // A teacher's saved question (Phase 7, L3b): none of theirs has the id, or
+  // they removed it (a 404). Nothing was written.
+  'saved_question_not_found',
 ] as const;
 export type ApiErrorReason = (typeof API_ERROR_REASONS)[number];
 

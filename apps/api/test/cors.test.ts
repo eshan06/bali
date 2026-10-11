@@ -89,16 +89,16 @@ describe('CORS (opt-in via CORS_ORIGINS)', () => {
     await app.close();
   });
 
-  // The portal's api-client sends GET, POST, PATCH and DELETE. @fastify/cors's
-  // default allows only GET,HEAD,POST, so a browser refused the PATCH behind
-  // New code (P11) before sending it. PUT (/v1/me/push-token) is iOS-only.
-  it.each(['GET', 'HEAD', 'POST', 'PATCH', 'DELETE'])(
-    'allows a %s preflight from a listed origin (P11)',
+  // The portal's api-client sends GET, POST, PATCH and DELETE, and PUT a saved
+  // question (L3b). @fastify/cors's default allows only GET,HEAD,POST, so a
+  // browser refused the PATCH behind New code (P11) before sending it.
+  it.each(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'])(
+    'allows a %s preflight from a listed origin (P11, L3b)',
     async (method) => {
       const app = buildWithCors('http://localhost:3000');
       const res = await app.inject({
         method: 'OPTIONS',
-        url: `/v1/classes/${randomUUID()}`,
+        url: `/v1/saved-questions/${randomUUID()}`,
         headers: { origin: 'http://localhost:3000', 'access-control-request-method': method },
       });
       expect([200, 204]).toContain(res.statusCode);
@@ -107,7 +107,6 @@ describe('CORS (opt-in via CORS_ORIGINS)', () => {
         .split(',')
         .map((m) => m.trim());
       expect(allowed).toContain(method);
-      expect(allowed).not.toContain('PUT');
       await app.close();
     },
   );

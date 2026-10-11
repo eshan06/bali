@@ -8,6 +8,24 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-11** — **A teacher's saved questions through the API (L3b2): an older save never undoes
+  a later one.** The conductor's ruling on L3b1's WARN, the owner being away: a replace takes an
+  answer's order (Live lesson, decision 4). It applies only when its `eventId` sorts after the one
+  the draft holds, compared by Postgres under the draft's row lock, as an answer's are; an older
+  one, a save landing late, changes nothing and is answered `replay` with the draft now. So the
+  portal (L7b) need not send a draft's saves one at a time. **The draft carries its `eventId`**
+  (`SavedQuestion.eventId`), so a client mints its next save after it, as decision 4 has a device do
+  for an answer: a teacher whose laptop's clock runs behind the one that saved last would otherwise
+  see each edit answered with the old words. **The same id is as L3b1 made it:** a write's own retry
+  answers the draft now, and another write's reuse of it (other words, or a removal under a save's
+  id) is `409 event_id_conflict`, a client bug, never a replay. **A removal is not ordered:** Remove
+  always removes, and a save landing after it is `404 saved_question_not_found`. *Weighed:* ordering
+  it too, which would let a late save keep a draft the teacher removed. **A create's retry stays
+  unordered** (L3b1): once its draft was replaced or removed, its id is free and the retry writes a
+  new draft; PLAN's L3b1 line said a `404` there, and is corrected (Claude Review's note on #316). A
+  removed or unknown draft is `404 saved_question_not_found`; the route's guard lets a removed one
+  through for its removal's retry. Not added: paging the list, a teacher's own drafts.
+
 - **2026-10-11** — **A teacher's saved questions in the database and the engine (L3b1); the routes
   are L3b2.** L3b whole is about 650 changed lines, so it ships as the split decided in advance: the
   table, the engine's writes and the privacy paths here, the four routes next. **The account
@@ -29,6 +47,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   (decision 4): a create's retry landing after the draft was replaced or removed writes a new draft,
   and an older replace landing after a newer one puts its words back. So the portal sends a draft's
   saves one at a time, and resends one only while it is that draft's newest write (L7b).
+  *Amended 2026-10-11 (L3b2, the entry above):* a replace takes an answer's order now, so an older
+  one changes nothing and the portal need not send a draft's saves one at a time; a create's retry
+  is as said here.
   **`event_id` both ways in one statement:** `idHeldBy` reads in one `UNION ALL` the holders a writer
   does not read itself, so a tap's `insertEvent` still pays one read for answers and drafts together.
   The writers beside the engine (the 13+ yes, push tokens, an invite's redeem) check their own table

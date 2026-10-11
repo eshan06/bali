@@ -48,7 +48,7 @@ export async function makeAuthedApp(db: Database, clock?: () => Date): Promise<A
 export async function authedInject(
   app: FastifyInstance,
   token: string,
-  opts: { method: 'GET' | 'POST'; url: string; payload?: object },
+  opts: { method: 'GET' | 'POST' | 'PUT' | 'DELETE'; url: string; payload?: object },
 ): Promise<LightMyRequestResponse> {
   return app.inject({
     method: opts.method,

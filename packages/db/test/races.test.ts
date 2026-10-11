@@ -4757,6 +4757,34 @@ describe.runIf(REAL_PG)('live lesson questions under contention (real Postgres, 
     }
   });
 
+  it('two saves of a draft keep the later, whichever lands first (L3b2, decision 4’s order)', async () => {
+    // The one behind waits on the draft's row, then is judged against the save ahead of it by their
+    // eventIds' order, never by which landed first.
+    for (const laterFirst of [true, false]) {
+      const { teacherId } = await seed(`race-draft-order-${laterFirst}`);
+      const created = await createSavedQuestion(db, drafting(teacherId));
+      if (created.outcome !== 'created') throw new Error(created.outcome);
+      const save = (eventId: string, prompt: string) => (on: Database) =>
+        replaceSavedQuestion(on, {
+          savedQuestionId: created.savedQuestion.id,
+          eventId,
+          prompt,
+          options: ['x', 'y'],
+        });
+      // Minted in this order, as one teacher's two saves.
+      const earlier = save(newUuidV7(), 'Earlier?');
+      const later = save(newUuidV7(), 'Later?');
+
+      const behind = await behindCommit(laterFirst ? later : earlier, () =>
+        (laterFirst ? earlier : later)(db),
+      );
+
+      if (behind.status === 'rejected') throw behind.reason as Error;
+      expect(behind.value.outcome).toBe(laterFirst ? 'replay' : 'replaced');
+      expect(await draftsOf(teacherId)).toMatchObject([{ prompt: 'Later?' }]);
+    }
+  }, 20_000);
+
   it('a draft behind a teacher’s deletion is refused and writes nothing; one ahead of it goes with the account (L3b)', async () => {
     /** A teacher whose class is archived, so the account may go (C3). */
     async function leaving(tag: string) {

@@ -8,6 +8,7 @@ import {
   events,
   newUuidV7,
   questions,
+  savedQuestions,
   startSession,
   tapIn,
   users,
@@ -16,6 +17,8 @@ import type {
   ApiErrorBody,
   QuestionResponse,
   QuestionResults,
+  SavedQuestionResponse,
+  SavedQuestionsResponse,
   SessionSnapshot,
 } from '@bali/shared';
 import { and, eq } from 'drizzle-orm';
@@ -28,8 +31,8 @@ import { makeTestDb, seedClassroom } from './helpers/db.js';
 /*
  * A live lesson's questions, the teacher's side (Phase 7, L3; ARCHITECTURE, "Live lesson",
  * decisions 3 and 6): open, close and the boot snapshot's open question, for the class's own
- * teacher. Who else is refused is the authorization matrix's too; the engine's own rules and races
- * are packages/db's (L1).
+ * teacher; and a teacher's saved questions (L3b, decision 12). Who else is refused is the
+ * authorization matrix's too; the engine's own rules and races are packages/db's (L1, L3b1).
  */
 
 let db: Database;
@@ -588,6 +591,254 @@ describe('GET /v1/sessions/:id: the open question', () => {
     expect((await snapshot(token, session.id)).question).toBeNull();
     const [row] = await questionsOf(session.id);
     expect(row?.closedAt).toBeNull();
+  });
+});
+
+describe('a teacher’s saved questions (L3b)', () => {
+  const list = async (token: string) =>
+    (
+      await authedInject(ctx.app, token, { method: 'GET', url: '/v1/saved-questions' })
+    ).json<SavedQuestionsResponse>().savedQuestions;
+  const create = (token: string, payload: object) =>
+    authedInject(ctx.app, token, { method: 'POST', url: '/v1/saved-questions', payload });
+  const replace = (token: string, id: string, payload: object) =>
+    authedInject(ctx.app, token, { method: 'PUT', url: `/v1/saved-questions/${id}`, payload });
+  const remove = (token: string, id: string, payload: object = { eventId: newUuidV7() }) =>
+    authedInject(ctx.app, token, { method: 'DELETE', url: `/v1/saved-questions/${id}`, payload });
+  const answered = (res: { json: () => unknown }) => res.json() as SavedQuestionResponse;
+
+  /** Write a draft through the route, its body an open's (`asking`): the answer's draft. */
+  async function drafted(token: string, over: Record<string, unknown> = {}) {
+    const res = await create(token, asking(over));
+    expect(res.statusCode).toBe(200);
+    return answered(res).savedQuestion;
+  }
+
+  const draftsOf = (teacherId: string) =>
+    db.select().from(savedQuestions).where(eq(savedQuestions.teacherId, teacherId));
+
+  it('writes one as checked, answered with it, and answers its retry with the draft now', async () => {
+    const { teacher, token } = await lesson('draft-create');
+    const body = asking({ prompt: '  Which?\nPick one. ', options: [' a ', 'b'] });
+
+    const res = await create(token, body);
+
+    expect(res.statusCode).toBe(200);
+    const [row] = await draftsOf(teacher.id);
+    expect(answered(res)).toEqual({
+      outcome: 'created',
+      savedQuestion: {
+        id: row!.id,
+        prompt: 'Which?\nPick one.',
+        options: ['a', 'b'],
+        correctOption: 1,
+        eventId: body.eventId,
+        createdAt: at(10).toISOString(),
+        updatedAt: at(10).toISOString(),
+      },
+    });
+    now = at(12);
+    expect(answered(await create(token, body))).toEqual({ ...answered(res), outcome: 'replay' });
+    expect(await draftsOf(teacher.id)).toHaveLength(1);
+  });
+
+  it('lists the caller’s own, newest first, never a removed one', async () => {
+    const c = await lesson('draft-list');
+    const other = await seedClassroom(db, 'draft-list-elsewhere');
+    expect(await list(c.token)).toEqual([]);
+    const first = await drafted(c.token, { prompt: 'First?' });
+    now = at(11);
+    const second = await drafted(c.token, { prompt: 'Second?' });
+    now = at(12);
+    const third = await drafted(c.token, { prompt: 'Third?' });
+    await drafted(await ctx.tokenFor(other.teacher.cognitoId), { prompt: 'Theirs?' });
+
+    await remove(c.token, second.id);
+
+    expect(await list(c.token)).toEqual([third, first]);
+  });
+
+  it('replaces one whole, and answers its retry with the draft now', async () => {
+    const { token } = await lesson('draft-replace');
+    const draft = await drafted(token);
+    now = at(12);
+    const body = asking({ prompt: 'Why?', options: ['x', 'y'], correctOption: undefined });
+
+    const res = await replace(token, draft.id, body);
+
+    expect(res.statusCode).toBe(200);
+    expect(answered(res)).toEqual({
+      outcome: 'replaced',
+      savedQuestion: {
+        ...draft,
+        prompt: 'Why?',
+        options: ['x', 'y'],
+        correctOption: null,
+        eventId: body.eventId,
+        updatedAt: at(12).toISOString(),
+      },
+    });
+    expect(answered(await replace(token, draft.id, body))).toEqual({
+      ...answered(res),
+      outcome: 'replay',
+    });
+  });
+
+  it('keeps the later of two saves landing out of order: the older answers the draft now', async () => {
+    const { teacher, token } = await lesson('draft-order');
+    const draft = await drafted(token);
+    // Minted in this order, as a teacher's two saves.
+    const [older, newer] = [asking({ prompt: 'Earlier?' }), asking({ prompt: 'Later?' })];
+
+    const later = await replace(token, draft.id, newer);
+    const late = await replace(token, draft.id, older);
+
+    expect(answered(later).outcome).toBe('replaced');
+    expect(late.statusCode).toBe(200);
+    expect(answered(late)).toEqual({ ...answered(later), outcome: 'replay' });
+    expect(await draftsOf(teacher.id)).toMatchObject([
+      { prompt: 'Later?', eventId: newer.eventId },
+    ]);
+  });
+
+  it('removes one, answering its retry so; then no write finds it', async () => {
+    const { teacher, token } = await lesson('draft-remove');
+    const draft = await drafted(token);
+    now = at(12);
+    const body = { eventId: newUuidV7() };
+
+    const res = await remove(token, draft.id, body);
+
+    expect(res.statusCode).toBe(200);
+    expect(answered(res)).toEqual({
+      outcome: 'removed',
+      savedQuestion: { ...draft, eventId: body.eventId, updatedAt: at(12).toISOString() },
+    });
+    expect(answered(await remove(token, draft.id, body))).toEqual({
+      ...answered(res),
+      outcome: 'replay',
+    });
+    for (const gone of [await remove(token, draft.id), await replace(token, draft.id, asking())]) {
+      expect(gone.statusCode).toBe(404);
+      expect(reasonOf(gone)).toBe('saved_question_not_found');
+    }
+    expect(await list(token)).toEqual([]);
+    expect(await draftsOf(teacher.id)).toMatchObject([{ removedAt: at(12) }]);
+  });
+
+  it('writes a create’s retry anew once its draft was removed: the removal holds the draft’s id', async () => {
+    // Never a 404: a draft keeps only its last write's id (L3b1). After a deletion, a disposal or
+    // a retention run, which keep it, the caller is no teacher: 403.
+    const { teacher, token } = await lesson('draft-create-removed');
+    const body = asking();
+    const draft = answered(await create(token, body)).savedQuestion;
+    await remove(token, draft.id);
+
+    const retry = await create(token, body);
+
+    expect(retry.statusCode).toBe(200);
+    expect(answered(retry)).toMatchObject({
+      outcome: 'created',
+      savedQuestion: { eventId: body.eventId },
+    });
+    expect(answered(retry).savedQuestion.id).not.toBe(draft.id);
+    expect(await draftsOf(teacher.id)).toHaveLength(2);
+  });
+
+  it('refuses a student, another teacher’s draft and an unknown one, writing nothing', async () => {
+    const c = await lesson('draft-who');
+    const other = await seedClassroom(db, 'draft-who-elsewhere');
+    const draft = await drafted(c.token);
+    const student = await ctx.tokenFor(c.student.cognitoId);
+    const theirs = await ctx.tokenFor(other.teacher.cognitoId);
+
+    const refused = [
+      await authedInject(ctx.app, student, { method: 'GET', url: '/v1/saved-questions' }),
+      await create(student, asking()),
+      await replace(student, draft.id, asking()),
+      await remove(student, draft.id),
+      await replace(theirs, draft.id, asking()),
+      await remove(theirs, draft.id),
+    ];
+    const unknown = [
+      await replace(c.token, newUuidV7(), asking()),
+      await remove(c.token, newUuidV7()),
+    ];
+
+    for (const res of refused) expect(res.statusCode).toBe(403);
+    for (const res of unknown) {
+      expect(res.statusCode).toBe(404);
+      expect(reasonOf(res)).toBe('saved_question_not_found');
+    }
+    expect(await draftsOf(c.teacher.id)).toMatchObject([{ id: draft.id, prompt: 'Which?' }]);
+    expect(await draftsOf(c.student.id)).toEqual([]);
+    expect(await draftsOf(other.teacher.id)).toEqual([]);
+  });
+
+  it('refuses an eventId a tap or an answer holds, writing nothing', async () => {
+    const { session, student, teacher, token } = await lesson('draft-spent');
+    const question = await asked(token, session.id);
+    const draft = await drafted(token);
+    const tapId = newUuidV7();
+    const answerId = newUuidV7();
+    await tapIn(db, {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId: tapId,
+      deviceTime: at(5),
+      now: at(5),
+    });
+    await answerQuestion(db, {
+      questionId: question.id,
+      studentId: student.id,
+      eventId: answerId,
+      option: 0,
+      now: at(11),
+    });
+
+    for (const eventId of [tapId, answerId]) {
+      for (const res of [
+        await create(token, asking({ eventId, prompt: 'Why?' })),
+        await replace(token, draft.id, asking({ eventId, prompt: 'Why?' })),
+        await remove(token, draft.id, { eventId }),
+      ]) {
+        expect(res.statusCode).toBe(409);
+        expect(reasonOf(res)).toBe('event_id_conflict');
+      }
+    }
+    expect(await draftsOf(teacher.id)).toMatchObject([
+      { id: draft.id, prompt: 'Which?', eventId: draft.eventId, removedAt: null },
+    ]);
+  });
+
+  it.each([
+    ['a blank prompt', { prompt: ' \n ' }],
+    ['a prompt of 501 characters', { prompt: 'x'.repeat(501) }],
+    ['a prompt with a bidi override', { prompt: 'Which ‮?' }],
+    ['one option', { options: ['a'], correctOption: 0 }],
+    ['seven options', { options: ['a', 'b', 'c', 'd', 'e', 'f', 'g'] }],
+    ['an option with a line break', { options: ['a', 'b\nc'] }],
+    ['a correct option past the last', { correctOption: 3 }],
+    ['an eventId that is no UUIDv7', { eventId: randomUUID() }],
+    ['no eventId', { eventId: undefined }],
+  ])('checks a save as an open: refuses %s, writing nothing', async (_, over) => {
+    const { teacher, token } = await lesson(`draft-bad-${randomUUID()}`);
+    const draft = await drafted(token);
+
+    const res = [await create(token, asking(over)), await replace(token, draft.id, asking(over))];
+
+    expect(res.map((r) => r.statusCode)).toEqual([400, 400]);
+    expect(await draftsOf(teacher.id)).toMatchObject([{ id: draft.id, prompt: 'Which?' }]);
+  });
+
+  it('refuses a removal with no UUIDv7 eventId, removing nothing', async () => {
+    const { teacher, token } = await lesson('draft-remove-bad');
+    const draft = await drafted(token);
+
+    for (const payload of [{}, { eventId: randomUUID() }]) {
+      expect((await remove(token, draft.id, payload)).statusCode).toBe(400);
+    }
+    expect(await draftsOf(teacher.id)).toMatchObject([{ removedAt: null }]);
   });
 });
 
