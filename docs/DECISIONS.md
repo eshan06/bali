@@ -8,6 +8,39 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-10** — **The deck storage interface (M1): S3 by presigned URLs, signed by hand, and an
+  in-memory stand-in.** `DeckStorage` (`apps/api/src/deck-storage.ts`) is what M2–M4 need and
+  nothing more: a presigned PUT, a presigned GET, the API's own read, a delete. **Signed by Node's
+  own crypto, no SDK** (as M1 was planned), which reverses the 2026-10-09 entry's "Phase 7's S3
+  presigned URLs, if built, take the SDK": the same reasons hold (the SDK's S3 client and its
+  credential chain for four calls), and a presigned URL is the Cognito deleter's signer plus a
+  canonical query (`sigv4.ts`, where that signer moved). It reproduces S3's published examples, a
+  GET signed in its headers and the same GET presigned, and matched `@smithy/signature-v4` byte for
+  byte on this API's own PUT, GET, read and delete (each pinned in the tests). **The PUT signs
+  `content-length` and `content-type`**, so S3 refuses a file of another length or type, the payload
+  `UNSIGNED-PAYLOAD` (M2's complete checks the `sha256`); **the GET signs `response-cache-control=
+  no-store`**, so S3 answers `Cache-Control: no-store` (decision 13); both live 5 minutes. **The read
+  asks S3 for one byte past its cap** (`Range`), so an object of any size costs at most the cap to
+  read; an empty object's `416` reads as empty. *Weighed:* reading the stream and stopping at the
+  cap, which the OpenAPI guard's syntax check refuses (no `.body` read outside `parseRequest`), and
+  which bounds nothing S3 doesn't. **A missing object reads as missing on `404 NoSuchKey` and on
+  `403 AccessDenied`:** the key has no `s3:ListBucket` (decision 8: put, get and delete only), and
+  without it S3 answers a missing object 403. The cost: a key whose policy lacks `s3:GetObject`
+  would read every deck as missing; runbook 10's check fails that before any deck is uploaded.
+  *Weighed:* granting `s3:ListBucket` for exact 404s, which would let the key list every deck,
+  beyond decision 8. **Virtual-hosted addresses** (`<bucket>.s3.<region>.amazonaws.com`), so a bucket
+  name with a dot is refused at boot (its certificate would not match). **The stand-in**
+  (`memoryDeckStorage`): files in a Map, URLs on `deck-storage.invalid` (RFC 2606: no real request
+  reaches one), answered by its own `fetch` with S3's refusals (an HMAC over the method, key, expiry,
+  type and length stands in for the signature), so M2's tests and M9's demo upload and download with
+  no AWS. **Config:** `DECK_BUCKET`, `DECK_BUCKET_REGION`, `DECK_BUCKET_ACCESS_KEY_ID`,
+  `DECK_BUCKET_SECRET_ACCESS_KEY`, all four or none, read like `COGNITO_DELETER_*` and passed to the
+  signer, never through AWS's credential chain; unset, storage is off and the boot says so once. The
+  app keeps it as `app.deckStorage` for M2's routes. **The owner's check** (runbook 10, M0):
+  `npm run deck-bucket:check`, run inside the API's container by `railway ssh`, so the key never
+  leaves Railway; it proves the bucket, its CORS (the portal's origins and no other) and the key
+  against real S3, the length and type refusals included.
+
 - **2026-10-10** — **Live lesson: the build resumes, both canvases approved, and no screen before
   backups and the bucket** (the owner, in chat). The owner lifted the hold of 2026-10-05 and
   approved the screens on both canvases, the [app's](https://claude.ai/artifact/CZpFbFuxnRrLcuywtJGfVQ) and the

@@ -66,8 +66,14 @@ export async function checkDeckBucket(
     check((await cors(upload, STRANGER, 'PUT')) === null, `${STRANGER}, any other origin, may not`);
     const read = await storage.read(key, file.byteLength);
     check(read instanceof Uint8Array && Buffer.from(read).equals(file), 'the API reads it');
-    await storage.delete(key);
-    check((await storage.read(key, file.byteLength)) === 'missing', 'the API deletes it');
+    const deleted = await storage.delete(key).then(
+      () => true,
+      () => false,
+    );
+    check(
+      deleted && (await storage.read(key, file.byteLength)) === 'missing',
+      'the API deletes it',
+    );
   } finally {
     await storage.delete(key).catch(() => undefined);
   }

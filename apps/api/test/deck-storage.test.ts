@@ -226,10 +226,12 @@ describe('the runbook’s check (runbook 10)', () => {
     return { storage, fetchImpl };
   }
 
-  async function run(allowed: readonly string[], origins = PORTAL) {
+  async function run(allowed: readonly string[], origins = PORTAL, mayDelete = true) {
     const { storage, fetchImpl } = bucket(allowed);
+    const denied = () => Promise.reject(new Error('S3 refused: AccessDenied (403)'));
+    const keyed = mayDelete ? storage : { ...storage, delete: denied };
     const lines: string[] = [];
-    const passed = await checkDeckBucket(storage, origins, (line) => lines.push(line), fetchImpl);
+    const passed = await checkDeckBucket(keyed, origins, (line) => lines.push(line), fetchImpl);
     return { passed, lines };
   }
 
@@ -256,6 +258,12 @@ describe('the runbook’s check (runbook 10)', () => {
 
     const none = await run(PORTAL, []);
     expect(none.lines).toContain('FAIL  CORS_ORIGINS names the portal’s origins');
+  });
+
+  it('fails a key that may not delete, on its own line', async () => {
+    const { passed, lines } = await run(PORTAL, PORTAL, false);
+    expect(passed).toBe(false);
+    expect(lines.filter((line) => line.startsWith('FAIL '))).toEqual(['FAIL  the API deletes it']);
   });
 });
 
