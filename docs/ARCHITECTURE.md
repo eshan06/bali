@@ -992,9 +992,10 @@ During a running session the teacher can ask the class a question (Slice 1) and 
 slides (Slice 2); each student follows on the web from a laptop (Slice 3) and on their own
 phone, on Bali's own screen. Planned 2026-10-05 from the research in
 `docs/ROADMAP-RESEARCH.md` (B); the build is Phase 7 in `docs/PLAN.md`, and its decision
-entries are `docs/DECISIONS.md`, 2026-10-05, 2026-10-09 and 2026-10-10. **The build is on
-hold by the owner (2026-10-05):** nothing starts until the owner says so; when resumed,
-backend only first (no UI, app or portal changes). The owner's picks of 2026-10-09 (the
+entries are `docs/DECISIONS.md`, 2026-10-05, 2026-10-09 and 2026-10-10. **The build resumed
+on 2026-10-10** (the owner, who had held it since 2026-10-05): the steps with no screen first,
+and no screen built until production backups and the bucket are in place (PLAN's L0b and M0).
+The owner's picks of 2026-10-09 (the
 screens' design, the defaults confirmed, and saved questions) follow the ten decisions
 (decisions 11 and 12), and those of 2026-10-10 (students on the web, decision 13, and the open
 questions settled) after them.
@@ -1286,8 +1287,8 @@ could.
 The owner confirmed decision 3's defaults and decision 8's limits as written (the guard at 3
 answers; the reveal at the teacher's choice on each close; the live breakdown on the teacher's
 own screen once the guard allows; decks of at most 25 MB and 200 pages), picked the screens
-below, and added saved questions (decision 12). The screens are drafts on two Claude Design
-canvases, built only once the owner signs them off (CLAUDE.md, Working rules):
+below, and added saved questions (decision 12). The screens are on two Claude Design
+canvases, approved by the owner on 2026-10-10 (CLAUDE.md, Working rules):
 [Live lesson app screens](https://claude.ai/artifact/CZpFbFuxnRrLcuywtJGfVQ) and
 [Live lesson portal screens](https://claude.ai/artifact/BxHbGud1xMeyXLUUvsewHM).
 
@@ -1343,9 +1344,9 @@ changes.
 ### The owner's picks (2026-10-10)
 
 The owner added students on the web as Slice 3 (decision 13), to be built web first, and took
-the recommendation on each question left open (Settled, below). The student pages are drafts on
-the [portal canvas](https://claude.ai/artifact/BxHbGud1xMeyXLUUvsewHM) (its two student rows),
-built only once the owner signs them off.
+the recommendation on each question left open (Settled, below). The student pages are on
+the [portal canvas](https://claude.ai/artifact/BxHbGud1xMeyXLUUvsewHM) (its student rows),
+approved with it on 2026-10-10.
 
 **13. Students on the web (Slice 3).** Students mostly have a laptop open in class, so the
 portal is where a student follows a lesson first; the phone shows the same lesson (decision 11)
@@ -1471,8 +1472,8 @@ Each exists because v2 broke it and shipped a real bug
   environments); iOS app structure (native, app + extension, mirror-not-cage); web portal
   (Next.js thin client on Vercel); the items in [ISSUES.md](ISSUES.md) are requirements;
   the live lesson (Phase 7, 2026-10-05: questions and slides within a running session,
-  totals only, phones polling; 2026-10-10: students on the web too, Slice 3), planned and not
-  yet built; the Start's push to waiting
+  totals only, phones polling; 2026-10-10: students on the web too, Slice 3), planned, its build
+  under way since 2026-10-10; the Start's push to waiting
   students (2026-10-06, a visible doorbell, never the truth), planned and not yet built.
 - **Open:** one design question, Phase 6: ISSUES #3's fallback, should Apple's answer
   call for one (the issue ranks the fallback designs, best fit first). Next: the build plan (what gets coded
