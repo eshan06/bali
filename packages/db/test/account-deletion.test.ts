@@ -17,16 +17,20 @@ import {
   enrollments,
   events,
   participations,
+  questions,
+  responses,
   schools,
   users,
 } from '../src/schema.js';
 import { makeTestDb } from '../src/testing.js';
 import {
+  answerQuestion,
   armTap,
   deleteAccount,
   deletedCognitoId,
   endSession,
   joinClassByCode,
+  openQuestion,
   renameStudent,
   startSession,
   tapIn,
@@ -122,6 +126,18 @@ async function lesson(classId: string, ana: string, ben: string) {
 const eventsOf = (userId: string) =>
   db.select().from(events).where(eq(events.userId, userId)).orderBy(events.seq);
 
+/** The class's teacher asks `prompt` in the running `sessionId`. */
+const ask = async (sessionId: string, teacherId: string, prompt = 'Which?') =>
+  (
+    await openQuestion(db, {
+      sessionId,
+      teacherId,
+      eventId: newUuidV7(),
+      prompt,
+      options: ['a', 'b'],
+    })
+  ).question;
+
 describe('deleteAccount (C3)', () => {
   it('leaves every class, ends the lesson the student is in, and names them nowhere', async () => {
     const { ana, ben, first, second } = await seed('c3-live');
@@ -186,6 +202,57 @@ describe('deleteAccount (C3)', () => {
     expect(after).toEqual(before);
     expect(after.joined).toEqual([ana.id, ben.id]);
     expect(after.unlocks).toMatchObject([{ studentId: ana.id, reason: 'nurse' }]);
+  });
+
+  it('keeps the student’s answers under the account it de-identifies, so the totals stay', async () => {
+    const { teacher, ana, ben, first } = await seed('c3-answers');
+    const session = await lesson(first.id, ana.id, ben.id);
+    const question = await ask(session.id, teacher.id);
+    for (const [studentId, option] of [
+      [ana.id, 1],
+      [ben.id, 0],
+    ] as const) {
+      await answerQuestion(db, {
+        questionId: question.id,
+        studentId,
+        eventId: newUuidV7(),
+        option,
+      });
+    }
+    const answers = () =>
+      db
+        .select()
+        .from(responses)
+        .where(eq(responses.questionId, question.id))
+        .orderBy(responses.option);
+    const before = await answers();
+
+    await deleteAccount(db, { userId: ana.id, eventId: newUuidV7(), at: new Date() });
+
+    expect(await answers()).toEqual(before);
+    expect(before.map((r) => r.studentId)).toEqual([ben.id, ana.id]);
+    expect(one(await db.select().from(users).where(eq(users.id, ana.id))).displayName).toBeNull();
+  });
+
+  it('leaves a deleted teacher’s questions their words, as it leaves their removed classes their names', async () => {
+    const { teacher, ana, ben, first } = await seed('c3-teacher-words');
+    const session = await lesson(first.id, ana.id, ben.id);
+    const question = await ask(session.id, teacher.id, 'Did Ana finish?');
+    await endSession(db, { sessionId: session.id, at: new Date(), reason: 'ended' });
+    // Both classes archived, and no block: the account may go (C3).
+    await db
+      .update(classes)
+      .set({ removedAt: new Date() })
+      .where(eq(classes.teacherId, teacher.id));
+
+    expect(
+      await deleteAccount(db, { userId: teacher.id, eventId: newUuidV7(), at: new Date() }),
+    ).toEqual({ outcome: 'deleted' });
+
+    expect(one(await db.select().from(classes).where(eq(classes.id, first.id))).name).toBe('1');
+    expect(
+      one(await db.select().from(questions).where(eq(questions.id, question.id))),
+    ).toMatchObject({ prompt: 'Did Ana finish?', options: ['a', 'b'], createdBy: teacher.id });
   });
 
   it('answers its retry, and nothing is written twice', async () => {
@@ -370,11 +437,23 @@ describe('deleteAccount (C3)', () => {
     ).toEqual({ outcome: 'deleted' });
   });
 
-  it('refuses a join, a rename or a tap that reaches the deleted account, and keeps a late unlock', async () => {
+  it('refuses a join, a rename, a tap or an answer that reaches the deleted account, and keeps a late unlock', async () => {
     const { ana, ben, first } = await seed('c3-after');
     const session = await lesson(first.id, ana.id, ben.id);
+    const question = await ask(session.id, first.teacherId);
     await deleteAccount(db, { userId: ana.id, eventId: newUuidV7(), at: new Date() });
     const gone = { code: 'ACCOUNT_DELETED' };
+
+    // An answer is no must-never-lose record (Live lesson, decision 5): refused, as a tap is.
+    await expect(
+      answerQuestion(db, {
+        questionId: question.id,
+        studentId: ana.id,
+        eventId: newUuidV7(),
+        option: 0,
+      }),
+    ).rejects.toMatchObject(gone);
+    expect(await db.select().from(responses).where(eq(responses.studentId, ana.id))).toEqual([]);
 
     await expect(
       joinClassByCode(db, {

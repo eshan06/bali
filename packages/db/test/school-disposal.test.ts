@@ -20,6 +20,8 @@ import {
   enrollments,
   events,
   participations,
+  questions,
+  responses,
   schools,
   sessions,
   teacherInvites,
@@ -28,10 +30,12 @@ import {
 import { mintTeacherInvite, recordAgreement, redeemTeacherInvite } from '../src/schools.js';
 import { makeTestDb } from '../src/testing.js';
 import {
+  answerQuestion,
   armTap,
   deletedCognitoId,
   disposeSchool,
   joinClassByCode,
+  openQuestion,
   renameStudent,
   SCHOOL_DISPOSAL_COVERAGE,
   startSession,
@@ -75,7 +79,8 @@ function one<T>(rows: T[]): T {
  * A school whose teacher came by an invite, with a block, a second invite still
  * open, two classes, Ana (renamed) and Ben in a lesson that is over, Ana's
  * unlock in it, and Ben's tap waiting for the teacher's next Start; both
- * students' phones registered for pushes, and both past the 13+ check.
+ * students' phones registered for pushes, and both past the 13+ check. In the
+ * running lesson, a question whose words name both students, answered by Ana.
  */
 async function seed(tag: string) {
   const school = one(
@@ -152,6 +157,20 @@ async function seed(tag: string) {
     deviceTime: new Date(),
     reason: 'nurse',
   });
+  const { question } = await openQuestion(db, {
+    sessionId: lesson.session.id,
+    teacherId: teacher.id,
+    eventId: newUuidV7(),
+    prompt: `Who helped Ben ${tag}?`,
+    options: [`Ana ${tag}`, `Ben ${tag}`, 'No one'],
+    correctOption: 0,
+  });
+  await answerQuestion(db, {
+    questionId: question.id,
+    studentId: ana.id,
+    eventId: newUuidV7(),
+    option: 0,
+  });
   for (const student of [ana, ben]) {
     await registerPushToken(db, {
       userId: student.id,
@@ -190,12 +209,23 @@ async function rowsOf(s: { school: { id: string }; teacher: { id: string } }) {
     .from(enrollments)
     .where(inArray(enrollments.classId, classIds));
   const peopleIds = [s.teacher.id, ...enrolled.map((e) => e.studentId)];
+  const lessons = await db.select().from(sessions).where(inArray(sessions.classId, classIds));
   return {
     school: await db.select().from(schools).where(eq(schools.id, s.school.id)),
     users: await db.select().from(users).where(inArray(users.id, peopleIds)),
     classes: classRows,
     enrollments: enrolled,
-    sessions: await db.select().from(sessions).where(inArray(sessions.classId, classIds)),
+    sessions: lessons,
+    questions: await db
+      .select()
+      .from(questions)
+      .where(
+        inArray(
+          questions.sessionId,
+          lessons.map((l) => l.id),
+        ),
+      ),
+    responses: await db.select().from(responses).where(inArray(responses.studentId, peopleIds)),
     participations: await db
       .select()
       .from(participations)
@@ -289,6 +319,13 @@ describe('disposeSchool (C6a)', () => {
     expect(after.events.find((e) => e.type === 'unlock')?.payload).toMatchObject({
       reason: 'nurse',
     });
+    // The lesson's question loses its words and keeps its count of options and its correct
+    // one; Ana's answer stays as it was, so the totals by option still add up.
+    expect(after.questions).toMatchObject([
+      { prompt: '', options: ['', '', ''], correctOption: 0 },
+    ]);
+    expect(after.responses).toEqual(before.responses);
+    expect(after.responses).toMatchObject([{ studentId: s.ana.id, option: 0 }]);
 
     // Nothing of any of it names a person any more.
     const text = JSON.stringify(after);

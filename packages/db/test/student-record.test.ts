@@ -329,7 +329,20 @@ describe('exportStudentRecord (C5)', () => {
   });
 
   it('exports a deleted account as the deletion left it, by its id only', async () => {
-    const { ana } = await seed('c5-deleted');
+    const { ana, teacher, session } = await seed('c5-deleted');
+    const { question } = await openQuestion(db, {
+      sessionId: session.id,
+      teacherId: teacher.id,
+      eventId: newUuidV7(),
+      prompt: 'Ready?',
+      options: ['yes', 'no'],
+    });
+    await answerQuestion(db, {
+      questionId: question.id,
+      studentId: ana.id,
+      eventId: newUuidV7(),
+      option: 0,
+    });
     await deleteAccount(db, { userId: ana.id, eventId: newUuidV7(), at: new Date() });
 
     expect(await exportStudentRecord(db, ana.cognitoId)).toBeNull();
@@ -342,6 +355,10 @@ describe('exportStudentRecord (C5)', () => {
     // Its phone's token went with it (N4), and its 13+ yes (C7-server).
     expect(record.deviceTokens).toEqual([]);
     expect(record.ageCheck).toBeNull();
+    // Its answer stays, an education record, with the question it answers (Live lesson).
+    expect(record.responses).toMatchObject([
+      { questionId: question.id, studentId: ana.id, option: 0, question: { prompt: 'Ready?' } },
+    ]);
     expect(JSON.stringify(record)).not.toContain('Ana');
   });
 
