@@ -442,7 +442,7 @@ Not PRs — the owner, the lawyer and the school (under Open owner items):
 ### Phase 7 steps (live lesson; one PR each; 👀 = the owner looks at screenshots, 📱 = needs the owner's iPhone, 🔧 = the owner in a console)
 
 Planned 2026-10-05 (`docs/DECISIONS.md`); the design is ARCHITECTURE's "Live lesson (Phase 7)",
-and every step builds against it. **Status: building — the owner lifted the hold and approved both canvases on 2026-10-10.** The steps with no screen come first: M1 (its PR writes M0's runbook, so it goes ahead), then the backend steps (L1–L4 with L3b, W1, then M2–M4), then the logic with no UI (L5, L6, W2, M7, M9). **No screen is built until L0b and M0 are both done** (the owner's order, 2026-10-10). Then the UI, **web first** (the owner, 2026-10-10): in each slice the teacher's portal, then the student web, then the phone (Slice 1: L6, L7, W2, W3, W4, L7b, L7c, then L5, L8; Slice 2: M5, M6, W5, then M7, M8, M9). Each step is one PR from a fresh worker, under ~400 changed
+and every step builds against it. **Status: building — the owner lifted the hold and approved both canvases on 2026-10-10.** The steps with no screen come first: M1 (its PR writes M0's runbook, so it goes ahead), then the backend steps (L1–L4 with L3b, W1, then M2–M4), then the logic with no UI (L5, L6, W2, M7, M9). **No screen is built until L0b and M0 are both done** (the owner's order, 2026-10-10). Then the UI, **web first** (the owner, 2026-10-10): in each slice the teacher's portal, then the student web, then the phone (Slice 1: L7, W3, W4, L7b, L7c, then L8; Slice 2: M5, M6, W5, then M8). Each step is one PR from a fresh worker, under ~400 changed
 lines not counting tests; a step that grows past that is split (L1a, L1b…). **Cloud-buildable:**
 L1–L6 (L3b included), M1–M4, M7, M9, W1, W2. **The Mac session's:** the UI steps, L7, L7b, L7c, L8, M5,
 M6, M8, W3, W4, W5, each built to its canvas, approved by the owner on 2026-10-10: the
@@ -469,7 +469,7 @@ Slice 1 — live questions:
 
 Slice 2 — slides:
 - **M0** 🔧 The owner: a private bucket per environment (AWS S3, settled 2026-10-10), its CORS for the portal's origins, an IAM identity for that bucket only, its keys as Railway secrets — validation: the runbook's check (a presigned PUT and GET from dev)
-- **M1** The storage interface: S3 adapter (presigned PUT and GET, delete) and an in-memory fake that CI and the demo use — validation: unit tests against the fake, the adapter's request signing tested offline
+- **M1** The storage interface: S3 adapter (presigned PUT and GET, delete) and an in-memory fake that CI and the demo use; M0's runbook (`docs/RUNBOOKS.md`, the owner's bucket, its CORS, its IAM user and the check) rides this PR — validation: unit tests against the fake, the adapter's request signing tested offline
 - **M2** Deck endpoints: create (presigned PUT), complete (magic bytes, ≤ 25 MB, sha256, ≤ 200 pages, not encrypted; the parse in a separate worker under a hard time limit, settled 2026-10-10), list, delete; the sweep rejects a deck pending 24 hours; S1 rows, OpenAPI — validation: integration tests with real and hostile PDFs (encrypted, wrong magic, oversized, too many pages, one that stalls the parser past the limit while the API keeps answering), authz, idempotent replay
 - **M3** Slide state: `session_presentations`, `POST /v1/sessions/{id}/slide`, `slide_shown`, the presentation GET's slide (no URL in the polled body), `GET /v1/decks/{id}/download`, the boot snapshot's presentation — validation: PGlite and real-Postgres tests (a slide change vs the session's end, a slide change vs the deck's removal), integration tests, fixtures, a `304` while the slide is unchanged
 - **M4** Privacy: decks in the account deletion (C3), the disposal and the retention run, titles emptied, stored objects deleted after the commit and the sweep's retry for any left unstamped, previews never touching storage, the coverage guards — validation: C3/C6a/C6b tests with decks present, the fake storage empty afterwards, a preview leaving it untouched, a failed delete retried by the sweep
@@ -714,7 +714,7 @@ plan backstop already treats it as source).
 
 ### Proposed future phases (not scheduled)
 
-Researched 2026-10-05; findings in [`docs/ROADMAP-RESEARCH.md`](ROADMAP-RESEARCH.md). Each starts with a docs PR and the owner's go; presenting and live questions is planned as Phase 7, its build on hold by the owner (2026-10-05).
+Researched 2026-10-05; findings in [`docs/ROADMAP-RESEARCH.md`](ROADMAP-RESEARCH.md). Each starts with a docs PR and the owner's go; presenting and live questions is planned as Phase 7, its build under way since 2026-10-10.
 
 - **SIS / LMS rosters.** Not for Vanderbilt (LTI and Okta need VUIT's approval). Smallest step: an expected roster of pasted emails or a CSV, offered on the consent screen to a student whose verified email matches (the server needs the email; S3's access tokens carry none). K-12 later: the data agreements first, then Clever SSO as a Cognito IdP, then rostering (Clever, ClassLink/OneRoster or Edlink); roster changes through the engine with deterministic event ids; no grade or attendance writeback before Apple's answer (ISSUES #3) and a FERPA review.
 - **Presenting and live questions** — planned as **Phase 7, Live lesson** (2026-10-05): see "Phase 7 steps" above and ARCHITECTURE's "Live lesson (Phase 7)".
