@@ -36,6 +36,8 @@ const OBJECT = `https://bali-decks-dev.s3.us-east-1.amazonaws.com/${KEY}`;
 const SIGNED =
   'X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIOSFODNN7EXAMPLE%2F20261010%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261010T123456Z&X-Amz-Expires=300';
 const EMPTY_SHA256 = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
+/** The download URL: the signature @smithy/signature-v4 gave this very request. */
+const DOWNLOAD = `${OBJECT}?${SIGNED}&X-Amz-SignedHeaders=host&response-cache-control=no-store&response-content-encoding=identity&X-Amz-Signature=a739a85f4f48941d5f039468dea301fb3e6d82a3f2820626c29da402313a2ad1`;
 
 interface Sent {
   url: string;
@@ -67,24 +69,17 @@ describe('the S3 adapter', () => {
     expect(URL_LIFETIME_S).toBe(300);
   });
 
-  it('presigns the GET, 5 minutes, its answer marked no-store, as the AWS SDK’s signer does', () => {
-    expect(s3(refusal('unused', 500)).storage.downloadUrl(KEY)).toBe(
-      `${OBJECT}?${SIGNED}&X-Amz-SignedHeaders=host&response-cache-control=no-store&X-Amz-Signature=9edfce4a1ce54719accc2cadc64899a018d2d67fdb92e39410537ddad3fa1e66`,
-    );
+  it('presigns the GET, 5 minutes, answered no-store and as stored, as the AWS SDK’s signer does', () => {
+    expect(s3(refusal('unused', 500)).storage.downloadUrl(KEY)).toBe(DOWNLOAD);
   });
 
-  it('reads an object from the bucket’s own host, its signing the AWS SDK’s signer’s', async () => {
+  it('reads an object through the download URL, so as stored', async () => {
     const { storage, sent } = s3(() => new Response('%PDF-1.7 a deck', { status: 206 }));
     const read = await storage.read(KEY, 25 * 1024 * 1024);
     expect(Buffer.from(read as Uint8Array).toString()).toBe('%PDF-1.7 a deck');
-    expect(sent.map(({ url, init }) => [init.method, url])).toEqual([['GET', OBJECT]]);
-    expect(sent[0]!.init.headers).toEqual({
-      range: 'bytes=0-26214400',
-      'x-amz-content-sha256': EMPTY_SHA256,
-      'x-amz-date': '20261010T123456Z',
-      authorization:
-        'AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/20261010/us-east-1/s3/aws4_request, SignedHeaders=host;range;x-amz-content-sha256;x-amz-date, Signature=08029eca5664a88f3a365be1e0fb6069c989b3131e59b8a2c7473b48e1b91e6d',
-    });
+    expect(sent.map(({ url }) => url)).toEqual([DOWNLOAD]);
+    expect(sent[0]!.init.method).toBeUndefined(); // fetch's GET
+    expect(sent[0]!.init.headers).toEqual({ range: 'bytes=0-26214400' });
     expect(sent[0]!.init.signal).toBeInstanceOf(AbortSignal);
   });
 

@@ -55,8 +55,9 @@ export async function checkDeckBucket(
     const same = Buffer.from(await got.arrayBuffer()).equals(file);
     check(got.status === 200 && same, 'a presigned GET gives it back');
     check(
-      got.headers.get('cache-control') === 'no-store',
-      'its answer says Cache-Control: no-store',
+      got.headers.get('cache-control') === 'no-store' &&
+        got.headers.get('content-encoding') === 'identity',
+      'its answer says Cache-Control: no-store and Content-Encoding: identity',
     );
     check(origins.length > 0, 'CORS_ORIGINS names the portal’s origins');
     for (const origin of origins) {

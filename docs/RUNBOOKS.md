@@ -1054,6 +1054,9 @@ locally, `http://localhost:3000`, unless you added more).
      pasted wrong (step 5).
    - `one of another length is refused` or `one of another type is refused`: stop and tell a
      session; S3 took a file the signing should have kept out.
+   - `its answer says Cache-Control: no-store and Content-Encoding: identity`: stop and tell a
+     session; S3 didn't answer as the download URL asks, so a browser could keep a copy or decode
+     a file before Bali checks it.
    - `<origin> may upload (CORS)` or `may download (CORS)`: that origin is missing from step 2's
      `AllowedOrigins`, or written there differently from `CORS_ORIGINS`.
      `https://example.com, any other origin, may not`: step 2 allows `*`.

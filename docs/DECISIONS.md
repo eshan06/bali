@@ -16,14 +16,22 @@ a real decision? Add a dated entry at the top: what was decided and why.
   credential chain for four calls), and a presigned URL is the Cognito deleter's signer plus a
   canonical query (`sigv4.ts`, where that signer moved). It reproduces S3's published examples, a
   GET signed in its headers and the same GET presigned, and matched `@smithy/signature-v4` byte for
-  byte on this API's own PUT, GET, read and delete (each pinned in the tests). **The PUT signs
+  byte on this API's own PUT, GET and delete (each pinned in the tests). **The PUT signs
   `content-length` and `content-type`**, so S3 refuses a file of another length or type, the payload
   `UNSIGNED-PAYLOAD` (M2's complete checks the `sha256`); **the GET signs `response-cache-control=
-  no-store`**, so S3 answers `Cache-Control: no-store` (decision 13); both live 5 minutes. **The read
-  asks S3 for one byte past its cap** (`Range`), so an object of any size costs at most the cap to
-  read; an empty object's `416` reads as empty. *Weighed:* reading the stream and stopping at the
-  cap, which the OpenAPI guard's syntax check refuses (no `.body` read outside `parseRequest`), and
-  which bounds nothing S3 doesn't. **A missing object reads as missing on `404 NoSuchKey` and on
+  no-store` and `response-content-encoding=identity`**, so S3 answers `Cache-Control: no-store`
+  (decision 13) and the bytes as stored; both live 5 minutes. **Why identity** (santa's round 1, both
+  reviewers; the owner's ruling, "fix it"): a crafted PUT may send `Content-Encoding: gzip` unsigned,
+  S3 keeps it and names it in its answers, and Node's fetch, a browser and URLSession decode what an
+  answer names, so a 25 MB gzip would decode to about 25 GB inside the API on M2's read, or on a
+  phone, before any cap or `sha256` check. **The read goes through the download URL**, so it gets
+  the bytes as stored too, and asks S3 for one byte past its cap (`Range`), so an object of any size
+  costs at most the cap to read; an answer that names an encoding anyway is refused before its body
+  is read (`EncodedAnswer`), its download stopped, so the cap holds whatever S3 sends; an empty
+  object's `416` reads as empty. *Weighed:* refusing an encoded answer alone, which a browser or the
+  phone can't do (they decode before Bali sees the bytes); reading the stream and stopping at the
+  cap, which the OpenAPI guard's syntax check refuses (no `.body` read outside `parseRequest`).
+  **A missing object reads as missing on `404 NoSuchKey` and on
   `403 AccessDenied`:** the key has no `s3:ListBucket` (decision 8: put, get and delete only), and
   without it S3 answers a missing object 403. The cost: a key whose policy lacks `s3:GetObject`
   would read every deck as missing; runbook 10's check fails that before any deck is uploaded.
@@ -32,14 +40,15 @@ a real decision? Add a dated entry at the top: what was decided and why.
   name with a dot is refused at boot (its certificate would not match). **The stand-in**
   (`memoryDeckStorage`): files in a Map, URLs on `deck-storage.invalid` (RFC 2606: no real request
   reaches one), answered by its own `fetch` with S3's refusals (an HMAC over the method, key, expiry,
-  type and length stands in for the signature), so M2's tests and M9's demo upload and download with
-  no AWS. **Config:** `DECK_BUCKET`, `DECK_BUCKET_REGION`, `DECK_BUCKET_ACCESS_KEY_ID`,
+  type and length stands in for the signature) and, as S3 answers the download URL, the bytes as
+  stored with `Content-Encoding: identity` whatever encoding the uploader named, so M2's tests and
+  M9's demo upload and download with no AWS. **Config:** `DECK_BUCKET`, `DECK_BUCKET_REGION`, `DECK_BUCKET_ACCESS_KEY_ID`,
   `DECK_BUCKET_SECRET_ACCESS_KEY`, all four or none, read like `COGNITO_DELETER_*` and passed to the
   signer, never through AWS's credential chain; unset, storage is off and the boot says so once. The
   app keeps it as `app.deckStorage` for M2's routes. **The owner's check** (runbook 10, M0):
   `npm run deck-bucket:check`, run inside the API's container by `railway ssh`, so the key never
   leaves Railway; it proves the bucket, its CORS (the portal's origins and no other) and the key
-  against real S3, the length and type refusals included.
+  against real S3, the length and type refusals and the download's two answer headers included.
 
 - **2026-10-10** — **Live lesson: the build resumes, both canvases approved, and no screen before
   backups and the bucket** (the owner, in chat). The owner lifted the hold of 2026-10-05 and

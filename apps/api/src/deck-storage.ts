@@ -20,9 +20,12 @@ declare module 'fastify' {
 export interface DeckStorage {
   /** A presigned PUT of a PDF of exactly `bytes` bytes (decision 6, `POST /v1/decks`). */
   uploadUrl(key: string, bytes: number): string;
-  /** A presigned GET, its answer marked `Cache-Control: no-store` (decision 13). */
+  /**
+   * A presigned GET, its answer marked `Cache-Control: no-store` (decision 13) and `Content-Encoding:
+   * identity`: the bytes as stored, never decoded.
+   */
   downloadUrl(key: string): string;
-  /** The object's bytes; `missing`; or `too_large`, read no further than `maxBytes` (M2). */
+  /** The object's bytes as stored; `missing`; or `too_large`, read no further than `maxBytes` (M2). */
   read(key: string, maxBytes: number): Promise<Uint8Array | 'missing' | 'too_large'>;
   /** Deletes the object; one already gone is fine (M4). */
   delete(key: string): Promise<void>;
@@ -77,14 +80,16 @@ export function s3DeckStorage(
     const request = { method, host, path: pathOf(objectKey), headers };
     return presignV4(request, scope, key, clock(), URL_LIFETIME_S, own);
   };
-  /** The API's own call, signed in its headers; S3 wants the empty payload's hash named. */
-  const call = (method: 'GET' | 'DELETE', objectKey: string, own: Record<string, string> = {}) => {
-    const path = pathOf(objectKey);
-    const request = { method, host, path, headers: { ...own, 'x-amz-content-sha256': sha256('') } };
-    const headers = signV4(request, '', scope, key, clock());
-    const signal = AbortSignal.timeout(STORAGE_TIMEOUT_MS);
-    return fetchImpl(`https://${host}${path}`, { method, headers, signal });
-  };
+  // The bytes as stored. S3 keeps a Content-Encoding a crafted PUT sends unsigned (gzip, say) and
+  // names it in its answer, and fetch, a browser and URLSession decode what an answer names, past
+  // any cap or sha256 check (santa's round 1). Asked for identity, S3 names that instead.
+  const downloadUrl = (objectKey: string) =>
+    presign(
+      'GET',
+      objectKey,
+      {},
+      { 'response-cache-control': 'no-store', 'response-content-encoding': 'identity' },
+    );
 
   return {
     // Its length and type signed: S3 refuses a PUT that sends other ones.
@@ -93,13 +98,22 @@ export function s3DeckStorage(
         'content-length': String(bytes),
         'content-type': DECK_CONTENT_TYPE,
       }),
-    downloadUrl: (objectKey) =>
-      presign('GET', objectKey, {}, { 'response-cache-control': 'no-store' }),
+    downloadUrl,
     async read(objectKey, maxBytes) {
-      // One byte past the cap and no more: S3 sends only the range asked for, so an object of any
-      // size costs at most the cap to read.
-      const response = await call('GET', objectKey, { range: `bytes=0-${maxBytes}` });
+      // Through the download URL, so the bytes as stored, and one byte past the cap and no more:
+      // S3 sends only the range asked for, so an object of any size costs at most the cap to read.
+      const abort = new AbortController();
+      const signal = AbortSignal.any([abort.signal, AbortSignal.timeout(STORAGE_TIMEOUT_MS)]);
+      const range = `bytes=0-${maxBytes}`;
+      const response = await fetchImpl(downloadUrl(objectKey), { headers: { range }, signal });
       if (response.ok) {
+        // An answer that names an encoding anyway is refused unread, its download stopped:
+        // decoding it could outgrow any cap.
+        const encoding = response.headers.get('content-encoding')?.toLowerCase() ?? 'identity';
+        if (encoding !== 'identity') {
+          abort.abort();
+          throw new StorageError('EncodedAnswer', response.status);
+        }
         const bytes = new Uint8Array(await response.arrayBuffer());
         return bytes.byteLength > maxBytes ? 'too_large' : bytes;
       }
@@ -113,8 +127,14 @@ export function s3DeckStorage(
       throw error;
     },
     async delete(objectKey) {
+      // Signed in its headers; S3 wants the empty payload's hash named.
+      const method = 'DELETE';
+      const path = pathOf(objectKey);
+      const request = { method, host, path, headers: { 'x-amz-content-sha256': sha256('') } };
+      const headers = signV4(request, '', scope, key, clock());
+      const signal = AbortSignal.timeout(STORAGE_TIMEOUT_MS);
+      const response = await fetchImpl(`https://${host}${path}`, { method, headers, signal });
       // 204, for an object that was never there too.
-      const response = await call('DELETE', objectKey);
       if (!response.ok) throw await refusal(response);
     },
   };
@@ -177,7 +197,12 @@ export function memoryDeckStorage(clock: () => Date = () => new Date()): MemoryD
       const object = objects.get(key);
       // As S3 answers a key with no s3:ListBucket (decision 8).
       if (!object) return refuse('AccessDenied');
-      const headers = { 'content-type': DECK_CONTENT_TYPE, 'cache-control': 'no-store' };
+      // As S3 answers the download URL: as stored, whatever encoding its uploader named.
+      const headers = {
+        'content-type': DECK_CONTENT_TYPE,
+        'cache-control': 'no-store',
+        'content-encoding': 'identity',
+      };
       return new Response(object.slice(), { headers });
     },
   };
