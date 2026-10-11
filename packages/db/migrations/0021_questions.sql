@@ -27,4 +27,6 @@ ALTER TABLE "questions" ADD CONSTRAINT "questions_created_by_users_id_fk" FOREIG
 ALTER TABLE "responses" ADD CONSTRAINT "responses_question_id_questions_id_fk" FOREIGN KEY ("question_id") REFERENCES "public"."questions"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "responses" ADD CONSTRAINT "responses_student_id_users_id_fk" FOREIGN KEY ("student_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "questions_one_open_per_session" ON "questions" USING btree ("session_id") WHERE "questions"."closed_at" IS NULL;--> statement-breakpoint
-CREATE UNIQUE INDEX "responses_question_student_unique" ON "responses" USING btree ("question_id","student_id");
+CREATE INDEX "questions_session_opened_idx" ON "questions" USING btree ("session_id","opened_at");--> statement-breakpoint
+CREATE UNIQUE INDEX "responses_question_student_unique" ON "responses" USING btree ("question_id","student_id");--> statement-breakpoint
+CREATE INDEX "responses_student_idx" ON "responses" USING btree ("student_id");

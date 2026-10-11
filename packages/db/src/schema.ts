@@ -497,6 +497,8 @@ export const questions = pgTable(
     uniqueIndex('questions_one_open_per_session')
       .on(t.sessionId)
       .where(sql`${t.closedAt} IS NULL`),
+    // A session's questions in the order asked: the poll's last closed one, results, the recap.
+    index('questions_session_opened_idx').on(t.sessionId, t.openedAt),
   ],
 );
 
@@ -517,6 +519,10 @@ export const responses = pgTable(
     /** When the server received the answer now, by its own clock. */
     answeredAt: timestamp('answered_at', { withTimezone: true }).notNull(),
   },
-  // One answer per student per question, replaced while the question is open.
-  (t) => [uniqueIndex('responses_question_student_unique').on(t.questionId, t.studentId)],
+  (t) => [
+    // One answer per student per question, replaced while the question is open.
+    uniqueIndex('responses_question_student_unique').on(t.questionId, t.studentId),
+    // A student's answers: their export, and the deletion's and the retention run's reads.
+    index('responses_student_idx').on(t.studentId),
+  ],
 );

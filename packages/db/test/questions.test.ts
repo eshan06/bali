@@ -24,7 +24,10 @@ import {
   closeQuestion,
   endSession,
   expireDueSessions,
+  extendSession,
   openQuestion,
+  refocus,
+  renameStudent,
   startSession,
   tapIn,
   unlock,
@@ -494,7 +497,7 @@ describe('answering a question', () => {
 });
 
 describe('an answer’s eventId, spent for every other mutation (settled 2026-10-10)', () => {
-  it('a tap, an unlock or an arm reusing it is refused as a reused id is: 409, nothing recorded', async () => {
+  it('a tap, an unlock, an arm or any other writer reusing it is refused as a reused id is: 409, nothing recorded', async () => {
     const { session, ana, teacher, ask } = await lesson('a-reuse');
     const { question } = await ask(5);
     const eventId = newUuidV7();
@@ -518,12 +521,28 @@ describe('an answer’s eventId, spent for every other mutation (settled 2026-10
         now: at(7),
       }),
     ).rejects.toMatchObject({ code: 'EVENT_ID_CONFLICT' });
+    // Every other writer records an event under it, which `insertEvent` refuses first.
+    for (const write of [
+      () =>
+        refocus(db, { sessionId: session.id, studentId, eventId, deviceTime: at(7), now: at(7) }),
+      () => extendSession(db, { sessionId: session.id, durationMinutes: 5, at: at(7), eventId }),
+      () => ask(8, { eventId }),
+      () => closeQuestion(db, { questionId: question.id, eventId, now: at(8) }),
+      () => renameStudent(db, { studentId, displayName: 'Ana', eventId }),
+    ]) {
+      await expect(write()).rejects.toMatchObject({ code: 'EVENT_ID_CONFLICT' });
+    }
 
     expect(await db.select().from(events).where(eq(events.eventId, eventId))).toEqual([]);
     expect(await db.select().from(armedTaps).where(eq(armedTaps.eventId, eventId))).toEqual([]);
     expect(
       await db.select().from(participations).where(eq(participations.sessionId, session.id)),
     ).toEqual([]);
+    expect(await questionNow(question.id)).toMatchObject({ closedAt: null });
+    const [now] = await db.select().from(sessions).where(eq(sessions.id, session.id));
+    expect(now!.endsAt).toEqual(at(25));
+    const [named] = await db.select().from(users).where(eq(users.id, studentId));
+    expect(named!.displayName).toBeNull();
   });
 
   it('a waiting tap whose id an answer took since still joins at its Start, under a fresh id', async () => {

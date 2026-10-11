@@ -1,5 +1,5 @@
 {
-  "id": "06d3bc3d-216a-4a91-87c4-2d0b1f76f283",
+  "id": "92367a23-e8a7-45df-bec3-8c9d99e2b438",
   "prevId": "d10e1e61-0e74-473e-932c-5846ca799c57",
   "version": "7",
   "dialect": "postgresql",
@@ -1222,6 +1222,27 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "questions_session_opened_idx": {
+          "name": "questions_session_opened_idx",
+          "columns": [
+            {
+              "expression": "session_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "opened_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -1325,6 +1346,21 @@
             }
           ],
           "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "responses_student_idx": {
+          "name": "responses_student_idx",
+          "columns": [
+            {
+              "expression": "student_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
           "concurrently": false,
           "method": "btree",
           "with": {}

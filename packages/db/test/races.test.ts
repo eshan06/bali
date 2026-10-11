@@ -4338,6 +4338,56 @@ describe.runIf(REAL_PG)('live lesson questions under contention (real Postgres, 
     }
   });
 
+  it('a duplicate whose first delivery commits after its own lookup is the replay, never a conflict', async () => {
+    // The window santa's round 1 found (#310): the duplicate has read `responses` and found
+    // nothing, and its first delivery commits before it goes on. Staged by a table lock on
+    // `events`, the next table it reads: it parks there, the first delivery (a raw insert)
+    // commits, and it is let go. Reading `responses` again there would refuse its own answer as
+    // a conflict; meeting the row at its upsert answers it as the replay.
+    const { studentId, question } = await asking('race-answer-window');
+    const answer = { questionId: question.id, studentId, eventId: newUuidV7(), option: 1 };
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let locked!: () => void;
+    const hasLock = new Promise<void>((resolve) => {
+      locked = resolve;
+    });
+    const holder = db.transaction(async (tx) => {
+      await tx.execute(sql`lock table events in access exclusive mode`);
+      locked();
+      await held;
+    });
+    await hasLock;
+
+    const duplicate = answerQuestion(db, answer);
+    let unstaged: Error | null = null;
+    try {
+      await waitForBlockedBackend();
+      await db.insert(responses).values({
+        questionId: question.id,
+        studentId,
+        option: 1,
+        eventId: answer.eventId,
+        answeredAt: new Date(),
+      });
+    } catch (err) {
+      unstaged = err instanceof Error ? err : new Error(String(err));
+    } finally {
+      release();
+    }
+    await holder;
+    const [settled] = await Promise.allSettled([duplicate]);
+    if (unstaged !== null) throw unstaged;
+    if (settled.status === 'rejected') throw settled.reason as Error;
+    expect(settled.value).toMatchObject({
+      outcome: 'replay',
+      response: { eventId: answer.eventId, option: 1 },
+    });
+    expect(await answersTo(question.id)).toHaveLength(1);
+  }, 20_000);
+
   it('two opens at once run one after the other: the later closes the earlier, neither fails', async () => {
     for (let round = 0; round < 12; round += 1) {
       const { classId, teacherId } = await seed(`race-open-twice-${round}`);
