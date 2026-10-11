@@ -204,8 +204,23 @@ export const EVENT_TYPES = [
   // A school year's retention run (C6b): no session, no class, no user. Its
   // payload is the school's id, the year's last day and counts, never a name.
   'retention_applied',
+  // A live lesson's question opened, and closed (Phase 7, Live lesson decision
+  // 5): no user. The payload is the question's id; a close's adds whether it
+  // revealed the correct option and what closed it (`QUESTION_CLOSED_BY`).
+  // Never an answer or a count: answers are not events (totals only).
+  'question_opened',
+  'question_closed',
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
+
+/**
+ * What closed a live lesson's question, in its `question_closed` event's
+ * `closed_by`: the teacher, a newer question opened in the session, or the
+ * session's end (End, the bell, a Start past it). Additive-only like the other
+ * vocab.
+ */
+export const QUESTION_CLOSED_BY = ['teacher', 'newer_question', 'session_end'] as const;
+export type QuestionClosedBy = (typeof QUESTION_CLOSED_BY)[number];
 
 /**
  * The events a student's own history shows (`GET /v1/me/history`, A7): the

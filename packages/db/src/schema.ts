@@ -8,6 +8,7 @@ import type {
 import { sql } from 'drizzle-orm';
 import {
   bigint,
+  boolean,
   check,
   date,
   index,
@@ -460,4 +461,62 @@ export const cognitoDeletions = pgTable(
   },
   // One per sign-in: a deletion's retry queues nothing more.
   (t) => [uniqueIndex('cognito_deletions_sign_in_unique').on(t.issuer, t.sub)],
+);
+
+/*
+ * A live lesson's questions and answers (Phase 7; ARCHITECTURE, "Live lesson", decision 4), written
+ * only by the transition engine. A question is asked within a running session; a response is a
+ * student's answer now, and never an event, so the stream never names who answered what.
+ */
+export const questions = pgTable(
+  'questions',
+  {
+    id: id(),
+    sessionId: uuid('session_id')
+      .notNull()
+      .references(() => sessions.id),
+    prompt: text('prompt').notNull(),
+    /** The options' texts, 2–6; an answer names one by its index. */
+    options: jsonb('options').$type<string[]>().notNull(),
+    /** The correct option's index, when the teacher gave one. */
+    correctOption: integer('correct_option'),
+    /** The open's idempotency key, and its `question_opened` event's id. */
+    eventId: uuid('event_id').notNull().unique(),
+    openedAt: timestamp('opened_at', { withTimezone: true }).notNull(),
+    /** NULL = open. */
+    closedAt: timestamp('closed_at', { withTimezone: true }),
+    /** Whether its close showed the correct option. */
+    revealed: boolean('revealed').notNull().default(false),
+    /** The teacher who opened it. */
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id),
+  },
+  (t) => [
+    // One open question per session: the backstop under the open's lock on the session.
+    uniqueIndex('questions_one_open_per_session')
+      .on(t.sessionId)
+      .where(sql`${t.closedAt} IS NULL`),
+  ],
+);
+
+export const responses = pgTable(
+  'responses',
+  {
+    id: id(),
+    questionId: uuid('question_id')
+      .notNull()
+      .references(() => questions.id),
+    studentId: uuid('student_id')
+      .notNull()
+      .references(() => users.id),
+    /** The index of the option chosen. */
+    option: integer('option').notNull(),
+    /** The answer now's idempotency key: a replaced answer's is not kept. */
+    eventId: uuid('event_id').notNull().unique(),
+    /** When the server received the answer now, by its own clock. */
+    answeredAt: timestamp('answered_at', { withTimezone: true }).notNull(),
+  },
+  // One answer per student per question, replaced while the question is open.
+  (t) => [uniqueIndex('responses_question_student_unique').on(t.questionId, t.studentId)],
 );
