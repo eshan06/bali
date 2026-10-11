@@ -143,7 +143,24 @@ describe('CORS (opt-in via CORS_ORIGINS)', () => {
     expect(over.statusCode).toBe(429);
     expect(over.headers['retry-after']).toBe('60');
     expect(over.headers['access-control-allow-origin']).toBe('http://localhost:3000');
-    expect(over.headers['access-control-expose-headers']).toBe('retry-after');
+    expect(over.headers['access-control-expose-headers']).toBe('retry-after, etag');
+    await app.close();
+  });
+
+  it('lets the portal’s poll send If-None-Match: a preflight allows it (L3r)', async () => {
+    const app = buildWithCors('http://localhost:3000');
+    const res = await app.inject({
+      method: 'OPTIONS',
+      url: `/v1/questions/${randomUUID()}/results`,
+      headers: {
+        origin: 'http://localhost:3000',
+        'access-control-request-method': 'GET',
+        'access-control-request-headers': 'authorization,if-none-match',
+      },
+    });
+    expect([200, 204]).toContain(res.statusCode);
+    const allowed = String(res.headers['access-control-allow-headers'] ?? '').split(',');
+    expect(allowed).toContain('if-none-match');
     await app.close();
   });
 

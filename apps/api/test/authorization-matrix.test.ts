@@ -123,6 +123,7 @@ const MATRIX = {
   'POST /v1/sessions/:id/protection-on':    [401, 401, 200,     409,     409,     409],
   'POST /v1/sessions/:id/questions':        [401, 401, 403,     403,     403,     200],
   'POST /v1/questions/:id/close':           [401, 401, 403,     403,     403,     200],
+  'GET /v1/questions/:id/results':          [401, 401, 403,     403,     403,     200],
 } as const satisfies Record<string, readonly number[]>;
 type RouteKey = keyof typeof MATRIX;
 
@@ -285,6 +286,9 @@ const REQUESTS: Record<RouteKey, (w: World) => Sent | Promise<Sent>> = {
   'POST /v1/questions/:id/close': async (w) => ({
     url: `/v1/questions/${await asked(w)}/close`,
     body: { eventId: newUuidV7() },
+  }),
+  'GET /v1/questions/:id/results': async (w) => ({
+    url: `/v1/questions/${await asked(w)}/results`,
   }),
 };
 
