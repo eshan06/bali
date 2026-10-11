@@ -20,7 +20,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   names an option by its index. The disposal picks its lessons' questions by a subquery, never a
   list of the lessons' ids, which a school outgrows: postgres.js binds at most 65,534 parameters a
   statement (santa's round-1 blocker on #311, fixed on the owner's ruling). The account deletion
-  leaves them, as it leaves a deleted teacher's removed classes their names (found:
+  leaves a question's words, as it leaves a deleted teacher's removed classes their names (found:
   `deleteAccount` never touches `classes.name`); one decision for all of a teacher's words at
   their own deletion, deck titles included, is #313, to make with M4.
   **An answer takes its student's row FOR SHARE first, and one reaching a deleted account is
