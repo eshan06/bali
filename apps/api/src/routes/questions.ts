@@ -1,9 +1,13 @@
 import {
+  answerQuestion,
   closeQuestion,
   createSavedQuestion,
   type Database,
+  findEnrolledStudent,
   findQuestion,
   findSavedQuestion,
+  findSessionById,
+  findShownQuestion,
   listSavedQuestions,
   openQuestion,
   questionCounts,
@@ -11,10 +15,14 @@ import {
   questionOpen,
   removeSavedQuestion,
   replaceSavedQuestion,
+  type ResponseRow,
   type SavedQuestionResult,
   type SavedQuestionRow,
+  sessionRunning,
 } from '@bali/db';
 import {
+  type AnswerResponse,
+  type Presentation,
   QUESTION_OPTION_MAX_LENGTH,
   QUESTION_OPTIONS_MAX,
   QUESTION_OPTIONS_MIN,
@@ -24,16 +32,18 @@ import {
   type SavedQuestion,
   type SavedQuestionResponse,
   type SavedQuestionsResponse,
+  type StudentQuestion,
   type TeacherQuestion,
 } from '@bali/shared';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
+import { requireAuth } from '../auth/plugin.js';
 import { requireSessionOwner, requireTeacher } from '../auth/teacher.js';
 import { INVISIBLE, UNPRINTABLE } from '../display-name.js';
 import { ApiError, parseRequest } from '../errors.js';
 import { sendTagged } from '../etag.js';
-import { mapTransitionError } from './errors.js';
+import { mapTransitionError, refusal } from './errors.js';
 
 const Params = z.object({ id: z.string().uuid() });
 
@@ -69,6 +79,8 @@ const OpenBody = z
   });
 const CloseBody = z.object({ eventId: z.uuidv7(), reveal: z.boolean().optional() });
 const RemoveBody = z.object({ eventId: z.uuidv7() });
+// Any index: one the question lacks is the engine's `invalid_option`.
+const AnswerBody = z.object({ eventId: z.uuidv7(), option: z.number().int() });
 
 const questionNotFound = () => ApiError.notFound('question not found', 'question_not_found');
 const savedQuestionNotFound = () =>
@@ -83,6 +95,34 @@ export function teacherQuestion(
   const { id, prompt, options, correctOption, revealed } = question;
   const open = questionOpen(question, session, now);
   return { id, prompt, options, correctOption, revealed, open };
+}
+
+/** A question as a student sees it: the correct option only once revealed, never a count. */
+function studentQuestion(
+  question: QuestionRow,
+  response: ResponseRow | null,
+  session: Parameters<typeof questionOpen>[1],
+  now: Date,
+): StudentQuestion {
+  const { id, prompt, options, correctOption, revealed } = question;
+  return {
+    id,
+    prompt,
+    options,
+    open: questionOpen(question, session, now),
+    correctOption: revealed ? correctOption : null,
+    answer: response && { option: response.option, eventId: response.eventId },
+  };
+}
+
+/**
+ * The caller, a student enrolled in the class `classId` now: the student routes' guard (decision
+ * 2). Anyone else is `403`; looked up, never created.
+ */
+async function requireEnrolled(db: Database, request: FastifyRequest, classId: string) {
+  const student = await findEnrolledStudent(db, requireAuth(request).sub, classId);
+  if (!student) throw ApiError.forbidden('not in this class');
+  return student;
 }
 
 /**
@@ -129,11 +169,13 @@ function savedAnswer(result: SavedQuestionResult): SavedQuestionResponse {
  * teacher only. Thin over the engine, which writes them; every answer says whether the question is
  * open now by the server's clock, so a close past the bell, before the sweep, answers it closed.
  * And a teacher's saved questions (L3b; decision 12), their own drafts only, each body checked as an
- * open's.
+ * open's. And the student's side (L4), for a student enrolled in the session's class now.
  *
  * POST /v1/sessions/:id/questions  open one in a running session, closing the one open there
  * POST /v1/questions/:id/close     close it, revealing its correct option when asked
  * GET  /v1/questions/:id/results   its totals, through the one guarded count; ETag and 304
+ * GET  /v1/sessions/:id/presentation  what a student shows: the question, their answer; ETag, 304
+ * POST /v1/questions/:id/answers   a student answers, writing no event
  * GET  /v1/saved-questions         the caller's drafts, newest first, none removed
  * POST /v1/saved-questions         write one
  * PUT  /v1/saved-questions/:id     replace it whole, unless the draft holds a later save
@@ -204,6 +246,56 @@ export function registerQuestionsRoutes(
         counts: counted.counts,
       };
       return sendTagged(request, reply, results);
+    },
+  );
+
+  app.get(
+    '/v1/sessions/:id/presentation',
+    { preHandler: app.authenticate, config: { parses: { params: Params } } },
+    async (request, reply) => {
+      const { id } = parseRequest(request, 'params', Params);
+      const session = await findSessionById(db, id);
+      if (!session) throw refusal('SESSION_NOT_FOUND');
+      const student = await requireEnrolled(db, request, session.classId);
+      const now = clock();
+      const running = sessionRunning(session, now);
+      // Nothing is shown outside a running session (decision 2): past the bell too, unswept.
+      const shown = running ? await findShownQuestion(db, session.id, student.id) : undefined;
+      const presentation: Presentation = {
+        running,
+        question: shown ? studentQuestion(shown.question, shown.response, session, now) : null,
+      };
+      return sendTagged(request, reply, presentation);
+    },
+  );
+
+  app.post(
+    '/v1/questions/:id/answers',
+    { preHandler: app.authenticate, config: { parses: { params: Params, body: AnswerBody } } },
+    async (request): Promise<AnswerResponse> => {
+      const { id } = parseRequest(request, 'params', Params);
+      const found = await findQuestion(db, id);
+      if (!found) throw questionNotFound();
+      const student = await requireEnrolled(db, request, found.session.classId);
+      // A 400 here can also be `invalid_option`, so a malformed body says which it is.
+      const body = parseRequest(request, 'body', AnswerBody, 'invalid_request');
+      const result = await mapTransitionError(() =>
+        answerQuestion(db, { ...body, questionId: id, studentId: student.id, now: clock() }),
+      );
+      switch (result.outcome) {
+        case 'answered':
+        case 'replay': {
+          const { option, eventId } = result.response;
+          return { outcome: result.outcome, answer: { option, eventId } };
+        }
+        case 'question_closed':
+          throw ApiError.conflict('the question is closed', 'question_closed');
+        case 'invalid_option':
+          throw ApiError.badInput('the question has no such option', undefined, 'invalid_option');
+        // Found by the guard, and a question is never deleted.
+        case 'question_not_found':
+          throw questionNotFound();
+      }
     },
   );
 

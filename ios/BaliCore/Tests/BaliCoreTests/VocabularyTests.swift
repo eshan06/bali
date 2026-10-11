@@ -63,6 +63,7 @@ struct VocabularyTests {
         ("api.ts", "ENROLLMENT_JOIN_OUTCOMES", values(EnrollmentJoinResponse.Outcome.self)),
         ("api.ts", "END_ENROLLMENT_OUTCOMES", values(EndEnrollmentResponse.Outcome.self)),
         ("api.ts", "END_ENROLLMENT_REASONS", values(EndEnrollmentResponse.Reason.self)),
+        ("api.ts", "ANSWER_OUTCOMES", values(AnswerResponse.Outcome.self)),
     ]
 
     @Test("Each vocabulary holds its list's values, in its order", arguments: vocabularies)

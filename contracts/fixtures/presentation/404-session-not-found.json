@@ -1,0 +1,16 @@
+{
+  "endpoint": "GET /v1/sessions/{id}/presentation",
+  "scenario": "A poll of a session the server does not know.",
+  "request": {
+    "path": "/v1/sessions/00000000-0000-7000-8000-000000000001/presentation"
+  },
+  "status": 404,
+  "type": "ApiErrorBody",
+  "body": {
+    "error": {
+      "code": "not_found",
+      "reason": "session_not_found",
+      "message": "session not found"
+    }
+  }
+}

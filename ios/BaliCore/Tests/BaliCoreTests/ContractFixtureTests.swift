@@ -62,6 +62,8 @@ enum Contract {
         "EndEnrollmentResponse": EndEnrollmentResponse.self,
         "JoinCodePreviewResponse": JoinCodePreviewResponse.self,
         "HistoryPage": HistoryPage.self,
+        "Presentation": Presentation.self,
+        "AnswerResponse": AnswerResponse.self,
         "ApiErrorBody": ApiErrorBody.self,
     ]
 
@@ -82,6 +84,7 @@ enum Contract {
         "POST /v1/sessions/{id}/protection-on": ProtectionOnRequest.self,
         "POST /v1/enrollments": EnrollmentJoinRequest.self,
         "DELETE /v1/enrollments/{id}": EndEnrollmentRequest.self,
+        "POST /v1/questions/{id}/answers": AnswerRequest.self,
     ]
 
     /// Each endpoint whose answers go through an outbox table, as the port's disposition of an

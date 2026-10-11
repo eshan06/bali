@@ -369,3 +369,50 @@ public struct HistoryPage: Codable, Sendable, Hashable {
     public let events: [HistoryEvent]
     public let nextBefore: String?
 }
+
+/// `GET /v1/sessions/{id}/presentation` — what the phone shows of a live lesson (Phase 7, L4),
+/// polled while the session runs. Slides and the phone's own state join it later, additively.
+public struct Presentation: Codable, Sendable, Hashable {
+    /// False once the session is over by the server's clock: stop polling.
+    public let running: Bool
+    /// The open question, or the last closed one until another opens; nil when none was asked,
+    /// and once the session is over.
+    public let question: StudentQuestion?
+}
+
+/// A live lesson's question as a student sees it: never anyone's counts.
+public struct StudentQuestion: Codable, Sendable, Hashable {
+    public let id: String
+    public let prompt: String
+    /// 2–6; an answer names one by its index.
+    public let options: [String]
+    /// An answer counts only while it is open, by the server's clock.
+    public let open: Bool
+    /// The correct option's index once the teacher's close revealed it; nil until then.
+    public let correctOption: Int?
+    /// The student's own answer now, if they gave one.
+    public let answer: StudentAnswer?
+}
+
+/// A student's answer now.
+public struct StudentAnswer: Codable, Sendable, Hashable {
+    public let option: Int
+    /// The id it was sent under: the next answer is minted after it (UUIDv7 order).
+    public let eventId: String
+}
+
+/// `POST /v1/questions/{id}/answers` — the student's answer, sent once and never queued: no outbox
+/// record goes ahead of an unlock for it.
+public struct AnswerRequest: Codable, Sendable, Hashable {
+    /// A UUIDv7.
+    public let eventId: String
+    public let option: Int
+    public init(eventId: String, option: Int) { (self.eventId, self.option) = (eventId, option) }
+}
+
+public struct AnswerResponse: Codable, Sendable, Hashable {
+    /// `ANSWER_OUTCOMES`: either way, `answer` is the answer the server holds.
+    public enum Outcome: String, CaseIterable, Sendable { case answered, replay }
+    public let outcome: OrUnknown<Outcome>
+    public let answer: StudentAnswer
+}

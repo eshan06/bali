@@ -1,0 +1,20 @@
+{
+  "endpoint": "POST /v1/questions/{id}/answers",
+  "scenario": "A student answers the open question: recorded, and never an event.",
+  "request": {
+    "path": "/v1/questions/00000000-0000-7000-8000-000000000001/answers",
+    "body": {
+      "eventId": "00000000-0000-7000-8000-000000000002",
+      "option": 1
+    }
+  },
+  "status": 200,
+  "type": "AnswerResponse",
+  "body": {
+    "outcome": "answered",
+    "answer": {
+      "option": 1,
+      "eventId": "00000000-0000-7000-8000-000000000002"
+    }
+  }
+}

@@ -316,6 +316,51 @@ export async function findUnclosedQuestion(db: Database, sessionId: string) {
   );
 }
 
+/**
+ * The question a session shows its students (Phase 7, L4; "Live lesson", decision 6), with
+ * `studentId`'s answer to it, if any: the open one, else the one closed last — the last asked, since
+ * an open closes the one before it — until another opens.
+ */
+export async function findShownQuestion(db: Database, sessionId: string, studentId: string) {
+  return first(
+    await db
+      .select({ question: questions, response: responses })
+      .from(questions)
+      .leftJoin(
+        responses,
+        and(eq(responses.questionId, questions.id), eq(responses.studentId, studentId)),
+      )
+      .where(eq(questions.sessionId, sessionId))
+      .orderBy(
+        sql`${questions.closedAt} desc nulls first`,
+        desc(questions.openedAt),
+        desc(questions.id),
+      )
+      .limit(1),
+  );
+}
+
+/**
+ * The student a sign-in names, if they are enrolled in `classId` now: who may follow a live lesson
+ * there and answer it (Phase 7, L4; "Live lesson", decision 2). A read: no account, no student.
+ */
+export async function findEnrolledStudent(db: Database, cognitoId: string, classId: string) {
+  return first(
+    await db
+      .select({ id: users.id })
+      .from(users)
+      .innerJoin(enrollments, eq(enrollments.studentId, users.id))
+      .where(
+        and(
+          eq(users.cognitoId, cognitoId),
+          eq(enrollments.classId, classId),
+          isNull(enrollments.removedAt),
+        ),
+      )
+      .limit(1),
+  );
+}
+
 /** A teacher's draft by id, removed or not (Phase 7, L3b), so a route can authorize its teacher. */
 export async function findSavedQuestion(db: Database, id: string) {
   return first(

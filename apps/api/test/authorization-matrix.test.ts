@@ -126,6 +126,8 @@ const MATRIX = {
   'POST /v1/sessions/:id/questions':        [401, 401, 403,     403,     403,     200],
   'POST /v1/questions/:id/close':           [401, 401, 403,     403,     403,     200],
   'GET /v1/questions/:id/results':          [401, 401, 403,     403,     403,     200],
+  'GET /v1/sessions/:id/presentation':      [401, 401, 200,     403,     403,     403],
+  'POST /v1/questions/:id/answers':         [401, 401, 200,     403,     403,     403],
   'GET /v1/saved-questions':                [401, 401, 403,     403,     200,     200],
   'POST /v1/saved-questions':               [401, 401, 403,     403,     200,     200],
   'PUT /v1/saved-questions/:id':            [401, 401, 403,     403,     403,     200],
@@ -297,6 +299,15 @@ const REQUESTS: Record<RouteKey, (w: World) => Sent | Promise<Sent>> = {
   }),
   'GET /v1/questions/:id/results': async (w) => ({
     url: `/v1/questions/${await asked(w)}/results`,
+  }),
+  // The student's side (L4): a student enrolled in the session's class now, unlocked or not.
+  'GET /v1/sessions/:id/presentation': async (w) => {
+    await asked(w);
+    return { url: `/v1/sessions/${w.sessionId}/presentation` };
+  },
+  'POST /v1/questions/:id/answers': async (w) => ({
+    url: `/v1/questions/${await asked(w)}/answers`,
+    body: { eventId: newUuidV7(), option: 1 },
   }),
   // A teacher's saved questions (L3b): each teacher's own; another teacher reads and writes theirs.
   'GET /v1/saved-questions': () => ({ url: '/v1/saved-questions' }),

@@ -1,5 +1,7 @@
 import {
   type AgeCheckResponse,
+  ANSWER_OUTCOMES,
+  type AnswerResponse,
   API_ERROR_REASONS,
   API_ERROR_STATUS,
   type ApiErrorBody,
@@ -20,6 +22,7 @@ import {
   type MeResponse,
   type MeUser,
   PARTICIPATION_STATES,
+  type Presentation,
   PROTECTION_OFF_OUTCOMES,
   PROTECTION_OFF_RECORDED_AS,
   type ProtectionOffResponse,
@@ -29,6 +32,8 @@ import {
   type RefocusResponse,
   type SessionView,
   stateChangeDisposition,
+  type StudentAnswer,
+  type StudentQuestion,
   TAP_OUTCOMES,
   tapDisposition,
   type TapResponse,
@@ -86,6 +91,8 @@ interface Contract {
   RegisterPushTokenResponse: RegisterPushTokenResponse;
   RemovePushTokenResponse: RemovePushTokenResponse;
   AgeCheckResponse: AgeCheckResponse;
+  Presentation: Presentation;
+  AnswerResponse: AnswerResponse;
   ApiErrorBody: ApiErrorBody;
 }
 export type FixtureType = keyof Contract;
@@ -142,6 +149,7 @@ const historyEvent = object<HistoryEvent>()({
   recordedAs: z.enum(UNLOCK_RECORDED_AS).nullable(),
   countedIn: meClass.nullable(),
 });
+const studentAnswer = object<StudentAnswer>()({ option: z.number().int(), eventId: z.uuid() });
 
 /**
  * Each type as a strict run-time schema: a field the type lacks, a missing
@@ -227,6 +235,21 @@ export const SCHEMAS = {
     outcome: z.enum(REMOVE_PUSH_TOKEN_OUTCOMES),
   }),
   AgeCheckResponse: object<AgeCheckResponse>()({ passed: z.boolean() }),
+  Presentation: object<Presentation>()({
+    running: z.boolean(),
+    question: object<StudentQuestion>()({
+      id: z.uuid(),
+      prompt: z.string(),
+      options: z.array(z.string()),
+      open: z.boolean(),
+      correctOption: z.number().int().nullable(),
+      answer: studentAnswer.nullable(),
+    }).nullable(),
+  }),
+  AnswerResponse: object<AnswerResponse>()({
+    outcome: z.enum(ANSWER_OUTCOMES),
+    answer: studentAnswer,
+  }),
   ApiErrorBody: object<ApiErrorBody>()({
     error: object<ApiErrorBody['error']>()({
       code: z.enum(Object.keys(API_ERROR_STATUS) as ApiErrorCode[]),
@@ -283,6 +306,9 @@ export const ENDPOINTS: Record<
   'PUT /v1/me/age-check': { type: 'AgeCheckResponse' },
   // A change of an unlock's reason, keyed by the unlock's own id (A20).
   'PATCH /v1/unlocks/{eventId}': { type: 'UnlockReasonResponse' },
+  // A live lesson (Phase 7, L4): the poll, and an answer, sent once and never an outbox record.
+  'GET /v1/sessions/{id}/presentation': { type: 'Presentation' },
+  'POST /v1/questions/{id}/answers': { type: 'AnswerResponse' },
 };
 
 /** One checked-in fixture: a real request, the answer it got, and what the phone does with it. */

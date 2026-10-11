@@ -8,6 +8,30 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-11** — **A live lesson's student side through the API (L4a): the question a student
+  sees and their answer; BaliCore's wire types come with the fixtures.** L4 whole is about 800
+  changed lines by santa's count, some 450 of them the fixtures and the OpenAPI snapshot, generated,
+  so it ships as the split decided in advance: both routes, their fixtures and S1 rows here; the
+  demo's question and the load gate's polling classes are L4b. **The question shown is the open
+  one, else the one closed last**, not the one opened last: the route reads an open's time before
+  the engine's lock, so of two opens racing, the later by the lock can carry the earlier time, and
+  it closes the other; the one closed last is the last asked. **Nothing once the session is over**
+  (decision 2): past the bell, swept or not, the poll answers `running: false` and no question, as
+  decision 13's page drops it. **The correct option alone says it is revealed:** null until the
+  close reveals it, so no `revealed` field. The caller's own answer rides in the question with its
+  `eventId` (decision 4). **Who:** a student enrolled in the session's class now, looked up and
+  never created, so a sign-in with no account here is `403` and the poll writes nothing; the class's
+  own teacher is `403` too; an unknown session or question is `404` before anyone is judged. **A
+  malformed answer is `400 invalid_request`**, since the route's other 400 is `invalid_option`, as a
+  rename's two are told apart (A8); the option is any integer at the boundary and the engine judges
+  its range, so a negative one is `invalid_option` too. **BaliCore's wire types come forward from
+  L5:** CI's Swift job decodes every fixture and wants a client call for each endpoint a fixture
+  names, so the fixtures land with `Presentation`, `StudentQuestion`, `StudentAnswer`,
+  `AnswerRequest` and `AnswerResponse`, and two plain calls, `presentation(session:)` and
+  `answer(question:_:)`. L5 keeps the poller (2 s, `If-None-Match`, the `304`, the stop) and the
+  answer's honest failure. The ETag is L3r's `sendTagged`, unchanged: a classmate's answer changes
+  nothing in a student's body, so their poll stays `304`.
+
 - **2026-10-11** — **A teacher's saved questions through the API (L3b2): an older save never undoes
   a later one.** The conductor's ruling on L3b1's WARN, the owner being away: a replace takes an
   answer's order (Live lesson, decision 4). It applies only when its `eventId` sorts after the one
