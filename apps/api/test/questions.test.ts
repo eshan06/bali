@@ -1,16 +1,24 @@
 import {
   answerQuestion,
   type Database,
+  endEnrollment,
   endSession,
+  enrollments,
   events,
   newUuidV7,
   questions,
   startSession,
   tapIn,
+  users,
 } from '@bali/db';
-import type { ApiErrorBody, QuestionResponse, SessionSnapshot } from '@bali/shared';
+import type {
+  ApiErrorBody,
+  QuestionResponse,
+  QuestionResults,
+  SessionSnapshot,
+} from '@bali/shared';
 import { and, eq } from 'drizzle-orm';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { authedInject, makeAuthedApp, type AuthedApp } from './helpers/app.js';
@@ -398,6 +406,164 @@ describe('POST /v1/questions/:id/close', () => {
     expect(res.statusCode).toBe(400);
     const [row] = await questionsOf(session.id);
     expect(row?.closedAt).toBeNull();
+  });
+});
+
+describe('GET /v1/questions/:id/results', () => {
+  const results = (token: string, questionId: string, ifNoneMatch?: string) =>
+    ctx.app.inject({
+      method: 'GET',
+      url: `/v1/questions/${questionId}/results`,
+      headers: {
+        authorization: `Bearer ${token}`,
+        ...(ifNoneMatch === undefined ? {} : { 'if-none-match': ifNoneMatch }),
+      },
+    });
+  const resultsOf = async (token: string, questionId: string) =>
+    (await results(token, questionId)).json<QuestionResults>();
+
+  /** `n` students more in the lesson's class, each enrolled and not tapped in. */
+  async function classmates(c: Awaited<ReturnType<typeof lesson>>, n: number) {
+    const added = [];
+    for (let i = 0; i < n; i += 1) {
+      const [student] = await db
+        .insert(users)
+        .values({ cognitoId: `${c.klass.id}-${i}`, role: 'student', schoolId: c.school.id })
+        .returning();
+      const [enrollment] = await db
+        .insert(enrollments)
+        .values({ classId: c.klass.id, studentId: student!.id })
+        .returning();
+      added.push({ id: student!.id, enrollmentId: enrollment!.id });
+    }
+    return added;
+  }
+
+  /** `studentId`'s answer at 09:11, as the engine records it (the answer route is L4's). */
+  const answer = (questionId: string, studentId: string, option: number) =>
+    answerQuestion(db, { questionId, studentId, eventId: newUuidV7(), option, now: at(11) });
+
+  it('shows the counts per option only from 3 answers: before, N of M alone', async () => {
+    const c = await lesson('results-guard');
+    const [ana, ben, cy] = await classmates(c, 3);
+    const question = await asked(c.token, c.session.id);
+    expect(await resultsOf(c.token, question.id)).toEqual({
+      answered: 0,
+      eligible: 4,
+      open: true,
+      correctOption: 1,
+      revealed: false,
+      counts: null,
+    });
+
+    await answer(question.id, ana!.id, 0);
+    await answer(question.id, ben!.id, 1);
+    expect(await resultsOf(c.token, question.id)).toMatchObject({ answered: 2, counts: null });
+
+    await answer(question.id, cy!.id, 1);
+    expect(await resultsOf(c.token, question.id)).toEqual({
+      answered: 3,
+      eligible: 4,
+      open: true,
+      correctOption: 1,
+      revealed: false,
+      counts: [1, 2, 0],
+    });
+  });
+
+  it('keeps counting an answer whose student was removed mid-session, against everyone who could have answered', async () => {
+    const c = await lesson('results-removed');
+    const [tappedAnswered, answeredOnly, tappedOnly, neither, stays] = await classmates(c, 5);
+    for (const student of [tappedAnswered!, tappedOnly!]) {
+      await tapIn(db, {
+        sessionId: c.session.id,
+        studentId: student.id,
+        eventId: newUuidV7(),
+        deviceTime: at(2),
+        now: at(2),
+      });
+    }
+    const question = await asked(c.token, c.session.id);
+    await answer(question.id, tappedAnswered!.id, 0);
+    await answer(question.id, answeredOnly!.id, 2);
+    await answer(question.id, stays!.id, 2);
+
+    for (const student of [tappedAnswered!, answeredOnly!, tappedOnly!, neither!]) {
+      await endEnrollment(db, {
+        enrollmentId: student.enrollmentId,
+        reason: 'removed_from_class',
+        at: at(12),
+      });
+    }
+
+    // N: the three who answered. M: the class now (the seeded student, `stays`), the session's
+    // participants, removed since (`tappedAnswered`, `tappedOnly`) and N's (`answeredOnly`): five,
+    // never below N. `neither` is in none of them.
+    expect(await resultsOf(c.token, question.id)).toMatchObject({
+      answered: 3,
+      eligible: 5,
+      counts: [1, 0, 2],
+    });
+  });
+
+  it('says whether it is open by the server’s clock, and whether its close revealed the answer', async () => {
+    const c = await lesson('results-open');
+    const revealed = await asked(c.token, c.session.id);
+    await close(c.token, revealed.id, { eventId: newUuidV7(), reveal: true });
+    expect(await resultsOf(c.token, revealed.id)).toMatchObject({
+      open: false,
+      correctOption: 1,
+      revealed: true,
+    });
+
+    const pastBell = await asked(c.token, c.session.id);
+    now = at(26);
+    expect(await resultsOf(c.token, pastBell.id)).toMatchObject({ open: false, revealed: false });
+  });
+
+  it('answers 304 while nothing changed, then 200 and a new ETag once an answer lands or the bell rings', async () => {
+    const c = await lesson('results-etag');
+    const [ana] = await classmates(c, 1);
+    const question = await asked(c.token, c.session.id);
+    const first = await results(c.token, question.id);
+    const etag = String(first.headers.etag);
+    // Strong, and the hash of the body as sent.
+    expect(etag).toBe(`"${createHash('sha256').update(first.body).digest('base64url')}"`);
+
+    const unchanged = await results(c.token, question.id, etag);
+    expect(unchanged.statusCode).toBe(304);
+    expect(unchanged.body).toBe('');
+    expect(unchanged.headers.etag).toBe(etag);
+    // Held in a list, or weak: compared as RFC 9110 says.
+    expect((await results(c.token, question.id, `"other", W/${etag}`)).statusCode).toBe(304);
+
+    await answer(question.id, ana!.id, 0);
+    const answered = await results(c.token, question.id, etag);
+    expect(answered.statusCode).toBe(200);
+    expect(answered.json<QuestionResults>().answered).toBe(1);
+    const next = String(answered.headers.etag);
+    expect(next).not.toBe(etag);
+
+    // Nothing written, but the body says closed past the bell, so its tag is another.
+    now = at(26);
+    const pastBell = await results(c.token, question.id, next);
+    expect(pastBell.statusCode).toBe(200);
+    expect(pastBell.json<QuestionResults>().open).toBe(false);
+  });
+
+  it('refuses an unknown question, a student and another teacher', async () => {
+    const c = await lesson('results-who');
+    const other = await seedClassroom(db, 'results-who-elsewhere');
+    const question = await asked(c.token, c.session.id);
+
+    const unknown = await results(c.token, randomUUID());
+    expect(unknown.statusCode).toBe(404);
+    expect(reasonOf(unknown)).toBe('question_not_found');
+    for (const cognitoId of [c.student.cognitoId, other.teacher.cognitoId]) {
+      const res = await results(await ctx.tokenFor(cognitoId), question.id);
+      expect(res.statusCode).toBe(403);
+      expect(res.headers.etag).toBeUndefined();
+    }
   });
 });
 

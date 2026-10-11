@@ -810,6 +810,24 @@ export interface QuestionResponse {
   question: TeacherQuestion;
 }
 
+// GET /v1/questions/{id}/results — a question's totals (Phase 7, L3r; "Live lesson", decisions 3
+// and 6), the class's own teacher only. A strong ETag over the body; `If-None-Match` answers `304`.
+export interface QuestionResults {
+  /** N: everyone with an answer to it, a student removed since included. */
+  answered: number;
+  /**
+   * M: the class's students now, the session's participants (a removed one included) and everyone
+   * counted in N, so never below N.
+   */
+  eligible: number;
+  /** As `TeacherQuestion.open`: by the server's clock, so closed past the bell. */
+  open: boolean;
+  correctOption: number | null;
+  revealed: boolean;
+  /** Per option, by its index, totalling N; null until at least 3 have answered (the guard). */
+  counts: number[] | null;
+}
+
 /**
  * One event as the catch-up feed and the live stream carry it. On the SSE stream
  * this JSON is the `data:` frame, with `seq` echoed in the SSE `id:` line so a

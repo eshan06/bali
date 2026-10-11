@@ -7,7 +7,12 @@ import { claimCognitoDeletions, queueCognitoDeletion } from '../src/cognito-dele
 import { registerPushToken } from '../src/device-tokens.js';
 import { newUuidV7 } from '../src/ids.js';
 import { createBlock, createClass } from '../src/management.js';
-import { findOrCreateStudent, findUserByCognitoId } from '../src/queries.js';
+import {
+  findOrCreateStudent,
+  findUserByCognitoId,
+  type QuestionCounts,
+  questionCounts,
+} from '../src/queries.js';
 import { hasSqlState } from '../src/sql-errors.js';
 import {
   ageChecks,
@@ -4617,4 +4622,44 @@ describe.runIf(REAL_PG)('live lesson questions under contention (real Postgres, 
     ).toMatchObject({ removedAt: null });
     expect(await answersTo(early.question.id)).toHaveLength(1);
   }, 20_000);
+
+  it('a count read while answers land is of one instant: N never above M, the counts totalling N (L3r)', async () => {
+    const { question } = await asking('race-count');
+    // In no class and no session: M holds each only once their answer is counted, as it holds a
+    // student removed since answering.
+    const outsiders = await db
+      .insert(users)
+      .values(
+        Array.from({ length: 16 }, (_, i) => ({
+          cognitoId: `student-race-count-${i}`,
+          role: 'student' as const,
+        })),
+      )
+      .returning();
+    const reads: QuestionCounts[] = [];
+    let landed = false;
+    const reading = (async () => {
+      while (!landed) reads.push((await questionCounts(db, question.id))!);
+    })();
+
+    await Promise.all(
+      outsiders.map((student, i) =>
+        answerQuestion(db, {
+          questionId: question.id,
+          studentId: student.id,
+          eventId: newUuidV7(),
+          option: i % 2,
+        }),
+      ),
+    );
+    landed = true;
+    await reading;
+
+    const last = (await questionCounts(db, question.id))!;
+    expect(last).toEqual({ answered: 16, eligible: 17, counts: [8, 8] });
+    for (const read of reads) {
+      expect(read.answered).toBeLessThanOrEqual(read.eligible);
+      expect(read.counts?.reduce((sum, n) => sum + n) ?? read.answered).toBe(read.answered);
+    }
+  });
 });

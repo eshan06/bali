@@ -127,13 +127,15 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
       .map((o) => o.trim())
       .filter(Boolean) ?? [];
   if (corsOrigins.length > 0) {
-    // A 429's Retry-After, readable by the portal's fetch, not only sent. The
-    // methods are the portal's api-client's (the plugin's default, GET,HEAD,POST,
-    // refused its PATCH); PUT serves only the iOS app, which sends no Origin.
+    // A 429's Retry-After and a poll's ETag (L3r), readable by the portal's
+    // fetch, not only sent; its If-None-Match is allowed as every requested
+    // header is. The methods are the portal's api-client's (the plugin's
+    // default, GET,HEAD,POST, refused its PATCH); PUT serves only the iOS app,
+    // which sends no Origin.
     void app.register(cors, {
       origin: corsOrigins,
       methods: ['GET', 'HEAD', 'POST', 'PATCH', 'DELETE'],
-      exposedHeaders: ['retry-after'],
+      exposedHeaders: ['retry-after', 'etag'],
     });
   }
 

@@ -21,6 +21,7 @@ import {
   events,
   participations,
   questions,
+  responses,
   sessions,
   users,
 } from './schema.js';
@@ -251,6 +252,56 @@ export async function findQuestion(db: Database, questionId: string) {
       .where(eq(questions.id, questionId))
       .limit(1),
   );
+}
+
+/** The fewest answers whose counts per option a teacher sees: decision 3's small-group guard. */
+const BREAKDOWN_FROM = 3;
+
+/** A question's totals, and nothing else of its answers: no student, no time. */
+export interface QuestionCounts {
+  /** N: everyone with a response to the question, a student removed since included. */
+  answered: number;
+  /** M: the class's students now, the session's participants (a removed one included) and N's. */
+  eligible: number;
+  /** Per option, by its index, totalling N; null until `BREAKDOWN_FROM` have answered. */
+  counts: number[] | null;
+}
+
+/**
+ * The one guarded count (Phase 7, L3r; ARCHITECTURE, "Live lesson", decision 3 and "Settled"): what
+ * the results route, the recap and any report read, so no count below the guard reaches anyone.
+ * One statement, so N, the counts and M are read at one instant: N never exceeds M, and the counts
+ * always total N. Undefined when no question has that id.
+ */
+export async function questionCounts(
+  db: Database,
+  questionId: string,
+): Promise<QuestionCounts | undefined> {
+  const [row] = await db
+    .select({
+      options: questions.options,
+      // Each answer's option alone.
+      chosen: sql<number[]>`(select coalesce(jsonb_agg(${responses.option}), '[]'::jsonb)
+        from ${responses} where ${responses.questionId} = ${questions.id})`,
+      eligible: sql<number>`(select count(*)::int from (
+        select ${enrollments.studentId} from ${enrollments} where ${enrollments.classId} = ${sessions.classId} and ${enrollments.removedAt} is null
+        union select ${participations.studentId} from ${participations} where ${participations.sessionId} = ${sessions.id}
+        union select ${responses.studentId} from ${responses} where ${responses.questionId} = ${questions.id}
+      ) as everyone)`,
+    })
+    .from(questions)
+    .innerJoin(sessions, eq(sessions.id, questions.sessionId))
+    .where(eq(questions.id, questionId));
+  if (!row) return undefined;
+  const { options, chosen, eligible } = row;
+  return {
+    answered: chosen.length,
+    eligible,
+    counts:
+      chosen.length < BREAKDOWN_FROM
+        ? null
+        : options.map((_, i) => chosen.filter((option) => option === i).length),
+  };
 }
 
 /** A session's question not yet closed, if any: whether it is open now is `questionOpen`'s to say. */

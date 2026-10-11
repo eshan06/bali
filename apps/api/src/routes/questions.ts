@@ -3,6 +3,7 @@ import {
   type Database,
   findQuestion,
   openQuestion,
+  questionCounts,
   type QuestionRow,
   questionOpen,
 } from '@bali/db';
@@ -12,6 +13,7 @@ import {
   QUESTION_OPTIONS_MIN,
   QUESTION_PROMPT_MAX_LENGTH,
   type QuestionResponse,
+  type QuestionResults,
   type TeacherQuestion,
 } from '@bali/shared';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
@@ -20,6 +22,7 @@ import { z } from 'zod';
 import { requireSessionOwner, requireTeacher } from '../auth/teacher.js';
 import { INVISIBLE, UNPRINTABLE } from '../display-name.js';
 import { ApiError, parseRequest } from '../errors.js';
+import { sendTagged } from '../etag.js';
 import { mapTransitionError } from './errors.js';
 
 const Params = z.object({ id: z.string().uuid() });
@@ -88,6 +91,7 @@ async function requireOwnQuestion(db: Database, request: FastifyRequest, id: str
  *
  * POST /v1/sessions/:id/questions  open one in a running session, closing the one open there
  * POST /v1/questions/:id/close     close it, revealing its correct option when asked
+ * GET  /v1/questions/:id/results   its totals, through the one guarded count; ETag and 304
  */
 export function registerQuestionsRoutes(
   app: FastifyInstance,
@@ -129,6 +133,30 @@ export function registerQuestionsRoutes(
         outcome: result.outcome,
         question: teacherQuestion(result.question, result.session, now),
       };
+    },
+  );
+
+  app.get(
+    '/v1/questions/:id/results',
+    { preHandler: app.authenticate, config: { parses: { params: Params } } },
+    async (request, reply) => {
+      const { id } = parseRequest(request, 'params', Params);
+      const { question, session } = await requireOwnQuestion(db, request, id);
+      // Counted after the question is read, never before: a close commits after every answer it
+      // lets count, so a question read closed is answered with its final counts.
+      const counted = await questionCounts(db, id);
+      // Found by the guard, and a question is never deleted.
+      if (!counted) throw questionNotFound();
+      const { open, correctOption, revealed } = teacherQuestion(question, session, clock());
+      const results: QuestionResults = {
+        answered: counted.answered,
+        eligible: counted.eligible,
+        open,
+        correctOption,
+        revealed,
+        counts: counted.counts,
+      };
+      return sendTagged(request, reply, results);
     },
   );
 }
