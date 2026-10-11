@@ -1,4 +1,6 @@
+import { newUuidV7 } from '@bali/db';
 import {
+  type AnswerResponse,
   type ApiErrorBody,
   type BlockDetail,
   type CheckInResponse,
@@ -11,7 +13,10 @@ import {
   type EventsPage,
   type FeedEvent,
   type JoinCodePreviewResponse,
+  type Presentation,
   type ProtectionOffResponse,
+  type QuestionResponse,
+  type QuestionResults,
   type RefocusResponse,
   type SessionSnapshot,
   type StartSessionResponse,
@@ -410,6 +415,9 @@ async function main(): Promise<void> {
     console.log('Ben is marked silent — exactly one episode opened.');
 
     const cal = byKey('cal');
+    const dana = byKey('dana');
+    // The answers to the lesson's question, which the event log must never hold (8:12am).
+    const answerIds = new Set<string>();
 
     line('8:08am — Ben comes back');
     // The room reports in first: the pump has been stopped since the silence
@@ -509,6 +517,94 @@ async function main(): Promise<void> {
       console.log(
         'Cal removed; his unlock was recorded (no_live_participation), next check-in: gone.',
       );
+
+      line('8:12am — the teacher asks a question, and the class answers it (Phase 7)');
+      const asked = await call<QuestionResponse>('POST', `/v1/sessions/${sid}/questions`, {
+        token: teacher.token,
+        body: {
+          eventId: newUuidV7(),
+          prompt: 'Which planet is the largest?',
+          options: ['Mars', 'Jupiter', 'Venus'],
+          correctOption: 1,
+        },
+      });
+      assert(asked.outcome === 'opened', `the question's open: ${JSON.stringify(asked)}`);
+      const question = asked.question;
+      await grid.waitFor((e) => e.type === 'question_opened', {
+        label: 'the question opening',
+        timeoutMs: world.liveWaitMs,
+      });
+      // What a phone polls every 2 s: the question, its correct option hidden, no one's counts.
+      const poll = (s: DemoActor) =>
+        call<Presentation>('GET', `/v1/sessions/${sid}/presentation`, { token: s.token });
+      const shown = await poll(ana);
+      assert(
+        shown.running && shown.question?.id === question.id && shown.question.open,
+        `Ana's poll should show the open question, got ${JSON.stringify(shown)}`,
+      );
+      assert(
+        shown.question.correctOption === null,
+        'the correct option stays hidden until revealed',
+      );
+      const answer = async (s: DemoActor, option: number) => {
+        const eventId = newUuidV7();
+        answerIds.add(eventId);
+        const sent = await call<AnswerResponse>('POST', `/v1/questions/${question.id}/answers`, {
+          token: s.token,
+          body: { eventId, option },
+        });
+        assert(sent.outcome === 'answered', `${s.displayName}'s answer: ${JSON.stringify(sent)}`);
+      };
+      const results = () =>
+        call<QuestionResults>('GET', `/v1/questions/${question.id}/results`, {
+          token: teacher.token,
+        });
+      await answer(ana, 1);
+      const own = await poll(ana);
+      assert(own.question?.answer?.option === 1, `Ana's poll, her answer: ${JSON.stringify(own)}`);
+      // The small-group guard: under 3 answers the teacher sees how many, never how they split.
+      const one = await results();
+      assert(one.answered === 1 && one.counts === null, `one answer: ${JSON.stringify(one)}`);
+      await answer(ben, 0);
+      await answer(dana, 1);
+      const three = await results();
+      // M counts Cal: removed, he was in the lesson.
+      assert(
+        three.answered === 3 && three.eligible === 4 && three.counts?.join() === '1,2,0',
+        `three answers of four, then the counts: ${JSON.stringify(three)}`,
+      );
+      console.log(
+        `  ${one.answered} of ${one.eligible} answered: no counts yet; ` +
+          `${three.answered} of ${three.eligible}: ${three.counts.join(' / ')}.`,
+      );
+
+      const closed = await call<QuestionResponse>('POST', `/v1/questions/${question.id}/close`, {
+        token: teacher.token,
+        body: { eventId: newUuidV7(), reveal: true },
+      });
+      assert(
+        closed.outcome === 'closed' && !closed.question.open && closed.question.revealed,
+        `the close, revealing: ${JSON.stringify(closed)}`,
+      );
+      await grid.waitFor((e) => e.type === 'question_closed', {
+        label: 'the question closing',
+        timeoutMs: world.liveWaitMs,
+      });
+      const late = await call<ApiErrorBody>('POST', `/v1/questions/${question.id}/answers`, {
+        token: ben.token,
+        body: { eventId: newUuidV7(), option: 1 },
+        expectStatus: 409,
+      });
+      assert(
+        late.error.reason === 'question_closed',
+        `an answer after the close: ${JSON.stringify(late)}`,
+      );
+      const revealed = await poll(ben);
+      assert(
+        revealed.question?.correctOption === 1 && revealed.question.answer?.option === 0,
+        `Ben's poll should show the answer beside his own: ${JSON.stringify(revealed)}`,
+      );
+      console.log('  closed and revealed; a change of answer after the close is refused (409).');
     });
 
     line('the live grid (the teacher snapshot, derived like the portal)');
@@ -552,7 +648,7 @@ async function main(): Promise<void> {
       display.get(cal.userId) === 'ended' && calRow?.unlock?.recordedAs === 'no_live_participation',
       `Cal, removed, should stay on the grid with his unlock, got ${JSON.stringify(calRow)}`,
     );
-    assert(display.get(byKey('dana').userId) === 'focused', 'Dana should read focused');
+    assert(display.get(dana.userId) === 'focused', 'Dana should read focused');
     console.log('  (Cal was removed — left, his unlock kept: the portal reads "Left · unlocked".)');
 
     line('the permanent event log (rule 6)');
@@ -575,10 +671,14 @@ async function main(): Promise<void> {
       'went_silent',
       'came_back',
       'enrollment_removed',
+      'question_opened',
+      'question_closed',
     ];
     for (const t of required) {
       assert(types.includes(t), `event log should contain ${t}`);
     }
+    // Totals only: an answer is a row of its own, never an event, so the stream never names one.
+    assert(!log.events.some((e) => answerIds.has(e.eventId)), 'no answer should be an event');
     assert(
       types.filter((t) => t === 'tap_in').length === 5,
       "four taps at the bell, plus Ana's re-tap",
@@ -632,7 +732,6 @@ async function main(): Promise<void> {
     });
     const expiringId = second.session.id;
     openSessionId = expiringId;
-    const dana = byKey('dana');
     const danaTap = await call<TapResponse>('POST', '/v1/taps', {
       token: dana.token,
       body: { tagId: block.tagId, eventId: randomUUID(), deviceTime: iso() },

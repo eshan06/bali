@@ -196,6 +196,29 @@ describe('GET /v1/sessions/:id/presentation', () => {
     });
   });
 
+  it('shows the open question, else the one closed last, never simply the one opened last', async () => {
+    const l = await lesson('show-order');
+    // Two opens racing: each reads the clock before the session's lock, so the later by the lock can
+    // carry the earlier time, and it closes the other (DECISIONS, 2026-10-11, L4a). Staged in that
+    // order, the question opened last by the clock is the one closed first.
+    now = at(12);
+    const beaten = await ask(l, 'Beaten?');
+    now = at(11);
+    const last = await ask(l, 'Last?');
+    expect(beaten.openedAt.getTime()).toBeGreaterThan(last.openedAt.getTime());
+    expect((await shown(l.phone, l.session.id)).question).toMatchObject({
+      id: last.id,
+      open: true,
+    });
+
+    now = at(13);
+    await close(last.id);
+    expect((await shown(l.phone, l.session.id)).question).toMatchObject({
+      id: last.id,
+      open: false,
+    });
+  });
+
   it('says the session is over at the bell, the sweep or not, and shows nothing then', async () => {
     const l = await lesson('show-bell');
     await ask(l);
