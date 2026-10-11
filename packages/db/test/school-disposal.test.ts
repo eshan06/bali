@@ -518,7 +518,7 @@ describe('disposeSchool (C6a)', () => {
   it('empties the questions of a school with more lessons than one statement can bind', async () => {
     const s = await seed('c6a-many');
     await pastBell(s.lesson.id);
-    // Past the 65,534 parameters postgres.js binds in one statement, made in one statement.
+    // More lessons than one statement binds (postgres.js refuses 65,534 parameters), made in one.
     const lessons = 65_600;
     await db.execute(sql`insert into ${sessions} (id, class_id, started_at, ends_at, ended_at)
       select gen_random_uuid(), ${s.first.id}, now() - interval '2 days',

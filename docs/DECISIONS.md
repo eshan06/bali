@@ -18,8 +18,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   in the school's lessons, the retention run those of a teacher it de-identifies, each keeping
   its count of options (an array of empty strings) and its correct option, so every answer still
   names an option by its index. The disposal picks its lessons' questions by a subquery, never a
-  list of the lessons' ids, which a school outgrows: postgres.js binds at most 65,534 parameters a
-  statement (santa's round-1 blocker on #311, fixed on the owner's ruling). The account deletion
+  list of the lessons' ids, which a school outgrows: postgres.js refuses a statement of 65,534
+  parameters or more (santa's round-1 blocker on #311, fixed on the owner's ruling). The account deletion
   leaves a question's words, as it leaves a deleted teacher's removed classes their names (found:
   `deleteAccount` never touches `classes.name`); one decision for all of a teacher's words at
   their own deletion, deck titles included, is #313, to make with M4.
