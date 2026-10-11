@@ -3492,8 +3492,9 @@ export type AnswerResult =
  * A student answers, writing no event (decision 5: totals only). It counts only while the question
  * is open and its session running by the server's clock (A17), else `question_closed`, nothing
  * recorded. It replaces their answer only when its eventId sorts after the one held — a UUIDv7
- * begins with the phone's time — so a slow first answer never undoes the second; an older one
- * changes nothing and is answered with the answer now, as its own replay is, past the close too.
+ * begins with the phone's time — so a slow first answer never undoes the second: an older one
+ * changes nothing and, while the question is open, is answered with the answer now. A replay is
+ * answered so past the close too.
  * The eventId is matched alone: one any other response or any event holds is EVENT_ID_CONFLICT,
  * nothing recorded (decision 6).
  */
