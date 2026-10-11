@@ -123,5 +123,5 @@ public enum ApiErrorReason: String, CaseIterable, Sendable, Encodable {
     case alreadyTeacher = "already_teacher", studentInClass = "student_in_class"
     case teacherHasClasses = "teacher_has_classes", accountDeleted = "account_deleted"
     case questionNotFound = "question_not_found", questionClosed = "question_closed"
-    case invalidOption = "invalid_option"
+    case invalidOption = "invalid_option", savedQuestionNotFound = "saved_question_not_found"
 }

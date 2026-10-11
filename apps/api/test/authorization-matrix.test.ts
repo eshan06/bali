@@ -1,4 +1,5 @@
 import {
+  createSavedQuestion,
   type Database,
   endSession,
   enrollments,
@@ -48,8 +49,9 @@ import { makeTestIssuer, type TestIssuer } from './helpers/test-issuer.js';
  *
  * Each row runs in a world of its own (`world`), so no row's write reaches
  * another's. And a 2xx to a stranger names nothing of this world's (`hidden`)
- * — its session, its student, their enrollment, tap and unlock, the owner and
- * their block, and the class unless the request carries its join code — so
+ * — its session, its student, their enrollment, tap and unlock, the owner,
+ * their block and saved question, and the class unless the request carries its
+ * join code — so
  * the routes no one is refused (an unlock, a check-in, a tap) are pinned too.
  */
 
@@ -124,6 +126,10 @@ const MATRIX = {
   'POST /v1/sessions/:id/questions':        [401, 401, 403,     403,     403,     200],
   'POST /v1/questions/:id/close':           [401, 401, 403,     403,     403,     200],
   'GET /v1/questions/:id/results':          [401, 401, 403,     403,     403,     200],
+  'GET /v1/saved-questions':                [401, 401, 403,     403,     200,     200],
+  'POST /v1/saved-questions':               [401, 401, 403,     403,     200,     200],
+  'PUT /v1/saved-questions/:id':            [401, 401, 403,     403,     403,     200],
+  'DELETE /v1/saved-questions/:id':         [401, 401, 403,     403,     403,     200],
 } as const satisfies Record<string, readonly number[]>;
 type RouteKey = keyof typeof MATRIX;
 
@@ -141,6 +147,8 @@ interface World {
   sessionId: string;
   tapId: string;
   unlockId: string;
+  /** The owner's saved question (L3b). */
+  draftId: string;
 }
 type Seeded = Awaited<ReturnType<typeof seedClassroom>>;
 
@@ -290,6 +298,20 @@ const REQUESTS: Record<RouteKey, (w: World) => Sent | Promise<Sent>> = {
   'GET /v1/questions/:id/results': async (w) => ({
     url: `/v1/questions/${await asked(w)}/results`,
   }),
+  // A teacher's saved questions (L3b): each teacher's own; another teacher reads and writes theirs.
+  'GET /v1/saved-questions': () => ({ url: '/v1/saved-questions' }),
+  'POST /v1/saved-questions': () => ({
+    url: '/v1/saved-questions',
+    body: { eventId: newUuidV7(), prompt: 'Which?', options: ['a', 'b'] },
+  }),
+  'PUT /v1/saved-questions/:id': (w) => ({
+    url: `/v1/saved-questions/${w.draftId}`,
+    body: { eventId: newUuidV7(), prompt: 'Why?', options: ['a', 'b'] },
+  }),
+  'DELETE /v1/saved-questions/:id': (w) => ({
+    url: `/v1/saved-questions/${w.draftId}`,
+    body: { eventId: newUuidV7() },
+  }),
 };
 
 /** The matrix's key for `route`: a HEAD is its GET's. */
@@ -327,6 +349,7 @@ function hidden(w: World, sent: Sent): string[] {
     w.unlockId,
     w.owner.id,
     w.block.id,
+    w.draftId,
   ];
   return JSON.stringify(sent).includes(w.klass.joinCode) ? ids : [...ids, w.klass.id];
 }
@@ -394,6 +417,13 @@ async function world(): Promise<World> {
     .select({ id: enrollments.id })
     .from(enrollments)
     .where(eq(enrollments.studentId, mine.student.id));
+  const draft = await createSavedQuestion(db, {
+    teacherId: mine.teacher.id,
+    eventId: newUuidV7(),
+    prompt: 'Which?',
+    options: ['a', 'b'],
+  });
+  if (draft.outcome !== 'created') throw new Error(`no draft: ${draft.outcome}`);
   return {
     owner: mine.teacher,
     student: mine.student,
@@ -405,6 +435,7 @@ async function world(): Promise<World> {
     sessionId: session.id,
     tapId,
     unlockId,
+    draftId: draft.savedQuestion.id,
   };
 }
 

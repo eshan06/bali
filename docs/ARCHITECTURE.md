@@ -1335,12 +1335,15 @@ changes.
   `created_at`, `updated_at`, `removed_at`. The teacher's, usable in any of their classes;
   a question's limits (decision 3).
 - **Writers.** The transition engine, as for decks: idempotent on `event_id`, a write locking
-  the draft's row alone.
+  the draft's row alone. A save replaces the draft only when its `event_id` sorts after the one
+  the draft holds, as an answer does (decision 4; ruled 2026-10-11, L3b2): an older save landing
+  late changes nothing and is answered with the draft now. The draft carries that id, so a client
+  mints its next save after it.
 - **API** (the teacher's own drafts only; anyone else `403`): `GET /v1/saved-questions` (never a
   removed one, newest first); `POST /v1/saved-questions` `{ eventId, prompt, options,
   correctOption? }`; `PUT /v1/saved-questions/{id}` (the same body, replacing the draft whole);
-  `DELETE /v1/saved-questions/{id}` `{ eventId }`. A new refusal, `saved_question_not_found`.
-  S1 matrix rows and the OpenAPI snapshot, as for every route.
+  `DELETE /v1/saved-questions/{id}` `{ eventId }`. A new refusal, `saved_question_not_found`: a
+  removed or unknown draft. S1 matrix rows and the OpenAPI snapshot, as for every route.
 - **Privacy.** The teacher's words, like a question's prompt: the account deletion of a teacher
   removes their drafts; the disposal and the retention run empty a draft's texts and set
   `removed_at`; never in a student's export. The coverage guards place `teacher_id`.

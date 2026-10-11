@@ -810,6 +810,42 @@ export interface QuestionResponse {
   question: TeacherQuestion;
 }
 
+// GET and POST /v1/saved-questions, PUT and DELETE /v1/saved-questions/{id} — a teacher's drafts of
+// questions (Phase 7, L3b; "Live lesson", decision 12), their own only. A save's body is an open's
+// (`OpenQuestionRequest`), and a removal's `{ eventId }`.
+/** A teacher's draft of a question: never shown to a student until asked. */
+export interface SavedQuestion {
+  id: string;
+  prompt: string;
+  /** 2–6, as a question's. */
+  options: string[];
+  correctOption: number | null;
+  /**
+   * The id of the write that last wrote it. A save applies only when its `eventId` sorts after this
+   * one (UUIDv7 order, as an answer's: decision 4), so a client mints its next save after it.
+   */
+  eventId: string;
+  createdAt: string;
+  /** Its last write's time: later than `createdAt` once it was edited. */
+  updatedAt: string;
+}
+/**
+ * Every outcome a draft's write answers with (`SavedQuestionResponse.outcome`): `created`,
+ * `replaced`, `removed`, or `replay`, which changed nothing: the write's own retry, or a save older
+ * than the draft's last write.
+ */
+export const SAVED_QUESTION_OUTCOMES = ['created', 'replaced', 'removed', 'replay'] as const;
+export type SavedQuestionOutcome = (typeof SAVED_QUESTION_OUTCOMES)[number];
+export interface SavedQuestionResponse {
+  outcome: SavedQuestionOutcome;
+  /** The draft now: once removed, as it was removed. */
+  savedQuestion: SavedQuestion;
+}
+export interface SavedQuestionsResponse {
+  /** Newest first, by when each was written first; never a removed one. */
+  savedQuestions: SavedQuestion[];
+}
+
 // GET /v1/questions/{id}/results — a question's totals (Phase 7, L3r; "Live lesson", decisions 3
 // and 6), the class's own teacher only. A strong ETag over the body; `If-None-Match` answers `304`.
 export interface QuestionResults {

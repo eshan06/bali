@@ -30,6 +30,7 @@ import {
   inArray,
   isNotNull,
   isNull,
+  lt,
   lte,
   ne,
   or,
@@ -3600,6 +3601,7 @@ export function answerQuestion(db: Database, input: AnswerInput): Promise<Answer
  * outside any session, never shown to a student. Each write is idempotent on the draft's `event_id`,
  * the id of the teacher's write that last wrote it: a replay writes nothing and answers the draft
  * now, and an id a later write replaced is no longer kept, as a replaced answer's is not. A replace
+ * applies only after that write, by its eventId's order, as an answer does (decision 4). A replace
  * and a removal lock the draft's row alone: no session, no class.
  */
 
@@ -3699,7 +3701,7 @@ export interface WriteSavedQuestionInput {
  * one at a time and a duplicate finds its own. The id the draft holds is this write's replay when
  * `replays` says the draft is as this write left it, else another write's: EVENT_ID_CONFLICT. A
  * draft removed, or none, is `saved_question_not_found`; an id another draft, an event or an answer
- * holds is EVENT_ID_CONFLICT.
+ * holds is EVENT_ID_CONFLICT. An `ordered` write older than the draft's last changes nothing.
  */
 function writeSavedQuestion(
   db: Database,
@@ -3708,6 +3710,8 @@ function writeSavedQuestion(
     outcome: 'replaced' | 'removed';
     set: Pick<Partial<SavedQuestionRow>, 'prompt' | 'options' | 'correctOption' | 'removedAt'>;
     replays: (draft: SavedQuestionRow) => boolean;
+    /** Applied only when its eventId sorts after the draft's: decision 4's order. */
+    ordered?: boolean;
   },
 ): Promise<SavedQuestionResult> {
   return onceMoreOnUnique(() =>
@@ -3725,17 +3729,29 @@ function writeSavedQuestion(
       if (await idHeldBy(tx, input.eventId, savedQuestions, events, responses)) {
         throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
       }
+      // Postgres orders uuids by their bytes: a UUIDv7's leading timestamp first. The row is held,
+      // so its eventId is the one read above.
       const [written] = await tx
         .update(savedQuestions)
         .set({ ...write.set, eventId: input.eventId, updatedAt: input.now ?? new Date() })
-        .where(eq(savedQuestions.id, draft.id))
+        .where(
+          and(
+            eq(savedQuestions.id, draft.id),
+            write.ordered ? lt(savedQuestions.eventId, input.eventId) : undefined,
+          ),
+        )
         .returning();
-      return { outcome: write.outcome, savedQuestion: written! };
+      if (!written) return { outcome: 'replay', savedQuestion: draft };
+      return { outcome: write.outcome, savedQuestion: written };
     }),
   );
 }
 
-/** The teacher replaces a draft's words whole (decision 12). */
+/**
+ * The teacher replaces a draft's words whole (decision 12). Only a save newer than the draft's last
+ * write, by its eventId (a UUIDv7 begins with its minting clock's time), applies: an older one, one
+ * landing late, changes nothing and answers the draft now, as an older answer does (decision 4).
+ */
 export function replaceSavedQuestion(
   db: Database,
   input: WriteSavedQuestionInput & SavedQuestionText,
@@ -3745,6 +3761,7 @@ export function replaceSavedQuestion(
     outcome: 'replaced',
     set: { prompt, options, correctOption },
     replays: (draft) => draft.removedAt === null && holdsWords(draft, input),
+    ordered: true,
   });
 }
 

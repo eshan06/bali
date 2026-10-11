@@ -122,9 +122,9 @@ const EXPECTED: Record<
  * 403s, which that route raises itself (A6; pinned in enrollments.test.ts),
  * the 400s of the history and of a rename (A8; pinned in history.test.ts
  * and me.test.ts), a teacher invite's refusals (T1b; pinned in
- * teacher-invites.test.ts), and a live lesson's question's, which the engine
- * answers as outcomes for the routes to map (L3, pinned in questions.test.ts;
- * the answer's two with L4).
+ * teacher-invites.test.ts), and a live lesson's question's and saved
+ * question's, which the engine answers as outcomes for the routes to map (L3
+ * and L3b, pinned in questions.test.ts; the answer's two with L4).
  */
 const ROUTE_REASONS: ApiErrorReason[] = [
   'unknown_user',
@@ -141,6 +141,7 @@ const ROUTE_REASONS: ApiErrorReason[] = [
   'question_not_found',
   'question_closed',
   'invalid_option',
+  'saved_question_not_found',
 ];
 
 /** What `mapTransitionError` turns an engine refusal with `code` into. */
