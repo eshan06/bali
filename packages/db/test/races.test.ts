@@ -25,6 +25,7 @@ import {
   participations,
   questions,
   responses,
+  savedQuestions,
   schools,
   sessions,
   teacherInvites,
@@ -46,6 +47,7 @@ import {
   changeUnlockReason,
   checkIn,
   closeQuestion,
+  createSavedQuestion,
   deleteAccount,
   disposeSchool,
   endEnrollment,
@@ -58,7 +60,9 @@ import {
   protectionOff,
   protectionOn,
   refocus,
+  removeSavedQuestion,
   renameStudent,
+  replaceSavedQuestion,
   startSession,
   tapIn,
   unlock,
@@ -4292,7 +4296,12 @@ describe.runIf(REAL_PG)('live lesson questions under contention (real Postgres, 
       const { studentId, question } = await asking(`race-answer-close-${round}`);
 
       const [answered] = await Promise.all([
-        answerQuestion(db, { questionId: question.id, studentId, eventId: newUuidV7(), option: 1 }),
+        answerQuestion(db, {
+          questionId: question.id,
+          studentId,
+          eventId: newUuidV7(),
+          option: 1,
+        }),
         closeQuestion(db, { questionId: question.id, eventId: newUuidV7() }),
       ]);
 
@@ -4313,7 +4322,12 @@ describe.runIf(REAL_PG)('live lesson questions under contention (real Postgres, 
       const { studentId, session, question } = await asking(`race-answer-end-${round}`);
 
       const [answered] = await Promise.all([
-        answerQuestion(db, { questionId: question.id, studentId, eventId: newUuidV7(), option: 0 }),
+        answerQuestion(db, {
+          questionId: question.id,
+          studentId,
+          eventId: newUuidV7(),
+          option: 0,
+        }),
         endSession(db, { sessionId: session.id, at: new Date(), reason: 'ended' }),
       ]);
 
@@ -4514,7 +4528,9 @@ describe.runIf(REAL_PG)('live lesson questions under contention (real Postgres, 
     );
 
     expect(settled.status).toBe('rejected');
-    expect((settled as PromiseRejectedResult).reason).toMatchObject({ code: 'EVENT_ID_CONFLICT' });
+    expect((settled as PromiseRejectedResult).reason).toMatchObject({
+      code: 'EVENT_ID_CONFLICT',
+    });
     expect(await answersTo(question.id)).toMatchObject([{ studentId: other.id }]);
   }, 20_000);
 
@@ -4662,4 +4678,175 @@ describe.runIf(REAL_PG)('live lesson questions under contention (real Postgres, 
       expect(read.counts?.reduce((sum, n) => sum + n) ?? read.answered).toBe(read.answered);
     }
   });
+
+  /** A draft "Which?" of `teacherId`'s, under `eventId` (L3b). */
+  const drafting = (teacherId: string, eventId = newUuidV7()) => ({
+    teacherId,
+    eventId,
+    prompt: 'Which?',
+    options: ['a', 'b'],
+  });
+  const draftsOf = (teacherId: string) =>
+    db.select().from(savedQuestions).where(eq(savedQuestions.teacherId, teacherId));
+
+  it('two deliveries of one draft at once are one draft, never a 500 (L3b)', async () => {
+    for (let round = 0; round < 12; round += 1) {
+      const { teacherId } = await seed(`race-draft-twice-${round}`);
+      const draft = drafting(teacherId);
+
+      const both = await Promise.all([
+        createSavedQuestion(db, draft),
+        createSavedQuestion(db, draft),
+      ]);
+
+      expect(both.map((r) => r.outcome).sort()).toEqual(['created', 'replay']);
+      expect(await draftsOf(teacherId)).toHaveLength(1);
+    }
+  });
+
+  it('a draft whose first delivery commits after its own lookup is the replay, never a conflict (L3b)', async () => {
+    // As an answer's (#310): uncommitted, the first delivery is missed by the duplicate's read of
+    // `saved_questions`, and the duplicate's insert parks on its `event_id`, then is run again.
+    const { teacherId } = await seed('race-draft-window');
+    const draft = drafting(teacherId);
+    let firstId = '';
+
+    const settled = await behindCommit(
+      async (tx) => {
+        const first = await createSavedQuestion(tx, draft);
+        if (first.outcome !== 'created') throw new Error(first.outcome);
+        firstId = first.savedQuestion.id;
+      },
+      () => createSavedQuestion(db, draft),
+    );
+
+    if (settled.status === 'rejected') throw settled.reason as Error;
+    expect(settled.value).toMatchObject({ outcome: 'replay', savedQuestion: { id: firstId } });
+    expect(await draftsOf(teacherId)).toHaveLength(1);
+  }, 20_000);
+
+  it('a replace racing the draft’s removal: the later one finds what the first left (L3b)', async () => {
+    for (let round = 0; round < 12; round += 1) {
+      const { teacherId } = await seed(`race-draft-write-${round}`);
+      const created = await createSavedQuestion(db, drafting(teacherId));
+      if (created.outcome !== 'created') throw new Error(created.outcome);
+      const savedQuestionId = created.savedQuestion.id;
+      const removal = newUuidV7();
+
+      const [replaced, removed] = await Promise.all([
+        replaceSavedQuestion(db, {
+          savedQuestionId,
+          eventId: newUuidV7(),
+          prompt: 'Why?',
+          options: ['x', 'y'],
+        }),
+        removeSavedQuestion(db, { savedQuestionId, eventId: removal }),
+      ]);
+
+      expect(removed.outcome).toBe('removed');
+      const [row] = await draftsOf(teacherId);
+      expect(row).toMatchObject({ eventId: removal });
+      expect(row!.removedAt).not.toBeNull();
+      if (replaced.outcome === 'replaced') {
+        // Ahead of the removal, which removed what it wrote.
+        expect(row).toMatchObject({ prompt: 'Why?', options: ['x', 'y'] });
+      } else {
+        expect(replaced).toEqual({ outcome: 'saved_question_not_found' });
+        expect(row).toMatchObject({ prompt: 'Which?', options: ['a', 'b'] });
+      }
+    }
+  });
+
+  it('a draft behind a teacher’s deletion is refused and writes nothing; one ahead of it goes with the account (L3b)', async () => {
+    /** A teacher whose class is archived, so the account may go (C3). */
+    async function leaving(tag: string) {
+      const { teacherId } = await seed(tag);
+      await db
+        .update(classes)
+        .set({ removedAt: new Date() })
+        .where(eq(classes.teacherId, teacherId));
+      return teacherId;
+    }
+
+    // Behind: the deletion holds the teacher's row (NO KEY UPDATE), so the draft's FOR SHARE waits,
+    // then reads it removed.
+    const behind = await leaving('race-draft-delete-behind');
+    const deletion = await heldDeletion(behind);
+    const late = createSavedQuestion(db, drafting(behind));
+    late.catch(() => undefined);
+    try {
+      await waitForBlockedBackend();
+    } finally {
+      deletion.release();
+      await deletion.committed;
+    }
+    await expect(late).rejects.toMatchObject({ code: 'ACCOUNT_DELETED' });
+    expect(await draftsOf(behind)).toEqual([]);
+
+    // Ahead: the draft holds the row FOR SHARE until it commits, so the deletion waits, then
+    // removes it with its words.
+    const ahead = await leaving('race-draft-delete-ahead');
+    const deleted = await behindCommit(
+      (tx) => createSavedQuestion(tx, drafting(ahead)),
+      () => deleteAccount(db, { userId: ahead, eventId: newUuidV7(), at: new Date() }),
+    );
+    if (deleted.status === 'rejected') throw deleted.reason as Error;
+    expect(deleted.value).toEqual({ outcome: 'deleted' });
+    const [gone] = await draftsOf(ahead);
+    expect(gone).toMatchObject({ prompt: '', options: ['', ''] });
+    expect(gone!.removedAt).not.toBeNull();
+  }, 20_000);
+
+  it('a draft after the year behind a retention run is refused; one ahead of it keeps its teacher named (L3b)', async () => {
+    /** A teacher with no class, their school's year over since yesterday: a draft is the one record since. */
+    async function yearOver(tag: string) {
+      const day = new Date(Date.now() - 86_400_000);
+      const two = (n: number) => String(n).padStart(2, '0');
+      const name = `School ${tag}`;
+      const school = one(
+        await db
+          .insert(schools)
+          .values({
+            name,
+            schoolYearEndsOn: `${day.getFullYear()}-${two(day.getMonth() + 1)}-${two(day.getDate())}`,
+          })
+          .returning(),
+      );
+      const teacher = one(
+        await db
+          .insert(users)
+          .values({
+            cognitoId: `teacher-${tag}`,
+            role: 'teacher',
+            schoolId: school.id,
+            createdAt: new Date(Date.now() - 30 * 86_400_000),
+          })
+          .returning(),
+      );
+      return {
+        teacherId: teacher.id,
+        retain: (on: Database) =>
+          applyRetention(on, { schoolId: school.id, at: new Date(), confirmName: name }),
+        draft: (on: Database) => createSavedQuestion(on, drafting(teacher.id)),
+      };
+    }
+
+    // Behind: the run holds the teacher's row and de-identifies them, with nothing since; the
+    // draft waits for it, then finds the account deleted, and writes nothing.
+    const behind = await yearOver('race-draft-retain-behind');
+    const late = await behindCommit(behind.retain, () => behind.draft(db));
+    expect(late.status).toBe('rejected');
+    expect((late as PromiseRejectedResult).reason).toMatchObject({ code: 'ACCOUNT_DELETED' });
+    expect(await draftsOf(behind.teacherId)).toEqual([]);
+
+    // Ahead: the draft holds the row until it commits; the run waits for it, then reads it as a
+    // record after the year, and keeps its teacher named and the draft as written.
+    const early = await yearOver('race-draft-retain-ahead');
+    const run = await behindCommit(early.draft, () => early.retain(db));
+    if (run.status === 'rejected') throw run.reason as Error;
+    if (run.value.outcome !== 'applied') throw new Error(run.value.outcome);
+    expect(run.value.continuing).toEqual([early.teacherId]);
+    expect((await userNow(early.teacherId)).removedAt).toBeNull();
+    expect(await draftsOf(early.teacherId)).toMatchObject([{ prompt: 'Which?', removedAt: null }]);
+  }, 20_000);
 });

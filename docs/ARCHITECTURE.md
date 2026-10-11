@@ -113,9 +113,10 @@ never stored here, no screen can ever show it.
   `sub`, how many tries, and when the next is due. Keyed to the Cognito user, not to a `users` row;
   deleted once the sign-in is gone, never exported. Not an engine table: written by the deletion's
   transaction and beside the engine.
-- `questions`, `responses`, `decks`, `session_presentations` — a live lesson's questions,
-  each student's answer now, the teacher's PDF decks and the slide a session shows (Phase 7;
-  "Live lesson", decision 4). Written only by the transition engine, except `decks.object_deleted_at`,
+- `questions`, `responses`, `saved_questions`, `decks`, `session_presentations` — a live lesson's
+  questions, each student's answer now, a teacher's drafts of questions, the teacher's PDF decks and
+  the slide a session shows (Phase 7; "Live lesson", decisions 4 and 12). Written only by the
+  transition engine, except `decks.object_deleted_at`,
   which the API stamps after the commit once it has deleted the object (or the sweep, for a
   leftover); an answer never writes to `events`.
 

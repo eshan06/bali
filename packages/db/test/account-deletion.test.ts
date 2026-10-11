@@ -19,6 +19,7 @@ import {
   participations,
   questions,
   responses,
+  savedQuestions,
   schools,
   users,
 } from '../src/schema.js';
@@ -26,11 +27,13 @@ import { makeTestDb } from '../src/testing.js';
 import {
   answerQuestion,
   armTap,
+  createSavedQuestion,
   deleteAccount,
   deletedCognitoId,
   endSession,
   joinClassByCode,
   openQuestion,
+  removeSavedQuestion,
   renameStudent,
   startSession,
   tapIn,
@@ -538,6 +541,58 @@ describe('a deleted teacher (C3)', () => {
       0,
     );
     expect(await db.select().from(blocks).where(eq(blocks.teacherId, teacher.id))).toHaveLength(0);
+  });
+
+  it('loses their drafts, removed with their words, and is given none after (Live lesson, decision 12)', async () => {
+    const [teacher, other] = await db
+      .insert(users)
+      .values([
+        { cognitoId: 'c3-drafts', role: 'teacher' },
+        { cognitoId: 'c3-drafts-other', role: 'teacher' },
+      ])
+      .returning();
+    const draft = async (teacherId: string, prompt: string) => {
+      const result = await createSavedQuestion(db, {
+        teacherId,
+        eventId: newUuidV7(),
+        prompt,
+        options: ['Yes', 'No', 'Not yet'],
+        correctOption: 0,
+      });
+      if (result.outcome !== 'created') throw new Error(result.outcome);
+      return result.savedQuestion;
+    };
+    const live = await draft(teacher!.id, 'Is Ana back?');
+    const dropped = await draft(teacher!.id, 'Did Ben pass?');
+    const droppedAt = fromNow(-MIN);
+    await removeSavedQuestion(db, {
+      savedQuestionId: dropped.id,
+      eventId: newUuidV7(),
+      now: droppedAt,
+    });
+    const theirs = await draft(other!.id, 'Is Ana back?');
+    const at = new Date();
+
+    await deleteAccount(db, { userId: teacher!.id, eventId: newUuidV7(), at });
+
+    const now = async (id: string) =>
+      one(await db.select().from(savedQuestions).where(eq(savedQuestions.id, id)));
+    const emptied = { prompt: '', options: ['', '', ''], correctOption: 0 };
+    expect(await now(live.id)).toMatchObject({ ...emptied, eventId: live.eventId, removedAt: at });
+    // One the teacher removed keeps when they did.
+    expect(await now(dropped.id)).toMatchObject({ ...emptied, removedAt: droppedAt });
+    expect(await now(theirs.id)).toEqual(theirs);
+    await expect(
+      createSavedQuestion(db, {
+        teacherId: teacher!.id,
+        eventId: newUuidV7(),
+        prompt: 'Late?',
+        options: ['a', 'b'],
+      }),
+    ).rejects.toMatchObject({ code: 'ACCOUNT_DELETED' });
+    expect(
+      await db.select().from(savedQuestions).where(eq(savedQuestions.teacherId, teacher!.id)),
+    ).toHaveLength(2);
   });
 });
 

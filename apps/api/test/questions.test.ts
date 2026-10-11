@@ -1,5 +1,6 @@
 import {
   answerQuestion,
+  createSavedQuestion,
   type Database,
   endEnrollment,
   endSession,
@@ -587,5 +588,43 @@ describe('GET /v1/sessions/:id: the open question', () => {
     expect((await snapshot(token, session.id)).question).toBeNull();
     const [row] = await questionsOf(session.id);
     expect(row?.closedAt).toBeNull();
+  });
+});
+
+describe('a saved question’s eventId (L3b)', () => {
+  it('is refused to a tap, an unlock and an open as a spent id, recording nothing', async () => {
+    const { session, teacher, student, block, token } = await lesson('draft-spent');
+    const drafted = await createSavedQuestion(db, {
+      teacherId: teacher.id,
+      eventId: newUuidV7(),
+      prompt: 'Which?',
+      options: ['a', 'b'],
+    });
+    if (drafted.outcome !== 'created') throw new Error(drafted.outcome);
+    const { eventId } = drafted.savedQuestion;
+    const phone = await ctx.tokenFor(student.cognitoId);
+    const deviceTime = at(9).toISOString();
+
+    const refused = [
+      await authedInject(ctx.app, phone, {
+        method: 'POST',
+        url: '/v1/taps',
+        payload: { tagId: block.tagId, eventId, deviceTime },
+      }),
+      // Kept and resent by the phone, never discarded: a 409 is no "recorded".
+      await authedInject(ctx.app, phone, {
+        method: 'POST',
+        url: `/v1/sessions/${session.id}/unlock`,
+        payload: { eventId, deviceTime },
+      }),
+      await ask(token, session.id, asking({ eventId })),
+    ];
+
+    for (const res of refused) {
+      expect(res.statusCode).toBe(409);
+      expect(reasonOf(res)).toBe('event_id_conflict');
+    }
+    expect(await db.select().from(events).where(eq(events.eventId, eventId))).toEqual([]);
+    expect(await questionsOf(session.id)).toEqual([]);
   });
 });

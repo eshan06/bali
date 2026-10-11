@@ -50,6 +50,8 @@ export const STUDENT_RECORD_COVERAGE = {
     'armed_taps.teacher_id': "the taps other students made on a teacher's block",
     'questions.created_by':
       "a teacher's questions: in the record only as the one a response answers",
+    'saved_questions.teacher_id':
+      "a teacher's drafts: never shown to a student; one asked is in the record as its question",
   },
 } as const;
 

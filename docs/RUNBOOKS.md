@@ -258,8 +258,8 @@ project for the API (its DSN).
       (the pilot), there is none to wait for: say so in the reply.
     - **Write back to the school,** by the agreement's channel, inside its days: the date of
       the disposal; what was removed (every name, Cognito subject and sign-in, class name,
-      block, open invite and pre-bell tap of the school, and the words of every question asked
-      in its lessons, prompt and options); what stays (lessons,
+      block, open invite and pre-bell tap of the school, the words of every question asked
+      in its lessons, prompt and options, and its teachers' saved questions); what stays (lessons,
       unlocks with their reason, taps and their times, and each answer by the number of the
       option picked, under accounts that name no one, kept
       as counts); and the day the last backup holding its data expires. If the agreement
@@ -278,14 +278,16 @@ project for the API (its DSN).
     - **Preview it** in the same shell: `npm run school -- retention <school-id>`. It prints
       how many students, teachers, enrollments and pre-bell taps would go, and the ids of
       the accounts it keeps named: anyone with a record after the year's last day (an answer
-      to a class question counts), at another school, or a teacher with a live class or
+      to a class question counts, and a teacher's saved question written since), at another
+      school, or a teacher with a live class or
       block. "no year end on record" or "isn't over until" means nothing was written: record
       the day, or wait.
     - **Run it,** pasting the preview's last line,
       `npm run school -- retention <school-id> --confirm '<name>'`. It prints one line of
       counts with no name: keep it with the school's records. A second run says it ran
       already, with the same counts. Each teacher it de-identifies loses the names of their
-      removed classes and the words of the questions they asked; every answer stays, by the
+      removed classes, the words of the questions they asked and their saved questions; every
+      answer stays, by the
       number of the option picked, under the account it de-identifies.
     - **Next year:** record the new last day with `year-end`; whoever was kept named this
       time is judged again against it. The Cognito sign-ins stay (a de-identified student

@@ -20,6 +20,7 @@ import {
   events,
   questions,
   responses,
+  savedQuestions,
   schools,
   sessions,
   teacherInvites,
@@ -31,9 +32,11 @@ import {
   answerQuestion,
   applyRetention,
   armTap,
+  createSavedQuestion,
   disposeSchool,
   endSession,
   openQuestion,
+  removeSavedQuestion,
   RETENTION_COVERAGE,
   renameStudent,
   startSession,
@@ -599,6 +602,66 @@ describe('applyRetention (C6b)', () => {
     expect(await question(late.question.id)).toMatchObject({
       prompt: 'Who finished first?',
       options: ['Quiet', 'Answerer'],
+    });
+  });
+
+  it('keeps a teacher whose one record after the year is a draft, and removes a de-identified teacher’s drafts with their words', async () => {
+    const [school] = await db
+      .insert(schools)
+      .values({ name: 'Drafts High', schoolYearEndsOn: localDay(1) })
+      .returning();
+    if (!school) throw new Error('seed');
+    const old = fromNow(-30 * DAY);
+    // Neither has a class or a block: what keeps one named is a draft written since.
+    const [writer, gone] = await db
+      .insert(users)
+      .values([
+        { cognitoId: 'drafts-writer', role: 'teacher', schoolId: school.id, createdAt: old },
+        { cognitoId: 'drafts-gone', role: 'teacher', schoolId: school.id, createdAt: old },
+      ])
+      .returning();
+    if (!writer || !gone) throw new Error('seed');
+    const draft = async (teacherId: string, prompt: string, now: Date) => {
+      const result = await createSavedQuestion(db, {
+        teacherId,
+        eventId: newUuidV7(),
+        prompt,
+        options: ['Yes', 'No'],
+        now,
+      });
+      if (result.outcome !== 'created') throw new Error(result.outcome);
+      return result.savedQuestion;
+    };
+    // In the year, Mr Gone writes two and removes one; after it, Ms Writer writes her first.
+    const live = await draft(gone.id, 'Is Ana back?', new Date());
+    const dropped = await draft(gone.id, 'Did Ben pass?', new Date());
+    const droppedAt = fromNow(MIN);
+    await removeSavedQuestion(db, {
+      savedQuestionId: dropped.id,
+      eventId: newUuidV7(),
+      now: droppedAt,
+    });
+    const next = await draft(writer.id, 'Ready for spring?', fromNow(2 * DAY + 12 * 60 * MIN));
+    const at = LATER();
+
+    const result = await applyRetention(db, { schoolId: school.id, at, confirmName: school.name });
+
+    expect(result).toMatchObject({
+      outcome: 'applied',
+      counts: { students: 0, teachers: 1, continuing: 1 },
+      continuing: [writer.id],
+    });
+    const now = async (id: string) =>
+      one(await db.select().from(savedQuestions).where(eq(savedQuestions.id, id)));
+    expect((await userRow(writer.id)).removedAt).toBeNull();
+    expect(await now(next.id)).toEqual(next);
+    // Mr Gone's drafts lose their words; the one he removed keeps when he did.
+    expect((await userRow(gone.id)).removedAt).toEqual(at);
+    expect(await now(live.id)).toMatchObject({ prompt: '', options: ['', ''], removedAt: at });
+    expect(await now(dropped.id)).toMatchObject({
+      prompt: '',
+      options: ['', ''],
+      removedAt: droppedAt,
     });
   });
 

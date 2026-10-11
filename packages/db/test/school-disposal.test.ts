@@ -22,6 +22,7 @@ import {
   participations,
   questions,
   responses,
+  savedQuestions,
   schools,
   sessions,
   teacherInvites,
@@ -32,10 +33,12 @@ import { makeTestDb } from '../src/testing.js';
 import {
   answerQuestion,
   armTap,
+  createSavedQuestion,
   deletedCognitoId,
   disposeSchool,
   joinClassByCode,
   openQuestion,
+  removeSavedQuestion,
   renameStudent,
   SCHOOL_DISPOSAL_COVERAGE,
   startSession,
@@ -80,7 +83,8 @@ function one<T>(rows: T[]): T {
  * open, two classes, Ana (renamed) and Ben in a lesson that is over, Ana's
  * unlock in it, and Ben's tap waiting for the teacher's next Start; both
  * students' phones registered for pushes, and both past the 13+ check. In the
- * running lesson, a question whose words name both students, answered by Ana.
+ * running lesson, a question whose words name both students, answered by Ana;
+ * and the teacher's drafts naming each, Ben's removed already.
  */
 async function seed(tag: string) {
   const school = one(
@@ -171,6 +175,23 @@ async function seed(tag: string) {
     eventId: newUuidV7(),
     option: 0,
   });
+  // The teacher's drafts for next week, naming both, one of them removed already.
+  for (const name of [`Ana ${tag}`, `Ben ${tag}`]) {
+    const drafted = await createSavedQuestion(db, {
+      teacherId: teacher.id,
+      eventId: newUuidV7(),
+      prompt: `Is ${name} back?`,
+      options: ['Yes', 'No'],
+    });
+    if (drafted.outcome !== 'created') throw new Error('seed: draft');
+    if (name.startsWith('Ben')) {
+      await removeSavedQuestion(db, {
+        savedQuestionId: drafted.savedQuestion.id,
+        eventId: newUuidV7(),
+        now: fromNow(-MIN),
+      });
+    }
+  }
   for (const student of [ana, ben]) {
     await registerPushToken(db, {
       userId: student.id,
@@ -247,6 +268,11 @@ async function rowsOf(s: { school: { id: string }; teacher: { id: string } }) {
     armed: await db.select().from(armedTaps).where(eq(armedTaps.teacherId, s.teacher.id)),
     tokens: await db.select().from(deviceTokens).where(inArray(deviceTokens.userId, peopleIds)),
     ageChecks: await db.select().from(ageChecks).where(inArray(ageChecks.userId, peopleIds)),
+    drafts: await db
+      .select()
+      .from(savedQuestions)
+      .where(eq(savedQuestions.teacherId, s.teacher.id))
+      .orderBy(savedQuestions.createdAt, savedQuestions.id),
   };
 }
 
@@ -337,6 +363,12 @@ describe('disposeSchool (C6a)', () => {
     ]);
     expect(after.responses).toEqual(before.responses);
     expect(after.responses).toMatchObject([{ studentId: s.ana.id, option: 0 }]);
+    // The teacher's drafts are removed and lose their words; the one removed already keeps when.
+    const [live, dropped] = before.drafts;
+    expect(after.drafts).toEqual([
+      { ...live, prompt: '', options: ['', ''], removedAt: at },
+      { ...dropped, prompt: '', options: ['', ''] },
+    ]);
 
     // Nothing of any of it names a person any more.
     const text = JSON.stringify(after);
