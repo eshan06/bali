@@ -2,8 +2,8 @@ import { type BinaryLike, createHash, createHmac } from 'node:crypto';
 
 /*
  * AWS Signature Version 4 by Node's own crypto, no SDK (DECISIONS, 2026-10-09 and 2026-10-10): a
- * request signed in its headers (Cognito's admin calls, the deck bucket's read and delete), or in
- * its URL, a presigned one (the deck bucket's PUT and GET).
+ * request signed in its headers (Cognito's admin calls, the deck bucket's delete), or in its URL, a
+ * presigned one (the deck bucket's PUT, and its GET, the API's own read's too).
  */
 
 const hmac = (key: BinaryLike, data: string) => createHmac('sha256', key).update(data).digest();
