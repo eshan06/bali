@@ -858,7 +858,7 @@ async function ownerOfEventId(
   return { kind: 'own', row: owner };
 }
 
-/** Is this `event_id` already on record: in `events`, or held by an answer? */
+/** Is this `event_id` already on record in `events`? */
 async function idIsSpent(tx: Database, eventId: string): Promise<boolean> {
   return (
     firstOrUndefined(
@@ -867,7 +867,7 @@ async function idIsSpent(tx: Database, eventId: string): Promise<boolean> {
         .from(events)
         .where(eq(events.eventId, eventId))
         .limit(1),
-    ) !== undefined || (await answerHolds(tx, eventId))
+    ) !== undefined
   );
 }
 
@@ -3508,6 +3508,8 @@ export function answerQuestion(db: Database, input: AnswerInput): Promise<Answer
       if (held?.questionId === question.id && held.studentId === input.studentId) {
         return { outcome: 'replay', response: held };
       }
+      // `responses` is read once, above: a duplicate of this answer committed since meets its row
+      // at the upsert below, which answers it as the replay, never as a conflict.
       if (held || (await idIsSpent(tx, input.eventId))) {
         throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
       }
