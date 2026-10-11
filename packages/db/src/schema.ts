@@ -526,3 +526,30 @@ export const responses = pgTable(
     index('responses_student_idx').on(t.studentId),
   ],
 );
+
+/*
+ * A teacher's saved questions (Phase 7; "Live lesson", decision 12): drafts written ahead of class,
+ * kept outside any session and never shown to a student; asking one opens a question with a copy of
+ * its text. Written only by the transition engine.
+ */
+export const savedQuestions = pgTable(
+  'saved_questions',
+  {
+    id: id(),
+    teacherId: uuid('teacher_id')
+      .notNull()
+      .references(() => users.id),
+    prompt: text('prompt').notNull(),
+    /** The options' texts, 2–6, as a question's. */
+    options: jsonb('options').$type<string[]>().notNull(),
+    correctOption: integer('correct_option'),
+    /** The idempotency key of the teacher's write that last wrote it: an earlier one's is not kept. */
+    eventId: uuid('event_id').notNull().unique(),
+    createdAt: createdAt(),
+    /** When the teacher last wrote it: its create, its last replace, or its removal. */
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    removedAt: removedAt(),
+  },
+  // A teacher's drafts: their list, their deletion's, a disposal's and a retention run's.
+  (t) => [index('saved_questions_teacher_idx').on(t.teacherId)],
+);

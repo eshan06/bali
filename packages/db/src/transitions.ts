@@ -36,6 +36,7 @@ import {
   type SQL,
   sql,
 } from 'drizzle-orm';
+import { unionAll } from 'drizzle-orm/pg-core';
 
 import { type CognitoSignIn, queueCognitoDeletion } from './cognito-deletions.js';
 import { newUuidV7 } from './ids.js';
@@ -51,6 +52,7 @@ import {
   participations,
   questions,
   responses,
+  savedQuestions,
   schools,
   sessions,
   teacherInvites,
@@ -228,11 +230,11 @@ async function insertEvent(
     deviceTime?: Date;
   },
 ): Promise<boolean> {
-  // An answer's id is spent too (Live lesson, settled 2026-10-10), though only `responses` holds
-  // it: an answer writes no event. Refused before the insert, as the reuse below is after it, so a
-  // caller that catches the refusal (`convertArmedTaps`) has written nothing under the id.
-  if (await answerHolds(tx, e.eventId)) {
-    throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by an answer');
+  // An answer's id and a saved question's are spent too (Live lesson, settled 2026-10-10), though
+  // neither writes an event. Refused before the insert, as the reuse below is after it, so a caller
+  // that catches the refusal (`convertArmedTaps`) has written nothing under the id.
+  if (await idHeldBy(tx, e.eventId, responses, savedQuestions)) {
+    throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by an answer or a draft');
   }
   const ahead = e.deviceTime ? clockAheadSeconds(e.deviceTime, heardNow()) : null;
   const payload =
@@ -872,13 +874,23 @@ async function idIsSpent(tx: Database, eventId: string): Promise<boolean> {
   );
 }
 
-/** Is this `event_id` held by an answer? It writes no event, so only `responses` holds its id. */
-async function answerHolds(tx: Database, eventId: string): Promise<boolean> {
-  const held = await tx
-    .select({ id: responses.id })
-    .from(responses)
-    .where(eq(responses.eventId, eventId))
-    .limit(1);
+/** A table whose rows hold a mutation's `event_id`: an event, an answer, a saved question. */
+type HoldsEventIds = typeof events | typeof responses | typeof savedQuestions;
+
+/**
+ * Is this `event_id` held by a row of any of `holders`? An id is spent across all three (Live
+ * lesson, settled 2026-10-10), though an answer and a saved question write no event, so only their
+ * own rows hold theirs. One statement however many are read: a tap pays one read for both.
+ */
+async function idHeldBy(
+  tx: Database,
+  eventId: string,
+  ...holders: [HoldsEventIds, HoldsEventIds, ...HoldsEventIds[]]
+): Promise<boolean> {
+  const read = (table: HoldsEventIds) =>
+    tx.select({ eventId: table.eventId }).from(table).where(eq(table.eventId, eventId));
+  const [first, second, ...rest] = holders;
+  const held = await unionAll(read(first), read(second), ...rest.map(read)).limit(1);
   return held.length > 0;
 }
 
@@ -1130,9 +1142,12 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
       }
       return { outcome: 'replay' };
     }
-    // An answer's id likewise: never this phone's tap (Live lesson, settled 2026-10-10).
-    if (await answerHolds(tx, input.eventId)) {
-      throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by an answer');
+    // An answer's id or a saved question's likewise: never this phone's tap (settled 2026-10-10).
+    if (await idHeldBy(tx, input.eventId, responses, savedQuestions)) {
+      throw new TransitionError(
+        'EVENT_ID_CONFLICT',
+        'event_id already used by an answer or a draft',
+      );
     }
 
     // Same rule, one table over: a row in `armed_taps` under this id is this
@@ -3513,8 +3528,9 @@ export type AnswerResult =
  * begins with the phone's time — so a slow first answer never undoes the second: an older one
  * changes nothing and, while the question is open, is answered with the answer now. A replay is
  * answered so past the close too.
- * The eventId is matched alone: one any other response or any event holds is EVENT_ID_CONFLICT,
- * nothing recorded (decision 6). One reaching an account deleted on its way is ACCOUNT_DELETED.
+ * The eventId is matched alone: one any other response, any event or a saved question holds is
+ * EVENT_ID_CONFLICT, nothing recorded (decision 6). One reaching an account deleted on its way is
+ * ACCOUNT_DELETED.
  */
 export function answerQuestion(db: Database, input: AnswerInput): Promise<AnswerResult> {
   return onceMoreOnUnique(() =>
@@ -3539,7 +3555,7 @@ export function answerQuestion(db: Database, input: AnswerInput): Promise<Answer
       // `responses` is read once, above: a duplicate of this answer committed since meets its row
       // at the upsert below, or trips its `event_id` and is run again, so the read above finds it:
       // the replay either way, never a conflict.
-      if (held || (await idIsSpent(tx, input.eventId))) {
+      if (held || (await idHeldBy(tx, input.eventId, events, savedQuestions))) {
         throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
       }
       // Refused as a tap is, never kept as an unlock is: an answer is no must-never-lose record.
@@ -3576,6 +3592,172 @@ export function answerQuestion(db: Database, input: AnswerInput): Promise<Answer
         );
       return { outcome: 'replay', response: kept! };
     }),
+  );
+}
+
+/*
+ * A teacher's saved questions (Phase 7; "Live lesson", decision 12): drafts written ahead of class,
+ * outside any session, never shown to a student. Each write is idempotent on the draft's `event_id`,
+ * the id of the teacher's write that last wrote it: a replay writes nothing and answers the draft
+ * now, and an id a later write replaced is no longer kept, as a replaced answer's is not. A replace
+ * and a removal lock the draft's row alone: no session, no class.
+ */
+
+export type SavedQuestionRow = typeof savedQuestions.$inferSelect;
+
+/** A draft's words, which the route checks as an open's (decision 3). */
+export interface SavedQuestionText {
+  prompt: string;
+  options: string[];
+  correctOption?: number | null;
+}
+
+export type SavedQuestionResult =
+  /** Written by this call; 'replay' wrote nothing, and carries the draft now. */
+  | { outcome: 'created' | 'replaced' | 'removed' | 'replay'; savedQuestion: SavedQuestionRow }
+  | { outcome: 'saved_question_not_found' };
+
+/** Whether a draft holds exactly these words: a write of them, under the id it holds, is its replay. */
+const holdsWords = (draft: SavedQuestionRow, text: SavedQuestionText) =>
+  draft.prompt === text.prompt &&
+  JSON.stringify(draft.options) === JSON.stringify(text.options) &&
+  draft.correctOption === (text.correctOption ?? null);
+
+export interface CreateSavedQuestionInput extends SavedQuestionText {
+  /** A teacher, as the route checks. */
+  teacherId: string;
+  /** The create's idempotency key (rule 4): the draft's `event_id` until the teacher writes it again. */
+  eventId: string;
+  /** The server's clock; now by default. */
+  now?: Date;
+}
+
+/**
+ * A teacher writes a draft. Its replay, the eventId a live draft of theirs holds with these words,
+ * answers that draft now; any other holder of the id, a draft, an event or an answer, is
+ * EVENT_ID_CONFLICT. The teacher's row is held FOR SHARE first, as a class's create holds it: their
+ * account's deletion, a disposal or a retention run holding it (NO KEY UPDATE) runs wholly before
+ * this, which then refuses ACCOUNT_DELETED, or after it, which then finds the draft (C3, C6a, C6b).
+ */
+export function createSavedQuestion(
+  db: Database,
+  input: CreateSavedQuestionInput,
+): Promise<SavedQuestionResult> {
+  return onceMoreOnUnique(() =>
+    db.transaction(async (tx): Promise<SavedQuestionResult> => {
+      const [teacher] = await tx
+        .select({ removedAt: users.removedAt })
+        .from(users)
+        .where(eq(users.id, input.teacherId))
+        .for('share');
+      // Read once: a duplicate of this create committed since trips `event_id` at the insert and is
+      // run again, which then finds it here, the replay, never a conflict.
+      const [held] = await tx
+        .select()
+        .from(savedQuestions)
+        .where(eq(savedQuestions.eventId, input.eventId));
+      if (
+        held?.teacherId === input.teacherId &&
+        held.removedAt === null &&
+        holdsWords(held, input)
+      ) {
+        return { outcome: 'replay', savedQuestion: held };
+      }
+      if (held || (await idHeldBy(tx, input.eventId, events, responses))) {
+        throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
+      }
+      if (teacher?.removedAt) throw accountDeleted();
+      const now = input.now ?? new Date();
+      const [created] = await tx
+        .insert(savedQuestions)
+        .values({
+          teacherId: input.teacherId,
+          prompt: input.prompt,
+          options: input.options,
+          correctOption: input.correctOption ?? null,
+          eventId: input.eventId,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .returning();
+      return { outcome: 'created', savedQuestion: created! };
+    }),
+  );
+}
+
+export interface WriteSavedQuestionInput {
+  /** The caller's own draft, as the route checks. */
+  savedQuestionId: string;
+  /** This write's idempotency key (rule 4): the draft's `event_id` from now on. */
+  eventId: string;
+  /** The server's clock; now by default. */
+  now?: Date;
+}
+
+/**
+ * Write the draft `savedQuestionId` under `eventId`, holding its row alone, so two writes to it run
+ * one at a time and a duplicate finds its own. The id the draft holds is this write's replay when
+ * `replays` says the draft is as this write left it, else another write's: EVENT_ID_CONFLICT. A
+ * draft removed, or none, is `saved_question_not_found`; an id another draft, an event or an answer
+ * holds is EVENT_ID_CONFLICT.
+ */
+function writeSavedQuestion(
+  db: Database,
+  input: WriteSavedQuestionInput,
+  write: {
+    outcome: 'replaced' | 'removed';
+    set: Pick<Partial<SavedQuestionRow>, 'prompt' | 'options' | 'correctOption' | 'removedAt'>;
+    replays: (draft: SavedQuestionRow) => boolean;
+  },
+): Promise<SavedQuestionResult> {
+  return onceMoreOnUnique(() =>
+    db.transaction(async (tx): Promise<SavedQuestionResult> => {
+      const [draft] = await tx
+        .select()
+        .from(savedQuestions)
+        .where(eq(savedQuestions.id, input.savedQuestionId))
+        .for('update');
+      if (draft?.eventId === input.eventId) {
+        if (write.replays(draft)) return { outcome: 'replay', savedQuestion: draft };
+        throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
+      }
+      if (!draft || draft.removedAt) return { outcome: 'saved_question_not_found' };
+      if (await idHeldBy(tx, input.eventId, savedQuestions, events, responses)) {
+        throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
+      }
+      const [written] = await tx
+        .update(savedQuestions)
+        .set({ ...write.set, eventId: input.eventId, updatedAt: input.now ?? new Date() })
+        .where(eq(savedQuestions.id, draft.id))
+        .returning();
+      return { outcome: write.outcome, savedQuestion: written! };
+    }),
+  );
+}
+
+/** The teacher replaces a draft's words whole (decision 12). */
+export function replaceSavedQuestion(
+  db: Database,
+  input: WriteSavedQuestionInput & SavedQuestionText,
+): Promise<SavedQuestionResult> {
+  const { prompt, options, correctOption = null } = input;
+  return writeSavedQuestion(db, input, {
+    outcome: 'replaced',
+    set: { prompt, options, correctOption },
+    replays: (draft) => draft.removedAt === null && holdsWords(draft, input),
+  });
+}
+
+/** The teacher removes a draft: marked removed, its words kept (data-model decision 3). */
+export function removeSavedQuestion(
+  db: Database,
+  input: WriteSavedQuestionInput,
+): Promise<SavedQuestionResult> {
+  const now = input.now ?? new Date();
+  return writeSavedQuestion(
+    db,
+    { ...input, now },
+    { outcome: 'removed', set: { removedAt: now }, replays: (draft) => draft.removedAt !== null },
   );
 }
 
@@ -4032,7 +4214,8 @@ export interface DeleteAccountResult {
  * name and its Cognito subject and is marked removed; each rename it made
  * loses the names it carried (the one rewrite of `events` the database allows,
  * migration 0015); its phones' device tokens (N4) and its 13+ yes (C7-server)
- * are deleted; its Cognito sign-in is queued for the API to delete (2026-10-09);
+ * are deleted; a teacher's drafts are removed, their words emptied; its Cognito sign-in is queued
+ * for the API to delete (2026-10-09);
  * and `account_deleted` is recorded under `eventId`, with no payload. Its other events and its
  * answers stay, so each class's reports and totals count as before, under a row that names no one.
  * A deleted teacher's questions keep their words, as their removed classes keep their names.
@@ -4123,6 +4306,9 @@ export async function deleteAccount(
       await tx.delete(deviceTokens).where(eq(deviceTokens.userId, me.id));
       // Its 13+ yes (C7-server), likewise: a yes behind this finds the account deleted.
       await tx.delete(ageChecks).where(eq(ageChecks.userId, me.id));
+      // A teacher's drafts (Live lesson, decision 12), their words with them: a create behind this
+      // finds the account deleted.
+      await removeDrafts(tx, eq(savedQuestions.teacherId, me.id), input.at);
       // Its Cognito sign-in (2026-10-09): queued with the deletion, so it goes even when the
       // phone's own DeleteUser never lands; the API deletes it from the pool after the commit.
       if (input.signIn) await queueCognitoDeletion(tx, input.signIn, input.at);
@@ -4177,6 +4363,7 @@ export const SCHOOL_DISPOSAL_COVERAGE = {
   'questions.created_by':
     'kept with its lesson, under its teacher de-identified; its prompt and option texts emptied, the option count kept',
   'responses.student_id': 'kept, under a person de-identified',
+  'saved_questions.teacher_id': "its teachers' drafts: removed, their words emptied",
 } as const;
 
 export interface DisposeSchoolInput {
@@ -4243,7 +4430,8 @@ class RetentionPreview extends Error {
  * anyone enrolled in, present in or recorded in one of its classes — is
  * de-identified as an account deletion leaves one (C3: no name, no Cognito
  * subject, removed; a rename's names emptied); its enrollments end; its classes
- * are removed and lose their names, its lessons' questions their words; its teachers' blocks are removed; the taps
+ * are removed and lose their names, its lessons' questions their words; its teachers' blocks are removed, and
+ * their drafts with their words emptied; the taps
  * waiting on them and its people's are deleted, as are its people's device
  * tokens (N4), their 13+ yes (C7-server) and its open invites; the
  * school is marked removed; and `school_disposed` records it with the school's
@@ -4383,6 +4571,7 @@ async function disposeOnce(tx: Database, input: DisposeSchoolInput): Promise<Dis
     : [];
   if (peopleIds.length) {
     await tx.delete(deviceTokens).where(inArray(deviceTokens.userId, peopleIds));
+    await removeDrafts(tx, inArray(savedQuestions.teacherId, peopleIds), input.at);
   }
   const removedBlocks = peopleIds.length
     ? await tx
@@ -4457,6 +4646,10 @@ async function deIdentify(tx: Database, ids: string[], at: Date): Promise<void> 
     );
 }
 
+/** Options emptied: as many empty strings as there were. */
+const emptied = (options: typeof questions.options | typeof savedQuestions.options) =>
+  sql`to_jsonb(array_fill(''::text, array[jsonb_array_length(${options})]))`;
+
 /**
  * The words of the questions `where` picks emptied, as a class's name is: a prompt can name a
  * person (Live lesson, decision 4). Each keeps its count of options, so every answer still names
@@ -4465,9 +4658,21 @@ async function deIdentify(tx: Database, ids: string[], at: Date): Promise<void> 
 async function emptyQuestions(tx: Database, where: SQL): Promise<void> {
   await tx
     .update(questions)
+    .set({ prompt: '', options: emptied(questions.options) })
+    .where(where);
+}
+
+/**
+ * The drafts `where` picks removed and their words emptied, as a question's are (Live lesson,
+ * decision 12): a prompt can name a person. One the teacher removed already keeps its time.
+ */
+async function removeDrafts(tx: Database, where: SQL, at: Date): Promise<void> {
+  await tx
+    .update(savedQuestions)
     .set({
       prompt: '',
-      options: sql`to_jsonb(array_fill(''::text, array[jsonb_array_length(${questions.options})]))`,
+      options: emptied(savedQuestions.options),
+      removedAt: sql`coalesce(${savedQuestions.removedAt}, ${at.toISOString()}::timestamptz)`,
     })
     .where(where);
 }
@@ -4595,6 +4800,8 @@ export const RETENTION_COVERAGE = {
     'kept with its lesson; a teacher it de-identifies loses their prompts and option texts, the option count kept',
   'responses.student_id':
     'kept, under a person it de-identifies; one answered after the year keeps its student named and continuing',
+  'saved_questions.teacher_id':
+    'a teacher it de-identifies: their drafts removed, their words emptied; one written after the year keeps them named',
 } as const;
 
 export interface ApplyRetentionInput {
@@ -4661,12 +4868,12 @@ export function yearOverAt(day: string): Date {
  * one (C3): no name, no Cognito subject, removed, a rename's names emptied;
  * each live enrollment ended as a removal ends it; their pre-bell taps and
  * their phones' device tokens (N4) and their 13+ yes (C7-server) deleted; a de-identified teacher's removed classes lose their names,
- * and their questions their words. Their lessons, participations, events and answers stay, so every
- * count still adds up.
+ * their questions their words, and their drafts are removed with theirs. Their lessons,
+ * participations, events and answers stay, so every count still adds up.
  *
  * Kept named, and reported by id (`continuing`): an account with a record
  * after the year's last day (an event, a lesson, a pre-bell tap of theirs or
- * on them, an invite redeemed, a class joined, an answer, a class or block made, the account itself made), with records at another school, or a
+ * on them, an invite redeemed, a class joined, an answer, a draft written, a class or block made, the account itself made), with records at another school, or a
  * teacher with a live class or block (as C3 refuses one). Splitting an
  * account's years would mean rewriting `events.user_id`; not built.
  *
@@ -4783,6 +4990,7 @@ async function retainOnce(tx: Database, input: ApplyRetentionInput): Promise<App
       .set({ name: '' })
       .where(and(inArray(classes.teacherId, teacherIds), isNotNull(classes.removedAt)));
     await emptyQuestions(tx, inArray(questions.createdBy, teacherIds));
+    await removeDrafts(tx, inArray(savedQuestions.teacherId, teacherIds), input.at);
   }
   await deIdentify(tx, goneIds, input.at);
 
@@ -4826,8 +5034,8 @@ async function retainOnce(tx: Database, input: ApplyRetentionInput): Promise<App
  * Those of `ids` with a record from `since` on: the account made, an event of
  * theirs, a participation in a lesson not over by then, a pre-bell tap (theirs,
  * or on them), an invite redeemed, a class joined, an answer, or, as
- * a teacher, a class or block still live or made since, or a lesson of a class
- * of theirs not over by then.
+ * a teacher, a draft written, a class or block still live or made since, or a
+ * lesson of a class of theirs not over by then.
  */
 async function activeSince(tx: Database, ids: string[], since: Date): Promise<string[]> {
   if (ids.length === 0) return [];
@@ -4872,6 +5080,11 @@ async function activeSince(tx: Database, ids: string[], since: Date): Promise<st
       .selectDistinct({ id: responses.studentId })
       .from(responses)
       .where(and(inArray(responses.studentId, ids), gte(responses.answeredAt, since)))),
+    // Nor is a draft: a teacher writing next year's questions, with no class yet.
+    ...(await tx
+      .selectDistinct({ id: savedQuestions.teacherId })
+      .from(savedQuestions)
+      .where(and(inArray(savedQuestions.teacherId, ids), gte(savedQuestions.updatedAt, since)))),
     ...(await tx
       .selectDistinct({ id: classes.teacherId })
       .from(classes)

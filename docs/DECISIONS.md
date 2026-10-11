@@ -8,6 +8,30 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-11** — **A teacher's saved questions in the database and the engine (L3b1); the routes
+  are L3b2.** L3b whole is about 650 changed lines, so it ships as the split decided in advance: the
+  table, the engine's writes and the privacy paths here, the four routes next. **The account
+  deletion's "removes their drafts" (decision 12) is read as the disposal and the retention run do
+  it:** removed, their words emptied, one rule for all three (`removeDrafts`). No one reads a deleted
+  teacher's drafts, and the retention run skips an account already deleted, so words kept at C3 would
+  stay until a disposal (#313's gap); a teacher's asked questions stay #313's. **A draft written after
+  the year's end is a record after the year**, so the retention run keeps its teacher named, as a
+  class, a block, a redeem or an answer since does: a teacher writing next year's questions with no
+  class yet is not de-identified with them. *Weighed:* drafts as no record (decision 12's words
+  alone). The create holds the teacher's row FOR SHARE, as a class's create does, so the deletion, a
+  disposal and a run each meet it wholly before or after; a replace or a removal locks the draft's
+  row alone (decision 12), so one landing inside a run that already read the teacher's drafts is
+  emptied with them. **A replay is the same write again:** the id a draft holds answers as a replay
+  only while the draft is as that write left it (a create: a live draft of the caller's with its
+  words; a replace: the draft live with its words; a removal: the draft removed), else it is another
+  write's, `EVENT_ID_CONFLICT`, as an event reused for another type is. A draft keeps only its last
+  write's id, as an answer does, so a create's retry landing after the draft was replaced or removed
+  writes a new draft: the portal resends a save only while it is that draft's newest write (L7b).
+  **`event_id` both ways in one statement:** `idHeldBy` reads in one `UNION ALL` the holders a writer
+  does not read itself, so a tap's `insertEvent` still pays one read for answers and drafts together.
+  The writers beside the engine (the 13+ yes, push tokens, an invite's redeem) check their own table
+  alone, as L1 left them.
+
 - **2026-10-11** — **A live lesson's answers and questions in the privacy paths (L2).** Answers
   are education records: the account deletion (C3), the disposal (C6a) and the retention run
   (C6b) keep each under the account they de-identify, so the totals stay and name no one. **An
