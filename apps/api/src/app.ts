@@ -24,6 +24,7 @@ import { registerHistoryRoute } from './routes/history.js';
 import { registerInternalRoutes } from './routes/internal.js';
 import { registerMeRoute } from './routes/me.js';
 import { registerPushTokenRoutes } from './routes/push-token.js';
+import { registerQuestionsRoutes } from './routes/questions.js';
 import { registerReportsRoutes } from './routes/reports.js';
 import { registerSessionsRoute } from './routes/sessions.js';
 import { registerTapsRoute } from './routes/taps.js';
@@ -172,7 +173,8 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
   registerClassesRoutes(app, deps.db);
   registerReportsRoutes(app, deps.db, clock);
   registerBlocksRoutes(app, deps.db);
-  registerFeedRoutes(app, deps.db, deps.stream);
+  registerQuestionsRoutes(app, deps.db, clock);
+  registerFeedRoutes(app, deps.db, clock, deps.stream);
   registerInternalRoutes(app, env.INTERNAL_API_KEY);
 
   return app;

@@ -121,8 +121,10 @@ const EXPECTED: Record<
  * The reasons no engine refusal maps to: DELETE /v1/enrollments/{id}'s two
  * 403s, which that route raises itself (A6; pinned in enrollments.test.ts),
  * the 400s of the history and of a rename (A8; pinned in history.test.ts
- * and me.test.ts), and a teacher invite's refusals (T1b; pinned in
- * teacher-invites.test.ts).
+ * and me.test.ts), a teacher invite's refusals (T1b; pinned in
+ * teacher-invites.test.ts), and a live lesson's question's, which the engine
+ * answers as outcomes for the routes to map (L3, pinned in questions.test.ts;
+ * the answer's two with L4).
  */
 const ROUTE_REASONS: ApiErrorReason[] = [
   'unknown_user',
@@ -136,6 +138,9 @@ const ROUTE_REASONS: ApiErrorReason[] = [
   'invite_expired',
   'already_teacher',
   'student_in_class',
+  'question_not_found',
+  'question_closed',
+  'invalid_option',
 ];
 
 /** What `mapTransitionError` turns an engine refusal with `code` into. */

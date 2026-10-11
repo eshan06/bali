@@ -20,6 +20,7 @@ import {
   enrollments,
   events,
   participations,
+  questions,
   sessions,
   users,
 } from './schema.js';
@@ -234,6 +235,33 @@ export async function previewJoinCode(
         .limit(1)
     ).length > 0;
   return { ...found, alreadyEnrolled: enrolled };
+}
+
+/**
+ * A live lesson's question (Phase 7, L3) with its session, and its class's teacher — null when the
+ * class is removed — so a route can authorize the class's own teacher.
+ */
+export async function findQuestion(db: Database, questionId: string) {
+  return first(
+    await db
+      .select({ question: questions, session: sessions, teacherId: classes.teacherId })
+      .from(questions)
+      .innerJoin(sessions, eq(sessions.id, questions.sessionId))
+      .leftJoin(classes, and(eq(classes.id, sessions.classId), isNull(classes.removedAt)))
+      .where(eq(questions.id, questionId))
+      .limit(1),
+  );
+}
+
+/** A session's question not yet closed, if any: whether it is open now is `questionOpen`'s to say. */
+export async function findUnclosedQuestion(db: Database, sessionId: string) {
+  return first(
+    await db
+      .select()
+      .from(questions)
+      .where(and(eq(questions.sessionId, sessionId), isNull(questions.closedAt)))
+      .limit(1),
+  );
 }
 
 /** A session by id (any state), so the lifecycle routes can authorize the teacher. */

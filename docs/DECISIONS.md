@@ -8,6 +8,23 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-11** — **A live lesson's question, the teacher's open and close (L3a): what "plain text"
+  refuses, and "open" by the server's clock.** Decision 3's "plain text" is checked at the boundary
+  as a display name is (A8), since the engine stores what it is given and the words reach every
+  student's screen and the projector: trimmed, something visible, nothing `UNPRINTABLE` (control and
+  format characters, so no bidi override turns an option around), counted in code points as the name
+  is, so an emoji is one character. **Line breaks only in the prompt:** the approved Ask design gives
+  the prompt a textarea and each option a one-line field. A tab is refused, not made a space, so the
+  teacher sees exactly what is stored. **`eventId` a UUIDv7 here** (`z.uuidv7()`), the house rule
+  for every mutation, though older routes accept any UUID: every client mints v7 already. **Open is
+  one rule,** `questionOpen` beside `sessionRunning`: never closed, and the session running by the
+  server's clock; the engine's close and answer use it, and so does every answer of the API. The
+  engine's open and close now return the question's own session as their transaction read it, so the
+  answer judges by the same view the transition did, and an open's retry sent under another session's
+  URL (a client bug, answered with the caller's own question as decision 5 says) is judged by the
+  session it is in. The boot snapshot carries a question only while it is open by that clock, so
+  none past the bell: the portal never shows an Ask's results as live after the phones let go.
+
 - **2026-10-10** — **The deck storage interface (M1): S3 by presigned URLs, signed by hand, and an
   in-memory stand-in.** `DeckStorage` (`apps/api/src/deck-storage.ts`) is what M2–M4 need and
   nothing more: a presigned PUT, a presigned GET, the API's own read, a delete. **Signed by Node's

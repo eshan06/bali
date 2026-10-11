@@ -26,6 +26,7 @@ import {
   expireDueSessions,
   extendSession,
   openQuestion,
+  questionOpen,
   refocus,
   renameStudent,
   startSession,
@@ -184,7 +185,7 @@ describe('opening a question', () => {
     const eventId = newUuidV7();
     const opened = await ask(5, { eventId });
 
-    expect(await ask(6, { eventId })).toEqual({ outcome: 'replay', question: opened.question });
+    expect(await ask(6, { eventId })).toEqual({ ...opened, outcome: 'replay' });
     await endSession(db, { sessionId: session.id, at: at(10), reason: 'ended' });
     expect(await ask(11, { eventId })).toMatchObject({
       outcome: 'replay',
@@ -286,6 +287,38 @@ describe('closing a question', () => {
     ).toMatchObject({ outcome: 'closed', question: { revealed: false, correctOption: null } });
   });
 
+  it('judges a retry sent under another session’s URL by its own session (L3)', async () => {
+    const { session, school, teacher, ask } = await lesson('q-replay-elsewhere');
+    const eventId = newUuidV7();
+    const opened = await ask(5, { eventId });
+    const [klass] = await db
+      .insert(classes)
+      .values({ teacherId: teacher.id, schoolId: school.id, name: 'b', joinCode: 'q-elsewhere-b' })
+      .returning();
+    const { session: elsewhere } = await startSession(db, {
+      classId: klass!.id,
+      startedAt: at(0),
+      endsAt: at(40),
+    });
+
+    const retry = await openQuestion(db, {
+      sessionId: elsewhere.id,
+      teacherId: teacher.id,
+      eventId,
+      prompt: 'Which?',
+      options: ['a', 'b'],
+      now: at(30),
+    });
+
+    expect(retry).toMatchObject({
+      outcome: 'replay',
+      question: { id: opened.question.id },
+      session: { id: session.id },
+    });
+    // Its own session is past its bell, though the one the URL names runs on.
+    expect(questionOpen(retry.question, retry.session, at(30))).toBe(false);
+  });
+
   it('answers a replay, or a close of one already closed, with the question now, recording nothing', async () => {
     const { session, ask } = await lesson('q-close-replay');
     const { question } = await ask(5);
@@ -295,7 +328,7 @@ describe('closing a question', () => {
     const again = newUuidV7();
     expect(
       await closeQuestion(db, { questionId: question.id, eventId, reveal: true, now: at(10) }),
-    ).toEqual({ outcome: 'replay', question: (closed as { question: unknown }).question });
+    ).toEqual({ ...closed, outcome: 'replay' });
     expect(
       await closeQuestion(db, { questionId: question.id, eventId: again, now: at(11) }),
     ).toMatchObject({ outcome: 'replay', question: { closedAt: at(9), revealed: false } });
