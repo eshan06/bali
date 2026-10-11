@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { getTableConfig, PgTable } from 'drizzle-orm/pg-core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -20,6 +20,8 @@ import {
   enrollments,
   events,
   participations,
+  questions,
+  responses,
   schools,
   sessions,
   teacherInvites,
@@ -28,10 +30,12 @@ import {
 import { mintTeacherInvite, recordAgreement, redeemTeacherInvite } from '../src/schools.js';
 import { makeTestDb } from '../src/testing.js';
 import {
+  answerQuestion,
   armTap,
   deletedCognitoId,
   disposeSchool,
   joinClassByCode,
+  openQuestion,
   renameStudent,
   SCHOOL_DISPOSAL_COVERAGE,
   startSession,
@@ -75,7 +79,8 @@ function one<T>(rows: T[]): T {
  * A school whose teacher came by an invite, with a block, a second invite still
  * open, two classes, Ana (renamed) and Ben in a lesson that is over, Ana's
  * unlock in it, and Ben's tap waiting for the teacher's next Start; both
- * students' phones registered for pushes, and both past the 13+ check.
+ * students' phones registered for pushes, and both past the 13+ check. In the
+ * running lesson, a question whose words name both students, answered by Ana.
  */
 async function seed(tag: string) {
   const school = one(
@@ -152,6 +157,20 @@ async function seed(tag: string) {
     deviceTime: new Date(),
     reason: 'nurse',
   });
+  const { question } = await openQuestion(db, {
+    sessionId: lesson.session.id,
+    teacherId: teacher.id,
+    eventId: newUuidV7(),
+    prompt: `Who helped Ben ${tag}?`,
+    options: [`Ana ${tag}`, `Ben ${tag}`, 'No one'],
+    correctOption: 0,
+  });
+  await answerQuestion(db, {
+    questionId: question.id,
+    studentId: ana.id,
+    eventId: newUuidV7(),
+    option: 0,
+  });
   for (const student of [ana, ben]) {
     await registerPushToken(db, {
       userId: student.id,
@@ -161,7 +180,18 @@ async function seed(tag: string) {
     });
     await recordAgeCheck(db, { userId: student.id, eventId: newUuidV7() });
   }
-  return { school, teacher, block, ana, ben, first, second, past: session, lesson: lesson.session };
+  return {
+    school,
+    teacher,
+    block,
+    ana,
+    ben,
+    first,
+    second,
+    past: session,
+    lesson: lesson.session,
+    question,
+  };
 }
 
 /** End a lesson the seed left running, by moving its bell into the past (the sweep's case). */
@@ -190,12 +220,23 @@ async function rowsOf(s: { school: { id: string }; teacher: { id: string } }) {
     .from(enrollments)
     .where(inArray(enrollments.classId, classIds));
   const peopleIds = [s.teacher.id, ...enrolled.map((e) => e.studentId)];
+  const lessons = await db.select().from(sessions).where(inArray(sessions.classId, classIds));
   return {
     school: await db.select().from(schools).where(eq(schools.id, s.school.id)),
     users: await db.select().from(users).where(inArray(users.id, peopleIds)),
     classes: classRows,
     enrollments: enrolled,
-    sessions: await db.select().from(sessions).where(inArray(sessions.classId, classIds)),
+    sessions: lessons,
+    questions: await db
+      .select()
+      .from(questions)
+      .where(
+        inArray(
+          questions.sessionId,
+          lessons.map((l) => l.id),
+        ),
+      ),
+    responses: await db.select().from(responses).where(inArray(responses.studentId, peopleIds)),
     participations: await db
       .select()
       .from(participations)
@@ -289,6 +330,13 @@ describe('disposeSchool (C6a)', () => {
     expect(after.events.find((e) => e.type === 'unlock')?.payload).toMatchObject({
       reason: 'nurse',
     });
+    // The lesson's question loses its words and keeps its count of options and its correct
+    // one; Ana's answer stays as it was, so the totals by option still add up.
+    expect(after.questions).toMatchObject([
+      { prompt: '', options: ['', '', ''], correctOption: 0 },
+    ]);
+    expect(after.responses).toEqual(before.responses);
+    expect(after.responses).toMatchObject([{ studentId: s.ana.id, option: 0 }]);
 
     // Nothing of any of it names a person any more.
     const text = JSON.stringify(after);
@@ -466,6 +514,28 @@ describe('disposeSchool (C6a)', () => {
     });
     expect(await rowsOf(s)).toEqual(before);
   });
+
+  it('empties the questions of a school with more lessons than one statement can bind', async () => {
+    const s = await seed('c6a-many');
+    await pastBell(s.lesson.id);
+    // More lessons than one statement binds (postgres.js refuses 65,534 parameters), made in one.
+    const lessons = 65_600;
+    await db.execute(sql`insert into ${sessions} (id, class_id, started_at, ends_at, ended_at)
+      select gen_random_uuid(), ${s.first.id}, now() - interval '2 days',
+        now() - interval '2 days', now() - interval '2 days'
+      from generate_series(1, ${lessons})`);
+
+    const done = await disposeSchool(db, {
+      schoolId: s.school.id,
+      at: new Date(),
+      confirmName: s.school.name,
+    });
+
+    expect(done).toMatchObject({ outcome: 'disposed', counts: { sessions: lessons + 2 } });
+    expect(
+      one(await db.select().from(questions).where(eq(questions.id, s.question.id))),
+    ).toMatchObject({ prompt: '', options: ['', '', ''] });
+  }, 120_000);
 
   it('a student the school already deleted (C3) is counted out, and nothing of theirs moves', async () => {
     const s = await seed('c6a-deleted');

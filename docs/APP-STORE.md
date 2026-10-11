@@ -176,7 +176,7 @@ Notes for the owner:
 ### App Privacy ("nutrition label")
 
 Read from the code and the data model as of 2026-10-04; the push token added 2026-10-06 (N6), the
-13+ yes 2026-10-08 (C7-server). Purpose for every row: **App
+13+ yes 2026-10-08 (C7-server), a live lesson's answers 2026-10-11 (L2). Purpose for every row: **App
 Functionality**. Nothing is used for **Analytics**, **Product Personalization**,
 **Developer's Advertising**, **Third-Party Advertising** or **Other Purposes**. Every row
 is **linked to the user** (it sits in a row keyed by their account). **Tracking: No** for
@@ -189,7 +189,7 @@ every row.
 | Identifiers → **User ID** | Bali's user id and the Cognito user id (`users.id`, `users.cognito_id`) | Bali's database | |
 | Identifiers → **Device ID** | The install id: a random UUID the app mints for its outbox (`events.order_install`, `armed_taps.order_install`), used to order a phone's own records. A student's APNs device token, with its environment (`device_tokens`, N3), used only to send the "class started" alert | Bali's database | ⚖️ Not a hardware or advertising id; it is per install and resets on reinstall. Apple's "Device ID" covers "other device-level ID"; declaring it is the safe reading. Confirm. The push token rides this row: App Functionality, linked (stored with the student's account, deleted with it, in C5's export), not tracking; never logged, never sent to anyone but Apple's push service |
 | Usage Data → **Product Interaction** | Focus-state events: tap in, unlock, refocus, Screen Time off, going silent and coming back, leaving a class or session; the ~30 s check-in's last-seen time; device timestamps of each, clamped to the session by the server | Bali's database (`events`, `participations`, `armed_taps`) | The core of the product. Bali never collects which apps are used |
-| User Content → **Other User Content** | The unlock reason, when given: one of bathroom, nurse, other (`UNLOCK_REASONS`) | Bali's database (event payload) | ⚖️ A fixed choice, not free text. "Nurse" hints at a health visit: confirm it isn't **Health & Fitness → Health** data, and who should see it (Phase 6's open decision: who sees unlock reasons) |
+| User Content → **Other User Content** | The unlock reason, when given: one of bathroom, nurse, other (`UNLOCK_REASONS`). A live lesson's answers (Phase 7): the option the student picked for each class question, and when the server received it | Bali's database (event payload; `responses`) | ⚖️ A fixed choice, not free text. "Nurse" hints at a health visit: confirm it isn't **Health & Fitness → Health** data, and who should see it (Phase 6's open decision: who sees unlock reasons). Answers: education records, counted only in the class's totals (the teacher never sees whose); in C5's export; kept under the account, named by no one, when it is deleted or de-identified |
 | Other Data → **Other Data Types** | Class membership: which classes the student joined, with which teacher, when they left. And that the account confirmed it is 13 or older (C7-server, once the app's half sends it): never a birth date or an age, nothing under 13 | Bali's database (`enrollments`, `age_checks`) | ⚖️ Could equally ride under Product Interaction; listing it separately is the more open answer. ⚖️ The 13+ yes: Apple lists no age type, so it rides here; confirm, and that a self-declared "13 or older" is not **Sensitive Info** |
 
 **Not collected:** location, contacts, photos, browsing or search history, purchases,
@@ -201,11 +201,13 @@ data; ⚖️ confirm a server-side error report triggered by an app request is n
 
 **Checks before pasting:**
 - The in-app "What your teacher sees" list, this table and the privacy policy (C2) must
-  agree (#130). They do as of this draft.
+  agree (#130). They do as of this draft, but for a live lesson's answers: the list gains their
+  two lines with L8, and no build that can answer ships before it.
 - The app's privacy manifest (`ios/Bali/PrivacyInfo.xcprivacy`, C1) lists the same data
   types; CI fails when this table's types and the manifest's differ. The push token adds no type
   (it is a Device ID, already declared linked, App Functionality, not tracking), so the
-  manifest needs no change for it; nor does the 13+ yes (Other Data Types, already declared).
+  manifest needs no change for it; nor does the 13+ yes (Other Data Types, already declared),
+  nor do a live lesson's answers (Other User Content, already declared for the unlock reason).
 - If accounts stop being self-created (Phase 6's open decision on how accounts are made),
   the email row still stands: the school or Cognito still holds it on Bali's behalf.
 - Data kept after an account is deleted follows the owner's retention policy (ISSUES #5,

@@ -4224,7 +4224,7 @@ describe.runIf(REAL_PG)(
   },
 );
 
-describe.runIf(REAL_PG)('live lesson questions under contention (real Postgres, L1)', () => {
+describe.runIf(REAL_PG)('live lesson questions under contention (real Postgres, L1, L2)', () => {
   beforeAll(async () => {
     await Promise.all(Array.from({ length: 5 }, () => db.execute(sql`select 1`)));
   });
@@ -4511,5 +4511,110 @@ describe.runIf(REAL_PG)('live lesson questions under contention (real Postgres, 
     expect(settled.status).toBe('rejected');
     expect((settled as PromiseRejectedResult).reason).toMatchObject({ code: 'EVENT_ID_CONFLICT' });
     expect(await answersTo(question.id)).toMatchObject([{ studentId: other.id }]);
+  }, 20_000);
+
+  const userNow = async (id: string) => one(await db.select().from(users).where(eq(users.id, id)));
+
+  it('an answer behind a deletion is refused and records nothing; one ahead of it stays, under the account it de-identifies (L2)', async () => {
+    // Behind: the deletion holds the student's row (NO KEY UPDATE), so the answer's FOR SHARE
+    // waits, then reads it removed.
+    const behind = await asking('race-answer-delete-behind');
+    const deletion = await heldDeletion(behind.studentId);
+    const late = answerQuestion(db, {
+      questionId: behind.question.id,
+      studentId: behind.studentId,
+      eventId: newUuidV7(),
+      option: 1,
+    });
+    late.catch(() => undefined);
+    try {
+      await waitForBlockedBackend();
+    } finally {
+      deletion.release();
+      await deletion.committed;
+    }
+    await expect(late).rejects.toMatchObject({ code: 'ACCOUNT_DELETED' });
+    expect(await answersTo(behind.question.id)).toEqual([]);
+
+    // Ahead: the answer holds the row FOR SHARE until it commits, so the deletion waits, then
+    // leaves the answer where it is, under a row that names no one.
+    const ahead = await asking('race-answer-delete-ahead');
+    const answer = {
+      questionId: ahead.question.id,
+      studentId: ahead.studentId,
+      eventId: newUuidV7(),
+      option: 0,
+    };
+    const deleted = await behindCommit(
+      (tx) => answerQuestion(tx, answer),
+      () => deleteAccount(db, { userId: ahead.studentId, eventId: newUuidV7(), at: new Date() }),
+    );
+    if (deleted.status === 'rejected') throw deleted.reason as Error;
+    expect(deleted.value).toEqual({ outcome: 'deleted' });
+    expect(await answersTo(ahead.question.id)).toMatchObject([
+      { studentId: ahead.studentId, eventId: answer.eventId, option: 0 },
+    ]);
+    expect((await userNow(ahead.studentId)).cognitoId).toBe(`deleted:${ahead.studentId}`);
+  }, 20_000);
+
+  it('an answer after the year behind a retention run is refused; one ahead of it keeps its student named and in class (L2)', async () => {
+    /** A question asked now, its school's year over since yesterday: an answer is the one record since. */
+    async function yearOver(tag: string) {
+      const s = await asking(tag);
+      const { schoolId } = one(
+        await db
+          .select({ schoolId: classes.schoolId })
+          .from(classes)
+          .where(eq(classes.id, s.classId)),
+      );
+      const day = new Date(Date.now() - 86_400_000);
+      const two = (n: number) => String(n).padStart(2, '0');
+      await db
+        .update(schools)
+        .set({
+          schoolYearEndsOn: `${day.getFullYear()}-${two(day.getMonth() + 1)}-${two(day.getDate())}`,
+        })
+        .where(eq(schools.id, schoolId));
+      const old = new Date(Date.now() - 30 * 86_400_000);
+      await db.update(users).set({ createdAt: old }).where(eq(users.id, s.studentId));
+      await db
+        .update(enrollments)
+        .set({ createdAt: old })
+        .where(eq(enrollments.studentId, s.studentId));
+      return {
+        ...s,
+        retain: (on: Database) =>
+          applyRetention(on, { schoolId, at: new Date(), confirmName: `School ${tag}` }),
+        answer: (on: Database) =>
+          answerQuestion(on, {
+            questionId: s.question.id,
+            studentId: s.studentId,
+            eventId: newUuidV7(),
+            option: 1,
+          }),
+      };
+    }
+
+    // Behind: the run holds the student's row, de-identified with nothing since; the answer
+    // waits for it, then finds the account deleted, and records nothing.
+    const behind = await yearOver('race-answer-retain-behind');
+    const late = await behindCommit(behind.retain, () => behind.answer(db));
+    expect(late.status).toBe('rejected');
+    expect((late as PromiseRejectedResult).reason).toMatchObject({ code: 'ACCOUNT_DELETED' });
+    expect(await answersTo(behind.question.id)).toEqual([]);
+    expect((await userNow(behind.studentId)).removedAt).not.toBeNull();
+
+    // Ahead: the answer holds the row until it commits; the run waits for it, then reads the
+    // answer as a record after the year, and keeps its student named and in class.
+    const early = await yearOver('race-answer-retain-ahead');
+    const run = await behindCommit(early.answer, () => early.retain(db));
+    if (run.status === 'rejected') throw run.reason as Error;
+    if (run.value.outcome !== 'applied') throw new Error(run.value.outcome);
+    expect(run.value.continuing).toContain(early.studentId);
+    expect((await userNow(early.studentId)).removedAt).toBeNull();
+    expect(
+      one(await db.select().from(enrollments).where(eq(enrollments.studentId, early.studentId))),
+    ).toMatchObject({ removedAt: null });
+    expect(await answersTo(early.question.id)).toHaveLength(1);
   }, 20_000);
 });

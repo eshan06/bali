@@ -8,6 +8,36 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-11** — **A live lesson's answers and questions in the privacy paths (L2).** Answers
+  are education records: the account deletion (C3), the disposal (C6a) and the retention run
+  (C6b) keep each under the account they de-identify, so the totals stay and name no one. **An
+  answer on or after the year's end is a record after the year** (`answered_at`, the server's
+  clock), so the retention run keeps that student named and in class, as it keeps a later tap or
+  join: a student who answers but never taps in has no other record. **A question's words go
+  where a class name goes:** the disposal empties the prompt and option texts of every question
+  in the school's lessons, the retention run those of a teacher it de-identifies, each keeping
+  its count of options (an array of empty strings) and its correct option, so every answer still
+  names an option by its index. The disposal picks its lessons' questions by a subquery, never a
+  list of the lessons' ids, which a school outgrows: postgres.js refuses a statement of 65,534
+  parameters or more (santa's round-1 blocker on #311, fixed on the owner's ruling). The account deletion
+  leaves a question's words, as it leaves a deleted teacher's removed classes their names (found:
+  `deleteAccount` never touches `classes.name`); one decision for all of a teacher's words at
+  their own deletion, deck titles included, is #313, to make with M4.
+  **An answer takes its student's row FOR SHARE first, and one reaching a deleted account is
+  refused `ACCOUNT_DELETED`, nothing recorded**, as a tap, a join or the 13+ yes is: an answer is
+  no must-never-lose record (Live lesson, decision 5). The lock is for the retention run: it
+  reads `responses` before it ends an enrollment, and an answer reads the account, so without
+  a lock both could commit, the run de-identifying a student whose answer after the year it
+  never saw. The deletion, the disposal and the run each hold that row (NO KEY UPDATE) and take a
+  person before a lesson, so an answer taking the row before its session closes no cycle.
+  *Weighed:* a plain read of the account after the session's lock (the deletion's leave holds
+  that lesson, the run takes it only after it has judged); the student's tap lock (the disposal
+  takes none, and a Start holds it under a lesson's lock). **The privacy documents:** the app's
+  manifest already declares Other User Content (the unlock reason) as linked, App Functionality,
+  not tracking, so answers change it in nothing; `docs/APP-STORE.md`'s row names them. The
+  consent list's two lines stay L8's. Not added: a count of emptied questions in
+  `school_disposed` or `retention_applied`.
+
 - **2026-10-11** — **A live lesson's question, the teacher's open and close (L3a): what "plain text"
   refuses, and "open" by the server's clock.** Decision 3's "plain text" is checked at the boundary
   as a display name is (A8), since the engine stores what it is given and the words reach every

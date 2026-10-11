@@ -33,6 +33,7 @@ import {
   lte,
   ne,
   or,
+  type SQL,
   sql,
 } from 'drizzle-orm';
 
@@ -142,7 +143,7 @@ export class TransitionError extends Error {
   }
 }
 
-/** A join, rename or tap of an account deleted while it was on its way (C3). */
+/** A join, rename, tap or answer of an account deleted while it was on its way (C3). */
 const accountDeleted = () => new TransitionError('ACCOUNT_DELETED', 'this account was deleted');
 
 type SessionRow = typeof sessions.$inferSelect;
@@ -3280,8 +3281,8 @@ export async function checkIn(db: Database, input: CheckInInput): Promise<CheckI
  * A live lesson's questions (Phase 7; ARCHITECTURE, "Live lesson", decisions 2–5): one open per
  * session, asked and answered only while it runs by the server's clock. Locks go session row
  * first, then question row: an open takes the session FOR UPDATE, so opens run one at a time; an
- * answer takes both FOR SHARE; a close and the session's end take the question FOR UPDATE, so an
- * answer racing either counts before it or sees it closed.
+ * answer takes both FOR SHARE, after its student's row; a close and the session's end take the
+ * question FOR UPDATE, so an answer racing either counts before it or sees it closed.
  */
 
 export type QuestionRow = typeof questions.$inferSelect;
@@ -3513,11 +3514,21 @@ export type AnswerResult =
  * changes nothing and, while the question is open, is answered with the answer now. A replay is
  * answered so past the close too.
  * The eventId is matched alone: one any other response or any event holds is EVENT_ID_CONFLICT,
- * nothing recorded (decision 6).
+ * nothing recorded (decision 6). One reaching an account deleted on its way is ACCOUNT_DELETED.
  */
 export function answerQuestion(db: Database, input: AnswerInput): Promise<AnswerResult> {
   return onceMoreOnUnique(() =>
     db.transaction(async (tx): Promise<AnswerResult> => {
+      // The student's row first, FOR SHARE, as an arm holds it: a deletion, a disposal or a
+      // retention run holding it (NO KEY UPDATE, which the answer's foreign key never waits for)
+      // runs wholly before this, which then finds the account deleted, or after it, which then
+      // finds this answer, kept under the account it de-identifies or read as a record after the
+      // year (C3, C6a, C6b). Before the session, as each of them takes a person before a lesson.
+      const [student] = await tx
+        .select({ removedAt: users.removedAt })
+        .from(users)
+        .where(eq(users.id, input.studentId))
+        .for('share');
       const locked = await lockQuestion(tx, input.questionId, 'share');
       if (!locked) return { outcome: 'question_not_found' };
       const { session, question } = locked;
@@ -3531,6 +3542,8 @@ export function answerQuestion(db: Database, input: AnswerInput): Promise<Answer
       if (held || (await idIsSpent(tx, input.eventId))) {
         throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
       }
+      // Refused as a tap is, never kept as an unlock is: an answer is no must-never-lose record.
+      if (student?.removedAt) throw accountDeleted();
       const now = input.now ?? new Date();
       if (!questionOpen(question, session, now)) {
         return { outcome: 'question_closed' };
@@ -4020,8 +4033,9 @@ export interface DeleteAccountResult {
  * loses the names it carried (the one rewrite of `events` the database allows,
  * migration 0015); its phones' device tokens (N4) and its 13+ yes (C7-server)
  * are deleted; its Cognito sign-in is queued for the API to delete (2026-10-09);
- * and `account_deleted` is recorded under `eventId`, with no payload. Its other events stay, so each class's reports count as before,
- * under a row that names no one.
+ * and `account_deleted` is recorded under `eventId`, with no payload. Its other events and its
+ * answers stay, so each class's reports and totals count as before, under a row that names no one.
+ * A deleted teacher's questions keep their words, as their removed classes keep their names.
  *
  * A teacher with a live class or block is refused `TEACHER_HAS_CLASSES`:
  * their students' class would be left to no one, so that account goes
@@ -4160,7 +4174,8 @@ export const SCHOOL_DISPOSAL_COVERAGE = {
   'teacher_invites.redeemed_by': 'kept, its teacher de-identified',
   'device_tokens.user_id': 'deleted: the device tokens of its people (N4)',
   'age_checks.user_id': 'deleted: the 13+ yes of each person it de-identifies (C7-server)',
-  'questions.created_by': 'kept with its lesson, under its teacher de-identified',
+  'questions.created_by':
+    'kept with its lesson, under its teacher de-identified; its prompt and option texts emptied, the option count kept',
   'responses.student_id': 'kept, under a person de-identified',
 } as const;
 
@@ -4228,7 +4243,7 @@ class RetentionPreview extends Error {
  * anyone enrolled in, present in or recorded in one of its classes — is
  * de-identified as an account deletion leaves one (C3: no name, no Cognito
  * subject, removed; a rename's names emptied); its enrollments end; its classes
- * are removed and lose their names; its teachers' blocks are removed; the taps
+ * are removed and lose their names, its lessons' questions their words; its teachers' blocks are removed; the taps
  * waiting on them and its people's are deleted, as are its people's device
  * tokens (N4), their 13+ yes (C7-server) and its open invites; the
  * school is marked removed; and `school_disposed` records it with the school's
@@ -4354,6 +4369,12 @@ async function disposeOnce(tx: Database, input: DisposeSchoolInput): Promise<Dis
       .set({ removedAt: input.at })
       .where(and(inArray(classes.id, classIds), isNull(classes.removedAt)));
   }
+  // Its lessons by a subquery, never a list of their ids: they outgrow what one statement binds.
+  const ofSchool = tx
+    .select({ id: sessions.id })
+    .from(sessions)
+    .where(inArray(sessions.classId, classIds));
+  if (lessons.length) await emptyQuestions(tx, inArray(questions.sessionId, ofSchool));
   const armed = peopleIds.length
     ? await tx
         .delete(armedTaps)
@@ -4434,6 +4455,21 @@ async function deIdentify(tx: Database, ids: string[], at: Date): Promise<void> 
         isNotNull(events.payload),
       ),
     );
+}
+
+/**
+ * The words of the questions `where` picks emptied, as a class's name is: a prompt can name a
+ * person (Live lesson, decision 4). Each keeps its count of options, so every answer still names
+ * one by its index and the counts by option stay.
+ */
+async function emptyQuestions(tx: Database, where: SQL): Promise<void> {
+  await tx
+    .update(questions)
+    .set({
+      prompt: '',
+      options: sql`to_jsonb(array_fill(''::text, array[jsonb_array_length(${questions.options})]))`,
+    })
+    .where(where);
 }
 
 /** Ids, once each, sorted: one order to lock them in. */
@@ -4555,8 +4591,10 @@ export const RETENTION_COVERAGE = {
     'deleted: the device tokens of a person it de-identifies (N4); a continuing one keeps theirs',
   'age_checks.user_id':
     'deleted: the 13+ yes of a person it de-identifies (C7-server); a continuing one keeps theirs',
-  'questions.created_by': 'kept with its lesson, under a teacher it de-identifies',
-  'responses.student_id': 'kept, under a person it de-identifies',
+  'questions.created_by':
+    'kept with its lesson; a teacher it de-identifies loses their prompts and option texts, the option count kept',
+  'responses.student_id':
+    'kept, under a person it de-identifies; one answered after the year keeps its student named and continuing',
 } as const;
 
 export interface ApplyRetentionInput {
@@ -4622,12 +4660,13 @@ export function yearOverAt(day: string): Date {
  * whose records all lie in it is de-identified as an account deletion leaves
  * one (C3): no name, no Cognito subject, removed, a rename's names emptied;
  * each live enrollment ended as a removal ends it; their pre-bell taps and
- * their phones' device tokens (N4) and their 13+ yes (C7-server) deleted; a de-identified teacher's removed classes lose their names. Their
- * lessons, participations and events stay, so every count still adds up.
+ * their phones' device tokens (N4) and their 13+ yes (C7-server) deleted; a de-identified teacher's removed classes lose their names,
+ * and their questions their words. Their lessons, participations, events and answers stay, so every
+ * count still adds up.
  *
  * Kept named, and reported by id (`continuing`): an account with a record
  * after the year's last day (an event, a lesson, a pre-bell tap of theirs or
- * on them, an invite redeemed, a class joined, a class or block made, the account itself made), with records at another school, or a
+ * on them, an invite redeemed, a class joined, an answer, a class or block made, the account itself made), with records at another school, or a
  * teacher with a live class or block (as C3 refuses one). Splitting an
  * account's years would mean rewriting `events.user_id`; not built.
  *
@@ -4743,6 +4782,7 @@ async function retainOnce(tx: Database, input: ApplyRetentionInput): Promise<App
       .update(classes)
       .set({ name: '' })
       .where(and(inArray(classes.teacherId, teacherIds), isNotNull(classes.removedAt)));
+    await emptyQuestions(tx, inArray(questions.createdBy, teacherIds));
   }
   await deIdentify(tx, goneIds, input.at);
 
@@ -4785,7 +4825,7 @@ async function retainOnce(tx: Database, input: ApplyRetentionInput): Promise<App
 /**
  * Those of `ids` with a record from `since` on: the account made, an event of
  * theirs, a participation in a lesson not over by then, a pre-bell tap (theirs,
- * or on them), an invite redeemed, a class joined, or, as
+ * or on them), an invite redeemed, a class joined, an answer, or, as
  * a teacher, a class or block still live or made since, or a lesson of a class
  * of theirs not over by then.
  */
@@ -4827,6 +4867,11 @@ async function activeSince(tx: Database, ids: string[], since: Date): Promise<st
       .selectDistinct({ id: enrollments.studentId })
       .from(enrollments)
       .where(and(inArray(enrollments.studentId, ids), gte(enrollments.createdAt, since)))),
+    // An answer is no event: a student answering in class may have no other record since.
+    ...(await tx
+      .selectDistinct({ id: responses.studentId })
+      .from(responses)
+      .where(and(inArray(responses.studentId, ids), gte(responses.answeredAt, since)))),
     ...(await tx
       .selectDistinct({ id: classes.teacherId })
       .from(classes)

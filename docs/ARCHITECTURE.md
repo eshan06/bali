@@ -1105,8 +1105,9 @@ every new key to `users` or `schools` is placed, so the PR that adds a key place
 - **Questions are the teacher's words.** Kept with their session. The disposal empties each
   question's prompt and option texts, as it empties class names, since a prompt can name a
   person (the counts by option index stay); the retention run does the same for the
-  questions of a teacher it de-identifies. In a student's export only as the question one of
-  their responses answers.
+  questions of a teacher it de-identifies; the account deletion leaves them, as it leaves a
+  deleted teacher's removed classes their names (C3). In a student's export only as the
+  question one of their responses answers.
 - **Decks are the teacher's content, not a student's record.** Not in a student's export.
   A teacher removing a deck sets `removed_at`; so do the disposal, the retention run for a
   teacher it de-identifies, and the account deletion of a teacher with decks but no class or
@@ -1132,9 +1133,13 @@ Its two unique constraints are backstops with different outcomes, and neither is
 `eventId` opened (the caller's own; another teacher's is `409 event_id_conflict`); a
 violation of the partial unique index on the open question means another question opened
 under another `eventId` meanwhile, so the transaction is retried, and the retry closes that
-question and opens this one, as a later open always does. An answer takes the session and the question FOR SHARE; a close and a
+question and opens this one, as a later open always does. An answer takes its student's row FOR
+SHARE first, as an arm does, then the session and the question FOR SHARE; a close and a
 session's end take the question FOR UPDATE. So an answer racing a close or the session's end
-either commits before it and counts, or sees it and is refused. A question the session's end
+either commits before it and counts, or sees it and is refused; and one racing the account's
+deletion, a disposal or a retention run, which hold that row, commits wholly before it (kept
+under the account they de-identify, or read as a record after the year) or after it (refused
+`account_deleted`, nothing recorded, as a tap is: an answer is no must-never-lose record, L2). A question the session's end
 closes is closed at the session's end — the bell when the sweep or a Start past it ends it
 (A17, A18) — never at the sweep's own time. A slide change reads its deck FOR SHARE and a
 deck's removal takes it FOR UPDATE, so a deck is never removed under a session showing it.
@@ -1206,7 +1211,8 @@ Student (enrolled in the session's class now; anyone else `403`, an unknown id `
   mismatch honestly with a retry.
 - `POST /v1/questions/{id}/answers` — `{ eventId, option }`, answered with the caller's
   answer now. `400 invalid_option` for an index the question lacks; `409 question_closed`
-  past its close or the bell; a replay (or an older answer, decision 4) answers the answer
+  past its close or the bell; `409 account_deleted` for an account deleted on its way,
+  nothing recorded (decision 5); a replay (or an older answer, decision 4) answers the answer
   now. An `eventId` already spent elsewhere is `409 event_id_conflict`, nothing recorded,
   as for every other mutation (tap step 9). The check matches on the `eventId` alone: any
   `responses` row holding it except the caller's own answer to this question (the replay

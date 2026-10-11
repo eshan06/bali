@@ -18,6 +18,8 @@ import {
   deviceTokens,
   enrollments,
   events,
+  questions,
+  responses,
   schools,
   sessions,
   teacherInvites,
@@ -26,10 +28,12 @@ import {
 import { hashInviteCode, recordYearEnd } from '../src/schools.js';
 import { makeTestDb } from '../src/testing.js';
 import {
+  answerQuestion,
   applyRetention,
   armTap,
   disposeSchool,
   endSession,
+  openQuestion,
   RETENTION_COVERAGE,
   renameStudent,
   startSession,
@@ -496,6 +500,106 @@ describe('applyRetention (C6b)', () => {
     expect(
       await db.select().from(armedTaps).where(eq(armedTaps.teacherId, tapped.id)),
     ).toHaveLength(1);
+  });
+
+  it('keeps a student whose one record after the year is an answer, and empties a de-identified teacher’s questions', async () => {
+    const [school] = await db
+      .insert(schools)
+      .values({ name: 'Answers High', schoolYearEndsOn: localDay(1) })
+      .returning();
+    if (!school) throw new Error('seed');
+    const old = fromNow(-30 * DAY);
+    const after = fromNow(2 * DAY + 12 * 60 * MIN);
+    const [rivera, gone, answerer, quiet] = await db
+      .insert(users)
+      .values([
+        { cognitoId: 'answers-rivera', role: 'teacher', schoolId: school.id, createdAt: old },
+        { cognitoId: 'answers-gone', role: 'teacher', schoolId: school.id, createdAt: old },
+        { cognitoId: 'answers-a', role: 'student', displayName: 'Answerer', createdAt: old },
+        { cognitoId: 'answers-q', role: 'student', displayName: 'Quiet', createdAt: old },
+      ])
+      .returning();
+    if (!rivera || !gone || !answerer || !quiet) throw new Error('seed');
+    const [live, archived] = await db
+      .insert(classes)
+      .values([
+        { teacherId: rivera.id, schoolId: school.id, name: 'Live', joinCode: 'ANS-1' },
+        { teacherId: gone.id, schoolId: school.id, name: 'Archived', joinCode: 'ANS-2' },
+      ])
+      .returning();
+    if (!live || !archived) throw new Error('seed');
+    await db.insert(enrollments).values([
+      { classId: live.id, studentId: answerer.id, createdAt: old },
+      { classId: archived.id, studentId: quiet.id, createdAt: old },
+    ]);
+    /** A lesson of `classId` from `at`, its teacher asking who finished first; `studentId` answers. */
+    async function asked(classId: string, teacherId: string, studentId: string, at: Date) {
+      const { session } = await startSession(db, {
+        classId,
+        startedAt: at,
+        endsAt: new Date(at.getTime() + 30 * MIN),
+      });
+      const { question } = await openQuestion(db, {
+        sessionId: session.id,
+        teacherId,
+        eventId: newUuidV7(),
+        prompt: 'Who finished first?',
+        options: ['Quiet', 'Answerer'],
+        correctOption: 1,
+        now: at,
+      });
+      await answerQuestion(db, {
+        questionId: question.id,
+        studentId,
+        eventId: newUuidV7(),
+        option: 1,
+        now: at,
+      });
+      return { session, question };
+    }
+    // In the year: Mr Gone asks, Quiet answers; then his lesson ends and his class is archived.
+    const inYear = await asked(archived.id, gone.id, quiet.id, new Date());
+    await endSession(db, { sessionId: inYear.session.id, at: new Date(), reason: 'ended' });
+    await db.update(classes).set({ removedAt: new Date() }).where(eq(classes.id, archived.id));
+    // After the year: Ms Rivera asks, and the answer is the one record Answerer has since.
+    const late = await asked(live.id, rivera.id, answerer.id, after);
+    const answers = () =>
+      db
+        .select()
+        .from(responses)
+        .where(inArray(responses.questionId, [inYear.question.id, late.question.id]))
+        .orderBy(responses.answeredAt);
+    const before = await answers();
+    const at = LATER();
+
+    const result = await applyRetention(db, { schoolId: school.id, at, confirmName: school.name });
+
+    expect(result).toMatchObject({
+      outcome: 'applied',
+      counts: { students: 1, teachers: 1, enrollments: 1, continuing: 2 },
+      continuing: [rivera.id, answerer.id].sort(),
+    });
+    // Answerer: named, and still in class.
+    expect(await userRow(answerer.id)).toMatchObject({ displayName: 'Answerer', removedAt: null });
+    expect(
+      one(await db.select().from(enrollments).where(eq(enrollments.studentId, answerer.id))),
+    ).toMatchObject({ removedAt: null });
+    // Quiet: de-identified, her answer kept under her row, as every answer is.
+    expect(await userRow(quiet.id)).toMatchObject({ displayName: null, removedAt: at });
+    expect(await answers()).toEqual(before);
+    // Mr Gone's question loses its words, keeping its count of options and its correct one;
+    // Ms Rivera, kept named, keeps hers.
+    const question = async (id: string) =>
+      one(await db.select().from(questions).where(eq(questions.id, id)));
+    expect(await question(inYear.question.id)).toMatchObject({
+      prompt: '',
+      options: ['', ''],
+      correctOption: 1,
+    });
+    expect(await question(late.question.id)).toMatchObject({
+      prompt: 'Who finished first?',
+      options: ['Quiet', 'Answerer'],
+    });
   });
 
   it('keeps a teacher who came in by an invite after the year, with no class yet, or a student who joined since', async () => {
