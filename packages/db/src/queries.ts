@@ -290,8 +290,8 @@ export async function questionCounts(
       chosen: sql<number[]>`(select coalesce(jsonb_agg(${responses.option}), '[]'::jsonb)
         from ${responses} where ${responses.questionId} = ${questions.id})`,
       // An enrollment from before the close (any, while open) not ended before the opening.
-      // ponytail: no index reaches ended enrollments, so this reads the whole table on each poll;
-      // an index on enrollments (class_id) once a school's history makes the read slow.
+      // ponytail: no index reaches ended enrollments, so each poll (a 304's too) reads the whole
+      // table, every school's and year's; an index on enrollments (class_id) once that grows slow.
       eligible: sql<number>`(select count(*)::int from (
         select ${enrollments.studentId} from ${enrollments} where ${enrollments.classId} = ${sessions.classId}
           and (${questions.closedAt} is null or ${enrollments.createdAt} <= ${questions.closedAt})

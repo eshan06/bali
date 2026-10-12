@@ -24,8 +24,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   API's, so a join within their skew of the close falls either side, fixed once both are written; a
   question past its bell reads to now until the sweep closes it at the bell, so a join in that
   minute counts until then (it cannot have answered); no index reaches a class's ended enrollments,
-  so the read scans the table each poll (a `ponytail:` note: an index on `enrollments (class_id)`
-  once a school's history makes it slow). The population test's M rose from 5 to 6: its `neither`
+  so each poll, a `304`'s too, reads the whole table, every school's and every year's (a `ponytail:`
+  note: an index on `enrollments (class_id)` once that grows slow). The population test's M rose from 5 to 6: its `neither`
   was in the class while the question was open. **#317, wording only:** "Settled" said every route
   that records an `eventId` refuses one an answer or a draft holds; the engine's writers do, and three
   writers beside it (`PUT /v1/me/age-check`, `PUT`/`DELETE /v1/me/push-token`, `POST
