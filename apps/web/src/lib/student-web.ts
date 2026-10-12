@@ -179,7 +179,8 @@ export type PhoneChip =
  * The student's own phone in the lesson, from the read's `phone` (W1): the state the teacher's grid
  * shows, derived by the server at its clock, so never greener than that; not in while the student
  * has no live participation here. Null before the first good read (the page is checking) and once
- * the session is over. While a read fails, it is the last good read's, as of `state.asOf`.
+ * the session is over. While a read fails, its state is the last good read's, as of `state.asOf`,
+ * and Silent's minutes count on to `now`, as the grid's do.
  */
 export function phoneChip(state: LessonState, now: Date = new Date()): PhoneChip | null {
   if (!state.presentation?.running) return null;
