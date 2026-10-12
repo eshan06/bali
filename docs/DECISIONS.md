@@ -25,10 +25,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   noise, but it hides a deploy missing its bucket); listing decks while storage is off. **A removed
   deck's object is deleted after the commit, and stamped only once no upload URL can write it again.**
   A `pending` deck's presigned PUT lives 5 minutes (M1), so an upload still in flight when its teacher
-  removes the deck lands after the delete: its object is deleted at once and left unstamped, and M4's
-  sweep, which retries the unstamped, takes such a deck only 5 minutes after its removal (no URL is
-  minted for a removed deck, so none outlives that). A failed delete is logged and left unstamped for
-  the same retry; the removal stands. **The create holds the school FOR KEY SHARE, then the teacher
+  removes the deck lands after the delete: its object is deleted at once and left unstamped. The rule
+  M2b and M4 carry (the conductor's ruling on santa's WARNs, the owner away): a removed or rejected
+  deck's object is stamped, and taken by the sweep, only once 5 minutes have passed since its last
+  upload URL was minted, which also covers a re-upload after the check and a retried create racing a
+  removal; M2a stamps by `status`, which holds only while no deck is checked. A failed delete is
+  logged and left unstamped for the sweep; the removal stands. **The create holds the school FOR KEY SHARE, then the teacher
   FOR SHARE**, a class's create's order (C6a's review), so no deck is made for an account its
   deletion, a disposal or a retention run took, and none deadlocks a disposal. **Bounded at the
   boundary:** more than `DECK_MAX_BYTES` (25 × 1024 × 1024) is a `400` before any URL is minted; a

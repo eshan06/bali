@@ -27,7 +27,9 @@ import {
   openQuestion,
   refocus,
   removeDeck,
+  removeSavedQuestion,
   renameStudent,
+  replaceSavedQuestion,
   startSession,
   tapIn,
   unlock,
@@ -222,6 +224,13 @@ describe('a deck’s eventId, spent both ways (settled 2026-10-10)', () => {
 
     const arm = { studentId, teacherId: teacher.id, eventId, deviceTime: at(7), expiresAt: at(59) };
     const words = { prompt: 'Q?', options: ['a', 'b'] };
+    const draft = await createSavedQuestion(db, {
+      teacherId: teacher.id,
+      eventId: newUuidV7(),
+      ...words,
+    });
+    if (draft.outcome !== 'created') throw new Error(draft.outcome);
+    const savedQuestionId = draft.savedQuestion.id;
     for (const reuse of [
       () => tapIn(db, { ...own, now: at(7) }),
       () => unlock(db, own),
@@ -229,6 +238,8 @@ describe('a deck’s eventId, spent both ways (settled 2026-10-10)', () => {
       () =>
         answerQuestion(db, { questionId: question.id, studentId, eventId, option: 0, now: at(7) }),
       () => createSavedQuestion(db, { teacherId: teacher.id, eventId, ...words }),
+      () => replaceSavedQuestion(db, { savedQuestionId, eventId, ...words, prompt: 'Why?' }),
+      () => removeSavedQuestion(db, { savedQuestionId, eventId }),
       // Every other writer records an event under it, which `insertEvent` refuses first.
       () => refocus(db, { ...own, now: at(7) }),
       () => closeQuestion(db, { questionId: question.id, eventId, now: at(8) }),
@@ -243,6 +254,9 @@ describe('a deck’s eventId, spent both ways (settled 2026-10-10)', () => {
     expect(
       await db.select().from(participations).where(eq(participations.sessionId, session.id)),
     ).toEqual([]);
+    expect(
+      await db.select().from(savedQuestions).where(eq(savedQuestions.id, savedQuestionId)),
+    ).toEqual([draft.savedQuestion]);
   });
 
   it('a deck write reusing an id an event, an answer, a draft or another deck holds is refused, writing nothing', async () => {
