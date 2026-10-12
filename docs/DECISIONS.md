@@ -8,6 +8,46 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-12** — **The demo shows a deck and the load gate follows one (M9): the harness's API
+  keeps decks in the in-memory stand-in, and one class's devices open together at the bell.**
+  **The harness's storage:** `load:serve` ran `src/server.ts`, whose decks' storage is the bucket
+  its env names or none, and with none a slide change is `503 deck_storage_off`. So the process
+  entry's body is `main()` (`src/main.ts`), which takes `buildApp`'s deps beside the database:
+  `server.ts` passes none, the harness the in-memory stand-in CI and the demo use (decision 8), and
+  no API code knows the harness. *Weighed:* the harness building the app itself (fewer lines, but a
+  second copy of the entry to drift from it); dummy S3 keys in its env (storage on with no bucket
+  behind it). **The seed's decks:** each teacher's goes through the engine's create and check
+  (`ready`, 24 pages), as the API's tests make one, with no object behind it: the gate never reads a
+  deck's bytes, which a device fetches from the bucket, never the API, so the API's share of a
+  slide is the change, the polls and the download's URL. One page is shown, not paged through: the
+  poll reads the slide on every read, a `304`'s included, so paging costs the polls nothing more.
+  **The gate:** each lesson's teacher shows page 1 right after asking (`kind:slide`), and each
+  device asks once for the download its slide names (`kind:download`), as the phone (M7) and the
+  student web do for a deck they don't hold. Every kind has a p95 of its own, the ask's included,
+  and each device's polls are counted, a check failing under 40 (#321's two WARNs, the conductor's
+  rulings: a slow ask passed unseen, and the poll count was the lesson's whole, so a device that
+  stopped polling hid behind the others; L4b's "at least 40 polls a device" now holds as written).
+  **The bell's lesson** (#322's WARN, the conductor's ruling: the moment W1 moved the devices off):
+  one more class's devices, a phone and a laptop for each of its 30 students, open the lesson within
+  the Starts' own 2 s, as a push at the Start would bring them, their `GET /v1/me` reads `kind:open`.
+  *Measured first with five classes' (300 devices):* the Starts' p95 995 ms against their 1 s, the
+  open reads' 433, the ask's 420 and the slide change's 436, a gate passing or failing by chance;
+  so one class's (60), and no threshold moved. *Then, one class's, over three runs* (CI's runner):
+  the Starts' p95 506, 524 and 577 ms (W1's runs: 232–393; L4b's: 329–535), the open reads' 19.1,
+  19.7 and 29.4, so their limit is 150 ms, five times the worst: a first read slowed fivefold at the
+  bell fails. A poll's p95 9.2–10.5 ms, a download's 6.1–10.6, an ask's 29–37, a slide change's
+  28–39, an answer's 16–31; about 23,400 school requests a run, none refused; the sweep, 600 phones
+  silent in 2.1 s and the 30 sessions ended in 176–189 ms, no deadlock. *Watch:* devices opening
+  together at a bell is where the API runs out first (its one process and 10 database connections):
+  60 of them took the Starts' p95 from about 300 ms to 500–580, 300 to the limit. The class-started
+  push (N), which rings every waiting phone at its Start, is the case to measure before it reaches a
+  school. **The demo** (8:15am): the teacher uploads a 3-page PDF where `POST /v1/decks` says (the
+  world's `storageFetch`: the stand-in's own fetch locally, the network against a deployment), the
+  API checks it, she shows page 2, Dana's poll names it and the bytes her download fetches match
+  its SHA-256, and once she stops presenting the poll shows none; the stream carries both changes. A
+  deployment with no bucket yet (dev before runbook 10) answers `503 deck_storage_off`, which the
+  demo says and skips, so its remote run stays green.
+
 - **2026-10-12** — **The portal's student side (W2): the age check read first, one poll loop for
   both polls, and the phone's chip only as the server says it.** **The home reads in the app's
   order:** `GET /v1/me/age-check` first, a read that creates nothing (C7), so an account whose check

@@ -201,14 +201,17 @@ npm run load:sweep   # once load:serve has stopped: the sweep at that size, time
 - **The gate** (`apps/api/scripts/load/gate.js`): every request carries one `X-Real-IP`, the
   school's address. The 600 students tap within the minute before the bell, the teachers start
   all 30 classes at it, and each phone reads the truth every 30 s for three minutes, while one
-  account asks `GET /v1/me` 50 times a second. Five of the classes follow a live lesson (L4b):
-  their teacher asks a question after the Start, and each student's phone and laptop poll
-  `GET /v1/sessions/{id}/presentation` every 2 s with its ETag, the phone answering once. It
-  passes when every school request is a 2xx or a poll's `304` (no `429`, no `5xx`) with p95 under
-  500 ms (a Start's under 1 s), and the flooder is refused, each `429` with a `Retry-After`. `load:sweep` then runs the API's own sweep on that bell, twice: 600 phones gone
+  account asks `GET /v1/me` 50 times a second. Six of the classes follow a live lesson (L4b, M9):
+  their teacher asks a question and shows the first page of a deck after the Start, and each
+  student's phone and laptop poll `GET /v1/sessions/{id}/presentation` every 2 s with its ETag
+  and ask once for the deck's download, the phone answering once; five classes' devices open the
+  lesson 5 to 30 s after the bell, the sixth's together at it, beside the Starts. It passes when
+  every school request is a 2xx or a poll's `304` (no `429`, no `5xx`) with p95 under 500 ms (a
+  Start's under 1 s, a device's first read at the bell under 150 ms), every device polls to the
+  end, and the flooder is refused, each `429` with a `Retry-After`. `load:sweep` then runs the API's own sweep on that bell, twice: 600 phones gone
   quiet, then 30 sessions ending at once. CI's "Load gate" runs both on every PR that touches
   `apps/api/`, `packages/db/`, `packages/shared/` or the root's `package.json`, lockfile or
-  `.nvmrc`, or by hand. Numbers and why: `docs/DECISIONS.md` (L2b, L4b).
+  `.nvmrc`, or by hand. Numbers and why: `docs/DECISIONS.md` (L2b, L4b, M9).
 - **Never dev's or prod's data:** both commands refuse a `TEST_DATABASE_URL` that isn't on this
   machine (`localhost`, `127.0.0.1`, `[::1]`), and one no one vouched for: `localhost` could be a
   tunnel to another machine, and nothing can tell, so `LOAD_LOCAL_POSTGRES=1` says it is not
