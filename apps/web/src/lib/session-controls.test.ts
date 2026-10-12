@@ -244,6 +244,13 @@ describe('extendAttemptFor', () => {
       }),
     ).toBeNull();
   });
+
+  it('takes only an answer that can be failed, or no lost write would be resent (#332’s review)', () => {
+    const attempt = { minutes: 5, eventId: 'event-sent' };
+    const neverFails = { kind: 'made' } as { kind: 'made' } | { kind: 'refused' };
+    // @ts-expect-error: an answer type with no `failed` kind is refused by the compiler.
+    expect(keepUnanswered(attempt, neverFails)).toBeNull();
+  });
 });
 
 describe('extendSession', () => {

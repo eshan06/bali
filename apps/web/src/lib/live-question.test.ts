@@ -12,7 +12,7 @@ import {
   pollResults,
   questionAfter,
   type QuestionDraft,
-  RESULTS_EVERY_MS,
+  POLL_EVERY_MS,
   type ResultsState,
 } from './live-question';
 import { keepUnanswered } from './session-controls';
@@ -248,6 +248,9 @@ describe('questionAfter', () => {
     expect(questionAfter(open, { type: 'question_closed', payload: null })).toBe(open);
     expect(questionAfter(open, { type: 'question_closed', payload: 'x' })).toBe(open);
     expect(questionAfter(open, { type: 'question_opened', payload: null })).toBe('unknown');
+    // Held or not (#332's review): an open naming no question is one only the snapshot knows.
+    expect(questionAfter(null, { type: 'question_opened', payload: null })).toBe('unknown');
+    expect(questionAfter(null, { type: 'question_opened', payload: {} })).toBe('unknown');
   });
 });
 
@@ -327,16 +330,16 @@ describe('pollResults', () => {
     await after(0);
     expect(reads).toEqual([{ at: 0, etag: null }]);
     expect(last()).toEqual({ results: results(), final: false, problem: null });
-    await after(RESULTS_EVERY_MS - 1);
+    await after(POLL_EVERY_MS - 1);
     expect(reads).toHaveLength(1);
     await after(1);
-    await after(RESULTS_EVERY_MS);
+    await after(POLL_EVERY_MS);
     expect(reads).toEqual([
       { at: 0, etag: null },
       { at: 2000, etag: '"a"' },
       { at: 4000, etag: '"a"' },
     ]);
-    await after(RESULTS_EVERY_MS);
+    await after(POLL_EVERY_MS);
     expect(reads[3]).toEqual({ at: 6000, etag: '"b"' });
     poll.stop();
   });
@@ -346,9 +349,9 @@ describe('pollResults', () => {
     const { api } = server(tagged('"a"', counted), null, null, tagged('"b"', { answered: 4 }));
     const poll = pollResults(api, QUESTION, onChange, page().doc);
     await after(0);
-    await after(2 * RESULTS_EVERY_MS);
+    await after(2 * POLL_EVERY_MS);
     expect(states).toEqual([{ results: results(counted), final: false, problem: null }]);
-    await after(RESULTS_EVERY_MS);
+    await after(POLL_EVERY_MS);
     expect(states).toHaveLength(2);
     expect(last()?.results).toEqual(results({ answered: 4 }));
     poll.stop();
@@ -362,15 +365,15 @@ describe('pollResults', () => {
     );
     pollResults(api, QUESTION, onChange, page().doc);
     await after(0);
-    await after(RESULTS_EVERY_MS);
+    await after(POLL_EVERY_MS);
     expect(last()).toMatchObject({ results: { answered: 20, open: false }, final: false });
-    await after(RESULTS_EVERY_MS);
+    await after(POLL_EVERY_MS);
     expect(last()).toEqual({
       results: results({ answered: 21, open: false }),
       final: true,
       problem: null,
     });
-    await after(10 * RESULTS_EVERY_MS);
+    await after(10 * POLL_EVERY_MS);
     expect(reads).toHaveLength(3);
   });
 
@@ -383,10 +386,10 @@ describe('pollResults', () => {
     inFlight.release(tagged('"a"', { answered: 20, open: false }));
     await after(0);
     expect(last()).toMatchObject({ results: { answered: 20 }, final: false });
-    await after(RESULTS_EVERY_MS);
+    await after(POLL_EVERY_MS);
     expect(last()).toMatchObject({ results: { answered: 21 }, final: true });
     poll.closed(); // the stream again, after the stop: nothing more is read
-    await after(10 * RESULTS_EVERY_MS);
+    await after(10 * POLL_EVERY_MS);
     expect(reads).toHaveLength(2);
   });
 
@@ -394,14 +397,14 @@ describe('pollResults', () => {
     const { api, reads } = server(tagged('"a"', { answered: 21, open: false }), null);
     pollResults(api, QUESTION, onChange, page().doc);
     await after(0);
-    await after(RESULTS_EVERY_MS);
+    await after(POLL_EVERY_MS);
     expect(reads[1]).toEqual({ at: 2000, etag: '"a"' });
     expect(last()).toEqual({
       results: results({ answered: 21, open: false }),
       final: true,
       problem: null,
     });
-    await after(10 * RESULTS_EVERY_MS);
+    await after(10 * POLL_EVERY_MS);
     expect(reads).toHaveLength(2);
   });
 
@@ -420,9 +423,9 @@ describe('pollResults', () => {
     const poll = pollResults(stale.api, QUESTION, onChange, page().doc);
     await after(0);
     poll.closed();
-    await after(RESULTS_EVERY_MS); // a read still saying open is never the last
+    await after(POLL_EVERY_MS); // a read still saying open is never the last
     expect(last()).toMatchObject({ results: { answered: 3, open: true }, final: false });
-    await after(RESULTS_EVERY_MS);
+    await after(POLL_EVERY_MS);
     expect(last()).toMatchObject({ results: { open: false }, final: true });
     expect(stale.reads).toHaveLength(3);
   });
@@ -436,15 +439,15 @@ describe('pollResults', () => {
     );
     pollResults(api, QUESTION, onChange, page().doc);
     await after(0);
-    await after(RESULTS_EVERY_MS);
+    await after(POLL_EVERY_MS);
     expect(last()).toEqual({
       results: results({ open: false }),
       final: false,
       problem: { kind: 'failed', status: undefined, retryAfter: undefined },
     });
-    await after(RESULTS_EVERY_MS);
+    await after(POLL_EVERY_MS);
     expect(last()?.problem).toMatchObject({ kind: 'failed', status: 503 });
-    await after(RESULTS_EVERY_MS);
+    await after(POLL_EVERY_MS);
     expect(last()).toEqual({ results: results({ open: false }), final: true, problem: null });
     expect(reads.map((read) => read.at)).toEqual([0, 2000, 4000, 6000]);
   });
@@ -457,7 +460,7 @@ describe('pollResults', () => {
     const poll = pollResults(api, QUESTION, onChange, page().doc);
     await after(0);
     expect(last()?.problem).toEqual({ kind: 'refused', status: 404, reason: 'question_not_found' });
-    await after(RESULTS_EVERY_MS);
+    await after(POLL_EVERY_MS);
     expect(reads).toHaveLength(2);
     expect(last()).toEqual({ results: results(), final: false, problem: null });
     poll.stop();
@@ -481,7 +484,7 @@ describe('pollResults', () => {
     await after(500);
     turn('hidden');
     turn('visible'); // a quick switch away and back: the 2 s still run from the last read
-    await after(RESULTS_EVERY_MS - 501);
+    await after(POLL_EVERY_MS - 501);
     expect(reads).toHaveLength(2);
     await after(1);
     expect(reads.map((read) => read.at)).toEqual([10_000, 40_000, 42_000]);
@@ -501,8 +504,8 @@ describe('pollResults', () => {
     await after(1); // 5 s
     await after(LONGEST_WAIT_MS); // none sent: a minute
     await after(LONGEST_WAIT_MS); // an hour asked: a minute
-    await after(RESULTS_EVERY_MS); // none to wait: the 2 s
-    await after(RESULTS_EVERY_MS); // a second: the 2 s
+    await after(POLL_EVERY_MS); // none to wait: the 2 s
+    await after(POLL_EVERY_MS); // a second: the 2 s
     turn('hidden');
     turn('visible'); // back in view inside the 5 s: still waits them out
     await after(4999);
@@ -513,6 +516,23 @@ describe('pollResults', () => {
     ]);
     expect(last()?.problem).toBeNull();
     poll.stop();
+  });
+
+  it('stops at a 401: the client signed out once, and no read signs out again (#332’s review)', async () => {
+    const onUnauthorized = vi.fn();
+    const fetched = vi.fn(() => Promise.resolve(new Response('', { status: 401 })));
+    const client = createApiClient({
+      baseUrl: 'http://api',
+      getToken: () => 'tok',
+      onUnauthorized,
+      fetchImpl: fetched,
+    });
+    pollResults(client, QUESTION, onChange, page().doc);
+    await after(0);
+    expect(last()?.problem).toEqual({ kind: 'refused', status: 401, reason: undefined });
+    await after(10 * POLL_EVERY_MS);
+    expect(fetched).toHaveBeenCalledTimes(1);
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
   });
 
   it('stops when told: no more reads, and an answer on its way changes nothing', async () => {

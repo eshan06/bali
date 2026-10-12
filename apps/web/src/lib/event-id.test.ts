@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { newEventId } from './event-id';
+import { eventIdAfter, newEventId } from './event-id';
 
 const V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const timeOf = (id: string) => parseInt(id.replace('-', '').slice(0, 12), 16);
 
 describe('newEventId', () => {
   it('is a UUIDv7: the time in its first 48 bits, then version 7 and the RFC 9562 variant', () => {
@@ -26,5 +27,29 @@ describe('newEventId', () => {
     const bytes = new Uint8Array(16).fill(0xab);
     newEventId(0, bytes);
     expect([...bytes]).toEqual(new Array(16).fill(0xab));
+  });
+});
+
+describe('eventIdAfter', () => {
+  const at = Date.UTC(2026, 9, 12, 9, 41);
+  // The answer held, minted at `at` with its random bits all ones: the last id of its millisecond.
+  const held = newEventId(at, new Uint8Array(16).fill(0xff));
+
+  it('sorts after the id held from a clock a minute behind it, a millisecond past it', () => {
+    const id = eventIdAfter(held, at - 60_000);
+    expect(id).toMatch(V7);
+    expect(id > held).toBe(true);
+    expect(timeOf(id)).toBe(at + 1);
+    // From the same clock, each next one minted after the last sorts after it too.
+    const next = eventIdAfter(id, at - 60_000);
+    expect(next > id).toBe(true);
+    expect(timeOf(next)).toBe(at + 2);
+  });
+
+  it('is of the clock’s own millisecond when that is later, or nothing is held', () => {
+    expect(timeOf(eventIdAfter(held, at + 5_000))).toBe(at + 5_000);
+    expect(timeOf(eventIdAfter(held, at))).toBe(at + 1);
+    expect(timeOf(eventIdAfter(null, at))).toBe(at);
+    expect(timeOf(eventIdAfter('not an id', at))).toBe(at);
   });
 });
