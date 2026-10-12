@@ -246,7 +246,9 @@ project for the API (its DSN).
       preview's last line, `npm run school -- dispose <school-id> --confirm '<name>'` (the
       name single-quoted, so an apostrophe or `$` in it reaches the command as typed).
       It prints one line, `disposed of school <id> on <time>: teachers …`, with no name: keep
-      it with the school's request. Running it again says it was disposed of already.
+      it with the school's request. Running it again says it was disposed of already. Its
+      teachers' slide decks go with it, their titles emptied; the API deletes each one's PDF from
+      the bucket by itself within the hour (runbook 10).
     - **Delete the school's sign-ins in Cognito.** The disposal doesn't reach them (the API
       deletes the sign-in of an account that deletes itself, runbook 9, never a disposal's),
       and each still holds an email address. In the production
@@ -259,7 +261,8 @@ project for the API (its DSN).
     - **Write back to the school,** by the agreement's channel, inside its days: the date of
       the disposal; what was removed (every name, Cognito subject and sign-in, class name,
       block, open invite and pre-bell tap of the school, the words of every question asked
-      in its lessons, prompt and options, and its teachers' saved questions); what stays (lessons,
+      in its lessons, prompt and options, its teachers' saved questions, and their slide decks,
+      title and PDF); what stays (lessons,
       unlocks with their reason, taps and their times, and each answer by the number of the
       option picked, under accounts that name no one, kept
       as counts); and the day the last backup holding its data expires. If the agreement
@@ -278,7 +281,7 @@ project for the API (its DSN).
     - **Preview it** in the same shell: `npm run school -- retention <school-id>`. It prints
       how many students, teachers, enrollments and pre-bell taps would go, and the ids of
       the accounts it keeps named: anyone with a record after the year's last day (an answer
-      to a class question counts, and a teacher's saved question written since), at another
+      to a class question counts, and a teacher's saved question or slide deck added since), at another
       school, or a teacher with a live class or
       block. "no year end on record" or "isn't over until" means nothing was written: record
       the day, or wait.
@@ -286,8 +289,9 @@ project for the API (its DSN).
       `npm run school -- retention <school-id> --confirm '<name>'`. It prints one line of
       counts with no name: keep it with the school's records. A second run says it ran
       already, with the same counts. Each teacher it de-identifies loses the names of their
-      removed classes, the words of the questions they asked and their saved questions; every
-      answer stays, by the
+      removed classes, the words of the questions they asked, their saved questions and their
+      slide decks (each title, and the PDF, which the API deletes from the bucket by itself within
+      the hour); every answer stays, by the
       number of the option picked, under the account it de-identifies.
     - **Next year:** record the new last day with `year-end`; whoever was kept named this
       time is judged again against it. The Cognito sign-ins stay (a de-identified student
@@ -1086,3 +1090,9 @@ locally, `http://localhost:3000`, unless you added more).
 
 To switch it off again, remove the four variables and deploy: the boot log says `deck storage is
 off`. Never delete a bucket a class has used: its decks go with it.
+
+**A Sentry error tagged `deck object deletion`** means the bucket keeps refusing the API's deletes
+of removed decks' PDFs (from a deck's third failed try in a row; the API tries each again, at most
+an hour apart). The error names S3's reason: `AccessDenied`, the policy (step 3) lacks
+`s3:DeleteObject` or names another bucket; `InvalidAccessKeyId` or `SignatureDoesNotMatch`, a key
+pasted wrong (step 5). Fix it, then run the check (step 6); the waiting PDFs go within the hour.

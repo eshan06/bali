@@ -190,6 +190,13 @@
       "when": 1791784016320,
       "tag": "0026_session_presentations",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1791790490542,
+      "tag": "0027_deck_object_delete_attempts",
+      "breakpoints": true
     }
   ]
 }

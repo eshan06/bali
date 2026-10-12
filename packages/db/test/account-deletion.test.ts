@@ -13,6 +13,7 @@ import {
   armedTaps,
   blocks,
   classes,
+  decks,
   deviceTokens,
   enrollments,
   events,
@@ -27,12 +28,14 @@ import { makeTestDb } from '../src/testing.js';
 import {
   answerQuestion,
   armTap,
+  createDeck,
   createSavedQuestion,
   deleteAccount,
   deletedCognitoId,
   endSession,
   joinClassByCode,
   openQuestion,
+  removeDeck,
   removeSavedQuestion,
   renameStudent,
   startSession,
@@ -603,6 +606,54 @@ describe('a deleted teacher (C3)', () => {
     expect(
       await db.select().from(savedQuestions).where(eq(savedQuestions.teacherId, teacher!.id)),
     ).toHaveLength(2);
+  });
+
+  it('loses their decks, removed with their titles emptied, and is given none after (Live lesson, decision 4; M4)', async () => {
+    const school = one(await db.insert(schools).values({ name: 'c3-decks' }).returning());
+    const [teacher, other] = await db
+      .insert(users)
+      .values([
+        { cognitoId: 'c3-decks', role: 'teacher', schoolId: school.id },
+        { cognitoId: 'c3-decks-other', role: 'teacher', schoolId: school.id },
+      ])
+      .returning();
+    const deck = async (teacherId: string, title: string) =>
+      (
+        await createDeck(db, {
+          teacherId,
+          schoolId: school.id,
+          eventId: newUuidV7(),
+          title,
+          bytes: 1_000,
+          sha256: 'c'.repeat(64),
+        })
+      ).deck;
+    const live = await deck(teacher!.id, 'Ana’s essay');
+    const dropped = await deck(teacher!.id, 'Ben’s retake');
+    const droppedAt = fromNow(-MIN);
+    await removeDeck(db, { deckId: dropped.id, eventId: newUuidV7(), now: droppedAt });
+    const theirs = await deck(other!.id, 'Ana’s essay');
+    const at = new Date();
+
+    await deleteAccount(db, { userId: teacher!.id, eventId: newUuidV7(), at });
+
+    const now = async (id: string) => one(await db.select().from(decks).where(eq(decks.id, id)));
+    // Its stored object is left for the API's sweep: the row says nothing of it yet.
+    expect(await now(live.id)).toEqual({ ...live, title: '', removedAt: at });
+    // One the teacher removed keeps when they did.
+    expect(await now(dropped.id)).toMatchObject({ title: '', removedAt: droppedAt });
+    expect(await now(theirs.id)).toEqual(theirs);
+    await expect(
+      createDeck(db, {
+        teacherId: teacher!.id,
+        schoolId: school.id,
+        eventId: newUuidV7(),
+        title: 'Late',
+        bytes: 1_000,
+        sha256: 'c'.repeat(64),
+      }),
+    ).rejects.toMatchObject({ code: 'ACCOUNT_DELETED' });
+    expect(await db.select().from(decks).where(eq(decks.teacherId, teacher!.id))).toHaveLength(2);
   });
 });
 

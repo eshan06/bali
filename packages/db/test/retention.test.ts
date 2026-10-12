@@ -15,6 +15,7 @@ import {
   armedTaps,
   blocks,
   classes,
+  decks,
   deviceTokens,
   enrollments,
   events,
@@ -32,10 +33,12 @@ import {
   answerQuestion,
   applyRetention,
   armTap,
+  createDeck,
   createSavedQuestion,
   disposeSchool,
   endSession,
   openQuestion,
+  removeDeck,
   removeSavedQuestion,
   RETENTION_COVERAGE,
   renameStudent,
@@ -352,6 +355,15 @@ describe('applyRetention (C6b)', () => {
     const s = await seed('c6b-preview');
     const at = LATER();
     const people = [s.ana.id, s.old.id, s.rivera.id, s.ben.id];
+    // Mr Old's deck, which the run then removes (M4): the preview leaves it, and its object.
+    await createDeck(db, {
+      teacherId: s.old.id,
+      schoolId: s.school.id,
+      eventId: newUuidV7(),
+      title: 'Art with Ana',
+      bytes: 1_000,
+      sha256: 'c'.repeat(64),
+    });
     const snapshot = async () => ({
       users: await db.select().from(users).where(inArray(users.id, people)),
       events: await db.$count(events),
@@ -359,6 +371,7 @@ describe('applyRetention (C6b)', () => {
       tokens: await db.$count(deviceTokens),
       ageChecks: await db.$count(ageChecks),
       classes: await db.select().from(classes).where(eq(classes.schoolId, s.school.id)),
+      decks: await db.select().from(decks).where(eq(decks.schoolId, s.school.id)),
     });
     const before = await snapshot();
 
@@ -374,6 +387,9 @@ describe('applyRetention (C6b)', () => {
     if (preview.outcome !== 'preview' || applied.outcome !== 'applied') throw new Error('outcome');
     expect(applied.counts).toEqual(preview.counts);
     expect(applied.continuing).toEqual(preview.continuing);
+    expect(await db.select().from(decks).where(eq(decks.teacherId, s.old.id))).toMatchObject([
+      { title: '', removedAt: at },
+    ]);
   });
 
   it('a second run for the same year answers with the first one’s counts and writes nothing', async () => {
@@ -663,6 +679,59 @@ describe('applyRetention (C6b)', () => {
       options: ['', ''],
       removedAt: droppedAt,
     });
+  });
+
+  it('keeps a teacher whose one record after the year is a deck, and removes a de-identified teacher’s decks with their titles emptied (M4)', async () => {
+    const [school] = await db
+      .insert(schools)
+      .values({ name: 'Decks High', schoolYearEndsOn: localDay(1) })
+      .returning();
+    if (!school) throw new Error('seed');
+    const old = fromNow(-30 * DAY);
+    // Neither has a class or a block: what keeps one named is a deck added since.
+    const [maker, gone] = await db
+      .insert(users)
+      .values([
+        { cognitoId: 'decks-maker', role: 'teacher', schoolId: school.id, createdAt: old },
+        { cognitoId: 'decks-gone', role: 'teacher', schoolId: school.id, createdAt: old },
+      ])
+      .returning();
+    if (!maker || !gone) throw new Error('seed');
+    const deck = async (teacherId: string, title: string, now: Date) =>
+      (
+        await createDeck(db, {
+          teacherId,
+          schoolId: school.id,
+          eventId: newUuidV7(),
+          title,
+          bytes: 1_000,
+          sha256: 'c'.repeat(64),
+          now,
+        })
+      ).deck;
+    // In the year, Mr Gone adds two and removes one; after it, Ms Maker adds her first.
+    const live = await deck(gone.id, 'Ana’s essay', new Date());
+    const dropped = await deck(gone.id, 'Ben’s retake', new Date());
+    const droppedAt = fromNow(MIN);
+    await removeDeck(db, { deckId: dropped.id, eventId: newUuidV7(), now: droppedAt });
+    const next = await deck(maker.id, 'Spring cells', fromNow(2 * DAY + 12 * 60 * MIN));
+    const at = LATER();
+
+    const result = await applyRetention(db, { schoolId: school.id, at, confirmName: school.name });
+
+    expect(result).toMatchObject({
+      outcome: 'applied',
+      counts: { students: 0, teachers: 1, continuing: 1 },
+      continuing: [maker.id],
+    });
+    const now = async (id: string) => one(await db.select().from(decks).where(eq(decks.id, id)));
+    expect((await userRow(maker.id)).removedAt).toBeNull();
+    expect(await now(next.id)).toEqual(next);
+    // Mr Gone's decks lose their titles, their objects the API's sweep's; the one he removed keeps
+    // when he did.
+    expect((await userRow(gone.id)).removedAt).toEqual(at);
+    expect(await now(live.id)).toEqual({ ...live, title: '', removedAt: at });
+    expect(await now(dropped.id)).toMatchObject({ title: '', removedAt: droppedAt });
   });
 
   it('keeps a teacher who came in by an invite after the year, with no class yet, or a student who joined since', async () => {

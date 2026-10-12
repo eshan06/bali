@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { newUuidV7 } from '../src/ids.js';
-import { decksToDrop, stampObjectDeleted } from '../src/queries.js';
+import { claimDecksToDrop, stampObjectDeleted } from '../src/queries.js';
 import {
   armedTaps,
   classes,
@@ -143,6 +143,8 @@ describe('a teacher’s decks (decision 4)', () => {
       uploadUrlMintedAt: at(5),
       removedAt: null,
       objectDeletedAt: null,
+      objectDeleteAttempts: 0,
+      objectNextAttemptAt: null,
     });
     expect(await db.select().from(events).where(eq(events.eventId, eventId))).toEqual([]);
   });
@@ -459,7 +461,7 @@ describe('the sweep’s decks (decision 6, M2b2)', () => {
     });
   });
 
-  it('lists the removed and rejected decks no upload can write, the oldest mint first; never a live one, a stamped one or one minted since', async () => {
+  it('claims the removed and rejected decks no upload can write, the oldest mint first; never a live one, a stamped one, one minted since or one not due', async () => {
     const { teacher } = await school('k-drop');
     const verdict = (status: 'ready' | 'rejected') =>
       status === 'ready'
@@ -485,13 +487,77 @@ describe('the sweep’s decks (decision 6, M2b2)', () => {
     const remint = newUuidV7();
     await add(teacher, 5, remint);
     const reminted = await remove(await written(add(teacher, 9, remint)));
-    const theirs = async (mintedBy: Date) =>
-      (await decksToDrop(db, mintedBy, 100))
+    const now = at(40);
+    const theirs = async (mintedBy: Date, when = now) =>
+      (await claimDecksToDrop(db, { mintedBy, now: when, limit: 100 }))
         .filter((deck) => deck.teacherId === teacher.id)
-        .map((deck) => deck.id);
+        .map((deck) => deck.id)
+        .sort();
 
-    expect(await theirs(at(8))).toEqual([removed.id, rejected.id]);
-    expect(await theirs(at(9))).toEqual([removed.id, rejected.id, reminted.id]);
-    expect(await decksToDrop(db, at(9), 1)).toHaveLength(1);
+    expect(await theirs(at(8))).toEqual([removed.id, rejected.id].sort());
+    // Claimed, each is due again only a minute on: until then only the one minted since is new.
+    expect(await theirs(at(9))).toEqual([reminted.id]);
+    expect(await theirs(at(9), new Date(at(41).getTime() - 1))).toEqual([]);
+    expect(await theirs(at(9), at(41))).toEqual([removed.id, rejected.id, reminted.id].sort());
+  });
+
+  it('claims as many as asked, the oldest mint first, and no deck twice', async () => {
+    const { teacher } = await school('k-drop-limit');
+    // A day before every other deck in this file's database, so these are the oldest it holds.
+    const early = (minute: number) => new Date(at(minute).getTime() - 24 * 60 * 60_000);
+    const removedAt = async (minute: number) => {
+      const made = await written(
+        createDeck(db, {
+          teacherId: teacher.id,
+          schoolId: teacher.schoolId!,
+          eventId: newUuidV7(),
+          title: 'Cells',
+          bytes: 1_000,
+          sha256: SHA256,
+          now: early(minute),
+        }),
+      );
+      return written(removeDeck(db, { deckId: made.id, eventId: newUuidV7() }));
+    };
+    const second = await removedAt(6);
+    const first = await removedAt(5);
+    const claim = (limit: number) =>
+      claimDecksToDrop(db, { mintedBy: early(9), now: at(40), limit });
+
+    expect((await claim(1)).map((deck) => deck.id)).toEqual([first.id]);
+    expect((await claim(10)).map((deck) => deck.id)).toEqual([second.id]);
+    expect(await claim(10)).toEqual([]);
+  });
+
+  it('counts each try and puts the next off: a minute, doubling, at most an hour, never overflowing', async () => {
+    const { teacher } = await school('k-drop-backoff');
+    const removed = await written(
+      removeDeck(db, { deckId: (await written(add(teacher, 5))).id, eventId: newUuidV7() }),
+    );
+    const claimed = async (now: Date) =>
+      (await claimDecksToDrop(db, { mintedBy: at(5), now, limit: 100 })).find(
+        (deck) => deck.id === removed.id,
+      );
+    let now = at(40);
+    const waits: number[] = [];
+
+    for (let tries = 1; tries <= 8; tries += 1) {
+      const deck = await claimed(now);
+      expect(deck?.objectDeleteAttempts).toBe(tries);
+      const next = deck!.objectNextAttemptAt!;
+      // Not tried again, by any sweep, until then.
+      expect(await claimed(new Date(next.getTime() - 1))).toBeUndefined();
+      waits.push((next.getTime() - now.getTime()) / 60_000);
+      now = next;
+    }
+    expect(waits).toEqual([1, 2, 4, 8, 16, 32, 60, 60]);
+
+    // A wrong policy left for weeks fails a delete hourly: the wait stays an hour, never past
+    // interval's range, which would make every claim an error.
+    await db.update(decks).set({ objectDeleteAttempts: 1000 }).where(eq(decks.id, removed.id));
+    expect(await claimed(now)).toMatchObject({
+      objectDeleteAttempts: 1001,
+      objectNextAttemptAt: new Date(now.getTime() + 60 * 60_000),
+    });
   });
 });

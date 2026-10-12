@@ -118,7 +118,7 @@ never stored here, no screen can ever show it.
   the slide a session shows (Phase 7; "Live lesson", decisions 4 and 12). Written only by the
   transition engine, except `decks.object_deleted_at`,
   which the API stamps after the commit once it has deleted the object (or the sweep, for a
-  leftover); an answer never writes to `events`.
+  leftover), and the sweep's tries at that delete (M4); an answer never writes to `events`.
 
 ### The decisions (2026-09-15)
 
@@ -1083,7 +1083,8 @@ nothing of a live lesson sits in the outbox ahead of an unlock (decision 5).
   `event_id` (unique: the write that last wrote it, as a draft's; M2), `created_at`,
   `upload_url_minted_at` (when its last upload URL was minted, a create's retry's included; M2b2),
   `removed_at` (decision 3's soft removal), `object_deleted_at` (when its stored object was
-  confirmed deleted; decision 8).
+  confirmed deleted; decision 8), `object_delete_attempts` and `object_next_attempt_at` (the
+  sweep's tries at that delete, and when it may try again; M4).
 - `session_presentations` (Slice 2) — at most one row per session, keyed by `session_id`:
   `deck_id` (nullable: nothing shown), `page` (from 1; with `deck_id`, or neither),
   `updated_at`, and the `event_id` of the slide change that set it. **A row of its own, not
@@ -1119,7 +1120,9 @@ every new key to `users` or `schools` is placed, so the PR that adds a key place
   A teacher removing a deck sets `removed_at`; so do the disposal, the retention run for a
   teacher it de-identifies, and the account deletion of a teacher with decks but no class or
   block (C3), each emptying the deck's `title` too, since a title can name a person. A
-  presentation row is kept, pointing at a removed deck, as the history of what was shown.
+  presentation row is kept, pointing at a removed deck, as the history of what was shown. A deck
+  made after the school's year end is a record after the year, so the retention run keeps its
+  teacher named, as a draft written since does (M4).
   **The stored object goes after the commit, never inside the transaction, and only once no
   upload can write it (M2b2):** the engine marks the row; once it commits, and once 30 minutes
   have passed since the deck's last upload URL was minted (the URL's 5 minutes, and 25 for an
@@ -1127,14 +1130,20 @@ every new key to `users` or `schools` is placed, so the PR that adds a key place
   API deletes the object and stamps `object_deleted_at`. Before then the sweep comes back for it
   by the same rule, as it does for any removed or rejected deck's object a failed delete or a
   crash left unstamped; no route serves a removed or rejected deck meanwhile. A disposal or
-  retention preview, rolled back, never touches storage.
+  retention preview, rolled back, never touches storage. The account deletion, the disposal and
+  the retention run (the last two the owner's commands, with no bucket) only mark the rows and
+  leave every object to the sweep (M4). A delete that keeps failing is put off, a minute, doubling,
+  at most an hour, and from the sweep's third failed try in a row said at error and to Sentry, as
+  the Cognito sign-in deleter's (2026-10-09), so a bucket or key mistake never takes every pass and
+  is seen.
 
 **5. Writers.** Questions, responses, decks and presentation state are written only by the
-transition engine (`packages/db/src/transitions.ts`), with one named exception:
-`decks.object_deleted_at`, stamped outside any engine transaction by the API or the sweep once
-the stored object is deleted, after the commit that removed or rejected the deck and once no
-upload can write it (decision 4) — it records a fact about storage, never a state change, and no
-other field of `decks` is written outside the engine. A create's retry records its fresh upload
+transition engine (`packages/db/src/transitions.ts`), with one named exception, a deck's stored
+object's delete: `decks.object_deleted_at`, stamped outside any engine transaction by the API or
+the sweep once the stored object is deleted, after the commit that removed or rejected the deck
+and once no upload can write it (decision 4), and the sweep's tries at it, counted as it claims
+each (`object_delete_attempts`, `object_next_attempt_at`; M4) — facts about storage, never a state
+change, and no other field of `decks` is written outside the engine. A create's retry records its fresh upload
 URL's mint on the deck row FOR UPDATE, after the school and the teacher; the sweep's 24-hour
 rejection is one guarded statement on the deck rows alone (M2b2). Each mutation runs in one transaction with
 a client-minted UUIDv7 `event_id`, idempotent on it: a replay writes nothing (but a deck

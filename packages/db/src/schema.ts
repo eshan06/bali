@@ -559,7 +559,7 @@ export const savedQuestions = pgTable(
 /*
  * A teacher's slide decks (Phase 7, Slice 2; "Live lesson", decision 4): one row per uploaded PDF,
  * its bytes in the bucket under `storage_key` (decision 8). Written only by the transition engine,
- * but for `object_deleted_at` (decision 5's one exception).
+ * but for its object's delete: `object_deleted_at` and the sweep's tries (decision 5's one exception).
  */
 export const decks = pgTable(
   'decks',
@@ -600,6 +600,10 @@ export const decks = pgTable(
      * could still write it (M2b2).
      */
     objectDeletedAt: timestamp('object_deleted_at', { withTimezone: true }),
+    /** The sweep's tries at deleting its stored object, each counted as it is claimed (M4). */
+    objectDeleteAttempts: integer('object_delete_attempts').notNull().default(0),
+    /** When the sweep may try that delete again: none before its first try (M4). */
+    objectNextAttemptAt: timestamp('object_next_attempt_at', { withTimezone: true }),
   },
   (t) => [
     // A teacher's decks: their list, and the privacy paths' reads.
