@@ -8,7 +8,15 @@ import { fileURLToPath } from 'node:url';
 
 import { newUuidV7 } from '@bali/db';
 import { dropDatabase } from '@bali/db/testing';
-import type { MeResponse, SessionSnapshot, StartSessionResponse, TapResponse } from '@bali/shared';
+import type {
+  DeckDownload,
+  MeResponse,
+  Presentation,
+  SessionSnapshot,
+  SlideResponse,
+  StartSessionResponse,
+  TapResponse,
+} from '@bali/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createCall } from '../scripts/demo/http.js';
@@ -177,6 +185,33 @@ describe.runIf(REAL_PG)('the load harness', () => {
     expect(live.size).toBe(2);
     expect(live.get(teacher.classId)).toBe(started.session.id);
     expect([...live.values()].filter((id) => id === null)).toHaveLength(1);
+  });
+
+  it("serves a lesson's slide: each teacher's seeded deck shows, and a student's poll and download see it", async () => {
+    // Decks' storage on (the in-memory stand-in), or the slide and the download would be 503s.
+    const call = createCall(base);
+    const teacher = school.teachers[2]!;
+    const student = school.students.find((s) => s.classId === teacher.classId)!;
+    expect(new Set(school.teachers.map((t) => t.deckId)).size).toBe(20);
+    const { session } = await call<StartSessionResponse>(
+      'POST',
+      `/v1/classes/${teacher.classId}/sessions`,
+      { token: teacher.token, body: { durationMinutes: 50 } },
+    );
+    const shown = await call<SlideResponse>('POST', `/v1/sessions/${session.id}/slide`, {
+      token: teacher.token,
+      body: { eventId: newUuidV7(), deckId: teacher.deckId, page: 1 },
+    });
+    expect(shown.slide).toMatchObject({ deckId: teacher.deckId, page: 1, pageCount: 24 });
+
+    const seen = await call<Presentation>('GET', `/v1/sessions/${session.id}/presentation`, {
+      token: student.token,
+    });
+    expect(seen.slide).toEqual(shown.slide);
+    const download = await call<DeckDownload>('GET', `/v1/decks/${teacher.deckId}/download`, {
+      token: student.token,
+    });
+    expect(download.url).toMatch(/^https:\/\/deck-storage\.invalid\//);
   });
 
   it("serves the gate's flooder: an account of the school's, in no class", async () => {

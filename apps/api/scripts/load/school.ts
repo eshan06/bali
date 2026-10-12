@@ -1,10 +1,12 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 import {
   blocks,
   classes,
+  completeDeck,
   createDb,
+  createDeck,
   enrollments,
   generateJoinCode,
   newUuidV7,
@@ -31,6 +33,8 @@ const TEACHERS = 20;
 const CLASS_SIZE = 30;
 /** Seed in the morning, load-test all day. */
 const TOKEN_HOURS = 12;
+/** Each teacher's deck, as a check leaves a 24-page PDF of 2 MB (M9). */
+const DECK = { bytes: 2_000_000, pages: 24 };
 
 /** Where the seed writes and serve.ts reads, unless LOAD_SCHOOL_FILE says otherwise. */
 export const SCHOOL_FILE =
@@ -40,8 +44,9 @@ export interface SchoolFile {
   /** What serve.ts gives the API: its database on the server, and the issuer it trusts. */
   api: { database: string; issuer: string; audience: string; jwksUri: string; internalKey: string };
   /**
-   * Per teacher: a token, the class they start at this bell, their block, and the second class
-   * every other one teaches (null for the rest), which another room takes at another bell.
+   * Per teacher: a token, the class they start at this bell, their block, the second class every
+   * other one teaches (null for the rest), which another room takes at another bell, and a deck of
+   * theirs, ready to show.
    */
   teachers: {
     token: string;
@@ -49,6 +54,7 @@ export interface SchoolFile {
     blockId: string;
     tagId: string;
     secondClassId: string | null;
+    deckId: string;
   }[];
   /** Per student: a token, the tag of the block they tap, and their class there. */
   students: { token: string; tagId: string; classId: string }[];
@@ -83,7 +89,8 @@ export function harnessServer(env: NodeJS.ProcessEnv): string {
  * A fresh `database` on `server` holding the school, and its file. Each teacher has a block and the
  * class they start at this bell; every other one teaches a second class too, which the room before
  * theirs takes at another bell. Rows go in directly, as the tests seed theirs: no participation,
- * no event.
+ * no event. Each teacher's deck goes through the engine's create and check, as the API's tests
+ * make one, with no object behind it: no gate request reads its bytes.
  */
 export async function seedSchool(server: string, database = 'bali_load'): Promise<SchoolFile> {
   const issuer = await makeTestIssuer();
@@ -110,6 +117,7 @@ export async function seedSchool(server: string, database = 'bali_load'): Promis
     };
   });
 
+  const deckIds = new Map<string, string>();
   const db = createDb(await recreateDatabase(server, database));
   try {
     await db.transaction(async (tx) => {
@@ -153,6 +161,19 @@ export async function seedSchool(server: string, database = 'bali_load'): Promis
           students.flatMap((s) => s.classIds.map((classId) => ({ classId, studentId: s.id }))),
         );
     });
+    for (const t of teachers) {
+      const { deck } = await createDeck(db, {
+        teacherId: t.id,
+        schoolId,
+        eventId: newUuidV7(),
+        title: `${t.name}'s slides`,
+        bytes: DECK.bytes,
+        sha256: createHash('sha256').update(t.sub).digest('hex'),
+      });
+      const verdict = { status: 'ready' as const, pageCount: DECK.pages };
+      await completeDeck(db, { deckId: deck.id, eventId: newUuidV7(), verdict });
+      deckIds.set(t.id, deck.id);
+    }
   } finally {
     await db.$client.end();
   }
@@ -174,6 +195,7 @@ export async function seedSchool(server: string, database = 'bali_load'): Promis
         blockId: t.blockId,
         tagId: t.tagId,
         secondClassId: t.secondClassId,
+        deckId: deckIds.get(t.id)!,
       })),
     ),
     students: await Promise.all(

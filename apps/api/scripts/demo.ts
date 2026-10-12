@@ -5,6 +5,9 @@ import {
   type BlockDetail,
   type CheckInResponse,
   type ClassDetail,
+  type CreateDeckResponse,
+  type DeckDownload,
+  type DeckResponse,
   deriveDisplayState,
   type EndEnrollmentResponse,
   type EndSessionResponse,
@@ -19,12 +22,14 @@ import {
   type QuestionResults,
   type RefocusResponse,
   type SessionSnapshot,
+  type SlideResponse,
   type StartSessionResponse,
   type TapResponse,
   type UnlockResponse,
 } from '@bali/shared';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
+import { pdf } from '../test/helpers/pdf.js';
 import { type Call, createCall } from './demo/http.js';
 import { openSseRecorder, type SseRecorder } from './demo/sse.js';
 import {
@@ -64,6 +69,7 @@ function assert(cond: unknown, msg: string): asserts cond {
 }
 
 const iso = (): string => new Date().toISOString();
+const sha256Of = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** The cast. Keys double as the suffix of each actor's env vars in remote mode. */
@@ -446,7 +452,8 @@ async function main(): Promise<void> {
     // and a silent room drifts past the 90s threshold, whereupon the sweep opens
     // episodes the "exactly one" assertions below forbid.
     const roomBeats = startHeartbeats(call, sid, students);
-    await withHeartbeats(roomBeats, async () => {
+    // Whether the deck was shown (8:15am): never, on a deployment with no bucket for decks.
+    const presented = await withHeartbeats(roomBeats, async () => {
       const cameBack = await grid.waitFor(
         (e) => e.type === 'came_back' && e.userId === ben.userId,
         {
@@ -605,6 +612,76 @@ async function main(): Promise<void> {
         `Ben's poll should show the answer beside his own: ${JSON.stringify(revealed)}`,
       );
       console.log('  closed and revealed; a change of answer after the close is refused (409).');
+
+      line('8:15am — the teacher shows a page of a deck, and a phone follows it (Phase 7)');
+      // A real PDF, uploaded where the API says, then checked by the API itself (decision 6).
+      const file = pdf(3);
+      const sha256 = sha256Of(file);
+      const created = await call<CreateDeckResponse>('POST', '/v1/decks', {
+        token: teacher.token,
+        body: { eventId: newUuidV7(), title: 'The planets', bytes: file.byteLength, sha256 },
+      }).catch((err: unknown) => {
+        // A deployment with no bucket yet (M0) keeps no decks, and says so.
+        if (err instanceof Error && err.message.includes('deck_storage_off')) return null;
+        throw err;
+      });
+      if (created === null) {
+        console.log('  skipped: this deployment has no bucket for decks (503 deck_storage_off).');
+        return false;
+      }
+      const deckId = created.deck.id;
+      const upload = await world.storageFetch(created.uploadUrl, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/pdf' },
+        body: file,
+      });
+      assert(upload.ok, `the upload: ${upload.status}`);
+      const checked = await call<DeckResponse>('POST', `/v1/decks/${deckId}/complete`, {
+        token: teacher.token,
+        body: { eventId: newUuidV7() },
+      });
+      assert(
+        checked.deck.status === 'ready' && checked.deck.pageCount === 3,
+        `the check should find 3 pages: ${JSON.stringify(checked)}`,
+      );
+      const show = (body: { deckId: string | null; page?: number }) =>
+        call<SlideResponse>('POST', `/v1/sessions/${sid}/slide`, {
+          token: teacher.token,
+          body: { eventId: newUuidV7(), ...body },
+        });
+      const page2 = await show({ deckId, page: 2 });
+      await grid.waitFor((e) => e.type === 'slide_shown' && e.eventId === page2.eventId, {
+        label: 'the slide showing',
+        timeoutMs: world.liveWaitMs,
+      });
+      // The poll names the deck and its SHA-256, never a URL; the download is a URL of minutes.
+      const followed = await poll(dana);
+      assert(
+        followed.slide?.deckId === deckId &&
+          followed.slide.page === 2 &&
+          followed.slide.sha256 === sha256,
+        `Dana's poll should show page 2 of the deck: ${JSON.stringify(followed)}`,
+      );
+      const { url } = await call<DeckDownload>('GET', `/v1/decks/${deckId}/download`, {
+        token: dana.token,
+      });
+      const fetched = await world.storageFetch(url);
+      const bytes = new Uint8Array(await fetched.arrayBuffer());
+      assert(
+        fetched.ok && sha256Of(bytes) === followed.slide.sha256,
+        `the bytes Dana fetched should be the slide's: ${fetched.status}, ${bytes.byteLength} bytes`,
+      );
+      const stopped = await show({ deckId: null });
+      await grid.waitFor((e) => e.type === 'slide_shown' && e.eventId === stopped.eventId, {
+        label: 'the presenting stopping',
+        timeoutMs: world.liveWaitMs,
+      });
+      const after = await poll(dana);
+      assert(stopped.slide === null && after.slide === null, `stopped: ${JSON.stringify(after)}`);
+      console.log(
+        `  page 2 of 3 shown; Dana's ${bytes.byteLength} bytes match its SHA-256; then stopped.`,
+      );
+      return true;
     });
 
     line('the live grid (the teacher snapshot, derived like the portal)');
@@ -677,6 +754,10 @@ async function main(): Promise<void> {
     for (const t of required) {
       assert(types.includes(t), `event log should contain ${t}`);
     }
+    assert(
+      types.filter((t) => t === 'slide_shown').length === (presented ? 2 : 0),
+      'a slide shown, then presenting stopped',
+    );
     // Totals only: an answer is a row of its own, never an event, so the stream never names one.
     assert(!log.events.some((e) => answerIds.has(e.eventId)), 'no answer should be an event');
     assert(
