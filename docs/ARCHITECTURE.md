@@ -1242,7 +1242,8 @@ Slice 2, teacher:
   pages, not encrypted — then marks it `ready` with its page count, or `rejected` with the
   reason, its object deleted by decision 4's rule; either verdict is a `200`, the deck carrying
   it (M2b). An `eventId` another record holds is `409 event_id_conflict` before anything is read
-  or parsed (M2b2). One-way:
+  or parsed, the id read before the deck, so a retry meeting its first delivery's verdict answers
+  that verdict (M2b2). One-way:
   a deck `ready` or `rejected` is never checked again, and any complete of it answers the
   verdict. The PUT expires in 5 minutes; a PUT over a
   `ready` deck's object before then changes bytes no client takes, since every client checks

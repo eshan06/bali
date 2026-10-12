@@ -19,9 +19,29 @@ import {
 } from '@bali/shared';
 import { eq } from 'drizzle-orm';
 import { createHash, randomUUID } from 'node:crypto';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CHECKS_AT_ONCE, parsePdf } from '../src/deck-check.js';
+
+/**
+ * The gap between a complete's two reads, the deck and its `eventId` (santa's round 1 on M2b2): once
+ * armed, the next of either read answers only after `between` has run, so a test commits another
+ * write right there. Unarmed, both reads are the engine's own.
+ */
+const gap = vi.hoisted(() => ({ between: undefined as (() => Promise<unknown>) | undefined }));
+vi.mock('@bali/db', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@bali/db')>();
+  const paused =
+    <A extends unknown[], R>(read: (...args: A) => Promise<R>) =>
+    async (...args: A) => {
+      const answer = await read(...args);
+      const between = gap.between;
+      gap.between = undefined;
+      await between?.();
+      return answer;
+    };
+  return { ...real, findDeck: paused(real.findDeck), eventIdSpent: paused(real.eventIdSpent) };
+});
 import {
   type DeckStorage,
   type MemoryDeckStorage,
@@ -585,6 +605,45 @@ describe('POST /v1/decks/:id/complete', () => {
     }
   });
 
+  it('answers a retry whose first delivery records the verdict between its two reads with that verdict, never a conflict (santa’s round 1)', async () => {
+    let parked!: () => void;
+    const parking = new Promise<void>((resolve) => (parked = resolve));
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const held = await makeAuthedApp(db, () => now, storage, {
+      parsePdf: async () => {
+        parked();
+        await gate;
+        return { pages: 1 };
+      },
+    });
+    try {
+      const { teacher, token } = await people('deck-retry-race');
+      const own = await held.tokenFor(teacher.cognitoId);
+      const deck = await uploaded(token, pdf(1));
+      const body = { eventId: newUuidV7() };
+      // The first delivery, parked in its parse with both its reads done.
+      const first = complete(own, deck.id, body, held.app);
+      await parking;
+      // Its retry: between its two reads, the first delivery's verdict commits.
+      gap.between = () => {
+        release();
+        return first;
+      };
+
+      const retry = await complete(own, deck.id, body, held.app);
+
+      expect(gap.between).toBeUndefined();
+      const ready = { ...deck, status: 'ready', pageCount: 1 };
+      expect((await first).json<DeckResponse>()).toEqual({ outcome: 'checked', deck: ready });
+      expect(retry.statusCode).toBe(200);
+      expect(retry.json<DeckResponse>()).toEqual({ outcome: 'replay', deck: ready });
+    } finally {
+      release();
+      await held.close();
+    }
+  });
+
   it('refuses an eventId another record holds after one read, before reading or parsing anything (#324’s review)', async () => {
     let reads = 0;
     let parses = 0;
@@ -722,6 +781,20 @@ describe('a removed or rejected deck’s object, and the sweep (M2b2)', () => {
 
     expect(await storage.read(storageKey, DECK_MAX_BYTES)).toBe('missing');
     expect((await rowOf(over.id)).objectDeletedAt).toEqual(at(40));
+  });
+
+  it('deletes a rejected deck’s object at once, stamped so, when its check comes 30 minutes after its last upload URL', async () => {
+    const { token } = await people('deck-rule-late-check');
+    // Uploaded by 09:10's URL, which lapsed at 09:15; checked at 09:40.
+    const over = await uploaded(token, pdf(DECK_MAX_PAGES + 1));
+    now = at(40);
+
+    const refused = (await complete(token, over.id)).json<DeckResponse>();
+
+    expect(refused.deck.rejection).toBe('too_many_pages');
+    const row = await rowOf(over.id);
+    expect(row.objectDeletedAt).toEqual(at(40));
+    expect(await storage.read(row.storageKey, DECK_MAX_BYTES)).toBe('missing');
   });
 
   it('rejects a deck left pending 24 hours unfinished, and deletes its object by the same rule', async () => {

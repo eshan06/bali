@@ -30,7 +30,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   decks no upload can write are deleted together, each stamped, so a pass stays within one
   delete's 30-second bound. A complete meeting the rejection answers it, as any of a checked
   deck. **A spent `eventId` is refused before the check** (#324's review): one read
-  (`eventIdSpent`) after the deck's own, so it never holds one of the two checks' turns. **The
+  (`eventIdSpent`), so it never holds one of the two checks' turns, taken before the deck's read
+  (santa's round-1 blocker, fixed on the conductor's ruling): read after it, a retry whose first
+  delivery recorded the verdict between the two reads was answered `409 event_id_conflict`; now
+  the deck reads checked, and the retry answers its verdict. **The
   worker's other endings are pinned:** a parse out of its 256 MB heap is `too_slow`, as decided; a
   crash, and an exit with no answer, are a `500` that leaves the deck pending, the API answering
   on (#324's review). **Left, as saved questions behave** (#323's and #324's reviews): a create

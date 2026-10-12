@@ -205,14 +205,17 @@ export function registerDecksRoutes(
     async (request): Promise<DeckResponse> => {
       const { id } = parseRequest(request, 'params', Params);
       const { teacher, storage } = await requireDecks(app, db, request);
-      const found = await requireOwnDeck(db, id, teacher.id);
       const { eventId } = parseRequest(request, 'body', EventBody);
+      // Read before the deck: a verdict this complete's own first delivery records in between then
+      // reads below as the deck checked, its replay, never as the id spent (santa's round 1).
+      const spent = await eventIdSpent(db, eventId);
+      const found = await requireOwnDeck(db, id, teacher.id);
       if (found.removedAt) throw deckNotFound();
       // One-way: a deck checked already is answered with its verdict, never checked again.
       if (found.status !== 'pending') return { outcome: 'replay', deck: deck(found) };
-      // A spent eventId never takes a check's turn: refused after one read, before anything is read
-      // or parsed (#324's review). The engine asks again as it records the verdict.
-      if (await eventIdSpent(db, eventId)) throw refusal('EVENT_ID_CONFLICT');
+      // A spent eventId never takes a check's turn: refused by that one read, before anything is
+      // read or parsed (#324's review). The engine asks again as it records the verdict.
+      if (spent) throw refusal('EVENT_ID_CONFLICT');
       // Outside any transaction: the read and the parse take seconds, never under a row lock.
       const verdict = await checkDeck(storage, found, parse);
       const result = await mapTransitionError(() =>
