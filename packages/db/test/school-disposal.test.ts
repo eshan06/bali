@@ -16,6 +16,7 @@ import {
   armedTaps,
   blocks,
   classes,
+  decks,
   deviceTokens,
   enrollments,
   events,
@@ -24,6 +25,7 @@ import {
   responses,
   savedQuestions,
   schools,
+  sessionPresentations,
   sessions,
   teacherInvites,
   users,
@@ -33,14 +35,18 @@ import { makeTestDb } from '../src/testing.js';
 import {
   answerQuestion,
   armTap,
+  completeDeck,
+  createDeck,
   createSavedQuestion,
   deletedCognitoId,
   disposeSchool,
   joinClassByCode,
   openQuestion,
+  removeDeck,
   removeSavedQuestion,
   renameStudent,
   SCHOOL_DISPOSAL_COVERAGE,
+  showSlide,
   startSession,
   tapIn,
   unlock,
@@ -84,7 +90,9 @@ function one<T>(rows: T[]): T {
  * unlock in it, and Ben's tap waiting for the teacher's next Start; both
  * students' phones registered for pushes, and both past the 13+ check. In the
  * running lesson, a question whose words name both students, answered by Ana;
- * and the teacher's drafts naming each, Ben's removed already.
+ * and the teacher's drafts naming each, Ben's removed already. The teacher's
+ * decks: one shown in the running lesson, and two naming each student, Ben's
+ * removed already.
  */
 async function seed(tag: string) {
   const school = one(
@@ -192,6 +200,30 @@ async function seed(tag: string) {
       });
     }
   }
+  for (const title of [`Cells ${tag}`, `Ana ${tag}’s essay`, `Ben ${tag}’s retake`]) {
+    const { deck } = await createDeck(db, {
+      teacherId: teacher.id,
+      schoolId: school.id,
+      eventId: newUuidV7(),
+      title,
+      bytes: 1_000,
+      sha256: 'c'.repeat(64),
+    });
+    if (title.startsWith('Cells')) {
+      const verdict = { status: 'ready', pageCount: 3 } as const;
+      await completeDeck(db, { deckId: deck.id, eventId: newUuidV7(), verdict });
+      await showSlide(db, {
+        sessionId: lesson.session.id,
+        teacherId: teacher.id,
+        eventId: newUuidV7(),
+        deckId: deck.id,
+        page: 2,
+      });
+    }
+    if (title.startsWith('Ben')) {
+      await removeDeck(db, { deckId: deck.id, eventId: newUuidV7(), now: fromNow(-MIN) });
+    }
+  }
   for (const student of [ana, ben]) {
     await registerPushToken(db, {
       userId: student.id,
@@ -273,6 +305,20 @@ async function rowsOf(s: { school: { id: string }; teacher: { id: string } }) {
       .from(savedQuestions)
       .where(eq(savedQuestions.teacherId, s.teacher.id))
       .orderBy(savedQuestions.createdAt, savedQuestions.id),
+    decks: await db
+      .select()
+      .from(decks)
+      .where(eq(decks.schoolId, s.school.id))
+      .orderBy(decks.createdAt, decks.id),
+    presentations: await db
+      .select()
+      .from(sessionPresentations)
+      .where(
+        inArray(
+          sessionPresentations.sessionId,
+          lessons.map((l) => l.id),
+        ),
+      ),
   };
 }
 
@@ -369,6 +415,17 @@ describe('disposeSchool (C6a)', () => {
       { ...live, prompt: '', options: ['', ''], removedAt: at },
       { ...dropped, prompt: '', options: ['', ''] },
     ]);
+    // Its decks are removed and lose their titles, the one removed already keeping when; each
+    // stored object is the API's sweep's (M4). The lesson that showed one keeps showing it, as the
+    // history of what was shown.
+    const [cells, essay, retake] = before.decks;
+    expect(after.decks).toEqual([
+      { ...cells, title: '', removedAt: at },
+      { ...essay, title: '', removedAt: at },
+      { ...retake, title: '' },
+    ]);
+    expect(after.presentations).toEqual(before.presentations);
+    expect(after.presentations).toMatchObject([{ deckId: cells!.id, page: 2 }]);
 
     // Nothing of any of it names a person any more.
     const text = JSON.stringify(after);

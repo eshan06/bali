@@ -8,6 +8,38 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-12** — **Decks in the privacy paths (M4): marked in the transaction, their objects the
+  sweep's, and a delete that keeps failing put off and reported.** **The rows:** a teacher's account
+  deletion (C3), the disposal (C6a) and the retention run (C6b, a teacher it de-identifies) set each
+  deck's `removed_at` (one removed already keeps its time) and empty its `title`, as ARCHITECTURE's
+  decision 4 says today, C3 included; #313, the one rule for all of a teacher's words at their own
+  deletion, stays the owner's, commented with this. The disposal takes the school's decks and its
+  people's (`school_id`, or `teacher_id` among them), so both coverage entries hold by the statement
+  itself, though a teacher's school never changes today (a teacher redeems no second invite).
+  Presentation rows stay, pointing at the removed deck. **The objects:** none of the three reaches
+  the bucket. The disposal and the run are the owner's commands, run with no bucket, and M2b2's sweep
+  already deletes any removed deck's object 30 minutes after its last upload URL, whatever removed it,
+  so the account deletion leaves its decks' to the sweep too, within a minute of that rule's time.
+  So a preview, rolled back, never touches storage, by construction. **A deck made after the
+  school's year end is a record after the year** (the worker's call, by L3b1's rule for drafts): a
+  teacher adding next year's slides with no class yet is kept named, never de-identified with their
+  new deck removed; a create racing the run meets it at the school's row, wholly before (read as
+  that record) or after (refused `account_deleted`). **A delete that keeps failing** (#325's Claude
+  Review: retried every minute, said at warn, so a bucket or key mistake would fill every pass's 50
+  slots unseen): the sweep claims due decks as the Cognito sign-in deleter claims its rows
+  (2026-10-09), one `UPDATE … WHERE id IN (SELECT … FOR UPDATE SKIP LOCKED)` counting the try and
+  putting the next off a minute, doubling, at most an hour, so two API instances never try one deck
+  at once and a failing deck leaves the slots to the others; from the third failed try in a row it is
+  said at error and reported to Sentry (`deck object deletion`), S3's code and status, never a title.
+  The tries live on the deck (migration 0027: `object_delete_attempts`, `object_next_attempt_at`),
+  so decision 5's one exception, the stored object's delete, now covers the sweep's tries beside
+  `object_deleted_at`: facts about storage, written outside the engine, never a state change.
+  *Weighed:* a table of its own, as `cognito_deletions` (more code for the same facts, and the claim
+  a join); the tries in the process's memory (lost on a restart, and a query that still returns the
+  same 50 failing decks first never frees the slots). A route's own try right after its removal or
+  rejection is not claimed or counted: the sweep's first try is the first counted. Not added: a count
+  of removed decks in `school_disposed` or `retention_applied`, as L2 added none for questions.
+
 - **2026-10-12** — **The slide in what students read, and a deck's download (M3b): only while a
   running session shows it, and a removed deck is gone for everyone.** **One reader,
   `presentationNow`,** gives the poll its `slide` and the boot snapshot its `presentation`, and

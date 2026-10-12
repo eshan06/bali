@@ -1,9 +1,9 @@
 import {
+  claimDecksToDrop,
   completeDeck,
   createDeck,
   type Database,
   type DeckRow,
-  decksToDrop,
   eventIdSpent,
   findDeck,
   findUserByCognitoId,
@@ -30,9 +30,11 @@ import { z } from 'zod';
 
 import { requireAuth } from '../auth/plugin.js';
 import { requireSessionOwner, requireTeacher } from '../auth/teacher.js';
+import { PERSISTENT_FAILURE_TRIES } from '../cognito/sign-in-deletion.js';
 import { checkDeck, type ParsePdf } from '../deck-check.js';
 import { type DeckStorage, URL_LIFETIME_S } from '../deck-storage.js';
 import { ApiError, parseRequest } from '../errors.js';
+import { captureFailure } from '../monitoring.js';
 import { mapTransitionError, refusal } from './errors.js';
 import { slide, Text } from './questions.js';
 
@@ -116,7 +118,9 @@ export const DROPS_PER_PASS = 50;
  * (the 5-minute rule, M2b2: its last upload URL's mint, the URL's 5 minutes, and an upload in
  * flight): its stored object deleted, and stamped so (decision 5's one exception). Before then it is
  * left for the sweep, which comes back for it; no route serves a removed or rejected deck. A failed
- * delete is said and left unstamped for the sweep too; the removal or the verdict stands.
+ * delete is said and left unstamped for the sweep too; the removal or the verdict stands. From the
+ * sweep's third failed try in a row it is said at error and reported (M4), as the Cognito sign-in
+ * deleter's: a bucket or key mistake fails every delete, and is seen.
  */
 async function dropObject(
   db: Database,
@@ -129,7 +133,14 @@ async function dropObject(
   try {
     await storage.delete(dropped.storageKey);
   } catch (err) {
-    log.warn({ err, deck: dropped.id }, 'a deck’s object was not deleted: left for the sweep');
+    // Its words name no one: a StorageError carries S3's code and status, never its message.
+    const attempts = dropped.objectDeleteAttempts;
+    const persistent = attempts >= PERSISTENT_FAILURE_TRIES;
+    log[persistent ? 'error' : 'warn'](
+      { err, deck: dropped.id, attempts },
+      'a deck’s object was not deleted: the sweep tries it again later',
+    );
+    if (persistent) captureFailure(err, 'deck object deletion');
     return;
   }
   await stampObjectDeleted(db, dropped.id, now);
@@ -138,8 +149,9 @@ async function dropObject(
 /**
  * The sweep's decks (decision 6, M2b2): every deck pending 24 hours rejected `unfinished`, then the
  * objects of removed and rejected decks no upload can write any more, deleted and stamped, the
- * oldest first: those that waited out their upload URL, and any a failed delete or a crash left
- * unstamped. Each settled before the pass ends.
+ * oldest first: those that waited out their upload URL, whatever removed them (a teacher, or an
+ * account's deletion, a disposal or a retention run, M4), and any a failed delete or a crash left
+ * unstamped, once due again (`claimDecksToDrop`). Each settled before the pass ends.
  */
 export async function sweepDecks(
   db: Database,
@@ -148,7 +160,8 @@ export async function sweepDecks(
   now: Date,
 ): Promise<void> {
   await rejectUnfinishedDecks(db, now);
-  const due = await decksToDrop(db, new Date(now.getTime() - OBJECT_WRITABLE_MS), DROPS_PER_PASS);
+  const mintedBy = new Date(now.getTime() - OBJECT_WRITABLE_MS);
+  const due = await claimDecksToDrop(db, { mintedBy, now, limit: DROPS_PER_PASS });
   const dropped = await Promise.allSettled(
     due.map((deck) => dropObject(db, storage, log, deck, now)),
   );

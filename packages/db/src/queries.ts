@@ -398,23 +398,40 @@ export function listDecks(db: Database, teacherId: string) {
 }
 
 /**
- * Removed and rejected decks whose stored object is not stamped deleted, their last upload URL minted
- * by `mintedBy`, so none can write it again (M2b2): the sweep's to delete, the oldest mint first.
+ * Claim up to `limit` removed and rejected decks whose stored object is not stamped deleted, their
+ * last upload URL minted by `mintedBy`, so none can write it again (M2b2), and due at `now`: the
+ * sweep's to delete, the oldest mint first. As the Cognito sign-in claim (2026-10-09), the claim
+ * counts the try and puts the next one off, a minute, doubling, at most an hour, in one statement:
+ * a delete that keeps failing never takes every pass's turn, and no two sweeps try one deck at once.
  * ponytail: a scan of `decks` each minute; a partial index on the unstamped once decks grow large.
  */
-export function decksToDrop(db: Database, mintedBy: Date, limit: number) {
-  return db
-    .select()
+export function claimDecksToDrop(
+  db: Database,
+  input: { mintedBy: Date; now: Date; limit: number },
+) {
+  const due = db
+    .select({ id: decks.id })
     .from(decks)
     .where(
       and(
         isNull(decks.objectDeletedAt),
         or(isNotNull(decks.removedAt), eq(decks.status, 'rejected')),
-        lte(decks.uploadUrlMintedAt, mintedBy),
+        lte(decks.uploadUrlMintedAt, input.mintedBy),
+        or(isNull(decks.objectNextAttemptAt), lte(decks.objectNextAttemptAt, input.now)),
       ),
     )
     .orderBy(asc(decks.uploadUrlMintedAt))
-    .limit(limit);
+    .limit(input.limit)
+    .for('update', { skipLocked: true });
+  return db
+    .update(decks)
+    .set({
+      objectDeleteAttempts: sql`${decks.objectDeleteAttempts} + 1`,
+      // The Cognito claim's schedule, its exponent capped too.
+      objectNextAttemptAt: sql`${input.now.toISOString()}::timestamptz + least(interval '1 minute' * power(2, least(${decks.objectDeleteAttempts}, 6)), interval '1 hour')`,
+    })
+    .where(inArray(decks.id, due))
+    .returning();
 }
 
 /**

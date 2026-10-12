@@ -4587,7 +4587,8 @@ export interface DeleteAccountResult {
  * name and its Cognito subject and is marked removed; each rename it made
  * loses the names it carried (the one rewrite of `events` the database allows,
  * migration 0015); its phones' device tokens (N4) and its 13+ yes (C7-server)
- * are deleted; a teacher's drafts are removed, their words emptied; its Cognito sign-in is queued
+ * are deleted; a teacher's drafts are removed, their words emptied, and their decks, their titles
+ * emptied (their stored objects the API's sweep's, M4); its Cognito sign-in is queued
  * for the API to delete (2026-10-09);
  * and `account_deleted` is recorded under `eventId`, with no payload. Its other events and its
  * answers stay, so each class's reports and totals count as before, under a row that names no one.
@@ -4679,9 +4680,10 @@ export async function deleteAccount(
       await tx.delete(deviceTokens).where(eq(deviceTokens.userId, me.id));
       // Its 13+ yes (C7-server), likewise: a yes behind this finds the account deleted.
       await tx.delete(ageChecks).where(eq(ageChecks.userId, me.id));
-      // A teacher's drafts (Live lesson, decision 12), their words with them: a create behind this
-      // finds the account deleted.
+      // A teacher's drafts (Live lesson, decision 12), their words with them, and their decks, their
+      // titles with them (decision 4, M4): a create behind this finds the account deleted.
       await removeDrafts(tx, eq(savedQuestions.teacherId, me.id), input.at);
+      await removeDecks(tx, eq(decks.teacherId, me.id), input.at);
       // Its Cognito sign-in (2026-10-09): queued with the deletion, so it goes even when the
       // phone's own DeleteUser never lands; the API deletes it from the pool after the commit.
       if (input.signIn) await queueCognitoDeletion(tx, input.signIn, input.at);
@@ -4738,8 +4740,8 @@ export const SCHOOL_DISPOSAL_COVERAGE = {
   'responses.student_id': 'kept, under a person de-identified',
   'saved_questions.teacher_id': "its teachers' drafts: removed, their words emptied",
   'decks.teacher_id':
-    "its teachers' decks: kept, their teacher de-identified (M4 removes them, their titles emptied)",
-  'decks.school_id': 'its decks: kept (M4 removes them, their titles emptied)',
+    "its teachers' decks: removed, their titles emptied; their stored objects the API's sweep's (M4)",
+  'decks.school_id': 'its decks: removed, their titles emptied, whoever made them (M4)',
 } as const;
 
 export interface DisposeSchoolInput {
@@ -4807,7 +4809,8 @@ class RetentionPreview extends Error {
  * de-identified as an account deletion leaves one (C3: no name, no Cognito
  * subject, removed; a rename's names emptied); its enrollments end; its classes
  * are removed and lose their names, its lessons' questions their words; its teachers' blocks are removed, and
- * their drafts with their words emptied; the taps
+ * their drafts with their words emptied, and its decks with their titles (their stored objects the
+ * API's sweep's, M4); the taps
  * waiting on them and its people's are deleted, as are its people's device
  * tokens (N4), their 13+ yes (C7-server) and its open invites; the
  * school is marked removed; and `school_disposed` records it with the school's
@@ -4949,6 +4952,12 @@ async function disposeOnce(tx: Database, input: DisposeSchoolInput): Promise<Dis
     await tx.delete(deviceTokens).where(inArray(deviceTokens.userId, peopleIds));
     await removeDrafts(tx, inArray(savedQuestions.teacherId, peopleIds), input.at);
   }
+  // The school's decks and its teachers' (M4): none is shown, since no lesson of it runs.
+  await removeDecks(
+    tx,
+    or(eq(decks.schoolId, school.id), inArray(decks.teacherId, peopleIds))!,
+    input.at,
+  );
   const removedBlocks = peopleIds.length
     ? await tx
         .update(blocks)
@@ -5049,6 +5058,22 @@ async function removeDrafts(tx: Database, where: SQL, at: Date): Promise<void> {
       prompt: '',
       options: emptied(savedQuestions.options),
       removedAt: sql`coalesce(${savedQuestions.removedAt}, ${at.toISOString()}::timestamptz)`,
+    })
+    .where(where);
+}
+
+/**
+ * The decks `where` picks removed and their titles emptied, as a draft's words are (Live lesson,
+ * decision 4; M4): a title can name a person. One removed already keeps its time. Their stored
+ * objects are the API's sweep's, after the commit, once no upload can write them (M2b2): nothing here
+ * reaches the bucket, so a preview, rolled back, leaves it as it was.
+ */
+async function removeDecks(tx: Database, where: SQL, at: Date): Promise<void> {
+  await tx
+    .update(decks)
+    .set({
+      title: '',
+      removedAt: sql`coalesce(${decks.removedAt}, ${at.toISOString()}::timestamptz)`,
     })
     .where(where);
 }
@@ -5179,7 +5204,7 @@ export const RETENTION_COVERAGE = {
   'saved_questions.teacher_id':
     'a teacher it de-identifies: their drafts removed, their words emptied; one written after the year keeps them named',
   'decks.teacher_id':
-    'a teacher it de-identifies: their decks kept (M4 removes them, their titles emptied)',
+    "a teacher it de-identifies: their decks removed, their titles emptied, their stored objects the API's sweep's; one made after the year keeps them named (M4)",
 } as const;
 
 export interface ApplyRetentionInput {
@@ -5246,12 +5271,13 @@ export function yearOverAt(day: string): Date {
  * one (C3): no name, no Cognito subject, removed, a rename's names emptied;
  * each live enrollment ended as a removal ends it; their pre-bell taps and
  * their phones' device tokens (N4) and their 13+ yes (C7-server) deleted; a de-identified teacher's removed classes lose their names,
- * their questions their words, and their drafts are removed with theirs. Their lessons,
+ * their questions their words, their drafts are removed with theirs, and their decks with their
+ * titles (M4). Their lessons,
  * participations, events and answers stay, so every count still adds up.
  *
  * Kept named, and reported by id (`continuing`): an account with a record
  * after the year's last day (an event, a lesson, a pre-bell tap of theirs or
- * on them, an invite redeemed, a class joined, an answer, a draft written, a class or block made, the account itself made), with records at another school, or a
+ * on them, an invite redeemed, a class joined, an answer, a draft written, a deck, a class or block made, the account itself made), with records at another school, or a
  * teacher with a live class or block (as C3 refuses one). Splitting an
  * account's years would mean rewriting `events.user_id`; not built.
  *
@@ -5369,6 +5395,7 @@ async function retainOnce(tx: Database, input: ApplyRetentionInput): Promise<App
       .where(and(inArray(classes.teacherId, teacherIds), isNotNull(classes.removedAt)));
     await emptyQuestions(tx, inArray(questions.createdBy, teacherIds));
     await removeDrafts(tx, inArray(savedQuestions.teacherId, teacherIds), input.at);
+    await removeDecks(tx, inArray(decks.teacherId, teacherIds), input.at);
   }
   await deIdentify(tx, goneIds, input.at);
 
@@ -5412,7 +5439,7 @@ async function retainOnce(tx: Database, input: ApplyRetentionInput): Promise<App
  * Those of `ids` with a record from `since` on: the account made, an event of
  * theirs, a participation in a lesson not over by then, a pre-bell tap (theirs,
  * or on them), an invite redeemed, a class joined, an answer, or, as
- * a teacher, a draft written, a class or block still live or made since, or a
+ * a teacher, a draft written, a deck made, a class or block still live or made since, or a
  * lesson of a class of theirs not over by then.
  */
 async function activeSince(tx: Database, ids: string[], since: Date): Promise<string[]> {
@@ -5463,6 +5490,11 @@ async function activeSince(tx: Database, ids: string[], since: Date): Promise<st
       .selectDistinct({ id: savedQuestions.teacherId })
       .from(savedQuestions)
       .where(and(inArray(savedQuestions.teacherId, ids), gte(savedQuestions.updatedAt, since)))),
+    // Nor is a deck (M4): a teacher adding next year's slides.
+    ...(await tx
+      .selectDistinct({ id: decks.teacherId })
+      .from(decks)
+      .where(and(inArray(decks.teacherId, ids), gte(decks.createdAt, since)))),
     ...(await tx
       .selectDistinct({ id: classes.teacherId })
       .from(classes)

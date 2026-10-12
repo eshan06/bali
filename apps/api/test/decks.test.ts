@@ -1,10 +1,13 @@
 import {
+  applyRetention,
   createSavedQuestion,
   type Database,
   DECK_PENDING_LIMIT_MS,
   decks,
+  disposeSchool,
   newUuidV7,
   savedQuestions,
+  schools,
   users,
 } from '@bali/db';
 import {
@@ -19,9 +22,17 @@ import {
 } from '@bali/shared';
 import { eq } from 'drizzle-orm';
 import { createHash, randomUUID } from 'node:crypto';
+import { Writable } from 'node:stream';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { buildApp } from '../src/app.js';
 import { CHECKS_AT_ONCE, parsePdf } from '../src/deck-check.js';
+import { captureFailure } from '../src/monitoring.js';
+
+vi.mock('../src/monitoring.js', async (actual) => ({
+  ...(await actual<typeof import('../src/monitoring.js')>()),
+  captureFailure: vi.fn(),
+}));
 
 /**
  * The gap between a complete's two reads, the deck and its `eventId` (santa's round 1 on M2b2): once
@@ -50,6 +61,7 @@ import {
 } from '../src/deck-storage.js';
 import { authedInject, makeAuthedApp, type AuthedApp } from './helpers/app.js';
 import { makeTestDb, seedClassroom } from './helpers/db.js';
+import { testEnv } from './helpers/env.js';
 import { encryptedPdf, pdf, swapped } from './helpers/pdf.js';
 
 /*
@@ -825,5 +837,159 @@ describe('a removed or rejected deck’s object, and the sweep (M2b2)', () => {
       outcome: 'replay',
       deck: unfinished,
     });
+  });
+});
+
+describe('decks in the privacy paths, and a delete that keeps failing (M4)', () => {
+  /** A teacher with no class and no block, alone at a school whose year ended on 2026-10-11. */
+  async function loneTeacher(tag: string) {
+    const [school] = await db
+      .insert(schools)
+      .values({ name: `School ${tag}`, schoolYearEndsOn: '2026-10-11' })
+      .returning();
+    const [teacher] = await db
+      .insert(users)
+      .values({
+        cognitoId: `teacher-${tag}`,
+        role: 'teacher',
+        schoolId: school!.id,
+        createdAt: new Date('2026-09-01T00:00:00Z'),
+      })
+      .returning();
+    return { school: school!, teacher: teacher!, token: await ctx.tokenFor(teacher!.cognitoId) };
+  }
+
+  /** `token`'s two decks, each checked: one uploaded by 09:10's URL, one by 09:20's. */
+  async function twoDecks(token: string) {
+    const checked = async (minute: number, pages: number) => {
+      now = at(minute);
+      const deck = await uploaded(token, pdf(pages));
+      expect((await complete(token, deck.id)).json<DeckResponse>().deck.status).toBe('ready');
+      return deck;
+    };
+    return [await checked(10, 2), await checked(20, 1)] as const;
+  }
+
+  const stored = async (deck: { id: string }) =>
+    storage.read((await rowOf(deck.id)).storageKey, DECK_MAX_BYTES);
+
+  it('an account’s deletion removes its decks, their titles emptied; the sweep deletes each object once no upload can write it', async () => {
+    const { token } = await loneTeacher('deck-c3');
+    const [early, late] = await twoDecks(token);
+    now = at(41);
+
+    const res = await authedInject(ctx.app, token, {
+      method: 'DELETE',
+      url: '/v1/me',
+      payload: { eventId: newUuidV7() },
+    });
+
+    expect(res.json()).toEqual({ outcome: 'deleted' });
+    for (const deck of [early, late]) {
+      expect(await rowOf(deck.id)).toMatchObject({ title: '', removedAt: at(41) });
+      // Nothing reached the bucket inside the deletion.
+      expect(await stored(deck)).not.toBe('missing');
+    }
+    // 09:10's upload URL can write its deck no more from 09:40; 09:20's from 09:50.
+    await ctx.app.sweep(at(41));
+    expect(await stored(early)).toBe('missing');
+    expect((await rowOf(early.id)).objectDeletedAt).toEqual(at(41));
+    expect(await stored(late)).not.toBe('missing');
+    await ctx.app.sweep(at(50));
+    expect(await stored(late)).toBe('missing');
+    expect((await rowOf(late.id)).objectDeletedAt).toEqual(at(50));
+  });
+
+  for (const [tag, path] of [
+    ['deck-c6a', 'a disposal'],
+    ['deck-c6b', 'a retention run'],
+  ] as const) {
+    it(`${path} removes the decks it reaches, their titles emptied, and the sweep deletes each object; its preview touches neither`, async () => {
+      const { school, token } = await loneTeacher(tag);
+      const theirs = await twoDecks(token);
+      // The day after the school's year ended, past that midnight in any zone.
+      now = new Date('2026-10-12T15:00:00Z');
+      const run = (confirmName?: string) => {
+        const input = { schoolId: school.id, at: now, confirmName };
+        return path === 'a disposal' ? disposeSchool(db, input) : applyRetention(db, input);
+      };
+      const rows = () => Promise.all(theirs.map((deck) => rowOf(deck.id)));
+      const before = await rows();
+
+      expect((await run()).outcome).toBe('preview');
+      await ctx.app.sweep(now);
+      expect(await rows()).toEqual(before);
+      for (const deck of theirs) expect(await stored(deck)).not.toBe('missing');
+
+      expect((await run(school.name)).outcome).toBe(path === 'a disposal' ? 'disposed' : 'applied');
+      expect(await rows()).toEqual(before.map((row) => ({ ...row, title: '', removedAt: now })));
+      await ctx.app.sweep(now);
+      for (const deck of theirs) {
+        expect(await stored(deck)).toBe('missing');
+        expect((await rowOf(deck.id)).objectDeletedAt).toEqual(now);
+      }
+    });
+  }
+
+  it('puts off a delete the bucket keeps refusing, a minute then two, said at error and reported from its third failure in a row; deleted once the bucket takes it', async () => {
+    const { token } = await people('deck-refused');
+    const deck = await uploaded(token, pdf(1));
+    expect((await remove(token, deck.id)).statusCode).toBe(200);
+    const { storageKey } = await rowOf(deck.id);
+    let refusing = true;
+    const refused: DeckStorage = {
+      ...storage,
+      delete: (key) =>
+        refusing ? Promise.reject(new StorageError('AccessDenied', 403)) : storage.delete(key),
+    };
+    const lines: string[] = [];
+    const logStream = new Writable({
+      write(chunk: Buffer, _encoding, done) {
+        lines.push(chunk.toString());
+        done();
+      },
+    });
+    const sweeping = buildApp(
+      { ...testEnv, LOG_LEVEL: 'warn' },
+      { db, verifyToken: ctx.issuer.verifier, clock: () => now, deckStorage: refused, logStream },
+    );
+    vi.mocked(captureFailure).mockClear();
+    try {
+      // Its 09:10 upload URL can write it no more from 09:40; each try puts the next off.
+      for (const minute of [40, 41, 43]) {
+        await sweeping.sweep(at(minute));
+        // Not due again a moment later: not tried.
+        await sweeping.sweep(new Date(at(minute).getTime() + 59_000));
+      }
+
+      const failures = lines
+        .map((line) => JSON.parse(line) as Record<string, unknown>)
+        .filter(
+          (line) => line.msg === 'a deck’s object was not deleted: the sweep tries it again later',
+        );
+      // pino: warn is 40, error 50.
+      expect(failures.map((line) => [line.level, line.attempts])).toEqual([
+        [40, 1],
+        [40, 2],
+        [50, 3],
+      ]);
+      expect(captureFailure).toHaveBeenCalledTimes(1);
+      expect(captureFailure).toHaveBeenCalledWith(expect.any(StorageError), 'deck object deletion');
+      expect(lines.join('')).not.toContain('Cells');
+      expect(await rowOf(deck.id)).toMatchObject({
+        objectDeletedAt: null,
+        objectDeleteAttempts: 3,
+        objectNextAttemptAt: at(47),
+      });
+      expect(await storage.read(storageKey, DECK_MAX_BYTES)).toEqual(pdf(1));
+
+      refusing = false;
+      await sweeping.sweep(at(47));
+
+      expect(await storage.read(storageKey, DECK_MAX_BYTES)).toBe('missing');
+      expect((await rowOf(deck.id)).objectDeletedAt).toEqual(at(47));
+    } finally {
+      await sweeping.close();
+    }
   });
 });

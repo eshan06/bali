@@ -8,6 +8,7 @@ import { registerPushToken } from '../src/device-tokens.js';
 import { newUuidV7 } from '../src/ids.js';
 import { createBlock, createClass } from '../src/management.js';
 import {
+  claimDecksToDrop,
   findOrCreateStudent,
   findUserByCognitoId,
   type QuestionCounts,
@@ -4241,6 +4242,48 @@ describe.runIf(REAL_PG)(
   },
 );
 
+describe.runIf(REAL_PG)('removed decks claimed by two sweeps at once (real Postgres, M4)', () => {
+  it('two claims at once never take the same deck, and between them take every deck due', async () => {
+    for (let round = 0; round < 10; round += 1) {
+      const { teacherId } = await seed(`race-deck-claim-${round}`);
+      const { schoolId } = one(
+        await db.select({ schoolId: users.schoolId }).from(users).where(eq(users.id, teacherId)),
+      );
+      // Minted before any other deck in this database, an earlier round's included, so these six
+      // are the only ones a claim minted by then can take.
+      const minted = new Date(Date.UTC(2000, 0, 1, 0, 59 - round));
+      const ids: string[] = [];
+      for (let i = 0; i < 6; i += 1) {
+        const { deck } = await createDeck(db, {
+          teacherId,
+          schoolId: schoolId!,
+          eventId: newUuidV7(),
+          title: 'Cells',
+          bytes: 1_000,
+          sha256: 'c'.repeat(64),
+          now: minted,
+        });
+        await removeDeck(db, { deckId: deck.id, eventId: newUuidV7() });
+        ids.push(deck.id);
+      }
+      const now = new Date();
+      // Two API instances' sweeps: each skips what the other holds, and a deck claimed is not due
+      // again for a minute, so no object's delete is tried twice at once and none is left behind.
+      const [a, b] = await Promise.all([
+        claimDecksToDrop(db, { mintedBy: minted, now, limit: 4 }),
+        claimDecksToDrop(db, { mintedBy: minted, now, limit: 4 }),
+      ]);
+      const claimed = [...a, ...b].map((deck) => deck.id);
+      expect(new Set(claimed).size, `round ${round}`).toBe(claimed.length);
+      expect(claimed.sort(), `round ${round}`).toEqual(ids.sort());
+      expect(
+        [...a, ...b].every((deck) => deck.objectDeleteAttempts === 1),
+        `round ${round}`,
+      ).toBe(true);
+    }
+  }, 30_000);
+});
+
 describe.runIf(REAL_PG)('live lesson questions under contention (real Postgres, L1, L2)', () => {
   beforeAll(async () => {
     await Promise.all(Array.from({ length: 5 }, () => db.execute(sql`select 1`)));
@@ -4990,7 +5033,7 @@ describe.runIf(REAL_PG)('live lesson questions under contention (real Postgres, 
     }
   });
 
-  it('a deck behind its teacher’s deletion is refused and writes nothing; one ahead of it is kept (M2)', async () => {
+  it('a deck behind its teacher’s deletion is refused and writes nothing; one ahead of it goes with the account (M2, M4)', async () => {
     /** A teacher whose class is archived, so the account may go (C3). */
     async function leaving(tag: string) {
       const { teacherId } = await seed(tag);
@@ -5017,7 +5060,7 @@ describe.runIf(REAL_PG)('live lesson questions under contention (real Postgres, 
     expect(await decksOf(behind)).toEqual([]);
 
     // Ahead: the create holds the row FOR SHARE until it commits, so the deletion waits, then
-    // goes ahead; the deck stays for M4's privacy paths to remove.
+    // removes it with its title (M4).
     const ahead = await leaving('race-deck-delete-ahead');
     const deck = await decking(ahead);
     const deleted = await behindCommit(
@@ -5026,10 +5069,12 @@ describe.runIf(REAL_PG)('live lesson questions under contention (real Postgres, 
     );
     if (deleted.status === 'rejected') throw deleted.reason as Error;
     expect(deleted.value).toEqual({ outcome: 'deleted' });
-    expect(await decksOf(ahead)).toMatchObject([{ eventId: deck.eventId }]);
+    const [gone] = await decksOf(ahead);
+    expect(gone).toMatchObject({ eventId: deck.eventId, title: '' });
+    expect(gone!.removedAt).not.toBeNull();
   }, 20_000);
 
-  it('a deck racing its school’s disposal never deadlocks: behind it refused, ahead of it kept (M2)', async () => {
+  it('a deck racing its school’s disposal never deadlocks: behind it refused, ahead of it removed with the school’s (M2, M4)', async () => {
     // The create holds the school (KEY SHARE) before its teacher, in the disposal's order, so the
     // two meet at the school's row: the disposal's FOR UPDATE, or the create's KEY SHARE, waits.
     async function school(tag: string) {
@@ -5054,7 +5099,64 @@ describe.runIf(REAL_PG)('live lesson questions under contention (real Postgres, 
     );
     if (disposed.status === 'rejected') throw disposed.reason as Error;
     expect(disposed.value.outcome).toBe('disposed');
-    expect(await decksOf(ahead.teacherId)).toMatchObject([{ eventId: ahead.deck.eventId }]);
+    const [gone] = await decksOf(ahead.teacherId);
+    expect(gone).toMatchObject({ eventId: ahead.deck.eventId, title: '' });
+    expect(gone!.removedAt).not.toBeNull();
+  }, 20_000);
+
+  it('a deck after the year behind a retention run is refused; one ahead of it keeps its teacher named (M4)', async () => {
+    /** A teacher with no class, their school's year over since yesterday: a deck is the one record since. */
+    async function yearOver(tag: string) {
+      const day = new Date(Date.now() - 86_400_000);
+      const two = (n: number) => String(n).padStart(2, '0');
+      const name = `School ${tag}`;
+      const school = one(
+        await db
+          .insert(schools)
+          .values({
+            name,
+            schoolYearEndsOn: `${day.getFullYear()}-${two(day.getMonth() + 1)}-${two(day.getDate())}`,
+          })
+          .returning(),
+      );
+      const teacher = one(
+        await db
+          .insert(users)
+          .values({
+            cognitoId: `teacher-${tag}`,
+            role: 'teacher',
+            schoolId: school.id,
+            createdAt: new Date(Date.now() - 30 * 86_400_000),
+          })
+          .returning(),
+      );
+      const deck = await decking(teacher.id);
+      return {
+        teacherId: teacher.id,
+        retain: (on: Database) =>
+          applyRetention(on, { schoolId: school.id, at: new Date(), confirmName: name }),
+        deck: (on: Database) => createDeck(on, deck),
+      };
+    }
+
+    // Behind: the run holds the school's row (FOR UPDATE) and de-identifies the teacher, with
+    // nothing since; the create waits at the school, then finds the account deleted, and writes
+    // nothing.
+    const behind = await yearOver('race-deck-retain-behind');
+    const late = await behindCommit(behind.retain, () => behind.deck(db));
+    expect(late.status).toBe('rejected');
+    expect((late as PromiseRejectedResult).reason).toMatchObject({ code: 'ACCOUNT_DELETED' });
+    expect(await decksOf(behind.teacherId)).toEqual([]);
+
+    // Ahead: the create holds the school (KEY SHARE) until it commits; the run waits there, then
+    // reads the deck as a record after the year, and keeps its teacher named and the deck as made.
+    const early = await yearOver('race-deck-retain-ahead');
+    const run = await behindCommit(early.deck, () => early.retain(db));
+    if (run.status === 'rejected') throw run.reason as Error;
+    if (run.value.outcome !== 'applied') throw new Error(run.value.outcome);
+    expect(run.value.continuing).toEqual([early.teacherId]);
+    expect((await userNow(early.teacherId)).removedAt).toBeNull();
+    expect(await decksOf(early.teacherId)).toMatchObject([{ title: 'Cells', removedAt: null }]);
   }, 20_000);
 
   it('a create’s retry racing its deck’s removal: retried first, the removal reads the retry’s upload URL; removed first, the retry makes a second pending deck (M2b2)', async () => {
