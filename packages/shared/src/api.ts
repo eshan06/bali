@@ -985,8 +985,8 @@ export interface QuestionResults {
   /** N: everyone with an answer to it, a student removed since included. */
   answered: number;
   /**
-   * M: the class's students now, the session's participants (a removed one included) and everyone
-   * counted in N, so never below N.
+   * M: everyone in the class at any time while it could be answered, the session's participants
+   * and everyone counted in N, so never below N, and never changed by a removal.
    */
   eligible: number;
   /** As `TeacherQuestion.open`: by the server's clock, so closed past the bell. */

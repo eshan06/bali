@@ -264,7 +264,10 @@ const BREAKDOWN_FROM = 3;
 export interface QuestionCounts {
   /** N: everyone with a response to the question, a student removed since included. */
   answered: number;
-  /** M: the class's students now, the session's participants (a removed one included) and N's. */
+  /**
+   * M: everyone in the class at any time while the question could be answered, the session's
+   * participants and N's, so a removal never changes it (#315).
+   */
   eligible: number;
   /** Per option, by its index, totalling N; null until `BREAKDOWN_FROM` have answered. */
   counts: number[] | null;
@@ -286,8 +289,13 @@ export async function questionCounts(
       // Each answer's option alone.
       chosen: sql<number[]>`(select coalesce(jsonb_agg(${responses.option}), '[]'::jsonb)
         from ${responses} where ${responses.questionId} = ${questions.id})`,
+      // An enrollment from before the close (any, while open) not ended before the opening.
+      // ponytail: no index reaches ended enrollments, so this reads the whole table on each poll;
+      // an index on enrollments (class_id) once a school's history makes the read slow.
       eligible: sql<number>`(select count(*)::int from (
-        select ${enrollments.studentId} from ${enrollments} where ${enrollments.classId} = ${sessions.classId} and ${enrollments.removedAt} is null
+        select ${enrollments.studentId} from ${enrollments} where ${enrollments.classId} = ${sessions.classId}
+          and (${questions.closedAt} is null or ${enrollments.createdAt} <= ${questions.closedAt})
+          and (${enrollments.removedAt} is null or ${enrollments.removedAt} >= ${questions.openedAt})
         union select ${participations.studentId} from ${participations} where ${participations.sessionId} = ${sessions.id}
         union select ${responses.studentId} from ${responses} where ${responses.questionId} = ${questions.id}
       ) as everyone)`,
