@@ -18,7 +18,9 @@ export const SWEEP_INTERVAL_MS = 60_000;
  * The sweep, the minute-tick that keeps derived truth honest: it ends every
  * session past its end time (decision 6), then opens a silence episode for
  * every focused phone gone quiet (decision 7), then tries each deleted
- * account's Cognito sign-in that is due (`signIns`, 2026-10-09). Each duty is
+ * account's Cognito sign-in that is due (`signIns`, 2026-10-09), then, while
+ * decks' storage is on, rejects the decks left pending and deletes the objects
+ * no upload can write any more (`decks`, M2b2). Each duty is
  * idempotent, so any number may run at once — each API process's own, every
  * minute, and the Railway cron's backup call to `/internal/sweep` (hosting
  * decision 3). By the server's clock; the load gate's timed sweep alone passes
@@ -28,13 +30,15 @@ export async function sweep(
   db: Database,
   now = new Date(),
   signIns?: SignInDeletions,
+  decks?: (now: Date) => Promise<void>,
 ): Promise<{ expired: number; wentSilent: number }> {
   // Expire first: a session ending here also ends its live participations, so
   // the silence pass never opens an episode on a phone that just left.
   const expired = await expireDueSessions(db, now);
   const wentSilent = await markSilentParticipations(db, now);
-  // Last: a bell never waits on Cognito.
+  // Last: a bell never waits on Cognito or the bucket.
   await signIns?.due(now);
+  await decks?.(now);
   return { expired: expired.length, wentSilent };
 }
 

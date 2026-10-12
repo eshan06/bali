@@ -1,6 +1,7 @@
 import {
   createSavedQuestion,
   type Database,
+  DECK_PENDING_LIMIT_MS,
   decks,
   newUuidV7,
   savedQuestions,
@@ -18,9 +19,29 @@ import {
 } from '@bali/shared';
 import { eq } from 'drizzle-orm';
 import { createHash, randomUUID } from 'node:crypto';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CHECKS_AT_ONCE, parsePdf } from '../src/deck-check.js';
+
+/**
+ * The gap between a complete's two reads, the deck and its `eventId` (santa's round 1 on M2b2): once
+ * armed, the next of either read answers only after `between` has run, so a test commits another
+ * write right there. Unarmed, both reads are the engine's own.
+ */
+const gap = vi.hoisted(() => ({ between: undefined as (() => Promise<unknown>) | undefined }));
+vi.mock('@bali/db', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@bali/db')>();
+  const paused =
+    <A extends unknown[], R>(read: (...args: A) => Promise<R>) =>
+    async (...args: A) => {
+      const answer = await read(...args);
+      const between = gap.between;
+      gap.between = undefined;
+      await between?.();
+      return answer;
+    };
+  return { ...real, findDeck: paused(real.findDeck), eventIdSpent: paused(real.eventIdSpent) };
+});
 import {
   type DeckStorage,
   type MemoryDeckStorage,
@@ -243,7 +264,7 @@ describe('GET /v1/decks', () => {
 });
 
 describe('DELETE /v1/decks/:id', () => {
-  it('removes one, then its stored object; its retry answers it removed, and anything else finds none', async () => {
+  it('removes one; its retry answers it removed, and anything else finds none', async () => {
     const { teacher, token } = await people('deck-remove');
     const { deck, uploadUrl } = await added(token);
     await upload(uploadUrl);
@@ -255,8 +276,8 @@ describe('DELETE /v1/decks/:id', () => {
     expect(res.statusCode).toBe(200);
     expect(res.json<DeckResponse>()).toEqual({ outcome: 'removed', deck });
     const [row] = await decksOf(teacher.id);
-    expect(await storage.read(row!.storageKey, DECK_MAX_BYTES)).toBe('missing');
-    // Pending, its upload URL may still write it: the sweep's to stamp (M4).
+    // Its upload URL, minted at 09:10, may still write it: the sweep's (M2b2).
+    expect(await storage.read(row!.storageKey, DECK_MAX_BYTES)).toEqual(PDF);
     expect(row).toMatchObject({ removedAt: at(12), eventId: body.eventId, objectDeletedAt: null });
 
     expect((await remove(token, deck.id, body)).json<DeckResponse>()).toEqual({
@@ -269,19 +290,19 @@ describe('DELETE /v1/decks/:id', () => {
     }
   });
 
-  it('stamps a decided deck’s object deleted once it is gone (decision 5)', async () => {
+  it('deletes its object at once, stamped so, once no upload can write it (decision 5)', async () => {
     const { teacher, token } = await people('deck-remove-ready');
-    const { deck, uploadUrl } = await added(token);
-    await upload(uploadUrl);
-    // As the check marks it (M2b).
-    await db.update(decks).set({ status: 'ready', pageCount: 3 }).where(eq(decks.id, deck.id));
-    now = at(12);
+    const deck = await uploaded(token, pdf(3));
+    await complete(token, deck.id);
+    // 09:10's upload URL lapsed at 09:15, and an upload begun by then has had 25 minutes.
+    now = at(40);
 
     expect((await remove(token, deck.id)).statusCode).toBe(200);
 
-    const [row] = await decksOf(teacher.id);
-    expect(row).toMatchObject({ removedAt: at(12), objectDeletedAt: at(12) });
-    expect(await storage.read(row!.storageKey, DECK_MAX_BYTES)).toBe('missing');
+    const row = await rowOf(deck.id);
+    expect(row).toMatchObject({ status: 'ready', removedAt: at(40), objectDeletedAt: at(40) });
+    expect(await storage.read(row.storageKey, DECK_MAX_BYTES)).toBe('missing');
+    expect(await decksOf(teacher.id)).toHaveLength(1);
   });
 
   it('keeps the removal when the object’s delete fails, leaving it unstamped for the sweep', async () => {
@@ -292,17 +313,23 @@ describe('DELETE /v1/decks/:id', () => {
     const broken = await makeAuthedApp(db, () => now, failing);
     try {
       const { teacher, token } = await people('deck-remove-fails');
-      const { deck } = await added(token);
-      await db.update(decks).set({ status: 'ready', pageCount: 3 }).where(eq(decks.id, deck.id));
+      const deck = await uploaded(token, pdf(1));
+      now = at(40);
 
       const own = await broken.tokenFor(teacher.cognitoId);
       const res = await remove(own, deck.id, undefined, broken.app);
 
       expect(res.statusCode).toBe(200);
       expect(res.json<DeckResponse>().outcome).toBe('removed');
-      const [row] = await decksOf(teacher.id);
-      expect(row!.removedAt).not.toBeNull();
-      expect(row!.objectDeletedAt).toBeNull();
+      const row = await rowOf(deck.id);
+      expect(row.removedAt).not.toBeNull();
+      expect(row.objectDeletedAt).toBeNull();
+      expect(await storage.read(row.storageKey, DECK_MAX_BYTES)).not.toBe('missing');
+
+      await ctx.app.sweep(at(41));
+
+      expect(await storage.read(row.storageKey, DECK_MAX_BYTES)).toBe('missing');
+      expect((await rowOf(deck.id)).objectDeletedAt).toEqual(at(41));
     } finally {
       await broken.close();
     }
@@ -376,7 +403,7 @@ describe('POST /v1/decks/:id/complete', () => {
     expect(await rowOf(deck.id)).toMatchObject({ eventId: body.eventId, status: 'ready' });
   });
 
-  it('takes 200 pages, and rejects 201: too_many_pages, its object deleted', async () => {
+  it('takes 200 pages, and rejects 201: too_many_pages', async () => {
     const { token } = await people('deck-pages');
     const most = await uploaded(token, pdf(DECK_MAX_PAGES));
     const over = await uploaded(token, pdf(DECK_MAX_PAGES + 1));
@@ -393,13 +420,9 @@ describe('POST /v1/decks/:id/complete', () => {
       outcome: 'checked',
       deck: { ...over, status: 'rejected', rejection: 'too_many_pages' },
     });
-    const row = await rowOf(over.id);
-    expect(await storage.read(row.storageKey, DECK_MAX_BYTES)).toBe('missing');
-    // Decided, so stamped at once, as a removal stamps one (M2a; M2b2 waits out its upload URL).
-    expect(row.objectDeletedAt).toEqual(now);
   });
 
-  it('rejects each upload that can be no deck, saying why, and deletes its object', async () => {
+  it('rejects each upload that can be no deck, saying why; the sweep deletes each object once no upload can write it', async () => {
     const { token } = await people('deck-hostile');
     const three = pdf(3);
     const cases: [string, Uint8Array<ArrayBuffer>, DeckRejection][] = [
@@ -414,6 +437,7 @@ describe('POST /v1/decks/:id/complete', () => {
       ['a password to open it', encryptedPdf(false), 'encrypted'],
       ['an owner’s password only, which opens with none', encryptedPdf(true), 'encrypted'],
     ];
+    const rejected: string[] = [];
     for (const [why, bytes, rejection] of cases) {
       const deck = await uploaded(token, bytes);
 
@@ -425,8 +449,7 @@ describe('POST /v1/decks/:id/complete', () => {
         status: 'rejected',
         rejection,
       });
-      const row = await rowOf(deck.id);
-      expect(await storage.read(row.storageKey, DECK_MAX_BYTES), why).toBe('missing');
+      rejected.push(deck.id);
     }
 
     // Other bytes of the declared length, which its URL takes: not the file declared.
@@ -436,11 +459,21 @@ describe('POST /v1/decks/:id/complete', () => {
     });
     await upload(uploadUrl, swapped(three, '/Count 3', '/Count 2'));
     expect((await complete(token, deck.id)).json<DeckResponse>().deck.rejection).toBe('mismatch');
+    rejected.push(deck.id);
     // Nothing uploaded at all.
     const never = (await added(token)).deck;
     expect((await complete(token, never.id)).json<DeckResponse>().deck.rejection).toBe(
       'unfinished',
     );
+
+    // Their upload URLs, minted at 09:10, lapsed at 09:15; an upload begun by then had 25 minutes.
+    await ctx.app.sweep(at(40));
+
+    for (const id of rejected) {
+      const row = await rowOf(id);
+      expect(row.objectDeletedAt).toEqual(at(40));
+      expect(await storage.read(row.storageKey, DECK_MAX_BYTES)).toBe('missing');
+    }
   });
 
   it('reads no further than 25 MB: an object past it is too_large, one of another length a mismatch', async () => {
@@ -535,6 +568,126 @@ describe('POST /v1/decks/:id/complete', () => {
     }
   });
 
+  it('ends a parse that runs out of its heap too_slow, and answers a crash or an exit with no answer 500, the deck pending; the API answers on', async () => {
+    const { teacher, token } = await people('deck-endings');
+    /** A parser that is `code` alone: what a hostile file could make PDF.js do. */
+    const parser = (code: string) => new URL(`data:text/javascript,${encodeURIComponent(code)}`);
+    const endings: [string, string, number][] = [
+      ['out of its heap', 'const kept = []; for (;;) kept.push(new Array(1e6).fill(1.5));', 200],
+      ['a crash', "throw new Error('the parser broke');", 500],
+      ['an exit with no answer', 'process.exit(0);', 500],
+    ];
+    for (const [why, code, status] of endings) {
+      const ending = await makeAuthedApp(db, () => now, storage, {
+        parsePdf: (bytes) => parsePdf(bytes, parser(code)),
+      });
+      try {
+        const deck = await uploaded(token, pdf(1));
+        const { eventId: created } = await rowOf(deck.id);
+        const own = await ending.tokenFor(teacher.cognitoId);
+
+        const res = await complete(own, deck.id, undefined, ending.app);
+
+        expect(res.statusCode, why).toBe(status);
+        if (status === 200) {
+          expect(res.json<DeckResponse>().deck, why).toMatchObject({
+            status: 'rejected',
+            rejection: 'too_slow',
+          });
+        } else {
+          expect(await rowOf(deck.id), why).toMatchObject({ status: 'pending', eventId: created });
+          expect((await complete(token, deck.id)).json<DeckResponse>().deck.status).toBe('ready');
+        }
+        expect((await ending.app.inject({ url: '/healthz' })).statusCode, why).toBe(200);
+      } finally {
+        await ending.close();
+      }
+    }
+  });
+
+  it('answers a retry whose first delivery records the verdict between its two reads with that verdict, never a conflict (santa’s round 1)', async () => {
+    let parked!: () => void;
+    const parking = new Promise<void>((resolve) => (parked = resolve));
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const held = await makeAuthedApp(db, () => now, storage, {
+      parsePdf: async () => {
+        parked();
+        await gate;
+        return { pages: 1 };
+      },
+    });
+    try {
+      const { teacher, token } = await people('deck-retry-race');
+      const own = await held.tokenFor(teacher.cognitoId);
+      const deck = await uploaded(token, pdf(1));
+      const body = { eventId: newUuidV7() };
+      // The first delivery, parked in its parse with both its reads done.
+      const first = complete(own, deck.id, body, held.app);
+      await parking;
+      // Its retry: between its two reads, the first delivery's verdict commits.
+      gap.between = () => {
+        release();
+        return first;
+      };
+
+      const retry = await complete(own, deck.id, body, held.app);
+
+      expect(gap.between).toBeUndefined();
+      const ready = { ...deck, status: 'ready', pageCount: 1 };
+      expect((await first).json<DeckResponse>()).toEqual({ outcome: 'checked', deck: ready });
+      expect(retry.statusCode).toBe(200);
+      expect(retry.json<DeckResponse>()).toEqual({ outcome: 'replay', deck: ready });
+    } finally {
+      release();
+      await held.close();
+    }
+  });
+
+  it('refuses an eventId another record holds after one read, before reading or parsing anything (#324’s review)', async () => {
+    let reads = 0;
+    let parses = 0;
+    const counting = await makeAuthedApp(
+      db,
+      () => now,
+      {
+        ...storage,
+        read: (key, maxBytes) => {
+          reads += 1;
+          return storage.read(key, maxBytes);
+        },
+      },
+      {
+        parsePdf: (bytes) => {
+          parses += 1;
+          return parsePdf(bytes);
+        },
+      },
+    );
+    try {
+      const { teacher, token } = await people('deck-spent-early');
+      const own = await counting.tokenFor(teacher.cognitoId);
+      const deck = await uploaded(token, pdf(1));
+      const draft = newUuidV7();
+      const words = { prompt: 'Which?', options: ['a', 'b'] };
+      await createSavedQuestion(db, { teacherId: teacher.id, eventId: draft, ...words });
+
+      // A draft's id, and the deck's own create's.
+      for (const eventId of [draft, (await rowOf(deck.id)).eventId]) {
+        const res = await complete(own, deck.id, { eventId }, counting.app);
+        expect(res.statusCode).toBe(409);
+        expect(reasonOf(res)).toBe('event_id_conflict');
+      }
+
+      expect([reads, parses]).toEqual([0, 0]);
+      const checked = await complete(own, deck.id, undefined, counting.app);
+      expect(checked.json<DeckResponse>().deck.status).toBe('ready');
+      expect([reads, parses]).toEqual([1, 1]);
+    } finally {
+      await counting.close();
+    }
+  });
+
   it('keeps the deck pending when the bucket fails its read: a 500, checked on the next complete', async () => {
     const failing = await makeAuthedApp(db, () => now, {
       ...storage,
@@ -582,5 +735,95 @@ describe('POST /v1/decks/:id/complete', () => {
 
     expect(await rowOf(deck.id)).toMatchObject({ status: 'pending', eventId: created });
     expect((await complete(token, deck.id)).json<DeckResponse>().deck.status).toBe('ready');
+  });
+});
+
+describe('a removed or rejected deck’s object, and the sweep (M2b2)', () => {
+  it('is deleted only once its last upload URL can write it no more, a retried create’s included: 5 minutes, and 25 for an upload in flight', async () => {
+    const { token } = await people('deck-rule');
+    const body = adding();
+    const { deck } = (await create(token, body)).json<CreateDeckResponse>();
+    // Its create retried at 09:13: a fresh URL, good until 09:18.
+    now = at(13);
+    const retry = (await create(token, body)).json<CreateDeckResponse>();
+    expect(retry.outcome).toBe('replay');
+    now = at(14);
+    expect((await remove(token, deck.id)).statusCode).toBe(200);
+    // An upload begun on the retry's URL lands after the removal.
+    now = at(16);
+    expect((await upload(retry.uploadUrl)).status).toBe(200);
+    const { storageKey } = await rowOf(deck.id);
+
+    // 09:40 is 30 minutes after the first URL, 09:42:59.999 short of the retry's.
+    for (const sweptAt of [at(40), new Date(at(43).getTime() - 1)]) {
+      await ctx.app.sweep(sweptAt);
+      expect(await storage.read(storageKey, DECK_MAX_BYTES)).toEqual(PDF);
+      expect((await rowOf(deck.id)).objectDeletedAt).toBeNull();
+    }
+    await ctx.app.sweep(at(43));
+
+    expect(await storage.read(storageKey, DECK_MAX_BYTES)).toBe('missing');
+    expect((await rowOf(deck.id)).objectDeletedAt).toEqual(at(43));
+  });
+
+  it('keeps a rejected deck’s object by the same rule, then the sweep deletes it', async () => {
+    const { token } = await people('deck-rule-rejected');
+    const over = await uploaded(token, pdf(DECK_MAX_PAGES + 1));
+    now = at(11);
+    const refused = (await complete(token, over.id)).json<DeckResponse>();
+    expect(refused.deck.rejection).toBe('too_many_pages');
+    const { storageKey } = await rowOf(over.id);
+
+    await ctx.app.sweep(new Date(at(40).getTime() - 1));
+    expect(await storage.read(storageKey, DECK_MAX_BYTES)).not.toBe('missing');
+    expect((await rowOf(over.id)).objectDeletedAt).toBeNull();
+    await ctx.app.sweep(at(40));
+
+    expect(await storage.read(storageKey, DECK_MAX_BYTES)).toBe('missing');
+    expect((await rowOf(over.id)).objectDeletedAt).toEqual(at(40));
+  });
+
+  it('deletes a rejected deck’s object at once, stamped so, when its check comes 30 minutes after its last upload URL', async () => {
+    const { token } = await people('deck-rule-late-check');
+    // Uploaded by 09:10's URL, which lapsed at 09:15; checked at 09:40.
+    const over = await uploaded(token, pdf(DECK_MAX_PAGES + 1));
+    now = at(40);
+
+    const refused = (await complete(token, over.id)).json<DeckResponse>();
+
+    expect(refused.deck.rejection).toBe('too_many_pages');
+    const row = await rowOf(over.id);
+    expect(row.objectDeletedAt).toEqual(at(40));
+    expect(await storage.read(row.storageKey, DECK_MAX_BYTES)).toBe('missing');
+  });
+
+  it('rejects a deck left pending 24 hours unfinished, and deletes its object by the same rule', async () => {
+    const { token } = await people('deck-unfinished');
+    // Uploaded at 09:10, never checked; another added at 09:11, nothing uploaded.
+    const left = await uploaded(token, pdf(1));
+    now = at(11);
+    const younger = (await added(token)).deck;
+    const dayAfter = (ms: number) => new Date(at(10).getTime() + DECK_PENDING_LIMIT_MS + ms);
+    const { storageKey } = await rowOf(left.id);
+
+    now = dayAfter(-1);
+    await ctx.app.sweep(now);
+    expect(await rowOf(left.id)).toMatchObject({ status: 'pending', objectDeletedAt: null });
+    now = dayAfter(0);
+    await ctx.app.sweep(now);
+
+    const unfinished = { ...left, status: 'rejected', rejection: 'unfinished' };
+    expect(await rowOf(left.id)).toMatchObject({
+      status: 'rejected',
+      rejection: 'unfinished',
+      objectDeletedAt: now,
+    });
+    expect(await storage.read(storageKey, DECK_MAX_BYTES)).toBe('missing');
+    expect((await list(token)).json<DecksResponse>()).toEqual({ decks: [younger, unfinished] });
+    // A complete now answers the sweep's verdict.
+    expect((await complete(token, left.id)).json<DeckResponse>()).toEqual({
+      outcome: 'replay',
+      deck: unfinished,
+    });
   });
 });

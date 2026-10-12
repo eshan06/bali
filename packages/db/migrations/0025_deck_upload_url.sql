@@ -1,0 +1,1 @@
+ALTER TABLE "decks" ADD COLUMN "upload_url_minted_at" timestamp with time zone DEFAULT now() NOT NULL;

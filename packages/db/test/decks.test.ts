@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { newUuidV7 } from '../src/ids.js';
-import { stampObjectDeleted } from '../src/queries.js';
+import { decksToDrop, stampObjectDeleted } from '../src/queries.js';
 import {
   armedTaps,
   classes,
@@ -23,10 +23,13 @@ import {
   completeDeck,
   createDeck,
   createSavedQuestion,
+  DECK_PENDING_LIMIT_MS,
   deleteAccount,
   type DeckResult,
+  eventIdSpent,
   openQuestion,
   refocus,
+  rejectUnfinishedDecks,
   removeDeck,
   removeSavedQuestion,
   renameStudent,
@@ -137,18 +140,20 @@ describe('a teacher’s decks (decision 4)', () => {
       rejection: null,
       eventId,
       createdAt: at(5),
+      uploadUrlMintedAt: at(5),
       removedAt: null,
       objectDeletedAt: null,
     });
     expect(await db.select().from(events).where(eq(events.eventId, eventId))).toEqual([]);
   });
 
-  it('answers a create’s replay with the deck now, and its id with another file or teacher as taken', async () => {
+  it('answers a create’s replay with the deck now, its fresh upload URL’s mint recorded, and its id with another file or teacher as taken', async () => {
     const { teacher, other } = await school('k-replay');
     const eventId = newUuidV7();
     const deck = await written(add(teacher, 5, eventId));
+    const minted = { ...deck, uploadUrlMintedAt: at(9) };
 
-    expect(await add(teacher, 9, eventId)).toEqual({ outcome: 'replay', deck });
+    expect(await add(teacher, 9, eventId)).toEqual({ outcome: 'replay', deck: minted });
     await expect(add(other, 9, eventId)).rejects.toMatchObject(conflict);
     const same = { teacherId: teacher.id, schoolId: teacher.schoolId!, eventId };
     for (const file of [{ title: 'Atoms' }, { bytes: 999 }, { sha256: 'd'.repeat(64) }]) {
@@ -157,8 +162,27 @@ describe('a teacher’s decks (decision 4)', () => {
       ).rejects.toMatchObject(conflict);
     }
 
-    expect(await decksOf(teacher.id)).toEqual([deck]);
+    expect(await decksOf(teacher.id)).toEqual([minted]);
     expect(await decksOf(other.id)).toEqual([]);
+  });
+
+  it('makes a second pending deck of a create retried once its deck was removed or checked: left, the sweep’s 24 hours take it (#323’s review)', async () => {
+    const { teacher } = await school('k-retry-after');
+    const verdict = { status: 'ready', pageCount: 1 } as const;
+    for (const write of [
+      (deckId: string) => removeDeck(db, { deckId, eventId: newUuidV7() }),
+      (deckId: string) => completeDeck(db, { deckId, eventId: newUuidV7(), verdict }),
+    ]) {
+      const eventId = newUuidV7();
+      const first = await written(add(teacher, 5, eventId));
+      await write(first.id);
+
+      const retry = await add(teacher, 9, eventId);
+
+      expect(retry).toMatchObject({ outcome: 'created', deck: { status: 'pending', eventId } });
+      expect(retry.deck.id).not.toBe(first.id);
+    }
+    expect(await decksOf(teacher.id)).toHaveLength(4);
   });
 
   it('refuses a deck to a teacher whose account was deleted on its way, writing nothing', async () => {
@@ -376,5 +400,98 @@ describe('a deck’s eventId, spent both ways (settled 2026-10-10)', () => {
     });
 
     expect(draft.outcome).toBe('created');
+  });
+
+  it('is found spent by one read, whatever record holds it (#324’s review)', async () => {
+    const { teacher } = await school('k-spent-read');
+    const deck = await written(add(teacher, 5));
+    const draft = newUuidV7();
+    await createSavedQuestion(db, {
+      teacherId: teacher.id,
+      eventId: draft,
+      prompt: 'Q?',
+      options: ['a', 'b'],
+    });
+
+    expect(await eventIdSpent(db, deck.eventId)).toBe(true);
+    expect(await eventIdSpent(db, draft)).toBe(true);
+    expect(await eventIdSpent(db, newUuidV7())).toBe(false);
+  });
+});
+
+// Last in the file: the sweep's rejection reads every deck in this file's database.
+describe('the sweep’s decks (decision 6, M2b2)', () => {
+  /** 09:mm a day later: 24 hours after 09:mm, to the millisecond. */
+  const dayAfter = (minute: number, ms = 0) =>
+    new Date(at(minute).getTime() + DECK_PENDING_LIMIT_MS + ms);
+
+  it('rejects a live deck left pending 24 hours unfinished, keeping its eventId; never a younger, a checked or a removed one', async () => {
+    const { teacher } = await school('k-unfinished');
+    const left = await written(add(teacher, 5));
+    const younger = await written(add(teacher, 6));
+    const checked = await written(
+      completeDeck(db, {
+        deckId: (await written(add(teacher, 5))).id,
+        eventId: newUuidV7(),
+        verdict: { status: 'ready', pageCount: 2 },
+      }),
+    );
+    const removed = await written(
+      removeDeck(db, { deckId: (await written(add(teacher, 5))).id, eventId: newUuidV7() }),
+    );
+
+    expect(await rejectUnfinishedDecks(db, dayAfter(5, -1))).not.toContain(left.id);
+    const rejected = await rejectUnfinishedDecks(db, dayAfter(5));
+    const again = await rejectUnfinishedDecks(db, dayAfter(5));
+
+    expect(rejected).toContain(left.id);
+    for (const spared of [younger, checked, removed]) expect(rejected).not.toContain(spared.id);
+    expect(again).toEqual([]);
+    const unfinished = { ...left, status: 'rejected', rejection: 'unfinished' };
+    expect(await decksOf(teacher.id)).toEqual(
+      expect.arrayContaining([unfinished, younger, checked, removed]),
+    );
+    // A complete meeting it answers the sweep's verdict, as any of a checked deck.
+    const verdict = { status: 'ready', pageCount: 1 } as const;
+    expect(await completeDeck(db, { deckId: left.id, eventId: newUuidV7(), verdict })).toEqual({
+      outcome: 'replay',
+      deck: unfinished,
+    });
+  });
+
+  it('lists the removed and rejected decks no upload can write, the oldest mint first; never a live one, a stamped one or one minted since', async () => {
+    const { teacher } = await school('k-drop');
+    const verdict = (status: 'ready' | 'rejected') =>
+      status === 'ready'
+        ? ({ status, pageCount: 1 } as const)
+        : ({ status, rejection: 'encrypted' } as const);
+    const check = async (minute: number, status: 'ready' | 'rejected') =>
+      written(
+        completeDeck(db, {
+          deckId: (await written(add(teacher, minute))).id,
+          eventId: newUuidV7(),
+          verdict: verdict(status),
+        }),
+      );
+    const remove = async (deck: { id: string }) =>
+      written(removeDeck(db, { deckId: deck.id, eventId: newUuidV7() }));
+    const rejected = await check(6, 'rejected');
+    const removed = await remove(await written(add(teacher, 5)));
+    await check(4, 'ready');
+    await written(add(teacher, 4));
+    const stamped = await remove(await written(add(teacher, 3)));
+    await stampObjectDeleted(db, stamped.id, at(4));
+    // Its create retried at 09:09, so its upload URL then.
+    const remint = newUuidV7();
+    await add(teacher, 5, remint);
+    const reminted = await remove(await written(add(teacher, 9, remint)));
+    const theirs = async (mintedBy: Date) =>
+      (await decksToDrop(db, mintedBy, 100))
+        .filter((deck) => deck.teacherId === teacher.id)
+        .map((deck) => deck.id);
+
+    expect(await theirs(at(8))).toEqual([removed.id, rejected.id]);
+    expect(await theirs(at(9))).toEqual([removed.id, rejected.id, reminted.id]);
+    expect(await decksToDrop(db, at(9), 1)).toHaveLength(1);
   });
 });

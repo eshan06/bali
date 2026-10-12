@@ -1081,6 +1081,7 @@ nothing of a live lesson sits in the outbox ahead of an unlock (decision 5).
   `storage_key`, `sha256`, `bytes`, `page_count`, `status` (`pending` / `ready` /
   `rejected`), `rejection` (why, once `rejected`: `DECK_REJECTIONS` in `@bali/shared`; M2b),
   `event_id` (unique: the write that last wrote it, as a draft's; M2), `created_at`,
+  `upload_url_minted_at` (when its last upload URL was minted, a create's retry's included; M2b2),
   `removed_at` (decision 3's soft removal), `object_deleted_at` (when its stored object was
   confirmed deleted; decision 8).
 - `session_presentations` (Slice 2) — at most one row per session, keyed by `session_id`:
@@ -1116,20 +1117,25 @@ every new key to `users` or `schools` is placed, so the PR that adds a key place
   teacher it de-identifies, and the account deletion of a teacher with decks but no class or
   block (C3), each emptying the deck's `title` too, since a title can name a person. A
   presentation row is kept, pointing at a removed deck, as the history of what was shown.
-  **The stored object goes after the commit, never inside the transaction:** the engine marks
-  the row, and once it commits the API deletes the object and stamps `object_deleted_at`; the
-  sweep deletes any removed or rejected deck's object still unstamped, so a crash between the
-  two leaves no object behind for long. A disposal or retention preview, rolled back, never
-  touches storage.
+  **The stored object goes after the commit, never inside the transaction, and only once no
+  upload can write it (M2b2):** the engine marks the row; once it commits, and once 30 minutes
+  have passed since the deck's last upload URL was minted (the URL's 5 minutes, and 25 for an
+  upload begun on it, since S3 checks a presigned PUT's expiry only when the upload starts), the
+  API deletes the object and stamps `object_deleted_at`. Before then the sweep comes back for it
+  by the same rule, as it does for any removed or rejected deck's object a failed delete or a
+  crash left unstamped; no route serves a removed or rejected deck meanwhile. A disposal or
+  retention preview, rolled back, never touches storage.
 
 **5. Writers.** Questions, responses, decks and presentation state are written only by the
 transition engine (`packages/db/src/transitions.ts`), with one named exception:
-`decks.object_deleted_at`, stamped outside any engine transaction by the API after the commit
-that removed or rejected the deck, once the stored object is deleted, or by the sweep for a
-leftover (decision 4) — it records a fact about storage, never a state change, and no other
-field of `decks` is written outside the engine. Each mutation runs in one transaction with
-a client-minted UUIDv7 `event_id`, idempotent on it: a replay writes nothing and answers the
-current truth. Locks are taken session row first, then question row, then deck row, in
+`decks.object_deleted_at`, stamped outside any engine transaction by the API or the sweep once
+the stored object is deleted, after the commit that removed or rejected the deck and once no
+upload can write it (decision 4) — it records a fact about storage, never a state change, and no
+other field of `decks` is written outside the engine. A create's retry records its fresh upload
+URL's mint on the deck row FOR UPDATE, after the school and the teacher; the sweep's 24-hour
+rejection is one guarded statement on the deck rows alone (M2b2). Each mutation runs in one transaction with
+a client-minted UUIDv7 `event_id`, idempotent on it: a replay writes nothing (but a deck
+create's, its fresh upload URL's mint) and answers the current truth. Locks are taken session row first, then question row, then deck row, in
 every transition: an open takes the session row FOR UPDATE, so two opens run one at a time.
 Its two unique constraints are backstops with different outcomes, and neither is ever a
 `500`: a violation of `questions.event_id` is a replay, answered with the question that
@@ -1229,18 +1235,22 @@ Student (enrolled in the session's class now; anyone else `403`, an unknown id `
 Slice 2, teacher:
 - `POST /v1/decks` — `{ eventId, title, bytes, sha256 }`: a `pending` deck and a presigned
   PUT, signed for `application/pdf` and that exact length, the browser uploads to directly.
-  More than 25 MB is refused before any URL is minted.
+  More than 25 MB is refused before any URL is minted. Every URL's mint is recorded on the
+  deck, a retry's too (M2b2).
 - `POST /v1/decks/{id}/complete` — `{ eventId }`: the API reads the object and checks it —
   the `%PDF-` magic bytes, its size ≤ 25 MB and equal to the declared, the `sha256`, ≤ 200
   pages, not encrypted — then marks it `ready` with its page count, or `rejected` with the
-  reason and its object deleted; either verdict is a `200`, the deck carrying it (M2b). One-way:
+  reason, its object deleted by decision 4's rule; either verdict is a `200`, the deck carrying
+  it (M2b). An `eventId` another record holds is `409 event_id_conflict` before anything is read
+  or parsed, the id read before the deck, so a retry meeting its first delivery's verdict answers
+  that verdict (M2b2). One-way:
   a deck `ready` or `rejected` is never checked again, and any complete of it answers the
   verdict. The PUT expires in 5 minutes; a PUT over a
   `ready` deck's object before then changes bytes no client takes, since every client checks
   the `sha256` the server verified. The checks are bounded: the size cap first, then the
   parse in a separate worker under a hard time limit, so a hostile file stalls only that
   worker, never the API (settled 2026-10-10); a PDF that exceeds either is `rejected`. A deck
-  left `pending` 24 hours is rejected by the sweep.
+  left `pending` 24 hours is rejected `unfinished` by the sweep (M2b2).
 - `GET /v1/decks` — the caller's own decks, never a removed one; `DELETE /v1/decks/{id}` —
   remove one (`409 deck_in_use` while a running session shows it).
 - `POST /v1/sessions/{id}/slide` — `{ eventId, deckId | null, page }`: show a page of one of
