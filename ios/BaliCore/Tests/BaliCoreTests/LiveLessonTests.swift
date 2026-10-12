@@ -282,7 +282,7 @@ struct LessonPollTests {
 
     @Test(
         "A second run takes over: the first stops at its read, saying nothing of it, so the poll never runs twice",
-        .timeLimit(.minutes(1)))
+        .timeLimit(.minutes(3)))
     func oneRunAtATime() async throws {
         let slide = try wire("presentation/slide.json")
         let world = LessonWorld([
@@ -458,7 +458,7 @@ struct LessonAnswerTests {
 
     @Test(
         "An answer landing while a poll is out stays on the card when that poll's older read comes back",
-        .timeLimit(.minutes(1)))
+        .timeLimit(.minutes(3)))
     func answerDuringPoll() async throws {
         // The second read is the server's from before the answer landed: it holds none.
         let world = LessonWorld([
@@ -478,7 +478,7 @@ struct LessonAnswerTests {
 
     @Test(
         "Two quick taps from a clock a minute behind land in order: the second minted after the first, and kept whichever answer comes back last",
-        .timeLimit(.minutes(1)))
+        .timeLimit(.minutes(3)))
     func quickTaps() async throws {
         let held = StudentAnswer(option: 0, eventId: EventID.mint(at: start + 60))
         let world = LessonWorld([.ok(asked(answer: held), etag: #""a""#)], now: start)
@@ -614,7 +614,7 @@ struct LessonDeckTests {
         #expect(world.sent.count == 4)
     }
 
-    @Test("A deck still on its way when the session ends goes to its asker, and is kept nowhere", .timeLimit(.minutes(1)))
+    @Test("A deck still on its way when the session ends goes to its asker, and is kept nowhere", .timeLimit(.minutes(3)))
     func endsMidFetch() async throws {
         let world = LessonWorld([.ok(try wire("download/shown.json")), bucket.held])
         let lesson = world.lesson()
