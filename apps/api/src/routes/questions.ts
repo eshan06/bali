@@ -3,7 +3,9 @@ import {
   closeQuestion,
   createSavedQuestion,
   type Database,
+  type DeckRow,
   findEnrolledStudent,
+  findPresentation,
   findQuestion,
   findSavedQuestion,
   findSessionById,
@@ -11,6 +13,7 @@ import {
   getLiveParticipation,
   listSavedQuestions,
   openQuestion,
+  type PresentationRow,
   questionCounts,
   type QuestionRow,
   questionOpen,
@@ -35,6 +38,8 @@ import {
   type SavedQuestion,
   type SavedQuestionResponse,
   type SavedQuestionsResponse,
+  type SessionPresentation,
+  type Slide,
   type StudentPhone,
   type StudentQuestion,
   type TeacherQuestion,
@@ -119,6 +124,35 @@ function studentQuestion(
   };
 }
 
+/** A page a session shows (M3): never a URL. A presentation naming a deck names its page. */
+export const slide = (presentation: PresentationRow, shown: DeckRow): Slide => ({
+  deckId: shown.id,
+  sha256: shown.sha256,
+  page: presentation.page!,
+  pageCount: shown.pageCount!,
+});
+
+type SessionRow = NonNullable<Awaited<ReturnType<typeof findSessionById>>>;
+
+/**
+ * What a session shows now (M3b; decision 6): its slide and the slide change that set it. None
+ * while the session isn't running by the server's clock, whatever its row still names (decision
+ * 2), nor before its first slide change; no slide once presenting stopped, nor a removed deck's.
+ */
+export async function presentationNow(
+  db: Database,
+  session: SessionRow,
+  now: Date,
+): Promise<SessionPresentation | null> {
+  const found = sessionRunning(session, now) && (await findPresentation(db, session.id));
+  if (!found) return null;
+  const { presentation, deck } = found;
+  return {
+    slide: deck && !deck.removedAt ? slide(presentation, deck) : null,
+    eventId: presentation.eventId,
+  };
+}
+
 /**
  * A student's own phone in a running session (W1; decision 13), derived as the grid derives it
  * (rule 2) at the server's clock. Its last contact only once silent: a check-in that leaves the
@@ -190,8 +224,8 @@ function savedAnswer(result: SavedQuestionResult): SavedQuestionResponse {
  * POST /v1/sessions/:id/questions  open one in a running session, closing the one open there
  * POST /v1/questions/:id/close     close it, revealing its correct option when asked
  * GET  /v1/questions/:id/results   its totals, through the one guarded count; ETag and 304
- * GET  /v1/sessions/:id/presentation  what a student shows: the question, their answer, their
- *                                     phone; ETag, 304
+ * GET  /v1/sessions/:id/presentation  what a student shows: the question, their answer, the
+ *                                     slide, their phone; ETag, 304
  * POST /v1/questions/:id/answers   a student answers, writing no event
  * GET  /v1/saved-questions         the caller's drafts, newest first, none removed
  * POST /v1/saved-questions         write one
@@ -283,6 +317,7 @@ export function registerQuestionsRoutes(
       const presentation: Presentation = {
         running,
         question: shown ? studentQuestion(shown.question, shown.response, session, now) : null,
+        slide: (await presentationNow(db, session, now))?.slide ?? null,
         phone: live?.session.id === session.id ? studentPhone(live.participation, now) : null,
       };
       return sendTagged(request, reply, presentation);

@@ -371,16 +371,36 @@ public struct HistoryPage: Codable, Sendable, Hashable {
 }
 
 /// `GET /v1/sessions/{id}/presentation` — what the phone shows of a live lesson (Phase 7, L4),
-/// polled while the session runs. Slides join it later, additively.
+/// polled while the session runs.
 public struct Presentation: Codable, Sendable, Hashable {
     /// False once the session is over by the server's clock: stop polling.
     public let running: Bool
     /// The open question, or the last closed one until another opens; nil when none was asked,
     /// and once the session is over.
     public let question: StudentQuestion?
+    /// The page the teacher shows (M3b), never a URL: nil while nothing is shown, once the session
+    /// is over, and from an older API.
+    public let slide: Slide?
     /// The student's own phone in this session as the teacher's grid shows it (W1): nil while
     /// they are not in it, once the session is over, and from an older API.
     public let phone: StudentPhone?
+}
+
+/// A page of a deck a running session shows. The deck is fetched through
+/// `GET /v1/decks/{id}/download` and its bytes checked against `sha256` before they are shown.
+public struct Slide: Codable, Sendable, Hashable {
+    public let deckId: String
+    /// The PDF's SHA-256, lowercase hex.
+    public let sha256: String
+    /// From 1 to `pageCount`: PDFKit's page index is `page - 1`.
+    public let page: Int
+    public let pageCount: Int
+}
+
+/// `GET /v1/decks/{id}/download` — where a slide's deck is fetched from (M3b).
+public struct DeckDownload: Codable, Sendable, Hashable {
+    /// A presigned GET, good for minutes and never cached: fetched at once; expired, ask again.
+    public let url: String
 }
 
 /// A student's own phone in a running session, as the server derives it at its clock.

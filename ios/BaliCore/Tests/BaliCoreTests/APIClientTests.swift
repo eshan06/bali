@@ -179,6 +179,9 @@ struct APIClientFixtureTests {
             let request = try fixture.sent(AnswerRequest.self)
             return try answered(await client.answer(question: fixture.parameter, request), fixture)
         },
+        "GET /v1/decks/{id}/download": { client, fixture in
+            try answered(await client.download(deck: fixture.parameter), fixture)
+        },
     ]
 
     /// Checks `response` is the fixture's answer — its status, and its body as the app decodes it:

@@ -23,6 +23,7 @@
         "eventId": "00000000-0000-7000-8000-000000000003"
       }
     },
+    "slide": null,
     "phone": {
       "state": "silent",
       "lastSeenAt": "2000-01-01T00:01:00.000Z"

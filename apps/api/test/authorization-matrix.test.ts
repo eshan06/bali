@@ -11,6 +11,7 @@ import {
   openQuestion,
   protectionOff,
   recordAgreement,
+  showSlide,
   startSession,
   tapIn,
   unlock,
@@ -139,6 +140,7 @@ const MATRIX = {
   'POST /v1/decks':                         [401, 401, 403,     403,     200,     200],
   'DELETE /v1/decks/:id':                   [401, 401, 403,     403,     403,     200],
   'POST /v1/decks/:id/complete':            [401, 401, 403,     403,     403,     200],
+  'GET /v1/decks/:id/download':             [401, 401, 200,     403,     403,     200],
   'POST /v1/sessions/:id/slide':            [401, 401, 403,     403,     403,     200],
 } as const satisfies Record<string, readonly number[]>;
 type RouteKey = keyof typeof MATRIX;
@@ -187,6 +189,12 @@ async function asked(w: World): Promise<string> {
     options: ['a', 'b'],
   });
   return question.id;
+}
+
+/** The owner's deck, checked ready with 3 pages (M2b). */
+async function ready(w: World) {
+  const verdict = { status: 'ready', pageCount: 3 } as const;
+  await completeDeck(db, { deckId: w.deckId, eventId: newUuidV7(), verdict });
 }
 
 /** Each route's request, against a row's world. A HEAD sends its GET's. */
@@ -345,10 +353,16 @@ const REQUESTS: Record<RouteKey, (w: World) => Sent | Promise<Sent>> = {
     url: `/v1/decks/${w.deckId}/complete`,
     body: { eventId: newUuidV7() },
   }),
+  // The owner's deck while the class's running session shows it (M3b): its students fetch it too.
+  'GET /v1/decks/:id/download': async (w) => {
+    await ready(w);
+    const page = { deckId: w.deckId, page: 2, eventId: newUuidV7() };
+    await showSlide(db, { ...page, sessionId: w.sessionId, teacherId: w.owner.id });
+    return { url: `/v1/decks/${w.deckId}/download` };
+  },
   // A page of the owner's deck, checked ready, in the class's running session (M3).
   'POST /v1/sessions/:id/slide': async (w) => {
-    const verdict = { status: 'ready', pageCount: 3 } as const;
-    await completeDeck(db, { deckId: w.deckId, eventId: newUuidV7(), verdict });
+    await ready(w);
     return {
       url: `/v1/sessions/${w.sessionId}/slide`,
       body: { eventId: newUuidV7(), deckId: w.deckId, page: 2 },

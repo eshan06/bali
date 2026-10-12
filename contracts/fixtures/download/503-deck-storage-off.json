@@ -1,0 +1,16 @@
+{
+  "endpoint": "GET /v1/decks/{id}/download",
+  "scenario": "The same download from a server with no bucket set up.",
+  "request": {
+    "path": "/v1/decks/00000000-0000-7000-8000-000000000001/download"
+  },
+  "status": 503,
+  "type": "ApiErrorBody",
+  "body": {
+    "error": {
+      "code": "unavailable",
+      "reason": "deck_storage_off",
+      "message": "slides are off on this server"
+    }
+  }
+}

@@ -308,6 +308,11 @@ public struct APIClient: Sendable {
         await send("GET", "/v1/sessions/\(escaped(id))/presentation")
     }
 
+    /// `GET /v1/decks/{id}/download` — a presigned GET of the deck a slide names (Phase 7, M3b).
+    public func download(deck id: String) async -> APIResponse<DeckDownload> {
+        await send("GET", "/v1/decks/\(escaped(id))/download")
+    }
+
     /// `POST /v1/questions/{id}/answers` — the student's answer, sent once: no outbox table reads it.
     public func answer(question id: String, _ request: AnswerRequest) async
         -> APIResponse<AnswerResponse>

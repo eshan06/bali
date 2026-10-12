@@ -6,33 +6,35 @@ import {
   decksToDrop,
   eventIdSpent,
   findDeck,
+  findUserByCognitoId,
   listDecks,
-  type PresentationRow,
   rejectUnfinishedDecks,
   removeDeck,
   sessionRunning,
+  sessionsShowingDeck,
   showSlide,
   stampObjectDeleted,
 } from '@bali/db';
 import {
   type CreateDeckResponse,
   type Deck,
+  type DeckDownload,
   DECK_MAX_BYTES,
   DECK_TITLE_MAX_LENGTH,
   type DeckResponse,
   type DecksResponse,
-  type Slide,
   type SlideResponse,
 } from '@bali/shared';
 import type { FastifyBaseLogger, FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
+import { requireAuth } from '../auth/plugin.js';
 import { requireSessionOwner, requireTeacher } from '../auth/teacher.js';
 import { checkDeck, type ParsePdf } from '../deck-check.js';
 import { type DeckStorage, URL_LIFETIME_S } from '../deck-storage.js';
 import { ApiError, parseRequest } from '../errors.js';
 import { mapTransitionError, refusal } from './errors.js';
-import { Text } from './questions.js';
+import { slide, Text } from './questions.js';
 
 const Params = z.object({ id: z.string().uuid() });
 const CreateBody = z.object({
@@ -54,7 +56,7 @@ const SlideBody = z
 
 const deckNotFound = () => ApiError.notFound('deck not found', 'deck_not_found');
 
-/** A slide change the engine refused (M3): nothing was written. */
+/** A slide change the engine refused (M3), or a deck no download serves (M3b): nothing written. */
 const slideRefused = {
   deck_not_found: deckNotFound,
   deck_not_ready: () => ApiError.conflict('the deck is not checked yet', 'deck_not_ready'),
@@ -62,14 +64,6 @@ const slideRefused = {
   page_out_of_range: () =>
     ApiError.badInput('the deck has no such page', undefined, 'page_out_of_range'),
 };
-
-/** A page a session shows (M3): never a URL. A presentation naming a deck names its page. */
-const slide = (presentation: PresentationRow, shown: DeckRow): Slide => ({
-  deckId: shown.id,
-  sha256: shown.sha256,
-  page: presentation.page!,
-  pageCount: shown.pageCount!,
-});
 
 const deck = (row: DeckRow): Deck => ({
   id: row.id,
@@ -84,8 +78,8 @@ const deck = (row: DeckRow): Deck => ({
 
 /**
  * Decks' storage. While it is off, no bucket set up (M1), every deck route, the slide's too, is
- * `503 deck_storage_off` once its caller is found, before anything is read or written: the server's
- * lack, never the request's.
+ * `503 deck_storage_off` once its caller is found (the download's: allowed to see the deck), before
+ * anything is written: the server's lack, never the request's.
  */
 function requireStorage(app: FastifyInstance): DeckStorage {
   if (app.deckStorage) return app.deckStorage;
@@ -171,6 +165,8 @@ export async function sweepDecks(
  * DELETE /v1/decks/:id           remove it; its stored object goes once no upload can write it
  * POST   /v1/decks/:id/complete  its upload checked: ready, or rejected, its object deleted as a
  *                                removed deck's is
+ * GET    /v1/decks/:id/download  a presigned GET of its PDF: for its teacher, or a student while a
+ *                                running session of their class shows it (M3b)
  * POST   /v1/sessions/:id/slide  show a page of one in the class's running session, or stop (M3)
  *
  * The sweep's part is `sweepDecks`.
@@ -256,6 +252,30 @@ export function registerDecksRoutes(
       if (result.outcome === 'checked' && result.deck.status === 'rejected')
         await dropObject(db, storage, request.log, result.deck, clock());
       return { outcome: result.outcome, deck: deck(result.deck) };
+    },
+  );
+
+  app.get(
+    '/v1/decks/:id/download',
+    { preHandler: app.authenticate, config: { parses: { params: Params } } },
+    async (request): Promise<DeckDownload> => {
+      const { id } = parseRequest(request, 'params', Params);
+      const caller = await findUserByCognitoId(db, requireAuth(request).sub);
+      const found = await findDeck(db, id);
+      // Removed is gone for everyone: its teacher, and the students of a lesson that showed it.
+      if (!found || found.removedAt) throw deckNotFound();
+      const now = clock();
+      // A student only while a running session shows it, never by a presentation's row alone.
+      const allowed =
+        caller !== undefined &&
+        (found.teacherId === caller.id ||
+          (await sessionsShowingDeck(db, found.id, caller.id)).some((s) => sessionRunning(s, now)));
+      if (!allowed) throw ApiError.forbidden('no running session of yours shows this deck');
+      const storage = requireStorage(app);
+      // Only its teacher reaches one unchecked or rejected: a slide shows a ready deck alone.
+      if (found.status !== 'ready')
+        throw slideRefused[found.status === 'pending' ? 'deck_not_ready' : 'deck_rejected']();
+      return { url: storage.downloadUrl(found.storageKey) };
     },
   );
 

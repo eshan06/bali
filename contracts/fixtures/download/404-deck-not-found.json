@@ -1,0 +1,16 @@
+{
+  "endpoint": "GET /v1/decks/{id}/download",
+  "scenario": "A download of a deck its teacher removed since.",
+  "request": {
+    "path": "/v1/decks/00000000-0000-7000-8000-000000000001/download"
+  },
+  "status": 404,
+  "type": "ApiErrorBody",
+  "body": {
+    "error": {
+      "code": "not_found",
+      "reason": "deck_not_found",
+      "message": "deck not found"
+    }
+  }
+}
