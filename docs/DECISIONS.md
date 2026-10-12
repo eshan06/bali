@@ -27,7 +27,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   **Over is over:** a read failing after one said the session is over sets no `problem`. *Not built:*
   joining a second ask to a fetch under way (M8 asks once per deck, keyed by its `sha256`); a
   session of its own for decks, past the transport's 30 s bound on a whole exchange (25 MB needs
-  about 7 Mbit/s; M8's device check on school Wi-Fi decides).
+  about 7 Mbit/s a phone, and a class fetching a deck at once shares one access point, a timed-out
+  fetch starting over from its first byte: several phones at once on school Wi-Fi decide, at M8's
+  device check or M10's).
 
 - **2026-10-12** — **The phone's live lesson in BaliCore (L5): one actor for the poll and the
   answer, the answer kept by its id's order, a `429`'s wait bounded.** **One `LiveLesson` per

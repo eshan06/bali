@@ -229,8 +229,9 @@ public actor LiveLesson {
             var request = URLRequest(url: url)
             request.timeoutInterval = client.timeout
             // ponytail: a deck rides the client's transport, its whole exchange bounded at 30 s
-            // (`URLSessionTransport.exchangeTimeout`), so 25 MB needs about 7 Mbit/s; give decks a
-            // session of their own if M8's device check finds a classroom's Wi-Fi slower.
+            // (`URLSessionTransport.exchangeTimeout`): 25 MB needs about 7 Mbit/s a phone, and a
+            // class fetching it at once shares one access point; give decks a session of their own
+            // if several phones at once on school Wi-Fi (M8, M10) find it short.
             guard case let (bytes, answer)? = try? await client.transport.send(request) else {
                 return .unreachable(.unreachable)
             }
