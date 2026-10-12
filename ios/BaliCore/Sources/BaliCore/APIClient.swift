@@ -66,18 +66,26 @@ public struct APIResponse<Answer: Decodable & Sendable>: Sendable {
     public let error: ApiErrorBody?
     /// Why no answer came, when `result` is `.networkError`; nil when one did.
     public let noAnswer: NoAnswer?
+    /// The answer's `ETag`, if it carried one: what a poll sends back as `If-None-Match` (L5).
+    public let etag: String?
+    /// A `429`'s `Retry-After` in whole seconds, as the API sends it; nil when none came so.
+    public let retryAfter: Int?
 
     init(_ noAnswer: NoAnswer) {
         (result, answer, error, self.noAnswer) = (.networkError, nil, nil, noAnswer)
+        (etag, retryAfter) = (nil, nil)
     }
 
-    init(status: Int, body: Data) {
+    init(_ response: HTTPURLResponse, body: Data) {
         let decoder = BaliJSON.makeDecoder()
+        let status = response.statusCode
         let succeeded = (200..<300).contains(status)
         result = .status(status)
         answer = succeeded ? (try? decoder.decode(Answer.self, from: body)) : nil
         error = succeeded ? nil : (try? decoder.decode(ApiErrorBody.self, from: body))
         noAnswer = nil
+        etag = response.value(forHTTPHeaderField: "ETag")
+        retryAfter = response.value(forHTTPHeaderField: "Retry-After").flatMap { Int($0) }
     }
 }
 
@@ -303,9 +311,12 @@ public struct APIClient: Sendable {
         return await send("GET", "/v1/me/history" + (query.isEmpty ? "" : "?" + query))
     }
 
-    /// `GET /v1/sessions/{id}/presentation` — what the phone shows of a live lesson (Phase 7, L4).
-    public func presentation(session id: String) async -> APIResponse<Presentation> {
-        await send("GET", "/v1/sessions/\(escaped(id))/presentation")
+    /// `GET /v1/sessions/{id}/presentation` — what the phone shows of a live lesson (Phase 7, L4):
+    /// a `304` with no body while it is the one the last answer's `ETag`, `etag`, names (L5).
+    public func presentation(session id: String, ifNoneMatch etag: String? = nil) async
+        -> APIResponse<Presentation>
+    {
+        await send("GET", "/v1/sessions/\(escaped(id))/presentation", ifNoneMatch: etag)
     }
 
     /// `GET /v1/decks/{id}/download` — a presigned GET of the deck a slide names (Phase 7, M3b).
@@ -322,7 +333,8 @@ public struct APIClient: Sendable {
 
     /// One request, sent once, and its answer as the tables take it.
     private func send<Answer: Decodable & Sendable>(
-        _ method: String, _ path: String, _ body: (any Encodable & Sendable)? = nil
+        _ method: String, _ path: String, _ body: (any Encodable & Sendable)? = nil,
+        ifNoneMatch etag: String? = nil
     ) async -> APIResponse<Answer> {
         guard let token = await tokens.accessToken(), !token.isEmpty else { return .init(.noToken) }
         // Neither the URL nor the body can fail — `path` is ASCII the client escaped, and every
@@ -338,6 +350,7 @@ public struct APIClient: Sendable {
         request.timeoutInterval = timeout
         request.httpMethod = method
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue(etag, forHTTPHeaderField: "If-None-Match")
         if let body {
             guard let data = try? BaliJSON.makeEncoder().encode(body) else {
                 return .init(.unreachable)
@@ -349,7 +362,7 @@ public struct APIClient: Sendable {
         }
         do {
             let (data, response) = try await transport.send(request)
-            return .init(status: response.statusCode, body: data)
+            return .init(response, body: data)
         } catch {
             return .init(.unreachable)
         }

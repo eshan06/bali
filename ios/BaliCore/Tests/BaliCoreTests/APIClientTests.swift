@@ -586,6 +586,23 @@ struct URLSessionTransportTests {
         #expect(server.head.contains("\r\nAuthorization: Bearer token-real\r\n"))
     }
 
+    @Test("A poll's If-None-Match goes on the wire, and its 304 comes back as itself, its ETag read")
+    func notModified() async throws {
+        let server = try LocalServer(
+            answer: "HTTP/1.1 304 Not Modified\r\nETag: \"a\"\r\nConnection: close\r\n\r\n")
+        let client = APIClient(
+            baseURL: try #require(URL(string: "http://127.0.0.1:\(server.port)")),
+            tokens: FixedToken(token: "token-real"), transport: Self.patient(),
+            timeout: Self.stall)
+
+        let read = await client.presentation(session: "s1", ifNoneMatch: #""a""#)
+        #expect(read.result == .status(304))
+        #expect(read.etag == #""a""#)
+        #expect(read.answer == nil && read.error == nil)
+        #expect(server.head.hasPrefix("GET /v1/sessions/s1/presentation HTTP/1.1\r\n"))
+        #expect(server.head.contains("\r\nIf-None-Match: \"a\"\r\n"))
+    }
+
     @Test("A server that never answers times out: .networkError, and the record kept")
     func timesOut() async throws {
         let server = try LocalServer(answer: nil)
