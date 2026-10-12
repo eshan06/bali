@@ -119,6 +119,59 @@ describe('api-client', () => {
     }
   });
 
+  it('reads under an ETag: If-None-Match only with a kept tag, the body with its tag, null for a 304', async () => {
+    const sent: (string | undefined)[] = [];
+    const replies = [
+      new Response(JSON.stringify({ answered: 1 }), { status: 200, headers: { etag: '"a"' } }),
+      new Response(null, { status: 304, headers: { etag: '"a"' } }),
+      new Response(JSON.stringify({ answered: 2 }), { status: 200 }),
+    ];
+    const api = createApiClient({
+      baseUrl: 'http://api',
+      getToken: () => 'tok',
+      fetchImpl: (_url, init) => {
+        sent.push((init?.headers as Record<string, string>)['if-none-match']);
+        return Promise.resolve(replies.shift()!);
+      },
+    });
+
+    expect(await api.getTagged('/x', null)).toEqual({ body: { answered: 1 }, etag: '"a"' });
+    expect(await api.getTagged('/x', '"a"')).toBeNull();
+    // An answer the browser shows no tag of (one CORS doesn't expose) is kept, with none.
+    expect(await api.getTagged('/x', '"a"')).toEqual({ body: { answered: 2 }, etag: null });
+    expect(sent).toEqual([undefined, '"a"', '"a"']);
+  });
+
+  it('fails a tagged read as any read: a 401 signs out, a 5xx and no answer throw', async () => {
+    const onUnauthorized = vi.fn();
+    const answering = (status: number) =>
+      createApiClient({
+        baseUrl: 'http://api',
+        getToken: () => 'tok',
+        onUnauthorized,
+        fetchImpl: () =>
+          Promise.resolve(jsonResponse({ error: { code: 'x', message: 'no' } }, status)),
+      });
+
+    await expect(answering(401).getTagged('/x', '"a"')).rejects.toBeInstanceOf(UnauthorizedError);
+    expect(onUnauthorized).toHaveBeenCalledOnce();
+    await expect(answering(503).getTagged('/x', '"a"')).rejects.toMatchObject({ status: 503 });
+    const offline = createApiClient({
+      baseUrl: 'http://api',
+      getToken: () => 'tok',
+      fetchImpl: () => Promise.reject(new Error('down')),
+    });
+    await expect(offline.getTagged('/x', null)).rejects.toBeInstanceOf(NetworkError);
+    // A 304 no tag asked for is no answer to keep: a plain read never sends one.
+    const stray = createApiClient({
+      baseUrl: 'http://api',
+      getToken: () => 'tok',
+      fetchImpl: () => Promise.resolve(new Response(null, { status: 304 })),
+    });
+    await expect(stray.getTagged('/x', null)).rejects.toMatchObject({ status: 304 });
+    expect(onUnauthorized).toHaveBeenCalledOnce();
+  });
+
   it('surfaces a clean ApiError (not a TypeError) on a non-conforming error body', async () => {
     // A valid-JSON body lacking our `{ error: { code, message } }` shape — e.g. an
     // ALB/API-Gateway `{ message }` — must still throw ApiError with the fallback
