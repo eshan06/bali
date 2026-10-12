@@ -444,6 +444,27 @@ export async function findPresentation(db: Database, sessionId: string) {
   );
 }
 
+/**
+ * The sessions not marked over that show deck `deckId`, of the classes `studentId` is enrolled in
+ * now (Phase 7, M3b): the student may download the deck while one runs by the server's clock, never
+ * by a presentation's row alone, which an ended session keeps (decision 6).
+ */
+export function sessionsShowingDeck(db: Database, deckId: string, studentId: string) {
+  return db
+    .select({ endedAt: sessions.endedAt, endsAt: sessions.endsAt })
+    .from(sessionPresentations)
+    .innerJoin(sessions, eq(sessions.id, sessionPresentations.sessionId))
+    .innerJoin(enrollments, eq(enrollments.classId, sessions.classId))
+    .where(
+      and(
+        eq(sessionPresentations.deckId, deckId),
+        isNull(sessions.endedAt),
+        eq(enrollments.studentId, studentId),
+        isNull(enrollments.removedAt),
+      ),
+    );
+}
+
 /** A session by id (any state), so the lifecycle routes can authorize the teacher. */
 export async function findSessionById(
   db: Database,

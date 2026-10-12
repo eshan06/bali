@@ -8,6 +8,35 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-12** — **The slide in what students read, and a deck's download (M3b): only while a
+  running session shows it, and a removed deck is gone for everyone.** **One reader,
+  `presentationNow`,** gives the poll its `slide` and the boot snapshot its `presentation`, and
+  reads the session's row only while the session runs by the server's clock: an ended session keeps
+  its row naming the last deck shown, as history (decision 4), so a reader that skipped the check
+  would show it (M3a's Claude Review WARN, the conductor's ruling, the owner away). It never names a
+  removed deck either, should a running session's row still name one (unreachable today: the
+  removal refuses `deck_in_use`), so a slide never points at a download answering `404`. **The
+  snapshot's presentation carries the `eventId`** of the slide change that set it, beside the slide
+  (the worker's call): a reloaded presenter, perhaps on a laptop whose clock runs behind the device
+  that changed it last, mints its next change after it, as `SlideResponse` lets it (decision 4's
+  order); null before the first change and once the session is over. **The download** answers M1's
+  presigned GET (`downloadUrl`: 5 minutes, `no-store`, the API's own answer `no-store` too) as
+  `{ url }` alone, since a client fetches at once and asks again when a fetch fails, to the deck's
+  teacher, or to a student enrolled now in a class whose session, running by the server's clock,
+  shows the deck now (`sessionsShowingDeck`, then `sessionRunning`), never by a presentation's row
+  alone. **Its order:** an unknown or removed deck is `404 deck_not_found` to anyone, before who is
+  asking, so the students of the lesson that showed it meet the removal as its teacher does and a
+  stranger learns no more than from an unknown id; anyone else `403`; storage off `503
+  deck_storage_off` only once the caller may see the deck, so a stranger's answer never depends on
+  the deploy; and the teacher's own deck not checked yet or rejected `409 deck_not_ready` or
+  `deck_rejected`, as a slide change answers, since no slide shows one and decision 4 has no route
+  serve a rejected deck. **The phone's contract:** BaliCore's `Slide`, `DeckDownload` and
+  `download(deck:)`, and five fixtures (the poll with a slide; the download's `200`, `403`, `404`
+  and `503`), so `deck_not_found` and `deck_storage_off` are refusals a phone meets now, and `503`
+  joins the statuses it decodes. The fixtures' app holds the download URL still (a stand-in
+  `downloadUrl`): a presigned URL's expiry and signature change every run, and a fixture changes
+  only when the contract does.
+
 - **2026-10-12** — **What a session shows, the slide change (M3a): an older slide change never
   undoes a later one, and pages count from 1.** M3 whole is over 400 changed lines by santa's count
   (M3a alone is 413), so it ships as the split decided in advance: `session_presentations`

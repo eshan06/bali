@@ -1,0 +1,12 @@
+{
+  "endpoint": "GET /v1/decks/{id}/download",
+  "scenario": "The phone fetches the deck that slide names (M3b): a presigned GET of its PDF, good for minutes.",
+  "request": {
+    "path": "/v1/decks/00000000-0000-7000-8000-000000000001/download"
+  },
+  "status": 200,
+  "type": "DeckDownload",
+  "body": {
+    "url": "https://deck-storage.invalid/decks%2F00000000-0000-7000-8000-000000000001.pdf?signature=fixture"
+  }
+}

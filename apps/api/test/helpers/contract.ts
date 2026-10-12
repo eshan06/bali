@@ -8,6 +8,7 @@ import {
   type ApiErrorCode,
   CHECK_IN_STATUSES,
   type CheckInResponse,
+  type DeckDownload,
   END_ENROLLMENT_OUTCOMES,
   END_ENROLLMENT_REASONS,
   type EndEnrollmentResponse,
@@ -31,6 +32,7 @@ import {
   REFOCUS_OUTCOMES,
   type RefocusResponse,
   type SessionView,
+  type Slide,
   stateChangeDisposition,
   type StudentAnswer,
   type StudentPhone,
@@ -94,6 +96,7 @@ interface Contract {
   AgeCheckResponse: AgeCheckResponse;
   Presentation: Presentation;
   AnswerResponse: AnswerResponse;
+  DeckDownload: DeckDownload;
   ApiErrorBody: ApiErrorBody;
 }
 export type FixtureType = keyof Contract;
@@ -246,6 +249,12 @@ export const SCHEMAS = {
       correctOption: z.number().int().nullable(),
       answer: studentAnswer.nullable(),
     }).nullable(),
+    slide: object<Slide>()({
+      deckId: z.uuid(),
+      sha256: z.string().regex(/^[0-9a-f]{64}$/),
+      page: z.number().int().positive(),
+      pageCount: z.number().int().positive(),
+    }).nullable(),
     phone: object<StudentPhone>()({
       state: z.enum([...PARTICIPATION_STATES, 'silent']),
       lastSeenAt: z.iso.datetime().nullable(),
@@ -255,6 +264,7 @@ export const SCHEMAS = {
     outcome: z.enum(ANSWER_OUTCOMES),
     answer: studentAnswer,
   }),
+  DeckDownload: object<DeckDownload>()({ url: z.url({ protocol: /^https$/ }) }),
   ApiErrorBody: object<ApiErrorBody>()({
     error: object<ApiErrorBody['error']>()({
       code: z.enum(Object.keys(API_ERROR_STATUS) as ApiErrorCode[]),
@@ -314,6 +324,8 @@ export const ENDPOINTS: Record<
   // A live lesson (Phase 7, L4): the poll, and an answer, sent once and never an outbox record.
   'GET /v1/sessions/{id}/presentation': { type: 'Presentation' },
   'POST /v1/questions/{id}/answers': { type: 'AnswerResponse' },
+  // A slide's deck (M3b), fetched once by the phone for a slide naming one it has not cached.
+  'GET /v1/decks/{id}/download': { type: 'DeckDownload' },
 };
 
 /** One checked-in fixture: a real request, the answer it got, and what the phone does with it. */

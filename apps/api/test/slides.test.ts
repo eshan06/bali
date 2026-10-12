@@ -3,7 +3,10 @@ import {
   createDeck,
   type Database,
   type DeckRow,
+  decks,
+  endEnrollment,
   endSession,
+  enrollments,
   events,
   newUuidV7,
   removeDeck,
@@ -11,25 +14,34 @@ import {
   startSession,
   tapIn,
 } from '@bali/db';
-import type { ApiErrorBody, SlideResponse } from '@bali/shared';
+import type {
+  ApiErrorBody,
+  DeckDownload,
+  Presentation,
+  SessionSnapshot,
+  SlideResponse,
+} from '@bali/shared';
 import { and, eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { memoryDeckStorage } from '../src/deck-storage.js';
+import { type MemoryDeckStorage, memoryDeckStorage } from '../src/deck-storage.js';
 import { authedInject, makeAuthedApp, type AuthedApp } from './helpers/app.js';
 import { makeTestDb, seedClassroom } from './helpers/db.js';
 
 /*
  * What a running session shows, through the API (Phase 7, M3; ARCHITECTURE, "Live lesson",
  * decisions 4–6): the teacher's slide changes, and a deck's removal refused while a running session
- * shows it. Who else is refused is the authorization matrix's too; the engine's own rules and races
+ * shows it; the slide in what students poll and the teacher's snapshot, and a deck's download
+ * (M3b). Who else is refused is the authorization matrix's too; the engine's own rules and races
  * are packages/db's (slides.test.ts, races.test.ts).
  */
 
 let db: Database;
 let closeDb: () => Promise<void>;
 let ctx: AuthedApp;
+/** Decks' storage, in memory, on the server's clock. */
+let storage: MemoryDeckStorage;
 /** The server's clock: 09:10 in a 09:00–09:25 lesson unless a test moves it. */
 let now: Date;
 
@@ -38,11 +50,8 @@ const at = (minute: number) => new Date(`2026-10-11T09:${String(minute).padStart
 beforeEach(async () => {
   ({ db, close: closeDb } = await makeTestDb());
   now = at(10);
-  ctx = await makeAuthedApp(
-    db,
-    () => now,
-    memoryDeckStorage(() => now),
-  );
+  storage = memoryDeckStorage(() => now);
+  ctx = await makeAuthedApp(db, () => now, storage);
 });
 
 afterEach(async () => {
@@ -306,5 +315,266 @@ describe('DELETE /v1/decks/:id while a session shows it (M3)', () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ outcome: 'removed' });
+  });
+});
+
+/** A GET as `token`, with its `If-None-Match` when given. */
+const read = (token: string, url: string, ifNoneMatch?: string) =>
+  ctx.app.inject({
+    method: 'GET',
+    url,
+    headers: {
+      authorization: `Bearer ${token}`,
+      ...(ifNoneMatch === undefined ? {} : { 'if-none-match': ifNoneMatch }),
+    },
+  });
+const poll = (token: string, sessionId: string, ifNoneMatch?: string) =>
+  read(token, `/v1/sessions/${sessionId}/presentation`, ifNoneMatch);
+async function slideOf(token: string, sessionId: string) {
+  const res = await poll(token, sessionId);
+  expect(res.statusCode).toBe(200);
+  return res.json<Presentation>().slide;
+}
+async function snapshotOf(token: string, sessionId: string) {
+  const res = await read(token, `/v1/sessions/${sessionId}`);
+  expect(res.statusCode).toBe(200);
+  return res.json<SessionSnapshot>().presentation;
+}
+const download = (token: string, deckId: string) => read(token, `/v1/decks/${deckId}/download`);
+/** The lesson's student's token. */
+const phoneOf = (l: { student: { cognitoId: string } }) => ctx.tokenFor(l.student.cognitoId);
+/** Ends the lesson at 09:12, the clock with it. */
+async function endAt12(sessionId: string) {
+  now = at(12);
+  await endSession(db, { sessionId, at: at(12), reason: 'ended' });
+}
+
+describe('the slide in what students read (M3b)', () => {
+  it('shows the page the teacher shows, never a URL, and none before it or once presenting stopped', async () => {
+    const l = await lesson('read-slide');
+    const phone = await phoneOf(l);
+    expect(await slideOf(phone, l.session.id)).toBeNull();
+
+    await slide(l.token, l.session.id, showing(l.cells.id, 3));
+    const res = await poll(phone, l.session.id);
+    expect(res.json<Presentation>().slide).toEqual({
+      deckId: l.cells.id,
+      sha256: l.cells.sha256,
+      page: 3,
+      pageCount: 12,
+    });
+    expect(res.body).not.toMatch(/https?:/);
+
+    await slide(l.token, l.session.id, showing(null));
+    expect(await slideOf(phone, l.session.id)).toBeNull();
+  });
+
+  it('answers 304 while the slide is unchanged, a late older change and a retry included, and anew once it moves', async () => {
+    const l = await lesson('read-etag');
+    const phone = await phoneOf(l);
+    // Minted in this order, as one teacher's two clicks; the later lands first.
+    const [older, later] = [showing(l.cells.id, 2), showing(l.cells.id, 3)];
+    await slide(l.token, l.session.id, later);
+    const etag = String((await poll(phone, l.session.id)).headers.etag);
+    expect((await poll(phone, l.session.id, etag)).statusCode).toBe(304);
+
+    expect(answered(await slide(l.token, l.session.id, older)).outcome).toBe('replay');
+    expect(answered(await slide(l.token, l.session.id, later)).outcome).toBe('replay');
+    expect((await poll(phone, l.session.id, etag)).statusCode).toBe(304);
+
+    await slide(l.token, l.session.id, showing(l.cells.id, 4));
+    const moved = await poll(phone, l.session.id, etag);
+    expect(moved.statusCode).toBe(200);
+    expect(moved.headers.etag).not.toBe(etag);
+    expect(moved.json<Presentation>().slide).toMatchObject({ page: 4 });
+  });
+
+  it('never shows an ended session’s slide: past the bell before the sweep, ended, and once its deck is removed', async () => {
+    const l = await lesson('read-over');
+    const phone = await phoneOf(l);
+    await slide(l.token, l.session.id, showing(l.cells.id, 3));
+    const over = { running: false, question: null, slide: null, phone: null };
+
+    now = at(25);
+    expect((await poll(phone, l.session.id)).json()).toEqual(over);
+    await endAt12(l.session.id);
+    expect((await poll(phone, l.session.id)).json()).toEqual(over);
+    await removeDeck(db, { deckId: l.cells.id, eventId: newUuidV7(), now: at(13) });
+    expect((await poll(phone, l.session.id)).json()).toEqual(over);
+    // The row still names the deck, as the history of what was shown (decision 4).
+    expect(await presentationOf(l.session.id)).toMatchObject({ deckId: l.cells.id, page: 3 });
+  });
+
+  it('never names a removed deck, should a running session’s row still name one', async () => {
+    const l = await lesson('read-removed');
+    const phone = await phoneOf(l);
+    const third = showing(l.cells.id, 3);
+    await slide(l.token, l.session.id, third);
+    // Staged: the removal itself refuses while a running session shows the deck (deck_in_use).
+    await db
+      .update(decks)
+      .set({ removedAt: at(9) })
+      .where(eq(decks.id, l.cells.id));
+
+    expect(await slideOf(phone, l.session.id)).toBeNull();
+    expect(await snapshotOf(l.token, l.session.id)).toEqual({
+      slide: null,
+      eventId: third.eventId,
+    });
+    const res = await download(phone, l.cells.id);
+    expect(res.statusCode).toBe(404);
+    expect(reasonOf(res)).toBe('deck_not_found');
+  });
+});
+
+describe('the boot snapshot’s presentation (M3b)', () => {
+  it('carries the slide and the slide change that set it; none before the first, nor once the session is over', async () => {
+    const l = await lesson('snapshot');
+    expect(await snapshotOf(l.token, l.session.id)).toBeNull();
+
+    const third = showing(l.cells.id, 3);
+    await slide(l.token, l.session.id, third);
+    const shown = { deckId: l.cells.id, sha256: l.cells.sha256, page: 3, pageCount: 12 };
+    expect(await snapshotOf(l.token, l.session.id)).toEqual({
+      slide: shown,
+      eventId: third.eventId,
+    });
+
+    const stop = showing(null);
+    await slide(l.token, l.session.id, stop);
+    expect(await snapshotOf(l.token, l.session.id)).toEqual({ slide: null, eventId: stop.eventId });
+
+    now = at(25);
+    expect(await snapshotOf(l.token, l.session.id)).toBeNull();
+  });
+});
+
+describe('GET /v1/decks/:id/download (M3b)', () => {
+  it('gives a student a presigned GET while the running session shows the deck, its teacher always; nothing kept', async () => {
+    const l = await lesson('download');
+    const phone = await phoneOf(l);
+    // The teacher's browser uploads it (M2): the bytes the URL then serves.
+    const put = await storage.fetch(storage.uploadUrl(l.cells.storageKey, l.cells.bytes), {
+      method: 'PUT',
+      headers: { 'content-type': 'application/pdf' },
+      body: new Uint8Array(l.cells.bytes),
+    });
+    expect(put.status).toBe(200);
+    expect((await download(l.token, l.cells.id)).statusCode).toBe(200);
+    expect((await download(phone, l.cells.id)).statusCode).toBe(403);
+
+    await slide(l.token, l.session.id, showing(l.cells.id, 3));
+    const res = await download(phone, l.cells.id);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['cache-control']).toBe('no-store');
+    const fetched = await storage.fetch(res.json<DeckDownload>().url);
+    expect(fetched.status).toBe(200);
+    expect(fetched.headers.get('cache-control')).toBe('no-store');
+    expect((await fetched.arrayBuffer()).byteLength).toBe(l.cells.bytes);
+  });
+
+  it('refuses a student once the session shows it no more: another deck, none, past the bell, ended', async () => {
+    const l = await lesson('download-not-shown');
+    const phone = await phoneOf(l);
+    const other = await deck(l.teacher.id, l.school.id);
+    const status = async (deckId: string) => (await download(phone, deckId)).statusCode;
+    await slide(l.token, l.session.id, showing(l.cells.id, 3));
+    expect(await status(l.cells.id)).toBe(200);
+
+    await slide(l.token, l.session.id, showing(other.id, 1));
+    expect([await status(l.cells.id), await status(other.id)]).toEqual([403, 200]);
+    await slide(l.token, l.session.id, showing(null));
+    expect(await status(other.id)).toBe(403);
+    await slide(l.token, l.session.id, showing(l.cells.id, 3));
+    now = at(25);
+    expect(await status(l.cells.id)).toBe(403);
+    await endAt12(l.session.id);
+    expect(await status(l.cells.id)).toBe(403);
+    expect((await download(l.token, l.cells.id)).statusCode).toBe(200);
+  });
+
+  it('refuses anyone else: another class’s student, one removed from this class, another teacher, no account', async () => {
+    const l = await lesson('download-who');
+    await slide(l.token, l.session.id, showing(l.cells.id, 3));
+    const elsewhere = await seedClassroom(db, 'download-who-elsewhere');
+    // Removed from this class, and in another, whose teacher shows nothing.
+    await db.insert(enrollments).values({ classId: elsewhere.klass.id, studentId: l.student.id });
+    const [gone] = await db
+      .select({ id: enrollments.id })
+      .from(enrollments)
+      .where(and(eq(enrollments.classId, l.klass.id), eq(enrollments.studentId, l.student.id)));
+    await endEnrollment(db, { enrollmentId: gone!.id, reason: 'removed_from_class', at: at(5) });
+
+    for (const sub of [
+      elsewhere.student.cognitoId,
+      l.student.cognitoId,
+      elsewhere.teacher.cognitoId,
+      'student-download-who-new',
+    ]) {
+      const res = await download(await ctx.tokenFor(sub), l.cells.id);
+      expect(res.statusCode, sub).toBe(403);
+    }
+  });
+
+  it('answers a removed deck 404 deck_not_found, to its teacher and the students of the lesson that showed it', async () => {
+    const l = await lesson('download-removed');
+    const phone = await phoneOf(l);
+    await slide(l.token, l.session.id, showing(l.cells.id, 3));
+    await endAt12(l.session.id);
+    const removed = await authedInject(ctx.app, l.token, {
+      method: 'DELETE',
+      url: `/v1/decks/${l.cells.id}`,
+      payload: { eventId: newUuidV7() },
+    });
+    expect(removed.statusCode).toBe(200);
+
+    for (const res of [
+      await download(l.token, l.cells.id),
+      await download(phone, l.cells.id),
+      await download(phone, randomUUID()),
+    ]) {
+      expect(res.statusCode).toBe(404);
+      expect(reasonOf(res)).toBe('deck_not_found');
+    }
+    expect((await download(phone, 'cells')).statusCode).toBe(400);
+  });
+
+  it('refuses its teacher a deck not checked yet or rejected (409), which no slide shows', async () => {
+    const l = await lesson('download-unchecked');
+    const pending = await deck(l.teacher.id, l.school.id, 'pending');
+    const rejected = await deck(l.teacher.id, l.school.id, 'rejected');
+
+    for (const [found, reason] of [
+      [pending, 'deck_not_ready'],
+      [rejected, 'deck_rejected'],
+    ] as const) {
+      const res = await download(l.token, found.id);
+      expect(res.statusCode).toBe(409);
+      expect(reasonOf(res)).toBe(reason);
+    }
+  });
+
+  it('answers 503 deck_storage_off while storage is off, to a caller who may see the deck; anyone else 403', async () => {
+    const l = await lesson('download-storage-off');
+    await slide(l.token, l.session.id, showing(l.cells.id, 3));
+    const elsewhere = await seedClassroom(db, 'download-storage-off-elsewhere');
+    const off = await makeAuthedApp(db, () => now);
+    try {
+      const send = async (sub: string) =>
+        authedInject(off.app, await off.tokenFor(sub), {
+          method: 'GET',
+          url: `/v1/decks/${l.cells.id}/download`,
+        });
+
+      for (const sub of [l.teacher.cognitoId, l.student.cognitoId]) {
+        const res = await send(sub);
+        expect(res.statusCode, sub).toBe(503);
+        expect(reasonOf(res)).toBe('deck_storage_off');
+      }
+      expect((await send(elsewhere.student.cognitoId)).statusCode).toBe(403);
+    } finally {
+      await off.close();
+    }
   });
 });

@@ -64,6 +64,7 @@ enum Contract {
         "HistoryPage": HistoryPage.self,
         "Presentation": Presentation.self,
         "AnswerResponse": AnswerResponse.self,
+        "DeckDownload": DeckDownload.self,
         "ApiErrorBody": ApiErrorBody.self,
     ]
 

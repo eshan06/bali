@@ -9,6 +9,7 @@
   "body": {
     "running": true,
     "question": null,
+    "slide": null,
     "phone": null
   }
 }

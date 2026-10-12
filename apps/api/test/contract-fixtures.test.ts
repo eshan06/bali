@@ -1,11 +1,15 @@
 import {
   closeQuestion,
+  completeDeck,
+  createDeck,
   type Database,
   endSession,
   enrollments,
   newUuidV7,
   openQuestion,
   protectionOff,
+  removeDeck,
+  showSlide,
   startSession,
   tapIn,
   unlock,
@@ -37,12 +41,14 @@ import {
   UPDATE_ME_OUTCOMES,
 } from '@bali/shared';
 import { and, eq } from 'drizzle-orm';
+import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { type DeckStorage, memoryDeckStorage } from '../src/deck-storage.js';
 import { type AuthedApp, makeAuthedApp } from './helpers/app.js';
 import {
   DISPOSITIONS,
@@ -238,6 +244,8 @@ const SCENARIOS: Record<string, string> = {
     'The same poll five minutes later with no check-in: their phone is silent, with when it was last heard.',
   'presentation/unlocked': 'Their phone after an Emergency Unlock.',
   'presentation/protection-off': 'Their phone after Screen Time was turned off.',
+  'presentation/slide':
+    'A page of the teacher’s deck shown in the lesson (M3b): which deck, its SHA-256 and the page, never a URL.',
   'presentation/over': 'The poll once the session is over: stop polling; nothing shows.',
   'presentation/403-not-enrolled': 'A poll of a lesson in a class the caller is not in.',
   'presentation/404-session-not-found': 'A poll of a session the server does not know.',
@@ -248,6 +256,12 @@ const SCENARIOS: Record<string, string> = {
   'answers/404-question-not-found': 'An answer to a question the server does not know.',
   'answers/409-question-closed': 'An answer after the teacher closed the question: not recorded.',
   'answers/409-event-id-conflict': 'An answer under an id the student’s own tap holds (a bug).',
+  'download/shown':
+    'The phone fetches the deck that slide names (M3b): a presigned GET of its PDF, good for minutes.',
+  'download/503-deck-storage-off': 'The same download from a server with no bucket set up.',
+  'download/403-not-shown':
+    'A download once the lesson is over: no running session of the student’s class shows the deck.',
+  'download/404-deck-not-found': 'A download of a deck its teacher removed since.',
 };
 
 interface Call {
@@ -258,6 +272,8 @@ interface Call {
   body?: object;
   /** When the server hears a call whose body names no time (a read): now, unless said. */
   at?: string;
+  /** The app that answers it: the run's, unless said. */
+  app?: FastifyInstance;
 }
 /**
  * The phone's clock, fixed: the server clamps it into the session's window
@@ -304,7 +320,7 @@ let heard = new Date();
 async function send(call: Call) {
   const made = call.at ?? (call.body as { deviceTime?: string } | undefined)?.deviceTime;
   heard = made === undefined ? new Date() : new Date(made);
-  const res = await ctx.app.inject({
+  const res = await (call.app ?? ctx.app).inject({
     method: call.method,
     url: call.path,
     headers: call.as === null ? {} : { authorization: `Bearer ${call.as}` },
@@ -911,7 +927,7 @@ async function captureAll() {
   const kim = await token(quiz.student.cognitoId);
   const poll = (as: string, sessionId = lessonNow.id, at?: string) =>
     get(as, `/v1/sessions/${sessionId}/presentation`, at);
-  const nothing = { running: true, question: null, phone: null };
+  const nothing = { running: true, question: null, slide: null, phone: null };
   await capture('presentation/nothing-asked', poll(kim), 200, nothing);
   const { question } = await openQuestion(db, {
     sessionId: lessonNow.id,
@@ -964,9 +980,38 @@ async function captureAll() {
   await capture('presentation/unlocked', poll(kim), 200, { running: true });
   await protectionOff(db, kims());
   await capture('presentation/protection-off', poll(kim), 200, { running: true });
+  // A slide (M3b): a page of the teacher's deck, and that deck's download while the lesson shows it.
+  const { deck: cells } = await createDeck(db, {
+    teacherId: quiz.teacher.id,
+    schoolId: quiz.school.id,
+    eventId: newUuidV7(),
+    title: 'Cells',
+    bytes: 1_000,
+    sha256: 'c'.repeat(64),
+  });
+  const ready = { status: 'ready', pageCount: 12 } as const;
+  await completeDeck(db, { deckId: cells.id, eventId: newUuidV7(), verdict: ready });
+  const page3 = { deckId: cells.id, page: 3, eventId: newUuidV7() };
+  await showSlide(db, { ...page3, sessionId: lessonNow.id, teacherId: quiz.teacher.id });
+  await capture('presentation/slide', poll(kim), 200, { running: true });
+  const download = (as: string) => get(as, `/v1/decks/${cells.id}/download`);
+  await capture('download/shown', download(kim), 200);
+  const noBucket = await makeAuthedApp(db, () => heard, undefined, {
+    verifyToken: ctx.issuer.verifier,
+  });
+  try {
+    const off = { ...download(kim), app: noBucket.app };
+    await capture('download/503-deck-storage-off', off, 503, { reason: 'deck_storage_off' });
+  } finally {
+    await noBucket.close();
+  }
   await end(lessonNow.id);
-  const done = { running: false, question: null, phone: null };
+  const done = { running: false, question: null, slide: null, phone: null };
   await capture('presentation/over', poll(kim), 200, done);
+  await capture('download/403-not-shown', download(kim), 403, notIn);
+  await removeDeck(db, { deckId: cells.id, eventId: newUuidV7() });
+  const removed = { reason: 'deck_not_found' };
+  await capture('download/404-deck-not-found', download(kim), 404, removed);
 
   // The account's deletion (C3), last: it leaves Eve's classes and her row named to no one.
   const deletion = del(eve, '/v1/me');
@@ -978,9 +1023,18 @@ async function captureAll() {
   });
 }
 
+/**
+ * Decks' storage, in memory (M2), its download URL held still: a real one's expiry and signature
+ * change every run, and a fixture changes only when the contract does.
+ */
+const storage: DeckStorage = {
+  ...memoryDeckStorage(),
+  downloadUrl: (key) => `https://deck-storage.invalid/${encodeURIComponent(key)}?signature=fixture`,
+};
+
 beforeAll(async () => {
   ({ db, close: closeDb } = await makeTestDb());
-  ctx = await makeAuthedApp(db, () => heard);
+  ctx = await makeAuthedApp(db, () => heard, storage);
   await captureAll();
 }, 60_000);
 
@@ -1053,6 +1107,8 @@ describe('the contract fixtures (contracts/fixtures)', () => {
     expect(states).toEqual(new Set([null, ...PARTICIPATION_STATES, 'silent']));
     const heardAt = owned.flatMap((p) => (p === null ? [] : [p.lastSeenAt === null]));
     expect(new Set(heardAt)).toEqual(new Set([true, false]));
+    // The slide (M3b): a page shown, and none.
+    expect(new Set(polls.map((p) => p.slide === null))).toEqual(new Set([true, false]));
     // A leave that ended the student's participation too — past the bell, before the sweep —
     // and one that ended only the enrollment (A19; #132's review).
     const endedHere = valuesOf('EndEnrollmentResponse', 'endedParticipation');
@@ -1106,9 +1162,11 @@ describe('the contract fixtures (contracts/fixtures)', () => {
     // Every refusal a phone can meet, by status and by reason: all but a
     // teacher's extend, a teacher invite's, which the portal redeems (T1b), a
     // saved question's, the teacher's (L3b), and a deck's or a slide change's,
-    // the teacher's until M3b's download gives the phone a deck's.
+    // the teacher's, but the two a phone's download meets (M3b): a removed
+    // deck, and no bucket.
     const errors = all.filter((f) => f.type === 'ApiErrorBody');
-    expect(new Set(errors.map((f) => f.status))).toEqual(new Set([400, 401, 403, 404, 409]));
+    const statuses = new Set([400, 401, 403, 404, 409, 503]);
+    expect(new Set(errors.map((f) => f.status))).toEqual(statuses);
     const reasons = errors.map((f) => (f.body as ApiErrorBody).error.reason).filter(Boolean);
     const portal = new Set<string>([
       'invalid_extension',
@@ -1119,8 +1177,6 @@ describe('the contract fixtures (contracts/fixtures)', () => {
       'already_teacher',
       'student_in_class',
       'saved_question_not_found',
-      'deck_not_found',
-      'deck_storage_off',
       'deck_not_ready',
       'deck_rejected',
       'page_out_of_range',

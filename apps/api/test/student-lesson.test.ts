@@ -171,6 +171,7 @@ describe('GET /v1/sessions/:id/presentation', () => {
     expect(await shown(l.phone, l.session.id)).toEqual({
       running: true,
       question: null,
+      slide: null,
       phone: null,
     });
   });
@@ -189,6 +190,7 @@ describe('GET /v1/sessions/:id/presentation', () => {
         correctOption: null,
         answer: null,
       },
+      slide: null,
       phone: null,
     });
   });
@@ -265,7 +267,7 @@ describe('GET /v1/sessions/:id/presentation', () => {
     await ask(l);
     // Tapped in, so the phone too is shown no more, though the sweep has not ended its row.
     await tappedIn(l);
-    const over = { running: false, question: null, phone: null };
+    const over = { running: false, question: null, slide: null, phone: null };
     now = at(25);
     expect(await shown(l.phone, l.session.id)).toEqual(over);
 

@@ -764,6 +764,12 @@ export interface SessionSnapshot {
    * open by the server's clock, so past the bell too. Additive: an older server omits it.
    */
   question?: TeacherQuestion | null;
+  /**
+   * What the session shows (Phase 7, M3b), so a reloaded presenter finds it and mints its next
+   * slide change after the last: null before its first slide change, and once the session is not
+   * running by the server's clock. Additive: an older server omits it.
+   */
+  presentation?: SessionPresentation | null;
 }
 
 // POST /v1/sessions/{id}/questions — open a question; POST /v1/questions/{id}/close — close it
@@ -955,6 +961,23 @@ export interface SlideResponse {
    */
   eventId: string;
 }
+/** What a running session shows, as its teacher's snapshot reads it (M3b). */
+export interface SessionPresentation {
+  /** The page shown now; null once presenting stopped. */
+  slide: Slide | null;
+  /** The slide change that set it, as `SlideResponse.eventId`: a client mints its next after it. */
+  eventId: string;
+}
+
+// GET /v1/decks/{id}/download — where a deck's PDF is fetched from (Phase 7, M3b; "Live lesson",
+// decisions 6 and 8): its own teacher, or a student while a running session of their class shows it.
+export interface DeckDownload {
+  /**
+   * A presigned GET of the PDF, good for minutes and answered `Cache-Control: no-store`: fetched at
+   * once, its bytes checked against the slide's `sha256`. Once it has expired, ask again.
+   */
+  url: string;
+}
 
 // GET /v1/questions/{id}/results — a question's totals (Phase 7, L3r; "Live lesson", decisions 3
 // and 6), the class's own teacher only. A strong ETag over the body; `If-None-Match` answers `304`.
@@ -976,8 +999,7 @@ export interface QuestionResults {
 
 // GET /v1/sessions/{id}/presentation — what a student's phone and the student web show of a live
 // lesson (Phase 7, L4; "Live lesson", decision 6), polled about every 2 s; a student enrolled in the
-// session's class now. A strong ETag over the body, and `If-None-Match` answers `304`. Slides (M3)
-// join it as a field of their own.
+// session's class now. A strong ETag over the body, and `If-None-Match` answers `304`.
 export interface Presentation {
   /** The session runs by the server's clock: false tells the client to stop polling. */
   running: boolean;
@@ -986,6 +1008,11 @@ export interface Presentation {
    * once the session is over: nothing is shown outside one (decision 2).
    */
   question: StudentQuestion | null;
+  /**
+   * The page the teacher shows (M3b), never a URL: a client fetches a deck it has not cached through
+   * `GET /v1/decks/{id}/download`. Null while nothing is shown, and once the session is over.
+   */
+  slide: Slide | null;
   /**
    * The caller's own phone in this session (W1; decision 13), as the teacher's grid shows it: null
    * while they have no live participation here — not tapped in, or gone to another class — and
