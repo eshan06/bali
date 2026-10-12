@@ -9,11 +9,11 @@ import http from 'k6/http';
  * address. The 600 tap within the minute before it, so each waits; each teacher's Start joins
  * their 30 at the bell, and every class starts, for `load:sweep` to end all 30. Each phone then
  * reads the truth every 30 s (decision 7): `GET /v1/me` while it waits, a check-in once joined.
- * Ten of the classes follow a live lesson (Phase 7, L4b, M9): their teacher asks a question and
+ * Six of the classes follow a live lesson (Phase 7, L4b, M9): their teacher asks a question and
  * shows a page of a deck once the Start has joined them, and each student follows it on a phone
  * and a laptop, each polling the presentation every 2 s beside the check-ins and asking once for
  * the download of the deck its slide names; each phone answers the question once. Five classes'
- * devices open the lesson 5 to 30 s after the bell, five classes' together at it, beside the Starts.
+ * devices open the lesson 5 to 30 s after the bell, the sixth's together at it, beside the Starts.
  * Meanwhile one account asks `GET /v1/me` 50 times a second. Thresholds below; why: DECISIONS.
  */
 
@@ -59,12 +59,13 @@ const POLL = 2;
 /** The fewest polls a device makes, opening the lesson at the latest, less a few in hand. */
 const DEVICE_POLLS = Math.floor((END - BELL - OPEN_WITHIN) / POLL) - 5;
 /**
- * The bell's lesson (M9): the next 5 teachers' classes, whose devices open it together, within the
+ * The bell's lesson (M9): the next teacher's class, whose devices open it together, within the
  * Starts' own 2 s, as a push at the Start would bring them. Their first reads (`kind:open`) meet the
  * Starts on the database's 10 connections, so they have a threshold of their own, chosen from CI's
- * numbers (DECISIONS, M9); every other threshold holds them too.
+ * numbers; every other threshold holds them too. One class's, not five's: five classes' devices
+ * took the Starts' p95 to 995 ms of their 1 s (DECISIONS, M9).
  */
-const BELL_CLASSES = 5;
+const BELL_CLASSES = 1;
 const OPEN_P95_MS = P95_MS;
 
 const school = (key) => new SharedArray(key, () => [JSON.parse(open(SCHOOL_FILE))[key]].flat());
