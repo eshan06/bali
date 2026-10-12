@@ -263,7 +263,7 @@ project for the API (its DSN).
       error tagged `deck object deletion` (its title is S3's reason, e.g. `StorageError: S3 refused:
       AccessDenied (403)`). If the API's boot log says `deck storage is off`, nothing is deleted:
       turn it back on first (runbook 10). Wait the hour, then search Sentry for
-      `route:"deck object deletion" is:unresolved`. If an issue is there, fix what runbook 10 says
+      `route:"deck object deletion" environment:production is:unresolved`. If an issue is there, fix what runbook 10 says
       S3's reason means, run its check, resolve the issue, wait another hour (a deck that kept
       failing is tried again at most an hour later), and reply only once no new event has come.
     - **Write back to the school,** by the agreement's channel, inside its days: the date of
