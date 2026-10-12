@@ -846,12 +846,30 @@ export interface SavedQuestionsResponse {
   savedQuestions: SavedQuestion[];
 }
 
-// GET and POST /v1/decks, DELETE /v1/decks/{id} — a teacher's slide decks (Phase 7, M2; "Live
-// lesson", decision 6), their own only. The PDF goes to the bucket by the create's presigned PUT,
-// never through the API; a removal's body is `{ eventId }`.
+// GET and POST /v1/decks, DELETE /v1/decks/{id}, POST /v1/decks/{id}/complete — a teacher's slide
+// decks (Phase 7, M2; "Live lesson", decision 6), their own only. The PDF goes to the bucket by the
+// create's presigned PUT, never through the API; a removal's body and a complete's are `{ eventId }`.
 /** Where a deck stands: `pending` until its upload is checked, then `ready` or `rejected`. */
 export const DECK_STATUSES = ['pending', 'ready', 'rejected'] as const;
 export type DeckStatus = (typeof DECK_STATUSES)[number];
+/**
+ * Why a deck was rejected (`Deck.rejection`), for its teacher to read: `not_pdf`, no `%PDF-` at its
+ * start or nothing PDF.js can read as a PDF with a page; `too_large`, more than `DECK_MAX_BYTES` in
+ * the bucket; `mismatch`, not the length or SHA-256 declared, so the upload didn't arrive whole;
+ * `too_many_pages`, more than `DECK_MAX_PAGES`; `encrypted`, a password on it, to open it or an
+ * owner's; `too_slow`, its parse ran past the check's time limit or out of its memory; `unfinished`,
+ * nothing uploaded. Additive-only like the other vocab.
+ */
+export const DECK_REJECTIONS = [
+  'not_pdf',
+  'too_large',
+  'mismatch',
+  'too_many_pages',
+  'encrypted',
+  'too_slow',
+  'unfinished',
+] as const;
+export type DeckRejection = (typeof DECK_REJECTIONS)[number];
 /** A teacher's deck: a PDF in the bucket, which no student sees before it is checked. */
 export interface Deck {
   id: string;
@@ -863,6 +881,8 @@ export interface Deck {
   sha256: string;
   /** Once `ready`; null before. */
   pageCount: number | null;
+  /** Once `rejected`, why; null otherwise (added M2b). */
+  rejection: DeckRejection | null;
   createdAt: string;
 }
 export interface CreateDeckRequest {
@@ -875,10 +895,11 @@ export interface CreateDeckRequest {
   sha256: string;
 }
 /**
- * Every outcome a deck's write answers with (`DeckResponse.outcome`): `created`, `removed`, or
- * `replay`, which changed nothing: the write's own retry.
+ * Every outcome a deck's write answers with (`DeckResponse.outcome`): `created`, `removed`,
+ * `checked` (its upload checked: `ready` or `rejected`, M2b), or `replay`, which changed nothing:
+ * the write's own retry, or a complete of a deck already checked, answered with its verdict.
  */
-export const DECK_OUTCOMES = ['created', 'removed', 'replay'] as const;
+export const DECK_OUTCOMES = ['created', 'removed', 'checked', 'replay'] as const;
 export type DeckOutcome = (typeof DECK_OUTCOMES)[number];
 export interface DeckResponse {
   outcome: DeckOutcome;

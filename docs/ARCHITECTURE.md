@@ -1079,7 +1079,8 @@ nothing of a live lesson sits in the outbox ahead of an unlock (decision 5).
   only a stored id is checked against another student's.
 - `decks` (Slice 2) — one row per uploaded PDF: `id`, `teacher_id`, `school_id`, `title`,
   `storage_key`, `sha256`, `bytes`, `page_count`, `status` (`pending` / `ready` /
-  `rejected`), `event_id` (unique: the write that last wrote it, as a draft's; M2), `created_at`,
+  `rejected`), `rejection` (why, once `rejected`: `DECK_REJECTIONS` in `@bali/shared`; M2b),
+  `event_id` (unique: the write that last wrote it, as a draft's; M2), `created_at`,
   `removed_at` (decision 3's soft removal), `object_deleted_at` (when its stored object was
   confirmed deleted; decision 8).
 - `session_presentations` (Slice 2) — at most one row per session, keyed by `session_id`:
@@ -1232,8 +1233,9 @@ Slice 2, teacher:
 - `POST /v1/decks/{id}/complete` — `{ eventId }`: the API reads the object and checks it —
   the `%PDF-` magic bytes, its size ≤ 25 MB and equal to the declared, the `sha256`, ≤ 200
   pages, not encrypted — then marks it `ready` with its page count, or `rejected` with the
-  reason and its object deleted. One-way: a deck `ready` or `rejected` is never checked
-  again, and its replay answers the verdict. The PUT expires in 5 minutes; a PUT over a
+  reason and its object deleted; either verdict is a `200`, the deck carrying it (M2b). One-way:
+  a deck `ready` or `rejected` is never checked again, and any complete of it answers the
+  verdict. The PUT expires in 5 minutes; a PUT over a
   `ready` deck's object before then changes bytes no client takes, since every client checks
   the `sha256` the server verified. The checks are bounded: the size cap first, then the
   parse in a separate worker under a hard time limit, so a hostile file stalls only that

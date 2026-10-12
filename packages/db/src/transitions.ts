@@ -1,5 +1,6 @@
 import type {
   ActionOrder,
+  DeckRejection,
   EventType,
   ParticipationEndedReason,
   ParticipationState,
@@ -3789,7 +3790,7 @@ export type DeckRow = typeof decks.$inferSelect;
 
 /** Written by this call; 'replay' wrote nothing, and carries the deck now. */
 export interface DeckResult {
-  outcome: 'created' | 'removed' | 'replay';
+  outcome: 'created' | 'removed' | 'checked' | 'replay';
   deck: DeckRow;
 }
 
@@ -3901,6 +3902,51 @@ export function removeDeck(
         .where(eq(decks.id, deck.id))
         .returning();
       return { outcome: 'removed', deck: removed! };
+    }),
+  );
+}
+
+export interface CompleteDeckInput {
+  /** The caller's own deck, as the route checks. */
+  deckId: string;
+  /** The complete's idempotency key (rule 4): the deck's `event_id` once it records the verdict. */
+  eventId: string;
+  /** What its upload's check decided, outside any transaction: the API's (decision 6). */
+  verdict:
+    { status: 'ready'; pageCount: number } | { status: 'rejected'; rejection: DeckRejection };
+}
+
+/**
+ * A pending deck's verdict, recorded (decision 6): `ready` with its page count, or `rejected` with
+ * why. Its row alone, FOR UPDATE, as a removal holds it. One-way: a deck already checked is never
+ * checked again, and any complete of it is answered with its verdict, writing nothing, as a close of
+ * a closed question is. The id any other row holds, this deck's create's included, is
+ * EVENT_ID_CONFLICT. A deck removed, or none, is `deck_not_found`.
+ */
+export function completeDeck(
+  db: Database,
+  input: CompleteDeckInput,
+): Promise<DeckResult | { outcome: 'deck_not_found' }> {
+  return onceMoreOnUnique(() =>
+    db.transaction(async (tx): Promise<DeckResult | { outcome: 'deck_not_found' }> => {
+      const [deck] = await tx.select().from(decks).where(eq(decks.id, input.deckId)).for('update');
+      if (!deck || deck.removedAt) return { outcome: 'deck_not_found' };
+      if (deck.status !== 'pending') return { outcome: 'replay', deck };
+      if (await idHeldBy(tx, input.eventId, decks, events, responses, savedQuestions)) {
+        throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
+      }
+      const { verdict } = input;
+      const [checked] = await tx
+        .update(decks)
+        .set({
+          status: verdict.status,
+          pageCount: verdict.status === 'ready' ? verdict.pageCount : null,
+          rejection: verdict.status === 'rejected' ? verdict.rejection : null,
+          eventId: input.eventId,
+        })
+        .where(eq(decks.id, deck.id))
+        .returning();
+      return { outcome: 'checked', deck: checked! };
     }),
   );
 }

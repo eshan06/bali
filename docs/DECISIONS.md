@@ -8,6 +8,48 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-11** — **A deck's check (M2b1): `unpdf` parses it in a worker thread stopped at 10
+  seconds, and a rejected deck says why.** M2b whole is over 400 changed lines by santa's count, so
+  it ships as the split decided in advance: `POST /v1/decks/{id}/complete`, the check, its parse
+  worker and the hostile PDFs here; the upload URL's mint and the 5-minute rule across removal,
+  rejection and the sweep, the sweep's 24-hour rejection, ARCHITECTURE decision 4's sentence and
+  #323's WARN 3 note are M2b2. **The dependency: `unpdf` 1.8.1** (2.1 MB, no dependencies, PDF.js
+  6.1.200's parser bundled for servers): the smallest of the three M2a sized, and PDF.js is what
+  the portal renders with (decision 8), so the page count the check records is the one the
+  presenter's viewer finds. It walks the page tree to its last page (a `/Count` past the tree is
+  corrected), throws `PasswordException` for a PDF that needs a password, and reports permissions
+  for one encrypted with an owner's password only, which opens with none: both are `encrypted`.
+  *Weighed:* `pdf-lib` (19.5 MB and 4 dependencies, unpublished since 2022; it read a truncated
+  file as 0 pages, no error), `pdfjs-dist` (35 MB and an optional native canvas, the same parser).
+  **Never its metadata:** PDF.js decodes an XMP stream whole, and a 200 KB flate bomb there grew a
+  probe's process by 840 MB; a worker's heap limit bounds JavaScript, not the buffers a decoder
+  fills, so the worker asks for the pages and the permissions alone. **The worker:** plain `.mjs`
+  in `node:worker_threads`, started with no loader (`execArgv: []`, never the API's tsx), stopped
+  at **10 seconds** or once its heap passes **256 MB**, both `too_slow`, and answered only once
+  its thread has stopped, so none outlives its check. A page parses in 40 ms with the worker's
+  start, 34 MB of 1.2 million objects behind a broken xref, which PDF.js indexes one by one, in
+  420 ms: 10 s is room for a slow container, and all a hostile file can cost. The heap limit
+  turns a runaway parse's out-of-memory, fatal to the whole process in an unlimited worker, into
+  that thread's alone. **Two checks at a time in a process** (`CHECKS_AT_ONCE`), the rest waiting
+  their turn in order: each holds a 25 MB read and a worker of up to 256 MB, so a teacher's many
+  hostile files at once slow the check, never take the API's memory. A parser that fails to start
+  or stops with no answer is the server's `500`, the deck left pending, as is the bucket's failed
+  read. **The verdict is an answer, not a
+  refusal:** `200`, `outcome: 'checked'`, the deck `ready` with its pages or `rejected` with
+  `rejection`, a column (migration 0024) and an additive field, from `DECK_REJECTIONS`:
+  `not_pdf`, `too_large`, `mismatch`, `too_many_pages`, `encrypted`, `too_slow`, `unfinished`, one
+  for each refusal line the approved "Your slides" design says (the portal canvas's "Every said
+  line"), so the list still says why after a reload. A length or SHA-256 other than declared is
+  one, `mismatch` ("didn't arrive in one piece"); nothing uploaded is `unfinished`, as the sweep's
+  24 hours will be. The SHA-256 is WebCrypto's, off the event loop. **One-way, as a close of a
+  closed question:** a complete of a deck checked already answers its verdict and records
+  nothing, whatever its `eventId`; only a pending deck is read and parsed, outside any
+  transaction, and the engine's `completeDeck` records the verdict under the deck's row lock, its
+  `eventId` spent both ways. *Weighed:* a `4xx` for a rejection, which the portal would have to
+  tell from a refusal of the request. **Left for M2b2:** a rejected deck's object is deleted after
+  the commit and stamped at once, as M2a's removal stamps a decided deck; no client uploads
+  before M5.
+
 - **2026-10-11** — **A teacher's slide decks, the table and the teacher's routes (M2a): storage off
   is `503 deck_storage_off`, and a pending deck's object is never stamped gone at its removal.** M2
   whole is about 900 changed lines by santa's count, so it ships as the split decided in advance:

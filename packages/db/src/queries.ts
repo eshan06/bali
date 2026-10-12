@@ -384,9 +384,7 @@ export function listSavedQuestions(db: Database, teacherId: string) {
 
 /** A deck by id, removed or not (Phase 7, M2), so a route can authorize its teacher. */
 export async function findDeck(db: Database, id: string) {
-  return first(
-    await db.select({ teacherId: decks.teacherId }).from(decks).where(eq(decks.id, id)).limit(1),
-  );
+  return first(await db.select().from(decks).where(eq(decks.id, id)).limit(1));
 }
 
 /** A teacher's decks ("Live lesson", decision 6): theirs alone, none removed, newest first. */

@@ -1,4 +1,5 @@
 import type {
+  DeckRejection,
   DeckStatus,
   EventType,
   ParticipationEndedReason,
@@ -581,6 +582,8 @@ export const decks = pgTable(
     /** Once `ready`. */
     pageCount: integer('page_count'),
     status: text('status').$type<DeckStatus>().notNull().default('pending'),
+    /** Once `rejected`, why (M2b). */
+    rejection: text('rejection').$type<DeckRejection>(),
     /** The idempotency key of the teacher's write that last wrote it: an earlier one's is not kept. */
     eventId: uuid('event_id').notNull().unique(),
     createdAt: createdAt(),

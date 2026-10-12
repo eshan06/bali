@@ -10,7 +10,9 @@ import {
   type ApiErrorBody,
   type CreateDeckResponse,
   DECK_MAX_BYTES,
+  DECK_MAX_PAGES,
   DECK_TITLE_MAX_LENGTH,
+  type DeckRejection,
   type DeckResponse,
   type DecksResponse,
 } from '@bali/shared';
@@ -18,14 +20,21 @@ import { eq } from 'drizzle-orm';
 import { createHash, randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { type MemoryDeckStorage, memoryDeckStorage, StorageError } from '../src/deck-storage.js';
+import { CHECKS_AT_ONCE, parsePdf } from '../src/deck-check.js';
+import {
+  type DeckStorage,
+  type MemoryDeckStorage,
+  memoryDeckStorage,
+  StorageError,
+} from '../src/deck-storage.js';
 import { authedInject, makeAuthedApp, type AuthedApp } from './helpers/app.js';
 import { makeTestDb, seedClassroom } from './helpers/db.js';
+import { encryptedPdf, pdf, swapped } from './helpers/pdf.js';
 
 /*
  * A teacher's slide decks through the API (Phase 7, M2; ARCHITECTURE, "Live lesson", decisions 4,
- * 5, 6 and 8): create, list and remove, against the in-memory bucket, and every deck route's
- * answer while storage is off. Who else is refused is the authorization matrix's too; the engine's
+ * 5, 6 and 8): create, list, remove and complete, against the in-memory bucket, the check with real
+ * and hostile PDFs, and every deck route's answer while storage is off. Who else is refused is the authorization matrix's too; the engine's
  * own rules and races are packages/db's.
  */
 
@@ -74,9 +83,18 @@ const remove = (
   app = ctx.app,
 ) => authedInject(app, token, { method: 'DELETE', url: `/v1/decks/${id}`, payload });
 
+const complete = (
+  token: string,
+  id: string,
+  payload: object = { eventId: newUuidV7() },
+  app = ctx.app,
+) => authedInject(app, token, { method: 'POST', url: `/v1/decks/${id}/complete`, payload });
+
 /** PUT `body` to an upload URL, as the browser does. */
 const upload = (url: string, body = PDF) =>
   storage.fetch(url, { method: 'PUT', headers: { 'content-type': 'application/pdf' }, body });
+
+const sha256Of = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 
 const reasonOf = (res: { json: () => unknown }) => (res.json() as ApiErrorBody).error.reason;
 const decksOf = (teacherId: string) =>
@@ -95,6 +113,19 @@ async function added(token: string, over: Record<string, unknown> = {}) {
   expect(res.statusCode).toBe(200);
   return res.json<CreateDeckResponse>();
 }
+
+/** Add a deck for `bytes` and upload them through its URL, as the portal does: the deck. */
+async function uploaded(token: string, bytes: Uint8Array<ArrayBuffer>) {
+  const { deck, uploadUrl } = await added(token, {
+    bytes: bytes.byteLength,
+    sha256: sha256Of(bytes),
+  });
+  expect((await upload(uploadUrl, bytes)).status).toBe(200);
+  return deck;
+}
+
+const rowOf = async (deckId: string) =>
+  (await db.select().from(decks).where(eq(decks.id, deckId)))[0]!;
 
 describe('POST /v1/decks', () => {
   it('adds a pending deck and the URL its PDF goes to; its retry is answered with a fresh one', async () => {
@@ -115,6 +146,7 @@ describe('POST /v1/decks', () => {
         bytes: PDF.byteLength,
         sha256: SHA256,
         pageCount: null,
+        rejection: null,
         createdAt: now.toISOString(),
       },
       uploadUrl: answer.uploadUrl,
@@ -300,6 +332,7 @@ describe('while decks’ storage is off (no bucket set up)', () => {
         await list(own, off.app),
         await create(own, adding(), off.app),
         await remove(own, deck.id, undefined, off.app),
+        await complete(own, deck.id, undefined, off.app),
       ]) {
         expect(res.statusCode).toBe(503);
         expect(res.json<ApiErrorBody>().error).toMatchObject({
@@ -312,5 +345,242 @@ describe('while decks’ storage is off (no bucket set up)', () => {
     } finally {
       await off.close();
     }
+  });
+});
+
+describe('POST /v1/decks/:id/complete', () => {
+  it('marks an uploaded PDF ready with its page count; its retry and any later complete answer that, never checking again', async () => {
+    const { token } = await people('deck-check');
+    const bytes = pdf(3);
+    const { deck, uploadUrl } = await added(token, {
+      bytes: bytes.byteLength,
+      sha256: sha256Of(bytes),
+    });
+    await upload(uploadUrl, bytes);
+    const body = { eventId: newUuidV7() };
+    now = at(11);
+
+    const res = await complete(token, deck.id, body);
+
+    expect(res.statusCode).toBe(200);
+    const ready = { ...deck, status: 'ready', pageCount: 3 };
+    expect(res.json<DeckResponse>()).toEqual({ outcome: 'checked', deck: ready });
+    expect(await rowOf(deck.id)).toMatchObject({ eventId: body.eventId, objectDeletedAt: null });
+    // One-way: other bytes PUT by its URL since are never checked; every client checks the sha256.
+    await upload(uploadUrl, swapped(bytes, '/Count 3', '/Count 2'));
+    for (const again of [body, { eventId: newUuidV7() }]) {
+      const answer = await complete(token, deck.id, again);
+      expect(answer.json<DeckResponse>()).toEqual({ outcome: 'replay', deck: ready });
+    }
+    expect((await list(token)).json<DecksResponse>()).toEqual({ decks: [ready] });
+    expect(await rowOf(deck.id)).toMatchObject({ eventId: body.eventId, status: 'ready' });
+  });
+
+  it('takes 200 pages, and rejects 201: too_many_pages, its object deleted', async () => {
+    const { token } = await people('deck-pages');
+    const most = await uploaded(token, pdf(DECK_MAX_PAGES));
+    const over = await uploaded(token, pdf(DECK_MAX_PAGES + 1));
+
+    const taken = (await complete(token, most.id)).json<DeckResponse>();
+    const refused = (await complete(token, over.id)).json<DeckResponse>();
+
+    expect(taken.deck).toMatchObject({
+      status: 'ready',
+      pageCount: DECK_MAX_PAGES,
+      rejection: null,
+    });
+    expect(refused).toEqual({
+      outcome: 'checked',
+      deck: { ...over, status: 'rejected', rejection: 'too_many_pages' },
+    });
+    const row = await rowOf(over.id);
+    expect(await storage.read(row.storageKey, DECK_MAX_BYTES)).toBe('missing');
+    // Decided, so stamped at once, as a removal stamps one (M2a; M2b2 waits out its upload URL).
+    expect(row.objectDeletedAt).toEqual(now);
+  });
+
+  it('rejects each upload that can be no deck, saying why, and deletes its object', async () => {
+    const { token } = await people('deck-hostile');
+    const three = pdf(3);
+    const cases: [string, Uint8Array<ArrayBuffer>, DeckRejection][] = [
+      // PDF.js would read this one: the magic alone refuses it.
+      ['another format’s magic', swapped(three, '%PDF-', '%PNG-'), 'not_pdf'],
+      [
+        '%PDF- and nothing a PDF has',
+        new TextEncoder().encode('%PDF-1.7\nno objects\n'),
+        'not_pdf',
+      ],
+      ['no pages', pdf(0), 'not_pdf'],
+      ['a password to open it', encryptedPdf(false), 'encrypted'],
+      ['an owner’s password only, which opens with none', encryptedPdf(true), 'encrypted'],
+    ];
+    for (const [why, bytes, rejection] of cases) {
+      const deck = await uploaded(token, bytes);
+
+      const res = await complete(token, deck.id);
+
+      expect(res.statusCode, why).toBe(200);
+      expect(res.json<DeckResponse>().deck, why).toEqual({
+        ...deck,
+        status: 'rejected',
+        rejection,
+      });
+      const row = await rowOf(deck.id);
+      expect(await storage.read(row.storageKey, DECK_MAX_BYTES), why).toBe('missing');
+    }
+
+    // Other bytes of the declared length, which its URL takes: not the file declared.
+    const { deck, uploadUrl } = await added(token, {
+      bytes: three.byteLength,
+      sha256: sha256Of(three),
+    });
+    await upload(uploadUrl, swapped(three, '/Count 3', '/Count 2'));
+    expect((await complete(token, deck.id)).json<DeckResponse>().deck.rejection).toBe('mismatch');
+    // Nothing uploaded at all.
+    const never = (await added(token)).deck;
+    expect((await complete(token, never.id)).json<DeckResponse>().deck.rejection).toBe(
+      'unfinished',
+    );
+  });
+
+  it('reads no further than 25 MB: an object past it is too_large, one of another length a mismatch', async () => {
+    const asked: number[] = [];
+    let answer: Awaited<ReturnType<DeckStorage['read']>> = 'too_large';
+    const sized = await makeAuthedApp(db, () => now, {
+      ...storage,
+      read: (_key, maxBytes) => {
+        asked.push(maxBytes);
+        return Promise.resolve(answer);
+      },
+    });
+    try {
+      const { teacher, token } = await people('deck-sized');
+      const own = await sized.tokenFor(teacher.cognitoId);
+      const big = await uploaded(token, pdf(3));
+      const short = await uploaded(token, pdf(3));
+
+      const refused = await complete(own, big.id, undefined, sized.app);
+      answer = pdf(2);
+      const mismatched = await complete(own, short.id, undefined, sized.app);
+
+      expect(refused.json<DeckResponse>().deck.rejection).toBe('too_large');
+      expect(mismatched.json<DeckResponse>().deck.rejection).toBe('mismatch');
+      expect(asked).toEqual([DECK_MAX_BYTES, DECK_MAX_BYTES]);
+    } finally {
+      await sized.close();
+    }
+  });
+
+  it('stops a parse that stalls past its time limit, rejecting too_slow, while the API keeps answering', async () => {
+    const limitMs = 500;
+    const stalls = new URL('./helpers/stalling-parser.mjs', import.meta.url);
+    const stalling = await makeAuthedApp(db, () => now, storage, {
+      parsePdf: (bytes) => parsePdf(bytes, stalls, limitMs),
+    });
+    try {
+      const { teacher, token } = await people('deck-stall');
+      const own = await stalling.tokenFor(teacher.cognitoId);
+      const deck = await uploaded(token, pdf(3));
+      const answered: string[] = [];
+      const started = performance.now();
+
+      const checking = complete(own, deck.id, undefined, stalling.app).finally(() =>
+        answered.push('complete'),
+      );
+      const listed = await list(own, stalling.app);
+      answered.push('list');
+      const health = await stalling.app.inject({ url: '/healthz' });
+      answered.push('healthz');
+      const res = await checking;
+
+      expect([listed.statusCode, health.statusCode]).toEqual([200, 200]);
+      expect(answered).toEqual(['list', 'healthz', 'complete']);
+      expect(performance.now() - started).toBeGreaterThanOrEqual(limitMs - 5);
+      expect(res.statusCode).toBe(200);
+      expect(res.json<DeckResponse>().deck).toMatchObject({
+        status: 'rejected',
+        rejection: 'too_slow',
+      });
+    } finally {
+      await stalling.close();
+    }
+  });
+
+  it('checks two at a time; the rest wait their turn, and each is answered', async () => {
+    let live = 0;
+    let most = 0;
+    const counting = await makeAuthedApp(db, () => now, storage, {
+      parsePdf: async () => {
+        most = Math.max(most, (live += 1));
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        live -= 1;
+        return { pages: 1 };
+      },
+    });
+    try {
+      const { teacher, token } = await people('deck-turns');
+      const own = await counting.tokenFor(teacher.cognitoId);
+      const pending = [];
+      for (let i = 0; i < 5; i += 1) pending.push(await uploaded(token, pdf(1)));
+
+      const answers = await Promise.all(
+        pending.map((deck) => complete(own, deck.id, undefined, counting.app)),
+      );
+
+      const statuses = answers.map((res) => res.json<DeckResponse>().deck.status);
+      expect(statuses).toEqual(Array<string>(5).fill('ready'));
+      expect(most).toBe(CHECKS_AT_ONCE);
+    } finally {
+      await counting.close();
+    }
+  });
+
+  it('keeps the deck pending when the bucket fails its read: a 500, checked on the next complete', async () => {
+    const failing = await makeAuthedApp(db, () => now, {
+      ...storage,
+      read: () => Promise.reject(new StorageError('InternalError', 500)),
+    });
+    try {
+      const { teacher, token } = await people('deck-read-fails');
+      const own = await failing.tokenFor(teacher.cognitoId);
+      const deck = await uploaded(token, pdf(1));
+      const { eventId: created } = await rowOf(deck.id);
+
+      const res = await complete(own, deck.id, undefined, failing.app);
+
+      expect(res.statusCode).toBe(500);
+      expect(await rowOf(deck.id)).toMatchObject({ status: 'pending', eventId: created });
+      expect((await complete(token, deck.id)).json<DeckResponse>().deck.status).toBe('ready');
+    } finally {
+      await failing.close();
+    }
+  });
+
+  it('refuses another teacher’s deck, a removed or unknown one, a spent eventId and a malformed body, deciding nothing', async () => {
+    const { teacher, token } = await people('deck-check-refused');
+    const other = await people('deck-check-refused-elsewhere');
+    const deck = await uploaded(token, pdf(1));
+    const gone = await uploaded(token, pdf(1));
+    await remove(token, gone.id);
+    const draft = newUuidV7();
+    const words = { prompt: 'Which?', options: ['a', 'b'] };
+    await createSavedQuestion(db, { teacherId: teacher.id, eventId: draft, ...words });
+    const created = (await rowOf(deck.id)).eventId;
+
+    expect((await complete(other.token, deck.id)).statusCode).toBe(403);
+    for (const res of [await complete(token, gone.id), await complete(token, newUuidV7())]) {
+      expect(res.statusCode).toBe(404);
+      expect(reasonOf(res)).toBe('deck_not_found');
+    }
+    // A draft's id, and the deck's own create's.
+    for (const eventId of [draft, created]) {
+      const res = await complete(token, deck.id, { eventId });
+      expect(res.statusCode).toBe(409);
+      expect(reasonOf(res)).toBe('event_id_conflict');
+    }
+    expect((await complete(token, deck.id, { eventId: randomUUID() })).statusCode).toBe(400);
+
+    expect(await rowOf(deck.id)).toMatchObject({ status: 'pending', eventId: created });
+    expect((await complete(token, deck.id)).json<DeckResponse>().deck.status).toBe('ready');
   });
 });
