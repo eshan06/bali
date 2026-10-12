@@ -61,12 +61,13 @@ const DEVICE_POLLS = Math.floor((END - BELL - OPEN_WITHIN) / POLL) - 5;
 /**
  * The bell's lesson (M9): the next teacher's class, whose devices open it together, within the
  * Starts' own 2 s, as a push at the Start would bring them. Their first reads (`kind:open`) meet the
- * Starts on the database's 10 connections, so they have a threshold of their own, chosen from CI's
- * numbers; every other threshold holds them too. One class's, not five's: five classes' devices
- * took the Starts' p95 to 995 ms of their 1 s (DECISIONS, M9).
+ * Starts on the database's 10 connections, so they have a threshold of their own: their p95 ran
+ * near 20 ms on CI, and five times that fails a first read slowed fivefold at the bell. Every other
+ * threshold holds them too. One class's, not five's: five classes' devices took the Starts' p95 to
+ * 995 ms of their 1 s (DECISIONS, M9).
  */
 const BELL_CLASSES = 1;
-const OPEN_P95_MS = P95_MS;
+const OPEN_P95_MS = 100;
 
 const school = (key) => new SharedArray(key, () => [JSON.parse(open(SCHOOL_FILE))[key]].flat());
 const students = school('students');
