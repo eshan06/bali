@@ -57,6 +57,12 @@ export interface ApiClientOptions {
 
 export interface ApiClient {
   get<T>(path: string): Promise<T>;
+  /**
+   * A polled read under an ETag (L3r): `If-None-Match` with `etag` when one is kept, answered with
+   * the body and its tag, or null for a `304`, the body unchanged. Every `/v1` answer is
+   * `no-store`, so the browser keeps no copy and the poller keeps the tag itself.
+   */
+  getTagged<T>(path: string, etag: string | null): Promise<{ body: T; etag: string | null } | null>;
   post<T>(path: string, body?: unknown): Promise<T>;
   patch<T>(path: string, body?: unknown): Promise<T>;
   del<T>(path: string): Promise<T>;
@@ -70,11 +76,17 @@ function retryAfterSeconds(header: string | null): number | undefined {
 export function createApiClient(opts: ApiClientOptions): ApiClient {
   const doFetch = opts.fetchImpl ?? fetch;
 
-  async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  async function send(
+    method: string,
+    path: string,
+    body?: unknown,
+    etag: string | null = null,
+  ): Promise<Response> {
     const headers: Record<string, string> = {};
     const token = opts.getToken();
     if (token) headers['authorization'] = `Bearer ${token}`;
     if (body !== undefined) headers['content-type'] = 'application/json';
+    if (etag !== null) headers['if-none-match'] = etag;
 
     let res: Response;
     try {
@@ -94,7 +106,8 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
       opts.onUnauthorized?.();
       throw new UnauthorizedError();
     }
-    if (!res.ok) {
+    // A `304` answers only an `If-None-Match`: the kept body still stands.
+    if (!res.ok && !(res.status === 304 && etag !== null)) {
       // A 5xx is the server failing; a 4xx is a refusal the screen explains.
       if (res.status >= 500) captureApiFailure(method, path, res.status);
       const parsed = (await res.json().catch(() => null)) as ApiErrorBody | null;
@@ -109,12 +122,22 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
         retryAfterSeconds(res.headers.get('retry-after')),
       );
     }
+    return res;
+  }
+
+  async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+    const res = await send(method, path, body);
     if (res.status === 204) return undefined as T;
     return (await res.json()) as T;
   }
 
   return {
     get: (path) => request('GET', path),
+    getTagged: async <T>(path: string, etag: string | null) => {
+      const res = await send('GET', path, undefined, etag);
+      if (res.status === 304) return null;
+      return { body: (await res.json()) as T, etag: res.headers.get('etag') };
+    },
     post: (path, body) => request('POST', path, body),
     patch: (path, body) => request('PATCH', path, body),
     del: (path) => request('DELETE', path),

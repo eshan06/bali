@@ -8,6 +8,32 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-12** — **The portal's live question (L6): no words in the logic, a resend under the
+  same id, and the results' last read begun after the close was known.** **No words:**
+  `live-question.ts` answers each call typed, `refused` by its `status` and `reason`, or `failed`
+  with no answer to go by (a `429` with its wait), and L7 says each as the approved canvas does
+  ("Asking failed", "The session ended first", "Results can't refresh"), so the strings are written
+  once, with their screen, under `no-ai-slop`. **A resend is the same attempt:** a failed open or
+  close keeps its attempt, and Try again with the same words, or the same choice of reveal, resends
+  it under its id, so an open whose answer was lost is answered by its replay, never a second
+  question closing the first; other words are a new attempt, as an extend's other minutes are.
+  **The last read** (#314's WARN, the conductor's ruling): the poll stops at the first good read
+  saying the question is closed that began after the poll first knew it was, from an earlier read
+  saying so or from `closed()` (the stream's `question_closed`, or this tab's close answered). So a
+  read at the bell, which can be one answer short, gets one more; a read already on its way when
+  the stream says closed never counts; and neither does a failed read or one still saying open. The
+  first signal wins: a `question_closed` after the stop reads nothing more. *Weighed:* a read at
+  once on `closed()`, the final counts up to 2 s sooner for a second clock beside the cadence.
+  **The cadence:** one read at a time, the next 2 s after the last answer; hidden, none, and back in
+  view it waits out what is left of the 2 s, so switching tabs never reads faster. "From the one
+  visible tab" is each tab reading only while visible: two tabs both in view both read, 60 of the
+  account's 120 a minute. *Weighed:* electing one tab across tabs (a `BroadcastChannel`), code for
+  a case the budget already holds. **A `429` waits** its `Retry-After`, 2 s to a minute, none or a
+  date the minute (L5's rule). **The ETag** goes through the client's `getTagged`: `If-None-Match`
+  only once a tag is kept and null for a `304`, so a read whose tag the browser can't see still
+  works, with whole bodies. *Not built:* the Ask form's checks before sending, which L7 writes with
+  their words.
+
 - **2026-10-12** — **The phone's slide decks in BaliCore (M7): kept in memory for the session, a
   bucket's refusal asked about once, nothing shown before its SHA-256 matches; the newest poll loop
   wins.** **In memory alone, never on disk:** the decks one `LiveLesson` fetched, by `sha256`, are

@@ -139,11 +139,12 @@ export type ExtendAnswer =
   | { kind: 'failed'; message: string };
 
 /**
- * What stays unanswered after `answer` to `attempt`: the attempt itself when no answer came (it
- * may have landed, so only a resend under its id is safe); nothing once the server answered, an
- * extend or a refusal, since the next press is then a new one (rule 4).
+ * What stays unanswered after `answer` to `attempt` (an extend, or a question's open or close,
+ * L6): the attempt itself when no answer came (it may have landed, so only a resend under its id
+ * is safe); nothing once the server answered, a change or a refusal, since the next press is then
+ * a new one (rule 4).
  */
-export function keepUnanswered(attempt: ExtendAttempt, answer: ExtendAnswer): ExtendAttempt | null {
+export function keepUnanswered<A, K extends { kind: string }>(attempt: A, answer: K): A | null {
   return answer.kind === 'failed' ? attempt : null;
 }
 
