@@ -8,6 +8,24 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-11** — **The student's own phone in the presentation read (W1): the grid's state at the
+  server's clock, and nothing once the session is over.** `phone` (Live lesson, decisions 6 and 13)
+  is the caller's live participation in this session through `deriveDisplayState`, the function the
+  grid and `/v1/me` derive by (rule 2), at the route's clock: focused, unlocked, protection off, or
+  silent past 90 s without a check-in. Read by the boot call's `getLiveParticipation`: a student
+  holds one live participation at most (decision 4), so it is this session's or none. **None** with
+  no live participation here (never tapped in, or gone to another class), **and once the session is
+  over**, past the bell before the sweep too: A17's clock ends the student's turn with the session,
+  and the page drops the phone with the question (decision 13). **`lastSeenAt` only once silent:**
+  when the server last heard from the phone, its last check-in or else its tap, as the grid counts a
+  Silent chip's minutes; null short of silence, so a check-in that changes nothing leaves the body
+  and its ETag as they were, and the ETag moves when the state does, the clock's silence included.
+  `state` is `DisplayState` without `ended`, so no new vocabulary. **The load gate's devices open
+  from 5 s after the bell** (L4b's Claude Review WARN, the conductor's ruling, the owner away): their
+  first reads shared the database's 10 connections with the bell's Starts, whose p95 ran 329–535 ms
+  against its 1 s, so a PR that never touched a Start could fail the gate at random. Each device
+  opens between 5 and 30 s after the bell, and no limit moved. *Measured* (CI's runner): GATE_NUMBERS.
+
 - **2026-10-11** — **The demo's question and the load gate's polling classes (L4b): five classes
   on phones and laptops meet no `429`, so the poll gets no budget of its own.** **The gate**
   (`gate.js`; Live lesson, decision 6's rate limits and "Settled"): the first five of the bell's 20
