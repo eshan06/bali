@@ -232,6 +232,14 @@ export const QUESTION_OPTIONS_MIN = 2;
 export const QUESTION_OPTIONS_MAX = 6;
 
 /**
+ * A slide deck as decision 8 bounds it (the owner's picks, 2026-10-09): at most 25 MB, refused
+ * before any upload URL is minted, and a title of one line in code points. What the create checks
+ * (M2), and what the portal's upload holds to.
+ */
+export const DECK_MAX_BYTES = 25 * 1024 * 1024;
+export const DECK_TITLE_MAX_LENGTH = 200;
+
+/**
  * The events a student's own history shows (`GET /v1/me/history`, A7): the
  * moments the consent screen says a teacher sees. `armed_tap_skipped` is a tap
  * a Start declined because it had already counted elsewhere — never a join.

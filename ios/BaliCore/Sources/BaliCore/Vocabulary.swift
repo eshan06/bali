@@ -124,4 +124,5 @@ public enum ApiErrorReason: String, CaseIterable, Sendable, Encodable {
     case teacherHasClasses = "teacher_has_classes", accountDeleted = "account_deleted"
     case questionNotFound = "question_not_found", questionClosed = "question_closed"
     case invalidOption = "invalid_option", savedQuestionNotFound = "saved_question_not_found"
+    case deckNotFound = "deck_not_found", deckStorageOff = "deck_storage_off"
 }

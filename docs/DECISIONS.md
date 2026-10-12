@@ -8,6 +8,34 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-11** — **A teacher's slide decks, the table and the teacher's routes (M2a): storage off
+  is `503 deck_storage_off`, and a pending deck's object is never stamped gone at its removal.** M2
+  whole is about 900 changed lines by santa's count, so it ships as the split decided in advance:
+  `decks`, the engine's create and removal, and the create, list and remove routes here; the check
+  (complete, its parse worker, the hostile PDFs) and the sweep's 24-hour rejection are M2b.
+  **`decks.event_id`**, which decision 4's list leaves to decision 5's idempotency: the id of the
+  write that last wrote the deck, unique, as a draft's (L3b1). A create's replay is the same create
+  while the deck is as it left it (pending, live, the same title, length and hash), answered with a
+  fresh upload URL, since the first answer and its URL never reached the caller. **Storage off, every
+  deck route answers `503 deck_storage_off`**, the list included, once the caller is found a teacher
+  and before anything is read or written. It is the server's lack, never the request's (a 4xx would
+  blame the caller) and no missing deck (a `404` would read as one); a 503 reaches Sentry, so a
+  teacher meeting it on a deploy with no bucket is seen; and one answer on every route lets the portal
+  say one thing, never listing decks it could neither take nor show. *Weighed:* `409` (no Sentry
+  noise, but it hides a deploy missing its bucket); listing decks while storage is off. **A removed
+  deck's object is deleted after the commit, and stamped only once no upload URL can write it again.**
+  A `pending` deck's presigned PUT lives 5 minutes (M1), so an upload still in flight when its teacher
+  removes the deck lands after the delete: its object is deleted at once and left unstamped, and M4's
+  sweep, which retries the unstamped, takes such a deck only 5 minutes after its removal (no URL is
+  minted for a removed deck, so none outlives that). A failed delete is logged and left unstamped for
+  the same retry; the removal stands. **The create holds the school FOR KEY SHARE, then the teacher
+  FOR SHARE**, a class's create's order (C6a's review), so no deck is made for an account its
+  deletion, a disposal or a retention run took, and none deadlocks a disposal. **Bounded at the
+  boundary:** more than `DECK_MAX_BYTES` (25 × 1024 × 1024) is a `400` before any URL is minted; a
+  title is a question option's plain text (one line, at most 200 code points); the `sha256` lowercase
+  hex, which the table checks too. Until M4 the privacy paths keep decks as they are, as the coverage
+  guards say; no client adds one before M5, which comes after M4.
+
 - **2026-10-11** — **The student's own phone in the presentation read (W1): the grid's state at the
   server's clock, and nothing once the session is over.** `phone` (Live lesson, decisions 6 and 13)
   is the caller's live participation in this session through `deriveDisplayState`, the function the

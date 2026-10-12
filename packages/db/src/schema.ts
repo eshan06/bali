@@ -1,4 +1,5 @@
 import type {
+  DeckStatus,
   EventType,
   ParticipationEndedReason,
   ParticipationState,
@@ -552,4 +553,45 @@ export const savedQuestions = pgTable(
   },
   // A teacher's drafts: their list, their deletion's, a disposal's and a retention run's.
   (t) => [index('saved_questions_teacher_idx').on(t.teacherId)],
+);
+
+/*
+ * A teacher's slide decks (Phase 7, Slice 2; "Live lesson", decision 4): one row per uploaded PDF,
+ * its bytes in the bucket under `storage_key` (decision 8). Written only by the transition engine,
+ * but for `object_deleted_at` (decision 5's one exception).
+ */
+export const decks = pgTable(
+  'decks',
+  {
+    id: id(),
+    teacherId: uuid('teacher_id')
+      .notNull()
+      .references(() => users.id),
+    /** The teacher's school when it was made. */
+    schoolId: uuid('school_id')
+      .notNull()
+      .references(() => schools.id),
+    title: text('title').notNull(),
+    /** Where its bytes are in the bucket: the API's own key, never a client's. */
+    storageKey: text('storage_key').notNull(),
+    /** The SHA-256 the teacher declared, lowercase hex; the check holds the bytes to it. */
+    sha256: text('sha256').notNull(),
+    /** The length the teacher declared: the upload URL takes exactly that. */
+    bytes: integer('bytes').notNull(),
+    /** Once `ready`. */
+    pageCount: integer('page_count'),
+    status: text('status').$type<DeckStatus>().notNull().default('pending'),
+    /** The idempotency key of the teacher's write that last wrote it: an earlier one's is not kept. */
+    eventId: uuid('event_id').notNull().unique(),
+    createdAt: createdAt(),
+    removedAt: removedAt(),
+    /** When its stored object was confirmed deleted, after the commit that removed or rejected it. */
+    objectDeletedAt: timestamp('object_deleted_at', { withTimezone: true }),
+  },
+  (t) => [
+    // A teacher's decks: their list, and the privacy paths' reads.
+    index('decks_teacher_idx').on(t.teacherId),
+    check('decks_status', sql`${t.status} IN ('pending', 'ready', 'rejected')`),
+    check('decks_sha256_hex', sql`${t.sha256} ~ '^[0-9a-f]{64}$'`),
+  ],
 );

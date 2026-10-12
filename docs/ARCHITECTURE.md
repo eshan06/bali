@@ -1079,8 +1079,9 @@ nothing of a live lesson sits in the outbox ahead of an unlock (decision 5).
   only a stored id is checked against another student's.
 - `decks` (Slice 2) — one row per uploaded PDF: `id`, `teacher_id`, `school_id`, `title`,
   `storage_key`, `sha256`, `bytes`, `page_count`, `status` (`pending` / `ready` /
-  `rejected`), `created_at`, `removed_at` (decision 3's soft removal), `object_deleted_at`
-  (when its stored object was confirmed deleted; decision 8).
+  `rejected`), `event_id` (unique: the write that last wrote it, as a draft's; M2), `created_at`,
+  `removed_at` (decision 3's soft removal), `object_deleted_at` (when its stored object was
+  confirmed deleted; decision 8).
 - `session_presentations` (Slice 2) — at most one row per session, keyed by `session_id`:
   `deck_id` (nullable: nothing shown), `page`, `updated_at`, and the `event_id` of the
   slide change that set it. **A row of its own, not columns on `sessions`:** `sessions` is
@@ -1172,7 +1173,8 @@ single place the two meet, so they serialise there and never deadlock.
 **6. The API (additive `/v1`).** Bodies validated at the boundary; every mutation carries
 `eventId`; new refusal reasons join `API_ERROR_REASONS` in `@bali/shared`
 (`question_not_found`, `question_closed`, `invalid_option`, and in Slice 2 `deck_not_found`,
-`deck_not_ready`, `deck_rejected`, `deck_in_use`, `page_out_of_range`), never renamed.
+`deck_not_ready`, `deck_rejected`, `deck_in_use`, `page_out_of_range`, and `deck_storage_off`,
+every deck route's `503` while no bucket is set up, M2), never renamed.
 
 Teacher (the class's own teacher only; another teacher and a student `403`):
 - `POST /v1/sessions/{id}/questions` — open a question: `{ eventId, prompt, options,

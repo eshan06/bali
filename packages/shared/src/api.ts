@@ -846,6 +846,57 @@ export interface SavedQuestionsResponse {
   savedQuestions: SavedQuestion[];
 }
 
+// GET and POST /v1/decks, DELETE /v1/decks/{id} — a teacher's slide decks (Phase 7, M2; "Live
+// lesson", decision 6), their own only. The PDF goes to the bucket by the create's presigned PUT,
+// never through the API; a removal's body is `{ eventId }`.
+/** Where a deck stands: `pending` until its upload is checked, then `ready` or `rejected`. */
+export const DECK_STATUSES = ['pending', 'ready', 'rejected'] as const;
+export type DeckStatus = (typeof DECK_STATUSES)[number];
+/** A teacher's deck: a PDF in the bucket, which no student sees before it is checked. */
+export interface Deck {
+  id: string;
+  title: string;
+  status: DeckStatus;
+  /** The file's length, as declared. */
+  bytes: number;
+  /** The file's SHA-256, lowercase hex: every client checks a download against it. */
+  sha256: string;
+  /** Once `ready`; null before. */
+  pageCount: number | null;
+  createdAt: string;
+}
+export interface CreateDeckRequest {
+  eventId: string;
+  /** Trimmed, one line, at most `DECK_TITLE_MAX_LENGTH` code points. */
+  title: string;
+  /** The file's exact length, at most `DECK_MAX_BYTES`. */
+  bytes: number;
+  /** The file's SHA-256, lowercase hex. */
+  sha256: string;
+}
+/**
+ * Every outcome a deck's write answers with (`DeckResponse.outcome`): `created`, `removed`, or
+ * `replay`, which changed nothing: the write's own retry.
+ */
+export const DECK_OUTCOMES = ['created', 'removed', 'replay'] as const;
+export type DeckOutcome = (typeof DECK_OUTCOMES)[number];
+export interface DeckResponse {
+  outcome: DeckOutcome;
+  /** The deck now: once removed, as it was removed. */
+  deck: Deck;
+}
+export interface CreateDeckResponse extends DeckResponse {
+  /**
+   * Where the browser PUTs the file, for 5 minutes: exactly `bytes` bytes, sent as
+   * `Content-Type: application/pdf`. A replay carries a fresh one.
+   */
+  uploadUrl: string;
+}
+export interface DecksResponse {
+  /** Newest first; never a removed one. */
+  decks: Deck[];
+}
+
 // GET /v1/questions/{id}/results — a question's totals (Phase 7, L3r; "Live lesson", decisions 3
 // and 6), the class's own teacher only. A strong ETag over the body; `If-None-Match` answers `304`.
 export interface QuestionResults {

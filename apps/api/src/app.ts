@@ -18,6 +18,7 @@ import { LOG_REDACT, serializeError } from './redact.js';
 import { registerAgeCheckRoutes } from './routes/age-check.js';
 import { registerBlocksRoutes } from './routes/blocks.js';
 import { registerClassesRoutes } from './routes/classes.js';
+import { registerDecksRoutes } from './routes/decks.js';
 import { registerEnrollmentsRoutes } from './routes/enrollments.js';
 import { registerFeedRoutes } from './routes/feed.js';
 import { registerHistoryRoute } from './routes/history.js';
@@ -161,7 +162,7 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
     apns && createApnsClient(apns, deps.apnsTransport ?? http2Transport()),
   );
   registerSessionsRoute(app, deps.db, clock, notifyClassStarted);
-  // Said once, at start, as push says it. No route reads it before M2's.
+  // Said once, at start, as push says it; the deck routes read it.
   const deckStorage = deps.deckStorage ?? s3DeckStorage(env);
   app.log.info(
     deckStorage
@@ -175,6 +176,7 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
   registerReportsRoutes(app, deps.db, clock);
   registerBlocksRoutes(app, deps.db);
   registerQuestionsRoutes(app, deps.db, clock);
+  registerDecksRoutes(app, deps.db, clock);
   registerFeedRoutes(app, deps.db, clock, deps.stream);
   registerInternalRoutes(app, env.INTERNAL_API_KEY);
 
