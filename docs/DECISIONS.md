@@ -8,6 +8,34 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-12** — **What a session shows, the slide change (M3a): an older slide change never
+  undoes a later one, and pages count from 1.** M3 whole is over 400 changed lines by santa's count
+  (M3a alone is 413), so it ships as the split decided in advance: `session_presentations`
+  (migration 0026), the engine's `showSlide`, `POST /v1/sessions/{id}/slide`, `slide_shown` and the
+  removal's `409 deck_in_use` here; the presentation read's slide, the boot snapshot's presentation
+  and `GET /v1/decks/{id}/download`, with their fixtures, are M3b. **Decision 4's order** (the
+  worker's call, on the conductor's L3b2 ruling for drafts; the docs said nothing of it): a slide
+  change replaces the row only when its `eventId` sorts after the one held, compared by Postgres in
+  the upsert, under the row's lock. A teacher's two quick clicks run at once, and the row's lock may
+  take the later first; without the order the earlier then lands last, and the students settle a
+  page behind the teacher. An older one changes nothing, records no event (nothing was shown) and
+  is answered `replay` with the slide now; its id is not kept, as a replaced answer's is not. So the
+  presenter (M6) need not send slide changes one at a time. **The answer carries the id the session
+  holds** (`SlideResponse.eventId`), so a device whose clock runs behind the one that changed it
+  last mints its next after it, as for an answer and a draft; without it, a teacher moving to a
+  laptop minutes behind would see every change answered with the old slide. **Pages count from
+  1**, as PDF.js and a teacher number them ("slide 3 of 12"); the phone's PDFKit takes `page - 1`.
+  **The row:** `deck_id` and `page` both or neither (a check); no unique `event_id`, since the
+  `slide_shown` written with it holds the id, so every writer's `events` check already spends it;
+  an index on `deck_id` for the removal's read. **The session's end leaves the row as it was**: a
+  read judges it by the session's running state (decision 2), so End, the sweep and a Start past
+  the bell stay untouched, and the row keeps what was shown last. **A deck not the caller's is `404
+  deck_not_found`**, as an unknown or removed one: the body names it, and no answer tells another
+  teacher's deck apart from none. **Storage off, the slide route is `503 deck_storage_off`** once its
+  caller is found the class's teacher, as every deck route (M2a): with no bucket no client can fetch
+  a deck. **A malformed body is `400 invalid_request`**, as an answer's, the route's other 400 being
+  `page_out_of_range`; the page is any whole number at the boundary, its range the engine's.
+
 - **2026-10-11** — **A removed or rejected deck's object, and the deck sweep (M2b2): deleted 30
   minutes after its last upload URL was minted, the URL's 5 and 25 for an upload in flight.**
   The conductor's ruling, the owner away: S3 checks a presigned PUT's expiry when the upload

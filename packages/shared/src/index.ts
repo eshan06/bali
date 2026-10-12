@@ -210,6 +210,10 @@ export const EVENT_TYPES = [
   // Never an answer or a count: answers are not events (totals only).
   'question_opened',
   'question_closed',
+  // A running session's slide changed (Phase 7, M3; Live lesson decision 5): no
+  // user. The payload is the deck's id and page, or both null once the teacher
+  // stopped presenting.
+  'slide_shown',
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 

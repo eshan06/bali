@@ -1,4 +1,5 @@
 import {
+  completeDeck,
   createDeck,
   createSavedQuestion,
   type Database,
@@ -138,6 +139,7 @@ const MATRIX = {
   'POST /v1/decks':                         [401, 401, 403,     403,     200,     200],
   'DELETE /v1/decks/:id':                   [401, 401, 403,     403,     403,     200],
   'POST /v1/decks/:id/complete':            [401, 401, 403,     403,     403,     200],
+  'POST /v1/sessions/:id/slide':            [401, 401, 403,     403,     403,     200],
 } as const satisfies Record<string, readonly number[]>;
 type RouteKey = keyof typeof MATRIX;
 
@@ -343,6 +345,15 @@ const REQUESTS: Record<RouteKey, (w: World) => Sent | Promise<Sent>> = {
     url: `/v1/decks/${w.deckId}/complete`,
     body: { eventId: newUuidV7() },
   }),
+  // A page of the owner's deck, checked ready, in the class's running session (M3).
+  'POST /v1/sessions/:id/slide': async (w) => {
+    const verdict = { status: 'ready', pageCount: 3 } as const;
+    await completeDeck(db, { deckId: w.deckId, eventId: newUuidV7(), verdict });
+    return {
+      url: `/v1/sessions/${w.sessionId}/slide`,
+      body: { eventId: newUuidV7(), deckId: w.deckId, page: 2 },
+    };
+  },
 };
 
 /** The matrix's key for `route`: a HEAD is its GET's. */

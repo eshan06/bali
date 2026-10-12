@@ -194,6 +194,14 @@ describe('grid-state', () => {
     expect(endsSession(evt(7, 'question_closed', null, T1, closed))).toBe(false);
   });
 
+  it('leaves the roster untouched for a slide shown, and presenting stopped (Phase 7, M3)', () => {
+    const s = fromSnapshot(snapshot(5, [{ id: 'ana' }]));
+    const shown = evt(6, 'slide_shown', null, T1, { deck_id: 'd1', page: 3 });
+    expect(applyEvent(s, shown)).toBe(s);
+    expect(applyEvent(s, evt(7, 'slide_shown', null, T1, { deck_id: null, page: null }))).toBe(s);
+    expect(endsSession(shown)).toBe(false);
+  });
+
   it('surfaces a student the snapshot never carried rather than dropping the event', () => {
     // A mid-session joiner, or one removed whose phone then unlocks: the record
     // is durable either way, so the grid must not stay silent about it.

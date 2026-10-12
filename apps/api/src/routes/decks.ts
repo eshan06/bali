@@ -7,8 +7,11 @@ import {
   eventIdSpent,
   findDeck,
   listDecks,
+  type PresentationRow,
   rejectUnfinishedDecks,
   removeDeck,
+  sessionRunning,
+  showSlide,
   stampObjectDeleted,
 } from '@bali/db';
 import {
@@ -18,11 +21,13 @@ import {
   DECK_TITLE_MAX_LENGTH,
   type DeckResponse,
   type DecksResponse,
+  type Slide,
+  type SlideResponse,
 } from '@bali/shared';
 import type { FastifyBaseLogger, FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
-import { requireTeacher } from '../auth/teacher.js';
+import { requireSessionOwner, requireTeacher } from '../auth/teacher.js';
 import { checkDeck, type ParsePdf } from '../deck-check.js';
 import { type DeckStorage, URL_LIFETIME_S } from '../deck-storage.js';
 import { ApiError, parseRequest } from '../errors.js';
@@ -38,8 +43,33 @@ const CreateBody = z.object({
   sha256: z.string().regex(/^[0-9a-f]{64}$/, 'is not a lowercase hex SHA-256'),
 });
 const EventBody = z.object({ eventId: z.uuidv7() });
+const SlideBody = z
+  .object({
+    eventId: z.uuidv7(),
+    deckId: z.string().uuid().nullable(),
+    // Any whole number: a page the deck lacks is the engine's `page_out_of_range`.
+    page: z.number().int().nullish(),
+  })
+  .refine((b) => b.deckId === null || b.page != null, { message: 'names no page', path: ['page'] });
 
 const deckNotFound = () => ApiError.notFound('deck not found', 'deck_not_found');
+
+/** A slide change the engine refused (M3): nothing was written. */
+const slideRefused = {
+  deck_not_found: deckNotFound,
+  deck_not_ready: () => ApiError.conflict('the deck is not checked yet', 'deck_not_ready'),
+  deck_rejected: () => ApiError.conflict('the deck was rejected', 'deck_rejected'),
+  page_out_of_range: () =>
+    ApiError.badInput('the deck has no such page', undefined, 'page_out_of_range'),
+};
+
+/** A page a session shows (M3): never a URL. A presentation naming a deck names its page. */
+const slide = (presentation: PresentationRow, shown: DeckRow): Slide => ({
+  deckId: shown.id,
+  sha256: shown.sha256,
+  page: presentation.page!,
+  pageCount: shown.pageCount!,
+});
 
 const deck = (row: DeckRow): Deck => ({
   id: row.id,
@@ -53,22 +83,19 @@ const deck = (row: DeckRow): Deck => ({
 });
 
 /**
- * The caller, a teacher, and decks' storage. While storage is off, no bucket set up (M1), every
- * deck route is `503 deck_storage_off`, before anything is read or written: the server's lack,
- * never the request's.
+ * Decks' storage. While it is off, no bucket set up (M1), every deck route, the slide's too, is
+ * `503 deck_storage_off` once its caller is found, before anything is read or written: the server's
+ * lack, never the request's.
  */
+function requireStorage(app: FastifyInstance): DeckStorage {
+  if (app.deckStorage) return app.deckStorage;
+  throw new ApiError('unavailable', 'slides are off on this server', undefined, 'deck_storage_off');
+}
+
+/** The caller, a teacher, and decks' storage (`requireStorage`). */
 async function requireDecks(app: FastifyInstance, db: Database, request: FastifyRequest) {
   const teacher = await requireTeacher(db, request);
-  const storage = app.deckStorage;
-  if (!storage) {
-    throw new ApiError(
-      'unavailable',
-      'slides are off on this server',
-      undefined,
-      'deck_storage_off',
-    );
-  }
-  return { teacher, storage };
+  return { teacher, storage: requireStorage(app) };
 }
 
 /** The caller's own deck, removed or not: none is `404 deck_not_found`, another teacher's `403`. */
@@ -144,6 +171,7 @@ export async function sweepDecks(
  * DELETE /v1/decks/:id           remove it; its stored object goes once no upload can write it
  * POST   /v1/decks/:id/complete  its upload checked: ready, or rejected, its object deleted as a
  *                                removed deck's is
+ * POST   /v1/sessions/:id/slide  show a page of one in the class's running session, or stop (M3)
  *
  * The sweep's part is `sweepDecks`.
  */
@@ -193,6 +221,9 @@ export function registerDecksRoutes(
       const now = clock();
       const result = await mapTransitionError(() => removeDeck(db, { deckId: id, eventId, now }));
       if (result.outcome === 'deck_not_found') throw deckNotFound();
+      if (result.outcome === 'deck_in_use') {
+        throw ApiError.conflict('a running session shows the deck', 'deck_in_use');
+      }
       if (!result.deck.objectDeletedAt)
         await dropObject(db, storage, request.log, result.deck, now);
       return { outcome: result.outcome, deck: deck(result.deck) };
@@ -225,6 +256,37 @@ export function registerDecksRoutes(
       if (result.outcome === 'checked' && result.deck.status === 'rejected')
         await dropObject(db, storage, request.log, result.deck, clock());
       return { outcome: result.outcome, deck: deck(result.deck) };
+    },
+  );
+
+  app.post(
+    '/v1/sessions/:id/slide',
+    { preHandler: app.authenticate, config: { parses: { params: Params, body: SlideBody } } },
+    async (request): Promise<SlideResponse> => {
+      const { id } = parseRequest(request, 'params', Params);
+      const { teacher, session } = await requireSessionOwner(db, request, id);
+      requireStorage(app);
+      // A 400 here can also be `page_out_of_range`, so a malformed body says which it is.
+      const body = parseRequest(request, 'body', SlideBody, 'invalid_request');
+      const now = clock();
+      const result = await mapTransitionError(() =>
+        showSlide(db, {
+          ...body,
+          page: body.page ?? null,
+          sessionId: session.id,
+          teacherId: teacher.id,
+          now,
+        }),
+      );
+      if (!('presentation' in result)) throw slideRefused[result.outcome]();
+      const { presentation, deck: shown } = result;
+      // Nothing is shown outside a running session (decision 2): a replay past the bell, none.
+      const running = sessionRunning(result.session, now);
+      return {
+        outcome: result.outcome,
+        slide: shown && running ? slide(presentation, shown) : null,
+        eventId: presentation.eventId,
+      };
     },
   );
 }

@@ -24,6 +24,7 @@ import {
   questions,
   responses,
   savedQuestions,
+  sessionPresentations,
   sessions,
   users,
 } from './schema.js';
@@ -426,6 +427,21 @@ export async function stampObjectDeleted(db: Database, deckId: string, at: Date)
     .update(decks)
     .set({ objectDeletedAt: at })
     .where(and(eq(decks.id, deckId), isNull(decks.objectDeletedAt)));
+}
+
+/**
+ * A session's presentation (Phase 7, M3) and the deck it names, if any: none before its first slide
+ * change. Whether it shows now is its session's running state's to say (decision 2).
+ */
+export async function findPresentation(db: Database, sessionId: string) {
+  return first(
+    await db
+      .select({ presentation: sessionPresentations, deck: decks })
+      .from(sessionPresentations)
+      .leftJoin(decks, eq(decks.id, sessionPresentations.deckId))
+      .where(eq(sessionPresentations.sessionId, sessionId))
+      .limit(1),
+  );
 }
 
 /** A session by id (any state), so the lifecycle routes can authorize the teacher. */

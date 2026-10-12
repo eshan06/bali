@@ -608,3 +608,30 @@ export const decks = pgTable(
     check('decks_sha256_hex', sql`${t.sha256} ~ '^[0-9a-f]{64}$'`),
   ],
 );
+
+/*
+ * What a session shows (Phase 7, Slice 2; "Live lesson", decision 4): at most one row a session, a
+ * page of one of its teacher's decks or none. A row of its own, not columns on `sessions`, so a
+ * teacher paging through a deck never rewrites the row every tap and the sweep lock. Written only
+ * by the transition engine; kept once the session ends, as the record of what it showed last.
+ */
+export const sessionPresentations = pgTable(
+  'session_presentations',
+  {
+    sessionId: uuid('session_id')
+      .primaryKey()
+      .references(() => sessions.id),
+    /** NULL = nothing shown: not yet, or the teacher stopped presenting. */
+    deckId: uuid('deck_id').references(() => decks.id),
+    /** From 1; with `deck_id`, or neither. */
+    page: integer('page'),
+    /** The slide change that set it, and its `slide_shown` event's id. */
+    eventId: uuid('event_id').notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [
+    // A deck's removal asks whether a running session shows it (`deck_in_use`).
+    index('session_presentations_deck_idx').on(t.deckId),
+    check('session_presentations_slide_whole', sql`(${t.deckId} IS NULL) = (${t.page} IS NULL)`),
+  ],
+);

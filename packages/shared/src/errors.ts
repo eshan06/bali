@@ -105,6 +105,13 @@ export const API_ERROR_REASONS = [
   // 503, on every deck route). Nothing was written.
   'deck_not_found',
   'deck_storage_off',
+  // A slide change (M3) naming a deck not checked yet, or rejected (a 409); a
+  // page the deck lacks (a 400). And a deck's removal while a running session
+  // shows it (a 409). Nothing was written.
+  'deck_not_ready',
+  'deck_rejected',
+  'page_out_of_range',
+  'deck_in_use',
 ] as const;
 export type ApiErrorReason = (typeof API_ERROR_REASONS)[number];
 
