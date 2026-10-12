@@ -8,6 +8,39 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-11** — **The demo's question and the load gate's polling classes (L4b): five classes
+  on phones and laptops meet no `429`, so the poll gets no budget of its own.** **The gate**
+  (`gate.js`; Live lesson, decision 6's rate limits and "Settled"): the first five of the bell's 20
+  classes follow a live lesson. Each of their teachers asks a question right after the Start, and
+  each of their 150 students follows it on a phone and a laptop, two devices of one account: each
+  opens the lesson within 30 s of the bell, finds its class's running session in `GET /v1/me` as the
+  student's home does, and polls `GET /v1/sessions/{id}/presentation` every 2 s with the ETag it
+  last got, to three minutes in, beside the phone's check-ins; each phone answers once. It passes on
+  the school's thresholds, which now hold the lesson's requests too (none refused, a poll's `304`
+  counted as answered), and on its own: one question asked per class, one answer per phone, at
+  least 40 polls a device, and a poll's and an answer's p95 under 500 ms. **No budget of its own:**
+  a student's two devices spend 60 a minute of the account's 120, the check-ins 2, and the budget
+  refills at 2 a second, so polling never empties it, however many classes poll: the budget is per
+  account (L1), and the school's address budgets only requests with no sign-in. **Within 30 s, not
+  10:** opening within 10 s of the bell, the devices' first reads met the bell's 30 Starts on the
+  API's 10 database connections, and two runs put the Starts' p95 at 519 and 867 ms (150–320 in
+  the five runs before), close to their 1 s. 30 s is how a phone learns of its session (decision
+  7's read), and the Starts came back to 329 ms. *Weighed:* raising the Starts' threshold, which
+  weakens a check. *Watch:* devices opening all at once at a bell (a push, or W2's home reading
+  faster than every 30 s) share those 10 connections with the Starts. **Measured** (CI's runner,
+  the 30 s run): 19,750 school requests, none refused, p95 7.3 ms: 15,912 polls at 4.7, an answer
+  17.5, a check-in 5.8, `GET /v1/me` 8.0, a tap 12.6, a Start 329; the flooder 239 answered and
+  2,761 refused, as before; the sweep, 600 phones silent in 2,025 ms, then the 30 sessions and the
+  five questions they held closed in 169 ms, no deadlock. **The demo** asks in its running session
+  after Cal's removal: Ana's poll shows the question with no correct option, Ana, Ben and Dana
+  answer, the results say 1 of 4 with no counts and then 3 of 4 with them (M counts Cal, removed,
+  as one in the lesson), the close reveals the answer, Ben's late answer is `409 question_closed`,
+  and the stream carries the open and the close, never an answer. **L4a's WARN (the conductor's
+  ruling, the owner away):** a test stages two racing opens' outcome, the later by the lock opened
+  at the earlier time, so the question opened last by the clock is the one closed first; the poll
+  shows the other, open, and then, closed, the one closed last. It fails both under "opened last"
+  and under "the open one, else the one opened last".
+
 - **2026-10-11** — **A live lesson's student side through the API (L4a): the question a student
   sees and their answer; BaliCore's wire types come with the fixtures.** L4 whole is about 800
   changed lines by santa's count, some 450 of them the fixtures and the OpenAPI snapshot, generated,
