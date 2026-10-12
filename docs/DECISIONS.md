@@ -8,6 +8,36 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-12** — **The owner's rulings on Phase 7's open items: a removal never changes a
+  question's M (#315), "Settled" narrowed to the engine's writers (#317), #313 left as today, and
+  the overnight calls confirmed.** **#315, fixed:** M was the union of the class's students now, the
+  session's participants and N's, so removing a student who never tapped in took them out of M only
+  if they hadn't answered: "12 of 25" became "12 of 24", on that question and every past one of the
+  class, and the teacher learned what decision 2 says they never do. M now counts every enrollment
+  of the class from before the question's close (any, while it is open; a join since the opening
+  included) and not ended before its opening, beside the participants and N's. Enrollments are only
+  ever marked ended, never deleted, so no removal, account deletion, disposal or retention run moves
+  a question's M, live or in the recap. One condition in `questionCounts`, still one statement, so N
+  never exceeds M. *Weighed:* #315's own proposal, every enrollment live at any time since the
+  opening, which also counts a student who joins after the close and could never have answered.
+  *Known limits:* an enrollment's `created_at` is the database's clock and a close's time the
+  API's, so a join within their skew of the close falls either side, fixed once both are written; a
+  question past its bell reads to now until the sweep closes it at the bell, so a join in that
+  minute counts until then (it cannot have answered); no index reaches a class's ended enrollments,
+  so the read scans the table each poll (a `ponytail:` note: an index on `enrollments (class_id)`
+  once a school's history makes it slow). The population test's M rose from 5 to 6: its `neither`
+  was in the class while the question was open. **#317, wording only:** "Settled" said every route
+  that records an `eventId` refuses one an answer or a draft holds; the engine's writers do, and three
+  writers beside it (`PUT /v1/me/age-check`, `PUT`/`DELETE /v1/me/push-token`, `POST
+  /v1/teacher-invites/redeem`) check only their own table. A UUIDv7 minted fresh never collides, so
+  the bullet names the engine's writers and no code changed. *Weighed:* the check added to the three,
+  a few lines each, for a collision only a client bug reusing ids across kinds of write makes.
+  **#313 stays as today for now,** to decide later: a teacher's own deletion keeps their removed
+  classes' names and their asked questions' words, empties and removes their drafts, and empties
+  their decks' titles; the retention run empties the words only of the teachers it de-identifies.
+  The issue stays open. **The overnight calls** (PLAN's Open owner items, Phase 7) are confirmed as
+  listed.
+
 - **2026-10-12** — **Phase 7's steps with no screen done; "the one visible tab" read as each visible
   tab; the decisions taken while the owner was away, listed to confirm.** The owner, away overnight,
   asked the conductor to take the recommended option on every review finding and report after; each
