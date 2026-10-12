@@ -258,6 +258,14 @@ project for the API (its DSN).
       out. Note the day the last backup from before the disposal expires (the Backups tab
       lists each backup's time; its retention is the schedule's). While prod has no backups
       (the pilot), there is none to wait for: say so in the reply.
+    - **Check its PDFs are gone** before you write back: the API deletes them from the bucket
+      within the hour, and a delete that keeps failing reports to Sentry from its third try as an
+      error tagged `deck object deletion` (its title is S3's reason, e.g. `StorageError: S3 refused:
+      AccessDenied (403)`). If the API's boot log says `deck storage is off`, nothing is deleted:
+      turn it back on first (runbook 10). Wait the hour, then search Sentry for
+      `route:"deck object deletion" environment:production is:unresolved`. If an issue is there, fix what runbook 10 says
+      S3's reason means, run its check, resolve the issue, wait another hour (a deck that kept
+      failing is tried again at most an hour later), and reply only once no new event has come.
     - **Write back to the school,** by the agreement's channel, inside its days: the date of
       the disposal; what was removed (every name, Cognito subject and sign-in, class name,
       block, open invite and pre-bell tap of the school, the words of every question asked
@@ -291,7 +299,7 @@ project for the API (its DSN).
       already, with the same counts. Each teacher it de-identifies loses the names of their
       removed classes, the words of the questions they asked, their saved questions and their
       slide decks (each title, and the PDF, which the API deletes from the bucket by itself within
-      the hour); every answer stays, by the
+      the hour, reporting to Sentry, tagged `deck object deletion`, if it can't); every answer stays, by the
       number of the option picked, under the account it de-identifies.
     - **Next year:** record the new last day with `year-end`; whoever was kept named this
       time is judged again against it. The Cognito sign-ins stay (a de-identified student

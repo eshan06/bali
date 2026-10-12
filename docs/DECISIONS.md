@@ -8,6 +8,17 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-12** — **Phase 7's steps with no screen done; "the one visible tab" read as each visible
+  tab; the decisions taken while the owner was away, listed to confirm.** The owner, away overnight,
+  asked the conductor to take the recommended option on every review finding and report after; each
+  ruling rode its step's PR, and PLAN's Open owner items lists the ones that changed or read the
+  design, to confirm. ARCHITECTURE's "the portal polls results, and the student web the
+  presentation, from its one visible tab" now says "from each tab while it is visible", how L6
+  (#332) and W2 (#333) poll and L6's entry reads it (a hidden tab reads nothing; two tabs in view
+  both read, within the account's budget). *Weighed:* electing one tab across a browser's tabs, a
+  cross-tab lock for a case a teacher rarely has. Runbook 1's disposal now checks Sentry for an open
+  `deck object deletion` before the school is told its PDFs are gone (#329's review).
+
 - **2026-10-12** — **The demo shows a deck and the load gate follows one (M9): the harness's API
   keeps decks in the in-memory stand-in, and one class's devices open together at the bell.**
   **The harness's storage:** `load:serve` ran `src/server.ts`, whose decks' storage is the bucket

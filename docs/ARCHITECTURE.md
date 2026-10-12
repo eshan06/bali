@@ -1281,7 +1281,8 @@ device, so a student following on a phone and a laptop at once spends 60 of the 
 120-a-minute budget beside the check-in's two, and each poller stops at a
 `429` until its `Retry-After`, so the poll never spends the headroom an Emergency Unlock
 needs (an unlock refused `429` is still kept and resent, never lost); the portal polls results,
-and the student web the presentation, from its one visible tab. L4's load gate measures several
+and the student web the presentation, from each tab while it is visible (a hidden tab reads
+nothing). L4's load gate measures several
 classes polling at once behind one school's address, each student on a phone and a laptop
 (settled 2026-10-10), and adds a dedicated budget only if it must.
 
@@ -1417,7 +1418,7 @@ and keeps everything that enforces focus.
   derived at the server's clock by the shared state function (rules 1 and 2), so the page never
   shows a phone greener than the teacher's grid. When the page can't reach Bali, the chip keeps
   its last state with "as of" and its time, beside the page's own can't-reach line.
-- **Polling.** As the phone: the presentation read about every 2 s from the one visible tab,
+- **Polling.** As the phone: the presentation read about every 2 s from each tab while it is visible,
   with `If-None-Match`, stopped when the session isn't running and at a `429` until its
   `Retry-After` (decision 6's rate limits).
 - **Two devices, one answer.** A student's answer is theirs whichever device sent it: each
