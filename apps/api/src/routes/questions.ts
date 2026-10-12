@@ -8,6 +8,7 @@ import {
   findSavedQuestion,
   findSessionById,
   findShownQuestion,
+  getLiveParticipation,
   listSavedQuestions,
   openQuestion,
   questionCounts,
@@ -22,6 +23,8 @@ import {
 } from '@bali/db';
 import {
   type AnswerResponse,
+  deriveDisplayState,
+  type ParticipationSnapshot,
   type Presentation,
   QUESTION_OPTION_MAX_LENGTH,
   QUESTION_OPTIONS_MAX,
@@ -32,6 +35,7 @@ import {
   type SavedQuestion,
   type SavedQuestionResponse,
   type SavedQuestionsResponse,
+  type StudentPhone,
   type StudentQuestion,
   type TeacherQuestion,
 } from '@bali/shared';
@@ -116,6 +120,18 @@ function studentQuestion(
 }
 
 /**
+ * A student's own phone in a running session (W1; decision 13), derived as the grid derives it
+ * (rule 2) at the server's clock. Its last contact only once silent: a check-in that leaves the
+ * state as it was changes nothing in the body, so the poll stays `304`.
+ */
+function studentPhone(p: ParticipationSnapshot, now: Date): StudentPhone | null {
+  const state = deriveDisplayState(p, now);
+  if (state === 'ended') return null;
+  const lastSeenAt = state === 'silent' ? (p.lastSeenAt ?? p.joinedAt).toISOString() : null;
+  return { state, lastSeenAt };
+}
+
+/**
  * The caller, a student enrolled in the class `classId` now: the student routes' guard (decision
  * 2). Anyone else is `403`; looked up, never created.
  */
@@ -174,7 +190,8 @@ function savedAnswer(result: SavedQuestionResult): SavedQuestionResponse {
  * POST /v1/sessions/:id/questions  open one in a running session, closing the one open there
  * POST /v1/questions/:id/close     close it, revealing its correct option when asked
  * GET  /v1/questions/:id/results   its totals, through the one guarded count; ETag and 304
- * GET  /v1/sessions/:id/presentation  what a student shows: the question, their answer; ETag, 304
+ * GET  /v1/sessions/:id/presentation  what a student shows: the question, their answer, their
+ *                                     phone; ETag, 304
  * POST /v1/questions/:id/answers   a student answers, writing no event
  * GET  /v1/saved-questions         the caller's drafts, newest first, none removed
  * POST /v1/saved-questions         write one
@@ -261,9 +278,12 @@ export function registerQuestionsRoutes(
       const running = sessionRunning(session, now);
       // Nothing is shown outside a running session (decision 2): past the bell too, unswept.
       const shown = running ? await findShownQuestion(db, session.id, student.id) : undefined;
+      // The caller's own, never another's: one live participation a student, at most (decision 4).
+      const live = running ? await getLiveParticipation(db, student.id) : undefined;
       const presentation: Presentation = {
         running,
         question: shown ? studentQuestion(shown.question, shown.response, session, now) : null,
+        phone: live?.session.id === session.id ? studentPhone(live.participation, now) : null,
       };
       return sendTagged(request, reply, presentation);
     },

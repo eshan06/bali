@@ -33,6 +33,7 @@ import {
   type SessionView,
   stateChangeDisposition,
   type StudentAnswer,
+  type StudentPhone,
   type StudentQuestion,
   TAP_OUTCOMES,
   tapDisposition,
@@ -244,6 +245,10 @@ export const SCHEMAS = {
       open: z.boolean(),
       correctOption: z.number().int().nullable(),
       answer: studentAnswer.nullable(),
+    }).nullable(),
+    phone: object<StudentPhone>()({
+      state: z.enum([...PARTICIPATION_STATES, 'silent']),
+      lastSeenAt: z.iso.datetime().nullable(),
     }).nullable(),
   }),
   AnswerResponse: object<AnswerResponse>()({

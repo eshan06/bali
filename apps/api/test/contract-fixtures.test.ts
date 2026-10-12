@@ -5,8 +5,10 @@ import {
   enrollments,
   newUuidV7,
   openQuestion,
+  protectionOff,
   startSession,
   tapIn,
+  unlock,
   users,
 } from '@bali/db';
 import {
@@ -20,6 +22,7 @@ import {
   HISTORY_EVENT_TYPES,
   type HistoryPage,
   type MeResponse,
+  PARTICIPATION_STATES,
   type Presentation,
   PROTECTION_OFF_OUTCOMES,
   PROTECTION_ON_OUTCOMES,
@@ -226,11 +229,15 @@ const SCENARIOS: Record<string, string> = {
   'account/409-teacher-has-classes':
     'A teacher with a class deleting their account: theirs goes through the school.',
   'presentation/nothing-asked':
-    'A live lesson polled (Phase 7, L4) before the teacher asks anything: the session runs.',
+    'A live lesson polled (Phase 7, L4) before the teacher asks anything: the session runs, and the student is not tapped in.',
   'presentation/open':
     'The question the teacher opened: the student’s to answer, its correct option hidden.',
   'presentation/revealed':
-    'That question closed with its correct option shown, and the student’s answer: it stays until another opens.',
+    'That question closed with its correct option shown, and the student’s answer: it stays until another opens. The student tapped in since: their phone is focused (W1).',
+  'presentation/silent':
+    'The same poll five minutes later with no check-in: their phone is silent, with when it was last heard.',
+  'presentation/unlocked': 'Their phone after an Emergency Unlock.',
+  'presentation/protection-off': 'Their phone after Screen Time was turned off.',
   'presentation/over': 'The poll once the session is over: stop polling; nothing shows.',
   'presentation/403-not-enrolled': 'A poll of a lesson in a class the caller is not in.',
   'presentation/404-session-not-found': 'A poll of a session the server does not know.',
@@ -902,9 +909,9 @@ async function captureAll() {
   const quiz = await seedClassroom(db, 'fx-quiz');
   const lessonNow = await start(quiz.klass.id);
   const kim = await token(quiz.student.cognitoId);
-  const poll = (as: string, sessionId = lessonNow.id) =>
-    get(as, `/v1/sessions/${sessionId}/presentation`);
-  const nothing = { running: true, question: null };
+  const poll = (as: string, sessionId = lessonNow.id, at?: string) =>
+    get(as, `/v1/sessions/${sessionId}/presentation`, at);
+  const nothing = { running: true, question: null, phone: null };
   await capture('presentation/nothing-asked', poll(kim), 200, nothing);
   const { question } = await openQuestion(db, {
     sessionId: lessonNow.id,
@@ -943,8 +950,23 @@ async function captureAll() {
   await capture('presentation/403-not-enrolled', poll(newcomer), 403, notIn);
   const noSession = { reason: 'session_not_found' };
   await capture('presentation/404-session-not-found', poll(kim, randomUUID()), 404, noSession);
+  // Kim's phone (W1), focused since her tap: silent past 90 s without a check-in by the server's
+  // clock, then unlocked, then with Screen Time off.
+  const quiet = new Date(Date.now() + 5 * 60_000).toISOString();
+  await capture('presentation/silent', poll(kim, lessonNow.id, quiet), 200, { running: true });
+  const kims = () => ({
+    sessionId: lessonNow.id,
+    studentId: quiz.student.id,
+    eventId: newUuidV7(),
+    deviceTime: new Date(),
+  });
+  await unlock(db, kims());
+  await capture('presentation/unlocked', poll(kim), 200, { running: true });
+  await protectionOff(db, kims());
+  await capture('presentation/protection-off', poll(kim), 200, { running: true });
   await end(lessonNow.id);
-  await capture('presentation/over', poll(kim), 200, { running: false, question: null });
+  const done = { running: false, question: null, phone: null };
+  await capture('presentation/over', poll(kim), 200, done);
 
   // The account's deletion (C3), last: it leaves Eve's classes and her row named to no one.
   const deletion = del(eve, '/v1/me');
@@ -1025,6 +1047,12 @@ describe('the contract fixtures (contracts/fixtures)', () => {
     expect(new Set(shown.map((q) => q.open))).toEqual(new Set([true, false]));
     expect(new Set(shown.map((q) => q.correctOption === null))).toEqual(new Set([true, false]));
     expect(new Set(shown.map((q) => q.answer === null))).toEqual(new Set([true, false]));
+    // The caller's own phone (W1): none, and each state the grid shows, its time once silent.
+    const owned = polls.map((p) => p.phone);
+    const states = new Set(owned.map((p) => p?.state ?? null));
+    expect(states).toEqual(new Set([null, ...PARTICIPATION_STATES, 'silent']));
+    const heardAt = owned.flatMap((p) => (p === null ? [] : [p.lastSeenAt === null]));
+    expect(new Set(heardAt)).toEqual(new Set([true, false]));
     // A leave that ended the student's participation too — past the bell, before the sweep —
     // and one that ended only the enrollment (A19; #132's review).
     const endedHere = valuesOf('EndEnrollmentResponse', 'endedParticipation');

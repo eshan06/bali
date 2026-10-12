@@ -8,6 +8,7 @@
   "type": "Presentation",
   "body": {
     "running": false,
-    "question": null
+    "question": null,
+    "phone": null
   }
 }
