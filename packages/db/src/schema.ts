@@ -587,8 +587,18 @@ export const decks = pgTable(
     /** The idempotency key of the teacher's write that last wrote it: an earlier one's is not kept. */
     eventId: uuid('event_id').notNull().unique(),
     createdAt: createdAt(),
+    /**
+     * When its last upload URL was minted, a create's retry's included (M2b2): until that URL has
+     * lapsed and an upload begun on it has landed, its object may still be written.
+     */
+    uploadUrlMintedAt: timestamp('upload_url_minted_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
     removedAt: removedAt(),
-    /** When its stored object was confirmed deleted, after the commit that removed or rejected it. */
+    /**
+     * When its stored object was confirmed deleted, once it was removed or rejected and no upload
+     * could still write it (M2b2).
+     */
     objectDeletedAt: timestamp('object_deleted_at', { withTimezone: true }),
   },
   (t) => [

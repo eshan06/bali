@@ -19,7 +19,7 @@ import { LOG_REDACT, serializeError } from './redact.js';
 import { registerAgeCheckRoutes } from './routes/age-check.js';
 import { registerBlocksRoutes } from './routes/blocks.js';
 import { registerClassesRoutes } from './routes/classes.js';
-import { registerDecksRoutes } from './routes/decks.js';
+import { registerDecksRoutes, sweepDecks } from './routes/decks.js';
 import { registerEnrollmentsRoutes } from './routes/enrollments.js';
 import { registerFeedRoutes } from './routes/feed.js';
 import { registerHistoryRoute } from './routes/history.js';
@@ -154,8 +154,6 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
   const clock = deps.clock ?? (() => new Date());
   const deleter = cognitoDeleter(env, deps.cognitoFetch);
   const signIns = signInDeletions(app, deps.db, deleter, env.AUTH_ISSUER, clock);
-  // Run every minute by the process entry (server.ts), and by the internal route on the cron's call.
-  app.decorate('sweep', (now?: Date) => sweep(deps.db, now, signIns));
   registerMeRoute(app, deps.db, clock, signIns);
   registerPushTokenRoutes(app, deps.db);
   registerAgeCheckRoutes(app, deps.db);
@@ -176,6 +174,9 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
       : 'deck storage is off: DECK_BUCKET, DECK_BUCKET_REGION, DECK_BUCKET_ACCESS_KEY_ID and DECK_BUCKET_SECRET_ACCESS_KEY are unset',
   );
   app.decorate('deckStorage', deckStorage);
+  const sweepDecksOn = deckStorage && ((at: Date) => sweepDecks(deps.db, deckStorage, app.log, at));
+  // Run every minute by the process entry (server.ts), and by the internal route on the cron's call.
+  app.decorate('sweep', (now?: Date) => sweep(deps.db, now, signIns, sweepDecksOn));
   registerEnrollmentsRoutes(app, deps.db, clock, limits);
   registerTeacherInvitesRoute(app, deps.db, limits);
   registerClassesRoutes(app, deps.db);

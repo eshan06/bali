@@ -3783,12 +3783,18 @@ export function removeSavedQuestion(
  * A teacher's slide decks (Phase 7, Slice 2; "Live lesson", decisions 4 and 5): one row per PDF,
  * `pending` until its upload is checked. Each write is idempotent on the deck's `event_id`, the id
  * of the teacher's write that last wrote it, as a draft's is. The stored object is the API's,
- * deleted after the commit (decision 4).
+ * deleted after the commit once no upload URL can write it (decision 4).
  */
 
 export type DeckRow = typeof decks.$inferSelect;
 
-/** Written by this call; 'replay' wrote nothing, and carries the deck now. */
+/** How long a deck may stay `pending` before the sweep rejects it `unfinished` (decision 6). */
+export const DECK_PENDING_LIMIT_MS = 24 * 60 * 60_000;
+
+/**
+ * Written by this call; 'replay' wrote nothing, and carries the deck now, but for a create's: it
+ * records the fresh upload URL's mint.
+ */
 export interface DeckResult {
   outcome: 'created' | 'removed' | 'checked' | 'replay';
   deck: DeckRow;
@@ -3808,13 +3814,16 @@ export interface CreateDeckInput {
 }
 
 /**
- * A teacher adds a deck, `pending`, its object's key the API's own. Its replay, the eventId a
- * pending deck of theirs still holds with this title, length and hash, answers that deck; any other
+ * A teacher adds a deck, `pending`, its object's key the API's own, and the mint of the upload URL
+ * the API then hands out. Its replay, the eventId a pending deck of theirs still holds with this
+ * title, length and hash, answers that deck, recording the replay's fresh URL's mint under the
+ * deck's row lock, so a removal or a check holding the row reads the last one (M2b2); any other
  * holder of the id is EVENT_ID_CONFLICT. The school is held FOR KEY SHARE, then the teacher FOR
  * SHARE, as a class's create holds them, in a disposal's order: the account's deletion, a disposal
  * or a retention run runs wholly before this, which then refuses ACCOUNT_DELETED, or after it.
  */
 export function createDeck(db: Database, input: CreateDeckInput): Promise<DeckResult> {
+  const now = input.now ?? new Date();
   return onceMoreOnUnique(() =>
     db.transaction(async (tx): Promise<DeckResult> => {
       await tx
@@ -3828,8 +3837,13 @@ export function createDeck(db: Database, input: CreateDeckInput): Promise<DeckRe
         .where(eq(users.id, input.teacherId))
         .for('share');
       // Read once: a duplicate of this create committed since trips `event_id` at the insert and is
-      // run again, which then finds it here, the replay, never a conflict.
-      const [held] = await tx.select().from(decks).where(eq(decks.eventId, input.eventId));
+      // run again, which then finds it here, the replay, never a conflict. FOR UPDATE: a removal or
+      // a verdict that commits first has replaced the deck's id, so the row no longer matches.
+      const [held] = await tx
+        .select()
+        .from(decks)
+        .where(eq(decks.eventId, input.eventId))
+        .for('update');
       if (
         held?.teacherId === input.teacherId &&
         held.status === 'pending' &&
@@ -3838,7 +3852,12 @@ export function createDeck(db: Database, input: CreateDeckInput): Promise<DeckRe
         held.bytes === input.bytes &&
         held.sha256 === input.sha256
       ) {
-        return { outcome: 'replay', deck: held };
+        const [minted] = await tx
+          .update(decks)
+          .set({ uploadUrlMintedAt: now })
+          .where(eq(decks.id, held.id))
+          .returning();
+        return { outcome: 'replay', deck: minted! };
       }
       if (held || (await idHeldBy(tx, input.eventId, events, responses, savedQuestions))) {
         throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
@@ -3857,7 +3876,8 @@ export function createDeck(db: Database, input: CreateDeckInput): Promise<DeckRe
           sha256,
           bytes,
           eventId,
-          createdAt: input.now ?? new Date(),
+          createdAt: now,
+          uploadUrlMintedAt: now,
         })
         .returning();
       return { outcome: 'created', deck: created! };
@@ -3949,6 +3969,37 @@ export function completeDeck(
       return { outcome: 'checked', deck: checked! };
     }),
   );
+}
+
+/**
+ * The sweep's: every live deck left `pending` `DECK_PENDING_LIMIT_MS` since its create, rejected
+ * `unfinished` (decision 6), its object the API's to delete by the 5-minute rule (M2b2). One guarded
+ * statement, so a verdict or a removal that commits first leaves the deck unmatched, and the
+ * complete that meets this rejection answers it, as any complete of a checked deck. Its `event_id`
+ * stays the teacher's last write's: the sweep is no one's mutation. The ids it rejected.
+ */
+export async function rejectUnfinishedDecks(db: Database, now: Date): Promise<string[]> {
+  const rejected = await db
+    .update(decks)
+    .set({ status: 'rejected', rejection: 'unfinished' })
+    .where(
+      and(
+        eq(decks.status, 'pending'),
+        isNull(decks.removedAt),
+        lte(decks.createdAt, new Date(now.getTime() - DECK_PENDING_LIMIT_MS)),
+      ),
+    )
+    .returning({ id: decks.id });
+  return rejected.map(({ id }) => id);
+}
+
+/**
+ * Is this `eventId` spent by any record: an event, an answer, a draft or a deck? One read, so a
+ * deck's complete refuses a spent one before its check reads or parses anything, never holding a
+ * check's turn for it (#324's review); its write asks again, under the deck's lock.
+ */
+export function eventIdSpent(db: Database, eventId: string): Promise<boolean> {
+  return idHeldBy(db, eventId, decks, events, responses, savedQuestions);
 }
 
 export interface JoinClassInput {

@@ -10,7 +10,7 @@ import {
   type UnlockReason,
   type UnlockRecordedAs,
 } from '@bali/shared';
-import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
 import type { SQLWrapper } from 'drizzle-orm';
 
 import {
@@ -397,9 +397,29 @@ export function listDecks(db: Database, teacherId: string) {
 }
 
 /**
- * Its stored object confirmed deleted, after the commit that removed or rejected the deck: the one
- * write to `decks` outside the engine (decision 5), a fact about storage, never a state change. The
- * first stamp stays.
+ * Removed and rejected decks whose stored object is not stamped deleted, their last upload URL minted
+ * by `mintedBy`, so none can write it again (M2b2): the sweep's to delete, the oldest mint first.
+ * ponytail: a scan of `decks` each minute; a partial index on the unstamped once decks grow large.
+ */
+export function decksToDrop(db: Database, mintedBy: Date, limit: number) {
+  return db
+    .select()
+    .from(decks)
+    .where(
+      and(
+        isNull(decks.objectDeletedAt),
+        or(isNotNull(decks.removedAt), eq(decks.status, 'rejected')),
+        lte(decks.uploadUrlMintedAt, mintedBy),
+      ),
+    )
+    .orderBy(asc(decks.uploadUrlMintedAt))
+    .limit(limit);
+}
+
+/**
+ * Its stored object confirmed deleted, once the deck was removed or rejected and no upload could
+ * still write it: the one write to `decks` outside the engine (decision 5), a fact about storage,
+ * never a state change. The first stamp stays.
  */
 export async function stampObjectDeleted(db: Database, deckId: string, at: Date): Promise<void> {
   await db

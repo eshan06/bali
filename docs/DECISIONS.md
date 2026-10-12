@@ -8,6 +8,34 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-11** — **A removed or rejected deck's object, and the deck sweep (M2b2): deleted 30
+  minutes after its last upload URL was minted, the URL's 5 and 25 for an upload in flight.**
+  The conductor's ruling, the owner away: S3 checks a presigned PUT's expiry when the upload
+  starts, so one begun at 4:59 lands minutes later. **Every URL's mint is recorded**, in
+  `decks.upload_url_minted_at` (migration 0025; existing rows take the migration's time, later
+  than their mint, so they wait longer): the create's, and a retry's under the deck's row lock
+  (FOR UPDATE, after the school and the teacher), so a removal or a check that holds the row
+  reads the last one, and one that commits first has replaced the deck's `eventId`, leaving the
+  retry no replay. **The margin, 25 minutes** (`UPLOAD_IN_FLIGHT_MS`): 25 MB at 140 kbit/s, a
+  link no teacher waits on, takes 25 minutes. An object waiting costs nothing, since no route
+  serves a removed or rejected deck, while one landing after its stamp would never be deleted,
+  so the margin errs long. It also covers the moment between the recorded mint, the route's
+  clock before its transaction, and the URL's signing after the commit. **Nothing is deleted
+  before then**, the removal's and the rejection's alike: one delete, by `dropObject`, at once
+  if the 30 minutes have passed, else by the sweep. **The sweep's decks** (`sweepDecks`, last,
+  while storage is on): one guarded statement rejects every live deck pending 24 hours since
+  its create `unfinished` (`rejectUnfinishedDecks`), keeping its `eventId`, the teacher's last
+  write's, since the sweep is no one's mutation; then the 50 oldest-minted removed or rejected
+  decks no upload can write are deleted together, each stamped, so a pass stays within one
+  delete's 30-second bound. A complete meeting the rejection answers it, as any of a checked
+  deck. **A spent `eventId` is refused before the check** (#324's review): one read
+  (`eventIdSpent`) after the deck's own, so it never holds one of the two checks' turns. **The
+  worker's other endings are pinned:** a parse out of its 256 MB heap is `too_slow`, as decided; a
+  crash, and an exit with no answer, are a `500` that leaves the deck pending, the API answering
+  on (#324's review). **Left, as saved questions behave** (#323's and #324's reviews): a create
+  retried after its deck was removed, or after its complete replaced the deck's `eventId`, adds a
+  second pending deck with a fresh URL, which the sweep's 24 hours reject if never checked.
+
 - **2026-10-11** — **A deck's check (M2b1): `unpdf` parses it in a worker thread stopped at 10
   seconds, and a rejected deck says why.** M2b whole is over 400 changed lines by santa's count, so
   it ships as the split decided in advance: `POST /v1/decks/{id}/complete`, the check, its parse

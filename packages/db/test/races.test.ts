@@ -51,6 +51,7 @@ import {
   completeDeck,
   createDeck,
   createSavedQuestion,
+  DECK_PENDING_LIMIT_MS,
   deleteAccount,
   disposeSchool,
   endEnrollment,
@@ -63,6 +64,7 @@ import {
   protectionOff,
   protectionOn,
   refocus,
+  rejectUnfinishedDecks,
   removeDeck,
   removeSavedQuestion,
   renameStudent,
@@ -5052,4 +5054,91 @@ describe.runIf(REAL_PG)('live lesson questions under contention (real Postgres, 
     expect(disposed.value.outcome).toBe('disposed');
     expect(await decksOf(ahead.teacherId)).toMatchObject([{ eventId: ahead.deck.eventId }]);
   }, 20_000);
+
+  it('a create’s retry racing its deck’s removal: retried first, the removal reads the retry’s upload URL; removed first, the retry makes a second pending deck (M2b2)', async () => {
+    // Retried first: the retry holds the deck's row while it records its fresh URL's mint, so the
+    // removal waits, then removes the deck with that mint, which the object's deletion waits out.
+    const ahead = await decking((await seed('race-deck-retry-remove-ahead')).teacherId);
+    const { deck } = await createDeck(db, { ...ahead, now: new Date(Date.now() - 60_000) });
+    const mintedAt = new Date();
+    const removal = await behindCommit(
+      (tx) => createDeck(tx, { ...ahead, now: mintedAt }),
+      () => removeDeck(db, { deckId: deck.id, eventId: newUuidV7() }),
+    );
+    if (removal.status === 'rejected') throw removal.reason as Error;
+    expect(removal.value).toMatchObject({
+      outcome: 'removed',
+      deck: { id: deck.id, uploadUrlMintedAt: mintedAt },
+    });
+    expect(await decksOf(ahead.teacherId)).toHaveLength(1);
+
+    // Removed first: the retry's FOR UPDATE waits on the row, then finds the id no longer the
+    // deck's, so it adds a second pending deck (#323's review, left: the sweep's 24 hours take it).
+    const behind = await decking((await seed('race-deck-retry-remove-behind')).teacherId);
+    const first = (await createDeck(db, behind)).deck;
+    const retry = await behindCommit(
+      (tx) => removeDeck(tx, { deckId: first.id, eventId: newUuidV7() }),
+      () => createDeck(db, behind),
+    );
+    if (retry.status === 'rejected') throw retry.reason as Error;
+    expect(retry.value).toMatchObject({ outcome: 'created', deck: { status: 'pending' } });
+    expect(retry.value.deck.id).not.toBe(first.id);
+    expect(await decksOf(behind.teacherId)).toHaveLength(2);
+  }, 20_000);
+
+  it('the sweep’s 24 hours racing a complete or a removal: whichever commits first stands, the other meeting it, never a 500 (M2b2)', async () => {
+    /** A teacher's deck, pending since a day and a minute ago. */
+    async function leftPending(tag: string) {
+      const { teacherId } = await seed(tag);
+      const input = await decking(teacherId);
+      const ago = new Date(Date.now() - DECK_PENDING_LIMIT_MS - 60_000);
+      return { teacherId, deck: (await createDeck(db, { ...input, now: ago })).deck };
+    }
+    const sweep = (on: Database) => rejectUnfinishedDecks(on, new Date());
+    const verdict = { status: 'ready', pageCount: 3 } as const;
+    const check = (on: Database, deckId: string) =>
+      completeDeck(on, { deckId, eventId: newUuidV7(), verdict });
+    const remove = (on: Database, deckId: string) =>
+      removeDeck(on, { deckId, eventId: newUuidV7() });
+
+    // Checked first: the sweep's statement waits on the row, then finds it pending no more.
+    const checked = await leftPending('race-deck-sweep-check-ahead');
+    const passed = await behindCommit(
+      (tx) => check(tx, checked.deck.id),
+      () => sweep(db),
+    );
+    if (passed.status === 'rejected') throw passed.reason as Error;
+    expect(passed.value).not.toContain(checked.deck.id);
+    expect(one(await decksOf(checked.teacherId))).toMatchObject({ status: 'ready' });
+
+    // The sweep first: the complete waits, then answers the sweep's verdict, as any of a checked deck.
+    const swept = await leftPending('race-deck-sweep-check-behind');
+    const answered = await behindCommit(
+      (tx) => sweep(tx),
+      () => check(db, swept.deck.id),
+    );
+    if (answered.status === 'rejected') throw answered.reason as Error;
+    const unfinished = { status: 'rejected', rejection: 'unfinished' };
+    expect(answered.value).toMatchObject({ outcome: 'replay', deck: unfinished });
+
+    // Removed first: the sweep passes it over; a removed deck's object goes by the 5-minute rule.
+    const removed = await leftPending('race-deck-sweep-remove-ahead');
+    const skipped = await behindCommit(
+      (tx) => remove(tx, removed.deck.id),
+      () => sweep(db),
+    );
+    if (skipped.status === 'rejected') throw skipped.reason as Error;
+    expect(skipped.value).not.toContain(removed.deck.id);
+    expect(one(await decksOf(removed.teacherId))).toMatchObject({ status: 'pending' });
+
+    // The sweep first: the removal waits, then removes the rejected deck.
+    const late = await leftPending('race-deck-sweep-remove-behind');
+    const removal = await behindCommit(
+      (tx) => sweep(tx),
+      () => remove(db, late.deck.id),
+    );
+    if (removal.status === 'rejected') throw removal.reason as Error;
+    expect(removal.value).toMatchObject({ outcome: 'removed', deck: unfinished });
+    expect(one(await decksOf(late.teacherId)).removedAt).not.toBeNull();
+  }, 40_000);
 });

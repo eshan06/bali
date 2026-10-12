@@ -3,8 +3,11 @@ import {
   createDeck,
   type Database,
   type DeckRow,
+  decksToDrop,
+  eventIdSpent,
   findDeck,
   listDecks,
+  rejectUnfinishedDecks,
   removeDeck,
   stampObjectDeleted,
 } from '@bali/db';
@@ -21,9 +24,9 @@ import { z } from 'zod';
 
 import { requireTeacher } from '../auth/teacher.js';
 import { checkDeck, type ParsePdf } from '../deck-check.js';
-import type { DeckStorage } from '../deck-storage.js';
+import { type DeckStorage, URL_LIFETIME_S } from '../deck-storage.js';
 import { ApiError, parseRequest } from '../errors.js';
-import { mapTransitionError } from './errors.js';
+import { mapTransitionError, refusal } from './errors.js';
 import { Text } from './questions.js';
 
 const Params = z.object({ id: z.string().uuid() });
@@ -77,10 +80,22 @@ async function requireOwnDeck(db: Database, id: string, teacherId: string) {
 }
 
 /**
- * After the commit that removed or rejected it (decision 4): its stored object deleted, and stamped
- * so (decision 5's one exception) unless the deck is still `pending`, whose upload URL may yet write
- * it (5 minutes, M1): the sweep's retry stamps that one once its URL has lapsed (M4). A failed
- * delete is said and left unstamped for the same retry; the removal or the verdict stands.
+ * The margin for an upload in flight (M2b2): S3 checks a presigned PUT's expiry when the upload
+ * starts, so one begun as its URL lapses streams on. 25 MB at 140 kbit/s, a link no teacher waits
+ * on, takes 25 minutes (`docs/DECISIONS.md`, 2026-10-11, M2b2).
+ */
+export const UPLOAD_IN_FLIGHT_MS = 25 * 60_000;
+/** From its last upload URL's mint, how long until no upload can write a deck's object (M2b2). */
+export const OBJECT_WRITABLE_MS = URL_LIFETIME_S * 1000 + UPLOAD_IN_FLIGHT_MS;
+/** Objects one sweep deletes at once, together: each delete is bounded (M1), so the pass is too. */
+export const DROPS_PER_PASS = 50;
+
+/**
+ * After the commit that removed or rejected it (decision 4), and only once no upload can write it
+ * (the 5-minute rule, M2b2: its last upload URL's mint, the URL's 5 minutes, and an upload in
+ * flight): its stored object deleted, and stamped so (decision 5's one exception). Before then it is
+ * left for the sweep, which comes back for it; no route serves a removed or rejected deck. A failed
+ * delete is said and left unstamped for the sweep too; the removal or the verdict stands.
  */
 async function dropObject(
   db: Database,
@@ -89,13 +104,34 @@ async function dropObject(
   dropped: DeckRow,
   now: Date,
 ) {
+  if (now.getTime() < dropped.uploadUrlMintedAt.getTime() + OBJECT_WRITABLE_MS) return;
   try {
     await storage.delete(dropped.storageKey);
   } catch (err) {
     log.warn({ err, deck: dropped.id }, 'a deck’s object was not deleted: left for the sweep');
     return;
   }
-  if (dropped.status !== 'pending') await stampObjectDeleted(db, dropped.id, now);
+  await stampObjectDeleted(db, dropped.id, now);
+}
+
+/**
+ * The sweep's decks (decision 6, M2b2): every deck pending 24 hours rejected `unfinished`, then the
+ * objects of removed and rejected decks no upload can write any more, deleted and stamped, the
+ * oldest first: those that waited out their upload URL, and any a failed delete or a crash left
+ * unstamped. Each settled before the pass ends.
+ */
+export async function sweepDecks(
+  db: Database,
+  storage: DeckStorage,
+  log: FastifyBaseLogger,
+  now: Date,
+): Promise<void> {
+  await rejectUnfinishedDecks(db, now);
+  const due = await decksToDrop(db, new Date(now.getTime() - OBJECT_WRITABLE_MS), DROPS_PER_PASS);
+  const dropped = await Promise.allSettled(
+    due.map((deck) => dropObject(db, storage, log, deck, now)),
+  );
+  for (const tried of dropped) if (tried.status === 'rejected') throw tried.reason;
 }
 
 /**
@@ -105,8 +141,11 @@ async function dropObject(
  *
  * GET    /v1/decks               the caller's decks, newest first, none removed
  * POST   /v1/decks               a pending deck and the URL its PDF is uploaded to
- * DELETE /v1/decks/:id           remove it, then its stored object
- * POST   /v1/decks/:id/complete  its upload checked: ready, or rejected and its object deleted
+ * DELETE /v1/decks/:id           remove it; its stored object goes once no upload can write it
+ * POST   /v1/decks/:id/complete  its upload checked: ready, or rejected, its object deleted as a
+ *                                removed deck's is
+ *
+ * The sweep's part is `sweepDecks`.
  */
 export function registerDecksRoutes(
   app: FastifyInstance,
@@ -135,7 +174,8 @@ export function registerDecksRoutes(
       const { outcome, deck: made } = await mapTransitionError(() =>
         createDeck(db, { ...body, teacherId: teacher.id, schoolId, now: clock() }),
       );
-      // A fresh URL for a replay too: the first answer, and its URL, never reached the caller.
+      // A fresh URL for a replay too: the first answer, and its URL, never reached the caller. The
+      // engine recorded its mint at `now`, before it; the margin covers the commit between (M2b2).
       const uploadUrl = storage.uploadUrl(made.storageKey, made.bytes);
       return { outcome, deck: deck(made), uploadUrl };
     },
@@ -170,6 +210,9 @@ export function registerDecksRoutes(
       if (found.removedAt) throw deckNotFound();
       // One-way: a deck checked already is answered with its verdict, never checked again.
       if (found.status !== 'pending') return { outcome: 'replay', deck: deck(found) };
+      // A spent eventId never takes a check's turn: refused after one read, before anything is read
+      // or parsed (#324's review). The engine asks again as it records the verdict.
+      if (await eventIdSpent(db, eventId)) throw refusal('EVENT_ID_CONFLICT');
       // Outside any transaction: the read and the parse take seconds, never under a row lock.
       const verdict = await checkDeck(storage, found, parse);
       const result = await mapTransitionError(() =>

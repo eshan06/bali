@@ -858,7 +858,8 @@ export type DeckStatus = (typeof DECK_STATUSES)[number];
  * the bucket; `mismatch`, not the length or SHA-256 declared, so the upload didn't arrive whole;
  * `too_many_pages`, more than `DECK_MAX_PAGES`; `encrypted`, a password on it, to open it or an
  * owner's; `too_slow`, its parse ran past the check's time limit or out of its memory; `unfinished`,
- * nothing uploaded. Additive-only like the other vocab.
+ * nothing uploaded, or no check asked for within 24 hours (the sweep's, M2b2). Additive-only like
+ * the other vocab.
  */
 export const DECK_REJECTIONS = [
   'not_pdf',
