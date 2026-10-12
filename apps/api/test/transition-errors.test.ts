@@ -125,7 +125,8 @@ const EXPECTED: Record<
  * teacher-invites.test.ts), a live lesson's question's and saved
  * question's, which the engine answers as outcomes for the routes to map (L3
  * and L3b, pinned in questions.test.ts; the answer's two with L4), and a
- * deck's, the same, with storage off the routes' own (M2, decks.test.ts).
+ * deck's, the same, with storage off the routes' own (M2, decks.test.ts), a
+ * slide change's and a removal's of a deck shown (M3, slides.test.ts).
  */
 const ROUTE_REASONS: ApiErrorReason[] = [
   'unknown_user',
@@ -145,6 +146,10 @@ const ROUTE_REASONS: ApiErrorReason[] = [
   'saved_question_not_found',
   'deck_not_found',
   'deck_storage_off',
+  'deck_not_ready',
+  'deck_rejected',
+  'page_out_of_range',
+  'deck_in_use',
 ];
 
 /** What `mapTransitionError` turns an engine refusal with `code` into. */

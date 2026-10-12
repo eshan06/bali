@@ -1085,12 +1085,15 @@ nothing of a live lesson sits in the outbox ahead of an unlock (decision 5).
   `removed_at` (decision 3's soft removal), `object_deleted_at` (when its stored object was
   confirmed deleted; decision 8).
 - `session_presentations` (Slice 2) — at most one row per session, keyed by `session_id`:
-  `deck_id` (nullable: nothing shown), `page`, `updated_at`, and the `event_id` of the
-  slide change that set it. **A row of its own, not columns on `sessions`:** `sessions` is
+  `deck_id` (nullable: nothing shown), `page` (from 1; with `deck_id`, or neither),
+  `updated_at`, and the `event_id` of the slide change that set it. **A row of its own, not
+  columns on `sessions`:** `sessions` is
   read and locked on every tap, check-in, unlock and the sweep, and a teacher paging through
   60 slides would rewrite that hot row 60 times; the separate row keeps those paths
   untouched (additive in fact, not only in name) while a slide change still takes the
-  session row FOR SHARE to serialise with its end.
+  session row FOR SHARE to serialise with its end. A slide change replaces the row only when
+  its `event_id` sorts after the one held, as an answer does: an older one landing late
+  changes nothing and records nothing (M3a). The session's end leaves the row as it was.
 
 Retention, disposal, deletion and export (ISSUES #5). The coverage guards
 (`STUDENT_RECORD_COVERAGE`, `SCHOOL_DISPOSAL_COVERAGE`, `RETENTION_COVERAGE`) fail CI until
@@ -1255,7 +1258,10 @@ Slice 2, teacher:
   remove one (`409 deck_in_use` while a running session shows it).
 - `POST /v1/sessions/{id}/slide` — `{ eventId, deckId | null, page }`: show a page of one of
   the caller's own `ready` decks, or stop presenting; recorded as `slide_shown`.
-  `400 page_out_of_range` past its page count; `409 session_not_running` as for questions.
+  `400 page_out_of_range` past its page count; `409 session_not_running` as for questions; a
+  deck not theirs, removed or unknown `404 deck_not_found`, one not checked yet `409
+  deck_not_ready`, a rejected one `409 deck_rejected`. Answered with the slide now and the
+  `eventId` the session holds, so a client mints its next after it (decision 4's order; M3a).
 
 Authorization: every new route gets its rows in S1's matrix
 (`apps/api/test/authorization-matrix.test.ts`) — no token, another app's token, a student,

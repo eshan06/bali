@@ -42,7 +42,13 @@ import { unionAll } from 'drizzle-orm/pg-core';
 
 import { type CognitoSignIn, queueCognitoDeletion } from './cognito-deletions.js';
 import { newUuidV7 } from './ids.js';
-import { changedReasons, latestTurn, liveClassWithCode, type UserRow } from './queries.js';
+import {
+  changedReasons,
+  findPresentation,
+  latestTurn,
+  liveClassWithCode,
+  type UserRow,
+} from './queries.js';
 import {
   ageChecks,
   armedTaps,
@@ -57,6 +63,7 @@ import {
   responses,
   savedQuestions,
   schools,
+  sessionPresentations,
   sessions,
   teacherInvites,
   users,
@@ -3894,19 +3901,22 @@ export interface RemoveDeckInput {
   now?: Date;
 }
 
+/** A removal's answer: the deck, or why there is none to remove now. */
+export type RemoveDeckResult =
+  DeckResult | { outcome: 'deck_not_found' } | { outcome: 'deck_in_use' };
+
 /**
  * The teacher removes a deck: marked removed (data-model decision 3). Its row alone, FOR UPDATE
- * (decision 5): no session's, so M3's `deck_in_use` reads the presentation rows here, unlocked. Its
- * replay, the id it holds with the deck removed, answers the deck now; the id it holds from another
- * write, or one any other row holds, is EVENT_ID_CONFLICT. A deck removed already, or none, is
- * `deck_not_found`.
+ * (decision 5): the one transition whose only lock is the deck row, since it can't know which
+ * session shows the deck before it looks. So it reads the presentation rows here, unlocked: a
+ * running session showing the deck is `deck_in_use`, nothing written, and a slide change's FOR SHARE
+ * on this row is where the two meet, so they never deadlock. Its replay, the id it holds with the
+ * deck removed, answers the deck now; the id it holds from another write, or one any other row
+ * holds, is EVENT_ID_CONFLICT. A deck removed already, or none, is `deck_not_found`.
  */
-export function removeDeck(
-  db: Database,
-  input: RemoveDeckInput,
-): Promise<DeckResult | { outcome: 'deck_not_found' }> {
+export function removeDeck(db: Database, input: RemoveDeckInput): Promise<RemoveDeckResult> {
   return onceMoreOnUnique(() =>
-    db.transaction(async (tx): Promise<DeckResult | { outcome: 'deck_not_found' }> => {
+    db.transaction(async (tx): Promise<RemoveDeckResult> => {
       const [deck] = await tx.select().from(decks).where(eq(decks.id, input.deckId)).for('update');
       if (deck?.eventId === input.eventId) {
         if (deck.removedAt) return { outcome: 'replay', deck };
@@ -3916,9 +3926,18 @@ export function removeDeck(
       if (await idHeldBy(tx, input.eventId, decks, events, responses, savedQuestions)) {
         throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
       }
+      const now = input.now ?? new Date();
+      // Only a session not marked over can be running: one a class at most, so a handful of rows.
+      const showing = await tx
+        .select({ endedAt: sessions.endedAt, endsAt: sessions.endsAt })
+        .from(sessionPresentations)
+        .innerJoin(sessions, eq(sessions.id, sessionPresentations.sessionId))
+        .where(and(eq(sessionPresentations.deckId, deck.id), isNull(sessions.endedAt)));
+      if (showing.some((session) => sessionRunning(session, now)))
+        return { outcome: 'deck_in_use' };
       const [removed] = await tx
         .update(decks)
-        .set({ removedAt: input.now ?? new Date(), eventId: input.eventId })
+        .set({ removedAt: now, eventId: input.eventId })
         .where(eq(decks.id, deck.id))
         .returning();
       return { outcome: 'removed', deck: removed! };
@@ -4000,6 +4019,119 @@ export async function rejectUnfinishedDecks(db: Database, now: Date): Promise<st
  */
 export function eventIdSpent(db: Database, eventId: string): Promise<boolean> {
   return idHeldBy(db, eventId, decks, events, responses, savedQuestions);
+}
+
+/*
+ * What a running session shows (Phase 7, Slice 2; "Live lesson", decisions 4–6): its one
+ * `session_presentations` row, a page of one of its teacher's ready decks or none, set by the
+ * teacher's slide changes, each recorded as `slide_shown`. A slide change takes the session row FOR
+ * SHARE, so it serialises with the session's end (FOR UPDATE), and reads its deck FOR SHARE, so it
+ * serialises with the deck's removal (FOR UPDATE). As an answer does, it applies only when its
+ * eventId sorts after the one the row holds, so one landing late never undoes a later one.
+ */
+
+export type PresentationRow = typeof sessionPresentations.$inferSelect;
+
+export interface ShowSlideInput {
+  sessionId: string;
+  /** The class's teacher, as the route checks (M3): only a deck of theirs is shown. */
+  teacherId: string;
+  /** The slide change's idempotency key (rule 4), and its `slide_shown` event's id. */
+  eventId: string;
+  /** A deck of the teacher's, or null to stop presenting. */
+  deckId: string | null;
+  /** From 1 to the deck's page count; none when `deckId` is null. */
+  page: number | null;
+  /** The server's clock, which the session must be running at (`sessionRunning`); now by default. */
+  now?: Date;
+}
+export type SlideResult =
+  /** 'shown' recorded this slide change; 'replay' changed nothing, and carries what is shown now. */
+  | {
+      outcome: 'shown' | 'replay';
+      presentation: PresentationRow;
+      /** The deck it names, if any. */
+      deck: DeckRow | null;
+      session: SessionRow;
+    }
+  | { outcome: 'deck_not_found' | 'deck_not_ready' | 'deck_rejected' | 'page_out_of_range' };
+
+/**
+ * The teacher shows a page of one of their ready decks in a running session, or stops presenting
+ * (decision 6). Its replay, the eventId a `slide_shown` of this session holds, answers what is shown
+ * now, whatever has happened since; any other holder of the id is EVENT_ID_CONFLICT. A deck not
+ * theirs, removed, or none is `deck_not_found`, one not checked yet `deck_not_ready`, a rejected one
+ * `deck_rejected`, a page it lacks `page_out_of_range`: nothing recorded.
+ */
+export function showSlide(db: Database, input: ShowSlideInput): Promise<SlideResult> {
+  return db.transaction(async (tx): Promise<SlideResult> => {
+    const [session] = await tx
+      .select()
+      .from(sessions)
+      .where(eq(sessions.id, input.sessionId))
+      .for('share');
+    if (!session) throw new TransitionError('SESSION_NOT_FOUND', 'no such session');
+    /** What it shows now, which a slide change that changes nothing is answered with. */
+    const unchanged = async (): Promise<SlideResult> => {
+      const shown = (await findPresentation(tx, session.id))!;
+      return { outcome: 'replay', ...shown, session };
+    };
+    const [held] = await tx
+      .select({ type: events.type, sessionId: events.sessionId })
+      .from(events)
+      .where(eq(events.eventId, input.eventId));
+    if (held?.type === 'slide_shown' && held.sessionId === session.id) return unchanged();
+    if (held || (await idHeldBy(tx, input.eventId, responses, savedQuestions, decks))) {
+      throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
+    }
+    const now = input.now ?? new Date();
+    if (!sessionRunning(session, now)) {
+      throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');
+    }
+
+    let deck: DeckRow | null = null;
+    if (input.deckId !== null) {
+      const [found] = await tx.select().from(decks).where(eq(decks.id, input.deckId)).for('share');
+      if (!found || found.teacherId !== input.teacherId || found.removedAt) {
+        return { outcome: 'deck_not_found' };
+      }
+      if (found.status !== 'ready') {
+        return { outcome: found.status === 'pending' ? 'deck_not_ready' : 'deck_rejected' };
+      }
+      const { page } = input;
+      if (page === null || !Number.isInteger(page) || page < 1 || page > (found.pageCount ?? 0)) {
+        return { outcome: 'page_out_of_range' };
+      }
+      deck = found;
+    }
+    const shown = {
+      deckId: deck?.id ?? null,
+      page: deck ? input.page : null,
+      eventId: input.eventId,
+      updatedAt: now,
+    };
+    const [presentation] = await tx
+      .insert(sessionPresentations)
+      .values({ sessionId: session.id, ...shown })
+      .onConflictDoUpdate({
+        target: sessionPresentations.sessionId,
+        set: shown,
+        // Postgres orders uuids by their bytes: a UUIDv7's leading timestamp first.
+        setWhere: sql`${sessionPresentations.eventId} < excluded.event_id`,
+      })
+      .returning();
+    // Older than the slide change that set it, or that one's own duplicate: it changes nothing.
+    if (!presentation) return unchanged();
+    await insertEvent(tx, {
+      eventId: input.eventId,
+      type: 'slide_shown',
+      sessionId: session.id,
+      classId: session.classId,
+      occurredAt: now,
+      payload: { deck_id: shown.deckId, page: shown.page },
+    });
+    return { outcome: 'shown', presentation, deck, session };
+  });
 }
 
 export interface JoinClassInput {

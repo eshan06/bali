@@ -919,6 +919,43 @@ export interface DecksResponse {
   decks: Deck[];
 }
 
+// POST /v1/sessions/{id}/slide — show a page of a deck in a running session, or stop presenting
+// (Phase 7, M3; "Live lesson", decisions 4–6): the class's own teacher, their own ready decks.
+/**
+ * A page a running session shows. Never a URL: a client fetches the deck through
+ * `GET /v1/decks/{id}/download` and checks the bytes against `sha256` (decision 8).
+ */
+export interface Slide {
+  deckId: string;
+  sha256: string;
+  /** From 1 to `pageCount`. */
+  page: number;
+  pageCount: number;
+}
+export interface ShowSlideRequest {
+  eventId: string;
+  /** A ready deck of the caller's, or null to stop presenting. */
+  deckId: string | null;
+  /** From 1 to the deck's `pageCount`; none when `deckId` is null. */
+  page?: number | null;
+}
+/**
+ * Every outcome a slide change answers with (`SlideResponse.outcome`): `shown`, or `replay`, which
+ * changed nothing — its own retry, or a slide change older than the one shown (decision 4's order).
+ */
+export const SLIDE_OUTCOMES = ['shown', 'replay'] as const;
+export type SlideOutcome = (typeof SLIDE_OUTCOMES)[number];
+export interface SlideResponse {
+  outcome: SlideOutcome;
+  /** The page the session shows now; null once presenting stopped, or the session is over. */
+  slide: Slide | null;
+  /**
+   * The slide change that set what it shows now. One applies only when its `eventId` sorts after
+   * this one (UUIDv7 order, as an answer's: decision 4), so a client mints its next after it.
+   */
+  eventId: string;
+}
+
 // GET /v1/questions/{id}/results — a question's totals (Phase 7, L3r; "Live lesson", decisions 3
 // and 6), the class's own teacher only. A strong ETag over the body; `If-None-Match` answers `304`.
 export interface QuestionResults {

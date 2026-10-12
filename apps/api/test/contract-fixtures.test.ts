@@ -1105,8 +1105,8 @@ describe('the contract fixtures (contracts/fixtures)', () => {
     }
     // Every refusal a phone can meet, by status and by reason: all but a
     // teacher's extend, a teacher invite's, which the portal redeems (T1b), a
-    // saved question's, the teacher's (L3b), and a deck's, the teacher's until
-    // M3's download gives the phone them.
+    // saved question's, the teacher's (L3b), and a deck's or a slide change's,
+    // the teacher's until M3b's download gives the phone a deck's.
     const errors = all.filter((f) => f.type === 'ApiErrorBody');
     expect(new Set(errors.map((f) => f.status))).toEqual(new Set([400, 401, 403, 404, 409]));
     const reasons = errors.map((f) => (f.body as ApiErrorBody).error.reason).filter(Boolean);
@@ -1121,6 +1121,10 @@ describe('the contract fixtures (contracts/fixtures)', () => {
       'saved_question_not_found',
       'deck_not_found',
       'deck_storage_off',
+      'deck_not_ready',
+      'deck_rejected',
+      'page_out_of_range',
+      'deck_in_use',
     ]);
     // Only a race reaches it: a join, rename, tap or answer whose route found the
     // account just before its deletion (C3); in sequence, the sign-in is a new account.

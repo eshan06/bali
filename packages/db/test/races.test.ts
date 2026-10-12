@@ -28,6 +28,7 @@ import {
   responses,
   savedQuestions,
   schools,
+  sessionPresentations,
   sessions,
   teacherInvites,
   users,
@@ -69,6 +70,7 @@ import {
   removeSavedQuestion,
   renameStudent,
   replaceSavedQuestion,
+  showSlide,
   startSession,
   tapIn,
   unlock,
@@ -5141,4 +5143,113 @@ describe.runIf(REAL_PG)('live lesson questions under contention (real Postgres, 
     expect(removal.value).toMatchObject({ outcome: 'removed', deck: unfinished });
     expect(one(await decksOf(late.teacherId)).removedAt).not.toBeNull();
   }, 40_000);
+
+  /** A running lesson of `seed`'s, a ready deck of its teacher's, and its slide change (M3). */
+  async function presenting(tag: string) {
+    const s = await seed(tag);
+    const session = await openSession(s.classId);
+    const { deck } = await createDeck(db, await decking(s.teacherId));
+    const verdict = { status: 'ready', pageCount: 12 } as const;
+    const ready = await completeDeck(db, { deckId: deck.id, eventId: newUuidV7(), verdict });
+    if (ready.outcome === 'deck_not_found') throw new Error(ready.outcome);
+    const show = (on: Database, change: { eventId?: string; page?: number } = {}) =>
+      showSlide(on, {
+        sessionId: session.id,
+        teacherId: s.teacherId,
+        eventId: change.eventId ?? newUuidV7(),
+        deckId: deck.id,
+        page: change.page ?? 1,
+      });
+    return { ...s, session, deck: ready.deck, show };
+  }
+  const presentationOf = async (sessionId: string) =>
+    one(
+      await db
+        .select()
+        .from(sessionPresentations)
+        .where(eq(sessionPresentations.sessionId, sessionId)),
+    );
+
+  it('a slide change racing the end of its session: ended first, it is refused; shown first, its slide_shown comes before the end (M3)', async () => {
+    // The end takes the session FOR UPDATE, a slide change FOR SHARE: whichever holds it, the other
+    // waits, so no slide is recorded in a session after its end.
+    const ended = await presenting('race-slide-end-behind');
+    const late = await behindCommit(
+      (tx) => endSession(tx, { sessionId: ended.session.id, at: new Date(), reason: 'ended' }),
+      () => ended.show(db),
+    );
+    expect(late.status).toBe('rejected');
+    expect((late as PromiseRejectedResult).reason).toMatchObject({ code: 'SESSION_NOT_RUNNING' });
+    expect(await eventsOfType(ended.session.id, 'slide_shown')).toEqual([]);
+
+    const shown = await presenting('race-slide-end-ahead');
+    const end = await behindCommit(
+      (tx) => shown.show(tx),
+      () => endSession(db, { sessionId: shown.session.id, at: new Date(), reason: 'ended' }),
+    );
+    if (end.status === 'rejected') throw end.reason as Error;
+    expect(end.value.ended).toBe(true);
+    const slide = one(await eventsOfType(shown.session.id, 'slide_shown'));
+    const over = one(await eventsOfType(shown.session.id, 'session_ended'));
+    expect(slide.seq).toBeLessThan(over.seq);
+  }, 20_000);
+
+  it('a slide change racing its deck’s removal: removed first, it finds none; shown first, the removal is deck_in_use (M3)', async () => {
+    // They meet only at the deck's row: the slide change's FOR SHARE, the removal's FOR UPDATE.
+    const removed = await presenting('race-slide-remove-behind');
+    const late = await behindCommit(
+      (tx) => removeDeck(tx, { deckId: removed.deck.id, eventId: newUuidV7() }),
+      () => removed.show(db),
+    );
+    if (late.status === 'rejected') throw late.reason as Error;
+    expect(late.value).toEqual({ outcome: 'deck_not_found' });
+    expect(await eventsOfType(removed.session.id, 'slide_shown')).toEqual([]);
+
+    const shown = await presenting('race-slide-remove-ahead');
+    const removal = await behindCommit(
+      (tx) => shown.show(tx),
+      () => removeDeck(db, { deckId: shown.deck.id, eventId: newUuidV7() }),
+    );
+    if (removal.status === 'rejected') throw removal.reason as Error;
+    expect(removal.value).toEqual({ outcome: 'deck_in_use' });
+    expect(one(await decksOf(shown.teacherId))).toEqual(shown.deck);
+  }, 20_000);
+
+  it('two deliveries of one slide change at once are one, never a 500 (M3)', async () => {
+    for (let round = 0; round < 12; round += 1) {
+      const p = await presenting(`race-slide-twice-${round}`);
+      const change = { eventId: newUuidV7(), page: 2 };
+
+      const both = await Promise.all([p.show(db, change), p.show(db, change)]);
+
+      expect(both.map((r) => r.outcome).sort()).toEqual(['replay', 'shown']);
+      expect(await eventsOfType(p.session.id, 'slide_shown')).toHaveLength(1);
+      expect(await presentationOf(p.session.id)).toMatchObject(change);
+    }
+  });
+
+  it('two slide changes at once keep the later, whichever lands first (M3, decision 4’s order)', async () => {
+    // The one behind waits on the presentation's row, then is judged against the one ahead of it by
+    // their eventIds' order, never by which landed first.
+    for (const laterFirst of [true, false]) {
+      const p = await presenting(`race-slide-order-${laterFirst}`);
+      // Minted in this order, as one teacher's two clicks.
+      const earlier = { eventId: newUuidV7(), page: 2 };
+      const later = { eventId: newUuidV7(), page: 3 };
+      const [ahead, behind] = laterFirst ? [later, earlier] : [earlier, later];
+
+      const settled = await behindCommit(
+        (tx) => p.show(tx, ahead),
+        () => p.show(db, behind),
+      );
+
+      if (settled.status === 'rejected') throw settled.reason as Error;
+      expect(settled.value.outcome).toBe(laterFirst ? 'replay' : 'shown');
+      expect(await presentationOf(p.session.id)).toMatchObject(later);
+      const shown = await eventsOfType(p.session.id, 'slide_shown');
+      expect(shown.map((e) => e.eventId)).toEqual(
+        laterFirst ? [later.eventId] : [earlier.eventId, later.eventId],
+      );
+    }
+  }, 20_000);
 });
