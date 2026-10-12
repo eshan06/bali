@@ -411,10 +411,16 @@ describe('the slide in what students read (M3b)', () => {
     const third = showing(l.cells.id, 3);
     await slide(l.token, l.session.id, third);
     // Staged: the removal itself refuses while a running session shows the deck (deck_in_use).
-    await db.update(decks).set({ removedAt: at(9) }).where(eq(decks.id, l.cells.id));
+    await db
+      .update(decks)
+      .set({ removedAt: at(9) })
+      .where(eq(decks.id, l.cells.id));
 
     expect(await slideOf(phone, l.session.id)).toBeNull();
-    expect(await snapshotOf(l.token, l.session.id)).toEqual({ slide: null, eventId: third.eventId });
+    expect(await snapshotOf(l.token, l.session.id)).toEqual({
+      slide: null,
+      eventId: third.eventId,
+    });
     const res = await download(phone, l.cells.id);
     expect(res.statusCode).toBe(404);
     expect(reasonOf(res)).toBe('deck_not_found');
