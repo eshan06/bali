@@ -376,8 +376,8 @@ public struct Presentation: Codable, Sendable, Hashable {
     /// False once the session is over by the server's clock: stop polling.
     public let running: Bool
     /// The open question, or the last closed one until another opens; nil when none was asked,
-    /// and once the session is over.
-    public let question: StudentQuestion?
+    /// and once the session is over. Settable here alone: `LiveLesson` keeps an answer's in it.
+    public internal(set) var question: StudentQuestion?
     /// The page the teacher shows (M3b), never a URL: nil while nothing is shown, once the session
     /// is over, and from an older API.
     public let slide: Slide?
@@ -422,7 +422,7 @@ public struct StudentQuestion: Codable, Sendable, Hashable {
     /// The correct option's index once the teacher's close revealed it; nil until then.
     public let correctOption: Int?
     /// The student's own answer now, if they gave one.
-    public let answer: StudentAnswer?
+    public internal(set) var answer: StudentAnswer?
 }
 
 /// A student's answer now.

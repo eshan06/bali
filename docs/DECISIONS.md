@@ -8,6 +8,31 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-12** — **The phone's live lesson in BaliCore (L5): one actor for the poll and the
+  answer, the answer kept by its id's order, a `429`'s wait bounded.** **One `LiveLesson` per
+  running session** holds both, so an answer is minted after the answer the poll holds and is kept
+  in what the poll shows. Its owner (L8) runs `run()` while the app is in front and cancels its task
+  as the app goes behind, as the engine's `run()` is run, so nothing polls behind the app by
+  construction; a read cancelled on its way changes nothing, so the card never says Bali can't be
+  reached because the app went behind. **The answer kept is the one whose id sorts last:** the
+  server replaces an answer only with a later id (decision 4), so a later id is the truth now, and a
+  read the server made before an answer landed (a poll crossing the answer on a slow network) never
+  takes it back, not even until the next read, while a laptop's later answer does. **Minted after the last
+  minted here too:** from a clock behind the held answer, two taps would both take its next
+  millisecond and sort by their random bits, so the second could lose to the first; each now takes
+  the millisecond after the last. **A `429` waits its `Retry-After`, from 2 s to a minute:** the
+  account's budget refills within its minute (the API's waits are a second or two), so a longer one,
+  none, or a date waits the minute. *Weighed:* any `Retry-After` whole, where a proxy's hour would
+  freeze a class's lesson for the hour. **Every other failure is said and tried again in 2 s**
+  (`PollProblem`), a `401`, `403`, `404` or `5xx` included: only the session's end and the owner
+  stop the poll, since the owner knows from `GET /v1/me` when the class is gone. **The answer's
+  failures** come back as `AnswerResult`, its four refusals by reason, every other status with its
+  reason, so L8 says the approved canvas's lines (Failed, Too late) and a tap sends it again; the
+  poll's no answer is its Offline card. **`EventID` moved to BaliCore** with `after:`: BaliCore
+  cannot see BaliOutbox, and every file that mints imports both. The clock is two closures, `now` and
+  `sleep`, not BaliOutbox's `SyncClock`: moving that for two calls would touch the engine and the
+  enforcer.
+
 - **2026-10-12** — **Decks in the privacy paths (M4): marked in the transaction, their objects the
   sweep's, and a delete that keeps failing put off and reported.** **The rows:** a teacher's account
   deletion (C3), the disposal (C6a) and the retention run (C6b, a teacher it de-identifies) set each
