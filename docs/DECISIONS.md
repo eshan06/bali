@@ -25,7 +25,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   if the 30 minutes have passed, else by the sweep. **The sweep's decks** (`sweepDecks`, last,
   while storage is on): one guarded statement rejects every live deck pending 24 hours since
   its create `unfinished` (`rejectUnfinishedDecks`), keeping its `eventId`, the teacher's last
-  write's, since the sweep is no one's mutation; then the 50 oldest-minted removed or rejected
+  write's, since the sweep is no one's mutation (so a create retried a day late finds its id held:
+  `409 event_id_conflict`); then the 50 oldest-minted removed or rejected
   decks no upload can write are deleted together, each stamped, so a pass stays within one
   delete's 30-second bound. A complete meeting the rejection answers it, as any of a checked
   deck. **A spent `eventId` is refused before the check** (#324's review): one read

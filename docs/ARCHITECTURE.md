@@ -1134,8 +1134,8 @@ upload can write it (decision 4) — it records a fact about storage, never a st
 other field of `decks` is written outside the engine. A create's retry records its fresh upload
 URL's mint on the deck row FOR UPDATE, after the school and the teacher; the sweep's 24-hour
 rejection is one guarded statement on the deck rows alone (M2b2). Each mutation runs in one transaction with
-a client-minted UUIDv7 `event_id`, idempotent on it: a replay writes nothing and answers the
-current truth. Locks are taken session row first, then question row, then deck row, in
+a client-minted UUIDv7 `event_id`, idempotent on it: a replay writes nothing (but a deck
+create's, its fresh upload URL's mint) and answers the current truth. Locks are taken session row first, then question row, then deck row, in
 every transition: an open takes the session row FOR UPDATE, so two opens run one at a time.
 Its two unique constraints are backstops with different outcomes, and neither is ever a
 `500`: a violation of `questions.event_id` is a replay, answered with the question that
