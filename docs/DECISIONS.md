@@ -8,6 +8,29 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-12** — **The phone's slide decks in BaliCore (M7): kept in memory for the session, a
+  bucket's refusal asked about once, nothing shown before its SHA-256 matches; the newest poll loop
+  wins.** **In memory alone, never on disk:** the decks one `LiveLesson` fetched, by `sha256`, are
+  emptied when a read says the session is over and go with the lesson when its owner drops it, as at
+  sign-out, so a crash, a kill or a lost sign-out leaves no file to sweep, and the client's
+  ephemeral, cacheless session writes none either. A deck is at most 25 MB and a lesson shows one or
+  two (a `ponytail:` note: keep only the current one if lessons ever show more). **A fresh URL for
+  each fetch, never kept,** and the bucket's `403`, which S3 answers for an expired presigned GET as
+  for an object gone (the key has no `s3:ListBucket`), asks the route once more: the route then says
+  the truth (`404` removed, `403` not shown), and a fresh URL refused again is said, never asked a
+  third time. The bytes go **with no bearer token**: the URL is its own credential, S3 refuses a
+  request carrying two, and the token stays with the API. **Nothing renders before the check:**
+  `DeckResult.ready` is the only way bytes leave, after their SHA-256 is the slide's. **One loop at
+  a time, the newest winning** (L5's WARN, the conductor's ruling): an older `run()` stops at its
+  next read and says nothing of it. *Weighed:* a second call returning at once, which after a quick
+  trip behind and back, the cancelled run still winding down, would leave the lesson unpolled.
+  **Over is over:** a read failing after one said the session is over sets no `problem`. *Not built:*
+  joining a second ask to a fetch under way (M8 asks once per deck, keyed by its `sha256`); a
+  session of its own for decks, past the transport's 30 s bound on a whole exchange (25 MB needs
+  about 7 Mbit/s a phone, and a class fetching a deck at once shares one access point, a timed-out
+  fetch starting over from its first byte: several phones at once on school Wi-Fi decide, at M8's
+  device check or M10's).
+
 - **2026-10-12** — **The phone's live lesson in BaliCore (L5): one actor for the poll and the
   answer, the answer kept by its id's order, a `429`'s wait bounded.** **One `LiveLesson` per
   running session** holds both, so an answer is minted after the answer the poll holds and is kept

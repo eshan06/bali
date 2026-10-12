@@ -15,17 +15,28 @@ private let start = Date(timeIntervalSince1970: 1_790_000_000)
 final class LessonWorld: HTTPTransport, @unchecked Sendable {
     /// One answer: a status, its headers and body — or, with no status, none at all (offline).
     /// `cancels`: the task that sent it is cancelled on its way, as the app going behind does.
+    /// `holds`: it waits on its way until the test lets it go (`release`). `echoes`: the pick its
+    /// request sent, taken, as the server answers an answer it now holds.
     struct Reply {
         var status: Int?
         var headers: [String: String] = [:]
         var body = ""
         var cancels = false
+        var holds = false
+        var echoes = false
 
         static func ok(_ body: String, etag: String? = nil) -> Reply {
             Reply(status: 200, headers: etag.map { ["ETag": $0] } ?? [:], body: body)
         }
         static let notModified = Reply(status: 304)
         static let offline = Reply(status: nil)
+        static let took = Reply(status: 200, echoes: true)
+        /// This answer, held on its way until the test lets it go.
+        var held: Reply {
+            var reply = self
+            reply.holds = true
+            return reply
+        }
     }
 
     private let lock = NSLock()
@@ -33,6 +44,7 @@ final class LessonWorld: HTTPTransport, @unchecked Sendable {
     private var time: Date
     private var requests: [URLRequest] = []
     private var waits: [TimeInterval] = []
+    private var holding: [CheckedContinuation<Void, Never>] = []
 
     init(_ replies: [Reply], now: Date = start) { (self.replies, time) = (replies, now) }
 
@@ -47,13 +59,29 @@ final class LessonWorld: HTTPTransport, @unchecked Sendable {
             return replies.isEmpty ? nil : replies.removeFirst()
         }
         let reply = try #require(next, "a request with no answer left: \(request.url!)")
+        if reply.holds {
+            await withCheckedContinuation { held in lock.withLock { holding.append(held) } }
+        }
         if reply.cancels { withUnsafeCurrentTask { $0?.cancel() } }
         guard let status = reply.status else { throw URLError(.notConnectedToInternet) }
+        var body = reply.body
+        if reply.echoes {
+            let pick = try JSONDecoder().decode(AnswerRequest.self, from: try #require(request.httpBody))
+            body = #"{"outcome":"answered","answer":{"option":\#(pick.option),"eventId":"\#(pick.eventId)"}}"#
+        }
         let response = HTTPURLResponse(
             url: try #require(request.url), statusCode: status, httpVersion: "HTTP/1.1",
             headerFields: reply.headers)
-        return (Data(reply.body.utf8), try #require(response))
+        return (Data(body.utf8), try #require(response))
     }
+
+    /// Waits until `count` answers are held on their way.
+    func held(_ count: Int) async throws {
+        while lock.withLock({ holding.count }) < count { try await Task.sleep(for: .milliseconds(1)) }
+    }
+
+    /// Lets the first answer held go on.
+    func release() { lock.withLock { holding.removeFirst() }.resume() }
 
     /// The poll's wait: noted, and the clock moved on — and, once no answer is left, a throw. A
     /// poll that never takes the answers left (no token) is stopped at 20 waits, never spun.
@@ -85,14 +113,21 @@ private func decoded(_ body: String) throws -> Presentation {
     try BaliJSON.makeDecoder().decode(Presentation.self, from: Data(body.utf8))
 }
 
-/// A running lesson's read: question `q1`, open, with the student's answer, if any.
-private func asked(answer: StudentAnswer? = nil) -> String {
+/// A running lesson's read: question `id`, open, with the student's answer, if any.
+private func asked(_ id: String = "q1", answer: StudentAnswer? = nil) -> String {
     let held = answer.map { #"{"option":\#($0.option),"eventId":"\#($0.eventId)"}"# } ?? "null"
     return #"""
-        {"running":true,"question":{"id":"q1","prompt":"Which planet is the largest?",\#
+        {"running":true,"question":{"id":"\#(id)","prompt":"Which planet is the largest?",\#
         "options":["Mars","Jupiter","Venus"],"open":true,"correctOption":null,"answer":\#(held)},\#
         "slide":null,"phone":null}
         """#
+}
+
+/// The ids of the answers `world` was sent, in the order sent.
+private func answerIDs(_ world: LessonWorld) throws -> [String] {
+    try world.sent.filter { $0.httpMethod == "POST" }.map { request in
+        try JSONDecoder().decode(AnswerRequest.self, from: try #require(request.httpBody)).eventId
+    }
 }
 
 /// A lower-case UUIDv7, as the API checks one.
@@ -244,6 +279,46 @@ struct LessonPollTests {
         #expect(world.slept == [2])
         #expect(await lesson.state.presentation == (try decoded(body)))
     }
+
+    @Test(
+        "A second run takes over: the first stops at its read, saying nothing of it, so the poll never runs twice",
+        .timeLimit(.minutes(3)))
+    func oneRunAtATime() async throws {
+        let slide = try wire("presentation/slide.json")
+        let world = LessonWorld([
+            .ok(try wire("presentation/open.json"), etag: #""a""#),
+            LessonWorld.Reply.ok(asked(), etag: #""stale""#).held,
+            .ok(slide, etag: #""b""#),
+        ])
+        let lesson = world.lesson()
+        let first = Task { await lesson.run() }
+        try await world.held(1)
+        // A second run, never cancelling the first: it reads, and waits (no answer left: stopped).
+        await lesson.run()
+        world.release()
+        await first.value
+        #expect(world.sent.count == 3)
+        // The first run's one wait, and the second's: the first never waits, nor reads, again.
+        #expect(world.slept == [2, 2])
+        #expect(await lesson.state.presentation == (try decoded(slide)))
+    }
+
+    @Test("Once a read says the session is over, a read failing after it says nothing: over, never unreachable")
+    func overStaysOver() async throws {
+        let over = try wire("presentation/over.json")
+        let world = LessonWorld([.ok(over, etag: #""b""#)])
+        let lesson = world.lesson()
+        await lesson.run()
+        for reply in [LessonWorld.Reply.offline, LessonWorld.Reply(status: 500)] {
+            world.then(reply)
+            await lesson.run()
+            let state = await lesson.state
+            #expect(state.problem == nil)
+            #expect(state.presentation == (try decoded(over)))
+        }
+        #expect(world.sent.count == 3)
+        #expect(world.slept.isEmpty)
+    }
 }
 
 @Suite("A live lesson's answer")
@@ -354,6 +429,205 @@ struct LessonAnswerTests {
         world.then(.ok(#"{"outcome":"replay","answer":{"option":1,"eventId":"\#(mine.eventId)"}}"#))
         #expect(await lesson.answer(question: "q1", option: 1) == .answered(mine))
         #expect(await lesson.state.presentation?.question?.answer == laptop)
+    }
+
+    @Test("A pick on one question never shows as the answer to the next: not through a read, nor landing late")
+    func twoQuestions() async throws {
+        let world = LessonWorld([.ok(asked(), etag: #""a""#)])
+        let lesson = world.lesson()
+        await lesson.run()
+        world.then(.took)
+        guard case .answered(let mine) = await lesson.answer(question: "q1", option: 1) else {
+            Issue.record("the pick on q1 was not taken")
+            return
+        }
+        #expect(await lesson.state.presentation?.question?.answer == mine)
+
+        // The teacher opens q2: its read shows no answer yet.
+        world.then(.ok(asked("q2"), etag: #""b""#))
+        await lesson.run()
+        #expect(await lesson.state.presentation?.question?.id == "q2")
+        #expect(await lesson.state.presentation?.question?.answer == nil)
+
+        // A tap on q1's card made before it changed, landing now: taken, and kept off q2's card.
+        world.then(.took)
+        let late = await lesson.answer(question: "q1", option: 2)
+        #expect(late == .answered(StudentAnswer(option: 2, eventId: try answerIDs(world)[1])))
+        #expect(await lesson.state.presentation?.question?.answer == nil)
+    }
+
+    @Test(
+        "An answer landing while a poll is out stays on the card when that poll's older read comes back",
+        .timeLimit(.minutes(3)))
+    func answerDuringPoll() async throws {
+        // The second read is the server's from before the answer landed: it holds none.
+        let world = LessonWorld([
+            .ok(asked(), etag: #""a""#), LessonWorld.Reply.ok(asked(), etag: #""b""#).held, .took,
+        ])
+        let lesson = world.lesson()
+        let polling = Task { await lesson.run() }
+        try await world.held(1)
+        guard case .answered(let mine) = await lesson.answer(question: "q1", option: 1) else {
+            Issue.record("the pick was not taken")
+            return
+        }
+        world.release()
+        await polling.value
+        #expect(await lesson.state.presentation?.question?.answer == mine)
+    }
+
+    @Test(
+        "Two quick taps from a clock a minute behind land in order: the second minted after the first, and kept whichever answer comes back last",
+        .timeLimit(.minutes(3)))
+    func quickTaps() async throws {
+        let held = StudentAnswer(option: 0, eventId: EventID.mint(at: start + 60))
+        let world = LessonWorld([.ok(asked(answer: held), etag: #""a""#)], now: start)
+        let lesson = world.lesson()
+        await lesson.run()
+        world.then(LessonWorld.Reply.took.held, .took)
+        let first = Task { await lesson.answer(question: "q1", option: 2) }
+        try await world.held(1)
+        let second = await lesson.answer(question: "q1", option: 1)
+        world.release()
+        let answered = await first.value
+
+        let ids = try answerIDs(world)
+        let held48 = try #require(time(held.eventId))
+        #expect(ids.map(time) == [held48 + 1, held48 + 2])
+        #expect(answered == .answered(StudentAnswer(option: 2, eventId: ids[0])))
+        #expect(second == .answered(StudentAnswer(option: 1, eventId: ids[1])))
+        // The first tap's answer came back last; the second's, sorting after it, is the one kept.
+        #expect(
+            await lesson.state.presentation?.question?.answer
+                == StudentAnswer(option: 1, eventId: ids[1]))
+    }
+}
+
+/// A deck's bytes in a test, and their SHA-256 as the API gives a slide's.
+private let pdf = "%PDF-1.7 Factoring quadratics"
+private let pdfSHA256 = "bb00f1264482b1749c27e894811b96e133b8f53a83f9794981f20455b7037afc"
+
+/// A page of that deck, shown.
+private func slide(page: Int = 4) -> Slide {
+    Slide(deckId: "d1", sha256: pdfSHA256, page: page, pageCount: 12)
+}
+
+/// The bucket's answer: the deck's bytes.
+private let bucket = LessonWorld.Reply(status: 200, body: pdf)
+
+/// Where the download fixture sends the phone, and where the route is.
+private let fixtureURL =
+    "https://deck-storage.invalid/decks%2F00000000-0000-7000-8000-000000000001.pdf?signature=fixture"
+private let route = "https://api.bali.test/v1/decks/d1/download"
+
+@Suite("A slide's deck")
+struct LessonDeckTests {
+    @Test("It asks for a URL, fetches the bytes with no token, and keeps them: the next page asks nothing")
+    func fetchesAndKeeps() async throws {
+        let world = LessonWorld([.ok(try wire("download/shown.json")), bucket])
+        let lesson = world.lesson()
+        #expect(await lesson.deck(for: slide(page: 4)) == .ready(Data(pdf.utf8)))
+        #expect(await lesson.deck(for: slide(page: 5)) == .ready(Data(pdf.utf8)))
+
+        let sent = world.sent
+        #expect(sent.map(\.url?.absoluteString) == [route, fixtureURL])
+        #expect(sent.map(\.httpMethod) == ["GET", "GET"])
+        #expect(sent.map { $0.value(forHTTPHeaderField: "Authorization") } == ["Bearer t", nil])
+    }
+
+    @Test("Bytes whose SHA-256 is not the slide's are refused and kept nowhere: the next ask fetches again")
+    func mismatch() async throws {
+        let shown = LessonWorld.Reply.ok(try wire("download/shown.json"))
+        let world = LessonWorld([
+            shown, LessonWorld.Reply(status: 200, body: "%PDF-1.7 Something else"), shown, bucket,
+        ])
+        let lesson = world.lesson()
+        #expect(await lesson.deck(for: slide()) == .mismatch)
+        #expect(await lesson.deck(for: slide()) == .ready(Data(pdf.utf8)))
+        #expect(world.sent.count == 4)
+    }
+
+    @Test("A URL the bucket refuses, as it refuses one expired, is asked for again once; refused again, it is said")
+    func expired() async throws {
+        let expired = LessonWorld.Reply(
+            status: 403,
+            body: "<Error><Code>AccessDenied</Code><Message>Request has expired</Message></Error>")
+        let freshURL = "https://deck-storage.invalid/decks%2Fd1.pdf?signature=fresh"
+        let fresh = LessonWorld.Reply.ok(#"{"url":"\#(freshURL)"}"#)
+        let world = LessonWorld([.ok(try wire("download/shown.json")), expired, fresh, bucket])
+        #expect(await world.lesson().deck(for: slide()) == .ready(Data(pdf.utf8)))
+        #expect(world.sent.map(\.url?.absoluteString) == [route, fixtureURL, route, freshURL])
+
+        // The fresh URL refused too: said, and never asked for a third time.
+        world.then(fresh, expired, fresh, expired)
+        #expect(await world.lesson().deck(for: slide()) == .refused(status: 403, reason: nil))
+        #expect(world.sent.count == 8)
+    }
+
+    @Test(
+        "Each refusal of the download is said by its status and reason, asked once, and kept nowhere",
+        arguments: [
+            ("download/403-not-shown.json", DeckResult.refused(status: 403, reason: nil)),
+            ("download/404-deck-not-found.json", .refused(status: 404, reason: .deckNotFound)),
+            ("download/503-deck-storage-off.json", .refused(status: 503, reason: .deckStorageOff)),
+        ])
+    func refusals(fixture: String, result: DeckResult) async throws {
+        let refusal = LessonWorld.Reply(status: try Contract.load(fixture).status, body: try wire(fixture))
+        let world = LessonWorld([refusal, refusal])
+        let lesson = world.lesson()
+        #expect(await lesson.deck(for: slide()) == result)
+        #expect(await lesson.deck(for: slide()) == result)
+        #expect(world.sent.count == 2)
+    }
+
+    @Test("No answer, an answer it cannot read, or the bucket's own refusal is said; with no token nothing is sent")
+    func failures() async throws {
+        let shown = LessonWorld.Reply.ok(try wire("download/shown.json"))
+        let elsewhere = LessonWorld.Reply(status: 302, headers: ["Location": "https://elsewhere.test/"])
+        let cases: [([LessonWorld.Reply], DeckResult)] = [
+            ([.offline], .unreachable(.unreachable)),
+            ([.ok("<html>OK</html>")], .refused(status: 200, reason: nil)),
+            ([shown, .offline], .unreachable(.unreachable)),
+            ([shown, LessonWorld.Reply(status: 500)], .refused(status: 500, reason: nil)),
+            ([shown, elsewhere], .refused(status: 302, reason: nil)),
+        ]
+        for (replies, result) in cases {
+            let world = LessonWorld(replies)
+            #expect(await world.lesson().deck(for: slide()) == result)
+            #expect(world.sent.count == replies.count)
+        }
+        let signedOut = LessonWorld([])
+        #expect(await signedOut.lesson(token: nil).deck(for: slide()) == .unreachable(.noToken))
+        #expect(signedOut.sent.isEmpty)
+    }
+
+    @Test("The session's end empties what it kept: once a read says it is over, the deck is asked for again")
+    func sessionEnd() async throws {
+        let world = LessonWorld([.ok(try wire("download/shown.json")), bucket])
+        let lesson = world.lesson()
+        #expect(await lesson.deck(for: slide()) == .ready(Data(pdf.utf8)))
+        world.then(.ok(try wire("presentation/over.json"), etag: #""b""#))
+        await lesson.run()
+
+        world.then(LessonWorld.Reply(status: 403, body: try wire("download/403-not-shown.json")))
+        #expect(await lesson.deck(for: slide()) == .refused(status: 403, reason: nil))
+        #expect(world.sent.count == 4)
+    }
+
+    @Test("A deck still on its way when the session ends goes to its asker, and is kept nowhere", .timeLimit(.minutes(3)))
+    func endsMidFetch() async throws {
+        let world = LessonWorld([.ok(try wire("download/shown.json")), bucket.held])
+        let lesson = world.lesson()
+        let fetching = Task { await lesson.deck(for: slide()) }
+        try await world.held(1)
+        world.then(.ok(try wire("presentation/over.json"), etag: #""b""#))
+        await lesson.run()
+        world.release()
+        #expect(await fetching.value == .ready(Data(pdf.utf8)))
+
+        world.then(LessonWorld.Reply(status: 403, body: try wire("download/403-not-shown.json")))
+        #expect(await lesson.deck(for: slide()) == .refused(status: 403, reason: nil))
+        #expect(world.sent.count == 4)
     }
 }
 
