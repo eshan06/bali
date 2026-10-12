@@ -42,11 +42,14 @@ const ACCOUNT_PER_SECOND = 2;
 const FLOOD_ANSWERED_MAX = ACCOUNT_BURST + ACCOUNT_PER_SECOND * FLOOD_SECONDS + 5;
 /**
  * The live lesson: the first 5 teachers' classes, each device opening it within 30 s of the bell,
- * as a phone learns of its session at its next 30 s read, and polling every 2 s to the end. A
- * student's two devices spend 60 a minute of their account's 120, beside the check-ins' 2, so not
- * one of their requests may be refused.
+ * as a phone learns of its session at its next 30 s read, and polling every 2 s to the end. None
+ * in the bell's first 5 s, while the Starts hold the database's 10 connections: there the devices'
+ * first reads pushed the Starts' p95 toward its 1 s (DECISIONS, W1). A student's two devices spend
+ * 60 a minute of their account's 120, beside the check-ins' 2, so not one of their requests may be
+ * refused.
  */
 const LESSON_CLASSES = 5;
+const OPEN_AFTER = 5;
 const OPEN_WITHIN = 30;
 const POLL = 2;
 /** The fewest polls a device makes, opening the lesson at the latest, less a few in hand. */
@@ -208,16 +211,16 @@ export function teacher() {
 }
 
 /**
- * A live lesson's phone or laptop: it opens the lesson within `OPEN_WITHIN` s of the bell, finds its
- * class's running session as the student's home does, in `GET /v1/me`, and polls the presentation
- * every 2 s with the ETag it last got, as the phone and the student web do. The phone answers the
- * question once it shows.
+ * A live lesson's phone or laptop: it opens the lesson between `OPEN_AFTER` and `OPEN_WITHIN` s
+ * after the bell, finds its class's running session as the student's home does, in `GET /v1/me`,
+ * and polls the presentation every 2 s with the ETag it last got, as the phone and the student web
+ * do. The phone answers the question once it shows.
  */
 export function device() {
   const i = exec.scenario.iterationInTest;
   const s = followers[Math.floor(i / 2)];
   const isPhone = i % 2 === 0;
-  until(BELL + Math.random() * OPEN_WITHIN);
+  until(BELL + OPEN_AFTER + Math.random() * (OPEN_WITHIN - OPEN_AFTER));
 
   let session = null;
   for (let at = elapsed(); session === null && at < END; at += POLL) {
