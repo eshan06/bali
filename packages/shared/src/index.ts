@@ -233,10 +233,11 @@ export const QUESTION_OPTIONS_MAX = 6;
 
 /**
  * A slide deck as decision 8 bounds it (the owner's picks, 2026-10-09): at most 25 MB, refused
- * before any upload URL is minted, and a title of one line in code points. What the create checks
- * (M2), and what the portal's upload holds to.
+ * before any upload URL is minted, at most 200 pages, which its check holds it to, and a title of
+ * one line in code points. What the create and the check hold to (M2), and the portal's upload.
  */
 export const DECK_MAX_BYTES = 25 * 1024 * 1024;
+export const DECK_MAX_PAGES = 200;
 export const DECK_TITLE_MAX_LENGTH = 200;
 
 /**

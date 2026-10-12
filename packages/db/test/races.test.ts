@@ -48,6 +48,7 @@ import {
   changeUnlockReason,
   checkIn,
   closeQuestion,
+  completeDeck,
   createDeck,
   createSavedQuestion,
   deleteAccount,
@@ -4941,6 +4942,47 @@ describe.runIf(REAL_PG)('live lesson questions under contention (real Postgres, 
       expect(all.map((r) => r.outcome).sort()).toEqual(
         won ?? ['deck_not_found', 'deck_not_found', 'removed'],
       );
+    }
+  });
+
+  it('two completes of one deck at once record one verdict: the other answers it (M2b)', async () => {
+    for (let round = 0; round < 12; round += 1) {
+      const { teacherId } = await seed(`race-deck-complete-${round}`);
+      const { deck } = await createDeck(db, await decking(teacherId));
+      const ready = { eventId: newUuidV7(), verdict: { status: 'ready', pageCount: 3 } as const };
+      const rejected = {
+        eventId: newUuidV7(),
+        verdict: { status: 'rejected', rejection: 'too_slow' } as const,
+      };
+
+      const both = await Promise.all(
+        [ready, rejected].map((complete) => completeDeck(db, { deckId: deck.id, ...complete })),
+      );
+
+      expect(both.map((r) => r.outcome).sort()).toEqual(['checked', 'replay']);
+      const [row] = await decksOf(teacherId);
+      const won = row!.eventId === ready.eventId ? ready : rejected;
+      expect(row).toMatchObject({ eventId: won.eventId, status: won.verdict.status });
+      expect(both.map((r) => ('deck' in r ? r.deck : r))).toEqual([row, row]);
+    }
+  });
+
+  it('a complete racing its deck’s removal: removed first, it finds none; checked first, the removal takes the checked deck (M2b)', async () => {
+    for (let round = 0; round < 12; round += 1) {
+      const { teacherId } = await seed(`race-deck-complete-remove-${round}`);
+      const { deck } = await createDeck(db, await decking(teacherId));
+      const verdict = { status: 'ready', pageCount: 3 } as const;
+
+      const [completed, removed] = await Promise.all([
+        completeDeck(db, { deckId: deck.id, eventId: newUuidV7(), verdict }),
+        removeDeck(db, { deckId: deck.id, eventId: newUuidV7() }),
+      ]);
+
+      expect(removed.outcome).toBe('removed');
+      const [row] = await decksOf(teacherId);
+      expect(row!.removedAt).not.toBeNull();
+      expect(['deck_not_found', 'checked']).toContain(completed.outcome);
+      expect(row!.status).toBe(completed.outcome === 'checked' ? 'ready' : 'pending');
     }
   });
 

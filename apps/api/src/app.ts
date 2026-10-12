@@ -7,6 +7,7 @@ import { registerAuth } from './auth/plugin.js';
 import { createCognitoVerifier, type TokenVerifier } from './auth/verify.js';
 import { cognitoDeleter } from './cognito/admin.js';
 import { signInDeletions } from './cognito/sign-in-deletion.js';
+import { type ParsePdf, parsePdf } from './deck-check.js';
 import { type DeckStorage, s3DeckStorage } from './deck-storage.js';
 import type { Env } from './env.js';
 import { registerErrors, routerRefusal } from './errors.js';
@@ -80,6 +81,11 @@ export interface AppDeps {
    * S3 bucket `DECK_BUCKET` names, or none while that is unset.
    */
   deckStorage?: DeckStorage;
+  /**
+   * How a deck's PDF is parsed (M2b): tests inject a parser that stalls. Unset, `parsePdf`: PDF.js
+   * in a worker thread under its time limit.
+   */
+  parsePdf?: ParsePdf;
 }
 
 /**
@@ -176,7 +182,7 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
   registerReportsRoutes(app, deps.db, clock);
   registerBlocksRoutes(app, deps.db);
   registerQuestionsRoutes(app, deps.db, clock);
-  registerDecksRoutes(app, deps.db, clock);
+  registerDecksRoutes(app, deps.db, clock, deps.parsePdf ?? ((bytes) => parsePdf(bytes)));
   registerFeedRoutes(app, deps.db, clock, deps.stream);
   registerInternalRoutes(app, env.INTERNAL_API_KEY);
 

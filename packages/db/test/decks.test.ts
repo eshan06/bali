@@ -20,6 +20,7 @@ import {
   answerQuestion,
   armTap,
   closeQuestion,
+  completeDeck,
   createDeck,
   createSavedQuestion,
   deleteAccount,
@@ -37,9 +38,9 @@ import {
 import type { Database } from '../src/types.js';
 
 /*
- * A teacher's slide decks in the engine (Phase 7, M2; ARCHITECTURE, "Live lesson", decisions 4
- * and 5): a create and a removal, each idempotent on the deck's eventId, and that id spent both
- * ways with every other mutation's. The routes and the stored object are apps/api's, the races
+ * A teacher's slide decks in the engine (Phase 7, M2; ARCHITECTURE, "Live lesson", decisions 4, 5
+ * and 6): a create, a removal and a complete's verdict, each idempotent on the deck's eventId, and
+ * that id spent both ways with every other mutation's. The routes and the stored object are apps/api's, the races
  * races.test.ts's.
  */
 
@@ -133,6 +134,7 @@ describe('a teacher’s decks (decision 4)', () => {
       bytes: 1_000,
       pageCount: null,
       status: 'pending',
+      rejection: null,
       eventId,
       createdAt: at(5),
       removedAt: null,
@@ -204,6 +206,61 @@ describe('a teacher’s decks (decision 4)', () => {
     await stampObjectDeleted(db, deck.id, at(12));
 
     expect(await decksOf(teacher.id)).toEqual([{ ...deck, objectDeletedAt: at(9) }]);
+  });
+});
+
+describe('a deck’s verdict (decision 6)', () => {
+  it('records ready with its pages, or rejected with why, under the complete’s eventId; never another', async () => {
+    const { teacher } = await school('k-complete');
+    const taken = await written(add(teacher, 5));
+    const refused = await written(add(teacher, 5));
+    const first = newUuidV7();
+
+    const ready = await written(
+      completeDeck(db, {
+        deckId: taken.id,
+        eventId: first,
+        verdict: { status: 'ready', pageCount: 12 },
+      }),
+    );
+    const rejected = await written(
+      completeDeck(db, {
+        deckId: refused.id,
+        eventId: newUuidV7(),
+        verdict: { status: 'rejected', rejection: 'encrypted' },
+      }),
+    );
+
+    expect(ready).toEqual({ ...taken, status: 'ready', pageCount: 12, eventId: first });
+    expect(rejected).toMatchObject({ status: 'rejected', rejection: 'encrypted', pageCount: null });
+    // One-way: its replay, and a later complete with another verdict, answer the first.
+    for (const again of [
+      { eventId: first, verdict: { status: 'rejected', rejection: 'too_slow' } as const },
+      { eventId: newUuidV7(), verdict: { status: 'ready', pageCount: 3 } as const },
+    ]) {
+      expect(await completeDeck(db, { deckId: taken.id, ...again })).toEqual({
+        outcome: 'replay',
+        deck: ready,
+      });
+    }
+    expect(await db.select().from(events).where(eq(events.eventId, first))).toEqual([]);
+    expect(await decksOf(teacher.id)).toEqual(expect.arrayContaining([ready, rejected]));
+  });
+
+  it('finds none once removed, and refuses its own create’s id: it is the create’s, never this', async () => {
+    const { teacher } = await school('k-complete-refused');
+    const deck = await written(add(teacher, 5));
+    const verdict = { status: 'ready', pageCount: 1 } as const;
+
+    await expect(
+      completeDeck(db, { deckId: deck.id, eventId: deck.eventId, verdict }),
+    ).rejects.toMatchObject(conflict);
+    await removeDeck(db, { deckId: deck.id, eventId: newUuidV7() });
+    for (const deckId of [deck.id, newUuidV7()]) {
+      expect(await completeDeck(db, { deckId, eventId: newUuidV7(), verdict })).toEqual(notFound);
+    }
+
+    expect(await decksOf(teacher.id)).toMatchObject([{ status: 'pending', pageCount: null }]);
   });
 });
 
@@ -292,9 +349,13 @@ describe('a deck’s eventId, spent both ways (settled 2026-10-10)', () => {
     const mine = await written(add(teacher, 7));
     const theirs = await written(add(other, 7));
 
+    const verdict = { status: 'ready', pageCount: 3 } as const;
     for (const eventId of [tap, question.eventId, answer, draft, theirs.eventId]) {
       await expect(add(teacher, 8, eventId)).rejects.toMatchObject(conflict);
       await expect(removeDeck(db, { deckId: mine.id, eventId })).rejects.toMatchObject(conflict);
+      await expect(completeDeck(db, { deckId: mine.id, eventId, verdict })).rejects.toMatchObject(
+        conflict,
+      );
     }
 
     expect(await decksOf(teacher.id)).toEqual([mine]);

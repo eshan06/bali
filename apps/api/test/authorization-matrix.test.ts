@@ -137,6 +137,7 @@ const MATRIX = {
   'GET /v1/decks':                          [401, 401, 403,     403,     200,     200],
   'POST /v1/decks':                         [401, 401, 403,     403,     200,     200],
   'DELETE /v1/decks/:id':                   [401, 401, 403,     403,     403,     200],
+  'POST /v1/decks/:id/complete':            [401, 401, 403,     403,     403,     200],
 } as const satisfies Record<string, readonly number[]>;
 type RouteKey = keyof typeof MATRIX;
 
@@ -337,6 +338,11 @@ const REQUESTS: Record<RouteKey, (w: World) => Sent | Promise<Sent>> = {
     body: { eventId: newUuidV7(), title: 'Cells', bytes: 1_000, sha256: 'c'.repeat(64) },
   }),
   'DELETE /v1/decks/:id': (w) => ({ url: `/v1/decks/${w.deckId}`, body: { eventId: newUuidV7() } }),
+  // Nothing uploaded: the owner's is checked, and rejected `unfinished` (M2b).
+  'POST /v1/decks/:id/complete': (w) => ({
+    url: `/v1/decks/${w.deckId}/complete`,
+    body: { eventId: newUuidV7() },
+  }),
 };
 
 /** The matrix's key for `route`: a HEAD is its GET's. */

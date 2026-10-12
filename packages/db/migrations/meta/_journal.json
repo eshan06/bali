@@ -169,6 +169,13 @@
       "when": 1791771956898,
       "tag": "0023_decks",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791776728515,
+      "tag": "0024_deck_rejection",
+      "breakpoints": true
     }
   ]
 }
