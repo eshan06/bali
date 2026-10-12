@@ -9,9 +9,11 @@ import http from 'k6/http';
  * address. The 600 tap within the minute before it, so each waits; each teacher's Start joins
  * their 30 at the bell, and every class starts, for `load:sweep` to end all 30. Each phone then
  * reads the truth every 30 s (decision 7): `GET /v1/me` while it waits, a check-in once joined.
- * Five of the classes follow a live lesson (Phase 7, L4b): their teacher asks a question once the
- * Start has joined them, and each student follows it on a phone and a laptop, each polling the
- * presentation every 2 s beside the check-ins; each phone answers it once.
+ * Ten of the classes follow a live lesson (Phase 7, L4b, M9): their teacher asks a question and
+ * shows a page of a deck once the Start has joined them, and each student follows it on a phone
+ * and a laptop, each polling the presentation every 2 s beside the check-ins and asking once for
+ * the download of the deck its slide names; each phone answers the question once. Five classes'
+ * devices open the lesson 5 to 30 s after the bell, five classes' together at it, beside the Starts.
  * Meanwhile one account asks `GET /v1/me` 50 times a second. Thresholds below; why: DECISIONS.
  */
 
@@ -33,6 +35,8 @@ const LESSON = { durationMinutes: 50 };
 const P95_MS = 500;
 /** A Start joins its 30 in one transaction, the bell's 30 Starts sharing 10 connections. */
 const START_P95_MS = 1000;
+/** Each teacher starts within this many seconds of the bell. */
+const START_WITHIN = 2;
 /** The flood: one account at 50 a second for a minute, against its budget (`BUDGETS.account`). */
 const FLOOD_RATE = 50;
 const FLOOD_SECONDS = 60;
@@ -54,17 +58,30 @@ const OPEN_WITHIN = 30;
 const POLL = 2;
 /** The fewest polls a device makes, opening the lesson at the latest, less a few in hand. */
 const DEVICE_POLLS = Math.floor((END - BELL - OPEN_WITHIN) / POLL) - 5;
+/**
+ * The bell's lesson (M9): the next 5 teachers' classes, whose devices open it together, within the
+ * Starts' own 2 s, as a push at the Start would bring them. Their first reads (`kind:open`) meet the
+ * Starts on the database's 10 connections, so they have a threshold of their own, chosen from CI's
+ * numbers (DECISIONS, M9); every other threshold holds them too.
+ */
+const BELL_CLASSES = 5;
+const OPEN_P95_MS = P95_MS;
 
 const school = (key) => new SharedArray(key, () => [JSON.parse(open(SCHOOL_FILE))[key]].flat());
 const students = school('students');
 const teachers = school('teachers');
 const flooder = school('flooder')[0];
-/** The live lesson's students, each a phone and a laptop following it. */
-const followers = new SharedArray('followers', () => {
-  const { teachers: all, students: everyone } = JSON.parse(open(SCHOOL_FILE));
-  const following = new Set(all.slice(0, LESSON_CLASSES).map((t) => t.classId));
-  return everyone.filter((s) => following.has(s.classId));
-});
+/** A lesson's students, the classes of teachers `from` to `to`, each a phone and a laptop. */
+const following = (key, from, to) =>
+  new SharedArray(key, () => {
+    const { teachers: all, students: everyone } = JSON.parse(open(SCHOOL_FILE));
+    const lesson = new Set(all.slice(from, to).map((t) => t.classId));
+    return everyone.filter((s) => lesson.has(s.classId));
+  });
+const followers = following('followers', 0, LESSON_CLASSES);
+const bellFollowers = following('bell followers', LESSON_CLASSES, LESSON_CLASSES + BELL_CLASSES);
+const lessons = LESSON_CLASSES + BELL_CLASSES;
+const studentsFollowing = followers.length + bellFollowers.length;
 const classSize = {};
 for (const s of students) classSize[s.classId] = (classSize[s.classId] || 0) + 1;
 const classes = teachers.length + [...teachers].filter((t) => t.secondClassId).length;
@@ -91,6 +108,14 @@ export const options = {
       executor: 'per-vu-iterations',
       exec: 'device',
       vus: followers.length * 2,
+      iterations: 1,
+      maxDuration: `${END + 60}s`,
+      tags: { who: 'school' },
+    },
+    bell: {
+      executor: 'per-vu-iterations',
+      exec: 'bellDevice',
+      vus: bellFollowers.length * 2,
       iterations: 1,
       maxDuration: `${END + 60}s`,
       tags: { who: 'school' },
@@ -122,11 +147,18 @@ export const options = {
     'http_req_duration{kind:checkin}': [`p(95)<${P95_MS}`],
     'http_req_duration{kind:poll}': [`p(95)<${P95_MS}`],
     'http_req_duration{kind:answer}': [`p(95)<${P95_MS}`],
-    // The live lesson's are the school's, so none refused; and each class asked, each phone
-    // answered once, every device polling to the end.
-    'http_reqs{kind:ask}': [`count==${LESSON_CLASSES}`],
-    'http_reqs{kind:answer}': [`count==${followers.length}`],
-    'http_reqs{kind:poll}': [`count>=${followers.length * 2 * DEVICE_POLLS}`],
+    'http_req_duration{kind:ask}': [`p(95)<${P95_MS}`],
+    'http_req_duration{kind:slide}': [`p(95)<${P95_MS}`],
+    'http_req_duration{kind:download}': [`p(95)<${P95_MS}`],
+    'http_req_duration{kind:open}': [`p(95)<${OPEN_P95_MS}`],
+    // The live lesson's are the school's, so none refused; and each class asked and shown a
+    // slide, each phone answered once, each device asked for the deck once and polled to the end
+    // (each device's own count is a check, in `follow`).
+    'http_reqs{kind:ask}': [`count==${lessons}`],
+    'http_reqs{kind:slide}': [`count==${lessons}`],
+    'http_reqs{kind:answer}': [`count==${studentsFollowing}`],
+    'http_reqs{kind:download}': [`count==${studentsFollowing * 2}`],
+    'http_reqs{kind:poll}': [`count>=${studentsFollowing * 2 * DEVICE_POLLS}`],
     // The flood: stopped by its own budget, every refusal a 429 with a Retry-After. No more
     // answered than the budget allows, so a raised budget fails; and every request sent, so a
     // slow API can't thin the flood into passing (no scenario may drop one).
@@ -187,23 +219,27 @@ export function phone() {
 }
 
 /**
- * A teacher at the bell: Start, which joins everyone waiting, and a live lesson's question; then
- * their second class.
+ * A teacher at the bell: Start, which joins everyone waiting, and a live lesson's question and
+ * the first page of their deck; then their second class.
  */
 export function teacher() {
   const i = exec.scenario.iterationInTest;
   const t = teachers[i];
-  sleep(Math.random() * 2);
+  sleep(Math.random() * START_WITHIN);
   const start = (id) => request('start', 'POST', `/v1/classes/${id}/sessions`, t.token, LESSON);
   const joins = (n) => (r) =>
     r.status === 200 && r.json('outcome') === 'created' && r.json('armedConverted') === n;
   const bell = start(t.classId);
   check(bell, { 'the Start joins everyone waiting': joins(classSize[t.classId]) });
-  if (i < LESSON_CLASSES) {
+  if (i < lessons) {
+    const session = `/v1/sessions/${bell.json('session.id')}`;
     const question = { eventId: uuidv7(), prompt: 'Which is prime?', options: ['4', '6', '7'] };
-    const path = `/v1/sessions/${bell.json('session.id')}/questions`;
-    check(request('ask', 'POST', path, t.token, question), {
+    check(request('ask', 'POST', `${session}/questions`, t.token, question), {
       'the question opens': (r) => r.status === 200 && r.json('outcome') === 'opened',
+    });
+    const shown = { eventId: uuidv7(), deckId: t.deckId, page: 1 };
+    check(request('slide', 'POST', `${session}/slide`, t.token, shown), {
+      'the slide shows': (r) => r.status === 200 && r.json('slide.deckId') === t.deckId,
     });
   }
   if (t.secondClassId)
@@ -211,21 +247,19 @@ export function teacher() {
 }
 
 /**
- * A live lesson's phone or laptop: it opens the lesson between `OPEN_AFTER` and `OPEN_WITHIN` s
- * after the bell, finds its class's running session as the student's home does, in `GET /v1/me`,
- * and polls the presentation every 2 s with the ETag it last got, as the phone and the student web
- * do. The phone answers the question once it shows.
+ * A live lesson's phone or laptop: it opens the lesson at `openAt` s, finds its class's running
+ * session as the student's home does, in `GET /v1/me` (tagged `opening`), and polls the presentation
+ * every 2 s with the ETag it last got, as the phone and the student web do, asking once for the
+ * download of the deck its slide names, as both do for a deck they don't hold. The phone answers
+ * the question once it shows.
  */
-export function device() {
-  const i = exec.scenario.iterationInTest;
-  const s = followers[Math.floor(i / 2)];
-  const isPhone = i % 2 === 0;
-  until(BELL + OPEN_AFTER + Math.random() * (OPEN_WITHIN - OPEN_AFTER));
+function follow(s, isPhone, openAt, opening) {
+  until(openAt);
 
   let session = null;
   for (let at = elapsed(); session === null && at < END; at += POLL) {
     until(at);
-    const me = request('me', 'GET', '/v1/me', s.token);
+    const me = request(opening, 'GET', '/v1/me', s.token);
     check(me, { 'the truth is read': (r) => r.status === 200 });
     const own = me.status === 200 && me.json('classes').find((c) => c.id === s.classId);
     session = own && own.liveSession ? own.liveSession.id : null;
@@ -234,10 +268,13 @@ export function device() {
 
   let etag = null;
   let answered = false;
+  let downloaded = false;
+  let polls = 0;
   for (let at = elapsed(); session !== null && at < END; at += POLL) {
     until(at);
     const sent = etag === null ? {} : { 'If-None-Match': etag };
     const r = request('poll', 'GET', `/v1/sessions/${session}/presentation`, s.token, null, sent);
+    polls += 1;
     check(r, {
       'a poll shows the lesson under its ETag, or 304 while it is unchanged': (res) =>
         (res.status === 200 && res.json('running') === true && Boolean(res.headers.Etag)) ||
@@ -245,6 +282,14 @@ export function device() {
     });
     if (r.status !== 200) continue;
     etag = r.headers.Etag;
+    const slide = r.json('slide');
+    if (!downloaded && slide !== null) {
+      downloaded = true;
+      check(request('download', 'GET', `/v1/decks/${slide.deckId}/download`, s.token), {
+        'the deck the slide names downloads': (res) =>
+          res.status === 200 && Boolean(res.json('url')),
+      });
+    }
     const question = r.json('question');
     if (isPhone && !answered && question !== null && question.open && question.answer === null) {
       answered = true;
@@ -257,7 +302,27 @@ export function device() {
       });
     }
   }
+  check(polls, { 'each device polls every 2 s to the end': (n) => n >= DEVICE_POLLS });
+  check(downloaded, { 'each device asks for the deck its slide names': (d) => d });
   if (isPhone) check(answered, { 'each phone answers the question': (a) => a });
+}
+
+/** A device of the first lessons, opening it between `OPEN_AFTER` and `OPEN_WITHIN` s after the bell. */
+export function device() {
+  const i = exec.scenario.iterationInTest;
+  const openAt = BELL + OPEN_AFTER + Math.random() * (OPEN_WITHIN - OPEN_AFTER);
+  follow(followers[Math.floor(i / 2)], i % 2 === 0, openAt, 'me');
+}
+
+/** A device of the bell's lessons, opening it within the Starts' own seconds (M9). */
+export function bellDevice() {
+  const i = exec.scenario.iterationInTest;
+  follow(
+    bellFollowers[Math.floor(i / 2)],
+    i % 2 === 0,
+    BELL + Math.random() * START_WITHIN,
+    'open',
+  );
 }
 
 /** The flooder: one account's `GET /v1/me`, answered or refused with when to try again. */

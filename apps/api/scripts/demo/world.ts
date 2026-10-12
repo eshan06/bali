@@ -6,6 +6,7 @@ import type { AddressInfo } from 'node:net';
 
 import { buildApp } from '../../src/app.js';
 import { createVerifier } from '../../src/auth/verify.js';
+import { memoryDeckStorage } from '../../src/deck-storage.js';
 import type { Env } from '../../src/env.js';
 import { type CognitoCredentials, fetchCognitoAccessToken } from './cognito.js';
 import { type Call, createCall, normalizeBase } from './http.js';
@@ -65,6 +66,11 @@ export interface DemoWorld {
    * so a deadline under that asserts more than the system promises.
    */
   readonly liveWaitMs: number;
+  /**
+   * How the demo reaches decks' storage at the URLs the API presigns (M9): the in-memory stand-in's
+   * own fetch locally, the network against a deployment.
+   */
+  readonly storageFetch: typeof fetch;
   /** Ensure every actor exists with the right role, and mint their tokens. */
   provision(actors: DemoActorSpec[]): Promise<Map<string, DemoActor>>;
   /**
@@ -162,11 +168,13 @@ export async function createLocalWorld(): Promise<DemoWorld> {
     DATABASE_URL: 'postgres://unused@localhost:5432/sim',
     INTERNAL_API_KEY: LOCAL_INTERNAL_KEY,
   };
+  const deckStorage = memoryDeckStorage();
   const app = buildApp(env, {
     db,
     verifyToken: verifier,
     // A brisk re-poll so the feed reflects writes promptly in the demo.
     stream: { repollMs: 100, heartbeatMs: 1000, maxPerTeacher: 5 },
+    deckStorage,
   });
   await app.listen({ port: 0, host: '127.0.0.1' });
   const addr = app.server.address() as AddressInfo;
@@ -179,6 +187,7 @@ export async function createLocalWorld(): Promise<DemoWorld> {
     // The sweep runs inline here, and the hub re-polls every 100ms.
     sweepWaitMs: 5_000,
     liveWaitMs: 15_000,
+    storageFetch: deckStorage.fetch,
     provision: (specs) => seedLocalActors(db, specs, tokenFor),
     compressSilence: ({ sessionId, studentId }) =>
       backdateLastSeen(
@@ -382,6 +391,7 @@ export function createRemoteWorld(config: RemoteConfig, deps: RemoteWorldDeps = 
     base: config.base,
     sweepWaitMs: config.sweepWaitMs,
     liveWaitMs: config.liveWaitMs,
+    storageFetch: fetch,
     provision: (specs) => signInRemoteActors(call, config, specs, deps.cognitoFetch),
 
     /*
