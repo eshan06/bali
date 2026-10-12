@@ -21,7 +21,7 @@ import type {
   SavedQuestionsResponse,
   SessionSnapshot,
 } from '@bali/shared';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, type SQL } from 'drizzle-orm';
 import { createHash, randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -500,14 +500,68 @@ describe('GET /v1/questions/:id/results', () => {
       });
     }
 
-    // N: the three who answered. M: the class now (the seeded student, `stays`), the session's
-    // participants, removed since (`tappedAnswered`, `tappedOnly`) and N's (`answeredOnly`): five,
-    // never below N. `neither` is in none of them.
+    // N: the three who answered. M: everyone in the class while it was open, the four removed since
+    // included (`neither` too, or removing them would show they didn't answer: #315): six, never
+    // below N.
     expect(await resultsOf(c.token, question.id)).toMatchObject({
       answered: 3,
-      eligible: 5,
+      eligible: 6,
       counts: [1, 0, 2],
     });
+  });
+
+  /** Removes `student` from the lesson's class at 09:mm, as its teacher does. */
+  const removed = (student: { enrollmentId: string }, minute: number) =>
+    endEnrollment(db, {
+      enrollmentId: student.enrollmentId,
+      reason: 'removed_from_class',
+      at: at(minute),
+    });
+
+  /** Dates the enrollments `where` picks 09:mm, by the lesson's clock, which M's window reads. */
+  const enrolledAt = (minute: number, where: SQL) =>
+    db
+      .update(enrollments)
+      .set({ createdAt: at(minute) })
+      .where(where);
+
+  it('never changes M by a removal, answered or not, while it is open or once it is closed (#315)', async () => {
+    const c = await lesson('results-removal');
+    const [answered, silent, later] = await classmates(c, 3);
+    // All four in the class from 09:00.
+    await enrolledAt(0, eq(enrollments.classId, c.klass.id));
+    const question = await asked(c.token, c.session.id);
+    await answer(question.id, answered!.id, 0);
+    // None of them tapped in: M is the four enrolled while it could be answered.
+    const counted = { answered: 1, eligible: 4 };
+    expect(await resultsOf(c.token, question.id)).toMatchObject(counted);
+
+    // While it is open: one who answered and one who didn't, whom M dropping alone would give away.
+    await removed(answered!, 12);
+    await removed(silent!, 12);
+    expect(await resultsOf(c.token, question.id)).toMatchObject(counted);
+
+    // Once it is closed, as the recap reads it.
+    now = at(13);
+    await close(c.token, question.id);
+    await removed(later!, 14);
+    expect(await resultsOf(c.token, question.id)).toMatchObject(counted);
+  });
+
+  it('counts in M who joined while it was open, never who left before it opened or joined after its close', async () => {
+    const c = await lesson('results-window');
+    const [left, joined, late] = await classmates(c, 3);
+    // The seeded student and `left` in the class from 09:00, `joined` from 09:11, while it is open,
+    // and `late` from 09:14, after its 09:13 close.
+    await enrolledAt(0, eq(enrollments.classId, c.klass.id));
+    await enrolledAt(11, eq(enrollments.id, joined!.enrollmentId));
+    await enrolledAt(14, eq(enrollments.id, late!.enrollmentId));
+    await removed(left!, 5);
+    const question = await asked(c.token, c.session.id);
+    now = at(13);
+    await close(c.token, question.id);
+
+    expect(await resultsOf(c.token, question.id)).toMatchObject({ answered: 0, eligible: 2 });
   });
 
   it('says whether it is open by the server’s clock, and whether its close revealed the answer', async () => {

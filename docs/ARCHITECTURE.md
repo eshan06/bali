@@ -1042,10 +1042,13 @@ nothing of a live lesson sits in the outbox ahead of an unlock (decision 5).
   population for N, the per-option counts and the guard:** everyone with a response to this
   question, counted from `responses`. An answer stays counted when its student leaves or is
   removed mid-session, as A9 keeps such a student on the grid, so the bars always total N and
-  a breakdown once shown never vanishes because of a removal. M is the union of the students
-  enrolled in the class now, the session's participants (a removed one included) and everyone
-  counted in N, so N never exceeds M. No answer's time is exposed to a teacher (the
-  student's own export, C5, has each of theirs whole, `answered_at` included).
+  a breakdown once shown never vanishes because of a removal. M is the union of every student
+  enrolled in the class at any time while the question could be answered (from its opening to
+  its close, or to now while it is open, a join since the opening included), the session's
+  participants (a removed one included) and everyone counted in N, so N never exceeds M, and a
+  removal never changes M: an M that fell when a student who never tapped in was removed would
+  tell the teacher they hadn't answered (ruled 2026-10-12, #315). No answer's time is exposed
+  to a teacher (the student's own export, C5, has each of theirs whole, `answered_at` included).
 - **No leaderboards, no grading, no per-student participation** in any report, recap or
   export a teacher reads. Totals-only governs what Bali shows. **Its known limit:** a teacher
   watching the live counts change while watching one student answer in the room can
@@ -1443,9 +1446,11 @@ and keeps everything that enforces focus.
   first in the page's order at every width).
 
 **Settled** (the owner, 2026-10-10, each as recommended; PLAN's step for each in parentheses):
-- `event_id` uniqueness in both directions: every route that records an `eventId` refuses one
-  that any `responses` or `saved_questions` row holds, as the answers route already checks
-  `events` (L1, L3b).
+- `event_id` uniqueness in both directions: every writer in the transition engine refuses an
+  `eventId` that any `responses` or `saved_questions` row holds, as the answers route already
+  checks `events` (L1, L3b). The three writers beside the engine, `PUT /v1/me/age-check`, `PUT`
+  and `DELETE /v1/me/push-token` and `POST /v1/teacher-invites/redeem`, check only their own
+  table: a UUIDv7 minted fresh never collides (narrowed 2026-10-12, the owner's ruling on #317).
 - The guard wherever counts are read: one guarded count that the results route, the recap and
   any report read (L3, L7c).
 - The portal checks a deck's `sha256` as the phone does, refusing a mismatch, for the presenter
