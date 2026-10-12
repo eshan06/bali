@@ -1,6 +1,6 @@
 {
   "endpoint": "GET /v1/sessions/{id}/presentation",
-  "scenario": "A live lesson polled (Phase 7, L4) before the teacher asks anything: the session runs.",
+  "scenario": "A live lesson polled (Phase 7, L4) before the teacher asks anything: the session runs, and the student is not tapped in.",
   "request": {
     "path": "/v1/sessions/00000000-0000-7000-8000-000000000001/presentation"
   },
@@ -8,6 +8,7 @@
   "type": "Presentation",
   "body": {
     "running": true,
-    "question": null
+    "question": null,
+    "phone": null
   }
 }

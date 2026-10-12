@@ -4,7 +4,13 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-10-11 (Central) — L4b (#321): the demo asks a question in its running session
+_Last updated: 2026-10-11 (Central) — W1 (#322): the presentation read carries the student's own
+phone in the session, as the teacher's grid shows it: focused, unlocked, Screen Time off, or silent
+past 90 s without a check-in by the server's clock with when it was last heard; none while they are
+not in the session, and once it is over. A check-in that changes nothing leaves the poll `304`.
+A fixture for each state, which BaliCore decodes; the load gate's lesson devices open from 5 s
+after the bell, off the Starts' connections. Next: M2, the deck endpoints (Phase 7 steps). Before it, L4b
+(#321): the demo asks a question in its running session
 (the open, a poll, three answers through the small-group guard, the close revealing it, a late
 answer refused, the stream carrying the open and the close and never an answer), and the load
 gate's first five classes follow a live lesson, each student's phone and laptop polling the
@@ -391,7 +397,7 @@ Apple's answer on §3.3.3(P) (ISSUES #3; ask before the first external build).
 **Phase 7, Live lesson: building** (the owner lifted the hold and approved both canvases,
 2026-10-10). The steps with no screen go first, one PR each: M1 ✅ (the storage interface, with
 M0's runbook, runbook 10), then the backend (L1–L4 with L3b, W1, M2–M4; L1 ✅, L2 ✅, L3a ✅, L3r
-✅, L3b1 ✅, L3b2 ✅, L4a ✅, L4b ✅, W1 next), then the logic
+✅, L3b1 ✅, L3b2 ✅, L4a ✅, L4b ✅, W1 ✅, M2 next), then the logic
 with no UI (L5, L6, W2, M7, M9). **No screen is built until production backups are on (L0b) and
 the S3 bucket exists (M0)** (the owner's order, 2026-10-10), so every UI step waits for both. Left for the owner, under Open owner items: L0b and M0 (runbook 10,
 dev first).
@@ -541,7 +547,7 @@ Slice 2 — slides:
 - **M10** 📱 Exit check: a real class on prod follows a deck
 
 Slice 3 — students on the web (added 2026-10-10; ARCHITECTURE, "Live lesson", decision 13; built web first, each step after the steps it reads):
-- **W1** The phone's state in the presentation read (after L4): the caller's own phone in the session, its state as the shared state function derives it at the server's clock (`focused`, `unlocked`, `protection_off`, `silent`, or none when not in) and the time of its last check-in once silent; additive, fixtures, OpenAPI — validation: integration tests (each state; silent from 90 s by the server's clock; none after leaving; another student's never shown), `npm run fixtures` drift check, a `304` across a check-in while nothing changes
+- **W1** The phone's state in the presentation read (after L4): the caller's own phone in the session, its state as the shared state function derives it at the server's clock (`focused`, `unlocked`, `protection_off`, `silent`, or none when not in) and the time of its last check-in once silent; additive, fixtures, OpenAPI — validation: integration tests (each state; silent from 90 s by the server's clock; none after leaving; another student's never shown), `npm run fixtures` drift check, a `304` across a check-in while nothing changes — ✅ (#322) in `apps/api/src/routes/questions.ts`: the poll's `phone`, a `StudentPhone` (`@bali/shared`): `state` by `deriveDisplayState` at the route's clock (`focused`, `unlocked`, `protection_off`, `silent`), and `lastSeenAt`, the last check-in or else the tap, only once silent; null with no live participation in this session (read by the boot call's `getLiveParticipation`) and once the session is over, past the bell unswept too. W2 makes the chip and its line from it; the phone shows nothing of it yet (BaliCore decodes it: `StudentPhone`). A fixture for each state (`presentation/` `silent`, `unlocked`, `protection-off`, `revealed` now focused, and none in the rest). Ride-along, L4b's WARN (the conductor's ruling): the load gate's devices open between 5 and 30 s after the bell (`OPEN_AFTER`), off the Starts' connections, no limit raised: over four CI runs the Starts' p95 was 232–393 ms (L4b's 329–535), a poll's 5.5–7.6, none refused. Tests: `apps/api/test/student-lesson.test.ts`, `contract-fixtures.test.ts`; BaliCore's `ContractFixtureTests`. Why: `docs/DECISIONS.md` (2026-10-11, W1)
 - **W2** Portal student logic in `apps/web/src/lib` (after W1): the home's routing (a teacher to their classes; a student who said 13+ in the app to theirs; anyone else to the invite page), the presentation poller (2 s, one visible tab, `If-None-Match`, stopping when the session isn't running and at a `429` until its `Retry-After`), the answer call minting its `eventId` after the held answer's, the phone's chip and line from W1's field, no UI — validation: vitest unit tests (the routing, the poller's stops, an id minted after a held one from a clock behind it), `npm run typecheck && npm run lint && npm test`
 - **W3** 👀 Student sign-in and home to the portal canvas (after W2): the sign-in page's words for students too, the invite page's line telling a student to set up in the app first, the student's classes (the one in class now with "Open the lesson"; none yet, with a teacher's link to the invite page); the privacy policy names the student pages; after L0b and M0 (the canvas approved 2026-10-10) — validation: `/santa-loop` with `web-design-guidelines` and `no-ai-slop`, screenshots for the owner
 - **W4** 👀 The lesson page to the portal canvas (after L7 and W3): the question card (answer, change, the revealed answer, the privacy line), the phone's chip and line, nothing shared yet, class over, loading, every said line, 200% zoom (one column under 1024 px, the question first) — validation: `/santa-loop` with the UI skills, screenshots, one student answering from the web and then the phone

@@ -867,7 +867,7 @@ export interface QuestionResults {
 // GET /v1/sessions/{id}/presentation — what a student's phone and the student web show of a live
 // lesson (Phase 7, L4; "Live lesson", decision 6), polled about every 2 s; a student enrolled in the
 // session's class now. A strong ETag over the body, and `If-None-Match` answers `304`. Slides (M3)
-// and the student's own phone (W1) join it as fields of their own.
+// join it as a field of their own.
 export interface Presentation {
   /** The session runs by the server's clock: false tells the client to stop polling. */
   running: boolean;
@@ -876,6 +876,22 @@ export interface Presentation {
    * once the session is over: nothing is shown outside one (decision 2).
    */
   question: StudentQuestion | null;
+  /**
+   * The caller's own phone in this session (W1; decision 13), as the teacher's grid shows it: null
+   * while they have no live participation here — not tapped in, or gone to another class — and
+   * once the session is over. Never another student's.
+   */
+  phone: StudentPhone | null;
+}
+/** A student's own phone in a running session: `deriveDisplayState` at the server's clock (rule 2). */
+export interface StudentPhone {
+  /** Silent past `SILENCE_THRESHOLD_MS` without a check-in, by the server's clock. */
+  state: Exclude<DisplayState, 'ended'>;
+  /**
+   * When the server last heard from the phone, its last check-in or else its tap, once `silent`;
+   * null otherwise, so a check-in short of silence changes nothing here and the poll stays `304`.
+   */
+  lastSeenAt: string | null;
 }
 /** A live lesson's question as a student sees it: never anyone's counts. */
 export interface StudentQuestion {

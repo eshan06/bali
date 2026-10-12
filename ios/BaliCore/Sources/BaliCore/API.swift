@@ -371,13 +371,24 @@ public struct HistoryPage: Codable, Sendable, Hashable {
 }
 
 /// `GET /v1/sessions/{id}/presentation` — what the phone shows of a live lesson (Phase 7, L4),
-/// polled while the session runs. Slides and the phone's own state join it later, additively.
+/// polled while the session runs. Slides join it later, additively.
 public struct Presentation: Codable, Sendable, Hashable {
     /// False once the session is over by the server's clock: stop polling.
     public let running: Bool
     /// The open question, or the last closed one until another opens; nil when none was asked,
     /// and once the session is over.
     public let question: StudentQuestion?
+    /// The student's own phone in this session as the teacher's grid shows it (W1): nil while
+    /// they are not in it, once the session is over, and from an older API.
+    public let phone: StudentPhone?
+}
+
+/// A student's own phone in a running session, as the server derives it at its clock.
+public struct StudentPhone: Codable, Sendable, Hashable {
+    /// Never `ended`: a phone not in the session is no phone here.
+    public let state: OrUnknown<DisplayState>
+    /// When the server last heard from it, once silent; nil otherwise.
+    public let lastSeenAt: Date?
 }
 
 /// A live lesson's question as a student sees it: never anyone's counts.

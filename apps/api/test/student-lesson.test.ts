@@ -8,13 +8,20 @@ import {
   events,
   newUuidV7,
   openQuestion,
+  participations,
+  protectionOff,
   responses,
   startSession,
   tapIn,
   unlock,
   users,
 } from '@bali/db';
-import type { AnswerResponse, ApiErrorBody, Presentation } from '@bali/shared';
+import {
+  type AnswerResponse,
+  type ApiErrorBody,
+  type Presentation,
+  SILENCE_THRESHOLD_MS,
+} from '@bali/shared';
 import { and, eq } from 'drizzle-orm';
 import { createHash, randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -129,10 +136,43 @@ const reasonOf = (res: { json: () => unknown }) => (res.json() as ApiErrorBody).
 const responsesTo = (questionId: string) =>
   db.select().from(responses).where(eq(responses.questionId, questionId));
 
+/** The lesson's student taps in at 09:02. */
+const tappedIn = (l: Lesson) =>
+  tapIn(db, {
+    sessionId: l.session.id,
+    studentId: l.student.id,
+    eventId: newUuidV7(),
+    deviceTime: at(2),
+    now: at(2),
+  });
+
+/**
+ * The server last heard from the student's phone at `when` (null: never since its tap). Staged:
+ * a check-in stamps the real clock, which runs long after this lesson's, so it reads as just heard.
+ */
+const lastHeard = (l: Lesson, when: Date | null) =>
+  db
+    .update(participations)
+    .set({ lastSeenAt: when })
+    .where(
+      and(eq(participations.sessionId, l.session.id), eq(participations.studentId, l.student.id)),
+    );
+
+const checkIn = (l: Lesson) =>
+  authedInject(ctx.app, l.phone, {
+    method: 'POST',
+    url: `/v1/sessions/${l.session.id}/checkin`,
+    payload: { deviceTime: now.toISOString() },
+  });
+
 describe('GET /v1/sessions/:id/presentation', () => {
   it('shows no question while none was asked', async () => {
     const l = await lesson('show-none');
-    expect(await shown(l.phone, l.session.id)).toEqual({ running: true, question: null });
+    expect(await shown(l.phone, l.session.id)).toEqual({
+      running: true,
+      question: null,
+      phone: null,
+    });
   });
 
   it('shows the open question, its correct option hidden, and no one’s counts', async () => {
@@ -149,6 +189,7 @@ describe('GET /v1/sessions/:id/presentation', () => {
         correctOption: null,
         answer: null,
       },
+      phone: null,
     });
   });
 
@@ -222,12 +263,15 @@ describe('GET /v1/sessions/:id/presentation', () => {
   it('says the session is over at the bell, the sweep or not, and shows nothing then', async () => {
     const l = await lesson('show-bell');
     await ask(l);
+    // Tapped in, so the phone too is shown no more, though the sweep has not ended its row.
+    await tappedIn(l);
+    const over = { running: false, question: null, phone: null };
     now = at(25);
-    expect(await shown(l.phone, l.session.id)).toEqual({ running: false, question: null });
+    expect(await shown(l.phone, l.session.id)).toEqual(over);
 
     now = at(10);
     await endSession(db, { sessionId: l.session.id, at: at(10), reason: 'ended' });
-    expect(await shown(l.phone, l.session.id)).toEqual({ running: false, question: null });
+    expect(await shown(l.phone, l.session.id)).toEqual(over);
   });
 
   it('answers 304 while nothing of the caller’s changed, a classmate’s answer included', async () => {
@@ -287,6 +331,114 @@ describe('GET /v1/sessions/:id/presentation', () => {
     expect(
       await db.select().from(users).where(eq(users.cognitoId, 'student-show-who-new')),
     ).toEqual([]);
+  });
+});
+
+describe('the caller’s own phone in the presentation (W1)', () => {
+  const phoneOf = async (token: string, sessionId: string) => (await shown(token, sessionId)).phone;
+  /** `ms` past 09:09. */
+  const after909 = (ms: number) => new Date(at(9).getTime() + ms);
+
+  it('shows it in each state the grid shows, and none before the student taps in', async () => {
+    const l = await lesson('phone-states');
+    const own = { sessionId: l.session.id, studentId: l.student.id };
+    expect(await phoneOf(l.phone, l.session.id)).toBeNull();
+
+    await tappedIn(l);
+    expect(await phoneOf(l.phone, l.session.id)).toEqual({ state: 'focused', lastSeenAt: null });
+    await unlock(db, { ...own, eventId: newUuidV7(), deviceTime: at(3) });
+    expect(await phoneOf(l.phone, l.session.id)).toEqual({ state: 'unlocked', lastSeenAt: null });
+    await protectionOff(db, { ...own, eventId: newUuidV7(), deviceTime: at(4) });
+    // Only a focused phone reads silent, as on the grid: protection off stands, however quiet.
+    await lastHeard(l, at(0));
+    expect(await phoneOf(l.phone, l.session.id)).toEqual({
+      state: 'protection_off',
+      lastSeenAt: null,
+    });
+  });
+
+  it('reads a focused phone silent past 90 s without a check-in, by the server’s clock', async () => {
+    const l = await lesson('phone-silent');
+    await tappedIn(l);
+    await lastHeard(l, at(9));
+    now = after909(SILENCE_THRESHOLD_MS);
+    expect(await phoneOf(l.phone, l.session.id)).toEqual({ state: 'focused', lastSeenAt: null });
+    now = after909(SILENCE_THRESHOLD_MS + 1);
+    expect(await phoneOf(l.phone, l.session.id)).toEqual({
+      state: 'silent',
+      lastSeenAt: at(9).toISOString(),
+    });
+
+    // Never heard since its tap: silent from the tap, as the grid counts it.
+    await lastHeard(l, null);
+    now = new Date(at(2).getTime() + SILENCE_THRESHOLD_MS + 1);
+    expect(await phoneOf(l.phone, l.session.id)).toEqual({
+      state: 'silent',
+      lastSeenAt: at(2).toISOString(),
+    });
+  });
+
+  it('shows none once the student has gone to another class, and never another student’s', async () => {
+    const l = await lesson('phone-whose');
+    const ana = await classmate(l, 'ana');
+    const hers = { sessionId: l.session.id, studentId: ana.id };
+    await tappedIn(l);
+    expect(await phoneOf(ana.phone, l.session.id)).toBeNull();
+    await tapIn(db, { ...hers, eventId: newUuidV7(), deviceTime: at(3), now: at(3) });
+    await unlock(db, { ...hers, eventId: newUuidV7(), deviceTime: at(4) });
+    expect(await phoneOf(l.phone, l.session.id)).toMatchObject({ state: 'focused' });
+    expect(await phoneOf(ana.phone, l.session.id)).toMatchObject({ state: 'unlocked' });
+
+    // The student taps into another class's lesson: this one shows their phone no more.
+    const other = await seedClassroom(db, 'phone-whose-other');
+    await db.insert(enrollments).values({ classId: other.klass.id, studentId: l.student.id });
+    const { session: elsewhere } = await startSession(db, {
+      classId: other.klass.id,
+      startedAt: at(0),
+      endsAt: at(25),
+    });
+    const switched = await tapIn(db, {
+      sessionId: elsewhere.id,
+      studentId: l.student.id,
+      eventId: newUuidV7(),
+      deviceTime: at(5),
+      now: at(5),
+    });
+    expect(switched.outcome).toBe('switched');
+    expect(await phoneOf(l.phone, l.session.id)).toBeNull();
+    expect(await phoneOf(l.phone, elsewhere.id)).toMatchObject({ state: 'focused' });
+  });
+
+  it('answers 304 across a check-in while nothing changes, and anew when the clock makes it silent', async () => {
+    const l = await lesson('phone-etag');
+    await tappedIn(l);
+    await lastHeard(l, at(9));
+    const focused = String((await presentation(l.phone, l.session.id)).headers.etag);
+
+    // A check-in moves the row's time, never the body.
+    expect((await checkIn(l)).statusCode).toBe(200);
+    const [row] = await db
+      .select()
+      .from(participations)
+      .where(eq(participations.studentId, l.student.id));
+    expect(row!.lastSeenAt).not.toEqual(at(9));
+    expect((await presentation(l.phone, l.session.id, focused)).statusCode).toBe(304);
+
+    // The clock alone makes it silent: a new body, unchanged then while it stays silent.
+    await lastHeard(l, at(9));
+    now = after909(SILENCE_THRESHOLD_MS + 1);
+    const silent = await presentation(l.phone, l.session.id, focused);
+    expect(silent.statusCode).toBe(200);
+    expect(silent.json<Presentation>().phone).toMatchObject({ state: 'silent' });
+    const quiet = String(silent.headers.etag);
+    now = at(12);
+    expect((await presentation(l.phone, l.session.id, quiet)).statusCode).toBe(304);
+
+    // Its next check-in brings it back.
+    await checkIn(l);
+    const back = await presentation(l.phone, l.session.id, quiet);
+    expect(back.statusCode).toBe(200);
+    expect(back.json<Presentation>().phone).toEqual({ state: 'focused', lastSeenAt: null });
   });
 });
 

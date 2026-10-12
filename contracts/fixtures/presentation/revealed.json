@@ -1,6 +1,6 @@
 {
   "endpoint": "GET /v1/sessions/{id}/presentation",
-  "scenario": "That question closed with its correct option shown, and the student’s answer: it stays until another opens.",
+  "scenario": "That question closed with its correct option shown, and the student’s answer: it stays until another opens. The student tapped in since: their phone is focused (W1).",
   "request": {
     "path": "/v1/sessions/00000000-0000-7000-8000-000000000001/presentation"
   },
@@ -22,6 +22,10 @@
         "option": 1,
         "eventId": "00000000-0000-7000-8000-000000000003"
       }
+    },
+    "phone": {
+      "state": "focused",
+      "lastSeenAt": null
     }
   }
 }
