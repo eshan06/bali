@@ -41,12 +41,13 @@ const ACCOUNT_PER_SECOND = 2;
 /** The most `200`s that budget allows the flood, plus a few for requests in flight at the end. */
 const FLOOD_ANSWERED_MAX = ACCOUNT_BURST + ACCOUNT_PER_SECOND * FLOOD_SECONDS + 5;
 /**
- * The live lesson: the first 5 teachers' classes, each device opening it within 10 s of the bell
- * and polling every 2 s to the end. A student's two devices spend 60 a minute of their account's
- * 120, beside the check-ins' 2, so not one of their requests may be refused.
+ * The live lesson: the first 5 teachers' classes, each device opening it within 30 s of the bell,
+ * as a phone learns of its session at its next 30 s read, and polling every 2 s to the end. A
+ * student's two devices spend 60 a minute of their account's 120, beside the check-ins' 2, so not
+ * one of their requests may be refused.
  */
 const LESSON_CLASSES = 5;
-const OPEN_WITHIN = 10;
+const OPEN_WITHIN = 30;
 const POLL = 2;
 /** The fewest polls a device makes, opening the lesson at the latest, less a few in hand. */
 const DEVICE_POLLS = Math.floor((END - BELL - OPEN_WITHIN) / POLL) - 5;

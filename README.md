@@ -59,6 +59,10 @@ identical either way:
 - **Cal** is removed mid-session; his phone, not yet knowing, still hits unlock —
   which is **recorded with a note** (`no_live_participation`), never a 404 or a
   discard (the ISSUES #2 guarantee) — and his next check-in learns he is `gone`.
+- Ms. Rivera **asks the class a question** (Phase 7): a phone's poll shows it with its correct
+  option hidden, Ana, Ben and Dana answer, and her results say how many answered but not how
+  they split until three have (the small-group guard). She closes it and reveals the answer; a
+  late answer is refused, and the stream carries the question's open and close, never an answer.
 - The teacher's grid watches all of it **live over SSE**: the stream is opened before
   the first incident, and the run asserts that every event written afterwards arrived
   on it, not merely that it could be read back later (rule 6).
@@ -172,7 +176,7 @@ export TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres  #
 export LOAD_LOCAL_POSTGRES=1  # you vouch that it is: localhost could be a tunnel to another
 npm run load:seed    # makes the database bali_load and writes apps/api/scripts/load/school.json
 npm run load:serve   # the API on it, at http://127.0.0.1:3001 (PORT and HOST move it)
-npm run load:gate    # from another shell: the bell and the flood, about three minutes
+npm run load:gate    # from another shell: the bell, a live lesson and the flood, about three minutes
 npm run load:sweep   # once load:serve has stopped: the sweep at that size, timed
 ```
 
@@ -190,12 +194,14 @@ npm run load:sweep   # once load:serve has stopped: the sweep at that size, time
 - **The gate** (`apps/api/scripts/load/gate.js`): every request carries one `X-Real-IP`, the
   school's address. The 600 students tap within the minute before the bell, the teachers start
   all 30 classes at it, and each phone reads the truth every 30 s for three minutes, while one
-  account asks `GET /v1/me` 50 times a second. It passes when every school request is a 2xx (no
-  `429`, no `5xx`) with p95 under 500 ms (a Start's under 1 s), and the flooder is refused, each
-  `429` with a `Retry-After`. `load:sweep` then runs the API's own sweep on that bell, twice: 600 phones gone
+  account asks `GET /v1/me` 50 times a second. Five of the classes follow a live lesson (L4b):
+  their teacher asks a question after the Start, and each student's phone and laptop poll
+  `GET /v1/sessions/{id}/presentation` every 2 s with its ETag, the phone answering once. It
+  passes when every school request is a 2xx or a poll's `304` (no `429`, no `5xx`) with p95 under
+  500 ms (a Start's under 1 s), and the flooder is refused, each `429` with a `Retry-After`. `load:sweep` then runs the API's own sweep on that bell, twice: 600 phones gone
   quiet, then 30 sessions ending at once. CI's "Load gate" runs both on every PR that touches
   `apps/api/`, `packages/db/`, `packages/shared/` or the root's `package.json`, lockfile or
-  `.nvmrc`, or by hand. Numbers and why: `docs/DECISIONS.md` (L2b).
+  `.nvmrc`, or by hand. Numbers and why: `docs/DECISIONS.md` (L2b, L4b).
 - **Never dev's or prod's data:** both commands refuse a `TEST_DATABASE_URL` that isn't on this
   machine (`localhost`, `127.0.0.1`, `[::1]`), and one no one vouched for: `localhost` could be a
   tunnel to another machine, and nothing can tell, so `LOAD_LOCAL_POSTGRES=1` says it is not
