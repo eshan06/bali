@@ -968,8 +968,9 @@ What it makes: per environment, a private S3 bucket the API keeps teachers' PDF 
 letting only the portal's origins upload and download, and an IAM user allowed only to put, get and
 delete files in that bucket (ARCHITECTURE, hosting decision 6 and "Live lesson" decision 8; PLAN's
 M0). The API already holds the code (M1): until a deploy holds the bucket's four variables, its
-boot log says `deck storage is off`. No Phase 7 screen is built until this and production backups
-(L0b) are done (the owner's order, 2026-10-10). Each environment gets its own bucket and user, so a
+boot log says `deck storage is off`. No Phase 7 screen is built until this is done (the owner's
+order, 2026-10-10; production backups, L0b, moved to before the first actual pilot on 2026-10-12,
+holding back no screen). Each environment gets its own bucket and user, so a
 leaked dev key can't touch production's decks.
 
 **Before you start:** the AWS console, signed in as an IAM or IAM Identity Center user that may

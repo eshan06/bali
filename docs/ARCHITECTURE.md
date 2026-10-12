@@ -987,6 +987,12 @@ the same `/v1` API, under the rules of "Live lesson (Phase 7)" below. Students f
 running lesson there too (Slice 3, Live lesson decision 13): their classes, the question and the
 slide, and their own phone's state, never a control that changes the phone.
 
+**7. The portal's look is v2's, with a side menu** (the owner, 2026-10-12): Home, Classes,
+Reports, Questions, Slides and Help on a teacher's signed-in pages, and a student's in the same
+layout with Your classes and Help. Its pages and their order are PLAN's "Portal redesign (v2's
+look)" steps (PV0–PV17); the look is DESIGN.md's. A look only: the API stays the one brain, and
+the reads its pages need are additive steps of their own (PV2, PV3).
+
 ## Live lesson (Phase 7)
 
 During a running session the teacher can ask the class a question (Slice 1) and present
@@ -995,7 +1001,10 @@ phone, on Bali's own screen. Planned 2026-10-05 from the research in
 `docs/ROADMAP-RESEARCH.md` (B); the build is Phase 7 in `docs/PLAN.md`, and its decision
 entries are `docs/DECISIONS.md`, 2026-10-05, 2026-10-09 and 2026-10-10. **The build resumed
 on 2026-10-10** (the owner, who had held it since 2026-10-05): the steps with no screen first,
-and no screen built until production backups and the bucket are in place (PLAN's L0b and M0).
+and no screen built until the bucket is in place (PLAN's M0). Its web screens are built on the
+portal's redesign in v2's look, after the pages they sit on (PLAN's PV steps to PV15; the owner,
+2026-10-12), and production backups (PLAN's L0b) come before the first actual pilot, holding back
+no screen (the owner, 2026-10-12).
 The owner's picks of 2026-10-09 (the
 screens' design, the defaults confirmed, and saved questions) follow the ten decisions
 (decisions 11 and 12), and those of 2026-10-10 (students on the web, decision 13, and the open
@@ -1282,7 +1291,8 @@ another student, a teacher who isn't the owner, the owner — and its request sc
 BaliCore decodes. **Rate limits** (ISSUES #1): the 2 s poll is 30 requests a minute per
 device, so a student following on a phone and a laptop at once spends 60 of the account's
 120-a-minute budget beside the check-in's two, and each poller stops at a
-`429` until its `Retry-After`, so the poll never spends the headroom an Emergency Unlock
+`429` until its `Retry-After`, a minute at most (none, or a date, waits the minute; confirmed by
+the owner, 2026-10-12: L5, L6, W2), so the poll never spends the headroom an Emergency Unlock
 needs (an unlock refused `429` is still kept and resent, never lost); the portal polls results,
 and the student web the presentation, from each tab while it is visible (a hidden tab reads
 nothing). L4's load gate measures several
@@ -1328,9 +1338,14 @@ The owner confirmed decision 3's defaults and decision 8's limits as written (th
 answers; the reveal at the teacher's choice on each close; the live breakdown on the teacher's
 own screen once the guard allows; decks of at most 25 MB and 200 pages), picked the screens
 below, and added saved questions (decision 12). The screens are on two Claude Design
-canvases, approved by the owner on 2026-10-10 (CLAUDE.md, Working rules):
-[Live lesson app screens](https://claude.ai/artifact/CZpFbFuxnRrLcuywtJGfVQ) and
-[Live lesson portal screens](https://claude.ai/artifact/BxHbGud1xMeyXLUUvsewHM).
+canvases, approved by the owner (CLAUDE.md, Working rules): the phone's on the
+[Live lesson app screens](https://claude.ai/artifact/CZpFbFuxnRrLcuywtJGfVQ) (2026-10-10), and
+the portal's and the student web's on
+[Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (2026-10-12),
+which replaced the look of the
+[Live lesson portal screens](https://claude.ai/artifact/BxHbGud1xMeyXLUUvsewHM) (approved
+2026-10-10), their words and states carried over except where the new canvas changes them
+(DESIGN.md, Sources).
 
 **11. What the screens do.**
 - **The phone.** While a question or a slide shows, the Focus screen's ring becomes a strip
@@ -1355,7 +1370,9 @@ canvases, approved by the owner on 2026-10-10 (CLAUDE.md, Working rules):
   teacher's own screen keeps the live breakdown. Decks live on one teacher-wide "Your slides"
   page; removing one is a plain button and a confirm line, never red (DESIGN.md keeps red for
   removing a student or deleting a class). The recap gains a Questions section: totals only,
-  the guard applied.
+  the guard applied. In v2's look (2026-10-12) the side menu leads to the questions and the
+  slides pages, asking and picking slides open in the class page's side panel, and the
+  Questions section is drawn on a session's report page, its totals read through PLAN's L3c.
 
 **12. Saved questions.** A teacher may write questions ahead of class and ask one with a
 click. They amend decision 2's "only within a running session": a saved question is the
@@ -1387,9 +1404,11 @@ changes.
 ### The owner's picks (2026-10-10)
 
 The owner added students on the web as Slice 3 (decision 13), to be built web first, and took
-the recommendation on each question left open (Settled, below). The student pages are on
+the recommendation on each question left open (Settled, below). The student pages were drawn on
 the [portal canvas](https://claude.ai/artifact/BxHbGud1xMeyXLUUvsewHM) (its student rows),
-approved with it on 2026-10-10.
+approved with it on 2026-10-10, and are now on
+[Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (approved
+2026-10-12), in the teacher's layout.
 
 **13. Students on the web (Slice 3).** Students mostly have a laptop open in class, so the
 portal is where a student follows a lesson first; the phone shows the same lesson (decision 11)
@@ -1423,7 +1442,7 @@ and keeps everything that enforces focus.
   its last state with "as of" and its time, beside the page's own can't-reach line.
 - **Polling.** As the phone: the presentation read about every 2 s from each tab while it is visible,
   with `If-None-Match`, stopped when the session isn't running and at a `429` until its
-  `Retry-After` (decision 6's rate limits).
+  `Retry-After`, a minute at most (decision 6's rate limits).
 - **Two devices, one answer.** A student's answer is theirs whichever device sent it: each
   device mints its next answer after the held one (decision 4), and both screens show the
   answer Bali holds.
@@ -1443,7 +1462,9 @@ and keeps everything that enforces focus.
   to Bali", where it said "Teacher portal"), the invite page's line for students, the student
   home with classes and with none, the lesson in each state of the phone, loading, every said
   line, and 200% zoom (one column under 1024 px, the question first, as on the phone; the card
-  first in the page's order at every width).
+  first in the page's order at every width). Redrawn in v2's look on 2026-10-12: the teacher's
+  layout, its side menu holding Your classes and Help, and the sign-in page adding "Students:
+  set up Bali in the app on your iPhone first."
 
 **Settled** (the owner, 2026-10-10, each as recommended; PLAN's step for each in parentheses):
 - `event_id` uniqueness in both directions: every writer in the transition engine refuses an
@@ -1452,15 +1473,16 @@ and keeps everything that enforces focus.
   and `DELETE /v1/me/push-token` and `POST /v1/teacher-invites/redeem`, check only their own
   table: a UUIDv7 minted fresh never collides (narrowed 2026-10-12, the owner's ruling on #317).
 - The guard wherever counts are read: one guarded count that the results route, the recap and
-  any report read (L3, L7c).
+  any report read (L3, L3c, L7c).
 - The portal checks a deck's `sha256` as the phone does, refusing a mismatch, for the presenter
   and the student web alike (M6, W5).
 - The PDF check runs in a separate worker under a hard time limit, so a hostile file can stall
   only itself, never the API (M2).
 - The load gate measures several classes polling at once behind one school's address, each
   student on a phone and a laptop (L4, M9).
-- Production backups are on before answers, education records, are stored on prod (L0b, the
-  owner's console step).
+- Production backups are on before the first actual pilot (L0b, the owner's console step;
+  amended by the owner on 2026-10-12 from "before answers, education records, are stored on
+  prod"), and no screen waits for them.
 - The storage provider (decision 8): AWS S3, in the Cognito account (M0).
 
 ## The six rules
