@@ -304,7 +304,7 @@ function follow(s, isPhone, openAt, opening) {
       });
     }
   }
-  check(polls, { 'each device polls every 2 s to the end': (n) => n >= DEVICE_POLLS });
+  check(polls, { 'each device polls to the end': (n) => n >= DEVICE_POLLS });
   check(downloaded, { 'each device asks for the deck its slide names': (d) => d });
   if (isPhone) check(answered, { 'each phone answers the question': (a) => a });
 }
