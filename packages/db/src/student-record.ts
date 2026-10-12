@@ -52,6 +52,7 @@ export const STUDENT_RECORD_COVERAGE = {
       "a teacher's questions: in the record only as the one a response answers",
     'saved_questions.teacher_id':
       "a teacher's drafts: never shown to a student; one asked is in the record as its question",
+    'decks.teacher_id': "a teacher's slides: their own content, never a student's record",
   },
 } as const;
 

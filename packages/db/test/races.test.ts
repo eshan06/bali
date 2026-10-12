@@ -19,6 +19,7 @@ import {
   armedTaps,
   blocks,
   classes,
+  decks,
   deviceTokens,
   enrollments,
   events,
@@ -47,6 +48,7 @@ import {
   changeUnlockReason,
   checkIn,
   closeQuestion,
+  createDeck,
   createSavedQuestion,
   deleteAccount,
   disposeSchool,
@@ -60,6 +62,7 @@ import {
   protectionOff,
   protectionOn,
   refocus,
+  removeDeck,
   removeSavedQuestion,
   renameStudent,
   replaceSavedQuestion,
@@ -4876,5 +4879,135 @@ describe.runIf(REAL_PG)('live lesson questions under contention (real Postgres, 
     expect(run.value.continuing).toEqual([early.teacherId]);
     expect((await userNow(early.teacherId)).removedAt).toBeNull();
     expect(await draftsOf(early.teacherId)).toMatchObject([{ prompt: 'Which?', removedAt: null }]);
+  }, 20_000);
+
+  /** A deck "Cells" of `teacherId`'s, at their school, under `eventId` (M2). */
+  async function decking(teacherId: string, eventId = newUuidV7()) {
+    const { schoolId } = one(
+      await db.select({ schoolId: users.schoolId }).from(users).where(eq(users.id, teacherId)),
+    );
+    const file = { title: 'Cells', bytes: 1_000, sha256: 'c'.repeat(64) };
+    return { teacherId, schoolId: schoolId!, eventId, ...file };
+  }
+  const decksOf = (teacherId: string) =>
+    db.select().from(decks).where(eq(decks.teacherId, teacherId));
+
+  it('two deliveries of one deck at once are one deck, never a 500 (M2)', async () => {
+    for (let round = 0; round < 12; round += 1) {
+      const { teacherId } = await seed(`race-deck-twice-${round}`);
+      const deck = await decking(teacherId);
+
+      const both = await Promise.all([createDeck(db, deck), createDeck(db, deck)]);
+
+      expect(both.map((r) => r.outcome).sort()).toEqual(['created', 'replay']);
+      expect(await decksOf(teacherId)).toHaveLength(1);
+    }
+  });
+
+  it('a deck whose first delivery commits after its own lookup is the replay, never a conflict (M2)', async () => {
+    // As a draft's: uncommitted, the first delivery is missed by the duplicate's read of `decks`,
+    // and the duplicate's insert parks on its `event_id`, then is run again.
+    const { teacherId } = await seed('race-deck-window');
+    const deck = await decking(teacherId);
+    let firstId = '';
+
+    const settled = await behindCommit(
+      async (tx) => {
+        firstId = (await createDeck(tx, deck)).deck.id;
+      },
+      () => createDeck(db, deck),
+    );
+
+    if (settled.status === 'rejected') throw settled.reason as Error;
+    expect(settled.value).toMatchObject({ outcome: 'replay', deck: { id: firstId } });
+    expect(await decksOf(teacherId)).toHaveLength(1);
+  }, 20_000);
+
+  it('removals of one deck at once remove it once: the rest are its replay or find none (M2)', async () => {
+    for (let round = 0; round < 12; round += 1) {
+      const { teacherId } = await seed(`race-deck-remove-${round}`);
+      const { deck } = await createDeck(db, await decking(teacherId));
+      const [mine, theirs] = [newUuidV7(), newUuidV7()];
+
+      const all = await Promise.all(
+        [mine, mine, theirs].map((eventId) => removeDeck(db, { deckId: deck.id, eventId })),
+      );
+
+      const removed = all.filter((r) => r.outcome === 'removed');
+      expect(removed).toHaveLength(1);
+      const [row] = await decksOf(teacherId);
+      expect(row!.removedAt).not.toBeNull();
+      const won = row!.eventId === mine ? ['deck_not_found', 'removed', 'replay'] : undefined;
+      expect(all.map((r) => r.outcome).sort()).toEqual(
+        won ?? ['deck_not_found', 'deck_not_found', 'removed'],
+      );
+    }
+  });
+
+  it('a deck behind its teacher’s deletion is refused and writes nothing; one ahead of it is kept (M2)', async () => {
+    /** A teacher whose class is archived, so the account may go (C3). */
+    async function leaving(tag: string) {
+      const { teacherId } = await seed(tag);
+      await db
+        .update(classes)
+        .set({ removedAt: new Date() })
+        .where(eq(classes.teacherId, teacherId));
+      return teacherId;
+    }
+
+    // Behind: the deletion holds the teacher's row (NO KEY UPDATE), so the create's FOR SHARE
+    // waits, then reads it removed.
+    const behind = await leaving('race-deck-delete-behind');
+    const deletion = await heldDeletion(behind);
+    const late = createDeck(db, await decking(behind));
+    late.catch(() => undefined);
+    try {
+      await waitForBlockedBackend();
+    } finally {
+      deletion.release();
+      await deletion.committed;
+    }
+    await expect(late).rejects.toMatchObject({ code: 'ACCOUNT_DELETED' });
+    expect(await decksOf(behind)).toEqual([]);
+
+    // Ahead: the create holds the row FOR SHARE until it commits, so the deletion waits, then
+    // goes ahead; the deck stays for M4's privacy paths to remove.
+    const ahead = await leaving('race-deck-delete-ahead');
+    const deck = await decking(ahead);
+    const deleted = await behindCommit(
+      (tx) => createDeck(tx, deck),
+      () => deleteAccount(db, { userId: ahead, eventId: newUuidV7(), at: new Date() }),
+    );
+    if (deleted.status === 'rejected') throw deleted.reason as Error;
+    expect(deleted.value).toEqual({ outcome: 'deleted' });
+    expect(await decksOf(ahead)).toMatchObject([{ eventId: deck.eventId }]);
+  }, 20_000);
+
+  it('a deck racing its school’s disposal never deadlocks: behind it refused, ahead of it kept (M2)', async () => {
+    // The create holds the school (KEY SHARE) before its teacher, in the disposal's order, so the
+    // two meet at the school's row: the disposal's FOR UPDATE, or the create's KEY SHARE, waits.
+    async function school(tag: string) {
+      const { teacherId } = await seed(tag);
+      const deck = await decking(teacherId);
+      const confirmName = `School ${tag}`;
+      const dispose = (on: Database) =>
+        disposeSchool(on, { schoolId: deck.schoolId, at: new Date(), confirmName });
+      return { teacherId, deck, dispose };
+    }
+
+    const behind = await school('race-deck-dispose-behind');
+    const late = await behindCommit(behind.dispose, () => createDeck(db, behind.deck));
+    expect(late.status).toBe('rejected');
+    expect((late as PromiseRejectedResult).reason).toMatchObject({ code: 'ACCOUNT_DELETED' });
+    expect(await decksOf(behind.teacherId)).toEqual([]);
+
+    const ahead = await school('race-deck-dispose-ahead');
+    const disposed = await behindCommit(
+      (tx) => createDeck(tx, ahead.deck),
+      () => ahead.dispose(db),
+    );
+    if (disposed.status === 'rejected') throw disposed.reason as Error;
+    expect(disposed.value.outcome).toBe('disposed');
+    expect(await decksOf(ahead.teacherId)).toMatchObject([{ eventId: ahead.deck.eventId }]);
   }, 20_000);
 });

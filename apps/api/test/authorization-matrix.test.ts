@@ -1,4 +1,5 @@
 import {
+  createDeck,
   createSavedQuestion,
   type Database,
   endSession,
@@ -19,6 +20,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { buildApp } from '../src/app.js';
+import { memoryDeckStorage } from '../src/deck-storage.js';
 import { makeTestDb, seedClassroom } from './helpers/db.js';
 import { testEnv } from './helpers/env.js';
 import { routeTable } from './helpers/openapi.js';
@@ -50,8 +52,8 @@ import { makeTestIssuer, type TestIssuer } from './helpers/test-issuer.js';
  * Each row runs in a world of its own (`world`), so no row's write reaches
  * another's. And a 2xx to a stranger names nothing of this world's (`hidden`)
  * — its session, its student, their enrollment, tap and unlock, the owner,
- * their block and saved question, and the class unless the request carries its
- * join code — so
+ * their block, saved question and deck, and the class unless the request carries
+ * its join code — so
  * the routes no one is refused (an unlock, a check-in, a tap) are pinned too.
  */
 
@@ -132,6 +134,9 @@ const MATRIX = {
   'POST /v1/saved-questions':               [401, 401, 403,     403,     200,     200],
   'PUT /v1/saved-questions/:id':            [401, 401, 403,     403,     403,     200],
   'DELETE /v1/saved-questions/:id':         [401, 401, 403,     403,     403,     200],
+  'GET /v1/decks':                          [401, 401, 403,     403,     200,     200],
+  'POST /v1/decks':                         [401, 401, 403,     403,     200,     200],
+  'DELETE /v1/decks/:id':                   [401, 401, 403,     403,     403,     200],
 } as const satisfies Record<string, readonly number[]>;
 type RouteKey = keyof typeof MATRIX;
 
@@ -151,6 +156,8 @@ interface World {
   unlockId: string;
   /** The owner's saved question (L3b). */
   draftId: string;
+  /** The owner's deck (M2). */
+  deckId: string;
 }
 type Seeded = Awaited<ReturnType<typeof seedClassroom>>;
 
@@ -323,6 +330,13 @@ const REQUESTS: Record<RouteKey, (w: World) => Sent | Promise<Sent>> = {
     url: `/v1/saved-questions/${w.draftId}`,
     body: { eventId: newUuidV7() },
   }),
+  // A teacher's decks (M2): each teacher's own; another teacher lists and adds theirs.
+  'GET /v1/decks': () => ({ url: '/v1/decks' }),
+  'POST /v1/decks': () => ({
+    url: '/v1/decks',
+    body: { eventId: newUuidV7(), title: 'Cells', bytes: 1_000, sha256: 'c'.repeat(64) },
+  }),
+  'DELETE /v1/decks/:id': (w) => ({ url: `/v1/decks/${w.deckId}`, body: { eventId: newUuidV7() } }),
 };
 
 /** The matrix's key for `route`: a HEAD is its GET's. */
@@ -361,6 +375,7 @@ function hidden(w: World, sent: Sent): string[] {
     w.owner.id,
     w.block.id,
     w.draftId,
+    w.deckId,
   ];
   return JSON.stringify(sent).includes(w.klass.joinCode) ? ids : [...ids, w.klass.id];
 }
@@ -401,7 +416,9 @@ beforeAll(async () => {
   issuer = await makeTestIssuer();
   // Quiet timers: the owner's stream stays open until the app closes.
   const stream = { repollMs: 60_000, heartbeatMs: 60_000 };
-  app = buildApp(testEnv, { db, verifyToken: issuer.verifier, stream });
+  // Decks' storage on (M2), in memory: off, a teacher's every deck route is 503 (decks.test.ts).
+  const deckStorage = memoryDeckStorage();
+  app = buildApp(testEnv, { db, verifyToken: issuer.verifier, stream, deckStorage });
 });
 
 afterAll(async () => {
@@ -435,6 +452,14 @@ async function world(): Promise<World> {
     options: ['a', 'b'],
   });
   if (draft.outcome !== 'created') throw new Error(`no draft: ${draft.outcome}`);
+  const { deck } = await createDeck(db, {
+    teacherId: mine.teacher.id,
+    schoolId: mine.school.id,
+    eventId: newUuidV7(),
+    title: 'Cells',
+    bytes: 1_000,
+    sha256: 'c'.repeat(64),
+  });
   return {
     owner: mine.teacher,
     student: mine.student,
@@ -447,6 +472,7 @@ async function world(): Promise<World> {
     tapId,
     unlockId,
     draftId: draft.savedQuestion.id,
+    deckId: deck.id,
   };
 }
 

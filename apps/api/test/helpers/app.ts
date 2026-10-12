@@ -2,6 +2,7 @@ import type { Database } from '@bali/db';
 import type { FastifyInstance, LightMyRequestResponse } from 'fastify';
 
 import { buildApp } from '../../src/app.js';
+import type { DeckStorage } from '../../src/deck-storage.js';
 import type { Budget, LimitOptions } from '../../src/limits.js';
 import { testEnv } from './env.js';
 import { makeTestIssuer, type TestIssuer } from './test-issuer.js';
@@ -32,11 +33,16 @@ export interface AuthedApp {
 
 /**
  * Build an app backed by the given db and the test issuer's verifier, on `clock` if given, with
- * budgets no test meets (`ROOMY_LIMITS`).
+ * budgets no test meets (`ROOMY_LIMITS`), and decks' storage when given (M2).
  */
-export async function makeAuthedApp(db: Database, clock?: () => Date): Promise<AuthedApp> {
+export async function makeAuthedApp(
+  db: Database,
+  clock?: () => Date,
+  deckStorage?: DeckStorage,
+): Promise<AuthedApp> {
   const issuer = await makeTestIssuer();
-  const app = buildApp(testEnv, { db, verifyToken: issuer.verifier, clock, limits: ROOMY_LIMITS });
+  const limits = ROOMY_LIMITS;
+  const app = buildApp(testEnv, { db, verifyToken: issuer.verifier, clock, limits, deckStorage });
   return {
     app,
     issuer,

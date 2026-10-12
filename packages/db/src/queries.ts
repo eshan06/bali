@@ -17,6 +17,7 @@ import {
   armedTaps,
   blocks,
   classes,
+  decks,
   enrollments,
   events,
   participations,
@@ -379,6 +380,34 @@ export function listSavedQuestions(db: Database, teacherId: string) {
     .from(savedQuestions)
     .where(and(eq(savedQuestions.teacherId, teacherId), isNull(savedQuestions.removedAt)))
     .orderBy(desc(savedQuestions.createdAt), desc(savedQuestions.id));
+}
+
+/** A deck by id, removed or not (Phase 7, M2), so a route can authorize its teacher. */
+export async function findDeck(db: Database, id: string) {
+  return first(
+    await db.select({ teacherId: decks.teacherId }).from(decks).where(eq(decks.id, id)).limit(1),
+  );
+}
+
+/** A teacher's decks ("Live lesson", decision 6): theirs alone, none removed, newest first. */
+export function listDecks(db: Database, teacherId: string) {
+  return db
+    .select()
+    .from(decks)
+    .where(and(eq(decks.teacherId, teacherId), isNull(decks.removedAt)))
+    .orderBy(desc(decks.createdAt), desc(decks.id));
+}
+
+/**
+ * Its stored object confirmed deleted, after the commit that removed or rejected the deck: the one
+ * write to `decks` outside the engine (decision 5), a fact about storage, never a state change. The
+ * first stamp stays.
+ */
+export async function stampObjectDeleted(db: Database, deckId: string, at: Date): Promise<void> {
+  await db
+    .update(decks)
+    .set({ objectDeletedAt: at })
+    .where(and(eq(decks.id, deckId), isNull(decks.objectDeletedAt)));
 }
 
 /** A session by id (any state), so the lifecycle routes can authorize the teacher. */

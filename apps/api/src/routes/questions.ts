@@ -52,11 +52,11 @@ import { mapTransitionError, refusal } from './errors.js';
 const Params = z.object({ id: z.string().uuid() });
 
 /**
- * A question's text (decision 3): plain text, trimmed, something visible, at most `max` code points;
- * line breaks only where `lines` (the prompt's box takes them, an option's doesn't). What is checked
- * is what is stored: the engine stores what it is given.
+ * A question's text (decision 3), and a deck's title (M2): plain text, trimmed, something visible,
+ * at most `max` code points; line breaks only where `lines` (the prompt's box takes them, an
+ * option's doesn't). What is checked is what is stored: the engine stores what it is given.
  */
-const Text = (max: number, lines = false) =>
+export const Text = (max: number, lines = false) =>
   z
     .string()
     .trim()

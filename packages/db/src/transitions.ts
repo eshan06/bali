@@ -47,6 +47,7 @@ import {
   armedTaps,
   blocks,
   classes,
+  decks,
   deviceTokens,
   enrollments,
   events,
@@ -231,11 +232,11 @@ async function insertEvent(
     deviceTime?: Date;
   },
 ): Promise<boolean> {
-  // An answer's id and a saved question's are spent too (Live lesson, settled 2026-10-10), though
-  // neither writes an event. Refused before the insert, as the reuse below is after it, so a caller
-  // that catches the refusal (`convertArmedTaps`) has written nothing under the id.
-  if (await idHeldBy(tx, e.eventId, responses, savedQuestions)) {
-    throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by an answer or a draft');
+  // An answer's id, a saved question's and a deck's are spent too (Live lesson, settled
+  // 2026-10-10), though none writes an event. Refused before the insert, as the reuse below is after
+  // it, so a caller that catches the refusal (`convertArmedTaps`) has written nothing under the id.
+  if (await idHeldBy(tx, e.eventId, responses, savedQuestions, decks)) {
+    throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another write');
   }
   const ahead = e.deviceTime ? clockAheadSeconds(e.deviceTime, heardNow()) : null;
   const payload =
@@ -875,13 +876,14 @@ async function idIsSpent(tx: Database, eventId: string): Promise<boolean> {
   );
 }
 
-/** A table whose rows hold a mutation's `event_id`: an event, an answer, a saved question. */
-type HoldsEventIds = typeof events | typeof responses | typeof savedQuestions;
+/** A table whose rows hold a mutation's `event_id`: an event, an answer, a saved question, a deck. */
+type HoldsEventIds = typeof events | typeof responses | typeof savedQuestions | typeof decks;
 
 /**
- * Is this `event_id` held by a row of any of `holders`? An id is spent across all three (Live
- * lesson, settled 2026-10-10), though an answer and a saved question write no event, so only their
- * own rows hold theirs. One statement however many are read: a tap pays one read for both.
+ * Is this `event_id` held by a row of any of `holders`? An id is spent across all four (Live
+ * lesson, settled 2026-10-10), though an answer, a saved question and a deck write no event, so
+ * only their own rows hold theirs. One statement however many are read: a tap pays one read for
+ * the three.
  */
 async function idHeldBy(
   tx: Database,
@@ -1143,12 +1145,10 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
       }
       return { outcome: 'replay' };
     }
-    // An answer's id or a saved question's likewise: never this phone's tap (settled 2026-10-10).
-    if (await idHeldBy(tx, input.eventId, responses, savedQuestions)) {
-      throw new TransitionError(
-        'EVENT_ID_CONFLICT',
-        'event_id already used by an answer or a draft',
-      );
+    // An answer's id, a saved question's or a deck's likewise: never this phone's tap (settled
+    // 2026-10-10).
+    if (await idHeldBy(tx, input.eventId, responses, savedQuestions, decks)) {
+      throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another write');
     }
 
     // Same rule, one table over: a row in `armed_taps` under this id is this
@@ -3556,7 +3556,7 @@ export function answerQuestion(db: Database, input: AnswerInput): Promise<Answer
       // `responses` is read once, above: a duplicate of this answer committed since meets its row
       // at the upsert below, or trips its `event_id` and is run again, so the read above finds it:
       // the replay either way, never a conflict.
-      if (held || (await idHeldBy(tx, input.eventId, events, savedQuestions))) {
+      if (held || (await idHeldBy(tx, input.eventId, events, savedQuestions, decks))) {
         throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
       }
       // Refused as a tap is, never kept as an unlock is: an answer is no must-never-lose record.
@@ -3665,7 +3665,7 @@ export function createSavedQuestion(
       ) {
         return { outcome: 'replay', savedQuestion: held };
       }
-      if (held || (await idHeldBy(tx, input.eventId, events, responses))) {
+      if (held || (await idHeldBy(tx, input.eventId, events, responses, decks))) {
         throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
       }
       if (teacher?.removedAt) throw accountDeleted();
@@ -3726,7 +3726,7 @@ function writeSavedQuestion(
         throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
       }
       if (!draft || draft.removedAt) return { outcome: 'saved_question_not_found' };
-      if (await idHeldBy(tx, input.eventId, savedQuestions, events, responses)) {
+      if (await idHeldBy(tx, input.eventId, savedQuestions, events, responses, decks)) {
         throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
       }
       // Postgres orders uuids by their bytes: a UUIDv7's leading timestamp first. The row is held,
@@ -3775,6 +3775,133 @@ export function removeSavedQuestion(
     db,
     { ...input, now },
     { outcome: 'removed', set: { removedAt: now }, replays: (draft) => draft.removedAt !== null },
+  );
+}
+
+/*
+ * A teacher's slide decks (Phase 7, Slice 2; "Live lesson", decisions 4 and 5): one row per PDF,
+ * `pending` until its upload is checked. Each write is idempotent on the deck's `event_id`, the id
+ * of the teacher's write that last wrote it, as a draft's is. The stored object is the API's,
+ * deleted after the commit (decision 4).
+ */
+
+export type DeckRow = typeof decks.$inferSelect;
+
+/** Written by this call; 'replay' wrote nothing, and carries the deck now. */
+export interface DeckResult {
+  outcome: 'created' | 'removed' | 'replay';
+  deck: DeckRow;
+}
+
+export interface CreateDeckInput {
+  /** A teacher, as the route checks, and their school. */
+  teacherId: string;
+  schoolId: string;
+  /** The create's idempotency key (rule 4): the deck's `event_id` until the teacher writes it again. */
+  eventId: string;
+  title: string;
+  bytes: number;
+  sha256: string;
+  /** The server's clock; now by default. */
+  now?: Date;
+}
+
+/**
+ * A teacher adds a deck, `pending`, its object's key the API's own. Its replay, the eventId a
+ * pending deck of theirs still holds with this title, length and hash, answers that deck; any other
+ * holder of the id is EVENT_ID_CONFLICT. The school is held FOR KEY SHARE, then the teacher FOR
+ * SHARE, as a class's create holds them, in a disposal's order: the account's deletion, a disposal
+ * or a retention run runs wholly before this, which then refuses ACCOUNT_DELETED, or after it.
+ */
+export function createDeck(db: Database, input: CreateDeckInput): Promise<DeckResult> {
+  return onceMoreOnUnique(() =>
+    db.transaction(async (tx): Promise<DeckResult> => {
+      await tx
+        .select({ id: schools.id })
+        .from(schools)
+        .where(eq(schools.id, input.schoolId))
+        .for('key share');
+      const [teacher] = await tx
+        .select({ removedAt: users.removedAt })
+        .from(users)
+        .where(eq(users.id, input.teacherId))
+        .for('share');
+      // Read once: a duplicate of this create committed since trips `event_id` at the insert and is
+      // run again, which then finds it here, the replay, never a conflict.
+      const [held] = await tx.select().from(decks).where(eq(decks.eventId, input.eventId));
+      if (
+        held?.teacherId === input.teacherId &&
+        held.status === 'pending' &&
+        held.removedAt === null &&
+        held.title === input.title &&
+        held.bytes === input.bytes &&
+        held.sha256 === input.sha256
+      ) {
+        return { outcome: 'replay', deck: held };
+      }
+      if (held || (await idHeldBy(tx, input.eventId, events, responses, savedQuestions))) {
+        throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
+      }
+      if (teacher?.removedAt) throw accountDeleted();
+      const { teacherId, schoolId, title, bytes, sha256, eventId } = input;
+      const id = newUuidV7();
+      const [created] = await tx
+        .insert(decks)
+        .values({
+          id,
+          teacherId,
+          schoolId,
+          title,
+          storageKey: `decks/${id}.pdf`,
+          sha256,
+          bytes,
+          eventId,
+          createdAt: input.now ?? new Date(),
+        })
+        .returning();
+      return { outcome: 'created', deck: created! };
+    }),
+  );
+}
+
+export interface RemoveDeckInput {
+  /** The caller's own deck, as the route checks. */
+  deckId: string;
+  /** The removal's idempotency key (rule 4): the deck's `event_id` from now on. */
+  eventId: string;
+  /** The server's clock; now by default. */
+  now?: Date;
+}
+
+/**
+ * The teacher removes a deck: marked removed (data-model decision 3). Its row alone, FOR UPDATE
+ * (decision 5): no session's, so M3's `deck_in_use` reads the presentation rows here, unlocked. Its
+ * replay, the id it holds with the deck removed, answers the deck now; the id it holds from another
+ * write, or one any other row holds, is EVENT_ID_CONFLICT. A deck removed already, or none, is
+ * `deck_not_found`.
+ */
+export function removeDeck(
+  db: Database,
+  input: RemoveDeckInput,
+): Promise<DeckResult | { outcome: 'deck_not_found' }> {
+  return onceMoreOnUnique(() =>
+    db.transaction(async (tx): Promise<DeckResult | { outcome: 'deck_not_found' }> => {
+      const [deck] = await tx.select().from(decks).where(eq(decks.id, input.deckId)).for('update');
+      if (deck?.eventId === input.eventId) {
+        if (deck.removedAt) return { outcome: 'replay', deck };
+        throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
+      }
+      if (!deck || deck.removedAt) return { outcome: 'deck_not_found' };
+      if (await idHeldBy(tx, input.eventId, decks, events, responses, savedQuestions)) {
+        throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
+      }
+      const [removed] = await tx
+        .update(decks)
+        .set({ removedAt: input.now ?? new Date(), eventId: input.eventId })
+        .where(eq(decks.id, deck.id))
+        .returning();
+      return { outcome: 'removed', deck: removed! };
+    }),
   );
 }
 
@@ -4381,6 +4508,9 @@ export const SCHOOL_DISPOSAL_COVERAGE = {
     'kept with its lesson, under its teacher de-identified; its prompt and option texts emptied, the option count kept',
   'responses.student_id': 'kept, under a person de-identified',
   'saved_questions.teacher_id': "its teachers' drafts: removed, their words emptied",
+  'decks.teacher_id':
+    "its teachers' decks: kept, their teacher de-identified (M4 removes them, their titles emptied)",
+  'decks.school_id': 'its decks: kept (M4 removes them, their titles emptied)',
 } as const;
 
 export interface DisposeSchoolInput {
@@ -4819,6 +4949,8 @@ export const RETENTION_COVERAGE = {
     'kept, under a person it de-identifies; one answered after the year keeps its student named and continuing',
   'saved_questions.teacher_id':
     'a teacher it de-identifies: their drafts removed, their words emptied; one written after the year keeps them named',
+  'decks.teacher_id':
+    'a teacher it de-identifies: their decks kept (M4 removes them, their titles emptied)',
 } as const;
 
 export interface ApplyRetentionInput {

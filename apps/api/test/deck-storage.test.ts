@@ -138,13 +138,15 @@ describe('the S3 adapter', () => {
 
   it('refuses, unread, an answer still labelled encoded: decoding it could outgrow any cap', async () => {
     const encoded = { status: 206, headers: { 'content-encoding': 'gzip' } };
-    const { storage, sent } = s3(() => new Response('%PDF-1.7 a deck', encoded));
+    const answer = new Response('%PDF-1.7 a deck', encoded);
+    const { storage, sent } = s3(() => answer);
     await expect(storage.read(KEY, 1_000)).rejects.toMatchObject({
       name: 'StorageError',
       code: 'EncodedAnswer',
       status: 206,
     });
     expect(sent[0]!.init.signal?.aborted).toBe(true);
+    expect(answer.bodyUsed).toBe(false);
   });
 });
 

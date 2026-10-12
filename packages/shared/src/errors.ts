@@ -100,6 +100,11 @@ export const API_ERROR_REASONS = [
   // A teacher's saved question (Phase 7, L3b): none of theirs has the id, or
   // they removed it (a 404). Nothing was written.
   'saved_question_not_found',
+  // A teacher's slide deck (Phase 7, M2): none has the id, or it was removed
+  // (a 404); or decks are off on this server, which has no bucket set up (a
+  // 503, on every deck route). Nothing was written.
+  'deck_not_found',
+  'deck_storage_off',
 ] as const;
 export type ApiErrorReason = (typeof API_ERROR_REASONS)[number];
 
