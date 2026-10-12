@@ -134,15 +134,18 @@ export async function closeQuestion(
 /**
  * The question the class page holds after a streamed event (decision 5's lifecycle events, which
  * carry its id, never its words): closed once the stream says so, revealed as its close was;
- * `'unknown'` once another question opened, whose words only the session's snapshot carries
- * (`GET /v1/sessions/{id}`, its `question`), so the page reads it again; else as it was.
+ * `'unknown'` once another question opened, or one the event doesn't name, whose words only the
+ * session's snapshot carries (`GET /v1/sessions/{id}`, its `question`), so the page reads it again;
+ * else as it was.
  */
 export function questionAfter(
   current: TeacherQuestion | null,
   e: Pick<FeedEvent, 'type' | 'payload'>,
 ): TeacherQuestion | null | 'unknown' {
   const { question_id: id, revealed } = (e.payload ?? {}) as Record<string, unknown>;
-  if (e.type === 'question_opened') return current?.id === id ? current : 'unknown';
+  if (e.type === 'question_opened') {
+    return typeof id === 'string' && current?.id === id ? current : 'unknown';
+  }
   if (e.type === 'question_closed' && current?.open === true && current.id === id) {
     return { ...current, open: false, revealed: revealed === true };
   }
@@ -182,33 +185,44 @@ export interface ResultsPoll {
   stop(): void;
 }
 
-/** How often an open question's results are read (decision 7: about every 2 s). */
-export const RESULTS_EVERY_MS = 2_000;
-/** The longest a `429` holds the poll, its `Retry-After` none or a date too: L5's minute. */
+/** How often a poll reads (decisions 6, 7: about every 2 s), 30 of the account's 120 a minute. */
+export const POLL_EVERY_MS = 2_000;
+/** The longest a `429` holds a poll, its `Retry-After` none or a date too: L5's minute. */
 export const LONGEST_WAIT_MS = 60_000;
 
 /**
- * Read `questionId`'s results (`GET /v1/questions/{id}/results`) about every 2 s while the page
- * is visible (decision 6), one read at a time, each with the kept ETag, handing each change to
- * `onChange`. Hidden, it reads nothing, and back in view it reads once the wait since the last
- * read is over. A `429` waits its `Retry-After`, from 2 s to a minute; any other failure is the
- * `problem`, read again in 2 s. It stops once the question is closed: after the read that sees it
- * closed, or the stream's `question_closed` (`closed()`), one more good read.
+ * One read's answer: `n`, its place among the reads begun, and its body (null for a `304`: the last
+ * body still stands) or its failure.
  */
-export function pollResults(
+export type PollRead<T> = { n: number } & ({ body: T | null } | { problem: Failure });
+
+/** A poll under way. */
+export interface Poll {
+  /** How many reads have begun. */
+  begun(): number;
+  /** No more reads, and an answer on its way is handed to no one. */
+  stop(): void;
+}
+
+/**
+ * Read `path` about every 2 s while the page is visible (decision 6), one read at a time, each with
+ * the ETag the last body came with (`getTagged`), handing each answer to `onRead`, which says
+ * whether to read on. Hidden, it reads nothing, and back in view it reads once the wait since the
+ * last answer is over. A `429` waits its `Retry-After`, from 2 s to a minute (L5's rule). A
+ * definitive `401` stops it, as the stream closes on one (`sse-client.ts`): the client has signed
+ * out already, and another read would only sign out again (#332's review).
+ */
+export function pollTagged<T>(
   api: Pick<ApiClient, 'getTagged'>,
-  questionId: string,
-  onChange: (state: ResultsState) => void,
-  doc: PageVisibility = document,
-): ResultsPoll {
-  let state: ResultsState = { results: null, final: false, problem: null };
+  path: string,
+  onRead: (read: PollRead<T>) => boolean,
+  doc: PageVisibility,
+): Poll {
   let etag: string | null = null;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let reading = false;
   let stopped = false;
-  /** Reads begun, and how many had begun once the question was known closed. */
   let reads = 0;
-  let closedAt: number | undefined;
   /** When the next read may begin: 2 s after the last answer, or a `429`'s wait. */
   let nextAt = 0;
 
@@ -231,40 +245,73 @@ export function pollResults(
     timer = undefined;
     reading = true;
     const n = (reads += 1);
-    let wait = RESULTS_EVERY_MS;
-    let next: ResultsState;
+    let wait = POLL_EVERY_MS;
+    let answer: PollRead<T>;
     try {
-      const got = await api.getTagged<QuestionResults>(`/v1/questions/${questionId}/results`, etag);
+      const got = await api.getTagged<T>(path, etag);
       if (got) etag = got.etag;
-      const results = got?.body ?? state.results;
-      const closed = results?.open === false;
-      if (closed) closedAt ??= n;
-      // A failed read is never the last, nor one begun before the close was known.
-      next = { results, problem: null, final: closed && closedAt !== undefined && n > closedAt };
+      answer = { n, body: got?.body ?? null };
     } catch (e) {
       const problem = failureOf(e);
       if (problem.kind === 'failed' && problem.status === 429) {
         const asked = (problem.retryAfter ?? Infinity) * 1000;
-        wait = Math.min(Math.max(asked, RESULTS_EVERY_MS), LONGEST_WAIT_MS);
+        wait = Math.min(Math.max(asked, POLL_EVERY_MS), LONGEST_WAIT_MS);
       }
-      next = { ...state, problem };
+      answer = { n, problem };
     }
     reading = false;
     if (stopped) return;
     nextAt = Date.now() + wait;
-    const changed = next.results !== state.results || next.problem !== state.problem || next.final;
-    state = next;
-    if (changed) onChange(state);
-    if (state.final) stop();
+    const signedOut = 'problem' in answer && answer.problem.status === 401;
+    if (!onRead(answer) || signedOut) stop();
     else schedule();
   }
 
   doc.addEventListener('visibilitychange', onVisibility);
   schedule();
+  return { begun: () => reads, stop };
+}
+
+/**
+ * Read `questionId`'s results (`GET /v1/questions/{id}/results`) through `pollTagged`, handing each
+ * change to `onChange`: a failure is the `problem`, read again in 2 s. It stops once the question
+ * is closed: after the read that sees it closed, or the stream's `question_closed` (`closed()`),
+ * one more good read.
+ */
+export function pollResults(
+  api: Pick<ApiClient, 'getTagged'>,
+  questionId: string,
+  onChange: (state: ResultsState) => void,
+  doc: PageVisibility = document,
+): ResultsPoll {
+  let state: ResultsState = { results: null, final: false, problem: null };
+  /** How many reads had begun once the question was known closed. */
+  let closedAt: number | undefined;
+  const poll = pollTagged<QuestionResults>(
+    api,
+    `/v1/questions/${questionId}/results`,
+    (read) => {
+      let next: ResultsState;
+      if ('problem' in read) next = { ...state, problem: read.problem };
+      else {
+        const results = read.body ?? state.results;
+        const closed = results?.open === false;
+        if (closed) closedAt ??= read.n;
+        // A failed read is never the last, nor one begun before the close was known.
+        next = { results, problem: null, final: closed && read.n > (closedAt ?? Infinity) };
+      }
+      const changed =
+        next.results !== state.results || next.problem !== state.problem || next.final;
+      state = next;
+      if (changed) onChange(state);
+      return !state.final;
+    },
+    doc,
+  );
   return {
     closed: () => {
-      closedAt ??= reads;
+      closedAt ??= poll.begun();
     },
-    stop,
+    stop: () => poll.stop(),
   };
 }

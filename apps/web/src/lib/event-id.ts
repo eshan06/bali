@@ -17,3 +17,14 @@ export function newEventId(
   const hex = Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
+
+/**
+ * A fresh UUIDv7 that sorts after `held`, however far behind this computer's clock stands: of
+ * `now`'s millisecond, or of the one past the millisecond `held` begins with, whichever is later.
+ * A write that replaces another only when its id sorts after (Live lesson, decision 4: an answer)
+ * mints its next this way, as the phone's `EventID.mint(at:after:)` does.
+ */
+export function eventIdAfter(held: string | null, now: number = Date.now()): string {
+  const time = held === null ? NaN : parseInt(held.replace(/-/g, '').slice(0, 12), 16);
+  return newEventId(Number.isFinite(time) ? Math.max(now, time + 1) : now);
+}

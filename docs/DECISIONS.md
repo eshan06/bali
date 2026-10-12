@@ -8,6 +8,30 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-12** — **The portal's student side (W2): the age check read first, one poll loop for
+  both polls, and the phone's chip only as the server says it.** **The home reads in the app's
+  order:** `GET /v1/me/age-check` first, a read that creates nothing (C7), so an account whose check
+  never passed goes to the invite page with no account made for it (the redeem makes one for a
+  sign-in with none, T1b), and `/v1/me`, which makes one, only then, its role telling a teacher
+  (always passed) from a student. *Weighed:* `/v1/me` first, as the classes home reads today, which makes an
+  account for every sign-in on the web, one read fewer for a teacher. **One loop, `pollTagged`**,
+  in `live-question.ts`: L6's results poll, moved out whole (one read at a time, 2 s after each
+  answer, while the tab is visible, the kept ETag, a `429`'s wait from 2 s to a minute), now under
+  both polls, so the `401` stop (#332's WARN, the conductor's ruling: the client has signed out, and
+  each read 2 s on signed out again) is written once. Any other failure is said and read again in 2
+  s, a `403` or `404` too, as L5's. **The lesson's state:** the presentation through `304`s, the
+  failure, and `asOf`, the last good read's time, set only while reads fail, so an unchanged lesson
+  hands nothing on every 2 s; the chip keeps its state "as of" then (decision 13). **The answer
+  follows L5's rules:** one request, never resent under its id: a pick again mints a new one, after
+  both the answer held and the last minted here (`eventIdAfter`, the phone's `mint(at:after:)`), so a
+  laptop whose clock is behind still counts, and of two answers to one question the one whose id
+  sorts last is kept, so a read crossing an answer never takes it back. **The chip is W1's field,
+  never re-derived:** the server's state at its clock is the grid's, so nothing here can make it
+  greener; no live participation is Not in; Silent's minutes count on at this computer's clock from
+  `lastSeenAt`, as the grid's do (`minutesSinceContact`); a state this page has no chip for (a
+  newer server) is `unknown`, as the grid's is, never a calmer one. **No words:** chips and lines
+  are kinds, and W4 writes the canvas's words with their screen, as L6 left L7 its own.
+
 - **2026-10-12** — **The portal's live question (L6): no words in the logic, a resend under the
   same id, and the results' last read begun after the close was known.** **No words:**
   `live-question.ts` answers each call typed, `refused` by its `status` and `reason`, or `failed`

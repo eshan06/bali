@@ -142,9 +142,13 @@ export type ExtendAnswer =
  * What stays unanswered after `answer` to `attempt` (an extend, or a question's open or close,
  * L6): the attempt itself when no answer came (it may have landed, so only a resend under its id
  * is safe); nothing once the server answered, a change or a refusal, since the next press is then
- * a new one (rule 4).
+ * a new one (rule 4). The answer's type must have a `failed` kind, or nothing would ever be resent
+ * (#332's review).
  */
-export function keepUnanswered<A, K extends { kind: string }>(attempt: A, answer: K): A | null {
+export function keepUnanswered<A, K extends { kind: string }>(
+  attempt: A,
+  answer: K & ('failed' extends K['kind'] ? unknown : never),
+): A | null {
   return answer.kind === 'failed' ? attempt : null;
 }
 
