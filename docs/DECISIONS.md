@@ -24,7 +24,13 @@ a real decision? Add a dated entry at the top: what was decided and why.
   from 5 s after the bell** (L4b's Claude Review WARN, the conductor's ruling, the owner away): their
   first reads shared the database's 10 connections with the bell's Starts, whose p95 ran 329–535 ms
   against its 1 s, so a PR that never touched a Start could fail the gate at random. Each device
-  opens between 5 and 30 s after the bell, and no limit moved. *Measured* (CI's runner): GATE_NUMBERS.
+  opens between 5 and 30 s after the bell, and no limit moved. *Measured* (CI's runner, four runs):
+  the Starts' p95 at 298, 368, 393 and 232 ms (L4b's runs: 329–535), a poll's at 5.5–7.6 ms with
+  its read of the phone (4.7 before it), an answer's at 9.8–15.9; 19,235–19,492 school requests a
+  run, none refused; the sweep, 600 phones silent in 1.6–2.2 s and the 30 sessions ended in 145–175
+  ms, no deadlock. *Weighed* (santa's WARN): the gate no longer measures a device's first reads
+  during the Starts, while each poll now reads one row more; L4b's *Watch* (devices opening all at
+  once at a bell, by a push or W2's home reading faster) is where that returns.
 
 - **2026-10-11** — **The demo's question and the load gate's polling classes (L4b): five classes
   on phones and laptops meet no `429`, so the poll gets no budget of its own.** **The gate**
