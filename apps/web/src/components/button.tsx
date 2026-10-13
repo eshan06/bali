@@ -1,14 +1,14 @@
 import type { ComponentProps } from 'react';
 
 /**
- * The portal's buttons (DESIGN.md §4): a pill 40 px tall with space-4 side padding and a body
- * semibold label, the focus ring from globals.css, each with a 1 px edge, so a label is one width
- * whatever the look. Primary is the brand's fill; secondary the card colour with a strong stroke,
- * sunken while hovered or pressed, and pressed (`aria-pressed`, Present) or open
- * (`aria-expanded`, New code) as a sunken fill with a `text-primary` edge, never by colour alone;
- * destructive only for removing a student or deleting a class (its tokens name no hover shade, so
- * it has none). Dimmed to 60 % while disabled, or while busy but kept focusable with
- * `aria-disabled`.
+ * The portal's buttons in v2's look (DESIGN.md §1 and §4): 40 px tall at `radius-sm`, 10 px
+ * corners, with 18 px side padding and a 15/20 semibold label on one line, the focus ring from
+ * globals.css, each with a 1 px edge, so a label is one width whatever the look. Primary is the
+ * brand's fill; secondary the card colour with a strong stroke, sunken while hovered or pressed,
+ * and pressed (`aria-pressed`, Present) or open (`aria-expanded`, New code) as a sunken fill with
+ * a `text-primary` edge, never by colour alone; destructive only for removing a student or
+ * deleting a class (its tokens name no hover shade, so it has none). Dimmed to 55 %, as v2.css
+ * draws it, while disabled, or while busy but kept focusable with `aria-disabled`.
  */
 const VARIANTS = {
   primary:
@@ -22,7 +22,7 @@ type Variant = keyof typeof VARIANTS;
 
 /** A button's look, for a link that leads somewhere as a button would (the callback's way back). */
 export function buttonClass(variant: Variant = 'primary', className = ''): string {
-  return `inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-full px-4 text-body font-semibold transition-colors disabled:cursor-default disabled:opacity-60 aria-disabled:cursor-default aria-disabled:opacity-60 motion-reduce:transition-none ${VARIANTS[variant]} ${className}`;
+  return `inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-sm px-4.5 text-button whitespace-nowrap transition-colors disabled:cursor-default disabled:opacity-55 aria-disabled:cursor-default aria-disabled:opacity-55 motion-reduce:transition-none ${VARIANTS[variant]} ${className}`;
 }
 
 /** A button's own props, its `ref` included (React 19 passes it as one), so focus can come back. */

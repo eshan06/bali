@@ -84,6 +84,43 @@ describe('a cell on the live grid', () => {
     expect(pill.split(' ')).toEqual(expect.arrayContaining(['rounded-lg', 'text-balance']));
   });
 
+  it('draws the chip in v2’s look: sentence case at 13/18, 3 × 10 px, a 1.5 px edge (PV4)', () => {
+    /** The chip's classes, and its icons' sizes. */
+    const look = (s: Student, present = false) => {
+      const html = render(s, present);
+      const classes = /<span class="(inline-flex[^"]*)">/.exec(html)?.[1]?.split(' ') ?? [];
+      const icons = [...html.matchAll(/<svg[^>]*\swidth="(\d+)"/g)].map((m) => Number(m[1]));
+      return { classes, icons };
+    };
+    const focused = look(student());
+    expect(focused.classes).toEqual(
+      expect.arrayContaining([
+        'text-caption',
+        'font-medium',
+        'px-2.5',
+        'py-0.75',
+        'border-[1.5px]',
+      ]),
+    );
+    expect(focused.classes).not.toContain('uppercase');
+    expect(focused.icons).toEqual([13]);
+    // The edge is on every chip, so each is one size; Silent's and Unknown's is dashed.
+    expect(focused.classes).toContain('border-transparent');
+    for (const dashed of [
+      look(student({ lastSeenAt: ago(330) })),
+      look(student({ state: 'mystery' as Student['state'] })),
+    ]) {
+      expect(dashed.classes).toEqual(
+        expect.arrayContaining(['border-dashed', 'border-border-strong']),
+      );
+    }
+    // In Present, the projector's size, still in sentence case.
+    const present = look(student(), true);
+    expect(present.classes).toContain('text-present-label');
+    expect(present.classes).not.toContain('uppercase');
+    expect(present.icons).toEqual([16]);
+  });
+
   it('draws no line for a phone heard from in the last minute', () => {
     expect(line(render(student()))).toBeNull();
   });

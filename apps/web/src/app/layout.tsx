@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 
 import { PortalBar } from '@/components/portal-bar';
 
-import { instrumentSans, jetBrainsMono } from './fonts';
+import { instrumentSans, instrumentSansItalic, jetBrainsMono } from './fonts';
 
 import './globals.css';
 
@@ -29,7 +29,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${instrumentSans.variable} ${jetBrainsMono.variable}`}>
+    <html
+      lang="en"
+      className={`${instrumentSans.variable} ${instrumentSansItalic.variable} ${jetBrainsMono.variable}`}
+    >
       <body className="min-h-dvh bg-surface-page font-sans text-text-primary antialiased tabular-nums">
         <PortalBar />
         {children}

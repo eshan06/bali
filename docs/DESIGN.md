@@ -137,7 +137,8 @@ session after the bell as a timeline of marks, `components/timeline.tsx`; the re
 per session with its counts in their states' inks), which finished the four designs.
 On 2026-10-12 the owner approved v2's look for the portal and the student web
 (§1), built page by page in PLAN's PV steps: until a page's step lands, it is
-laid out as PB drew it, the shared pieces PV4 restyles aside.
+laid out as PB drew it, the shared pieces PV4 restyled aside (the buttons, the
+field, the chip and the card on its own, 2026-10-13).
 Every
 portal source file is held to the tokens' utilities by `tokens.test.ts`, and
 since D2g the theme holds none of Tailwind's own colours, type sizes,
@@ -199,8 +200,8 @@ ui-rounded (SF Pro Rounded) for large numerals, JetBrains Mono 500 and 600 for
 codes; the body 15/22 with tabular figures. *Colours:* the tokens' light
 values, unchanged, and `border-input` (§2); `v2.css` also draws with the
 primitives green-50, green-200, green-800, orange-400, orange-700, red-300 and
-stone-300 to 500, all in `bali-tokens.json` (`globals.css` lacks green-50,
-orange-400, orange-700 and red-300 so far); a dialog's backdrop is
+stone-300 to 500, all in `bali-tokens.json` and all in `globals.css` since
+PV4; a dialog's backdrop is
 `rgba(33, 28, 21, 0.32)`. *Type:* the greeting 28/34; a page's or a class's
 heading 26/32; card titles 18/24; a dialog's title 19/25; meta lines 13.5/19;
 section labels 11.5/15, uppercase at +0.05em; chips 13/18; menu items 14/20;
@@ -298,7 +299,17 @@ beside the owner's ruled sizes (`input`, `code-lg`, `present-*`, §3), so no
 other value gets in; spacing needs no token, Tailwind's multiples of `space-1`
 drawing it (`p-4.5` is 18 px). Reports' framing line is italic, and the
 self-hosted Instrument Sans is upright only, so its italic file is added
-beside it (`fonts.ts`, PV4 naming it as §7 asks).
+beside it (`fonts.ts`, PV4 naming it as §7 asks). PV4 added them
+(`globals.css`, 2026-10-13): the radii `item` (8), `frame` (12) and `live`
+(16); the sizes `greeting`, `page-title`, `dialog-title`, `meta`,
+`section-label` (uppercase, as `label`), `button`, `tile-name`, `tile-line`,
+`home-countdown`, `present-title`, `present-countdown`, `present-question`,
+`present-tile-name`, `present-tile-state` and the codes' `code-chip`,
+`code-card` and `code-present`, a size the scale has keeping the scale's style
+(chips `caption`, card titles `h3`); and the italic, a family of its own so no
+page preloads it, set on `italic`, `em` and `i`. A size `v2.css` draws that
+these facts don't list (the small button's 13.5/18) joins with the step that
+builds it, named and pinned the same way.
 
 Density: the teacher's live grid is dense (many students at a glance); the
 student app is airy and simple. Theme: **light, everywhere.** The app and the
@@ -462,8 +473,9 @@ where they differ (Present's included: §5); the input size stands.
   to 60% while disabled or busy, at D1's `radius-md` (the app's pills were
   rolled back with D2h, 2026-10-06). On the web: 40 px tall, `space-4` side
   padding, a `body` semibold label. *v2's look (§1):* 10 px corners
-  (`radius-sm`), 18 px side padding, a 15/20 semibold label; small, 34 px tall
-  at 13.5/18; the sign-in's, 48 px.
+  (`radius-sm`), 18 px side padding, a 15/20 semibold label on one line, dimmed
+  to 55% while disabled or busy; small, 34 px tall at 13.5/18; the sign-in's,
+  48 px.
 - **Secondary button:** the primary's shape, `surface-card` with a
   `border-strong` stroke and `text-primary` ink; hovered, `surface-sunken`;
   pressed (Present, `aria-pressed`) or open (New code, `aria-expanded`),
@@ -500,7 +512,8 @@ where they differ (Present's included: §5); the input size stands.
   stand alone as D1 drew them. Use a card only when elevation means hierarchy;
   otherwise group with spacing or a hairline. *v2's look (§1):* a card is
   `radius-md` with 20 px padding, Home's live card and the student's lesson
-  card 16 px; grey (`surface-sunken`) also fills the menu's current item, the
+  card 16 px (a list's cards keep `space-4` until the step that draws the list
+  in v2's look: its tiles, rows or table); grey (`surface-sunken`) also fills the menu's current item, the
   length picker's track, a table's head, the recap's name pills, a code's chip
   and the bars' tracks, and no longer a field.
 - **State chip:** a pill (`radius-full`) filled with the state's tint, its
@@ -511,7 +524,8 @@ where they differ (Present's included: §5); the input size stands.
   Silent and Unknown add a 1 px dashed `border-strong` edge (§2). A chip
   never pulses but as §7 allows. *v2's look (§1), on the web:* sentence case
   at 13/18, 3 × 10 px, a 13 px icon and a 1.5 px edge, dashed for Silent and
-  Unknown; the live grid's cells are tinted tiles, not chips (§5).
+  Unknown (PV4; in Present, until PV8, at the projector's 14/20, medium and
+  untracked); the live grid's cells are tinted tiles, not chips (§5).
 - **The grid's stale banner** ("Live feed has gone quiet…", drawn on D2a's
   canvas): stone, not amber. `surface-sunken` with a `border-default`
   hairline and `text-primary` ink, at `radius-sm`: the grid is honest, not

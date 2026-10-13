@@ -36,7 +36,7 @@ export default function LoginPage() {
 
   return (
     <EntryPage>
-      {/* A card on its own (DESIGN.md §4): radius-lg, space-6 padding, its own hairline edge. */}
+      {/* A card on its own (DESIGN.md §4): radius-md, 20 px padding, its own hairline edge. */}
       <div className={CARD_ALONE}>
         <h1 className="text-h1 text-balance">Teacher portal</h1>
         <p className="mt-2 text-body-lg text-pretty text-text-secondary">
@@ -57,7 +57,7 @@ export default function LoginPage() {
         ) : null}
       </div>
       {/* The public pages, under the card and in line with its text: the card keeps to signing in. */}
-      <nav aria-label="Help and policies" className="mt-4 px-6">
+      <nav aria-label="Help and policies" className="mt-4 px-5">
         <ul className="flex flex-wrap gap-x-5 gap-y-2 text-body">
           {PUBLIC_PAGES.map((page) => (
             <li key={page.href}>

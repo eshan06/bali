@@ -1,9 +1,10 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { buttonClass } from '../components/button';
 import { CARD, CARD_ALONE } from '../components/card';
 
 /*
@@ -11,7 +12,8 @@ import { CARD, CARD_ALONE } from '../components/card';
  * AppTests.tokens pins Theme.swift to it: every `--bali-*` variable globals.css sets (their light
  * values: the portal is always light), each radius, the spacing unit and each type style in its
  * @theme, and the families in fonts.ts, so the two cannot drift apart unnoticed. A value the tokens
- * lack has no place here.
+ * lack has no place here but the owner's: the sizes and colours the owner ruled, and v2's look's
+ * radii and sizes (DESIGN.md §1, Its call: built exactly as drawn), each named and pinned below.
  */
 interface Token {
   name: string;
@@ -77,6 +79,53 @@ const bytes = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2)
  * each pinned by a test of its own: bali-softpulse's glow (DESIGN.md §7) and border-input (§2).
  */
 const RULED = new Set(['--bali-softpulse-glow', '--bali-border-input']);
+
+/** v2's look's radii (DESIGN.md §1, Style facts), beside the tokens' five: built exactly as drawn. */
+const V2_RADII = { item: '8px', frame: '12px', live: '16px' };
+/**
+ * v2's look's sizes off the tokens' scale (DESIGN.md §1, Style facts), built exactly as drawn (the
+ * owner, 2026-10-12): size, line height, weight and tracking, as v2.css draws each.
+ */
+const V2_SIZES: Record<string, [string, string, number, string?]> = {
+  greeting: ['28px', '34px', 600, '-0.015em'],
+  'page-title': ['26px', '32px', 600, '-0.01em'],
+  'dialog-title': ['19px', '25px', 600],
+  meta: ['13.5px', '19px', 400],
+  'section-label': ['11.5px', '15px', 600, '0.05em'],
+  button: ['15px', '20px', 600],
+  'tile-name': ['15px', '20px', 600],
+  'tile-line': ['12.5px', '17px', 500],
+  'home-countdown': ['30px', '34px', 600],
+  'present-title': ['36px', '42px', 600, '-0.01em'],
+  'present-countdown': ['44px', '48px', 600],
+  'present-question': ['34px', '40px', 600, '-0.01em'],
+  'present-tile-name': ['21px', '28px', 600],
+  'present-tile-state': ['17px', '24px', 600],
+  'code-chip': ['17px', '26px', 600, '0.16em'],
+  'code-card': ['40px', '48px', 600, '0.16em'],
+  'code-present': ['34px', '44px', 600, '0.16em'],
+};
+/** The sizes §1 lists that the scale has, each its style: [style, size, line height]. */
+const ON_SCALE = [
+  ['h3', '18px', '24px'], // card titles
+  ['caption', '13px', '18px'], // chips, a tile's state
+  ['data', '14px', '20px'], // menu items
+  ['data-lg', '28px', '32px'], // the class page's countdown
+  ['h2', '24px', '30px'], // figures, Present's options
+  ['body', '15px', '22px'], // a Present tile's line
+];
+/** The primitives v2's look draws with directly (DESIGN.md §1, Style facts). */
+const V2_PRIMITIVES = [
+  'green-50',
+  'green-200',
+  'green-800',
+  'orange-400',
+  'orange-700',
+  'red-300',
+  'stone-300',
+  'stone-400',
+  'stone-500',
+];
 /** A colour token's `#rrggbb` on one side, through its `{primitive}` if it names one. */
 function hexOf(name: string, mode: 'light' | 'dark'): string {
   const token = colours.get(name) as Token;
@@ -105,6 +154,12 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
       const token = colours.get(name.slice('--bali-'.length)) ?? shadows.get(name.slice(7));
       expect(token, name).toBeDefined();
       expect(value, name).toBe(side(token as Token, 'light'));
+    }
+  });
+
+  it('every primitive v2’s look draws with is on :root, at its token’s value (PV4)', () => {
+    for (const name of V2_PRIMITIVES) {
+      expect(light.get(`--bali-${name}`), name).toBe(side(colours.get(name) as Token, 'light'));
     }
   });
 
@@ -188,9 +243,10 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
       const ratio = contrast(hexOf('stone-500', 'light'), hexOf(surface, 'light'));
       expect(ratio, surface).toBeGreaterThanOrEqual(3);
     }
-    // Every field's, through the one Field; a refused field's edge stays `text-primary`.
+    // Every field's, through the one Field; a refused field's edge stays `text-primary`. The field
+    // is white in v2's look (DESIGN.md §1), its grey well gone (PV4).
     expect(read('../components/field.tsx')).toMatch(
-      /<input[^]*className=\{`[^`]*\bborder-border-input\b[^`]*\baria-\[invalid=true\]:border-text-primary\b/,
+      /<input[^]*className=\{`[^`]*\bborder-border-input\b[^`]*\bbg-surface-card\b[^`]*\baria-\[invalid=true\]:border-text-primary\b/,
     );
   });
 
@@ -215,12 +271,19 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     }
   });
 
-  it('the radii are the tokens’ five and no other', () => {
+  it('the radii are the tokens’ five and v2’s three (8, 12, 16), and no other', () => {
     expect(theme.get('--radius-*')).toBe('initial');
     const radii = [...theme.keys()].filter((k) => k.startsWith('--radius-') && k !== '--radius-*');
-    expect(radii.sort()).toEqual(tokens.radius.tokens.map((t) => `--${t.name}`).sort());
+    expect(radii.sort()).toEqual(
+      [
+        ...tokens.radius.tokens.map((t) => `--${t.name}`),
+        ...Object.keys(V2_RADII).map((name) => `--radius-${name}`),
+      ].sort(),
+    );
     for (const token of tokens.radius.tokens)
       expect(theme.get(`--${token.name}`)).toBe(token.value);
+    for (const [name, value] of Object.entries(V2_RADII))
+      expect(theme.get(`--radius-${name}`), name).toBe(value);
   });
 
   it('a transition is DESIGN.md §7’s `fast` 150 ms on the `standard` easing unless a class says otherwise', () => {
@@ -250,18 +313,25 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     }
   });
 
-  it('beside them, only the sizes the owner ruled (DESIGN.md §3, §5), each where it belongs', () => {
+  it('beside them, only the sizes the owner ruled (DESIGN.md §1, §3, §5), each where it belongs', () => {
     // The input size: 16 px, so iPhone Safari never zooms into a field when it is tapped
     // (2026-10-05). The Present view's names and chip labels, 20 px and 14 px as drawn
     // (2026-10-05). code-lg, the join code in Present, 24 px at the code style's weight
     // (2026-10-06). Their line heights on the 4-pt grid; the design system gains them at the
-    // owner's next export.
+    // owner's next export. And v2's look's sizes, as drawn (2026-10-12), pinned below.
     const sizes = [...theme.keys()]
       .filter((k) => k.startsWith('--text-') && k !== '--text-*' && !k.slice(2).includes('--'))
       .map((k) => k.slice('--text-'.length));
     const styles = tokens.type.groups.flatMap((g) => g.styles.map((s) => s.name));
     expect(sizes.sort()).toEqual(
-      [...styles, 'code-lg', 'input', 'present-label', 'present-name'].sort(),
+      [
+        ...styles,
+        'code-lg',
+        'input',
+        'present-label',
+        'present-name',
+        ...Object.keys(V2_SIZES),
+      ].sort(),
     );
     const code = tokens.type.groups.flatMap((g) => g.styles).find((s) => s.name === 'code');
     expect(theme.get('--text-code-lg')).toBe('24px');
@@ -274,14 +344,27 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     expect(theme.get('--text-present-name')).toBe('20px');
     expect(theme.get('--text-present-name--line-height')).toBe('28px');
     expect(theme.get('--text-present-name--font-weight')).toBe('600');
-    // The label style's weight and tracking at the projector's size.
-    const label = tokens.type.groups.flatMap((g) => g.styles).find((s) => s.name === 'label');
+    // The chip's weight at the projector's size, untracked: a chip is sentence case in v2's look
+    // (PV4), where the label style's tracking was for capitals.
     expect(theme.get('--text-present-label')).toBe('14px');
     expect(theme.get('--text-present-label--line-height')).toBe('20px');
-    expect(theme.get('--text-present-label--font-weight')).toBe(String(label?.fontWeight));
-    expect(theme.get('--text-present-label--letter-spacing')).toBe(label?.letterSpacing);
+    expect(theme.get('--text-present-label--font-weight')).toBe('500');
+    expect(theme.has('--text-present-label--letter-spacing')).toBe(false);
     for (const size of ['present-name', 'present-label', 'input', 'code-lg']) {
       expect(parseInt(theme.get(`--text-${size}--line-height`) ?? '', 10) % 4, size).toBe(0);
+    }
+    // v2's sizes off the scale, each as drawn; the ones the scale has, the scale's own.
+    for (const [name, [size, line, weight, tracking]] of Object.entries(V2_SIZES)) {
+      expect(theme.get(`--text-${name}`), name).toBe(size);
+      expect(theme.get(`--text-${name}--line-height`), name).toBe(line);
+      expect(theme.get(`--text-${name}--font-weight`), name).toBe(String(weight));
+      expect(theme.get(`--text-${name}--letter-spacing`), name).toBe(tracking);
+    }
+    for (const [style, size, line] of ON_SCALE) {
+      expect([theme.get(`--text-${style}`), theme.get(`--text-${style}--line-height`)]).toEqual([
+        size,
+        line,
+      ]);
     }
     const src = fileURLToPath(new URL('../', import.meta.url));
     const present = sources(src).filter(
@@ -302,17 +385,36 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     expect(sansFace).toBe('Instrument Sans');
     expect(monoFace).toBe('JetBrains Mono');
     const list = (names: string[]) => `[${names.map((n) => `'${n}'`).join(', ')}]`;
-    expect(fonts).toContain(`fallback: ${list(sansRest)}`);
+    // The sans's upright and its italic (PV4) fall back to the sans stack, the mono to its own.
+    expect(fonts.split(`fallback: ${list(sansRest)}`)).toHaveLength(3);
     expect(fonts).toContain(`fallback: ${list(monoRest)}`);
-    expect(fonts).toContain("src: './fonts/instrument-sans-");
-    expect(fonts).toContain("src: './fonts/jetbrains-mono-");
-    // Exactly the stacks: no metric-matched Arial ahead of them on either face.
-    expect(fonts.match(/adjustFontFallback: false/g)).toHaveLength(2);
+    const files = [...fonts.matchAll(/src: '\.\/(fonts\/[\w-]+\.woff2)'/g)].map((m) => m[1]);
+    expect(files).toEqual([
+      'fonts/instrument-sans-latin-wght-normal.woff2',
+      'fonts/instrument-sans-latin-wght-italic.woff2',
+      'fonts/jetbrains-mono-latin-wght-normal.woff2',
+    ]);
+    for (const file of files)
+      expect(existsSync(fileURLToPath(new URL(`./${file}`, import.meta.url))), file).toBe(true);
+    // Exactly the stacks: no metric-matched Arial ahead of them on any face.
+    expect(fonts.match(/adjustFontFallback: false/g)).toHaveLength(3);
     expect(inline.get('--font-sans')).toBe('var(--font-instrument-sans)');
     expect(inline.get('--font-mono')).toBe('var(--font-jetbrains-mono)');
     expect(tokens.type.families.num.startsWith('ui-rounded, "SF Pro Rounded"')).toBe(true);
     expect(inline.get('--font-num')).toBe(
       "ui-rounded,'sf pro rounded',var(--font-instrument-sans)",
+    );
+  });
+
+  it('the italic is its own face, never preloaded, and every italic text is set in it (PV4)', () => {
+    // Its own family, so next/font preloads it on no page (it preloads every file of a family);
+    // the base layer then sets it on `italic`, `em` and `i`, so the upright is never slanted.
+    expect(fonts).toMatch(
+      /localFont\(\{\s*src: '\.\/fonts\/instrument-sans-latin-wght-italic\.woff2',\s*weight: '400 700',\s*style: 'italic',\s*variable: '--font-instrument-sans-italic',[^}]*\bpreload: false,\s*\}\)/,
+    );
+    expect(read('./layout.tsx')).toContain('${instrumentSansItalic.variable}');
+    expect(css).toMatch(
+      /:where\(\.italic, em, i\)\s*\{\s*font-family: var\(--font-instrument-sans-italic\);\s*\}/,
     );
   });
 
@@ -332,8 +434,8 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
 });
 
 describe('every page and piece uses the tokens’ utilities, never a Tailwind default', () => {
-  // DESIGN.md: no `slate-*`, no `text-sm`. Every screen is in Soft premium since D2g, and the theme
-  // holds no default colour or size, so one would draw nothing: each source file is held to it.
+  // DESIGN.md: no `slate-*`, no `text-sm`. Every screen is drawn from the tokens since D2g, and the
+  // theme holds no default colour or size, so one would draw nothing: each source file is held to it.
   const src = fileURLToPath(new URL('../', import.meta.url));
   const DRAWN = sources(src)
     .filter((file) => /\.tsx?$/.test(file))
@@ -368,9 +470,11 @@ describe('every page and piece uses the tokens’ utilities, never a Tailwind de
 
 describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
   // Cards sit straight on the page with their own hairline (DESIGN.md §4). Grey stays only where
-  // the approved designs keep it: a field's well, the grid's stale banner, the policy draft's
-  // banner and badge, and a control's hover, pressed or open state; a chip's fill is its state's
-  // own tint.
+  // the approved designs keep it: the grid's stale banner, the policy draft's banner and badge,
+  // and a control's hover, pressed or open state; a chip's fill is its state's own tint. A field
+  // is white in v2's look (PV4); the grey v2 adds (the menu's current item, the length picker's
+  // track, a table's head, the recap's name pills, a code's chip, the bars' tracks) comes with
+  // the step that draws each.
   const src = fileURLToPath(new URL('../', import.meta.url));
   const files = sources(src).filter((file) => /\.tsx?$/.test(file));
 
@@ -394,20 +498,44 @@ describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
     const filled = Object.fromEntries(
       files.filter((file) => bare(file) > 0).map((file) => [relative(src, file), bare(file)]),
     );
-    // A field's well, the stale banner, and the policy draft's banner and Placeholder badge.
+    // The stale banner, and the policy draft's banner and Placeholder badge.
     expect(filled).toEqual({
-      [join('components', 'field.tsx')]: 1,
       [join('components', 'live-grid.tsx')]: 1,
       [join('components', 'policy-draft.tsx')]: 2,
     });
   });
 
-  it('a card keeps its own hairline and soft shadow', () => {
+  it('a card keeps its own hairline and soft shadow, at radius-md', () => {
     for (const card of [CARD, CARD_ALONE]) {
       expect(card).toMatch(/\bbg-surface-card\b/);
       expect(card).toMatch(/\bborder border-border-default\b/);
       expect(card).toMatch(/\bshadow-1\b/);
+      expect(card).toMatch(/\brounded-md\b/);
     }
+    // v2's card on its own, 20 px in (DESIGN.md §4); a list's cards keep space-4 until the step
+    // that draws the list in v2's look.
+    expect(CARD_ALONE).toMatch(/\bp-5\b/);
+    expect(CARD).toMatch(/\bp-4\b/);
+  });
+});
+
+describe('the buttons in v2’s look (DESIGN.md §1 and §4, PV4)', () => {
+  const look = buttonClass('primary').split(' ');
+
+  it('are 40 px tall with 10 px corners, 18 px in, their label 15/20 semibold on one line', () => {
+    expect(look).toEqual(
+      expect.arrayContaining(['h-10', 'rounded-sm', 'px-4.5', 'text-button', 'whitespace-nowrap']),
+    );
+    // No pill (Soft premium's, superseded) on any variant.
+    for (const variant of ['primary', 'secondary', 'destructive'] as const) {
+      expect(buttonClass(variant)).not.toMatch(/\brounded-full\b/);
+    }
+  });
+
+  it('dim to 55 % while disabled or busy, as v2.css draws them', () => {
+    expect(look).toEqual(
+      expect.arrayContaining(['disabled:opacity-55', 'aria-disabled:opacity-55']),
+    );
   });
 });
 
