@@ -4,7 +4,13 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-10-12 (Central) — PV3: `GET /v1/me/activity` gives a teacher's Recent
+_Last updated: 2026-10-12 (Central) — PV1 approved (canvas version 21): what no board drew is
+drawn, the owner's rulings in DECISIONS (a teacher's page at phone width with the class's tiles in two
+columns and Present and Recent activity hidden under 640 px; L7c's Questions on the report page only;
+Present after the bell "Class is over" alone; the classes home's old card gone; the recap's line on
+"Focused the whole time" corrected). PV3b, a class list in a fixed order, added (the owner: fix it).
+The plan's notes now sit on their steps (PV5, PV12, PV15, PV17, L7, L7b, L7c, M5, M6, W4), and dev's
+hosted sign-up trap is in GOTCHAS. Next: PV3b, then PV4. Before it, PV3: `GET /v1/me/activity` gives a teacher's Recent
 activity, what Home shows: the newest four of today's Emergency Unlocks (each with its reason now),
 protection offs and session starts across their own classes, each with its student, class and time.
 Its unlocks and protection offs are those each session's report lists, late ones and ones after the
@@ -660,7 +666,7 @@ validation** (each 👀): vitest, `npm run typecheck && npm run lint && npm test
 - **PV14** 👀 A session's report (~250; ReportOpened, ReportStates' "Loading this session…" and "Couldn't load this session."): one session on a page and a URL of its own, its recap card and its Unlocks table; its Questions card is L7c's — validation: as above
 - **PV15** 👀 The entry pages (~250; SignIn, Invite, EntryStates): v2's centred sign-in with W3's words for students ("Sign in to Bali", its line for teachers and students, and "Students: set up Bali in the app on your iPhone first."), the invite card under a bar with Sign out and its line for students; `/auth/callback`, `/support`, `/privacy` and `/terms` as PV1 draws them (`app/login/page.tsx`, `components/entry-page.tsx`, `components/invite-code.tsx`); and W2's `homeFor` routing wired into `/` here (PV0's review), so a student who said 13+ in the app no longer lands on the invite page and `/` reads the 13+ check before `/v1/me` — validation: as above. **Then Phase 7's web screens** (Phase 7 steps)
 - **PV16** 👀 Classes (~350; Classes, ClassesNew, ClassesCreated, HomeStates' New class states): `/classes` in the menu, a card per class with its student count, last session (PV2) and Live chip, New class as a dialog (Creating…, a `5xx` with Try again) in place of the inline create row, "Period 4 Biology is ready" with its join code, Copy code and Done, and the block's card — validation: as above
-- **PV17** 👀 Home (Main, HomeIdle, HomeNew, HomeStates), in three: **PV17a** (~300) the greeting and date, each class once (Live and Open, or Start…), the block's card with Register block, and "Set up your first class" for a new teacher; **PV17b** (~300) the live class's card on the session's snapshot and stream (its ring, countdown, six state counts, Open the class, Present and the latest unlock); **PV17c** (~250) Last session (PV2; hidden until a class's first session ends) and Recent activity (PV3; hidden under 640 px; no empty state, a live class's own start always listed): for up to a minute after a bell `lastSession` names a session whose report still says `ended: false`, which means only "not swept yet" (PV2's review), so the card never reads that flag as still running — validation: as above
+- **PV17** 👀 Home (Main, HomeIdle, HomeNew, HomeStates), in three: **PV17a** (~300) the greeting and date, each class once (Live and Open, or Start…), the block's card with Register block, and "Set up your first class" for a new teacher; **PV17b** (~300) the live class's card on the session's snapshot and stream (its ring, countdown, six state counts, Open the class, Present and the latest unlock); **PV17c** (~250) Last session (PV2; hidden until a class's first session ends) and Recent activity (PV3; hidden under 640 px; no empty state, a live class's own start always listed): for up to a minute after a bell `lastSession` names a session whose report still says `ended: false`, which means only "not swept yet" (PV2's review), so the card never reads that flag as still running; if Recent activity is polled rather than read once, its read is narrowed first to the three kinds and the reason changes (PV3's review) — validation: as above
 
 ### Phase 7 steps (live lesson; one PR each; 👀 = the owner looks at screenshots, 📱 = needs the owner's iPhone, 🔧 = the owner in a console)
 
