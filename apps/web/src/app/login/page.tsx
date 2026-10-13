@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 
 import { Button } from '@/components/button';
-import { CARD_ALONE } from '@/components/card';
+import { CARD_ENTRY } from '@/components/card';
 import { EntryPage } from '@/components/entry-page';
 import { TextLink } from '@/components/text-link';
 import { type SignedOut, signedOut, startLogin } from '@/lib/auth';
@@ -36,8 +36,8 @@ export default function LoginPage() {
 
   return (
     <EntryPage>
-      {/* A card on its own (DESIGN.md §4): radius-lg, space-6 padding, its own hairline edge. */}
-      <div className={CARD_ALONE}>
+      {/* An entry page's card (DESIGN.md §4): radius-md, 24 px padding, its own hairline edge. */}
+      <div className={CARD_ENTRY}>
         <h1 className="text-h1 text-balance">Teacher portal</h1>
         <p className="mt-2 text-body-lg text-pretty text-text-secondary">
           Sign in to see your classes.

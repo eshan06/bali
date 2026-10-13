@@ -1,8 +1,8 @@
 import type { ComponentProps, ReactNode } from 'react';
 
 /**
- * A text field (DESIGN.md §4, Inputs): its label above, the input a `surface-sunken` well at
- * `radius-sm` with a `border-input` edge, 3:1 against the card, the page and the well (the owner's
+ * A text field (DESIGN.md §4, Inputs): its label above, the input white (`surface-card`, v2's
+ * look) at `radius-sm` with a `border-input` edge, 3:1 against the card and the page (the owner's
  * ruling of 2026-10-06), its help below in `caption`, the focus ring from globals.css. What is
  * typed is the input size, 16 px (§3, the owner's ruling of 2026-10-05), so iPhone Safari never
  * zooms into the field when it is tapped: every portal input is this one. `mono` sets it in the
@@ -52,7 +52,7 @@ export function Field({
             {...props}
             aria-invalid={refusal ? true : invalid}
             aria-describedby={describes || undefined}
-            className={`block h-10 w-full rounded-sm border border-border-input bg-surface-sunken px-3 text-input text-text-primary aria-[invalid=true]:border-text-primary ${mono ? 'font-mono font-medium' : ''}`}
+            className={`block h-10 w-full rounded-sm border border-border-input bg-surface-card px-3 text-input text-text-primary aria-[invalid=true]:border-text-primary ${mono ? 'font-mono font-medium' : ''}`}
           />
         </div>
         {trailing}

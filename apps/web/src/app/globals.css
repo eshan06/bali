@@ -6,13 +6,14 @@
  * light, like the app, whatever the device's mode (the owner, 2026-10-07), its native controls and
  * scrollbars too. tokens.test.ts pins every value here to the JSON, so the two cannot drift; a
  * value the tokens lack is a question for the owner, written here only once the owner rules on it
- * (border-input below; the input size and code-lg in the type scale).
- * Every semantic token is here; of the primitives, only the ones a semantic token or the mark
- * reference (a page uses semantic tokens, never a primitive).
+ * (border-input below; the input size, code-lg and v2's look's radii and sizes in the theme).
+ * Every semantic token is here; of the primitives, the ones a semantic token or the mark
+ * reference, and those v2's look draws with directly (DESIGN.md §1, Style facts).
  */
 :root {
   color-scheme: light;
 
+  --bali-green-50: #f0f7f3;
   --bali-green-100: #dcede3;
   --bali-green-200: #bcdcca;
   --bali-green-400: #62a483;
@@ -28,10 +29,13 @@
   --bali-stone-600: #6b665d;
   --bali-stone-700: #524e47;
   --bali-orange-100: #f7e6d2;
+  --bali-orange-400: #db9347;
+  --bali-orange-700: #8c4f1e;
   --bali-orange-800: #6f3f1b;
   --bali-blue-100: #e0ebfa;
   --bali-blue-700: #28528e;
   --bali-red-100: #fae3e0;
+  --bali-red-300: #e89b92;
   --bali-red-600: #a93d31;
   --bali-red-700: #8c342b;
 
@@ -108,6 +112,10 @@
   --radius-md: 14px;
   --radius-lg: 20px;
   --radius-full: 999px;
+  /* v2's look's three more (DESIGN.md §1, Its call: built exactly as drawn), portal-only. */
+  --radius-item: 8px; /* a menu item, a segment of the length picker */
+  --radius-frame: 12px; /* a table's box, a slide, Present's join code */
+  --radius-live: 16px; /* Home's live card, the student's lesson card */
 
   --shadow-*: initial;
 
@@ -166,14 +174,80 @@
 
   /* The Present view's two sizes, the owner's ruling (2026-10-05): names 20 px and chip labels
      14 px as D2a's canvas drew them, their line heights on the 4-pt grid (26 and 18 drawn, taken
-     up to 28 and 20). The live grid's only. Not in the tokens yet (DESIGN.md §5). */
+     up to 28 and 20). The live grid's only. Not in the tokens yet (DESIGN.md §5). The label is the
+     chip's at the projector's size: medium, in sentence case, untracked, since v2's look (PV4). */
   --text-present-name: 20px;
   --text-present-name--line-height: 28px;
   --text-present-name--font-weight: 600;
   --text-present-label: 14px;
   --text-present-label--line-height: 20px;
-  --text-present-label--font-weight: 600;
-  --text-present-label--letter-spacing: 0.06em;
+  --text-present-label--font-weight: 500;
+
+  /* v2's look's sizes (DESIGN.md §1, Style facts), built exactly as drawn (the owner,
+     2026-10-12, Its call): portal-only, out of bali-tokens.json and the app. A size §1 lists that
+     the scale has takes the scale's style: card titles `h3`, chips `caption`, menu items `data`,
+     the class page's countdown `data-lg`, figures and Present's options `h2`, a Present tile's
+     line `body`. `text-section-label` adds `uppercase`; the countdowns take `font-num`, the codes
+     `font-mono`. */
+  --text-greeting: 28px;
+  --text-greeting--line-height: 34px;
+  --text-greeting--font-weight: 600;
+  --text-greeting--letter-spacing: -0.015em;
+  --text-page-title: 26px;
+  --text-page-title--line-height: 32px;
+  --text-page-title--font-weight: 600;
+  --text-page-title--letter-spacing: -0.01em;
+  --text-dialog-title: 19px;
+  --text-dialog-title--line-height: 25px;
+  --text-dialog-title--font-weight: 600;
+  --text-meta: 13.5px;
+  --text-meta--line-height: 19px;
+  --text-meta--font-weight: 400;
+  --text-section-label: 11.5px;
+  --text-section-label--line-height: 15px;
+  --text-section-label--font-weight: 600;
+  --text-section-label--letter-spacing: 0.05em;
+  --text-button: 15px;
+  --text-button--line-height: 20px;
+  --text-button--font-weight: 600;
+  --text-tile-name: 15px;
+  --text-tile-name--line-height: 20px;
+  --text-tile-name--font-weight: 600;
+  --text-tile-line: 12.5px;
+  --text-tile-line--line-height: 17px;
+  --text-tile-line--font-weight: 500;
+  --text-home-countdown: 30px;
+  --text-home-countdown--line-height: 34px;
+  --text-home-countdown--font-weight: 600;
+  --text-present-title: 36px;
+  --text-present-title--line-height: 42px;
+  --text-present-title--font-weight: 600;
+  --text-present-title--letter-spacing: -0.01em;
+  --text-present-countdown: 44px;
+  --text-present-countdown--line-height: 48px;
+  --text-present-countdown--font-weight: 600;
+  --text-present-question: 34px;
+  --text-present-question--line-height: 40px;
+  --text-present-question--font-weight: 600;
+  --text-present-question--letter-spacing: -0.01em;
+  --text-present-tile-name: 21px;
+  --text-present-tile-name--line-height: 28px;
+  --text-present-tile-name--font-weight: 600;
+  --text-present-tile-state: 17px;
+  --text-present-tile-state--line-height: 24px;
+  --text-present-tile-state--font-weight: 600;
+  --text-code-chip: 17px;
+  --text-code-chip--line-height: 26px;
+  --text-code-chip--font-weight: 600;
+  --text-code-chip--letter-spacing: 0.16em;
+  --text-code-card: 40px;
+  --text-code-card--line-height: 48px;
+  --text-code-card--font-weight: 600;
+  --text-code-card--letter-spacing: 0.16em;
+  --text-code-present: 34px;
+  --text-code-present--line-height: 44px;
+  --text-code-present--font-weight: 600;
+  --text-code-present--letter-spacing: 0.16em;
 }
 
 @theme inline {
@@ -255,6 +329,12 @@
   :focus-visible {
     outline: 2px solid var(--bali-focus-ring-color);
     outline-offset: 2px;
+  }
+
+  /* Italic text in Instrument Sans's italic face, a family of its own (fonts.ts), never the
+     upright slanted: `italic`, as Reports' framing line takes it, `em` and `i`. */
+  :where(.italic, em, i) {
+    font-family: var(--font-instrument-sans-italic);
   }
 
   /* §7: every animation off under reduced motion; a fade is instant. */

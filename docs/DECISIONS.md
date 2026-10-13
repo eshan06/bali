@@ -8,6 +8,63 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-13** — **PV4: v2's look's shared pieces on every page at once, built exactly as drawn
+  (the owner, 2026-10-12): the buttons, the field, the chip and the card on its own; v2's radii and
+  sizes as named portal tokens; Instrument Sans's italic, self-hosted.** Built to
+  [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (version 21),
+  `project/v2.css` and the boards that use its pieces (ClassLive, ClassStates, ClassBefore, Main,
+  SignIn, HomeStates). **The primitives:** green-50, orange-400, orange-700 and red-300 join
+  `globals.css`'s `:root`, so every primitive `v2.css` draws with is there, each pinned to
+  `bali-tokens.json` like the rest. No Tailwind colour names them yet: the step that first draws
+  with one names its utility, and `tokens.test.ts`'s ban on Tailwind's own palette names rules out
+  a bare `bg-green-50`. **The radii:** `item` 8 (a menu item, a segment of the length picker),
+  `frame` 12 (a table's box, a slide, Present's join code), `live` 16 (Home's live card, the
+  student's lesson card), named for what takes each, as DESIGN.md §1 lists them (*weighed:* names
+  on the tokens' size scale, which has no room: 8 sits between `xs` and `sm`). **The sizes:** the
+  seventeen of §1's style facts off the scale, each named for the role §1 gives it, at the weight
+  and tracking `v2.css` draws: `greeting`, `page-title`, `dialog-title`, `meta`, `section-label`,
+  `button`, `tile-name`, `tile-line`, `home-countdown`, `present-title`, `present-countdown`,
+  `present-question`, `present-tile-name`, `present-tile-state`, `code-chip`, `code-card`,
+  `code-present`; `button` and `tile-name` share their values and keep a name each, as §1 lists
+  them apart. A size §1 lists that the scale has keeps the scale's style (chips `caption`, card
+  titles `h3`, menu items `data`, figures `h2`). A size `v2.css` draws that §1 doesn't list (the
+  small button's 13.5/18, the sign-in's 16/20) joins with the step that builds it, named and pinned
+  the same way (*weighed:* every pair `v2.css` draws, some 35, most for pieces no step has built).
+  **The buttons:** `radius-sm`, 18 px in, `text-button` (15/20 semibold) on one line, dimmed to
+  55 % while disabled or busy as `v2.css` draws them (60 % before); hover, pressed and open
+  unchanged; no small or large size until a page draws one (PV6, PV15). **The field:** white
+  (`surface-card`), its edge, height and type unchanged. **The chip:** sentence case at `caption`
+  medium (13/18, 500, as `v2.css`'s chip label), 3 × 10 px, 13 px icons 6 px apart, and a 1.5 px
+  edge on every chip, transparent but on Silent and Unknown, where it is dashed `border-strong`,
+  so every chip is one size. Kept: a long label wraps after its dot (the owner's ruling), the two
+  Left icons (Q2 A), and `radius-lg`, which draws `v2.css`'s pill on one line (the chip is 27 px
+  tall) and a rounded box when a label wraps in a narrow cell, a case no board draws since `v2.css`
+  never puts a chip in a cell. Present's chip keeps the projector's 14/20 (`present-label`), now
+  medium and untracked like the chip, since the label style's 600 and +0.06 em were for capitals
+  (*weighed:* leaving it, tracked sentence case no board draws), until PV8 draws Present's tiles.
+  **The card:** one on its own is `v2.css`'s card, `radius-md` with 20 px padding (it was
+  `radius-lg` with 24): the recap, the block, the class page's cards and Help's. An entry page's
+  (sign-in, its callback, the invite code) is `v2.css`'s stage card, `radius-md` with 24 px
+  (`CARD_ENTRY`), as SignIn, Invite and AuthCallbackFailed draw it (santa's WARN; it had taken the
+  20 px card first). The class page's Loading card holds the Start card's new height (116 px), and
+  a grid cell's floor is a cell with its line under the 27 px chip (117 px), so nothing jumps or
+  gapes (santa's WARN). A list's cards (the grid's cells, the classes, the reports) keep
+  `radius-md` with 16 px until the step that draws each list: `v2.css` draws no one list card (a
+  class row 18 × 20, Home's rows 15 × 18, a tile 12 × 14), so 20 px would be a size no board draws
+  (*weighed:* one 20 px card everywhere). **The
+  italic:** `@fontsource-variable/instrument-sans` 5.3.0, the upright's package and version (the
+  repo's upright matches its file byte for byte), its latin `wght` italic,
+  `files/instrument-sans-latin-wght-italic.woff2` (31,828 bytes, SHA-256
+  `77210cdde0281b5ecb0d592e063a98656f1bc36993a3b98f506eb91ff4a433a5`), taken with `npm pack`, no
+  dependency added; the same OFL, whose `fonts/OFL.txt` already names the italic. A next/font
+  family of its own, never preloaded: next/font preloads every file of a family, which would load
+  32 KB on every page and log Chrome's "preloaded but not used" for one line on Reports
+  (*weighed:* one family with both files). So `italic` alone never slants the upright,
+  `globals.css` sets the italic face on `italic`, `em` and `i`. **`tokens.test.ts`** pins all of it,
+  the grey wells' list without the field, and the chip rendered (`live-grid.test.ts`). *Found, not
+  built:* `v2.css` draws every icon at stroke 1.75, where lucide's default is 2 and DESIGN.md's facts
+  name no stroke; the portal's icons stay at 2 until the owner says otherwise.
+
 - **2026-10-13** — **The portal's sign-in lasts the school day: its tokens 12 hours on prod, a day
   on dev.** The portal keeps only Cognito's access token, per tab, with no refresh token and no
   silent renewal (`docs/WEB.md`, "Known gap — token renewal"; a refresh token never goes in web

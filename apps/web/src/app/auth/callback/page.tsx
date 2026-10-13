@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import { buttonClass } from '@/components/button';
-import { CARD_ALONE } from '@/components/card';
+import { CARD_ENTRY } from '@/components/card';
 import { EntryPage } from '@/components/entry-page';
 import { completeLogin } from '@/lib/auth';
 
@@ -28,7 +28,7 @@ export default function CallbackPage() {
 
   return (
     <EntryPage>
-      <div className={CARD_ALONE}>
+      <div className={CARD_ENTRY}>
         {failed ? (
           <>
             <p role="alert" className="text-body-lg text-pretty">

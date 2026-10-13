@@ -44,7 +44,7 @@ import {
 import { createSseClient, type SseClient, type SseStatus } from '@/lib/sse-client';
 import { useApi, useSignOut } from '@/lib/use-api';
 
-/** A state's edge: none to see on a tinted chip; Silent's and Unknown's dashed (Q3 A). */
+/** A state's edge: none to see on a tinted chip; Silent's and Unknown's dashed (Q3 A, 1.5 px). */
 const SOLID = 'border-transparent';
 const DASHED = 'border-dashed border-border-strong';
 const EMERGENCY = `${SOLID} bg-state-emergency-bg text-state-emergency-fg`;
@@ -96,12 +96,14 @@ export const COLUMNS = 'grid-cols-[repeat(auto-fill,minmax(min(212px,100%),1fr))
 export const PRESENT_COLUMNS = 'grid-cols-2 @2xl:grid-cols-3 @4xl:grid-cols-4';
 
 /**
- * A state chip: a pill in the state's tint, padded `space-2` × `space-3`, its label in the `label`
- * style (DESIGN.md §4). It says the state alone, the same words on the teacher's screen and on the
- * projector (the Class page design); only Silent carries how long the phone has been quiet. A label
- * too long for its cell wraps balanced, after the dot ("Left ·" over "protection off", the
- * owner's ruling), at `radius-lg`, which draws a pill on one line. `pulse` is `bali-softpulse`
- * (§7), and `onPulseEnd` hears it finish. In Present the label takes the projector's size (§5).
+ * A state chip in v2's look (DESIGN.md §4): a pill in the state's tint with a 1.5 px edge, padded
+ * 3 × 10 px, its 13 px icons centred on the label's first line, the label in sentence case at
+ * 13/18 (`caption`, medium). It says the state alone, the same words on the teacher's screen and
+ * on the projector (the Class page design); only Silent carries how long the phone has been quiet.
+ * A label too long for its cell wraps balanced, after the dot ("Left ·" over "protection off", the
+ * owner's ruling), at `radius-lg`, which draws the pill on one line (it is 27 px tall) and a
+ * rounded box on two. `pulse` is `bali-softpulse` (§7), and `onPulseEnd` hears it finish. In
+ * Present the label takes the projector's size (§5), its icons 16 px.
  */
 function Chip({
   display,
@@ -120,14 +122,14 @@ function Chip({
   return (
     <span
       onAnimationEnd={pulse ? onPulseEnd : undefined}
-      className={`inline-flex max-w-full items-start gap-1 rounded-lg border px-3 py-2 text-balance uppercase ${present ? 'text-present-label' : 'text-label'} ${chip.tone} ${pulse ? 'animate-softpulse' : ''}`}
+      className={`inline-flex max-w-full items-start gap-1.5 rounded-lg border-[1.5px] px-2.5 py-0.75 text-balance ${present ? 'text-present-label' : 'text-caption font-medium'} ${chip.tone} ${pulse ? 'animate-softpulse' : ''}`}
     >
       {chip.icons.map((Icon, i) => (
         <Icon
           key={i}
-          size={present ? 16 : 14}
+          size={present ? 16 : 13}
           aria-hidden="true"
-          className={`shrink-0 ${present ? 'mt-0.5' : 'mt-px'}`}
+          className={`shrink-0 ${present ? 'mt-0.5' : 'mt-[2.5px]'}`}
         />
       ))}
       {/* A no-break space before each dot, so a label breaks after it, never before. */}
@@ -155,8 +157,8 @@ const ONE_COLUMN =
 /**
  * One student's cell (the Class page design): the name, then the chip, then the line under it: the
  * unlock's reason (`unlockNote`, never in Present) and how long since the phone was heard from
- * (`lastSeenNote`), so a row's chips line up. Every cell is as tall as one with that line. In
- * Present the line sits beside the chip when it fits.
+ * (`lastSeenNote`), so a row's chips line up. Every cell is as tall as one with that line: 117 px
+ * with v2's 27 px chip (`min-h-29.25`). In Present the line sits beside the chip when it fits.
  */
 export function Cell({
   student: s,
@@ -176,7 +178,7 @@ export function Cell({
   const seen = lastSeenNote(s, display, now);
   return (
     <li
-      className={`flex flex-col gap-2 ${CARD} ${present ? 'min-h-22' : `min-h-31 ${ONE_COLUMN}`}`}
+      className={`flex flex-col gap-2 ${CARD} ${present ? 'min-h-22' : `min-h-29.25 ${ONE_COLUMN}`}`}
     >
       <div className="flex items-start justify-between gap-2">
         <span
