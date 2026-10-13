@@ -8,8 +8,8 @@ _Last updated: 2026-10-13 (Central) — PV4c: PV4b's tests of the icons' stroke 
 would quietly stop holding (moved out of the base layer, commented out or overridden; a stroke set on
 one icon by an inline style, an alias's too; lucide renaming its class), and leave a component of its
 own its stroke, such as PV7's countdown ring. Nothing drawn changes. Next: PV7. Before it, PV5b: the
-shell's read of the account, fixed as the owner approved PV5's review: while it is read, "Loading…" in the page's place with no menu or bar, where
-the window was blank (a redeem's fresh read too); a failed read "Couldn't load your account." with
+shell's read of the account, fixed as the owner approved PV5's review: while it is read, "Loading…"
+in the page's place with no menu or bar, where the window was blank (a redeem's fresh read too); a failed read "Couldn't load your account." with
 Try again under today's bar on every page, and read again on the next page opened, where only Home
 read it again; and only the newest read's answer counts, so no past failure shows over fresh data.
 Next: PV7. Before it, PV6: a class's page before a session in v2's look, built
