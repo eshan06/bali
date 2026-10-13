@@ -40,15 +40,15 @@ uses values the one before it produced:
   `bali prod` with its variables, `TZ` `America/Chicago` and `CORS_ORIGINS`
   `https://bali-portal.vercel.app` (5–6), the sweep cron `sweep-cron` (7; its first run
   logged `expired 0`, `wentSilent 0`), and `/healthz` answering ok (8).
-- **Runbook 1 — not done, by the owner's ruling:** backups (4). Railway's backups need
-  its **Pro** plan; the account is on **Hobby** (upgraded 2026-10-05). For the Vanderbilt
-  pilot prod runs **without backups**, an accepted risk (step 4 says what that means);
-  revisit before any K-12 school. Railway's 2FA (1) is deferred by the owner.
+- **Runbook 1 — not done yet:** backups (4), before the Vanderbilt pilot's first class (PLAN's
+  L0b; the owner, 2026-10-12, withdrawing the ruling of 2026-10-05 that ran the pilot without
+  them). Railway's backups need its **Pro** plan; the account is on **Hobby** (upgraded
+  2026-10-05). Railway's 2FA (1) is deferred by the owner.
 - **Runbook 3, the Vercel flip — done** (2026-10-05): the project `bali-portal`, rooted at
   `apps/web`, at `https://bali-portal.vercel.app`, Node.js 22.x, prod's values; the API's
   CORS preflight from it answers `204`. The old project `bali-web` (the v2 demo) isn't
   connected to the repo, so step 2 wasn't needed. Step 6 done (2026-10-06): `vercel.json` deleted. `bali-portal` hadn't been deploying `main` by itself (the owner deployed by hand); check the next push to `main` deploys it.
-- **Runbook 4, the restore drill — on hold** while prod has no backups. Its half A, a
+- **Runbook 4, the restore drill — on hold** until prod's first backup (runbook 1, step 4). Its half A, a
   `pg_dump` into a scratch database, works without them (skip its step 1).
 - **Runbook 5, GitHub:** the load gate is a required check (7); the rest is open.
 - **Runbook 6, alerts:** open.
@@ -114,11 +114,10 @@ project for the API (its DSN).
 4. **Backups.** Postgres service → **Backups** tab → turn on a **daily** schedule (and
    weekly, if offered). Backups need Railway's **Pro** plan ($20 a month); Hobby has
    none.
-   - **The Vanderbilt pilot runs without them** (the owner's ruling, 2026-10-05; the
-     account is on Hobby). An accepted risk for an informal pilot of adults: if prod's
-     volume is lost, its sessions, reports and unlock records are gone, and the school,
-     its teachers and their classes are made again by hand. **Revisit before any K-12
-     school:** Pro and this step, or a nightly `pg_dump` to an encrypted S3 bucket.
+   - **Before the Vanderbilt pilot's first class** (PLAN's L0b; the owner, 2026-10-12): the
+     account is on Hobby, so upgrade it to Pro first. The ruling of 2026-10-05 ran the pilot
+     without them, an accepted risk for adults; the owner withdrew it, since a lost volume
+     would take the pilot's sessions, reports, unlock records and answers with it.
    - **Point-in-time recovery:** hosting decision 4 asks for it. Railway's backups, as
      far as this doc's author knows, are scheduled volume snapshots, not
      point-in-time recovery. If you find no PITR setting, write that down and raise
@@ -258,8 +257,8 @@ project for the API (its DSN).
       left there only ever makes a new, empty account.
     - **Backups:** Railway's backups (step 4) still hold the school's data until they age
       out. Note the day the last backup from before the disposal expires (the Backups tab
-      lists each backup's time; its retention is the schedule's). While prod has no backups
-      (the pilot), there is none to wait for: say so in the reply.
+      lists each backup's time; its retention is the schedule's). While prod has no backups,
+      there is none to wait for: say so in the reply.
     - **Check its PDFs are gone** before you write back: the API deletes them from the bucket
       within the hour, and a delete that keeps failing reports to Sentry from its third try as an
       error tagged `deck object deletion` (its title is S3's reason, e.g. `StorageError: S3 refused:
@@ -553,8 +552,8 @@ your Vercel projects; step 1 tells you which case you're in.
 What it proves: prod's data can be brought back, how long it takes, and that it comes
 back whole. Run it after prod holds real sessions, then once a term.
 
-**On hold for the Vanderbilt pilot:** prod has no backups (runbook 1, step 4), so step 1
-below fails, and half B needs backups on dev, the same plan. Half A without step 1 proves a
+**On hold until prod's first backup** (runbook 1, step 4; before the Vanderbilt pilot's first
+class): until then step 1 below fails, and half B needs backups on dev, the same plan. Half A without step 1 proves a
 `pg_dump` of prod restores whole; it is worth a run before the pilot's first week ends.
 
 Railway's restore button, as far as this doc's author knows, restores a backup **over
@@ -972,7 +971,8 @@ delete files in that bucket (ARCHITECTURE, hosting decision 6 and "Live lesson" 
 M0). The API already holds the code (M1): until a deploy holds the bucket's four variables, its
 boot log says `deck storage is off`. No Phase 7 screen was to be built until this was done (the
 owner's order, 2026-10-10), and it was, on 2026-10-12, in both environments; production backups
-(L0b), once in that order too, now come before the first actual pilot. Each environment gets its
+(L0b), once in that order too, now come before the first actual pilot, the Vanderbilt pilot's first
+class. Each environment gets its
 own bucket and user, so a
 leaked dev key can't touch production's decks.
 

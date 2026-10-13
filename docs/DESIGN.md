@@ -144,7 +144,7 @@ since D2g the theme holds none of Tailwind's own colours, type sizes,
 tracking or leading, so a default draws nothing. **A portal page uses the
 tokens' utilities and no Tailwind default** (no `slate-*`, no `text-sm`): a
 value the tokens lack is a question for the owner (v2's radii, sizes and
-spacing are one, open: §1, Its open call).
+spacing were one: built exactly as drawn, §1, Its call).
 
 ## 1. Visual theme and atmosphere
 
@@ -290,17 +290,15 @@ keeping its underline. A rule marked superseded still holds for a page, and
 rewrites the pin: PV4 for the shared pieces (buttons, fields, chips, cards), on
 every page at once, then each page's own step.
 
-**Its open call** (the owner's; PLAN's Open owner items): the canvas's radii
-(8, 12, 16), type sizes and spacing are off the tokens' scale. The default,
-for the owner's OK: build exactly as drawn, each added as a portal token
-(portal-only: out of `bali-tokens.json`, the design system's export, and out of
-the app), which `tokens.test.ts` names and pins beside the owner's ruled sizes
-(`input`, `code-lg`, `present-*`, §3), so no other value gets in; spacing needs
-no token, Tailwind's multiples of `space-1` drawing it (`p-4.5` is 18 px). The
-other way: snap each value to the nearest of today's. Reports' framing line is
-italic, and the self-hosted Instrument Sans is upright only, so its italic
-file is added beside it (`fonts.ts`; the default too, PV4 naming it as §7
-asks).
+**Its call** (the owner, 2026-10-12: built exactly as drawn): the canvas's
+radii (8, 12, 16), type sizes and spacing, off the tokens' scale, are each
+added as a portal token (portal-only: out of `bali-tokens.json`, the design
+system's export, and out of the app), which `tokens.test.ts` names and pins
+beside the owner's ruled sizes (`input`, `code-lg`, `present-*`, §3), so no
+other value gets in; spacing needs no token, Tailwind's multiples of `space-1`
+drawing it (`p-4.5` is 18 px). Reports' framing line is italic, and the
+self-hosted Instrument Sans is upright only, so its italic file is added
+beside it (`fonts.ts`, PV4 naming it as §7 asks).
 
 Density: the teacher's live grid is dense (many students at a glance); the
 student app is airy and simple. Theme: **light, everywhere.** The app and the
@@ -453,7 +451,7 @@ is never edited by hand), as it should the Present view's sizes (§5) and
 class page's minutes field types in it too, on the Field since D2f-2.
 
 **The portal and the student web (v2's look, §1):** `v2.css`'s sizes, listed
-in §1's style facts, join this scale under §1's open call, superseding it
+in §1's style facts, join this scale (§1, Its call: built exactly as drawn), superseding it
 where they differ (Present's included: §5); the input size stands.
 
 ## 4. Component stylings
@@ -568,7 +566,7 @@ where they differ (Present's included: §5); the input size stands.
   Spacing tokens: `space-1` 4 · `space-2` 8 · `space-3` 12 · `space-4` 16 ·
   `space-5` 20 · `space-6` 24 · `space-8` 32 · `space-10` 40 · `space-12` 48 ·
   `space-16` 64. *v2's look (§1):* the portal also spaces at 3, 6, 9, 10, 14,
-  18, 22 and 30 px, under §1's open call.
+  18, 22 and 30 px (§1, Its call).
 - **iOS (D1):** the page colour to the edges, 24 pt side gutters, content
   16 pt below the status bar; a screen scrolls only once the phone's text size
   outgrows it, so no line is ever cut off.
@@ -618,7 +616,7 @@ where they differ (Present's included: §5); the input size stands.
   values, and their usage notes still name `radius-sm` for buttons and
   `radius-md` for chips until the owner next exports the design system.
   *v2's look (§1):* eight radii on the portal, the tokens' five and 8, 12 and
-  16 under §1's open call; buttons, fields and codes `radius-sm`, cards
+  16 (§1, Its call); buttons, fields and codes `radius-sm`, cards
   `radius-md`, Present's question card `radius-lg`, chips and pills
   `radius-full`.
 
