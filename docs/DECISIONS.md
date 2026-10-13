@@ -20,8 +20,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   tag only to its first `>`. *Weighed:* the names imported from `lucide-react`, which miss the
   aliases; the checker is exact, in under a second. **Lucide's class:** a rendered `House` must carry
   `lucide`, the class the rule targets, and its paths no stroke of their own; an update renaming the
-  class would otherwise put every icon back at 2 with every test green. **Not covered:** a spread, a
-  style typed as a whole `CSSProperties`, and another selector outranking the rule.
+  class would otherwise put every icon back at 2 with every test green. **Not covered** (santa's
+  review, each checked; no code does any): a spread; a style typed as a whole `CSSProperties`, or
+  set on one side of a choice held in constants (`on ? PLAIN : THICK`, or a constant `on ? {
+  strokeWidth: 2 } : {}`); an icon reached through a prop typed `ComponentType<LucideProps>`, which
+  has no call signature; and another selector outranking the rule.
 
 - **2026-10-13** — **PV5b: the shell's read of the account, fixed as the owner approved ("yes
   fix", on three of PV5's Claude Review warnings, #352).** Built in `components/shell.tsx` with the
