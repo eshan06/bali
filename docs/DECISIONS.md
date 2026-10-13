@@ -8,6 +8,24 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-13** — **PV4c: PV4b's tests of the icons' stroke fail where the rule would quietly stop
+  holding (the owner's "fix", on PV4b's review, #353).** Test only (`tokens.test.ts`); nothing drawn
+  changes. **The rule:** read without comments, at the base layer's top and in nothing within it, the
+  only rule naming `.lucide`; the old test passed with it below the layer (where it would outrank
+  PV12b's and PV16's classes), in the reduced-motion query, commented out, or overridden. **Each
+  icon:** found by its type with TypeScript's checker, aliases such as the shell's `Icon` included,
+  and refused lucide's stroke props (`nonScalingStroke` added: lucide's replacement for
+  `absoluteStrokeWidth`, whose effect the rule can't undo) or an inline style whose type sets
+  `strokeWidth`; the old check refused the prop on any capitalised tag, PV7's ring too, and read a
+  tag only to its first `>`. *Weighed:* the names imported from `lucide-react`, which miss the
+  aliases; the checker is exact, in under a second. **Lucide's class:** a rendered `House` must carry
+  `lucide`, the class the rule targets, and its paths no stroke of their own; an update renaming the
+  class would otherwise put every icon back at 2 with every test green. **Not covered** (santa's
+  review, each checked; no code does any): a spread; a style typed as a whole `CSSProperties`, or
+  set on one side of a choice held in constants (`on ? PLAIN : THICK`, or a constant `on ? {
+  strokeWidth: 2 } : {}`); an icon reached through a prop typed `ComponentType<LucideProps>`, which
+  has no call signature; and another selector outranking the rule.
+
 - **2026-10-13** — **PV5b: the shell's read of the account, fixed as the owner approved ("yes
   fix", on three of PV5's Claude Review warnings, #352).** Built in `components/shell.tsx` with the
   states as drawn and shipped, no new words. **(1) A blank window:** the page waited hidden for the
