@@ -141,7 +141,11 @@ laid out as PB drew it, the shared pieces PV4 restyled aside (the buttons, the
 field, the chip and the card on its own, 2026-10-13), and beside the side menu
 PV5 put on a teacher's signed-in pages (`components/shell.tsx`, 2026-10-13),
 which frames each page at v2's width and gutters; never on the projector, where
-Present keeps its own column until PV9.
+Present keeps its own column until PV9. A class's page while no session runs is
+v2's since PV6 (2026-10-13): its header, the length picker, the roster beside the
+join code's card with Copy, and New code's confirm a dialog (`JoinCode`'s, in the
+live header too); the page while one runs, and the recap, keep their layouts
+until PV7 and PV12.
 Every
 portal source file is held to the tokens' utilities by `tokens.test.ts`, and
 since D2g the theme holds none of Tailwind's own colours, type sizes,
@@ -317,7 +321,9 @@ these facts don't list (the small button's 13.5/18) joins with the step that
 builds it, named and pinned the same way: PV5 added the side menu's three, all
 semibold, `lockup` (16/22, the lockup's word), `menu-name` (13/17) and
 `menu-initials` (11/11), and named its avatar's two primitives for it,
-`avatar-bg` (green-200) and `avatar-fg` (green-800).
+`avatar-bg` (green-200) and `avatar-fg` (green-800); PV6 the class page's two,
+both semibold, `button-sm` (13.5/18, the small button's label) and `segment`
+(14/18, the length picker's), and a dialog's backdrop as the colour `scrim`.
 
 Density: the teacher's live grid is dense (many students at a glance); the
 student app is airy and simple. Theme: **light, everywhere.** The app and the
