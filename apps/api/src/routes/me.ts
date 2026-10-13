@@ -94,7 +94,8 @@ export function registerMeRoute(
       displayNameFromClaims(identity.claims),
     );
 
-    // The server's clock, read once: the whole answer is judged at one instant (PV2's review).
+    // The server's clock, read once, so a tap still waiting and every class are judged at one
+    // instant (PV2's review).
     const now = clock();
 
     // A tap of theirs waiting for a Start, by the server's clock (#166): none,
