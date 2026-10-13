@@ -62,6 +62,9 @@ export const CANT_MAKE_CODE = "Bali couldn't make a new code just now. Try again
 /** The new join code is in place (P11), said beside it. */
 export const NEW_CODE_MADE = 'This is the new code. The old one has stopped working.';
 
+/** Copy found no clipboard, or the browser refused it (PV6): the code stays there to select. */
+export const CANT_COPY = "Bali couldn't copy the code. Select it and copy it yourself.";
+
 /**
  * A Start answered `existing` (P10): a session of the class was already running, started from
  * another tab or a phone, so the length picked here set nothing; the bell beside the grid is its.

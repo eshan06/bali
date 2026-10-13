@@ -109,6 +109,9 @@ const V2_SIZES: Record<string, [string, string, number, string?]> = {
   lockup: ['16px', '22px', 600],
   'menu-name': ['13px', '17px', 600],
   'menu-initials': ['11px', '11px', 600],
+  // The class page's (PV6): the small button's label and a segment of the length picker.
+  'button-sm': ['13.5px', '18px', 600],
+  segment: ['14px', '18px', 600],
 };
 /** The sizes §1 lists that the scale has, each its style: [style, size, line height]. */
 const ON_SCALE = [
@@ -452,7 +455,7 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     }
   });
 
-  it('beside them, only border-input and the side menu’s avatar, in v2.css’s primitives (PV5)', () => {
+  it('beside them, only border-input, the side menu’s avatar (PV5) and a dialog’s backdrop (PV6)', () => {
     const named = [...inline.keys()].filter((k) => k.startsWith('--color-'));
     const semanticNames = semantic(tokens.color.tokens).map((t) =>
       t.name === 'focus-ring-color' ? '--color-focus-ring' : `--color-${t.name}`,
@@ -461,11 +464,17 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
       '--color-avatar-bg',
       '--color-avatar-fg',
       '--color-border-input',
+      '--color-scrim',
     ]);
     expect(inline.get('--color-avatar-bg')).toBe('var(--bali-green-200)');
     expect(inline.get('--color-avatar-fg')).toBe('var(--bali-green-800)');
     // Its initials are small text: 4.5:1 at least, as every chip's ink on its fill.
     expect(contrast(hexOf('green-800', 'light'), hexOf('green-200', 'light'))).toBeGreaterThan(4.5);
+    // A dialog's backdrop (DESIGN.md §1 and §6): the shadows' own warm black, at 32 %.
+    expect(inline.get('--color-scrim')).toBe('rgba(33,28,21,0.32)');
+    for (const name of ['shadow-1', 'shadow-2', 'shadow-3']) {
+      expect(side(shadows.get(name) as Token, 'light'), name).toContain('rgba(33,28,21,');
+    }
   });
 });
 
@@ -509,8 +518,8 @@ describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
   // the approved designs keep it: the grid's stale banner, the policy draft's banner and badge,
   // and a control's hover, pressed or open state, the side menu's item on its own page (PV5)
   // among them; a chip's fill is its state's own tint. A field is white in v2's look (PV4); the
-  // grey v2 adds (the length picker's track, a table's head, the recap's name pills, a code's
-  // chip, the bars' tracks) comes with the step that draws each.
+  // grey v2 adds comes with the step that draws each: the length picker's track and the join
+  // code's chip (PV6); a table's head, the recap's name pills and the bars' tracks to come.
   const src = fileURLToPath(new URL('../', import.meta.url));
   const files = sources(src).filter((file) => /\.tsx?$/.test(file));
 
@@ -522,7 +531,6 @@ describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
       'aria-pressed',
       'aria-expanded',
       'aria-[current=page]',
-      'has-checked',
     ]);
     const fills = (file: string) =>
       [
@@ -541,8 +549,11 @@ describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
     const filled = Object.fromEntries(
       files.filter((file) => bare(file) > 0).map((file) => [relative(src, file), bare(file)]),
     );
-    // The stale banner, and the policy draft's banner and Placeholder badge.
+    // The stale banner, the policy draft's banner and Placeholder badge, and v2's two on the class
+    // page: the length picker's track and the join code's chip.
     expect(filled).toEqual({
+      [join('app', 'classes', '[id]', 'page.tsx')]: 1,
+      [join('components', 'join-code.tsx')]: 1,
       [join('components', 'live-grid.tsx')]: 1,
       [join('components', 'policy-draft.tsx')]: 2,
     });
@@ -580,6 +591,15 @@ describe('the buttons in v2’s look (DESIGN.md §1 and §4, PV4)', () => {
     expect(look).toEqual(
       expect.arrayContaining(['disabled:opacity-55', 'aria-disabled:opacity-55']),
     );
+  });
+
+  it('come small too (PV6): 34 px tall, 14 px in, a 13.5/18 label, the rest as the others', () => {
+    const small = buttonClass('secondary', '', 'sm').split(' ');
+    expect(small).toEqual(
+      expect.arrayContaining(['h-8.5', 'px-3.5', 'text-button-sm', 'rounded-sm', 'gap-2']),
+    );
+    expect(small).not.toEqual(expect.arrayContaining(['h-10']));
+    expect(small).not.toEqual(expect.arrayContaining(['text-button']));
   });
 });
 

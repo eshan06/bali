@@ -260,6 +260,15 @@
   --text-menu-initials: 11px;
   --text-menu-initials--line-height: 11px;
   --text-menu-initials--font-weight: 600;
+
+  /* The class page's two (PV6), as v2.css draws them and §1's facts don't list: the small
+     button's label (Reports, Copy, New code) and a segment of the length picker. */
+  --text-button-sm: 13.5px;
+  --text-button-sm--line-height: 18px;
+  --text-button-sm--font-weight: 600;
+  --text-segment: 14px;
+  --text-segment--line-height: 18px;
+  --text-segment--font-weight: 600;
 }
 
 @theme inline {
@@ -309,6 +318,9 @@
      tokens.test.ts bars Tailwind's palette names. */
   --color-avatar-bg: var(--bali-green-200);
   --color-avatar-fg: var(--bali-green-800);
+  /* A dialog's backdrop (DESIGN.md §1 and §6, PV6): the shadows' warm black at 32 %, written out
+     here (inline), since a ::backdrop reads no variable in some browsers. */
+  --color-scrim: rgba(33, 28, 21, 0.32);
 }
 
 /* §6: the three shadows, by name. */
