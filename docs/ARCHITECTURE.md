@@ -1001,7 +1001,8 @@ phone, on Bali's own screen. Planned 2026-10-05 from the research in
 `docs/ROADMAP-RESEARCH.md` (B); the build is Phase 7 in `docs/PLAN.md`, and its decision
 entries are `docs/DECISIONS.md`, 2026-10-05, 2026-10-09 and 2026-10-10. **The build resumed
 on 2026-10-10** (the owner, who had held it since 2026-10-05): the steps with no screen first,
-and no screen built until the bucket is in place (PLAN's M0). Its web screens are built on the
+and no screen built until the bucket was in place (PLAN's M0, done 2026-10-12 in both
+environments). Its web screens are built on the
 portal's redesign in v2's look, after the pages they sit on (PLAN's PV steps to PV15; the owner,
 2026-10-12), and production backups (PLAN's L0b) come before the first actual pilot, holding back
 no screen (the owner, 2026-10-12).

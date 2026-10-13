@@ -51,7 +51,8 @@ pick on the
 (2026-10-04; `docs/DECISIONS.md`, 2026-10-05): its B artboards and its answers
 to Q2–Q7 are the reference for what this file says about it. For the portal
 and the student web, v2's look replaced it on 2026-10-12 (§1), its tiles
-superseding Q4's and Q5's answers there; Q2, Q3, Q6 and Q7 stand. The approved
+superseding Q4's and Q5's answers there; Q2, Q6, Q7 and Q3's dashed edge (1.5 px
+now) stand. The approved
 screen designs win over both for the screens they draw: D1 for the student app
 (`docs/PLAN.md`), with the app's
 [Sign in & sign up](https://claude.ai/artifact/McyYhpX1UTq1nU6oCCwPwG) for Sign in, the 13+
@@ -86,8 +87,8 @@ to check and approve, before it is built (PLAN's PV1). The app keeps its own
 canvases (the
 [Live lesson app screens](https://claude.ai/artifact/CZpFbFuxnRrLcuywtJGfVQ)
 for L8 and M8). It is built in PLAN's "Portal redesign (v2's look)" steps,
-PV0–PV17, Phase 7's web screens among them, each page keeping today's look
-until its step lands.
+PV0–PV17, Phase 7's web screens among them, each page keeping today's layout
+until its step lands (PV4's shared pieces change on every page at once).
 A design draws only what the backend does today, and only the screens the
 phases ask for: it never promises what the API lacks. **v2's canvas is the one
 exception, the owner's (2026-10-12):** it draws each class's student count and
@@ -135,8 +136,8 @@ card in the session's place until the class is read), and PB5 the recap and the 
 session after the bell as a timeline of marks, `components/timeline.tsx`; the reports list a card
 per session with its counts in their states' inks), which finished the four designs.
 On 2026-10-12 the owner approved v2's look for the portal and the student web
-(§1), built page by page in PLAN's PV steps: until a page's step lands, it looks
-as PB drew it.
+(§1), built page by page in PLAN's PV steps: until a page's step lands, it is
+laid out as PB drew it, the shared pieces PV4 restyles aside.
 Every
 portal source file is held to the tokens' utilities by `tokens.test.ts`, and
 since D2g the theme holds none of Tailwind's own colours, type sizes,
@@ -168,7 +169,8 @@ Design System's tokens, as the approved canvas draws it (Sources, above), its
 look `v2.css`. It replaces **Soft premium** (the owner's pick, 2026-10-04, Q1 B
 on D2a's canvas; the `high-end-visual-design` skill's language, inside Bali's
 tokens), in which the portal is drawn today (D2c–D2g, then PB1–PB5): a page
-keeps that look until its PV step lands. The app is drawn in neither: its Soft
+keeps that layout until its PV step lands, PV4 restyling the shared pieces
+everywhere at once. The app is drawn in neither: its Soft
 premium redraw (D2h–D2j) was rolled back on 2026-10-06, and it keeps D1's look.
 In this file's terms:
 
@@ -260,8 +262,9 @@ card), "The breakdown shows once 3 students have answered." (a question open
 with fewer than 3 answers; the compose line "You'll see how many picked each
 answer once 3 have answered." stays), "Updates every few seconds." (under "N
 of M answered"), "Every phone in this class shows this slide, and so does
-Present." (the presenter's card), and, gone with the menu, "Write questions and
-upload slides before class, then ask or show them from a class page."
+Present." (the presenter's card); and, gone with the menu once PV1 confirms the
+classes home's card goes, "Write questions and upload slides before class, then
+ask or show them from a class page."
 
 **What it supersedes**, each by the owner's approval of 2026-10-12, for the
 portal and the student web (the app keeps every one): the pill buttons (§4)
@@ -276,13 +279,16 @@ table in a box that scrolls; the five radii (§5) for eight; the type scale
 (§3) and the 4-point grid (§5) for `v2.css`'s sizes and spacing (3, 6, 9, 10,
 14, 18, 22 and 30 px); 40 px gutters on a centred page 1400 px wide (§5) for
 36 px beside the menu on one 1260 px wide; the stale banner (§4) for the
-reconnect pill; Present's sizes and How it ended (§5); and "a link never
+reconnect pill; Present's sizes and How it ended (§5); §2's "use the
+semantic tokens", for the primitives `v2.css` draws with directly (Style
+facts); Q3 A's 1 px dashed edge (§2, §4) for 1.5 px; and "a link never
 rests on colour alone" (§4, Links) for a link standing on its own (a `quiet`
 link: Open, Open the class, Open the recap; a table row's session), which
 rests in its ink and weight, underlined on hover, a link in running text
 keeping its underline. A rule marked superseded still holds for a page, and
-`tokens.test.ts` still pins it, until that page's PV step lands and rewrites
-the pin (PLAN's PV4 on).
+`tokens.test.ts` still pins it, until the PV step that redraws it lands and
+rewrites the pin: PV4 for the shared pieces (buttons, fields, chips, cards), on
+every page at once, then each page's own step.
 
 **Its open call** (the owner's; PLAN's Open owner items): the canvas's radii
 (8, 12, 16), type sizes and spacing are off the tokens' scale. The default,

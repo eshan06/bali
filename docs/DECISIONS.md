@@ -55,8 +55,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   (2026-10-10: backups on before any build that can answer reaches prod, and before any screen)
   now comes before the first actual pilot and holds back no screen; ARCHITECTURE's "Settled" and
   its Live lesson intro, PLAN's L0b, its gates and Open owner items, and runbook 10 say so. M0, the
-  bucket, is under way (the owner's) and still comes before Phase 7's screens (the order of
-  2026-10-10). *Left as they were:* hosting decision 4's exception and `docs/PILOT.md` run the
+  bucket, still came before Phase 7's screens (the order of 2026-10-10), and the owner finished it
+  the same day: runbook 10's check `PASS` on dev and on prod, deck storage on in both. *Left as they were:* hosting decision 4's exception and `docs/PILOT.md` run the
   Vanderbilt pilot without backups (the ruling of 2026-10-05); whether "the first actual pilot" is
   that one or the K-12 one after it is the owner's to say. **ARCHITECTURE decisions 6 and 13** said
   a poller stops at a `429` "until its `Retry-After`"; L5, L6 and W2 wait it out a minute at most
