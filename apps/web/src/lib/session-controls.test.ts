@@ -6,6 +6,7 @@ import { CANT_ADD_TIME, CANT_MAKE_CODE, CANT_REACH, TOO_MANY_TRIES } from './err
 import {
   bellTime,
   codeMoved,
+  copyText,
   DEFAULT_MINUTES,
   EXTEND_PRESETS,
   extendAttemptFor,
@@ -411,6 +412,32 @@ describe('regenerateCode', () => {
     expect(await codeMoved(unreachable, CLASS, 'OLDCDE')).toBeNull();
     const down = api(503, { error: { code: 'unavailable', message: 'unavailable' } });
     expect(await codeMoved(down.client, CLASS, 'OLDCDE')).toBeNull();
+  });
+});
+
+describe('copyText (the join code’s Copy, PV6)', () => {
+  it('puts the code on the clipboard, answered true once it is there', async () => {
+    const copied: string[] = [];
+    const clipboard = { writeText: (text: string) => Promise.resolve(void copied.push(text)) };
+    expect(await copyText('VMAF7E', clipboard)).toBe(true);
+    expect(copied).toEqual(['VMAF7E']);
+  });
+
+  it('answers false, never thrown, where the browser refuses it or has no clipboard', async () => {
+    const refused = {
+      writeText: () =>
+        Promise.reject(new DOMException('Write permission denied.', 'NotAllowedError')),
+    };
+    expect(await copyText('VMAF7E', refused)).toBe(false);
+    const throws = {
+      writeText: (): Promise<void> => {
+        throw new TypeError('not allowed');
+      },
+    };
+    expect(await copyText('VMAF7E', throws)).toBe(false);
+    // A page not served securely has none; nor has Node, whose own default it reads here.
+    expect(await copyText('VMAF7E', undefined)).toBe(false);
+    expect(await copyText('VMAF7E')).toBe(false);
   });
 });
 

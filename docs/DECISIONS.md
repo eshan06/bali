@@ -8,6 +8,54 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-13** — **PV6: a class's page before a session in v2's look, built exactly as drawn;
+  New code's confirm a native dialog; Copy, new.** Built to
+  [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (version 21):
+  ClassBefore, ClassNewCode, ClassStates' lines before a session and its Loading and errors, and
+  PV1's CopyStates, checked box for box against the boards rendered from their own markup and
+  `v2.css` at 1440 and 390 px (`v2.css`'s block under 640 px, as PhoneClassLive applies it). **Only
+  while no session runs:** the page while one runs keeps its layout until PV7 (its nav, the
+  header's code with New code, the roster under the grid), and the recap and How it ended theirs
+  until PV12, between the Start card and the roster, where ClassEnded puts the recap. After the
+  bell the header says "no session running" until PV12 draws ClassEnded's "28 students · the
+  session ended at 9:55 AM". **The header:** the name over "28 students · no session running", the
+  count from the roster the page already reads (no new read), "1 student" for one, "No session
+  running" alone until the roster is read, the line's place held while the class is read so
+  nothing below it moves (as the Loading card holds the Start card's 118 px); Reports a small
+  secondary button where the nav's links were, the menu's Home taking All classes' place
+  (DESIGN.md §4, Links). **The length picker:** v2's
+  segmented control, a grey track with each length a segment, the pick white and raised with a
+  check, its radios clipped away and the focus ring on the segment. **The roster:** three columns in
+  a card beside the join code's card, at every width as `v2.css` draws them. *Weighed:* today's
+  `break-words`, which broke "Washington" mid-word at 390 px where the board lets a long word run
+  into the 32 px gap; the board's way kept, so a name wider than column and gap (some 13 letters on
+  a phone, 30 on a computer) reaches the next column (a `ponytail:` note says so). An empty roster
+  is a plain line, never a card (§4). **The join code's card:** the code on its grey chip at
+  `code-card`, selectable whole (`select-all`, for the failure's "Select it"), "Students type it in
+  the Bali app to join this class.", then Copy and New code, small. **Copy:** the clipboard through
+  `copyText`, which answers false, never thrown, where the page has no clipboard or the browser
+  refuses it; Copied for 2 s (CopyStates' "a few seconds"; v2's was 1.6), said to a screen reader by
+  a status of its own, or "Bali couldn't copy the code. Select it and copy it yourself." under the
+  buttons. **New code's confirm:** a native modal `<dialog>` (ClassNewCode: 460 px, 120 px from the
+  top, over the warm backdrop), so the page behind it is inert and Escape closes it, held while a
+  code is being made; Cancel focused first, since nothing is lost until Make new code; a failure
+  said inside it, the dialog opened again should the browser have closed it meanwhile; closed after
+  a failure, the class read once more as before (#247's review); focus back on New code. *Weighed:*
+  a drawn scrim with a focus trap of our own, more code for what the platform does. **During a live
+  session, New code opens the same dialog** in place of its raised card: one flow, not two, until
+  PV7 removes it from that header, since ClassLive draws none. **Three portal tokens, named and
+  pinned** (`tokens.test.ts`), as PV4 asks of a value `v2.css` draws that §1's facts don't list:
+  `button-sm` (13.5/18, `Button`'s `size="sm"`: 34 px tall, 14 px in) and `segment` (14/18), both
+  semibold, and the colour `scrim`, a dialog's backdrop, `rgba(33, 28, 21, 0.32)` (§1, §6), the
+  shadows' warm black, written out in `@theme inline` since a `::backdrop` reads no variable in
+  some browsers. **The boards' tight lines:** `v2.css`'s `.app p { margin: 0 }` outranks `.help`'s
+  and `.refusal`'s 8 px, so the boards draw the code's line right under its chip and a refused
+  length right under its help: built as drawn; the shared Field keeps its help's 8 px (PV4's).
+  **At phone width** the roster's three columns wrap names onto two lines and the length picker
+  puts "Other…" on a second row; the canvas draws no phone version of this page, and the owner
+  ruled (2026-10-13) to leave it for now, issue #354 tracking a revisit with a phone version drawn
+  for the owner first.
+
 - **2026-10-13** — **PV4b: every lucide icon on the portal at the canvas's 1.75 stroke, set once
   (the owner's ruling on PV4's review).** [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4)
   draws every icon at 1.75 (`v2.css`'s `.ic`), where lucide-react draws 2; PV4 found it and left

@@ -7,7 +7,7 @@ import type { RecapFormat } from './recap';
 
 /*
  * The class page's controls, tested: the session's length and adding time (P10), a new code (P11),
- * and Present kept for the tab.
+ * copying the code (PV6), and Present kept for the tab.
  */
 
 /** The lengths offered as presets, in minutes, and the pick when this computer remembers none. */
@@ -225,6 +225,23 @@ export async function codeMoved(
     return klass.joinCode === shown ? null : klass;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Copy the join code to the clipboard (PV6): true once it is there; false, never thrown, where the
+ * browser has no clipboard (a page not served securely) or refuses it, so the page can say so.
+ */
+export async function copyText(
+  text: string,
+  clipboard: Pick<Clipboard, 'writeText'> | undefined = globalThis.navigator?.clipboard,
+): Promise<boolean> {
+  try {
+    if (!clipboard) return false;
+    await clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
   }
 }
 
