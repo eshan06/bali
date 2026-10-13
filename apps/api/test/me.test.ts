@@ -8,6 +8,7 @@ import {
   expireDueSessions,
   findUserByCognitoId,
   getLiveParticipation,
+  newUuidV7,
   startSession,
   users,
 } from '@bali/db';
@@ -907,6 +908,128 @@ describe('GET /v1/me', () => {
         liveSession: { id: session.id, endsAt: session.endsAt.toISOString() },
       },
     ]);
+  });
+
+  /** A class's teacher changes it (`PATCH /v1/classes/{id}`): New code, or a rename. */
+  async function changeClass(teacherSub: string, classId: string, payload: object) {
+    const res = await ctx.app.inject({
+      method: 'PATCH',
+      url: `/v1/classes/${classId}`,
+      headers: { authorization: `Bearer ${await ctx.tokenFor(teacherSub)}` },
+      payload,
+    });
+    expect(res.statusCode).toBe(200);
+  }
+
+  it('lists a teacher’s classes oldest first, and New code or a rename moves none (PV3b)', async () => {
+    // PV2's review (#344): read in no order, a class just written could come back last, and the
+    // portal's home shows the list as read.
+    const { school, teacher, klass: first } = await seedClassroom(db, 'me-order');
+    const made = (minutes: number) => new Date(first.createdAt.getTime() + minutes * 60_000);
+    const period = (n: number, more: Partial<typeof classes.$inferInsert> = {}) => ({
+      teacherId: teacher.id,
+      schoolId: school.id,
+      name: `Period ${n}`,
+      joinCode: joinCodeFor(`me-order-${n}`),
+      createdAt: made(n),
+      ...more,
+    });
+    const [second, third] = await db
+      .insert(classes)
+      .values([period(2), period(3)])
+      .returning();
+    const token = await ctx.tokenFor(teacher.cognitoId);
+    const listed = async () => (await me(token)).body.classes.map((c) => c.id);
+    const oldestFirst = [first.id, second!.id, third!.id];
+    expect(await listed()).toEqual(oldestFirst);
+
+    await changeClass(teacher.cognitoId, first.id, { regenerateCode: true });
+    expect(await listed()).toEqual(oldestFirst);
+    await changeClass(teacher.cognitoId, second!.id, { name: 'Period 2 Biology' });
+    expect(await listed()).toEqual(oldestFirst);
+
+    // Two made at one instant: the one whose id sorts first comes first, though written last.
+    const [early, late] = [newUuidV7(), newUuidV7()].sort();
+    await db
+      .insert(classes)
+      .values([period(5, { id: late, createdAt: made(4) }), period(4, { id: early })]);
+    expect(await listed()).toEqual([...oldestFirst, early, late]);
+  });
+
+  it('lists a student’s classes in the order they joined them, and New code or a rename moves none (PV3b)', async () => {
+    // Four classes made A to D, joined A (at its seeding), D, then B and C at one instant, C's
+    // row written first: the one whose id sorts first comes first.
+    type Seeded = Awaited<ReturnType<typeof seedClassroom>>;
+    const seeded: Seeded[] = [];
+    for (const tag of ['a', 'b', 'c', 'd'])
+      seeded.push(await seedClassroom(db, `me-joined-${tag}`));
+    const [a, b, c, d] = seeded as [Seeded, Seeded, Seeded, Seeded];
+    const { student } = a;
+    const joined = (minutes: number) => new Date(Date.now() + minutes * 60_000);
+    /** The student joins `them` at `createdAt`, in one statement. */
+    const join = (createdAt: Date, ...them: Seeded[]) =>
+      db
+        .insert(enrollments)
+        .values(them.map((x) => ({ classId: x.klass.id, studentId: student.id, createdAt })));
+    await join(joined(1), d);
+    await join(joined(2), c, b);
+    const [tiedFirst, tiedSecond] = [b, c].sort((x, y) => (x.klass.id < y.klass.id ? -1 : 1));
+    const byJoining = [a, d, tiedFirst!, tiedSecond!].map((x) => x.klass.id);
+    const token = await ctx.tokenFor(student.cognitoId);
+    const listed = async () => (await me(token)).body.classes.map((x) => x.id);
+    expect(await listed()).toEqual(byJoining);
+
+    // New code on A, by its teacher, and a rename of D.
+    await changeClass(a.teacher.cognitoId, a.klass.id, { regenerateCode: true });
+    expect(await listed()).toEqual(byJoining);
+    await changeClass(d.teacher.cognitoId, d.klass.id, { name: 'Period 4 Art' });
+    expect(await listed()).toEqual(byJoining);
+
+    // A left and joined again: by its live enrollment, last.
+    await db
+      .update(enrollments)
+      .set({ removedAt: joined(3) })
+      .where(and(eq(enrollments.classId, a.klass.id), eq(enrollments.studentId, student.id)));
+    await join(joined(4), a);
+    expect(await listed()).toEqual([...byJoining.slice(1), a.klass.id]);
+  });
+
+  it('judges every class at one instant of the server’s clock, read once a request (PV2’s review)', async () => {
+    // A clock that moves on every read. Read per class, a session whose bell falls between two
+    // reads would run in one class of the answer and be over in the next.
+    const at = new Date(Date.UTC(2026, 9, 12, 9, 0));
+    let reads = 0;
+    const timed = await makeAuthedApp(db, () => new Date(at.getTime() + reads++));
+    onTestFinished(() => timed.close());
+    const { school, teacher, student, klass } = await seedClassroom(db, 'me-instant');
+    const [other] = await db
+      .insert(classes)
+      .values({
+        teacherId: teacher.id,
+        schoolId: school.id,
+        name: 'Period 2',
+        joinCode: joinCodeFor('me-instant-2'),
+      })
+      .returning();
+    await db.insert(enrollments).values({ classId: other!.id, studentId: student.id });
+    const running: string[] = [];
+    for (const { id } of [klass, other!]) {
+      const started = await startSession(db, {
+        classId: id,
+        startedAt: new Date(at.getTime() - 60_000),
+        endsAt: new Date(at.getTime() + 1),
+      });
+      running.push(started.session.id);
+    }
+    const classesOf = async (sub: string) => {
+      reads = 0;
+      return (await me(await timed.tokenFor(sub), timed)).body.classes;
+    };
+
+    const taught = await classesOf(teacher.cognitoId);
+    expect(taught.map((c) => c.summary?.runningSession?.id)).toEqual(running);
+    const enrolled = await classesOf(student.cognitoId);
+    expect(enrolled.map((c) => c.liveSession?.id)).toEqual(running);
   });
 
   it('requires authentication', async () => {

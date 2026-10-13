@@ -122,7 +122,8 @@ export async function findOrCreateStudent(
 }
 
 /**
- * A student's active classes, each with its teacher's display name (C2a), the
+ * A student's active classes in the order they joined them (their live enrollment's, then the
+ * class's id: PV3b), each with its teacher's display name (C2a), the
  * enrollment leaving it deletes (A19) and its session not marked over, if any
  * (C3c): a class has at most one (`sessions_one_running_per_class`). Whether it
  * runs is the engine's one rule, `sessionRunning`, the caller's to apply.
@@ -155,7 +156,8 @@ export async function getEnrolledClasses(
         isNull(enrollments.removedAt),
         isNull(classes.removedAt),
       ),
-    );
+    )
+    .orderBy(asc(enrollments.createdAt), asc(classes.id));
   return rows.map(({ liveId, liveEndsAt, ...row }) => ({
     ...row,
     live:
@@ -529,9 +531,10 @@ export interface TaughtClass extends ClassRow {
 }
 
 /**
- * A teacher's active classes, each with its students enrolled now, its session not marked over
- * (as `getEnrolledClasses` reads it) and its newest one marked over (PV2). One statement, so the
- * facts are read at one instant: a session ended between two reads would be both.
+ * A teacher's active classes, oldest first (then by id: PV3b), each with its students enrolled
+ * now, its session not marked over (as `getEnrolledClasses` reads it) and its newest one marked
+ * over (PV2). One statement, so the facts are read at one instant: a session ended between two
+ * reads would be both.
  */
 export async function getTaughtClasses(db: Database, teacherId: string): Promise<TaughtClass[]> {
   const live = alias(sessions, 'live');
@@ -557,7 +560,8 @@ export async function getTaughtClasses(db: Database, teacherId: string): Promise
     .from(classes)
     .leftJoin(live, and(eq(live.classId, classes.id), isNull(live.endedAt)))
     .leftJoinLateral(ended, sql`true`)
-    .where(and(eq(classes.teacherId, teacherId), isNull(classes.removedAt)));
+    .where(and(eq(classes.teacherId, teacherId), isNull(classes.removedAt)))
+    .orderBy(asc(classes.createdAt), asc(classes.id));
   return rows.map(
     ({ liveId, liveStartedAt, liveEndsAt, endedId, endedStartedAt, endedAt, ...row }) => ({
       ...row,

@@ -94,11 +94,14 @@ export function registerMeRoute(
       displayNameFromClaims(identity.claims),
     );
 
+    // The server's clock, read once: the whole answer is judged at one instant (PV2's review).
+    const now = clock();
+
     // A tap of theirs waiting for a Start, by the server's clock (#166): none,
     // and a phone waiting for its teacher's Start stops waiting. Read before the
     // session, so a Start landing between the two answers with its session —
     // never with no session and no tap waiting (#166's review).
-    const armed = user.role === 'student' && (await hasArmedTap(db, user.id, clock()));
+    const armed = user.role === 'student' && (await hasArmedTap(db, user.id, now));
 
     // Each class names its teacher (C2a): a teacher's own, the caller — already
     // in hand, with its summary (PV2); a student's, read with the class in one
@@ -111,7 +114,7 @@ export function registerMeRoute(
             teacher: { displayName: user.displayName },
             enrollmentId: null,
             liveSession: null,
-            summary: summaryOf(c, clock()),
+            summary: summaryOf(c, now),
           }))
         : (await getEnrolledClasses(db, user.id)).map((c) => ({
             id: c.id,
@@ -120,7 +123,7 @@ export function registerMeRoute(
             enrollmentId: c.enrollmentId,
             // Running by the server's clock, the engine's one rule (A17), or none (C3c).
             liveSession:
-              c.live && sessionRunning(c.live, clock())
+              c.live && sessionRunning(c.live, now)
                 ? { id: c.live.id, endsAt: c.live.endsAt.toISOString() }
                 : null,
           }));
