@@ -58,8 +58,8 @@ export function frameFor(
 /**
  * What the shell does with the account as a page opens: forgets one whose sign-in is gone (a Sign
  * out or an expired session, which both land on /login), so going back never shows it; reads one
- * not read yet on a signed-in page; or keeps what it has. A failed read waits for Try again or the
- * next page, never a loop.
+ * not read yet on a signed-in page; or keeps what it has. A failed read is not read again here,
+ * never a loop: Home reads it again as it opens and with its Try again.
  */
 export function accountStep(
   path: string,
@@ -73,9 +73,13 @@ export function accountStep(
   return 'read';
 }
 
-/** A signed-in page the back button brings back whole, its sign-in gone: reloaded, never shown. */
-export const reloadOnRestore = (path: string, signedIn: boolean): boolean =>
-  !signedIn && !SIGNED_OUT_PATHS.test(path);
+/**
+ * A signed-in page the back button brings back whole (the browser's back-forward cache) is
+ * reloaded, never shown as it was kept: its account may have signed out, expired, or given way to
+ * another sign-in in this tab since.
+ */
+export const reloadOnRestore = (persisted: boolean, path: string): boolean =>
+  persisted && !SIGNED_OUT_PATHS.test(path);
 
 /** Who is signed in, as `GET /v1/me` last said: one read, for the menu's foot and for Home. */
 export interface Me {
@@ -273,14 +277,11 @@ export function Shell({ children }: { children: ReactNode }) {
     }
   }, [path, me, error, load]);
 
-  // Back here by the back button with the page kept whole: after a Sign out or an expired session
-  // it is reloaded, so it never shows the account that left; else Sign out works again.
+  // Back here by the back button with the page kept whole: a signed-in page reloads, so it never
+  // shows an account that has since left (`reloadOnRestore`), and its Sign out starts afresh.
   useEffect(() => {
     const back = (e: PageTransitionEvent) => {
-      if (!e.persisted) return;
-      if (reloadOnRestore(window.location.pathname, getAccessToken() !== null)) {
-        window.location.reload();
-      } else setLeaving(false);
+      if (reloadOnRestore(e.persisted, window.location.pathname)) window.location.reload();
     };
     window.addEventListener('pageshow', back);
     return () => window.removeEventListener('pageshow', back);

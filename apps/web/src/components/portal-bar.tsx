@@ -7,9 +7,10 @@ import { Button } from '@/components/button';
 import { Mark } from '@/components/mark';
 
 /**
- * The bar over the invite-code screen (S4a), until PV15 draws that page in v2's look: the mark and
- * the name, home, and Sign out. The shell (`shell.tsx`) puts it there and signs out; every other
- * signed-in page has the side menu instead.
+ * Today's bar (S4a): the mark and the name, home, and Sign out. The shell (`shell.tsx`) puts it
+ * over a signed-in page for an account that isn't a teacher (the invite-code screen's, until PV15
+ * draws it in v2's look) and after a failed account read, and signs out; a teacher's pages have the
+ * side menu instead.
  */
 export function PortalBar({ leaving, onSignOut }: { leaving: boolean; onSignOut: () => void }) {
   return (

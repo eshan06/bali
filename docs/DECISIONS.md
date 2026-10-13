@@ -22,8 +22,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   until PV9 draws Present, so a 1024 px projector keeps Present's four columns (the review's
   blocker: beside the menu it fell to three, and 28 students to ten rows). (2) **Nothing from an
   account that left:** the shell forgets the account once its sign-in is gone (a Sign out and an
-  expired session both land on /login), and a signed-in page the back button restores whole after
-  that is reloaded, so neither shows the last teacher's classes or name. (3) **The menu only once
+  expired session both land on /login), and every signed-in page the back button restores whole is
+  reloaded, since its account may have signed out, expired or given way to another sign-in in that
+  tab since; so neither shows the last teacher's classes or name (santa's round 2 found the
+  restore checked only that some sign-in was there). (3) **The menu only once
   the account reads as a teacher:** until it is read, nothing shows (the page hidden, so no frame
   flashes on the invite page or for anyone else, nor a page drawn from an account that left); a
   failed read shows today's bar, with Sign out, and the page's own Try again. (4) **A class link's

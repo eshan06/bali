@@ -103,7 +103,7 @@ describe('what frames a page', () => {
     });
   });
 
-  it('says a failed read under today’s bar, with Sign out and the page’s Try again', () => {
+  it('says a failed read under today’s bar, with Sign out (Home has Try again)', () => {
     for (const path of ['/', '/classes/c1']) {
       expect(frameFor(path, null, "Couldn't reach Bali.", false), path).toEqual({
         chrome: 'bar',
@@ -136,15 +136,38 @@ describe('the account as pages change (the owner, 2026-10-13)', () => {
     expect(accountStep('/', true, null, "Couldn't reach Bali.", false)).toBe('keep');
   });
 
-  it('reloads a signed-in page the back button restores after its sign-in is gone', () => {
-    expect(reloadOnRestore('/', false)).toBe(true);
-    expect(reloadOnRestore('/classes/c1', false)).toBe(true);
-    expect(reloadOnRestore('/', true)).toBe(false);
-    expect(reloadOnRestore('/login', false)).toBe(false);
-    expect(reloadOnRestore('/support', false)).toBe(false);
-    // The shell's handler does: a page the browser kept whole, its sign-in gone, reloads.
-    expect(read('./shell.tsx')).toMatch(
-      /if \(!e\.persisted\) return;\s*if \(reloadOnRestore\(window\.location\.pathname, getAccessToken\(\) !== null\)\) \{\s*window\.location\.reload\(\);/,
+  it('reloads every signed-in page the back button restores whole, whoever is signed in now', () => {
+    // Its account may have signed out, expired, or given way to another sign-in in this tab.
+    expect(reloadOnRestore(true, '/')).toBe(true);
+    expect(reloadOnRestore(true, '/classes/c1')).toBe(true);
+    expect(reloadOnRestore(false, '/')).toBe(false);
+    expect(reloadOnRestore(true, '/login')).toBe(false);
+    expect(reloadOnRestore(true, '/support')).toBe(false);
+  });
+});
+
+describe('the shell’s wiring of the rulings (read from its source)', () => {
+  const shell = read('./shell.tsx');
+
+  it('frames the page by Present, the account and its failure', () => {
+    expect(shell).toMatch(/const frame = frameFor\(path, me, error, presenting\);/);
+    // A page's usePresenting reaches the shell's own state, on and back off.
+    expect(shell).toMatch(/const \[presenting, setPresenting\] = useState\(false\);/);
+    expect(shell).toMatch(/<PresentingContext value=\{setPresenting\}>/);
+    expect(shell).toMatch(
+      /useEffect\(\(\) => \{\s*setPresenting\(on\);\s*return \(\) => setPresenting\(false\);\s*\}, \[on, setPresenting\]\);/,
+    );
+  });
+
+  it('reads, keeps or forgets the account as accountStep says, on every page and every answer', () => {
+    expect(shell).toMatch(
+      /const step = accountStep\(path, getAccessToken\(\) !== null, me, error, reading\.current\);\s*if \(step === 'read'\) load\(\);\s*if \(step === 'forget'\) \{\s*setMe\(null\);\s*setError\(null\);\s*\}\s*\}, \[path, me, error, load\]\);/,
+    );
+  });
+
+  it('reloads a page the browser kept whole as reloadOnRestore says', () => {
+    expect(shell).toMatch(
+      /const back = \(e: PageTransitionEvent\) => \{\s*if \(reloadOnRestore\(e\.persisted, window\.location\.pathname\)\) window\.location\.reload\(\);\s*\};\s*window\.addEventListener\('pageshow', back\);/,
     );
   });
 });
