@@ -216,6 +216,8 @@ the countdown 44/48, a question 34/40, its options 24/30 and a tile's lines
 live card and the student's lesson card 16; buttons, fields and codes 10; menu
 items and the length picker's segments 8; tables and slides 12; Present's
 question card 20; pills `radius-full`. *Shadows:* the tokens' three (above).
+*Icons:* lucide's at a 1.75 stroke (`.ic`; the owner, 2026-10-13; `globals.css`
+since PV4b), but the recap's marks at 2.25 and the "is ready" dialog's check at 1.5.
 *Layout:* the side menu 216 px, white with a hairline on its right, padding
 32/12/14, the current item grey (`surface-sunken`) and semibold, its foot a
 28 px avatar of initials, the name and a Sign out icon; the page beside it,

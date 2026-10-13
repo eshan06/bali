@@ -8,6 +8,30 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-13** — **PV4b: every lucide icon on the portal at the canvas's 1.75 stroke, set once
+  (the owner's ruling on PV4's review).** [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4)
+  draws every icon at 1.75 (`v2.css`'s `.ic`), where lucide-react draws 2; PV4 found it and left
+  the portal at 2 until the owner said otherwise (its entry, below). The owner chose the canvas's,
+  as for the rest of the look: built exactly as drawn (DESIGN.md §1, Its call). **Built:** one rule
+  in `globals.css`'s base layer, `svg.lucide { stroke-width: 1.75 }`. Every lucide-react icon
+  carries the `lucide` class and sets its stroke on the svg alone, which its paths inherit, and any
+  CSS rule beats an svg's own `stroke-width` attribute, so every icon takes it wherever it is drawn,
+  Present included (*weighed:* lucide-react's `LucideProvider` with `strokeWidth={1.75}` around the
+  layout, where a per-icon prop would still win; but it is a client provider in the server layout,
+  and `v2.css` itself draws the stroke as a class rule with more specific exceptions). Since the
+  rule beats the attribute, the `strokeWidth` prop draws nothing on the portal: `tokens.test.ts`
+  pins the rule in the base layer and refuses a `strokeWidth` or `absoluteStrokeWidth` on any
+  component, so no icon sets a stroke of its own. **The canvas's two exceptions:** the recap's marks,
+  10 px icons in 18 px rings, at 2.25 (`.mk .ic`), and the 40 px check in ClassesCreated's "is
+  ready" dialog at 1.5 (the board's own style). The portal draws neither yet: today's timeline marks
+  are PB5's, 12 px in 20 px discs, and take 1.75 with the rest until PV12b redraws them. So each
+  comes with the step that builds its piece, as a class (`stroke-[2.25]`, `stroke-[1.5]`: a utility
+  outranks the base layer), noted on PV12's and PV16's lines, and DESIGN.md §1's style facts name
+  the stroke. The mark, the countdown's ring and any other svg that is not lucide's keep their own
+  strokes. **Seen:** every lucide icon on Home and a class page computes 1.75 px (2 before), on the
+  dev teacher's own pages and on a live class's fixture; the canvas's Main board draws its menu's
+  icons at 1.75 px, and the menu now matches it (screenshots on the PR).
+
 - **2026-10-13** — **PV5: v2's side menu on a teacher's signed-in pages, Home and Help its only
   items for now, never on the projector, and one read of who is signed in.** Built to
   [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (version 21):
