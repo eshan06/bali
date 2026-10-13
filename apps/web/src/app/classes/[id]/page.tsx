@@ -367,9 +367,10 @@ export default function ClassDetailPage() {
               </Button>
             </section>
           ) : (
+            // As tall as the Start card it holds the place of (116 px), so nothing jumps.
             <section
               aria-label="Session"
-              className={`mt-6 flex min-h-30.5 items-center ${CARD_ALONE}`}
+              className={`mt-6 flex min-h-29 items-center ${CARD_ALONE}`}
             >
               <p role="status" className="text-body text-text-secondary">
                 Loading…

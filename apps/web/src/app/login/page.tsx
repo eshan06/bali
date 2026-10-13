@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 
 import { Button } from '@/components/button';
-import { CARD_ALONE } from '@/components/card';
+import { CARD_ENTRY } from '@/components/card';
 import { EntryPage } from '@/components/entry-page';
 import { TextLink } from '@/components/text-link';
 import { type SignedOut, signedOut, startLogin } from '@/lib/auth';
@@ -36,8 +36,8 @@ export default function LoginPage() {
 
   return (
     <EntryPage>
-      {/* A card on its own (DESIGN.md §4): radius-md, 20 px padding, its own hairline edge. */}
-      <div className={CARD_ALONE}>
+      {/* An entry page's card (DESIGN.md §4): radius-md, 24 px padding, its own hairline edge. */}
+      <div className={CARD_ENTRY}>
         <h1 className="text-h1 text-balance">Teacher portal</h1>
         <p className="mt-2 text-body-lg text-pretty text-text-secondary">
           Sign in to see your classes.
@@ -57,7 +57,7 @@ export default function LoginPage() {
         ) : null}
       </div>
       {/* The public pages, under the card and in line with its text: the card keeps to signing in. */}
-      <nav aria-label="Help and policies" className="mt-4 px-5">
+      <nav aria-label="Help and policies" className="mt-4 px-6">
         <ul className="flex flex-wrap gap-x-5 gap-y-2 text-body">
           {PUBLIC_PAGES.map((page) => (
             <li key={page.href}>

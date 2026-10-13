@@ -157,8 +157,8 @@ const ONE_COLUMN =
 /**
  * One student's cell (the Class page design): the name, then the chip, then the line under it: the
  * unlock's reason (`unlockNote`, never in Present) and how long since the phone was heard from
- * (`lastSeenNote`), so a row's chips line up. Every cell is as tall as one with that line. In
- * Present the line sits beside the chip when it fits.
+ * (`lastSeenNote`), so a row's chips line up. Every cell is as tall as one with that line: 117 px
+ * with v2's 27 px chip (`min-h-29.25`). In Present the line sits beside the chip when it fits.
  */
 export function Cell({
   student: s,
@@ -178,7 +178,7 @@ export function Cell({
   const seen = lastSeenNote(s, display, now);
   return (
     <li
-      className={`flex flex-col gap-2 ${CARD} ${present ? 'min-h-22' : `min-h-31 ${ONE_COLUMN}`}`}
+      className={`flex flex-col gap-2 ${CARD} ${present ? 'min-h-22' : `min-h-29.25 ${ONE_COLUMN}`}`}
     >
       <div className="flex items-start justify-between gap-2">
         <span

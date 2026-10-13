@@ -7,5 +7,8 @@
  */
 export const CARD = 'rounded-md border border-border-default bg-surface-card p-4 shadow-1';
 
-/** A card on its own (the recap, the block, sign-in), v2's card: `radius-md` with 20 px padding. */
+/** A card on its own (the recap, the block, the class page's), v2's: `radius-md` with 20 px. */
 export const CARD_ALONE = 'rounded-md border border-border-default bg-surface-card p-5 shadow-1';
+
+/** An entry page's card (sign-in, its callback, the invite code), v2's: `radius-md` with 24 px. */
+export const CARD_ENTRY = 'rounded-md border border-border-default bg-surface-card p-6 shadow-1';

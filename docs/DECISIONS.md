@@ -43,11 +43,15 @@ a real decision? Add a dated entry at the top: what was decided and why.
   medium and untracked like the chip, since the label style's 600 and +0.06 em were for capitals
   (*weighed:* leaving it, tracked sentence case no board draws), until PV8 draws Present's tiles.
   **The card:** one on its own is `v2.css`'s card, `radius-md` with 20 px padding (it was
-  `radius-lg` with 24): the recap, the block, the class page's cards, Help's, sign-in's and the
-  invite code's; sign-in's links under its card move in with its text. A list's cards (the grid's
-  cells, the classes, the reports) keep `radius-md` with 16 px until the step that draws each
-  list: `v2.css` draws no one list card (a class row 18 × 20, Home's rows 15 × 18, a tile
-  12 × 14), so 20 px would be a size no board draws (*weighed:* one 20 px card everywhere). **The
+  `radius-lg` with 24): the recap, the block, the class page's cards and Help's. An entry page's
+  (sign-in, its callback, the invite code) is `v2.css`'s stage card, `radius-md` with 24 px
+  (`CARD_ENTRY`), as SignIn, Invite and AuthCallbackFailed draw it (santa's WARN; it had taken the
+  20 px card first). The class page's Loading card holds the Start card's new height (116 px), and
+  a grid cell's floor is a cell with its line under the 27 px chip (117 px), so nothing jumps or
+  gapes (santa's WARN). A list's cards (the grid's cells, the classes, the reports) keep
+  `radius-md` with 16 px until the step that draws each list: `v2.css` draws no one list card (a
+  class row 18 × 20, Home's rows 15 × 18, a tile 12 × 14), so 20 px would be a size no board draws
+  (*weighed:* one 20 px card everywhere). **The
   italic:** `@fontsource-variable/instrument-sans` 5.3.0, the upright's package and version (the
   repo's upright matches its file byte for byte), its latin `wght` italic,
   `files/instrument-sans-latin-wght-italic.woff2` (31,828 bytes, SHA-256

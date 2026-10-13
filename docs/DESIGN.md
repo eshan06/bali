@@ -512,8 +512,10 @@ where they differ (Present's included: §5); the input size stands.
   stand alone as D1 drew them. Use a card only when elevation means hierarchy;
   otherwise group with spacing or a hairline. *v2's look (§1):* a card is
   `radius-md` with 20 px padding, Home's live card and the student's lesson
-  card 16 px (a list's cards keep `space-4` until the step that draws the list
-  in v2's look: its tiles, rows or table); grey (`surface-sunken`) also fills the menu's current item, the
+  card 16 px, an entry page's (sign-in, its callback, the invite code) 24 px
+  in (`v2.css`'s stage card), a list's cards keeping `space-4` until the step
+  that draws the list in v2's look (its tiles, rows or table); grey
+  (`surface-sunken`) also fills the menu's current item, the
   length picker's track, a table's head, the recap's name pills, a code's chip
   and the bars' tracks, and no longer a field.
 - **State chip:** a pill (`radius-full`) filled with the state's tint, its
