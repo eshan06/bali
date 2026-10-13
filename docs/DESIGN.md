@@ -139,8 +139,9 @@ On 2026-10-12 the owner approved v2's look for the portal and the student web
 (§1), built page by page in PLAN's PV steps: until a page's step lands, it is
 laid out as PB drew it, the shared pieces PV4 restyled aside (the buttons, the
 field, the chip and the card on its own, 2026-10-13), and beside the side menu
-PV5 put on every signed-in page but the invite page (`components/shell.tsx`,
-2026-10-13), which frames each page at v2's width and gutters.
+PV5 put on a teacher's signed-in pages (`components/shell.tsx`, 2026-10-13),
+which frames each page at v2's width and gutters; never on the projector, where
+Present keeps its own column until PV9.
 Every
 portal source file is held to the tokens' utilities by `tokens.test.ts`, and
 since D2g the theme holds none of Tailwind's own colours, type sizes,

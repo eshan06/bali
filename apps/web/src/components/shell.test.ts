@@ -6,13 +6,16 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
-import { chromeFor, initials, Shell, SideMenu } from './shell';
+import { accountStep, frameFor, initials, PAGE, reloadOnRestore, Shell, SideMenu } from './shell';
 
 /*
  * The shell (PV5): v2's side menu on a teacher's signed-in pages, built to the canvas's teacher
- * boards, StudentZoom's bar and PV1's phone and no-name boards. Rendered: which frame a page gets,
- * the menu's items, the page it marks, its foot with and without a name, its bar under 776 px and
- * its three rows under 640 px, and the page beside it.
+ * boards, StudentZoom's bar and PV1's phone and no-name boards, under the owner's rulings of
+ * 2026-10-13 (no menu in Present; nothing shown from an account that left; the menu only once the
+ * account reads as a teacher). Which frame a page gets, what happens to the account as pages change
+ * and the back button restores one, and, rendered, the menu's items, the page it marks, its foot
+ * with and without a name, its bar under 776 px and its three rows under 640 px, and the page beside
+ * it.
  */
 const nav = vi.hoisted(() => ({ path: '/' }));
 vi.mock('next/navigation', () => ({
@@ -55,24 +58,94 @@ const links = (html: string) =>
 const classesOf = (html: string, tag: RegExp) =>
   /\bclass="([^"]*)"/.exec(tag.exec(html)?.[0] ?? '')?.[1]?.split(' ') ?? [];
 
+const NONE = { chrome: null, framed: false, hidden: false };
+const MENU = { chrome: 'menu', framed: true, hidden: false };
+
 describe('what frames a page', () => {
   it('draws nothing on a page read without signing in: each has its own bar', () => {
     for (const path of ['/login', '/auth/callback', '/support', '/privacy', '/terms']) {
-      expect(chromeFor(path, account('teacher')), path).toBe('none');
+      expect(frameFor(path, account('teacher'), null, false), path).toEqual(NONE);
     }
   });
 
-  it('keeps today’s bar on the invite page alone, home for an account that doesn’t teach', () => {
-    expect(chromeFor('/', account('student'))).toBe('bar');
-    expect(chromeFor('/', account('teacher'))).toBe('menu');
+  it('draws the side menu for a teacher, the page beside it in v2’s frame', () => {
+    for (const path of ['/', '/classes/c1', '/classes/c1/reports']) {
+      expect(frameFor(path, account('teacher'), null, false), path).toEqual(MENU);
+    }
   });
 
-  it('draws the side menu on every other signed-in page, and before the account is read', () => {
-    expect(chromeFor('/', null)).toBe('menu');
-    for (const path of ['/classes/c1', '/classes/c1/reports']) {
-      expect(chromeFor(path, null), path).toBe('menu');
-      expect(chromeFor(path, account('student')), path).toBe('menu');
+  it('draws no menu or frame on the projector, as ClassPresent draws it (the owner, 2026-10-13)', () => {
+    expect(frameFor('/classes/c1', account('teacher'), null, true)).toEqual(NONE);
+    // Whether or not the account is read yet: a reload in Present comes back without the menu.
+    expect(frameFor('/classes/c1', null, null, true)).toEqual(NONE);
+  });
+
+  it('shows nothing until the account is read, so no menu flashes for anyone (the owner, 2026-10-13)', () => {
+    for (const path of ['/', '/classes/c1', '/classes/c1/reports']) {
+      expect(frameFor(path, null, null, false), path).toEqual({
+        chrome: null,
+        framed: false,
+        hidden: true,
+      });
     }
+  });
+
+  it('keeps today’s bar for an account that doesn’t teach, never the menu; the invite page frames itself', () => {
+    expect(frameFor('/', account('student'), null, false)).toEqual({
+      chrome: 'bar',
+      framed: false,
+      hidden: false,
+    });
+    expect(frameFor('/classes/c1', account('student'), null, false)).toEqual({
+      chrome: 'bar',
+      framed: true,
+      hidden: false,
+    });
+  });
+
+  it('says a failed read under today’s bar, with Sign out and the page’s Try again', () => {
+    for (const path of ['/', '/classes/c1']) {
+      expect(frameFor(path, null, "Couldn't reach Bali.", false), path).toEqual({
+        chrome: 'bar',
+        framed: true,
+        hidden: false,
+      });
+    }
+  });
+});
+
+describe('the account as pages change (the owner, 2026-10-13)', () => {
+  const teacher = account('teacher');
+
+  it('is forgotten once the sign-in is gone, so going back never shows it', () => {
+    // A Sign out and an expired session both land on /login, the token gone.
+    expect(accountStep('/login', false, teacher, null, false)).toBe('forget');
+    expect(accountStep('/login', false, null, "Couldn't reach Bali.", false)).toBe('forget');
+    // An answer that lands after the Sign out is forgotten too.
+    expect(accountStep('/', false, teacher, null, false)).toBe('forget');
+    expect(accountStep('/login', false, null, null, false)).toBe('keep');
+  });
+
+  it('is read once on a signed-in page, and kept as pages change, Help included', () => {
+    expect(accountStep('/classes/c1', true, null, null, false)).toBe('read');
+    expect(accountStep('/classes/c1', true, null, null, true)).toBe('keep');
+    expect(accountStep('/classes/c1', true, teacher, null, false)).toBe('keep');
+    expect(accountStep('/support', true, teacher, null, false)).toBe('keep');
+    expect(accountStep('/support', true, null, null, false)).toBe('keep');
+    // A failed read waits for Try again or another page: never a loop of reads.
+    expect(accountStep('/', true, null, "Couldn't reach Bali.", false)).toBe('keep');
+  });
+
+  it('reloads a signed-in page the back button restores after its sign-in is gone', () => {
+    expect(reloadOnRestore('/', false)).toBe(true);
+    expect(reloadOnRestore('/classes/c1', false)).toBe(true);
+    expect(reloadOnRestore('/', true)).toBe(false);
+    expect(reloadOnRestore('/login', false)).toBe(false);
+    expect(reloadOnRestore('/support', false)).toBe(false);
+    // The shell's handler does: a page the browser kept whole, its sign-in gone, reloads.
+    expect(read('./shell.tsx')).toMatch(
+      /if \(!e\.persisted\) return;\s*if \(reloadOnRestore\(window\.location\.pathname, getAccessToken\(\) !== null\)\) \{\s*window\.location\.reload\(\);/,
+    );
   });
 });
 
@@ -191,14 +264,8 @@ describe('the side menu', () => {
 describe('the shell', () => {
   const page = createElement('main', null, 'page');
 
-  it('sets a signed-in page beside the menu, left-aligned, 1260 px at most, in v2’s gutters', () => {
-    nav.path = '/classes/c1';
-    const html = renderToStaticMarkup(createElement(Shell, null, page));
-    const frame =
-      /^<div class="flex max-\[776px\]:block"><nav aria-label="Main"[^]*<\/nav><div class="([^"]*)"><main>page<\/main><\/div><\/div>$/.exec(
-        html,
-      );
-    expect(frame?.[1]?.split(' ')).toEqual(
+  it('sets the page beside the menu left-aligned, 1260 px at most, in v2’s gutters', () => {
+    expect(PAGE.split(' ')).toEqual(
       expect.arrayContaining([
         'max-w-[1260px]',
         'min-w-0',
@@ -211,10 +278,13 @@ describe('the shell', () => {
         'max-sm:pb-10',
       ]),
     );
-    // Before the account is read, its foot says Sign out in words, so it is there from the first
-    // paint, and nothing is marked on a page the menu doesn't list.
-    expect(html).toContain('Sign out</button>');
-    expect(html).not.toContain('aria-current');
+  });
+
+  it('first paints a signed-in page hidden, with no menu or bar, until the account is read', () => {
+    nav.path = '/classes/c1';
+    expect(renderToStaticMarkup(createElement(Shell, null, page))).toBe(
+      '<div><div hidden=""><main>page</main></div></div>',
+    );
   });
 
   it('draws nothing around a page read without signing in, the page in the same place', () => {

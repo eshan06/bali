@@ -25,14 +25,57 @@ import { PortalBar } from './portal-bar';
 /** The pages read without signing in (sign-in, its callback, Help, the policies), each with a bar. */
 export const SIGNED_OUT_PATHS = /^\/(login|auth|support|privacy|terms)(\/|$)/;
 
-/**
- * What frames a page: nothing on a signed-out page, today's bar on the invite page (`/` for an
- * account that doesn't teach) until PV15 draws it, and the side menu on every other.
- */
-export function chromeFor(path: string, me: MeResponse | null): 'none' | 'bar' | 'menu' {
-  if (SIGNED_OUT_PATHS.test(path)) return 'none';
-  return path === '/' && me !== null && me.user.role !== 'teacher' ? 'bar' : 'menu';
+/** How the shell frames a page: the side menu or today's bar, the page's frame, or nothing yet. */
+export interface Frame {
+  chrome: 'menu' | 'bar' | null;
+  /** The page at v2's width and gutters (`PAGE`). */
+  framed: boolean;
+  /** Nothing shown yet: the account isn't read, so neither its frame nor a page drawn from it. */
+  hidden: boolean;
 }
+
+/**
+ * How a page is framed (the owner's rulings, 2026-10-13). A signed-out page draws its own bar, and
+ * a page on the projector (Present) has no menu and no frame of the shell's, as ClassPresent draws
+ * it. Otherwise nothing shows until the account is read, so no frame flashes before it is known and
+ * no page is drawn from an account that left; then the side menu for a teacher alone, and today's
+ * bar for anyone else and on a failed read, with Sign out, the invite page framing itself (PV15
+ * draws it).
+ */
+export function frameFor(
+  path: string,
+  me: MeResponse | null,
+  error: string | null,
+  presenting: boolean,
+): Frame {
+  if (SIGNED_OUT_PATHS.test(path) || presenting)
+    return { chrome: null, framed: false, hidden: false };
+  if (me === null && error === null) return { chrome: null, framed: false, hidden: true };
+  if (me?.user.role === 'teacher') return { chrome: 'menu', framed: true, hidden: false };
+  return { chrome: 'bar', framed: !(path === '/' && me !== null), hidden: false };
+}
+
+/**
+ * What the shell does with the account as a page opens: forgets one whose sign-in is gone (a Sign
+ * out or an expired session, which both land on /login), so going back never shows it; reads one
+ * not read yet on a signed-in page; or keeps what it has. A failed read waits for Try again or the
+ * next page, never a loop.
+ */
+export function accountStep(
+  path: string,
+  signedIn: boolean,
+  me: MeResponse | null,
+  error: string | null,
+  reading: boolean,
+): 'forget' | 'read' | 'keep' {
+  if (!signedIn) return me !== null || error !== null ? 'forget' : 'keep';
+  if (SIGNED_OUT_PATHS.test(path) || me !== null || error !== null || reading) return 'keep';
+  return 'read';
+}
+
+/** A signed-in page the back button brings back whole, its sign-in gone: reloaded, never shown. */
+export const reloadOnRestore = (path: string, signedIn: boolean): boolean =>
+  !signedIn && !SIGNED_OUT_PATHS.test(path);
 
 /** Who is signed in, as `GET /v1/me` last said: one read, for the menu's foot and for Home. */
 export interface Me {
@@ -45,8 +88,18 @@ export interface Me {
 }
 
 const MeContext = createContext<Me>({ me: null, error: null, load: () => undefined });
+const PresentingContext = createContext<(on: boolean) => void>(() => undefined);
 
 export const useMe = (): Me => useContext(MeContext);
+
+/** A page on the projector says so while it is (Present): the shell then draws no menu or frame. */
+export function usePresenting(on: boolean): void {
+  const setPresenting = useContext(PresentingContext);
+  useEffect(() => {
+    setPresenting(on);
+    return () => setPresenting(false);
+  }, [on, setPresenting]);
+}
 
 /** A name's initials, as v2 drew them: the first letter of its first two words (Ms. Rivera, MR). */
 export function initials(name: string): string {
@@ -94,14 +147,14 @@ const FOOT =
   'mt-2 border-t border-border-default pt-3 max-[776px]:mt-0 max-[776px]:ml-auto max-[776px]:border-t-0 max-[776px]:pt-0 max-sm:order-1';
 
 /** The page beside the menu: left-aligned, 1260 px at most, 30/36/56 in, 22/16/40 on a phone. */
-const SHELL = 'flex max-[776px]:block';
-const PAGE =
+export const SHELL = 'flex max-[776px]:block';
+export const PAGE =
   'max-w-[1260px] min-w-0 flex-1 px-9 pt-7.5 pb-14 max-sm:px-4 max-sm:pt-5.5 max-sm:pb-10';
 
 /**
- * The side menu, drawn from what it is given. Its foot names the account, its initials beside the
- * name and Sign out an icon; with no name to show (none on the account, or not read yet), Sign out
- * in words alone (HomeNoName), so it is there from the first paint.
+ * The side menu, drawn from what it is given, for a teacher. Its foot names the account, its
+ * initials beside the name and Sign out an icon; with no name on the account, Sign out in words
+ * alone (HomeNoName).
  */
 export function SideMenu({
   path,
@@ -171,11 +224,10 @@ export function SideMenu({
 }
 
 /**
- * The frame of every page (the root layout's), and who is signed in. A signed-in page opens with
- * no answer yet, so it reads `/v1/me` (Home reads it again as it opens); a page moving to another
- * keeps the answer. The invite page keeps today's bar; every other signed-in page sits beside the
- * side menu, drawn from the first paint. One tree throughout, so the page under it is never
- * remounted as its frame changes (a redeem's turn from the bar to the menu).
+ * The frame of every page (the root layout's), and who is signed in: one read of `/v1/me` as a
+ * signed-in page first opens (Home reads it again as it opens), kept as pages change and forgotten
+ * once the sign-in is gone. `frameFor` says what to draw. One tree throughout, so the page under it
+ * is never remounted as its frame changes (a redeem's turn from the bar to the menu, Present).
  */
 export function Shell({ children }: { children: ReactNode }) {
   const api = useApi();
@@ -183,6 +235,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const path = usePathname();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [presenting, setPresenting] = useState(false);
   // A read under way: the frame asks only when none is.
   const reading = useRef(false);
   // A Sign out under way: a second press sends nothing.
@@ -210,13 +263,25 @@ export function Shell({ children }: { children: ReactNode }) {
     [api],
   );
 
+  // On every page, and again as an answer lands (one landing after a Sign out is forgotten too).
   useEffect(() => {
-    if (!SIGNED_OUT_PATHS.test(path) && me === null && !reading.current && getAccessToken()) load();
-  }, [path, me, load]);
+    const step = accountStep(path, getAccessToken() !== null, me, error, reading.current);
+    if (step === 'read') load();
+    if (step === 'forget') {
+      setMe(null);
+      setError(null);
+    }
+  }, [path, me, error, load]);
 
-  // Back here from the hosted UI by the back button (the page kept whole): Sign out works again.
+  // Back here by the back button with the page kept whole: after a Sign out or an expired session
+  // it is reloaded, so it never shows the account that left; else Sign out works again.
   useEffect(() => {
-    const back = (e: PageTransitionEvent) => e.persisted && setLeaving(false);
+    const back = (e: PageTransitionEvent) => {
+      if (!e.persisted) return;
+      if (reloadOnRestore(window.location.pathname, getAccessToken() !== null)) {
+        window.location.reload();
+      } else setLeaving(false);
+    };
     window.addEventListener('pageshow', back);
     return () => window.removeEventListener('pageshow', back);
   }, []);
@@ -232,23 +297,27 @@ export function Shell({ children }: { children: ReactNode }) {
     if (endSession() === 'local') router.replace('/login');
   }
 
-  const chrome = chromeFor(path, me);
+  const frame = frameFor(path, me, error, presenting);
   const value = useMemo(() => ({ me, error, load }), [me, error, load]);
   return (
     <MeContext value={value}>
-      <div className={chrome === 'menu' ? SHELL : undefined}>
-        {chrome === 'menu' ? (
-          <SideMenu
-            path={path}
-            name={me?.user.displayName?.trim() || null}
-            leaving={leaving}
-            onSignOut={onSignOut}
-          />
-        ) : chrome === 'bar' ? (
-          <PortalBar leaving={leaving} onSignOut={onSignOut} />
-        ) : null}
-        <div className={chrome === 'menu' ? PAGE : undefined}>{children}</div>
-      </div>
+      <PresentingContext value={setPresenting}>
+        <div className={frame.chrome === 'menu' ? SHELL : undefined}>
+          {frame.chrome === 'menu' ? (
+            <SideMenu
+              path={path}
+              name={me?.user.displayName?.trim() || null}
+              leaving={leaving}
+              onSignOut={onSignOut}
+            />
+          ) : frame.chrome === 'bar' ? (
+            <PortalBar leaving={leaving} onSignOut={onSignOut} />
+          ) : null}
+          <div hidden={frame.hidden} className={frame.framed ? PAGE : undefined}>
+            {children}
+          </div>
+        </div>
+      </PresentingContext>
     </MeContext>
   );
 }

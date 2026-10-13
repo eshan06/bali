@@ -18,6 +18,7 @@ import { Field } from '@/components/field';
 import { JoinCode } from '@/components/join-code';
 import { LiveGrid } from '@/components/live-grid';
 import { RecapCard } from '@/components/recap-card';
+import { usePresenting } from '@/components/shell';
 import { NAV_LINK } from '@/components/text-link';
 import { getAccessToken } from '@/lib/auth';
 import { errText, NOT_A_SESSION_LENGTH, SESSION_ALREADY_RUNNING } from '@/lib/errors';
@@ -40,6 +41,13 @@ import {
 } from '@/lib/session-controls';
 import { useApi } from '@/lib/use-api';
 
+/**
+ * The page in Present, the projector's view, with no menu (the owner's ruling, 2026-10-13, as
+ * ClassPresent draws it): its own column as before the menu, 1400 px at most with 40 px gutters, so
+ * a 1024 px projector keeps Present's four columns, until PV9 draws Present.
+ */
+const PRESENT_PAGE = 'mx-auto max-w-[1400px] px-4 pb-16 sm:px-10';
+
 /** A hairline between the bell and the controls, 40 px tall as the buttons are. */
 const DIVIDER = 'h-10 w-px shrink-0 bg-border-default';
 
@@ -58,7 +66,8 @@ const LENGTH =
  * the session's card (the bell, Extend, and End set apart), then the live grid with Present; then
  * the roster. In Present the header folds the bell, the code and the controls into one row, so a
  * class of 28 fits one 1080p screen. Each failure is said where it happened. It sits in the shell's
- * frame beside the side menu (PV5), which sets its width and gutters.
+ * frame beside the side menu (PV5), which sets its width and gutters; in Present the shell draws
+ * neither, and the page keeps its own column (`PRESENT_PAGE`).
  */
 export default function ClassDetailPage() {
   const api = useApi();
@@ -93,6 +102,8 @@ export default function ClassDetailPage() {
   // The projector view (DESIGN.md §5), toggled in the grid's header and kept for this tab, so a
   // reload or a return from Reports comes back in it; a new tab or window opens without it.
   const [present, setPresent] = useState(false);
+  // On the projector, no menu: the shell draws none while Present is on.
+  usePresenting(present);
   // The page opened in Present: with no session to show, the recap carries the toggle, so the
   // teacher can always leave it.
   const [openedInPresent, setOpenedInPresent] = useState(false);
@@ -299,7 +310,7 @@ export default function ClassDetailPage() {
   );
 
   return (
-    <main>
+    <main className={present ? `${PRESENT_PAGE} ${projecting ? 'pt-5' : 'pt-8'}` : undefined}>
       <nav aria-label="Class" className="flex justify-between gap-4">
         <Link href="/" className={NAV_LINK}>
           <ArrowLeft size={16} aria-hidden="true" />
