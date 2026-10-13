@@ -1340,9 +1340,10 @@ bytes against the slide's `sha256` before rendering them, refusing a mismatch as
 opened. Each page's text layer is its VoiceOver label (a page with none says which slide it
 is).
 
-**9. Apple and privacy.** Answers are Bali's own data, not Family Controls data, but the
-feature strengthens the "organizational setting" reading of §3.3.3(P) (ISSUES #3), so the
-owner's App Review question describes it. The steps that ship it update the privacy
+**9. Apple and privacy.** Answers are Bali's own data, not Family Controls data. The owner's
+App Review question on §3.3.3(P) (ISSUES #3; case 102994872143, sent 2026-10-13) asks about
+Family Controls alone, and leaves the live lesson out as unrelated to it, as it does an unlock's
+optional reason (the owner's ruling, 2026-10-13; this said the question would describe it). The steps that ship it update the privacy
 manifest, `docs/APP-STORE.md`'s privacy table (answers as "Other User Content") and the
 consent preview's "what your teacher sees" list (your answers count in the class's totals;
 your teacher never sees your answer).

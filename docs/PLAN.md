@@ -981,7 +981,7 @@ Researched 2026-10-05; findings in [`docs/ROADMAP-RESEARCH.md`](ROADMAP-RESEARCH
 
 - ✅ Tap a block on the prod TestFlight build: done by the owner on 2026-10-12, and it worked as usual, so the NFC entitlement as TAG alone (#236, `BlockReader`'s `NFCNDEFReaderSession`) is confirmed on a device; NDEF stays out.
 - 🔧 Sentry: confirm monitor `api-sweep`'s `production` environment is active and alerting (dev checks in to the same slug, #239's review; runbook 6, step 2).
-- ⏳ Apple's developer agreement §3.3.3(P) on Family Controls (ISSUES #3): asked by the owner on 2026-10-13, **case 102994872143** (`docs/APP-STORE.md` §5.6 holds the question as sent); waiting on Apple's answer, to record in ISSUES #3. Not in the question: an unlock's optional reason, which the teacher sees, and Phase 7's live lesson (ARCHITECTURE, "Live lesson", decision 9); a follow-up on the case can add both.
+- ⏳ Apple's developer agreement §3.3.3(P) on Family Controls (ISSUES #3): asked by the owner on 2026-10-13, **case 102994872143** (`docs/APP-STORE.md` §5.6 holds the question as sent); waiting on Apple's answer, to record in ISSUES #3.
 - Confirm the state of the later K-12 pilot (likely Los Angeles or New Jersey) and its school's phone policy (ISSUES #4). The first pilot is preliminary: adults at Vanderbilt, on their own phones.
 - A lawyer for the privacy policy, terms and the school's data agreement; the rest of Phase 6's owner list.
 - ✅ #148 the sign-in page: D2d drew it (`infra/cognito/hosted-ui/`); the owner uploaded its logos and CSS to dev's and prod's pools (2026-10-06; both pools' live `custom-css.css` read back at 21:58Z with the `#8a847a` field edge).

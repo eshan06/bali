@@ -470,10 +470,5 @@ from the first draft: four questions, the fourth on students under 18. As sent:
 > Thanks,
 > (the owner)
 
-*Not in it,* and true of the product: the teacher also sees an unlock's optional reason (bathroom,
-nurse, other), and Phase 7's live lesson shows the class a question and a slide on Bali's own
-screen, the teacher seeing totals only (ARCHITECTURE, "Live lesson", decision 9 asks that the
-question describe it). A follow-up on the same case can add both.
-
 Record the answer, its date and case number in ISSUES #3, and the review notes' top line
 (section 2).

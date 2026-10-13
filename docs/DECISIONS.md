@@ -8,6 +8,15 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-13** — **Apple's §3.3.3(P) question is about Family Controls alone.** The owner sent
+  App Review the question (case 102994872143; `docs/APP-STORE.md` §5.6 holds it as sent, ISSUES #3
+  records it asked). It describes the shields, Emergency Unlock and what the teacher's grid shows,
+  and adds a fourth question, whether the answers change for high schoolers under 18. It leaves out
+  an unlock's optional reason and Phase 7's live lesson, which the conductor proposed adding in a
+  follow-up; the owner ruled them unrelated to the question (Bali's own data, nothing received
+  through Family Controls), so no follow-up is sent and ARCHITECTURE's "Live lesson" decision 9 no
+  longer says the question describes the live lesson.
+
 - **2026-10-12** — **PV3b: the class lists in a fixed order, a teacher's oldest first and a
   student's in the order they joined.** `getTaughtClasses` and `getEnrolledClasses` read with no
   `ORDER BY` (PV2's review, #344; the owner: fix it), and Postgres then returns rows in whatever
