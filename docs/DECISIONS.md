@@ -61,10 +61,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   a fixture** (the fixtures are a phone's), so the new test reads each against the contract's strict
   `MeResponse` schema, the one the OpenAPI snapshot now carries.
 
-- **2026-10-12** — **The owner's rulings on PV1's first boards, and the class order fixed.** Drawn
-  on [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (row "PV1: states
-  no board drew, for your approval") and ruled by the owner as they landed; the rest of PV1's boards
-  are still being drawn, and the set's approval will be dated here. **A teacher's page at phone
+- **2026-10-12** — **PV1 approved: what no board drew, drawn and ruled; and the class order
+  fixed.** Drawn on [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4)
+  (three rows titled "PV1, for your approval"), ruled by the owner as the boards landed, and the set
+  approved by the owner the same night, with Present after the bell changed to "Class is over"
+  alone. **A teacher's page at phone
   width** (390 px; the portal in a phone's browser: there is no teacher app) is drawn as a class
   live and as Home. The class page's grid is **two columns of short tinted tiles**, every tile one
   size, each its state with at most one detail (an unlock's reason, or Clock off), the rest a tap
@@ -82,6 +83,22 @@ a real decision? Add a dated entry at the top: what was decided and why.
   turned protection off, went silent or left. A late tap-in still counts." (the end, not the bell:
   a teacher can end early); and ReportOpened's recap card is titled "This session" (the shipped
   report's words), its repeated date and its "Open its report", a link to its own page, gone.
+  **The rest, as drawn:** Present after the bell says "Class is over" alone, the figures staying
+  on the class page's recap (*weighed:* the recap's four totals, which students could misread:
+  "Silent 13 min"); W5's full-screen slide closes by itself when a question opens, the slides stop
+  or class ends (*weighed:* a bar with Answer it); several unlock pop-ups stack, newest on top,
+  each until it is closed (*weighed:* a Close all from three); Home's Last session is hidden until
+  a class's first session ends (*weighed:* "No sessions yet."), and Recent activity has no empty
+  state, since a live class's own start is always listed; Help, the policy pages and the sign-in
+  callback (signing in, and its failure) in v2's look with today's words; an empty Classes page;
+  a teacher with no display name ("Good afternoon", and Sign out in words at the menu's foot);
+  Copy's "Copied" and its failure line ("Bali couldn't copy the code. Select it and copy it
+  yourself."); the student panel loading, failing, and in each state ("Zuri Mensah hasn't tapped
+  in this session." before a tap-in); Home's live card, Last session and Recent activity loading
+  and failing, each with Try again. The panel's rare Unknown state is not drawn: only its chip
+  would change. Help's "Reports, on the class page, lists your past sessions." stays true until
+  Reports joins the menu; PV13 rewords it to "Reports, in the menu, lists each class's past
+  sessions." (the owner's OK).
   **The class order** (PV2's review, #344): `getTaughtClasses` and `getEnrolledClasses` read with
   no `ORDER BY`, so an update to a class row (New code, a rename) can move that class in its list
   on the next read, and today's portal home shows the list as read. The owner: fix it (PV3b: a
