@@ -2,6 +2,10 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { House } from 'lucide-react';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 import { buttonClass } from '../components/button';
@@ -429,18 +433,6 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     );
   });
 
-  it('every lucide icon draws at v2.css’s 1.75 stroke, set once for all (PV4b)', () => {
-    // The owner, 2026-10-13: one base-layer rule, which beats the svg's own attribute, so no icon
-    // passes a stroke of its own (it would draw nothing); one drawn otherwise takes a class.
-    expect(css).toMatch(/@layer base\s*\{[^]*\bsvg\.lucide\s*\{\s*stroke-width: 1\.75;\s*\}/);
-    const src = fileURLToPath(new URL('../', import.meta.url));
-    for (const file of sources(src)) {
-      expect(readFileSync(file, 'utf8'), relative(src, file)).not.toMatch(
-        /<[A-Z]\w*\b[^>]*\b(?:strokeWidth|absoluteStrokeWidth)\b/,
-      );
-    }
-  });
-
   it('the browser’s own chrome takes surface-page, one colour (the layout’s viewport)', () => {
     const page = hexOf('surface-page', 'light').toLowerCase();
     expect(read('./layout.tsx')).toContain(
@@ -475,6 +467,107 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     for (const name of ['shadow-1', 'shadow-2', 'shadow-3']) {
       expect(side(shadows.get(name) as Token, 'light'), name).toContain('rgba(33,28,21,');
     }
+  });
+});
+
+describe('every lucide icon draws at v2.css’s 1.75 stroke, set once (PV4b)', () => {
+  // The owner, 2026-10-13: one base-layer rule, which beats the svg's own attribute, so no icon
+  // passes a stroke of its own (it would draw nothing); one drawn otherwise takes a class, which
+  // outranks the layer. Each test fails where the rule would quietly stop holding (PV4c).
+  const src = fileURLToPath(new URL('../', import.meta.url));
+  /** What the browser reads of globals.css: no comments. */
+  const live = css.replace(/\/\*[^]*?\*\//g, '');
+  const rule = /\bsvg\.lucide\s*\{\s*stroke-width: 1\.75;\s*\}/.exec(live);
+
+  /** The heads of the blocks open at `index` in `live`, outermost first: `@layer base`, `@media …`. */
+  function blocksAt(index: number): string[] {
+    const open: string[] = [];
+    let head = 0;
+    for (let i = 0; i < index; i++) {
+      const c = live.charAt(i);
+      if (c === '{') open.push(live.slice(head, i).trim());
+      if (c === '}') open.pop();
+      if (c === '{' || c === '}' || c === ';') head = i + 1;
+    }
+    return open;
+  }
+
+  /**
+   * Each lucide icon the portal draws, known by its props, lucide's (they take `nonScalingStroke`),
+   * so one drawn under another name counts too (the shell's `Icon`); and of each, what would give
+   * it a stroke of its own: a stroke prop of lucide's, or an inline style that sets one.
+   */
+  function lucideIcons(): { icon: string; own: string[] }[] {
+    const files = sources(src).filter((file) => file.endsWith('.tsx'));
+    const web = fileURLToPath(new URL('../../', import.meta.url));
+    const tsconfig = ts.readConfigFile(join(web, 'tsconfig.json'), (path) => ts.sys.readFile(path));
+    const { options } = ts.parseJsonConfigFileContent(tsconfig.config, ts.sys, web);
+    const program = ts.createProgram(files, options);
+    const checker = program.getTypeChecker();
+    const ownStroke = (attr: ts.JsxAttributeLike): boolean => {
+      if (!ts.isJsxAttribute(attr)) return false;
+      const name = attr.name.getText();
+      if (['strokeWidth', 'absoluteStrokeWidth', 'nonScalingStroke'].includes(name)) return true;
+      const value =
+        attr.initializer && ts.isJsxExpression(attr.initializer)
+          ? attr.initializer.expression
+          : undefined;
+      if (name !== 'style' || !value) return false;
+      // A style that sets it: written in place, held in a constant, or one side of `? :` with none.
+      const stroke = checker
+        .getNonNullableType(checker.getTypeAtLocation(value))
+        .getProperty('strokeWidth');
+      return stroke !== undefined && (stroke.flags & ts.SymbolFlags.Optional) === 0;
+    };
+    const icons: { icon: string; own: string[] }[] = [];
+    for (const file of files) {
+      const visit = (node: ts.Node): void => {
+        if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
+          const props = checker
+            .getTypeAtLocation(node.tagName)
+            .getCallSignatures()[0]
+            ?.getParameters()[0];
+          if (props && checker.getTypeOfSymbol(props).getProperty('nonScalingStroke')) {
+            icons.push({
+              icon: `${relative(src, file)}: <${node.tagName.getText()}>`,
+              own: node.attributes.properties.filter(ownStroke).map((attr) => attr.getText()),
+            });
+          }
+        }
+        ts.forEachChild(node, visit);
+      };
+      const source = program.getSourceFile(file);
+      if (source) visit(source);
+    }
+    return icons;
+  }
+
+  it('by one rule the browser reads, at the base layer’s top, the only one naming the icons', () => {
+    expect(rule).not.toBeNull();
+    // Out of the layer it would outrank the class an icon drawn otherwise takes (PV12b, PV16); in a
+    // media query it would hold only there.
+    expect(blocksAt(rule?.index ?? 0)).toEqual(['@layer base']);
+    // No other rule names the icons, so none puts them back at 2.
+    expect(live.match(/\.lucide(?![\w-])/g)).toHaveLength(1);
+  });
+
+  it('on the class lucide still gives every svg it draws, whose paths take the svg’s stroke', () => {
+    // As the portal draws an icon: sized, hidden from a screen reader, with a class of its own.
+    const html = renderToStaticMarkup(
+      createElement(House, { size: 17, 'aria-hidden': 'true', className: 'shrink-0' }),
+    );
+    const svg = /^<svg\b[^>]*\bclass="([^"]*)"[^>]*>/.exec(html);
+    // `lucide`, the class `svg.lucide` targets: renamed in an update, every icon would go back to 2.
+    expect(svg?.[1]?.split(' ')).toEqual(expect.arrayContaining(['lucide', 'shrink-0']));
+    // The paths inherit the svg's stroke; a stroke of their own would beat the rule.
+    expect(html.slice(svg?.[0].length)).not.toContain('stroke-width');
+  });
+
+  it('never set on one icon, by a prop or an inline style, under any name; any other component keeps its own', () => {
+    const icons = lucideIcons();
+    // Known by type, the aliases with the rest: finding none would mean it can no longer see them.
+    expect(icons.length).toBeGreaterThan(0);
+    expect(icons.filter((icon) => icon.own.length > 0)).toEqual([]);
   });
 });
 
