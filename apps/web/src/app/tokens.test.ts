@@ -426,6 +426,18 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     );
   });
 
+  it('every lucide icon draws at v2.css’s 1.75 stroke, set once for all (PV4b)', () => {
+    // The owner, 2026-10-13: one base-layer rule, which beats the svg's own attribute, so no icon
+    // passes a stroke of its own (it would draw nothing); one drawn otherwise takes a class.
+    expect(css).toMatch(/@layer base\s*\{[^]*\bsvg\.lucide\s*\{\s*stroke-width: 1\.75;\s*\}/);
+    const src = fileURLToPath(new URL('../', import.meta.url));
+    for (const file of sources(src)) {
+      expect(readFileSync(file, 'utf8'), relative(src, file)).not.toMatch(
+        /<[A-Z]\w*\b[^>]*\b(?:strokeWidth|absoluteStrokeWidth)\b/,
+      );
+    }
+  });
+
   it('the browser’s own chrome takes surface-page, one colour (the layout’s viewport)', () => {
     const page = hexOf('surface-page', 'light').toLowerCase();
     expect(read('./layout.tsx')).toContain(

@@ -353,6 +353,13 @@
     font-family: var(--font-instrument-sans-italic);
   }
 
+  /* Every lucide icon at v2.css's 1.75 stroke, where lucide draws 2 (the owner, 2026-10-13). Any
+     rule beats the svg's own `stroke-width`, so the `strokeWidth` prop does nothing here: an icon
+     the canvas draws otherwise takes a class, as v2.css's two exceptions do (PV12b, PV16). */
+  svg.lucide {
+    stroke-width: 1.75;
+  }
+
   /* §7: every animation off under reduced motion; a fade is instant. */
   @media (prefers-reduced-motion: reduce) {
     *,
