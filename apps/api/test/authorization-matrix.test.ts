@@ -96,6 +96,7 @@ const MATRIX = {
   'PATCH /v1/me':                           [401, 401, 200,     200,     403,     403],
   'DELETE /v1/me':                          [401, 401, 200,     200,     409,     409],
   'GET /v1/me/history':                     [401, 401, 200,     200,     403,     403],
+  'GET /v1/me/activity':                    [401, 401, 403,     403,     200,     200],
   'PUT /v1/me/push-token':                  [401, 401, 200,     200,     403,     403],
   'DELETE /v1/me/push-token':               [401, 401, 200,     200,     403,     403],
   'GET /v1/me/age-check':                   [401, 401, 200,     200,     200,     200],
@@ -210,6 +211,8 @@ const REQUESTS: Record<RouteKey, (w: World) => Sent | Promise<Sent>> = {
   // own history, so the stranger check reads it. (Another's cursor is a 400:
   // history.test.ts.)
   'GET /v1/me/history': () => ({ url: '/v1/me/history' }),
+  // Each teacher's own (PV3): another teacher is given theirs, never the owner's unlock.
+  'GET /v1/me/activity': () => ({ url: '/v1/me/activity' }),
   // Students only (N3): each student registers, or removes, a token of their own phone's.
   'PUT /v1/me/push-token': () => ({
     url: '/v1/me/push-token',

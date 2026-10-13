@@ -10,7 +10,7 @@ import {
   type UnlockReason,
   type UnlockRecordedAs,
 } from '@bali/shared';
-import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
 import type { SQLWrapper } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 
@@ -986,6 +986,24 @@ export function sessionEvents(db: Database, sessionIds: string[]) {
 /** Every event of one session, as `sessionEvents` reads them: its report's (R2). */
 export async function getSessionEvents(db: Database, sessionId: string): Promise<ReportEventRow[]> {
   return sessionEvents(db, [sessionId]);
+}
+
+/**
+ * A teacher's sessions started at `since` or later, in their live classes, each with its class's
+ * name now: Home's Recent activity reads today's (PV3). Unexecuted, as `sessionEvents` is.
+ */
+export function taughtSessionsSince(db: Database, teacherId: string, since: Date) {
+  return db
+    .select({ session: sessions, className: classes.name })
+    .from(sessions)
+    .innerJoin(classes, eq(classes.id, sessions.classId))
+    .where(
+      and(
+        eq(classes.teacherId, teacherId),
+        isNull(classes.removedAt),
+        gte(sessions.startedAt, since),
+      ),
+    );
 }
 
 /*

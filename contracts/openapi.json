@@ -1151,6 +1151,18 @@
         }
       }
     },
+    "/v1/me/activity": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "default": {
+            "$ref": "#/components/responses/error"
+          }
+        }
+      }
+    },
     "/v1/me/age-check": {
       "get": {
         "responses": {

@@ -267,6 +267,21 @@ export const HISTORY_EVENT_TYPES = [
 export type HistoryEventType = (typeof HISTORY_EVENT_TYPES)[number];
 
 /**
+ * What a teacher's Recent activity shows (`GET /v1/me/activity`, PV3; the owner's call,
+ * 2026-10-12): an Emergency Unlock, protection off and a session started — nothing else.
+ * Additive-only like the other vocab; a client skips a value it does not know.
+ */
+export const ACTIVITY_EVENT_TYPES = [
+  'unlock',
+  'protection_off',
+  'session_started',
+] as const satisfies readonly EventType[];
+export type ActivityEventType = (typeof ACTIVITY_EVENT_TYPES)[number];
+
+/** How many moments Recent activity gives: the four Home's board draws (PV3). */
+export const ACTIVITY_LIMIT = 4;
+
+/**
  * Why an emergency unlock was recorded without flipping a participation to
  * unlocked (ISSUES.md #2 — the record must never be lost). It lands in the
  * unlock event's `payload.recorded_as`, and reports read it to explain a
