@@ -81,6 +81,12 @@ touching infra, CI, git plumbing, or the dev environment.
 
 ## Cloud sessions / dev environment
 
+- **A sign-up on dev's hosted page fails.** Dev's Cognito pool (`us-east-1_YTloqilwT`) verifies
+  no attribute, so its Sign up makes the account unconfirmed and lands on Cognito's "An error was
+  encountered with the requested page." Use the existing demo accounts (`$DEMO_USER_TEACHER` and
+  the students the owner's shell exports) until the owner turns on email verification in the
+  console; then delete this entry.
+
 - **Dev's demo teacher can turn back into a student.** Provisioned 2026-09-22, the row read
   `role = 'student'` again on 2026-09-26, cause unknown: no code path turns a teacher into a
   student (a first sign-in makes a student row; an invite's redeem, T1b, only ever makes a

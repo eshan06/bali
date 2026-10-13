@@ -61,6 +61,34 @@ a real decision? Add a dated entry at the top: what was decided and why.
   a fixture** (the fixtures are a phone's), so the new test reads each against the contract's strict
   `MeResponse` schema, the one the OpenAPI snapshot now carries.
 
+- **2026-10-12** — **The owner's rulings on PV1's first boards, and the class order fixed.** Drawn
+  on [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (row "PV1: states
+  no board drew, for your approval") and ruled by the owner as they landed; the rest of PV1's boards
+  are still being drawn, and the set's approval will be dated here. **A teacher's page at phone
+  width** (390 px; the portal in a phone's browser: there is no teacher app) is drawn as a class
+  live and as Home. The class page's grid is **two columns of short tinted tiles**, every tile one
+  size, each its state with at most one detail (an unlock's reason, or Clock off), the rest a tap
+  away in the student panel: the owner's pick of two (*weighed:* one tinted row per student, 35 px
+  rows, under the usual 44 px tap size). Its header is compact on a phone: the countdown beside the
+  class name, the name at the card titles' 18/24, and +5, +10 and End on one row. **Present is
+  hidden under 640 px** on the class page and on Home's live card (it drives a projector; nobody
+  presents from a phone), and **so is Recent activity** (the live card keeps the latest unlock).
+  All of it is `v2.css`'s block for under 640 px, so no approved board changes. **L7c's Questions
+  are on a session's report page only**, not under the class page's recap (*weighed:* both; the
+  class page stays short after the bell, the report a click away). **The classes home's "Questions
+  and slides" card is gone:** the side menu's Questions and Slides take its place (PV1's first item,
+  confirmed). **The two corrections:** the line under "Focused the whole time", on ClassEnded and
+  ReportOpened alike, is now "From their own tap-in to the end of the session, they never unlocked,
+  turned protection off, went silent or left. A late tap-in still counts." (the end, not the bell:
+  a teacher can end early); and ReportOpened's recap card is titled "This session" (the shipped
+  report's words), its repeated date and its "Open its report", a link to its own page, gone.
+  **The class order** (PV2's review, #344): `getTaughtClasses` and `getEnrolledClasses` read with
+  no `ORDER BY`, so an update to a class row (New code, a rename) can move that class in its list
+  on the next read, and today's portal home shows the list as read. The owner: fix it (PV3b: a
+  teacher's classes oldest first, a student's in the order they joined). *Found too:* dev's
+  Cognito pool verifies no attribute, so a sign-up on its hosted page makes an unconfirmed account
+  and ends on Cognito's error page (GOTCHAS; the console fix is the owner's).
+
 - **2026-10-12** — **The owner's three calls: the portal built exactly as drawn, Recent activity as
   Home's board draws it, and production backups on before the Vanderbilt pilot.** Asked together,
   each with the conductor's recommendation, and each taken. **Exactly as drawn** (PV4 no longer
