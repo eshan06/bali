@@ -11,8 +11,10 @@ import {
   queueCognitoDeletion,
   renameStudent,
   sessionRunning,
+  type TaughtClass,
 } from '@bali/db';
 import {
+  type ClassSummary,
   type DeleteMeResponse,
   deriveDisplayState,
   type MeResponse,
@@ -31,6 +33,26 @@ import { mapTransitionError } from './errors.js';
 const UpdateBody = z.object({ displayName: z.string(), eventId: z.string().uuid() });
 const NewName = z.object({ displayName: DisplayName });
 const DeleteBody = z.object({ eventId: z.string().uuid() });
+
+/**
+ * A teacher's own class at a glance (PV2), by the engine's one rule (`sessionRunning`, A17): its
+ * session not marked over runs until its bell, and past it is over, swept or not, ended at its
+ * bell — the time the sweep stamps — and the class's newest, since a Start ends it before the next
+ * begins (A18).
+ */
+function summaryOf({ studentCount, live, ended }: TaughtClass, now: Date): ClassSummary {
+  const running = live !== null && sessionRunning(live, now);
+  const last = live !== null && !running ? { ...live, endedAt: live.endsAt } : ended;
+  return {
+    studentCount,
+    runningSession: running ? { id: live.id, endsAt: live.endsAt.toISOString() } : null,
+    lastSession: last && {
+      id: last.id,
+      startedAt: last.startedAt.toISOString(),
+      endedAt: last.endedAt.toISOString(),
+    },
+  };
+}
 
 /** The caller's sign-in (the verifier checked `iss`); a federated one's username is not its sub. */
 function signInOf({ sub, claims: { iss, username } }: AuthedIdentity): CognitoSignIn {
@@ -79,8 +101,8 @@ export function registerMeRoute(
     const armed = user.role === 'student' && (await hasArmedTap(db, user.id, clock()));
 
     // Each class names its teacher (C2a): a teacher's own, the caller — already
-    // in hand; a student's, read with the class in one query, with the
-    // enrollment that leaving it deletes (A19).
+    // in hand, with its summary (PV2); a student's, read with the class in one
+    // query, with the enrollment that leaving it deletes (A19).
     const classes: MeResponse['classes'] =
       user.role === 'teacher'
         ? (await getTaughtClasses(db, user.id)).map((c) => ({
@@ -89,6 +111,7 @@ export function registerMeRoute(
             teacher: { displayName: user.displayName },
             enrollmentId: null,
             liveSession: null,
+            summary: summaryOf(c, clock()),
           }))
         : (await getEnrolledClasses(db, user.id)).map((c) => ({
             id: c.id,

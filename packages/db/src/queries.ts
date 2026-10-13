@@ -12,6 +12,7 @@ import {
 } from '@bali/shared';
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
 import type { SQLWrapper } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 
 import {
   armedTaps,
@@ -517,12 +518,59 @@ export async function findLiveSessionForClass(
   );
 }
 
-/** A teacher's active classes. */
-export async function getTaughtClasses(db: Database, teacherId: string): Promise<ClassRow[]> {
-  return db
-    .select()
+/** A teacher's class as `getTaughtClasses` reads it (PV2). */
+export interface TaughtClass extends ClassRow {
+  /** Its active enrollments. */
+  studentCount: number;
+  /** Its session not marked over, if any: whether it runs is `sessionRunning`'s to say. */
+  live: { id: string; startedAt: Date; endsAt: Date; endedAt: null } | null;
+  /** Its newest session marked over, by when it started. */
+  ended: { id: string; startedAt: Date; endedAt: Date } | null;
+}
+
+/**
+ * A teacher's active classes, each with its students enrolled now, its session not marked over
+ * (as `getEnrolledClasses` reads it) and its newest one marked over (PV2). One statement, so the
+ * facts are read at one instant: a session ended between two reads would be both.
+ */
+export async function getTaughtClasses(db: Database, teacherId: string): Promise<TaughtClass[]> {
+  const live = alias(sessions, 'live');
+  const ended = db
+    .select({ id: sessions.id, startedAt: sessions.startedAt, endedAt: sessions.endedAt })
+    .from(sessions)
+    .where(and(eq(sessions.classId, classes.id), isNotNull(sessions.endedAt)))
+    .orderBy(desc(sessions.startedAt), desc(sessions.id))
+    .limit(1)
+    .as('ended');
+  const rows = await db
+    .select({
+      ...classesColumns,
+      studentCount: sql<number>`(select count(*)::int from ${enrollments}
+        where ${enrollments.classId} = ${classes.id} and ${enrollments.removedAt} is null)`,
+      liveId: live.id,
+      liveStartedAt: live.startedAt,
+      liveEndsAt: live.endsAt,
+      endedId: ended.id,
+      endedStartedAt: ended.startedAt,
+      endedAt: ended.endedAt,
+    })
     .from(classes)
+    .leftJoin(live, and(eq(live.classId, classes.id), isNull(live.endedAt)))
+    .leftJoinLateral(ended, sql`true`)
     .where(and(eq(classes.teacherId, teacherId), isNull(classes.removedAt)));
+  return rows.map(
+    ({ liveId, liveStartedAt, liveEndsAt, endedId, endedStartedAt, endedAt, ...row }) => ({
+      ...row,
+      live:
+        liveId !== null && liveStartedAt !== null && liveEndsAt !== null
+          ? { id: liveId, startedAt: liveStartedAt, endsAt: liveEndsAt, endedAt: null }
+          : null,
+      ended:
+        endedId !== null && endedStartedAt !== null && endedAt !== null
+          ? { id: endedId, startedAt: endedStartedAt, endedAt }
+          : null,
+    }),
+  );
 }
 
 /**

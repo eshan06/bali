@@ -85,6 +85,29 @@ export interface MeClassWithTeacher extends MeClass {
    * runs, and on a teacher's own class.
    */
   liveSession: { id: string; endsAt: string } | null;
+  /**
+   * What the portal's Home and Classes show of a teacher's own class (PV2, added 2026-10-12,
+   * additive). Absent on a student's class.
+   */
+  summary?: ClassSummary;
+}
+/** A teacher's own class at a glance (PV2), by the server's clock. */
+export interface ClassSummary {
+  /** The students enrolled in it now: a join counts, a leave or a removal no longer does. */
+  studentCount: number;
+  /**
+   * Its session running now by the server's clock (A17), and its bell: `liveSession`'s shape,
+   * since `liveSession` stays null on a teacher's own class (the app would tell a teacher signed
+   * into it to tap in). Null when none runs.
+   */
+  runningSession: { id: string; endsAt: string } | null;
+  /**
+   * Its newest session that is over by the server's clock (A17), never the running one: one past
+   * its bell is, though the sweep has not marked it yet. When it started, and when it ended: its
+   * End, else its bell, the time the sweep stamps. Null when the class has had none. Its figures
+   * are its report's (`GET /v1/classes/{id}/reports/sessions/{sessionId}`).
+   */
+  lastSession: { id: string; startedAt: string; endedAt: string } | null;
 }
 export interface MeUser {
   id: string;

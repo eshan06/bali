@@ -8,6 +8,7 @@ import {
   type ApiErrorCode,
   CHECK_IN_STATUSES,
   type CheckInResponse,
+  type ClassSummary,
   type DeckDownload,
   END_ENROLLMENT_OUTCOMES,
   END_ENROLLMENT_REASONS,
@@ -130,6 +131,19 @@ const meClassWithTeacher = object<MeClassWithTeacher>()({
     id: z.uuid(),
     endsAt: z.iso.datetime(),
   }).nullable(),
+  // A teacher's own class's (PV2): absent on every class a student's answer lists.
+  summary: object<ClassSummary>()({
+    studentCount: z.number().int().nonnegative(),
+    runningSession: object<NonNullable<ClassSummary['runningSession']>>()({
+      id: z.uuid(),
+      endsAt: z.iso.datetime(),
+    }).nullable(),
+    lastSession: object<NonNullable<ClassSummary['lastSession']>>()({
+      id: z.uuid(),
+      startedAt: z.iso.datetime(),
+      endedAt: z.iso.datetime(),
+    }).nullable(),
+  }).optional(),
 });
 const meUser = object<MeUser>()({
   id: z.uuid(),
