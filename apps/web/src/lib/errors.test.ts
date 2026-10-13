@@ -4,6 +4,7 @@ import { ApiError, createApiClient, NetworkError } from './api-client';
 import {
   ACCOUNT_DELETED,
   CANT_ADD_TIME,
+  CANT_COPY,
   CANT_MAKE_CODE,
   CANT_REACH,
   errText,
@@ -76,12 +77,15 @@ describe('errText', () => {
     );
     expect(CANT_MAKE_CODE).toBe("Bali couldn't make a new code just now. Try again.");
     expect(NEW_CODE_MADE).toBe('This is the new code. The old one has stopped working.');
+    // Copy's failure (PV6): the code stays on the page to select.
+    expect(CANT_COPY).toBe("Bali couldn't copy the code. Select it and copy it yourself.");
     for (const words of [
       NOT_A_SESSION_LENGTH,
       CANT_ADD_TIME,
       SESSION_ALREADY_RUNNING,
       CANT_MAKE_CODE,
       NEW_CODE_MADE,
+      CANT_COPY,
     ]) {
       expect(words).not.toMatch(/[—!]/);
     }

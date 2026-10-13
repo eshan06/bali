@@ -15,10 +15,13 @@ import {
   useState,
 } from 'react';
 
+import type { ApiClient } from '@/lib/api-client';
 import { endSession, getAccessToken } from '@/lib/auth';
 import { errText } from '@/lib/errors';
 import { useApi } from '@/lib/use-api';
 
+import { Button } from './button';
+import { CARD_ALONE } from './card';
 import { Mark } from './mark';
 import { PortalBar } from './portal-bar';
 
@@ -30,17 +33,21 @@ export interface Frame {
   chrome: 'menu' | 'bar' | null;
   /** The page at v2's width and gutters (`PAGE`). */
   framed: boolean;
-  /** Nothing shown yet: the account isn't read, so neither its frame nor a page drawn from it. */
+  /**
+   * The page waits: the account isn't read, so neither its frame nor a page drawn from it shows,
+   * and the shell says why in its place (`AccountUnread`).
+   */
   hidden: boolean;
 }
 
 /**
  * How a page is framed (the owner's rulings, 2026-10-13). A signed-out page draws its own bar, and
  * a page on the projector (Present) has no menu and no frame of the shell's, as ClassPresent draws
- * it. Otherwise nothing shows until the account is read, so no frame flashes before it is known and
- * no page is drawn from an account that left; then the side menu for a teacher alone, and today's
- * bar for anyone else and on a failed read, with Sign out, the invite page framing itself (PV15
- * draws it).
+ * it. Otherwise the page waits for the account, so no frame flashes before it is known and no page
+ * is drawn from an account that left: Loading… with no menu or bar while it is read, its failure
+ * under today's bar with Sign out (PV5b, the owner's approval of #352's review); then the side menu
+ * for a teacher alone, and today's bar for anyone else, the invite page framing itself (PV15 draws
+ * it).
  */
 export function frameFor(
   path: string,
@@ -50,16 +57,17 @@ export function frameFor(
 ): Frame {
   if (SIGNED_OUT_PATHS.test(path) || presenting)
     return { chrome: null, framed: false, hidden: false };
-  if (me === null && error === null) return { chrome: null, framed: false, hidden: true };
-  if (me?.user.role === 'teacher') return { chrome: 'menu', framed: true, hidden: false };
-  return { chrome: 'bar', framed: !(path === '/' && me !== null), hidden: false };
+  if (me === null) return { chrome: error === null ? null : 'bar', framed: false, hidden: true };
+  if (me.user.role === 'teacher') return { chrome: 'menu', framed: true, hidden: false };
+  return { chrome: 'bar', framed: path !== '/', hidden: false };
 }
 
 /**
  * What the shell does with the account as a page opens: forgets one whose sign-in is gone (a Sign
  * out or an expired session, which both land on /login), so going back never shows it; reads one
- * not read yet on a signed-in page; or keeps what it has. A failed read is not read again here,
- * never a loop: Home reads it again as it opens and with its Try again.
+ * not read yet on a signed-in page, and one whose last read failed once another page opens (PV5b);
+ * or keeps what it has. A failure is never read again on its own page, so never a loop of reads:
+ * there its Try again reads it.
  */
 export function accountStep(
   path: string,
@@ -67,10 +75,31 @@ export function accountStep(
   me: MeResponse | null,
   error: string | null,
   reading: boolean,
+  newPage: boolean,
 ): 'forget' | 'read' | 'keep' {
   if (!signedIn) return me !== null || error !== null ? 'forget' : 'keep';
-  if (SIGNED_OUT_PATHS.test(path) || me !== null || error !== null || reading) return 'keep';
-  return 'read';
+  if (SIGNED_OUT_PATHS.test(path) || reading) return 'keep';
+  if (error !== null) return newPage ? 'read' : 'keep';
+  return me === null ? 'read' : 'keep';
+}
+
+/**
+ * One read of the account (`GET /v1/me`), numbered in `reads` as it starts: its answer, or its
+ * failure in words (`errText`), or null once a newer read has begun, so a read that settles late
+ * never says a past failure over fresh data, nor an old answer over a newer word (PV5b).
+ */
+export async function readAccount(
+  api: Pick<ApiClient, 'get'>,
+  reads: { current: number },
+): Promise<{ me: MeResponse } | { error: string } | null> {
+  const mine = ++reads.current;
+  let said: { me: MeResponse } | { error: string };
+  try {
+    said = { me: await api.get<MeResponse>('/v1/me') };
+  } catch (e) {
+    said = { error: errText(e) };
+  }
+  return mine === reads.current ? said : null;
 }
 
 /**
@@ -85,7 +114,10 @@ export const reloadOnRestore = (persisted: boolean, path: string): boolean =>
 export interface Me {
   /** The last answer; null before the first, and while a fresh read (a redeem's) is under way. */
   me: MeResponse | null;
-  /** The last read's failure (`errText`), for Home to say with Try again; null once one works. */
+  /**
+   * The last read's failure (`errText`), said with Try again: by the shell while no answer is held
+   * (`AccountUnread`), by Home over its classes after one; null once a read works.
+   */
   error: string | null;
   /** Read it again: after a change, for Try again, or `fresh` after a redeem, forgetting it first. */
   load: (fresh?: boolean) => void;
@@ -228,10 +260,39 @@ export function SideMenu({
 }
 
 /**
+ * The account not read, said in the page's place on every signed-in page, as Home said it
+ * (HomeStates' "Loading, before the account answers" and "The account didn't load"): Loading…
+ * while it is read, or its failure with Try again, which reads it again. In the page's frame, with
+ * no menu: nothing of a teacher's shows before the account reads as one.
+ */
+export function AccountUnread({ error, onRetry }: { error: string | null; onRetry: () => void }) {
+  return (
+    <main className={PAGE}>
+      {error ? (
+        <div className={`mx-auto max-w-md ${CARD_ALONE}`}>
+          <p role="alert">
+            <span className="block text-h3">Couldn&apos;t load your account.</span>
+            <span className="mt-2 block text-body text-text-secondary">{error}</span>
+          </p>
+          <Button variant="secondary" onClick={onRetry} className="mt-6">
+            Try again
+          </Button>
+        </div>
+      ) : (
+        <p role="status" className="mx-auto max-w-md text-center text-body text-text-secondary">
+          Loading…
+        </p>
+      )}
+    </main>
+  );
+}
+
+/**
  * The frame of every page (the root layout's), and who is signed in: one read of `/v1/me` as a
  * signed-in page first opens (Home reads it again as it opens), kept as pages change and forgotten
- * once the sign-in is gone. `frameFor` says what to draw. One tree throughout, so the page under it
- * is never remounted as its frame changes (a redeem's turn from the bar to the menu, Present).
+ * once the sign-in is gone; a failed one read again by Try again and on the next page opened.
+ * `frameFor` says what to draw. One tree throughout, so the page under it is never remounted as its
+ * frame changes (a redeem's turn from the bar to the menu, Present).
  */
 export function Shell({ children }: { children: ReactNode }) {
   const api = useApi();
@@ -242,6 +303,10 @@ export function Shell({ children }: { children: ReactNode }) {
   const [presenting, setPresenting] = useState(false);
   // A read under way: the frame asks only when none is.
   const reading = useRef(false);
+  // The newest read's number (`readAccount`): only its answer counts.
+  const reads = useRef(0);
+  // The page the account was last looked at on: a failure is read again on the next one.
+  const seen = useRef<string | null>(null);
   // A Sign out under way: a second press sends nothing.
   const [leaving, setLeaving] = useState(false);
 
@@ -250,26 +315,22 @@ export function Shell({ children }: { children: ReactNode }) {
       if (fresh) setMe(null);
       setError(null);
       reading.current = true;
-      void api
-        .get<MeResponse>('/v1/me')
-        .then(
-          (answer) => {
-            setMe(answer);
-            // A failure said by an earlier read that settled after this one began is past.
-            setError(null);
-          },
-          (e: unknown) => setError(errText(e)),
-        )
-        .finally(() => {
-          reading.current = false;
-        });
+      void readAccount(api, reads).then((said) => {
+        // A newer read is under way: its answer is the one that counts.
+        if (said === null) return;
+        reading.current = false;
+        if ('me' in said) setMe(said.me);
+        else setError(said.error);
+      });
     },
     [api],
   );
 
   // On every page, and again as an answer lands (one landing after a Sign out is forgotten too).
   useEffect(() => {
-    const step = accountStep(path, getAccessToken() !== null, me, error, reading.current);
+    const newPage = seen.current !== path;
+    seen.current = path;
+    const step = accountStep(path, getAccessToken() !== null, me, error, reading.current, newPage);
     if (step === 'read') load();
     if (step === 'forget') {
       setMe(null);
@@ -314,6 +375,7 @@ export function Shell({ children }: { children: ReactNode }) {
           ) : frame.chrome === 'bar' ? (
             <PortalBar leaving={leaving} onSignOut={onSignOut} />
           ) : null}
+          {frame.hidden ? <AccountUnread error={error} onRetry={() => load()} /> : null}
           <div hidden={frame.hidden} className={frame.framed ? PAGE : undefined}>
             {children}
           </div>

@@ -7,7 +7,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 import { Blocks } from '@/components/blocks';
 import { Button } from '@/components/button';
-import { CARD, CARD_ALONE } from '@/components/card';
+import { CARD } from '@/components/card';
 import { EntryPage } from '@/components/entry-page';
 import { Field } from '@/components/field';
 import { InviteCode } from '@/components/invite-code';
@@ -22,8 +22,9 @@ import { useApi } from '@/lib/use-api';
  * desktop, under them on anything narrower, the teacher's block. A create's failure is said under
  * its field with Try again; a made class is said by the list, read again. An account that doesn't
  * teach yet gets the invite code in place of all of it. The account is the shell's one read of
- * `/v1/me` (`useMe`), which the side menu names too, read again as the page opens; the page sits
- * in the shell's frame beside the menu (PV5).
+ * `/v1/me` (`useMe`), which the side menu names too, read again as the page opens; until it
+ * answers, the shell says Loading… or its failure in the page's place (PV5b); the page sits in the
+ * shell's frame beside the menu (PV5).
  */
 export default function HomePage() {
   const api = useApi();
@@ -80,33 +81,15 @@ export default function HomePage() {
     setName('');
   }
 
-  if (me === null || me.user.role !== 'teacher') {
-    // Not a teacher yet, as `/v1/me` says: the invite code, in place of the classes or a 403.
-    if (me) {
-      return (
-        <EntryPage signedIn>
-          <InviteCode onTeacher={onTeacher} />
-        </EntryPage>
-      );
-    }
+  // The account not read yet, or its read failed: the shell says so in this page's place
+  // (`AccountUnread`), as it does on every page.
+  if (me === null) return null;
+  // Not a teacher yet, as `/v1/me` says: the invite code, in place of the classes or a 403.
+  if (me.user.role !== 'teacher') {
     return (
-      <main>
-        {error ? (
-          <div className={`mx-auto max-w-md ${CARD_ALONE}`}>
-            <p role="alert">
-              <span className="block text-h3">Couldn&apos;t load your account.</span>
-              <span className="mt-2 block text-body text-text-secondary">{error}</span>
-            </p>
-            <Button variant="secondary" onClick={() => load()} className="mt-6">
-              Try again
-            </Button>
-          </div>
-        ) : (
-          <p role="status" className="mx-auto max-w-md text-center text-body text-text-secondary">
-            Loading…
-          </p>
-        )}
-      </main>
+      <EntryPage signedIn>
+        <InviteCode onTeacher={onTeacher} />
+      </EntryPage>
     );
   }
 
