@@ -8,6 +8,17 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-13** — **The portal's sign-in lasts the school day: its tokens 12 hours on prod, a day
+  on dev.** The portal keeps only Cognito's access token, per tab, with no refresh token and no
+  silent renewal (`docs/WEB.md`, "Known gap — token renewal"; a refresh token never goes in web
+  storage, S4), so Cognito's default hour signed a teacher out an hour after they signed in,
+  mid-class if it fell then; it signed the owner's dev tab out during PV4's screenshots. The owner
+  set the portal's app clients in the console: `bali-web` (prod) access and ID tokens 720 minutes,
+  `bali-web-dev` (dev) a day; dev's read back the same night. Only the portal's clients: the phone
+  renews its own sign-in. *Weighed:* a day on prod too, Cognito's maximum, since an access token
+  can't be revoked before it expires; 12 hours covers a school day with half the window. Silent
+  renewal stays later. No code changed: the API checks a token's expiry, whatever its length.
+
 - **2026-10-13** — **Apple's §3.3.3(P) question is about Family Controls alone.** The owner sent
   App Review the question (case 102994872143; `docs/APP-STORE.md` §5.6 holds it as sent, ISSUES #3
   records it asked). It describes the shields, Emergency Unlock and what the teacher's grid shows,
