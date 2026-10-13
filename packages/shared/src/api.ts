@@ -1,5 +1,6 @@
 import type { DisplayState } from './state.js';
 import type {
+  ActivityEventType,
   EventType,
   HistoryEventType,
   ParticipationEndedReason,
@@ -1208,4 +1209,32 @@ export interface SessionReportsPage {
   sessions: SessionReportSummary[];
   /** Pass as `before` for the next, older page; null at the end. A `400` for it: reload from the top. */
   nextBefore: string | null;
+}
+
+// GET /v1/me/activity — a teacher's Recent activity (PV3, added 2026-10-12): Home's `Main` board.
+// From today's sessions of the caller's own live classes, today by the server's clock in the
+// school's zone (hosting decision 5). Its unlocks and protection offs are those each session's
+// report lists (R2), late ones and ones after the bell included, so the two never disagree.
+/** One moment of Recent activity. */
+export interface ActivityEvent {
+  /** The event's own id: stable across reads. */
+  eventId: string;
+  /** An Emergency Unlock, protection off, or a session started. */
+  type: ActivityEventType;
+  /** The device's time clamped into the session's window (rule 1); a start's, when it started. */
+  occurredAt: string;
+  /** Its class, by its name now. */
+  class: MeClass;
+  /**
+   * Its student, as the report and the grid name them: their display name now, null when their
+   * account has none (a deleted account's has none), where the grid shows the first 8 characters
+   * of `id`. Null on a session started.
+   */
+  student: ReportStudent | null;
+  /** An unlock's reason now: its latest change's (A20), else the one sent with it; null when none. */
+  reason: UnlockReason | null;
+}
+export interface ActivityResponse {
+  /** Newest first, by `occurredAt`; `ACTIVITY_LIMIT` at most. No paging: Home shows these. */
+  events: ActivityEvent[];
 }

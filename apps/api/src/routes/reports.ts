@@ -4,8 +4,12 @@ import {
   getClassSessionsPage,
   getSessionEvents,
   sessionEvents,
+  taughtSessionsSince,
 } from '@bali/db';
 import {
+  ACTIVITY_LIMIT,
+  type ActivityEventType,
+  type ActivityResponse,
   type ReportEvent,
   type ReportStudent,
   type ReportWindow,
@@ -58,6 +62,7 @@ function counted(session: ReportWindow, events: readonly ReportEvent[], now: Dat
  *
  * GET /v1/classes/:id/reports/sessions/:sessionId  one session's report (R2)
  * GET /v1/classes/:id/reports/sessions             the class's sessions, newest first, paged (R3)
+ * GET /v1/me/activity                              Recent activity across the teacher's classes (PV3)
  *
  * What `sessionReport` (R1) counts from each session's own events, by the server's clock: a
  * session not yet marked over is answered too, counted to now or to its bell, and says so. A
@@ -147,6 +152,58 @@ export function registerReportsRoutes(app: FastifyInstance, db: Database, clock:
           };
         }),
         nextBefore: page.nextBefore,
+      };
+    },
+  );
+
+  // Home's Recent activity (PV3): today's sessions of the teacher's own live classes, today from
+  // midnight by the server's clock in the school's zone (hosting decision 5). It takes nothing:
+  // Home shows the newest four, and a student has none to read (403).
+  app.get(
+    '/v1/me/activity',
+    { preHandler: app.authenticate },
+    async (request): Promise<ActivityResponse> => {
+      const teacher = await requireTeacher(db, request);
+      const now = clock();
+      const today = new Date(now);
+      today.setHours(0, 0, 0, 0);
+      const todays = await taughtSessionsSince(db, teacher.id, today);
+      if (todays.length === 0) return { events: [] };
+
+      // Every event of those sessions in one statement, as R3 reads a page's.
+      const events = await sessionEvents(
+        db,
+        todays.map(({ session }) => session.id),
+      );
+      const moments = todays.flatMap(({ session, className }) => {
+        const own = events.filter((e) => e.sessionId === session.id);
+        // The unlocks and protection offs its report lists, by the report's own function, so
+        // Home never shows one the report leaves out, or leaves out one it lists; an unlock
+        // with its reason now (A20).
+        const { unlocks, protectionOffs } = sessionReport(session, own, now);
+        const reasons = new Map(unlocks.map((u) => [u.eventId, u.reason]));
+        const offs = new Set(protectionOffs.map((off) => off.eventId));
+        const klass = { id: session.classId, name: className };
+        return own
+          .filter(
+            (e) => e.type === 'session_started' || reasons.has(e.eventId) || offs.has(e.eventId),
+          )
+          .map((e) => ({ e, klass, reason: reasons.get(e.eventId) ?? null }));
+      });
+      return {
+        events: moments
+          // Newest first; at one instant the later record, as the engine numbered them.
+          .sort((a, b) => b.e.occurredAt.getTime() - a.e.occurredAt.getTime() || b.e.seq - a.e.seq)
+          .slice(0, ACTIVITY_LIMIT)
+          .map(({ e, klass, reason }) => ({
+            eventId: e.eventId,
+            type: e.type as ActivityEventType,
+            occurredAt: e.occurredAt.toISOString(),
+            class: klass,
+            // As the report names them; a session's start names no one.
+            student: e.userId === null ? null : { id: e.userId, displayName: e.displayName },
+            reason,
+          })),
       };
     },
   );

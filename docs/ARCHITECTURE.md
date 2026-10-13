@@ -577,6 +577,16 @@ Teacher app and web portal:
   never the running one (`lastSession`: its id, start and end, or null). One past its bell is over
   before the sweep marks it (A17), ended at its bell, the time the sweep then stamps; its figures
   are its report's (R2). Read for every class in one statement.
+- `GET /v1/me/activity` — the teacher's Recent activity, what the portal's Home shows (added
+  2026-10-12, PV3, additive): from today's sessions of the caller's own live classes, today from
+  midnight by the server's clock in the school's zone (hosting decision 5), three kinds only (the
+  owner's call, 2026-10-12): an Emergency Unlock with its reason now (A20), protection off, and a
+  session started. Each with its class, its time and its student as R2's report names them (their
+  display name now, null when they have none; none for a start). Its unlocks and protection offs
+  are the ones each session's report lists, by R2's own `sessionReport`, late ones and ones after
+  the bell included, so Home and the report never disagree. Newest first (at one instant, the later
+  record), four at most (`ACTIVITY_LIMIT`, the board's count); no paging and no query. A student is
+  `403`.
 - `POST /v1/teacher-invites/redeem` — how an account becomes a teacher (T1b): `{ code, eventId }`,
   the code the owner minted for a school (data model, `teacher_invites`), matched as the command
   printed it with its case, spaces and dashes set aside, and looked up by its hash; in the body,

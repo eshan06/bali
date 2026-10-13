@@ -8,6 +8,34 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-12** — **PV3: Recent activity is `GET /v1/me/activity`, its unlocks and protection offs
+  the report's, by the report's own function.** Home's `Main` board draws four moments: an
+  Emergency Unlock with its reason, protection off and a session started, each with its student, its
+  class and its time (the owner's call, below). **The route** is the caller's own, as `GET
+  /v1/me/history` is a student's: a teacher's (`requireTeacher`; a student, or a sign-in with no
+  account, which it never makes, is `403`). *Weighed:* `GET /v1/activity`. **Which unlocks and
+  protection offs: the ones each session's report lists, read by `sessionReport` itself** (R1, over
+  the session's events, as R2 and R3 read them), so a late (`superseded`) unlock, one after the bell
+  (`after_session_end`), one recorded while protection was off and one with nothing live show on
+  Home as they are listed in the report, and one kept with no class is in neither (it has no
+  session). The reason now comes the same way (A20: the session's latest `unlock_reason_changed`
+  naming it, else its own), and the names as the report gives them (`ReportStudent`: the display
+  name now, null when there is none, a deleted account's included, where the grid and the recap show
+  the id's first 8 characters). *Weighed:* a SQL copy of the report's listing rule, reading four rows
+  and `changedReasons` for their reasons: leaner, but a second copy of R2's rule, free to drift from
+  it (v2's disease). **The cost:** two statements, today's sessions (`taughtSessionsSince`) and every
+  event of them (`sessionEvents`, as R3 reads a page's), never one per event; a teacher's day is a
+  few sessions of a few hundred events. *Skipped:* an EXPLAIN pin; narrow the read to the three kinds
+  and the reason changes if Home ever polls it. **"Today"** is the sessions started from midnight of
+  the server's clock's day in the process's zone, the school's (hosting decision 5); a late record of
+  one counts, yesterday's sessions never do. *Weighed:* events that occurred today, which split a
+  session's records at midnight. **Newest first** by `occurredAt`, the clamped time the board shows;
+  at one instant the later record by `seq` (a phone clock behind holds an unlock to its session's
+  start, which reads before it). **Left out:** an unlock's note (`recordedAs`; the board draws none,
+  and it can be added), the session's id (the class's opens the class), paging and query parameters
+  (a query is ignored, as `GET /v1/blocks` ignores one). Showing it only while a class is live is the
+  page's (PV17c).
+
 - **2026-10-12** — **PV2: a teacher's own class's summary on `GET /v1/me`, one optional object, its
   "over" the engine's one rule.** Home's and Classes' rows ("28 students · last session today, 8:00
   AM", "no sessions yet", the Live chip) and Home's Last session card ("9:05 AM to 9:55 AM") need, per
