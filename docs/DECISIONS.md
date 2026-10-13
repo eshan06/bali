@@ -8,6 +8,61 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-12** — **The portal and the student web in v2's look, planned as their own steps
+  (PV0–PV17) ahead of Phase 7's web screens; "focused the whole time" defined; Present keeps +5,
+  +10 and End; what no board draws is drawn first.** The owner approved the canvas
+  [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (53 boards, its look
+  `v2.css` on the Bali Design System's tokens), every board but the row "An idea, not in the plan:
+  questions suggested from your slides", which is out (`v2.css`'s block for it is not ported). **It
+  replaces Soft premium** for the portal and the student web: the four portal canvases of
+  2026-10-06 and the portal and student-web boards of the Phase 7 canvas (2026-10-10), whose words
+  and states carry over except where it changes them; the app keeps its canvases (L8, M8 build to
+  the Live lesson app screens). **Decided on it** (the owner's picks): a side menu (Home, Classes,
+  Reports, Questions, Slides, Help); the live grid's cells as v2's tinted tiles, all the same size
+  (picked of four); v2's unlock pop-up, which stays until closed, and its student side panel; no
+  roster under the grid during a session (the grid itself lists every student); a recap listing
+  who wasn't focused the whole time first, with no "How it ended" (picked of four: it repeated
+  the list); Home listing each class once, with the block card's Register block; four Phase 7
+  sentences dropped (DESIGN.md §1, The words); the student web in the teacher's layout. **"Focused
+  the whole time"**, which that recap needs and nothing defined: from the student's own tap-in to
+  the session's end, with no unlock, no Screen Time off, no going silent and no leaving; a late
+  tap-in still counts. **Present keeps +5, +10 and End:** the board left them off, and the canvas's
+  own note says every control carries over. **Its own plan**, "Portal redesign (v2's look)",
+  PV0–PV17 beside Phase 7: the groundwork, the side menu and the pages Phase 7 sits on (PV4–PV15)
+  before Phase 7's web screens, so those are built once, in the new look on the new shell; Classes
+  and Home (PV16, PV17) after them. Phase 7's web steps (L7, L7b, L7c, M5, M6, W3–W5) now build
+  to the new canvas's boards; **L3c**, a read of a session's questions with their guarded totals,
+  comes before L7c, since the canvas draws the Questions card on a session's report page, not the
+  class page's recap; M5's in-use line names the class, so `409 deck_in_use` carries it
+  (additive). **What no board draws is drawn first** (PV1's list), on the canvas, for the owner to
+  check and approve before it is built, as CLAUDE.md's rule asks of every state. **The canvas draws
+  what no API served** (each class's student count and last session; Home's Recent activity), so
+  DESIGN.md's "a design draws only what the backend does today" has this one exception, and PV2
+  and PV3 build the reads before any page shows them. **Two calls wait for the owner's OK**, each
+  with the conductor's default (PLAN's Open owner items): build exactly as drawn, the canvas's
+  radii, sizes and spacing added as portal tokens (or snapped to today's scale), and the events
+  Recent activity shows. **The rulings it supersedes** are each marked in DESIGN.md (§1, What it
+  supersedes), and each holds for a page, `tokens.test.ts`'s pin with it, until that page's PV
+  step lands. **The `high-end-visual-design` skill's Bali block** now points at v2's look, its
+  pills no longer the portal's shape (DESIGN.md's "Updating one" asks the why here). *Found while
+  planning, PV1's to settle on the canvas:* ClassEnded's line under "Focused the whole time"
+  ("Tapped in by 9:08 AM and focused until the bell.") reads against a late tap-in counting, and
+  ReportOpened's recap card still says "Last session" and links "Open its report" to its own page.
+
+- **2026-10-12** — **Production backups before the first actual pilot (L0b), no longer before any
+  screen; a `429`'s wait capped at a minute in ARCHITECTURE.** The owner: "we will do the backups
+  later before our first actual pilot. not yet. log that as a decision for before the pilot". L0b
+  (2026-10-10: backups on before any build that can answer reaches prod, and before any screen)
+  now comes before the first actual pilot and holds back no screen; ARCHITECTURE's "Settled" and
+  its Live lesson intro, PLAN's L0b, its gates and Open owner items, and runbook 10 say so. M0, the
+  bucket, still came before Phase 7's screens (the order of 2026-10-10), and the owner finished it
+  the same day: runbook 10's check `PASS` on dev and on prod, deck storage on in both. *Left as they were:* hosting decision 4's exception and `docs/PILOT.md` run the
+  Vanderbilt pilot without backups (the ruling of 2026-10-05); whether "the first actual pilot" is
+  that one or the K-12 one after it is the owner's to say. **ARCHITECTURE decisions 6 and 13** said
+  a poller stops at a `429` "until its `Retry-After`"; L5, L6 and W2 wait it out a minute at most
+  (none, or a date, waits the minute), one of the overnight calls the owner confirmed (#341), so
+  both now say so.
+
 - **2026-10-12** — **The owner's rulings on Phase 7's open items: a removal never changes a
   question's M (#315), "Settled" narrowed to the engine's writers (#317), #313 left as today, and
   the overnight calls confirmed.** **#315, fixed:** M was the union of the class's students now, the

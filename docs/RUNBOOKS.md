@@ -58,8 +58,10 @@ uses values the one before it produced:
 - **Runbook 9, the Cognito sign-in deleter:** open (added 2026-10-09). Until it's done the API
   logs `Cognito sign-in deletion is off` at boot and only queues each deleted account's sign-in;
   the phone's own DeleteUser still deletes one when it lands.
-- **Runbook 10, the deck bucket:** open (added 2026-10-10, PLAN's M0). Until it's done the API
-  logs `deck storage is off` at boot, and no Phase 7 screen is built (the owner's order).
+- **Runbook 10, the deck bucket — done** (2026-10-12, PLAN's M0): dev's bucket
+  `bali-decks-dev-eshshah` and prod's `bali-decks-prod-eshshah`; the check
+  (`railway ssh --service bali -- npm run --silent deck-bucket:check`, and `--service "bali prod"`)
+  ended `PASS` on both, so deck storage is on in both environments.
 
 **Prod's data so far:** the school "Vanderbilt" (id `01a10a81-4ac0-7698-a1d4-fc0487865082`),
 its data agreement recorded 2026-10-05 and its year's end `2026-12-18`; the owner is a
@@ -968,8 +970,10 @@ What it makes: per environment, a private S3 bucket the API keeps teachers' PDF 
 letting only the portal's origins upload and download, and an IAM user allowed only to put, get and
 delete files in that bucket (ARCHITECTURE, hosting decision 6 and "Live lesson" decision 8; PLAN's
 M0). The API already holds the code (M1): until a deploy holds the bucket's four variables, its
-boot log says `deck storage is off`. No Phase 7 screen is built until this and production backups
-(L0b) are done (the owner's order, 2026-10-10). Each environment gets its own bucket and user, so a
+boot log says `deck storage is off`. No Phase 7 screen was to be built until this was done (the
+owner's order, 2026-10-10), and it was, on 2026-10-12, in both environments; production backups
+(L0b), once in that order too, now come before the first actual pilot. Each environment gets its
+own bucket and user, so a
 leaked dev key can't touch production's decks.
 
 **Before you start:** the AWS console, signed in as an IAM or IAM Identity Center user that may
