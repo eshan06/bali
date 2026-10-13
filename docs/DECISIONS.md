@@ -8,6 +8,39 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-12** — **The owner's three calls: the portal built exactly as drawn, Recent activity as
+  Home's board draws it, and production backups on before the Vanderbilt pilot.** Asked together,
+  each with the conductor's recommendation, and each taken. **Exactly as drawn** (PV4 no longer
+  waits): the canvas's radii (8, 12, 16), type sizes and spacing off the tokens' scale are added as
+  portal tokens, portal-only (out of `bali-tokens.json`, the design system's export, and out of the
+  app), each named and pinned by `tokens.test.ts` beside the owner's ruled sizes (`input`,
+  `code-lg`, `present-*`), so no other value gets in; spacing takes no token, drawn as Tailwind's
+  multiples of `space-1` (`p-4.5` is 18 px); and Instrument Sans's italic file is self-hosted beside
+  its upright for Reports' framing line (PV4 names it, as DESIGN.md §7 asks of a font). *Weighed:*
+  each value snapped to the nearest of today's scale: no new tokens, but every page a few pixels off
+  the boards the owner approved, and the italic line upright. **Recent activity** (PV3 no longer
+  waits): the three kinds Home's `Main` board draws, an Emergency Unlock with its reason, protection
+  off and a session started, each with its student as the grid names them (none for a start), its
+  class and its time; from today's sessions of the teacher's own classes, newest first, four at
+  most; shown while a class is live, as the board draws it (HomeIdle draws none). Nothing else: no
+  tap-in, return to focus, silence, leaving, extension, end, question or slide. *Weighed:* unlocks
+  alone, quieter, two of the board's kinds gone. **"The first actual pilot" is the Vanderbilt
+  pilot** (the question the L0b entry below left open): production backups (L0b; Railway's Pro
+  plan, runbook 1, step 4) go on before its first class. The ruling of 2026-10-05 that ran the
+  Vanderbilt pilot without backups, an accepted risk for an informal pilot of adults, is withdrawn,
+  so hosting decision 4 has no exception left; ARCHITECTURE, PILOT.md, DEPLOY.md and RUNBOOKS.md say
+  so, and PLAN's critical path to the pilot gains the step. *Why:* from its first class the pilot's
+  sessions, reports, unlock records and answers live only on prod, and a lost volume would take
+  them with it. *Follows from it:* runbook 4's restore drill, on hold only while prod had no
+  backups, can run once the first backup exists; and a disposal's data now waits in the backups
+  until they age out, which runbook 1, step 11 already has the owner note in the reply to the
+  school. Point-in-time recovery stays as runbook 1, step 4 says: Railway's backups are scheduled
+  snapshots, and finding no PITR setting is the owner's to raise. *Weighed:* the first K-12 school,
+  as the docs had it. **Logged with them, two deferrals of 2026-10-12 that had only an issue** (the
+  owner asked whether every earlier decision was in this log): downloading a session's report waits
+  for a later phase (#339; DESIGN.md §1 and PV13 point at it), and so does a saved question shared
+  by several classes (#340; a draft is its teacher's alone, ARCHITECTURE "Live lesson" decision 12).
+
 - **2026-10-12** — **The portal and the student web in v2's look, planned as their own steps
   (PV0–PV17) ahead of Phase 7's web screens; "focused the whole time" defined; Present keeps +5,
   +10 and End; what no board draws is drawn first.** The owner approved the canvas

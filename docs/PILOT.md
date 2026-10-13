@@ -12,14 +12,14 @@ redesigned (D2), so their wording and layout will change under it. Production's 
 
 **What runs where:** the API `https://bali-prod-production.up.railway.app`, the portal
 `https://bali-portal.vercel.app`, the Cognito pool `bali-production` (sign-up only with a
-`@vanderbilt.edu` address), the student app through TestFlight. Prod has **no database
-backups** for this pilot (the owner's ruling, 2026-10-05; `docs/RUNBOOKS.md`, runbook 1,
-step 4).
+`@vanderbilt.edu` address), the student app through TestFlight. Prod's **database backups
+go on before the first class** (PLAN's L0b; the owner, 2026-10-12, withdrawing the ruling of
+2026-10-05 that ran this pilot without them; `docs/RUNBOOKS.md`, runbook 1, step 4).
 
 ## 1. Setup, in order
 
-Done once, by the owner, before the first class. Steps 1–3 are done for the owner's own
-class (2026-10-05); for another professor, start at step 3.
+Done once, by the owner, before the first class, after prod's backups are on (runbook 1, step 4).
+Steps 1–3 are done for the owner's own class (2026-10-05); for another professor, start at step 3.
 
 1. **The school.** In a shell inside the API service (never through a public database
    proxy; `docs/RUNBOOKS.md`, runbook 1, step 9):
@@ -181,7 +181,7 @@ At the end:
   Named records become de-identified; counts stay.
 - **Disposing of the school's data,** only on Vanderbilt's written request:
   `npm run school -- dispose <school-id>`, then with `--confirm` (runbook 1, step 11), and
-  delete the school's sign-ins in Cognito. With no backups, nothing waits to age out.
+  delete the school's sign-ins in Cognito. Its data waits in the backups until they age out:
+  say when in the reply (runbook 1, step 11).
 - **Write down what was learned** in `docs/PLAN.md` (a session's PR), with anything the
-  next school (K-12) needs first: backups (runbook 1, step 4), the data agreements, the
-  13+ screen.
+  next school (K-12) needs first: the data agreements, the 13+ screen.

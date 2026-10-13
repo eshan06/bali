@@ -129,7 +129,8 @@ own pool (hosting decision 2). None of these is secret:
 - **Production's API:** `https://bali-prod-production.up.railway.app` — Railway
   environment `production`, services `bali prod`, `postgres prod` (no public TCP
   proxy) and the backup sweep cron `sweep-cron` (`*/5 * * * *`); `/healthz` answers ok.
-  No backups, by the owner's ruling for the pilot (`docs/RUNBOOKS.md`, runbook 1, step 4).
+  No backups yet: they go on before the Vanderbilt pilot's first class (PLAN's L0b;
+  `docs/RUNBOOKS.md`, runbook 1, step 4).
 - **The portal:** the Vercel project `bali-portal` (root `apps/web`, Node.js 22.x) at
   `https://bali-portal.vercel.app`, built with prod's values (2026-10-05); prod's
   `CORS_ORIGINS` is that origin.

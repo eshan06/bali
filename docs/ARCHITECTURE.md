@@ -803,10 +803,10 @@ minutes, as the backup. The sweep is idempotent, so two instances, or the API an
 sweeping at once is harmless.
 
 **4. Database safety from day one.** Automatic daily backups with point-in-time
-recovery, and the database in the same region as the API. *Exception, the owner's ruling
-(2026-10-05):* prod runs without backups for the Vanderbilt pilot (Railway's need its Pro
-plan), an accepted risk for an informal pilot of adults; this decision holds again before
-any K-12 school (`docs/DECISIONS.md`, 2026-10-05).
+recovery, and the database in the same region as the API. Production's go on before the
+Vanderbilt pilot's first class (PLAN's L0b; Railway's need its Pro plan): the owner withdrew,
+on 2026-10-12, the exception of 2026-10-05 that ran that pilot without them
+(`docs/DECISIONS.md`, both dates).
 
 **5. The deploy sets `TZ` to the school's zone.** The server's local time is the
 school's: bell times render in it (carried over from v2) and an armed tap's
@@ -1004,8 +1004,8 @@ on 2026-10-10** (the owner, who had held it since 2026-10-05): the steps with no
 and no screen built until the bucket was in place (PLAN's M0, done 2026-10-12 in both
 environments). Its web screens are built on the
 portal's redesign in v2's look, after the pages they sit on (PLAN's PV steps to PV15; the owner,
-2026-10-12), and production backups (PLAN's L0b) come before the first actual pilot, holding back
-no screen (the owner, 2026-10-12).
+2026-10-12), and production backups (PLAN's L0b) come before the first actual pilot, the Vanderbilt
+pilot's first class, holding back no screen (the owner, 2026-10-12).
 The owner's picks of 2026-10-09 (the
 screens' design, the defaults confirmed, and saved questions) follow the ten decisions
 (decisions 11 and 12), and those of 2026-10-10 (students on the web, decision 13, and the open
@@ -1481,9 +1481,9 @@ and keeps everything that enforces focus.
   only itself, never the API (M2).
 - The load gate measures several classes polling at once behind one school's address, each
   student on a phone and a laptop (L4, M9).
-- Production backups are on before the first actual pilot (L0b, the owner's console step;
-  amended by the owner on 2026-10-12 from "before answers, education records, are stored on
-  prod"), and no screen waits for them.
+- Production backups are on before the first actual pilot, the Vanderbilt pilot (L0b, the
+  owner's console step; amended by the owner on 2026-10-12 from "before answers, education
+  records, are stored on prod"), and no screen waits for them.
 - The storage provider (decision 8): AWS S3, in the Cognito account (M0).
 
 ## The six rules
