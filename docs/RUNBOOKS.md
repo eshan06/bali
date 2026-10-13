@@ -394,7 +394,10 @@ and the portal on its free Vercel address, `https://<project>.vercel.app` (e.g.
      secret**). Name `bali-web`.
      **Login pages** → **Allowed callback URLs:** `https://<portal domain>/auth/callback`
      only. **Allowed sign-out URLs:** `https://<portal domain>/login` only. No
-     `localhost`, no preview URLs, no dev URLs.
+     `localhost`, no preview URLs, no dev URLs. **App client information → Edit →
+     Token expiration:** access and ID tokens **12 hours** (720 minutes): the portal
+     keeps no refresh token, so this is how long a teacher stays signed in (`docs/WEB.md`,
+     "Known gap — token renewal"; set on prod 2026-10-13).
    - **The phone's:** type **Mobile app** (public, no secret). Name `bali-ios`.
      Callback `bali://auth/callback` only; follow `docs/DEPLOY.md`, "The phone's
      sign-in", steps 2–3 (scopes with **Profile** ticked by hand, and the 365-day

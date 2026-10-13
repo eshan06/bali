@@ -451,6 +451,9 @@ why, Open owner items the owner's queue.
   checks in to Sentry Cron `api-sweep` (P9).
 - Deck storage (Phase 7's slides) is on in both environments, the buckets
   `bali-decks-dev-eshshah` and `bali-decks-prod-eshshah` (M0, the owner, 2026-10-12; runbook 10).
+- **The portal's sign-in lasts the school day** (the owner, 2026-10-13): its app clients' access
+  and ID tokens 12 hours on prod and a day on dev, up from Cognito's hour, which signed a teacher
+  out mid-class (`docs/WEB.md`, "Known gap — token renewal").
 - **No prod backups yet** (Railway's need the Pro plan). L0b turns them on before the first actual
   pilot (the owner, 2026-10-12: "we will do the backups later before our first actual pilot"),
   which is the Vanderbilt pilot (the owner, 2026-10-12), so the ruling of 2026-10-05 that ran it

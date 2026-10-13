@@ -273,9 +273,12 @@ and the ingest host of `NEXT_PUBLIC_SENTRY_DSN`, read at build time.
 ## Known gap — token renewal
 
 The portal stores only the Cognito **access token** (sessionStorage, per tab).
-There is no refresh token and no silent renewal, so when the ~1h access token
-expires the next API call or stream read returns 401 and the teacher is dropped
-to `/login` — mid-class if it happens then. This is deliberate for the Phase 2
-skeleton, not an oversight: the honesty rule still holds (only a definitive 401
-ever signs anyone out), and renewal lands with the real portal UI. It is tracked
-in `docs/PLAN.md`'s decision log.
+There is no refresh token and no silent renewal, so when the access token
+expires the next API call or stream read returns 401 and the teacher is sent to
+`/login`. Its lifetime is the portal's app client's own setting, raised from
+Cognito's default hour, which dropped a teacher mid-class, to **12 hours on prod**
+(`bali-web`) and **a day on dev** (`bali-web-dev`), the access and ID tokens alike
+(the owner, 2026-10-13; `docs/DECISIONS.md`): a sign-in lasts the school day. The
+honesty rule still holds (only a definitive 401 ever signs anyone out). Silent
+renewal is still later, and a refresh token, when one comes, never goes in web
+storage (S4).
