@@ -424,7 +424,9 @@ Student app:
   join them (`armed`; added 2026-10-03, #166, additive): not taken by a Start, not past the end
   of its school day by the server's clock, for a teacher of a class they are in — the taps a
   Start converts; false for a teacher. A phone waiting for its teacher's Start stops waiting once
-  it is false.
+  it is false. The classes come in a fixed order (2026-10-12, PV3b), so New code or a rename moves
+  none: a student's in the order they joined them, by their live enrollment, a teacher's oldest
+  first, each then by id.
 - `DELETE /v1/me` — the caller deletes their own account (C3, added 2026-10-04, additive):
   `{ eventId }`, through the engine (data-model decision 3's amendment), answered `deleted`;
   a retry, or any call from a sign-in with no account here, is `already_deleted`, and makes

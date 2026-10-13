@@ -8,6 +8,24 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-12** — **PV3b: the class lists in a fixed order, a teacher's oldest first and a
+  student's in the order they joined.** `getTaughtClasses` and `getEnrolledClasses` read with no
+  `ORDER BY` (PV2's review, #344; the owner: fix it), and Postgres then returns rows in whatever
+  order its plan reads them. PGlite read a teacher's classes in their rows' order on disk, where an
+  update writes a new version of the row, so a class given New code came back last (the regression
+  test's failure before the fix); it read a student's through `enrollments_active_unique`, in
+  class-id order, which an update to a class does not move but which is not the order they joined
+  either. A plan that changes as the tables grow can reorder both. **A teacher's: by
+  `classes.created_at`, then `id`**, as `listBlocks` orders blocks (P3). **A student's: by their
+  live enrollment's `created_at`, then the class's `id`**, so a class left and joined again goes
+  last. *Weighed:* by the class's own age, as a teacher's, which would put a class joined today
+  among the old ones. The `id` makes each order total where two times tie. *Skipped:* an index for
+  either: the sort is of one person's few classes. **And `GET /v1/me` reads the server's clock once
+  a request**, not once per class (PV2's review), so a session whose bell falls between two reads
+  never runs in one class of the answer and is over in the next; a tap still waiting is judged at
+  that instant too. The live session's state keeps its own read of the wall clock, the clock the
+  engine stamps `last_seen_at` with (`heardNow`).
+
 - **2026-10-12** — **PV3: Recent activity is `GET /v1/me/activity`, its unlocks and protection offs
   the report's, by the report's own function.** Home's `Main` board draws four moments: an
   Emergency Unlock with its reason, protection off and a session started, each with its student, its
