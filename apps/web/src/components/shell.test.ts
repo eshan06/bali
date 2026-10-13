@@ -6,7 +6,19 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
-import { accountStep, frameFor, initials, PAGE, reloadOnRestore, Shell, SideMenu } from './shell';
+import { NetworkError } from '../lib/api-client';
+import { CANT_REACH } from '../lib/errors';
+import {
+  AccountUnread,
+  accountStep,
+  frameFor,
+  initials,
+  PAGE,
+  readAccount,
+  reloadOnRestore,
+  Shell,
+  SideMenu,
+} from './shell';
 
 /*
  * The shell (PV5): v2's side menu on a teacher's signed-in pages, built to the canvas's teacher
@@ -15,7 +27,9 @@ import { accountStep, frameFor, initials, PAGE, reloadOnRestore, Shell, SideMenu
  * account reads as a teacher). Which frame a page gets, what happens to the account as pages change
  * and the back button restores one, and, rendered, the menu's items, the page it marks, its foot
  * with and without a name, its bar under 776 px and its three rows under 640 px, and the page beside
- * it.
+ * it. And how the account is read (PV5b, the owner's approval of #352's review): Loading… in the
+ * page's place until it answers, its failure there with Try again, read again on the next page,
+ * and only the newest read's answer counts.
  */
 const nav = vi.hoisted(() => ({ path: '/' }));
 vi.mock('next/navigation', () => ({
@@ -80,7 +94,7 @@ describe('what frames a page', () => {
     expect(frameFor('/classes/c1', null, null, true)).toEqual(NONE);
   });
 
-  it('shows nothing until the account is read, so no menu flashes for anyone (the owner, 2026-10-13)', () => {
+  it('draws no menu or bar while the account is read, so none flashes for anyone; the page waits (the owner, 2026-10-13)', () => {
     for (const path of ['/', '/classes/c1', '/classes/c1/reports']) {
       expect(frameFor(path, null, null, false), path).toEqual({
         chrome: null,
@@ -103,12 +117,14 @@ describe('what frames a page', () => {
     });
   });
 
-  it('says a failed read under today’s bar, with Sign out (Home has Try again)', () => {
-    for (const path of ['/', '/classes/c1']) {
-      expect(frameFor(path, null, "Couldn't reach Bali.", false), path).toEqual({
+  it('says a failed read in the page’s place under today’s bar, with Sign out, on every page (#352’s review)', () => {
+    // A class page under a failed read showed itself with no menu and nothing said: the page waits
+    // for the account on every page, its failure said where the page would be (`AccountUnread`).
+    for (const path of ['/', '/classes/c1', '/classes/c1/reports']) {
+      expect(frameFor(path, null, CANT_REACH, false), path).toEqual({
         chrome: 'bar',
-        framed: true,
-        hidden: false,
+        framed: false,
+        hidden: true,
       });
     }
   });
@@ -119,21 +135,34 @@ describe('the account as pages change (the owner, 2026-10-13)', () => {
 
   it('is forgotten once the sign-in is gone, so going back never shows it', () => {
     // A Sign out and an expired session both land on /login, the token gone.
-    expect(accountStep('/login', false, teacher, null, false)).toBe('forget');
-    expect(accountStep('/login', false, null, "Couldn't reach Bali.", false)).toBe('forget');
+    expect(accountStep('/login', false, teacher, null, false, true)).toBe('forget');
+    expect(accountStep('/login', false, null, CANT_REACH, false, true)).toBe('forget');
     // An answer that lands after the Sign out is forgotten too.
-    expect(accountStep('/', false, teacher, null, false)).toBe('forget');
-    expect(accountStep('/login', false, null, null, false)).toBe('keep');
+    expect(accountStep('/', false, teacher, null, false, false)).toBe('forget');
+    expect(accountStep('/login', false, null, null, false, true)).toBe('keep');
   });
 
   it('is read once on a signed-in page, and kept as pages change, Help included', () => {
-    expect(accountStep('/classes/c1', true, null, null, false)).toBe('read');
-    expect(accountStep('/classes/c1', true, null, null, true)).toBe('keep');
-    expect(accountStep('/classes/c1', true, teacher, null, false)).toBe('keep');
-    expect(accountStep('/support', true, teacher, null, false)).toBe('keep');
-    expect(accountStep('/support', true, null, null, false)).toBe('keep');
-    // A failed read waits for Try again or another page: never a loop of reads.
-    expect(accountStep('/', true, null, "Couldn't reach Bali.", false)).toBe('keep');
+    expect(accountStep('/classes/c1', true, null, null, false, true)).toBe('read');
+    expect(accountStep('/classes/c1', true, null, null, true, true)).toBe('keep');
+    expect(accountStep('/classes/c1', true, teacher, null, false, true)).toBe('keep');
+    expect(accountStep('/support', true, teacher, null, false, true)).toBe('keep');
+    expect(accountStep('/support', true, null, null, false, true)).toBe('keep');
+  });
+
+  it('is read again after a failure on the next page opened, never again on its own page (#352’s review)', () => {
+    // A failed read used to wait for Home, so a class page kept no menu until the teacher went
+    // there: any page opened next reads it again, as Try again does on the page it failed on.
+    for (const path of ['/', '/classes/c1', '/classes/c1/reports']) {
+      expect(accountStep(path, true, null, CANT_REACH, false, true), path).toBe('read');
+    }
+    // A later read of a known account that failed (Home's list after a create) too.
+    expect(accountStep('/classes/c1', true, teacher, CANT_REACH, false, true)).toBe('read');
+    // Its own page, as the failure lands: kept, said with Try again, never a loop of reads.
+    expect(accountStep('/classes/c1', true, null, CANT_REACH, false, false)).toBe('keep');
+    // Never a second read beside one under way, nor on a page read without signing in.
+    expect(accountStep('/classes/c1', true, null, CANT_REACH, true, true)).toBe('keep');
+    expect(accountStep('/support', true, null, CANT_REACH, false, true)).toBe('keep');
   });
 
   it('reloads every signed-in page the back button restores whole, whoever is signed in now', () => {
@@ -160,8 +189,21 @@ describe('the shell’s wiring of the rulings (read from its source)', () => {
   });
 
   it('reads, keeps or forgets the account as accountStep says, on every page and every answer', () => {
+    // A new page is one the effect hasn't seen yet: the same page's answers never read again.
     expect(shell).toMatch(
-      /const step = accountStep\(path, getAccessToken\(\) !== null, me, error, reading\.current\);\s*if \(step === 'read'\) load\(\);\s*if \(step === 'forget'\) \{\s*setMe\(null\);\s*setError\(null\);\s*\}\s*\}, \[path, me, error, load\]\);/,
+      /const newPage = seen\.current !== path;\s*seen\.current = path;\s*const step = accountStep\(\s*path,\s*getAccessToken\(\) !== null,\s*me,\s*error,\s*reading\.current,\s*newPage,?\s*\);\s*if \(step === 'read'\) load\(\);\s*if \(step === 'forget'\) \{\s*setMe\(null\);\s*setError\(null\);\s*\}\s*\}, \[path, me, error, load\]\);/,
+    );
+  });
+
+  it('applies only the newest read’s answer, so a past failure never shows over fresh data (#352’s review)', () => {
+    expect(shell).toMatch(
+      /void readAccount\(api, reads\)\.then\(\(said\) => \{\s*(\/\/[^\n]*\s*)*if \(said === null\) return;\s*reading\.current = false;\s*if \('me' in said\) setMe\(said\.me\);\s*else setError\(said\.error\);\s*\}\);/,
+    );
+  });
+
+  it('says the account unread in the page’s place, Try again reading it again (#352’s review)', () => {
+    expect(shell).toMatch(
+      /\{frame\.hidden \? <AccountUnread error=\{error\} onRetry=\{\(\) => load\(\)\} \/> : null\}\s*<div hidden=\{frame\.hidden\}/,
     );
   });
 
@@ -303,11 +345,27 @@ describe('the shell', () => {
     );
   });
 
-  it('first paints a signed-in page hidden, with no menu or bar, until the account is read', () => {
-    nav.path = '/classes/c1';
-    expect(renderToStaticMarkup(createElement(Shell, null, page))).toBe(
-      '<div><div hidden=""><main>page</main></div></div>',
+  it('first paints Loading… in a signed-in page’s place, with no menu or bar, the page kept for later (#352’s review)', () => {
+    // It painted a blank window (Home's own Loading… hidden with the page), after a redeem too.
+    for (const path of ['/', '/classes/c1']) {
+      nav.path = path;
+      expect(renderToStaticMarkup(createElement(Shell, null, page)), path).toMatch(
+        /^<div><main class="[^"]*"><p role="status" class="[^"]*">Loading…<\/p><\/main><div hidden=""><main>page<\/main><\/div><\/div>$/,
+      );
+    }
+  });
+
+  it('says the account unread as Home said it (HomeStates): Loading…, or its failure with Try again', () => {
+    const unread = (error: string | null) =>
+      renderToStaticMarkup(createElement(AccountUnread, { error, onRetry: () => undefined }));
+    expect(unread(null)).toMatch(
+      /^<main class="[^"]*"><p role="status" class="[^"]*\btext-text-secondary\b[^"]*">Loading…<\/p><\/main>$/,
     );
+    expect(unread(CANT_REACH)).toMatch(
+      /<p role="alert"><span class="block text-h3">Couldn(’|'|&#x27;)t load your account\.<\/span><span class="[^"]*">Couldn(’|'|&#x27;)t reach Bali\. Check your connection, then try again\.<\/span><\/p><button type="button"[^>]*>Try again<\/button>/,
+    );
+    // In the page's frame, beside no menu: v2's gutters, as the page would have them.
+    expect(classesOf(unread(null), /<main\b[^>]*>/)).toEqual(PAGE.split(' '));
   });
 
   it('draws nothing around a page read without signing in, the page in the same place', () => {
@@ -327,7 +385,58 @@ describe('the shell', () => {
     const home = read('../app/page.tsx');
     expect(home).toContain('const { me, error, load } = useMe();');
     expect(home).not.toContain("'/v1/me'");
-    // A redeem forgets the account and reads it again, so the menu comes with the classes.
+    // A redeem forgets the account and reads it again, so the menu comes with the classes; until
+    // it answers, the shell says Loading… in Home's place, as it does for every page.
     expect(home).toMatch(/redeemed\.current = true;\s*load\(true\);/);
+    expect(read('./shell.tsx')).toMatch(/\(fresh = false\) => \{\s*if \(fresh\) setMe\(null\);/);
+    // Home draws nothing of its own for an account not read: the shell's words are the only ones.
+    expect(home).toMatch(/if \(me === null\) return null;/);
+    expect(home).not.toMatch(/>\s*Loading…\s*<|Couldn&apos;t load your account/);
+  });
+});
+
+describe('the account’s reads (#352’s review)', () => {
+  const teacher = account('teacher');
+
+  /** An API whose reads answer in the order given, each settled by hand. */
+  function api() {
+    const settles: { answer: (me: MeResponse) => void; fail: (e: unknown) => void }[] = [];
+    return {
+      settles,
+      get: <T>() =>
+        new Promise<T>((resolve, reject) => {
+          settles.push({ answer: (me) => resolve(me as T), fail: reject });
+        }),
+    };
+  }
+
+  it('drops a read that settles after a newer one began: no past failure over fresh data', async () => {
+    // Try again pressed twice on a slow connection, or a create's read beside Home's own.
+    const reads = { current: 0 };
+    const fake = api();
+    const older = readAccount(fake, reads);
+    const newer = readAccount(fake, reads);
+    fake.settles[1]?.answer(teacher);
+    expect(await newer).toEqual({ me: teacher });
+    fake.settles[0]?.fail(new NetworkError());
+    expect(await older).toBeNull();
+  });
+
+  it('drops an older answer too, so the newest read’s word stands', async () => {
+    const reads = { current: 0 };
+    const fake = api();
+    const older = readAccount(fake, reads);
+    const newer = readAccount(fake, reads);
+    fake.settles[1]?.fail(new NetworkError());
+    expect(await newer).toEqual({ error: CANT_REACH });
+    fake.settles[0]?.answer(teacher);
+    expect(await older).toBeNull();
+  });
+
+  it('says the newest read’s failure in words: no answer is CANT_REACH', async () => {
+    const fake = api();
+    const read = readAccount(fake, { current: 0 });
+    fake.settles[0]?.fail(new NetworkError());
+    expect(await read).toEqual({ error: CANT_REACH });
   });
 });
