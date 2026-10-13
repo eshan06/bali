@@ -1,9 +1,11 @@
 import {
   armedTaps,
+  classes,
   type Database,
   endSession,
   enrollments,
   events,
+  expireDueSessions,
   findUserByCognitoId,
   getLiveParticipation,
   startSession,
@@ -12,6 +14,7 @@ import {
 import type {
   ApiErrorBody,
   DeleteMeResponse,
+  EnrollmentJoinResponse,
   MeResponse,
   RosterResponse,
   SessionReportResponse,
@@ -24,7 +27,8 @@ import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 
 import { authedInject, makeAuthedApp, type AuthedApp } from './helpers/app.js';
-import { makeTestDb, seedClassroom } from './helpers/db.js';
+import { SCHEMAS } from './helpers/contract.js';
+import { joinCodeFor, makeTestDb, seedClassroom } from './helpers/db.js';
 
 // `/v1/me`'s read of the live session, as it is, so a test can land a Start
 // just after it (#166's review).
@@ -711,6 +715,198 @@ describe('GET /v1/me', () => {
     // The name just filled reaches their classes in the same answer (C2a).
     expect(body.classes.map((c) => c.teacher.displayName)).toEqual(['ms.rivera']);
     expect((await findUserByCognitoId(db, teacher.cognitoId))?.displayName).toBe('ms.rivera');
+  });
+
+  it('gives a teacher each class’s students enrolled now: a join counts, a leave and a removal no longer do (PV2)', async () => {
+    const { school, teacher, klass } = await seedClassroom(db, 'me-count');
+    const [empty] = await db
+      .insert(classes)
+      .values({
+        teacherId: teacher.id,
+        schoolId: school.id,
+        name: 'Period 6',
+        joinCode: joinCodeFor('me-count-empty'),
+      })
+      .returning();
+    // Another teacher's class, whose student counts in none of these.
+    await seedClassroom(db, 'me-count-other');
+    const token = await ctx.tokenFor(teacher.cognitoId);
+    const counts = async () =>
+      new Map((await me(token)).body.classes.map((c) => [c.id, c.summary?.studentCount]));
+    expect(await counts()).toEqual(
+      new Map([
+        [klass.id, 1],
+        [empty!.id, 0],
+      ]),
+    );
+
+    const join = async (sub: string) => {
+      const payload = {
+        joinCode: klass.joinCode,
+        eventId: randomUUID(),
+        deviceTime: new Date().toISOString(),
+      };
+      const res = await authedInject(ctx.app, await ctx.tokenFor(sub), {
+        method: 'POST',
+        url: '/v1/enrollments',
+        payload,
+      });
+      expect(res.statusCode).toBe(200);
+      return res.json<EnrollmentJoinResponse>().enrollmentId;
+    };
+    const leaving = await join('student-me-count-leaves');
+    const removed = await join('student-me-count-removed');
+    expect((await counts()).get(klass.id)).toBe(3);
+
+    const leave = await authedInject(ctx.app, await ctx.tokenFor('student-me-count-leaves'), {
+      method: 'DELETE',
+      url: `/v1/enrollments/${leaving}`,
+    });
+    const removal = await authedInject(ctx.app, token, {
+      method: 'DELETE',
+      url: `/v1/enrollments/${removed}`,
+    });
+    expect([leave.statusCode, removal.statusCode]).toEqual([200, 200]);
+    expect(await counts()).toEqual(
+      new Map([
+        [klass.id, 1],
+        [empty!.id, 0],
+      ]),
+    );
+    // The roster the class page lists, counted alike.
+    const roster = await authedInject(ctx.app, token, {
+      method: 'GET',
+      url: `/v1/classes/${klass.id}/roster`,
+    });
+    expect(roster.json<RosterResponse>().students).toHaveLength(1);
+  });
+
+  it('gives a teacher each class’s running session and its last one over, by the server’s clock: never the running one, and one past its bell before the sweep marks it, ended at its bell (PV2)', async () => {
+    const at = (minutes: number) => new Date(Date.UTC(2026, 9, 12, 9, minutes));
+    const clock = { now: at(0) };
+    const timed = await onClock(clock);
+    const { school, teacher, klass } = await seedClassroom(db, 'me-last');
+    // The teacher's other class, whose last session stays its own.
+    const [period1] = await db
+      .insert(classes)
+      .values({
+        teacherId: teacher.id,
+        schoolId: school.id,
+        name: 'Period 1',
+        joinCode: joinCodeFor('me-last-period-1'),
+      })
+      .returning();
+    const token = await timed.tokenFor(teacher.cognitoId);
+    const summaries = async () => {
+      const { body } = await me(token, timed);
+      // As the API snapshot describes it: no teacher's answer is a fixture.
+      expect(SCHEMAS.MeResponse.safeParse(body).error).toBeUndefined();
+      return new Map(body.classes.map((c) => [c.id, c.summary]));
+    };
+    const window = (id: string, startedAt: Date, endedAt: Date) => ({
+      id,
+      startedAt: startedAt.toISOString(),
+      endedAt: endedAt.toISOString(),
+    });
+    const summary = (
+      runningSession: { id: string; endsAt: Date } | null,
+      lastSession: ReturnType<typeof window> | null,
+    ) => ({
+      studentCount: 1,
+      runningSession: runningSession && {
+        id: runningSession.id,
+        endsAt: runningSession.endsAt.toISOString(),
+      },
+      lastSession,
+    });
+
+    // No session yet, in either.
+    expect(await summaries()).toEqual(
+      new Map([
+        [klass.id, summary(null, null)],
+        [period1!.id, { ...summary(null, null), studentCount: 0 }],
+      ]),
+    );
+
+    // Period 1, 8:00 to its End at 8:40.
+    const early = await startSession(db, {
+      classId: period1!.id,
+      startedAt: at(-60),
+      endsAt: at(-10),
+    });
+    await endSession(db, { sessionId: early.session.id, at: at(-20), reason: 'ended' });
+    const period1Summary = {
+      ...summary(null, window(early.session.id, at(-60), at(-20))),
+      studentCount: 0,
+    };
+
+    // 9:00 to 9:25, running: never the last.
+    const first = await startSession(db, { classId: klass.id, startedAt: at(0), endsAt: at(25) });
+    clock.now = at(10);
+    expect(await summaries()).toEqual(
+      new Map([
+        [klass.id, summary({ id: first.session.id, endsAt: at(25) }, null)],
+        [period1!.id, period1Summary],
+      ]),
+    );
+
+    // Ended early by its teacher at 9:20: the last, ended then.
+    await endSession(db, { sessionId: first.session.id, at: at(20), reason: 'ended' });
+    clock.now = at(21);
+    expect((await summaries()).get(klass.id)).toEqual(
+      summary(null, window(first.session.id, at(0), at(20))),
+    );
+
+    // 9:30 to 9:55, running to its last instant: the last is still the first.
+    const second = await startSession(db, {
+      classId: klass.id,
+      startedAt: at(30),
+      endsAt: at(55),
+    });
+    clock.now = new Date(at(55).getTime() - 1);
+    expect((await summaries()).get(klass.id)).toEqual(
+      summary({ id: second.session.id, endsAt: at(55) }, window(first.session.id, at(0), at(20))),
+    );
+
+    // At its bell it is over (A17), though the sweep has not marked it: the last, ended at its bell.
+    clock.now = at(55);
+    const atTheBell = summary(null, window(second.session.id, at(30), at(55)));
+    expect(await summaries()).toEqual(
+      new Map([
+        [klass.id, atTheBell],
+        [period1!.id, period1Summary],
+      ]),
+    );
+    // The sweep marks it at its bell: nothing moves.
+    expect(await expireDueSessions(db, at(57))).toEqual([second.session.id]);
+    clock.now = at(57);
+    expect((await summaries()).get(klass.id)).toEqual(atTheBell);
+    // Nor does the app hear of a teacher's own class's session (C3c).
+    const { body } = await me(token, timed);
+    expect(body.classes.map((c) => c.liveSession)).toEqual([null, null]);
+  });
+
+  it('gives a student’s classes no summary: a student’s answer is as it was (PV2)', async () => {
+    const { student, klass } = await seedClassroom(db, 'me-no-summary');
+    const { session } = await startSession(db, {
+      classId: klass.id,
+      startedAt: new Date(Date.now() - 60_000),
+      endsAt: new Date(Date.now() + 25 * 60_000),
+    });
+    const [enrollment] = await db
+      .select()
+      .from(enrollments)
+      .where(eq(enrollments.studentId, student.id));
+    const { body } = await me(await ctx.tokenFor(student.cognitoId));
+    expect(body.classes).toStrictEqual([
+      {
+        id: klass.id,
+        name: klass.name,
+        teacher: { displayName: null },
+        enrollmentId: enrollment!.id,
+        liveSession: { id: session.id, endsAt: session.endsAt.toISOString() },
+      },
+    ]);
   });
 
   it('requires authentication', async () => {

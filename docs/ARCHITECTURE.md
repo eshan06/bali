@@ -569,7 +569,14 @@ Student app:
   no row yet is an empty history. Only ever the caller's own; a teacher is `403`.
 
 Teacher app and web portal:
-- `GET /v1/me` — same boot call, role-aware.
+- `GET /v1/me` — same boot call, role-aware. A teacher's own class carries its `summary` (added
+  2026-10-12, PV2, additive; absent on a student's class), what the portal's Home and Classes show
+  of it: the students enrolled in it now (`studentCount`); its session running by the server's
+  clock, with its bell (`runningSession`, `liveSession`'s shape: `liveSession` stays null there, or
+  the app would tell a teacher signed into it to tap in); and its newest session over by that clock,
+  never the running one (`lastSession`: its id, start and end, or null). One past its bell is over
+  before the sweep marks it (A17), ended at its bell, the time the sweep then stamps; its figures
+  are its report's (R2). Read for every class in one statement.
 - `POST /v1/teacher-invites/redeem` — how an account becomes a teacher (T1b): `{ code, eventId }`,
   the code the owner minted for a school (data model, `teacher_invites`), matched as the command
   printed it with its case, spaces and dashes set aside, and looked up by its hash; in the body,

@@ -8,6 +8,31 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-12** — **PV2: a teacher's own class's summary on `GET /v1/me`, one optional object, its
+  "over" the engine's one rule.** Home's and Classes' rows ("28 students · last session today, 8:00
+  AM", "no sessions yet", the Live chip) and Home's Last session card ("9:05 AM to 9:55 AM") need, per
+  class, its students enrolled now, its running session and its last one over. **One optional
+  `summary`** on a teacher's own class (`ClassSummary`: `studentCount`, `runningSession`,
+  `lastSession`), absent on a student's, so a student's answer and its fixtures are unchanged and a
+  client checks one key. *Weighed:* three flat optional fields, each optional on its own, which a
+  type cannot tie together. **The running session beside `liveSession`, not in it:** `liveSession`
+  is documented as null on a teacher's own class, and the app's `inSessionCard` reads it to tell a
+  student "<class> is in session. Tap your teacher's block to join.", which a teacher signed into
+  the app would get. **"Over" is `sessionRunning`'s, in the route** (A17; C3c's review: never a
+  copy of it in SQL): the read brings the class's session not marked over, as `getEnrolledClasses`
+  does, and its newest one marked over; the route says which runs. One past its bell, not yet swept,
+  is the last, ended at its bell; it is the class's newest, since a Start ends it before the next
+  begins (A18). **`lastSession.endedAt` is when it ended: its End, else its bell**, never R3's raw
+  pair (`endsAt`, and an `endedAt` null until the sweep), so no client re-derives the end. The
+  sweep stamps the bell (`endHeldSession` clamps to it), so the value never moves when it runs.
+  **One statement** (a lateral read of the newest marked session, a correlated count of the active
+  enrollments), so a session ended between two reads is never both running and the last; still no
+  query per class. *Weighed:* a grouped query per fact, as planned, three round trips and three
+  snapshots. *Skipped:* an EXPLAIN pin like R3's; the boot call reads a teacher's few classes, each
+  a probe of `sessions_class_started_idx` and `enrollments_active_unique`. **No teacher's answer is
+  a fixture** (the fixtures are a phone's), so the new test reads each against the contract's strict
+  `MeResponse` schema, the one the OpenAPI snapshot now carries.
+
 - **2026-10-12** — **The owner's three calls: the portal built exactly as drawn, Recent activity as
   Home's board draws it, and production backups on before the Vanderbilt pilot.** Asked together,
   each with the conductor's recommendation, and each taken. **Exactly as drawn** (PV4 no longer
