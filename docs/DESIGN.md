@@ -138,7 +138,10 @@ per session with its counts in their states' inks), which finished the four desi
 On 2026-10-12 the owner approved v2's look for the portal and the student web
 (§1), built page by page in PLAN's PV steps: until a page's step lands, it is
 laid out as PB drew it, the shared pieces PV4 restyled aside (the buttons, the
-field, the chip and the card on its own, 2026-10-13).
+field, the chip and the card on its own, 2026-10-13), and beside the side menu
+PV5 put on a teacher's signed-in pages (`components/shell.tsx`, 2026-10-13),
+which frames each page at v2's width and gutters; never on the projector, where
+Present keeps its own column until PV9.
 Every
 portal source file is held to the tokens' utilities by `tokens.test.ts`, and
 since D2g the theme holds none of Tailwind's own colours, type sizes,
@@ -309,7 +312,10 @@ beside it (`fonts.ts`, PV4 naming it as §7 asks). PV4 added them
 (chips `caption`, card titles `h3`); and the italic, a family of its own so no
 page preloads it, set on `italic`, `em` and `i`. A size `v2.css` draws that
 these facts don't list (the small button's 13.5/18) joins with the step that
-builds it, named and pinned the same way.
+builds it, named and pinned the same way: PV5 added the side menu's three, all
+semibold, `lockup` (16/22, the lockup's word), `menu-name` (13/17) and
+`menu-initials` (11/11), and named its avatar's two primitives for it,
+`avatar-bg` (green-200) and `avatar-fg` (green-800).
 
 Density: the teacher's live grid is dense (many students at a glance); the
 student app is airy and simple. Theme: **light, everywhere.** The app and the
@@ -605,7 +611,7 @@ where they differ (Present's included: §5); the input size stands.
   gains them when the owner next exports it. The grid reflows by column count
   below the desktop width, never by shrinking type: as many columns as fit,
   each at least 212 px, so six at 1440, in the class page 1400 px wide at most
-  (PB4a); Present's four from a 56 rem grid, three and then two narrower. In Present the page's header folds the bell, the
+  (PB4a), and five beside the side menu (PV5) until v2's tiles (PV8); Present's four from a 56 rem grid, three and then two narrower. In Present the page's header folds the bell, the
   join code in `code-lg` and the controls into one row, so a class of 28 fits
   one 1080p screen. *v2's look (§1), superseding Q4 and Present's sizes:*
   tinted tiles, each `minmax(250px, 1fr)` and 84 px tall, four to a row at

@@ -127,11 +127,12 @@ describe('a cell on the live grid', () => {
 });
 
 describe('the grid’s columns', () => {
-  it('fits six at the desktop width', () => {
-    // The class page's column there: 1400 px less its two 40 px gutters, the cells 8 px apart.
-    // The canvas's 216 px fitted five, where its notes and DESIGN.md §5 say six.
+  it('fits five at the desktop width, beside the side menu', () => {
+    // The class page's column at 1440 px since the side menu (PV5): 1440 less the menu's 216 px
+    // and the page's two 36 px gutters, the cells 8 px apart. It held six in 1400 px less two 40 px
+    // gutters until then; v2's tiles (PV8) make it four.
     const min = Number(/minmax\(min\((\d+)px/.exec(COLUMNS)?.[1]);
-    expect(Math.floor((1320 + 8) / (min + 8))).toBe(6);
+    expect(Math.floor((1440 - 216 - 2 * 36 + 8) / (min + 8))).toBe(5);
   });
 
   it('keeps Present’s four from a 56 rem grid, so a 1024 px projector still shows four', () => {

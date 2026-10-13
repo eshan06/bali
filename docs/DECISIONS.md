@@ -8,6 +8,53 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-13** — **PV5: v2's side menu on a teacher's signed-in pages, Home and Help its only
+  items for now, never on the projector, and one read of who is signed in.** Built to
+  [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (version 21):
+  every teacher board's menu (Main, ClassLive), StudentZoom's bar at 720 px, PV1's PhoneHome and
+  PhoneClassLive at 390 px, HomeNoName and ClassPresent (`components/shell.tsx`, the root layout's;
+  checked against the boards rendered at the same widths, box for box). **Where it shows:** for an
+  account that reads as a teacher, on every signed-in page; the signed-out pages (`/login`,
+  `/auth/*`, Help, the policy pages) keep their bars, and anyone else keeps today's bar, the invite
+  page with it until PV15 draws it. **The owner's rulings on #352's review (2026-10-13), each as
+  recommended:** (1) **No menu on the projector:** while Present is on (`usePresenting`) the shell
+  draws no menu and no frame, as ClassPresent draws it, and the class page keeps its own column
+  until PV9 draws Present, so a 1024 px projector keeps Present's four columns (the review's
+  blocker: beside the menu it fell to three, and 28 students to ten rows). (2) **Nothing from an
+  account that left:** the shell forgets the account once its sign-in is gone (a Sign out and an
+  expired session both land on /login), and every signed-in page the back button restores whole is
+  reloaded, since its account may have signed out, expired or given way to another sign-in in that
+  tab since; so neither shows the last teacher's classes or name (santa's round 2 found the
+  restore checked only that some sign-in was there). (3) **The menu only once
+  the account reads as a teacher:** until it is read, nothing shows (the page hidden, so no frame
+  flashes on the invite page or for anyone else, nor a page drawn from an account that left); a
+  failed read shows today's bar, with Sign out, and the page's own Try again. (4) **A class link's
+  read of `/v1/me` waits for PV15** (rare), which moves the shell's read behind the 13+ check
+  (W2's `homeFor`), so a web sign-in that never set up the app makes no account. **Its items:**
+  Home and Help, each listed once its page exists (Reports with PV13, Questions with L7b, Slides
+  with M5, Classes with PV16), never a dead or disabled link; Help is `/support`, under its own bar.
+  **The page marked** by `aria-current`, grey and semibold: Home on Home; nothing on a class page
+  or its reports until Classes and Reports join the menu (*weighed:* Home there, today's class list,
+  which PV16 moves). **The foot:** the initials (v2's rule, the first letter of the first two words,
+  in any script), the name, and Sign out as an icon named "Sign out"; for a teacher with no display
+  name, Sign out in words alone (HomeNoName). **One read of `/v1/me`**, the shell's, shared with
+  Home (`useMe`): a redeem turns the invite page into Home beside the menu with no reload, and the
+  menu and the page never disagree about who is signed in (*weighed:* the shell reading on its own
+  beside Home's read, one fact twice). The shell reads as a signed-in page first opens, Home again
+  as it opens (as before), and a page moving to another keeps the answer. **As drawn, and where the
+  boards don't say:** in view as the page scrolls, with its own scroll on a short window, as v2's
+  own menu was (`v2-archive`'s `Sidenav`, `sticky top-0 h-screen`); 216 px at every width, where
+  v2.css's `flex: 1 1 216px` grows it past 1476 px (no board shows it), the page left-aligned beside
+  it; the lockup's word in the brand's ink, as every board renders it (v2.css's `.app a` outranks
+  `.brand`'s primary ink); 2 px between items, as v2.css draws them; the avatar's primitives named
+  for it (`avatar-bg`, `avatar-fg`, since `tokens.test.ts` bars Tailwind's palette names) and the
+  menu's three sizes added as portal tokens (`lockup` 16/22, `menu-name` 13/17, `menu-initials`
+  11/11, semibold), as PV4 left them to the step that builds them; the icons at lucide's stroke, as
+  PV4 noted. **The page beside it:** the shell frames each of a teacher's pages at v2's 1260 px and
+  30/36/56 (22/16/40 on a phone), so Home, a class page and its reports drop their own 1400 px and
+  40 px gutters, their layouts otherwise as they were; the class page's standard grid fits five
+  across at 1440 until PV8's tiles.
+
 - **2026-10-13** — **PV4: v2's look's shared pieces on every page at once, built exactly as drawn
   (the owner, 2026-10-12): the buttons, the field, the chip and the card on its own; v2's radii and
   sizes as named portal tokens; Instrument Sans's italic, self-hosted.** Built to

@@ -12,8 +12,8 @@ import { getAccessToken } from '@/lib/auth';
 import { FIRST_READ, type ReadAt, readSessions, startRead } from '@/lib/reports';
 import { useApi } from '@/lib/use-api';
 
-/** The class page's column, 1400 px at most, and in it the list's, 72 rem (the Recap & reports design). */
-const PAGE = 'mx-auto max-w-[1400px] px-4 pt-10 pb-16 sm:px-10 *:max-w-6xl';
+/** The list's column, 72 rem at most (the Recap & reports design), in the shell's frame (PV5). */
+const PAGE = '*:max-w-6xl';
 
 /**
  * A class's reports (R5; the Recap & reports design): R3's sessions, a page of 20 at a time, each

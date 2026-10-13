@@ -130,8 +130,8 @@ describe('the reports page', () => {
     );
   });
 
-  it('keeps the list 72 rem in the class page’s column, its column names quiet', () => {
-    expect(page).toMatch(/const PAGE = 'mx-auto max-w-\[1400px\][^']*\*:max-w-6xl';/);
+  it('keeps the list 72 rem in the shell’s frame beside the side menu, its column names quiet', () => {
+    expect(page).toMatch(/const PAGE = '\*:max-w-6xl';/);
     expect(page).toMatch(/className=\{`hidden [^`]*\$\{QUIET\} \$\{ROW\}`\}/);
   });
 });

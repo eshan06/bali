@@ -78,4 +78,21 @@ describe('the class page in Present', () => {
     expect(recap).toMatch(/\btoggle=\{grid === null && openedInPresent \? presentToggle : null\}/);
     expect(recapCard.match(/\{toggle\}/g)).toHaveLength(1);
   });
+
+  it('has no menu and keeps its own column, so a 1024 px projector shows four (the owner, 2026-10-13)', () => {
+    // The page tells the shell while Present is on, and the shell then draws no menu or frame
+    // (shell.test.ts, `frameFor`); the page keeps the column it had before the menu until PV9.
+    expect(page).toMatch(/usePresenting\(present\);/);
+    const frame = /const PRESENT_PAGE = '([^']*)';/.exec(page)?.[1] ?? '';
+    expect(frame.split(' ')).toEqual(
+      expect.arrayContaining(['mx-auto', 'max-w-[1400px]', 'px-4', 'sm:px-10']),
+    );
+    expect(page).toMatch(
+      /<main\s+className=\{present \? `\$\{PRESENT_PAGE\} \$\{projecting \? 'pt-5' : 'pt-8'\}` : undefined\}/,
+    );
+    // Present's fourth column comes at a 56 rem grid (PRESENT_COLUMNS' @4xl): 1024 px less the two
+    // gutters is 944 px, over it.
+    const gutter = Number(/\bsm:px-(\d+)\b/.exec(frame)?.[1]) * 4;
+    expect(1024 - 2 * gutter).toBeGreaterThanOrEqual(56 * 16);
+  });
 });
