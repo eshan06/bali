@@ -22,11 +22,11 @@ const page = readFileSync(
   'utf8',
 );
 
-/** The page while no session runs: from its own `return` to the end. */
+/** The page while no session runs: the render's second branch, to the end. */
 const before = page.slice(page.indexOf('// No session running (PV6)'));
-/** The page while a session runs: its branch, before the one above. */
+/** The page while a session runs: the render's first branch, before the one above. */
 const live = page.slice(
-  page.indexOf('if (klass !== null && grid !== null && !grid.over)'),
+  page.indexOf('return klass !== null && grid !== null && !grid.over ? ('),
   page.indexOf('// No session running (PV6)'),
 );
 /** A constant's class list, by its name. */

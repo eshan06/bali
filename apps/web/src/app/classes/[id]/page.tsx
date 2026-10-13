@@ -321,137 +321,128 @@ export default function ClassDetailPage() {
   );
 
   // While a session runs, the page as it was before v2's look, until PV7 draws it.
-  if (klass !== null && grid !== null && !grid.over) {
-    return (
-      <main className={present ? `${PRESENT_PAGE} ${projecting ? 'pt-5' : 'pt-8'}` : undefined}>
-        <nav aria-label="Class" className="flex justify-between gap-4">
-          <Link href="/" className={NAV_LINK}>
-            <ArrowLeft size={16} aria-hidden="true" />
-            All classes
-          </Link>
-          <Link href={`/classes/${classId}/reports`} className={NAV_LINK}>
-            Reports
-            <ArrowRight size={16} aria-hidden="true" />
-          </Link>
-        </nav>
+  return klass !== null && grid !== null && !grid.over ? (
+    <main className={present ? `${PRESENT_PAGE} ${projecting ? 'pt-5' : 'pt-8'}` : undefined}>
+      <nav aria-label="Class" className="flex justify-between gap-4">
+        <Link href="/" className={NAV_LINK}>
+          <ArrowLeft size={16} aria-hidden="true" />
+          All classes
+        </Link>
+        <Link href={`/classes/${classId}/reports`} className={NAV_LINK}>
+          Reports
+          <ArrowRight size={16} aria-hidden="true" />
+        </Link>
+      </nav>
 
-        {/* One header in both views, so the code stays put as Present turns on. */}
-        <header
-          className={`flex min-h-10 flex-wrap gap-x-8 gap-y-4 ${projecting ? 'mt-4 items-center' : 'mt-5 items-start justify-between'}`}
-        >
-          <h1 className="min-w-0 text-h1 text-balance break-words">{klass.name}</h1>
-          {projecting ? endsAt : null}
-          {projecting ? <div className="grow" /> : null}
-          <JoinCode classId={classId} code={klass.joinCode} onClass={setKlass} large={projecting} />
-          {projecting ? <div aria-hidden="true" className={`${DIVIDER} max-lg:hidden`} /> : null}
-          {projecting ? (
-            <div className="flex flex-wrap items-center gap-2">
-              {extend}
-              {end()}
-            </div>
-          ) : null}
-        </header>
-
-        {/* Its roster didn't load, or a read again of the class failed: said under the header. */}
-        {(error ?? rosterError) ? (
-          <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-3">
-            <p role="alert" className="text-body">
-              Couldn&apos;t load this class.{' '}
-              <span className="text-text-secondary">{error ?? rosterError}</span>
-            </p>
-            <Button variant="secondary" onClick={load}>
-              Try again
-            </Button>
+      {/* One header in both views, so the code stays put as Present turns on. */}
+      <header
+        className={`flex min-h-10 flex-wrap gap-x-8 gap-y-4 ${projecting ? 'mt-4 items-center' : 'mt-5 items-start justify-between'}`}
+      >
+        <h1 className="min-w-0 text-h1 text-balance break-words">{klass.name}</h1>
+        {projecting ? endsAt : null}
+        {projecting ? <div className="grow" /> : null}
+        <JoinCode classId={classId} code={klass.joinCode} onClass={setKlass} large={projecting} />
+        {projecting ? <div aria-hidden="true" className={`${DIVIDER} max-lg:hidden`} /> : null}
+        {projecting ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {extend}
+            {end()}
           </div>
         ) : null}
+      </header>
 
-        {/* The same three places in both views, so the grid never restarts as Present turns on. */}
-        <div>
-          {/* The session's card: the bell, adding time, and End set apart (End sends at once). */}
-          {projecting ? null : (
-            <section
-              aria-label="Session"
-              className={`mt-6 flex flex-wrap items-center gap-x-6 gap-y-4 ${CARD_ALONE}`}
-            >
-              {endsAt}
-              <div aria-hidden="true" className={`${DIVIDER} max-sm:hidden`} />
-              <div className="flex grow flex-wrap items-center gap-2 max-sm:basis-full">
-                {extend}
-                {end('ml-auto')}
-              </div>
-            </section>
-          )}
-          {/* Said right under the controls, where they are. */}
-          {said ? (
-            <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-3">
-              <p role={said.kind === 'note' ? 'status' : 'alert'} className="text-body">
-                {said.message}
-              </p>
-              {said.kind === 'failed' ? (
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    const again = unanswered.current;
-                    if (again) addTime(again);
-                  }}
-                  aria-disabled={busy !== null}
-                >
-                  Try again
-                </Button>
-              ) : null}
-            </div>
-          ) : null}
-          <section
-            aria-labelledby={`${id}-live`}
-            className={`flex flex-col ${projecting ? 'mt-5 gap-3' : 'mt-8 gap-4'}`}
-          >
-            <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-              <h2 id={`${id}-live`} className="text-h2">
-                Live grid
-              </h2>
-              {presentToggle}
-            </div>
-            <LiveGrid
-              sessionId={grid.id}
-              onEnded={onEnded}
-              onSession={onSession}
-              present={present}
-            />
-          </section>
+      {/* Its roster didn't load, or a read again of the class failed: said under the header. */}
+      {(error ?? rosterError) ? (
+        <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-3">
+          <p role="alert" className="text-body">
+            Couldn&apos;t load this class.{' '}
+            <span className="text-text-secondary">{error ?? rosterError}</span>
+          </p>
+          <Button variant="secondary" onClick={load}>
+            Try again
+          </Button>
         </div>
+      ) : null}
 
+      {/* The same three places in both views, so the grid never restarts as Present turns on. */}
+      <div>
+        {/* The session's card: the bell, adding time, and End set apart (End sends at once). */}
+        {projecting ? null : (
+          <section
+            aria-label="Session"
+            className={`mt-6 flex flex-wrap items-center gap-x-6 gap-y-4 ${CARD_ALONE}`}
+          >
+            {endsAt}
+            <div aria-hidden="true" className={`${DIVIDER} max-sm:hidden`} />
+            <div className="flex grow flex-wrap items-center gap-2 max-sm:basis-full">
+              {extend}
+              {end('ml-auto')}
+            </div>
+          </section>
+        )}
+        {/* Said right under the controls, where they are. */}
+        {said ? (
+          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-3">
+            <p role={said.kind === 'note' ? 'status' : 'alert'} className="text-body">
+              {said.message}
+            </p>
+            {said.kind === 'failed' ? (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  const again = unanswered.current;
+                  if (again) addTime(again);
+                }}
+                aria-disabled={busy !== null}
+              >
+                Try again
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
         <section
-          aria-labelledby={`${id}-roster`}
-          className="mt-14 border-t border-border-default pt-8"
+          aria-labelledby={`${id}-live`}
+          className={`flex flex-col ${projecting ? 'mt-5 gap-3' : 'mt-8 gap-4'}`}
         >
-          <h2 id={`${id}-roster`} className="text-h2">
-            Roster
-          </h2>
-          {/* Unread, it says so under the header with Try again, never "Loading…" here. */}
-          {roster === null ? (
-            rosterError ? null : (
-              <p role="status" className="mt-4 text-body text-text-secondary">
-                Loading…
-              </p>
-            )
-          ) : roster.students.length === 0 ? (
-            <p className="mt-4 text-body text-text-secondary">No students have joined yet.</p>
-          ) : (
-            <ul className="mt-4 columns-2 gap-x-6 sm:columns-3 sm:gap-x-10 lg:columns-4">
-              {roster.students.map((s) => (
-                <li key={s.enrollmentId} className="break-inside-avoid py-2 text-body break-words">
-                  {s.displayName ?? s.studentId.slice(0, 8)}
-                </li>
-              ))}
-            </ul>
-          )}
+          <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+            <h2 id={`${id}-live`} className="text-h2">
+              Live grid
+            </h2>
+            {presentToggle}
+          </div>
+          <LiveGrid sessionId={grid.id} onEnded={onEnded} onSession={onSession} present={present} />
         </section>
-      </main>
-    );
-  }
+      </div>
 
-  // No session running (PV6), or the class not read yet: v2's look, its parts 22 px apart.
-  return (
+      <section
+        aria-labelledby={`${id}-roster`}
+        className="mt-14 border-t border-border-default pt-8"
+      >
+        <h2 id={`${id}-roster`} className="text-h2">
+          Roster
+        </h2>
+        {/* Unread, it says so under the header with Try again, never "Loading…" here. */}
+        {roster === null ? (
+          rosterError ? null : (
+            <p role="status" className="mt-4 text-body text-text-secondary">
+              Loading…
+            </p>
+          )
+        ) : roster.students.length === 0 ? (
+          <p className="mt-4 text-body text-text-secondary">No students have joined yet.</p>
+        ) : (
+          <ul className="mt-4 columns-2 gap-x-6 sm:columns-3 sm:gap-x-10 lg:columns-4">
+            {roster.students.map((s) => (
+              <li key={s.enrollmentId} className="break-inside-avoid py-2 text-body break-words">
+                {s.displayName ?? s.studentId.slice(0, 8)}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </main>
+  ) : (
+    // No session running (PV6), or the class not read yet: v2's look, its parts 22 px apart.
     <main className={`flex flex-col gap-5.5 ${present ? `${PRESENT_PAGE} pt-8` : ''}`}>
       {/* The name over its line, Reports at the end; on a phone the name at the card titles' size and
           Reports on a line of its own. */}
