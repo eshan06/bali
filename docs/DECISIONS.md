@@ -16,12 +16,14 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `v2.css` at 1440 and 390 px (`v2.css`'s block under 640 px, as PhoneClassLive applies it). **Only
   while no session runs:** the page while one runs keeps its layout until PV7 (its nav, the
   header's code with New code, the roster under the grid), and the recap and How it ended theirs
-  until PV12, between the Start card and the roster, where ClassEnded puts the recap. **The
-  header:** the name over "28 students · no session running", the count the roster the page
-  already reads (no new read), "1 student" for one, "No session running" alone until the roster is
-  read, the line's place held while the class is read so nothing below it moves (as the Loading
-  card holds the Start card's 118 px); Reports a small secondary button where the nav's links were,
-  the menu's Home taking All classes' place (DESIGN.md §4, Links). **The length picker:** v2's
+  until PV12, between the Start card and the roster, where ClassEnded puts the recap. After the
+  bell the header says "no session running" until PV12 draws ClassEnded's "28 students · the
+  session ended at 9:55 AM". **The header:** the name over "28 students · no session running", the
+  count from the roster the page already reads (no new read), "1 student" for one, "No session
+  running" alone until the roster is read, the line's place held while the class is read so
+  nothing below it moves (as the Loading card holds the Start card's 118 px); Reports a small
+  secondary button where the nav's links were, the menu's Home taking All classes' place
+  (DESIGN.md §4, Links). **The length picker:** v2's
   segmented control, a grey track with each length a segment, the pick white and raised with a
   check, its radios clipped away and the focus ring on the segment. **The roster:** three columns in
   a card beside the join code's card, at every width as `v2.css` draws them. *Weighed:* today's
@@ -39,10 +41,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   code is being made; Cancel focused first, since nothing is lost until Make new code; a failure
   said inside it, the dialog opened again should the browser have closed it meanwhile; closed after
   a failure, the class read once more as before (#247's review); focus back on New code. *Weighed:*
-  a drawn scrim with a focus trap of our own, more code for what the platform does. **The live
-  header's New code opens the same dialog** in place of its raised card: one flow, not two, until
-  PV7, where it goes, since ClassLive draws none. **Three portal tokens, named and pinned**
-  (`tokens.test.ts`), as PV4 asks of a value `v2.css` draws that §1's facts don't list:
+  a drawn scrim with a focus trap of our own, more code for what the platform does. **During a live
+  session, New code opens the same dialog** in place of its raised card: one flow, not two, until
+  PV7 removes it from that header, since ClassLive draws none. **Three portal tokens, named and
+  pinned** (`tokens.test.ts`), as PV4 asks of a value `v2.css` draws that §1's facts don't list:
   `button-sm` (13.5/18, `Button`'s `size="sm"`: 34 px tall, 14 px in) and `segment` (14/18), both
   semibold, and the colour `scrim`, a dialog's backdrop, `rgba(33, 28, 21, 0.32)` (§1, §6), the
   shadows' warm black, written out in `@theme inline` since a `::backdrop` reads no variable in
