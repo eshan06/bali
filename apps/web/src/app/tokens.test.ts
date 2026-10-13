@@ -104,6 +104,11 @@ const V2_SIZES: Record<string, [string, string, number, string?]> = {
   'code-chip': ['17px', '26px', 600, '0.16em'],
   'code-card': ['40px', '48px', 600, '0.16em'],
   'code-present': ['34px', '44px', 600, '0.16em'],
+  // The side menu's (PV5), which v2.css draws and §1's facts don't list: the lockup's word, the
+  // name at its foot and the initials in its avatar.
+  lockup: ['16px', '22px', 600],
+  'menu-name': ['13px', '17px', 600],
+  'menu-initials': ['11px', '11px', 600],
 };
 /** The sizes §1 lists that the scale has, each its style: [style, size, line height]. */
 const ON_SCALE = [
@@ -434,6 +439,22 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
       expect(inline.get(`--color-${name}`), token.name).toBe(`var(--bali-${token.name})`);
     }
   });
+
+  it('beside them, only border-input and the side menu’s avatar, in v2.css’s primitives (PV5)', () => {
+    const named = [...inline.keys()].filter((k) => k.startsWith('--color-'));
+    const semanticNames = semantic(tokens.color.tokens).map((t) =>
+      t.name === 'focus-ring-color' ? '--color-focus-ring' : `--color-${t.name}`,
+    );
+    expect(named.filter((k) => !semanticNames.includes(k)).sort()).toEqual([
+      '--color-avatar-bg',
+      '--color-avatar-fg',
+      '--color-border-input',
+    ]);
+    expect(inline.get('--color-avatar-bg')).toBe('var(--bali-green-200)');
+    expect(inline.get('--color-avatar-fg')).toBe('var(--bali-green-800)');
+    // Its initials are small text: 4.5:1 at least, as every chip's ink on its fill.
+    expect(contrast(hexOf('green-800', 'light'), hexOf('green-200', 'light'))).toBeGreaterThan(4.5);
+  });
 });
 
 describe('every page and piece uses the tokens’ utilities, never a Tailwind default', () => {
@@ -474,20 +495,27 @@ describe('every page and piece uses the tokens’ utilities, never a Tailwind de
 describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
   // Cards sit straight on the page with their own hairline (DESIGN.md §4). Grey stays only where
   // the approved designs keep it: the grid's stale banner, the policy draft's banner and badge,
-  // and a control's hover, pressed or open state; a chip's fill is its state's own tint. A field
-  // is white in v2's look (PV4); the grey v2 adds (the menu's current item, the length picker's
-  // track, a table's head, the recap's name pills, a code's chip, the bars' tracks) comes with
-  // the step that draws each.
+  // and a control's hover, pressed or open state, the side menu's item on its own page (PV5)
+  // among them; a chip's fill is its state's own tint. A field is white in v2's look (PV4); the
+  // grey v2 adds (the length picker's track, a table's head, the recap's name pills, a code's
+  // chip, the bars' tracks) comes with the step that draws each.
   const src = fileURLToPath(new URL('../', import.meta.url));
   const files = sources(src).filter((file) => /\.tsx?$/.test(file));
 
   it('surface-sunken fills nothing else', () => {
     // Each fill with its variants: none at rest, or only a control's states.
-    const STATES = new Set(['hover', 'active', 'aria-pressed', 'aria-expanded', 'has-checked']);
+    const STATES = new Set([
+      'hover',
+      'active',
+      'aria-pressed',
+      'aria-expanded',
+      'aria-[current=page]',
+      'has-checked',
+    ]);
     const fills = (file: string) =>
-      [...readFileSync(file, 'utf8').matchAll(/((?:[\w-]+:)*)bg-surface-sunken\b/g)].map(
-        (m) => m[1] ?? '',
-      );
+      [
+        ...readFileSync(file, 'utf8').matchAll(/((?:[\w-]+(?:\[[\w=]+\])?:)*)bg-surface-sunken\b/g),
+      ].map((m) => m[1] ?? '');
     for (const file of files) {
       for (const variants of fills(file).filter(Boolean)) {
         const states = variants.split(':').filter(Boolean);

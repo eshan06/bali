@@ -7,9 +7,9 @@ import { TEXT_LINK, TextLink } from '@/components/text-link';
  * The draft outline a policy page shows until the lawyer's words arrive (Phase 6, C2a): a notice
  * at the top saying so, then the sections the page will have, each marked as a placeholder, then
  * where to ask. Public like the help page (P4): no API call, no state, rendered per request like
- * every page (the root layout's `dynamic`), and no Sign out bar (`PortalBar` skips it). It makes
- * no legal claim of its own: where a fact is already public on the help page, a line links there
- * instead of restating it. Drawn as the approved Entry & info design draws it: the notice as
+ * every page (the root layout's `dynamic`), and no Sign out or side menu (the shell skips it). It
+ * makes no legal claim of its own: where a fact is already public on the help page, a line links
+ * there instead of restating it. Drawn as the approved Entry & info design draws it: the notice as
  * DESIGN.md §4's calm banner, and the outline as one document sheet, each section's title with a
  * small Placeholder badge.
  */

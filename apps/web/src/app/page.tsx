@@ -1,6 +1,5 @@
 'use client';
 
-import type { MeResponse } from '@bali/shared';
 import { ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -12,20 +11,19 @@ import { CARD, CARD_ALONE } from '@/components/card';
 import { EntryPage } from '@/components/entry-page';
 import { Field } from '@/components/field';
 import { InviteCode } from '@/components/invite-code';
+import { useMe } from '@/components/shell';
 import { getAccessToken } from '@/lib/auth';
 import { CLASS_NAME_MAX, type CreateAnswer, createClass } from '@/lib/classes';
-import { errText } from '@/lib/errors';
 import { useApi } from '@/lib/use-api';
-
-/** The page under the bar (the Classes home canvas): 1400 px at most, its gutters the bar's (§5). */
-const PAGE = 'mx-auto max-w-[1400px] px-4 pt-10 pb-16 sm:px-10';
 
 /**
  * The classes home (the approved Classes home design): the teacher's classes as cards, each
  * opening its class page, and the create row under them on a card of its own; beside them on a
  * desktop, under them on anything narrower, the teacher's block. A create's failure is said under
  * its field with Try again; a made class is said by the list, read again. An account that doesn't
- * teach yet gets the invite code in place of all of it.
+ * teach yet gets the invite code in place of all of it. The account is the shell's one read of
+ * `/v1/me` (`useMe`), which the side menu names too, read again as the page opens; the page sits
+ * in the shell's frame beside the menu (PV5).
  */
 export default function HomePage() {
   const api = useApi();
@@ -33,8 +31,7 @@ export default function HomePage() {
   const id = useId();
   // A create under way: a second Enter before the page redraws sends nothing.
   const sending = useRef(false);
-  const [me, setMe] = useState<MeResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { me, error, load } = useMe();
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   // The last create's failure, said under the field; Try again sends the name again, but after a
@@ -44,11 +41,6 @@ export default function HomePage() {
   const redeemed = useRef(false);
   const heading = useRef<HTMLHeadingElement>(null);
 
-  const load = useCallback(() => {
-    setError(null);
-    api.get<MeResponse>('/v1/me').then(setMe, (e: unknown) => setError(errText(e)));
-  }, [api]);
-
   useEffect(() => {
     if (!getAccessToken()) {
       router.replace('/login');
@@ -57,11 +49,11 @@ export default function HomePage() {
     load();
   }, [load, router]);
 
-  // The account teaches now (T2): who it is, read again, so the classes view shows; no reload.
+  // The account teaches now (T2): who it is, read again, so the classes view shows, the side
+  // menu with it; no reload.
   const onTeacher = useCallback(() => {
     redeemed.current = true;
-    setMe(null);
-    load();
+    load(true);
   }, [load]);
 
   useEffect(() => {
@@ -98,14 +90,14 @@ export default function HomePage() {
       );
     }
     return (
-      <main className={PAGE}>
+      <main>
         {error ? (
           <div className={`mx-auto max-w-md ${CARD_ALONE}`}>
             <p role="alert">
               <span className="block text-h3">Couldn&apos;t load your account.</span>
               <span className="mt-2 block text-body text-text-secondary">{error}</span>
             </p>
-            <Button variant="secondary" onClick={load} className="mt-6">
+            <Button variant="secondary" onClick={() => load()} className="mt-6">
               Try again
             </Button>
           </div>
@@ -119,7 +111,7 @@ export default function HomePage() {
   }
 
   return (
-    <main className={PAGE}>
+    <main>
       <h1 ref={heading} tabIndex={-1} className="text-h1 text-balance">
         Your classes
       </h1>
@@ -135,7 +127,7 @@ export default function HomePage() {
                 Couldn&apos;t load your classes.{' '}
                 <span className="text-text-secondary">{error}</span>
               </p>
-              <Button variant="secondary" onClick={load}>
+              <Button variant="secondary" onClick={() => load()}>
                 Try again
               </Button>
             </div>

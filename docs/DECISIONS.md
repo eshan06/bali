@@ -8,6 +8,43 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-13** — **PV5: v2's side menu on every signed-in page but the invite page, Home and Help
+  its only items for now, and one read of who is signed in.** Built to
+  [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (version 21):
+  every teacher board's menu (Main, ClassLive), StudentZoom's bar at 720 px, PV1's PhoneHome and
+  PhoneClassLive at 390 px, and HomeNoName (`components/shell.tsx`, the root layout's; checked
+  against the boards rendered at the same widths, box for box). **Where it shows:** every page but
+  the signed-out ones (`/login`, `/auth/*`, Help and the policy pages keep their bars) and the
+  invite page, `/` for an account that doesn't teach, which keeps today's bar until PV15 draws it;
+  a class page and its reports always (*weighed:* by role on every page, which put a class page a
+  student opens under the bar with no gutters). **Its items:** Home and Help, each listed once its
+  page exists (Reports with PV13, Questions with L7b, Slides with M5, Classes with PV16), never a
+  dead or disabled link; Help is `/support`, under its own bar. **The page marked** by
+  `aria-current`, grey and semibold: Home on Home; nothing on a class page or its reports until
+  Classes and Reports join the menu (*weighed:* Home there, today's class list, which PV16 moves).
+  **The foot:** the initials (v2's rule, the first letter of the first two words, in any script),
+  the name, and Sign out as an icon named "Sign out"; with no name to show, Sign out in words alone
+  (HomeNoName), which is also the foot until the account is read, or when the read fails, so Sign
+  out is there from the first paint and never waits on the API. **One read of `/v1/me`**, the
+  shell's, shared with Home (`useMe`): a redeem turns the invite page into Home beside the menu
+  with no reload, and the menu and the page never disagree about who is signed in (*weighed:* the
+  shell reading on its own beside Home's read, one fact twice). The shell reads as a signed-in
+  page first opens, Home again as it opens (as before), and a page moving to another keeps the
+  answer. PV15 puts that read behind the 13+ check (W2's `homeFor`), so a web sign-in that never
+  set up the app still makes no account. **As drawn, and where the boards don't say:** in view as
+  the page scrolls, with its own scroll on a short window, as v2's own menu was (`v2-archive`'s
+  `Sidenav`, `sticky top-0 h-screen`); 216 px at every width, where v2.css's `flex: 1 1 216px`
+  grows it past 1476 px (no board shows it), the page left-aligned beside it; the lockup's word in
+  the brand's ink, as every board renders it (v2.css's `.app a` outranks `.brand`'s primary ink);
+  2 px between items, as v2.css draws them; the avatar's primitives named for it (`avatar-bg`,
+  `avatar-fg`, since `tokens.test.ts` bars Tailwind's palette names) and the menu's three sizes
+  added as portal tokens (`lockup` 16/22, `menu-name` 13/17, `menu-initials` 11/11, semibold), as
+  PV4 left them to the step that builds them; the icons at lucide's stroke, as PV4 noted. **The
+  page beside it:** the shell frames each signed-in page at v2's 1260 px and 30/36/56 (22/16/40
+  on a phone), so Home, a class page and its reports drop their own 1400 px and 40 px gutters,
+  their layouts otherwise as they were; the class page's grid fits five across at 1440 until
+  PV8's tiles; Present keeps the menu until PV9 takes it off.
+
 - **2026-10-13** — **PV4: v2's look's shared pieces on every page at once, built exactly as drawn
   (the owner, 2026-10-12): the buttons, the field, the chip and the card on its own; v2's radii and
   sizes as named portal tokens; Instrument Sans's italic, self-hosted.** Built to

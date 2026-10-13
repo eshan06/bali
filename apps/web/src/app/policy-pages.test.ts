@@ -25,7 +25,7 @@ const pages = {
 const draft = read('../components/policy-draft.tsx');
 const login = read('./login/page.tsx');
 const support = read('./support/page.tsx');
-const bar = read('../components/portal-bar.tsx');
+const shell = read('../components/shell.tsx');
 
 describe('the policy pages are a marked draft outline', () => {
   it.each(Object.entries(pages))(
@@ -101,9 +101,9 @@ describe('the policy pages are a marked draft outline', () => {
     expect(support).not.toContain('coming soon');
   });
 
-  it('shows no Sign out bar, like /login and /support', () => {
-    // The pattern as PortalBar declares it, tested on paths rather than pinned as text.
-    const source = /const SIGNED_OUT_PATHS = \/(.+)\/;/.exec(bar)?.[1];
+  it('shows no Sign out bar or side menu, like /login and /support', () => {
+    // The pattern as the shell declares it, tested on paths rather than pinned as text.
+    const source = /const SIGNED_OUT_PATHS = \/(.+)\/;/.exec(shell)?.[1];
     expect(source).toBeDefined();
     const signedOut = new RegExp(source ?? '');
     for (const path of ['/privacy', '/terms', '/privacy/', '/support', '/login']) {

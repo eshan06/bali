@@ -40,12 +40,6 @@ import {
 } from '@/lib/session-controls';
 import { useApi } from '@/lib/use-api';
 
-/**
- * The page's column: 1400 px at most, as the Class page design draws it, since the live grid is
- * its main object and six columns need the room; 40 px gutters from the desktop width (§5).
- */
-const PAGE = 'mx-auto max-w-[1400px] px-4 pb-16 sm:px-10';
-
 /** A hairline between the bell and the controls, 40 px tall as the buttons are. */
 const DIVIDER = 'h-10 w-px shrink-0 bg-border-default';
 
@@ -63,7 +57,8 @@ const LENGTH =
  * length picker and Start, the last session's recap and how it ended, with Present; while one runs,
  * the session's card (the bell, Extend, and End set apart), then the live grid with Present; then
  * the roster. In Present the header folds the bell, the code and the controls into one row, so a
- * class of 28 fits one 1080p screen. Each failure is said where it happened.
+ * class of 28 fits one 1080p screen. Each failure is said where it happened. It sits in the shell's
+ * frame beside the side menu (PV5), which sets its width and gutters.
  */
 export default function ClassDetailPage() {
   const api = useApi();
@@ -304,7 +299,7 @@ export default function ClassDetailPage() {
   );
 
   return (
-    <main className={`${PAGE} ${projecting ? 'pt-5' : 'pt-8'}`}>
+    <main>
       <nav aria-label="Class" className="flex justify-between gap-4">
         <Link href="/" className={NAV_LINK}>
           <ArrowLeft size={16} aria-hidden="true" />

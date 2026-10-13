@@ -86,9 +86,10 @@ query string, and the SSE stream is read with `fetch` + `ReadableStream` (not
 > be byte-for-byte identical, or Cognito rejects the exchange. That mismatch is the
 > most common first-run failure.
 
-**Sign out (S4a).** Every signed-in page, the invite-code screen's included, has a
-bar with Sign out (`PortalBar`, `src/components/portal-bar.tsx`, in the root layout;
-hidden on `/login`, `/auth/*` and the public pages `/support`, `/privacy` and `/terms`). It forgets the token, then sends the browser to
+**Sign out (S4a).** Every signed-in page has Sign out: at the foot of the side menu
+(`Shell`, `src/components/shell.tsx`, in the root layout; PV5), and on the invite-code
+screen in the bar over it (`PortalBar`, until PV15); neither on `/login`, `/auth/*` and the
+public pages `/support`, `/privacy` and `/terms`. It forgets the token, then sends the browser to
 `<NEXT_PUBLIC_COGNITO_DOMAIN>/logout?client_id=…&logout_uri=<origin>/login`, which ends
 the Cognito session and returns to `/login`, saying "You're signed out." So the next
 Sign in on a shared classroom computer asks who it is, instead of opening the last

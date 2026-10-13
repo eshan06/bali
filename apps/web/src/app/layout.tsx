@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 
-import { PortalBar } from '@/components/portal-bar';
+import { Shell } from '@/components/shell';
 
 import { instrumentSans, instrumentSansItalic, jetBrainsMono } from './fonts';
 
@@ -34,8 +34,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       className={`${instrumentSans.variable} ${instrumentSansItalic.variable} ${jetBrainsMono.variable}`}
     >
       <body className="min-h-dvh bg-surface-page font-sans text-text-primary antialiased tabular-nums">
-        <PortalBar />
-        {children}
+        <Shell>{children}</Shell>
       </body>
     </html>
   );
