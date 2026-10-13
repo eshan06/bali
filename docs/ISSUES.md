@@ -153,6 +153,10 @@ consultations.
   records may not be enough alone, because of "or otherwise".
 - Phase 6 gates on it.
 
+**Asked 2026-10-13** by the owner, App Store Connect → Contact Us, **case 102994872143**: the
+question as sent is in `docs/APP-STORE.md`, section 5.6. Waiting on Apple's answer, to be recorded
+here with its date.
+
 **Done when:** Apple's answer is on record, and the design matches it.
 
 ## 4. Phone bans at school

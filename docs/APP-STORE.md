@@ -429,46 +429,46 @@ ISSUES #3: Beta App Review applies §3.3.3(P), so the pilot's first external bui
 stopped by it. Ask before submitting the first external build, through App Store Connect →
 **Contact Us** → App Review → *(wording unsure)* a question about a guideline or the
 developer agreement, or through an App Review appointment at a Meet with Apple session.
-The draft to paste (the owner edits it; the facts are true of the code today):
+**Sent by the owner on 2026-10-13, case 102994872143** (App Store Connect → Contact Us), edited
+from the first draft: four questions, the fourth on students under 18. As sent:
 
 > Hello App Review,
 >
 > We'd like guidance before we submit our first build for external TestFlight testing.
 >
-> Bali (bundle ID com.bali.Bali, with its extensions com.bali.Bali.BaliMonitor and
-> com.bali.Bali.BaliShield; Family Controls distribution entitlement granted 2026-09-24)
-> helps a student keep their own iPhone out of the way during class. The student installs
-> Bali, approves Screen Time access for themselves with `.individual` authorization, joins
-> their class with a code, and taps their iPhone on their teacher's NFC tag when class
-> starts. Bali then shields all app and web categories (`.all()`) until the class's end
-> time. The student can hold Emergency Unlock at any time to remove the shields at once,
-> with or without a network; calls, FaceTime, Messages and Emergency SOS keep working; and
-> revoking Screen Time access or deleting the app ends it.
+> Bali (com.bali.Bali, with extensions com.bali.Bali.BaliMonitor and com.bali.Bali.BaliShield)
+> helps students keep their own iPhones out of the way during class. A student installs Bali,
+> approves Screen Time access for themselves with .individual authorization, and joins their
+> class with a code. When class starts, they tap their iPhone on the teacher's NFC tag. Bali then
+> uses Screen Time to shield every app and website category (.all()) until class ends. iOS never
+> shields some built-in apps, including Phone, FaceTime, Messages and Emergency SOS, so a student
+> can always call or text. Furthermore, the student can press and hold Emergency Unlock at any
+> time to remove the shields right away, even offline. Turning off Screen Time access or deleting
+> the app also removes them.
 >
-> Bali never uses a FamilyActivityPicker and never receives which apps the student has or
-> uses. The teacher sees only what Bali records itself, which the student reads before
-> joining: whether each student is focused, unlocked (with an optional reason), or has
-> turned Screen Time access off; the last contact during class; tap-in and end times; and
-> leaving the class.
+> Bali never uses FamilyActivityPicker and never sees which apps a student has or uses. During
+> class, the teacher sees whether each student is focused, unlocked, or has turned off Screen Time
+> access. The teacher also sees when each student tapped in, when their session ended, when Bali
+> last heard from their phone, and whether they left the class.
 >
-> Our first users are adult students at Vanderbilt University, on their own iPhones, in
-> one professor's class.
+> Our first pilot is adult students at a university, on their own iPhones. We plan to expand to
+> high schools, where students would be 13 to 17 and also use their own iPhones.
 >
-> Our questions about section 3.3.3(P) of the Apple Developer Program License Agreement:
+> We have four questions about section 3.3.3(P) of the Developer Program License Agreement:
 >
-> 1. Is this use, where each student approves Family Controls on their own device to
->    manage their own focus, within "offering individuals the ability to manage their
->    devices to enable focus and productivity", given that a teacher starts the class
->    session?
-> 2. Does sharing with the teacher the state Bali records itself (focused, unlocked,
->    Screen Time access off), with the student's consent before joining, fall under the
->    restriction on sharing data "received through the Family Controls Framework or
->    otherwise"? If so, what may the teacher see?
-> 3. How would you like to review a feature that needs our NFC tag? We plan to include a
->    screen recording of the tap and accounts for everything around it.
+> 1. Each student turns on Family Controls on their own device to manage their own focus. Does
+>    that count as "offering individuals the ability to manage their devices to enable focus and
+>    productivity," even though a teacher starts the class session?
+> 2. Bali shows the teacher the state it records itself (focused, unlocked, or Screen Time access
+>    off), and the student agrees to this before joining. Does that fall under the restriction on
+>    sharing data "received through the Family Controls Framework or otherwise"? If it does, what
+>    may the teacher see?
+> 3. The main feature needs our NFC tag. How would you like to review it? We plan to include a
+>    screen recording of the tap and test accounts for everything else.
+> 4. Would any of your answers change for high school students under 18?
 >
-> Thank you,
-> [🔧 name, team, contact]
+> Thanks,
+> (the owner)
 
 Record the answer, its date and case number in ISSUES #3, and the review notes' top line
 (section 2).
