@@ -88,9 +88,11 @@ query string, and the SSE stream is read with `fetch` + `ReadableStream` (not
 
 **Sign out (S4a).** Every signed-in page has Sign out: at the foot of the side menu on a
 teacher's pages (`Shell`, `src/components/shell.tsx`, in the root layout; PV5), and in the bar
-over the page for any other account, the invite-code screen's included (`PortalBar`, until
-PV15); none on the projector (Present, whose toggle brings the menu back), `/login`, `/auth/*`
-and the public pages `/support`, `/privacy` and `/terms`. It forgets the token, then sends the browser to
+over the page for any other account, the invite-code screen's included, and over a failed read of
+the account, said in the page's place with Try again (`PortalBar`, until PV15); none while the
+account is read, when the page's place says Loading… alone (PV5b), nor on the projector (Present,
+whose toggle brings the menu back), `/login`, `/auth/*` and the public pages `/support`, `/privacy`
+and `/terms`. It forgets the token, then sends the browser to
 `<NEXT_PUBLIC_COGNITO_DOMAIN>/logout?client_id=…&logout_uri=<origin>/login`, which ends
 the Cognito session and returns to `/login`, saying "You're signed out." So the next
 Sign in on a shared classroom computer asks who it is, instead of opening the last

@@ -8,6 +8,34 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-13** — **PV5b: the shell's read of the account, fixed as the owner approved ("yes
+  fix", on three of PV5's Claude Review warnings, #352).** Built in `components/shell.tsx` with the
+  states as drawn and shipped, no new words. **(1) A blank window:** the page waited hidden for the
+  account, Home's "Loading…" with it, so a first open, and a redeem's fresh read, showed nothing,
+  not even Sign out. Now the page's place says Loading… while the account is read (`AccountUnread`,
+  HomeStates' "Loading, before the account answers": Home's own line, moved into the shell), with no
+  menu or bar, so the menu still comes only once the account reads as a teacher and nothing flashes
+  on the invite page. **(2) A missing menu:** only Home read a failed account again, so a class page
+  kept today's bar, its content and nothing said until the teacher went Home. Now every signed-in
+  page waits for the account, its failure said in the page's place, "Couldn't load your account."
+  over `errText`'s words (`CANT_REACH` when no answer came) with Try again, under today's bar with
+  Sign out (HomeStates' "The account didn't load": Home's card, moved); Try again reads it again,
+  and so does the next page opened (`accountStep`'s `newPage`), never its own page as the failure
+  lands, so never a loop of reads. PV5's test comment that said so is now true, and tested. **(3) A
+  stale failure:** `readAccount` numbers each read, and one that settles after a newer one began is
+  dropped, its failure or its answer, so a past failure never shows over fresh data. Sequenced, not
+  cancelled: the API client has no abort, and a dropped answer costs nothing. *Weighed:* the page
+  shown under its failure, as PV5 had it, with the shell's line above it, which kept a class page
+  usable when its own reads worked; but two "Couldn't load" lines could stack there, a composition
+  no board draws, and a teacher's page would show for an account not read as one, so the page waits
+  on a failure as it does on a read. The bar during the read, for Sign out: it would flash before a
+  teacher's menu, which PV5's ruling rules out, so one round trip shows Loading… alone. Keeping the
+  old answer through a redeem's fresh read (the review's other suggestion): the invite card would
+  hold "Redeeming…" and, should that read fail, stay there with nothing said; the redeem still
+  forgets it first. The class page's own Loading card there: its header carries Reports, a
+  teacher's control, before the account reads; one line on every page, Home's. Rode along:
+  `CANT_COPY` in `errors.test.ts`'s word checks (PV6's review).
+
 - **2026-10-13** — **PV6: a class's page before a session in v2's look, built exactly as drawn;
   New code's confirm a native dialog; Copy, new.** Built to
   [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (version 21):
