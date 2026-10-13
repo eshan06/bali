@@ -36,6 +36,51 @@ a real decision? Add a dated entry at the top: what was decided and why.
   (a query is ignored, as `GET /v1/blocks` ignores one). Showing it only while a class is live is the
   page's (PV17c).
 
+- **2026-10-12** — **PV1 approved: what no board drew, drawn and ruled; and the class order
+  fixed.** Drawn on [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4)
+  (three rows titled "PV1, for your approval"), ruled by the owner as the boards landed, and the set
+  approved by the owner the same night (canvas version 21), with Present after the bell changed to
+  "Class is over" alone. **A teacher's page at phone
+  width** (390 px; the portal in a phone's browser: there is no teacher app) is drawn as a class
+  live and as Home. The class page's grid is **two columns of short tinted tiles**, every tile one
+  size, each its state with at most one detail (an unlock's reason, or Clock off), the rest a tap
+  away in the student panel: the owner's pick of two (*weighed:* one tinted row per student, 35 px
+  rows, under the usual 44 px tap size). Its header is compact on a phone: the countdown beside the
+  class name, the name at the card titles' 18/24, and +5, +10 and End on one row. **Present is
+  hidden under 640 px** on the class page and on Home's live card (it drives a projector; nobody
+  presents from a phone), and **so is Recent activity** (the live card keeps the latest unlock).
+  All of it is `v2.css`'s block for under 640 px, so no approved board changes. **L7c's Questions
+  are on a session's report page only**, not under the class page's recap (*weighed:* both; the
+  class page stays short after the bell, the report a click away). **The classes home's "Questions
+  and slides" card is gone:** the side menu's Questions and Slides take its place (PV1's first item,
+  confirmed). **The two corrections:** the line under "Focused the whole time", on ClassEnded and
+  ReportOpened alike, is now "From their own tap-in to the end of the session, they never unlocked,
+  turned protection off, went silent or left. A late tap-in still counts." (the end, not the bell:
+  a teacher can end early); and ReportOpened's recap card is titled "This session" (the shipped
+  report's words), its repeated date and its "Open its report", a link to its own page, gone.
+  **The rest, as drawn:** Present after the bell says "Class is over" alone, the figures staying
+  on the class page's recap (*weighed:* the recap's four totals, which students could misread:
+  "Silent 13 min"); W5's full-screen slide closes by itself when a question opens, the slides stop
+  or class ends (*weighed:* a bar with Answer it); several unlock pop-ups stack, newest on top,
+  each until it is closed (*weighed:* a Close all from three); Home's Last session is hidden until
+  a class's first session ends (*weighed:* "No sessions yet."), and Recent activity has no empty
+  state, since a live class's own start is always listed; Help, the policy pages and the sign-in
+  callback (signing in, and its failure) in v2's look with today's words; an empty Classes page;
+  a teacher with no display name ("Good afternoon", and Sign out in words at the menu's foot);
+  Copy's "Copied" and its failure line ("Bali couldn't copy the code. Select it and copy it
+  yourself."); the student panel loading, failing, and in each state ("Zuri Mensah hasn't tapped
+  in this session." before a tap-in); Home's live card, Last session and Recent activity loading
+  and failing, each with Try again. The panel's rare Unknown state is not drawn: only its chip
+  would change. Help's "Reports, on the class page, lists your past sessions." stays true until
+  Reports joins the menu; PV13 rewords it to "Reports, in the menu, lists each class's past
+  sessions." (the owner's OK).
+  **The class order** (PV2's review, #344): `getTaughtClasses` and `getEnrolledClasses` read with
+  no `ORDER BY`, so an update to a class row (New code, a rename) can move that class in its list
+  on the next read, and today's portal home shows the list as read. The owner: fix it (PV3b: a
+  teacher's classes oldest first, a student's in the order they joined). *Found too:* dev's
+  Cognito pool verifies no attribute, so a sign-up on its hosted page makes an unconfirmed account
+  and ends on Cognito's error page (GOTCHAS; the console fix is the owner's).
+
 - **2026-10-12** — **PV2: a teacher's own class's summary on `GET /v1/me`, one optional object, its
   "over" the engine's one rule.** Home's and Classes' rows ("28 students · last session today, 8:00
   AM", "no sessions yet", the Live chip) and Home's Last session card ("9:05 AM to 9:55 AM") need, per
