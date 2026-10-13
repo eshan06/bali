@@ -64,8 +64,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
 - **2026-10-12** — **PV1 approved: what no board drew, drawn and ruled; and the class order
   fixed.** Drawn on [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4)
   (three rows titled "PV1, for your approval"), ruled by the owner as the boards landed, and the set
-  approved by the owner the same night, with Present after the bell changed to "Class is over"
-  alone. **A teacher's page at phone
+  approved by the owner the same night (canvas version 21), with Present after the bell changed to
+  "Class is over" alone. **A teacher's page at phone
   width** (390 px; the portal in a phone's browser: there is no teacher app) is drawn as a class
   live and as Home. The class page's grid is **two columns of short tinted tiles**, every tile one
   size, each its state with at most one detail (an unlock's reason, or Clock off), the rest a tap
