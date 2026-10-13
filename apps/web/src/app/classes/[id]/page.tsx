@@ -449,7 +449,7 @@ export default function ClassDetailPage() {
       <header className="flex flex-wrap items-center gap-x-4.5 gap-y-3.5 max-sm:gap-x-3.5">
         <div className="min-w-0 max-sm:flex-1">
           <h1
-            className={`text-page-title wrap-anywhere max-sm:text-h3 ${klass ? '' : 'text-text-tertiary'}`}
+            className={`text-page-title text-balance wrap-anywhere max-sm:text-h3 ${klass ? '' : 'text-text-tertiary'}`}
           >
             {klass?.name ?? '…'}
           </h1>

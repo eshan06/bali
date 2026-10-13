@@ -24,7 +24,7 @@ const CODE =
  * native modal, so the page behind it is inert and Escape closes it; shown only while open.
  */
 const DIALOG =
-  'm-auto mt-30 w-115 max-w-[calc(100%-48px)] flex-col gap-4.5 rounded-md bg-surface-card p-6 text-text-primary shadow-3 backdrop:bg-scrim open:flex';
+  'm-auto mt-30 w-115 max-w-[calc(100%-48px)] flex-col gap-4.5 overscroll-contain rounded-md bg-surface-card p-6 text-text-primary shadow-3 backdrop:bg-scrim open:flex';
 
 /**
  * The class's join code. Before a session, on its own card (`card`; ClassBefore, CopyStates): the

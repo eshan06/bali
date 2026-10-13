@@ -78,7 +78,9 @@ describe('the class page before its class is read', () => {
 
 describe('the class page while no session runs (ClassBefore)', () => {
   it('heads it with the name over "28 students · no session running", Reports at the end', () => {
-    expect(before).toMatch(/className=\{`text-page-title wrap-anywhere max-sm:text-h3 /);
+    expect(before).toMatch(
+      /className=\{`text-page-title text-balance wrap-anywhere max-sm:text-h3 /,
+    );
     expect(before).toMatch(
       /roster\s*\?\s*`\$\{students\(roster\.students\.length\)\} · no session running`\s*:\s*'No session running'/,
     );
