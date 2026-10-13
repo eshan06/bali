@@ -510,7 +510,7 @@ why, Open owner items the owner's queue.
   polling, so it can no longer miss its window (it failed main's run for #244).
 
 **The pilot's critical path.** The prod TestFlight build (✅ uploaded) → the owner's phone
-test on prod, a block tap included → the privacy page (C2, the lawyer's words) → the external
+test on prod, a block tap included (✅ the tap, 2026-10-12) → the privacy page (C2, the lawyer's words) → the external
 TestFlight group `Vanderbilt pilot` and Beta App Review (`docs/APP-STORE.md`, section 5) →
 Apple's answer on §3.3.3(P) (ISSUES #3; ask before the first external build); and before the
 first class, production backups (L0b, the owner's console step; the owner, 2026-10-12).
@@ -975,7 +975,7 @@ Researched 2026-10-05; findings in [`docs/ROADMAP-RESEARCH.md`](ROADMAP-RESEARCH
 6. Vercel `bali-portal`: an Ignored Build Step `[ "$VERCEL_GIT_COMMIT_REF" != "main" ]`, so PR previews (which fail without env, by design) stop building.
 
 
-- 📱 Tap a block on the first prod TestFlight build (build 4): #236 changed the NFC entitlement to TAG alone and `BlockReader` uses `NFCNDEFReaderSession`. Apple's docs say that works, but no device has confirmed it (B6's check ran under NDEF and TAG). If the tap fails, NDEF has to come back, and the new `ios.yml`/`testflight.yml` guards with it.
+- ✅ Tap a block on the prod TestFlight build: done by the owner on 2026-10-12, and it worked as usual, so the NFC entitlement as TAG alone (#236, `BlockReader`'s `NFCNDEFReaderSession`) is confirmed on a device; NDEF stays out.
 - 🔧 Sentry: confirm monitor `api-sweep`'s `production` environment is active and alerting (dev checks in to the same slug, #239's review; runbook 6, step 2).
 - 🚨 Apple's developer agreement §3.3.3(P) on Family Controls (ISSUES #3): ask App Review now (Phase 6).
 - Confirm the state of the later K-12 pilot (likely Los Angeles or New Jersey) and its school's phone policy (ISSUES #4). The first pilot is preliminary: adults at Vanderbilt, on their own phones.
