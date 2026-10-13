@@ -51,6 +51,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   some browsers. **The boards' tight lines:** `v2.css`'s `.app p { margin: 0 }` outranks `.help`'s
   and `.refusal`'s 8 px, so the boards draw the code's line right under its chip and a refused
   length right under its help: built as drawn; the shared Field keeps its help's 8 px (PV4's).
+  **At phone width** the roster's three columns wrap names onto two lines and the length picker
+  puts "Other…" on a second row; the canvas draws no phone version of this page, and the owner
+  ruled (2026-10-13) to leave it for now, issue #354 tracking a revisit with a phone version drawn
+  for the owner first.
 
 - **2026-10-13** — **PV4b: every lucide icon on the portal at the canvas's 1.75 stroke, set once
   (the owner's ruling on PV4's review).** [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4)
