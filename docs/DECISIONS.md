@@ -8,6 +8,50 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-14** — **PV7: a class's page while a session runs in v2's look, built exactly as
+  drawn; a lost stream as the floating pill, a quiet one as the stone line; Present's page as it was
+  until PV9.** Built to [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4)
+  (version 21): ClassLive, ClassStale and ClassStates' lines during a session, checked box for box
+  against the boards rendered from their own markup and `v2.css` at 1440 px, and PhoneClassLive at
+  390 (#375). **The header** (`components/live-header.tsx`): the 44 px ring, its arc the share of
+  the session left (the start from the Start's answer or the first snapshot, which never moves; the
+  bell only ever later), the name over "Live · 25 of 28 joined · join code VMAF7E", "Live · join
+  code" alone until the grid is counted; the countdown on this computer's clock to the server's
+  bell, "23:14" and "1:05:00" past an hour, rounded up so the bell reads 0:00, read again as each
+  second of the time left turns over (the bell's own milliseconds, so no second is skipped or shown
+  twice) and no more once the bell is past, "…" until the bell is known; "ends 9:55 AM" under it at
+  12.5/17, a new portal size (`countdown-sub`); +5, +10 and End at the end, End 8 px apart. On a
+  phone as PhoneClassLive draws it. **No New code while a session runs:** ClassLive draws none, so
+  the code is in the line, and New code stays on the card before a session. **The counts**
+  (`LiveCounts`): six small chips in the grid's own words, icons and tints (`CHIP`, exported from
+  `live-grid.tsx`), the count first, a zero too, so none comes and goes; each tile once, both Left
+  tiles under Left as ClassLive counts "Left · unlocked", Unknown under none but as joined (it
+  tapped in; this tab can't say more); "joined" is every tile but Not here, of every tile the grid
+  shows. `LiveGrid` counts (`stateCounts`) and tells the page only when a count moves, by session,
+  so another session's counts never show. Present beside them, small, hidden under 640 px (PV1).
+  **The stream's health, as the boards draw it:** a lost stream (the client reconnecting) as
+  ClassStale's floating pill (white, a strong edge, `shadow-2`, a stone-500 dot, the new colour
+  `pip`), 14 px from the page's top, on a layer over the page that takes no room or clicks; a
+  stream open but quiet as ClassStates' stone line over the grid ("over the grid, stone, never
+  amber"), as before. DESIGN.md §4 said the pill for both; the boards win for the screens they draw,
+  so §4 now says so. *Weighed:* the pill for both, one look, but a composition no board draws. **The
+  pill stays in view as the page scrolls** (sticky on its layer), where ClassStale draws it absolute
+  at the page's top: at rest the two are one, and a grid scrolled to its last row, a phone's
+  especially, still says it may be out of date. Not announced (no live region): its seconds change
+  every second, as the old line's did. **No roster** while a session runs: the grid names every
+  student. **ClassStates' said lines** right under the header, Try again small, a grid that didn't
+  load too (`livePage` on `LiveGrid`). **Present's page as it was** until PV9 draws it (its nav, its
+  header with the bell, the code with New code and the controls, the old line for a lost stream,
+  the roster under the grid), and How it ended as it was until PV12: one tree for both views, so the
+  grid never reboots or reconnects as Present turns on and the toggle keeps focus (checked in the
+  browser: the same grid node, focus on the toggle). **PV6's `LABEL` comment** now says 32 px, its
+  12 px and its section's 20 px gap, as ClassBefore draws it (PV6's review). *Found, left for PV8:*
+  the pill flashes for 60–100 ms as each page loads, since `staleness` reads the stream's
+  `connecting` as reconnecting; the old line did the same. *Size:* 565 changed lines without tests,
+  over the ~400 a step should be; about 100 are Present's kept parts re-indented and about 120
+  comments, and the conductor kept it as one PR, since the header, the counts and the pill read the
+  same grid and a split would ship a page that doesn't match ClassLive.
+
 - **2026-10-14** — **The owner's answers to PLAN's open questions, and two calls of their own.**
   Asked on 2026-10-13 and again today, each with the conductor's recommendation. **PV5b's
   whole-page error stays:** when the account can't load, "Couldn't load your account." with Try
