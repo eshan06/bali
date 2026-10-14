@@ -9,7 +9,8 @@ concrete exploit, personal data that the account deletion, a school's disposal, 
 or the student's export misses, and an existing test loosened, skipped or deleted with no behavior
 change named in the PR's description now block, named in `claude-review.yml`'s rules, which santa's
 reviewers copy; Claude Review and santa judge a PR by `main`'s rules (the prompt, CLAUDE.md and
-ARCHITECTURE.md), never its own copies; santa's Reviewer B reviews as an attacker; a
+ARCHITECTURE.md), never its own copies; a push after a failed review must clear each of its
+blockers before the review may pass; santa's Reviewer B reviews as an attacker; a
 `claude-review.md` the PR commits no longer counts as the verdict; both Claude workflows run Opus
 5.5 (`claude-opus-5-5`). Its PR's own Claude Review is red by design until the owner's ruleset
 toggle (GOTCHAS). CodeQL's default setup is on
