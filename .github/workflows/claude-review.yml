@@ -106,8 +106,8 @@ jobs:
             deletion has none, so check what they can't: free text, names,
             data keyed another way.
 
-            Do NOT nitpick style that lint already enforces, and do NOT demand
-            work outside this PR's scope.
+            Do NOT nitpick style that lint already enforces,
+            and do NOT demand work outside this PR's scope.
 
             Write your review to a file named `claude-review.md` in the repo
             root:
