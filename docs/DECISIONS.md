@@ -8,6 +8,33 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-13** — **The reviewers block on security holes and on personal data the privacy paths
+  miss, and both Claude workflows run Opus 5.5 (the owner's ruling, in chat: "security should be a
+  blocker, student data reaching deletion and export paths should also be a blocker"; "we
+  definitely need to switch to Opus 5.5").** **Two new BLOCKERs** in `claude-review.yml`'s rules,
+  inside the text santa-loop copies to its reviewers (its Step 1), so the gate and santa read the
+  same rules: a security hole with a concrete exploit, from the attacker's input to the harm
+  (injection of SQL, a command or a header, XSS, path traversal, SSRF, CSRF, input used unvalidated
+  at a trust boundary, authorization that lets one student, teacher or school reach another's data,
+  secrets or personal data in logs or error responses); and a new or changed table, column or stored
+  field holding a student's or a teacher's personal data that the account deletion, the school
+  disposal, the retention run or the student-record export does not handle. *Why:* the owner's
+  review policy of 2026-09-23 already blocked on security holes, but the rulebook never named them,
+  so a reviewer could weigh one as a WARN; and the coverage guards (`STUDENT_RECORD_COVERAGE`,
+  `SCHOOL_DISPOSAL_COVERAGE`, `RETENTION_COVERAGE`) see only foreign keys to `users` (the
+  disposal's to `schools` too), and the account deletion has none, so free text, a name, or data
+  keyed another way (`cognito_deletions`, keyed to the Cognito user) met no guard. The bar stays:
+  file:line and a concrete failure, no style, nothing outside the PR's scope. **Opus 5.5:**
+  `--model claude-opus-5-5` in `claude-review.yml` and `claude.yml`, where `claude-opus-5` had run
+  since Phase 2; santa's reviewers already ran Opus 5.5 (`model: opus`), so the final gate was the
+  older model. The id was proven on the owner's subscription first (`claude -p --model
+  claude-opus-5-5` answered), since a wrong one would fail every PR's review and its fix would take
+  the toggle again. As with every edit to these two files, this PR's own Claude Review is red by
+  design, and it merges by the owner's ruleset toggle (GOTCHAS). **CodeQL:** GitHub's default setup,
+  turned on today by the conductor as a repository setting (runbook 5, step 5): JavaScript/TypeScript
+  and GitHub Actions, the default query suite; Swift not yet, since its default setup needs a macOS
+  build of the xcodegen project; not a required check yet.
+
 - **2026-10-13** — **PV4c: PV4b's tests of the icons' stroke fail where the rule would quietly stop
   holding (the owner's "fix", on PV4b's review, #353).** Test only (`tokens.test.ts`); nothing drawn
   changes. **The rule:** read without comments, at the base layer's top and in nothing within it, the

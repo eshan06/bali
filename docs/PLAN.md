@@ -4,7 +4,13 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-10-13 (Central) — the redesign's state at a pause: PV0–PV6 done with PV3b, PV4b,
+_Last updated: 2026-10-13 (Central) — the reviewers (the owner's ruling): a security hole with a
+concrete exploit, and personal data that the account deletion, a school's disposal, the retention
+run or the student's export misses, now block, named in `claude-review.yml`'s rules, which santa's
+reviewers copy; both Claude workflows run Opus 5.5 (`claude-opus-5-5`). Its PR's own Claude Review
+is red by design until the owner's ruleset toggle (GOTCHAS). CodeQL's default setup is on
+(JavaScript/TypeScript and GitHub Actions; not a required check). Next: PV7. Before it,
+the redesign's state at a pause: PV0–PV6 done with PV3b, PV4b,
 PV4c and PV5b; next PV7, a class live. The notes for coming steps are on their lines (PV7, PV13, PV15,
 PV17), and two of the owner's answers are pending under Open owner items ("To answer"). Before it,
 PV4c: PV4b's tests of the icons' stroke now fail where the rule
@@ -669,7 +675,7 @@ Not PRs — the owner, the lawyer and the school (under Open owner items):
 - Decision: who sees unlock reasons. (How accounts are made: decided 2026-10-04, self sign-up gated to `@vanderbilt.edu`, S11; MFA Optional with TOTP; the portal on `<project>.vercel.app` for now)
 - 🔧 Cognito for prod: self sign-up gated (S11's Lambda) ✅, a password policy ✅, MFA Optional (TOTP) ✅, MFA on the AWS root ✅; to check: no password-auth clients, unused clients deleted, user-existence errors off; skipped for the pilot: threat protection, CloudTrail — runbook: `docs/RUNBOOKS.md`, 2 (its status list). In dev's pool, candidates to delete: the unreferenced `bali-ios` (`6qcvcp0ubqmb8gunkt1d6dpkeo`) and the old `bali-ios-dev` (`33qr62dl4ee4inigneidmfe2s9`, made with a secret); the clients in use are `bali-ios-dev-public` and `bali-web-dev` (`docs/DEPLOY.md`)
 - 🔧 Railway for prod: the database on the private network only ✅, `CORS_ORIGINS` set exactly ✅, a long `INTERNAL_API_KEY` ✅; 2FA deferred by the owner; **no backups yet, so no restore drill**: backups before the Vanderbilt pilot's first class (L0b; the owner, 2026-10-12, withdrawing the ruling of 2026-10-05), the drill once a backup exists — runbooks: `docs/RUNBOOKS.md`, 1 and 4
-- 🔧 GitHub: a ruleset and CODEOWNERS so no PR changes `.github/**`, the `Dockerfile` or `.railway/` without the owner; secret scanning with push protection; private vulnerability reporting; CodeQL; 2FA — runbook: `docs/RUNBOOKS.md`, 5
+- 🔧 GitHub: a ruleset and CODEOWNERS so no PR changes `.github/**`, the `Dockerfile` or `.railway/` without the owner; secret scanning with push protection; private vulnerability reporting; CodeQL ✅ (default setup, 2026-10-13: JavaScript/TypeScript and GitHub Actions; Swift not yet; not a required check); 2FA — runbook: `docs/RUNBOOKS.md`, 5
 - The school: its phone policy allows Bali, its FERPA notice names vendors as school officials, the agreement is signed, parents are told, students with 504 or IEP plans are accommodated
 
 ### Portal redesign (v2's look) steps (PV; one PR each; 👀 = the owner looks at screenshots)
