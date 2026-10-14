@@ -42,20 +42,21 @@ import { makeTestIssuer, type TestIssuer } from './helpers/test-issuer.js';
  * (`OPTIONS *`), registered only where a deploy names origins, answers with
  * headers and no data: cors.test.ts holds it.
  *
- * Every /v1 route answers six callers, in this order: no token; a token
+ * Every /v1 route answers seven callers, in this order: no token; a token
  * validly signed for an app client the API doesn't accept (the owner's
  * account, so only the client id is wrong); the class's student, in its
- * session; a student of another class; that class's teacher; and the owner,
- * this class's teacher. /internal/* answers no key, a wrong key and the right
- * key; /healthz, anyone. A route anywhere else fails the guard, whatever its
- * row, until `callersOf` says who can call it: a new prefix (a /v2) is never
- * public by default.
+ * session; a student of a class at another school; that class's teacher; a
+ * colleague, a teacher at the owner's school with a class and block of their
+ * own; and the owner, this class's teacher. /internal/* answers no key, a wrong
+ * key and the right key; /healthz, anyone. A route anywhere else fails the
+ * guard, whatever its row, until `callersOf` says who can call it: a new prefix
+ * (a /v2) is never public by default.
  *
  * Each row runs in a world of its own (`world`), so no row's write reaches
  * another's. And a 2xx to a stranger names nothing of this world's (`hidden`)
  * — its session, its student, their enrollment, tap and unlock, the owner,
- * their block, saved question and deck, and the class unless the request carries
- * its join code — so
+ * their block, saved question and deck, the class unless the request carries
+ * its join code, and to a caller from another school the school — so
  * the routes no one is refused (an unlock, a check-in, a tap) are pinned too.
  */
 
@@ -63,8 +64,9 @@ const SIGNED_IN = [
   'no token',
   'another app',
   'student',
-  'another student',
-  'another teacher',
+  'another school’s student',
+  'another school’s teacher',
+  'colleague',
   'owner',
 ] as const;
 const KEYED = ['no key', 'a wrong key', 'the right key'] as const;
@@ -80,7 +82,11 @@ function callersOf(url: string): readonly Caller[] | undefined {
 }
 
 /** Callers with no claim on this world: a 2xx to one of them names nothing of it. */
-const STRANGERS = new Set<Caller>(['another student', 'another teacher']);
+const STRANGERS = new Set<Caller>([
+  'another school’s student',
+  'another school’s teacher',
+  'colleague',
+]);
 
 /** What each caller is answered, in `callersOf`'s order. */
 // prettier-ignore
@@ -90,68 +96,74 @@ const MATRIX = {
   //                                        no key  wrong  right
   'POST /internal/sweep':                   [401,   401,   200],
   'POST /internal/sessions/expire':         [401,   401,   200],
-  //                                        none  app  student  other    other    owner
+  //                                        none  app  student  other    other    colleague  owner
+  //                                                            school's school's
   //                                                            student  teacher
-  'GET /v1/me':                             [401, 401, 200,     200,     200,     200],
-  'PATCH /v1/me':                           [401, 401, 200,     200,     403,     403],
-  'DELETE /v1/me':                          [401, 401, 200,     200,     409,     409],
-  'GET /v1/me/history':                     [401, 401, 200,     200,     403,     403],
-  'GET /v1/me/activity':                    [401, 401, 403,     403,     200,     200],
-  'PUT /v1/me/push-token':                  [401, 401, 200,     200,     403,     403],
-  'DELETE /v1/me/push-token':               [401, 401, 200,     200,     403,     403],
-  'GET /v1/me/age-check':                   [401, 401, 200,     200,     200,     200],
-  'PUT /v1/me/age-check':                   [401, 401, 200,     200,     200,     200],
-  'POST /v1/taps':                          [401, 401, 200,     200,     200,     200],
-  'POST /v1/taps/:eventId/unlock':          [401, 401, 200,     200,     200,     200],
-  'PATCH /v1/unlocks/:eventId':             [401, 401, 200,     404,     404,     404],
-  'GET /v1/join-codes/:code':               [401, 401, 200,     200,     403,     403],
-  'POST /v1/enrollments':                   [401, 401, 200,     200,     403,     403],
-  'DELETE /v1/enrollments/:id':             [401, 401, 200,     403,     403,     200],
-  'POST /v1/teacher-invites/redeem':        [401, 401, 409,     409,     409,     409],
-  'POST /v1/classes':                       [401, 401, 403,     403,     200,     200],
-  'GET /v1/classes/:id':                    [401, 401, 403,     403,     403,     200],
-  'PATCH /v1/classes/:id':                  [401, 401, 403,     403,     403,     200],
-  'GET /v1/classes/:id/roster':             [401, 401, 403,     403,     403,     200],
-  'GET /v1/classes/:id/reports/sessions':   [401, 401, 403,     403,     403,     200],
+  'GET /v1/me':                             [401, 401, 200,     200,     200,     200,       200],
+  'PATCH /v1/me':                           [401, 401, 200,     200,     403,     403,       403],
+  'DELETE /v1/me':                          [401, 401, 200,     200,     409,     409,       409],
+  'GET /v1/me/history':                     [401, 401, 200,     200,     403,     403,       403],
+  'GET /v1/me/activity':                    [401, 401, 403,     403,     200,     200,       200],
+  'PUT /v1/me/push-token':                  [401, 401, 200,     200,     403,     403,       403],
+  'DELETE /v1/me/push-token':               [401, 401, 200,     200,     403,     403,       403],
+  'GET /v1/me/age-check':                   [401, 401, 200,     200,     200,     200,       200],
+  'PUT /v1/me/age-check':                   [401, 401, 200,     200,     200,     200,       200],
+  'POST /v1/taps':                          [401, 401, 200,     200,     200,     200,       200],
+  'POST /v1/taps/:eventId/unlock':          [401, 401, 200,     200,     200,     200,       200],
+  'PATCH /v1/unlocks/:eventId':             [401, 401, 200,     404,     404,     404,       404],
+  'GET /v1/join-codes/:code':               [401, 401, 200,     200,     403,     403,       403],
+  'POST /v1/enrollments':                   [401, 401, 200,     200,     403,     403,       403],
+  'DELETE /v1/enrollments/:id':             [401, 401, 200,     403,     403,     403,       200],
+  'POST /v1/teacher-invites/redeem':        [401, 401, 409,     409,     409,     409,       409],
+  'POST /v1/classes':                       [401, 401, 403,     403,     200,     200,       200],
+  'GET /v1/classes/:id':                    [401, 401, 403,     403,     403,     403,       200],
+  'PATCH /v1/classes/:id':                  [401, 401, 403,     403,     403,     403,       200],
+  'GET /v1/classes/:id/roster':             [401, 401, 403,     403,     403,     403,       200],
+  'GET /v1/classes/:id/reports/sessions':   [401, 401, 403,     403,     403,     403,       200],
   'GET /v1/classes/:id/reports/sessions/:sessionId':
-                                            [401, 401, 403,     403,     403,     200],
-  'POST /v1/classes/:id/sessions':          [401, 401, 403,     403,     403,     200],
-  'POST /v1/blocks':                        [401, 401, 403,     403,     409,     200],
-  'GET /v1/blocks':                         [401, 401, 403,     403,     200,     200],
-  'GET /v1/sessions/:id':                   [401, 401, 403,     403,     403,     200],
-  'GET /v1/sessions/:id/events':            [401, 401, 403,     403,     403,     200],
-  'GET /v1/sessions/:id/stream':            [401, 401, 403,     403,     403,     200],
-  'POST /v1/sessions/:id/end':              [401, 401, 403,     403,     403,     200],
-  'POST /v1/sessions/:id/extend':           [401, 401, 403,     403,     403,     200],
-  'POST /v1/sessions/:id/checkin':          [401, 401, 200,     200,     200,     200],
-  'POST /v1/sessions/:id/unlock':           [401, 401, 200,     200,     200,     200],
-  'POST /v1/sessions/:id/refocus':          [401, 401, 200,     409,     409,     409],
-  'POST /v1/sessions/:id/protection-off':   [401, 401, 200,     409,     409,     409],
-  'POST /v1/sessions/:id/protection-on':    [401, 401, 200,     409,     409,     409],
-  'POST /v1/sessions/:id/questions':        [401, 401, 403,     403,     403,     200],
-  'POST /v1/questions/:id/close':           [401, 401, 403,     403,     403,     200],
-  'GET /v1/questions/:id/results':          [401, 401, 403,     403,     403,     200],
-  'GET /v1/sessions/:id/presentation':      [401, 401, 200,     403,     403,     403],
-  'POST /v1/questions/:id/answers':         [401, 401, 200,     403,     403,     403],
-  'GET /v1/saved-questions':                [401, 401, 403,     403,     200,     200],
-  'POST /v1/saved-questions':               [401, 401, 403,     403,     200,     200],
-  'PUT /v1/saved-questions/:id':            [401, 401, 403,     403,     403,     200],
-  'DELETE /v1/saved-questions/:id':         [401, 401, 403,     403,     403,     200],
-  'GET /v1/decks':                          [401, 401, 403,     403,     200,     200],
-  'POST /v1/decks':                         [401, 401, 403,     403,     200,     200],
-  'DELETE /v1/decks/:id':                   [401, 401, 403,     403,     403,     200],
-  'POST /v1/decks/:id/complete':            [401, 401, 403,     403,     403,     200],
-  'GET /v1/decks/:id/download':             [401, 401, 200,     403,     403,     200],
-  'POST /v1/sessions/:id/slide':            [401, 401, 403,     403,     403,     200],
+                                            [401, 401, 403,     403,     403,     403,       200],
+  'POST /v1/classes/:id/sessions':          [401, 401, 403,     403,     403,     403,       200],
+  'POST /v1/blocks':                        [401, 401, 403,     403,     409,     409,       200],
+  'GET /v1/blocks':                         [401, 401, 403,     403,     200,     200,       200],
+  'GET /v1/sessions/:id':                   [401, 401, 403,     403,     403,     403,       200],
+  'GET /v1/sessions/:id/events':            [401, 401, 403,     403,     403,     403,       200],
+  'GET /v1/sessions/:id/stream':            [401, 401, 403,     403,     403,     403,       200],
+  'POST /v1/sessions/:id/end':              [401, 401, 403,     403,     403,     403,       200],
+  'POST /v1/sessions/:id/extend':           [401, 401, 403,     403,     403,     403,       200],
+  'POST /v1/sessions/:id/checkin':          [401, 401, 200,     200,     200,     200,       200],
+  'POST /v1/sessions/:id/unlock':           [401, 401, 200,     200,     200,     200,       200],
+  'POST /v1/sessions/:id/refocus':          [401, 401, 200,     409,     409,     409,       409],
+  'POST /v1/sessions/:id/protection-off':   [401, 401, 200,     409,     409,     409,       409],
+  'POST /v1/sessions/:id/protection-on':    [401, 401, 200,     409,     409,     409,       409],
+  'POST /v1/sessions/:id/questions':        [401, 401, 403,     403,     403,     403,       200],
+  'POST /v1/questions/:id/close':           [401, 401, 403,     403,     403,     403,       200],
+  'GET /v1/questions/:id/results':          [401, 401, 403,     403,     403,     403,       200],
+  'GET /v1/sessions/:id/presentation':      [401, 401, 200,     403,     403,     403,       403],
+  'POST /v1/questions/:id/answers':         [401, 401, 200,     403,     403,     403,       403],
+  'GET /v1/saved-questions':                [401, 401, 403,     403,     200,     200,       200],
+  'POST /v1/saved-questions':               [401, 401, 403,     403,     200,     200,       200],
+  'PUT /v1/saved-questions/:id':            [401, 401, 403,     403,     403,     403,       200],
+  'DELETE /v1/saved-questions/:id':         [401, 401, 403,     403,     403,     403,       200],
+  'GET /v1/decks':                          [401, 401, 403,     403,     200,     200,       200],
+  'POST /v1/decks':                         [401, 401, 403,     403,     200,     200,       200],
+  'DELETE /v1/decks/:id':                   [401, 401, 403,     403,     403,     403,       200],
+  'POST /v1/decks/:id/complete':            [401, 401, 403,     403,     403,     403,       200],
+  'GET /v1/decks/:id/download':             [401, 401, 200,     403,     403,     403,       200],
+  'POST /v1/sessions/:id/slide':            [401, 401, 403,     403,     403,     403,       200],
 } as const satisfies Record<string, readonly number[]>;
 type RouteKey = keyof typeof MATRIX;
 
-/** A row's world: one classroom whose resources every request names, and another's two people. */
+/**
+ * A row's world: one classroom whose resources every request names, another school's classroom's
+ * two people, and a colleague with a classroom of their own at the owner's school.
+ */
 interface World {
+  school: Seeded['school'];
   owner: Seeded['teacher'];
   student: Seeded['student'];
   otherTeacher: Seeded['teacher'];
   otherStudent: Seeded['student'];
+  colleague: Seeded['teacher'];
   klass: Seeded['klass'];
   block: Seeded['block'];
   /** The student's enrollment in the owner's class. */
@@ -242,7 +254,7 @@ const REQUESTS: Record<RouteKey, (w: World) => Sent | Promise<Sent>> = {
     return { url: `/v1/enrollments/${w.enrollmentId}`, body: { eventId: randomUUID() } };
   },
   // A live code for the owner's school: no caller here may redeem it — the two
-  // students are in a live class (the owner's ruling, T1b), the two teachers
+  // students are in a live class (the owner's ruling, T1b), the three teachers
   // teachers already — so none is made a teacher by the call.
   'POST /v1/teacher-invites/redeem': async (w) => {
     const schoolId = w.owner.schoolId!;
@@ -397,9 +409,10 @@ function unlisted(
 /**
  * What a 2xx to a stranger never names: the world's own ids — and its class,
  * unless the request carries the class's join code, which opens it (the
- * preview and the join answer with the class).
+ * preview and the join answer with the class), and its school, unless the
+ * stranger is a colleague there.
  */
-function hidden(w: World, sent: Sent): string[] {
+function hidden(w: World, sent: Sent, caller: Caller): string[] {
   const ids = [
     w.sessionId,
     w.student.id,
@@ -411,7 +424,9 @@ function hidden(w: World, sent: Sent): string[] {
     w.draftId,
     w.deckId,
   ];
-  return JSON.stringify(sent).includes(w.klass.joinCode) ? ids : [...ids, w.klass.id];
+  if (!JSON.stringify(sent).includes(w.klass.joinCode)) ids.push(w.klass.id);
+  if (caller !== 'colleague') ids.push(w.school.id);
+  return ids;
 }
 
 /** The headers `caller` sends in world `w`. */
@@ -424,10 +439,12 @@ async function headersFor(caller: Caller, w: World): Promise<Record<string, stri
       return bearer(w.owner.cognitoId, 'another-app-client-id');
     case 'student':
       return bearer(w.student.cognitoId);
-    case 'another student':
+    case 'another school’s student':
       return bearer(w.otherStudent.cognitoId);
-    case 'another teacher':
+    case 'another school’s teacher':
       return bearer(w.otherTeacher.cognitoId);
+    case 'colleague':
+      return bearer(w.colleague.cognitoId);
     case 'owner':
       return bearer(w.owner.cognitoId);
     case 'a wrong key':
@@ -460,11 +477,15 @@ afterAll(async () => {
   await closeDb();
 });
 
-/** A fresh world: the owner's classroom, its session running with its student in it, and another classroom. */
+/**
+ * A fresh world: the owner's classroom, its session running with its student in it, another
+ * school's classroom, and a colleague's classroom at the owner's school.
+ */
 async function world(): Promise<World> {
   const tag = `authz-${(worlds += 1)}`;
   const mine = await seedClassroom(db, tag);
   const theirs = await seedClassroom(db, `${tag}-elsewhere`);
+  const colleagues = await seedClassroom(db, `${tag}-colleague`, mine.school);
   const { session } = await startSession(db, {
     classId: mine.klass.id,
     startedAt: new Date(Date.now() - 60_000),
@@ -495,10 +516,12 @@ async function world(): Promise<World> {
     sha256: 'c'.repeat(64),
   });
   return {
+    school: mine.school,
     owner: mine.teacher,
     student: mine.student,
     otherTeacher: theirs.teacher,
     otherStudent: theirs.student,
+    colleague: colleagues.teacher,
     klass: mine.klass,
     block: mine.block,
     enrollmentId: enrollment!.id,
@@ -524,7 +547,7 @@ describe('the guard', () => {
     expect(stale, 'a row for a route the app no longer registers').toEqual([]);
   });
 
-  it('fails a route added without a row, and a /v1 row short of its six callers', () => {
+  it('fails a route added without a row, and a /v1 row short of its seven callers', () => {
     const added: RouteOptions = { method: 'POST', url: '/v1/new', handler: () => ({}) };
     expect(unlisted([...routes, added])).toEqual(['POST /v1/new']);
     expect(unlisted(routes, { ...MATRIX, 'GET /v1/me': [200] })).toEqual([
@@ -543,6 +566,14 @@ describe('the guard', () => {
     // As public as /healthz, or with no callers at all: neither passes.
     expect(unlisted(outside, rows([200]))).toEqual(named);
     expect(unlisted(outside, rows([]))).toEqual(named);
+  });
+
+  it('meets another school’s people at another school, and the colleague at the owner’s', async () => {
+    const w = await world();
+    expect(w.owner.schoolId).toBe(w.school.id);
+    expect(w.colleague.schoolId).toBe(w.school.id);
+    expect(w.otherTeacher.schoolId).not.toBe(w.school.id);
+    expect(w.otherStudent.schoolId).toBe(w.otherTeacher.schoolId);
   });
 });
 
@@ -565,7 +596,7 @@ describe.each(routes.filter((route) => unlisted([route]).length === 0))('$method
     });
     expect(res.statusCode).toBe(status);
     if (STRANGERS.has(caller) && status < 300 && !sent.stream) {
-      for (const id of hidden(w, sent)) {
+      for (const id of hidden(w, sent, caller)) {
         expect(res.body, `${caller} is shown ${id}`).not.toContain(id);
       }
     }
