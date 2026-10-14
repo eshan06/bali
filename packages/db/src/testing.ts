@@ -45,15 +45,35 @@ export async function makeTestDb(): Promise<TestDb> {
   return url ? makeRealPostgresDb(url) : makePgliteDb();
 }
 
+/**
+ * The migrated cluster's data directory, made once per module instance (Vitest isolates each test
+ * file, so once per file). Every PGlite database is a fresh instance restored from it: the same
+ * bytes a new instance holds after every migration, in ~80 ms where initdb and the migrations take
+ * ~450 ms — most of the PGlite lane's wall clock when every test makes one.
+ */
+let migratedDataDir: Promise<Blob> | undefined;
+
 async function makePgliteDb(): Promise<TestDb> {
+  const { PGlite } = await import('@electric-sql/pglite');
+  const { drizzle: pgliteDrizzle } = await import('drizzle-orm/pglite');
+
+  migratedDataDir ??= migratedPgliteDataDir();
+  const pg = new PGlite({ loadDataDir: await migratedDataDir });
+  return { db: pgliteDrizzle(pg, { schema }), close: () => pg.close() };
+}
+
+async function migratedPgliteDataDir(): Promise<Blob> {
   const { PGlite } = await import('@electric-sql/pglite');
   const { drizzle: pgliteDrizzle } = await import('drizzle-orm/pglite');
   const { migrate: pgliteMigrate } = await import('drizzle-orm/pglite/migrator');
 
   const pg = new PGlite();
-  const db = pgliteDrizzle(pg, { schema });
-  await pgliteMigrate(db, { migrationsFolder: MIGRATIONS_DIR });
-  return { db, close: () => pg.close() };
+  try {
+    await pgliteMigrate(pgliteDrizzle(pg), { migrationsFolder: MIGRATIONS_DIR });
+    return await pg.dumpDataDir('none');
+  } finally {
+    await pg.close();
+  }
 }
 
 async function makeRealPostgresDb(baseUrl: string): Promise<TestDb> {
