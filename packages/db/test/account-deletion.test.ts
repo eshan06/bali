@@ -1,5 +1,6 @@
 import { sessionReport } from '@bali/shared';
 import { and, eq, isNull, sql } from 'drizzle-orm';
+import { getTableConfig, PgTable } from 'drizzle-orm/pg-core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { recordAgeCheck } from '../src/age-checks.js';
@@ -8,6 +9,7 @@ import { newUuidV7 } from '../src/ids.js';
 import { createBlock, createClass } from '../src/management.js';
 import { mintTeacherInvite, recordAgreement, redeemTeacherInvite } from '../src/schools.js';
 import { getSessionEvents, getSessionRoster } from '../src/queries.js';
+import * as schema from '../src/schema.js';
 import {
   ageChecks,
   armedTaps,
@@ -26,6 +28,7 @@ import {
 } from '../src/schema.js';
 import { makeTestDb } from '../src/testing.js';
 import {
+  ACCOUNT_DELETION_COVERAGE,
   answerQuestion,
   armTap,
   createDeck,
@@ -143,6 +146,22 @@ const ask = async (sessionId: string, teacherId: string, prompt = 'Which?') =>
       options: ['a', 'b'],
     })
   ).question;
+
+describe('the account deletion’s coverage of the schema', () => {
+  it('handles every foreign key to users', () => {
+    const keyed: string[] = [];
+    for (const table of Object.values(schema)) {
+      if (!(table instanceof PgTable)) continue;
+      const config = getTableConfig(table);
+      for (const fk of config.foreignKeys) {
+        const ref = fk.reference();
+        if (getTableConfig(ref.foreignTable).name !== 'users') continue;
+        for (const column of ref.columns) keyed.push(`${config.name}.${column.name}`);
+      }
+    }
+    expect(Object.keys(ACCOUNT_DELETION_COVERAGE).sort()).toEqual(keyed.sort());
+  });
+});
 
 describe('deleteAccount (C3)', () => {
   it('leaves every class, ends the lesson the student is in, and names them nowhere', async () => {

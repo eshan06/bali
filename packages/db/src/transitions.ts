@@ -4560,6 +4560,37 @@ function renameOnce(db: Database, input: RenameInput): Promise<RenameResult> {
 /** The `cognito_id` a deleted account keeps: no Cognito subject has this shape. */
 export const deletedCognitoId = (userId: string) => `deleted:${userId}`;
 
+/**
+ * Where each foreign key to `users` stands in an account's deletion (C3): what
+ * `deleteAccount` does with the rows of the account it deletes. A test holds
+ * this to the schema, so a new table or column keyed to a person fails CI until
+ * the deletion handles it.
+ */
+export const ACCOUNT_DELETION_COVERAGE = {
+  'classes.teacher_id':
+    'a teacher with a live class is refused; a removed one kept, its name with it (#313, as today)',
+  'blocks.teacher_id': 'a teacher with a live block is refused; a removed one kept',
+  'enrollments.student_id': 'each live one ended as a leave ends it; all kept, the account de-identified',
+  'participations.student_id':
+    "a live one ended with its class's leave; all kept, under the account de-identified, so reports count as before",
+  'events.user_id':
+    "kept, under the account de-identified; a rename's names emptied (migration 0015); account_deleted recorded, no payload",
+  'armed_taps.student_id':
+    'a waiting one consumed, so no Start weighs it; all kept, under the account de-identified',
+  'armed_taps.teacher_id':
+    "kept: the taps students made on their block, those students' own; a teacher with a live block is refused",
+  'teacher_invites.redeemed_by':
+    'kept, its teacher de-identified: the database keeps a redeemed invite from any change (migrations 0013, 0014)',
+  'device_tokens.user_id': 'deleted: the device tokens of its phones (N4)',
+  'age_checks.user_id': 'deleted: its 13+ yes (C7-server)',
+  'questions.created_by':
+    'kept with its lesson, its words with it, as a removed class keeps its name (#313, as today)',
+  'responses.student_id': 'kept, under the account de-identified, so the totals stay',
+  'saved_questions.teacher_id': 'their drafts: removed, their words emptied',
+  'decks.teacher_id':
+    "their decks: removed, their titles emptied; their stored objects the API's sweep's (M4)",
+} as const;
+
 export interface DeleteAccountInput {
   userId: string;
   /** The client's idempotency key for the account_deleted event (rule 4). */
