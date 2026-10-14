@@ -28,28 +28,67 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # A PR whose every changed file is under docs/ runs no test job: none can
+  # fail on a Markdown change (docs-only.sh says which files count). Each test
+  # job is skipped only on that answer, so a decision that failed runs them
+  # all, and fails the gate; pushes to main run everything. Decided here, not
+  # by a paths filter on the workflow: a workflow filtered out never reports,
+  # so a required check would wait on it forever, while a job skipped by its
+  # `if` reports success (as in ios.yml).
+  changes:
+    name: CI changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      docs-only: ${{ steps.diff.outputs.docs-only }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+      - id: diff
+        env:
+          # Through env, never inline: refnames may contain $, backticks, ;.
+          EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        # The self-test first, so a decision that stops working fails here
+        # instead of skipping the tests; each on its own line, so a failure
+        # fails the step.
+        run: |
+          docs_only=false
+          if [ "$EVENT" = pull_request ]; then
+            .github/scripts/docs-only.test.sh
+            docs_only=$(.github/scripts/docs-only.sh "origin/$BASE_REF")
+          fi
+          echo "docs-only=$docs_only" >> "$GITHUB_OUTPUT"
+
   # The check protect-main requires by this name. Its two halves run side by
   # side, the unit tests alone taking about as long as the rest together;
-  # it passes only when both did. always(), so it runs and fails on a half
-  # failed, skipped or cancelled: a gate skipped by its `if` would count as
-  # passed.
+  # it passes only when both did, or when both were skipped on a docs-only
+  # PR. always(), so it runs and fails on a half failed, cancelled or skipped
+  # for any other reason, and on a docs-only decision that failed: a gate
+  # skipped by its `if` would count as passed.
   check:
     name: Typecheck · lint · unit tests
-    needs: [static, unit]
+    needs: [changes, static, unit]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - env:
+          CHANGES: ${{ needs.changes.result }}
+          DOCS_ONLY: ${{ needs.changes.outputs.docs-only }}
           STATIC: ${{ needs.static.result }}
           UNIT: ${{ needs.unit.result }}
         run: |
-          [ "$STATIC" = success ] && [ "$UNIT" = success ] && exit 0
-          echo "::error::Typecheck · lint · build: $STATIC. Unit tests (PGlite): $UNIT."
+          [ "$CHANGES" = success ] && [ "$STATIC" = success ] && [ "$UNIT" = success ] && exit 0
+          [ "$CHANGES" = success ] && [ "$DOCS_ONLY" = true ] && [ "$STATIC" = skipped ] && [ "$UNIT" = skipped ] && exit 0
+          echo "::error::CI changes: $CHANGES (docs-only: ${DOCS_ONLY:-none}). Typecheck · lint · build: $STATIC. Unit tests (PGlite): $UNIT."
           exit 1
 
   unit:
     name: Unit tests (PGlite)
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.docs-only != 'true' }}
     # Arm: its four vCPUs are four cores, where the x64 runner's four share
     # two, and the PGlite suites are CPU-bound. Free for public repositories
     # only: a private repo's job would wait for a runner. The real-Postgres
@@ -69,6 +108,8 @@ jobs:
 
   static:
     name: Typecheck · lint · build
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.docs-only != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -168,6 +209,8 @@ jobs:
   # factory (@bali/db/testing) onto Postgres.
   test-postgres:
     name: Integration + race tests (real Postgres)
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.docs-only != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
@@ -204,12 +247,14 @@ jobs:
   # mirrors @bali/shared's vocabularies, so a change to an answer, a fixture or
   # a vocabulary goes red here until the Swift types catch up. It is Foundation
   # only, so it runs on Linux in Swift's official image — no macOS minutes.
-  # On every PR, not path-filtered: the contract spans apps/api (which writes
-  # the fixtures), packages/shared, contracts/ and ios/, and a filtered job
-  # never reports on the PRs it skips, so it could not be made required.
-  # BaliOutbox's tests run here too: they settle the same answers.
+  # On every PR but a docs-only one, not path-filtered: the contract spans
+  # apps/api (which writes the fixtures), packages/shared, contracts/ and ios/,
+  # and a filtered job never reports on the PRs it skips, so it could not be
+  # made required. BaliOutbox's tests run here too: they settle the same answers.
   swift:
     name: BaliCore Swift tests (Linux)
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.docs-only != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     container: swift:6.4-noble
