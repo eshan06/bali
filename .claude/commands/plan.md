@@ -149,13 +149,20 @@ After posting the plan, this session is the **conductor**. It never writes code 
 
 For EACH PR-sized step, in order, one at a time:
 
-1. Launch a worker: the Agent tool with `subagent_type: general-purpose`, `isolation: "worktree"` and the brief below. Wait for its report before launching the next one — steps build on each other, and every PR edits `docs/PLAN.md`, so two workers at once would collide.
+1. Launch a worker: the Agent tool with `subagent_type: general-purpose`, `isolation: "worktree"`, the `effort` below and the brief below. Wait for its report before launching the next one — steps build on each other, and every PR edits `docs/PLAN.md`, so two workers at once would collide.
 2. Keep only the report. A **parked** step (a draft PR) doesn't stop the run: carry on with the next step that doesn't depend on it.
 3. A worker whose step is over santa's size limit reports back with a proposed split. Either re-plan the step into smaller ones — each to its own worker, building on the pushed branch — or, if it genuinely can't be split, continue that worker (SendMessage) with "go on as one PR; put this reason in the PR description: …".
 4. A device checkpoint (📱) or a scope/architecture question the docs don't answer: stop and ask the owner, per CLAUDE.md.
 
+**The worker's effort** (the owner's ruling, 2026-10-14; `docs/DECISIONS.md`). The owner explicitly instructs the conductor to pass the Agent tool's `effort` on every worker it launches:
+
+- `xhigh` for a step that only builds an approved portal screen: a 👀 step built from an approved board, changing files under `apps/web/src/app` or `apps/web/src/components` (pages and components, with their tests and styles) and `docs/`, and nothing in `apps/web/src/lib`, the API, `packages/`, the database or its migrations, iOS, CI or workflows, or the rules (`CLAUDE.md`, `.claude/`, `docs/ARCHITECTURE.md`). Not a step that changes sign-in, sign-out, the account's read (`GET /v1/me`, which makes the account) or the 13+ check, wherever that code sits (`app/page.tsx`, `app/login/`, `app/auth/`, `components/shell.tsx`; PV15 does), nor the privacy policy's or terms' words: that is privacy and security work. A step split into a logic half and a screen half runs its logic half at `max` (PV11a's and PV12a's `lib/` halves).
+- `max` for every other step, and whenever in doubt.
+
+The call's `effort` overrides whatever default the worker's agent type sets. An `xhigh` worker whose step turns out to need a change `xhigh` doesn't cover pushes its branch and reports back before making it, as for the size limit (item 3), and a worker at `max` takes that change on. Santa's Claude reviewers run at `max` whatever the worker's effort (`.claude/commands/santa-loop.md`, Step 2).
+
 When every step is merged or parked, report: merged PRs, parked steps and why.
 
-Worker brief (fill in the step):
+Worker brief (fill in the step, and for an `xhigh` worker its line):
 
-> You are the worker for exactly one step: <the step, with its validation command and the plan's notes for it>. You are the worker, not a planner: never run `/plan` and never start workers of your own (santa's reviewers are fine). Start from the latest main: `git fetch origin && git switch -c <branch> origin/main`. Read CLAUDE.md and orient per its step 1, then do its steps 3–6 for this step only — execute, verify (the checks, then `.claude/commands/santa-loop.md`), ship (PR, auto-merge, every check green) and PLAN.md. Reply in at most 10 lines: the PR link, merged or parked (and why) — or, if santa's size check stopped you, the pushed branch and a proposed split — and anything the owner must know.
+> You are the worker for exactly one step: <the step, with its validation command and the plan's notes for it>. <At `xhigh` only: You run at `xhigh` because this step only builds an approved portal screen: before changing `docs/ARCHITECTURE.md` or anything but pages and components under `apps/web/src/app` or `apps/web/src/components` (with their tests and styles) and `docs/`, or sign-in, sign-out, the account's read, the 13+ check, or the privacy policy's or terms' words, push your branch and report back.> You are the worker, not a planner: never run `/plan` and never start workers of your own (santa's reviewers are fine). Start from the latest main: `git fetch origin && git switch -c <branch> origin/main`. Read CLAUDE.md and orient per its step 1, then do its steps 3–6 for this step only — execute, verify (the checks, then `.claude/commands/santa-loop.md`), ship (PR, auto-merge, every check green) and PLAN.md. Reply in at most 10 lines: the PR link, merged or parked (and why) — or, if santa's size check stopped you, the pushed branch and a proposed split — and anything the owner must know.
