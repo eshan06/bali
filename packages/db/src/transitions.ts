@@ -4570,7 +4570,8 @@ export const ACCOUNT_DELETION_COVERAGE = {
   'classes.teacher_id':
     'a teacher with a live class is refused; a removed one kept, its name with it (#313, as today)',
   'blocks.teacher_id': 'a teacher with a live block is refused; a removed one kept',
-  'enrollments.student_id': 'each live one ended as a leave ends it; all kept, the account de-identified',
+  'enrollments.student_id':
+    'each live one ended as a leave ends it; all kept, the account de-identified',
   'participations.student_id':
     "a live one ended with its class's leave; all kept, under the account de-identified, so reports count as before",
   'events.user_id':

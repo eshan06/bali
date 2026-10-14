@@ -8,6 +8,25 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-13** — **The account deletion gets the coverage guard the other privacy paths have
+  (the owner's go, 2026-10-13).** Until now only the export (C5), the disposal (C6a) and the
+  retention run (C6b) failed CI on a new foreign key to `users` they didn't place, so a table or
+  column keyed to a person that `deleteAccount` never touched passed. `ACCOUNT_DELETION_COVERAGE`
+  now sits beside `deleteAccount`, in the retention run's shape: each key with what the deletion
+  does with its rows, held to the schema by a test in `account-deletion.test.ts`. **Each key read
+  from the code and its tests:** deleted, its phones' device tokens (N4) and its 13+ yes
+  (C7-server); removed with their words emptied, a teacher's drafts and decks (M4); each live
+  enrollment ended as a leave ends it, a live participation with it; a waiting armed tap consumed;
+  kept under the de-identified account, the enrollments, participations, events (a rename's names
+  emptied), answers, armed taps, the taps students made on a teacher's block, and a redeemed
+  invite, which the database keeps from any change (migrations 0013, 0014); a teacher with a live
+  class or block refused. **No gap found:** each handling is the one ARCHITECTURE already decides
+  (data-model decision 3's amendment; Live lesson, decisions 4 and 12). The two keys that keep a
+  teacher's words, a removed class's name and an asked question's prompt and options, name #313,
+  which the owner left as today on 2026-10-12. *Weighed:* the export's grouped shape (`exported`,
+  `notTheirs`), which makes the action a key; the flat map keeps one shape for the three paths that
+  de-identify, and the test needs only the keys.
+
 - **2026-10-13** — **PV4c: PV4b's tests of the icons' stroke fail where the rule would quietly stop
   holding (the owner's "fix", on PV4b's review, #353).** Test only (`tokens.test.ts`); nothing drawn
   changes. **The rule:** read without comments, at the base layer's top and in nothing within it, the
