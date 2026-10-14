@@ -8,6 +8,38 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-14** — **A PR that changes only Markdown under `docs/` skips CI's test jobs, every
+  required check still reporting (the owner's workflow review, approved 2026-10-13; #365).** **How:**
+  a "CI changes" job in `ci.yml` decides, as `ios.yml` and `load-gate.yml` do: a job, not a `paths`
+  filter, since a workflow filtered out never reports and a required check would wait on it forever,
+  while a job skipped by its `if` reports success. `.github/scripts/docs-only.sh` answers from `git
+  diff --no-renames --name-only` against `HEAD^1`, the base the PR was merged into (as static's
+  API-snapshot step reads it; two deep, and a HEAD that is no merge fails the step). The four test
+  jobs run unless its answer is `true` (`!cancelled()`), so a decision that failed runs them all; the
+  gate "Typecheck · lint · unit tests" passes only when the decision succeeded and both its halves
+  succeeded, or both were skipped on a docs-only answer. Pushes to `main` run everything; Claude
+  Review, "Plan doc updated" and the attribution check run on every PR, as before. **What counts:**
+  Markdown under `docs/`, and nothing else: not another file there (`eslint .` lints a `docs/x.ts`;
+  santa's round 1, both reviewers), not `docs/APP-STORE.md` (the static job's `privacy-manifests.py`
+  checks the app's privacy manifests against its table, the one doc a skipped job reads), not a file
+  moved into `docs/` (`--no-renames` lists the path it left: `README.md`, which a test reads, moved
+  there runs the tests), and not a change to no file. `docs-only.test.sh` pins each and runs first;
+  mutation-checked. **Measured:** before, a docs-only PR ran the whole suite: #358, the last one, was
+  green 8:22 after its run began (before #361's split); this PR, the suite as such a PR ran it until
+  now, 4:40, bound by the real-Postgres lane (the four test jobs 2:24–4:31, ~14 runner-minutes).
+  After, the throwaway draft #366, one line of `docs/ROADMAP-RESEARCH.md` against this branch: the
+  four test jobs skipped, the gate passed 11 s after the run began (decision `true`, both halves
+  `skipped`), every other required check green by then ("iOS changes" and "Plan doc updated" ran, the
+  iOS build and the load gate skipped as on any docs PR), and Claude Review, failed on the draft by
+  design, passed in 43 s once it was ready: about 45 s to all green. **Its limit:** someone with write
+  access could open a PR into a branch holding untested code, get its docs-only results, then
+  retarget it to `main`: a retarget fires only `edited`, which no PR workflow here re-runs on, so
+  Claude Review's and the iOS and load-gate checks' results already go stale the same way. Docs-only
+  only into `main` would close it for the tests, but then no docs-only PR could have proved this
+  change before it merged (#366 targeted its branch). **Not here:** `ios.yml` and `load-gate.yml`
+  diff with renames on, so a file moved out of `ios/` (or out of the load gate's paths) to another
+  folder reads as no change there and skips that job; `--no-renames` in each would fix it.
+
 - **2026-10-14** — **Two rules that only reviewers checked are tests now: only the engine writes
   `participations` and `events`, and the authorization matrix says which school each caller is at
   (the owner's workflow review, approved 2026-10-13).** **The engine's rule:**
