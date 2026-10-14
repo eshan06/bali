@@ -33,15 +33,13 @@ jobs:
         env:
           # Through env, never inline: refnames may contain $, backticks, ;.
           BASE_REF: ${{ github.base_ref }}
-        # The diff on its own line, so a failing one fails the step: piped
-        # into grep, it would read as "no iOS change" and skip the build.
+        # The self-test first, so a decision that stops working fails here
+        # instead of skipping the build; each on its own line, so a failure
+        # fails the step. touches.sh says how a moved file counts.
         run: |
-          changed=$(git diff --name-only "origin/$BASE_REF"...HEAD)
-          if printf '%s\n' "$changed" | grep -qE '^(ios/|\.github/workflows/ios\.yml$)'; then
-            echo "ios=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "ios=false" >> "$GITHUB_OUTPUT"
-          fi
+          .github/scripts/touches.test.sh
+          ios=$(.github/scripts/touches.sh "origin/$BASE_REF" '^(ios/|\.github/workflows/ios\.yml$)')
+          echo "ios=$ios" >> "$GITHUB_OUTPUT"
 
   build:
     name: iOS app + BaliCore tests (iOS Simulator)
