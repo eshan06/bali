@@ -8,6 +8,34 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-14** — **Two rules that only reviewers checked are tests now: only the engine writes
+  `participations` and `events`, and the authorization matrix says which school each caller is at
+  (the owner's workflow review, approved 2026-10-13).** **The engine's rule:**
+  `packages/db/test/engine-writes.test.ts` reads every file in each app's and package's `src` and
+  `scripts`. Scripts count because the owner's commands run them against production. Tests are left
+  out, and the migrations live outside both folders. The test fails on a write to either table
+  anywhere but `transitions.ts`: a drizzle `insert`, `update` or `delete` of the table (by its
+  name, through a namespace such as `schema.events`, or by an import's alias), or raw SQL that
+  inserts into, updates, deletes from, truncates or merges into either table (its name in any
+  case, or an interpolation that names it). Like O1b's scan of request reads, it reads syntax:
+  a table held in a variable, or SQL pieced together from strings, is still review's to catch. The
+  test also checks that it finds the engine's own writes, so a scan that reads nothing fails
+  instead of passing. **One write outside the engine was already there.** The test names it as its
+  one exception and its code is unchanged: `backdateLastSeen` (`@bali/db/testing`) moves a live
+  participation's last check-in into the past for the demo and tests, and refuses to run unless
+  `NODE_ENV` is test or development. CLAUDE.md's rule doesn't mention it; whether it should is the
+  owner's call. **The matrix:** its "another student" and "another teacher" turned out to be at
+  another school already (`seedClassroom` makes a new school on every call). So the matrix already
+  showed another school was refused, but never said so, and no caller was at the owner's school.
+  The two are now "another school's student" and "another school's teacher". A seventh caller, a
+  colleague (a teacher at the owner's school with a class and a block of their own), has a row on
+  every route. A successful answer to any stranger must not contain the class's join code, and one
+  to a caller from another school must not contain the owner's school's id either. Every route
+  gives the colleague the same answer it gives the other school's teacher: no route grants access
+  by school, so nothing reached the other school and nothing needed a fix. **Why the colleague
+  matters:** changing `requireOwnClass` to accept any teacher at the class's school failed exactly
+  the colleague's 10 rows and none of the existing ones.
+
 - **2026-10-13** — **The owner's standing orders move into the repo, ECC is turned off for it, and
   agents are denied the owner's GitHub gates (the owner's workflow review, approved after two rounds
   of independent review).** **Why in the repo:** the orders lived in the Mac's AI memory, which is

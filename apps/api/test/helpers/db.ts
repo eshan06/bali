@@ -43,10 +43,14 @@ export function joinCodeFor(tag: string): string {
  * A school, a teacher (cognito id `teacher-<tag>`), an enrolled student
  * (`student-<tag>`), a class (join code `joinCodeFor(tag)`), and the teacher's
  * block (tag `TAG-<tag>`). The cognito ids are what the test issuer signs
- * tokens for.
+ * tokens for. Given a `school`, the classroom is that school's, and no new one is made.
  */
-export async function seedClassroom(db: Database, tag: string) {
-  const school = one(
+export async function seedClassroom(
+  db: Database,
+  tag: string,
+  school?: typeof schools.$inferSelect,
+) {
+  school ??= one(
     await db
       .insert(schools)
       .values({ name: `School ${tag}` })
