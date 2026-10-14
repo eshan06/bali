@@ -32,6 +32,13 @@ export interface AuthedApp {
 }
 
 /**
+ * One issuer per test file (Vitest isolates each), for every app built here: an RSA key pair takes
+ * tens of milliseconds to generate, more on CI, and most suites build an app per test. A test that
+ * needs a key no app trusts calls `makeTestIssuer` itself, which always makes a new pair.
+ */
+let fileIssuer: Promise<TestIssuer> | undefined;
+
+/**
  * Build an app backed by the given db and the test issuer's verifier, on `clock` if given, with
  * budgets no test meets (`ROOMY_LIMITS`), decks' storage when given (M2), and any `more` deps.
  */
@@ -41,7 +48,7 @@ export async function makeAuthedApp(
   deckStorage?: DeckStorage,
   more: Partial<AppDeps> = {},
 ): Promise<AuthedApp> {
-  const issuer = await makeTestIssuer();
+  const issuer = await (fileIssuer ??= makeTestIssuer());
   const limits = ROOMY_LIMITS;
   const verifyToken = issuer.verifier;
   const app = buildApp(testEnv, { db, verifyToken, clock, limits, deckStorage, ...more });

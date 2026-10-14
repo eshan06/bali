@@ -222,3 +222,30 @@ describe('backdateSessionEnd, against a database', () => {
     }
   });
 });
+
+/*
+ * PGlite's databases are restored from one migrated copy made per file, not migrated per call: the
+ * copy must stay the migrated cluster, never a database a test has written to, and no two calls may
+ * share an instance.
+ */
+describe('makeTestDb', () => {
+  it('gives each call a database of its own: a row written in one is in no other, later ones too', async () => {
+    const first = await makeTestDb();
+    const second = await makeTestDb();
+    try {
+      await first.db.insert(schema.schools).values({ name: 'Only in the first' });
+      expect(await second.db.select().from(schema.schools)).toEqual([]);
+
+      const later = await makeTestDb();
+      try {
+        expect(await later.db.select().from(schema.schools)).toEqual([]);
+      } finally {
+        await later.close();
+      }
+      expect(await first.db.select().from(schema.schools)).toHaveLength(1);
+    } finally {
+      await first.close();
+      await second.close();
+    }
+  });
+});
