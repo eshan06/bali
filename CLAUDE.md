@@ -65,7 +65,8 @@ Applies to anything: a new phase, a new feature, a fix the owner asks for.
    task with no plan is done by the session itself. Message the
    owner only for: parked steps, device checkpoints (anything needing a
    physical iPhone), genuine scope or architecture decisions the docs don't
-   answer, a screen with no approved design (Working rules), and
+   answer, a screen with no approved design (Working rules), a finding whose
+   reachability is doubtful (Owner's standing orders), and
    destructive/irreversible actions.
 3. **Execute** on a branch cut from the latest `origin/main`: code + tests
    together, fast checks locally as you go.
@@ -148,6 +149,49 @@ lint && npm test`, plus `npm run demo` when API behavior changed), then run
   description: strip it right after creating the PR (`update_pull_request`
   with the body minus the footer), and never add one to a comment or review
   either. The "No Claude attribution" check fails the PR until it is gone.
+
+## Owner's standing orders
+
+Until 2026-10-13 these lived in one machine's AI memory; here every machine
+and every session gets them.
+
+- **Findings** (a reviewer's, CI's or your own): a proven bug (a failing
+  test, on a path real users can reach) or a security hole (a concrete
+  exploit) → fix it now, then tell the owner in one plain line. An edge case
+  whose reachability is doubtful → ask the owner first, in plain words: what
+  happens, how likely it is, how much it matters, your recommendation. Style
+  → fix it in place, never another round. A finding that needs a condition
+  ruled impossible (below) is dropped, but never a security or privacy
+  finding (that goes to the owner), and every dropped finding gets one line
+  in the PR description.
+- **Ruled impossible**, for the adult university pilot (the owner re-checks
+  this list before the first K-12 school): two accounts on one phone, since
+  phones are never shared (the owner, 2026-10-08); humanly impossible timings,
+  such as double taps under a millisecond apart; impossible inputs, such as a
+  Cognito token with no `sub`.
+- **Owner away:** when the owner says they're away, take your recommended
+  option on a doubtful finding, record it, and tell them after.
+- **Talk plainly:** no jargon, concise, and name weak spots plainly.
+- **Notify** the owner (PushNotification) when a step merges or parks, when
+  screenshots are ready, or when a decision is needed; never for routine
+  progress.
+- **UI:** build only from approved boards; every user-facing string goes
+  through `no-ai-slop`; send each build screenshot beside its board; after
+  any canvas publish, open it and check every new or changed board before
+  reporting.
+- **Phone tests:** open every part of a phone test with its starting state:
+  the class, focused or unlocked, the screen, Airplane mode, the sticker.
+- **Reviews:** a failed Claude Review is never re-run to get a different
+  answer; it stands until a new commit is pushed. A blocker you believe is
+  wrong parks the step for the owner, who decides.
+- **Owner-only actions:** agents never add or remove the owner's approval
+  labels, change rulesets or branch protection, or bypass-merge (`--admin`).
+  `.claude/settings.json` denies those commands to Claude Code sessions; it
+  stops accidents, not a deliberate workaround.
+- **End of a phase:** the conductor lists the phase's review findings and
+  every bug found after a merge; anything that repeated becomes a test, a CI
+  check or a rule here (the "critical or recurring issue" rule, on a
+  schedule).
 
 ## Commands
 
