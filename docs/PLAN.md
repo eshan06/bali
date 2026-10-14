@@ -61,6 +61,8 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
   per core); each PGlite test database is restored from one migrated copy per test file. The
   real-Postgres lane (~5 minutes, unchanged) and Claude Review (6–12) now bound a PR's merge.
 
+- **Worker effort (the owner, 2026-10-14):** a worker that only builds an approved portal screen runs at `xhigh`, every other worker and every santa reviewer at `max` (`.claude/commands/plan.md`, `santa-loop.md`); the first 3–5 `xhigh` screen steps' blockers and times, against earlier screen steps', decide whether it stays (DECISIONS 2026-10-14).
+
 **The pilot's critical path.** The prod TestFlight build (✅ uploaded) → the owner's phone
 test on prod, a block tap included (✅ the tap, 2026-10-12) → the privacy page (C2, the lawyer's words) → the external
 TestFlight group `Vanderbilt pilot` and Beta App Review (`docs/APP-STORE.md`, section 5) →

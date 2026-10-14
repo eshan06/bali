@@ -8,6 +8,25 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-14** — **A worker that only builds an approved portal screen runs at `xhigh`; every
+  other worker, and every santa reviewer, at `max` (the owner's ruling, after weighing speed and
+  usage limits against care).** **The rule:** the conductor passes the Agent tool's `effort` on
+  each worker it launches (`.claude/commands/plan.md`, its last section), and the call's `effort`
+  overrides the agent type's default. `xhigh` for a 👀 step built from an approved board whose
+  change is page and component files under `apps/web/src/app` or `apps/web/src/components`, and
+  docs, with nothing in `apps/web/src/lib`, the API, `packages/`, the database or its migrations,
+  iOS, CI or workflows, or the rules; `max` for every other step, a split step's logic half
+  (PV11a's and PV12a's `lib/` halves) included, and whenever in doubt. An `xhigh` worker that
+  finds it needs a change outside those files reports back before making it, and a worker at
+  `max` takes that change on. Santa's Claude reviewers, Reviewer A and Reviewer B's Claude
+  fallback, run at `max` in every round, whatever the worker's effort (`santa-loop.md`, Step 2).
+  **Why:** the owner's review of speed and usage limits. A screen-only step building an approved
+  board is the lowest-risk work: the board fixes what it builds, its tests pin it, and santa and
+  Claude Review still check it. Engine, database, privacy and security work keeps `max`, and the
+  reviewers stay at `max`, so the safety net never weakens. **How it is judged:** the conductor
+  compares the first 3–5 `xhigh` screen steps with earlier screen steps: santa's and Claude
+  Review's blockers, and the time each took to merge. More blockers at `xhigh` → back to `max`.
+
 - **2026-10-14** — **A file moved out of `ios/`, or out of the load gate's paths, runs that job, and
   the load gate runs when its decision fails (#365's review; #368).** **The bug:** `ios.yml` and
   `load-gate.yml` decided from `git diff --name-only`, whose rename detection lists a moved file
