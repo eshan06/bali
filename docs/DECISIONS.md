@@ -8,6 +8,30 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-14** — **A file moved out of `ios/`, or out of the load gate's paths, runs that job, and
+  the load gate runs when its decision fails (#365's review; #368).** **The bug:** `ios.yml` and
+  `load-gate.yml` decided from `git diff --name-only`, whose rename detection lists a moved file
+  only where it went: a file moved from `ios/` into another folder read as no iOS change and skipped
+  the iOS build, and one moved out of `apps/api/`, `packages/db/` or `packages/shared/` skipped the
+  load gate. **The fix:** both decide through `.github/scripts/touches.sh <base> <pattern>`, which
+  diffs with `--no-renames`, as `docs-only.sh` does, so the path a file left counts as well as the
+  one it went to; each workflow keeps its own pattern. A diff that fails, or a pattern grep refuses,
+  fails the script instead of answering `false`, the answer that skips. `touches.test.sh` pins it
+  and runs first in both decision jobs; its moved-out case failed before the fix, and each of six
+  mutants fails it (renames on, a failed diff or a grep error answering, always `true`, always
+  `false`, fixed strings). **The gate's `if`:** "Load gate changes" is no required check, so a
+  decision that failed skipped the gate, and a required check that was skipped counts as passed:
+  the old comment's promise, that a failing diff would not skip the gate, did not hold. The gate now
+  runs unless the decision said `false` (`!cancelled()`, as `ci.yml`'s test jobs do). "iOS changes"
+  is required, so a failed iOS decision already blocks the PR; its build stays skipped then,
+  sparing a macOS run. **Proved:** the throwaway draft #367 moved only `ios/README.md`, to the
+  repository's root, against this branch: "iOS changes" ran the self-test and the iOS build started
+  (cancelled once seen), and the load gate skipped, as it should. On that commit, `git diff
+  --name-only` with renames on lists only `README-ios.md`, which the old decision read as no iOS
+  change. **Not here:** `plan-check.yml`'s "Plan doc updated" diffs with renames on too, so a source
+  file moved out of `apps/`, `packages/` or `ios/` into another folder asks for no PLAN.md update;
+  it can decide through `touches.sh` the same way.
+
 - **2026-10-14** — **A migration that destroys or rewrites data waits for the owner: the "Migration
   guard" check (the owner's workflow review, approved 2026-10-13 after two independent reviews).**
   **Why:** production has no backups yet (L0b), so a dropped column or a backfill gone wrong can't be
@@ -57,6 +81,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   keyword inside a string (`E'UPD\x41TE …'` run by a DO), a journal entry naming SQL outside the
   folder, or a call to a function an earlier migration made; a guarded word in a string or a
   function body fails too, a false alarm that costs one approval.
+
 - **2026-10-14** — **A PR that changes only Markdown under `docs/` skips CI's test jobs, every
   required check still reporting (the owner's workflow review, approved 2026-10-13; #365).** **How:**
   a "CI changes" job in `ci.yml` decides, as `ios.yml` and `load-gate.yml` do: a job, not a `paths`
