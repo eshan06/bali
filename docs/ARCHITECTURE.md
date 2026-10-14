@@ -1129,8 +1129,9 @@ nothing of a live lesson sits in the outbox ahead of an unlock (decision 5).
   changes nothing and records nothing (M3a). The session's end leaves the row as it was.
 
 Retention, disposal, deletion and export (ISSUES #5). The coverage guards
-(`STUDENT_RECORD_COVERAGE`, `SCHOOL_DISPOSAL_COVERAGE`, `RETENTION_COVERAGE`) fail CI until
-every new key to `users` or `schools` is placed, so the PR that adds a key places it:
+(`STUDENT_RECORD_COVERAGE`, `ACCOUNT_DELETION_COVERAGE`, `SCHOOL_DISPOSAL_COVERAGE`,
+`RETENTION_COVERAGE`) fail CI until every new key to `users` or `schools` is placed, so the PR
+that adds a key places it:
 - **Responses are education records.** Account deletion (C3) keeps them under the
   de-identified user, so the counts stay and name no one; the student's export (C5) includes
   every response of theirs with its question's prompt, options and session; a school's
