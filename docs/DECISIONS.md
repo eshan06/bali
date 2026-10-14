@@ -8,6 +8,39 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-13** — **PLAN.md holds the current state only; its history moved word for word to
+  `docs/PLAN-ARCHIVE.md`, and a check caps it at 8,000 words (the owner's workflow review,
+  approved after two rounds of independent review).** PLAN.md, which every session and worker
+  reads first, had grown to ~75,000 words, nearly all of it history: its status line alone ~7,800
+  words of "Before it, …", and finished steps' notes up to 32,000 characters a line. **The
+  split:** PLAN.md keeps the live status (its doubled "Next: PV7" fixed, #360's review), Now, each
+  phase on one line, the redesign's and Phase 7's steps (a finished step one line: its id, title,
+  ✅, PR and DECISIONS date; an open step's notes whole, since the conductor briefs workers from
+  them), a line for each step still open in an earlier phase, the go-live features (every row,
+  its notes cut to its status) and the cut list whole, the owner's open items (Phase 5's and
+  Phase 6's owner lists moved in beside them, and the owner's calls left on finished steps' lines
+  named in one line) and its update rules. Everything else moved word for word, under PLAN's own
+  headings, to `docs/PLAN-ARCHIVE.md`: history, searched like this log, never read front to
+  back. **Checked:** a script found every non-blank line of the old PLAN.md in one of the two
+  files, the only new lines the summaries and headers; two fresh readers, one given the old
+  PLAN.md and one the new, answered the same seven questions (Phase 7's done and open steps and
+  their order, the next step and its validation, the go-live features, what is cut, the owner's
+  open items, the phases' status). They agreed on the steps, their order, the next step, the
+  go-live features and the phases; what the old file held only inside finished steps' lines came
+  back into the new one: the owner's calls left there, the sweep's unbounded retry (Phase 4's
+  L3), the two deferrals with only an issue (#339, #340), and Apple's answer to record in ISSUES
+  #3. **The cap:** the required "Plan doc updated" check (`plan-check.yml`, its job name
+  unchanged) fails once `docs/PLAN.md` passes 8,000 words (`wc -w`, in
+  `.github/scripts/plan-words.sh`, its self-test run first), its error naming where the detail
+  goes. The new PLAN.md is ~7,200 words, over the ~5,000 aimed at: the open steps' notes alone
+  (PV7–PV17 and Phase 7's fifteen) are ~2,400 of them, and the owner's open items ~1,300.
+  **From now on:** a step done shrinks to its one line, its full line moved to the archive; the
+  header's status is replaced, the one it replaces moved to the top of the archive; before
+  building a step, search the archive for its id (finished steps' notes say what they left for it,
+  "for L7 to wire"). CLAUDE.md's "Read first" says so, and `docs/RUNBOOKS.md` records the restore
+  drill under Open owner items now. *Why:* a 75,000-word first read spent each session's context
+  before any work began, and an uncapped plan grows back.
+
 - **2026-10-13** — **The account deletion gets the coverage guard the other privacy paths have
   (the owner's go, 2026-10-13).** Until now only the export (C5), the disposal (C6a) and the
   retention run (C6b) failed CI on a new foreign key to `users` they didn't place, so a table or

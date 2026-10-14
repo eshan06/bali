@@ -615,7 +615,8 @@ Run it outside school hours, so prod isn't changing while you count.
    after that backup is gone; that is expected.
 
 **Record it** — a line in `docs/PLAN.md` (ask a session for a PR, or add it to the
-PR the session opens next) under Phase 5's P6, like:
+PR the session opens next) under Open owner items, on Phase 6's "Railway for prod" line
+(P6's own line is in `docs/PLAN-ARCHIVE.md` since 2026-10-13), like:
 `Restore drill 2026-MM-DD: prod backup of <time> restored into scratch in <A minutes>, counts and session <id>'s events match; dev's in-place restore took <B minutes>.`
 A failed check goes there too, with what failed.
 
