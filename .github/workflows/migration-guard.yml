@@ -12,8 +12,9 @@ name: Migrations
 on:
   pull_request:
     # labeled, unlabeled: the owner's approval re-runs the check with no push.
-    # edited: a PR moved to another base is judged against that base.
-    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
+    # Only the owner adds or removes labels; no edit of the PR re-runs it, so
+    # no agent's edit races a push's run for the label.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
 
 permissions:
   contents: read
@@ -31,25 +32,18 @@ jobs:
         shell: bash
     env:
       LABEL: owner-approved-migration
-      GH_TOKEN: ${{ github.token }}
       PR: ${{ github.event.pull_request.number }}
-      # A new version of the PR: a push, a reopen (which brings the pushes made
-      # while it was closed) or a new base. Its run removes the label and never
-      # reads it, so an approval never carries over.
-      FRESH: ${{ github.event.action == 'synchronize' || github.event.action == 'reopened' || (github.event.action == 'edited' && github.event.changes.base != null) }}
+      # A new version of the PR: a push, or a reopen, which brings the pushes
+      # made while it was closed. Its run removes the label and never reads it,
+      # so an approval never carries over.
+      FRESH: ${{ github.event.action == 'synchronize' || github.event.action == 'reopened' }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-        with:
-          fetch-depth: 0
-
-      # Its self-test first, so a check that stops matching fails instead of
-      # passing every migration.
-      - name: Self-test the guard
-        run: python3 .github/scripts/migration-guard.test.py
-
-      # Read live, never from the event, so a re-run sees the label as it is now.
+      # First, so no failed step before it can leave an old approval on.
+      # Read live, never from the event, so a re-run sees the label as it is.
       - name: A new version of the PR needs the owner's approval again
         if: env.FRESH == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           labels=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR" --jq '.labels[].name')
           if grep -qxF "$LABEL" <<<"$labels"; then
@@ -57,12 +51,30 @@ jobs:
             echo "Removed $LABEL: this version of the PR needs the owner's approval again."
           fi
 
+      # The token stays out of the checkout, so the PR's own code never holds it.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # Its self-test first, so a check that stops matching fails instead of
+      # passing every migration.
+      - name: Self-test the guard
+        run: python3 .github/scripts/migration-guard.test.py
+
       - name: Migrations that destroy or rewrite data wait for the owner
         env:
+          GH_TOKEN: ${{ github.token }}
           # Through env, not inline interpolation: refnames may contain $, `, ;.
           BASE_REF: ${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          # HEAD is the PR merged into its base, so this is what the PR would land.
+          # HEAD is the PR merged into its base: what it would land. The run
+          # judges the head its check is filed on, never an older merge.
+          if [ "$(git rev-parse HEAD^2)" != "$HEAD_SHA" ]; then
+            echo "::error::This run checked out a merge of another head than $HEAD_SHA: re-run it."
+            exit 1
+          fi
           changed=$(git -c core.quotePath=false diff --name-only --no-renames --diff-filter=d \
             "origin/$BASE_REF...HEAD" -- 'packages/db/migrations/*.sql')
           if [ -z "$changed" ]; then
@@ -75,4 +87,4 @@ jobs:
             labels=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR" --jq '.labels[].name')
             if grep -qxF "$LABEL" <<<"$labels"; then approval=(--approved); fi
           fi
-          python3 .github/scripts/migration-guard.py "${approval[@]}" "${files[@]}"
+          env -u GH_TOKEN python3 .github/scripts/migration-guard.py "${approval[@]}" "${files[@]}"

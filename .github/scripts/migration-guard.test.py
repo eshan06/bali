@@ -79,7 +79,31 @@ CAUGHT = [
     # A function body or an EXECUTE runs: strings and dollar quotes are checked like code.
     ("in a function body", "CREATE FUNCTION f() RETURNS void LANGUAGE sql AS $$\n"
      "  DELETE FROM t\n$$;", [(2, "DELETE FROM")]),
-    ("in an EXECUTE", "DO $$ BEGIN EXECUTE 'DROP TABLE t'; END $$;", [(1, "DROP TABLE")]),
+    ("in an EXECUTE", "DO $$ BEGIN EXECUTE 'DROP TABLE t'; END $$;",
+     [(1, "DROP TABLE"), (1, "EXECUTE of SQL built at run time")]),
+    # An EXECUTE runs a string built at run time, which no pattern reads: it is a finding itself.
+    ("an UPDATE built with format()", "DO $$ DECLARE t text; BEGIN\n"
+     "  FOREACH t IN ARRAY ARRAY['decks', 'questions'] LOOP\n"
+     "    EXECUTE format('UPDATE %I SET title = NULL', t);\n"
+     "  END LOOP;\nEND $$;", [(3, "UPDATE ... SET"), (3, "EXECUTE of SQL built at run time")]),
+    ("an UPDATE glued from strings", "EXECUTE 'UPDATE ' || quote_ident(t) || ' SET title = NULL';",
+     [(1, "UPDATE ... SET"), (1, "EXECUTE of SQL built at run time")]),
+    ("keywords split across strings", "EXECUTE 'ALTER TABLE users DR' || 'OP COLUMN email';",
+     [(1, "EXECUTE of SQL built at run time")]),
+    # Postgres's other spellings of a table and a name.
+    ("UPDATE ONLY (name)", "UPDATE ONLY (users) SET email = NULL;", [(1, "UPDATE ... SET")]),
+    ("an UPDATE with a comment inside", 'UPDATE "users" -- every row\n  SET "email" = NULL;',
+     [(1, "UPDATE ... SET")]),
+    ("an alias past ASCII", "UPDATE users AS u€ SET email = NULL;", [(1, "UPDATE ... SET")]),
+    ("a column drop on ONLY (name)", "ALTER TABLE ONLY (users) DROP email;", [(1, "DROP COLUMN")]),
+    ("a type change on ONLY (name)", "ALTER TABLE ONLY (users) ALTER name TYPE int USING 0;",
+     [(1, "a column type change")]),
+    ("a U& name with UESCAPE", "ALTER TABLE users ALTER COLUMN U&\"email\" UESCAPE '!' TYPE int "
+     "USING 0;", [(1, "a column type change")]),
+    ("after a dollar quote tagged past ASCII", "ALTER TABLE users ALTER COLUMN name SET DEFAULT "
+     "$€$ -- $€$, DROP COLUMN email;", [(1, "DROP COLUMN")]),
+    ("after a name holding $ past ASCII", "ALTER TABLE users ADD COLUMN x€$t$ text DEFAULT "
+     "' $t$ -- ', DROP COLUMN email;", [(1, "DROP COLUMN")]),
 ]
 
 # (case, SQL): each one must pass.
@@ -109,6 +133,9 @@ PASSED = [
      '"b"("id") ON DELETE SET NULL ON UPDATE SET DEFAULT;'),
     ("a foreign key that cascades", 'ALTER TABLE "a" ADD CONSTRAINT "f" FOREIGN KEY ("x") REFERENCES '
      '"b"("id") ON DELETE cascade ON UPDATE cascade;'),
+    ("a foreign key's actions, UPDATE first", 'ALTER TABLE "a" ADD CONSTRAINT "f" FOREIGN KEY ("x") '
+     'REFERENCES "b"("id") ON UPDATE CASCADE ON DELETE SET NULL ("x");'),
+    ("a column named type", 'ALTER TABLE "events" ALTER COLUMN "type" SET DEFAULT \'unlock\';'),
     ("triggers on UPDATE and DELETE", "CREATE TRIGGER t BEFORE UPDATE OR DELETE ON events\n"
      "FOR EACH ROW WHEN (OLD.redeemed_at IS NOT NULL) EXECUTE FUNCTION f();"),
     ("a trigger dropped", "DROP TRIGGER IF EXISTS teacher_invites_single_use ON teacher_invites;"),
@@ -133,11 +160,12 @@ class Findings(unittest.TestCase):
     def test_the_migrations_before_the_guard(self):
         """0000-0027, drizzle's and hand-written: only 0001 trips, its trigger forbidding TRUNCATE
         on events naming the word. None holds a backfill UPDATE."""
+        changed = "0000-0027 are applied migrations: a PR that changes them updates this test too"
         paths = [p for p in sorted((ROOT / "packages/db/migrations").glob("*.sql")) if p.name < "0028"]
-        self.assertEqual(len(paths), 28)
+        self.assertEqual(len(paths), 28, changed)
         tripped = {p.name: guard.findings(p.read_text(encoding="utf-8")) for p in paths}
         tripped = {name: hits for name, hits in tripped.items() if hits}
-        self.assertEqual(tripped, {"0001_events_append_only.sql": [(20, "TRUNCATE")]})
+        self.assertEqual(tripped, {"0001_events_append_only.sql": [(20, "TRUNCATE")]}, changed)
 
     def test_the_workflow_uses_the_same_label(self):
         workflow = (ROOT / ".github/workflows/migration-guard.yml").read_text(encoding="utf-8")

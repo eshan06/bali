@@ -6,11 +6,12 @@ rewrites data never merges without the owner (docs/DECISIONS.md, 2026-10-14).
 
 Each FILE is migration SQL, read as drizzle runs it: split at `--> statement-breakpoint`, each
 part sent to Postgres on its own. Outside comments, in any case, it flags DROP TABLE, DROP
-COLUMN, TRUNCATE, DELETE FROM, UPDATE ... SET, MERGE, a column type change, RENAME, and a
-DROP ... CASCADE or DROP OWNED, in each spelling Postgres takes (COLUMN left out, an upsert's
-UPDATE SET). Index and constraint drops and additive DDL pass. Strings, quoted names and
-dollar-quoted bodies are checked like code, since a function body or an EXECUTE '...' runs:
-only what is surely a comment is skipped, so a word in one never fails and nothing else hides.
+COLUMN, TRUNCATE, DELETE FROM, UPDATE ... SET, MERGE, a column type change, RENAME, a DROP ...
+CASCADE or DROP OWNED, and an EXECUTE of SQL built at run time, which it can't read. It takes
+other spellings Postgres accepts too (COLUMN left out, ONLY (name), an upsert's UPDATE SET);
+deliberate evasions are out of its reach (docs/DECISIONS.md, 2026-10-14, Limits). Index and constraint drops, a foreign key's ON UPDATE / ON DELETE actions and
+additive DDL pass. Strings, quoted names and dollar-quoted bodies are checked like code, since a
+function body or an EXECUTE '...' runs; only what is surely a comment is skipped.
 
 Exit 0: nothing found, or found with --approved (the owner's label is on the PR): notices.
 Exit 1: found, not approved: an error on each file and line. Exit 2: a file can't be read,
@@ -22,12 +23,17 @@ import sys
 LABEL = "owner-approved-migration"
 SEPARATOR = "--> statement-breakpoint"  # where drizzle-orm's migrator splits each file
 
+# The characters Postgres takes in a name: ASCII letters, _ and anything past ASCII; digits and
+# $ after the first. A dollar quote's tag takes the same but $.
+START = "A-Za-z_\u0080-\U0010ffff"
+WORD = re.compile(rf"[{START}0-9$]")
 # A name, quoted or not. An unquoted one is taken whole, never tried in pieces: the \b around
 # each keyword already keeps a piece from matching, and this keeps a long word from being slow.
-NAME = r'(?:(?:U&)?"(?:[^"]|"")*"|[^\W\d][\w$]*(?![\w$]))'
+NAME = rf"""(?:(?:U&)?"(?:[^"]|"")*"(?:\s*UESCAPE\s*'[^']*')?|[{START}][{START}0-9$]*(?![{START}0-9$]))"""
 QNAME = rf"{NAME}(?:\s*\.\s*{NAME})*"
 # Where an ALTER TABLE action starts: after the table's name, or after a comma.
-ACTION = rf"(?:\bALTER\s+TABLE\b(?:\s+IF\s+EXISTS\b)?(?:\s+ONLY\b)?\s*{QNAME}(?:\s*\*)?|,)\s*"
+ACTION = (rf"(?:\bALTER\s+TABLE\b(?:\s+IF\s+EXISTS\b)?\s*(?:\bONLY\b\s*(?:\(\s*{QNAME}\s*\)|{QNAME})"
+          rf"|{QNAME}(?:\s*\*)?)|,)\s*")
 # Each kind as findings are reported, and the patterns that find it. A pattern's group `at` is
 # where it is reported when that isn't where it starts.
 RULES = [
@@ -36,9 +42,9 @@ RULES = [
     ("DROP COLUMN", rf"{ACTION}(?P<at>\bDROP\b)(?!\s*(?:COLUMN|CONSTRAINT)\b)"),  # COLUMN left out
     ("TRUNCATE", r"\bTRUNCATE\b"),
     ("DELETE FROM", r"\bDELETE\s+FROM\b"),
-    ("UPDATE ... SET", rf"\bUPDATE\b\s*(?:\bONLY\b\s*)?{QNAME}(?:\s*\*)?(?:\s*(?:\bAS\b\s*)?{NAME})?\s*\bSET\b"),
-    # An upsert's or a MERGE's. A foreign key's ON UPDATE SET NULL or SET DEFAULT changes no row now.
-    ("UPDATE ... SET", r"\bUPDATE\s+SET\b(?!\s*(?:NULL|DEFAULT)\b)"),
+    # Anything between, in one statement: a table's name, ONLY (name), an upsert's or a MERGE's
+    # bare UPDATE SET, a format('%I') placeholder.
+    ("UPDATE ... SET", r"\bUPDATE\b[^;]*?\bSET\b"),
     ("MERGE", r"\bMERGE\s+INTO\b"),
     ("a column type change", r"\bSET\s+DATA\s+TYPE\b"),
     ("a column type change", rf"\bALTER\s+COLUMN\b\s*{NAME}\s*\bTYPE\b"),
@@ -49,15 +55,21 @@ RULES = [
     ("DROP ... CASCADE", r"(?P<at>\bDROP\b)(?!\s*(?:TABLE|COLUMN|INDEX|CONSTRAINT|DEFAULT|NOT"
      r"|EXPRESSION|IDENTITY)\b)[^;]*?\bCASCADE\b"),
     ("DROP OWNED", r"\bDROP\s+OWNED\b"),
+    # PL/pgSQL's EXECUTE runs a string built at run time (format('...%I...'), 'DR' || 'OP'),
+    # which no pattern can read; a trigger's EXECUTE FUNCTION names a function and passes.
+    ("EXECUTE of SQL built at run time", r"\bEXECUTE\b(?!\s*(?:FUNCTION|PROCEDURE)\b)"),
 ]
 KINDS = list(dict.fromkeys(kind for kind, _ in RULES))
 RULES = [(kind, re.compile(pattern, re.I)) for kind, pattern in RULES]
+# A foreign key's actions change no row now, and ON UPDATE SET NULL would read as an UPDATE ...
+# SET: blanked before the rules run.
+FK_ACTION = re.compile(r"\bON\s+(?:UPDATE|DELETE)\s+(?:NO\s+ACTION\b|RESTRICT\b|CASCADE\b"
+                       r"|SET\s+(?:NULL|DEFAULT)\b(?:\s*\([^();]*\))?)", re.I)
 
 SPECIAL = re.compile(r"""--|/\*|['"$]""")
 LINE_END = re.compile(r"[\r\n]")  # Postgres ends a -- comment at either
 BLOCK = re.compile(r"/\*|\*/")
-DOLLAR = re.compile(r"\$(?:[^\W\d]\w*)?\$")
-WORD = re.compile(r"[\w$]")
+DOLLAR = re.compile(rf"\$(?:[{START}][{START}0-9]*)?\$")
 
 
 def blank(text):
@@ -134,8 +146,9 @@ def code_of(sql):
 
 
 def findings(sql):
-    """[(line, kind)] for each place in `sql` that destroys or rewrites data, in line order."""
-    code = code_of(sql)
+    """[(line, kind)] for each place in `sql` that destroys or rewrites data, or runs SQL it
+    can't read, in line order."""
+    code = FK_ACTION.sub(lambda action: blank(action.group()), code_of(sql))
     found = set()
     for kind, rule in RULES:
         for match in rule.finditer(code):
@@ -180,18 +193,18 @@ def main(args):
             if approved:
                 message = f"{kind}: approved by the owner ({LABEL})."
             else:
-                message = f"{kind}: this destroys or rewrites data, so the owner must approve it."
+                message = f"{kind}: this can destroy or rewrite data, so the owner must approve it."
             print(f"::{'notice' if approved else 'error'} file={prop(path)},line={line}::{data(message)}")
     if unreadable:
         print(f"::error::{unreadable} migration file(s) couldn't be read: the guard fails closed.")
         return 2
     if total and not approved:
-        print(f"::error::{total} place(s) above destroy or rewrite data. The owner must approve "
+        print(f"::error::{total} place(s) above can destroy or rewrite data. The owner must approve "
               f"this migration: they add the label {LABEL} to this PR. A new push removes it, so "
               "each version of the PR needs its own approval.")
         return 1
     if total:
-        print(f"{total} place(s) destroy or rewrite data; the owner approved them ({LABEL}).")
+        print(f"{total} place(s) can destroy or rewrite data; the owner approved them ({LABEL}).")
     else:
         print(f"Nothing in {len(files)} migration file(s) destroys or rewrites data.")
     return 0
