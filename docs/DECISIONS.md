@@ -8,6 +8,25 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-14** — **The owner's answers to PLAN's open questions, and two calls of their own.**
+  Asked on 2026-10-13 and again today, each with the conductor's recommendation. **PV5b's
+  whole-page error stays:** when the account can't load, "Couldn't load your account." with Try
+  again takes the whole page's place, a live class page's too, its End and +5 hidden until Try
+  again works (as recommended). **PV5b's review notes ride later steps** (as recommended): PV15
+  sends a tab with no sign-in, on a URL with no page, to `/login` instead of "Loading…" forever;
+  PV17a gives Home's error state a real heading, focus kept on Try again and one `<main>` while it
+  waits. Both lines lose their "if the owner OKs it". **PV4c's two test limits stay** (its entry,
+  "Not covered"; rare and low-impact, as recommended). **The four steps before the pilot's first
+  class** (the column-level privacy test, the repeated-`event_id` check, the pilot's deploy rules,
+  and Dependabot's `allowed_bots`) **come after the redesign's PV17c**, not one in each gap between
+  redesign steps as the conductor recommended: the redesign runs straight through first. #309
+  waits for the last of them. **A test-only PR, next after PV7:** the three tests that fail only on
+  the Windows PC (`docs/GOTCHAS.md`, "The Windows PC") pass there too, CI's runs unchanged, and the
+  PR deletes their GOTCHAS entry. **Demo logins:** the owner brings the Mac's `.env.demo` to the
+  PC's clone (git ignores it), so later steps' screenshots can show demo students tapped in,
+  unlocked or silent; a worker loads it for one demo command at a time and never prints it, and no
+  password passes through a chat.
+
 - **2026-10-14** — **The conductor moved from the owner's Mac to an always-on Windows PC (the
   owner's call).** **What moved:** the conductor (`.claude/commands/plan.md`'s last section: one
   worker at a time, the record kept in PLAN.md) and with it the portal's UI steps, PV7–PV17 and
