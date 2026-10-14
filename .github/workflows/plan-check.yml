@@ -21,14 +21,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Its self-test first, so a check that stops counting fails instead of passing.
+      - run: .github/scripts/plan-words.test.sh
       - name: docs/PLAN.md stays under 8,000 words
-        run: |
-          WORDS="$(wc -w < docs/PLAN.md | tr -d ' ')"
-          echo "docs/PLAN.md: $WORDS words (the cap is 8,000)."
-          if [ "$WORDS" -gt 8000 ]; then
-            echo "::error file=docs/PLAN.md::docs/PLAN.md is $WORDS words, over its 8,000-word cap. It holds the current state only: move finished detail (a done step's full notes, past status lines) word for word to docs/PLAN-ARCHIVE.md, and the why to docs/DECISIONS.md."
-            exit 1
-          fi
+        run: .github/scripts/plan-words.sh docs/PLAN.md 8000
 
       - name: Source changes must update docs/PLAN.md
         env:
