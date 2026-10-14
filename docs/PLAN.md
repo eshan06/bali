@@ -40,7 +40,7 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
   PV4b, PV4c and PV5b; next PV7, the Mac session's. Phase 7's web screens follow PV15.
 - **The workflow review's last steps, next on the Mac** (the owner, 2026-10-13; one PR each):
   - the migration guard: CI fails a migration that deletes or rewrites data unless the owner's approval label is on the PR, and the owner makes it a required check;
-  - docs-only PRs (every changed file under `docs/`) skip the test jobs, each still reporting success; Claude Review, attribution and the plan check still run;
+  - docs-only PRs skip the test jobs ✅ (#365; DECISIONS 2026-10-14): only Markdown under `docs/` counts, `APP-STORE.md` not (a check reads it); every required check still reports, Claude Review and the plan check still run; such a PR is green in about a minute, from 4:40;
   - two tests ✅ (#364; DECISIONS 2026-10-14): only `transitions.ts` writes `participations` and `events` (the one exception, the test-only `backdateLastSeen`, named for the owner to rule on); the matrix's other-school callers, there all along, are named, and a colleague at the owner's school is added; nothing leaked.
 
 - **The "class started" push (N1–N6, decided 2026-10-06):** a visible alert to the students
