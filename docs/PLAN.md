@@ -9,10 +9,10 @@ is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
 _Last updated: 2026-10-14 (Central) — the Windows test fix (#376): the three tests that failed only
-on the Windows PC pass there, CI's runs unchanged: the contract fixtures' and the tokens test's paths
-compared with `/` on every OS, and the boot test's SIGINT-then-SIGTERM case skipped on Windows alone,
-which sends a child process no POSIX signals; their GOTCHAS entry deleted. Before it, PV7, a class
-live in v2's look (#375). Next: PV8, tiles._
+on the Windows PC fail there no more, CI's runs unchanged: the contract fixtures' and the tokens
+test's paths compared with `/` on every OS, and the boot test's SIGINT-then-SIGTERM case skipped on
+Windows alone, which sends a child process no POSIX signals; their GOTCHAS entry deleted. Before it,
+PV7, a class live in v2's look (#375). Next: PV8, tiles._
 
 ## Now
 
@@ -32,8 +32,9 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
 - **The conductor on the Windows PC (the owner, 2026-10-14):** an always-on PC runs the conductor,
   one worker at a time, and builds the portal's UI steps from PV7 on, screenshotted in a preview tab
   the owner signs in; its traps are `docs/GOTCHAS.md`'s "The Windows PC" (DECISIONS 2026-10-14).
-  The test-only PR so the three tests that failed only there pass there too, CI unchanged ✅ (#376):
-  `npm test` passes whole on the PC.
+  The test-only PR for the three tests that failed only there ✅ (#376): two pass there now, and the
+  boot test's SIGINT-then-SIGTERM case is skipped there alone (Windows has no POSIX signals); CI's
+  runs unchanged, and `npm test` passes whole on the PC.
 - **The owner's Mac session (Xcode and the iPhone):** the app's Sign in & sign up is built; the app
   keeps D1's look until the owner approves a new one (its redesign rolled back, 2026-10-06). Left:
   the push's app half (not started), TestFlight build 9 for C7's phone test (📱), and the phone's
