@@ -269,6 +269,12 @@
   --text-segment: 14px;
   --text-segment--line-height: 18px;
   --text-segment--font-weight: 600;
+
+  /* The live header's (PV7), as v2.css draws it and §1's facts don't list: the line under the
+     countdown, "ends 9:55 AM". */
+  --text-countdown-sub: 12.5px;
+  --text-countdown-sub--line-height: 17px;
+  --text-countdown-sub--font-weight: 400;
 }
 
 @theme inline {
@@ -321,6 +327,8 @@
   /* A dialog's backdrop (DESIGN.md §1 and §6, PV6): the shadows' warm black at 32 %, written out
      here (inline), since a ::backdrop reads no variable in some browsers. */
   --color-scrim: rgba(33, 28, 21, 0.32);
+  /* The reconnect pill's dot (PV7; DESIGN.md §4), the primitive v2.css fills it with. */
+  --color-pip: var(--bali-stone-500);
 }
 
 /* §6: the three shadows, by name. */

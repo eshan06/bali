@@ -143,9 +143,11 @@ PV5 put on a teacher's signed-in pages (`components/shell.tsx`, 2026-10-13),
 which frames each page at v2's width and gutters; never on the projector, where
 Present keeps its own column until PV9. A class's page while no session runs is
 v2's since PV6 (2026-10-13): its header, the length picker, the roster beside the
-join code's card with Copy, and New code's confirm a dialog (`JoinCode`'s, in the
-live header too); the page while one runs, and the recap, keep their layouts
-until PV7 and PV12.
+join code's card with Copy, and New code's confirm a dialog (`JoinCode`'s, in
+Present's header too). The page while one runs is v2's since PV7 (2026-10-14):
+ClassLive's header with the ring and the countdown, the state counts, the
+reconnect pill, no roster and no New code, Present keeping its page until PV9;
+the recap keeps its layout until PV12.
 Every
 portal source file is held to the tokens' utilities by `tokens.test.ts`, and
 since D2g the theme holds none of Tailwind's own colours, type sizes,
@@ -243,9 +245,10 @@ code (the line PB3 removed comes back). On a class's page the bell's card
 becomes a header with the ring and a countdown ticking on this computer's clock
 to the server's bell, the bell's time beside it; state counts sit over the
 grid; **no roster during a session** (the grid names every student); New
-code's confirm is a dialog; the join code gets a Copy button; the stale banner
-is a floating reconnect pill; an unlock the stream brings also opens v2's
-**pop-up**, which stays until closed, with Open student, never on the
+code's confirm is a dialog; the join code gets a Copy button; a lost stream is
+said in a floating reconnect pill (a quiet one keeps the stone line, §4); an
+unlock the stream brings also opens v2's **pop-up**, which stays until closed,
+with Open student, never on the
 projector; a tile opens v2's **student panel** (when they tapped in, their
 chip, this session's moments, the last check-in). **Present keeps +5, +10 and
 End** (the owner, 2026-10-12: the board left them off, and the canvas's own
@@ -289,7 +292,7 @@ table in a box that scrolls; the five radii (§5) for eight; the type scale
 (§3) and the 4-point grid (§5) for `v2.css`'s sizes and spacing (3, 6, 9, 10,
 14, 18, 22 and 30 px); 40 px gutters on a centred page 1400 px wide (§5) for
 36 px beside the menu on one 1260 px wide; the stale banner (§4) for the
-reconnect pill; Present's sizes and How it ended (§5); §2's "use the
+reconnect pill while the stream reconnects; Present's sizes and How it ended (§5); §2's "use the
 semantic tokens", for the primitives `v2.css` draws with directly (Style
 facts); Q3 A's 1 px dashed edge (§2, §4) for 1.5 px; and "a link never
 rests on colour alone" (§4, Links) for a link standing on its own (a `quiet`
@@ -323,7 +326,9 @@ semibold, `lockup` (16/22, the lockup's word), `menu-name` (13/17) and
 `menu-initials` (11/11), and named its avatar's two primitives for it,
 `avatar-bg` (green-200) and `avatar-fg` (green-800); PV6 the class page's two,
 both semibold, `button-sm` (13.5/18, the small button's label) and `segment`
-(14/18, the length picker's), and a dialog's backdrop as the colour `scrim`.
+(14/18, the length picker's), and a dialog's backdrop as the colour `scrim`; PV7
+the live header's `countdown-sub` (12.5/17, regular, "ends 9:55 AM") and the
+reconnect pill's dot as the colour `pip` (stone-500).
 
 Density: the teacher's live grid is dense (many students at a glance); the
 student app is airy and simple. Theme: **light, everywhere.** The app and the
@@ -545,8 +550,10 @@ where they differ (Present's included: §5); the input size stands.
 - **The grid's stale banner** ("Live feed has gone quiet…", drawn on D2a's
   canvas): stone, not amber. `surface-sunken` with a `border-default`
   hairline and `text-primary` ink, at `radius-sm`: the grid is honest, not
-  alarmed. *v2's look (§1):* a floating reconnect pill in its place, still
-  stone: white, a `border-strong` edge, `shadow-2` and a stone-500 dot.
+  alarmed. *v2's look (§1):* a floating reconnect pill in its place while the
+  stream reconnects (ClassStale), still stone: white, a `border-strong` edge,
+  `shadow-2` and a stone-500 dot; a stream open but quiet keeps this line over
+  the grid, as ClassStates draws it (PV7: the boards win).
 - **Inputs:** `surface-sunken` well with a `border-input` edge (§2), label
   above, helper and error text below; focus shows the focus ring, and a
   refusal draws the edge in `text-primary`, never red. What is typed is the

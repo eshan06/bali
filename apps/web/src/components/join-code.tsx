@@ -30,9 +30,10 @@ const DIALOG =
  * The class's join code. Before a session, on its own card (`card`; ClassBefore, CopyStates): the
  * code on its chip, what students do with it, then Copy and New code; Copy says Copied for a few
  * seconds, or, where the browser refuses it, says so under the buttons, the code still there to
- * select. While a session runs, two items of the page's header, as before v2's look until PV7 draws
- * it: the code with New code, `large` setting it in `code-lg` for Present. New code opens a dialog
- * in both (ClassNewCode), since the old code stops working the moment the new one is made; then
+ * select. While a session runs, two items of Present's header, as before v2's look until PV9 draws
+ * it: the code with New code, `large` setting it in `code-lg` (the class page's own live header
+ * shows the code in its line with no New code since PV7, as ClassLive draws it). New code opens a
+ * dialog in both (ClassNewCode), since the old code stops working the moment the new one is made; then
  * the new code takes its place and is said under it. Each failure is said in the dialog, and Try
  * again sends it again. `onClass` gets the class as the answer gives it, its new code included.
  * Focus goes back to New code whenever the dialog closes.
@@ -216,8 +217,8 @@ export function JoinCode({
   }
 
   return (
-    // Two of the header's items while a session runs (PV7 redraws it): the code with New code, a
-    // made code said under it; and the dialog, which takes no place in the row.
+    // Two of Present's header's items while a session runs (PV9 redraws it): the code with New
+    // code, a made code said under it; and the dialog, which takes no place in the row.
     <>
       {/* At the header's end, the code keeps its place when a made code's line grows the column. */}
       <div className="flex flex-col items-start sm:items-end">

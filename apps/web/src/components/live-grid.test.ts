@@ -3,8 +3,11 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 import type { Student } from '../lib/grid-state';
-import { Cell, COLUMNS, PRESENT_COLUMNS } from './live-grid';
+import { Cell, COLUMNS, PRESENT_COLUMNS, stateCounts } from './live-grid';
 
 /*
  * A student's cell on the live grid (the Class page design), rendered: the chip says the state
@@ -149,5 +152,96 @@ describe('the grid’s columns', () => {
     const cell = (present: boolean) => /<li class="([^"]*)"/.exec(render(student(), present))?.[1];
     expect(cell(false)).toContain('@max-[432px]:grid');
     expect(cell(true)).not.toContain('@max-[432px]');
+  });
+});
+
+describe('the grid counted for the class page (PV7)', () => {
+  it('counts each tile once in its state, both Left tiles under Left, as ClassLive does', () => {
+    const counted = stateCounts([
+      'focused',
+      'focused',
+      'unlocked',
+      'protection_off',
+      'silent',
+      'absent',
+      'ended',
+      'left_unprotected',
+      'left_protection_off',
+    ]);
+    expect(counted).toEqual({
+      total: 9,
+      joined: 8,
+      counts: { focused: 2, unlocked: 1, protection_off: 1, silent: 1, absent: 1, ended: 3 },
+    });
+  });
+
+  it('counts Unknown in no state but as joined: it tapped in, and this tab can’t say more', () => {
+    expect(stateCounts(['unknown', 'absent'])).toEqual({
+      total: 2,
+      joined: 1,
+      counts: { focused: 0, unlocked: 0, protection_off: 0, silent: 0, absent: 1, ended: 0 },
+    });
+  });
+});
+
+describe('the grid’s lines on the class page while a session runs (PV7)', () => {
+  const source = readFileSync(fileURLToPath(new URL('./live-grid.tsx', import.meta.url)), 'utf8');
+  /** A constant's class list, by its name. */
+  const classes = (name: string) =>
+    (new RegExp(`const ${name} =\\s*'([^']*)'`).exec(source)?.[1] ?? '').split(' ');
+
+  it('says a lost stream in the floating pill, and a quiet one in the stone line over the grid', () => {
+    expect(source).toMatch(
+      /\{stale && !over \? \(\s*livePage && stale\.reason === 'reconnecting' \? \(\s*<div className=\{PILL_LAYER\}>\s*<p className=\{PILL\}>\s*<span aria-hidden="true" className="size-1\.75 shrink-0 rounded-full bg-pip" \/>\s*\{staleWords\(stale\)\}[^]*?\) : \(\s*<p className="rounded-sm border border-border-default bg-surface-sunken px-4 py-3 text-body text-text-primary tabular-nums">/,
+    );
+  });
+
+  it('floats the pill as ClassStale draws it, 14 px from the page’s top, in view as it scrolls', () => {
+    // White, a strong edge, shadow-2, 13/18 medium in the secondary ink, 6 × 14 px (DESIGN.md §4).
+    expect(classes('PILL')).toEqual(
+      expect.arrayContaining([
+        'sticky',
+        'top-3.5',
+        'mx-auto',
+        'w-fit',
+        'rounded-full',
+        'border',
+        'border-border-strong',
+        'bg-surface-card',
+        'shadow-2',
+        'px-3.5',
+        'py-1.5',
+        'text-caption',
+        'font-medium',
+        'text-text-secondary',
+      ]),
+    );
+    // Its layer over the page's whole height, taking no room or clicks: 30 px less 16 is 14 px
+    // from the frame's top (22 less 8 on a phone).
+    expect(classes('PILL_LAYER')).toEqual(
+      expect.arrayContaining([
+        'pointer-events-none',
+        'absolute',
+        'inset-x-0',
+        '-top-4',
+        'bottom-0',
+        'max-sm:-top-2',
+      ]),
+    );
+  });
+
+  it('asks a grid that didn’t load to try again with a small button there, as ClassStates does', () => {
+    expect(source).toMatch(
+      /size=\{livePage \? 'sm' : 'md'\}\s*onClick=\{\(\) => setAttempt\(\(n\) => n \+ 1\)\}/,
+    );
+  });
+
+  it('tells the page its counts only when one moves, not on every second’s tick', () => {
+    // Never beside the grid's "didn't load" line, which a later refresh can fill under it.
+    expect(source).toMatch(/useEffect\(\(\) => \{\s*if \(!students \|\| error\) return;/);
+    expect(source).toMatch(/\}, \[students, now, sessionId, error\]\);/);
+    expect(source).toMatch(
+      /const key = JSON\.stringify\(counts\);\s*if \(key === told\.current\) return;\s*told\.current = key;\s*onCountsRef\.current\?\.\(sessionId, counts\);/,
+    );
   });
 });
