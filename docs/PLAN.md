@@ -78,7 +78,7 @@ One line each. Phases 3–6's step lists, the push's (N1–N6) and this table in
 | 1 | The spine: monorepo, CI, schema, transition engine, auth, taps, sessions, Railway dev | ✅ on `main` |
 | 2 | Walking skeleton: race tests, enrollments, sessions, events feed + SSE, portal + live grid, phone simulator | ✅ **complete** (2026-09-22) |
 | 3 | iOS student app: BaliCore, outbox + sync, enforcement, sign-in, screens, device test gate | ✅ **complete** (2026-10-03) |
-| 4 | Reports + recap, rate limits, the one-address load gate, the OpenAPI check, the authorization matrix | ✅ **complete** (2026-10-05) |
+| 4 | Reports + recap, rate limits, the one-address load gate, the OpenAPI check, the authorization matrix | ✅ **complete** (2026-10-05); the sweep's per-row retry left unbounded at this size: bound it if the sweep grows (L3) |
 | 5 | Pilot readiness: prod, Sentry, TestFlight, App Store, runbooks | ✅ cloud steps done; **prod live 2026-10-05**; open: the owner's items |
 | 6 | Security and compliance; gates Phase 5's student-facing steps | ✅ cloud steps done; open: C2 (⚖️ the lawyer's words), C7's phone check 📱, S8 (the owner's decision), S10 📱 |
 | 7 | Live lesson: questions and PDF slides in a running session, followed on the phone and the web | building (Phase 7 steps) |
@@ -251,6 +251,7 @@ Researched 2026-10-05; findings in [`docs/ROADMAP-RESEARCH.md`](ROADMAP-RESEARCH
 Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect accounts and keys; Sign in with Apple (needed only if Google sign-in stays, guideline 4.8); writing the NFC tags; iPhone checks. The student-facing steps wait for Phase 6's gate items.
 
 - 🔧 Sentry: confirm monitor `api-sweep`'s `production` environment is active and alerting (dev checks in to the same slug, #239's review; runbook 6, step 2).
+- ⏳ Apple's developer agreement §3.3.3(P) on Family Controls (ISSUES #3): asked by the owner on 2026-10-13, **case 102994872143** (`docs/APP-STORE.md` §5.6 holds the question as sent); waiting on Apple's answer, to record in ISSUES #3.
 - #165 the Me page: D2j's redesign was rolled back (2026-10-06), so a better Me waits for a design the owner approves; the issue, closed by #266, is the owner's to reopen.
 - #130 App Store readiness.
 - #175 Screen Time turned back on in Settings, noticed by Bali itself.
@@ -322,6 +323,8 @@ session already past its bell.
 
 Parked by design, blocking before real students: data-deletion policy,
 under-13 parental-consent machinery.
+
+Deferred to a later phase (2026-10-12, an issue each): downloading a session's report (#339) and a saved question shared by several classes (#340).
 
 ## External / waiting
 

@@ -926,7 +926,6 @@ plan backstop already treats it as source).
 Done items, and the lines `docs/PLAN.md` keeps short or once (as of 2026-10-13).
 
 - ✅ Tap a block on the prod TestFlight build: done by the owner on 2026-10-12, and it worked as usual, so the NFC entitlement as TAG alone (#236, `BlockReader`'s `NFCNDEFReaderSession`) is confirmed on a device; NDEF stays out.
-- ⏳ Apple's developer agreement §3.3.3(P) on Family Controls (ISSUES #3): asked by the owner on 2026-10-13, **case 102994872143** (`docs/APP-STORE.md` §5.6 holds the question as sent); waiting on Apple's answer, to record in ISSUES #3.
 - Confirm the state of the later K-12 pilot (likely Los Angeles or New Jersey) and its school's phone policy (ISSUES #4). The first pilot is preliminary: adults at Vanderbilt, on their own phones.
 - A lawyer for the privacy policy, terms and the school's data agreement; the rest of Phase 6's owner list.
 - ✅ #148 the sign-in page: D2d drew it (`infra/cognito/hosted-ui/`); the owner uploaded its logos and CSS to dev's and prod's pools (2026-10-06; both pools' live `custom-css.css` read back at 21:58Z with the `#8a847a` field edge).
