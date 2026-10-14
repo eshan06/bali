@@ -8,12 +8,12 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-13 (Central) — PLAN.md is the current state only: finished history moved
-word for word to `docs/PLAN-ARCHIVE.md`, and the "Plan doc updated" check fails this file past
-8,000 words (`docs/DECISIONS.md`, 2026-10-13). Before it, the account deletion's coverage guard
-(no gap found). The redesign is at a pause after PV6, the notes for coming steps on their lines
-(PV7, PV13, PV15, PV17) and two of the owner's answers pending under Open owner items ("To
-answer"). Next: PV7, a class live._
+_Last updated: 2026-10-13 (Central) — CI's required "Typecheck · lint · unit tests" is done about 4
+minutes after a push, from 12–13 (Now, "CI speed"; `docs/DECISIONS.md`, 2026-10-13); no test
+changed or skipped. Before it, PLAN.md the current state only, its history in `docs/PLAN-ARCHIVE.md`.
+The redesign is at a pause after PV6, the notes for coming steps on their lines (PV7, PV13, PV15,
+PV17) and two of the owner's answers pending under Open owner items ("To answer"). Next: PV7, a
+class live._
 
 ## Now
 
@@ -48,6 +48,11 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
   them; until the owner's runbook 9 sets each environment's key, dev and prod only queue (the
   boot log says `Cognito sign-in deletion is off`), and the phone's own DeleteUser still deletes
   one when it lands.
+
+- **CI speed (2026-10-13):** "Typecheck · lint · unit tests" is a gate of that name over two jobs
+  side by side, "Typecheck · lint · build" (x64) and "Unit tests (PGlite)" (Arm, a Vitest worker
+  per core); each PGlite test database is restored from one migrated copy per test file. The
+  real-Postgres lane (~5 minutes, unchanged) and Claude Review (6–12) now bound a PR's merge.
 
 **The pilot's critical path.** The prod TestFlight build (✅ uploaded) → the owner's phone
 test on prod, a block tap included (✅ the tap, 2026-10-12) → the privacy page (C2, the lawyer's words) → the external

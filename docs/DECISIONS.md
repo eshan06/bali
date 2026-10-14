@@ -8,6 +8,31 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-13** — **CI speed: the required unit-test check in about 4 minutes, from 12–13 (the
+  owner's speed review).** Measured first: `npm test` was ~470 s of the job's ~570–770 s, the api
+  package 426 s of it, and nearly all of that was `makeTestDb` on PGlite running initdb and every
+  migration for each test (~450 ms locally, more on CI's runners), most api suites calling it in
+  `beforeEach`. **Three changes, no test changed or skipped:** (1) PGlite databases are restored
+  from one migrated data directory per test file (`dumpDataDir` once, `loadDataDir` per call): the
+  bytes a fresh migrated instance holds, ~35–80 ms; `testing-helpers.test.ts` pins that no two
+  calls share a database and one made after a write holds none of it. The real-Postgres path is
+  untouched. (2) `makeAuthedApp` shares one test issuer per file, where each app generated an RSA
+  pair; no test relies on two of its apps holding different keys, and `makeTestIssuer` still makes
+  a fresh pair for a test that needs a foreign one. (3) `ci.yml`: the check protect-main requires
+  is a gate of the same name, passing only when its two halves did — "Typecheck · lint · build"
+  (x64, every other step) and "Unit tests (PGlite)" — run side by side, under `always()`, so a half
+  failed, skipped or cancelled fails it (a gate skipped by its `if` would count as passed); the tests run on GitHub's
+  Arm runner (free for public repositories) with a Vitest worker per core. **Measured on CI:** the
+  job 9:35–12:48 with `npm test` 7:49–10:32; after (1) and (2), 6:55 with 4:48; on Arm, 5:30 and
+  5:35 with 3:23 and 3:29; split, the gate done 3:56 after the run began (tests 3:46, the rest
+  2:07). *Weighed:* a fourth worker on x64 (its four vCPUs share two cores: each file got slower,
+  the wall clock no shorter); a 1 MB WAL segment and a CHECKPOINT before the dump (no faster:
+  the restore's cost is its 1,106 files and Postgres's start, not bytes); emptying tables between
+  tests on one instance (faster, but a test would no longer get a fresh database); sharding the
+  test files across runners (the split already lands under the real-Postgres lane's ~5 minutes and
+  Claude Review's 6–12, which now bound a PR's merge). The ruleset is unchanged: the two halves'
+  own names are not required, the gate is.
+
 - **2026-10-13** — **PLAN.md holds the current state only; its history moved word for word to
   `docs/PLAN-ARCHIVE.md`, and a check caps it at 8,000 words (the owner's workflow review,
   approved after two rounds of independent review).** PLAN.md, which every session and worker
