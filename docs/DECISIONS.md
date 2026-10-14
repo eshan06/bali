@@ -28,9 +28,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   before its words, the line running on after them, nothing cut, every tile as tall as the grid's
   tallest, as the board's own rule draws it. *A call made here:* PhoneClassLive's sample tiles show
   the reason and Clock off but neither "last seen" nor protection off's "Unlocked · nurse"; the
-  phone shows the computer's line in full,
-  since the grid never hides how stale a phone is (§2) and an unlock under protection off is the
-  teacher's to see. The owner sees it in the screenshots. **In Present** (ClassPresent): one size up,
+  phone shows the computer's line in full, since the grid never hides how stale a phone is (§2)
+  and an unlock under protection off is the teacher's to see. The owner sees it in the screenshots. **In Present** (ClassPresent): one size up,
   100 px tall, 12 × 18 px in, a 24 px icon, 21/28, 17/24 and 15/22 medium; its four columns from a
   56 rem grid kept, 12 px apart, three and then two narrower, so a 1024 px projector still shows
   four (the page itself is PV9's). **`bali-softpulse`** rings the whole tile, keyed by its unlock as

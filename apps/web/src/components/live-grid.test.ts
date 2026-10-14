@@ -116,9 +116,10 @@ describe('a tile on the live grid (PV8)', () => {
       expect(parts(html).state?.words).toBe('Unlocked');
       expect(parts(html).line).toBeUndefined();
       noReason(html);
-      noReason(
-        render(student({ state: 'unlocked', unlock: unlocked(reason), endedAt: ago(60) }), true),
-      );
+      // Both Left tiles that carry an unlock.
+      for (const state of ['unlocked', 'protection_off'] as const) {
+        noReason(render(student({ state, unlock: unlocked(reason), endedAt: ago(60) }), true));
+      }
       // The teacher's own view says it.
       expect(render(student({ state: 'unlocked', unlock: unlocked(reason) }))).toMatch(
         /bathroom|nurse|other reason/i,
@@ -264,6 +265,7 @@ describe('a tile on the live grid (PV8)', () => {
     ]);
     expect(tile.name?.classes).toContain('text-present-tile-name');
     expect(tile.state?.classes).toContain('text-present-tile-state');
+    expect(tile.state?.classes).not.toContain('uppercase');
     expect(tile.line?.classes).toEqual(expect.arrayContaining(['text-body', 'font-medium']));
     // A Left state's flag at 16 px.
     const left = parts(render(student({ state: 'protection_off', endedAt: ago(60) }), true));

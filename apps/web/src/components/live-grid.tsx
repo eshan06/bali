@@ -131,8 +131,8 @@ export function stateCounts(displays: readonly GridDisplay[]): StateCounts {
  * The grid's columns (ClassLive): as many tiles as fit, each at least 250 px, 10 px apart, so four
  * fill the class page beside the side menu at 1440 px; never wider than the grid (`min`). On a
  * phone (PhoneClassLive, under 640 px), two columns 8 px apart, every tile as tall as the grid's
- * tallest (PV1's pick: one size, nothing cut). Present keeps four columns from a 56 rem grid (DESIGN.md §5), 12 px apart, three and then
- * two narrower, so a 1024 px projector still shows four.
+ * tallest (PV1's pick: one size, nothing cut). Present keeps four columns from a 56 rem grid
+ * (DESIGN.md §5), 12 px apart, three and then two narrower, so a 1024 px projector still shows four.
  */
 export const COLUMNS =
   'grid-cols-[repeat(auto-fill,minmax(min(250px,100%),1fr))] gap-2.5 max-sm:grid-cols-2 max-sm:auto-rows-fr max-sm:gap-2';
