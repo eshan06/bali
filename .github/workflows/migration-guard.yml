@@ -1,0 +1,78 @@
+# The migration guard: a migration that destroys or rewrites data never merges
+# without the owner (docs/DECISIONS.md, 2026-10-14). Production has no backups
+# yet (PLAN's L0b), so a dropped column or a backfill gone wrong can't be
+# undone, and every other check passes it. "Migration guard" fails a PR whose
+# added or changed migration SQL drops, deletes, rewrites, renames or retypes
+# data until the owner adds the label owner-approved-migration; a new push
+# removes the label, so each version of the PR needs its own approval. What it
+# flags lives in .github/scripts/migration-guard.py. No path filter: a required
+# check must report on every PR.
+name: Migrations
+
+on:
+  pull_request:
+    # labeled, unlabeled: the owner's approval re-runs the check with no push.
+    # edited: a PR moved to another base is judged against that base.
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    name: Migration guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write # to remove the owner's label on a new push, and nothing else
+    defaults:
+      run:
+        shell: bash
+    env:
+      LABEL: owner-approved-migration
+      GH_TOKEN: ${{ github.token }}
+      PR: ${{ github.event.pull_request.number }}
+      # A new version of the PR: a push, a reopen (which brings the pushes made
+      # while it was closed) or a new base. Its run removes the label and never
+      # reads it, so an approval never carries over.
+      FRESH: ${{ github.event.action == 'synchronize' || github.event.action == 'reopened' || (github.event.action == 'edited' && github.event.changes.base != null) }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+
+      # Its self-test first, so a check that stops matching fails instead of
+      # passing every migration.
+      - name: Self-test the guard
+        run: python3 .github/scripts/migration-guard.test.py
+
+      # Read live, never from the event, so a re-run sees the label as it is now.
+      - name: A new version of the PR needs the owner's approval again
+        if: env.FRESH == 'true'
+        run: |
+          labels=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR" --jq '.labels[].name')
+          if grep -qxF "$LABEL" <<<"$labels"; then
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/issues/$PR/labels/$LABEL" >/dev/null
+            echo "Removed $LABEL: this version of the PR needs the owner's approval again."
+          fi
+
+      - name: Migrations that destroy or rewrite data wait for the owner
+        env:
+          # Through env, not inline interpolation: refnames may contain $, `, ;.
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          # HEAD is the PR merged into its base, so this is what the PR would land.
+          changed=$(git -c core.quotePath=false diff --name-only --no-renames --diff-filter=d \
+            "origin/$BASE_REF...HEAD" -- 'packages/db/migrations/*.sql')
+          if [ -z "$changed" ]; then
+            echo "No migration SQL added or changed."
+            exit 0
+          fi
+          mapfile -t files <<<"$changed"
+          approval=()
+          if [ "$FRESH" != true ]; then
+            labels=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR" --jq '.labels[].name')
+            if grep -qxF "$LABEL" <<<"$labels"; then approval=(--approved); fi
+          fi
+          python3 .github/scripts/migration-guard.py "${approval[@]}" "${files[@]}"

@@ -8,6 +8,43 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-14** — **A migration that destroys or rewrites data waits for the owner: the "Migration
+  guard" check (the owner's workflow review, approved 2026-10-13 after two independent reviews).**
+  **Why:** production has no backups yet (L0b), so a dropped column or a backfill gone wrong can't be
+  undone, and every other check passes such a migration, so auto-merge would ship it on green. **The
+  check:** `.github/workflows/migration-guard.yml`, job "Migration guard", on every PR (no path
+  filter, so it can be required: the owner adds it to `protect-main`). It reads the migration SQL the
+  PR adds or changes under `packages/db/migrations/` (the PR merged into its base, against the base)
+  and fails on, outside comments and in any case: DROP TABLE, DROP COLUMN, TRUNCATE, DELETE FROM,
+  UPDATE … SET, a column type change (ALTER COLUMN … TYPE, SET DATA TYPE) and RENAME, each in the
+  other spellings Postgres takes (COLUMN left out of an ALTER TABLE's DROP or ALTER … TYPE; an
+  upsert's or a MERGE's UPDATE SET); and, beyond the review's list, MERGE, a DROP … CASCADE and DROP
+  OWNED, which destroy data under another name (a CASCADE drops the columns and tables that depend
+  on what it drops). A foreign key's `ON UPDATE SET NULL` rewrites no row now and passes, as do index
+  and constraint drops and additive DDL. Each finding is an error on its file and line, and the run
+  ends saying the owner must approve. **How it reads SQL:** as drizzle runs it, split at
+  `--> statement-breakpoint` and each part lexed as Postgres lexes it, so what follows a separator
+  is a statement, never a comment. `--` comments (ended by a newline or a carriage return) and nested
+  `/* */` ones are skipped; strings, quoted names and dollar-quoted bodies are checked like code,
+  since a function body or an `EXECUTE '…'` runs; what isn't surely a comment is checked, an
+  unterminated `/*` included. The detection is `.github/scripts/migration-guard.py`, in Python
+  because comments and strings need a small lexer (as `privacy-manifests.py` is); its self-test,
+  `migration-guard.test.py`, runs first, as plan-check's does: each kind and spelling, the
+  separators, comments that mention DROP, an additive migration and the 28 migrations before it.
+  **The approval:** the owner adds the label `owner-approved-migration`, and the labeled event
+  re-runs the check, which reads the PR's labels live, never from the event, so a re-run sees them
+  as they are. A new version of the PR, a push, a reopen (it brings the pushes made while the PR was
+  closed) or a new base (`edited`), removes the label before judging, with `pull-requests: write` for
+  that alone, and that run never reads the label: no approval carries over, and re-running it asks
+  again. The reopen and the new base go past the review's "on synchronize" by its own rule: a new
+  version needs a fresh approval. Agents never add or remove the label (CLAUDE.md's standing
+  orders; `.claude/settings.json`). **The migrations before it:** 1 of the 28 (0000–0027) would
+  have tripped it, 0001, whose trigger forbidding TRUNCATE on `events` names the word (the bare word
+  is the rule, so it stays); none holds a backfill UPDATE. So the owner is asked once per migration
+  that drops, renames, retypes or backfills, which none has done yet. **Limits:** a PR that edits
+  the guard runs its own copy, as one that edits Claude Review does (PLAN's known edges), until the
+  owner's CODEOWNERS on `.github/**`; a guarded word in a string or a function body fails too, a
+  false alarm that costs one approval.
 - **2026-10-14** — **A PR that changes only Markdown under `docs/` skips CI's test jobs, every
   required check still reporting (the owner's workflow review, approved 2026-10-13; #365).** **How:**
   a "CI changes" job in `ci.yml` decides, as `ios.yml` and `load-gate.yml` do: a job, not a `paths`
