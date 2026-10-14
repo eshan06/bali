@@ -7,9 +7,10 @@ import { describe, expect, it, vi } from 'vitest';
 
 /*
  * The join code (PV6): before a session on its own card (ClassBefore, CopyStates), the code on its
- * chip, its line, Copy and New code; while a session runs, the header's code with New code, as
- * before v2's look until PV7. New code's confirm is a dialog in both (ClassNewCode), rendered closed
- * at rest. What needs a press (Copy's answer, the dialog's states) is read from the source.
+ * chip, its line, Copy and New code; while a session runs, Present's header's code with New code,
+ * as before v2's look until PV9 (the class page's own live header has none since PV7). New code's
+ * confirm is a dialog in both (ClassNewCode), rendered closed at rest. What needs a press (Copy's
+ * answer, the dialog's states) is read from the source.
  */
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: () => undefined }) }));
 const { JoinCode } = await import('./join-code');
@@ -67,7 +68,7 @@ describe('the join code’s card, before a session (ClassBefore)', () => {
   });
 });
 
-describe('the join code in the header, while a session runs (until PV7)', () => {
+describe('the join code in Present’s header, while a session runs (until PV9)', () => {
   it('draws the code and New code, its made-code line mounted and empty', () => {
     const html = render({});
     expect(html).toMatch(/<span translate="no" class="font-mono text-code">VMAF7E<\/span>/);
