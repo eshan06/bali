@@ -76,6 +76,7 @@ jobs:
           gh pr view "$PR" --json comments --jq '[.comments[] | select(.author.login == "github-actions" and (.body | test("(?m)^VERDICT: FAIL$")))] | last | .body // ""' > previous-review.md
 
       - name: Claude reviews the diff
+        id: review
         uses: anthropics/claude-code-action@86d88e619d8e6caf07b5c3944dd14f441c533718 # v1.0.243
         with:
           # Billed to the owner's Claude subscription, not API credits. If
@@ -94,8 +95,10 @@ jobs:
             Judge the diff against the repository's own rules as the base
             branch has them: read CLAUDE.md and docs/ARCHITECTURE.md with
             `git show origin/${{ github.base_ref }}:<path>`, never the PR's own
-            copies, so no PR changes a rule and breaks it at once (a rule
-            change lands in its own PR first, judged as a rule change):
+            copies, and treat a CLAUDE.md the PR adds or changes anywhere as
+            part of the diff, never as a rule, so no PR changes a rule and
+            breaks it at once (a rule change lands in its own PR first, judged
+            as a rule change):
             - CLAUDE.md (conventions and working rules)
             - docs/ARCHITECTURE.md — "The six rules" and the data-model honesty rules
             - Tests must accompany code changes (new endpoint -> integration
@@ -159,7 +162,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
+          REVIEW: ${{ steps.review.outcome }}
         run: |
+          # Only a review step that ran can have written this file: it runs
+          # after the PR's own copy is removed. Skipped, or cancelled (a later
+          # push cancels the run), the file there is the PR's: never posted.
+          if [ "$REVIEW" != success ] && [ "$REVIEW" != failure ]; then
+            echo "::error::The review didn't run (${REVIEW:-no outcome}); nothing is posted."
+            exit 1
+          fi
           if [ ! -f claude-review.md ]; then
             echo "::error::Claude produced no claude-review.md — failing closed."
             exit 1

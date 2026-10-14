@@ -17,9 +17,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `origin/main`'s `claude-review.yml`. *Why:* a PR could edit a rule and the code that breaks it in
   one go, and be judged by its own edit; a rule change now lands in its own PR first and is judged
   as one. The prompt was already the base's (the action refuses a workflow that differs from
-  `main`'s), and so is the CLAUDE.md the CLI loads by itself: before it starts, the action puts
+  `main`'s), and so is the root CLAUDE.md the CLI loads by itself: before it starts, the action puts
   back the base's `CLAUDE.md`, `.claude/` and `.mcp.json` (`restoreConfigFromBase`), which answers
-  santa's warning that the PR's copy reached the reviewer that way. **A loosened test blocks:** an
+  santa's warning that the PR's copy reached the reviewer that way. A CLAUDE.md the PR adds in a
+  folder, or the action's own copy of the PR's in `.claude-pr/`, still loads when the reviewer reads
+  a file beside it, so the rules say a CLAUDE.md the PR adds or changes anywhere is part of the
+  diff, never a rule (santa's round 2). **A loosened test blocks:** an
   existing test loosened, skipped or deleted (an assertion weakened, a case removed, `.skip` or
   `.only`), unless the PR's description names the behavior change it is meant to make. The action's
   agent mode passes the reviewer no PR context, so a step writes the description to
@@ -33,7 +36,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   caught. The newest failed review, not the newest review: a PASS since has cleared it already, and
   checking it again costs little. Not in santa's copied rules: santa's round 2 already checks its
   round-1 list. A blocker the reviewer got wrong is cleared only by changing the code, or by the
-  owner. **Reviewer B as an attacker:** the same rules, diff and output, its lens one student,
+  owner: editing the newest failed review's comment to strike it (only that one is read; deleting
+  it brings back the one before), then a re-run, or merging past the check. **Reviewer B as an attacker:** the same rules, diff and output, its lens one student,
   teacher or school reaching another's data, injection and the web's holes, personal data escaping
   the four privacy paths, secrets or personal data in logs or errors, and migrations that destroy or
   rewrite data; the lens moves where it looks, never what blocks, so santa stays no stricter than the
@@ -44,7 +48,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   tree held at that path (santa's round 1, both reviewers, reproduced): committed as a link to
   `$RUNNER_TEMP/review-secrets.py`, it turned the base's scanner into the author's code, which the
   posting step runs, forging a PASS. The step now removes `claude-review.md` and each file it writes
-  before writing, so no link is followed and only the reviewer's verdict counts.
+  before writing, so no link is followed and only the reviewer's verdict counts. And the posting
+  step, which runs even on a cancelled run, posts only when the review step ran: a run a later push
+  cancelled before it would post the PR's own `claude-review.md` as Claude Review's comment, where
+  a `VERDICT: FAIL` with no blockers would pass for the last failed review (santa's round 2).
 
 - **2026-10-13** — **The reviewers block on security holes and on personal data the privacy paths
   miss, and both Claude workflows run Opus 5.5 (the owner's ruling, in chat: "security should be a
