@@ -8,13 +8,11 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-14 (Central) — PV7, a class live in v2's look (#375; `docs/DECISIONS.md`,
-2026-10-14): the header with the ring, "Live · 25 of 28 joined · join code", the countdown on this
-computer's clock to the server's bell and the bell's time, +5, +10 and End; the six state counts
-beside a small Present; a lost stream as the floating reconnect pill, a quiet one as the stone line;
-no roster and no New code while a session runs; Present's page as it was until PV9. Before it, the
-owner's answers (PV5b's error kept, its notes into PV15 and PV17a). Next: the Windows test fix, then
-PV8._
+_Last updated: 2026-10-14 (Central) — the Windows test fix (#376): the three tests that failed only
+on the Windows PC fail there no more, CI's runs unchanged: the contract fixtures' and the tokens
+test's paths compared with `/` on every OS, and the boot test's SIGINT-then-SIGTERM case skipped on
+Windows alone, which sends a child process no POSIX signals; their GOTCHAS entry deleted. Before it,
+PV7, a class live in v2's look (#375). Next: PV8, tiles._
 
 ## Now
 
@@ -34,14 +32,15 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
 - **The conductor on the Windows PC (the owner, 2026-10-14):** an always-on PC runs the conductor,
   one worker at a time, and builds the portal's UI steps from PV7 on, screenshotted in a preview tab
   the owner signs in; its traps are `docs/GOTCHAS.md`'s "The Windows PC" (DECISIONS 2026-10-14).
-  Next after PV7 (the owner, 2026-10-14): a test-only PR so the three tests that fail only there
-  pass there too, CI unchanged; it deletes their GOTCHAS entry.
+  The test-only PR for the three tests that failed only there ✅ (#376): two pass there now, and the
+  boot test's SIGINT-then-SIGTERM case is skipped there alone (Windows has no POSIX signals); CI's
+  runs unchanged, and `npm test` passes whole on the PC.
 - **The owner's Mac session (Xcode and the iPhone):** the app's Sign in & sign up is built; the app
   keeps D1's look until the owner approves a new one (its redesign rolled back, 2026-10-06). Left:
   the push's app half (not started), TestFlight build 9 for C7's phone test (📱), and the phone's
   Phase 7 screens (L8, M8). C2's legal words (⚖️) go into the portal's pages, on the Windows PC.
 - **The portal redesign in v2's look (PV0–PV17, the owner, 2026-10-12):** PV0–PV7 done, with PV3b,
-  PV4b, PV4c and PV5b; next PV8, on the Windows PC, after its test fix. Phase 7's web screens follow
+  PV4b, PV4c and PV5b; next PV8, on the Windows PC. Phase 7's web screens follow
   PV15.
 - **The workflow review's last steps** ✅ (the owner, 2026-10-13; DECISIONS 2026-10-14): the
   migration guard (#369), docs-only PRs skipping the test jobs (#365), moved files (#368) and two

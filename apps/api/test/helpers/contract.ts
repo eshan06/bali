@@ -61,7 +61,7 @@ import {
   USER_ROLES,
 } from '@bali/shared';
 import { mkdir, readdir, rm, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { dirname, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 
@@ -383,13 +383,19 @@ export function serialize(fixture: Fixture): string {
   return `${json}\n`;
 }
 
-/** Every `.json` file under `dir`, relative to it — what the drift check reconciles. */
+/**
+ * Every `.json` file under `dir`, relative to it — what the drift check reconciles. Its parts are
+ * joined by `/` on every OS, as a fixture's name joins them; Windows' `readdir` gives `\`.
+ */
 export async function jsonFiles(dir: string): Promise<string[]> {
   const files = await readdir(dir, { recursive: true }).catch((err: NodeJS.ErrnoException) => {
     if (err.code === 'ENOENT') return [];
     throw err;
   });
-  return files.filter((file) => file.endsWith('.json')).sort();
+  return files
+    .filter((file) => file.endsWith('.json'))
+    .map((file) => file.split(sep).join('/'))
+    .sort();
 }
 
 /**

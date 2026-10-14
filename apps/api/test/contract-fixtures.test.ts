@@ -1201,7 +1201,7 @@ describe('the contract fixtures (contracts/fixtures)', () => {
       await writeFixtures(dir, new Map([['me/new-student', fixtures.get('me/new-student')!]]));
       expect(await readFile(join(dir, 'README.md'), 'utf8')).toBe('For BaliCore.\n');
       // A stale fixture is still a fixture of nothing, and goes.
-      expect(await jsonFiles(dir)).toEqual([join('me', 'new-student.json')]);
+      expect(await jsonFiles(dir)).toEqual(['me/new-student.json']);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

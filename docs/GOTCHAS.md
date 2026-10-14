@@ -92,11 +92,6 @@ The conductor's machine since 2026-10-14 (`docs/DECISIONS.md`); the clone is `C:
 - **`cd` in the Bash tool can fail.** fnm's `--use-on-cd` turns `cd` into its own function, which
   in the Bash tool can stop with "We can't find the necessary environment variables to replace the
   Node version" (seen entering a worktree). Use `git -C <path>`, absolute paths or `builtin cd`.
-- **Three tests fail here and pass on CI**, on a clean `main`: `apps/api/test/contract-fixtures.test.ts`
-  (fixture names come out with backslashes, `age-check\passed`), `apps/api/test/boot.test.ts`'s
-  "SIGINT then SIGTERM shuts down once, cleanly" (POSIX signals) and `apps/web/src/app/tokens.test.ts`'s
-  `components\field.tsx` case (the backslash misses the field's own exception). CI is the judge
-  for them; a worker never fixes them inside its step.
 - **Line endings.** Git for Windows checks files out with CRLF by default and the repo is LF, so
   the clone sets `core.autocrlf=input` (its worktrees share it); a new clone sets it again.
 - **The clone's root holds the owner's v2 files**, untracked: `.idea/`, `android/`, `packages/api/`,
