@@ -10,6 +10,12 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-14 (Central) — PV8, tiles (#377; `docs/DECISIONS.md`, 2026-10-14): the
+live grid's cells as v2's tinted tiles, every one the same size, each with one line (an unlock's
+reason, "last seen", Clock off; in Present never a reason), on a phone two columns of short tiles;
+the tiles and the class page's counts share one look; the reconnect pill no longer flashes as a
+page loads. Before it, the Windows test fix (#376). Next: PV9, Present._
+
 _Last updated: 2026-10-14 (Central) — the Windows test fix (#376): the three tests that failed only
 on the Windows PC fail there no more, CI's runs unchanged: the contract fixtures' and the tokens
 test's paths compared with `/` on every OS, and the boot test's SIGINT-then-SIGTERM case skipped on

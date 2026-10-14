@@ -8,6 +8,27 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-14** — **The owner's calls on PV8's results, each as the conductor recommended, and
+  dev's `bali-ios` client found in use.** **A first connect that hangs is said within seconds:**
+  PV8 stopped the reconnect pill flashing as each page loads (the stream's `connecting` had read as
+  reconnecting), and in its place a first connect that hangs, which a school's network can do, went
+  unsaid for 60 s, until the quiet line; the old line said it at once. So an unlock arriving in
+  that minute would not show, and nothing would say the grid was not live (ARCHITECTURE, Web
+  portal, decision 4: the grid states its own health). The owner's call: the reconnect pill once
+  the first connect has taken over about 3 s, so a normal load shows nothing and a hang is said
+  within seconds, built in PV9, whose Present pill runs on the same code. **A phone's tiles as
+  drawn:** at 390 px PV8 gave each tile the computer's whole line ("Unlocked · Bathroom · last seen 5
+  min ago"), which wraps and makes rows uneven; PhoneClassLive draws the state and its reason alone,
+  every tile one height. The owner's call: as drawn, in PV9; "last seen" and the rest stay on a
+  computer and come to the student panel (PV11). **The demo students' names:** dev's four demo
+  students are named by their sign-in emails, which the screenshots showed; they get plain names
+  on dev, Ana, Ben, Cal and Dana, set once through `PATCH /v1/me` (dev data only; `npm run demo`
+  uses its own names in its log lines alone). **`bali-ios` is the demo's client:** dev's API
+  accepted the demo's sign-ins through `bali-ios` (`6qcvcp0ubqmb8gunkt1d6dpkeo`) during PV8, and it
+  accepts only the clients `AUTH_AUDIENCE` lists, so PLAN's "unreferenced" was wrong and
+  `docs/DEPLOY.md`'s copy of dev's list was short: the client stays, and only the old
+  `bali-ios-dev` is left to delete.
+
 - **2026-10-14** — **PV8: the live grid's cells as v2's tinted tiles, built exactly as drawn;
   the counts and the tiles share one look; the pill no longer flashes as a page loads.** Built to
   [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (version 21):
@@ -113,7 +134,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   redesign steps as the conductor recommended: the redesign runs straight through first. #309
   waits for the last of them. **A test-only PR, next after PV7:** the three tests that fail only on
   the Windows PC (`docs/GOTCHAS.md`, "The Windows PC") pass there too, CI's runs unchanged, and the
-  PR deletes their GOTCHAS entry. **Demo logins:** the owner brings the Mac's `.env.demo` to the
+  PR deletes their GOTCHAS entry. As the owner approved it when asked: two path bugs in tests
+  fixed, and the stop-signal test, which needs POSIX signals, skipped on Windows alone (#376), so
+  on that PC only CI checks the API's clean shutdown. **Demo logins:** the owner brings the Mac's `.env.demo` to the
   PC's clone (git ignores it), so later steps' screenshots can show demo students tapped in,
   unlocked or silent; a worker loads it for one demo command at a time and never prints it, and no
   password passes through a chat.
