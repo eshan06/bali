@@ -8,6 +8,47 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-14** — **PV9: Present in v2's look, built as drawn; and the owner's two calls on PV8's
+  results, the pill for a first connect past 3 s and a phone tile's one detail.** Built to
+  [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (version 21):
+  ClassPresent and PresentEnded at 1920 × 1080, ClassStale at 1440 px and PhoneClassLive at 390
+  (#379). **Present** is the class page's own tree one size up, so the grid never reboots as it
+  turns on: `LiveHeader`'s `present` draws the 64 px ring (r 28.5, stroked 7), the name at 36/42
+  over "Live · 25 of 28 joined" at 18/24, the countdown at 44/48 over "ends 9:55 AM" at 16/22, and
+  the join code out of the line in a well of its own, "Join code" then the code at 34/44 on its
+  grey chip; `LiveCounts`' `present` the counts at 16/22, 8 × 15 px in, with 18 px icons; the page
+  36/48/40 in and at least the screen's height, with no menu (PV5). **+5, +10 and End kept**, before
+  Present at the header's end (the owner, 2026-10-12). **Gone**, none of it drawn on ClassPresent:
+  Present's old nav, its header with the bell and New code, its "Live grid" heading and its roster;
+  with them `JoinCode`'s Present-only variant and the `code-lg` size (24/32, 2026-10-06), unused
+  now. `present-caption` (16/22) joins the portal sizes. **The toggle moves** from beside the counts
+  into Present's header as it is pressed, so focus follows it (checked in the browser, both ways).
+  **After the bell** (PresentEnded, as PV1 approved): the header, its ring whole as drawn, Present
+  at its end, and "Class is over" alone on a card that fills the screen, the figures left to the
+  recap. Its line stays PV6's "28 students · no session running" until PV12b draws the board's "the
+  session ended at 9:55 AM" for the class page and Present together: the page holds no reliable end
+  time (End's answer carries none). A page that comes back in Present with no session running shows
+  the same, so to start the next session the teacher leaves Present first, as PresentEnded draws no
+  Start. The recap and How it ended are never in Present now, so the page no longer passes them
+  `present` or the recap a `toggle` (`RecapCard` itself unchanged: PV12 redraws it). **The pill
+  for a first connect past 3 s** (the owner's call): `healthOf` reads the stream's first connect as
+  open for its first `FIRST_CONNECT_MS` (3000 ms) and as a reconnect after it, timed from when the
+  stream is made, after the grid's own read; the grid's 1 s tick says it within 3 to 4 s. Present's
+  grid takes `livePage` too, so a lost stream is the pill there as well. Checked on dev: with the
+  stream's request held open, a client navigation to a live class showed the pill 3.5 s after the
+  connect began, and a normal load showed none. **A phone tile's one detail** (the owner's call,
+  "Match the board"): an Unlocked tile's reason or a Focused tile's Clock off, nothing else ("last
+  seen", protection off's unlock and a Left tile's reason stay on a computer), every tile one
+  height; the computer's whole line is hidden there, and the detail on a computer. **The
+  screenshots** used dev's demo students, now named Ana, Ben, Cal and Dana (`PATCH /v1/me`, signed in
+  as each): Unlocked with a reason, Protection off after an unlock, Silent, and Clock off (a tap ten
+  minutes ahead); Present live and with the pill, the class page with the pill, and Present after
+  End. A class of 28 on one 1080p screen, and PhoneClassLive's 28 tiles, were shown with the real
+  components and the board's sample class in a throwaway page in the local preview alone, never
+  committed. *Size:* 708 changed lines without tests, over santa's ~400, but 368 are deletions and
+  247 were added ignoring indentation; the conductor kept it as one PR, since splitting off the two
+  calls (~80) would still leave Present at ~630.
+
 - **2026-10-14** — **The owner's calls on PV8's results, each as the conductor recommended, and
   dev's `bali-ios` client found in use.** **A first connect that hangs is said within seconds:**
   PV8 stopped the reconnect pill flashing as each page loads (the stream's `connecting` had read as
@@ -18,8 +59,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the first connect has taken over about 3 s, so a normal load shows nothing and a hang is said
   within seconds, built in PV9, whose Present pill runs on the same code. **A phone's tiles as
   drawn:** at 390 px PV8 gave each tile the computer's whole line ("Unlocked · Bathroom · last seen 5
-  min ago"), which wraps and makes rows uneven; PhoneClassLive draws the state and its reason alone,
-  every tile one height. The owner's call: as drawn, in PV9; "last seen" and the rest stay on a
+  min ago"), which wraps and makes rows uneven; as PhoneClassLive draws it: an Unlocked tile's
+  reason or a Focused tile's Clock off, every tile one height (corrected in PV9: this said "the
+  state and its reason alone", but the board draws Clock off too). The owner's call: as drawn, in PV9; "last seen" and the rest stay on a
   computer and come to the student panel (PV11). **The demo students' names:** dev's four demo
   students are named by their sign-in emails, which the screenshots showed; they get plain names
   on dev, Ana, Ben, Cal and Dana, set once through `PATCH /v1/me` (dev data only; `npm run demo`

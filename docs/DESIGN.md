@@ -140,15 +140,19 @@ On 2026-10-12 the owner approved v2's look for the portal and the student web
 laid out as PB drew it, the shared pieces PV4 restyled aside (the buttons, the
 field, the chip and the card on its own, 2026-10-13), and beside the side menu
 PV5 put on a teacher's signed-in pages (`components/shell.tsx`, 2026-10-13),
-which frames each page at v2's width and gutters; never on the projector, where
-Present keeps its own column until PV9. A class's page while no session runs is
+which frames each page at v2's width and gutters; never on the projector, which
+frames itself. A class's page while no session runs is
 v2's since PV6 (2026-10-13): its header, the length picker, the roster beside the
-join code's card with Copy, and New code's confirm a dialog (`JoinCode`'s, in
-Present's header too). The page while one runs is v2's since PV7 (2026-10-14):
+join code's card with Copy, and New code's confirm a dialog (`JoinCode`). The page
+while one runs is v2's since PV7 (2026-10-14):
 ClassLive's header with the ring and the countdown, the state counts, the
-reconnect pill, no roster and no New code, Present keeping its page until PV9;
+reconnect pill, no roster and no New code;
 the recap keeps its layout until PV12. The grid's cells are v2's tinted tiles since
-PV8 (2026-10-14), on the class page, in Present and under How it ended alike.
+PV8 (2026-10-14), on the class page, in Present and under How it ended alike, a
+phone's with one detail at most since PV9. Present is v2's since PV9 (2026-10-14):
+ClassPresent's page, the class page's own parts one size up, its code in a well of
+its own and +5, +10 and End kept; after the bell PresentEnded's "Class is over"
+alone; and the reconnect pill there too, and for a first connect past 3 s.
 Every
 portal source file is held to the tokens' utilities by `tokens.test.ts`, and
 since D2g the theme holds none of Tailwind's own colours, type sizes,
@@ -329,7 +333,10 @@ semibold, `lockup` (16/22, the lockup's word), `menu-name` (13/17) and
 both semibold, `button-sm` (13.5/18, the small button's label) and `segment`
 (14/18, the length picker's), and a dialog's backdrop as the colour `scrim`; PV7
 the live header's `countdown-sub` (12.5/17, regular, "ends 9:55 AM") and the
-reconnect pill's dot as the colour `pip` (stone-500).
+reconnect pill's dot as the colour `pip` (stone-500); PV9 Present's
+`present-caption` (16/22, regular: the line under its countdown, its code's label
+and its counts), its line under the name `h3` at regular weight, and retired
+`code-lg` (§3), Present's code being `code-present`.
 
 Density: the teacher's live grid is dense (many students at a glance); the
 student app is airy and simple. Theme: **light, everywhere.** The app and the
@@ -469,7 +476,7 @@ saying what it means and what to do on the phone.
 | data | 14 / 20 | 500 | Tables and stats, tabular |
 | data-lg | 28 / 32, rounded | 600 | Medium countdowns, tabular |
 | code | 14 / 20, mono | 500 | Codes only: join codes, invite codes, block IDs |
-| code-lg | 24 / 32, mono | 500 | The join code in Present only, read from the back of the room |
+| code-lg | 24 / 32, mono | 500 | The join code in Present only, read from the back of the room; retired in PV9 (2026-10-14) for v2's `code-present` (§1) |
 | input | 16 / 24 | 400 | Text typed in a field, on the web; a code typed in one is mono at 500 |
 
 **The input size** is the owner's ruling (2026-10-05): iPhone Safari zooms
@@ -554,7 +561,8 @@ where they differ (Present's included: §5); the input size stands.
   canvas): stone, not amber. `surface-sunken` with a `border-default`
   hairline and `text-primary` ink, at `radius-sm`: the grid is honest, not
   alarmed. *v2's look (§1):* a floating reconnect pill in its place while the
-  stream reconnects (ClassStale), still stone: white, a `border-strong` edge,
+  stream reconnects (ClassStale), and once its first connect has taken 3 s (the
+  owner, 2026-10-14; PV9), in Present too, still stone: white, a `border-strong` edge,
   `shadow-2` and a stone-500 dot; a stream open but quiet keeps this line over
   the grid, as ClassStates draws it (PV7: the boards win).
 - **Inputs:** `surface-sunken` well with a `border-input` edge (§2), label
@@ -635,22 +643,26 @@ where they differ (Present's included: §5); the input size stands.
   tinted tiles, each `minmax(250px, 1fr)` and 84 px tall, four to a row at
   1440, each part cut short rather than wrapped so every tile is one size, and
   on a phone two columns of short tiles, each as tall as the grid's tallest, nothing cut (PV1;
-  built in PV8); Present four columns of 100 px tiles (21/28, 17/24, 15/22), no menu,
+  built in PV8), each with one detail at most, as PhoneClassLive draws it: an Unlocked
+  tile's reason or a Focused tile's Clock off (the owner, 2026-10-14; PV9); Present four
+  columns of 100 px tiles (21/28, 17/24, 15/22), no menu,
   its header the ring, the class, the countdown, the join code at 34/44 and the
-  controls, **+5, +10 and End kept** beside Present (the owner, 2026-10-12).
+  controls, **+5, +10 and End kept** beside Present (the owner, 2026-10-12; built in PV9,
+  where the header that folded the bell and `code-lg` into one row went).
 - **Present never shows an unlock's reason**, because the class can see it:
   no line under "Unlocked" where the teacher's view says "Nurse" there
   (2026-10-06).
 - **A session that ends in Present stays so** (D2g): the recap lists each unlock
   by who and when with no reason, How it ended is the projector view, and the
   toggle beside it leaves Present, the reasons back. *v2's look (§1):* How it
-  ended is gone; what Present shows after the bell is drawn for the owner's
-  approval before it is built (PLAN's PV1), and still never a reason.
+  ended is gone from Present; after the bell it says "Class is over" alone
+  under its header (PresentEnded, PV1; built in PV9), the figures left to the
+  recap, and so never a reason.
 - **Present is kept for the browser tab** (2026-10-06), class by class: a
   reload or a return from Reports comes back in it until the teacher turns it
   off, and another class's page, a new tab or a new window opens without it;
-  back in it with no session running, the recap carries the toggle at the end
-  of its header.
+  back in it with no session running, it says "Class is over" with the toggle at
+  the end of its header (PV9; the recap carried it before).
 - **Radii:** `radius-xs` 6 (small badges) · `radius-sm` 10 (inputs) ·
   `radius-md` 14 (cards in a list) · `radius-lg` 20 (sheets, a card on its
   own) · `radius-full` (chips, buttons and Emergency Unlock). One system,
