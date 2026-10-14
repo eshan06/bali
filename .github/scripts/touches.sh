@@ -17,7 +17,8 @@ set -euo pipefail
 
 changed=$(git diff -z --no-renames --name-only "$1"...HEAD | tr '\0' '\n')
 found=0
-grep -qE -- "$2" <<<"$changed" || found=$?
+# -a: a path that isn't valid UTF-8 is still text (macOS's grep skips it otherwise).
+grep -aqE -- "$2" <<<"$changed" || found=$?
 # grep's 1 is no match; anything else is an error, never a false.
 case $found in
   0) echo true ;;
