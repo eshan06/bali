@@ -1,8 +1,9 @@
 #!/bin/bash
-# Self-test for docs-only.sh: a change under docs/ alone is docs-only; one
-# outside it, docs/APP-STORE.md, a file moved into docs/ or no change at all is
-# not; a base that isn't there fails instead of answering. CI runs it first, so
-# a decision that stops working fails instead of skipping the tests.
+# Self-test for docs-only.sh: a change to Markdown under docs/ alone is
+# docs-only; one outside it, any other file under docs/, docs/APP-STORE.md, a
+# file moved into docs/ or no change at all is not; a base that isn't there
+# fails instead of answering. CI runs it first, so a decision that stops
+# working fails instead of skipping the tests.
 #
 #   .github/scripts/docs-only.test.sh
 set -euo pipefail
@@ -48,9 +49,10 @@ expect false 'a doc and a source file' 'echo more >>docs/a.md; echo more >>apps/
 expect false 'README.md, which a test reads' 'echo more >>README.md'
 expect false 'a docs/ folder elsewhere' 'mkdir -p apps/docs; echo x >apps/docs/x.md'
 expect false 'a folder whose name starts with docs' 'mkdir docsite; echo x >docsite/x.md'
+expect false 'code under docs/, which ESLint lints' 'echo "export const x = 1;" >docs/x.ts'
 expect false 'docs/APP-STORE.md, which the privacy-manifest check reads' 'echo more >>docs/APP-STORE.md'
 expect false 'docs/APP-STORE.md beside another doc' 'echo more >>docs/APP-STORE.md; echo more >>docs/a.md'
-expect false 'a source file moved into docs/' 'git mv apps/app.ts docs/app.ts'
+expect false 'README.md moved into docs/' 'git mv README.md docs/README.md'
 expect false 'no change at all' ':'
 
 if got=$("$CHECK" no-such-base 2>/dev/null); then
