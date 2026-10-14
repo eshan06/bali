@@ -8,6 +8,22 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-14** — **The conductor moved from the owner's Mac to an always-on Windows PC (the
+  owner's call).** **What moved:** the conductor (`.claude/commands/plan.md`'s last section: one
+  worker at a time, the record kept in PLAN.md) and with it the portal's UI steps, PV7–PV17 and
+  Phase 7's web screens (L7, L7b, L7c, M5, M6, W3, W4, W5). Their screenshots are taken in a
+  preview of `main` the PC serves on port 3000, in a tab the owner signs in to as dev's demo
+  teacher; no agent signs in. **What stays on the Mac:** Xcode and the iPhone: L8, M8, TestFlight
+  build 9 for C7's phone test, and the push's app half. The Mac session may work beside the
+  conductor, and every PR edits PLAN.md, so a worker rebases onto the latest `origin/main` before it
+  edits PLAN.md or pushes. **Why the split:** the PC never sleeps on mains power; Xcode, the
+  Simulator and the owner's iPhone are the Mac's. **How the PC works:** its checkout stays on `main`,
+  each worker in a worktree of its own; Node 22 through fnm in Git Bash only, npm's `script-shell`
+  set to Git Bash, and three tests that fail only there, green on CI (`docs/GOTCHAS.md`, "The
+  Windows PC"). The canvas's generator script stayed on the Mac: a board changed on the PC is edited
+  and republished with the Artifact tool, and the owner approves it before anything is built from
+  it. How a step is built, reviewed and shipped is unchanged.
+
 - **2026-10-14** — **A worker that only builds an approved portal screen runs at `xhigh`; every
   other worker, and santa's Claude reviewers, at `max` (the owner's ruling, after weighing speed
   and usage limits against care).** **The rule:** the conductor passes the Agent tool's `effort` on
