@@ -113,14 +113,12 @@ function writesIn(file: string, source: string): string[] {
       if (table) found.push(`${file}: ${node.expression.name.text} ${table}`);
     }
     for (const [, verb, interpolated, plain] of (textOf(node) ?? '').matchAll(SQL_WRITE)) {
-      // SQL folds an unquoted name's case; an interpolation names a table by any word in it.
+      // SQL folds an unquoted name's case; an interpolation names a table by its last word
+      // (`${schema.events}`, `${sql.identifier('events')}`), never `${events.length}`.
       const table =
         plain !== undefined
           ? tableOf(plain.toLowerCase())
-          : interpolated
-              ?.match(/[\w$]+/g)
-              ?.map((word) => aliases.get(word))
-              .find(Boolean);
+          : aliases.get(interpolated?.match(/[\w$]+/g)?.at(-1) ?? '');
       if (table) found.push(`${file}: ${verb!.split(/\s/)[0]!.toLowerCase()} ${table}`);
     }
     ts.forEachChild(node, visit);
@@ -162,6 +160,8 @@ describe('only the transition engine writes participations and events', () => {
       await tx.update(schema['participations']).set(change);
       await db.insert(history).values(row);
       await tx.update((participations as typeof participations)!).set(change);
+      await tx.delete(events satisfies Table).where(match);
+      await tx.insert(<Table>participations).values(row);
       await db.execute(sql\`insert into events (id) values (\${id})\`);
       await db.execute(sql\`UPDATE "participations" SET state = \${state}\`);
       await db.execute(sql\`UPDATE PARTICIPATIONS SET state = \${state}\`);
@@ -178,6 +178,8 @@ describe('only the transition engine writes participations and events', () => {
       'w.ts: update participations',
       'w.ts: insert events',
       'w.ts: update participations',
+      'w.ts: delete events',
+      'w.ts: insert participations',
       'w.ts: insert events',
       'w.ts: update participations',
       'w.ts: update participations',
@@ -196,6 +198,7 @@ describe('only the transition engine writes participations and events', () => {
       await db.update(sessions).set({ endedAt });
       await db.execute(sql\`insert into events_archive select * from events\`);
       await db.execute(sql\`update \${sessions} set ends_at = now()\`);
+      log.info(\`update \${events.length} rows\`);
       const etag = createHash('sha256').update(json).digest('hex');
       seen.delete(eventId);
     `;
