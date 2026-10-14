@@ -29,8 +29,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   session ended at 9:55 AM" for the class page and Present together: the page holds no reliable end
   time (End's answer carries none). A page that comes back in Present with no session running shows
   the same, so to start the next session the teacher leaves Present first, as PresentEnded draws no
-  Start. The recap and How it ended are never in Present now, so the page no longer passes them
-  `present` or the recap a `toggle` (`RecapCard` itself unchanged: PV12 redraws it). **The pill
+  Start; leaving Present with no toggle left to follow puts focus on Start. The recap and How it
+  ended are never in Present now; they still take `present`, off there, so no reason could reach
+  the projector should that change (santa's review), and the recap no longer gets a `toggle`
+  (`RecapCard` itself unchanged: PV12 redraws it). **The pill
   for a first connect past 3 s** (the owner's call): `healthOf` reads the stream's first connect as
   open for its first `FIRST_CONNECT_MS` (3000 ms) and as a reconnect after it, timed from when the
   stream is made, after the grid's own read; the grid's 1 s tick says it within 3 to 4 s. Present's

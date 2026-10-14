@@ -123,11 +123,13 @@ export default function ClassDetailPage() {
   const [present, setPresent] = useState(false);
   // On the projector, no menu: the shell draws none while Present is on.
   usePresenting(present);
-  // The toggle moves as it is pressed (beside the counts, into Present's header), so focus follows.
+  // The toggle moves as it is pressed (beside the counts, into Present's header), so focus follows;
+  // to Start where none is left to follow (Present left with no session to show).
   const toggle = useRef<HTMLButtonElement>(null);
+  const start = useRef<HTMLButtonElement>(null);
   const toggled = useRef(false);
   useEffect(() => {
-    if (toggled.current) toggle.current?.focus();
+    if (toggled.current) (toggle.current ?? start.current)?.focus();
     toggled.current = false;
   }, [present]);
   // Extend (P10): the last attempt whose answer never came, resent by Try again; and what is said
@@ -516,7 +518,12 @@ export default function ClassDetailPage() {
                   ))}
                 </div>
                 {/* One button throughout, so focus stays on it whatever it comes to say. */}
-                <Button type="submit" aria-disabled={busy !== null} aria-busy={busy === 'start'}>
+                <Button
+                  ref={start}
+                  type="submit"
+                  aria-disabled={busy !== null}
+                  aria-busy={busy === 'start'}
+                >
                   {busy === 'start'
                     ? 'Starting…'
                     : minutes === null
@@ -564,9 +571,10 @@ export default function ClassDetailPage() {
             </fieldset>
           </form>
           {/* The last session's recap (R4) until a new one starts; only once the class is read,
-              so a session already running never shows it. Never in Present, whose page after the
-              bell says only that class is over. */}
-          <RecapCard classId={classId} />
+              so a session already running never shows it. Present after the bell is its own page,
+              which says only that class is over, so `present` is off here; passed all the same, so
+              no reason ever reaches the projector should that change. */}
+          <RecapCard classId={classId} present={present} />
           {/* As it ended, until the next Start (R5): who was still unlocked stays in view. Present,
               beside it, shows the room only that class is over. */}
           {grid ? (
@@ -577,7 +585,7 @@ export default function ClassDetailPage() {
                 </h2>
                 {presentToggle()}
               </div>
-              <LiveGrid sessionId={grid.id} />
+              <LiveGrid sessionId={grid.id} present={present} />
             </section>
           ) : null}
           {/* The roster beside the join code's card; on a narrow page the card goes under it. */}

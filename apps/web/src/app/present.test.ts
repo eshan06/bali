@@ -60,10 +60,12 @@ describe('the class page in Present while a session runs (ClassPresent)', () => 
     expect(toggle.slice(0, toggle.indexOf('</Button>'))).toMatch(
       /onClick=\{\(\) => \{\s*rememberPresent\(classId, !present\);\s*toggled\.current = true;\s*setPresent\(!present\);/,
     );
-    // Only a press moves focus: the page coming back in Present takes none.
+    // Only a press moves focus: the page coming back in Present takes none. Present left with no
+    // session to show leaves no toggle to follow, so focus goes to Start, the next thing to do.
     expect(page).toMatch(
-      /useEffect\(\(\) => \{\s*if \(toggled\.current\) toggle\.current\?\.focus\(\);\s*toggled\.current = false;\s*\}, \[present\]\);/,
+      /useEffect\(\(\) => \{\s*if \(toggled\.current\) \(toggle\.current \?\? start\.current\)\?\.focus\(\);\s*toggled\.current = false;\s*\}, \[present\]\);/,
     );
+    expect(page).toMatch(/<Button\s+ref=\{start\}\s+type="submit"/);
   });
 });
 
@@ -92,12 +94,12 @@ describe('the class page in Present after the bell (PresentEnded)', () => {
   });
 
   it('never shows the recap or How it ended in Present, so no figure or reason reaches the room', () => {
-    // Present after the bell is its own page, so the recap and How it ended only show off it.
-    for (const tag of [
-      ...tags('RecapCard'),
-      ...tags('LiveGrid').filter((t) => !t.includes('onEnded')),
-    ]) {
-      expect(tag).not.toMatch(/\bpresent\b/);
+    // Present after the bell is its own page, so the recap and How it ended only show off it; each
+    // still takes Present, so no reason could reach the projector should that ever change (#265).
+    expect(tags('LiveGrid')).toHaveLength(2);
+    expect(tags('RecapCard')).toHaveLength(1);
+    for (const tag of [...tags('RecapCard'), ...tags('LiveGrid')]) {
+      expect(tag).toMatch(/\bpresent=\{present\}/);
     }
     const ending = page.slice(page.indexOf('<h2 id={`${id}-ended`}'));
     expect(ending.slice(0, ending.indexOf('<LiveGrid'))).toMatch(/\{presentToggle\(\)\}/);
