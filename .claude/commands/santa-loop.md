@@ -36,7 +36,7 @@ git diff --stat origin/main...HEAD
 
 ### Step 1: The blocking rules — one source
 
-What blocks is defined in one place: the reviewer prompt in `.github/workflows/claude-review.yml`. Give both reviewers its rules verbatim — the text from "Judge the diff against the repository's own rules" through "do NOT demand work outside this PR's scope", plus its "BLOCKER is reserved for: …" line — but not its instructions for writing `claude-review.md`: reviewers here answer in the Step 2 format and write no files. Don't add criteria here — santa must never be stricter than the final gate. The one added criterion is Step 2's design check, which is advice only: its findings are WARNs, never blockers, so santa stays no stricter than the gate. Changing the rules means editing that workflow, which is an owner decision (see GOTCHAS).
+What blocks is defined in one place: the reviewer prompt in `.github/workflows/claude-review.yml`, as `origin/main` has it (`git show origin/main:.github/workflows/claude-review.yml`), never the branch's copy. Like the gate, santa judges a branch by the rules it would merge into, so no branch changes a rule and breaks it at once: a rule change lands in its own PR first. Give both reviewers its rules verbatim, `${{ github.base_ref }}` read as `main` — the text from "Judge the diff against the repository's own rules" through "do NOT demand work outside this PR's scope", plus its "BLOCKER is reserved for: …" line — but not its instructions for writing `claude-review.md`: reviewers here answer in the Step 2 format and write no files. Don't add criteria here — santa must never be stricter than the final gate. The one added criterion is Step 2's design check, which is advice only: its findings are WARNs, never blockers, so santa stays no stricter than the gate. Changing the rules means editing that workflow, which is an owner decision (see GOTCHAS).
 
 ### Step 2: Dual independent review
 
@@ -44,6 +44,7 @@ Launch both reviewers **in parallel** (one message, two tool uses). Each gets:
 
 - the rules from Step 1, verbatim
 - the diff (`git diff origin/main...HEAD`), not whole files — reviewers open files themselves when they need context
+- the PR's description, or the one it will carry (the rules' exception for a loosened test reads it)
 - this instruction: "You are an independent reviewer and have NOT seen any other review. Report a BLOCKER only if it fits the rules and you can cite the file:line and a concrete failure: this input or state → this wrong result. Everything else is a WARN. Zero findings is a normal, common result — do not manufacture findings."
 - this output format:
 
@@ -62,6 +63,8 @@ An Agent with `subagent_type: code-reviewer` and `model: opus`.
 
 #### Reviewer B: external model (Claude fallback only if no external CLI is installed)
 
+Reviewer B gets the same rules, diff, description and output format, and reviews as an attacker: one student, teacher or school reaching another's data; injection, XSS, path traversal, SSRF, CSRF, unvalidated input at a trust boundary; personal data escaping the account deletion, the disposal, the retention run or the export; secrets or personal data in logs or errors; migrations that destroy or rewrite data. The lens moves where it looks, never what blocks: a finding blocks only as the rules say. Codex, Gemini and the Claude fallback alike.
+
 Detect which CLIs are available:
 
 ```bash
@@ -69,12 +72,12 @@ command -v codex >/dev/null 2>&1 && echo "codex" || true
 command -v gemini >/dev/null 2>&1 && echo "gemini" || true
 ```
 
-Write the same prompt Reviewer A gets to a unique temp file:
+Write Reviewer B's prompt to a unique temp file:
 
 ```bash
 PROMPT_FILE=$(mktemp /tmp/santa-reviewer-b-XXXXXX.txt)
 cat > "$PROMPT_FILE" << 'EOF'
-... rules + diff + instruction + output format ...
+... rules + diff + description + instruction + the attacker's lens + output format ...
 EOF
 ```
 
@@ -94,7 +97,7 @@ gemini -p "$(cat "$PROMPT_FILE")" -m gemini-2.5-pro
 rm -f "$PROMPT_FILE"
 ```
 
-**Claude fallback** (neither CLI installed): a second Agent with `subagent_type: code-reviewer` and `model: opus`. Say in the report that both reviewers share a model family — context isolation still holds, model diversity doesn't.
+**Claude fallback** (neither CLI installed): a second Agent with `subagent_type: code-reviewer` and `model: opus`, given Reviewer B's prompt. Say in the report that both reviewers share a model family — context isolation still holds, model diversity doesn't.
 
 #### Design check (only when the diff touches user-facing UI)
 
@@ -149,7 +152,7 @@ Rounds:    [N]/2
 
 ## Notes
 
-- Reviewer A (Claude Opus) always runs, so there is always one strong reviewer. Reviewer B's different model (GPT-5.4 or Gemini 2.5 Pro) brings different blind spots; the Claude-only fallback keeps context isolation but loses that.
+- Reviewer A (Claude Opus) always runs, so there is always one strong reviewer. Reviewer B's different model (GPT-5.4 or Gemini 2.5 Pro) brings different blind spots; the Claude-only fallback keeps context isolation and the attacker's lens but loses that.
 - External reviewers run read-only (`--sandbox read-only` for Codex).
 - Fresh reviewers each round keep them from anchoring on earlier findings; round 2's narrow scope keeps them off code that's already settled.
 - Fixes are committed each round, so an interrupted loop keeps them.

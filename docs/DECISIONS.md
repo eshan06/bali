@@ -8,6 +8,29 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-13** — **A PR is judged by the base branch's rules, a loosened test blocks, and santa's
+  Reviewer B reviews as an attacker (the owner's approval, after an independent review of the
+  workflow; folded into #359 so the owner's bypass merge happens once).** **The base's rules:**
+  Claude Review reads CLAUDE.md and docs/ARCHITECTURE.md with `git show origin/<base>:<path>`
+  (`Bash(git show:*)` allowed; the checkout fetches every branch), never the PR's own copies, and
+  santa copies its rules from `origin/main`'s `claude-review.yml`. *Why:* a PR could edit a rule and
+  the code that breaks it in one go, and be judged by its own edit; a rule change now lands in its
+  own PR first and is judged as one. The prompt was already the base's: the action refuses a
+  workflow that differs from `main`'s. **A loosened test blocks:** an existing test loosened,
+  skipped or deleted (an assertion weakened, a case removed, `.skip` or `.only`), unless the PR's
+  description names the behavior change it is meant to make. The action's agent mode passes the
+  reviewer no PR context, so a step writes the description to `pr-description.md` from the PR as it
+  stands (`gh pr view`), and a re-run reads an edited one; santa's reviewers get the description the
+  PR carries or will carry. **Reviewer B as an attacker:** the same rules, diff and output, its lens
+  one student, teacher or school reaching another's data, injection and the web's holes, personal
+  data escaping the four privacy paths, secrets or personal data in logs or errors, and migrations
+  that destroy or rewrite data; the lens moves where it looks, never what blocks, so santa stays no
+  stricter than the gate. Reviewer A keeps the full rules and its checklist. **Rode along, a hole
+  found writing this:** the posting step read `claude-review.md` from the checkout, so a PR that
+  committed one ending `VERDICT: PASS` passed whenever the review wrote none, which a diff too large
+  for the reviewer to finish would bring about; the step that writes the description deletes it
+  first, so only the reviewer's verdict counts.
+
 - **2026-10-13** — **The reviewers block on security holes and on personal data the privacy paths
   miss, and both Claude workflows run Opus 5.5 (the owner's ruling, in chat: "security should be a
   blocker, student data reaching deletion and export paths should also be a blocker"; "we

@@ -4,11 +4,15 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-10-13 (Central) — the reviewers (the owner's ruling): a security hole with a
-concrete exploit, and personal data that the account deletion, a school's disposal, the retention
-run or the student's export misses, now block, named in `claude-review.yml`'s rules, which santa's
-reviewers copy; both Claude workflows run Opus 5.5 (`claude-opus-5-5`). Its PR's own Claude Review
-is red by design until the owner's ruleset toggle (GOTCHAS). CodeQL's default setup is on
+_Last updated: 2026-10-13 (Central) — the reviewers (the owner's rulings): a security hole with a
+concrete exploit, personal data that the account deletion, a school's disposal, the retention run
+or the student's export misses, and an existing test loosened, skipped or deleted with no behavior
+change named in the PR's description now block, named in `claude-review.yml`'s rules, which santa's
+reviewers copy; Claude Review and santa judge a PR by `main`'s rules (the prompt, CLAUDE.md and
+ARCHITECTURE.md), never its own copies; santa's Reviewer B reviews as an attacker; a
+`claude-review.md` the PR commits no longer counts as the verdict; both Claude workflows run Opus
+5.5 (`claude-opus-5-5`). Its PR's own Claude Review is red by design until the owner's ruleset
+toggle (GOTCHAS). CodeQL's default setup is on
 (JavaScript/TypeScript and GitHub Actions; not a required check). Next: PV7. Before it,
 the redesign's state at a pause: PV0–PV6 done with PV3b, PV4b,
 PV4c and PV5b; next PV7, a class live. The notes for coming steps are on their lines (PV7, PV13, PV15,
