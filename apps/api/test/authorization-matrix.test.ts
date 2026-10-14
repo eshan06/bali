@@ -55,8 +55,8 @@ import { makeTestIssuer, type TestIssuer } from './helpers/test-issuer.js';
  * Each row runs in a world of its own (`world`), so no row's write reaches
  * another's. And a 2xx to a stranger names nothing of this world's (`hidden`)
  * — its session, its student, their enrollment, tap and unlock, the owner,
- * their block, saved question and deck, the class unless the request carries
- * its join code, and to a caller from another school the school — so
+ * their block, saved question and deck, the class and its join code unless the
+ * request carries the code, and to a caller from another school the school — so
  * the routes no one is refused (an unlock, a check-in, a tap) are pinned too.
  */
 
@@ -407,9 +407,9 @@ function unlisted(
 }
 
 /**
- * What a 2xx to a stranger never names: the world's own ids — and its class,
- * unless the request carries the class's join code, which opens it (the
- * preview and the join answer with the class), and its school, unless the
+ * What a 2xx to a stranger never names: the world's own ids — and its class and
+ * the class's join code, unless the request carries the code, which opens the
+ * class (the preview and the join answer with it), and its school, unless the
  * stranger is a colleague there.
  */
 function hidden(w: World, sent: Sent, caller: Caller): string[] {
@@ -424,7 +424,7 @@ function hidden(w: World, sent: Sent, caller: Caller): string[] {
     w.draftId,
     w.deckId,
   ];
-  if (!JSON.stringify(sent).includes(w.klass.joinCode)) ids.push(w.klass.id);
+  if (!JSON.stringify(sent).includes(w.klass.joinCode)) ids.push(w.klass.id, w.klass.joinCode);
   if (caller !== 'colleague') ids.push(w.school.id);
   return ids;
 }

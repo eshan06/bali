@@ -9,18 +9,20 @@ import { describe, expect, it } from 'vitest';
  * Only the transition engine writes `participations` and `events` (CLAUDE.md's
  * first convention; ARCHITECTURE, data-model decision 1): both tables in one
  * transaction, always, so the live picture and the history never disagree. This
- * reads every source file in each app's and package's `src`, tests left out (the
- * migrations live outside `src`), and fails a write to either table anywhere but
+ * reads every file in each app's and package's `src` and `scripts` (the owner's
+ * commands run against production), tests left out and the migrations outside
+ * both, and fails a write to either table anywhere but
  * `packages/db/src/transitions.ts`.
  *
  * Syntax, not types, as O1b's scan of request reads (apps/api/test/openapi.test.ts):
  * a drizzle `insert(`, `update(` or `delete(` of either table, by its name, a
- * namespace's (`schema.events`) or an import's alias; and raw SQL in a string or
- * template that inserts into, updates, deletes from, truncates or merges into
- * either, by name or by `${events}`. Comments are never read. Another object's
- * `.delete(events)` would fail it loudly, never pass; a write that hides the
- * table's name (a variable holding it, SQL pieced together from strings) is a
- * dodge for review, not a mistake this catches.
+ * namespace's (`schema.events`) or an import's alias, in parentheses, `!`, `as` or
+ * `satisfies` too; and raw SQL in a string or template that inserts into, updates,
+ * deletes from, truncates or merges into either, by its name in any case or by an
+ * interpolation naming it (`${events}`, `${sql.identifier('events')}`). Comments
+ * are never read. Another object's `.delete(events)` would fail it loudly, never
+ * pass; a write that hides the table's name (a variable holding it, SQL pieced
+ * together from strings) is a dodge for review, not a mistake this catches.
  */
 
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
@@ -39,19 +41,21 @@ const OUTSIDE_THE_ENGINE = ['packages/db/src/testing.ts: update participations']
 const SOURCE = /\.(?:[cm]?[jt]s|[jt]sx)$/;
 const TEST = /\.(?:test|spec)\.[^.]+$/;
 
-/** Raw SQL that writes: the verb, then the table, by name or by `${…table}`. */
+/** Raw SQL that writes: the verb, then the table, as an interpolation (`${…}`) or by name. */
 const SQL_WRITE =
-  /\b(insert\s+into|update|delete\s+from|truncate(?:\s+table)?|merge\s+into)\s+(?:only\s+)?(?:"?public"?\s*\.\s*)?(?:\$\{\s*(?:[\w$]+\s*\??\.\s*)*([\w$]+)\s*\}|"?([\w$]+)"?)(?![\w$])/gi;
+  /\b(insert\s+into|update|delete\s+from|truncate(?:\s+table)?|merge\s+into)\s+(?:only\s+)?(?:"?public"?\s*\.\s*)?(?:\$\{([^}]*)\}|"?([\w$]+)"?(?![\w$]))/gi;
 
-/** The source files of every app and package, as paths from the repository's root. */
+/** The source and script files of every app and package, as paths from the repository's root. */
 async function sourceFiles(): Promise<string[]> {
   const files: string[] = [];
   for (const group of ['apps', 'packages']) {
     for (const name of await readdir(join(ROOT, group))) {
-      const src = join(group, name, 'src');
-      if (!existsSync(join(ROOT, src))) continue;
-      for (const f of await readdir(join(ROOT, src), { recursive: true })) {
-        if (SOURCE.test(f) && !TEST.test(f)) files.push(join(src, f).split('\\').join('/'));
+      for (const dir of ['src', 'scripts']) {
+        const root = join(group, name, dir);
+        if (!existsSync(join(ROOT, root))) continue;
+        for (const f of await readdir(join(ROOT, root), { recursive: true })) {
+          if (SOURCE.test(f) && !TEST.test(f)) files.push(join(root, f).split('\\').join('/'));
+        }
       }
     }
   }
@@ -69,6 +73,15 @@ function writesIn(file: string, source: string): string[] {
   // Each name a table goes by in this file: its own, and an import's alias.
   const aliases = new Map(TABLES.map((t) => [t, t]));
   const named = (node: ts.Node): string | undefined => {
+    while (
+      ts.isParenthesizedExpression(node) ||
+      ts.isNonNullExpression(node) ||
+      ts.isAsExpression(node) ||
+      ts.isSatisfiesExpression(node) ||
+      ts.isTypeAssertionExpression(node)
+    ) {
+      node = node.expression;
+    }
     if (ts.isIdentifier(node)) return aliases.get(node.text);
     if (ts.isPropertyAccessExpression(node)) return tableOf(node.name.text);
     if (ts.isElementAccessExpression(node) && ts.isStringLiteralLike(node.argumentExpression)) {
@@ -100,7 +113,14 @@ function writesIn(file: string, source: string): string[] {
       if (table) found.push(`${file}: ${node.expression.name.text} ${table}`);
     }
     for (const [, verb, interpolated, plain] of (textOf(node) ?? '').matchAll(SQL_WRITE)) {
-      const table = tableOf(interpolated ?? plain ?? '');
+      // SQL folds an unquoted name's case; an interpolation names a table by any word in it.
+      const table =
+        plain !== undefined
+          ? tableOf(plain.toLowerCase())
+          : interpolated
+              ?.match(/[\w$]+/g)
+              ?.map((word) => aliases.get(word))
+              .find(Boolean);
       if (table) found.push(`${file}: ${verb!.split(/\s/)[0]!.toLowerCase()} ${table}`);
     }
     ts.forEachChild(node, visit);
@@ -110,10 +130,11 @@ function writesIn(file: string, source: string): string[] {
 }
 
 describe('only the transition engine writes participations and events', () => {
-  it('holds in every source file of the apps and packages', async () => {
+  it('holds in every source and script file of the apps and packages', async () => {
     const files = await sourceFiles();
     expect(files).toContain(ENGINE);
     expect(files).toContain('apps/api/src/routes/taps.ts');
+    expect(files).toContain('apps/api/scripts/school.ts');
     const writes = (
       await Promise.all(files.map(async (f) => writesIn(f, await readFile(join(ROOT, f), 'utf8'))))
     ).flat();
@@ -140,9 +161,13 @@ describe('only the transition engine writes participations and events', () => {
         .where(match);
       await tx.update(schema['participations']).set(change);
       await db.insert(history).values(row);
+      await tx.update((participations as typeof participations)!).set(change);
       await db.execute(sql\`insert into events (id) values (\${id})\`);
       await db.execute(sql\`UPDATE "participations" SET state = \${state}\`);
+      await db.execute(sql\`UPDATE PARTICIPATIONS SET state = \${state}\`);
       await db.execute(sql\`delete from \${schema.events} where seq = \${seq}\`);
+      await db.execute(sql\`insert into \${history} (id) values (\${id})\`);
+      await db.execute(sql\`update \${sql.identifier('participations')} set state = \${state}\`);
       await db.execute(sql.raw('DELETE FROM public.participations'));
       await client.query(\`truncate table events\`);
     `;
@@ -152,9 +177,13 @@ describe('only the transition engine writes participations and events', () => {
       'w.ts: delete events',
       'w.ts: update participations',
       'w.ts: insert events',
+      'w.ts: update participations',
       'w.ts: insert events',
       'w.ts: update participations',
+      'w.ts: update participations',
       'w.ts: delete events',
+      'w.ts: insert events',
+      'w.ts: update participations',
       'w.ts: delete participations',
       'w.ts: truncate events',
     ]);
