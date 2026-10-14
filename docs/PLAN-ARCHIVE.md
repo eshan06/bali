@@ -10,6 +10,14 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-14 (Central) — PV7, a class live in v2's look (#375; `docs/DECISIONS.md`,
+2026-10-14): the header with the ring, "Live · 25 of 28 joined · join code", the countdown on this
+computer's clock to the server's bell and the bell's time, +5, +10 and End; the six state counts
+beside a small Present; a lost stream as the floating reconnect pill, a quiet one as the stone line;
+no roster and no New code while a session runs; Present's page as it was until PV9. Before it, the
+owner's answers (PV5b's error kept, its notes into PV15 and PV17a). Next: the Windows test fix, then
+PV8._
+
 _Last updated: 2026-10-14 (Central) — the owner's answers (`docs/DECISIONS.md`, 2026-10-14): PV5b's
 whole-page error kept, its review notes folded into PV15 and PV17a, PV4c's test limits left, the four
 pre-pilot steps after the redesign's PV17c, and a test-only PR for the three tests that fail only on

@@ -131,20 +131,27 @@ describe('boot contracts', () => {
     }
   }, 30_000);
 
-  it('SIGINT then SIGTERM shuts down once, cleanly', async () => {
-    // PORT=0 lets the OS pick a free port — no collision window.
-    const { child, exited, waitForOutput } = bootServer({ PORT: '0', HOST: '127.0.0.1' });
-    await waitForOutput('Server listening');
-    child.kill('SIGINT');
-    child.kill('SIGTERM');
-    const result = await exitWithin(child, exited, 20_000);
+  // Windows has no POSIX signals: Node's kill() there ends the child at once whatever the signal,
+  // as SIGKILL would, so the graceful shutdown this checks never runs. Skipped on Windows alone;
+  // CI's Linux runners run it as before.
+  it.skipIf(process.platform === 'win32')(
+    'SIGINT then SIGTERM shuts down once, cleanly',
+    async () => {
+      // PORT=0 lets the OS pick a free port — no collision window.
+      const { child, exited, waitForOutput } = bootServer({ PORT: '0', HOST: '127.0.0.1' });
+      await waitForOutput('Server listening');
+      child.kill('SIGINT');
+      child.kill('SIGTERM');
+      const result = await exitWithin(child, exited, 20_000);
 
-    expect(result.code).toBe(0);
-    expect(result.signal).toBeNull();
-    const shutdownLogs = result.output.match(/"msg":"shutting down"/g) ?? [];
-    expect(shutdownLogs).toHaveLength(1);
-    // The process entry starts the minute sweep (A15) — the one line that
-    // fixes sessions ending late; sweep.test.ts pins what the ticker does.
-    expect(result.output).toContain('"msg":"sweeping every minute"');
-  }, 30_000);
+      expect(result.code).toBe(0);
+      expect(result.signal).toBeNull();
+      const shutdownLogs = result.output.match(/"msg":"shutting down"/g) ?? [];
+      expect(shutdownLogs).toHaveLength(1);
+      // The process entry starts the minute sweep (A15) — the one line that
+      // fixes sessions ending late; sweep.test.ts pins what the ticker does.
+      expect(result.output).toContain('"msg":"sweeping every minute"');
+    },
+    30_000,
+  );
 });

@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { House } from 'lucide-react';
@@ -580,15 +580,17 @@ describe('every page and piece uses the tokens’ utilities, never a Tailwind de
   // DESIGN.md: no `slate-*`, no `text-sm`. Every screen is drawn from the tokens since D2g, and the
   // theme holds no default colour or size, so one would draw nothing: each source file is held to it.
   const src = fileURLToPath(new URL('../', import.meta.url));
+  // Each under src/, its parts joined by `/` on every OS (Windows' own is `\`), so a case is named
+  // alike everywhere and the field's exception below finds it.
   const DRAWN = sources(src)
     .filter((file) => /\.tsx?$/.test(file))
-    .map((file) => relative(src, file));
+    .map((file) => relative(src, file).split(sep).join('/'));
 
   it('covers the redrawn screens, the recap and the reports page included', () => {
     expect(DRAWN.length).toBeGreaterThan(30);
-    expect(DRAWN).toContain(join('components', 'recap-card.tsx'));
-    expect(DRAWN).toContain(join('app', 'classes', '[id]', 'reports', 'page.tsx'));
-    expect(DRAWN).toContain(join('components', 'reports-list.tsx'));
+    expect(DRAWN).toContain('components/recap-card.tsx');
+    expect(DRAWN).toContain('app/classes/[id]/reports/page.tsx');
+    expect(DRAWN).toContain('components/reports-list.tsx');
   });
 
   // A side's border, a ring's offset and a shadow take a colour too (`border-t-slate-200`).
