@@ -11,10 +11,9 @@ import {
   ShieldOff,
   WifiOff,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 
 import { Button } from '@/components/button';
-import { CARD } from '@/components/card';
 import { getAccessToken } from '@/lib/auth';
 import { config } from '@/lib/config';
 import { errText } from '@/lib/errors';
@@ -39,17 +38,18 @@ import {
 import { createSseClient, type SseClient, type SseStatus } from '@/lib/sse-client';
 import { useApi, useSignOut } from '@/lib/use-api';
 
-/** A state's edge: none to see on a tinted chip; Silent's and Unknown's dashed (Q3 A, 1.5 px). */
+/** A state's edge: none to see on a tint; Silent's and Unknown's dashed (Q3 A, 1.5 px). */
 const SOLID = 'border-transparent';
 const DASHED = 'border-dashed border-border-strong';
 const EMERGENCY = `${SOLID} bg-state-emergency-bg text-state-emergency-fg`;
 const REVOKED = `${SOLID} bg-state-revoked-bg text-state-revoked-fg`;
 
 /**
- * Each state's chip (DESIGN.md §2 and §4): its tint, its icon and its label, never colour alone.
- * The two Left chips take their state's colour, the flag first and the state's icon after it
- * (Q2 A); Silent is the ended pair with a dashed edge, Unknown dashed with no fill (Q3 A). The class
- * page's counts take the same (PV7).
+ * Each state's look (DESIGN.md §2): its tint, its icon and its words, never colour alone. A tile
+ * (PV8) and the class page's count of it (PV7) both draw from it, so the two always agree. The two
+ * Left states take their state's colour, the flag first and the state's icon after it (Q2 A; a
+ * student who left while unlocked counts under Left with an orange tile, the owner, 2026-10-14);
+ * Silent is the ended pair with a dashed edge, Unknown dashed with no fill (Q3 A).
  */
 export const CHIP: Record<GridDisplay, { label: string; icons: LucideIcon[]; tone: string }> = {
   focused: {
@@ -128,81 +128,65 @@ export function stateCounts(displays: readonly GridDisplay[]): StateCounts {
 }
 
 /**
- * The grid's columns (the Class page design): as many as fit, each at least 212 px, so six fill
- * the class page's 1320 px column at the desktop width, every chip on one line but Unknown's and
- * "Left · protection off", which wrap after their dot; never wider than the grid (`min`), on a
- * phone. Present keeps its four columns (DESIGN.md §5) from a 56 rem grid, as it shipped: the
- * canvas's 320 px would leave a 1280 px projector three, a 1024 px one two.
+ * The grid's columns (ClassLive): as many tiles as fit, each at least 250 px, 10 px apart, so four
+ * fill the class page beside the side menu at 1440 px; never wider than the grid (`min`). On a
+ * phone (PhoneClassLive, under 640 px), two columns 8 px apart, every tile as tall as the grid's
+ * tallest (PV1's pick: one size, nothing cut). Present keeps four columns from a 56 rem grid
+ * (DESIGN.md §5), 12 px apart, three and then two narrower, so a 1024 px projector still shows four.
  */
-export const COLUMNS = 'grid-cols-[repeat(auto-fill,minmax(min(212px,100%),1fr))]';
-export const PRESENT_COLUMNS = 'grid-cols-2 @2xl:grid-cols-3 @4xl:grid-cols-4';
+export const COLUMNS =
+  'grid-cols-[repeat(auto-fill,minmax(min(250px,100%),1fr))] gap-2.5 max-sm:grid-cols-2 max-sm:auto-rows-fr max-sm:gap-2';
+export const PRESENT_COLUMNS = 'grid-cols-2 gap-3 @2xl:grid-cols-3 @4xl:grid-cols-4';
+
+/** Clock off's tooltip (S9): advice, which changes no state. */
+const CLOCK_OFF = "This phone's clock is set ahead. Bali records the time by its own clock.";
+
+/** A dot between two parts of a line, after a no-break space, so a line never starts with one. */
+const DOT = '\u00a0· ';
 
 /**
- * A state chip in v2's look (DESIGN.md §4): a pill in the state's tint with a 1.5 px edge, padded
- * 3 × 10 px, its 13 px icons centred on the label's first line, the label in sentence case at
- * 13/18 (`caption`, medium). It says the state alone, the same words on the teacher's screen and
- * on the projector (the Class page design); only Silent carries how long the phone has been quiet.
- * A label too long for its cell wraps balanced, after the dot ("Left ·" over "protection off", the
- * owner's ruling), at `radius-lg`, which draws the pill on one line (it is 27 px tall) and a
- * rounded box on two. `pulse` is `bali-softpulse` (§7), and `onPulseEnd` hears it finish. In
- * Present the label takes the projector's size (§5), its icons 16 px.
+ * A tile in v2's look (ClassStates): filled with its state's tint, its edge 1.5 px (dashed for
+ * Silent and Unknown), 14 px corners; the state's icon, then the name, the state and one line, each
+ * cut short with an ellipsis rather than wrapped, so every tile is one size: 84 px tall, 12 × 14 px
+ * in. On a phone (PhoneClassLive) a short tile, 10 × 12 px in, as tall as the tallest: no icon at
+ * the side, the state's icon before its words, the line after them, nothing cut. In Present
+ * (ClassPresent), one size up: 100 px tall, 12 × 18 px in, its icon 24 px.
  */
-function Chip({
-  display,
-  silent,
-  pulse,
-  onPulseEnd,
-  present,
-}: {
-  display: GridDisplay;
-  silent: string | null;
-  pulse: boolean;
-  onPulseEnd?: () => void;
-  present: boolean;
-}) {
-  const chip = CHIP[display];
-  return (
-    <span
-      onAnimationEnd={pulse ? onPulseEnd : undefined}
-      className={`inline-flex max-w-full items-start gap-1.5 rounded-lg border-[1.5px] px-2.5 py-0.75 text-balance ${present ? 'text-present-label' : 'text-caption font-medium'} ${chip.tone} ${pulse ? 'animate-softpulse' : ''}`}
-    >
-      {chip.icons.map((Icon, i) => (
-        <Icon
-          key={i}
-          size={present ? 16 : 13}
-          aria-hidden="true"
-          className={`shrink-0 ${present ? 'mt-0.5' : 'mt-[2.5px]'}`}
-        />
-      ))}
-      {/* A no-break space before each dot, so a label breaks after it, never before. */}
-      <span className="min-w-0">
-        {(silent === null ? chip.label : `${chip.label} · ${silent}`).replaceAll(' · ', '\u00a0· ')}
-      </span>
-    </span>
-  );
-}
+const TILE = {
+  standard:
+    'grid h-21 grid-cols-[20px_minmax(0,1fr)] gap-x-2.5 px-3.5 py-3 max-sm:block max-sm:h-auto max-sm:px-3 max-sm:py-2.5',
+  present: 'grid h-25 grid-cols-[24px_minmax(0,1fr)] gap-x-3 px-4.5 py-3',
+};
 
 /**
- * The dot between an unlock's reason and "last seen", as wide as " · ", clipped away when "last
- * seen" wraps under the reason (the line's `overflow-hidden`), so a line never starts with it.
+ * The tile's words, as `TILE` lays it out: the name 15/20, the state 13/18 and the line 12.5/17;
+ * in Present 21/28, 17/24 and 15/22. On a phone the state and the line run on as one, wrapping,
+ * on the state's own line height.
  */
-const AFTER_REASON =
-  "-ml-2.5 before:inline-block before:w-2.5 before:text-center before:content-['·']";
+const WORDS = {
+  standard: {
+    text: 'max-sm:block max-sm:text-caption',
+    name: 'text-tile-name max-sm:whitespace-normal max-sm:wrap-anywhere',
+    state: 'text-caption font-semibold max-sm:inline max-sm:whitespace-normal max-sm:wrap-anywhere',
+    line: 'text-tile-line max-sm:inline max-sm:whitespace-normal',
+  },
+  present: {
+    text: '',
+    name: 'text-present-tile-name',
+    state: 'text-present-tile-state',
+    line: 'text-body font-medium',
+  },
+};
 
 /**
- * The standard grid on one column (a phone, under 432 px, where a second column stops fitting):
- * the chip beside the name, the line under both, as the canvas's container rule draws it.
+ * One student's tile (ClassStates, ClassLive, PhoneClassLive, ClassPresent): the state's icon, the
+ * name, the state's words (Silent's with its minutes, a Left state's after its flag), and one line:
+ * an unlock's reason (`unlockNote`, never in Present, the projector the class can see), how long
+ * since the phone was heard from (`lastSeenNote`) and Clock off (S9), each that applies, in that
+ * order. `pulse` is `bali-softpulse` (DESIGN.md §7) on the whole tile, and `onPulseEnd` hears it
+ * finish.
  */
-const ONE_COLUMN =
-  '@max-[432px]:grid @max-[432px]:min-h-0 @max-[432px]:grid-cols-[minmax(0,1fr)_auto] @max-[432px]:items-center @max-[432px]:gap-x-3 @max-[432px]:gap-y-1';
-
-/**
- * One student's cell (the Class page design): the name, then the chip, then the line under it: the
- * unlock's reason (`unlockNote`, never in Present) and how long since the phone was heard from
- * (`lastSeenNote`), so a row's chips line up. Every cell is as tall as one with that line: 117 px
- * with v2's 27 px chip (`min-h-29.25`). In Present the line sits beside the chip when it fits.
- */
-export function Cell({
+export function Tile({
   student: s,
   now,
   present,
@@ -216,60 +200,84 @@ export function Cell({
   onPulseEnd?: () => void;
 }) {
   const display = gridDisplay(s, now);
+  const { label, icons, tone } = CHIP[display];
+  // The state's own icon at the side; a Left state's flag before its words.
+  const flags = icons.slice(0, -1);
+  const StateIcon = icons[icons.length - 1] ?? Circle;
+  const words = display === 'silent' ? `${label} · ${silentNote(s, now)}` : label;
   const reason = unlockNote(s, display, present);
   const seen = lastSeenNote(s, display, now);
+  const line = [
+    ...(reason === null ? [] : [reason.charAt(0).toUpperCase() + reason.slice(1)]),
+    ...(seen === null ? [] : [seen]),
+    ...(s.clockOff ? ['Clock off'] : []),
+  ];
+  const look = present ? 'present' : 'standard';
   return (
-    <li
-      className={`flex flex-col gap-2 ${CARD} ${present ? 'min-h-22' : `min-h-29.25 ${ONE_COLUMN}`}`}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <span
-          className={`min-w-0 break-words ${present ? 'text-present-name' : 'text-body font-semibold'}`}
-        >
-          {s.displayName ?? s.studentId.slice(0, 8)}
-        </span>
-        {/* S9: advice beside the name, never a colour of its own; it changes no state. */}
-        {s.clockOff ? (
-          <span
-            title="This phone's clock is set ahead. Bali records the time by its own clock."
-            className="shrink-0 rounded-xs border border-current px-2 text-caption whitespace-nowrap text-text-tertiary"
-          >
-            Clock off
-          </span>
-        ) : null}
-      </div>
+    <li className="flex min-w-0">
+      {/* Keyed by its unlock, so each new one pulses from the start; once it has pulsed it leaves
+          the set, so a tile that turns red and back stays still. */}
       <div
-        className={
-          present
-            ? 'flex flex-wrap items-center gap-x-3 gap-y-1'
-            : 'flex flex-col items-start gap-2 @max-[432px]:contents'
-        }
+        key={s.unlock?.eventId ?? 'none'}
+        onAnimationEnd={pulse ? onPulseEnd : undefined}
+        className={`${TILE[look]} w-full items-start rounded-md border-[1.5px] tabular-nums ${tone} ${pulse ? 'animate-softpulse' : ''}`}
       >
-        {/* Keyed by its unlock, so each new one pulses from the start; once it has pulsed it
-            leaves the set, so a chip that turns red and back stays still. */}
-        <Chip
-          key={s.unlock?.eventId ?? 'none'}
-          display={display}
-          silent={display === 'silent' ? silentNote(s, now) : null}
-          pulse={pulse}
-          present={present}
-          onPulseEnd={onPulseEnd}
+        <StateIcon
+          size={present ? 24 : 20}
+          aria-hidden="true"
+          className={`mt-px ${present ? '' : 'max-sm:hidden'}`}
         />
-        {reason === null && seen === null ? null : (
-          <p className="flex flex-wrap overflow-hidden text-caption tabular-nums @max-[432px]:col-span-full">
-            {reason === null ? null : (
-              <span className="mr-2.5 text-text-secondary first-letter:uppercase">{reason}</span>
-            )}
-            {seen === null ? null : (
-              <span className={`text-text-tertiary ${reason === null ? '' : AFTER_REASON}`}>
-                {seen}
-              </span>
-            )}
-          </p>
-        )}
+        <span className={`flex min-w-0 flex-col ${WORDS[look].text}`}>
+          <span className={`block truncate ${WORDS[look].name}`}>
+            {s.displayName ?? s.studentId.slice(0, 8)}
+          </span>
+          <span className={`block truncate ${WORDS[look].state}`}>
+            {/* A Left state's flag; on a phone, the state's own icon after it. */}
+            {[...flags, ...(present ? [] : [StateIcon])].map((Icon, i) => (
+              <Icon
+                key={i}
+                size={present ? 16 : 13}
+                aria-hidden="true"
+                className={`mr-0.75 inline align-[-2px] ${i < flags.length ? '' : 'sm:hidden'}`}
+              />
+            ))}
+            {words.replaceAll(' · ', DOT)}
+          </span>
+          {line.length === 0 ? null : (
+            <span className={`block truncate ${WORDS[look].line}`}>
+              {/* On a phone the line runs on after the state's words. */}
+              {present ? null : (
+                <span aria-hidden="true" className="sm:hidden">
+                  {DOT}
+                </span>
+              )}
+              {line.map((part, i) => (
+                <Fragment key={part}>
+                  {i === 0 ? null : DOT}
+                  {part === 'Clock off' ? (
+                    <span title={CLOCK_OFF}>{part}</span>
+                  ) : (
+                    part.replaceAll(' · ', DOT)
+                  )}
+                </Fragment>
+              ))}
+            </span>
+          )}
+        </span>
       </div>
     </li>
   );
+}
+
+/**
+ * The stream's state as the grid's health reads it (`staleness`): its first connect, as the page
+ * loads, counts as open, judged by how long the stream has been quiet, since it has lost nothing
+ * and the grid was just read. Read as a reconnect, it flashed the pill for the 60–100 ms the
+ * connect takes on every page load (PV7's find); a first connect that hangs is still said, as the
+ * quiet stream's line, once the stream has been quiet that long.
+ */
+export function healthOf(status: SseStatus): 'open' | 'reconnecting' {
+  return status === 'reconnecting' ? 'reconnecting' : 'open';
 }
 
 /**
@@ -299,9 +307,9 @@ export function LiveGrid({
   /** Called with `sessionId` and the grid counted (`stateCounts`) whenever a count changes (PV7). */
   onCounts?: (sessionId: string, counts: StateCounts) => void;
   /**
-   * The projector view (DESIGN.md §5): four columns, names 20 px, chip labels 14 px, cells at
-   * least 88 px tall, readable from the back of a classroom; the same chips and words, but never
-   * an unlock's reason: the class can see it (`unlockNote`).
+   * The projector view (DESIGN.md §5; ClassPresent): four columns of tiles one size up, readable
+   * from the back of a classroom; the same states and words, but never an unlock's reason: the
+   * class can see it (`unlockNote`).
    */
   present?: boolean;
   /**
@@ -474,7 +482,7 @@ export function LiveGrid({
   }
 
   const stale = staleness({
-    status,
+    status: healthOf(status),
     lastStreamActivityAt: lastStreamActivity.current,
     lastGridActivityAt: lastGridActivity.current,
     now: now.getTime(),
@@ -502,13 +510,13 @@ export function LiveGrid({
       {rows.length === 0 ? (
         <p className="text-body text-text-secondary">No students enrolled yet.</p>
       ) : (
-        // Fewer columns as the grid narrows, never smaller type (§5); the cells straight on the page.
+        // Fewer columns as the grid narrows, never smaller type (§5); the tiles straight on the page.
         <div className="@container">
-          <ul className={`grid gap-2 ${present ? PRESENT_COLUMNS : COLUMNS}`}>
+          <ul className={`grid ${present ? PRESENT_COLUMNS : COLUMNS}`}>
             {rows.map((s) => {
               const unlock = s.unlock?.eventId;
               return (
-                <Cell
+                <Tile
                   key={s.studentId}
                   student={s}
                   now={now}

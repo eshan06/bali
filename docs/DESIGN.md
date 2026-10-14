@@ -147,7 +147,8 @@ join code's card with Copy, and New code's confirm a dialog (`JoinCode`'s, in
 Present's header too). The page while one runs is v2's since PV7 (2026-10-14):
 ClassLive's header with the ring and the countdown, the state counts, the
 reconnect pill, no roster and no New code, Present keeping its page until PV9;
-the recap keeps its layout until PV12.
+the recap keeps its layout until PV12. The grid's cells are v2's tinted tiles since
+PV8 (2026-10-14), on the class page, in Present and under How it ended alike.
 Every
 portal source file is held to the tokens' utilities by `tokens.test.ts`, and
 since D2g the theme holds none of Tailwind's own colours, type sizes,
@@ -405,7 +406,9 @@ a focused, unlocked or protection-off chip whose phone hasn't checked in for a
 whole minute, and a focused one reads Silent from 90 s, its label carrying the
 time from then (`lastSeenNote`, `grid-state.ts`). A grid chip says its state
 alone; an unlock's reason sits on that line too, before "last seen" (PB4a, the
-Class page design). Unknown's dashed edge
+Class page design). *v2's tiles (PV8):* the tile says its state, and its one
+line carries the reason, "last seen" and Clock off, in that order, all in the
+state's own ink, as ClassStates draws it. Unknown's dashed edge
 is `border-strong` on purpose, the pick's (Q3 A), where the borrowed
 `state-nodevice-bg` token's own note says `border-default`. The two Left chips
 each take their state's own colour (the owner's pick, 2026-10-04, Q2 A), and
@@ -545,8 +548,8 @@ where they differ (Present's included: §5); the input size stands.
   Silent and Unknown add a 1 px dashed `border-strong` edge (§2). A chip
   never pulses but as §7 allows. *v2's look (§1), on the web:* sentence case
   at 13/18, 3 × 10 px, a 13 px icon and a 1.5 px edge, dashed for Silent and
-  Unknown (PV4; in Present, until PV8, at the projector's 14/20, medium and
-  untracked); the live grid's cells are tinted tiles, not chips (§5).
+  Unknown (PV4); the live grid's cells are tinted tiles, not chips, since PV8
+  (§5), the class page's counts still chips.
 - **The grid's stale banner** ("Live feed has gone quiet…", drawn on D2a's
   canvas): stone, not amber. `surface-sunken` with a `border-default`
   hairline and `text-primary` ink, at `radius-sm`: the grid is honest, not
@@ -622,15 +625,17 @@ where they differ (Present's included: §5); the input size stands.
   2026-10-05): names 20 px and labels 14 px, as drawn, with their line
   heights on the 4-pt grid (the canvas drew 26 and 18; D2f-2 took them up to
   28 and 20, never tighter than drawn, 14/20 being the scale's own pair for
-  14 px: `text-present-name`, `text-present-label`), and the design system
-  gains them when the owner next exports it. The grid reflows by column count
+  14 px: `text-present-name`, `text-present-label`, retired with Present's
+  chips in PV8). The grid reflows by column count
   below the desktop width, never by shrinking type: as many columns as fit,
   each at least 212 px, so six at 1440, in the class page 1400 px wide at most
-  (PB4a), and five beside the side menu (PV5) until v2's tiles (PV8); Present's four from a 56 rem grid, three and then two narrower. In Present the page's header folds the bell, the
+  (PB4a), and five beside the side menu (PV5) until v2's tiles (PV8); Present's four from a 56 rem grid, three and then two narrower, as its tiles keep (PV8). In Present the page's header folds the bell, the
   join code in `code-lg` and the controls into one row, so a class of 28 fits
   one 1080p screen. *v2's look (§1), superseding Q4 and Present's sizes:*
   tinted tiles, each `minmax(250px, 1fr)` and 84 px tall, four to a row at
-  1440; Present four columns of 100 px tiles (21/28, 17/24, 15/22), no menu,
+  1440, each part cut short rather than wrapped so every tile is one size, and
+  on a phone two columns of short tiles, each as tall as the grid's tallest, nothing cut (PV1;
+  built in PV8); Present four columns of 100 px tiles (21/28, 17/24, 15/22), no menu,
   its header the ring, the class, the countdown, the join code at 34/44 and the
   controls, **+5, +10 and End kept** beside Present (the owner, 2026-10-12).
 - **Present never shows an unlock's reason**, because the class can see it:
@@ -742,10 +747,10 @@ the teacher's cue.
 
 (D2c's theme variables carry the glow; the snippet names it so it stands
 alone.) In the portal (D2f-1) it is the `animate-softpulse` utility
-(`globals.css`, pinned by `tokens.test.ts`), on the chip of an unlock the stream
-brings while the grid is open, orange only (`softpulses`, `grid-state.ts`), once
-per unlock: never one the grid booted with or the stream's overlap replays, never
-a red chip.
+(`globals.css`, pinned by `tokens.test.ts`), on the tile (the chip until PV8) of
+an unlock the stream brings while the grid is open, orange only (`softpulses`,
+`grid-state.ts`), once per unlock: never one the grid booted with or the stream's
+overlap replays, never a red tile.
 
 ## 8. Responsive behaviour
 

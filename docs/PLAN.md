@@ -8,11 +8,11 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-14 (Central) — the Windows test fix (#376): the three tests that failed only
-on the Windows PC fail there no more, CI's runs unchanged: the contract fixtures' and the tokens
-test's paths compared with `/` on every OS, and the boot test's SIGINT-then-SIGTERM case skipped on
-Windows alone, which sends a child process no POSIX signals; their GOTCHAS entry deleted. Before it,
-PV7, a class live in v2's look (#375). Next: PV8, tiles._
+_Last updated: 2026-10-14 (Central) — PV8, tiles (#377; `docs/DECISIONS.md`, 2026-10-14): the
+live grid's cells as v2's tinted tiles, every one the same size, each with one line (an unlock's
+reason, "last seen", Clock off; in Present never a reason), on a phone two columns of short tiles;
+the tiles and the class page's counts share one look; the reconnect pill no longer flashes as a
+page loads. Before it, the Windows test fix (#376). Next: PV9, Present._
 
 ## Now
 
@@ -39,8 +39,8 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
   keeps D1's look until the owner approves a new one (its redesign rolled back, 2026-10-06). Left:
   the push's app half (not started), TestFlight build 9 for C7's phone test (📱), and the phone's
   Phase 7 screens (L8, M8). C2's legal words (⚖️) go into the portal's pages, on the Windows PC.
-- **The portal redesign in v2's look (PV0–PV17, the owner, 2026-10-12):** PV0–PV7 done, with PV3b,
-  PV4b, PV4c and PV5b; next PV8, on the Windows PC. Phase 7's web screens follow
+- **The portal redesign in v2's look (PV0–PV17, the owner, 2026-10-12):** PV0–PV8 done, with PV3b,
+  PV4b, PV4c and PV5b; next PV9, on the Windows PC. Phase 7's web screens follow
   PV15.
 - **The workflow review's last steps** ✅ (the owner, 2026-10-13; DECISIONS 2026-10-14): the
   migration guard (#369), docs-only PRs skipping the test jobs (#365), moved files (#368) and two
@@ -131,10 +131,10 @@ validation** (each 👀): vitest, `npm run typecheck && npm run lint && npm test
 - **PV5b** 👀 The shell's read of the account — ✅ (#356; DECISIONS 2026-10-13)
 - **PV6** 👀 A class before a session — ✅ (#355; DECISIONS 2026-10-13)
 - **PV7** 👀 A class live — ✅ (#375; DECISIONS 2026-10-14)
-- **PV8** 👀 Tiles (~300; ClassStates' twelve tiles and Present's): the grid's cells as v2's tinted tiles (`components/live-grid.tsx`), every one the same size (84 px, `minmax(250px, 1fr)`; Present's 100 px, four columns), each with one line, an unlock's reason, "last seen" or Clock off (in Present never a reason); `bali-softpulse` kept; what PV7 left for it, in the same file: the class page's counts draw with the grid's `CHIP` (its words, icons and tints; `components/live-header.tsx`), so the tiles keep it or give the counts their own, and the reconnect pill flashes for 60–100 ms as each page loads, the stream's `connecting` read as reconnecting (pre-existing: the old line did it too) — validation: as above
+- **PV8** 👀 Tiles — ✅ (#377; DECISIONS 2026-10-14)
 - **PV9** 👀 Present (~200; ClassPresent at 1920 × 1080): no menu (the shell draws none in Present since PV5; Present keeps its old column until here), its header one size up, the join code at 34/44, the counts (PV7's `LiveCounts`), the four columns, the reconnect pill (PV7's, `livePage` on `LiveGrid`), and **+5, +10 and End kept** (the owner, 2026-10-12; the board leaves them off); after the bell "Class is over" alone, the figures left to the recap (PV1); PV7 left Present's page as it was, its nav, its header's code with New code and its roster under the grid, none of which ClassPresent draws — validation: as above, a class of 28 on one 1080p screen
 - **PV10** 👀 The unlock pop-up (~150; ClassUnlock): an unlock the stream brings opens a pop-up that stays until closed, beside the tile's pulse, never on the projector, several at once as PV1 draws them; its Open student opens PV11's panel — validation: as above
-- **PV11** 👀 The student panel (ClassStudent; its states as PV1 draws them), in two: **PV11a** the logic in `apps/web/src/lib` (~150, no words): when the student tapped in, their state, this session's moments and their last check-in, from `GET /v1/sessions/{id}/events` and the grid's state; **PV11b** the panel (~250): 372 px from the right, opened by a tile and by the pop-up's Open student — validation: vitest for PV11a; as above for PV11b
+- **PV11** 👀 The student panel (ClassStudent; its states as PV1 draws them), in two: **PV11a** the logic in `apps/web/src/lib` (~150, no words): when the student tapped in, their state, this session's moments and their last check-in, from `GET /v1/sessions/{id}/events` and the grid's state; **PV11b** the panel (~250): 372 px from the right, opened by a tile and by the pop-up's Open student; PV8 left each tile a plain list item, so here it becomes the button ClassStates draws, marked while its panel is open (`.tile.is-selected`) — validation: vitest for PV11a; as above for PV11b
 - **PV12** 👀 The recap (ClassEnded), in two: **PV12a** the grouping in `lib/recap.ts` (~200): *focused the whole time* as the owner ruled (2026-10-12: from the student's own tap-in to the session's end, with no unlock, no Screen Time off, no going silent and no leaving; a late tap-in still counts), focused part of the time (each student's moments, for their line and their words), and didn't join, a late or superseded unlock and a record after the bell placed by `sessionReport`'s rules, as the report places them; **PV12b** the recap (~300; `components/recap-card.tsx`, `timeline.tsx`): the Start card, the last session's figures, those not focused the whole time first, then who was, then who didn't join, the roster and the join code (PV6's); the header's line after the bell, "28 students · the session ended at 9:55 AM", where PV6 says "no session running"; **"How it ended" removed**; the marks' icons at `v2.css`'s 2.25 (`.mk .ic`), by a class, since PV4b's 1.75 rule beats the `strokeWidth` prop — validation: vitest for PV12a (a late tap-in; an unlock and a return; Screen Time off and back on; a silence; a leave; each at the session's edges); as above for PV12b
 - **PV13** 👀 Reports (~350; Reports, ReportStates): `/reports` in the menu, the class picked with pills (no "All classes"), the framing line in italic (the `italic` class alone, never with `font-sans`, which re-slants the upright; PV4's review), the sessions as a table, newest first, with Show earlier, each session's average focus as a bar; `/classes/[id]/reports` redirects to it with that class picked; downloading waits for #339; Help's "Reports, on the class page, lists your past sessions." becomes "Reports, in the menu, lists each class's past sessions." (PV1) — validation: as above, the old URL's redirect
 - **PV14** 👀 A session's report (~250; ReportOpened, ReportStates' "Loading this session…" and "Couldn't load this session."): one session on a page and a URL of its own, its recap card and its Unlocks table; its Questions card is L7c's — validation: as above
