@@ -237,6 +237,9 @@ describe('the grid’s lines on the class page while a session runs (PV7)', () =
   });
 
   it('tells the page its counts only when one moves, not on every second’s tick', () => {
+    // Never beside the grid's "didn't load" line, which a later refresh can fill under it.
+    expect(source).toMatch(/useEffect\(\(\) => \{\s*if \(!students \|\| error\) return;/);
+    expect(source).toMatch(/\}, \[students, now, sessionId, error\]\);/);
     expect(source).toMatch(
       /const key = JSON\.stringify\(counts\);\s*if \(key === told\.current\) return;\s*told\.current = key;\s*onCountsRef\.current\?\.\(sessionId, counts\);/,
     );

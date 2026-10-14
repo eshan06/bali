@@ -73,6 +73,9 @@ describe('the class page in Present', () => {
     expect(live).toMatch(/\{present \? \(\s*<nav aria-label="Class"/);
     expect(live).toMatch(/\{present \? \(\s*<section\s+aria-labelledby=\{`\$\{id\}-roster`\}/);
     expect(live.match(/All classes|Roster/g)).toHaveLength(2);
+    expect(live).toMatch(
+      /<ul className="mt-4 columns-2 gap-x-6 sm:columns-3 sm:gap-x-10 lg:columns-4">/,
+    );
   });
 
   it('keeps the live grid in one place as Present turns on, so it never reboots or reconnects', () => {

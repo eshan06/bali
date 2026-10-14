@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { bellTime } from '../lib/session-controls';
 import type { GridDisplay } from '../lib/grid-state';
 import { stateCounts } from './live-grid';
-import { LiveCounts, LiveHeader, shareLeft, timeLeft } from './live-header';
+import { LiveCounts, LiveHeader, nextTick, shareLeft, timeLeft } from './live-header';
 
 /*
  * A class's header while a session runs and its counts over the grid (PV7; ClassLive, and
@@ -57,6 +57,21 @@ describe('the time left', () => {
     expect(timeLeft(-5000)).toBe('0:00');
   });
 
+  it('is read again just after each whole second turns over, and no more past the bell', () => {
+    // 23:14.400 left: in 410 ms it reads 23:14, then every second on the bell's own milliseconds.
+    expect(nextTick((23 * 60 + 14) * 1000 + 400)).toBe(410);
+    expect(nextTick((23 * 60 + 14) * 1000)).toBe(10);
+    expect(nextTick(999)).toBe(1009);
+    // Each reading lands past the second it waited for, so the next is a whole second on.
+    const left = (23 * 60 + 14) * 1000 + 400;
+    const after = left - (nextTick(left) ?? 0);
+    expect(timeLeft(after)).toBe('23:14');
+    expect(nextTick(after)).toBe(1000);
+    expect(timeLeft(after - (nextTick(after) ?? 0))).toBe('23:13');
+    expect(nextTick(0)).toBeNull();
+    expect(nextTick(-250)).toBeNull();
+  });
+
   it('is a share of the session for the ring: whole at the start, none at the bell', () => {
     expect(shareLeft(STARTED, BELL, NOW)).toBeCloseTo(1394 / 3000);
     expect(shareLeft(STARTED, BELL, Date.parse(STARTED) - 1000)).toBe(1);
@@ -79,7 +94,7 @@ describe('the live header (ClassLive)', () => {
       /<p class="mt-0\.5 text-meta text-text-secondary">Live · 25 of 28 joined · (<!-- -->)?join\u00a0code\u00a0<span translate="no" class="font-mono font-medium">VMAF7E<\/span><\/p>/,
     );
     expect(html).toContain(
-      `<span class="font-num text-data-lg">23:14</span><span class="text-countdown-sub text-text-secondary">ends <time dateTime="${BELL}">${bellTime(BELL)}</time></span>`,
+      `<span class="font-num text-data-lg tabular-nums">23:14</span><span class="text-countdown-sub text-text-secondary">ends <time dateTime="${BELL}">${bellTime(BELL)}</time></span>`,
     );
     // The controls at the end, on a line of their own on a phone.
     expect(html).toMatch(

@@ -397,13 +397,15 @@ export default function ClassDetailPage() {
         </LiveHeader>
       )}
 
-      {/* Its roster didn't load, or a read again of the class failed: said under the header. */}
-      {(error ?? rosterError) ? (
+      {/* A read again of the class failed, or its roster didn't load where a roster shows
+          (Present's): said under the header. Off Present a roster's failure waits for the page
+          that shows one, after the bell. */}
+      {(present ? (error ?? rosterError) : error) ? (
         <div className={`flex flex-wrap items-center gap-x-4 gap-y-3 ${present ? 'mt-6' : ''}`}>
           <p role="alert" className="text-body">
             Couldn&apos;t load this class.{' '}
             <span className={present ? 'text-text-secondary' : undefined}>
-              {error ?? rosterError}
+              {present ? (error ?? rosterError) : error}
             </span>
           </p>
           <Button variant="secondary" size={present ? 'md' : 'sm'} onClick={load}>

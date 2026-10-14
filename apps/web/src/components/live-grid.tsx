@@ -404,16 +404,17 @@ export function LiveGrid({
   }, [over]);
 
   // The grid counted, told only when a count moves: a student tapping in, unlocking or going
-  // silent on this clock, not every second's tick.
+  // silent on this clock, not every second's tick. Never while the grid says it didn't load (the
+  // 15 s refresh can still fill it then), so no count stands beside that line.
   const told = useRef<string | null>(null);
   useEffect(() => {
-    if (!students) return;
+    if (!students || error) return;
     const counts = stateCounts(Object.values(students).map((s) => gridDisplay(s, now)));
     const key = JSON.stringify(counts);
     if (key === told.current) return;
     told.current = key;
     onCountsRef.current?.(sessionId, counts);
-  }, [students, now, sessionId]);
+  }, [students, now, sessionId, error]);
 
   // Slow snapshot refresh keeps derived silence honest for quietly-present
   // students: heartbeats update last_seen_at server-side but emit no event

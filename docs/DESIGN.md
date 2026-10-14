@@ -245,9 +245,10 @@ code (the line PB3 removed comes back). On a class's page the bell's card
 becomes a header with the ring and a countdown ticking on this computer's clock
 to the server's bell, the bell's time beside it; state counts sit over the
 grid; **no roster during a session** (the grid names every student); New
-code's confirm is a dialog; the join code gets a Copy button; the stale banner
-is a floating reconnect pill; an unlock the stream brings also opens v2's
-**pop-up**, which stays until closed, with Open student, never on the
+code's confirm is a dialog; the join code gets a Copy button; a lost stream is
+said in a floating reconnect pill (a quiet one keeps the stone line, §4); an
+unlock the stream brings also opens v2's **pop-up**, which stays until closed,
+with Open student, never on the
 projector; a tile opens v2's **student panel** (when they tapped in, their
 chip, this session's moments, the last check-in). **Present keeps +5, +10 and
 End** (the owner, 2026-10-12: the board left them off, and the canvas's own
@@ -291,7 +292,7 @@ table in a box that scrolls; the five radii (§5) for eight; the type scale
 (§3) and the 4-point grid (§5) for `v2.css`'s sizes and spacing (3, 6, 9, 10,
 14, 18, 22 and 30 px); 40 px gutters on a centred page 1400 px wide (§5) for
 36 px beside the menu on one 1260 px wide; the stale banner (§4) for the
-reconnect pill; Present's sizes and How it ended (§5); §2's "use the
+reconnect pill while the stream reconnects; Present's sizes and How it ended (§5); §2's "use the
 semantic tokens", for the primitives `v2.css` draws with directly (Style
 facts); Q3 A's 1 px dashed edge (§2, §4) for 1.5 px; and "a link never
 rests on colour alone" (§4, Links) for a link standing on its own (a `quiet`

@@ -179,6 +179,11 @@ describe('the class page while a session runs (ClassLive)', () => {
     expect(own).not.toMatch(/Roster|roster\.students|<JoinCode|All classes/);
   });
 
+  it('says a roster that didn’t load only where a roster shows: Present, or after the bell', () => {
+    expect(live).toMatch(/\{\(present \? \(error \?\? rosterError\) : error\) \? \(/);
+    expect(live).toMatch(/\{present \? \(error \?\? rosterError\) : error\}/);
+  });
+
   it('says its lines as ClassStates does: right under the header, Try again small', () => {
     // A failed read again of the class, and an extend's failure, refusal or note.
     expect(own.match(/size=\{present \? 'md' : 'sm'\}/g)).toHaveLength(2);

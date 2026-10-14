@@ -26,27 +26,30 @@ export function shareLeft(startedAt: string, endsAt: string, now: number): numbe
 }
 
 /**
- * This computer's clock, read again as each second of the time left turns over (its bell's own
- * milliseconds, so no second is ever skipped or shown twice), and no more once the bell is past.
+ * When to read the clock again, `left` ms before the bell: just after the time left's next whole
+ * second (the bell's own milliseconds, so no second is ever skipped or shown twice); null once the
+ * bell is past, when the countdown rests at 0:00.
  */
+export function nextTick(left: number): number | null {
+  return left > 0 ? (left % 1000) + 10 : null;
+}
+
+/** This computer's clock, read as a bell arrives or moves, then as each second turns over. */
 function useClock(endsAt: string | null): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (endsAt === null) return;
     const end = Date.parse(endsAt);
     let timer: number | undefined;
-    const next = () => {
-      const left = end - Date.now();
-      if (left <= 0) return;
-      timer = window.setTimeout(
-        () => {
-          setNow(Date.now());
-          next();
-        },
-        (left % 1000) + 10,
-      );
+    const tick = () => {
+      const at = Date.now();
+      setNow(at);
+      const wait = nextTick(end - at);
+      if (wait !== null) timer = window.setTimeout(tick, wait);
     };
-    next();
+    // Right away, so a bell that lands late (a reload's snapshot, an extend) never counts from an
+    // older reading.
+    timer = window.setTimeout(tick, 0);
     return () => window.clearTimeout(timer);
   }, [endsAt]);
   return now;
@@ -114,7 +117,9 @@ export function LiveHeader({
       <p className="flex flex-col border-l border-border-default pl-4.5 max-sm:border-l-0 max-sm:pl-0 max-sm:text-right">
         {endsAt ? (
           <>
-            <span className="font-num text-data-lg">{timeLeft(Date.parse(endsAt) - now)}</span>
+            <span className="font-num text-data-lg tabular-nums">
+              {timeLeft(Date.parse(endsAt) - now)}
+            </span>
             <span className="text-countdown-sub text-text-secondary">
               ends <time dateTime={endsAt}>{bellTime(endsAt)}</time>
             </span>
@@ -147,7 +152,7 @@ export function LiveCounts({ counts }: { counts: StateCounts }) {
         return (
           <li
             key={state}
-            className={`inline-flex items-center gap-1.5 rounded-full border-[1.5px] px-2.5 py-0.75 text-caption font-medium whitespace-nowrap ${tone}`}
+            className={`inline-flex items-center gap-1.5 rounded-full border-[1.5px] px-2.5 py-0.75 text-caption font-medium whitespace-nowrap tabular-nums ${tone}`}
           >
             {Icon ? <Icon size={13} aria-hidden="true" className="shrink-0" /> : null}
             {`${counts.counts[state]} ${label}`}
