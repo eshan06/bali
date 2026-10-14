@@ -137,6 +137,9 @@ lint && npm test`, plus `npm run demo` when API behavior changed), then run
   step's draft PR. Green checks = merged; a PR never waits for a human unless
   the owner asked to review it, a check is red, or the step was parked.
   Drive red checks to green — never by weakening a check.
+- **A migration that drops, deletes, rewrites, renames or retypes data** fails
+  "Migration guard" until the owner adds the label `owner-approved-migration`;
+  a new push removes the label.
 - verify against dev when applicable / the environment has the AWS + Railway access / prod is off-limits
 - Commit style: `feat(api): …`, `fix(db): …`, `test(web): …`, `docs: …`.
 - **No Claude attribution in commits or on GitHub** — no `Co-Authored-By`, no
