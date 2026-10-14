@@ -50,7 +50,8 @@ uses values the one before it produced:
   connected to the repo, so step 2 wasn't needed. Step 6 done (2026-10-06): `vercel.json` deleted. `bali-portal` hadn't been deploying `main` by itself (the owner deployed by hand); check the next push to `main` deploys it.
 - **Runbook 4, the restore drill — on hold** until prod's first backup (runbook 1, step 4). Its half A, a
   `pg_dump` into a scratch database, works without them (skip its step 1).
-- **Runbook 5, GitHub:** the load gate is a required check (7); the rest is open.
+- **Runbook 5, GitHub:** the load gate is a required check (7); CodeQL's default setup is on (5;
+  2026-10-13: JavaScript/TypeScript and GitHub Actions, not a required check); the rest is open.
 - **Runbook 6, alerts:** open.
 - **Runbook 8, Railway's IaC:** open (added 2026-10-06, P8); due before 2026-12-01.
 - **Runbook 7, push:** open (added 2026-10-06, N6). Until it's done the API logs

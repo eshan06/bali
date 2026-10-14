@@ -8,6 +8,77 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-13** — **A PR is judged by the base branch's rules, a loosened test blocks, a new push
+  must clear the last failed review, and santa's Reviewer B reviews as an attacker (the owner's
+  approvals, after two independent reviews of the workflow; folded into #359 so the owner's bypass
+  merge happens once).** **The base's rules:** Claude Review reads CLAUDE.md and
+  docs/ARCHITECTURE.md with `git show origin/<base>:<path>` (`Bash(git show:*)` allowed; the
+  checkout fetches every branch), never the PR's own copies, and santa copies its rules from
+  `origin/main`'s `claude-review.yml`. *Why:* a PR could edit a rule and the code that breaks it in
+  one go, and be judged by its own edit; a rule change now lands in its own PR first and is judged
+  as one. The prompt was already the base's (the action refuses a workflow that differs from
+  `main`'s), and so is the root CLAUDE.md the CLI loads by itself: before it starts, the action puts
+  back the base's `CLAUDE.md`, `.claude/` and `.mcp.json` (`restoreConfigFromBase`), which answers
+  santa's warning that the PR's copy reached the reviewer that way. A CLAUDE.md the PR adds in a
+  folder, or the action's own copy of the PR's in `.claude-pr/`, still loads when the reviewer reads
+  a file beside it, so the rules say a CLAUDE.md the PR adds or changes anywhere is part of the
+  diff, never a rule (santa's round 2). **A loosened test blocks:** an
+  existing test loosened, skipped or deleted (an assertion weakened, a case removed, `.skip` or
+  `.only`), unless the PR's description names the behavior change it is meant to make. The action's
+  agent mode passes the reviewer no PR context, so a step writes the description to
+  `pr-description.md` from the PR as it stands (`gh pr view`), and a re-run reads an edited one;
+  santa's reviewers get the description the PR carries or will carry. **The last failed review
+  cleared first:** the same step writes the PR's last failed Claude Review (the newest
+  `github-actions` comment with a `VERDICT: FAIL` line) to `previous-review.md`, read with the job's
+  own token, so the reviewer gains no tool and no write access; the reviewer clears each of its
+  BLOCKERs by file:line, fixed (where) or still present, and may PASS only once every one is fixed.
+  *Why:* a cosmetic commit after a FAIL bought a fresh review that could miss what the last one
+  caught. The newest failed review, not the newest review: a PASS since has cleared it already, and
+  checking it again costs little. Not in santa's copied rules: santa's round 2 already checks its
+  round-1 list. A blocker the reviewer got wrong is cleared only by changing the code, or by the
+  owner: editing the newest failed review's comment to strike it (only that one is read; deleting
+  it brings back the one before), then a re-run, or merging past the check. **Reviewer B as an attacker:** the same rules, diff and output, its lens one student,
+  teacher or school reaching another's data, injection and the web's holes, personal data escaping
+  the four privacy paths, secrets or personal data in logs or errors, and migrations that destroy or
+  rewrite data; the lens moves where it looks, never what blocks, so santa stays no stricter than the
+  gate. Reviewer A keeps the full rules and its checklist. **Two holes closed on the way.** (1) The
+  posting step read `claude-review.md` from the checkout, so a PR that committed one ending `VERDICT:
+  PASS` passed whenever the review wrote none, which a diff too large for the reviewer to finish
+  would bring about. (2) The new step's first draft wrote the description through whatever the PR's
+  tree held at that path (santa's round 1, both reviewers, reproduced): committed as a link to
+  `$RUNNER_TEMP/review-secrets.py`, it turned the base's scanner into the author's code, which the
+  posting step runs, forging a PASS. The step now removes `claude-review.md` and each file it writes
+  before writing, so no link is followed and only the reviewer's verdict counts. And the posting
+  step, which runs even on a cancelled run, posts only when the review step ran: a run a later push
+  cancelled before it would post the PR's own `claude-review.md` as Claude Review's comment, where
+  a `VERDICT: FAIL` with no blockers would pass for the last failed review (santa's round 2).
+
+- **2026-10-13** — **The reviewers block on security holes and on personal data the privacy paths
+  miss, and both Claude workflows run Opus 5.5 (the owner's ruling, in chat: "security should be a
+  blocker, student data reaching deletion and export paths should also be a blocker"; "we
+  definitely need to switch to Opus 5.5").** **Two new BLOCKERs** in `claude-review.yml`'s rules,
+  inside the text santa-loop copies to its reviewers (its Step 1), so the gate and santa read the
+  same rules: a security hole with a concrete exploit, from the attacker's input to the harm
+  (injection of SQL, a command or a header, XSS, path traversal, SSRF, CSRF, input used unvalidated
+  at a trust boundary, authorization that lets one student, teacher or school reach another's data,
+  secrets or personal data in logs or error responses); and a new or changed table, column or stored
+  field holding a student's or a teacher's personal data that the account deletion, the school
+  disposal, the retention run or the student-record export does not handle. *Why:* the owner's
+  review policy of 2026-09-23 already blocked on security holes, but the rulebook never named them,
+  so a reviewer could weigh one as a WARN; and the coverage guards (`STUDENT_RECORD_COVERAGE`,
+  `SCHOOL_DISPOSAL_COVERAGE`, `RETENTION_COVERAGE`, and since #360 `ACCOUNT_DELETION_COVERAGE`) see
+  only foreign keys to `users` (the disposal's to `schools` too), so free text, a name, or data
+  keyed another way (`cognito_deletions`, keyed to the Cognito user) meets no guard. The bar stays:
+  file:line and a concrete failure, no style, nothing outside the PR's scope. **Opus 5.5:**
+  `--model claude-opus-5-5` in `claude-review.yml` and `claude.yml`, where `claude-opus-5` had run
+  since Phase 2; santa's reviewers already ran Opus 5.5 (`model: opus`), so the final gate was the
+  older model. The id was proven on the owner's subscription first (`claude -p --model
+  claude-opus-5-5` answered), since a wrong one would fail every PR's review and its fix would take
+  the toggle again. As with every edit to these two files, this PR's own Claude Review is red by
+  design, and it merges by the owner's ruleset toggle (GOTCHAS). **CodeQL:** GitHub's default setup,
+  turned on today by the conductor as a repository setting (runbook 5, step 5): JavaScript/TypeScript
+  and GitHub Actions, the default query suite; Swift not yet, since its default setup needs a macOS
+  build of the xcodegen project; not a required check yet.
 - **2026-10-13** — **CI speed: the required unit-test check in about 4 minutes, from 12–13 (the
   owner's speed review).** Measured first: `npm test` was ~470 s of the job's ~570–770 s, the api
   package 426 s of it, and nearly all of that was `makeTestDb` on PGlite running initdb and every
