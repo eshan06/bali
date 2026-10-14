@@ -11,7 +11,7 @@ is in `docs/DECISIONS.md`, and finished history is word for word in
 _Last updated: 2026-10-13 (Central) — the owner's standing orders moved into CLAUDE.md (the
 findings rule, what is ruled impossible, reviews, owner-only actions, the end-of-phase review), ECC
 turned off for this repo and the owner's GitHub gates denied to agents in `.claude/settings.json`
-(`docs/DECISIONS.md`, 2026-10-13); three steps added before the pilot (Open owner items). Before
+(`docs/DECISIONS.md`, 2026-10-13); four steps added before the pilot (Open owner items). Before
 it, the reviewers' new rules (#359) and the required unit-test check in about 4 minutes (#361).
 The redesign is at a pause after PV6, the notes for coming steps on their lines (PV7, PV13, PV15,
 PV17) and two of the owner's answers pending under Open owner items ("To answer"). Next: PV7, a
@@ -279,10 +279,11 @@ Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect acc
 - Left for the owner on finished steps' lines (in full in `docs/PLAN-ARCHIVE.md`): P7's App Review path (decide its section 4, then fill the accounts and paste); P6's restore drill, its result recorded once a backup exists; S4's CSP check on the deployed portal after each Next upgrade; ⚖️ whether C7-server's yes rides Other Data Types; device rounds still marked pending (B5b's round 2, steps 7 and 9; B5c's round 3, steps 1 and 3; round 4, B6a and B6b); smaller calls on F (a refused tap's end-of-day drop or dismiss button; the waiting card's Tap in), B6c-2 (`.keep`/`.retry`), B5b (a rule for a replaced window, a code step to schedule) and D2 (Present's key per class).
 - **To answer** (asked 2026-10-13, each with the conductor's recommendation): (1) PV5b: when the account can't load, the can't-reach line with Try again takes the whole page's place, a live class page's too (End and +5 hidden until Try again works); keep it (recommended). (2) Fold PV5b's review notes into PV15 (a tab with no sign-in on a URL with no page goes to `/login`) and PV17 (Home's error state: a heading, focus on Try again, one `<main>`): recommended. PV4c's two test limits (DECISIONS, "Not covered") are rare and low-impact: leave (recommended).
 - 🔧 Before the pilot's first class: the owner's prod block gets a fresh code (its first reached the repo's history in #228), and a session builds an owner command that retires a block, to retire the old code (`docs/PILOT.md`, setup step 6). The portal's three class-page controls are built (P10, P11).
-- **Before the pilot's first class, three steps for sessions** (the owner's workflow review, 2026-10-13; one PR each):
+- **Before the pilot's first class, four steps for sessions** (the owner's workflow review, 2026-10-13; one PR each):
   - a column-level privacy test: every column classified personal or not, each personal one placed by the privacy paths that handle it (the account deletion, the disposal, the retention run, the export), so a new column fails until it is placed; FERPA covers university students too;
   - a repeated-`event_id` check on every data-changing route, driven from the authorization matrix's route list;
-  - pilot deploy rules: no deploys during class hours, and a documented one-command rollback in `docs/RUNBOOKS.md`.
+  - pilot deploy rules: no deploys during class hours, and a documented one-command rollback in `docs/RUNBOOKS.md`;
+  - Dependabot PRs can't pass Claude Review (the action rejects bot actors: add `allowed_bots` for dependabot in `claude-review.yml`, bundled with the next edit to that protected file); until then #309 (`next` 15.5.27, fixing two moderate SSG/ISR cache-poisoning alerts that likely don't apply: the portal renders per request on Vercel) waits.
 - 🔧 The Cognito sign-in deleter: runbook 9 (`docs/RUNBOOKS.md`) — per environment an IAM policy
   allowing only `AdminGetUser` and `AdminDeleteUser` on its own pool, a user and its access key,
   the two `COGNITO_DELETER_*` variables on dev's `bali` and prod's `bali prod`; the end-to-end
