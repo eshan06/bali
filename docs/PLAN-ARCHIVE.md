@@ -10,6 +10,15 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-13 (Central) — the owner's standing orders moved into CLAUDE.md (the
+findings rule, what is ruled impossible, reviews, owner-only actions, the end-of-phase review), ECC
+turned off for this repo and the owner's GitHub gates denied to agents in `.claude/settings.json`
+(`docs/DECISIONS.md`, 2026-10-13); four steps added before the pilot (Open owner items). Before
+it, the reviewers' new rules (#359) and the required unit-test check in about 4 minutes (#361).
+The redesign is at a pause after PV6, the notes for coming steps on their lines (PV7, PV13, PV15,
+PV17) and two of the owner's answers pending under Open owner items ("To answer"). Next: PV7, a
+class live, in a fresh session; on the Mac, the workflow review's last three steps (In flight)._
+
 _Last updated: 2026-10-13 (Central) — CI's required "Typecheck · lint · unit tests" is done about 4
 minutes after a push, from 12–13 (Now, "CI speed"; `docs/DECISIONS.md`, 2026-10-13); no test
 changed or skipped. Before it, PLAN.md the current state only, its history in `docs/PLAN-ARCHIVE.md`.
@@ -561,6 +570,19 @@ why, Open owner items the owner's queue.
   (`ci.yml` concurrency: per-commit group on push, cancel only PR runs), and the race test
   "a refresh landing inside a conversion" is staged by a held session row instead of aimed by
   polling, so it can no longer miss its window (it failed main's run for #244).
+
+**In flight, as PLAN.md said it until the conductor moved to the Windows PC (2026-10-14):**
+- **The owner's Mac session (all UI):** the portal's approved designs (always light) and the app's
+  Sign in & sign up are built; the app keeps D1's look until the owner approves a new one (its
+  redesign rolled back, 2026-10-06). Left: C2's legal words (⚖️), the push's app half (not
+  started), TestFlight build 9 for C7's phone test (📱), and the redesign.
+- **The workflow review's last steps, next on the Mac** (the owner, 2026-10-13; one PR each):
+  - the migration guard ✅ (#369; DECISIONS 2026-10-14): "Migration guard" fails a migration that drops, deletes, rewrites, renames or retypes data until the owner adds `owner-approved-migration`, which a new push removes; a required check in `protect-main` since 2026-10-14;
+  - docs-only PRs skip the test jobs ✅ (#365; DECISIONS 2026-10-14): only Markdown under `docs/` counts, `APP-STORE.md` not (a check reads it); every required check still reports, Claude Review and the plan check still run; such a PR is green in about a minute, from 4:40;
+  - moved files ✅ (#368; DECISIONS 2026-10-14): a file moved out of `ios/` or the load gate's paths, or one whose name git quotes, runs that job (`--no-renames -z`, through the self-tested `touches.sh`), and the load gate runs when its decision fails; `plan-check.yml` has the same gap, not fixed here;
+  - two tests ✅ (#364; DECISIONS 2026-10-14): only `transitions.ts` writes `participations` and `events` (the one exception, the test-only `backdateLastSeen`, named for the owner to rule on); the matrix's other-school callers, there all along, are named, and a colleague at the owner's school is added; nothing leaked.
+- Who does what: "The Mac session: all UI (`apps/web/src/app`, `apps/web/src/components`, `ios/Bali/UI`,
+  `ios/BaliShield`, user-facing strings)."
 
 **Phase 7, Live lesson: building** (the owner lifted the hold and approved both canvases,
 2026-10-10). The steps with no screen go first, one PR each: M1 ✅ (the storage interface, with

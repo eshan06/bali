@@ -8,14 +8,13 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-13 (Central) — the owner's standing orders moved into CLAUDE.md (the
-findings rule, what is ruled impossible, reviews, owner-only actions, the end-of-phase review), ECC
-turned off for this repo and the owner's GitHub gates denied to agents in `.claude/settings.json`
-(`docs/DECISIONS.md`, 2026-10-13); four steps added before the pilot (Open owner items). Before
-it, the reviewers' new rules (#359) and the required unit-test check in about 4 minutes (#361).
-The redesign is at a pause after PV6, the notes for coming steps on their lines (PV7, PV13, PV15,
-PV17) and two of the owner's answers pending under Open owner items ("To answer"). Next: PV7, a
-class live, in a fresh session; on the Mac, the workflow review's last three steps (In flight)._
+_Last updated: 2026-10-14 (Central) — the conductor moved from the owner's Mac to an always-on
+Windows PC, which builds the portal's UI steps too; the Mac keeps Xcode and the iPhone (Now, Who
+does what; `docs/DECISIONS.md`, 2026-10-14; `docs/GOTCHAS.md`, "The Windows PC"). Before it, the
+workflow review's last steps (#364, #365, #368, #369) and the workers' effort (#372). The redesign
+is at a pause after PV6, the notes for coming steps on their lines (PV7, PV13, PV15, PV17) and the
+owner's answers pending under Open owner items ("To answer"). Next: PV7, a class live, on the
+Windows PC._
 
 ## Now
 
@@ -32,17 +31,18 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
 `docs/PILOT.md`.
 
 **In flight.**
-- **The owner's Mac session (all UI):** the portal's approved designs (always light) and the app's
-  Sign in & sign up are built; the app keeps D1's look until the owner approves a new one (its
-  redesign rolled back, 2026-10-06). Left: C2's legal words (⚖️), the push's app half (not
-  started), TestFlight build 9 for C7's phone test (📱), and the redesign.
+- **The conductor on the Windows PC (the owner, 2026-10-14):** an always-on PC runs the conductor,
+  one worker at a time, and builds the portal's UI steps from PV7 on, screenshotted in a preview tab
+  the owner signs in; its traps are `docs/GOTCHAS.md`'s "The Windows PC" (DECISIONS 2026-10-14).
+- **The owner's Mac session (Xcode and the iPhone):** the app's Sign in & sign up is built; the app
+  keeps D1's look until the owner approves a new one (its redesign rolled back, 2026-10-06). Left:
+  the push's app half (not started), TestFlight build 9 for C7's phone test (📱), and the phone's
+  Phase 7 screens (L8, M8). C2's legal words (⚖️) go into the portal's pages, on the Windows PC.
 - **The portal redesign in v2's look (PV0–PV17, the owner, 2026-10-12):** PV0–PV6 done, with PV3b,
-  PV4b, PV4c and PV5b; next PV7, the Mac session's. Phase 7's web screens follow PV15.
-- **The workflow review's last steps, next on the Mac** (the owner, 2026-10-13; one PR each):
-  - the migration guard ✅ (#369; DECISIONS 2026-10-14): "Migration guard" fails a migration that drops, deletes, rewrites, renames or retypes data until the owner adds `owner-approved-migration`, which a new push removes; a required check in `protect-main` since 2026-10-14;
-  - docs-only PRs skip the test jobs ✅ (#365; DECISIONS 2026-10-14): only Markdown under `docs/` counts, `APP-STORE.md` not (a check reads it); every required check still reports, Claude Review and the plan check still run; such a PR is green in about a minute, from 4:40;
-  - moved files ✅ (#368; DECISIONS 2026-10-14): a file moved out of `ios/` or the load gate's paths, or one whose name git quotes, runs that job (`--no-renames -z`, through the self-tested `touches.sh`), and the load gate runs when its decision fails; `plan-check.yml` has the same gap, not fixed here;
-  - two tests ✅ (#364; DECISIONS 2026-10-14): only `transitions.ts` writes `participations` and `events` (the one exception, the test-only `backdateLastSeen`, named for the owner to rule on); the matrix's other-school callers, there all along, are named, and a colleague at the owner's school is added; nothing leaked.
+  PV4b, PV4c and PV5b; next PV7, on the Windows PC. Phase 7's web screens follow PV15.
+- **The workflow review's last steps** ✅ (the owner, 2026-10-13; DECISIONS 2026-10-14): the
+  migration guard (#369), docs-only PRs skipping the test jobs (#365), moved files (#368) and two
+  tests (#364), each in full in `docs/PLAN-ARCHIVE.md`.
 
 - **The "class started" push (N1–N6, decided 2026-10-06):** a visible alert to the students
   whose waiting tap a Start converts; a doorbell, never the truth. N1 (the docs), N2 (CI) and N3 (the
@@ -71,8 +71,10 @@ first class, production backups (L0b, the owner's console step; the owner, 2026-
 
 **Who does what.**
 - Cloud sessions: the backend, CI and docs. Never UI, never a console.
-- The Mac session: all UI (`apps/web/src/app`, `apps/web/src/components`, `ios/Bali/UI`,
-  `ios/BaliShield`, user-facing strings).
+- The Windows PC (since 2026-10-14): the conductor, whose workers build the steps one at a time,
+  the portal's UI included (`apps/web/src/app`, `apps/web/src/components`, its user-facing strings).
+- The Mac session: Xcode and the iPhone (`ios/Bali/UI`, `ios/BaliShield`, the app's user-facing
+  strings): L8, M8, TestFlight build 9, the push's app half.
 - The owner: the consoles (AWS, Railway, Vercel, Sentry, App Store Connect), Apple, the
   lawyer, the school, and every iPhone check.
 
@@ -111,7 +113,7 @@ Sources); a state no board draws is built only once PV1 has drawn it and the own
 page keeps today's layout until its step lands, while PV4's shared pieces (buttons, fields, chips,
 cards) change on every page at once. Each step is one PR from a fresh worker, under ~400
 changed lines not counting tests (the estimates below are from the boards; a step past it splits,
-as noted). **Cloud-buildable:** PV2, PV3, PV3b. **The Mac session's:** PV4–PV17. **A UI step's
+as noted). **Cloud-buildable:** PV2, PV3, PV3b. **The Mac session's:** PV4–PV6; **the Windows PC's:** PV7–PV17 (2026-10-14). **A UI step's
 validation** (each 👀): vitest, `npm run typecheck && npm run lint && npm test`, `/santa-loop` with
 `web-design-guidelines` and `no-ai-slop`, and screenshots beside its boards for the owner.
 
@@ -143,8 +145,8 @@ validation** (each 👀): vitest, `npm run typecheck && npm run lint && npm test
 Planned 2026-10-05 (`docs/DECISIONS.md`); the design is ARCHITECTURE's "Live lesson (Phase 7)",
 and every step builds against it. **Status: building** (the owner lifted the hold and approved both canvases on 2026-10-10): the steps with no screen are done but L3c, and M0 is done (2026-10-12). **The web screens come after the portal redesign's PV15** (the owner, 2026-10-12: its groundwork, its side menu and the pages they sit on first; "Portal redesign (v2's look) steps"). Then the UI, **web first** (the owner, 2026-10-10): in each slice the teacher's portal, then the student web, then the phone (Slice 1: L7, W3, W4, L7b, L3c, L7c, then L8; Slice 2: M5, M6, W5, then M8); the redesign's PV16 and PV17 follow the web screens, not waiting for the phone's (L8, M8). Each step is one PR from a fresh worker, under ~400 changed
 lines not counting tests; a step that grows past that is split (L1a, L1b…). **Cloud-buildable:**
-L1–L6 (L3b and L3c included), M1–M4, M7, M9, W1, W2. **The Mac session's:** the UI steps, L7, L7b, L7c, L8, M5,
-M6, M8, W3, W4, W5, each built to its canvas: the
+L1–L6 (L3b and L3c included), M1–M4, M7, M9, W1, W2. **The UI steps:** the web's, L7, L7b, L7c, M5,
+M6, W3, W4, W5, on the Windows PC, and the phone's, L8 and M8, on the Mac (2026-10-14), each built to its canvas: the
 [app screens](https://claude.ai/artifact/CZpFbFuxnRrLcuywtJGfVQ) (L8, M8; approved 2026-10-10) and
 [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (L7, L7b, L7c, M5, M6, W3–W5; approved
 2026-10-12), which replaced the look of the [portal screens](https://claude.ai/artifact/BxHbGud1xMeyXLUUvsewHM)
