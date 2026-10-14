@@ -36,8 +36,15 @@ const unlocked = (reason: UnlockReason | null) => ({ eventId: 'v1', reason });
 const render = (s: Student, present = false, pulse = false) =>
   renderToStaticMarkup(createElement(Tile, { student: s, now: NOW, present, pulse }));
 
-/** Markup as read: tags dropped, no-break spaces read as spaces. */
-const text = (html: string) => html.replace(/<[^>]+>/g, '').replace(/\u00a0/g, ' ');
+/**
+ * Markup as read: each tag read as a space (never removed outright, so no tag can form from what
+ * is left), and each run of spaces, no-break ones included, as one.
+ */
+const text = (html: string) =>
+  html
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 /** The tile's parts: its classes, its words' three spans (name, state, line) and its icons' sizes. */
 function parts(html: string) {
   const tile = /<li class="flex min-w-0"><div class="([^"]*)"/.exec(html)?.[1]?.split(' ') ?? [];
@@ -54,7 +61,7 @@ function parts(html: string) {
     html: m[2] ?? '',
     // The phone's dot before the line, hidden on a computer, left out of what a computer shows.
     words: text(
-      (m[2] ?? '').replace(/<span aria-hidden="true" class="sm:hidden">[^<]*<\/span>/, ''),
+      (m[2] ?? '').replace(/<span aria-hidden="true" class="sm:hidden">[^<]*<\/span>/, ' '),
     ),
   }));
   const icons = [...html.matchAll(/<svg[^>]*\swidth="(\d+)"[^>]*class="([^"]*)"/g)].map((m) => ({
