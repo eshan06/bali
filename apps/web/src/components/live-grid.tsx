@@ -1,11 +1,6 @@
 'use client';
 
-import {
-  EVENT_RESUME_OVERLAP,
-  type SessionSnapshot,
-  type SessionView,
-  STREAM_HEARTBEAT_MS,
-} from '@bali/shared';
+import { EVENT_RESUME_OVERLAP, type SessionSnapshot, STREAM_HEARTBEAT_MS } from '@bali/shared';
 import {
   Circle,
   CircleCheck,
@@ -53,9 +48,10 @@ const REVOKED = `${SOLID} bg-state-revoked-bg text-state-revoked-fg`;
 /**
  * Each state's chip (DESIGN.md §2 and §4): its tint, its icon and its label, never colour alone.
  * The two Left chips take their state's colour, the flag first and the state's icon after it
- * (Q2 A); Silent is the ended pair with a dashed edge, Unknown dashed with no fill (Q3 A).
+ * (Q2 A); Silent is the ended pair with a dashed edge, Unknown dashed with no fill (Q3 A). The class
+ * page's counts take the same (PV7).
  */
-const CHIP: Record<GridDisplay, { label: string; icons: LucideIcon[]; tone: string }> = {
+export const CHIP: Record<GridDisplay, { label: string; icons: LucideIcon[]; tone: string }> = {
   focused: {
     label: 'Focused',
     icons: [CircleCheck],
@@ -84,6 +80,52 @@ const CHIP: Record<GridDisplay, { label: string; icons: LucideIcon[]; tone: stri
     tone: `${DASHED} bg-state-nodevice-bg text-text-primary`,
   },
 };
+
+/** The six states the class page counts over the grid (ClassLive), in its order. */
+export const COUNTED = [
+  'focused',
+  'unlocked',
+  'protection_off',
+  'silent',
+  'absent',
+  'ended',
+] as const;
+export type Counted = (typeof COUNTED)[number];
+
+/**
+ * Where each student counts: in their tile's state, both Left tiles under Left, as ClassLive
+ * counts "Left · unlocked"; Unknown under none, since this tab can't say what it is.
+ */
+const COUNTED_AS: Record<GridDisplay, Counted | null> = {
+  focused: 'focused',
+  unlocked: 'unlocked',
+  protection_off: 'protection_off',
+  silent: 'silent',
+  absent: 'absent',
+  ended: 'ended',
+  left_unprotected: 'ended',
+  left_protection_off: 'ended',
+  unknown: null,
+};
+
+/** The grid right now, counted (ClassLive): "Live · 25 of 28 joined" and the six counts. */
+export interface StateCounts {
+  /** Each student the grid shows, once. */
+  total: number;
+  /** Those who tapped in this session: all but Not here. */
+  joined: number;
+  counts: Record<Counted, number>;
+}
+
+/** The grid's tiles, counted by their states (`gridDisplay`'s). */
+export function stateCounts(displays: readonly GridDisplay[]): StateCounts {
+  const counts = Object.fromEntries(COUNTED.map((state) => [state, 0])) as Record<Counted, number>;
+  for (const display of displays) {
+    const state = COUNTED_AS[display];
+    if (state !== null) counts[state] += 1;
+  }
+  return { total: displays.length, joined: displays.length - counts.absent, counts };
+}
 
 /**
  * The grid's columns (the Class page design): as many as fit, each at least 212 px, so six fill
@@ -230,33 +272,57 @@ export function Cell({
   );
 }
 
+/**
+ * The stream lost, said as v2's floating pill (ClassStale; DESIGN.md §4): white, a strong edge,
+ * `shadow-2` and a stone dot. It sits on a layer over the whole page, 14 px from its top as drawn,
+ * taking no room and nobody's clicks, and stays in view as the page scrolls, so a grid scrolled to
+ * its last row still says it may be out of date. The layer is placed against the nearest
+ * positioned ancestor, the class page's `<main>` (its frame is 30 px in, 22 on a phone).
+ */
+const PILL_LAYER = 'pointer-events-none absolute inset-x-0 -top-4 bottom-0 z-10 max-sm:-top-2';
+const PILL =
+  'sticky top-3.5 mx-auto flex w-fit max-w-full items-center gap-2 rounded-full border border-border-strong bg-surface-card px-3.5 py-1.5 text-caption font-medium text-text-secondary shadow-2';
+
 export function LiveGrid({
   sessionId,
   onEnded,
   onSession,
+  onCounts,
   present = false,
+  livePage = false,
 }: {
   sessionId: string;
   /** Called with `sessionId` once the server marks the session over: an end event, or a snapshot. */
   onEnded?: (sessionId: string) => void;
-  /** Called with the session as each snapshot the grid keeps says it is: its bell (P10). */
-  onSession?: (session: SessionView) => void;
+  /** Called with the session as each snapshot the grid keeps says it is: its start and bell (P10). */
+  onSession?: (session: SessionSnapshot['session']) => void;
+  /** Called with `sessionId` and the grid counted (`stateCounts`) whenever a count changes (PV7). */
+  onCounts?: (sessionId: string, counts: StateCounts) => void;
   /**
    * The projector view (DESIGN.md §5): four columns, names 20 px, chip labels 14 px, cells at
    * least 88 px tall, readable from the back of a classroom; the same chips and words, but never
    * an unlock's reason: the class can see it (`unlockNote`).
    */
   present?: boolean;
+  /**
+   * The class page's own grid while a session runs (PV7), its said lines as ClassStale and
+   * ClassStates draw them: a lost stream as the floating pill (`PILL`) in place of the line over
+   * the grid, a stream open but quiet still that line, and a grid that didn't load said with a
+   * small Try again. Off, as before: Present until PV9, How it ended until PV12.
+   */
+  livePage?: boolean;
 }) {
   const api = useApi();
   const onUnauthorized = useSignOut();
   // The newest callbacks, read where a snapshot lands, so a new one never restarts the stream.
   const onEndedRef = useRef(onEnded);
   const onSessionRef = useRef(onSession);
+  const onCountsRef = useRef(onCounts);
   useEffect(() => {
     onEndedRef.current = onEnded;
     onSessionRef.current = onSession;
-  }, [onEnded, onSession]);
+    onCountsRef.current = onCounts;
+  }, [onEnded, onSession, onCounts]);
   const [students, setStudents] = useState<Students | null>(null);
   // Over when it boots (R5's grid under the recap card): drawn once, holding none of the streams.
   const [over, setOver] = useState(false);
@@ -337,6 +403,18 @@ export function LiveGrid({
     return () => clearInterval(t);
   }, [over]);
 
+  // The grid counted, told only when a count moves: a student tapping in, unlocking or going
+  // silent on this clock, not every second's tick.
+  const told = useRef<string | null>(null);
+  useEffect(() => {
+    if (!students) return;
+    const counts = stateCounts(Object.values(students).map((s) => gridDisplay(s, now)));
+    const key = JSON.stringify(counts);
+    if (key === told.current) return;
+    told.current = key;
+    onCountsRef.current?.(sessionId, counts);
+  }, [students, now, sessionId]);
+
   // Slow snapshot refresh keeps derived silence honest for quietly-present
   // students: heartbeats update last_seen_at server-side but emit no event
   // (decision 7), so they never reach the grid through the stream alone. It is
@@ -376,7 +454,11 @@ export function LiveGrid({
         <p role="alert" className="text-body">
           {error}
         </p>
-        <Button variant="secondary" onClick={() => setAttempt((n) => n + 1)}>
+        <Button
+          variant="secondary"
+          size={livePage ? 'sm' : 'md'}
+          onClick={() => setAttempt((n) => n + 1)}
+        >
           Try again
         </Button>
       </div>
@@ -403,9 +485,18 @@ export function LiveGrid({
     <div className="flex flex-col gap-3">
       {/* The grid's health (§4): stone, never amber; honest, not alarmed. */}
       {stale && !over ? (
-        <p className="rounded-sm border border-border-default bg-surface-sunken px-4 py-3 text-body text-text-primary tabular-nums">
-          {staleWords(stale)}
-        </p>
+        livePage && stale.reason === 'reconnecting' ? (
+          <div className={PILL_LAYER}>
+            <p className={PILL}>
+              <span aria-hidden="true" className="size-1.75 shrink-0 rounded-full bg-pip" />
+              {staleWords(stale)}
+            </p>
+          </div>
+        ) : (
+          <p className="rounded-sm border border-border-default bg-surface-sunken px-4 py-3 text-body text-text-primary tabular-nums">
+            {staleWords(stale)}
+          </p>
+        )
       ) : null}
       {rows.length === 0 ? (
         <p className="text-body text-text-secondary">No students enrolled yet.</p>

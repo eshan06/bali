@@ -116,6 +116,8 @@ const V2_SIZES: Record<string, [string, string, number, string?]> = {
   // The class page's (PV6): the small button's label and a segment of the length picker.
   'button-sm': ['13.5px', '18px', 600],
   segment: ['14px', '18px', 600],
+  // The live header's (PV7): the line under the countdown, "ends 9:55 AM".
+  'countdown-sub': ['12.5px', '17px', 400],
 };
 /** The sizes §1 lists that the scale has, each its style: [style, size, line height]. */
 const ON_SCALE = [
@@ -447,7 +449,7 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     }
   });
 
-  it('beside them, only border-input, the side menu’s avatar (PV5) and a dialog’s backdrop (PV6)', () => {
+  it('beside them, only border-input, the side menu’s avatar (PV5), a dialog’s backdrop (PV6) and the reconnect pill’s dot (PV7)', () => {
     const named = [...inline.keys()].filter((k) => k.startsWith('--color-'));
     const semanticNames = semantic(tokens.color.tokens).map((t) =>
       t.name === 'focus-ring-color' ? '--color-focus-ring' : `--color-${t.name}`,
@@ -456,8 +458,11 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
       '--color-avatar-bg',
       '--color-avatar-fg',
       '--color-border-input',
+      '--color-pip',
       '--color-scrim',
     ]);
+    // The reconnect pill's dot (DESIGN.md §4): stone-500, as v2.css draws it.
+    expect(inline.get('--color-pip')).toBe('var(--bali-stone-500)');
     expect(inline.get('--color-avatar-bg')).toBe('var(--bali-green-200)');
     expect(inline.get('--color-avatar-fg')).toBe('var(--bali-green-800)');
     // Its initials are small text: 4.5:1 at least, as every chip's ink on its fill.

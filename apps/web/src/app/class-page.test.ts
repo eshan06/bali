@@ -10,7 +10,9 @@ import { describe, expect, it, vi } from 'vitest';
  * session and its Loading and errors). Before its class is read, the session's place holds a
  * Loading card, never the Start form, which used to flash while the class loaded, even mid-lesson.
  * Rendered as the server first draws it, before any read; what needs a read is read from the
- * source. The page while a session runs keeps its layout until PV7 (present.test.ts pins it).
+ * source. And the page while a session runs (PV7; ClassLive, ClassStale, ClassStates' lines during
+ * a session), read from the source too; its header and counts are rendered in live-header.test.ts,
+ * and Present's own page, kept until PV9, is pinned in present.test.ts.
  */
 vi.mock('next/navigation', () => ({
   useParams: () => ({ id: 'c1' }),
@@ -132,20 +134,61 @@ describe('the class page while no session runs (ClassBefore)', () => {
     expect(classes('LABEL')).toEqual(
       expect.arrayContaining(['mb-3', 'text-section-label', 'text-text-tertiary', 'uppercase']),
     );
+    // 32 px over its card as ClassBefore draws it: the label's 12 px and its section's 20 px gap
+    // (PV6's review: its comment said 12).
+    expect(page).toMatch(/32 px above its card[^]*its own 12 px and its section's 20 px gap/);
+    expect(cols.match(/flex min-w-0 flex-\[[^\]]+\] flex-col gap-5"/g)).toHaveLength(2);
     // An empty roster says so in a plain line, never in a card (DESIGN.md §4).
     expect(cols).toMatch(
       /roster\.students\.length === 0 \? \(\s*<p className="text-body text-text-secondary">No students have joined yet\.<\/p>/,
     );
   });
 
-  it('leaves the page while a session runs as it was, until PV7: its nav, its header’s code, its roster', () => {
-    expect(live).toMatch(/All classes/);
-    expect(live).toMatch(
-      /<JoinCode classId=\{classId\} code=\{klass\.joinCode\} onClass=\{setKlass\} large=\{projecting\} \/>/,
+  it('draws none of it while a session runs: no length picker, no join code’s card', () => {
+    expect(live).not.toMatch(/\bcard\b \/>|TRACK|SEGMENT|columns-3 gap-x-8/);
+  });
+});
+
+describe('the class page while a session runs (ClassLive)', () => {
+  /** The page off Present: the live branch, Present's own nav, header and roster set aside. */
+  const own = live
+    .replace(/\{present \? \(\s*<(nav|section)\b[^]*?<\/\1>\s*\) : null\}/g, '')
+    .replace(/\{present \? \(\s*\/\/[^]*?<\/header>\s*\) : \(/, '{(');
+
+  it('heads it with ClassLive’s header: the ring, the line, the countdown, then +5, +10 and End', () => {
+    expect(own).toMatch(
+      /<LiveHeader\s+name=\{klass\.name\}\s+joinCode=\{klass\.joinCode\}\s+counts=\{counts\}\s+startedAt=\{grid\.startedAt\}\s+endsAt=\{grid\.endsAt\}\s*>\s*\{extend\}\s*\{end\('ml-2'\)\}\s*<\/LiveHeader>/,
     );
-    expect(live).toMatch(
-      /<ul className="mt-4 columns-2 gap-x-6 sm:columns-3 sm:gap-x-10 lg:columns-4">/,
+    // Its parts 22 px apart, as v2.css's page; `relative` places the reconnect pill over it.
+    expect(own).toMatch(/: 'relative flex flex-col gap-5\.5'\}>/);
+  });
+
+  it('counts the class over the grid, beside a small Present that a phone never shows', () => {
+    expect(own).toMatch(/\) : counts \? \(\s*<LiveCounts counts=\{counts\} \/>\s*\) : null\}/);
+    // The live grid's own counts, never another session's (a Start after an end).
+    expect(page).toMatch(
+      /const counts = grid !== null && counted\?\.session === grid\.id \? counted\.counts : null;/,
     );
-    expect(live).not.toMatch(/\bcard\b \/>|ClassBefore|TRACK|SEGMENT/);
+    expect(page).toMatch(/onCounts=\{onCounts\}/);
+    const toggle = page.slice(page.indexOf('const presentToggle'));
+    expect(toggle).toMatch(/size=\{beside \? 'sm' : 'md'\}/);
+    expect(toggle).toMatch(/className=\{beside \? 'ml-auto max-sm:hidden' : ''\}/);
+  });
+
+  it('shows no roster and no New code: the grid names every student, and ClassLive draws none', () => {
+    expect(own).not.toMatch(/Roster|roster\.students|<JoinCode|All classes/);
+  });
+
+  it('says its lines as ClassStates does: right under the header, Try again small', () => {
+    // A failed read again of the class, and an extend's failure, refusal or note.
+    expect(own.match(/size=\{present \? 'md' : 'sm'\}/g)).toHaveLength(2);
+    expect(own).toMatch(/className=\{present \? undefined : 'contents'\}/);
+  });
+
+  it('keeps the session’s start for the ring, from the Start’s answer or the first snapshot', () => {
+    expect(page).toMatch(/startedAt: res\.session\.startedAt,\s*endsAt: res\.session\.endsAt,/);
+    expect(page).toMatch(/const startedAt = cur\.startedAt \?\? session\.startedAt \?\? null;/);
+    // A reload knows neither until the grid's snapshot says them.
+    expect(page).toMatch(/\{ id: c\.liveSessionId, over: false, startedAt: null, endsAt: null \}/);
   });
 });
