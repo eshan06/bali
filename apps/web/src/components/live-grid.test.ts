@@ -101,20 +101,28 @@ describe('a tile on the live grid (PV8)', () => {
   });
 
   it('never shows an unlock’s reason in Present, the projector the class can see', () => {
+    /** Nowhere in a Present tile's markup: not its words, nor a tooltip or a label on any tag. */
+    const noReason = (html: string) => expect(html).not.toMatch(/bathroom|nurse|other reason/i);
     for (const reason of ['bathroom', 'nurse', 'other'] as const) {
-      const off = parts(
-        render(
-          student({ state: 'protection_off', unlock: unlocked(reason), lastSeenAt: ago(330) }),
-          true,
-        ),
+      const offHtml = render(
+        student({ state: 'protection_off', unlock: unlocked(reason), lastSeenAt: ago(330) }),
+        true,
       );
+      const off = parts(offHtml);
       expect(off.state?.words).toBe('Protection off');
       expect(off.line?.words).toBe('Unlocked · last seen 5 min ago');
+      noReason(offHtml);
       const html = render(student({ state: 'unlocked', unlock: unlocked(reason) }), true);
       expect(parts(html).state?.words).toBe('Unlocked');
-      expect(text(html)).not.toContain(reason === 'other' ? 'other reason' : reason);
-      expect(text(html)).not.toMatch(/Bathroom|Nurse|Other/);
       expect(parts(html).line).toBeUndefined();
+      noReason(html);
+      noReason(
+        render(student({ state: 'unlocked', unlock: unlocked(reason), endedAt: ago(60) }), true),
+      );
+      // The teacher's own view says it.
+      expect(render(student({ state: 'unlocked', unlock: unlocked(reason) }))).toMatch(
+        /bathroom|nurse|other reason/i,
+      );
     }
     // ClassPresent's: "last seen" alone, a Left tile with no line, and Clock off.
     const seen = student({ state: 'unlocked', unlock: unlocked('bathroom'), lastSeenAt: ago(330) });
@@ -197,6 +205,8 @@ describe('a tile on the live grid (PV8)', () => {
     expect(tile.state?.classes).toEqual(
       expect.arrayContaining(['truncate', 'text-caption', 'font-semibold']),
     );
+    // In sentence case, as PV4 drew the chip: no capitals by a class.
+    expect(tile.state?.classes).not.toContain('uppercase');
     expect(tile.line?.classes).toEqual(expect.arrayContaining(['truncate', 'text-tile-line']));
   });
 
@@ -285,7 +295,7 @@ describe('the grid’s columns', () => {
     expect(Math.floor((1440 - 216 - 2 * 36 + 10) / (min + 10))).toBe(4);
   });
 
-  it('is two columns on a phone, 8 px apart, every row as tall as its tallest tile', () => {
+  it('is two columns on a phone, 8 px apart, every tile as tall as the tallest', () => {
     expect(classes).toEqual(
       expect.arrayContaining(['max-sm:grid-cols-2', 'max-sm:auto-rows-fr', 'max-sm:gap-2']),
     );
@@ -326,6 +336,11 @@ describe('the stream’s first connect (PV7’s find)', () => {
 
   it('says a lost stream at once, as the pill', () => {
     expect(health('reconnecting', 0)).toEqual({ reason: 'reconnecting', secondsAgo: 0 });
+  });
+
+  it('is how the grid reads its stream’s health', () => {
+    const source = readFileSync(fileURLToPath(new URL('./live-grid.tsx', import.meta.url)), 'utf8');
+    expect(source).toMatch(/const stale = staleness\(\{\s*status: healthOf\(status\),/);
   });
 });
 

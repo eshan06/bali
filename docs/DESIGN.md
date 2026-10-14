@@ -634,7 +634,7 @@ where they differ (Present's included: §5); the input size stands.
   one 1080p screen. *v2's look (§1), superseding Q4 and Present's sizes:*
   tinted tiles, each `minmax(250px, 1fr)` and 84 px tall, four to a row at
   1440, each part cut short rather than wrapped so every tile is one size, and
-  on a phone two columns of short tiles as tall as their row, nothing cut (PV1;
+  on a phone two columns of short tiles, each as tall as the grid's tallest, nothing cut (PV1;
   built in PV8); Present four columns of 100 px tiles (21/28, 17/24, 15/22), no menu,
   its header the ring, the class, the countdown, the join code at 34/44 and the
   controls, **+5, +10 and End kept** beside Present (the owner, 2026-10-12).

@@ -25,9 +25,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   ClassPresent draws it. Clock off moves from a badge beside the name into the line, keeping its
   tooltip. In Present never a reason (`unlockNote`, unchanged). **On a phone** (under 640 px, as
   PhoneClassLive draws it, PV1's two columns of short tiles): no icon at the side, the state's icon
-  before its words, the line running on after them, nothing cut, every row as tall as its tallest
-  tile. *A call made here:* PhoneClassLive's sample tiles show the reason and Clock off but neither
-  "last seen" nor protection off's "Unlocked · nurse"; the phone shows the computer's line in full,
+  before its words, the line running on after them, nothing cut, every tile as tall as the grid's
+  tallest, as the board's own rule draws it. *A call made here:* PhoneClassLive's sample tiles show
+  the reason and Clock off but neither "last seen" nor protection off's "Unlocked · nurse"; the
+  phone shows the computer's line in full,
   since the grid never hides how stale a phone is (§2) and an unlock under protection off is the
   teacher's to see. The owner sees it in the screenshots. **In Present** (ClassPresent): one size up,
   100 px tall, 12 × 18 px in, a 24 px icon, 21/28, 17/24 and 15/22 medium; its four columns from a

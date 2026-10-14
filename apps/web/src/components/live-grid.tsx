@@ -130,8 +130,8 @@ export function stateCounts(displays: readonly GridDisplay[]): StateCounts {
 /**
  * The grid's columns (ClassLive): as many tiles as fit, each at least 250 px, 10 px apart, so four
  * fill the class page beside the side menu at 1440 px; never wider than the grid (`min`). On a
- * phone (PhoneClassLive, under 640 px), two columns 8 px apart, every row as tall as its tallest
- * tile. Present keeps four columns from a 56 rem grid (DESIGN.md §5), 12 px apart, three and then
+ * phone (PhoneClassLive, under 640 px), two columns 8 px apart, every tile as tall as the grid's
+ * tallest (PV1's pick: one size, nothing cut). Present keeps four columns from a 56 rem grid (DESIGN.md §5), 12 px apart, three and then
  * two narrower, so a 1024 px projector still shows four.
  */
 export const COLUMNS =
@@ -148,8 +148,8 @@ const DOT = '\u00a0· ';
  * A tile in v2's look (ClassStates): filled with its state's tint, its edge 1.5 px (dashed for
  * Silent and Unknown), 14 px corners; the state's icon, then the name, the state and one line, each
  * cut short with an ellipsis rather than wrapped, so every tile is one size: 84 px tall, 12 × 14 px
- * in. On a phone (PhoneClassLive) a short tile, 10 × 12 px in, as tall as its row: no icon at the
- * side, the state's icon before its words, the line after them, nothing cut. In Present
+ * in. On a phone (PhoneClassLive) a short tile, 10 × 12 px in, as tall as the tallest: no icon at
+ * the side, the state's icon before its words, the line after them, nothing cut. In Present
  * (ClassPresent), one size up: 100 px tall, 12 × 18 px in, its icon 24 px.
  */
 const TILE = {
