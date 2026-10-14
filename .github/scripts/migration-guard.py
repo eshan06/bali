@@ -31,6 +31,8 @@ WORD = re.compile(rf"[{START}0-9$]")
 # each keyword already keeps a piece from matching, and this keeps a long word from being slow.
 NAME = rf"""(?:(?:U&)?"(?:[^"]|"")*"(?:\s*UESCAPE\s*'[^']*')?|[{START}][{START}0-9$]*(?![{START}0-9$]))"""
 QNAME = rf"{NAME}(?:\s*\.\s*{NAME})*"
+# The rest of one statement: up to a ; outside quotes, a quoted run taken whole.
+SPAN = r"""(?:"(?:[^"]|"")*"|'(?:[^']|'')*'|[^;"'])*?"""
 # Where an ALTER TABLE action starts: after the table's name, or after a comma.
 ACTION = (rf"(?:\bALTER\s+TABLE\b(?:\s+IF\s+EXISTS\b)?\s*(?:\bONLY\b\s*(?:\(\s*{QNAME}\s*\)|{QNAME})"
           rf"|{QNAME}(?:\s*\*)?)|,)\s*")
@@ -44,7 +46,7 @@ RULES = [
     ("DELETE FROM", r"\bDELETE\s+FROM\b"),
     # Anything between, in one statement: a table's name, ONLY (name), an upsert's or a MERGE's
     # bare UPDATE SET, a format('%I') placeholder.
-    ("UPDATE ... SET", r"\bUPDATE\b[^;]*?\bSET\b"),
+    ("UPDATE ... SET", rf"\bUPDATE\b{SPAN}\bSET\b"),
     ("MERGE", r"\bMERGE\s+INTO\b"),
     ("a column type change", r"\bSET\s+DATA\s+TYPE\b"),
     ("a column type change", rf"\bALTER\s+COLUMN\b\s*{NAME}\s*\bTYPE\b"),
@@ -53,18 +55,19 @@ RULES = [
     # It drops what depends on what it drops, columns and tables included (DROP TABLE and DROP
     # COLUMN are their own kinds); an index's or a constraint's keeps the data.
     ("DROP ... CASCADE", r"(?P<at>\bDROP\b)(?!\s*(?:TABLE|COLUMN|INDEX|CONSTRAINT|DEFAULT|NOT"
-     r"|EXPRESSION|IDENTITY)\b)[^;]*?\bCASCADE\b"),
+     rf"|EXPRESSION|IDENTITY)\b){SPAN}\bCASCADE\b"),
     ("DROP OWNED", r"\bDROP\s+OWNED\b"),
     # PL/pgSQL's EXECUTE runs a string built at run time (format('...%I...'), 'DR' || 'OP'),
-    # which no pattern can read; a trigger's EXECUTE FUNCTION names a function and passes.
-    ("EXECUTE of SQL built at run time", r"\bEXECUTE\b(?!\s*(?:FUNCTION|PROCEDURE)\b)"),
+    # which no pattern can read. A trigger's EXECUTE FUNCTION f() and a GRANT EXECUTE ON pass.
+    ("EXECUTE of SQL built at run time",
+     rf"\bEXECUTE\b(?!\s*(?:ON\b|(?:FUNCTION|PROCEDURE)\s*{QNAME}\s*\())"),
 ]
 KINDS = list(dict.fromkeys(kind for kind, _ in RULES))
 RULES = [(kind, re.compile(pattern, re.I)) for kind, pattern in RULES]
 # A foreign key's actions change no row now, and ON UPDATE SET NULL would read as an UPDATE ...
-# SET: blanked before the rules run.
+# SET: blanked before the rules run, a SET NULL's column list only when it holds names.
 FK_ACTION = re.compile(r"\bON\s+(?:UPDATE|DELETE)\s+(?:NO\s+ACTION\b|RESTRICT\b|CASCADE\b"
-                       r"|SET\s+(?:NULL|DEFAULT)\b(?:\s*\([^();]*\))?)", re.I)
+                       rf"|SET\s+(?:NULL|DEFAULT)\b(?:\s*\(\s*{NAME}(?:\s*,\s*{NAME})*\s*\))?)", re.I)
 
 SPECIAL = re.compile(r"""--|/\*|['"$]""")
 LINE_END = re.compile(r"[\r\n]")  # Postgres ends a -- comment at either
@@ -141,8 +144,10 @@ def uncommented(sql):
 
 def code_of(sql):
     """`sql` with its comments blanked out, each part between drizzle's separators lexed on its
-    own, as Postgres receives it; the separators blanked too. Offsets and lines are unchanged."""
-    return (" " * len(SEPARATOR)).join(uncommented(part) for part in sql.split(SEPARATOR))
+    own, as Postgres receives it. Each separator becomes a ; and spaces, since no statement runs
+    past one; offsets and lines are unchanged."""
+    end = ";" + " " * (len(SEPARATOR) - 1)
+    return end.join(uncommented(part) for part in sql.split(SEPARATOR))
 
 
 def findings(sql):

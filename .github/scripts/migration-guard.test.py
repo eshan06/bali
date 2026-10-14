@@ -90,6 +90,15 @@ CAUGHT = [
      [(1, "UPDATE ... SET"), (1, "EXECUTE of SQL built at run time")]),
     ("keywords split across strings", "EXECUTE 'ALTER TABLE users DR' || 'OP COLUMN email';",
      [(1, "EXECUTE of SQL built at run time")]),
+    ("an EXECUTE of a variable named procedure", "DO $$ DECLARE procedure text := 'x';\n"
+     "BEGIN EXECUTE procedure; END $$;", [(2, "EXECUTE of SQL built at run time")]),
+    # A ; inside quotes ends no statement, and a string can't pass for a foreign key's action.
+    ("an UPDATE of a quoted name holding ;", 'UPDATE "a;b" SET x = 1;', [(1, "UPDATE ... SET")]),
+    ("an UPDATE with an alias holding ;", 'UPDATE users AS "u;" SET email = NULL;',
+     [(1, "UPDATE ... SET")]),
+    ("after a string that reads as a foreign key's action", "ALTER TABLE users ALTER COLUMN a SET "
+     "DEFAULT 'ON DELETE SET NULL (', DROP COLUMN email, ALTER COLUMN b SET DEFAULT ')';",
+     [(1, "DROP COLUMN")]),
     # Postgres's other spellings of a table and a name.
     ("UPDATE ONLY (name)", "UPDATE ONLY (users) SET email = NULL;", [(1, "UPDATE ... SET")]),
     ("an UPDATE with a comment inside", 'UPDATE "users" -- every row\n  SET "email" = NULL;',
@@ -139,6 +148,12 @@ PASSED = [
     ("triggers on UPDATE and DELETE", "CREATE TRIGGER t BEFORE UPDATE OR DELETE ON events\n"
      "FOR EACH ROW WHEN (OLD.redeemed_at IS NOT NULL) EXECUTE FUNCTION f();"),
     ("a trigger dropped", "DROP TRIGGER IF EXISTS teacher_invites_single_use ON teacher_invites;"),
+    ("grants of EXECUTE", "GRANT EXECUTE ON FUNCTION f() TO app;\n"
+     "REVOKE EXECUTE ON FUNCTION f() FROM PUBLIC;\n"
+     "ALTER DEFAULT PRIVILEGES GRANT EXECUTE ON FUNCTIONS TO app;"),
+    # Each part between drizzle's separators runs on its own: no statement spans two.
+    ("a part with no ; before an ALTER ... SET", "CREATE TRIGGER t BEFORE UPDATE ON x FOR EACH ROW "
+     "EXECUTE FUNCTION f()--> statement-breakpoint\nALTER TABLE y ALTER COLUMN c SET DEFAULT 1;"),
     ("a grant, and a row lock", "GRANT UPDATE ON t TO r;\nSELECT 1 FROM t FOR UPDATE;"),
     ("a function testing TG_OP", "CREATE OR REPLACE FUNCTION f() RETURNS trigger LANGUAGE plpgsql "
      "AS $$\nBEGIN\n  IF TG_OP = 'UPDATE' THEN\n    RETURN NEW;\n  END IF;\nEND;\n$$;"),
