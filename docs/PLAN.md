@@ -41,7 +41,7 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
 - **The workflow review's last steps, next on the Mac** (the owner, 2026-10-13; one PR each):
   - the migration guard: CI fails a migration that deletes or rewrites data unless the owner's approval label is on the PR, and the owner makes it a required check;
   - docs-only PRs (every changed file under `docs/`) skip the test jobs, each still reporting success; Claude Review, attribution and the plan check still run;
-  - two tests ✅ (DECISIONS 2026-10-14): only `transitions.ts` writes `participations` and `events` (the one exception, the test-only `backdateLastSeen`, named for the owner to rule on); the matrix's other-school callers, there all along, are named, and a colleague at the owner's school is added; nothing leaked.
+  - two tests ✅ (#364; DECISIONS 2026-10-14): only `transitions.ts` writes `participations` and `events` (the one exception, the test-only `backdateLastSeen`, named for the owner to rule on); the matrix's other-school callers, there all along, are named, and a colleague at the owner's school is added; nothing leaked.
 
 - **The "class started" push (N1–N6, decided 2026-10-06):** a visible alert to the students
   whose waiting tap a Start converts; a doorbell, never the truth. N1 (the docs), N2 (CI) and N3 (the
