@@ -41,7 +41,7 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
 - **The workflow review's last steps, next on the Mac** (the owner, 2026-10-13; one PR each):
   - the migration guard ✅ (#369; DECISIONS 2026-10-14): "Migration guard" fails a migration that drops, deletes, rewrites, renames or retypes data until the owner adds `owner-approved-migration`, which a new push removes; left, the owner's: make it a required check in `protect-main`;
   - docs-only PRs skip the test jobs ✅ (#365; DECISIONS 2026-10-14): only Markdown under `docs/` counts, `APP-STORE.md` not (a check reads it); every required check still reports, Claude Review and the plan check still run; such a PR is green in about a minute, from 4:40;
-  - moved files ✅ (#368; DECISIONS 2026-10-14): a file moved out of `ios/` or the load gate's paths runs that job (`--no-renames`, through the self-tested `touches.sh`), and the load gate runs when its decision fails; `plan-check.yml` has the same gap, not fixed here;
+  - moved files ✅ (#368; DECISIONS 2026-10-14): a file moved out of `ios/` or the load gate's paths, or one whose name git quotes, runs that job (`--no-renames -z`, through the self-tested `touches.sh`), and the load gate runs when its decision fails; `plan-check.yml` has the same gap, not fixed here;
   - two tests ✅ (#364; DECISIONS 2026-10-14): only `transitions.ts` writes `participations` and `events` (the one exception, the test-only `backdateLastSeen`, named for the owner to rule on); the matrix's other-school callers, there all along, are named, and a colleague at the owner's school is added; nothing leaked.
 
 - **The "class started" push (N1–N6, decided 2026-10-06):** a visible alert to the students

@@ -15,11 +15,15 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the iOS build, and one moved out of `apps/api/`, `packages/db/` or `packages/shared/` skipped the
   load gate. **The fix:** both decide through `.github/scripts/touches.sh <base> <pattern>`, which
   diffs with `--no-renames`, as `docs-only.sh` does, so the path a file left counts as well as the
-  one it went to; each workflow keeps its own pattern. A diff that fails, or a pattern grep refuses,
-  fails the script instead of answering `false`, the answer that skips. `touches.test.sh` pins it
-  and runs first in both decision jobs; its moved-out case failed before the fix, and each of six
-  mutants fails it (renames on, a failed diff or a grep error answering, always `true`, always
-  `false`, fixed strings). **The gate's `if`:** "Load gate changes" is no required check, so a
+  one it went to; each workflow keeps its own pattern. And with `-z`, which lists each path as it
+  is: without it git wraps a path holding a non-ASCII byte, a quote, a backslash or a control
+  character in quotes, so a new `ios/café.swift` read as no iOS change, the same skip (santa's
+  round 1, both reviewers; `core.quotePath=false` would still quote the rest). A diff that fails,
+  or a pattern grep refuses, fails the script instead of answering `false`, the answer that skips.
+  `touches.test.sh` pins it and runs first in both decision jobs; its moved-out and quoted-name
+  cases failed before their fixes, and each of nine mutants fails it (renames on; a failed diff, no
+  `pipefail` or a grep error answering; always `true`; always `false`; fixed strings; paths quoted,
+  `core.quotePath` off or not). **The gate's `if`:** "Load gate changes" is no required check, so a
   decision that failed skipped the gate, and a required check that was skipped counts as passed:
   the old comment's promise, that a failing diff would not skip the gate, did not hold. The gate now
   runs unless the decision said `false` (`!cancelled()`, as `ci.yml`'s test jobs do). "iOS changes"
@@ -28,9 +32,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   repository's root, against this branch: "iOS changes" ran the self-test and the iOS build started
   (cancelled once seen), and the load gate skipped, as it should. On that commit, `git diff
   --name-only` with renames on lists only `README-ios.md`, which the old decision read as no iOS
-  change. **Not here:** `plan-check.yml`'s "Plan doc updated" diffs with renames on too, so a source
-  file moved out of `apps/`, `packages/` or `ios/` into another folder asks for no PLAN.md update;
-  it can decide through `touches.sh` the same way.
+  change. **Not here:** `plan-check.yml`'s "Plan doc updated" reads its diff the old way, so a source
+  file moved out of `apps/`, `packages/` or `ios/` into another folder, or one whose name git
+  quotes, asks for no PLAN.md update; it can decide through `touches.sh` the same way.
 
 - **2026-10-14** — **A migration that destroys or rewrites data waits for the owner: the "Migration
   guard" check (the owner's workflow review, approved 2026-10-13 after two independent reviews).**

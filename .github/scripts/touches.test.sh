@@ -1,8 +1,8 @@
 #!/bin/bash
-# Self-test for touches.sh: a watched file changed, or moved in or out of the
-# watched paths, touches them; a file elsewhere, one moved elsewhere, or no
-# change at all does not; a base that isn't there and a pattern grep refuses
-# fail instead of answering. ios.yml and load-gate.yml run it first, so a
+# Self-test for touches.sh: a watched file changed, one moved in or out of the
+# watched paths, or one whose name git quotes touches them; a file elsewhere,
+# one moved elsewhere, or no change at all does not; a base that isn't there
+# and a pattern grep refuses fail instead of answering. ios.yml and load-gate.yml run it first, so a
 # decision that stops working fails instead of skipping their job.
 #
 #   .github/scripts/touches.test.sh
@@ -48,6 +48,7 @@ expect true 'a watched file changed' 'echo more >>ios/app.swift'
 expect true 'the watched file changed' 'echo more >>job.yml'
 expect true 'a file moved out of the watched folder' 'git mv ios/app.swift apps/app.swift'
 expect true 'a file moved into it' 'git mv apps/app.ts ios/app.ts'
+expect true 'a watched file whose name git quotes' "echo new >'ios/say \"café\".swift'"
 expect false 'a file elsewhere changed' 'echo more >>apps/app.ts'
 expect false 'a file moved elsewhere' 'mkdir apps/sub; git mv apps/app.ts apps/sub/app.ts'
 expect false 'no change at all' ':'
