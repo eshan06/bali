@@ -172,17 +172,6 @@
   --text-code-lg--line-height: 32px;
   --text-code-lg--font-weight: 500;
 
-  /* The Present view's two sizes, the owner's ruling (2026-10-05): names 20 px and chip labels
-     14 px as D2a's canvas drew them, their line heights on the 4-pt grid (26 and 18 drawn, taken
-     up to 28 and 20). The live grid's only. Not in the tokens yet (DESIGN.md §5). The label is the
-     chip's at the projector's size: medium, in sentence case, untracked, since v2's look (PV4). */
-  --text-present-name: 20px;
-  --text-present-name--line-height: 28px;
-  --text-present-name--font-weight: 600;
-  --text-present-label: 14px;
-  --text-present-label--line-height: 20px;
-  --text-present-label--font-weight: 500;
-
   /* v2's look's sizes (DESIGN.md §1, Style facts), built exactly as drawn (the owner,
      2026-10-12, Its call): portal-only, out of bali-tokens.json and the app. A size §1 lists that
      the scale has takes the scale's style: card titles `h3`, chips `caption`, menu items `data`,

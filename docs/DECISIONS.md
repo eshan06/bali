@@ -8,6 +8,53 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-14** — **PV8: the live grid's cells as v2's tinted tiles, built exactly as drawn;
+  the counts and the tiles share one look; the pill no longer flashes as a page loads.** Built to
+  [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (version 21):
+  ClassStates' twelve tiles and Present's four, ClassLive at 1440 px, PhoneClassLive at 390 and
+  ClassPresent's tiles at 1920 (`components/live-grid.tsx`, `Tile`). **The tile:** filled with its
+  state's tint, a 1.5 px edge (dashed for Silent and Unknown), 14 px corners, 84 px tall and 12 ×
+  14 px in; the state's own icon at 20 px, then the name (15/20), the state (13/18 semibold) and one
+  line (12.5/17 medium), each cut short with an ellipsis rather than wrapped, so every tile is one
+  size whatever it says; all three in the state's own ink, as the board draws them, where §2 had
+  "last seen" in `text-tertiary` under a chip. The grid `minmax(250px, 1fr)` 10 px apart, four
+  across beside the menu at 1440. A Left state's flag before its words, its state's icon at the side
+  (Q2 A). **The line:** an unlock's reason, "last seen" and Clock off, each that applies, in that
+  order, joined by a dot: "Bathroom · last seen 5 min ago", "Unlocked · nurse", "Clock off". Its
+  first part's first letter capitalised as drawn; "last seen" alone stays lower case, as
+  ClassPresent draws it. Clock off moves from a badge beside the name into the line, keeping its
+  tooltip. In Present never a reason (`unlockNote`, unchanged). **On a phone** (under 640 px, as
+  PhoneClassLive draws it, PV1's two columns of short tiles): no icon at the side, the state's icon
+  before its words, the line running on after them, nothing cut, every row as tall as its tallest
+  tile. *A call made here:* PhoneClassLive's sample tiles show the reason and Clock off but neither
+  "last seen" nor protection off's "Unlocked · nurse"; the phone shows the computer's line in full,
+  since the grid never hides how stale a phone is (§2) and an unlock under protection off is the
+  teacher's to see. The owner sees it in the screenshots. **In Present** (ClassPresent): one size up,
+  100 px tall, 12 × 18 px in, a 24 px icon, 21/28, 17/24 and 15/22 medium; its four columns from a
+  56 rem grid kept, 12 px apart, three and then two narrower, so a 1024 px projector still shows
+  four (the page itself is PV9's). **`bali-softpulse`** rings the whole tile, keyed by its unlock as
+  the chip was. **Not a button yet:** ClassStates says a tile is a button that opens the student's
+  panel; that panel is PV11's, and a button that opens nothing would be a control that does nothing,
+  so the tile becomes a button there. **One look for a tile and its count:** the tiles keep the
+  grid's `CHIP` (words, icons, tints), which the class page's counts already read (PV7), so a count
+  and its tiles can never disagree; the grid's chip pill is gone, and with it Present's two old sizes
+  (`text-present-name`, `text-present-label`, 2026-10-05), unused now. **The owner confirmed
+  (2026-10-14, PV7's reviewers' question):** a student who left while unlocked counts under Left,
+  with an orange tile, as ClassLive draws it. **How it ended** (until PV12 removes it) shows the same
+  tiles: it is the same grid, and keeping the old cells there alone would keep a second cell no board
+  draws for one step. **The pill's load flash** (PV7's find): the stream's first connect, 60–100 ms
+  as each page loads, read as a reconnect and flashed the pill. The grid's health now reads it as an
+  open stream, judged by how long the stream has been quiet (`healthOf`): it has lost nothing, the
+  grid having just been read; a first connect that hangs is still said, as the quiet stream's line,
+  once the stream is quiet too long. Done in the component; `staleness` is unchanged. Checked on
+  dev: a watcher on the page saw no "Reconnecting" as a session's grid booted. **The screenshots**
+  used dev's demo students, signed in through the `bali-ios` client, which dev accepted: Focused,
+  Unlocked with a reason, Protection off after an unlock, Silent, Not here, "last seen", Clock off (a
+  tap whose phone clock ran ten minutes ahead, as S9 notes), the pulse, and after End the three Left
+  tiles. Unknown can't be produced on dev (it needs a state this tab doesn't know), so it was
+  rendered with the real `Tile` from a throwaway page in the local preview alone, never committed.
+  *Size:* about 265 changed lines without tests.
+
 - **2026-10-14** — **PV7: a class's page while a session runs in v2's look, built exactly as
   drawn; a lost stream as the floating pill, a quiet one as the stone line; Present's page as it was
   until PV9.** Built to [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4)

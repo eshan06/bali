@@ -329,24 +329,15 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
 
   it('beside them, only the sizes the owner ruled (DESIGN.md §1, §3, §5), each where it belongs', () => {
     // The input size: 16 px, so iPhone Safari never zooms into a field when it is tapped
-    // (2026-10-05). The Present view's names and chip labels, 20 px and 14 px as drawn
     // (2026-10-05). code-lg, the join code in Present, 24 px at the code style's weight
     // (2026-10-06). Their line heights on the 4-pt grid; the design system gains them at the
-    // owner's next export. And v2's look's sizes, as drawn (2026-10-12), pinned below.
+    // owner's next export. And v2's look's sizes, as drawn (2026-10-12), pinned below. The Present
+    // view's old names and chip labels (20 and 14 px, 2026-10-05) went with its tiles (PV8).
     const sizes = [...theme.keys()]
       .filter((k) => k.startsWith('--text-') && k !== '--text-*' && !k.slice(2).includes('--'))
       .map((k) => k.slice('--text-'.length));
     const styles = tokens.type.groups.flatMap((g) => g.styles.map((s) => s.name));
-    expect(sizes.sort()).toEqual(
-      [
-        ...styles,
-        'code-lg',
-        'input',
-        'present-label',
-        'present-name',
-        ...Object.keys(V2_SIZES),
-      ].sort(),
-    );
+    expect(sizes.sort()).toEqual([...styles, 'code-lg', 'input', ...Object.keys(V2_SIZES)].sort());
     const code = tokens.type.groups.flatMap((g) => g.styles).find((s) => s.name === 'code');
     expect(theme.get('--text-code-lg')).toBe('24px');
     expect(theme.get('--text-code-lg--line-height')).toBe('32px');
@@ -355,16 +346,7 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     expect(theme.get('--text-input--line-height')).toBe('24px');
     expect(theme.get('--text-input--font-weight')).toBe('400');
     expect(read('../components/field.tsx')).toMatch(/<input[^]*className=\{`[^`]*\btext-input\b/);
-    expect(theme.get('--text-present-name')).toBe('20px');
-    expect(theme.get('--text-present-name--line-height')).toBe('28px');
-    expect(theme.get('--text-present-name--font-weight')).toBe('600');
-    // The chip's weight at the projector's size, untracked: a chip is sentence case in v2's look
-    // (PV4), where the label style's tracking was for capitals.
-    expect(theme.get('--text-present-label')).toBe('14px');
-    expect(theme.get('--text-present-label--line-height')).toBe('20px');
-    expect(theme.get('--text-present-label--font-weight')).toBe('500');
-    expect(theme.has('--text-present-label--letter-spacing')).toBe(false);
-    for (const size of ['present-name', 'present-label', 'input', 'code-lg']) {
+    for (const size of ['input', 'code-lg']) {
       expect(parseInt(theme.get(`--text-${size}--line-height`) ?? '', 10) % 4, size).toBe(0);
     }
     // v2's sizes off the scale, each as drawn; the ones the scale has, the scale's own.
@@ -380,12 +362,12 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
         line,
       ]);
     }
-    // The Present view's two old sizes are the live grid's alone (v2's Present sizes are for its
-    // own steps, PV8 and PV9).
+    // A Present tile's two sizes are the live grid's alone (PV8; Present's header is PV9's).
     const src = fileURLToPath(new URL('../', import.meta.url));
     const present = sources(src).filter(
       (file) =>
-        file.endsWith('.tsx') && /\btext-present-(?:name|label)\b/.test(readFileSync(file, 'utf8')),
+        file.endsWith('.tsx') &&
+        /\btext-present-tile-(?:name|state)\b/.test(readFileSync(file, 'utf8')),
     );
     expect(present.map((file) => relative(src, file))).toEqual([
       join('components', 'live-grid.tsx'),
