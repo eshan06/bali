@@ -4,9 +4,10 @@ import type { EventType } from './index.js';
 import { sessionReport, type ReportEvent, type ReportWindow } from './report.js';
 
 /*
- * One test per counting rule of PLAN.md's reports row, on events built by
- * hand. packages/db/test/report.test.ts drives the real engine through the
- * same rules and reads back what it stores.
+ * One test per counting rule of the go-live features' Reports row
+ * (docs/PLAN-ARCHIVE.md), on events built by hand.
+ * packages/db/test/report.test.ts drives the real engine through the same
+ * rules and reads back what it stores.
  */
 
 const at = (minute: number) => new Date(Date.UTC(2026, 0, 1, 9, 0) + minute * 60_000);

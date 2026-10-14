@@ -64,8 +64,8 @@ the app and both extensions (2026-09-24).
 
 ## To run it on your iPhone: B5's device check
 
-A Debug build, run from Xcode as above, against dev. `docs/PLAN.md`'s B5 step keeps the same
-list and its status.
+A Debug build, run from Xcode as above, against dev. `docs/PLAN-ARCHIVE.md`'s B5 step keeps the
+same list and its status.
 
 **Set up once, on dev.** A session needs a teacher, a class, a block and a student. The teacher's
 side is `npm run dev:teacher`, from a checkout on your Mac (`npm ci` once): it signs in as the exit

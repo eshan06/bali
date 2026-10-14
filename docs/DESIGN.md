@@ -8,7 +8,7 @@ collects), plus Bali's design tooling at the end.
 **Scope: user-facing UI only.** That means the portal's pages and components
 (`apps/web/src/app`, `apps/web/src/components`), the student app's screens
 (`ios/Bali/UI`), the shield (`ios/BaliShield`), the Cognito sign-in page (its
-logo and CSS; D2d, `docs/PLAN.md`), a future demo site, and **user-facing
+logo and CSS; D2d, `docs/PLAN-ARCHIVE.md`), a future demo site, and **user-facing
 strings wherever they live**. Several live outside those folders (found by
 grep, 2026-10-05; a new one joins this list). In
 `ios/BaliOutbox/Sources/BaliOutbox/`: `ShieldWords.swift`; the `words` in
@@ -54,7 +54,7 @@ and the student web, v2's look replaced it on 2026-10-12 (§1), its tiles
 superseding Q4's and Q5's answers there; Q2, Q6, Q7 and Q3's dashed edge (1.5 px
 now) stand. The approved
 screen designs win over both for the screens they draw: D1 for the student app
-(`docs/PLAN.md`), with the app's
+(`docs/PLAN-ARCHIVE.md`), with the app's
 [Sign in & sign up](https://claude.ai/artifact/McyYhpX1UTq1nU6oCCwPwG) for Sign in, the 13+
 question, the intro, the gap's fallback, Your name and Home in no class (the owner, 2026-10-06
 and 2026-10-07; drawn in D1's look), and for
@@ -79,7 +79,7 @@ designs of 2026-10-06,
 [Classes home](https://claude.ai/artifact/Shc2dz4xn8Qc9iDHDuYT2N),
 [Class page & live grid](https://claude.ai/artifact/662Zkg7urbM64BXvNbq2GX) and
 [Recap & reports](https://claude.ai/artifact/BuiyWgXpVNkhPR8osDBcHZ) (built in
-PB1–PB5, `docs/PLAN.md`), and the portal and student-web boards of the
+PB1–PB5, `docs/PLAN-ARCHIVE.md`), and the portal and student-web boards of the
 [Live lesson portal screens](https://claude.ai/artifact/BxHbGud1xMeyXLUUvsewHM)
 (2026-10-10): their words and states carry over except where this canvas
 changes them. A page or a state it doesn't draw is drawn on it, for the owner
@@ -103,7 +103,7 @@ pinned by `AppTests.tokens`) in D1's shapes. Its Soft premium redraw (D2h–D2j)
 was rolled back on 2026-10-06, the owner's call on seeing it
 (`docs/DECISIONS.md`): every app screen looks as it did before D2h, and a new
 look for any of them waits for a design the owner approves. The words and the
-fixes those steps made stayed (`docs/PLAN.md`, D2). The portal draws from them too, from D2c on
+fixes those steps made stayed (`docs/PLAN-ARCHIVE.md`, D2). The portal draws from them too, from D2c on
 (`apps/web/src/app/globals.css`, pinned by `tokens.test.ts`): every semantic
 token as a `--bali-*` variable (and the primitives they and the mark
 reference), their light values on `:root` and only those (the portal is
@@ -390,7 +390,7 @@ portal's `GridDisplay` (`apps/web/src/lib/grid-state.ts`).
 | none in v3 | no_device | `state-nodevice-*`, unused | smartphone / iphone.slash | none |
 
 The words for a state are decided per surface, and several are owner rulings
-(`docs/PLAN.md`, `docs/DECISIONS.md`): the grid's "Protection off" is the app's
+(`docs/PLAN-ARCHIVE.md`, `docs/DECISIONS.md`): the grid's "Protection off" is the app's
 "Screen Time off" (the owner's 2026-09-27 ruling replaced D1's "Permission
 off"). `silent` is a real display state, derived from the last check-in and
 never stored (data-model decision 7), so it is never green, and neither is
@@ -712,7 +712,7 @@ where they differ (Present's included: §5); the input size stands.
   step that names it.
 - Add new em-dashes to user-facing strings. Existing ones go in D2's screen
   group steps, each cleaning the strings it owns (the owner's em-dash cleanup,
-  `docs/PLAN.md`); don't strip them piecemeal in unrelated PRs.
+  `docs/PLAN-ARCHIVE.md`); don't strip them piecemeal in unrelated PRs.
 
 **`bali-softpulse`** (the owner's pick, 2026-10-04, Q7 A: a glow ring). When
 an Emergency Unlock lands on the grid, its chip's ring swells and fades, 1.2 s
