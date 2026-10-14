@@ -3,7 +3,7 @@
 Two investigations made on 2026-10-05, for phases that are **proposed, not scheduled**.
 Nothing here is decided beyond the rulings it names; each phase starts with a docs PR and
 a `docs/DECISIONS.md` entry, and anything that changes `docs/ARCHITECTURE.md` is discussed
-with the owner first. `docs/PLAN.md` lists them under "Proposed future phases".
+with the owner first. `docs/PLAN.md` lists them under "Proposed future phases (not scheduled)".
 
 ## A. SIS / LMS integration (rosters from the school's systems)
 
