@@ -33,19 +33,23 @@ jobs:
           # Through env, never inline: refnames may contain $, backticks, ;.
           EVENT: ${{ github.event_name }}
           BASE_REF: ${{ github.base_ref }}
-        # The diff on its own line: piped into grep, a failing one would skip the gate.
+        # The self-test first, as in ios.yml; each on its own line, so a
+        # failure fails the step. touches.sh says how a moved file counts.
         run: |
           run=true
           if [ "$EVENT" = pull_request ]; then
-            changed=$(git diff --name-only "origin/$BASE_REF"...HEAD)
-            printf '%s\n' "$changed" | grep -qE '^(apps/api/|packages/(db|shared)/|package(-lock)?\.json$|\.nvmrc$|\.github/workflows/load-gate\.yml$)' || run=false
+            .github/scripts/touches.test.sh
+            run=$(.github/scripts/touches.sh "origin/$BASE_REF" '^(apps/api/|packages/(db|shared)/|package(-lock)?\.json$|\.nvmrc$|\.github/workflows/load-gate\.yml$)')
           fi
           echo "run=$run" >> "$GITHUB_OUTPUT"
 
   gate:
     name: One-address load gate (k6)
     needs: changes
-    if: needs.changes.outputs.run == 'true'
+    # Skipped only on the decision's false, so a decision that failed runs the
+    # gate: "Load gate changes" is no required check, and a gate skipped
+    # because it failed would count as passed.
+    if: ${{ !cancelled() && needs.changes.outputs.run != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:

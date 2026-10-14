@@ -7,10 +7,13 @@
 #
 #   .github/scripts/touches.sh <base> <pattern>
 #
+# A moved file counts where it left as well as where it went: --no-renames
+# lists both paths, where git's rename detection lists only the new one, so a
+# file moved out of ios/ read as no iOS change and skipped the build.
 # touches.test.sh pins each case.
 set -euo pipefail
 
-changed=$(git diff --name-only "$1"...HEAD)
+changed=$(git diff --no-renames --name-only "$1"...HEAD)
 found=0
 grep -qE -- "$2" <<<"$changed" || found=$?
 # grep's 1 is no match; anything else is an error, never a false.
