@@ -10,6 +10,14 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-14 (Central) — the conductor moved from the owner's Mac to an always-on
+Windows PC, which builds the portal's UI steps too; the Mac keeps Xcode and the iPhone (Now, Who
+does what; `docs/DECISIONS.md`, 2026-10-14; `docs/GOTCHAS.md`, "The Windows PC"). Before it, the
+workflow review's last steps (#364, #365, #368, #369) and the workers' effort (#372). The redesign
+is at a pause after PV6, the notes for coming steps on their lines (PV7, PV13, PV15, PV17) and the
+owner's answers pending under Open owner items ("To answer"). Next: PV7, a class live, on the
+Windows PC._
+
 _Last updated: 2026-10-13 (Central) — the owner's standing orders moved into CLAUDE.md (the
 findings rule, what is ruled impossible, reviews, owner-only actions, the end-of-phase review), ECC
 turned off for this repo and the owner's GitHub gates denied to agents in `.claude/settings.json`
@@ -961,6 +969,7 @@ plan backstop already treats it as source).
 
 Done items, and the lines `docs/PLAN.md` keeps short or once (as of 2026-10-13).
 
+- ✅ Answered by the owner on 2026-10-14, each as recommended (`docs/DECISIONS.md`, 2026-10-14); the item as PLAN.md held it: **To answer** (asked 2026-10-13, each with the conductor's recommendation): (1) PV5b: when the account can't load, the can't-reach line with Try again takes the whole page's place, a live class page's too (End and +5 hidden until Try again works); keep it (recommended). (2) Fold PV5b's review notes into PV15 (a tab with no sign-in on a URL with no page goes to `/login`) and PV17 (Home's error state: a heading, focus on Try again, one `<main>`): recommended. PV4c's two test limits (DECISIONS, "Not covered") are rare and low-impact: leave (recommended).
 - ✅ Tap a block on the prod TestFlight build: done by the owner on 2026-10-12, and it worked as usual, so the NFC entitlement as TAG alone (#236, `BlockReader`'s `NFCNDEFReaderSession`) is confirmed on a device; NDEF stays out.
 - Confirm the state of the later K-12 pilot (likely Los Angeles or New Jersey) and its school's phone policy (ISSUES #4). The first pilot is preliminary: adults at Vanderbilt, on their own phones.
 - A lawyer for the privacy policy, terms and the school's data agreement; the rest of Phase 6's owner list.
