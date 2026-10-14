@@ -10,6 +10,13 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-13 (Central) — PLAN.md is the current state only: finished history moved
+word for word to `docs/PLAN-ARCHIVE.md`, and the "Plan doc updated" check fails this file past
+8,000 words (`docs/DECISIONS.md`, 2026-10-13). Before it, the account deletion's coverage guard
+(no gap found). The redesign is at a pause after PV6, the notes for coming steps on their lines
+(PV7, PV13, PV15, PV17) and two of the owner's answers pending under Open owner items ("To
+answer"). Next: PV7, a class live._
+
 _Last updated: 2026-10-13 (Central) — the account deletion's coverage guard (C3's line):
 `ACCOUNT_DELETION_COVERAGE` places every foreign key to `users` by what `deleteAccount` does with
 its rows, and a test fails on a new key it doesn't place, as the export's, the disposal's and the
