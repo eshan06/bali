@@ -30,11 +30,13 @@ concurrency:
 jobs:
   # The check protect-main requires by this name. Its two halves run side by
   # side, the unit tests alone taking about as long as the rest together;
-  # it passes only when both did.
+  # it passes only when both did. always(), so it runs and fails on a half
+  # failed, skipped or cancelled: a gate skipped by its `if` would count as
+  # passed.
   check:
     name: Typecheck · lint · unit tests
     needs: [static, unit]
-    if: ${{ !cancelled() }}
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -49,8 +51,9 @@ jobs:
   unit:
     name: Unit tests (PGlite)
     # Arm: its four vCPUs are four cores, where the x64 runner's four share
-    # two, and the PGlite suites are CPU-bound. The real-Postgres lane below
-    # still runs the whole suite on x64.
+    # two, and the PGlite suites are CPU-bound. Free for public repositories
+    # only: a private repo's job would wait for a runner. The real-Postgres
+    # lane below still runs the whole suite on x64.
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 30
     steps:
