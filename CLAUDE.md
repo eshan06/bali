@@ -161,10 +161,10 @@ and every session gets them.
   whose reachability is doubtful → ask the owner first, in plain words: what
   happens, how likely it is, how much it matters, your recommendation. Style
   → fix it in place, never another round (a Claude Review PASS with WARNs
-  still merges as is, step 5). A finding that needs a condition
-  ruled impossible (below) is dropped, but never a security or privacy
-  finding (that goes to the owner), and every dropped finding gets one line
-  in the PR description.
+  still merges as is, step 5). A finding that needs a condition ruled
+  impossible (below) is dropped, but never a security or privacy finding
+  (that goes to the owner), and every dropped finding gets one line in the
+  PR description.
 - **Ruled impossible**, for the adult university pilot (the owner re-checks
   this list before the first K-12 school): two accounts on one phone, since
   phones are never shared (the owner, 2026-10-08); humanly impossible timings,
@@ -184,7 +184,9 @@ and every session gets them.
   the class, focused or unlocked, the screen, Airplane mode, the sticker.
 - **Reviews:** a failed Claude Review is never re-run to get a different
   answer; it stands until a new commit is pushed. A Claude Review blocker you
-  believe is wrong parks the step for the owner, who decides.
+  believe is wrong parks the step for the owner, who clears it by striking it
+  in the newest failed review's comment and re-running, or merges past the
+  check (`docs/DECISIONS.md`, 2026-10-13, #359).
 - **Owner-only actions:** agents never add or remove the owner's approval
   labels, change rulesets or branch protection, or bypass-merge (`--admin`).
   `.claude/settings.json` denies those commands to Claude Code sessions; it
