@@ -8,6 +8,64 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-13** — **The owner's standing orders move into the repo, ECC is turned off for it, and
+  agents are denied the owner's GitHub gates (the owner's workflow review, approved after two rounds
+  of independent review).** **Why in the repo:** the orders lived in the Mac's AI memory, which is
+  per machine, so a session on the Windows laptop or in the cloud never saw them; CLAUDE.md and
+  `.claude/settings.json` ride the checkout to every machine. CLAUDE.md's new "Owner's standing
+  orders" holds them: the findings rule (a proven bug or a security hole fixed now and told after;
+  a doubtful edge case asked first; style fixed in place; a finding that needs a condition ruled
+  impossible dropped with one line in the PR, never a security or privacy one, which goes to the
+  owner); what is ruled impossible for the adult pilot (two accounts on one phone, sub-millisecond
+  timings, impossible inputs), re-checked by the owner before the first K-12 school, where loaner
+  and handed-down phones are real; the owner away; plain talk; notifications; UI; a phone test's
+  starting state; reviews (a failed Claude Review is never re-run for a different answer, it stands
+  until a new commit, and a Claude Review blocker believed wrong parks the step for the owner);
+  owner-only actions; and the end-of-phase review, the "critical or recurring issue" rule on a
+  schedule. **ECC off:** `"enabledPlugins": { "ecc@ecc": false }`, the form `claude plugin disable
+  ecc@ecc --scope project` writes. The project's `false` overrides the account's `true` for that
+  plugin alone: Ponytail and the others stay on. ECC 2.2.1 registered 24 hooks (9 before every tool
+  call, 7 at every stop) and listed 286 skills, 94 commands and 68 agents, and the repo used none of
+  them: `/plan`, santa-loop, the `code-reviewer` agent and the `santa-method`,
+  `web-design-guidelines` and `no-ai-slop` skills live in `.claude/`. Its learning store held
+  logged observations and no learned lesson. **The deny list:** agents act on GitHub as the owner's
+  account, so GitHub can't tell an agent's label, ruleset edit or merge from the owner's.
+  `permissions.deny` refuses, in every permission mode, `bypassPermissions` included: adding or
+  removing a label (`gh pr edit` or `gh issue edit` with `--add-label` or `--remove-label`, `gh pr
+  create` or `gh issue create` and their `new` aliases with `--label` or `-l`, `gh label`, a `gh api`
+  write to a `/labels` path or of a `labels[]=` field, GraphQL's label mutations and any
+  `labelIds`); a write to a `/rulesets` or `/protection` path, and the ruleset and
+  branch-protection mutations; and `gh pr merge --admin`. A `gh api` call on one of those paths
+  counts as a write when it carries `-X`, `--method`, `-f`, `-F` or `--input`, so a read there is a
+  plain `gh api <path>` (an explicit `-X GET` is refused too). A command whose text names a denied
+  flag is refused even where the flag is only words, such as a PR body passed inline: pass that body
+  with `--body-file`. A merge through `gh api` isn't listed: `protect-main` has no bypass actor, so
+  GitHub itself refuses a merge past its checks; `--admin` is denied anyway, for the day one is
+  added. **Its limit:** a rule matches a command as it is usually written, so `gh` by its full
+  path, inside `sh -c` or a script, with `-R` before the subcommand, a short flag joined to its
+  value or to other flags (`-lx`, `-dl x`, which only a deliberate workaround writes), a request
+  body or GraphQL query read from a file, or the GitHub MCP's own tools in a cloud session get past
+  it. It stops accidents, not a deliberate workaround; the full fix, a GitHub identity of the
+  agents' own, was offered to the owner and not taken now. On Windows with Git Bash, Claude Code
+  turns its PowerShell tool off once a Bash rule denies (its own safeguard), so the list holds there
+  too; PowerShell stays on, out of these rules' reach, if `CLAUDE_CODE_USE_POWERSHELL_TOOL=1` is
+  set, a settings file holds a `PowerShell(…)` rule, or a command-line tool list names it (untried:
+  the Mac has no PowerShell). **Checked:** headless sessions started in the branch's worktree
+  (`claude -p` in `bypassPermissions`, on Claude Code 2.1.283 and on the desktop app's 2.1.295)
+  were refused 35 forms of the denied commands (flags in either order, `-l` and the `new` aliases,
+  after `cd … &&`, behind an environment variable, inside `$( )`, the GraphQL mutations), each
+  aimed at a PR, label or repository that doesn't exist, and ran 17 ordinary ones (`gh pr view`,
+  `gh pr checks`, `gh pr edit` with `--body` or `--title`, `gh pr merge --auto --squash`, `gh pr
+  create` and `gh pr new` with no label, a title saying "multi-line", `gh pr list --label`, reads of
+  the labels, the rulesets, an issue and a PR, `--jq '.labels[].name'`, GraphQL reads, `gh api -X
+  GET search/issues`); a subagent of such a session was refused too. Santa's round 1 found `-l`,
+  the `new` aliases, a `labels[]=` field and `labelIds` getting through; a session showed them run,
+  and both versions refused them once their rules were added. Those sessions loaded no ECC plugin,
+  skill or command, and Ponytail's skills. **Picking them up:** settings load from the folder a
+  session starts in, so pull `main` into that checkout, or cut the worktree from the new `main`,
+  and start a new session; a running session reloads permissions when its settings file changes,
+  but keeps ECC until it restarts.
+
 - **2026-10-13** — **A PR is judged by the base branch's rules, a loosened test blocks, a new push
   must clear the last failed review, and santa's Reviewer B reviews as an attacker (the owner's
   approvals, after two independent reviews of the workflow; folded into #359 so the owner's bypass

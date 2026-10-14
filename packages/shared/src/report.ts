@@ -10,11 +10,11 @@ import { isUnlockReason, PROTECTION_OFF_RECORDED_AS, UNLOCK_RECORDED_AS } from '
 import { clampToWindow } from './state.js';
 
 /*
- * R1 — what a session's report counts (PLAN.md's reports row), from the
- * session's own events: who joined, the class's focus minutes, and its
- * unlocks and protection-off reports. One pure function (rule 2), so every
- * report and recap counts alike. Aggregates only, never rankings: a
- * student's own minutes never leave it.
+ * R1 — what a session's report counts (the go-live features' Reports row, in
+ * docs/PLAN-ARCHIVE.md), from the session's own events: who joined, the
+ * class's focus minutes, and its unlocks and protection-off reports. One pure
+ * function (rule 2), so every report and recap counts alike. Aggregates only,
+ * never rankings: a student's own minutes never leave it.
  *
  * Read in `seq` order, the engine's own: it applied each record as it arrived
  * and noted those it did not apply (`payload.recorded_as`) — an unlock with

@@ -32,10 +32,10 @@ import {
 import type { Database } from '../src/types.js';
 
 /*
- * R1 against what the engine really stores: each counting rule of PLAN.md's
- * reports row, driven through the transition engine, and the events it wrote
- * fed to `sessionReport`. The function's own tests (packages/shared) pin the
- * same rules on events built by hand.
+ * R1 against what the engine really stores: each counting rule of the go-live
+ * features' Reports row (docs/PLAN-ARCHIVE.md), driven through the transition
+ * engine, and the events it wrote fed to `sessionReport`. The function's own
+ * tests (packages/shared) pin the same rules on events built by hand.
  */
 
 let db: Database;

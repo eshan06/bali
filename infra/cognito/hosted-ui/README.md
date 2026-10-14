@@ -2,7 +2,7 @@
 
 Sign-in, sign-up and forgot-password are Cognito's own pages, in both pools, for the portal and
 the phone alike. Cognito lets a pool set one logo and one CSS file, always together, over a fixed
-list of class names (`docs/DESIGN.md`; D2d in `docs/PLAN.md`). These are Bali's:
+list of class names (`docs/DESIGN.md`; D2d in `docs/PLAN-ARCHIVE.md`). These are Bali's:
 
 - `hosted-ui.css`: one file for both pools, so they can't drift. Bali's tokens on Cognito's
   classes. A property outside AWS's per-class list is marked "if kept": the page holds without

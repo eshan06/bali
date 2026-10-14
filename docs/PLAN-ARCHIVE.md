@@ -10,6 +10,13 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-13 (Central) — CI's required "Typecheck · lint · unit tests" is done about 4
+minutes after a push, from 12–13 (Now, "CI speed"; `docs/DECISIONS.md`, 2026-10-13); no test
+changed or skipped. Before it, PLAN.md the current state only, its history in `docs/PLAN-ARCHIVE.md`.
+The redesign is at a pause after PV6, the notes for coming steps on their lines (PV7, PV13, PV15,
+PV17) and two of the owner's answers pending under Open owner items ("To answer"). Next: PV7, a
+class live._
+
 _Last updated: 2026-10-13 (Central) — PLAN.md is the current state only: finished history moved
 word for word to `docs/PLAN-ARCHIVE.md`, and the "Plan doc updated" check fails this file past
 8,000 words (`docs/DECISIONS.md`, 2026-10-13). Before it, the account deletion's coverage guard
