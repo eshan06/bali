@@ -100,11 +100,9 @@ jobs:
             the account deletion (`deleteAccount`), the school disposal
             (`disposeSchool`), the retention run (`applyRetention`) or the
             student-record export (`exportStudentRecord`) does not handle. The
-            coverage guards (`STUDENT_RECORD_COVERAGE`,
-            `SCHOOL_DISPOSAL_COVERAGE`, `RETENTION_COVERAGE`) see only foreign
-            keys to `users` (the disposal's to `schools` too), and the account
-            deletion has none, so check what they can't: free text, names,
-            data keyed another way.
+            schema coverage guards see only foreign keys (to `users`, and the
+            disposal's to `schools`), so check what they can't: free text,
+            names, data keyed another way.
 
             Do NOT nitpick style that lint already enforces,
             and do NOT demand work outside this PR's scope.
