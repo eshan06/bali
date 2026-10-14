@@ -1,6 +1,8 @@
 # The plan backstop: a PR that changes source code must also update
 # docs/PLAN.md, so every session/contributor leaves the shared status doc
 # accurate. Escape hatch for trivial fixes: put [no-plan] in a commit message.
+# It also keeps docs/PLAN.md, which every session reads first, under 8,000
+# words: the current state only, finished history in docs/PLAN-ARCHIVE.md.
 name: Plan doc
 
 on:
@@ -18,6 +20,11 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
+
+      # Its self-test first, so a check that stops counting fails instead of passing.
+      - run: .github/scripts/plan-words.test.sh
+      - name: docs/PLAN.md stays under 8,000 words
+        run: .github/scripts/plan-words.sh docs/PLAN.md 8000
 
       - name: Source changes must update docs/PLAN.md
         env:

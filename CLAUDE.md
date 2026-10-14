@@ -8,9 +8,13 @@ is always allowed and always recorded.
 
 1. `docs/ARCHITECTURE.md` — the design. It is law; changing a decision means
    discussing it with the owner first.
-2. `docs/PLAN.md` — phases, go-live features, live status. Check it before
-   building anything: is it already done, planned for a later phase, or
-   deliberately cut?
+2. `docs/PLAN.md` — the current state only: live status, phases, the open
+   steps, go-live features, the owner's open items. Check it before building
+   anything: is it already done, planned for a later phase, or deliberately
+   cut? A finished step is one line there, with its PR and its DECISIONS
+   date; the why goes in `docs/DECISIONS.md`; finished history lives in
+   `docs/PLAN-ARCHIVE.md` — search it like DECISIONS, never read it front
+   to back. A CI check holds PLAN.md under 8,000 words.
 3. `docs/GOTCHAS.md` — live traps of this environment and process (git
    plumbing, CI, cloud sessions, dev). Skim it so known traps aren't
    rediscovered the hard way.
