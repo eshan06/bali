@@ -1,7 +1,8 @@
 #!/bin/bash
 # Self-test for plan-words.sh: a file at its cap passes, one word over fails and
-# says where the detail goes, and a missing file fails. CI runs it before the
-# real check, so a check that stops counting fails instead of passing.
+# says where the detail goes, and a missing file or a cap that isn't a number
+# fails. CI runs it before the real check, so a check that stops counting fails
+# instead of passing.
 #
 #   .github/scripts/plan-words.test.sh
 set -euo pipefail
@@ -38,6 +39,7 @@ expect fail 'one word over the default cap' "$DIR/over-cap.md"
 expect pass 'an empty file' "$DIR/empty.md"
 expect pass 'under a cap given' "$DIR/at-cap.md" 8001
 expect fail 'over a cap given' "$DIR/at-cap.md" 7999
+expect fail 'a cap not a whole number' "$DIR/at-cap.md" 8,000
 expect fail 'no file' "$DIR/missing.md"
 
 "$CHECK" "$DIR/over-cap.md" >"$DIR/out" 2>&1 || true

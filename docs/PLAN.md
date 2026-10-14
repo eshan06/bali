@@ -250,6 +250,8 @@ Researched 2026-10-05; findings in [`docs/ROADMAP-RESEARCH.md`](ROADMAP-RESEARCH
 **Phase 5's owner list:**
 Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect accounts and keys; Sign in with Apple (needed only if Google sign-in stays, guideline 4.8); writing the NFC tags; iPhone checks. The student-facing steps wait for Phase 6's gate items.
 
+**The rest of the owner's queue:**
+
 - 🔧 Sentry: confirm monitor `api-sweep`'s `production` environment is active and alerting (dev checks in to the same slug, #239's review; runbook 6, step 2).
 - ⏳ Apple's developer agreement §3.3.3(P) on Family Controls (ISSUES #3): asked by the owner on 2026-10-13, **case 102994872143** (`docs/APP-STORE.md` §5.6 holds the question as sent); waiting on Apple's answer, to record in ISSUES #3.
 - #165 the Me page: D2j's redesign was rolled back (2026-10-06), so a better Me waits for a design the owner approves; the issue, closed by #266, is the owner's to reopen.

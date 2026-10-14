@@ -8,6 +8,13 @@ set -euo pipefail
 
 file=${1:-docs/PLAN.md}
 cap=${2:-8000}
+# A cap that isn't a whole number ("8,000") would make the test below error, which
+# `if` reads as false: every file would pass.
+case $cap in '' | *[!0-9]*)
+  echo "::error::the cap must be a whole number of words, not '$cap'"
+  exit 1
+  ;;
+esac
 words=$(wc -w <"$file" | tr -d ' ')
 echo "$file: $words words (the cap is $cap)"
 if [ "$words" -gt "$cap" ]; then
