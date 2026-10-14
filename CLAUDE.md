@@ -160,7 +160,8 @@ and every session gets them.
   exploit) → fix it now, then tell the owner in one plain line. An edge case
   whose reachability is doubtful → ask the owner first, in plain words: what
   happens, how likely it is, how much it matters, your recommendation. Style
-  → fix it in place, never another round. A finding that needs a condition
+  → fix it in place, never another round (a Claude Review PASS with WARNs
+  still merges as is, step 5). A finding that needs a condition
   ruled impossible (below) is dropped, but never a security or privacy
   finding (that goes to the owner), and every dropped finding gets one line
   in the PR description.
@@ -182,8 +183,8 @@ and every session gets them.
 - **Phone tests:** open every part of a phone test with its starting state:
   the class, focused or unlocked, the screen, Airplane mode, the sticker.
 - **Reviews:** a failed Claude Review is never re-run to get a different
-  answer; it stands until a new commit is pushed. A blocker you believe is
-  wrong parks the step for the owner, who decides.
+  answer; it stands until a new commit is pushed. A Claude Review blocker you
+  believe is wrong parks the step for the owner, who decides.
 - **Owner-only actions:** agents never add or remove the owner's approval
   labels, change rulesets or branch protection, or bypass-merge (`--admin`).
   `.claude/settings.json` denies those commands to Claude Code sessions; it

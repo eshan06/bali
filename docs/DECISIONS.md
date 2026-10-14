@@ -20,8 +20,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   timings, impossible inputs), re-checked by the owner before the first K-12 school, where loaner
   and handed-down phones are real; the owner away; plain talk; notifications; UI; a phone test's
   starting state; reviews (a failed Claude Review is never re-run for a different answer, it stands
-  until a new commit, and a blocker believed wrong parks the step for the owner); owner-only
-  actions; and the end-of-phase review, the "critical or recurring issue" rule on a schedule.
+  until a new commit, and a Claude Review blocker believed wrong parks the step for the owner);
+  owner-only actions; and the end-of-phase review, the "critical or recurring issue" rule on a
+  schedule.
   **ECC off:** `"enabledPlugins": { "ecc@ecc": false }`, the form `claude plugin disable ecc@ecc
   --scope project` writes. The project's `false` overrides the account's `true` for that plugin
   alone: Ponytail and the others stay on. ECC 2.2.1 registered 24 hooks (9 before every tool call,
@@ -32,8 +33,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   account, so GitHub can't tell an agent's label, ruleset edit or merge from the owner's.
   `permissions.deny` refuses, in every permission mode, `bypassPermissions` included: adding or
   removing a label (`gh pr edit` or `gh issue edit` with `--add-label` or `--remove-label`, `gh pr
-  create` or `gh issue create` with `--label`, `gh label`, a `gh api` write to a `/labels` path, the
-  label mutations in GraphQL); a write to a `/rulesets` or `/protection` path, and the ruleset and
+  create` or `gh issue create` and their `new` aliases with `--label` or `-l`, `gh label`, a `gh api`
+  write to a `/labels` path or of a `labels[]=` field, GraphQL's label mutations and any
+  `labelIds`); a write to a `/rulesets` or `/protection` path, and the ruleset and
   branch-protection mutations; and `gh pr merge --admin`. A `gh api` call on one of those paths
   counts as a write when it carries `-X`, `--method`, `-f`, `-F` or `--input`, so a read there is a
   plain `gh api <path>` (an explicit `-X GET` is refused too). A command whose text names a denied
@@ -41,21 +43,25 @@ a real decision? Add a dated entry at the top: what was decided and why.
   with `--body-file`. A merge through `gh api` isn't listed: `protect-main` has no bypass actor, so
   GitHub itself refuses a merge past its checks; `--admin` is denied anyway, for the day one is
   added. **Its limit:** a rule matches a command as it is usually written, so `gh` by its full
-  path, inside `sh -c` or a script, with `-R` before the subcommand, a GraphQL query read from a
-  file, or the GitHub MCP's own tools in a cloud session get past it. It stops accidents, not a
-  deliberate workaround; the full fix, a GitHub identity of the agents' own, was offered to the
-  owner and not taken now. On Windows with Git Bash, Claude Code turns its PowerShell tool off once
-  any Bash rule denies (its own safeguard), so the list holds there too, unless
-  `CLAUDE_CODE_USE_POWERSHELL_TOOL=1` turns PowerShell back on, which would need the same rules as
-  `PowerShell(…)`. **Checked:** headless sessions started in the branch's worktree (`claude -p` in
-  `bypassPermissions`, on Claude Code 2.1.283 and on the desktop app's 2.1.295) were refused 26
-  forms of the denied commands (flags in either order, after `cd … &&`, behind an environment
-  variable, inside `$( )`, the GraphQL mutations), each aimed at a PR, label or repository that
-  doesn't exist, and ran 12 ordinary ones (`gh pr view`, `gh pr checks`, `gh pr edit` with `--body`
-  or `--title`, `gh pr merge --auto --squash`, `gh pr create` with no label, `gh pr list --label`,
-  reads of the labels, the rulesets and a PR, a GraphQL read, `gh api -X GET search/issues`); a
-  subagent of such a session was refused too. Those sessions loaded no ECC plugin, skill or
-  command, and Ponytail's skills. **Picking them up:** settings load from the folder a session
+  path, inside `sh -c` or a script, with `-R` before the subcommand, a short flag with its value
+  attached (`-lx`), a request body or GraphQL query read from a file, or the GitHub MCP's own tools
+  in a cloud session get past it. It stops accidents, not a deliberate workaround; the full fix, a
+  GitHub identity of the agents' own, was offered to the owner and not taken now. On Windows with
+  Git Bash, Claude Code turns its PowerShell tool off once a Bash rule denies (its own safeguard),
+  so the list holds there too; PowerShell stays on, out of these rules' reach, if
+  `CLAUDE_CODE_USE_POWERSHELL_TOOL=1` is set or a settings file holds a `PowerShell(…)` rule
+  (untried: the Mac has no PowerShell). **Checked:** headless sessions started in the branch's
+  worktree (`claude -p` in `bypassPermissions`, on Claude Code 2.1.283 and on the desktop app's
+  2.1.295) were refused 35 forms of the denied commands (flags in either order, `-l` and the `new`
+  aliases, after `cd … &&`, behind an environment variable, inside `$( )`, the GraphQL mutations),
+  each aimed at a PR, label or repository that doesn't exist, and ran 17 ordinary ones (`gh pr
+  view`, `gh pr checks`, `gh pr edit` with `--body` or `--title`, `gh pr merge --auto --squash`, `gh
+  pr create` and `gh pr new` with no label, a title saying "multi-line", `gh pr list --label`, reads
+  of the labels, the rulesets, an issue and a PR, `--jq '.labels[].name'`, GraphQL reads, `gh api -X
+  GET search/issues`); a subagent of such a session was refused too. Santa's round 1 found `-l`,
+  the `new` aliases, a `labels[]=` field and `labelIds` getting through; a session showed them run,
+  and refused once their rules were added. Those sessions loaded no ECC plugin, skill or command,
+  and Ponytail's skills. **Picking them up:** settings load from the folder a session
   starts in, so pull `main` into that checkout, or cut the worktree from the new `main`, and start
   a new session; a running session reloads permissions when its settings file changes, but keeps
   ECC until it restarts.
