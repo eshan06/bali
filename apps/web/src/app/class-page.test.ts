@@ -12,7 +12,7 @@ import { describe, expect, it, vi } from 'vitest';
  * Rendered as the server first draws it, before any read; what needs a read is read from the
  * source. And the page while a session runs (PV7; ClassLive, ClassStale, ClassStates' lines during
  * a session), read from the source too; its header and counts are rendered in live-header.test.ts,
- * and Present's own page, kept until PV9, is pinned in present.test.ts.
+ * and Present's page (PV9) is pinned in present.test.ts.
  */
 vi.mock('next/navigation', () => ({
   useParams: () => ({ id: 'c1' }),
@@ -26,10 +26,10 @@ const page = readFileSync(
 
 /** The page while no session runs: the render's second branch, to the end. */
 const before = page.slice(page.indexOf('// No session running (PV6)'));
-/** The page while a session runs: the render's first branch, before the one above. */
+/** The page while a session runs: the render's first branch, before Present's after the bell. */
 const live = page.slice(
   page.indexOf('return klass !== null && grid !== null && !grid.over ? ('),
-  page.indexOf('// No session running (PV6)'),
+  page.indexOf('// After the bell in Present'),
 );
 /** A constant's class list, by its name. */
 const classes = (name: string) =>
@@ -74,7 +74,10 @@ describe('the class page before its class is read', () => {
     // failed while it is still on its way (santa's review).
     expect(page.match(/setError\(errText\(e\)\)/g)).toHaveLength(1);
     expect(page).toMatch(/\/roster`\)\s*\.then\(setRoster, \(e: unknown\) => setRosterError\(/);
-    expect(before).toMatch(/\{klass && \(error \?\? rosterError\) \? \(/);
+    expect(before).toMatch(/\{klass \? cantLoad\(error \?\? rosterError\) : null\}/);
+    expect(page).toMatch(
+      /const cantLoad = \(message: string \| null\) =>\s*message === null \? null : \(\s*<div className="flex flex-wrap items-center gap-x-4 gap-y-3">\s*<p role="alert" className="text-body">\s*Couldn&apos;t load this class\. \{message\}\s*<\/p>\s*<Button variant="secondary" size="sm" onClick=\{load\}>/,
+    );
   });
 });
 
@@ -83,9 +86,10 @@ describe('the class page while no session runs (ClassBefore)', () => {
     expect(before).toMatch(
       /className=\{`text-page-title text-balance wrap-anywhere max-sm:text-h3 /,
     );
-    expect(before).toMatch(
-      /roster\s*\?\s*`\$\{students\(roster\.students\.length\)\} · no session running`\s*:\s*'No session running'/,
+    expect(page).toMatch(
+      /const noSession = roster\s*\?\s*`\$\{students\(roster\.students\.length\)\} · no session running`\s*:\s*'No session running';/,
     );
+    expect(before).toMatch(/\{klass === null \? '\\u00a0' : noSession\}/);
     // On a phone the name takes the card titles' size and Reports a line of its own (v2.css).
     expect(before).toMatch(/max-sm:ml-0 max-sm:basis-full/);
     expect(before).toMatch(/buttonClass\('secondary', '', 'sm'\)[^]*<ChartBar size=\{16\}/);
@@ -129,7 +133,7 @@ describe('the class page while no session runs (ClassBefore)', () => {
     const cols = before.slice(before.indexOf('<div className="flex flex-wrap items-start gap-5">'));
     // The roster first, at 999 1 520 px, then the card's rail at 1 1 320 px (v2.css's .cols).
     expect(cols).toMatch(
-      /flex-\[999_1_520px\][^]*\{roster \? `Roster · \$\{students\(roster\.students\.length\)\}` : 'Roster'\}[^]*<ul className="columns-3 gap-x-8">[^]*flex-\[1_1_320px\][^]*Join code[^]*<JoinCode classId=\{classId\} code=\{klass\.joinCode\} onClass=\{setKlass\} card \/>/,
+      /flex-\[999_1_520px\][^]*\{roster \? `Roster · \$\{students\(roster\.students\.length\)\}` : 'Roster'\}[^]*<ul className="columns-3 gap-x-8">[^]*flex-\[1_1_320px\][^]*Join code[^]*<JoinCode classId=\{classId\} code=\{klass\.joinCode\} onClass=\{setKlass\} \/>/,
     );
     expect(classes('LABEL')).toEqual(
       expect.arrayContaining(['mb-3', 'text-section-label', 'text-text-tertiary', 'uppercase']),
@@ -145,26 +149,23 @@ describe('the class page while no session runs (ClassBefore)', () => {
   });
 
   it('draws none of it while a session runs: no length picker, no join code’s card', () => {
-    expect(live).not.toMatch(/\bcard\b \/>|TRACK|SEGMENT|columns-3 gap-x-8/);
+    expect(live).not.toMatch(/<JoinCode|TRACK|SEGMENT|columns-3 gap-x-8/);
   });
 });
 
 describe('the class page while a session runs (ClassLive)', () => {
-  /** The page off Present: the live branch, Present's own nav, header and roster set aside. */
-  const own = live
-    .replace(/\{present \? \(\s*<(nav|section)\b[^]*?<\/\1>\s*\) : null\}/g, '')
-    .replace(/\{present \? \(\s*\/\/[^]*?<\/header>\s*\) : \(/, '{(');
-
   it('heads it with ClassLive’s header: the ring, the line, the countdown, then +5, +10 and End', () => {
-    expect(own).toMatch(
-      /<LiveHeader\s+name=\{klass\.name\}\s+joinCode=\{klass\.joinCode\}\s+counts=\{counts\}\s+startedAt=\{grid\.startedAt\}\s+endsAt=\{grid\.endsAt\}\s*>\s*\{extend\}\s*\{end\('ml-2'\)\}\s*<\/LiveHeader>/,
+    expect(live).toMatch(
+      /<LiveHeader\s+name=\{klass\.name\}\s+joinCode=\{klass\.joinCode\}\s+counts=\{counts\}\s+startedAt=\{grid\.startedAt\}\s+endsAt=\{grid\.endsAt\}\s+present=\{present\}\s*>\s*\{extend\}\s*\{end\('ml-2'\)\}\s*\{present \? presentToggle\(false, 'ml-2'\) : null\}\s*<\/LiveHeader>/,
     );
     // Its parts 22 px apart, as v2.css's page; `relative` places the reconnect pill over it.
-    expect(own).toMatch(/: 'relative flex flex-col gap-5\.5'\}>/);
+    expect(live).toMatch(/: 'relative flex flex-col gap-5\.5'\}>/);
   });
 
   it('counts the class over the grid, beside a small Present that a phone never shows', () => {
-    expect(own).toMatch(/\) : counts \? \(\s*<LiveCounts counts=\{counts\} \/>\s*\) : null\}/);
+    expect(live).toMatch(
+      /\{counts \? <LiveCounts counts=\{counts\} present=\{present\} \/> : null\}\s*\{present \? null : presentToggle\(true\)\}/,
+    );
     // The live grid's own counts, never another session's (a Start after an end).
     expect(page).toMatch(
       /const counts = grid !== null && counted\?\.session === grid\.id \? counted\.counts : null;/,
@@ -172,22 +173,24 @@ describe('the class page while a session runs (ClassLive)', () => {
     expect(page).toMatch(/onCounts=\{onCounts\}/);
     const toggle = page.slice(page.indexOf('const presentToggle'));
     expect(toggle).toMatch(/size=\{beside \? 'sm' : 'md'\}/);
-    expect(toggle).toMatch(/className=\{beside \? 'ml-auto max-sm:hidden' : ''\}/);
+    expect(toggle).toMatch(/className=\{beside \? 'ml-auto max-sm:hidden' : className\}/);
   });
 
   it('shows no roster and no New code: the grid names every student, and ClassLive draws none', () => {
-    expect(own).not.toMatch(/Roster|roster\.students|<JoinCode|All classes/);
+    expect(live).not.toMatch(/Roster|roster\.students|<JoinCode|All classes/);
   });
 
-  it('says a roster that didn’t load only where a roster shows: Present, or after the bell', () => {
-    expect(live).toMatch(/\{\(present \? \(error \?\? rosterError\) : error\) \? \(/);
-    expect(live).toMatch(/\{present \? \(error \?\? rosterError\) : error\}/);
+  it('says a roster that didn’t load only after the bell, where a roster shows', () => {
+    expect(live).toMatch(/\{cantLoad\(error\)\}/);
+    expect(live).not.toMatch(/rosterError/);
   });
 
   it('says its lines as ClassStates does: right under the header, Try again small', () => {
-    // A failed read again of the class, and an extend's failure, refusal or note.
-    expect(own.match(/size=\{present \? 'md' : 'sm'\}/g)).toHaveLength(2);
-    expect(own).toMatch(/className=\{present \? undefined : 'contents'\}/);
+    // A failed read again of the class (`cantLoad`), and an extend's failure, refusal or note.
+    expect(live).toMatch(
+      /\{said \? \(\s*<div className="flex flex-wrap items-center gap-x-4 gap-y-3">[^]*?size="sm"[^]*?Try again/,
+    );
+    expect(live).not.toMatch(/size=\{present/);
   });
 
   it('keeps the session’s start for the ring, from the Start’s answer or the first snapshot', () => {

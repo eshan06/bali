@@ -118,6 +118,8 @@ const V2_SIZES: Record<string, [string, string, number, string?]> = {
   segment: ['14px', '18px', 600],
   // The live header's (PV7): the line under the countdown, "ends 9:55 AM".
   'countdown-sub': ['12.5px', '17px', 400],
+  // Present's (PV9): the line under its countdown, its code's label and its counts.
+  'present-caption': ['16px', '22px', 400],
 };
 /** The sizes §1 lists that the scale has, each its style: [style, size, line height]. */
 const ON_SCALE = [
@@ -329,26 +331,19 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
 
   it('beside them, only the sizes the owner ruled (DESIGN.md §1, §3, §5), each where it belongs', () => {
     // The input size: 16 px, so iPhone Safari never zooms into a field when it is tapped
-    // (2026-10-05). code-lg, the join code in Present, 24 px at the code style's weight
-    // (2026-10-06). Their line heights on the 4-pt grid; the design system gains them at the
-    // owner's next export. And v2's look's sizes, as drawn (2026-10-12), pinned below. The Present
-    // view's old names and chip labels (20 and 14 px, 2026-10-05) went with its tiles (PV8).
+    // (2026-10-05), its line height on the 4-pt grid; the design system gains it at the owner's
+    // next export. And v2's look's sizes, as drawn (2026-10-12), pinned below. The Present view's
+    // old names and chip labels (20 and 14 px, 2026-10-05) went with its tiles (PV8), and its
+    // code-lg (24 px, 2026-10-06) with its header (PV9), whose code is v2's `code-present`.
     const sizes = [...theme.keys()]
       .filter((k) => k.startsWith('--text-') && k !== '--text-*' && !k.slice(2).includes('--'))
       .map((k) => k.slice('--text-'.length));
     const styles = tokens.type.groups.flatMap((g) => g.styles.map((s) => s.name));
-    expect(sizes.sort()).toEqual([...styles, 'code-lg', 'input', ...Object.keys(V2_SIZES)].sort());
-    const code = tokens.type.groups.flatMap((g) => g.styles).find((s) => s.name === 'code');
-    expect(theme.get('--text-code-lg')).toBe('24px');
-    expect(theme.get('--text-code-lg--line-height')).toBe('32px');
-    expect(theme.get('--text-code-lg--font-weight')).toBe(String(code?.fontWeight));
+    expect(sizes.sort()).toEqual([...styles, 'input', ...Object.keys(V2_SIZES)].sort());
     expect(theme.get('--text-input')).toBe('16px');
     expect(theme.get('--text-input--line-height')).toBe('24px');
     expect(theme.get('--text-input--font-weight')).toBe('400');
     expect(read('../components/field.tsx')).toMatch(/<input[^]*className=\{`[^`]*\btext-input\b/);
-    for (const size of ['input', 'code-lg']) {
-      expect(parseInt(theme.get(`--text-${size}--line-height`) ?? '', 10) % 4, size).toBe(0);
-    }
     // v2's sizes off the scale, each as drawn; the ones the scale has, the scale's own.
     for (const [name, [size, line, weight, tracking]] of Object.entries(V2_SIZES)) {
       expect(theme.get(`--text-${name}`), name).toBe(size);
@@ -362,7 +357,7 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
         line,
       ]);
     }
-    // A Present tile's two sizes are the live grid's alone (PV8; Present's header is PV9's).
+    // A Present tile's two sizes are the live grid's alone (PV8), the header's its own (PV9).
     const src = fileURLToPath(new URL('../', import.meta.url));
     const present = sources(src).filter(
       (file) =>

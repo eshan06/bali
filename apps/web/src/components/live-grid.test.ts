@@ -6,8 +6,15 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { staleness, type Student } from '../lib/grid-state';
-import { COLUMNS, healthOf, PRESENT_COLUMNS, stateCounts, Tile } from './live-grid';
+import { staleness, staleWords, type Student } from '../lib/grid-state';
+import {
+  COLUMNS,
+  FIRST_CONNECT_MS,
+  healthOf,
+  PRESENT_COLUMNS,
+  stateCounts,
+  Tile,
+} from './live-grid';
 
 /*
  * A student's tile on the live grid (PV8; ClassStates' twelve, ClassLive, PhoneClassLive at 390 px
@@ -45,6 +52,8 @@ const text = (html: string) =>
     .replace(/<[^>]+>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+/** A tile's one detail on a phone, its dot hidden from screen readers, hidden on a computer. */
+const PHONE = /<span class="sm:hidden"><span aria-hidden="true">\u00a0· <\/span>([^<]*)<\/span>/;
 /** The tile's parts: its classes, its words' three spans (name, state, line) and its icons' sizes. */
 function parts(html: string) {
   const tile = /<li class="flex min-w-0"><div class="([^"]*)"/.exec(html)?.[1]?.split(' ') ?? [];
@@ -59,10 +68,8 @@ function parts(html: string) {
   const [name, state, line] = spans.map((m) => ({
     classes: m[1]?.split(' ') ?? [],
     html: m[2] ?? '',
-    // The phone's dot before the line, hidden on a computer, left out of what a computer shows.
-    words: text(
-      (m[2] ?? '').replace(/<span aria-hidden="true" class="sm:hidden">[^<]*<\/span>/, ' '),
-    ),
+    // The phone's one detail, hidden on a computer, left out of what a computer shows.
+    words: text((m[2] ?? '').replace(PHONE, ' ')),
   }));
   const icons = [...html.matchAll(/<svg[^>]*\swidth="(\d+)"[^>]*class="([^"]*)"/g)].map((m) => ({
     size: Number(m[1]),
@@ -240,7 +247,8 @@ describe('a tile on the live grid (PV8)', () => {
       expect.arrayContaining(['max-sm:block', 'max-sm:h-auto', 'max-sm:px-3', 'max-sm:py-2.5']),
     );
     expect(tile.icons[0]?.classes).toContain('max-sm:hidden');
-    // The state's icon before its words, and the line run on after them, nothing cut.
+    // The state's icon before its words, and its one detail run on after them, nothing cut; the
+    // computer's line hidden there.
     expect(tile.icons[1]?.classes).toContain('sm:hidden');
     expect(tile.state?.classes).toEqual(
       expect.arrayContaining(['max-sm:inline', 'max-sm:whitespace-normal']),
@@ -248,10 +256,34 @@ describe('a tile on the live grid (PV8)', () => {
     expect(tile.line?.classes).toEqual(
       expect.arrayContaining(['max-sm:inline', 'max-sm:whitespace-normal']),
     );
-    expect(tile.line?.html).toMatch(
-      /^<span aria-hidden="true" class="sm:hidden">\u00a0· <\/span>Bathroom$/,
-    );
+    expect(PHONE.exec(tile.line?.html ?? '')?.[1]).toBe('Bathroom');
+    expect(tile.line?.html.replace(PHONE, '')).toBe('<span class="max-sm:hidden">Bathroom</span>');
     expect(tile.name?.classes).toContain('max-sm:whitespace-normal');
+  });
+
+  it('says one detail at most on a phone, as PhoneClassLive draws it (the owner, 2026-10-14)', () => {
+    // An Unlocked tile's reason and a Focused tile's Clock off; "last seen", protection off's
+    // unlock and a Left tile's reason stay on a computer, for the student's panel (PV11).
+    const phone = (over: Partial<Student>) => PHONE.exec(render(student(over)))?.[1];
+    const cases: [Partial<Student>, string | undefined][] = [
+      [{ state: 'unlocked', unlock: unlocked('bathroom'), lastSeenAt: ago(330) }, 'Bathroom'],
+      [{ state: 'unlocked', unlock: unlocked('nurse'), clockOff: true }, 'Nurse'],
+      [{ state: 'unlocked', unlock: unlocked('other') }, 'Other reason'],
+      [{ clockOff: true }, 'Clock off'],
+      [{ state: 'unlocked', unlock: unlocked(null), lastSeenAt: ago(330) }, undefined],
+      [{ state: 'protection_off', unlock: unlocked('nurse'), lastSeenAt: ago(330) }, undefined],
+      [{ state: 'unlocked', unlock: unlocked('other'), endedAt: ago(60) }, undefined],
+      [{ lastSeenAt: ago(330), clockOff: true }, undefined],
+      [{ state: 'protection_off', clockOff: true }, undefined],
+    ];
+    for (const [over, detail] of cases) expect(phone(over), JSON.stringify(over)).toBe(detail);
+    // The computer's whole line is still there, hidden on a phone alone.
+    const html = render(
+      student({ state: 'unlocked', unlock: unlocked(null), lastSeenAt: ago(330) }),
+    );
+    expect(parts(html).line?.html).toBe('<span class="max-sm:hidden">last seen 5 min ago</span>');
+    // Present has no phone layout: its line is the same at every width.
+    expect(render(student({ clockOff: true }), true)).not.toMatch(/sm:hidden/);
   });
 
   it('is one size up in Present, as ClassPresent draws it: 100 px tall, 12 × 18 px in, a 24 px icon', () => {
@@ -320,14 +352,15 @@ describe('the grid’s columns', () => {
   });
 });
 
-describe('the stream’s first connect (PV7’s find)', () => {
+describe('the stream’s first connect (PV7’s find; the owner, 2026-10-14)', () => {
   const at = Date.parse('2026-10-14T15:00:00.000Z');
-  const health = (status: Parameters<typeof healthOf>[0], quietMs: number) =>
+  /** The grid's health `ms` after the stream's first connect began, nothing heard since. */
+  const health = (status: Parameters<typeof healthOf>[0], ms: number) =>
     staleness({
-      status: healthOf(status),
+      status: healthOf(status, ms),
       lastStreamActivityAt: at,
       lastGridActivityAt: at,
-      now: at + quietMs,
+      now: at + ms,
       heartbeatMs: STREAM_HEARTBEAT_MS,
     });
 
@@ -336,20 +369,28 @@ describe('the stream’s first connect (PV7’s find)', () => {
     expect(health('open', 100)).toBeNull();
   });
 
-  it('still says a first connect that hangs, once the stream has been quiet too long', () => {
-    expect(health('connecting', 3 * STREAM_HEARTBEAT_MS + 1000)).toEqual({
-      reason: 'stale',
-      secondsAgo: (3 * STREAM_HEARTBEAT_MS) / 1000 + 1,
-    });
+  it('says a first connect that takes 3 s as the pill, within seconds, and not a moment before', () => {
+    expect(FIRST_CONNECT_MS).toBe(3000);
+    expect(health('connecting', 2999)).toBeNull();
+    expect(health('connecting', 3000)).toEqual({ reason: 'reconnecting', secondsAgo: 3 });
+    expect(staleWords({ reason: 'reconnecting', secondsAgo: 3 })).toBe(
+      'Reconnecting… last updated 3s ago',
+    );
+    // An open stream is judged by how long it has been quiet, never by its connect's time.
+    expect(health('open', 3000)).toBeNull();
   });
 
   it('says a lost stream at once, as the pill', () => {
     expect(health('reconnecting', 0)).toEqual({ reason: 'reconnecting', secondsAgo: 0 });
   });
 
-  it('is how the grid reads its stream’s health', () => {
+  it('is how the grid reads its stream’s health, timed from the stream’s own start', () => {
     const source = readFileSync(fileURLToPath(new URL('./live-grid.tsx', import.meta.url)), 'utf8');
-    expect(source).toMatch(/const stale = staleness\(\{\s*status: healthOf\(status\),/);
+    expect(source).toMatch(
+      /const stale = staleness\(\{\s*status: healthOf\(status, now\.getTime\(\) - connectStart\.current\),/,
+    );
+    // Started as the stream is made, after the grid's own read: the read's time is no connect's.
+    expect(source).toMatch(/connectStart\.current = Date\.now\(\);\s*sse = createSseClient\(\{/);
   });
 });
 

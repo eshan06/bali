@@ -6,7 +6,7 @@
  * light, like the app, whatever the device's mode (the owner, 2026-10-07), its native controls and
  * scrollbars too. tokens.test.ts pins every value here to the JSON, so the two cannot drift; a
  * value the tokens lack is a question for the owner, written here only once the owner rules on it
- * (border-input below; the input size, code-lg and v2's look's radii and sizes in the theme).
+ * (border-input below; the input size and v2's look's radii and sizes in the theme).
  * Every semantic token is here; of the primitives, the ones a semantic token or the mark
  * reference, and those v2's look draws with directly (DESIGN.md §1, Style facts).
  */
@@ -165,13 +165,6 @@
   --text-input--line-height: 24px;
   --text-input--font-weight: 400;
 
-  /* code-lg, the owner's ruling (2026-10-06): the join code in Present, read from the back of the
-     room; `font-mono` at the code style's weight, its line height on the 4-pt grid. Not in the
-     tokens yet (DESIGN.md §3). */
-  --text-code-lg: 24px;
-  --text-code-lg--line-height: 32px;
-  --text-code-lg--font-weight: 500;
-
   /* v2's look's sizes (DESIGN.md §1, Style facts), built exactly as drawn (the owner,
      2026-10-12, Its call): portal-only, out of bali-tokens.json and the app. A size §1 lists that
      the scale has takes the scale's style: card titles `h3`, chips `caption`, menu items `data`,
@@ -264,6 +257,12 @@
   --text-countdown-sub: 12.5px;
   --text-countdown-sub--line-height: 17px;
   --text-countdown-sub--font-weight: 400;
+
+  /* Present's (PV9), as v2.css draws it and §1's facts don't list: 16/22, the line under its
+     countdown, its code's label and its counts. */
+  --text-present-caption: 16px;
+  --text-present-caption--line-height: 22px;
+  --text-present-caption--font-weight: 400;
 }
 
 @theme inline {

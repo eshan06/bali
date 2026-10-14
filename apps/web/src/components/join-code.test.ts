@@ -7,33 +7,33 @@ import { describe, expect, it, vi } from 'vitest';
 
 /*
  * The join code (PV6): before a session on its own card (ClassBefore, CopyStates), the code on its
- * chip, its line, Copy and New code; while a session runs, Present's header's code with New code,
- * as before v2's look until PV9 (the class page's own live header has none since PV7). New code's
- * confirm is a dialog in both (ClassNewCode), rendered closed at rest. What needs a press (Copy's
- * answer, the dialog's states) is read from the source.
+ * chip, its line, Copy and New code, New code's confirm a dialog (ClassNewCode), rendered closed at
+ * rest. While a session runs the header shows the code (PV7, PV9), with no New code. What needs a
+ * press (Copy's answer, the dialog's states) is read from the source.
  */
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: () => undefined }) }));
 const { JoinCode } = await import('./join-code');
 const source = readFileSync(fileURLToPath(new URL('./join-code.tsx', import.meta.url)), 'utf8');
 
-const render = (props: { card?: boolean; large?: boolean }) =>
+const render = () =>
   renderToStaticMarkup(
-    createElement(JoinCode, { classId: 'c1', code: 'VMAF7E', onClass: () => undefined, ...props }),
+    createElement(JoinCode, { classId: 'c1', code: 'VMAF7E', onClass: () => undefined }),
   );
 /** A constant's class list, by its name. */
 const classes = (name: string) =>
   (new RegExp(`const ${name} =\\s*'([^']*)'`).exec(source)?.[1] ?? '').split(' ');
 
 describe('the join code’s card, before a session (ClassBefore)', () => {
-  const html = render({ card: true });
+  const html = render();
 
   it('draws the code at 40/48 on its grey chip, selectable whole, then what students do with it', () => {
     expect(html).toMatch(
       /^<span translate="no" class="[^"]*">VMAF7E<\/span><p role="status" class="mt-3 text-body empty:mt-0"><\/p><p class="text-caption text-text-tertiary">Students type it in the Bali app to join this class\.<\/p>/,
     );
-    expect(classes('CODE')).toEqual(
+    expect(/^<span translate="no" class="([^"]*)">/.exec(html)?.[1]?.split(' ')).toEqual(
       expect.arrayContaining([
         'bg-surface-sunken',
+        'border-border-default',
         'rounded-md',
         'font-mono',
         'text-code-card',
@@ -68,26 +68,8 @@ describe('the join code’s card, before a session (ClassBefore)', () => {
   });
 });
 
-describe('the join code in Present’s header, while a session runs (until PV9)', () => {
-  it('draws the code and New code, its made-code line mounted and empty', () => {
-    const html = render({});
-    expect(html).toMatch(/<span translate="no" class="font-mono text-code">VMAF7E<\/span>/);
-    expect(html).toMatch(
-      /<button type="button" aria-haspopup="dialog" class="[^"]*\bh-10\b[^"]*">New code<\/button>/,
-    );
-    expect(html).toMatch(/<p role="status" class="[^"]*"><\/p>/);
-    expect(html).not.toMatch(/Copy|Students type it/);
-  });
-
-  it('sets the code in code-lg for Present', () => {
-    expect(render({ large: true })).toMatch(
-      /<span translate="no" class="font-mono text-code-lg">VMAF7E<\/span>/,
-    );
-  });
-});
-
 describe('New code’s confirm, a dialog (ClassNewCode)', () => {
-  const html = render({ card: true });
+  const html = render();
   const dialog = /<dialog[^]*<\/dialog>/.exec(html)?.[0] ?? '';
 
   it('is rendered closed, titled and described, Cancel before Make new code', () => {

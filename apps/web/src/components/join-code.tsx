@@ -15,9 +15,12 @@ type Said = { kind: 'failed' | 'made'; message: string };
 /** How long Copy reads Copied before it reads Copy again (CopyStates: "for a few seconds"). */
 const COPIED_FOR = 2000;
 
-/** The code on its card (ClassBefore): 40/48 on its grey chip, centred for its tracking. */
-const CODE =
-  'inline-block rounded-md border border-border-default bg-surface-sunken py-4 pr-6.5 pl-[calc(26px+0.16em)] font-mono text-code-card text-text-primary select-all';
+/** A code's grey chip (v2.css's `.code`), set by its size and padding where it shows. */
+export const CODE_CHIP =
+  'inline-block border border-border-default bg-surface-sunken font-mono text-text-primary select-all';
+
+/** The code on its card (ClassBefore): 40/48 on its chip, centred for its tracking. */
+const CODE = `${CODE_CHIP} rounded-md py-4 pr-6.5 pl-[calc(26px+0.16em)] text-code-card`;
 
 /**
  * New code's dialog (ClassNewCode): 460 px, 120 px from the top, over the page's warm backdrop. A
@@ -27,29 +30,23 @@ const DIALOG =
   'm-auto mt-30 w-115 max-w-[calc(100%-48px)] flex-col gap-4.5 overscroll-contain rounded-md bg-surface-card p-6 text-text-primary shadow-3 backdrop:bg-scrim open:flex';
 
 /**
- * The class's join code. Before a session, on its own card (`card`; ClassBefore, CopyStates): the
- * code on its chip, what students do with it, then Copy and New code; Copy says Copied for a few
- * seconds, or, where the browser refuses it, says so under the buttons, the code still there to
- * select. While a session runs, two items of Present's header, as before v2's look until PV9 draws
- * it: the code with New code, `large` setting it in `code-lg` (the class page's own live header
- * shows the code in its line with no New code since PV7, as ClassLive draws it). New code opens a
- * dialog in both (ClassNewCode), since the old code stops working the moment the new one is made; then
- * the new code takes its place and is said under it. Each failure is said in the dialog, and Try
- * again sends it again. `onClass` gets the class as the answer gives it, its new code included.
- * Focus goes back to New code whenever the dialog closes.
+ * The class's join code on its own card, before a session (ClassBefore, CopyStates): the code on
+ * its chip, what students do with it, then Copy and New code; Copy says Copied for a few seconds,
+ * or, where the browser refuses it, says so under the buttons, the code still there to select.
+ * While a session runs the header shows the code, with no New code (PV7, PV9), as ClassLive and
+ * ClassPresent draw it. New code opens a dialog (ClassNewCode), since the old code stops working
+ * the moment the new one is made; then the new code takes its place and is said under it. Each
+ * failure is said in the dialog, and Try again sends it again. `onClass` gets the class as the
+ * answer gives it, its new code included. Focus goes back to New code whenever the dialog closes.
  */
 export function JoinCode({
   classId,
   code,
   onClass,
-  card = false,
-  large = false,
 }: {
   classId: string;
   code: string;
   onClass: (klass: ClassDetail) => void;
-  card?: boolean;
-  large?: boolean;
 }) {
   const api = useApi();
   const id = useId();
@@ -123,13 +120,7 @@ export function JoinCode({
   }
 
   const newCode = (
-    <Button
-      ref={toggle}
-      variant="secondary"
-      size={card ? 'sm' : 'md'}
-      aria-haspopup="dialog"
-      onClick={open}
-    >
+    <Button ref={toggle} variant="secondary" size="sm" aria-haspopup="dialog" onClick={open}>
       New code
     </Button>
   );
@@ -179,62 +170,37 @@ export function JoinCode({
     </dialog>
   );
 
-  if (card) {
-    return (
-      <>
-        <span translate="no" className={CODE}>
-          {code}
-        </span>
-        <p role="status" className="mt-3 text-body empty:mt-0">
-          {made}
-        </p>
-        <p className="text-caption text-text-tertiary">
-          Students type it in the Bali app to join this class.
-        </p>
-        <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
-          <Button variant="secondary" size="sm" onClick={() => void copyCode()}>
-            {copy === 'copied' ? (
-              <Check size={16} aria-hidden="true" />
-            ) : (
-              <Copy size={16} aria-hidden="true" />
-            )}
-            {copy === 'copied' ? 'Copied' : 'Copy'}
-          </Button>
-          {newCode}
-          {/* The button's own word changes too quietly for a screen reader: said here as well. */}
-          <span role="status" className="sr-only">
-            {copy === 'copied' ? 'Copied' : null}
-          </span>
-        </div>
-        {copy === 'failed' ? (
-          <p role="alert" className="mt-3 text-body">
-            {CANT_COPY}
-          </p>
-        ) : null}
-        {ask}
-      </>
-    );
-  }
-
   return (
-    // Two of Present's header's items while a session runs (PV9 redraws it): the code with New
-    // code, a made code said under it; and the dialog, which takes no place in the row.
     <>
-      {/* At the header's end, the code keeps its place when a made code's line grows the column. */}
-      <div className="flex flex-col items-start sm:items-end">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <p className="flex items-baseline gap-2">
-            <span className="text-caption text-text-tertiary">Join code</span>
-            <span translate="no" className={`font-mono ${large ? 'text-code-lg' : 'text-code'}`}>
-              {code}
-            </span>
-          </p>
-          {newCode}
-        </div>
-        <p role="status" className="mt-2 text-body empty:mt-0 sm:text-right">
-          {made}
-        </p>
+      <span translate="no" className={CODE}>
+        {code}
+      </span>
+      <p role="status" className="mt-3 text-body empty:mt-0">
+        {made}
+      </p>
+      <p className="text-caption text-text-tertiary">
+        Students type it in the Bali app to join this class.
+      </p>
+      <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
+        <Button variant="secondary" size="sm" onClick={() => void copyCode()}>
+          {copy === 'copied' ? (
+            <Check size={16} aria-hidden="true" />
+          ) : (
+            <Copy size={16} aria-hidden="true" />
+          )}
+          {copy === 'copied' ? 'Copied' : 'Copy'}
+        </Button>
+        {newCode}
+        {/* The button's own word changes too quietly for a screen reader: said here as well. */}
+        <span role="status" className="sr-only">
+          {copy === 'copied' ? 'Copied' : null}
+        </span>
       </div>
+      {copy === 'failed' ? (
+        <p role="alert" className="mt-3 text-body">
+          {CANT_COPY}
+        </p>
+      ) : null}
       {ask}
     </>
   );

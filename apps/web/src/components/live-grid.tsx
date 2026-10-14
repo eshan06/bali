@@ -149,7 +149,7 @@ const DOT = '\u00a0· ';
  * Silent and Unknown), 14 px corners; the state's icon, then the name, the state and one line, each
  * cut short with an ellipsis rather than wrapped, so every tile is one size: 84 px tall, 12 × 14 px
  * in. On a phone (PhoneClassLive) a short tile, 10 × 12 px in, as tall as the tallest: no icon at
- * the side, the state's icon before its words, the line after them, nothing cut. In Present
+ * the side, the state's icon before its words, its one detail after them, nothing cut. In Present
  * (ClassPresent), one size up: 100 px tall, 12 × 18 px in, its icon 24 px.
  */
 const TILE = {
@@ -183,8 +183,8 @@ const WORDS = {
  * name, the state's words (Silent's with its minutes, a Left state's after its flag), and one line:
  * an unlock's reason (`unlockNote`, never in Present, the projector the class can see), how long
  * since the phone was heard from (`lastSeenNote`) and Clock off (S9), each that applies, in that
- * order. `pulse` is `bali-softpulse` (DESIGN.md §7) on the whole tile, and `onPulseEnd` hears it
- * finish.
+ * order; on a phone only the detail PhoneClassLive draws (`brief`). `pulse` is `bali-softpulse`
+ * (DESIGN.md §7) on the whole tile, and `onPulseEnd` hears it finish.
  */
 export function Tile({
   student: s,
@@ -205,13 +205,18 @@ export function Tile({
   const flags = icons.slice(0, -1);
   const StateIcon = icons[icons.length - 1] ?? Circle;
   const words = display === 'silent' ? `${label} · ${silentNote(s, now)}` : label;
-  const reason = unlockNote(s, display, present);
+  const note = unlockNote(s, display, present);
+  const reason = note === null ? null : note.charAt(0).toUpperCase() + note.slice(1);
   const seen = lastSeenNote(s, display, now);
   const line = [
-    ...(reason === null ? [] : [reason.charAt(0).toUpperCase() + reason.slice(1)]),
+    ...(reason === null ? [] : [reason]),
     ...(seen === null ? [] : [seen]),
     ...(s.clockOff ? ['Clock off'] : []),
   ];
+  // On a phone one detail at most, as PhoneClassLive draws them: an Unlocked tile's reason, a
+  // Focused tile's Clock off (the owner, 2026-10-14). The rest stays on a computer until PV11.
+  const brief =
+    display === 'unlocked' ? reason : display === 'focused' && s.clockOff ? 'Clock off' : null;
   const look = present ? 'present' : 'standard';
   return (
     <li className="flex min-w-0">
@@ -245,22 +250,25 @@ export function Tile({
           </span>
           {line.length === 0 ? null : (
             <span className={`block truncate ${WORDS[look].line}`}>
-              {/* On a phone the line runs on after the state's words. */}
-              {present ? null : (
-                <span aria-hidden="true" className="sm:hidden">
-                  {DOT}
+              {/* On a phone its one detail runs on after the state's words, the line hidden. */}
+              {present || brief === null ? null : (
+                <span className="sm:hidden">
+                  <span aria-hidden="true">{DOT}</span>
+                  {brief}
                 </span>
               )}
-              {line.map((part, i) => (
-                <Fragment key={part}>
-                  {i === 0 ? null : DOT}
-                  {part === 'Clock off' ? (
-                    <span title={CLOCK_OFF}>{part}</span>
-                  ) : (
-                    part.replaceAll(' · ', DOT)
-                  )}
-                </Fragment>
-              ))}
+              <span className={present ? undefined : 'max-sm:hidden'}>
+                {line.map((part, i) => (
+                  <Fragment key={part}>
+                    {i === 0 ? null : DOT}
+                    {part === 'Clock off' ? (
+                      <span title={CLOCK_OFF}>{part}</span>
+                    ) : (
+                      part.replaceAll(' · ', DOT)
+                    )}
+                  </Fragment>
+                ))}
+              </span>
             </span>
           )}
         </span>
@@ -269,15 +277,20 @@ export function Tile({
   );
 }
 
+/** How long the stream's first connect may take before the grid says so (the owner, 2026-10-14). */
+export const FIRST_CONNECT_MS = 3000;
+
 /**
- * The stream's state as the grid's health reads it (`staleness`): its first connect, as the page
- * loads, counts as open, judged by how long the stream has been quiet, since it has lost nothing
- * and the grid was just read. Read as a reconnect, it flashed the pill for the 60–100 ms the
- * connect takes on every page load (PV7's find); a first connect that hangs is still said, as the
- * quiet stream's line, once the stream has been quiet that long.
+ * The stream's state as the grid's health reads it (`staleness`), `connectingMs` after its first
+ * connect began: that connect counts as open for its first `FIRST_CONNECT_MS`, since it has lost
+ * nothing and the grid was just read, so no pill flashes for the 60–100 ms it takes as each page
+ * loads (PV7's find); one that hangs past it, as a school's network can, is said as the pill, as a
+ * lost stream is at once.
  */
-export function healthOf(status: SseStatus): 'open' | 'reconnecting' {
-  return status === 'reconnecting' ? 'reconnecting' : 'open';
+export function healthOf(status: SseStatus, connectingMs: number): 'open' | 'reconnecting' {
+  return status === 'reconnecting' || (status === 'connecting' && connectingMs >= FIRST_CONNECT_MS)
+    ? 'reconnecting'
+    : 'open';
 }
 
 /**
@@ -285,7 +298,8 @@ export function healthOf(status: SseStatus): 'open' | 'reconnecting' {
  * `shadow-2` and a stone dot. It sits on a layer over the whole page, 14 px from its top as drawn,
  * taking no room and nobody's clicks, and stays in view as the page scrolls, so a grid scrolled to
  * its last row still says it may be out of date. The layer is placed against the nearest
- * positioned ancestor, the class page's `<main>` (its frame is 30 px in, 22 on a phone).
+ * positioned ancestor, the class page's `<main>` (its frame is 30 px in, 22 on a phone; in Present
+ * it has no frame, and the pill, sticky, still rests 14 px from the screen's top).
  */
 const PILL_LAYER = 'pointer-events-none absolute inset-x-0 -top-4 bottom-0 z-10 max-sm:-top-2';
 const PILL =
@@ -313,10 +327,10 @@ export function LiveGrid({
    */
   present?: boolean;
   /**
-   * The class page's own grid while a session runs (PV7), its said lines as ClassStale and
-   * ClassStates draw them: a lost stream as the floating pill (`PILL`) in place of the line over
-   * the grid, a stream open but quiet still that line, and a grid that didn't load said with a
-   * small Try again. Off, as before: Present until PV9, How it ended until PV12.
+   * The class page's own grid while a session runs (PV7), in Present too (PV9), its said lines as
+   * ClassStale and ClassStates draw them: a lost stream as the floating pill (`PILL`) in place of
+   * the line over the grid, a stream open but quiet still that line, and a grid that didn't load
+   * said with a small Try again. Off, as before: How it ended until PV12.
    */
   livePage?: boolean;
 }) {
@@ -349,6 +363,8 @@ export function LiveGrid({
   // working poll.
   const lastStreamActivity = useRef<number>(Date.now());
   const lastGridActivity = useRef<number>(Date.now());
+  // When the stream's first connect began, for how long it has taken (`healthOf`).
+  const connectStart = useRef<number>(Date.now());
   // The newest event seq the grid has applied, so a stale in-flight snapshot
   // can't roll it backwards over a streamed unlock.
   const appliedSeq = useRef<number>(0);
@@ -372,6 +388,7 @@ export function LiveGrid({
         appliedSeq.current = snap.latestSeq;
         lastStreamActivity.current = Date.now();
         lastGridActivity.current = Date.now();
+        connectStart.current = Date.now();
         sse = createSseClient({
           url: `${config.apiUrl}/v1/sessions/${sessionId}/stream`,
           getToken: getAccessToken,
@@ -482,7 +499,7 @@ export function LiveGrid({
   }
 
   const stale = staleness({
-    status: healthOf(status),
+    status: healthOf(status, now.getTime() - connectStart.current),
     lastStreamActivityAt: lastStreamActivity.current,
     lastGridActivityAt: lastGridActivity.current,
     now: now.getTime(),
