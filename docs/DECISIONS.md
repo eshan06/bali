@@ -34,13 +34,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `.github/scripts/plan-words.sh`, its self-test run first), its error naming where the detail
   goes. The new PLAN.md is ~7,200 words, over the ~5,000 aimed at: the open steps' notes alone
   (PV7–PV17 and Phase 7's fifteen) are ~2,400 of them, and the owner's open items ~1,300.
-  **From now on:** a step done shrinks to its one line,
-  its full line moved to the archive; the header's status is replaced, the one it replaces moved
-  to the top of the archive; before building a step, search the archive for its id (finished
-  steps' notes say what they left for it, "for L7 to wire"). CLAUDE.md's "Read first" says so,
-  and `docs/RUNBOOKS.md` records the restore drill under Open owner items now. *Why:* a
-  75,000-word first read spent each session's context before any work began, and an uncapped plan
-  grows back.
+  **From now on:** a step done shrinks to its one line, its full line moved to the archive; the
+  header's status is replaced, the one it replaces moved to the top of the archive; before
+  building a step, search the archive for its id (finished steps' notes say what they left for it,
+  "for L7 to wire"). CLAUDE.md's "Read first" says so, and `docs/RUNBOOKS.md` records the restore
+  drill under Open owner items now. *Why:* a 75,000-word first read spent each session's context
+  before any work began, and an uncapped plan grows back.
 
 - **2026-10-13** — **The account deletion gets the coverage guard the other privacy paths have
   (the owner's go, 2026-10-13).** Until now only the export (C5), the disposal (C6a) and the
