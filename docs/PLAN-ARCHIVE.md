@@ -10,6 +10,13 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-15 (Central) — PV12b, the recap (#386; `docs/DECISIONS.md`, 2026-10-15),
+its states no board draws approved by the owner as built: the class page after the bell as
+ClassEnded draws it, the figures over who wasn't focused the whole time (each with their line, its
+marks and their moments in words), who was and who didn't join; "28 students · the session ended at
+9:55 AM"; How it ended gone. Before it, M5a (#396). L7's two PRs (#389, #390) and L7b's parts 1b
+and 1c (#394, #395), approved by the owner too, follow it. Next: M5b, the Slides page._
+
 _Last updated: 2026-10-15 (Central) — M5's API half, M5a (#396; `docs/DECISIONS.md`, 2026-10-15),
 with no screen: a deck's removal refused `409 deck_in_use` names, in its `details`, every class
 whose running session shows the deck, each by id and name, in the order `/v1/me` lists the

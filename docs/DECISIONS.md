@@ -156,10 +156,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the OpenAPI snapshot. No fixture and nothing in BaliCore: no phone reads it.
 
 - **2026-10-15** — **L7-1a: the class page's question card and its results, built to the canvas;
-  asking split off to L7-1b; five states the canvas doesn't draw built plainest and parked for the
-  owner.** L7's first part, the class page's, came to 768 changed lines without tests, so the
-  conductor split it (2026-10-15): this half, the card with a question in it and its results (draft
-  #389), then L7-1b, asking in the side panel (stacked on it). Built to
+  asking split off to L7-1b; five states the canvas doesn't draw built plainest, approved by the
+  owner as built.** L7's first part, the class page's, came to 768 changed lines without tests, so
+  the conductor split it (2026-10-15): this half, the card with a question in it and its results
+  (#389), then L7-1b, asking in the side panel (stacked on it). Built to
   [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (version 21):
   LessonWaiting, LessonLive, LessonClosed and LessonStates' lines for them; Present and its
   projector untouched, nothing of a question in its markup (L7's part 2). **The live question**
@@ -184,12 +184,18 @@ a real decision? Add a dated entry at the top: what was decided and why.
   render:** `.app ul`'s margin 0 outranks `.opts`' 14 px, so the options sit right under the
   question (as PV6 and PV15 built the boards' tight lines). **Tokens:** the colours `bar`
   (stone-500), `bar-right` (green-600) and `letter-right` (green-100), as v2.css draws the results.
-  **What the canvas doesn't draw**, each built in the plainest way its pieces allow, the owner's to
-  rule (the PR parked as a draft): a question with no correct option (Close alone; closed, no tag
-  and no line on what students see); a closed question under 3 answers (LessonWaiting's options with
-  no counts under LessonClosed's head and "Final count"); where Closing failed and Results can't
-  refresh sit (under the card's head); the bell's line in the closed card; and the card before its
-  first read (the question, no count yet). **Screenshots** (`.claude/shots/L7-1/`, taken before the
+  **What the canvas doesn't draw**, each built in the plainest way its pieces allow, **approved by
+  the owner (2026-10-15), each as built, after their look at the screenshots** (asked with the PR
+  parked as a draft): a question with no correct option (Close alone; closed, no tag and no line on
+  what students see); a closed question under 3 answers (LessonWaiting's options with no counts
+  under LessonClosed's head and "Final count"); where Closing failed and Results can't refresh sit
+  (under the card's head); the bell's line in the closed card; and the card before its first read
+  (the question, no count yet). The owner also kept, as recommended, the edge the PR's review notes
+  raised: a newer question asked and closed in another tab while this tab's stream was down leaves
+  the older closed question on the card until Done, its totals true. These states were coded before
+  any canvas drew them, which the owner accepted for this PR and the four drafts approved with it
+  (#386, #390, #394, #395); from now on a state no board draws is drawn on the canvas first.
+  **Screenshots** (`.claude/shots/L7-1/`, taken before the
   split): on dev, the demo class with Ana, Ben, Cal and Dana answering through the API (two, the
   guard; four, the breakdown), closed with and without the answer, and Present with no question; the
   pane's 1440 px shots are soft, so the real components were also rendered sharp with the boards'
