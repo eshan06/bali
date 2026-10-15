@@ -10,6 +10,15 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-15 (Central) — L7b's part 1a, the save logic for Your questions (#393;
+`docs/DECISIONS.md`, 2026-10-15), with no screen: the drafts oldest first, what Bali refuses before
+it saves as the server checks it, each save minted after the draft's own `eventId` and a reply under
+another one read as not saved (#318), a removal; the API client sends `PUT`, and a removal's body.
+The page follows as two drafts stacked on it, for the owner's calls: the list with Remove, then
+writing, editing and the menu's Questions (the conductor's split of 844 lines). Before it, W3, the
+student's home (#392). PV12b (#386) and L7's two PRs (#389, #390) wait on the owner as drafts.
+Next: PV14, a session's report._
+
 _Last updated: 2026-10-15 (Central) — W3, the student's home (#392; `docs/DECISIONS.md`,
 2026-10-15): `/` sends a student who said 13+ in the app to their home in v2's look, the teacher's
 layout with Your classes and Help: each class in session on a live card (its ring, its teacher, the

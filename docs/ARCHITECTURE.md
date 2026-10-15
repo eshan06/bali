@@ -1200,9 +1200,9 @@ closes is closed at the session's end — the bell when the sweep or a Start pas
 deck's removal takes it FOR UPDATE, so a deck is never removed under a session showing it.
 **A deck's removal is the one transition whose only lock is the deck row:** it takes no
 session row (it can't know which session shows the deck before it looks), takes the deck
-FOR UPDATE first, then reads the presentation rows without locking them to answer `409
-deck_in_use`. That keeps the order: a slide change's FOR SHARE on the same deck row is the
-single place the two meet, so they serialise there and never deadlock.
+FOR UPDATE first, then reads the presentation rows, with their sessions' classes, without locking
+them to answer `409 deck_in_use` (M5a). That keeps the order: a slide change's FOR SHARE on the
+same deck row is the single place the two meet, so they serialise there and never deadlock.
 - **Answers never write to `events`.** The events feed streams to the teacher's browser
   (Live updates), so a per-student answer event would put who answered what on the
   teacher's screen and break totals-only. The `responses` row is the record; its own
@@ -1304,7 +1304,10 @@ Slice 2, teacher:
   worker, never the API (settled 2026-10-10); a PDF that exceeds either is `rejected`. A deck
   left `pending` 24 hours is rejected `unfinished` by the sweep (M2b2).
 - `GET /v1/decks` — the caller's own decks, never a removed one; `DELETE /v1/decks/{id}` —
-  remove one (`409 deck_in_use` while a running session shows it).
+  remove one (`409 deck_in_use` while a running session shows it). The refusal's `details` name
+  every class whose running session shows the deck, each its id and its name, in the order `/v1/me`
+  lists the teacher's classes (added 2026-10-15, M5a, additive: `DeckInUseDetails`), for the Slides
+  page's "It's showing in Biology, period 3 right now".
 - `POST /v1/sessions/{id}/slide` — `{ eventId, deckId | null, page }`: show a page of one of
   the caller's own `ready` decks, or stop presenting; recorded as `slide_shown`.
   `400 page_out_of_range` past its page count; `409 session_not_running` as for questions; a

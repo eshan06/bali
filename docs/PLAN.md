@@ -8,14 +8,12 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-15 (Central) — L7b's part 1a, the save logic for Your questions (#393;
-`docs/DECISIONS.md`, 2026-10-15), with no screen: the drafts oldest first, what Bali refuses before
-it saves as the server checks it, each save minted after the draft's own `eventId` and a reply under
-another one read as not saved (#318), a removal; the API client sends `PUT`, and a removal's body.
-The page follows as two drafts stacked on it, for the owner's calls: the list with Remove, then
-writing, editing and the menu's Questions (the conductor's split of 844 lines). Before it, W3, the
-student's home (#392). PV12b (#386) and L7's two PRs (#389, #390) wait on the owner as drafts.
-Next: PV14, a session's report._
+_Last updated: 2026-10-15 (Central) — M5's API half, M5a (#396; `docs/DECISIONS.md`, 2026-10-15),
+with no screen: a deck's removal refused `409 deck_in_use` names, in its `details`, every class
+whose running session shows the deck, each by id and name, in the order `/v1/me` lists the
+teacher's classes (`DeckInUseDetails`, additive), for the Slides page's "It's showing in Biology,
+period 3 right now". Before it, L7b's part 1a (#393). PV12b (#386), L7's two PRs (#389, #390) and
+L7b's parts 1b and 1c (#394, #395) wait on the owner as drafts. Next: M5b, the Slides page._
 
 ## Now
 
@@ -194,7 +192,7 @@ Slice 2 — slides:
 - **M3a** The slide change — ✅ (#327; DECISIONS 2026-10-12)
 - **M3b** The poll's slide and a deck's download (for M6) — ✅ (#328; DECISIONS 2026-10-12)
 - **M4** Decks in the privacy paths — ✅ (#329; DECISIONS 2026-10-12)
-- **M5** 👀 The slides page and upload to v2's canvas (Slides, LessonStates' M5 lines): the page in the menu; pick a PDF, upload with its percentage and Cancel (XHR's upload progress: `fetch` gives none), Checking…, the server's verdict said honestly (the size refusal, password-protected), "showing right now", a removal's confirm line; its in-use line names the class ("It's showing in Biology, period 3 right now"), so `409 deck_in_use` first carries that class (additive, in the error's `details`), its API half its own PR if M5 outgrows one; the bucket's origin in the CSP's `connect-src` (moved here from M6: without it the browser refuses the upload); an upload still running 25 minutes after its URL was minted is aborted and said honestly (#326) — validation: integration tests for the refusal's class, `/santa-loop` with the UI skills, screenshots
+- **M5** 👀 The slides page and upload to v2's canvas (Slides, LessonStates' M5 lines): the page in the menu; pick a PDF, upload with its percentage and Cancel (XHR's upload progress: `fetch` gives none), Checking…, the server's verdict said honestly (the size refusal, password-protected), "showing right now", a removal's confirm line; its in-use line names the class ("It's showing in Biology, period 3 right now"), from `409 deck_in_use`'s `details`: **its API half, M5a** — ✅ (#396; DECISIONS 2026-10-15): `DeckInUseDetails`, every class whose running session shows the deck, by id and name, the order `/v1/me`'s; the portal's `ApiError` keeps no `details` yet, M5b's to read; **left, M5b, the page**; the bucket's origin in the CSP's `connect-src` (moved here from M6: without it the browser refuses the upload); an upload still running 25 minutes after its URL was minted is aborted and said honestly (#326) — validation: `/santa-loop` with the UI skills, screenshots
 - **M6** 👀 Portal presenter to v2's canvas (LessonDecks, LessonSlide, PresentSlide, LessonStates' M6 lines: picking a deck in the side panel, the class page's slide controls and Present's slide; the presenter card's "Every phone in this class shows this slide, and so does Present." not built), in two PRs (PDF.js and the CSP, then the presenter): PDF.js ≥ 4.2.67, `isEvalSupported: false`, its worker self-hosted; the bytes checked against the slide's `sha256`, a mismatch refused with a retry (settled 2026-10-10); the CSP's `worker-src` (the bucket's `connect-src` came with M5) — validation: CSP tests, a tampered deck refused, `/santa-loop`, screenshots
 - **M7** BaliCore's deck download and cache (for M8) — ✅ (#331; DECISIONS 2026-10-12)
 - **M8** 👀📱 iOS slide view to the app canvas: PDFKit, pinch zoom, each page's text as its VoiceOver label, Emergency Unlock untouched — validation: XCTest, the device check on a shielded phone

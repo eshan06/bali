@@ -8,6 +8,39 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-15** — **M5a: a deck's removal refused `409 deck_in_use` names, in its `details`, every
+  class whose running session shows the deck, for the Slides page's in-use line.** M5's line names
+  the class ("It's showing in Biology, period 3 right now"), so its API half ships first as its own
+  PR (#396), with no screen; the page, M5b, follows. **The shape** (`DeckInUseDetails` in
+  `@bali/shared`): `{ classes: [{ id, name }] }`, `MeClass`'s, the name as the class has it now. The
+  refusal's `code`, `reason` and `message` stay as M3a left them, and an old client reads no
+  `details`: additive. **Every class, not the first:** the removal stays refused while any running
+  session shows the deck, so a refusal naming one would send a teacher who stopped it there into a
+  second refusal naming the next; named all at once, the page can say each. More than one is rare
+  (one teacher's two sessions running, the deck shown in both). **In the order `/v1/me` lists a
+  teacher's classes** (PV3b: oldest first, then by id), so a page naming one names the first its
+  lists show, and a rename never reorders them. *Weighed:* the first alone; the order the sessions
+  started, or the slides were shown (no page lists classes so); the session's id too (nothing reads
+  it). **Who reads it:** the deck's own teacher alone. The route refuses everyone else before the
+  engine runs, none with `details`: another teacher `403` as S1 pins it (the brief said `404`; the
+  route's answer is unchanged), a student `403`, an unknown or removed deck `404 deck_not_found`. A
+  slide change shows only a deck of the class's own teacher (`showSlide`), and no class changes
+  teacher, so every class named is the caller's own. **The lock order is decision 5's:** the deck's
+  row alone, FOR UPDATE, then the presentation rows read unlocked, their sessions' classes now in
+  the same statement. A slide change of this deck waits on that row, so one committed first is read
+  with its class (its real-Postgres race now asserts the class), and one behind finds the deck
+  removed. **A rename or an end meanwhile can't make it wrong in a way that matters:** neither takes
+  the deck's row, so the read waits on neither and sees each as committed before it began: the old
+  name of the same class, or a session still running, which the teacher's next try finds over. The
+  read only ever answers a refusal, never a write, so at worst the refusal was true a moment
+  earlier; no deck goes while a running session shows it. Pinned on real Postgres: a rename and the
+  session's end held uncommitted, the removal answers at once with the class's old name, and goes
+  once they commit. **For M5b:** the portal's `ApiError` keeps no `details` yet. No OpenAPI drift:
+  its error shape takes any `details`; `deck_in_use` is the portal's, so no fixture or BaliCore
+  change. Tests: `apps/api/test/slides.test.ts` (the refusal whole; two classes, the older named
+  first though its session started later, then each alone; nothing named to anyone else),
+  `packages/db/test/slides.test.ts`, `races.test.ts`.
+
 - **2026-10-15** — **L7b's part 1a: the save logic for Your questions, with no screen; each save
   minted after the draft's own `eventId`, and a reply under another one read as not saved.** L7b's
   first part, the Questions page, came to 844 changed lines without tests, so the conductor split it

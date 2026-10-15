@@ -1,4 +1,5 @@
 import {
+  classes,
   completeDeck,
   createDeck,
   type Database,
@@ -27,7 +28,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { type MemoryDeckStorage, memoryDeckStorage } from '../src/deck-storage.js';
 import { authedInject, makeAuthedApp, type AuthedApp } from './helpers/app.js';
-import { makeTestDb, seedClassroom } from './helpers/db.js';
+import { joinCodeFor, makeTestDb, seedClassroom } from './helpers/db.js';
 
 /*
  * What a running session shows, through the API (Phase 7, M3; ARCHITECTURE, "Live lesson",
@@ -291,19 +292,82 @@ describe('DELETE /v1/decks/:id while a session shows it (M3)', () => {
       url: `/v1/decks/${id}`,
       payload: { eventId: newUuidV7() },
     });
+  /** The refusal as M3 answered it, its details naming `shownIn`, each by id and name (M5a). */
+  const inUse = (...shownIn: { id: string; name: string }[]) => ({
+    error: {
+      code: 'conflict',
+      reason: 'deck_in_use',
+      message: 'a running session shows the deck',
+      details: { classes: shownIn.map(({ id, name }) => ({ id, name })) },
+    },
+  });
 
-  it('refuses 409 deck_in_use while the running session shows it, and removes it once it no longer does', async () => {
+  it('refuses 409 deck_in_use while the running session shows it, naming its class, and removes it once it no longer does', async () => {
     const l = await lesson('slide-in-use');
     await slide(l.token, l.session.id, showing(l.cells.id, 3));
 
-    const inUse = await remove(l.token, l.cells.id);
-    expect(inUse.statusCode).toBe(409);
-    expect(reasonOf(inUse)).toBe('deck_in_use');
+    const refused = await remove(l.token, l.cells.id);
+    expect(refused.statusCode).toBe(409);
+    expect(refused.json()).toEqual(inUse(l.klass));
 
     await slide(l.token, l.session.id, showing(null));
     const gone = await remove(l.token, l.cells.id);
     expect(gone.statusCode).toBe(200);
     expect(gone.json()).toMatchObject({ outcome: 'removed' });
+  });
+
+  it('names every class whose running session shows it, in the order the teacher’s classes are listed (M5a)', async () => {
+    const l = await lesson('slide-in-use-two');
+    // A class of the same teacher's made before this one: named first, though its session starts,
+    // and shows the deck, after this one's.
+    const [older] = await db
+      .insert(classes)
+      .values({
+        teacherId: l.teacher.id,
+        schoolId: l.school.id,
+        name: 'Biology, period 3',
+        joinCode: joinCodeFor('slide-in-use-two-older'),
+        createdAt: new Date('2020-01-01T00:00:00Z'),
+      })
+      .returning();
+    const { session: second } = await startSession(db, {
+      classId: older!.id,
+      startedAt: at(5),
+      endsAt: at(30),
+    });
+    await slide(l.token, l.session.id, showing(l.cells.id, 3));
+    await slide(l.token, second.id, showing(l.cells.id, 1));
+
+    const both = await remove(l.token, l.cells.id);
+    expect(both.statusCode).toBe(409);
+    expect(both.json()).toEqual(inUse(older!, l.klass));
+
+    // Stopped in one, it is still shown in the other, which is named alone.
+    await slide(l.token, l.session.id, showing(null));
+    expect((await remove(l.token, l.cells.id)).json()).toEqual(inUse(older!));
+    await slide(l.token, second.id, showing(null));
+    const gone = await remove(l.token, l.cells.id);
+    expect(gone.statusCode).toBe(200);
+    expect(gone.json()).toMatchObject({ outcome: 'removed' });
+  });
+
+  it('names no class to anyone else: another teacher and a student 403, an unknown deck 404, none with details (M5a)', async () => {
+    const l = await lesson('slide-in-use-others');
+    await slide(l.token, l.session.id, showing(l.cells.id, 3));
+    const elsewhere = await seedClassroom(db, 'slide-in-use-others-elsewhere');
+
+    for (const [token, deckId, status] of [
+      [await ctx.tokenFor(elsewhere.teacher.cognitoId), l.cells.id, 403],
+      [await ctx.tokenFor(l.student.cognitoId), l.cells.id, 403],
+      [l.token, randomUUID(), 404],
+    ] as const) {
+      const res = await remove(token, deckId);
+      expect(res.statusCode).toBe(status);
+      expect(res.json<ApiErrorBody>().error.details).toBeUndefined();
+      expect(res.body).not.toContain(l.klass.id);
+      expect(res.body).not.toContain(l.klass.name);
+    }
+    expect((await remove(l.token, l.cells.id)).json()).toEqual(inUse(l.klass));
   });
 
   it('removes a deck shown by a session past its bell, though the sweep has not ended it', async () => {
