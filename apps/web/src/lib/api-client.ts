@@ -152,13 +152,18 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
   return {
     get: (path) => request('GET', path),
     getTagged: async <T>(path: string, etag: string | null) => {
-      // Aborted at the limit, fetch rejects (a NetworkError, from `send`), or the body does.
+      // At the limit, no answer: before the headers `send` says so, during the body this does.
       const abort = new AbortController();
       const timer = setTimeout(() => abort.abort(), POLL_TIMEOUT_MS);
       try {
         const res = await send('GET', path, undefined, etag, abort.signal);
         if (res.status === 304) return null;
-        return { body: (await res.json()) as T, etag: res.headers.get('etag') };
+        const body = (await res.json().catch((e: unknown) => {
+          if (!abort.signal.aborted) throw e;
+          captureApiFailure('GET', path, 'network');
+          throw new NetworkError();
+        })) as T;
+        return { body, etag: res.headers.get('etag') };
       } finally {
         clearTimeout(timer);
       }

@@ -17,8 +17,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   load gate measured a poll's p95 at 5–11 ms at the server (L4b, M9), so 10 s leaves a school's
   network at the bell room to be slow and still says a hang about 12 s after the last answer. The
   limit is on the whole answer, its body too, and its timer is cleared as the read settles, however
-  it settles. Timed out, the read fails as a read with no answer does (a `NetworkError`, the poll's
-  `failed` with no status), and the poll reads again 2 s later (#403). **Not on the other calls:**
+  it settles. Timed out, before its headers or in its body, the read fails as a read with no answer
+  does (a `NetworkError`, reported to monitoring as no answer; the poll's `failed` with no status),
+  and the poll reads again 2 s later (#403). **Not on the other calls:**
   the live grid's stream is long-lived by design, with its own reconnect; the slide upload is XHR,
   with its own 25-minute stop (#326); and a limit on every call, in `send`, would cut `POST
   /v1/decks/{id}/complete`, which on the API reads up to 25 MB from the bucket (its 30 s limit) and

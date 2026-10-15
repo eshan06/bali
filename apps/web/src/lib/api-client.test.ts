@@ -7,6 +7,9 @@ import {
   POLL_TIMEOUT_MS,
   UnauthorizedError,
 } from './api-client';
+import { captureApiFailure } from './monitoring';
+
+vi.mock('./monitoring', () => ({ captureApiFailure: vi.fn() }));
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -254,6 +257,7 @@ describe('api-client', () => {
   describe('a tagged read with no answer (#334)', () => {
     beforeEach(() => {
       vi.useFakeTimers();
+      vi.mocked(captureApiFailure).mockClear();
     });
     afterEach(() => {
       vi.useRealTimers();
@@ -276,9 +280,10 @@ describe('api-client', () => {
       await expect(read).rejects.toBeInstanceOf(NetworkError);
       expect(onUnauthorized).not.toHaveBeenCalled();
       expect(vi.getTimerCount()).toBe(0);
+      expect(vi.mocked(captureApiFailure).mock.calls).toEqual([['GET', '/x', 'network']]);
     });
 
-    it('fails a body that stops on its way too: the limit is on the whole answer', async () => {
+    it('fails a body that stops on its way the same way: the limit is on the whole answer', async () => {
       const api = createApiClient({
         baseUrl: 'http://api',
         getToken: () => 'tok',
@@ -300,17 +305,20 @@ describe('api-client', () => {
       await vi.advanceTimersByTimeAsync(POLL_TIMEOUT_MS - 1);
       expect(settled).not.toHaveBeenCalled();
       await vi.advanceTimersByTimeAsync(1);
-      await expect(read).rejects.toMatchObject({ name: 'AbortError' });
+      await expect(read).rejects.toBeInstanceOf(NetworkError);
       expect(vi.getTimerCount()).toBe(0);
+      expect(vi.mocked(captureApiFailure).mock.calls).toEqual([['GET', '/x', 'network']]);
     });
 
-    it('clears its timer once answered: a body, a 304, a refusal, a 401, no network', async () => {
+    it('clears its timer once answered: a body, a 304, a refusal, a 401, no network, not JSON', async () => {
       const replies: (() => Promise<Response>)[] = [
         () => Promise.resolve(new Response('{"answered":1}', { headers: { etag: '"a"' } })),
         () => Promise.resolve(new Response(null, { status: 304 })),
         () => Promise.resolve(jsonResponse({ error: { code: 'x', message: 'no' } }, 503)),
         () => Promise.resolve(new Response('', { status: 401 })),
         () => Promise.reject(new TypeError('Failed to fetch')),
+        // A proxy's page: a body that came whole, so its own error, never the limit's no answer.
+        () => Promise.resolve(new Response('<html>', { status: 200 })),
       ];
       const api = createApiClient({
         baseUrl: 'http://api',
@@ -318,7 +326,7 @@ describe('api-client', () => {
         fetchImpl: () => replies.shift()!(),
       });
       const answers: unknown[] = [];
-      for (let i = 0; i < 5; i += 1) {
+      for (let i = 0; i < 6; i += 1) {
         answers.push(await api.getTagged('/x', '"a"').catch((e: unknown) => e));
         expect(vi.getTimerCount(), `after answer ${i + 1}`).toBe(0);
       }
@@ -328,6 +336,11 @@ describe('api-client', () => {
         'ApiError',
         'UnauthorizedError',
         'NetworkError',
+        'SyntaxError',
+      ]);
+      expect(vi.mocked(captureApiFailure).mock.calls).toEqual([
+        ['GET', '/x', 503],
+        ['GET', '/x', 'network'],
       ]);
     });
 
