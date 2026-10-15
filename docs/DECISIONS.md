@@ -12,7 +12,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   calls; a tile is its button, Open student its other door, and Present closes it.** Built to
   [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (version 21):
   ClassStudent and PanelStates at 1440 px, ClassStates' tile as a button and ClassUnlock's Open
-  student, with PhoneClassLive's tiles at 390 (#PRNUM). **The panel** (`components/student-panel.tsx`)
+  student, with PhoneClassLive's tiles at 390 (#383). **The panel** (`components/student-panel.tsx`)
   is v2.css's `.panel`: 372 px from the right, white, a hairline on its left, `shadow-3`, scrolling
   itself; the name at 18/24 over "Tapped in at 9:05 AM", their state as their tile has it (a chip
   drawn by the grid, `StateChip`, so the two never disagree; the state's own icon, so "Left ·

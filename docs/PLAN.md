@@ -8,7 +8,7 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-14 (Central) — PV11b, the student panel (#PRNUM; `docs/DECISIONS.md`,
+_Last updated: 2026-10-14 (Central) — PV11b, the student panel (#383; `docs/DECISIONS.md`,
 2026-10-14): ClassStudent's panel, 372 px from the right, opened by a tile, now a button marked
 while its panel is open, and by a pop-up's Open student; the name, when they tapped in, their state
 as their tile has it, this session's moments with their times and each unlock's reason, and the last
@@ -135,7 +135,7 @@ validation** (each 👀): vitest, `npm run typecheck && npm run lint && npm test
 - **PV8** 👀 Tiles — ✅ (#377; DECISIONS 2026-10-14)
 - **PV9** 👀 Present — ✅ (#379; DECISIONS 2026-10-14)
 - **PV10** 👀 The unlock pop-up — ✅ (#381; DECISIONS 2026-10-14)
-- **PV11** 👀 The student panel — ✅ as PV11a (#382) and PV11b (#PRNUM; DECISIONS 2026-10-14)
+- **PV11** 👀 The student panel — ✅ as PV11a (#382) and PV11b (#383; DECISIONS 2026-10-14)
 - **PV12** 👀 The recap (ClassEnded), in two: **PV12a** the grouping in `lib/recap.ts` (~200): *focused the whole time* as the owner ruled (2026-10-12: from the student's own tap-in to the session's end, with no unlock, no Screen Time off, no going silent and no leaving; a late tap-in still counts), focused part of the time (each student's moments, for their line and their words), and didn't join, a late or superseded unlock and a record after the bell placed by `sessionReport`'s rules, as the report places them; **PV12b** the recap (~300; `components/recap-card.tsx`, `timeline.tsx`): the Start card, the last session's figures, those not focused the whole time first, then who was, then who didn't join, the roster and the join code (PV6's); the header's line after the bell, "28 students · the session ended at 9:55 AM", where PV6 says "no session running"; **"How it ended" removed**; the marks' icons at `v2.css`'s 2.25 (`.mk .ic`), by a class, since PV4b's 1.75 rule beats the `strokeWidth` prop — validation: vitest for PV12a (a late tap-in; an unlock and a return; Screen Time off and back on; a silence; a leave; each at the session's edges); as above for PV12b
 - **PV13** 👀 Reports (~350; Reports, ReportStates): `/reports` in the menu, the class picked with pills (no "All classes"), the framing line in italic (the `italic` class alone, never with `font-sans`, which re-slants the upright; PV4's review), the sessions as a table, newest first, with Show earlier, each session's average focus as a bar; `/classes/[id]/reports` redirects to it with that class picked; downloading waits for #339; Help's "Reports, on the class page, lists your past sessions." becomes "Reports, in the menu, lists each class's past sessions." (PV1) — validation: as above, the old URL's redirect
 - **PV14** 👀 A session's report (~250; ReportOpened, ReportStates' "Loading this session…" and "Couldn't load this session."): one session on a page and a URL of its own, its recap card and its Unlocks table; its Questions card is L7c's — validation: as above
