@@ -318,6 +318,22 @@ export async function questionCounts(
   };
 }
 
+/**
+ * A session's questions in the order asked (Phase 7, L3c): by their opens' `question_opened` events,
+ * which the session's lock lets in one at a time (decision 5), so their `seq` is that order. Never by
+ * `opened_at`, the route's clock read before the lock: of two opens racing, the later can carry the
+ * earlier time (L4a).
+ */
+export async function sessionQuestions(db: Database, sessionId: string) {
+  const rows = await db
+    .select({ question: questions })
+    .from(questions)
+    .innerJoin(events, eq(events.eventId, questions.eventId))
+    .where(eq(questions.sessionId, sessionId))
+    .orderBy(asc(events.seq));
+  return rows.map((row) => row.question);
+}
+
 /** A session's question not yet closed, if any: whether it is open now is `questionOpen`'s to say. */
 export async function findUnclosedQuestion(db: Database, sessionId: string) {
   return first(

@@ -3,7 +3,9 @@ import {
   findSessionById,
   getClassSessionsPage,
   getSessionEvents,
+  questionCounts,
   sessionEvents,
+  sessionQuestions,
   taughtSessionsSince,
 } from '@bali/db';
 import {
@@ -14,16 +16,18 @@ import {
   type ReportStudent,
   type ReportWindow,
   SESSION_REPORTS_PAGE_LIMIT,
+  type SessionReportQuestionsResponse,
   type SessionReportResponse,
   type SessionReportsPage,
   sessionReport,
 } from '@bali/shared';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
 import { requireOwnClass, requireTeacher } from '../auth/teacher.js';
 import { ApiError, parseRequest } from '../errors.js';
 import { refusal } from './errors.js';
+import { teacherQuestion } from './questions.js';
 
 const Params = z.object({ id: z.string().uuid(), sessionId: z.string().uuid() });
 const ClassParams = z.object({ id: z.string().uuid() });
@@ -58,9 +62,25 @@ function counted(session: ReportWindow, events: readonly ReportEvent[], now: Dat
 }
 
 /**
+ * The session a report route names, in a class the caller teaches: a student and another teacher
+ * `403`, an unknown class `404 class_not_found`, and a session not in the class the unknown
+ * session's `404 session_not_found`, so no class's report names another's.
+ */
+async function reportedSession(db: Database, request: FastifyRequest) {
+  const teacher = await requireTeacher(db, request);
+  const { id: classId, sessionId } = parseRequest(request, 'params', Params);
+  const klass = await requireOwnClass(db, teacher, classId);
+  const session = await findSessionById(db, sessionId);
+  if (!session || session.classId !== klass.id) throw refusal('SESSION_NOT_FOUND');
+  return session;
+}
+
+/**
  * Reports (Phase 4), the class's own teacher only.
  *
  * GET /v1/classes/:id/reports/sessions/:sessionId  one session's report (R2)
+ * GET /v1/classes/:id/reports/sessions/:sessionId/questions  the questions it asked, with
+ *                                                  their totals (Phase 7, L3c)
  * GET /v1/classes/:id/reports/sessions             the class's sessions, newest first, paged (R3)
  * GET /v1/me/activity                              Recent activity across the teacher's classes (PV3)
  *
@@ -73,11 +93,7 @@ export function registerReportsRoutes(app: FastifyInstance, db: Database, clock:
     '/v1/classes/:id/reports/sessions/:sessionId',
     { preHandler: app.authenticate, config: { parses: { params: Params } } },
     async (request): Promise<SessionReportResponse> => {
-      const teacher = await requireTeacher(db, request);
-      const { id: classId, sessionId } = parseRequest(request, 'params', Params);
-      const klass = await requireOwnClass(db, teacher, classId);
-      const session = await findSessionById(db, sessionId);
-      if (!session || session.classId !== klass.id) throw refusal('SESSION_NOT_FOUND');
+      const session = await reportedSession(db, request);
 
       const events = await getSessionEvents(db, session.id);
       const report = counted(session, events, clock());
@@ -101,6 +117,34 @@ export function registerReportsRoutes(app: FastifyInstance, db: Database, clock:
           student: student(off.studentId),
           occurredAt: off.occurredAt.toISOString(),
           recordedAs: off.recordedAs,
+        })),
+      };
+    },
+  );
+
+  // Its Questions card (L7c), read beside the report: each question's totals the results route's.
+  app.get(
+    '/v1/classes/:id/reports/sessions/:sessionId/questions',
+    { preHandler: app.authenticate, config: { parses: { params: Params } } },
+    async (request): Promise<SessionReportQuestionsResponse> => {
+      const session = await reportedSession(db, request);
+      // Each question read before it is counted, as the results route reads one: a recorded close
+      // commits after every answer it lets count, so a question read closed is counted whole.
+      const counted = [];
+      // ponytail: one count a question, a session's few; one statement for all if sessions ask many.
+      for (const question of await sessionQuestions(db, session.id)) {
+        // Just read, and a question is never deleted.
+        counted.push({ question, ...(await questionCounts(db, question.id))! });
+      }
+      // Open by the server's clock once counted, as the results route judges it.
+      const now = clock();
+      return {
+        questions: counted.map(({ question, answered, eligible, counts }) => ({
+          ...teacherQuestion(question, session, now),
+          openedAt: question.openedAt.toISOString(),
+          answered,
+          eligible,
+          counts,
         })),
       };
     },

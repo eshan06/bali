@@ -1242,6 +1242,12 @@ Teacher (the class's own teacher only; another teacher and a student `403`):
   it is open, the correct option and whether it is revealed, and `counts` per option — null
   until at least 3 have answered (the guard is the server's, never only the portal's).
   ETag and `304`.
+- `GET /v1/classes/{id}/reports/sessions/{sessionId}/questions` — the questions a session asked,
+  for its report page (decision 11's Questions; PLAN's L3c): in the order asked, the order its
+  opens took the session's lock, each as its teacher sees it, with when it was asked and its totals
+  as the results route counts them, through the same guarded count (`answered`, `eligible`,
+  `counts` null until at least 3 have answered). Refused as R2's report is: an unknown class `404
+  class_not_found`, a session not in the class the unknown session's `404 session_not_found`.
 - The session's boot snapshot (`GET /v1/sessions/{id}`) gains the open question, and in
   Slice 2 the presentation, as optional fields, so a reloaded portal finds them.
 

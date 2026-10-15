@@ -8,6 +8,40 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-15** — **L3c: a session's questions for its report, a route of its own beside R2's, each
+  question's totals the results route's, in the order the opens took the session's lock.** For
+  L7c's Questions card, which [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4)
+  draws on a session's report page (ReportOpened), not under the class page's recap (#391). **The
+  route:** `GET /v1/classes/{id}/reports/sessions/{sessionId}/questions`, under R2's report and
+  refused as it is, by one guard both now share (`reportedSession`): the class's own teacher only,
+  another teacher and a student `403`, an unknown class `404 class_not_found`, a session not in the
+  class the unknown session's `404 session_not_found`, a malformed id `400`. *Weighed:* a
+  `questions` field on R2's report, additive, but the canvas draws the card failing on its own
+  (LessonStates' "Bali couldn't load this session's questions." with Try again), which a field of
+  R2's could not; and `GET /v1/sessions/{id}/questions` beside the open, with R2's two `404`s
+  rebuilt for it. **The answer** (`SessionReportQuestionsResponse` in `@bali/shared`): each question
+  as its teacher sees it (`TeacherQuestion`: its words, its correct option, whether its close
+  revealed it, open by the server's clock), when it was asked (`openedAt`, the time ReportOpened
+  draws beside it), and its totals, `answered`, `eligible` and `counts`, each read through
+  `questionCounts`, the one guarded count the results route reads ("Settled": the guard wherever
+  counts are read). So the card and the live results never disagree: a question still open, the
+  session not over, counts as the results route counts it, its question read before its count as
+  that route reads them. Nothing names a student, and no answer's time reaches the teacher
+  (decision 3); a question's own time is not an answer's. **In the order asked, by the opens'
+  `question_opened` events' `seq`,** which the session's lock hands out one open at a time
+  (decision 5). Never `opened_at`: each route reads its clock before that lock, so of two opens
+  racing the later can carry the earlier time (L4a's race). Nor the order closed (L4a's "the one
+  closed last is the last asked", right for the one question a student is shown): an End racing an
+  open closes it at a time before it opened. One join, on `events.event_id`'s unique index; both
+  races staged in the route's tests, and on real Postgres two opens racing, the one left open
+  always listed last. *Weighed:* `opened_at` and the index the schema made for "the order asked";
+  the order closed.
+  **One count a question,** `questionCounts` as L3r left it: a session asks a few, and its
+  statement stays the one guard. *Weighed:* one statement for a whole session's, a second way into
+  the guard; a `ponytail:` note says when. **No ETag:** the report page reads it once; the live
+  results keep theirs. **Compatibility:** additive, a `/v1` route and two types; its S1 rows and
+  the OpenAPI snapshot. No fixture and nothing in BaliCore: no phone reads it.
+
 - **2026-10-15** — **PV15: the entry pages in v2's look, and the account read behind the 13+ check
   on every page; a student who said 13+ keeps the invite card, without its line for students,
   until W3.** Built to [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4)
