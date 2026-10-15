@@ -7,7 +7,7 @@ import {
 
 import type { ApiClient } from './api-client';
 import { errText } from './errors';
-import { gridDisplay, type GridDisplay, type Student } from './grid-state';
+import { gridDisplay, type GridDisplay, lastContact, type Student } from './grid-state';
 import { type Moment, momentOf, payloadOf, readEvents } from './recap';
 
 /*
@@ -145,7 +145,7 @@ export function studentPanel(
   }
   // Oldest first, as the recap places them; the sort keeps the engine's order at one instant.
   moments.sort((a, b) => a.at.getTime() - b.at.getTime());
-  const contact = student.joinedAt === null ? null : (student.lastSeenAt ?? student.joinedAt);
+  const contact = student.joinedAt === null ? null : lastContact(student);
   return {
     display: gridDisplay(student, now),
     tappedInAt: moments.find((m) => m.moment === 'in')?.at ?? null,

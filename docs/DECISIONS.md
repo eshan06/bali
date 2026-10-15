@@ -14,12 +14,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   on ClassStudent and PanelStates (`apps/web/src/lib/student-panel.ts`, #382). **The state and the
   last check-in are the grid's:** `studentPanel(student, events, now)` takes the grid's own `Student`
   for the tile and answers its `gridDisplay`, so the panel can never disagree with the tile (rule 2);
-  the last check-in is the grid's `lastSeenAt`, the server's stamp that the tile's "last seen" and
-  Silent's minutes count from, since a check-in writes no event (decision 7); none until the student
-  tapped in here; and never later than now, as those minutes are never fewer than none: a phone whose
-  clock is set ahead (S9) gives a streamed record a time minutes on, which the grid holds as its last
-  contact until the 15 s refresh brings the server's stamp. **When they tapped in, and each moment,
-  are the session's events':** their first tap-in the engine applied (a late one, A13 and A14, is
+  the last check-in is the grid's last contact (`lastContact`, now shared with `minutesSinceContact`),
+  the server's stamp that the tile's "last seen" and Silent's minutes count from, since a check-in
+  writes no event (decision 7); none until the student tapped in here; and never later than now, as
+  those minutes are never fewer than none: a phone whose clock is set ahead (S9) gives a streamed
+  record a time minutes on, which the grid holds as its last contact until the 15 s refresh brings
+  the server's stamp. **When they tapped in, and each moment, are the session's events':** their first tap-in the engine applied (a late one, A13 and A14, is
   none), at its record's time; the moments are the recap's own by one rule both now read
   (`momentOf`, in `recap.ts`): tapped in, unlocked, back in focus, protection off, Screen Time back
   on, went silent, came back and left; no late return; every unlock, whatever it changed, as R2
@@ -43,8 +43,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the logic gives both, and which the panel lists is PV11b's to settle with the board. A phone whose
   clock is set ahead has its tap-in and moments at its claim held to the window, which can be
   minutes after now, up to the bell, where PanelStates' Clock off caption says Bali records the time
-  by its own clock: PV11b's words to settle with the board. *Size:* about 180 changed lines of code
-  without tests.
+  by its own clock: PV11b's words to settle with the board. The panel stays off the projector, as
+  the board says: its moments carry each unlock's reason, with no Present switch, since no board
+  draws the panel there (#265; santa's review). *Size:* about 180 changed lines of code without
+  tests.
 
 - **2026-10-14** — **PV10: the unlock pop-up, built as drawn; it lives with the session's live
   page; Open student waits for PV11b.** Built to
