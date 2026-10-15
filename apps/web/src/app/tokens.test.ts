@@ -617,7 +617,7 @@ describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
   // and a control's hover, pressed or open state, the side menu's item on its own page (PV5)
   // among them; a chip's fill is its state's own tint. A field is white in v2's look (PV4); the
   // grey v2 adds comes with the step that draws each: the length picker's track and the join
-  // code's chip (PV6); a table's head, the recap's name pills and the bars' tracks to come.
+  // code's chip (PV6); a table's head and the bars' tracks (PV13); the recap's name pills to come.
   const src = fileURLToPath(new URL('../', import.meta.url));
   const files = sources(src).filter((file) => /\.tsx?$/.test(file));
 

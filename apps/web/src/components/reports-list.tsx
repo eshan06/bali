@@ -29,8 +29,8 @@ const CELL = 'border-b border-border-default px-4 py-3 align-middle text-cell';
 const FIGURE = `${CELL} text-right whitespace-nowrap`;
 
 /**
- * A session's average focus as its bar (Reports): out of its length, its start to its end in whole
- * minutes, as the table says its times; null when nobody joined, who have no average.
+ * A session's average focus as its bar (Reports): out of its length, its start to its end rounded
+ * to whole minutes as R2 rounds the average; null when nobody joined, who have no average.
  */
 export function focusBar(
   session: SessionReportSummary,

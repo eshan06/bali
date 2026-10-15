@@ -106,6 +106,9 @@ describe('a session’s average focus as its bar', () => {
     expect(focusBar(FRI)).toEqual({ words: '35 of 36 min', percent: (35 / 36) * 100 });
     // Not marked over yet: to its bell.
     expect(focusBar({ ...TUE, endedAt: null })?.words).toBe('45 of 50 min');
+    // Its exact length rounded, as R2 rounds the average: 35 min 20 s is 35.
+    const seconds = { startedAt: '2026-10-02T14:05:50.000Z', endedAt: '2026-10-02T14:41:10.000Z' };
+    expect(focusBar({ ...FRI, ...seconds })?.words).toBe('35 of 35 min');
   });
 
   it('has none for a session nobody joined, and never runs past its track', () => {
@@ -311,13 +314,33 @@ describe('the page’s wiring (read from its source)', () => {
   const page = source('../app/reports/page.tsx');
 
   it('reads the class ?class= names, else the account’s first, and again as another is picked', () => {
-    expect(page).toMatch(/const asked = useSearchParams\(\)\.get\('class'\);/);
+    expect(page).toMatch(/const param = useSearchParams\(\)\.get\('class'\);/);
     expect(page).toMatch(/const classId = asked \?\? classes\?\.\[0\]\?\.id \?\? null;/);
     expect(page).toMatch(
-      /if \(classId === null\) return;\s*setOpen\(null\);\s*void read\(FIRST_READ, 'newest'\);\s*return \(\) => \{\s*latest\.current \+= 1;\s*\};\s*\}, \[api, classId, router\]\);/,
+      /if \(classId === null\) return;\s*void read\(FIRST_READ, 'newest'\);\s*return \(\) => \{\s*latest\.current \+= 1;\s*\};\s*\}, \[api, classId, router\]\);/,
     );
     // Only the newest read's answer counts.
     expect(page).toMatch(/if \(mine === latest\.current\) setList\(next\);/);
+  });
+
+  it('takes only a class id from ?class=, so no other path reaches the API (santa’s review)', () => {
+    // `..` survives encodeURIComponent, and would read /v1/reports/sessions in the class's place.
+    const id = new RegExp(/const CLASS_ID = (\/.*\/i);/.exec(page)?.[1]?.slice(1, -2) ?? '$^', 'i');
+    expect(id.test('01a10de8-cc00-72ce-a3df-81a148608a72')).toBe(true);
+    for (const other of ['..', '.', '', 'c1', '01a10de8-cc00-72ce-a3df-81a148608a72/..']) {
+      expect(id.test(other), other).toBe(false);
+    }
+    expect(page).toMatch(
+      /const asked = param !== null && CLASS_ID\.test\(param\) \? param : null;/,
+    );
+  });
+
+  it('starts another class’s list afresh in the render that picks it, its row closed (santa’s review)', () => {
+    // A row left open drew the last class's session under the new class's id for one render,
+    // which read that session from the new class; and a pick of no class kept the last failure.
+    expect(page).toMatch(
+      /if \(listed !== classId\) \{\s*setListed\(classId\);\s*setList\(FIRST_READ\);\s*setOpen\(null\);\s*\}/,
+    );
   });
 
   it('takes the classes from the shell’s one read of the account', () => {
