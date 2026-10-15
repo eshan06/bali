@@ -10,6 +10,14 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-15 (Central) — L7's part 2, Present's question (#402; `docs/DECISIONS.md`,
+2026-10-15), and with it L7: on the projector a live question shows in the grid's place, as
+PresentQuestion and PresentAnswer draw it, totals only: "N of M answered" while it is open, each
+answer's count once it is closed and Bali's last read after the close is in, never under the
+server's guard, the correct answer only once shown. Its intermediate states drawn on the canvas
+first (PresentQuestionStates, PresentQuestionPhone) and built from them. Before it, PV14, a
+session's report (#401). Next: M6, the presenter; L7c's Questions card goes on PV14's page._
+
 _Last updated: 2026-10-15 (Central) — PV14, a session's report (#401; `docs/DECISIONS.md`,
 2026-10-15): one session on a page and a URL of its own, as ReportOpened draws it, its recap card
 and its Unlocks table; the class page's recap opens it (Open its report), and so does each Reports
