@@ -11,9 +11,10 @@ import {
   ShieldOff,
   WifiOff,
 } from 'lucide-react';
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useReducer, useRef, useState } from 'react';
 
 import { Button } from '@/components/button';
+import { NO_POPUPS, popupsAfter, unlockNews, UnlockPopups } from '@/components/unlock-popups';
 import { getAccessToken } from '@/lib/auth';
 import { config } from '@/lib/config';
 import { errText } from '@/lib/errors';
@@ -237,13 +238,14 @@ export function Tile({
             {s.displayName ?? s.studentId.slice(0, 8)}
           </span>
           <span className={`block truncate ${WORDS[look].state}`}>
-            {/* A Left state's flag; on a phone, the state's own icon after it. */}
-            {[...flags, ...(present ? [] : [StateIcon])].map((Icon, i) => (
+            {/* On a phone the state's own icon first, then a Left state's flag, as PhoneClassLive
+                draws "Left · unlocked"; on a computer the flag alone, the icon at the side. */}
+            {[...(present ? [] : [StateIcon]), ...flags].map((Icon, i) => (
               <Icon
                 key={i}
                 size={present ? 16 : 13}
                 aria-hidden="true"
-                className={`mr-0.75 inline align-[-2px] ${i < flags.length ? '' : 'sm:hidden'}`}
+                className={`mr-0.75 inline align-[-2px] ${!present && i === 0 ? 'sm:hidden' : ''}`}
               />
             ))}
             {words.replaceAll(' · ', DOT)}
@@ -330,7 +332,8 @@ export function LiveGrid({
    * The class page's own grid while a session runs (PV7), in Present too (PV9), its said lines as
    * ClassStale and ClassStates draw them: a lost stream as the floating pill (`PILL`) in place of
    * the line over the grid, a stream open but quiet still that line, and a grid that didn't load
-   * said with a small Try again. Off, as before: How it ended until PV12.
+   * said with a small Try again; and each unlock the stream brings as a pop-up (PV10; ClassUnlock),
+   * never in Present. Off, as before: How it ended until PV12.
    */
   livePage?: boolean;
 }) {
@@ -346,6 +349,11 @@ export function LiveGrid({
     onCountsRef.current = onCounts;
   }, [onEnded, onSession, onCounts]);
   const [students, setStudents] = useState<Students | null>(null);
+  // The students as last drawn, read where an event lands: the name an unlock's pop-up gives.
+  const drawn = useRef<Students | null>(null);
+  useEffect(() => {
+    drawn.current = students;
+  }, [students]);
   // Over when it boots (R5's grid under the recap card): drawn once, holding none of the streams.
   const [over, setOver] = useState(false);
   const [now, setNow] = useState(() => new Date());
@@ -354,6 +362,9 @@ export function LiveGrid({
   const [attempt, setAttempt] = useState(0); // a boot that failed, tried again (rule 5)
   // The unlocks that landed while the grid was open, by event id: their chips pulse (§7).
   const [liveUnlocks, setLiveUnlocks] = useState<ReadonlySet<string>>(() => new Set());
+  // And each opens a pop-up (PV10), kept while Present is on and shown after it, until it is closed
+  // or the session's live page goes, its grid with it.
+  const [popups, tell] = useReducer(popupsAfter, NO_POPUPS);
   // Any sign of life from the server: an event, a heartbeat comment, or a
   // snapshot refresh that came back. A heartbeat is freshness and not just
   // liveness — a quiet class emits no events, so nothing arriving is normal
@@ -396,9 +407,10 @@ export function LiveGrid({
           overlap: EVENT_RESUME_OVERLAP,
           onEvent: (e) => {
             setStudents((prev) => (prev ? applyEvent(prev, e) : prev));
-            if (landsLive(e, snap.latestSeq)) {
-              setLiveUnlocks((prev) => new Set(prev).add(e.eventId));
-            }
+            const live = landsLive(e, snap.latestSeq);
+            if (live) setLiveUnlocks((prev) => new Set(prev).add(e.eventId));
+            const news = unlockNews(e, live, drawn.current);
+            if (news) tell(news);
             if (e.seq > appliedSeq.current) appliedSeq.current = e.seq;
             lastStreamActivity.current = Date.now();
             lastGridActivity.current = Date.now();
@@ -552,6 +564,13 @@ export function LiveGrid({
           </ul>
         </div>
       )}
+      {/* The unlock pop-ups (ClassUnlock, ClassUnlocks), after the grid, never on the projector. */}
+      {livePage && !present ? (
+        <UnlockPopups
+          unlocks={popups.open}
+          onClose={(eventId) => tell({ kind: 'close', eventId })}
+        />
+      ) : null}
     </div>
   );
 }

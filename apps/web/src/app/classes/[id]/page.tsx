@@ -291,8 +291,8 @@ export default function ClassDetailPage() {
 
   // Present, the projector the class can see (DESIGN.md §5): beside the live grid's counts, small
   // and hidden on a phone, which never drives a projector (PV1; `beside`), in Present's header, and
-  // beside How it ended. Pressed is its check, with the Button's sunken fill and `text-primary`
-  // edge, never colour alone.
+  // beside How it ended. Pressed, the Button's sunken fill and `text-primary` edge, never colour
+  // alone; its icon the same both ways, as ClassPresent draws it.
   const presentToggle = (beside = false, className = '') => (
     <Button
       ref={toggle}
@@ -306,11 +306,7 @@ export default function ClassDetailPage() {
       }}
       className={beside ? 'ml-auto max-sm:hidden' : className}
     >
-      {present ? (
-        <Check size={16} aria-hidden="true" />
-      ) : (
-        <Presentation size={16} aria-hidden="true" />
-      )}
+      <Presentation size={16} aria-hidden="true" />
       Present
     </Button>
   );

@@ -8,12 +8,12 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-14 (Central) — PV9, Present (#379; `docs/DECISIONS.md`, 2026-10-14): the
-projector's page in v2's look, the class page's own parts one size up with +5, +10 and End kept,
-"Class is over" alone after the bell; and the owner's two calls on PV8's results, on the class page
-and Present alike: the reconnect pill once a first connect takes 3 s, and a phone tile's one detail
-as PhoneClassLive draws it. Dev's demo students are Ana, Ben, Cal and Dana. Next: PV10, the unlock
-pop-up._
+_Last updated: 2026-10-14 (Central) — PV10, the unlock pop-up (#381; `docs/DECISIONS.md`,
+2026-10-14): each unlock the live stream brings opens ClassUnlock's pop-up beside its tile's pulse,
+newest on top, each until it is closed, never in Present and never twice; it goes with the live
+page, the unlock then on its tile and in the recap; Open student waits for PV11b. With it, Present's
+pressed button keeps its slides icon and a phone's "Left · unlocked" tile puts the lock first. Before
+it, PV9, Present (#379). Next: PV11a, the student panel's logic._
 
 ## Now
 
@@ -40,8 +40,8 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
   keeps D1's look until the owner approves a new one (its redesign rolled back, 2026-10-06). Left:
   the push's app half (not started), TestFlight build 9 for C7's phone test (📱), and the phone's
   Phase 7 screens (L8, M8). C2's legal words (⚖️) go into the portal's pages, on the Windows PC.
-- **The portal redesign in v2's look (PV0–PV17, the owner, 2026-10-12):** PV0–PV9 done, with PV3b,
-  PV4b, PV4c and PV5b; next PV10, on the Windows PC. Phase 7's web screens follow
+- **The portal redesign in v2's look (PV0–PV17, the owner, 2026-10-12):** PV0–PV10 done, with PV3b,
+  PV4b, PV4c and PV5b; next PV11a, on the Windows PC. Phase 7's web screens follow
   PV15.
 - **The workflow review's last steps** ✅ (the owner, 2026-10-13; DECISIONS 2026-10-14): the
   migration guard (#369), docs-only PRs skipping the test jobs (#365), moved files (#368) and two
@@ -134,7 +134,7 @@ validation** (each 👀): vitest, `npm run typecheck && npm run lint && npm test
 - **PV7** 👀 A class live — ✅ (#375; DECISIONS 2026-10-14)
 - **PV8** 👀 Tiles — ✅ (#377; DECISIONS 2026-10-14)
 - **PV9** 👀 Present — ✅ (#379; DECISIONS 2026-10-14)
-- **PV10** 👀 The unlock pop-up (~150; ClassUnlock): an unlock the stream brings opens a pop-up that stays until closed, beside the tile's pulse, never on the projector, several at once as PV1 draws them; its Open student opens PV11's panel — validation: as above
+- **PV10** 👀 The unlock pop-up — ✅ (#381; DECISIONS 2026-10-14)
 - **PV11** 👀 The student panel (ClassStudent; its states as PV1 draws them), in two: **PV11a** the logic in `apps/web/src/lib` (~150, no words): when the student tapped in, their state, this session's moments and their last check-in, from `GET /v1/sessions/{id}/events` and the grid's state; **PV11b** the panel (~250): 372 px from the right, opened by a tile and by the pop-up's Open student; PV8 left each tile a plain list item, so here it becomes the button ClassStates draws, marked while its panel is open (`.tile.is-selected`) — validation: vitest for PV11a; as above for PV11b
 - **PV12** 👀 The recap (ClassEnded), in two: **PV12a** the grouping in `lib/recap.ts` (~200): *focused the whole time* as the owner ruled (2026-10-12: from the student's own tap-in to the session's end, with no unlock, no Screen Time off, no going silent and no leaving; a late tap-in still counts), focused part of the time (each student's moments, for their line and their words), and didn't join, a late or superseded unlock and a record after the bell placed by `sessionReport`'s rules, as the report places them; **PV12b** the recap (~300; `components/recap-card.tsx`, `timeline.tsx`): the Start card, the last session's figures, those not focused the whole time first, then who was, then who didn't join, the roster and the join code (PV6's); the header's line after the bell, "28 students · the session ended at 9:55 AM", where PV6 says "no session running"; **"How it ended" removed**; the marks' icons at `v2.css`'s 2.25 (`.mk .ic`), by a class, since PV4b's 1.75 rule beats the `strokeWidth` prop — validation: vitest for PV12a (a late tap-in; an unlock and a return; Screen Time off and back on; a silence; a leave; each at the session's edges); as above for PV12b
 - **PV13** 👀 Reports (~350; Reports, ReportStates): `/reports` in the menu, the class picked with pills (no "All classes"), the framing line in italic (the `italic` class alone, never with `font-sans`, which re-slants the upright; PV4's review), the sessions as a table, newest first, with Show earlier, each session's average focus as a bar; `/classes/[id]/reports` redirects to it with that class picked; downloading waits for #339; Help's "Reports, on the class page, lists your past sessions." becomes "Reports, in the menu, lists each class's past sessions." (PV1) — validation: as above, the old URL's redirect
@@ -284,6 +284,7 @@ Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect acc
 - 🔧 Production, still open: check that the next push to `main` deploys `bali-portal` on its own now that `vercel.json` is deleted (runbook 3, step 6); Railway 2FA, threat protection, CloudTrail, the backups (L0b) and the restore drill are on Phase 6's owner list above.
 - 👀 After the next deploy of `bali` and `bali prod` (P8's follow-up): the deploy log shows the migrations, then `Server listening`; a later redeploy's log for the old deployment shows `shutting down` with `signal: SIGTERM`.
 - Phase 7: **to decide**, #313 (what a teacher's own deletion, and the retention run, do with their words), kept as today for now (the owner's ruling, 2026-10-12); **tracked fixes**, #319 (saved questions' id case), #326 (a slow upload outliving its deck; M5 aborts it), #334 (a timeout on the portal's polls, before W4), #336 (capacity at the bell, before the class-started push reaches a school); L0b is the owner's (Railway, above). The calls confirmed on 2026-10-12: this line in full in `docs/PLAN-ARCHIVE.md`.
+- #380: Present after the bell has no Start, so starting the next class from a projected tab shows the last recap's unlock reasons (the owner, 2026-10-14: tracked, not now)
 - Left for the owner on finished steps' lines (in full in `docs/PLAN-ARCHIVE.md`): P7's App Review path (decide its section 4, then fill the accounts and paste); P6's restore drill, its result recorded once a backup exists; S4's CSP check on the deployed portal after each Next upgrade; ⚖️ whether C7-server's yes rides Other Data Types; device rounds still marked pending (B5b's round 2, steps 7 and 9; B5c's round 3, steps 1 and 3; round 4, B6a and B6b); smaller calls on F (a refused tap's end-of-day drop or dismiss button; the waiting card's Tap in), B6c-2 (`.keep`/`.retry`), B5b (a rule for a replaced window, a code step to schedule) and D2 (Present's key per class).
 - ✅ **Answered** (the owner, 2026-10-14; DECISIONS 2026-10-14): PV5b's whole-page error kept; its review notes folded into PV15 and PV17a; PV4c's two test limits left.
 - 🔧 Before the pilot's first class: the owner's prod block gets a fresh code (its first reached the repo's history in #228), and a session builds an owner command that retires a block, to retire the old code (`docs/PILOT.md`, setup step 6). The portal's three class-page controls are built (P10, P11).

@@ -317,6 +317,8 @@
   --color-scrim: rgba(33, 28, 21, 0.32);
   /* The reconnect pill's dot (PV7; DESIGN.md §4), the primitive v2.css fills it with. */
   --color-pip: var(--bali-stone-500);
+  /* The unlock pop-up's top edge (PV10), the primitive v2.css draws it with. */
+  --color-unlock-edge: var(--bali-orange-400);
 }
 
 /* §6: the three shadows, by name. */
