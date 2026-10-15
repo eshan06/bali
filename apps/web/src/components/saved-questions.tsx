@@ -116,7 +116,9 @@ export function DraftCard({
     new Date(edited ? draft.updatedAt : draft.createdAt),
   );
   return (
-    <li className={`grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-5 gap-y-2 ${CARD_ALONE}`}>
+    <li
+      className={`grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-5 gap-y-2 text-body ${CARD_ALONE}`}
+    >
       <div className="min-w-0">
         <p id={id} className="font-semibold whitespace-pre-line wrap-anywhere">
           {draft.prompt}
