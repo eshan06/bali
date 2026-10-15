@@ -256,6 +256,62 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the failures; each is rendered in the tests. *Size:* 651 changed lines without tests, 267 of them
   PB5's list of cards and the old page deleted; the new code 384 (the conductor kept it one PR).
 
+- **2026-10-15** — **PV12b: the recap after the bell, built as ClassEnded draws it; what no board
+  draws approved by the owner as built.** Built to
+  [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (version 21):
+  ClassEnded (PV1's correction kept: a late tap-in still counts), ClassStates' lines after the bell
+  and ReportStates' recap states, at 1440 px (#386), from PV12a's `recapGroups` (#384). **The card**
+  (`components/recap-card.tsx`): "Last session" over its day and times, the four figures (`.stats`,
+  "1,064 min"), the note on silence, "No unlocks." when there were none, then the groups
+  (`RecapLists`, `components/timeline.tsx`): *Focused part of the time*, a row each, the name, a thin
+  line from each tap-in to their leaving or the end, a mark at each other moment (`.mk`: 18 px rings,
+  an unlock's orange, a protection off's red, Silent's dashed, the rest stone), side by side where
+  they would overlap (`lefts`, now with a size), and their moments in ClassEnded's words (`saidOf`:
+  "Unlocked at 9:18 AM, Bathroom. Back in focus at 9:24 AM.", "no reason given", "Other reason",
+  the tile's words; every moment but the first tap-in, where the line starts, so a return after a
+  switch away is said); *Focused the whole time* and *Didn't join*, names in grey pills. **The marks'
+  icons at 2.25 by a class** (`stroke-[2.25]`), a utility, which outranks PV4b's base-layer 1.75 rule
+  (checked in the browser: computed 2.25). **The axis:** 6 gaps or fewer for the recap, a tick each 10
+  minutes for 50 as ClassEnded draws it (`recap.ts`'s axis takes the count; the reports' timeline keeps
+  12), each time between the ends hidden by the axis's own width where two would touch, those beside
+  an end (which carry AM or PM) first. **Words in the component, not `recap.ts`:** the approved change
+  to its "Other" and "No reason given" would also have reworded the reports page's opened timeline,
+  which keeps PB5's look until PV13 and PV14; the recap reads `reasonWords`, the pop-up's and the
+  panel's, with none in lowercase as ClassEnded writes it. **The header's line** after the bell, "28
+  students · the session ended at 9:55 AM", from the end the server marked on the session the card
+  found (R3's `endedAt`; `onFound`, cleared as the card goes, so a next session's end never paints
+  with the last one's), for a session that ended today on this computer's calendar (`endedToday`):
+  an older one keeps "no session running" beside the card's own day. **Who didn't join** is the class
+  page's roster, read again as a session ends here (santa's review, Reviewer B: the roster the page
+  opened with missed a student who joined the class with the code mid-session and never tapped in, and
+  kept one removed meanwhile); the card waits for it, and a failed read is the card's to say ("Couldn't
+  load the last session." with the reason; Try again reads the roster again), as well as the header's.
+  **How it ended removed**, with the Present toggle beside it: ClassEnded draws neither, so Present
+  is entered while a session runs, and after the bell only a tab kept in it shows PresentEnded. New
+  portal tokens: the size `axis` (12/16) and the colours `mark` (stone-400) and `mark-off` (red-300),
+  an unlock's ring taking `unlock-edge`. **Not built:** ClassEnded's "Open its report", since a
+  session's own page is PV14's (a link to the reports list would not be its report); and Present's
+  "the session ended at 9:55 AM" (PresentEnded), Present staying as PV9 left it (#380). **Approved by
+  the owner (2026-10-15), each as built, after their look at the screenshots** (asked with the PR
+  parked as a draft, each recommended as built): the two states no board draws, a student who never
+  joined with an unlock or protection off here (a row under Didn't join, its mark on no line) and one
+  recorded before the student's own tap-in or after an early End (under Focused part of the time, its
+  mark off their line), which also answers PV12a's question; the recap at 390 px, the rows stacked
+  under a 40 rem card; the line only for a session that ended today; and a failed roster read said
+  twice. These states were coded before any canvas drew them, which the owner accepted for this PR
+  and the four drafts approved with it (#389, #390, #394, #395); from now on a state no board draws
+  is drawn on the canvas first. **Left as they are** (santa's WARNs): a tab left open past midnight keeps "the session ended at …" until it
+  next renders; `LiveGrid`'s mode off the live page has no caller since How it ended went, and its
+  comments still name it (the live page stays as it is in this step). **The screenshots** used dev's
+  demo class: Ana focused throughout, Ben tapped in late, Cal unlocked (Bathroom), came back and went
+  silent, Dana never joined; then a second short session for the undrawn states (Dana unlocked
+  without joining, Cal unlocked before his tap-in, Ana unlocked after the End). *Size:* 466 changed
+  lines without tests before santa's fixes, 104 of them comments, over santa's ~400; kept as one PR by
+  the conductor, since the only clean split leaves its first half drawing nothing on screen.
+  - **2026-10-15, W3's states (#392):** the owner approved, after the fact, the three states W3
+    merged without their look: no class in session, the classes listed with no "Other classes"
+    label; a teacher with no name, "In class now"; two classes in session at once, a card each.
+
 - **2026-10-15** — **A `came_back` is the server's: stamped when the server heard the phone, held to
   the window and never before the `went_silent` it closes (a fix, #385).** Found by PV11b's santa
   review (#383). Decision 7 says the pair is server-minted, but the engine stamped the `came_back`

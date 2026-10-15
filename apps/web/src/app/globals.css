@@ -287,6 +287,11 @@
   --text-button-lg: 16px;
   --text-button-lg--line-height: 20px;
   --text-button-lg--font-weight: 600;
+
+  /* The recap's (PV12b), as v2.css draws it and §1's facts don't list: its axis's times, 12/16. */
+  --text-axis: 12px;
+  --text-axis--line-height: 16px;
+  --text-axis--font-weight: 400;
 }
 
 @theme inline {
@@ -350,6 +355,10 @@
   /* A live card's edge (W3, the student's home; Home's with PV17b), the primitive v2.css's
      `.livecard` draws it with. */
   --color-live-edge: var(--bali-green-200);
+  /* The recap's marks (PV12b), the primitives v2.css's `.mk` rings them with: stone, and a
+     protection off's red; an unlock's is the pop-up's edge (`unlock-edge`). */
+  --color-mark: var(--bali-stone-400);
+  --color-mark-off: var(--bali-red-300);
 }
 
 /* §6: the three shadows, by name. */

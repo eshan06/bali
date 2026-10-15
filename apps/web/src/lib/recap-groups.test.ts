@@ -254,13 +254,29 @@ describe('recapGroups', () => {
     }
   });
 
-  it('runs the axis from the start to the end, a tick each 5 minutes, AM or PM at its ends', () => {
+  it('runs the axis from the start to the end, a tick each 10 minutes, AM or PM at its ends', () => {
+    // ClassEnded's ticks (PV12b): 6 gaps or fewer, where the reports' timeline has 12.
     const { ticks, step } = groups(board());
-    expect([ticks.at(0), ticks.at(-1)].map((t) => [t?.x, plain(t?.label ?? '')])).toEqual([
+    expect(ticks.map((t) => [t.x, plain(t.label)])).toEqual([
       [0, '9:05 AM'],
+      [20, '9:15'],
+      [40, '9:25'],
+      [60, '9:35'],
+      [80, '9:45'],
       [100, '9:55 AM'],
     ]);
-    expect(step).toBe(10);
+    expect(step).toBe(20);
+  });
+
+  it('keeps 6 gaps or fewer whatever the length: a tick each 5 minutes for 25, each 15 for 75', () => {
+    const lasting = (minutes: number) => {
+      const end = new Date(Date.parse(SESSION.startedAt) + minutes * 60_000).toISOString();
+      return groups([], { session: { ...SESSION, endsAt: end, endedAt: end } });
+    };
+    expect(lasting(25).step).toBe(20);
+    expect(lasting(75).step).toBe(20);
+    expect(lasting(60).ticks.length - 1).toBe(6);
+    expect(lasting(480).ticks.map((t) => t.x)).toEqual([0, 25, 50, 75, 100]);
   });
 });
 

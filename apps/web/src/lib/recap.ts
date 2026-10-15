@@ -249,13 +249,16 @@ export function placement(at: number, start: number, end: number): number {
   return Math.round(share * 10_000) / 100;
 }
 
-/** Minutes between the axis's ticks: the least of these that leaves it 12 gaps or fewer. */
+/** Minutes between the axis's ticks: the least of these that leaves it `gaps` gaps or fewer. */
 const STEPS = [5, 10, 15, 30, 60, 120];
 
-/** The axis: its first and last times with AM or PM, the ticks between without. */
-function axis(start: number, end: number, clock: Intl.DateTimeFormat) {
+/**
+ * The axis: its first and last times with AM or PM, the ticks between without. The timeline's has
+ * 12 gaps or fewer, the recap's (ClassEnded) 6: a tick each 10 minutes for 50.
+ */
+function axis(start: number, end: number, clock: Intl.DateTimeFormat, gaps = 12) {
   const span = end - start;
-  const step = (STEPS.find((m) => span <= m * 60_000 * 12) ?? 120) * 60_000;
+  const step = (STEPS.find((m) => span <= m * 60_000 * gaps) ?? 120) * 60_000;
   const bare = (t: number) =>
     clock
       .formatToParts(t)
@@ -554,6 +557,6 @@ export function recapGroups(
     partTime: partTime.map(student),
     wholeTime: rows.filter((r) => joined.has(r.id) && r.broke === null).map(student),
     notJoined: notJoined.map(student),
-    ...axis(start, axisEnd, clock),
+    ...axis(start, axisEnd, clock, 6),
   };
 }

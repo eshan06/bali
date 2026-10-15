@@ -11,8 +11,8 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
-import { sessionTimeline } from '../lib/recap';
-import { lefts, Timeline } from './timeline';
+import { type RecapGroups, type RecapStudent, sessionTimeline } from '../lib/recap';
+import { lefts, RecapLists, Timeline } from './timeline';
 
 /*
  * The session's timeline (the Recap & reports design), rendered: a legend of the marks it shows,
@@ -341,5 +341,74 @@ describe('marks under a minute apart (PB5’s review)', () => {
     expect(source).toContain('const at = placedAt[m.key] ?? m.x;');
     expect(source).toContain("${at > 70 ? FLIP : at > 50 ? FLIP_NARROW : ''}");
     expect(source.match(/opening\(m\.key, e\.currentTarget\);/g)).toHaveLength(2);
+  });
+});
+
+describe('the recap’s lists (PV12b; ClassEnded)', () => {
+  /** A student focused part of the time, their moments at these places on the axis. */
+  const student = (key: string, xs: [RecapStudent['moments'][number]['moment'], number][]) => ({
+    key,
+    name: key,
+    spans: [{ from: 0, to: 100 }],
+    moments: xs.map(([moment, x], i) => ({
+      key: `${key}-${i}`,
+      moment,
+      at: new Date(Date.parse(AT(5)) + x * 36_000),
+      reason: null,
+      x,
+    })),
+  });
+  const tick = (x: number, label: string) => ({ x, label });
+  /** A 60-minute session's axis: a tick each 10 minutes, a sixth of it apart. */
+  const GROUPS: RecapGroups = {
+    partTime: [
+      student('Ana', [
+        ['in', 0],
+        ['silent', 40],
+        ['back', 40.5],
+        ['unlock', 41],
+      ]),
+    ],
+    wholeTime: [],
+    notJoined: [],
+    ticks: [
+      tick(0, '9:05 AM'),
+      ...[1, 2, 3, 4, 5].map((i) => tick((i * 100) / 6, `9:${i}5`)),
+      tick(100, '10:05 AM'),
+    ],
+    step: 100 / 6,
+  };
+  const html = renderToStaticMarkup(createElement(RecapLists, { groups: GROUPS, present: false }));
+
+  it('sets the marks of moments under a minute apart side by side, 18 px each, a tap-in none', () => {
+    const centres = [...html.matchAll(/<span style="left:([^"]+)" class="absolute top-0\.5/g)].map(
+      (m) => px(m[1] ?? '', 300),
+    );
+    // At its time, then right after the one before it: 18 px apart, centre to centre.
+    expect(centres.map(Math.round)).toEqual([120, 138, 156]);
+    const packed = lefts(
+      [
+        { moment: 'in', x: 0 },
+        { moment: 'unlock', x: 0 },
+      ],
+      18,
+    );
+    expect(packed.map((l) => px(l, 300))).toEqual([0, 18]);
+  });
+
+  it('hides the axis’s ticks between its ends on a narrow axis, those beside an end first', () => {
+    const ticks = [...html.matchAll(/class="absolute top-0 text-axis([^"]*)">([^<]*)</g)].map(
+      (m) => `${m[2]}:${/@max-\[(\d+)rem\]\/axis:hidden/.exec(m[1] ?? '')?.[1] ?? 'always'}`,
+    );
+    // A sixth apart: under 30 rem beside an end, whose label carries AM or PM; under 15 between.
+    expect(ticks).toEqual([
+      '9:05 AM:always',
+      '9:15:30',
+      '9:25:15',
+      '9:35:15',
+      '9:45:15',
+      '9:55:30',
+      '10:05 AM:always',
+    ]);
   });
 });

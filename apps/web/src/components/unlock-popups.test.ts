@@ -346,11 +346,11 @@ describe('the pop-ups on the class page', () => {
     expect(grid).toMatch(
       /\{selects \? \(\s*<UnlockPopups\s+unlocks=\{popups\.open\}\s+students=\{students\}\s+onClose=\{\(eventId\) => tell\(\{ kind: 'close', eventId \}\)\}\s+onOpen=\{\(u\) => \{\s*tell\(\{ kind: 'close', eventId: u\.eventId \}\);\s*open\(u\.studentId\);\s*\}\}\s*\/>\s*\) : null\}\s*<\/div>\s*\);\s*\}\s*$/,
     );
-    // Only the live page's grid takes `livePage`: How it ended's never streams, and opens none.
+    // The page's one grid is the live page's, which takes `livePage` (How it ended's, which never
+    // streamed, went with it in PV12b).
     const grids = page.match(/<LiveGrid\b[^]*?\/>/g) ?? [];
-    expect(grids).toHaveLength(2);
+    expect(grids).toHaveLength(1);
     expect(grids[0]).toMatch(/\blivePage\b/);
-    expect(grids[1]).not.toMatch(/\blivePage\b/);
     // Placed against the live page's `<main>`, as the reconnect pill is.
     expect(page).toMatch(/: 'relative flex flex-col gap-5\.5'\}>/);
   });

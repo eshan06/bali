@@ -113,8 +113,8 @@ const POPUP =
 /**
  * The unlock pop-ups (PV10; ClassUnlock, ClassUnlocks): each unlock the stream brings, newest on
  * top, until it is closed. The live grid holds them, so they go with the session's live page, as
- * ClassUnlock draws them on it alone; each unlock then shows on its tile under How it ended and in
- * the recap. Its words are an alert, so a screen reader says each as it opens
+ * ClassUnlock draws them on it alone; each unlock then shows in the recap (How it ended, where its
+ * tile showed too, went in PV12b). Its words are an alert, so a screen reader says each as it opens
  * ("Ethan Park used Emergency Unlock. Nurse · 9:31 AM") without moving focus; Close is described by
  * them, and closing one moves focus to the Close of the pop-up that takes its place, else the one
  * above it.
