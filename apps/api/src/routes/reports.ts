@@ -130,16 +130,18 @@ export function registerReportsRoutes(app: FastifyInstance, db: Database, clock:
       const session = await reportedSession(db, request);
       // Each question read before it is counted, as the results route reads one: a recorded close
       // commits after every answer it lets count, so a question read closed is counted whole.
-      const counted = [];
+      const totalled = [];
       // ponytail: one count a question, a session's few; one statement for all if sessions ask many.
       for (const question of await sessionQuestions(db, session.id)) {
-        // Just read, and a question is never deleted.
-        counted.push({ question, ...(await questionCounts(db, question.id))! });
+        const totals = await questionCounts(db, question.id);
+        // Just read, and no path deletes a question: a bug, never an answer short of its totals.
+        if (!totals) throw new Error(`question ${question.id} vanished while counted`);
+        totalled.push({ question, ...totals });
       }
       // Open by the server's clock once counted, as the results route judges it.
       const now = clock();
       return {
-        questions: counted.map(({ question, answered, eligible, counts }) => ({
+        questions: totalled.map(({ question, answered, eligible, counts }) => ({
           ...teacherQuestion(question, session, now),
           openedAt: question.openedAt.toISOString(),
           answered,
