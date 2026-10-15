@@ -8,12 +8,12 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-14 (Central) — A fix in the engine (#385; `docs/DECISIONS.md`, 2026-10-14):
+_Last updated: 2026-10-15 (Central) — A fix in the engine (#385; `docs/DECISIONS.md`, 2026-10-15):
 a `came_back` is stamped when the server heard the phone, held to the window and never before the
 `went_silent` it closes, no longer with the phone's claim, which a slow clock or a record made out of
-contact put before the silence, so R2 counted that silence as focus; a check-in takes no time from
-the phone now. Found by PV11b's review (#383). Before it, PV12a, the recap's grouping (#384). Next:
-PV12b, the recap._
+contact put before the silence, so R2 counted that silence as focus; R2 counts a silence to its
+`came_back`, and a check-in takes no time from the phone now. Found by PV11b's review (#383). Before
+it, PV12a, the recap's grouping (#384). Next: PV12b, the recap._
 
 ## Now
 
@@ -322,7 +322,7 @@ One line each; every row's full notes, as they stood on 2026-10-13, are in `docs
 | Minimal student personal history + edit own name | 3 | backs the privacy contract · ✅ (A7, A8, C6b) |
 | Sign in with Apple (App Review guideline 4.8) | 5 | Cognito IdP |
 | End-of-session recap card (portal) | 4 | ✅ (R4) |
-| Reports: class focus minutes + unlock list; aggregates only, never rankings | 4 | ✅ (R1–R3, R5); `sessionReport` counts by this row's rules, in its full notes; a silence timed by the server's clock at both ends (#385) |
+| Reports: class focus minutes + unlock list; aggregates only, never rankings | 4 | ✅ (R1–R3, R5); `sessionReport` counts by this row's rules, in its full notes; a silence counted from its `went_silent` to its `came_back`, both the server's (#385) |
 | Teacher signup gating (invite code) | 4 | ✅ (T1a, T1b, T2) |
 | Block provisioning: pre-written tags + portal register-by-ID fallback | 5 | no teacher iOS app at launch · ✅ the portal's half (P3) |
 | Privacy policy, terms, pilot agreement, support/FAQ page | 5 | policy work, launch-blocking |

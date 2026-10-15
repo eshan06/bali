@@ -277,6 +277,33 @@ describe('sessionReport', () => {
     expect(report).toMatchObject({ focusMinutes: 40, silentMinutes: 8 });
   });
 
+  it('a silence lasts until its came_back, though the record before it claims a time sooner', () => {
+    // The engine records what closed the silence, then its came_back, stamped when the server heard
+    // the phone. Ana's re-tap claims 08:53, from a clock 15 minutes slow; Ben's refocus, 09:00.
+    // Ended at either claim, a clock set back counted the silence as focus. A stint's end ends it
+    // too, with no came_back: Cy switched away while silent, then tapped back in.
+    const report = sessionReport(
+      lesson,
+      recorded(
+        ['tap_in', 'ana', 1],
+        ['went_silent', 'ana', 5],
+        ['tap_in', 'ana', -7],
+        ['came_back', 'ana', 8],
+        ['tap_in', 'ben', 1],
+        ['went_silent', 'ben', 5],
+        ['refocus', 'ben', 0],
+        ['came_back', 'ben', 9],
+        ['tap_in', 'cy', 1],
+        ['went_silent', 'cy', 5],
+        ['left_for_other_session', 'cy', 12],
+        ['tap_in', 'cy', 15],
+      ),
+      later,
+    );
+    // Ana 4 + 17 and 3 silent; Ben 4 + 16 and 4 silent; Cy 4 + 10 and 7 silent.
+    expect(report).toMatchObject({ focusMinutes: 55, silentMinutes: 14 });
+  });
+
   it('an unlock shows its reason now: its latest change’s (A20)', () => {
     const report = sessionReport(
       lesson,

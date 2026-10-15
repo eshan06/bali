@@ -8,7 +8,7 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
-- **2026-10-14** — **A `came_back` is the server's: stamped when the server heard the phone, held to
+- **2026-10-15** — **A `came_back` is the server's: stamped when the server heard the phone, held to
   the window and never before the `went_silent` it closes (a fix, #385).** Found by PV11b's santa
   review (#383). Decision 7 says the pair is server-minted, but the engine stamped the `came_back`
   with the claim of whatever closed the episode: a check-in's `deviceTime`, or the clamped time of a
@@ -29,18 +29,26 @@ a real decision? Add a dated entry at the top: what was decided and why.
   keeps every other role: each record's own clamped time, and A10–A14's order. *Weighed:* the
   marker's own time (`silent_since`) as the floor: no read, but a check-in reads it before its
   transaction, and an extend moves the window the `went_silent` was clamped to; the event is exact,
-  one indexed read when an episode closes. **Where a figure moves:** R2 ends a silence at the next
-  record. On the check-in path that is the `came_back`; a tap, a return, an unlock or a protection off
-  that closes an episode is recorded just before its `came_back` and ends the silence at its own
-  time, so there the fix moves the moments' order, and for a clock behind holds what follows to the
-  server's time, as R2 holds any time to the one before it. **Compatibility:** no shape changes, and a correction, not a behaviour
-  change (API decision 2). Events already recorded on dev and prod stay as they are: an old session
-  whose silence a slow clock closed early still reports it short or at 0, its time as focus, and
-  lists that "back" before its "silent"; from this deploy on, new episodes are timed right. **Tests:**
-  R2 and the feed through the real check-in route; each other contact path claiming a time before
-  the silence; a sweep's clock ahead; the timestamps suite's check-in (it pinned the claim); a fast
-  and a slow clock's check-in moved to the route's tests, where the claim arrives now; and on real
-  Postgres, two check-ins racing to close one episode, one `came_back` at the server's time.
+  one indexed read when an episode closes. **And R2 ends a silence at its `came_back`, as R1's own
+  rule says** ("until contact (`came_back` ...) or the end of its stint"): it ended one at the next
+  record, and a tap, a return, an unlock or a protection off that closes an episode is recorded just
+  before its `came_back`, so a slow clock's re-tap, or a refocus anyone can send while focused, still
+  ended the silence at its claim, counted as focus (santa's review, both reviewers; the tests in
+  `packages/shared/src/report.test.ts` and `packages/db/test/report.test.ts`). Now a silence lasts
+  through such a record to its `came_back`, and a stint's end (a switch away, a leave, a removal),
+  which records no `came_back`, ends it as before. An unlock or a protection off still ends focus at
+  its own time, so neither moves a figure. Safe for what is stored: every contact has recorded its
+  `came_back` since 2026-09-20 (#6), before prod. **Compatibility:** no shape changes, and a correction, not a behaviour
+  change (API decision 2). Events already recorded on dev and prod stay as they are. An old session
+  whose silence a check-in's slow clock closed early still reports it short or at 0, its time as
+  focus, and lists that "back" before its "silent"; one a re-tap or a refocus closed now counts to
+  its `came_back`, which was stamped with that record's own claim, so it reads as it did. From this
+  deploy on, new episodes are timed right. **Tests:** R2 and the feed through the real check-in
+  route; each other contact path claiming a time before the silence; a sweep's clock ahead; R2's
+  silence through a re-tap and a refocus, by hand and through the engine; the timestamps suite's
+  check-in (it pinned the claim); a fast and a slow clock's check-in moved to the route's tests,
+  where the claim arrives now; and on real Postgres, two check-ins racing to close one episode, one
+  `came_back` at the server's time.
 
 - **2026-10-14** — **PV12a: the recap's grouping, with no words: who joined and every unlock are
   R2's, the moments the panel's, and an unlock always breaks "the whole time".** For PV12b's recap,

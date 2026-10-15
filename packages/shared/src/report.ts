@@ -208,8 +208,10 @@ export function sessionReport(
 
     advance(s, occurredAt);
     // Silence is a focused phone's, as the sweep marks it, closed by any
-    // contact — which the engine records as `came_back` — or by the stint's end.
-    s.silent = e.type === 'went_silent' && s.state === 'focused';
+    // contact — which the engine records as `came_back`, after the record that
+    // made it and stamped when the server heard it — or by the stint's end.
+    if (e.type === 'went_silent') s.silent = s.state === 'focused';
+    else if (e.type === 'came_back' || next === null) s.silent = false;
     if (next !== undefined) s.state = next;
     if (e.type === 'tap_in' && next === 'focused') joined.add(studentId);
   }

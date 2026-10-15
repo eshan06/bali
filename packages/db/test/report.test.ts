@@ -441,6 +441,27 @@ describe('sessionReport over what the engine stores', () => {
     expect(await reportOf(session.id)).toMatchObject({ focusMinutes: 21, silentMinutes: 3 });
   });
 
+  it('a silence lasts until its came_back, though the re-tap or refocus that ends it claims sooner', async () => {
+    // Ana's phone, its clock 15 minutes slow, comes back from a silence by re-tapping at 09:08,
+    // claiming 08:53. Ben's comes back at 09:09 with a refocus claiming 09:00: a phone sends one
+    // only after an unlock, but anyone can. Each is recorded, then its came_back, stamped when the
+    // server heard it, and the silence lasts until then.
+    const { klass, student: ana } = await seedClass('silence-closed');
+    const ben = await enrol(klass, 'silence-closed-2');
+    const session = await lesson(klass);
+    for (const student of [ana, ben]) {
+      await tapIn(db, move(session, student, 1));
+      await backdateLastSeen(db, { sessionId: session.id, studentId: student.id }, at(1));
+    }
+    await markSilentParticipations(db, at(5));
+    await tapIn(db, { ...move(session, ana, -7), now: at(8) });
+    await refocus(db, { ...move(session, ben, 0), now: at(9) });
+    await endSession(db, { sessionId: session.id, at: at(25), reason: 'expired' });
+
+    // Ana 4 + 17 and 3 silent; Ben 4 + 16 and 4 silent.
+    expect(await reportOf(session.id)).toMatchObject({ focusMinutes: 41, silentMinutes: 7 });
+  });
+
   it('an unlock shows its reason now: its latest change’s (A20)', async () => {
     const { klass, student } = await seedClass('reason');
     const session = await lesson(klass);
