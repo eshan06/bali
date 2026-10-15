@@ -190,6 +190,10 @@ The class page's "Questions and slides" card is v2's since L7-1a (2026-10-15): b
 and the grid, never in Present, a question's totals ("N of M answered", each option's count and bar
 from 3 answers), Close and Close and show answer, Done; and since L7-1b, at rest, Ask a question,
 which opens in the side panel, 460 px, where a student's panel shows, one at a time.
+Your questions is v2's since L7b part 1 (2026-10-15): Questions in the menu, the drafts oldest
+first as Questions draws them, each removed after its confirm across the card's foot, and Write a
+question and Edit opening QuestionsEdit's card over the list, its letters grey and its refusals
+under each field as LessonStates words them.
 Every
 portal source file is held to the tokens' utilities by `tokens.test.ts`, and
 since D2g the theme holds none of Tailwind's own colours, type sizes,
