@@ -6,9 +6,8 @@ import { useId } from 'react';
 
 import { Button } from '@/components/button';
 import { CARD_ALONE } from '@/components/card';
-import { RecapCard } from '@/components/recap-card';
 import { sessionWhen } from '@/lib/recap';
-import { type ReadAt, type SessionList, sessionRow } from '@/lib/reports';
+import { type ReadAt, reportPath, type SessionList, sessionRow } from '@/lib/reports';
 
 /** The figures' names, in the columns' order, after the session's own. */
 export const COLUMNS = [
@@ -21,12 +20,17 @@ export const COLUMNS = [
 ] as const;
 
 /** A section's name over its part, v2.css's `.wlabel`, 12 px above it. */
-const LABEL = 'mb-3 text-section-label text-text-tertiary uppercase';
-/** v2.css's `.wtable`: its head grey, each cell 16 px in, a hairline under every row but the last. */
-const HEAD =
+export const LABEL = 'mb-3 text-section-label text-text-tertiary uppercase';
+/**
+ * v2.css's `.wtable` (Reports', and a session's Unlocks on its own page, PV14): its head grey, each
+ * cell 16 px in, a hairline under every row but the last, in a box that scrolls sideways.
+ */
+export const HEAD =
   'border-b border-border-default bg-surface-sunken px-4 py-2.75 text-section-label whitespace-nowrap text-text-tertiary uppercase';
-const CELL = 'border-b border-border-default px-4 py-3 align-middle text-cell';
-const FIGURE = `${CELL} text-right whitespace-nowrap`;
+export const CELL = 'border-b border-border-default px-4 py-3 align-middle text-cell';
+export const FIGURE = `${CELL} text-right whitespace-nowrap`;
+export const TABLE_BOX =
+  'overflow-x-auto rounded-frame border border-border-default bg-surface-card';
 
 /**
  * A session's average focus as its bar (Reports): out of its length, its start to its end rounded
@@ -50,23 +54,20 @@ export function focusBar(
 /**
  * The Reports page as its state draws it (Reports, ReportStates): the heading and its framing line
  * in italic, the class picked with pills, then that class's sessions, newest first, as a table in a
- * box that scrolls sideways, with Show earlier, beside each session's average focus as a bar. Every
- * state with its words: loading, couldn't load with Try again, none yet, the place lost, and
- * earlier sessions that didn't load. `classes` is null until the account is read.
+ * box that scrolls sideways, each a link to its own page (PV14), with Show earlier, beside each
+ * session's average focus as a bar. Every state with its words: loading, couldn't load with Try
+ * again, none yet, the place lost, and earlier sessions that didn't load. `classes` is null until
+ * the account is read.
  */
 export function ReportsView({
   classes,
   classId,
   list,
-  open,
-  onToggle,
   onRead,
 }: {
   classes: { id: string; name: string }[] | null;
   classId: string | null;
   list: SessionList;
-  open: string | null;
-  onToggle: (sessionId: string) => void;
   onRead: (at: ReadAt) => void;
 }) {
   const sessionsId = useId();
@@ -139,12 +140,7 @@ export function ReportsView({
               <h2 id={sessionsId} className={LABEL}>
                 Sessions · {list.className}
               </h2>
-              <SessionsTable
-                classId={classId ?? ''}
-                sessions={list.sessions}
-                open={open}
-                onToggle={onToggle}
-              />
+              <SessionsTable classId={classId ?? ''} sessions={list.sessions} />
               {list.nextBefore === null ? null : list.failure?.at === 'earlier' ? (
                 <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-3">
                   <p role="alert" className="text-body">
@@ -180,22 +176,18 @@ export function ReportsView({
 
 /**
  * The sessions as v2.css's table, in a box that scrolls sideways when the page is narrower than
- * it (DESIGN.md §8). Until a session has a page of its own (PV14), its row opens its report under
- * it, as the reports list did, kept in view in the box as it scrolls.
+ * it (DESIGN.md §8), each session a link to its own page (PV14): its day, underlined on hover, over
+ * its times, the two the link's words.
  */
 export function SessionsTable({
   classId,
   sessions,
-  open,
-  onToggle,
 }: {
   classId: string;
   sessions: SessionReportSummary[];
-  open: string | null;
-  onToggle: (sessionId: string) => void;
 }) {
   return (
-    <div className="@container overflow-x-auto rounded-frame border border-border-default bg-surface-card">
+    <div className={TABLE_BOX}>
       <table aria-label="Sessions, newest first" className="w-full border-collapse">
         <thead>
           <tr>
@@ -212,24 +204,19 @@ export function SessionsTable({
         <tbody className="[&>tr:last-child>*]:border-b-0">
           {sessions.map((session) => {
             const row = sessionRow(session);
-            const isOpen = open === session.id;
-            const recap = `recap-${session.id}`;
-            return [
-              <tr key={session.id} className={isOpen ? 'bg-row-open' : undefined}>
+            return (
+              <tr key={session.id}>
                 <th scope="row" className={`${CELL} text-left font-normal whitespace-nowrap`}>
-                  <button
-                    type="button"
-                    aria-expanded={isOpen}
-                    aria-controls={isOpen ? recap : undefined}
-                    onClick={() => onToggle(session.id)}
-                    className="group block cursor-pointer rounded-sm text-left"
+                  <Link
+                    href={reportPath(classId, session.id)}
+                    className="group block rounded-sm text-left"
                   >
                     <span className="block font-semibold underline-offset-2 group-hover:underline">
                       {row.day}
                       <span className="sr-only">,</span>
                     </span>
                     <span className="block text-cell-sub text-text-tertiary">{row.times}</span>
-                  </button>
+                  </Link>
                 </th>
                 {row.figures ? (
                   <>
@@ -246,18 +233,8 @@ export function SessionsTable({
                 )}
                 <td className={FIGURE}>{row.unlocks}</td>
                 <td className={FIGURE}>{row.protectionOffs}</td>
-              </tr>,
-              isOpen ? (
-                <tr key={recap} id={recap}>
-                  <td colSpan={COLUMNS.length + 1} className={CELL}>
-                    {/* The box's width, held at its left as the table scrolls under it. */}
-                    <div className="sticky left-4 w-[calc(100cqw-2rem)]">
-                      <RecapCard classId={classId} session={session} />
-                    </div>
-                  </td>
-                </tr>
-              ) : null,
-            ];
+              </tr>
+            );
           })}
         </tbody>
       </table>

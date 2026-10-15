@@ -1,10 +1,26 @@
-import type { ClassDetail, SessionReportsPage, SessionReportSummary } from '@bali/shared';
+import type {
+  ClassDetail,
+  FeedEvent,
+  RosterResponse,
+  SessionReportResponse,
+  SessionReportsPage,
+  SessionReportSummary,
+} from '@bali/shared';
 import { describe, expect, it } from 'vitest';
 
 import { ApiError, NetworkError } from './api-client';
 import { CANT_REACH, TOO_MANY_TRIES } from './errors';
-import { recapView } from './recap';
-import { FIRST_READ, readSessions, type SessionList, sessionRow, startRead } from './reports';
+import { classFigures } from './recap';
+import {
+  FIRST_READ,
+  readSessionPage,
+  readSessions,
+  reportPath,
+  type SessionList,
+  sessionRow,
+  startRead,
+  UUID,
+} from './reports';
 
 // A class's lessons at 9:05 in New York, each ended by the sweep at its bell, newest first.
 const NY = { locale: 'en-US', timeZone: 'America/New_York' };
@@ -232,17 +248,9 @@ describe('sessionRow', () => {
       unlocks: '3',
       protectionOffs: '1',
     });
-    const report = {
-      ended: true,
-      joined: [],
-      focusMinutes: 83,
-      averageFocusMinutes: 21,
-      silentMinutes: 2,
-      unlocks: [],
-      protectionOffs: [],
-    };
-    const joined = Array.from({ length: 4 }, (_, i) => ({ id: `u${i}`, displayName: null }));
-    expect(row.figures).toEqual(recapView(MON, { ...report, joined }, [], NY).stats);
+    // As the recap card says them from R2's report of the 4 who joined (`RecapBody`).
+    const report = { focusMinutes: 83, averageFocusMinutes: 21, silentMinutes: 2 };
+    expect(row.figures).toEqual(classFigures(4, report, NY.locale));
   });
 
   it('has no figures when nobody joined, and still counts what was recorded', () => {
@@ -265,5 +273,122 @@ describe('sessionRow', () => {
     const big = lesson('s9', 2, { focusMinutes: 1250, unlockCount: 1200 });
     expect(sessionRow(big, NY)).toMatchObject({ unlocks: '1,200' });
     expect(sessionRow(big, NY).figures?.focus).toBe('1,250');
+  });
+});
+
+describe('a session’s own page (PV14)', () => {
+  const SESSION = '0199e3a1-0000-7000-8000-00000000000a';
+  const CLASS_ID = '0199e3a1-0000-7000-8000-00000000000c';
+  const KLASS_PATH = `/v1/classes/${CLASS_ID}`;
+  const REPORT_PATH = `${KLASS_PATH}/reports/sessions/${SESSION}`;
+  const FEED = `/v1/sessions/${SESSION}/events?after=0`;
+  const tap: FeedEvent = {
+    seq: 1,
+    eventId: 'e1',
+    type: 'tap_in',
+    userId: 'u1',
+    occurredAt: MON.startedAt,
+    payload: null,
+  };
+  const REPORT: SessionReportResponse = {
+    ended: true,
+    startedAt: MON.startedAt,
+    endsAt: MON.endsAt,
+    endedAt: MON.endedAt,
+    joined: [{ id: 'u1', displayName: 'Ana' }],
+    focusMinutes: 25,
+    averageFocusMinutes: 25,
+    silentMinutes: 0,
+    unlocks: [],
+    protectionOffs: [],
+  };
+  const ROSTER: RosterResponse = {
+    students: [
+      { enrollmentId: 'n1', studentId: 'u1', displayName: 'Ana', joinedAt: MON.startedAt },
+    ],
+  };
+  const answers = (over: Record<string, unknown[]> = {}) => ({
+    [REPORT_PATH]: [REPORT],
+    [FEED]: [{ events: [tap], nextAfter: 1 }],
+    [`/v1/sessions/${SESSION}/events?after=1`]: [{ events: [], nextAfter: 1 }],
+    [`${KLASS_PATH}/roster`]: [ROSTER],
+    ...over,
+  });
+
+  it('reads its report, its events and the class’s roster, when it ran from the report', async () => {
+    const api = fakeApi(answers());
+    expect(await readSessionPage(api, CLASS_ID, SESSION)).toEqual({
+      kind: 'ready',
+      session: { startedAt: MON.startedAt, endsAt: MON.endsAt, endedAt: MON.endedAt },
+      report: REPORT,
+      events: [tap],
+      roster: ROSTER.students,
+    });
+    // The three at once: the report and the roster asked before the feed's second page.
+    expect(api.asked.slice(0, 3).sort()).toEqual(
+      [REPORT_PATH, FEED, `${KLASS_PATH}/roster`].sort(),
+    );
+  });
+
+  it('keeps a session not marked over as none, its end its bell', async () => {
+    const running = { ...REPORT, ended: false, endedAt: null };
+    const read = await readSessionPage(
+      fakeApi(answers({ [REPORT_PATH]: [running] })),
+      CLASS_ID,
+      SESSION,
+    );
+    expect(read).toMatchObject({ kind: 'ready', session: { endedAt: null, endsAt: MON.endsAt } });
+  });
+
+  it('says why any of the three failed, the roster’s and the feed’s included, for Try again', async () => {
+    for (const failing of [REPORT_PATH, FEED, `${KLASS_PATH}/roster`]) {
+      const api = fakeApi(answers({ [failing]: [new NetworkError()] }));
+      expect(await readSessionPage(api, CLASS_ID, SESSION), failing).toEqual({
+        kind: 'error',
+        message: CANT_REACH,
+      });
+    }
+    const busy = new ApiError(429, 'rate_limited', 'too many requests', undefined, 1);
+    const api = fakeApi(answers({ [REPORT_PATH]: [busy] }));
+    expect(await readSessionPage(api, CLASS_ID, SESSION)).toEqual({
+      kind: 'error',
+      message: TOO_MANY_TRIES,
+    });
+  });
+
+  it('says a report that doesn’t say when it ran (an API before PV14) failed, never draws it', async () => {
+    const old: SessionReportResponse = { ...REPORT };
+    delete old.startedAt;
+    delete old.endsAt;
+    delete old.endedAt;
+    const api = fakeApi(answers({ [REPORT_PATH]: [old] }));
+    expect(await readSessionPage(api, CLASS_ID, SESSION)).toEqual({
+      kind: 'error',
+      message: 'Something went wrong. Try again.',
+    });
+  });
+
+  it('puts the class and the session in the paths as one segment each', async () => {
+    const api = fakeApi({});
+    await readSessionPage(api, 'a/b', 'c/d');
+    expect(api.asked.sort()).toEqual([
+      '/v1/classes/a%2Fb/reports/sessions/c%2Fd',
+      '/v1/classes/a%2Fb/roster',
+      '/v1/sessions/c%2Fd/events?after=0',
+    ]);
+  });
+
+  it('has a path of its own, its class then its session', () => {
+    expect(reportPath(CLASS_ID, SESSION)).toBe(`/reports/${CLASS_ID}/${SESSION}`);
+    expect(reportPath('a/b', 'c?d')).toBe('/reports/a%2Fb/c%3Fd');
+  });
+
+  it('takes ids as the API mints them, and nothing else (santa’s review on PV13)', () => {
+    expect(UUID.test(SESSION)).toBe(true);
+    expect(UUID.test(SESSION.toUpperCase())).toBe(true);
+    // `..` survives encodeURIComponent, and would read another route in a class's place.
+    for (const other of ['..', '.', '', 'c1', `${SESSION}/..`, ` ${SESSION}`, `${SESSION}x`]) {
+      expect(UUID.test(other), other).toBe(false);
+    }
   });
 });

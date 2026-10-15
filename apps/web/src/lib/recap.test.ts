@@ -6,12 +6,11 @@ import type {
   SessionReportSummary,
   UnlockReason,
 } from '@bali/shared';
-import { UNLOCK_REASONS } from '@bali/shared';
 import { describe, expect, it } from 'vitest';
 
 import { ApiError, NetworkError } from './api-client';
 import { CANT_REACH, TOO_MANY_TRIES } from './errors';
-import { latestEnded, loadRecap, type RecapState, recapView, sessionTimes } from './recap';
+import { classFigures, latestEnded, loadRecap, type RecapState, sessionTimes } from './recap';
 
 // A 25-minute lesson at 9:05 in New York, ended by the sweep at its bell.
 const NY = { locale: 'en-US', timeZone: 'America/New_York' };
@@ -106,7 +105,7 @@ function fakeApi(answers: Record<string, unknown>) {
 
 async function states(api: ReturnType<typeof fakeApi>, classId = 'c1'): Promise<RecapState[]> {
   const shown: RecapState[] = [];
-  await loadRecap(api, classId, undefined, (s) => shown.push(s));
+  await loadRecap(api, classId, (s) => shown.push(s));
   return shown;
 }
 
@@ -171,22 +170,6 @@ describe('loadRecap', () => {
     }
   });
 
-  it('reads a session the reports page opened, its report and events alone (R5)', async () => {
-    const api = fakeApi({ [ONE]: REPORT, ...READ });
-    const shown: RecapState[] = [];
-    await loadRecap(api, 'c1', SESSION, (s) => shown.push(s));
-    expect(shown).toEqual([
-      { kind: 'loading', session: SESSION },
-      { kind: 'ready', session: SESSION, report: REPORT, events: EVENTS },
-    ]);
-    expect(api.asked).toEqual([ONE, FEED, FEED_END]);
-
-    const failing = fakeApi({ [ONE]: REPORT, [FEED]: new NetworkError() });
-    const failed: RecapState[] = [];
-    await loadRecap(failing, 'c1', SESSION, (s) => failed.push(s));
-    expect(failed.at(-1)).toEqual({ kind: 'error', message: CANT_REACH });
-  });
-
   it('puts the class id in the path as one segment', async () => {
     const api = fakeApi({ '/v1/classes/a%2Fb/reports/sessions?limit=1': page() });
     expect(await states(api, 'a/b')).toEqual([{ kind: 'none' }]);
@@ -205,38 +188,14 @@ describe('sessionTimes', () => {
   });
 });
 
-describe('recapView', () => {
+describe('classFigures', () => {
   it('gives the class’s figures, each a number in the viewer’s format, nothing per student', () => {
-    expect(recapView(SESSION, REPORT, EVENTS, NY).stats).toEqual({
+    expect(classFigures(REPORT.joined.length, REPORT, NY.locale)).toEqual({
       joined: '4',
       focus: '83',
       average: '21',
       silent: '2',
     });
-    expect(recapView(SESSION, { ...REPORT, focusMinutes: 1214 }, EVENTS, NY).stats?.focus).toBe(
-      '1,214',
-    );
-  });
-
-  it('has no figures when nobody joined, and still marks what was recorded', () => {
-    const nobody = { ...REPORT, joined: [], averageFocusMinutes: null };
-    const view = recapView(SESSION, nobody, [], NY);
-    expect(view.stats).toBeNull();
-    // Every unlock and protection off R2 lists keeps its row (the timeline's own tests say more).
-    expect(view.timeline.rows.map((r) => r.name)).toEqual(['Maya', 'Theo', 'Priya']);
-  });
-
-  it('gives Present the same figures and the same marks, never an unlock’s reason (#265)', () => {
-    const teacher = recapView(SESSION, REPORT, EVENTS, NY);
-    const projected = recapView(SESSION, REPORT, EVENTS, NY, true);
-    expect(projected.stats).toEqual(teacher.stats);
-    const reasons = (view: typeof teacher) =>
-      view.timeline.rows.flatMap((r) => r.marks.map((m) => m.reason)).filter(Boolean);
-    expect(reasons(teacher)).toEqual(['No reason given', 'No reason given', 'Bathroom']);
-    expect(reasons(projected)).toEqual([]);
-    for (const reason of UNLOCK_REASONS) {
-      const report = { ...REPORT, unlocks: [{ ...REPORT.unlocks[0], reason }] };
-      expect(reasons(recapView(SESSION, report, EVENTS, NY, true))).toEqual([]);
-    }
+    expect(classFigures(4, { ...REPORT, focusMinutes: 1214 }, NY.locale).focus).toBe('1,214');
   });
 });

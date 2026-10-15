@@ -436,7 +436,7 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     }
   });
 
-  it('beside them, only border-input, the side menu’s avatar (PV5), a dialog’s backdrop (PV6), the reconnect pill’s dot (PV7), the unlock pop-up’s edge (PV10) and Open student (PV11b), the recap’s marks (PV12b), Reports’ opened row (PV13), a live card’s edge (W3), and a question’s bars and correct letter (L7; the letter on Your questions too, L7b)', () => {
+  it('beside them, only border-input, the side menu’s avatar (PV5), a dialog’s backdrop (PV6), the reconnect pill’s dot (PV7), the unlock pop-up’s edge (PV10) and Open student (PV11b), the recap’s marks (PV12b), a live card’s edge (W3), and a question’s bars and correct letter (L7; the letter on Your questions too, L7b)', () => {
     const named = [...inline.keys()].filter((k) => k.startsWith('--color-'));
     const semanticNames = semantic(tokens.color.tokens).map((t) =>
       t.name === 'focus-ring-color' ? '--color-focus-ring' : `--color-${t.name}`,
@@ -452,7 +452,6 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
       '--color-mark',
       '--color-mark-off',
       '--color-pip',
-      '--color-row-open',
       '--color-scrim',
       '--color-unlock-edge',
       '--color-unlock-link',
@@ -466,12 +465,7 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     expect(inline.get('--color-bar-right')).toBe('var(--bali-green-600)');
     expect(inline.get('--color-letter-right')).toBe('var(--bali-green-100)');
     expect(contrast(hexOf('green-700', 'light'), hexOf('green-100', 'light'))).toBeGreaterThan(4.5);
-    // Reports' opened row: green-50, as v2.css's `.wtable tr.is-open` fills it, under the
-    // primary ink at 4.5:1 and more.
-    expect(inline.get('--color-row-open')).toBe('var(--bali-green-50)');
-    expect(contrast(hexOf('text-primary', 'light'), hexOf('green-50', 'light'))).toBeGreaterThan(
-      4.5,
-    );
+    // Reports' opened row's green-50 (PV13) went with the row: a session has its own page (PV14).
     // The recap's marks' rings, as v2.css's `.mk` draws them: stone-400, and red-300 for a
     // protection off (an unlock's is `unlock-edge`). Graphics, not text: 1.4.11 asks 3:1 of a
     // control's edge, and a mark is no control; its icon is in its state's ink.
@@ -758,7 +752,7 @@ describe('the buttons in v2’s look (DESIGN.md §1 and §4, PV4)', () => {
   });
 });
 
-describe('Reports’ sessions are a table in a box that scrolls sideways (PV13; DESIGN.md §8)', () => {
+describe('Reports’ tables are each in a box that scrolls sideways (PV13, PV14; DESIGN.md §8)', () => {
   // v2's look superseded the card per session (D2g) and "never a table that scrolls sideways": the
   // box scrolls, never the page, and no figure wraps or shrinks below its size to fit.
   const list = read('../components/reports-list.tsx');
@@ -766,7 +760,13 @@ describe('Reports’ sessions are a table in a box that scrolls sideways (PV13; 
   it('scrolls in its own box, and only there', () => {
     expect(list.match(/<table\b/g)).toHaveLength(1);
     expect(list.match(/overflow-x-auto/g)).toHaveLength(1);
-    expect(list).toMatch(/<div className="@container overflow-x-auto [^"]*">\s*<table\b/);
+    expect(list).toMatch(/export const TABLE_BOX =\s*'overflow-x-auto [^']*';/);
+    expect(list).toMatch(/<div className=\{TABLE_BOX\}>\s*<table\b/);
+    // A session's Unlocks on its own page (PV14), in the same box.
+    const unlocks = read('../components/session-report.tsx');
+    expect(unlocks.match(/<table\b/g)).toHaveLength(1);
+    expect(unlocks).toMatch(/<div className=\{TABLE_BOX\}>\s*<table\b/);
+    expect(unlocks).not.toMatch(/overflow-x/);
     expect(read('./reports/page.tsx')).not.toMatch(/overflow-x|<table\b/);
   });
 

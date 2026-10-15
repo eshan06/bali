@@ -8,13 +8,13 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-15 (Central) — M5b's part 2, Your slides (#400; `docs/DECISIONS.md`,
-2026-10-15), and with it M5: the Slides page in the menu, as the Slides board draws it, a PDF
-picked and uploaded with its percentage and Cancel, Checking the file… and the server's verdict, a
-removal's confirm, the in-use line naming each class; its intermediate states drawn on the canvas
-first (SlidesStates, SlidesPhone; the owner's rule, #398) and built from them. Real uploads on dev
-from the owner's tab: the bucket takes the browser's PUT. Before it, L7b's part 1c, writing and
-editing on Your questions (#395). Next: M6, the presenter._
+_Last updated: 2026-10-15 (Central) — PV14, a session's report (#401; `docs/DECISIONS.md`,
+2026-10-15): one session on a page and a URL of its own, as ReportOpened draws it, its recap card
+and its Unlocks table; the class page's recap opens it (Open its report), and so does each Reports
+row; R2 now says when the session ran (additive). Its intermediate states drawn on the canvas first
+(ReportPageStates, ReportPhone) and built from them; PB5's timeline, which only Reports' opened row
+still drew, removed with that row. Before it, M5b's part 2, Your slides (#400). Next: M6, the
+presenter; L7c's Questions card goes on this page._
 
 ## Now
 
@@ -41,9 +41,8 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
   keeps D1's look until the owner approves a new one (its redesign rolled back, 2026-10-06). Left:
   the push's app half (not started), TestFlight build 9 for C7's phone test (📱), and the phone's
   Phase 7 screens (L8, M8). C2's legal words (⚖️) go into the portal's pages, on the Windows PC.
-- **The portal redesign in v2's look (PV0–PV17, the owner, 2026-10-12):** PV0–PV13 and PV15
-  done, with PV3b, PV4b, PV4c and PV5b; next PV14, on the Windows PC. Phase 7's web screens, which
-  followed PV15, may start.
+- **The portal redesign in v2's look (PV0–PV17, the owner, 2026-10-12):** PV0–PV15 done, with
+  PV3b, PV4b, PV4c and PV5b; PV16 and PV17 follow Phase 7's web screens, on the Windows PC.
 - **The workflow review's last steps** ✅ (the owner, 2026-10-13; DECISIONS 2026-10-14): the
   migration guard (#369), docs-only PRs skipping the test jobs (#365), moved files (#368) and two
   tests (#364), each in full in `docs/PLAN-ARCHIVE.md`.
@@ -141,7 +140,7 @@ validation** (each 👀): vitest, `npm run typecheck && npm run lint && npm test
 - **PV11** 👀 The student panel — ✅ as PV11a (#382) and PV11b (#383; DECISIONS 2026-10-14)
 - **PV12** 👀 The recap (ClassEnded) — ✅ as PV12a (#384) and PV12b (#386; DECISIONS 2026-10-15)
 - **PV13** 👀 Reports — ✅ (#387; DECISIONS 2026-10-15)
-- **PV14** 👀 A session's report (~250; ReportOpened, ReportStates' "Loading this session…" and "Couldn't load this session."): one session on a page and a URL of its own, its recap card and its Unlocks table, and the class page's recap gets ClassEnded's "Open its report" linking to it (PV12b left it out); its Questions card is L7c's — validation: as above
+- **PV14** 👀 A session's report — ✅ (#401; DECISIONS 2026-10-15)
 - **PV15** 👀 The entry pages — ✅ (#388; DECISIONS 2026-10-15). **Then Phase 7's web screens** (Phase 7 steps)
 - **PV16** 👀 Classes (~350; Classes, ClassesNew, ClassesCreated, HomeStates' New class states): `/classes` in the menu, a card per class with its student count, last session (PV2) and Live chip, New class as a dialog (Creating…, a `5xx` with Try again) in place of the inline create row, "Period 4 Biology is ready" with its join code, Copy code and Done (its 40 px check at the board's 1.5 stroke, by a class, as PV4b says), and the block's card — validation: as above
 - **PV17** 👀 Home (Main, HomeIdle, HomeNew, HomeStates), in three: **PV17a** (~300) the greeting and date, each class once (Live and Open, or Start…), the block's card with Register block, and "Set up your first class" for a new teacher; Home's error state with a real heading, focus kept on Try again and one `<main>` while it waits (PV5b's review; the owner, 2026-10-14); **PV17b** (~300) the live class's card on the session's snapshot and stream (its ring, countdown, six state counts, Open the class, Present and the latest unlock); **PV17c** (~250) Last session (PV2; hidden until a class's first session ends) and Recent activity (PV3; hidden under 640 px; no empty state, a live class's own start always listed): for up to a minute after a bell `lastSession` names a session whose report still says `ended: false`, which means only "not swept yet" (PV2's review), so the card never reads that flag as still running; if Recent activity is polled rather than read once, its read is narrowed first to the three kinds and the reason changes (PV3's review) — validation: as above

@@ -350,8 +350,6 @@
   --color-unlock-edge: var(--bali-orange-400);
   /* And its Open student (PV11b), the primitive v2.css's `.t-act` draws with. */
   --color-unlock-link: var(--bali-orange-700);
-  /* Reports' opened row (PV13), the primitive v2.css's `.wtable tr.is-open` fills it with. */
-  --color-row-open: var(--bali-green-50);
   /* A live card's edge (W3, the student's home; Home's with PV17b), the primitive v2.css's
      `.livecard` draws it with. */
   --color-live-edge: var(--bali-green-200);

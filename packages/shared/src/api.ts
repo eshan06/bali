@@ -1177,6 +1177,14 @@ export interface SessionReportResponse {
    * and past its bell until the sweep marks it: the counts then run to now, or to the bell.
    */
   ended: boolean;
+  /**
+   * The session's window, as R3's row gives it (PV14, added 2026-10-15, additive): its start, its
+   * bell, which an extend moves on, and when it was marked over (null until then), so a session's
+   * page says when it ran from this one read. Absent from an API before it.
+   */
+  startedAt?: string;
+  endsAt?: string;
+  endedAt?: string | null;
   /** Who joined, in the order they first did: never a tap a Start declined, nor a late one. */
   joined: ReportStudent[];
   /** Focused and in contact: the whole class's. */

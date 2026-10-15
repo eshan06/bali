@@ -101,6 +101,10 @@ export function registerReportsRoutes(app: FastifyInstance, db: Database, clock:
       const student = (id: string): ReportStudent => ({ id, displayName: names.get(id) ?? null });
       return {
         ended: session.endedAt !== null,
+        // Its window, as R3's row gives it: its page's day and times (PV14).
+        startedAt: session.startedAt.toISOString(),
+        endsAt: session.endsAt.toISOString(),
+        endedAt: session.endedAt?.toISOString() ?? null,
         joined: report.joined.map(student),
         focusMinutes: report.focusMinutes,
         averageFocusMinutes: report.averageFocusMinutes,

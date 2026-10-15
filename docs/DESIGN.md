@@ -23,8 +23,8 @@ Try again.", "Bali couldn't lock your apps. Try again."). In
 `apps/web/src/lib`: `errors.ts`; `grid-state.ts` (the grid's notes and
 badges); `api-client.ts` (`UnauthorizedError`'s words; a `NetworkError` is
 said as `errors.ts`'s `CANT_REACH`, its own message a log line, D2c-2);
-`recap.ts` ("No reason given", the reasons, and the session's "9:05 AM to
-9:30 AM"). `blocks.ts`, `classes.ts`, `reports.ts`, `invite.ts` and `decks.ts` hold
+`recap.ts` (the session's "9:05 AM to 9:30 AM"; PB5's timeline took its reasons
+and "No reason given" with it in PV14). `blocks.ts`, `classes.ts`, `reports.ts`, `invite.ts` and `decks.ts` hold
 none: their words are in `blocks.tsx`, the classes home (`app/page.tsx`), the
 reports page, `invite-code.tsx`, `slides.tsx` and `errors.ts`. In
 `ios/Bali/` outside `UI/`: the NFC sheet's words in `BlockReader.swift`
@@ -161,8 +161,8 @@ reconnect pill, no roster and no New code.
 The page after the bell is v2's since PV12b (2026-10-15): ClassEnded's line, "28 students ·
 the session ended at 9:55 AM" for a session that ended today, and its recap, the figures
 over who wasn't focused the whole time (a row each: the name, a thin line with its marks,
-the moments in words), who was and who didn't join, by name; How it ended is gone; an
-opened report keeps PB5's timeline until PV13 and PV14. The grid's cells are v2's tinted
+the moments in words), who was and who didn't join, by name; How it ended is gone; and
+since PV14 its head's Open its report opens the session's own page. The grid's cells are v2's tinted
 tiles since PV8 (2026-10-14), on the class page and in Present alike, a
 phone's with one detail at most since PV9. Present is v2's since PV9 (2026-10-14):
 ClassPresent's page, the class page's own parts one size up, its code in a well of
@@ -179,7 +179,14 @@ phone's clock is off, so its times may be off too.", the tile's Clock off toolti
 Reports is v2's since PV13 (2026-10-15): a menu page, one class at a time picked
 with pills, its sessions as a table in a box that scrolls sideways beside each
 one's average focus as a bar, and `/classes/[id]/reports` a redirect to it with
-that class picked; until PV14 a row opens its report under it, as the reports list did.
+that class picked; each row's session a link to its own page since PV14, where a row opened
+its report under it, as the reports list did, until then.
+A session's report is v2's since PV14 (2026-10-15): a page and a URL of its own
+(`/reports/<class>/<session>`, Reports marked in the menu), ReportOpened's page: the way back to
+Reports with its class picked, the session's day over its times, its recap card ("This session",
+the class page's recap) and its Unlocks table, none when there were none; ReportStates' two lines
+and its other states as ReportPageStates and ReportPhone draw them (drawn on the canvas first);
+its Questions card L7c's. PB5's timeline, which only an opened row still drew, went with it.
 The entry pages are v2's since PV15 (2026-10-15): sign-in and its callback on v2's stage
 (the mark at 40 px, Bali and "Focus sessions for your classroom" over the card, no bar),
 the invite card under v2's white bar with Sign out, and Help and the policy pages under
@@ -390,7 +397,7 @@ regular: its times) and its marks' two colours, `mark` (stone-400, a ring's edge
 Reports' four, `pill` (13.5/18, medium: a class's pill), `bar-row` (13.5/18, regular: a bar's row),
 `cell` (14/19, regular: a table's cell) and `cell-sub` (12/16, regular: the line
 under a cell's words), and the opened row's tint as the colour `row-open`
-(green-50, v2.css's `.wtable tr.is-open`); PV15 the entry pages' two, both
+(green-50, v2.css's `.wtable tr.is-open`), retired with the opened row in PV14; PV15 the entry pages' two, both
 semibold, `entry-title` (20/26: an entry page's card title) and `button-lg`
 (16/20: the sign-in's 48 px button's label, `Button`'s `size="lg"`); W3 the colour
 `live-edge` (green-200, a live card's edge, v2.css's `.livecard`), its sizes all named already; L7
@@ -653,7 +660,8 @@ where they differ (Present's included: §5); the input size stands.
   semibold beside its 16 px arrow, which carries it at rest, underlined on
   hover (`NAV_LINK`). *v2's look (§1):* the side menu takes All classes'
   place; a link standing on its own is `quiet` (13/18 semibold `text-brand`)
-  or `back` (beside its 16 px arrow), and a table row's session is its own
+  or `back` (14/20 semibold beside its 16 px arrow, `NAV_LINK` since PV14:
+  a session's report back to Reports), and a table row's session is its own
   text in `text-primary` semibold, each underlined on hover; a link in running
   text keeps its underline. The app's policy
   links (`PolicyLinks`, C2-app) keep their look from before D2h, `caption` in

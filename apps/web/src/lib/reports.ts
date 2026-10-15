@@ -1,10 +1,34 @@
-import type { ClassDetail, SessionReportsPage, SessionReportSummary } from '@bali/shared';
+import type {
+  ClassDetail,
+  FeedEvent,
+  RosterResponse,
+  RosterStudent,
+  SessionReportResponse,
+  SessionReportsPage,
+  SessionReportSummary,
+} from '@bali/shared';
 
 import { type ApiClient, ApiError } from './api-client';
 import { errText } from './errors';
-import { classFigures, type RecapFormat, sessionWhen } from './recap';
+import {
+  classFigures,
+  type RecapFormat,
+  readEvents,
+  sessionWhen,
+  type SessionWindow,
+} from './recap';
 
-/* The reports page's logic (R5), tested: R3's sessions a page at a time, and each row's words. */
+/*
+ * The reports' logic (R5), tested: R3's sessions a page at a time and each row's words, and a
+ * session's own page (PV14).
+ */
+
+/** An id as the API mints them (a UUID): anything else in a URL names no class or session. */
+export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** A session's report page (PV14): Reports' rows and the class page's recap link to it. */
+export const reportPath = (classId: string, sessionId: string): string =>
+  `/reports/${encodeURIComponent(classId)}/${encodeURIComponent(sessionId)}`;
 
 /** The newest page, or Show earlier's: the one before the oldest read. */
 export type ReadAt = 'newest' | 'earlier';
@@ -81,6 +105,53 @@ function settled(list: SessionList, kept: SessionReportSummary[], page: SessionR
   const known = new Set(kept.map((s) => s.id));
   const sessions = [...kept, ...page.sessions.filter((s) => s.ended && !known.has(s.id))];
   return { ...list, sessions, nextBefore: page.nextBefore, reading: null, failure: null };
+}
+
+/** A session's report page as it reads (PV14): loading, read, or why it couldn't be. */
+export type SessionPage =
+  | { kind: 'loading' }
+  | {
+      kind: 'ready';
+      /** When it ran, R2's own. */
+      session: SessionWindow;
+      report: SessionReportResponse;
+      events: FeedEvent[];
+      /** The class's roster now: who didn't join, as the class page's recap reads it. */
+      roster: RosterStudent[];
+    }
+  | { kind: 'error'; message: string };
+
+/**
+ * Read a session's page: its report (R2, when it ran included), its events and the class's roster,
+ * all three at once. Any failure is said with Try again, which reads all three again; so is a
+ * report that says nothing of when it ran, an API's from before PV14 (the portal can deploy first).
+ */
+export async function readSessionPage(
+  api: Pick<ApiClient, 'get'>,
+  classId: string,
+  sessionId: string,
+): Promise<SessionPage> {
+  const klass = `/v1/classes/${encodeURIComponent(classId)}`;
+  try {
+    const [report, events, { students }] = await Promise.all([
+      api.get<SessionReportResponse>(`${klass}/reports/sessions/${encodeURIComponent(sessionId)}`),
+      readEvents(api, sessionId),
+      api.get<RosterResponse>(`${klass}/roster`),
+    ]);
+    const { startedAt, endsAt, endedAt = null } = report;
+    if (startedAt === undefined || endsAt === undefined) {
+      return { kind: 'error', message: errText(null) };
+    }
+    return {
+      kind: 'ready',
+      session: { startedAt, endsAt, endedAt },
+      report,
+      events,
+      roster: students,
+    };
+  } catch (e) {
+    return { kind: 'error', message: errText(e) };
+  }
 }
 
 /** A row's words: its day, its times, and its figures as its recap says them (null: nobody joined). */

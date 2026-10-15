@@ -624,6 +624,8 @@ Teacher app and web portal:
   events (rule 2's `sessionReport`), so a student removed from the class since is still named.
   Whole minutes, each rounded from its exact figure: the total never a sum of rounded parts. A
   session not yet marked over is answered too, counted to now or to its bell, with `ended: false`.
+  And when it ran, as R3's row gives it (`startedAt`, `endsAt`, `endedAt`; added 2026-10-15, PV14,
+  additive): its report page's day and times, from this one read.
   Another teacher and a student are `403`; a session not in the class is the unknown session's
   `404 session_not_found`, an unknown class `404 class_not_found`.
 - `GET /v1/classes/{id}/reports/sessions` — the class's sessions (R3), for the class's own
