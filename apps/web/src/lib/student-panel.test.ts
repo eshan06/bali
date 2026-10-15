@@ -260,6 +260,20 @@ describe('studentPanel', () => {
     });
   });
 
+  it('never says the phone checked in later than now, its clock set ahead', () => {
+    // Ten minutes ahead (S9), its tap reads 9:30 on the record at 9:20, and the stream moves the
+    // tile's last contact there until the refresh brings the server's own stamp: the tile counts no
+    // minutes from it, and the panel says now.
+    const events = [event('tap_in', 'ivy', 30, { clock_ahead_s: 600 })];
+    expect(panel('ivy', events, 20)).toEqual({
+      display: 'focused',
+      tappedInAt: '09:30',
+      moments: ['in@09:30'],
+      lastCheckIn: '09:20',
+    });
+    expect(minutesSinceContact(grid(events).ivy, new Date(at(20)))).toBe(0);
+  });
+
   it('ends their moments with Left on a leave, a removal or a switch to another class', () => {
     for (const left of [
       'enrollment_left',

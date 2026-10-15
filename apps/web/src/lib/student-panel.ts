@@ -102,7 +102,9 @@ export interface StudentPanel {
   moments: PanelMoment[];
   /**
    * When the server last heard from their phone: what their tile's minutes count from
-   * (`minutesSinceContact`); null until they tapped in here.
+   * (`minutesSinceContact`), never later than now, as those minutes are never fewer than none (a
+   * phone's clock set ahead, S9, puts a streamed record's time there until the refresh); null until
+   * they tapped in here.
    */
   lastCheckIn: Date | null;
 }
@@ -143,10 +145,11 @@ export function studentPanel(
   }
   // Oldest first, as the recap places them; the sort keeps the engine's order at one instant.
   moments.sort((a, b) => a.at.getTime() - b.at.getTime());
+  const contact = student.joinedAt === null ? null : (student.lastSeenAt ?? student.joinedAt);
   return {
     display: gridDisplay(student, now),
     tappedInAt: moments.find((m) => m.moment === 'in')?.at ?? null,
     moments,
-    lastCheckIn: student.joinedAt === null ? null : (student.lastSeenAt ?? student.joinedAt),
+    lastCheckIn: contact && new Date(Math.min(contact.getTime(), now.getTime())),
   };
 }
