@@ -469,17 +469,23 @@ function breaksFocus(m: StudentMoment, end: number): boolean {
 }
 
 /**
- * A student's time in the session from their moments: from each tap-in to their leaving, or the
- * session's end, whichever came first; a tap-in while in it already starts nothing.
+ * A student's time in the session: from each tap-in to their leaving, or the session's end,
+ * whichever came first; a tap-in while in it already starts nothing. Walked in the engine's order,
+ * each time held to no earlier than the one before, as R2 holds them, so a phone's clock set ahead
+ * never draws a line past the removal the server stamped before its tap's claimed time.
  */
-function lineOf(moments: readonly StudentMoment[], end: number): [number, number][] {
+function lineOf(events: readonly FeedEvent[], studentId: string, end: number): [number, number][] {
   const spans: [number, number][] = [];
   let from: number | null = null;
-  for (const m of moments) {
-    const t = Math.min(m.at.getTime(), end);
-    if (m.moment === 'in' && from === null) from = t;
-    if (m.moment === 'left' && from !== null) {
-      spans.push([from, t]);
+  let last = 0;
+  const theirs = events.filter((e) => e.userId === studentId).sort((a, b) => a.seq - b.seq);
+  for (const e of theirs) {
+    const moment = momentOf(e);
+    if (moment !== 'in' && moment !== 'left') continue;
+    last = Math.max(last, Math.min(Date.parse(e.occurredAt), end));
+    if (moment === 'in' && from === null) from = last;
+    if (moment === 'left' && from !== null) {
+      spans.push([from, last]);
       from = null;
     }
   }
@@ -540,7 +546,7 @@ export function recapGroups(
   const student = (r: (typeof rows)[number]): RecapStudent => ({
     key: r.id,
     name: names.get(r.id) ?? r.id.slice(0, 8),
-    spans: lineOf(r.moments, end).map(([from, to]) => ({ from: x(from), to: x(to) })),
+    spans: lineOf(feed, r.id, end).map(([from, to]) => ({ from: x(from), to: x(to) })),
     moments: r.moments.map((m) => ({ ...m, x: x(m.at.getTime()) })),
   });
   const clock = new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit', timeZone });

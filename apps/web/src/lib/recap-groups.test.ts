@@ -338,14 +338,21 @@ describe('focused part of the time', () => {
     expect(g.wholeTime).toEqual([]);
   });
 
-  it('lists Screen Time off and back on, from the session’s start', () => {
+  it('lists Screen Time off and back on at the session’s start, and off at its bell', () => {
     const g = groups([
       event('tap_in', 'Ana', 5),
       event('protection_off', 'Ana', 5),
       event('protection_on', 'Ana', 20),
+      event('tap_in', 'Marcus', 6),
+      // A phone whose clock ran ahead, its report applied before the bell: held to the bell.
+      event('protection_off', 'Marcus', 55, { clock_ahead_s: 300 }),
     ]);
-    expect(g.partTime.map(said)).toEqual(['Ana: in@09:05, off@09:05, on@09:20']);
-    expect(g.partTime.map(line)).toEqual(['0–100']);
+    expect(g.partTime.map(said)).toEqual([
+      'Ana: in@09:05, off@09:05, on@09:20',
+      'Marcus: in@09:06, off@09:55',
+    ]);
+    expect(g.partTime.map(line)).toEqual(['0–100', '2–100']);
+    expect(g.partTime[1]?.moments.at(-1)?.x).toBe(100);
   });
 
   it('lists a silence and the check-in that ended it', () => {
@@ -370,6 +377,20 @@ describe('focused part of the time', () => {
       'Ana: in@09:05, left@09:27',
     ]);
     expect(g.partTime.map(line)).toEqual(['2–30 50–100', '0–44']);
+  });
+
+  it('draws the line in the order Bali recorded it, a phone’s clock never outrunning a removal', () => {
+    // A phone ten minutes ahead (S9) taps in at 9:06, its tap stamped 9:16; the teacher removes her
+    // at 9:10 by the server's clock. R2 holds the removal to her tap and counts her no focus: her
+    // line is none, never 9:16 to the bell.
+    const events = [
+      event('tap_in', 'Ana', 16, { clock_ahead_s: 600 }),
+      event('enrollment_removed', 'Ana', 10),
+    ];
+    expect(reportOf(events).focusMinutes).toBe(0);
+    const g = groups(events);
+    expect(g.partTime.map(said)).toEqual(['Ana: left@09:10, in@09:16']);
+    expect(g.partTime.map(line)).toEqual(['22–22']);
   });
 
   it('ends the line at the session’s end, and draws a leave after it where it was', () => {
@@ -425,21 +446,27 @@ describe('focused part of the time', () => {
     expect(g.partTime.map(said)).toEqual(['Amara: in@09:05, off@09:30']);
   });
 
-  it('lists an unlock after an early End, past the line’s end, the axis stretched to it', () => {
-    // Ended at 9:20; at 9:21 a phone that hadn't heard yet unlocked. R2 lists it, so the recap
-    // shows it, where the session's end draws Ana's line to.
+  it('lists an unlock and Screen Time off after an early End, past the line’s end', () => {
+    // Ended at 9:20; at 9:21 two phones that hadn't heard yet unlocked and turned Screen Time off.
+    // R2 lists both, so the recap shows both, past where the session's end draws each line to,
+    // the axis stretched to them.
     const session = { ...SESSION, endedAt: at(20) };
     const g = groups(
       [
         event('tap_in', 'Ana', 5),
+        event('tap_in', 'Marcus', 5),
         event('session_ended', null, 20),
         event('unlock', 'Ana', 21, { recorded_as: 'after_session_end' }),
+        event('protection_off', 'Marcus', 21, { recorded_as: 'after_session_end' }),
       ],
       { session },
     );
-    expect(g.partTime.map(said)).toEqual(['Ana: in@09:05, unlock@09:21']);
-    expect(g.partTime.map(line)).toEqual(['0–93.75']);
-    expect(g.partTime[0]?.moments.at(-1)?.x).toBe(100);
+    expect(g.partTime.map(said)).toEqual([
+      'Ana: in@09:05, unlock@09:21',
+      'Marcus: in@09:05, off@09:21',
+    ]);
+    expect(g.partTime.map(line)).toEqual(['0–93.75', '0–93.75']);
+    expect(g.partTime.map((s) => s.moments.at(-1)?.x)).toEqual([100, 100]);
     expect(plain(g.ticks.at(-1)?.label ?? '')).toBe('9:21 AM');
   });
 
