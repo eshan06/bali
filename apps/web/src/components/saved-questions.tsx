@@ -123,11 +123,14 @@ export function DraftCard({
         </p>
         <ul className="flex flex-wrap gap-x-4.5 gap-y-1.5">
           {draft.options.map((option, i) => (
-            <li key={i} className="inline-flex min-w-0 items-center gap-2">
-              <span aria-hidden="true" className={letter(i === draft.correctOption)}>
-                {LETTERS[i]}
+            // On a narrow card the tag goes under the answer, which keeps its letter beside it.
+            <li key={i} className="inline-flex min-w-0 flex-wrap items-center gap-2">
+              <span className="inline-flex min-w-0 items-center gap-2">
+                <span aria-hidden="true" className={letter(i === draft.correctOption)}>
+                  {LETTERS[i]}
+                </span>
+                <span className="min-w-0 wrap-anywhere">{option}</span>
               </span>
-              <span className="min-w-0 wrap-anywhere">{option}</span>
               {i === draft.correctOption ? (
                 <span className="inline-flex items-center gap-1 text-section-label text-text-brand uppercase">
                   <CircleCheck size={14} aria-hidden="true" />
