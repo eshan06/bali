@@ -260,7 +260,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the owner's look at what no board draws.** Built to
   [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (version 21):
   ClassEnded (PV1's correction kept: a late tap-in still counts), ClassStates' lines after the bell
-  and ReportStates' recap states, at 1440 px, from PV12a's `recapGroups` (#386). **The card**
+  and ReportStates' recap states, at 1440 px (#386), from PV12a's `recapGroups` (#384). **The card**
   (`components/recap-card.tsx`): "Last session" over its day and times, the four figures (`.stats`,
   "1,064 min"), the note on silence, "No unlocks." when there were none, then the groups
   (`RecapLists`, `components/timeline.tsx`): *Focused part of the time*, a row each, the name, a thin
