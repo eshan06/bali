@@ -14,6 +14,7 @@ export function middleware(request: NextRequest) {
     apiUrl: webConfig.apiUrl,
     cognitoDomain: webConfig.cognito.domain,
     sentryDsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+    deckBucketUrl: process.env.NEXT_PUBLIC_DECK_BUCKET_URL,
     nonce: btoa(crypto.randomUUID()),
     dev: process.env.NODE_ENV === 'development',
   });

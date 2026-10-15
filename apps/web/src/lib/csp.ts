@@ -13,6 +13,12 @@ export interface CspOptions {
   cognitoDomain: string;
   /** NEXT_PUBLIC_SENTRY_DSN: its ingest host takes error reports. Unset or blank = monitoring off. */
   sentryDsn?: string | undefined;
+  /**
+   * NEXT_PUBLIC_DECK_BUCKET_URL: the environment's deck bucket, which a teacher's browser uploads a
+   * PDF to by its presigned PUT (M5) and the presenter reads one from (M6). Unset or blank = none,
+   * and the browser refuses an upload.
+   */
+  deckBucketUrl?: string | undefined;
   /** This response's nonce: Next stamps it on every script it renders. */
   nonce: string;
   /** `next dev` only: its fast refresh evaluates code and injects styles without a nonce. */
@@ -35,13 +41,15 @@ function originOf(url: string | undefined): string | null {
 /**
  * A production build's check of the origins the CSP is built from (next.config.ts), so a bad one
  * fails the build rather than every page: the API's URL must be set (unset, the portal would
- * call its localhost default) and be an http(s) URL; Cognito's and Sentry's, when set, too.
+ * call its localhost default) and be an http(s) URL; Cognito's, Sentry's and the deck bucket's, when
+ * set, too.
  */
 export function checkBuildEnv(env: Record<string, string | undefined>): void {
   const urls = {
     NEXT_PUBLIC_API_URL: env.NEXT_PUBLIC_API_URL,
     NEXT_PUBLIC_COGNITO_DOMAIN: env.NEXT_PUBLIC_COGNITO_DOMAIN,
     NEXT_PUBLIC_SENTRY_DSN: env.NEXT_PUBLIC_SENTRY_DSN,
+    NEXT_PUBLIC_DECK_BUCKET_URL: env.NEXT_PUBLIC_DECK_BUCKET_URL,
   };
   for (const [name, value] of Object.entries(urls)) {
     let origin: string | null;
@@ -62,6 +70,7 @@ export function contentSecurityPolicy(options: CspOptions): string {
   if (api === null) throw new Error('the API URL is blank: the portal could call nothing');
   const cognito = originOf(options.cognitoDomain);
   const sentry = originOf(options.sentryDsn);
+  const bucket = originOf(options.deckBucketUrl);
   const list = (...sources: (string | null | false)[]) =>
     sources.filter((s): s is string => typeof s === 'string').join(' ');
 
@@ -75,7 +84,7 @@ export function contentSecurityPolicy(options: CspOptions): string {
     // Style attributes only, never a <style> element: Next's built-in 404 and error pages style
     // by attribute. An attribute selects nothing, and any URL in it still meets img-src.
     'style-src-attr': "'unsafe-inline'",
-    'connect-src': list("'self'", api, cognito, sentry),
+    'connect-src': list("'self'", api, cognito, sentry, bucket),
     'img-src': "'self' data:",
     'object-src': "'none'",
     'base-uri': "'self'",

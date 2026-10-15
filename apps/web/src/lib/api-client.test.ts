@@ -127,6 +127,34 @@ describe('api-client', () => {
     const err = await plain.get('/x').catch((e: unknown) => e);
     expect(err).toBeInstanceOf(ApiError);
     expect((err as ApiError).reason).toBeUndefined();
+    expect((err as ApiError).details).toBeUndefined();
+  });
+
+  it('keeps the error’s details as sent, for the page to read (a deck in use names its classes, M5a)', async () => {
+    const details = { classes: [{ id: 'c1', name: 'Biology, period 3' }] };
+    const api = createApiClient({
+      baseUrl: 'http://api',
+      getToken: () => 'tok',
+      fetchImpl: () =>
+        Promise.resolve(
+          jsonResponse(
+            {
+              error: {
+                code: 'conflict',
+                reason: 'deck_in_use',
+                message: 'a running session shows the deck',
+                details,
+              },
+            },
+            409,
+          ),
+        ),
+    });
+    await expect(api.del('/v1/decks/d1', { eventId: 'e1' })).rejects.toMatchObject({
+      status: 409,
+      reason: 'deck_in_use',
+      details,
+    });
   });
 
   it('never signs out on a 5xx — a server hiccup is transient, not a bad token', async () => {

@@ -8,13 +8,15 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-15 (Central) — L7-1a, the class page's question card (#389;
-`docs/DECISIONS.md`, 2026-10-15), its states the canvas doesn't draw approved by the owner as
-built: a question's card over the live grid, "N of M answered" under the guard, each option's count
-from 3 answers, close and reveal, Done; Present untouched. L7's first part split in two (the
-conductor, 768 lines): L7-1b, asking in the side panel (#390), follows it. Before it, PV12b, the
-recap (#386). L7b's parts 1b and 1c (#394, #395), approved by the owner too, follow them. Next:
-M5b, the Slides page._
+_Last updated: 2026-10-15 (Central) — M5b's part 1, the upload's logic for Your slides (#397;
+`docs/DECISIONS.md`, 2026-10-15), with no screen: a picked file judged before anything is sent (over
+25 MB, not a PDF), the upload (its SHA-256, the create, the PUT by XMLHttpRequest with its progress
+and Cancel, stopped 25 minutes after the create, #326, then the check), Try again going on from
+where it stopped, and a removal naming M5a's classes in use; the API client keeps an error's
+`details`, and the CSP's `connect-src` names the environment's deck bucket
+(`NEXT_PUBLIC_DECK_BUCKET_URL`; on Vercel the owner's, runbook 10, step 8). Before it, L7-1a, the
+class page's question card (#389). L7-1b (#390) and L7b's parts 1b and 1c (#394, #395), approved by
+the owner, follow it. Next: M5b's part 2, the Slides page._
 
 ## Now
 
@@ -193,7 +195,7 @@ Slice 2 — slides:
 - **M3a** The slide change — ✅ (#327; DECISIONS 2026-10-12)
 - **M3b** The poll's slide and a deck's download (for M6) — ✅ (#328; DECISIONS 2026-10-12)
 - **M4** Decks in the privacy paths — ✅ (#329; DECISIONS 2026-10-12)
-- **M5** 👀 The slides page and upload to v2's canvas (Slides, LessonStates' M5 lines): the page in the menu; pick a PDF, upload with its percentage and Cancel (XHR's upload progress: `fetch` gives none), Checking…, the server's verdict said honestly (the size refusal, password-protected), "showing right now", a removal's confirm line; its in-use line names the class ("It's showing in Biology, period 3 right now"), from `409 deck_in_use`'s `details`: **its API half, M5a** — ✅ (#396; DECISIONS 2026-10-15): `DeckInUseDetails`, every class whose running session shows the deck, by id and name, the order `/v1/me`'s; the portal's `ApiError` keeps no `details` yet, M5b's to read; **left, M5b, the page**; the bucket's origin in the CSP's `connect-src` (moved here from M6: without it the browser refuses the upload); an upload still running 25 minutes after its URL was minted is aborted and said honestly (#326) — validation: `/santa-loop` with the UI skills, screenshots
+- **M5** 👀 The slides page and upload to v2's canvas (Slides, LessonStates' M5 lines): the page in the menu; pick a PDF, upload with its percentage and Cancel (XHR's upload progress: `fetch` gives none), Checking…, the server's verdict said honestly (the size refusal, password-protected), "showing right now", a removal's confirm line; its in-use line names the class ("It's showing in Biology, period 3 right now"), from `409 deck_in_use`'s `details`: **its API half, M5a** — ✅ (#396; DECISIONS 2026-10-15): `DeckInUseDetails`, every class whose running session shows the deck, by id and name, the order `/v1/me`'s; **M5b in two** (the worker's split, over ~400 lines whole): **part 1, the upload's logic** — ✅ (#397; DECISIONS 2026-10-15): `lib/decks.ts`, the API client's `details`, and the bucket's origin in the CSP's `connect-src` (moved here from M6: without it the browser refuses the upload), `NEXT_PUBLIC_DECK_BUCKET_URL`, on Vercel the owner's (runbook 10, step 8); an upload still running 25 minutes after its create is stopped (#326); **left, part 2, the page**, each state its boards don't draw drawn on the canvas first (the owner, 2026-10-15), the stopped upload said honestly — validation: `/santa-loop` with the UI skills, screenshots
 - **M6** 👀 Portal presenter to v2's canvas (LessonDecks, LessonSlide, PresentSlide, LessonStates' M6 lines: picking a deck in the side panel, the class page's slide controls and Present's slide; the presenter card's "Every phone in this class shows this slide, and so does Present." not built), in two PRs (PDF.js and the CSP, then the presenter): PDF.js ≥ 4.2.67, `isEvalSupported: false`, its worker self-hosted; the bytes checked against the slide's `sha256`, a mismatch refused with a retry (settled 2026-10-10); the CSP's `worker-src` (the bucket's `connect-src` came with M5) — validation: CSP tests, a tampered deck refused, `/santa-loop`, screenshots
 - **M7** BaliCore's deck download and cache (for M8) — ✅ (#331; DECISIONS 2026-10-12)
 - **M8** 👀📱 iOS slide view to the app canvas: PDFKit, pinch zoom, each page's text as its VoiceOver label, Emergency Unlock untouched — validation: XCTest, the device check on a shielded phone
@@ -304,6 +306,7 @@ Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect acc
 - 🔧 Dev's Cognito pool (`us-east-1_YTloqilwT`): turn on email as the attribute to verify, so a sign-up on its hosted page can be confirmed; today it ends on Cognito's error page with the account unconfirmed (found 2026-10-12; `docs/GOTCHAS.md`). The demo accounts sign in as they are.
 - 🔧 Delete dev's unused phone client `bali-ios-dev` (`33qr62dl4ee4inigneidmfe2s9`) in the dev pool; keep `bali-ios`, the demo's (2026-10-14).
 - 🔧 S4a's Sign out: check dev's web app client lists `http://localhost:3000/login` under Allowed sign-out URLs, and add it if not (`docs/WEB.md`).
+- 🔧 Vercel `bali-portal`: `NEXT_PUBLIC_DECK_BUCKET_URL`, prod's deck bucket (runbook 10, step 8), then Redeploy, before Your slides (M5b) is used on prod: without it the browser refuses every upload.
 
 ## Go-live features
 

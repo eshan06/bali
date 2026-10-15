@@ -1,0 +1,584 @@
+import { createHash } from 'node:crypto';
+
+import { type Deck, DECK_MAX_BYTES, DECK_TITLE_MAX_LENGTH } from '@bali/shared';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import { type ApiClient, ApiError, NetworkError } from './api-client';
+import {
+  inUseClasses,
+  judgePick,
+  newUpload,
+  putPdf,
+  type PutOptions,
+  readDecks,
+  removeAttemptFor,
+  removeDeck,
+  runUpload,
+  titleOf,
+  type Upload,
+  type UploadEnd,
+  UPLOAD_LIMIT_MS,
+  type UploadStep,
+  type XhrClass,
+} from './decks';
+
+/*
+ * Your slides' logic (M5): the decks read, a picked file judged before anything is sent, the
+ * upload (its SHA-256, the create, the PUT with its progress, Cancel and the 25-minute limit of
+ * #326, then the check), Try again going on from where it stopped, and a removal, the in-use
+ * refusal naming its classes (M5a), each against a fake API and a fake XMLHttpRequest.
+ */
+
+const ID = '0199b000-0000-7000-8000-0000000000d1';
+const URL_PUT =
+  'https://bali-decks-dev.s3.us-east-1.amazonaws.com/decks/0199b000-0000-7000-8000-0000000000d1.pdf?X-Amz-Signature=abc';
+const PDF = new TextEncoder().encode('%PDF-1.7\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n');
+const SHA = createHash('sha256').update(PDF).digest('hex');
+
+const deck = (over: Partial<Deck> = {}): Deck => ({
+  id: ID,
+  title: 'Unit 3 review',
+  status: 'pending',
+  bytes: PDF.byteLength,
+  sha256: SHA,
+  pageCount: null,
+  rejection: null,
+  createdAt: '2026-10-15T14:00:00.000Z',
+  ...over,
+});
+
+/** A fake API: each call recorded, each answered by `answer` (a value, or an error to throw). */
+function fakeApi(answer: (method: string, path: string, body: unknown) => unknown) {
+  const calls: [string, string, unknown][] = [];
+  const call =
+    (method: string) =>
+    // Async, so an answer thrown is the call's rejection.
+    // eslint-disable-next-line @typescript-eslint/require-await
+    async (path: string, body?: unknown): Promise<never> => {
+      calls.push([method, path, body]);
+      return answer(method, path, body) as never;
+    };
+  const api: Pick<ApiClient, 'get' | 'post' | 'del'> = {
+    get: call('GET'),
+    post: call('POST'),
+    del: call('DELETE'),
+  };
+  return { api, calls };
+}
+const refusal = (status: number, reason?: string, details?: unknown) =>
+  new ApiError(status, 'conflict', 'refused', reason, undefined, details);
+
+/** A stand-in XMLHttpRequest: what was sent, and the browser's events, raised by the test. */
+class FakeXhr {
+  static made: FakeXhr[] = [];
+  method = '';
+  url = '';
+  headers: Record<string, string> = {};
+  body: unknown = undefined;
+  timeout = 0;
+  status = 0;
+  aborted = false;
+  upload: { onprogress: ((e: Partial<ProgressEvent>) => void) | null } = { onprogress: null };
+  onload: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  onabort: (() => void) | null = null;
+  ontimeout: (() => void) | null = null;
+  private timer: ReturnType<typeof setTimeout> | undefined;
+  constructor() {
+    FakeXhr.made.push(this);
+  }
+  open(method: string, url: string) {
+    this.method = method;
+    this.url = url;
+  }
+  setRequestHeader(name: string, value: string) {
+    this.headers[name] = value;
+  }
+  /** As the browser does: the request ends with `timeout` once that much has passed since send. */
+  send(body: unknown) {
+    this.body = body;
+    if (this.timeout > 0) this.timer = setTimeout(() => this.ontimeout?.(), this.timeout);
+  }
+  abort() {
+    this.aborted = true;
+    clearTimeout(this.timer);
+    this.onabort?.();
+  }
+  progress(loaded: number, total: number, lengthComputable = true) {
+    this.upload.onprogress?.({ loaded, total, lengthComputable });
+  }
+  answer(status: number) {
+    clearTimeout(this.timer);
+    this.status = status;
+    this.onload?.();
+  }
+  fail() {
+    clearTimeout(this.timer);
+    this.onerror?.();
+  }
+}
+const Xhr = FakeXhr as unknown as XhrClass;
+const lastXhr = () => FakeXhr.made.at(-1);
+
+afterEach(() => {
+  FakeXhr.made = [];
+  vi.useRealTimers();
+});
+
+describe('the decks (Your slides)', () => {
+  it('reads them from `GET /v1/decks`, as the API orders them', async () => {
+    const decks = [deck(), deck({ id: 'd0', status: 'ready', pageCount: 12 })];
+    const { api, calls } = fakeApi(() => ({ decks }));
+    expect(await readDecks(api)).toEqual({ kind: 'read', decks });
+    expect(calls).toEqual([['GET', '/v1/decks', undefined]]);
+  });
+
+  it('says why a read failed, for the page to say with Try again', async () => {
+    const offline = fakeApi(() => {
+      throw new NetworkError();
+    });
+    expect(await readDecks(offline.api)).toEqual({
+      kind: 'failed',
+      status: undefined,
+      retryAfter: undefined,
+    });
+    const off = fakeApi(() => {
+      throw new ApiError(503, 'unavailable', 'slides are off', 'deck_storage_off');
+    });
+    expect(await readDecks(off.api)).toMatchObject({ kind: 'failed', status: 503 });
+  });
+});
+
+describe('a deck’s title, from its file’s name', () => {
+  it('is the name without its .pdf, as the canvas shows one', () => {
+    expect(titleOf('Unit 3 review.pdf')).toBe('Unit 3 review');
+    expect(titleOf('Lab safety.PDF')).toBe('Lab safety');
+    expect(titleOf('Midterm review (scanned).pdf')).toBe('Midterm review (scanned)');
+    // Only the last .pdf goes; a name with none keeps all of it.
+    expect(titleOf('notes.pdf.pdf')).toBe('notes.pdf');
+    expect(titleOf('Chapter 4')).toBe('Chapter 4');
+  });
+
+  it('is held to the create’s checks: trimmed, nothing it can’t show, 200 code points', () => {
+    expect(titleOf('  Unit 3  .pdf')).toBe('Unit 3');
+    const LRM = String.fromCodePoint(0x200e);
+    const TAB = String.fromCharCode(9);
+    expect(titleOf(`${LRM}Unit${TAB}3.pdf`)).toBe('Unit3');
+    // 150 emoji are 300 UTF-16 units: kept whole, never cut inside one.
+    const long = '😀'.repeat(DECK_TITLE_MAX_LENGTH + 50);
+    expect([...titleOf(`${long}.pdf`)]).toHaveLength(DECK_TITLE_MAX_LENGTH);
+    expect(titleOf(`${long}.pdf`)).toBe('😀'.repeat(DECK_TITLE_MAX_LENGTH));
+  });
+
+  it('keeps the whole name when nothing else is left of it', () => {
+    expect(titleOf('.pdf')).toBe('.pdf');
+    expect(titleOf('   .pdf')).toBe('.pdf');
+    expect(titleOf(`${String.fromCodePoint(0x200b)}.pdf`)).toBe('.pdf');
+  });
+});
+
+/** A picked file as the browser gives one, its size as said: no 25 MB held in memory. */
+function picked(name: string, head: Uint8Array<ArrayBuffer> | 'unreadable', size?: number): File {
+  const blob = head === 'unreadable' ? new Blob([]) : new Blob([head]);
+  return {
+    name,
+    size: size ?? blob.size,
+    slice: (start?: number, end?: number) =>
+      head === 'unreadable'
+        ? ({ text: () => Promise.reject(new Error('NotReadableError')) } as unknown as Blob)
+        : blob.slice(start, end),
+  } as unknown as File;
+}
+
+describe('a picked file, judged before anything is sent', () => {
+  it('is too large past 25 MB, before anything of it is read', async () => {
+    const big = picked('Chapter 4 scan.pdf', 'unreadable', DECK_MAX_BYTES + 1);
+    expect(await judgePick(big)).toEqual({ kind: 'too_large' });
+    expect(await judgePick(picked('At the limit.pdf', PDF, DECK_MAX_BYTES))).toEqual({
+      kind: 'deck',
+      title: 'At the limit',
+    });
+  });
+
+  it('is no PDF without the check’s %PDF- at its start, whatever its name says', async () => {
+    const pptx = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x14, 0x00]);
+    expect(await judgePick(picked('Unit 3.pptx', pptx))).toEqual({ kind: 'not_pdf' });
+    expect(await judgePick(picked('Unit 3.pdf', pptx))).toEqual({ kind: 'not_pdf' });
+    expect(await judgePick(picked('Empty.pdf', new Uint8Array()))).toEqual({ kind: 'not_pdf' });
+    expect(await judgePick(picked('Lab safety', PDF))).toEqual({
+      kind: 'deck',
+      title: 'Lab safety',
+    });
+  });
+
+  it('lets a file it can’t read through: its upload reads it whole and says it stopped', async () => {
+    expect(await judgePick(picked('Offline.pdf', 'unreadable'))).toEqual({
+      kind: 'deck',
+      title: 'Offline',
+    });
+  });
+});
+
+describe('the PUT to the bucket (XMLHttpRequest, for its progress)', () => {
+  const put = (over: Partial<PutOptions> = {}) => {
+    const progress: number[] = [];
+    const controller = new AbortController();
+    const ended = putPdf(URL_PUT, new Blob([PDF]), {
+      deadline: 1_000 + UPLOAD_LIMIT_MS,
+      now: () => 1_000,
+      onProgress: (f) => progress.push(f),
+      signal: controller.signal,
+      Xhr,
+      ...over,
+    });
+    return { ended, progress, controller };
+  };
+
+  it('sends the PDF as it was signed, and says how much is sent', async () => {
+    const { ended, progress } = put();
+    const xhr = lastXhr()!;
+    expect([xhr.method, xhr.url, xhr.headers]).toEqual([
+      'PUT',
+      URL_PUT,
+      { 'Content-Type': 'application/pdf' },
+    ]);
+    expect(xhr.body).toBeInstanceOf(Blob);
+    xhr.progress(10, 40);
+    xhr.progress(5, 40, false);
+    xhr.progress(40, 40);
+    xhr.answer(200);
+    expect(await ended).toBe('uploaded');
+    expect(progress).toEqual([0.25, 1]);
+  });
+
+  it('gives the browser the time left until the deadline, measured on the clock given', async () => {
+    const { ended } = put({ deadline: 5_000 + UPLOAD_LIMIT_MS, now: () => 65_000 });
+    expect(lastXhr()!.timeout).toBe(UPLOAD_LIMIT_MS - 60_000);
+    lastXhr()!.answer(200);
+    await ended;
+  });
+
+  it('ends on the bucket’s refusal, no answer, the browser’s timeout or Cancel', async () => {
+    const refused = put();
+    lastXhr()!.answer(403);
+    expect(await refused.ended).toEqual({ failed: 403 });
+
+    const offline = put();
+    lastXhr()!.fail();
+    expect(await offline.ended).toEqual({ failed: undefined });
+
+    const slow = put();
+    lastXhr()!.ontimeout?.();
+    expect(await slow.ended).toBe('too_slow');
+
+    const cancelled = put();
+    cancelled.controller.abort();
+    expect(lastXhr()!.aborted).toBe(true);
+    expect(await cancelled.ended).toBe('cancelled');
+  });
+
+  it('sends nothing once cancelled, or past its deadline', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    expect(await put({ signal: controller.signal }).ended).toBe('cancelled');
+    expect(await put({ deadline: 1_000 }).ended).toBe('too_slow');
+    expect(FakeXhr.made).toHaveLength(0);
+  });
+});
+
+/** A fake API answering the create with a fresh URL each time, and the check with `verdict`. */
+function deckApi(
+  verdict: () => unknown = () => ({
+    outcome: 'checked',
+    deck: deck({ status: 'ready', pageCount: 12 }),
+  }),
+) {
+  let urls = 0;
+  return fakeApi((method, path) => {
+    if (path === '/v1/decks')
+      return { outcome: 'created', deck: deck(), uploadUrl: `${URL_PUT}&n=${++urls}` };
+    if (path === `/v1/decks/${ID}/complete`) return verdict();
+    throw new Error(`unexpected ${method} ${path}`);
+  });
+}
+
+/** An upload run with the fake XMLHttpRequest, its steps recorded. */
+function run(api: Pick<ApiClient, 'post'>, upload: Upload, now = () => 0) {
+  const steps: UploadStep[] = [];
+  const controller = new AbortController();
+  const ended = runUpload(api, upload, {
+    signal: controller.signal,
+    onStep: (step) => steps.push(step),
+    now,
+    put: (url, body, opts) => putPdf(url, body, { ...opts, Xhr }),
+  });
+  return { ended, steps, controller };
+}
+/** Until the PUT is sent: the file read and hashed, the create answered. */
+async function untilPut(count = 1) {
+  await vi.waitFor(() => expect(FakeXhr.made).toHaveLength(count));
+  return lastXhr()!;
+}
+
+describe('an upload, from the file to the server’s verdict', () => {
+  const file = () => new Blob([PDF]);
+
+  it('creates the deck with its SHA-256, sends it with its progress, then asks for the check', async () => {
+    const { api, calls } = deckApi();
+    const upload = newUpload(file(), 'Unit 3 review');
+    const { ended, steps } = run(api, upload);
+    const xhr = await untilPut();
+    expect(xhr.url).toBe(`${URL_PUT}&n=1`);
+    xhr.progress(31, 50);
+    xhr.answer(200);
+    expect(await ended).toEqual({
+      kind: 'checked',
+      deck: deck({ status: 'ready', pageCount: 12 }),
+    });
+    expect(calls).toEqual([
+      [
+        'POST',
+        '/v1/decks',
+        { eventId: upload.createId, title: 'Unit 3 review', bytes: PDF.byteLength, sha256: SHA },
+      ],
+      ['POST', `/v1/decks/${ID}/complete`, { eventId: upload.completeId }],
+    ]);
+    expect(steps).toEqual([
+      { step: 'uploading', fraction: 0 },
+      { step: 'uploading', fraction: 0.62 },
+      { step: 'checking' },
+    ]);
+  });
+
+  it('answers a rejection as the server’s verdict, with why', async () => {
+    const rejected = deck({ status: 'rejected', rejection: 'encrypted' });
+    const { api } = deckApi(() => ({ outcome: 'checked', deck: rejected }));
+    const { ended } = run(api, newUpload(file(), 'Midterm review (scanned)'));
+    (await untilPut()).answer(200);
+    expect(await ended).toEqual({ kind: 'checked', deck: rejected });
+  });
+
+  it('stops an upload still running 25 minutes after its create, on a fake clock', async () => {
+    vi.useFakeTimers();
+    let createdAt = 0;
+    const { api, calls } = fakeApi((_method, path) => {
+      if (path !== '/v1/decks') throw new Error(`unexpected ${path}`);
+      createdAt = Date.now();
+      return { outcome: 'created', deck: deck(), uploadUrl: URL_PUT };
+    });
+    const { ended, steps } = run(api, newUpload(file(), 'Unit 3 review'), () => Date.now());
+    const seen: { end?: UploadEnd } = {};
+    void ended.then((end) => (seen.end = end));
+    const xhr = await untilPut();
+    xhr.progress(1, 50);
+    await vi.advanceTimersByTimeAsync(createdAt + UPLOAD_LIMIT_MS - 1 - Date.now());
+    expect(seen.end).toBeUndefined();
+    expect(steps.at(-1)).toEqual({ step: 'uploading', fraction: 0.02 });
+    await vi.advanceTimersByTimeAsync(1);
+    expect(seen.end).toMatchObject({
+      kind: 'too_slow',
+      upload: { deck: deck(), uploaded: false },
+    });
+    // No check is asked for an upload that never arrived.
+    expect(calls.map(([, path]) => path)).toEqual(['/v1/decks']);
+  });
+
+  it('counts the 25 minutes from before the create, so a slow create leaves the PUT less', async () => {
+    let clock = 0;
+    const slowApi = fakeApi((_method, path) => {
+      if (path !== '/v1/decks') throw new Error('unexpected');
+      clock += 120_000;
+      return { outcome: 'created', deck: deck(), uploadUrl: URL_PUT };
+    });
+    const { ended } = run(slowApi.api, newUpload(file(), 'Unit 3 review'), () => clock);
+    const xhr = await untilPut();
+    expect(xhr.timeout).toBe(UPLOAD_LIMIT_MS - 120_000);
+    xhr.fail();
+    await ended;
+  });
+
+  it('is cancelled while it is sent, keeping its pending deck for the Cancel to remove', async () => {
+    const { api, calls } = deckApi();
+    const { ended, controller } = run(api, newUpload(file(), 'Unit 3 review'));
+    const xhr = await untilPut();
+    controller.abort();
+    expect(xhr.aborted).toBe(true);
+    expect(await ended).toMatchObject({ kind: 'cancelled', upload: { deck: deck() } });
+    expect(calls).toHaveLength(1);
+  });
+
+  it('is cancelled before its create when Cancel comes while the file is read', async () => {
+    const { api, calls } = deckApi();
+    const { ended, controller } = run(api, newUpload(file(), 'Unit 3 review'));
+    controller.abort();
+    expect(await ended).toMatchObject({ kind: 'cancelled', upload: { deck: null } });
+    expect(calls).toEqual([]);
+  });
+
+  it('stops on a file it can’t read, sending nothing', async () => {
+    const { api, calls } = deckApi();
+    const unreadable = {
+      size: 10,
+      arrayBuffer: () => Promise.reject(new Error('NotReadableError')),
+    } as unknown as Blob;
+    expect(await run(api, newUpload(unreadable, 'Offline')).ended).toMatchObject({
+      kind: 'stopped',
+      failure: { kind: 'failed', status: undefined },
+      upload: { sha256: null, deck: null },
+    });
+    expect(calls).toEqual([]);
+  });
+
+  it('goes on from where it stopped: a failed create is sent again under its own id', async () => {
+    let fail = true;
+    const { api, calls } = fakeApi((_method, path) => {
+      if (fail) {
+        fail = false;
+        throw new NetworkError();
+      }
+      return path === '/v1/decks'
+        ? { outcome: 'replay', deck: deck(), uploadUrl: URL_PUT }
+        : { outcome: 'checked', deck: deck({ status: 'ready', pageCount: 12 }) };
+    });
+    const first = await run(api, newUpload(file(), 'Unit 3 review')).ended;
+    expect(first).toMatchObject({ kind: 'stopped', upload: { sha256: SHA, deck: null } });
+    if (first.kind !== 'stopped') return;
+    const again = run(api, first.upload);
+    (await untilPut()).answer(200);
+    expect(await again.ended).toMatchObject({ kind: 'checked' });
+    expect(calls[1]).toEqual(calls[0]);
+  });
+
+  it('goes on from where it stopped: a failed PUT is sent again on a fresh URL, its create replayed', async () => {
+    const { api, calls } = deckApi();
+    const first = run(api, newUpload(file(), 'Unit 3 review'));
+    (await untilPut()).answer(500);
+    const stopped = await first.ended;
+    expect(stopped).toMatchObject({
+      kind: 'stopped',
+      failure: { kind: 'failed', status: 500 },
+      upload: { deck: deck(), uploaded: false },
+    });
+    if (stopped.kind !== 'stopped') return;
+    const again = run(api, stopped.upload);
+    const xhr = await untilPut(2);
+    expect(xhr.url).toBe(`${URL_PUT}&n=2`);
+    xhr.answer(200);
+    expect(await again.ended).toMatchObject({ kind: 'checked' });
+    expect(calls.map(([, path]) => path)).toEqual([
+      '/v1/decks',
+      '/v1/decks',
+      `/v1/decks/${ID}/complete`,
+    ]);
+    expect(calls[1]).toEqual(calls[0]);
+  });
+
+  it('goes on from where it stopped: a failed check is asked again, the same check, nothing sent again', async () => {
+    let fail = true;
+    const { api, calls } = deckApi(() => {
+      if (!fail) return { outcome: 'replay', deck: deck({ status: 'ready', pageCount: 12 }) };
+      fail = false;
+      throw new ApiError(500, 'internal', 'the parser stopped');
+    });
+    const first = run(api, newUpload(file(), 'Unit 3 review'));
+    (await untilPut()).answer(200);
+    const stopped = await first.ended;
+    expect(stopped).toMatchObject({ kind: 'stopped', upload: { uploaded: true } });
+    if (stopped.kind !== 'stopped') return;
+    const steps: UploadStep[] = [];
+    const again = await runUpload(api, stopped.upload, {
+      signal: new AbortController().signal,
+      onStep: (step) => steps.push(step),
+    });
+    expect(again).toMatchObject({ kind: 'checked', deck: { status: 'ready' } });
+    expect(steps).toEqual([{ step: 'checking' }]);
+    expect(FakeXhr.made).toHaveLength(1);
+    expect(calls.slice(1)).toEqual([
+      ['POST', `/v1/decks/${ID}/complete`, { eventId: stopped.upload.completeId }],
+      ['POST', `/v1/decks/${ID}/complete`, { eventId: stopped.upload.completeId }],
+    ]);
+  });
+
+  it('is gone when its deck was removed meanwhile, in another tab', async () => {
+    const { api } = deckApi(() => {
+      throw refusal(404, 'deck_not_found');
+    });
+    const { ended } = run(api, newUpload(file(), 'Unit 3 review'));
+    (await untilPut()).answer(200);
+    expect(await ended).toEqual({ kind: 'gone' });
+  });
+
+  it('stops on a refused create, the refusal typed for the page', async () => {
+    const { api } = fakeApi(() => {
+      throw new ApiError(429, 'too_many_requests', 'slow down', undefined, 2);
+    });
+    expect(await run(api, newUpload(file(), 'Unit 3 review')).ended).toMatchObject({
+      kind: 'stopped',
+      failure: { kind: 'failed', status: 429, retryAfter: 2 },
+    });
+  });
+});
+
+describe('the classes a deck in use names (M5a)', () => {
+  const BIO = { id: 'c1', name: 'Biology, period 3' };
+  const CHEM = { id: 'c2', name: 'Chemistry' };
+
+  it('reads each class, in the order sent', () => {
+    expect(inUseClasses({ classes: [BIO, CHEM] })).toEqual([BIO, CHEM]);
+    expect(inUseClasses({ classes: [{ ...BIO, extra: 1 }] })).toEqual([BIO]);
+  });
+
+  it('reads none from a server before M5a, or any other shape', () => {
+    for (const details of [undefined, null, {}, { classes: [] }, { classes: 'c1' }, [BIO]]) {
+      expect(inUseClasses(details)).toBeNull();
+    }
+    expect(inUseClasses({ classes: [BIO, { id: 'c2' }] })).toBeNull();
+  });
+});
+
+describe('a removal (Remove, and Cancel’s of its pending deck)', () => {
+  it('sends the removal under its id, the unanswered one again, else a fresh one', async () => {
+    const first = removeAttemptFor(undefined, ID);
+    expect(removeAttemptFor(first, ID)).toBe(first);
+    expect(removeAttemptFor(first, 'd2')).toMatchObject({ deckId: 'd2' });
+    expect(removeAttemptFor(first, 'd2').eventId).not.toBe(first.eventId);
+    const { api, calls } = fakeApi(() => ({ outcome: 'removed', deck: deck() }));
+    expect(await removeDeck(api, first)).toEqual({ kind: 'removed' });
+    expect(calls).toEqual([['DELETE', `/v1/decks/${ID}`, { eventId: first.eventId }]]);
+  });
+
+  it('counts a deck already gone as removed', async () => {
+    const { api } = fakeApi(() => {
+      throw refusal(404, 'deck_not_found');
+    });
+    expect(await removeDeck(api, removeAttemptFor(undefined, ID))).toEqual({ kind: 'removed' });
+  });
+
+  it('names the classes showing it, from the refusal’s details', async () => {
+    const classes = [{ id: 'c1', name: 'Biology, period 3' }];
+    const { api } = fakeApi(() => {
+      throw refusal(409, 'deck_in_use', { classes });
+    });
+    expect(await removeDeck(api, removeAttemptFor(undefined, ID))).toEqual({
+      kind: 'in_use',
+      classes,
+    });
+  });
+
+  it('reads an in-use refusal naming no class as refused, and no answer as failed', async () => {
+    const bare = fakeApi(() => {
+      throw refusal(409, 'deck_in_use');
+    });
+    expect(await removeDeck(bare.api, removeAttemptFor(undefined, ID))).toEqual({
+      kind: 'refused',
+      status: 409,
+      reason: 'deck_in_use',
+    });
+    const offline = fakeApi(() => {
+      throw new NetworkError();
+    });
+    expect(await removeDeck(offline.api, removeAttemptFor(undefined, ID))).toMatchObject({
+      kind: 'failed',
+    });
+  });
+});

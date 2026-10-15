@@ -10,6 +10,14 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-15 (Central) — L7-1a, the class page's question card (#389;
+`docs/DECISIONS.md`, 2026-10-15), its states the canvas doesn't draw approved by the owner as
+built: a question's card over the live grid, "N of M answered" under the guard, each option's count
+from 3 answers, close and reveal, Done; Present untouched. L7's first part split in two (the
+conductor, 768 lines): L7-1b, asking in the side panel (#390), follows it. Before it, PV12b, the
+recap (#386). L7b's parts 1b and 1c (#394, #395), approved by the owner too, follow them. Next:
+M5b, the Slides page._
+
 _Last updated: 2026-10-15 (Central) — PV12b, the recap (#386; `docs/DECISIONS.md`, 2026-10-15),
 its states no board draws approved by the owner as built: the class page after the bell as
 ClassEnded draws it, the figures over who wasn't focused the whole time (each with their line, its
