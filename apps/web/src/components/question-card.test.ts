@@ -176,7 +176,7 @@ describe('a question open (LessonWaiting, LessonLive)', () => {
       at: 0,
     };
     expect(render(behind)).toMatch(
-      /<p class="[^"]*\bbg-surface-sunken\b[^"]*">These totals may be behind\. Bali can&#x27;t reach the server and keeps trying\.<\/p>/,
+      /<p role="status" class="[^"]*\bbg-surface-sunken\b[^"]*">These totals may be behind\. Bali can&#x27;t reach the server and keeps trying\.<\/p>/,
     );
     behind.results = { ...behind.results, final: true };
     expect(render(behind)).not.toContain('may be behind');
@@ -290,6 +290,19 @@ describe('its hook (L6’s logic, held for one session)', () => {
     );
   });
 
+  it('reads one at a time, and nothing once the page has gone', () => {
+    // The stream's overlap as it starts can name many old questions: one more read, not a burst.
+    expect(hook).toMatch(
+      /if \(reading\.current\?\.session === session\) \{\s*reading\.current\.again = true;\s*return;\s*\}/,
+    );
+    expect(hook).toMatch(
+      /if \(now\.current\.session !== session\) return;\s*if \(again\) void read\(session\);\s*else if \(failed\) retry\.current = window\.setTimeout/,
+    );
+    expect(hook).toMatch(
+      /return \(\) => \{\s*window\.clearTimeout\(retry\.current\);\s*now\.current = \{ session: null, question: null \};/,
+    );
+  });
+
   it('hears the stream through the class page’s live grid', () => {
     const page = readFileSync(
       fileURLToPath(new URL('../app/classes/[id]/page.tsx', import.meta.url)),
@@ -315,8 +328,11 @@ describe('its hook (L6’s logic, held for one session)', () => {
   });
 
   it('polls the shown question’s results, once more after it closes for the final counts', () => {
+    expect(hook).toMatch(/pollResults\(api, id, \(state\) =>\s*setResults\(\(prev\) => \(\{/);
+    // Timed from the read that first found it closed, so a close heard just before the bell, its
+    // last read landing after it, is never said as the bell's.
     expect(hook).toMatch(
-      /pollResults\(api, id, \(state\) => setResults\(\{ id, state, at: Date\.now\(\) \}\)\)/,
+      /at: prev\?\.id === id && prev\.state\.results\?\.open === false \? prev\.at : Date\.now\(\),/,
     );
     expect(hook).toMatch(
       /if \(before\?\.open && question\?\.id === before\.id && !question\.open\) \{\s*if \(poll\.current\?\.id === question\.id\) poll\.current\.poll\.closed\(\);/,

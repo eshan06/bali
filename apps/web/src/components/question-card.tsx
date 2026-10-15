@@ -71,6 +71,7 @@ export function useLiveQuestion(sessionId: string | null) {
   const sending = useRef(false);
   const unansweredClose = useRef<CloseAttempt | null>(null);
   const retry = useRef<number | undefined>(undefined);
+  const reading = useRef<{ session: string; again: boolean } | null>(null);
 
   const put = useCallback((session: string | null, question: TeacherQuestion | null) => {
     const before = now.current.question;
@@ -86,34 +87,54 @@ export function useLiveQuestion(sessionId: string | null) {
 
   const read = useCallback(
     async (session: string): Promise<void> => {
+      // One read at a time: any asked for meanwhile (the stream's overlap as it starts) are one more.
+      if (reading.current?.session === session) {
+        reading.current.again = true;
+        return;
+      }
+      reading.current = { session, again: false };
       window.clearTimeout(retry.current);
+      let failed = false;
       try {
         const snap = await api.get<SessionSnapshot>(`/v1/sessions/${session}`);
         const q = snap.question ?? null;
         if (q && q.id > newest.current) put(session, q);
       } catch (e) {
-        // Read again shortly; meanwhile the grid says whether Bali can be reached.
-        if (failureOf(e).kind === 'failed' && now.current.session === session) {
-          retry.current = window.setTimeout(() => void read(session), POLL_EVERY_MS);
-        }
+        failed = failureOf(e).kind === 'failed';
       }
+      const again = reading.current?.session === session && reading.current.again;
+      if (reading.current?.session === session) reading.current = null;
+      // Gone, nothing more; else read again shortly, the grid saying meanwhile whether Bali is reached.
+      if (now.current.session !== session) return;
+      if (again) void read(session);
+      else if (failed) retry.current = window.setTimeout(() => void read(session), POLL_EVERY_MS);
     },
     [api, put],
   );
 
-  // A new session starts with nothing shown, then reads what it has open.
+  // A new session starts with nothing shown, then reads what it has open; none once it is gone.
   useEffect(() => {
     now.current = { session: sessionId, question: null };
     newest.current = '';
     setHeld(now.current);
     if (sessionId !== null) void read(sessionId);
-    return () => window.clearTimeout(retry.current);
+    return () => {
+      window.clearTimeout(retry.current);
+      now.current = { session: null, question: null };
+    };
   }, [sessionId, read]);
 
   const id = held.session === sessionId ? (held.question?.id ?? null) : null;
   useEffect(() => {
     if (id === null) return;
-    const p = pollResults(api, id, (state) => setResults({ id, state, at: Date.now() }));
+    const p = pollResults(api, id, (state) =>
+      setResults((prev) => ({
+        id,
+        state,
+        // When it was first found closed: a close heard just before the bell is no bell's.
+        at: prev?.id === id && prev.state.results?.open === false ? prev.at : Date.now(),
+      })),
+    );
     poll.current = { id, poll: p };
     return () => p.stop();
   }, [api, id]);
@@ -243,7 +264,10 @@ export function QuestionCard({
         </div>
       ) : null}
       {r?.problem && !r.final ? (
-        <p className="rounded-sm border border-border-default bg-surface-sunken px-4 py-3 text-body text-text-primary">
+        <p
+          role="status"
+          className="rounded-sm border border-border-default bg-surface-sunken px-4 py-3 text-body text-text-primary"
+        >
           These totals may be behind. Bali can&apos;t reach the server and keeps trying.
         </p>
       ) : null}
