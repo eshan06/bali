@@ -101,14 +101,16 @@ lint && npm test`, plus `npm run demo` when API behavior changed), then run
   it changed a real design decision, update ARCHITECTURE.md itself.
 - **Every user-facing screen is designed in Claude Design and approved by the
   owner before it is built.** Every state counts (loading, empty, error, large
-  text). A UI PR links the approved design it builds. **An intermediate state
-  of an approved screen** that no board draws (loading, empty, an error or
-  refusal line, a narrow-width, large-text or rare-case variant, buttons held
-  while sending) is drawn on that screen's canvas first and then built from
-  that drawing, without waiting for the owner's approval; the UI PR names
-  that board. A new screen or page still waits for the owner's approval: one
-  with no approved design is a stop-and-ask. Never code an undrawn state;
-  restoring a previously shipped look on the owner's order is the only
+  text): never code an undrawn state. A UI PR links the approved design it
+  builds. **An intermediate state of an approved screen** that no board draws
+  (loading, empty, an error or refusal line, a narrow-width, large-text or
+  rare-case variant, buttons held while sending) is drawn on that screen's
+  canvas first, labelled as an intermediate state, and then built from that
+  drawing, without waiting for the owner's approval; the UI PR names that
+  board. Anything else no board draws counts as a new screen, and so does a
+  state you aren't sure is intermediate: a new screen or page still waits for
+  the owner's approval, and one with no approved design is a stop-and-ask.
+  Restoring a previously shipped look on the owner's order is the only
   exception.
 - **User-facing UI work, and only that, uses the design framework.** That
   covers the portal's pages and components (`apps/web/src/app`,

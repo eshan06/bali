@@ -9,25 +9,36 @@ touching before changing how something works. A pointer of the form
 a real decision? Add a dated entry at the top: what was decided and why.
 
 - **2026-10-15** — **An intermediate state of an approved screen that no board draws is drawn on
-  the canvas first and then built from that drawing, without waiting for the owner's approval; a
-  new screen or page still waits for the owner (the owner's rule).** The owner, to the conductor:
-  "just know that before you make those 'intermediate' type screens make them in the claude design
-  artifact and then use them. for those intermediate screens you dont need my approval". **Why:**
-  workers had coded 28 states no board drew (loading lines, error and refusal lines, a phone-width
-  panel, rare-case variants, buttons held while sending) straight into code, never drawn on the
-  canvas first; the owner approved them after the fact, from screenshots, and set this rule. **The
-  rule** (CLAUDE.md, Working rules, and its "UI:" standing order): such a state (loading, empty, an
-  error or refusal line, a narrow-width, large-text or rare-case variant, buttons held while
-  sending) goes on its screen's canvas first and is built from that drawing, and the UI PR names
-  that board. Never code an undrawn state; restoring a previously shipped look on the owner's order
-  is still the only exception. **What it doesn't change:** a new screen or page still waits for the
-  owner's approval, and one with no approved design is a stop-and-ask; every user-facing string
-  still goes through `no-ai-slop`; after any canvas publish, the worker opens it and checks every
-  new or changed board before reporting, and sends each build screenshot beside its board. **What it
-  amends,** for intermediate states only: 2026-10-12's "what no board draws is drawn first … for the
-  owner to check and approve before it is built" (PV1's) and 2026-10-14's "the owner approves it
-  before anything is built from it" (a board changed on the Windows PC); DESIGN.md's Sources and
-  PLAN's redesign steps say so too.
+  the canvas first, labelled as one, and then built from that drawing, without waiting for the
+  owner's approval; anything else no board draws still waits for the owner (the owner's rule).**
+  The owner, to the conductor: "just know that before you make those 'intermediate' type screens
+  make them in the claude design artifact and then use them. for those intermediate screens you
+  dont need my approval". **Why:** workers had coded 28 states no board drew (loading lines, error
+  and refusal lines, a phone-width panel, rare-case variants, buttons held while sending) straight
+  into code, never drawn on the canvas first; the owner approved them after the fact, from
+  screenshots, and set this rule. **The rule** (CLAUDE.md, Working rules, and its "UI:" standing
+  order): such a state (loading, empty, an error or refusal line, a narrow-width, large-text or
+  rare-case variant, buttons held while sending) goes on its screen's canvas first, labelled as an
+  intermediate state, and is built from that drawing; the UI PR names that board. Never code an
+  undrawn state. **Where the line falls:** anything else no board draws counts as a new screen, and
+  so does a state the worker isn't sure is intermediate: it waits for the owner's approval, a
+  stop-and-ask without an approved design. **The label** keeps the canvas honest: DESIGN.md's
+  "every board is approved" now excepts a board labelled as an intermediate state, so no later
+  worker takes a worker's drawing for the owner's. The line and the label both came from santa's
+  round 1 on this change. **What it doesn't change:** a new screen or page still waits for the
+  owner's approval; every user-facing string still goes through `no-ai-slop`; after any canvas
+  publish, the worker opens it and checks every new or changed board before reporting, and sends
+  each build screenshot beside its board; restoring a previously shipped look on the owner's order
+  is still the only exception. **What it amends,** for intermediate states only: 2026-10-12's "what
+  no board draws is drawn first … for the owner to check and approve before it is built" (PV1's)
+  and 2026-10-14's "the owner approves it before anything is built from it" (a board changed on the
+  Windows PC). DESIGN.md (Sources, and §8: a teacher's page at phone width, which PV1 drew only for
+  a class live and Home, is now an intermediate state) and PLAN's redesign steps say so too. *Its
+  limit* (santa's Reviewer B, for the owner): the rule as the owner gave it doesn't say whether an
+  intermediate state may show something about a student that its approved screen doesn't (a rare
+  case on the recap, say), or carry a new refusal line at sign-in or the 13+ check; santa and
+  Claude Review still check every such PR, and the owner still sees its screenshots beside its
+  boards.
 
 - **2026-10-15** — **M5b's part 1: the upload's logic for Your slides, with no screen; the PUT by
   XMLHttpRequest, stopped by the browser 25 minutes after the create, and the bucket in the CSP by

@@ -70,10 +70,11 @@ Bali Design System's tokens: Home, Classes, a class (before a session, live,
 an unlock, one student, reconnecting, New code, every tile, the recap,
 Present), Reports, signing in, Phase 7's questions and slides in class, Your
 questions and Your slides, the projector, and students on the web. Every board
-is approved but the row "An idea, not in the plan: questions suggested from
-your slides" (AISlides, AIReview, AIEdit, AIAsk, AIQuestions, AIStates), which
-is out; `v2.css`'s block for it (`.switch`, `.setting`, `.tag`, `.sugg*`,
-`.callout`, `.edit-cols`) is not ported. It replaces, for the look, the four
+is approved, but a board labelled as an intermediate state (below) and the row
+"An idea, not in the plan: questions suggested from your slides" (AISlides,
+AIReview, AIEdit, AIAsk, AIQuestions, AIStates), which is out; `v2.css`'s block
+for it (`.switch`, `.setting`, `.tag`, `.sugg*`, `.callout`, `.edit-cols`) is
+not ported. It replaces, for the look, the four
 designs of 2026-10-06,
 [Entry & info](https://claude.ai/artifact/K7vJUJLDNpHgtZV9cYcXbF),
 [Classes home](https://claude.ai/artifact/Shc2dz4xn8Qc9iDHDuYT2N),
@@ -82,13 +83,15 @@ designs of 2026-10-06,
 PB1–PB5, `docs/PLAN-ARCHIVE.md`), and the portal and student-web boards of the
 [Live lesson portal screens](https://claude.ai/artifact/BxHbGud1xMeyXLUUvsewHM)
 (2026-10-10): their words and states carry over except where this canvas
-changes them. A page or a screen it doesn't draw is drawn on it, for the owner
-to check and approve, before it is built (PLAN's PV1). An intermediate state
-of an approved screen that no board draws (loading, empty, an error or
-refusal line, a narrow-width, large-text or rare-case variant, buttons held
-while sending) is drawn on it first and then built from that drawing,
-without waiting for the owner's approval (CLAUDE.md, Working rules). The app
-keeps its own canvases (the
+changes them. A page, a screen or anything else it doesn't draw is drawn on
+it, for the owner to check and approve, before it is built (PLAN's PV1). An
+intermediate state of an approved screen that no board draws (loading, empty,
+an error or refusal line, a narrow-width, large-text or rare-case variant,
+buttons held while sending) is the exception: it is drawn on the canvas
+first, labelled as an intermediate state, and then built from that drawing,
+without waiting for the owner's approval, and a state that may not be
+intermediate waits for the owner (CLAUDE.md, Working rules). The app keeps
+its own canvases (the
 [Live lesson app screens](https://claude.ai/artifact/CZpFbFuxnRrLcuywtJGfVQ)
 for L8 and M8). It is built in PLAN's "Portal redesign (v2's look)" steps,
 PV0–PV17, Phase 7's web screens among them, each page keeping today's layout
@@ -100,7 +103,8 @@ last session and Home's Recent activity, which no API served then; PV2 and PV3
 build those reads, and no page shows one before its read exists. The portal is
 designed desktop-first: v2's canvas draws the student's lesson at 720 px (200%
 zoom) and the side menu as a bar on top below 776 px, a teacher's page at phone
-width is PV1's to draw, and no page may break on a phone or a tablet (§8).
+width is drawn first as an intermediate state (above; PV1 drew a class live
+and Home), and no page may break on a phone or a tablet (§8).
 
 **Where it stands today:** the iOS app draws from the tokens (`Theme.swift`,
 pinned by `AppTests.tokens`) in D1's shapes. Its Soft premium redraw (D2h–D2j)
@@ -842,7 +846,8 @@ every unlock is the teacher's to see.
   words side by side, its marks spaced as `lefts` spaces them; on a card under
   40 rem (a phone, which no board draws; PV12b) each part under the one before,
   and the axis's times between its ends hide where two would touch. A teacher's
-  page at phone width is drawn in PV1 first.
+  page at phone width is drawn on the canvas first, as an intermediate state
+  (Sources; PV1 drew a class live and Home).
 
 ## 9. Agent prompt guide
 
