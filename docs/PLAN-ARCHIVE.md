@@ -10,6 +10,15 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-15 (Central) — W3, the student's home (#392; `docs/DECISIONS.md`,
+2026-10-15): `/` sends a student who said 13+ in the app to their home in v2's look, the teacher's
+layout with Your classes and Help: each class in session on a live card (its ring, its teacher, the
+time left and the bell), the rest under it, none yet the empty card with a teacher's way to the
+invite page, now also at `/invite`; `/v1/me`'s live session carries its start for the ring
+(additive; BaliCore reads it as optional). Open the lesson and the phone's chip are W4's. Before it,
+L3c (#391). PV12b (#386) and L7's two PRs (#389, #390) wait on the owner as drafts. Next: PV14, a
+session's report._
+
 _Last updated: 2026-10-15 (Central) — L3c, a session's questions for its report (#391;
 `docs/DECISIONS.md`, 2026-10-15): `GET /v1/classes/{id}/reports/sessions/{sessionId}/questions`,
 beside R2's report and refused as it is, answers each question the session asked, in the order its

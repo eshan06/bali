@@ -24,6 +24,39 @@ describe('api-client', () => {
     expect((captured?.headers as Record<string, string>).authorization).toBe('Bearer tok');
   });
 
+  it('sends a PUT’s body, and a DELETE’s when it has one (a saved question’s, L7b), as JSON', async () => {
+    const sent: { url: string; method?: string; body?: unknown; type?: string }[] = [];
+    const fetchImpl = vi.fn((url: string | URL | Request, init?: RequestInit) => {
+      const headers = init?.headers as Record<string, string>;
+      sent.push({
+        url: url as string,
+        method: init?.method,
+        body: init?.body,
+        type: headers['content-type'],
+      });
+      return Promise.resolve(jsonResponse({ ok: 1 }));
+    });
+    const api = createApiClient({ baseUrl: 'http://api', getToken: () => 'tok', fetchImpl });
+    expect(await api.put('/v1/saved-questions/q1', { eventId: 'e1' })).toEqual({ ok: 1 });
+    expect(await api.del('/v1/saved-questions/q1', { eventId: 'e2' })).toEqual({ ok: 1 });
+    expect(await api.del('/v1/enrollments/n1')).toEqual({ ok: 1 });
+    expect(sent).toEqual([
+      {
+        url: 'http://api/v1/saved-questions/q1',
+        method: 'PUT',
+        body: '{"eventId":"e1"}',
+        type: 'application/json',
+      },
+      {
+        url: 'http://api/v1/saved-questions/q1',
+        method: 'DELETE',
+        body: '{"eventId":"e2"}',
+        type: 'application/json',
+      },
+      { url: 'http://api/v1/enrollments/n1', method: 'DELETE', body: undefined, type: undefined },
+    ]);
+  });
+
   it('throws NetworkError — never a sign-out — when fetch rejects', async () => {
     const onUnauthorized = vi.fn();
     const api = createApiClient({

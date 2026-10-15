@@ -8,6 +8,31 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-15** — **L7b's part 1a: the save logic for Your questions, with no screen; each save
+  minted after the draft's own `eventId`, and a reply under another one read as not saved.** L7b's
+  first part, the Questions page, came to 844 changed lines without tests, so the conductor split it
+  in three (2026-10-15): this logic (`apps/web/src/lib/saved-questions.ts`, #393), then the page as
+  two drafts stacked on it for the owner's calls, the list with Remove, then writing, editing and the
+  menu's Questions. **Oldest first** (`oldestFirst`): by each draft's first write, then its id, as
+  the canvas lists them; the API answers newest first. **What Bali refuses before it saves**
+  (`refusalsOf`): the server's own checks (`Text` in `routes/questions.ts`, with `display-name.ts`'s
+  `UNPRINTABLE` and `INVISIBLE`, pinned to them by a test) on the trimmed words: blank, a character
+  that can't be shown (the question's own line breaks allowed), an answer over 200 code points. The
+  question's 500 are its field's to hold, as the canvas draws a count and no refusal for it. Typed,
+  with no words: the page says them. **Each save's id** (`saveAttemptFor`): minted after the draft's
+  own and after the last save sent whose answer never came, however far behind this computer's
+  clock stands (`eventIdAfter`), the ids compared lower-cased, as Postgres orders them (#319); the
+  same words for the same draft send that unanswered one again under its id. **A save's answer**
+  (`saveDraft`): saved when answered under its own id; answered under another, a later save made in
+  another tab or on another computer holds the draft (decision 12's order, #318), so not saved, with
+  the draft now, whose id the next save is minted after; the draft removed meanwhile, `gone`.
+  **A removal** (`removeDraft`): unordered, as decision 12 has it; one whose answer never came is
+  sent again under its id, and a draft already gone (`saved_question_not_found`) counts as removed.
+  **The API client** gains `put`, and a body on `DELETE`, where a saved question's removal carries
+  its `eventId` (CORS allows both since L3b2). *Known limit:* a new question's save whose answer
+  never came, then other words saved, makes a second draft if the first landed, since a create holds
+  no id of a draft to replace; both show in the list, and either can be removed.
+
 - **2026-10-15** — **W3: the student's home in v2's look, in the teacher's layout with Your classes
   and Help; `/` sends a student who said 13+ there; `/v1/me`'s live session gains its start, for the
   ring.** Built to [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4)
