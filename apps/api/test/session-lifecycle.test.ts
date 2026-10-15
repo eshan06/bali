@@ -4,6 +4,7 @@ import {
   enrollments,
   events,
   expireDueSessions,
+  markSilentParticipations,
   participations,
   startSession,
   tapIn,
@@ -22,7 +23,12 @@ import type {
   TapResponse,
   UnlockResponse,
 } from '@bali/shared';
-import { stateChangeDisposition, tapDisposition, unlockDisposition } from '@bali/shared';
+import {
+  SILENCE_THRESHOLD_MS,
+  stateChangeDisposition,
+  tapDisposition,
+  unlockDisposition,
+} from '@bali/shared';
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -364,6 +370,52 @@ describe('POST /v1/sessions/:id/checkin', () => {
       payload: { deviceTime: now() },
     });
     expect(res.statusCode).toBe(401);
+  });
+
+  /** A check-in from the student, its phone's clock `ms` off. */
+  async function checkInSkewed(
+    c: { student: { cognitoId: string } },
+    sessionId: string,
+    ms: number,
+  ) {
+    return post(await ctx.tokenFor(c.student.cognitoId), `/v1/sessions/${sessionId}/checkin`, {
+      deviceTime: new Date(Date.now() + ms).toISOString(),
+    });
+  }
+
+  async function lastContact(sessionId: string) {
+    const [row] = await db
+      .select()
+      .from(participations)
+      .where(eq(participations.sessionId, sessionId));
+    return row!.lastSeenAt!.getTime();
+  }
+
+  it("a phone with a fast clock still goes silent: last contact is the server's (rule 1)", async () => {
+    // The student sets the phone an hour forward, checks in once, then force-quits. clampToWindow
+    // pins a time past the bell to endsAt, a moment to come, so keying silence off the claim left
+    // `now - last_seen_at` negative for the rest of the lesson: a green chip over a phone that is
+    // gone, rule 3's v2 bug.
+    const c = await seedRunning('checkin-fast');
+    await tap(c.session.id, c.student.id);
+    const res = await checkInSkewed(c, c.session.id, 60 * 60_000);
+    expect(res.json<CheckInResponse>().status).toBe('live');
+    expect(await lastContact(c.session.id)).toBeLessThanOrEqual(Date.now());
+    // ...so the sweep opens an episode once the threshold passes.
+    const later = new Date(Date.now() + SILENCE_THRESHOLD_MS + 5_000);
+    expect(await markSilentParticipations(db, later)).toBe(1);
+  });
+
+  it('a phone with a slow clock does not have its last contact pinned backwards', async () => {
+    // A clock far behind clamped to startedAt at every heartbeat, so the sweep opened an episode,
+    // the next check-in closed it, and the sweep opened it again: two events a minute against
+    // decision 7's "exactly once per episode".
+    const c = await seedRunning('checkin-slow');
+    await tap(c.session.id, c.student.id);
+    await checkInSkewed(c, c.session.id, -60 * 60_000);
+    expect(Math.abs(Date.now() - (await lastContact(c.session.id)))).toBeLessThan(60_000);
+    // Nothing to open: the contact is genuinely recent.
+    expect(await markSilentParticipations(db, new Date())).toBe(0);
   });
 });
 

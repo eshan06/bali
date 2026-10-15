@@ -10,6 +10,13 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-14 (Central) — PV12a, the recap's grouping (#384; `docs/DECISIONS.md`,
+2026-10-14): `recapGroups` in `lib/recap.ts`, no words: who wasn't focused the whole time, each with
+their line and moments, who was, and who didn't join; who joined and every unlock and protection off
+are R2's, so the recap and the report never disagree, and the moments are the student panel's own,
+one list both read (`studentMoments`). Before it, PV11b, the student panel (#383). Next: PV12b, the
+recap._
+
 _Last updated: 2026-10-14 (Central) — PV11b, the student panel (#383; `docs/DECISIONS.md`,
 2026-10-14): ClassStudent's panel, 372 px from the right, opened by a tile, now a button marked
 while its panel is open, and by a pop-up's Open student; the name, when they tapped in, their state

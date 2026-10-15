@@ -1,4 +1,3 @@
-import { SILENCE_THRESHOLD_MS } from '@bali/shared';
 import { and, eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -7,6 +6,8 @@ import {
   checkIn,
   endSession,
   markSilentParticipations,
+  protectionOff,
+  refocus,
   startSession,
   tapIn,
   unlock,
@@ -32,8 +33,8 @@ function one<T>(rows: T[]): T {
   return row;
 }
 
-/** A running session with one enrolled, tapped-in (focused) student. */
-async function seed(tag: string) {
+/** A session that started `ago` back (a minute by default), and one enrolled student it focused. */
+async function seed(tag: string, ago = 60_000) {
   const school = one(
     await db
       .insert(schools)
@@ -67,7 +68,7 @@ async function seed(tag: string) {
   const session = (
     await startSession(db, {
       classId: klass.id,
-      startedAt: new Date(Date.now() - 60_000),
+      startedAt: new Date(Date.now() - ago),
       endsAt: new Date(Date.now() + 25 * 60_000),
     })
   ).session;
@@ -75,7 +76,7 @@ async function seed(tag: string) {
     sessionId: session.id,
     studentId: student.id,
     eventId: randomUUID(),
-    deviceTime: new Date(),
+    deviceTime: session.startedAt,
   });
   return { session, studentId: student.id };
 }
@@ -172,7 +173,7 @@ describe('markSilentParticipations', () => {
     expect(revived.silentSince).toBeNull();
 
     // A heartbeat now must not claim a return from an episode that is over.
-    await checkIn(db, { sessionId: session.id, studentId, deviceTime: new Date() });
+    await checkIn(db, { sessionId: session.id, studentId });
     expect(await eventsOf(session.id, 'came_back')).toHaveLength(0);
 
     // And going quiet again opens a genuinely new episode.
@@ -212,7 +213,7 @@ describe('markSilentParticipations', () => {
 describe('checkIn and silence episodes', () => {
   it('a normal heartbeat writes no history (decision 7)', async () => {
     const { session, studentId } = await seed('sil-heartbeat');
-    const res = await checkIn(db, { sessionId: session.id, studentId, deviceTime: new Date() });
+    const res = await checkIn(db, { sessionId: session.id, studentId });
     expect(res.status).toBe('live');
     expect(await eventsOf(session.id, 'went_silent')).toHaveLength(0);
     expect(await eventsOf(session.id, 'came_back')).toHaveLength(0);
@@ -224,69 +225,77 @@ describe('checkIn and silence episodes', () => {
     await markSilentParticipations(db, new Date());
     expect((await participationOf(session.id, studentId)).silentSince).not.toBeNull();
 
-    const res = await checkIn(db, { sessionId: session.id, studentId, deviceTime: new Date() });
+    const res = await checkIn(db, { sessionId: session.id, studentId });
     expect(res.status).toBe('live');
     expect((await participationOf(session.id, studentId)).silentSince).toBeNull();
     expect(await eventsOf(session.id, 'came_back')).toHaveLength(1);
 
     // The episode is closed — a further heartbeat adds no second came_back.
-    await checkIn(db, { sessionId: session.id, studentId, deviceTime: new Date() });
+    await checkIn(db, { sessionId: session.id, studentId });
     expect(await eventsOf(session.id, 'came_back')).toHaveLength(1);
   });
 
-  it("a phone with a fast clock still goes silent — liveness is the server's observation", async () => {
-    const { session, studentId } = await seed('sil-skew-fast');
-    // The student sets the phone clock an hour forward, checks in once, then
-    // force-quits. clampToWindow pins a device time past the bell to endsAt —
-    // a moment in the future — so keying silence off the device's claim leaves
-    // `now - last_seen_at` negative for the rest of the lesson: a solid green
-    // chip for a phone that is gone, which is rule 3's v2 bug on the new grid.
-    await checkIn(db, {
-      sessionId: session.id,
-      studentId,
-      deviceTime: new Date(Date.now() + 60 * 60_000),
-    });
+  // A check-in takes no time from the phone (decision 7): what a fast or slow
+  // clock does to it is pinned where the claim arrives, the route's tests
+  // (apps/api/test/session-lifecycle.test.ts).
+});
 
-    const row = one(
-      await db
-        .select()
-        .from(participations)
-        .where(
-          and(eq(participations.sessionId, session.id), eq(participations.studentId, studentId)),
-        ),
-    );
-    expect(row.lastSeenAt).not.toBeNull();
-    expect(row.lastSeenAt!.getTime()).toBeLessThanOrEqual(Date.now());
+describe('a came_back is the server’s, never the phone’s claim (decision 7)', () => {
+  const MINUTE = 60_000;
 
-    // ...so the sweep still opens an episode once the threshold passes. Scoped
-    // to this session: the suite shares one database, so the global count also
-    // picks up earlier tests' rows.
-    await markSilentParticipations(db, new Date(Date.now() + SILENCE_THRESHOLD_MS + 5_000));
+  /**
+   * A phone 20 minutes into a lesson, quiet since 12 minutes ago, which the sweep marked silent 10
+   * minutes ago. What it sends next claims 15 minutes ago: a record made out of contact reads so,
+   * and so does every record from a clock set back.
+   */
+  async function wentQuiet(tag: string) {
+    const { session, studentId } = await seed(tag, 20 * MINUTE);
+    await backdateContact(session.id, studentId, 12 * MINUTE);
+    // Counted in this session alone: the suite shares one database.
+    await markSilentParticipations(db, new Date(Date.now() - 10 * MINUTE));
     expect(await eventsOf(session.id, 'went_silent')).toHaveLength(1);
-  });
-
-  it('a phone with a slow clock does not have its last contact pinned backwards', async () => {
-    // The mirror case: a clock far behind clamps to startedAt on every
-    // heartbeat, so the sweep opens an episode, the next check-in closes it,
-    // and the sweep reopens it — two event rows a minute against decision 7's
-    // "exactly once per episode".
-    const { session, studentId } = await seed('sil-skew-slow');
-    await checkIn(db, {
+    const sent = () => ({
       sessionId: session.id,
       studentId,
-      deviceTime: new Date(Date.now() - 60 * 60_000),
+      eventId: randomUUID(),
+      deviceTime: new Date(Date.now() - 15 * MINUTE),
     });
-    const row = one(
-      await db
-        .select()
-        .from(participations)
-        .where(
-          and(eq(participations.sessionId, session.id), eq(participations.studentId, studentId)),
-        ),
-    );
-    expect(Math.abs(Date.now() - row.lastSeenAt!.getTime())).toBeLessThan(60_000);
-    // Nothing to open: the contact is genuinely recent, so no episode flaps.
-    await markSilentParticipations(db, new Date());
-    expect(await eventsOf(session.id, 'went_silent')).toHaveLength(0);
+    return { session, studentId, sent };
+  }
+
+  it.each(['tap', 'refocus', 'unlock', 'protection off'] as const)(
+    'closed by the phone’s %s, which claims a time before the silence: stamped when the server heard it',
+    async (kind) => {
+      const { session, sent } = await wentQuiet(`back-${kind.replace(' ', '-')}`);
+      const heard = Date.now();
+      if (kind === 'tap') await tapIn(db, sent());
+      else if (kind === 'refocus') await refocus(db, sent());
+      else if (kind === 'unlock') await unlock(db, sent());
+      else await protectionOff(db, sent());
+
+      const silent = one(await eventsOf(session.id, 'went_silent'));
+      const back = one(await eventsOf(session.id, 'came_back'));
+      // Stamped with the claim, it fell 5 minutes before the went_silent it closes.
+      expect(back.occurredAt.getTime()).toBeGreaterThan(silent.occurredAt.getTime());
+      expect(back.occurredAt.getTime()).toBeGreaterThanOrEqual(heard);
+      expect(back.occurredAt.getTime()).toBeLessThanOrEqual(Date.now());
+    },
+  );
+
+  it('is never before the went_silent it closes, though the sweep’s clock ran ahead', async () => {
+    // Two processes sweep and hear phones, each by its own clock: a went_silent stamped a little
+    // ahead of the contact that closes it still comes first.
+    const { session, studentId } = await seed('back-sweep-ahead');
+    await backdateContact(session.id, studentId, SILENT_AGO);
+    await markSilentParticipations(db, new Date(Date.now() + 2 * MINUTE));
+    await tapIn(db, {
+      sessionId: session.id,
+      studentId,
+      eventId: randomUUID(),
+      deviceTime: new Date(),
+    });
+
+    const silent = one(await eventsOf(session.id, 'went_silent'));
+    expect(one(await eventsOf(session.id, 'came_back')).occurredAt).toEqual(silent.occurredAt);
   });
 });

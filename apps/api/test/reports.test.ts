@@ -18,6 +18,7 @@ import { backdateLastSeen } from '@bali/db/testing';
 import {
   type ActionOrder,
   type ApiErrorBody,
+  type EventsPage,
   SESSION_REPORTS_PAGE_LIMIT,
   type SessionReportResponse,
   type SessionReportsPage,
@@ -216,6 +217,46 @@ describe('GET /v1/classes/:id/reports/sessions/:sessionId', () => {
       focusMinutes: 25,
       averageFocusMinutes: 12,
     });
+  });
+
+  it('keeps the silence of a phone whose clock is behind: its came_back is the server’s, after its went_silent', async () => {
+    // Ana's phone, its clock 15 minutes slow, goes quiet after 09:01 and the sweep marks it silent
+    // at 09:05. It checks in at 09:08 by the server's clock, claiming 08:53. Stamped with that
+    // claim (held to 09:00), its came_back fell before its went_silent, and the report counted
+    // her 3 silent minutes as focus: 24 focused, 0 silent (decision 7: the pair is the server's).
+    const c = await seedClassroom(db, 'slow-clock');
+    const session = await lesson(c.klass.id);
+    await tapIn(db, move(session.id, c.student.id, at(1)));
+    await backdateLastSeen(db, { sessionId: session.id, studentId: c.student.id }, at(1));
+    expect(await markSilentParticipations(db, at(5))).toBe(1);
+    now = at(8);
+    const back = await authedInject(ctx.app, await ctx.tokenFor(c.student.cognitoId), {
+      method: 'POST',
+      url: `/v1/sessions/${session.id}/checkin`,
+      payload: { deviceTime: at(-7).toISOString() },
+    });
+    expect(back.statusCode).toBe(200);
+    await endSession(db, { sessionId: session.id, at: at(25), reason: 'expired' });
+    now = at(30);
+
+    // 09:01 to 09:05, then 09:08 to the bell.
+    const res = await reportAs(c.teacher.cognitoId, c.klass.id, session.id);
+    expect(res.json<SessionReportResponse>()).toMatchObject({
+      focusMinutes: 21,
+      averageFocusMinutes: 21,
+      silentMinutes: 3,
+    });
+    // And the feed the recap and the student panel place them by: silent at 09:05, back at 09:08.
+    const feed = await authedInject(ctx.app, await ctx.tokenFor(c.teacher.cognitoId), {
+      method: 'GET',
+      url: `/v1/sessions/${session.id}/events?after=0`,
+    });
+    const when = (type: string) =>
+      feed.json<EventsPage>().events.find((e) => e.type === type)?.occurredAt;
+    expect([when('went_silent'), when('came_back')]).toEqual([
+      at(5).toISOString(),
+      at(8).toISOString(),
+    ]);
   });
 
   it('answers a session not over yet: to now while it runs, to its bell past it, ended once swept', async () => {
@@ -421,7 +462,7 @@ describe('GET /v1/classes/:id/reports/sessions', () => {
     const stuck = move(eventful.id, ben.id, at(66), { install, seq: 2 });
     await tapIn(db, move(eventful.id, ben.id, at(67), { install, seq: 3 }));
     expect((await unlock(db, stuck)).recordedAs).toBe('superseded');
-    await checkIn(db, { sessionId: eventful.id, studentId: ana.id, deviceTime: at(68, 30) });
+    await checkIn(db, { sessionId: eventful.id, studentId: ana.id, now: at(68, 30) });
     await protectionOff(db, move(eventful.id, ben.id, at(77, 20)));
     await endSession(db, { sessionId: eventful.id, at: at(85), reason: 'expired' });
     // No one joined.

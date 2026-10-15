@@ -25,6 +25,7 @@ import {
   and,
   asc,
   between,
+  desc,
   eq,
   gt,
   gte,
@@ -1988,16 +1989,7 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
           await fileKeptUnlocks(tx, session, input, null);
           return { outcome: 'replay', state: null, participationId: null, session: null };
         }
-        await closeOpenSilence(
-          tx,
-          {
-            id: live.id,
-            sessionId: session.id,
-            classId: session.classId,
-            studentId: live.studentId,
-          },
-          occurredAt,
-        );
+        await closeOpenSilence(tx, session, live, now);
         await tx
           .update(participations)
           .set({ lastSeenAt: heardNow() })
@@ -2024,18 +2016,7 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
       // ended_at IS NULL guard skips it, and the upsert clears the stale marker
       // without a came_back, because that episode ended with the stint.
       const priorStint = await loadParticipation(tx, session.id, input.studentId);
-      if (priorStint) {
-        await closeOpenSilence(
-          tx,
-          {
-            id: priorStint.id,
-            sessionId: session.id,
-            classId: session.classId,
-            studentId: input.studentId,
-          },
-          occurredAt,
-        );
-      }
+      if (priorStint) await closeOpenSilence(tx, session, priorStint, now);
 
       const upserted = firstOrUndefined(
         await tx
@@ -2120,32 +2101,55 @@ async function fileKeptUnlocks(
  * that phone's NEXT went_silent forever (decision 7 promises the pair fires
  * exactly once per episode). The guarded UPDATE keeps it to one event even if
  * two contacts race; `ended_at IS NULL` keeps it to a live participation, like
- * the sweep and checkIn.
+ * the sweep.
+ *
+ * The pair is server-minted (decision 7), so the `came_back` is stamped `heard`,
+ * when the server heard the phone, never with the claim of what the phone sent:
+ * a record made out of contact, or a clock set back, would put the return before
+ * the silence, and the report (R2) would count that silence as focus. Held to the
+ * window, and never before the `went_silent` it closes, read from the event
+ * itself: the sweep stamps it by its own clock, which can run ahead of this one.
  */
 async function closeOpenSilence(
   tx: Database,
-  p: { id: string; sessionId: string; classId: string; studentId: string },
-  at: Date,
+  session: SessionRow,
+  row: Pick<ParticipationRow, 'id' | 'studentId'>,
+  heard: Date,
 ): Promise<void> {
   const closed = await tx
     .update(participations)
     .set({ silentSince: null })
     .where(
       and(
-        eq(participations.id, p.id),
+        eq(participations.id, row.id),
         isNotNull(participations.silentSince),
         isNull(participations.endedAt),
       ),
     )
     .returning({ id: participations.id });
   if (closed.length === 0) return;
+  const back = clampToWindow(heard, session.startedAt, session.endsAt);
+  const silent = firstOrUndefined(
+    await tx
+      .select({ at: events.occurredAt })
+      .from(events)
+      .where(
+        and(
+          eq(events.userId, row.studentId),
+          eq(events.sessionId, session.id),
+          eq(events.type, 'went_silent'),
+        ),
+      )
+      .orderBy(desc(events.occurredAt))
+      .limit(1),
+  );
   await insertEvent(tx, {
     eventId: newUuidV7(),
     type: 'came_back',
-    sessionId: p.sessionId,
-    classId: p.classId,
-    userId: p.studentId,
-    occurredAt: at,
+    sessionId: session.id,
+    classId: session.classId,
+    userId: row.studentId,
+    occurredAt: silent !== undefined && silent.at > back ? silent.at : back,
   });
 }
 
@@ -2305,16 +2309,7 @@ async function changeState<Ended = never>(
         throw new TransitionError(onlyOutOf.code, onlyOutOf.message);
       }
 
-      await closeOpenSilence(
-        tx,
-        {
-          id: row.id,
-          sessionId: session.id,
-          classId: session.classId,
-          studentId: input.studentId,
-        },
-        occurredAt,
-      );
+      await closeOpenSilence(tx, session, row, input.now ?? heardNow());
       // Late, it is contact and nothing more: what went ahead of it stands, and
       // the answer is its retry's — the truth now, which the phone applies.
       if (late) {
@@ -2766,16 +2761,7 @@ async function unlockIn(
   }
 
   if (live && note === null) {
-    await closeOpenSilence(
-      tx,
-      {
-        id: live.id,
-        sessionId: session.id,
-        classId: session.classId,
-        studentId: input.studentId,
-      },
-      occurredAt,
-    );
+    await closeOpenSilence(tx, session, live, heardNow());
     await tx
       .update(participations)
       .set({ state: 'unlocked', lastSeenAt: heardNow() })
@@ -2800,16 +2786,7 @@ async function unlockIn(
     // cases — but contact must never leave one open. The answer names the
     // state left alone, which the phone applies — after a late unlock, what
     // the student's own later changes made it.
-    await closeOpenSilence(
-      tx,
-      {
-        id: live.id,
-        sessionId: session.id,
-        classId: session.classId,
-        studentId: input.studentId,
-      },
-      occurredAt,
-    );
+    await closeOpenSilence(tx, session, live, heardNow());
     await tx
       .update(participations)
       .set({ lastSeenAt: heardNow() })
@@ -3217,7 +3194,8 @@ export async function protectionOff(
 export interface CheckInInput {
   sessionId: string;
   studentId: string;
-  deviceTime: Date;
+  /** The server's clock as it heard the check-in, which stamps a `came_back`; now by default. */
+  now?: Date;
 }
 export interface CheckInResult {
   /** 'live' with the current state, or 'gone' when there's no live participation to touch. */
@@ -3232,7 +3210,8 @@ export interface CheckInResult {
  * adds an events row, because nothing changed. The response carries the
  * current session (its end time, so a phone that missed an extension learns
  * of it) and the stored state; silence is derived from `last_seen_at` on read,
- * not stored here.
+ * not stored here. The phone's own time stamps nothing: last contact and a
+ * `came_back` are the server's (rule 1, decision 7), so it is not taken.
  */
 export async function checkIn(db: Database, input: CheckInInput): Promise<CheckInResult> {
   const session = await loadSession(db, input.sessionId);
@@ -3240,8 +3219,6 @@ export async function checkIn(db: Database, input: CheckInInput): Promise<CheckI
 
   const live = await loadLiveParticipation(db, input.sessionId, input.studentId);
   if (!live) return { status: 'gone', state: null, session };
-
-  const seenAt = clampToWindow(input.deviceTime, session.startedAt, session.endsAt);
 
   // The common heartbeat: no silence episode open, so a single cheap UPDATE and
   // no events row (decision 7 — a heartbeat that changes nothing writes no
@@ -3254,11 +3231,12 @@ export async function checkIn(db: Database, input: CheckInInput): Promise<CheckI
     return { status: 'live', state: live.state, session };
   }
 
-  // Closing a silence episode IS a change, so it earns a `came_back` event. The
-  // guarded UPDATE (silent_since IS NOT NULL) emits exactly one per episode even
-  // if two check-ins race — the loser just records its heartbeat. (If a sweep
-  // opens an episode between the read above and here, the next check-in closes
-  // it: a one-heartbeat lag, never a lost or duplicated `came_back`.)
+  // Closing a silence episode IS a change, so it earns a `came_back` event
+  // (`closeOpenSilence`): its guarded UPDATE emits exactly one per episode even if
+  // two check-ins race — the loser just records its heartbeat — and none on a row
+  // a racing endSession just ended. (If a sweep opens an episode between the read
+  // above and here, the next check-in closes it: a one-heartbeat lag, never a lost
+  // or duplicated `came_back`.)
   //
   // Retry on deadlock, as the sweep does: this takes the row first and the
   // session's key-share lock (the event's foreign key) second, while a state
@@ -3267,35 +3245,11 @@ export async function checkIn(db: Database, input: CheckInInput): Promise<CheckI
   // the episode only if nothing closed it meanwhile.
   return withDeadlockRetry(() =>
     db.transaction(async (tx) => {
-      const closed = await tx
+      await closeOpenSilence(tx, session, live, input.now ?? heardNow());
+      await tx
         .update(participations)
-        .set({ lastSeenAt: heardNow(), silentSince: null })
-        // `ended_at IS NULL` (like the sweep's guard) keeps `came_back` on a live
-        // participation only: a check-in racing endSession then records no
-        // came_back on the just-ended row (it falls through to the heartbeat below).
-        .where(
-          and(
-            eq(participations.id, live.id),
-            isNotNull(participations.silentSince),
-            isNull(participations.endedAt),
-          ),
-        )
-        .returning({ id: participations.id });
-      if (closed.length === 0) {
-        await tx
-          .update(participations)
-          .set({ lastSeenAt: heardNow() })
-          .where(eq(participations.id, live.id));
-        return { status: 'live', state: live.state, session };
-      }
-      await insertEvent(tx, {
-        eventId: newUuidV7(),
-        type: 'came_back',
-        sessionId: session.id,
-        classId: session.classId,
-        userId: input.studentId,
-        occurredAt: seenAt,
-      });
+        .set({ lastSeenAt: heardNow() })
+        .where(eq(participations.id, live.id));
       return { status: 'live', state: live.state, session };
     }),
   );

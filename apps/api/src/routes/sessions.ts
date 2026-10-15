@@ -180,10 +180,11 @@ export function registerSessionsRoute(
     async (request): Promise<CheckInResponse> => {
       const identity = requireAuth(request);
       const { id: sessionId } = parseRequest(request, 'params', SessionParams);
-      const body = parseRequest(request, 'body', CheckInBody);
+      // Checked as /v1 ships it; the phone's deviceTime stamps nothing (rule 1, decision 7).
+      parseRequest(request, 'body', CheckInBody);
       const student = await findOrCreateStudent(db, identity.sub);
       const result = await mapTransitionError(() =>
-        checkIn(db, { sessionId, studentId: student.id, deviceTime: new Date(body.deviceTime) }),
+        checkIn(db, { sessionId, studentId: student.id, now: clock() }),
       );
       return {
         status: result.status,

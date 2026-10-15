@@ -3426,20 +3426,16 @@ describe('checkIn', () => {
     });
     const before = (await eventsFor(session.id)).length;
 
-    const r = await checkIn(db, {
-      sessionId: session.id,
-      studentId: student.id,
-      deviceTime: new Date('2026-01-01T09:02:00Z'),
-    });
+    const r = await checkIn(db, { sessionId: session.id, studentId: student.id });
     expect(r.status).toBe('live');
     expect(r.state).toBe('focused');
     expect((await eventsFor(session.id)).length).toBe(before);
     const live = one(
       await db.select().from(participations).where(eq(participations.sessionId, session.id)),
     );
-    // last_seen_at is the server's observation, never the device's claim: the
-    // heartbeat carries a 2026-01-01 device time and the row still records when
-    // this process actually heard from the phone.
+    // last_seen_at is the server's observation, never a claim of the phone's
+    // (rule 1), and never held to the window: the lesson ran on 2026-01-01, and
+    // the row records when this process actually heard from the phone.
     expect(live.lastSeenAt).not.toBeNull();
     expect(live.lastSeenAt!.getTime()).toBeGreaterThan(new Date('2026-01-02T00:00:00Z').getTime());
     expect(Math.abs(Date.now() - live.lastSeenAt!.getTime())).toBeLessThan(60_000);
@@ -3451,11 +3447,7 @@ describe('checkIn', () => {
       classId: klass.id,
       ...window('2026-01-01T09:00:00Z'),
     });
-    const r = await checkIn(db, {
-      sessionId: session.id,
-      studentId: student.id,
-      deviceTime: new Date('2026-01-01T09:02:00Z'),
-    });
+    const r = await checkIn(db, { sessionId: session.id, studentId: student.id });
     expect(r.status).toBe('gone');
   });
 });
@@ -5818,11 +5810,7 @@ describe('enrollment lifecycle', () => {
       at: new Date('2026-01-01T09:05:00Z'),
     });
 
-    const checkin = await checkIn(db, {
-      sessionId: session.id,
-      studentId: student.id,
-      deviceTime: new Date('2026-01-01T09:06:00Z'),
-    });
+    const checkin = await checkIn(db, { sessionId: session.id, studentId: student.id });
     expect(checkin.status).toBe('gone');
 
     const u = await unlock(db, {
