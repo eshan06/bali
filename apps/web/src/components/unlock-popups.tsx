@@ -10,8 +10,8 @@ import { bellTime } from '@/lib/session-controls';
 export interface Unlock {
   /** The unlock's own event id: one pop-up per unlock. */
   eventId: string;
-  /** The student as their tile names them. */
-  name: string;
+  /** Who unlocked, named as their tile names them, as it names them now (`UnlockPopups`). */
+  studentId: string;
   /** The reason they gave, the latest one (A20). */
   reason: UnlockReason | null;
   /** When the server recorded it. */
@@ -57,23 +57,18 @@ export function popupsAfter(state: Popups, action: PopupAction): Popups {
 
 /**
  * What one streamed event tells the pop-ups, if anything: an unlock that landed live (`live`, the
- * grid's `landsLive`, as its tile's pulse), its student named as their tile names them; or a new
- * reason for an unlock (A20), whichever unlock it names.
+ * grid's `landsLive`, as its tile's pulse); or a new reason for an unlock (A20), whichever unlock it
+ * names.
  */
-export function unlockNews(
-  e: FeedEvent,
-  live: boolean,
-  students: Students | null,
-): UnlockNews | null {
+export function unlockNews(e: FeedEvent, live: boolean): UnlockNews | null {
   const { reason: given, unlock_event_id: of } = (e.payload ?? {}) as {
     reason?: unknown;
     unlock_event_id?: unknown;
   };
   const reason = isUnlockReason(given) ? given : null;
   if (e.type === 'unlock' && live) {
-    const id = e.userId ?? '';
-    const name = students?.[id]?.displayName ?? id.slice(0, 8);
-    return { kind: 'unlock', unlock: { eventId: e.eventId, name, reason, at: e.occurredAt } };
+    const unlock = { eventId: e.eventId, studentId: e.userId ?? '', reason, at: e.occurredAt };
+    return { kind: 'unlock', unlock };
   }
   if (e.type === 'unlock_reason_changed' && typeof of === 'string') {
     return { kind: 'reason', eventId: of, reason };
@@ -100,8 +95,8 @@ const LAYER =
 /**
  * The stack as ClassUnlocks draws it: 96 px from the frame's top and 18 px from its right, 380 px
  * wide at most, 10 px apart. It stays in view as the page scrolls, 18 px from the top (v2.css's
- * `.toast`), so an unlock is never left above a grid scrolled to its last row; at rest the two are
- * one.
+ * `.toast`), so a new unlock isn't left above a grid scrolled to its last row; at rest the two are
+ * one. A stack taller than the page under it scrolls with the page.
  */
 const STACK =
   'sticky top-4.5 mt-24 mr-4.5 ml-auto flex w-95 max-w-[calc(100%-36px)] flex-col gap-2.5';
@@ -123,12 +118,17 @@ const POPUP =
  */
 export function UnlockPopups({
   unlocks,
+  students,
   onClose,
 }: {
   unlocks: readonly Unlock[];
+  /** The grid's students, so a pop-up names each as their tile does now. */
+  students: Students;
   onClose: (eventId: string) => void;
 }) {
   if (unlocks.length === 0) return null;
+  // As the tile names them: their display name, else the start of their id until the grid has it.
+  const nameOf = (u: Unlock) => students[u.studentId]?.displayName ?? u.studentId.slice(0, 8);
   return (
     <div className={LAYER}>
       <div className={STACK}>
@@ -140,7 +140,7 @@ export function UnlockPopups({
             <div role="alert" className="min-w-0">
               {/* 15/20 semibold, the size of a tile's name. */}
               <p id={`unlock-${u.eventId}`} className="text-tile-name wrap-break-word">
-                {u.name} used Emergency Unlock
+                {nameOf(u)} used Emergency Unlock
               </p>
               <p className="mt-0.5 text-caption text-text-secondary">
                 {u.reason === null ? 'No reason given' : REASON[u.reason]}

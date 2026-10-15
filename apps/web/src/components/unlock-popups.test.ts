@@ -29,11 +29,16 @@ const read = (path: string) => readFileSync(fileURLToPath(new URL(path, import.m
 const AT = '2026-10-07T14:31:00.000Z';
 const unlock = (eventId: string, over: Partial<Unlock> = {}): Unlock => ({
   eventId,
-  name: 'Ethan Park',
+  studentId: 'u1-0000-aaaa',
   reason: 'nurse',
   at: AT,
   ...over,
 });
+/** The grid's students: one named, one with no name yet. */
+const STUDENTS = {
+  'u1-0000-aaaa': { displayName: 'Ethan Park' } as Student,
+  'u2-0000-bbbb': { displayName: null } as Student,
+} satisfies Students;
 const opened = (u: Unlock): PopupAction => ({ kind: 'unlock', unlock: u });
 const run = (...actions: PopupAction[]) => actions.reduce(popupsAfter, NO_POPUPS);
 const ids = (actions: PopupAction[]) => run(...actions).open.map((u) => u.eventId);
@@ -57,10 +62,7 @@ describe('the pop-ups open (ClassUnlocks)', () => {
   });
 
   it('keeps two of one student’s unlocks apart: each is its own', () => {
-    expect(ids([opened(unlock('a')), opened(unlock('b', { name: 'Ethan Park' }))])).toEqual([
-      'b',
-      'a',
-    ]);
+    expect(ids([opened(unlock('a')), opened(unlock('b'))])).toEqual(['b', 'a']);
   });
 
   it('never opens one twice: not while it is open, nor once it is closed', () => {
@@ -105,35 +107,21 @@ describe('what the stream tells the pop-ups', () => {
     payload: { reason: 'nurse' },
     ...over,
   });
-  const students = {
-    'u1-0000-aaaa': { displayName: 'Ethan Park' } as Student,
-    'u2-0000-bbbb': { displayName: null } as Student,
-  } satisfies Students;
 
   it('opens a pop-up for an unlock that landed live, as its tile pulses', () => {
-    expect(unlockNews(event({}), true, students)).toEqual({
+    expect(unlockNews(event({}), true)).toEqual({
       kind: 'unlock',
-      unlock: { eventId: 'e1', name: 'Ethan Park', reason: 'nurse', at: AT },
+      unlock: { eventId: 'e1', studentId: 'u1-0000-aaaa', reason: 'nurse', at: AT },
     });
     // One the boot snapshot already held, which the stream's first connect replays: none.
-    expect(unlockNews(event({}), false, students)).toBeNull();
-  });
-
-  it('names the student as their tile does: no name, or not on the grid yet, by their id', () => {
-    const named = (userId: string) => {
-      const news = unlockNews(event({ userId }), true, students);
-      return news?.kind === 'unlock' ? news.unlock.name : null;
-    };
-    expect(named('u2-0000-bbbb')).toBe('u2-0000-');
-    expect(named('u3-0000-cccc')).toBe('u3-0000-');
-    expect(unlockNews(event({}), true, null)).toMatchObject({ unlock: { name: 'u1-0000-' } });
+    expect(unlockNews(event({}), false)).toBeNull();
   });
 
   it('reads a reason it doesn’t know, or none, as none', () => {
     for (const payload of [{}, { reason: 'lunch' }, null, 'nurse']) {
-      expect(unlockNews(event({ payload }), true, students), JSON.stringify(payload)).toMatchObject(
-        { unlock: { reason: null } },
-      );
+      expect(unlockNews(event({ payload }), true), JSON.stringify(payload)).toMatchObject({
+        unlock: { reason: null },
+      });
     }
   });
 
@@ -142,26 +130,26 @@ describe('what the stream tells the pop-ups', () => {
       type: 'unlock_reason_changed',
       payload: { unlock_event_id: 'e0', reason: 'bathroom' },
     });
-    expect(unlockNews(changed, false, students)).toEqual({
+    expect(unlockNews(changed, false)).toEqual({
       kind: 'reason',
       eventId: 'e0',
       reason: 'bathroom',
     });
-    expect(
-      unlockNews(event({ type: 'unlock_reason_changed', payload: {} }), false, students),
-    ).toBeNull();
+    expect(unlockNews(event({ type: 'unlock_reason_changed', payload: {} }), false)).toBeNull();
   });
 
   it('says nothing of any other event', () => {
     for (const type of ['tap_in', 'refocus', 'protection_off', 'session_ended'] as const) {
-      expect(unlockNews(event({ type }), true, students), type).toBeNull();
+      expect(unlockNews(event({ type }), true), type).toBeNull();
     }
   });
 });
 
 describe('a pop-up, as ClassUnlock draws it', () => {
-  const render = (unlocks: Unlock[]) =>
-    renderToStaticMarkup(createElement(UnlockPopups, { unlocks, onClose: () => undefined }));
+  const render = (unlocks: Unlock[], students: Students = STUDENTS) =>
+    renderToStaticMarkup(
+      createElement(UnlockPopups, { unlocks, students, onClose: () => undefined }),
+    );
   /** Each pop-up's markup, top to bottom. */
   const popups = (html: string) =>
     html.match(/<div class="pointer-events-auto[^]*?<\/button>/g) ?? [];
@@ -184,6 +172,19 @@ describe('a pop-up, as ClassUnlock draws it', () => {
     // The title 15/20 semibold, the line 13/18 in the secondary ink, 2 px under it.
     expect(words).toMatch(/<p id="unlock-e1" class="text-tile-name wrap-break-word">/);
     expect(words).toMatch(/<p class="mt-0\.5 text-caption text-text-secondary">/);
+  });
+
+  it('names the student as their tile does now: no name, or not on the grid yet, by their id', () => {
+    const named = (studentId: string, students: Students = STUDENTS) =>
+      /<p id="unlock-e1"[^>]*>([^<]*) used Emergency Unlock<\/p>/.exec(
+        render([unlock('e1', { studentId })], students),
+      )?.[1];
+    expect(named('u1-0000-aaaa')).toBe('Ethan Park');
+    expect(named('u2-0000-bbbb')).toBe('u2-0000-');
+    expect(named('u3-0000-cccc')).toBe('u3-0000-');
+    // A joiner the grid learns of after their unlock: named once the grid's refresh names them.
+    const later = { ...STUDENTS, 'u3-0000-cccc': { displayName: 'Zuri Mensah' } as Student };
+    expect(named('u3-0000-cccc', later)).toBe('Zuri Mensah');
   });
 
   it('says each reason as the student’s tile does, and none as the recap does', () => {
@@ -264,9 +265,9 @@ describe('a pop-up, as ClassUnlock draws it', () => {
 
   it('stacks several, newest on top, 380 px wide, 96 px from the frame’s top and 18 from its right', () => {
     const html = render([
-      unlock('c', { name: 'Ethan Park' }),
-      unlock('b', { name: 'Diego Ramírez', reason: null }),
-      unlock('a', { name: 'Jaylen Brooks', reason: 'bathroom' }),
+      unlock('c'),
+      unlock('b', { studentId: 'u2-0000-bbbb', reason: null }),
+      unlock('a', { reason: 'bathroom' }),
     ]);
     expect(popups(html).map((p) => /<p id="unlock-(\w)"/.exec(p)?.[1])).toEqual(['c', 'b', 'a']);
     // The layer over the frame (30/36 px in, 22/16 on a phone), taking no clicks but the pop-ups'.
@@ -312,7 +313,7 @@ describe('the pop-ups on the class page', () => {
   it('opens one for each unlock the live grid’s stream brings, as its tile pulses', () => {
     expect(grid).toMatch(/const \[popups, tell\] = useReducer\(popupsAfter, NO_POPUPS\);/);
     expect(grid).toMatch(
-      /const live = landsLive\(e, snap\.latestSeq\);\s*if \(live\) setLiveUnlocks\(\(prev\) => new Set\(prev\)\.add\(e\.eventId\)\);\s*const news = unlockNews\(e, live, drawn\.current\);\s*if \(news\) tell\(news\);/,
+      /const live = landsLive\(e, snap\.latestSeq\);\s*if \(live\) setLiveUnlocks\(\(prev\) => new Set\(prev\)\.add\(e\.eventId\)\);\s*const news = unlockNews\(e, live\);\s*if \(news\) tell\(news\);/,
     );
   });
 
@@ -320,7 +321,7 @@ describe('the pop-ups on the class page', () => {
     // Held by the grid, so they go with the session's live page, as ClassUnlock draws them; kept
     // while Present is on, and shown again once it is off.
     expect(grid).toMatch(
-      /\{livePage && !present \? \(\s*<UnlockPopups\s+unlocks=\{popups\.open\}\s+onClose=\{\(eventId\) => tell\(\{ kind: 'close', eventId \}\)\}\s*\/>\s*\) : null\}\s*<\/div>\s*\);\s*\}\s*$/,
+      /\{livePage && !present \? \(\s*<UnlockPopups\s+unlocks=\{popups\.open\}\s+students=\{students\}\s+onClose=\{\(eventId\) => tell\(\{ kind: 'close', eventId \}\)\}\s*\/>\s*\) : null\}\s*<\/div>\s*\);\s*\}\s*$/,
     );
     // Only the live page's grid takes `livePage`: How it ended's never streams, and opens none.
     const grids = page.match(/<LiveGrid\b[^]*?\/>/g) ?? [];

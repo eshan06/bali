@@ -349,11 +349,6 @@ export function LiveGrid({
     onCountsRef.current = onCounts;
   }, [onEnded, onSession, onCounts]);
   const [students, setStudents] = useState<Students | null>(null);
-  // The students as last drawn, read where an event lands: the name an unlock's pop-up gives.
-  const drawn = useRef<Students | null>(null);
-  useEffect(() => {
-    drawn.current = students;
-  }, [students]);
   // Over when it boots (R5's grid under the recap card): drawn once, holding none of the streams.
   const [over, setOver] = useState(false);
   const [now, setNow] = useState(() => new Date());
@@ -409,7 +404,7 @@ export function LiveGrid({
             setStudents((prev) => (prev ? applyEvent(prev, e) : prev));
             const live = landsLive(e, snap.latestSeq);
             if (live) setLiveUnlocks((prev) => new Set(prev).add(e.eventId));
-            const news = unlockNews(e, live, drawn.current);
+            const news = unlockNews(e, live);
             if (news) tell(news);
             if (e.seq > appliedSeq.current) appliedSeq.current = e.seq;
             lastStreamActivity.current = Date.now();
@@ -568,6 +563,7 @@ export function LiveGrid({
       {livePage && !present ? (
         <UnlockPopups
           unlocks={popups.open}
+          students={students}
           onClose={(eventId) => tell({ kind: 'close', eventId })}
         />
       ) : null}

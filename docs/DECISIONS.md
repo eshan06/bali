@@ -15,8 +15,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   **The pop-up** (`components/unlock-popups.tsx`) is v2.css's `.toast`: white, a hairline and a 3 px
   orange-400 top edge (the colour `unlock-edge`), 14 px corners, `shadow-3`, 14/10/14/16 px in; the
   lock in its tint's 36 px well; "Ethan Park used Emergency Unlock" at 15/20 semibold (the tile name's
-  size) over "Nurse · 9:31 AM" at 13/18, the reason as the tile says it ("Other reason") and none as
-  the recap says it ("No reason given"); Close, 32 px. The stack is 380 px wide, 96 px from the
+  size) over "Nurse · 9:31 AM" at 13/18, the student named as their tile names them now (a joiner
+  the grid learns of after their unlock is named once the grid's refresh names them; santa's
+  review), the reason as the tile says it ("Other reason") and none as the recap says it ("No
+  reason given"); Close, 32 px. The stack is 380 px wide, 96 px from the
   page frame's top and 18 px from its right, 10 px apart, newest on top, as ClassUnlocks draws it.
   **When one opens:** for each unlock the live stream brings, the same cue as the tile's pulse
   (`landsLive`), so never for one the page booted with; and for one whose tile stays still too (an
