@@ -8,6 +8,28 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-15** — **Anything new shown about a student is never an intermediate state: it waits
+  for the owner's approval like a new screen. A new error or refusal line at sign-in or the 13+
+  check is an intermediate state like any other (the owner's answer).** It closes the limit left
+  open in the entry below (#398), which santa's Reviewer B and Claude Review had raised. The
+  conductor asked the owner: "Some of them touch privacy or security: a new 'can't sign in'
+  message, a refusal at the 13+ age check, or something new shown about a student (like a rare case
+  on the recap). Should those always wait for you?" The owner chose "Only student info waits":
+  "New sign-in and 13+ refusals get drawn and built like any in-between state. Only something new
+  shown about a student waits for you." **The rule** (CLAUDE.md, Working rules, and its "UI:"
+  standing order): a new error or refusal line at sign-in or the 13+ check, even one that tells
+  someone about their own account, is drawn on its screen's canvas first, labelled as an
+  intermediate state, and built from that drawing without waiting for the owner's approval;
+  anything new shown about a student that no approved board shows there (a fact, label, row or
+  rare case, on the recap, a report, the grid, the student panel or anywhere else) waits for it,
+  and a state the worker isn't sure is intermediate still counts as a new screen. Santa's round 1
+  added "there" (new where it shows: an unlock's reason, which the teacher's grid shows, is still
+  new on Present, which the class sees) and "about their own account" (so no refusal line reads as
+  both). DESIGN.md (Sources) and PLAN's redesign steps say so too. **Also:** "Restoring a
+  previously shipped look on the owner's order is the only exception" now says "the only other
+  exception", since the intermediate state before it is an exception too (Claude Review's WARN
+  on #398).
+
 - **2026-10-15** — **An intermediate state of an approved screen that no board draws is drawn on
   the canvas first, labelled as one, and then built from that drawing, without waiting for the
   owner's approval; anything else no board draws still waits for the owner (the owner's rule).**
