@@ -1,0 +1,6 @@
+{
+  // The root's own TypeScript: vitest.workers.ts, which each package's vitest config imports. Its
+  // project for the linter's type-aware rules; the packages' typechecks check it through those configs.
+  "extends": "./tsconfig.base.json",
+  "include": ["vitest.workers.ts"]
+}
