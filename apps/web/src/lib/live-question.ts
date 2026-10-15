@@ -207,10 +207,11 @@ export interface Poll {
 /**
  * Read `path` about every 2 s while the page is visible (decision 6), one read at a time, each with
  * the ETag the last body came with (`getTagged`), handing each answer to `onRead`, which says
- * whether to read on. Hidden, it reads nothing, and back in view it reads once the wait since the
- * last answer is over. A `429` waits its `Retry-After`, from 2 s to a minute (L5's rule). A
- * definitive `401` stops it, as the stream closes on one (`sse-client.ts`): the client has signed
- * out already, and another read would only sign out again (#332's review).
+ * whether to read on; a read with no answer in 10 s is a failure (`POLL_TIMEOUT_MS`, #334), so a
+ * half-open connection never holds the poll. Hidden, it reads nothing, and back in view it reads
+ * once the wait since the last answer is over. A `429` waits its `Retry-After`, from 2 s to a
+ * minute (L5's rule). A definitive `401` stops it, as the stream closes on one (`sse-client.ts`):
+ * the client has signed out already, and another read would only sign out again (#332's review).
  */
 export function pollTagged<T>(
   api: Pick<ApiClient, 'getTagged'>,

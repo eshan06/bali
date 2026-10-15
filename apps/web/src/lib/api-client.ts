@@ -65,7 +65,8 @@ export interface ApiClient {
   /**
    * A polled read under an ETag (L3r): `If-None-Match` with `etag` when one is kept, answered with
    * the body and its tag, or null for a `304`, the body unchanged. Every `/v1` answer is
-   * `no-store`, so the browser keeps no copy and the poller keeps the tag itself.
+   * `no-store`, so the browser keeps no copy and the poller keeps the tag itself. An answer not
+   * whole within `POLL_TIMEOUT_MS` fails as no answer, for the poll to read again (#334).
    */
   getTagged<T>(path: string, etag: string | null): Promise<{ body: T; etag: string | null } | null>;
   post<T>(path: string, body?: unknown): Promise<T>;
@@ -74,6 +75,13 @@ export interface ApiClient {
   /** A removal may carry its `eventId` in its body (a saved question's, L3b2). */
   del<T>(path: string, body?: unknown): Promise<T>;
 }
+
+/**
+ * How long a polled read (`getTagged`) waits for its whole answer before it fails as unreached
+ * (#334): a half-open connection never fails by itself, and the browser gives up only after
+ * minutes. The polls alone: a deck's check (`POST /v1/decks/{id}/complete`) can take longer.
+ */
+export const POLL_TIMEOUT_MS = 10_000;
 
 /** `Retry-After` as the API sends it, whole seconds; anything else (a date, none) is unknown. */
 function retryAfterSeconds(header: string | null): number | undefined {
@@ -88,6 +96,7 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
     path: string,
     body?: unknown,
     etag: string | null = null,
+    signal?: AbortSignal,
   ): Promise<Response> {
     const headers: Record<string, string> = {};
     const token = opts.getToken();
@@ -101,6 +110,7 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
         method,
         headers,
         body: body !== undefined ? JSON.stringify(body) : undefined,
+        signal,
       });
     } catch {
       // fetch rejects only on a network-level failure, never on an HTTP error
@@ -142,9 +152,16 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
   return {
     get: (path) => request('GET', path),
     getTagged: async <T>(path: string, etag: string | null) => {
-      const res = await send('GET', path, undefined, etag);
-      if (res.status === 304) return null;
-      return { body: (await res.json()) as T, etag: res.headers.get('etag') };
+      // Aborted at the limit, fetch rejects (a NetworkError, from `send`), or the body does.
+      const abort = new AbortController();
+      const timer = setTimeout(() => abort.abort(), POLL_TIMEOUT_MS);
+      try {
+        const res = await send('GET', path, undefined, etag, abort.signal);
+        if (res.status === 304) return null;
+        return { body: (await res.json()) as T, etag: res.headers.get('etag') };
+      } finally {
+        clearTimeout(timer);
+      }
     },
     post: (path, body) => request('POST', path, body),
     put: (path, body) => request('PUT', path, body),
