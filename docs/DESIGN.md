@@ -165,6 +165,11 @@ Reports is v2's since PV13 (2026-10-15): a menu page, one class at a time picked
 with pills, its sessions as a table in a box that scrolls sideways beside each
 one's average focus as a bar, and `/classes/[id]/reports` a redirect to it with
 that class picked; until PV14 a row opens its report under it, as the reports list did.
+The entry pages are v2's since PV15 (2026-10-15): sign-in and its callback on v2's stage
+(the mark at 40 px, Bali and "Focus sessions for your classroom" over the card, no bar),
+the invite card under v2's white bar with Sign out, and Help and the policy pages under
+that bar in one column 860 px wide, Help's sections cards, the policy outline one card
+with a Placeholder chip per section, their words unchanged.
 Every
 portal source file is held to the tokens' utilities by `tokens.test.ts`, and
 since D2g the theme holds none of Tailwind's own colours, type sizes,
@@ -353,7 +358,9 @@ and its counts), its line under the name `h3` at regular weight, and retired
 (13.5/18, medium: a class's pill), `bar-row` (13.5/18, regular: a bar's row),
 `cell` (14/19, regular: a table's cell) and `cell-sub` (12/16, regular: the line
 under a cell's words), and the opened row's tint as the colour `row-open`
-(green-50, v2.css's `.wtable tr.is-open`).
+(green-50, v2.css's `.wtable tr.is-open`); PV15 the entry pages' two, both
+semibold, `entry-title` (20/26: an entry page's card title) and `button-lg`
+(16/20: the sign-in's 48 px button's label, `Button`'s `size="lg"`).
 
 Density: the teacher's live grid is dense (many students at a glance); the
 student app is airy and simple. Theme: **light, everywhere.** The app and the
@@ -548,7 +555,8 @@ where they differ (Present's included: §5); the input size stands.
   ruling, 2026-10-06;
   `components/card.ts`). Grey stays only where the approved designs keep it: a
   text field's well, the state chips' fills, the grid's stale banner, a
-  button's hover and pressed states, and the policy draft's banner and badge.
+  button's hover and pressed states, and the policy draft's banner (its
+  Placeholder badge a chip in Not here's tint since PV15).
   Cards in a list (the grid's cells, the classes, the reports) are
   `radius-md` with `space-4` padding, `space-2` apart; a card standing alone
   (sign-in, the invite code, the block's card, the recap, a sheet) is
@@ -563,8 +571,9 @@ where they differ (Present's included: §5); the input size stands.
   that draws the list in v2's look (its tiles, rows or table); grey
   (`surface-sunken`) also fills the menu's current item, the
   length picker's track, a table's head, the recap's name pills, a code's chip,
-  the bars' tracks, the student panel's moment dots and Reports' place-lost
-  notice (drawn as the stale banner is), and no longer a field.
+  the bars' tracks, the student panel's moment dots, Reports' place-lost
+  notice (drawn as the stale banner is) and Help's two lists of what a teacher
+  sees (SupportPage's `.notice`, PV15), and no longer a field.
 - **State chip:** a pill (`radius-full`) filled with the state's tint, its
   icon and label in the state's ink, the `label` style in uppercase; padding
   `space-2` × `space-3` on the web (the tokens' values, kept by the owner's

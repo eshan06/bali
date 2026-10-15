@@ -8,6 +8,69 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-15** — **PV15: the entry pages in v2's look, and the account read behind the 13+ check
+  on every page; a student who said 13+ keeps the invite card, without its line for students,
+  until W3.** Built to [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4)
+  (version 21): SignIn, Invite, EntryStates, and PV1's AuthCallback, AuthCallbackFailed,
+  SupportPage, PrivacyPage and TermsPage, at 1440 and 390 px (#388). **The account's read**
+  (`components/shell.tsx`): the shell reads the account through W2's `homeFor`, `GET
+  /v1/me/age-check` first and `GET /v1/me`, which makes the account, only for one that passed it, so
+  a web sign-in that never set up the app makes no account on any page: `/`, a class page's link, a
+  URL with no page. The age check makes nothing; the invite's redeem still makes the account it
+  turns into a teacher's (T1b). `useMe` gives the answer as `home` (a teacher or a student with
+  `/v1/me`'s answer, or an account read no further), `me` beside it. A test fails should any portal
+  source but `lib/student-web.ts` read `/v1/me`. *Changed from W2:* `homeFor` throws a failed read
+  where it returned L6's `Failure`, so the shell says it in `errText`'s words with Try again, as it
+  said `/v1/me`'s (PV5b); no `/v1/me` follows a check that didn't answer. *Weighed:* a `Failure` and
+  words for it beside `errText`, a second wording of the same failures. **A `401`** says nothing in
+  the page's place: the client has signed the tab out and is sending it to /login, where it showed
+  "Couldn't load your account. session expired" until /login opened. **A tab with no sign-in on a
+  signed-in page goes to /login** (`accountStep`'s `sign in`; PV5b's review, the owner, 2026-10-14):
+  a URL with no page had no page of its own to send it there, so it said Loading… for ever. The
+  pages' own redirects stay. **Home's branches:** a teacher their classes; an account the check
+  never passed the invite card with Invite's line for students ("Here as a student? …"); **a student
+  who said 13+ the invite card without that line** (the conductor's call, guard 2 of the brief):
+  the line would tell them to set up an app they have, and refreshing would change nothing, while
+  the card is the page W3's StudentHomeEmpty itself links a student to ("Setting up a teacher
+  account?"); their home, StudentHome, is W3's, its line in PLAN now saying so. *Weighed:* the card
+  with the line (dishonest for them), a screen no board draws (none to build). **The gap until W3**
+  (the conductor's call): the sign-in page's "Teachers and students sign in here to see their
+  classes." ships as the board's words, though a signed-in student sees no classes until W3; no
+  student uses the web before the pilot. Reports reads an account never passed as one with no classes
+  ("No reports yet."), as it read the account `/v1/me` made for it before (santa's review, both
+  reviewers). **The pages, built as drawn:** sign-in and its callback on v2's stage (the mark at 40
+  px, Bali and "Focus sessions for your classroom" over the card, no bar; `components/entry-page.tsx`),
+  "Sign in to Bali" at `entry-title` (20/26), Sign in at 48 px (`Button`'s new `size="lg"`, label
+  `button-lg` 16/20), "Students: set up Bali in the app on your iPhone first." and the public pages
+  under the card; a Sign out's word over Sign in and a page that didn't open under it, as Entry &
+  info placed them. The invite card under v2's white bar (`PortalBar` on `TOP_BAR`, Bali in the
+  brand's ink, Sign out small with its icon), the same bar over a failed account read and any page of
+  an account that doesn't teach. Help and the policy pages under the bar with Bali (`LockupBar`) in
+  one column 860 px wide: Help's sections cards, its contents quiet links (`QUIET_LINK`), its two
+  lists of what a teacher sees in v2.css's grey `.notice`; the policy outline one card, each section
+  with a Placeholder chip in Not here's tint (it was a grey badge). **The privacy policy's and the
+  terms' words are unchanged:** their pages are not in the diff, only `policy-draft.tsx`'s look.
+  **Where the boards render other than v2.css reads:** `.app p { margin: 0 }` outranks `.stage-name`'s
+  10 px and `.stage-foot`'s 14 px, so "Bali" and the foot line sit 6 px from their neighbours, built so
+  (as PV6 built the boards' tight lines); where SignIn and AuthCallback draw the stage as the board's
+  root it is content-box, its 120 px of padding added to the window's height, so the board's stack
+  sits 60 px lower and the board scrolls: the page keeps the window's height with no scroll, as the
+  Invite board's stage renders; Help's question titles have no size in v2.css, so the board draws
+  them at the browser's h3 (17.55/22), built at the card titles' 18/24 (`text-h3`, today's); the
+  boards' line breaks matched (no `text-pretty` on their lines); a link in running text kept at
+  `TextLink`'s medium, where the boards draw it regular (DESIGN.md §4). **The screenshots:** at 1440,
+  the pages and their boards in headless Chrome (a throwaway profile) at the exact size; at 390, both
+  in the preview pane (the boards given a phone viewport, as the canvas's frames have one); the
+  callback's "Signing in…", the invite page (never passed, and a passed student) and the bar over a
+  failed read with the real components in throwaway pages in the preview alone, deleted after;
+  Cognito's page never opened; a teacher in the owner's tab still lands on Home with the menu,
+  reading the check then `/v1/me`, and a tab with no sign-in on `/no-such-page` landed on /login.
+  **Santa:** round 1, no blockers from either reviewer (Reviewer B the Claude fallback); fixed, Reports'
+  never-passed account and the sign-in page's words pinned in a test; left, the bar's Bali link has no
+  hover (as the board and the side menu's) and the callback has no heading (as drawn). *Size:* 449
+  changed lines without tests, 12% over santa's ~400, kept as one PR (the conductor: one flow sharing
+  the bar, the stage and the card; the 154 routing lines named first in the PR for the reviewers).
+
 - **2026-10-15** — **PV13: Reports in the menu, one class at a time, its sessions as v2's table
   beside their average focus; until PV14 a row opens its report under it.** Built to
   [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (version 21):
