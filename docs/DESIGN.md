@@ -385,7 +385,8 @@ semibold, `entry-title` (20/26: an entry page's card title) and `button-lg`
 (16/20: the sign-in's 48 px button's label, `Button`'s `size="lg"`); W3 the colour
 `live-edge` (green-200, a live card's edge, v2.css's `.livecard`), its sizes all named already; L7
 a live question's results' three colours, `bar` (stone-500, an option's bar), `bar-right`
-(green-600, the correct one's) and `letter-right` (green-100, the correct option's letter).
+(green-600, the correct one's) and `letter-right` (green-100, the correct option's letter, v2.css's
+`.right .letter`), which L7b's Your questions takes for its correct answer's letter too.
 
 Density: the teacher's live grid is dense (many students at a glance); the
 student app is airy and simple. Theme: **light, everywhere.** The app and the
