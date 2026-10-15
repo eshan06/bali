@@ -32,18 +32,19 @@ a real decision? Add a dated entry at the top: what was decided and why.
   page keeping today's layout until its step lands), the open row in v2.css's own open-row tint
   (`.wtable tr.is-open`, green-50, the colour `row-open`), the report held at the box's width and
   in its view as the table scrolls (`sticky`, `100cqw`); and a teacher with no class sees
-  ReportStates' "No reports yet." with no pills. Santa's Reviewer A held the first a blocker, a
-  state no board draws; dismissed as PB5's approved state carried over in v2's own piece, until
-  PV14 (round 2 below). **The old URL**, `/classes/[id]/reports`, is a redirect to
+  ReportStates' "No reports yet." with no pills. Santa's Reviewer A held both a blocker, states no
+  board draws; dismissed, and round 2's two reviewers upheld it: PB5's opened row is the owner's
+  approved state (Recap & reports, 2026-10-06), carried over as a page keeps today's layout until
+  its step lands (PLAN's PV rules; DESIGN.md, Sources) in v2.css's own open-row piece, and
+  ReportStates draws "None yet" on its own. **The old URL**, `/classes/[id]/reports`, is a redirect to
   `/reports?class=<id>`, a server component, so no page flashes; the class page's Reports links
   straight there. **The words** are the boards' and today's, Help's sentence the owner's (PV1).
   **Tokens** (DESIGN.md §1, Its call): `pill` (13.5/18 medium), `bar-row` (13.5/18 regular), `cell`
   (14/19 regular) and `cell-sub` (12/16 regular), and `row-open`; grey also fills the table's head,
   the bars' tracks and the place-lost notice, drawn as the stale banner is. *Not on the preview:*
   Show earlier and its two states (no class on dev holds more than 20 ended sessions), loading and
-  the failures; each is rendered in the tests. *Size:* 639 changed lines without tests, 267 of them
-  PB5's list of cards and the old page deleted; the new code about 370 (the conductor kept it one
-  PR).
+  the failures; each is rendered in the tests. *Size:* 651 changed lines without tests, 267 of them
+  PB5's list of cards and the old page deleted; the new code 384 (the conductor kept it one PR).
 
 - **2026-10-15** — **A `came_back` is the server's: stamped when the server heard the phone, held to
   the window and never before the `went_silent` it closes (a fix, #385).** Found by PV11b's santa
