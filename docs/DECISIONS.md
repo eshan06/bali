@@ -8,6 +8,27 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-15** — **Vitest runs at most 6 test files at once in each package, so a machine with
+  many cores runs `npm test` as CI does (CLAUDE.md's "critical or recurring issue" rule).** On the
+  Windows PC (8 cores, 16 threads, 14 GiB) vitest's default, a worker per logical core but one, ran
+  15 files at once, and three workers' runs that day failed on `main`'s own code where each file
+  passes alone: the boot test's server start overran its 20 s, `slides.test.ts` ran out of memory,
+  and `tokens.test.ts`'s icon-stroke check (PV4b) overran its 5 s. The api, web and db configs now
+  take `maxWorkers` from the root's `vitest.workers.ts`: `vitest run`'s own count, up to 6, which
+  watch mode, used by no script here, now takes in place of its halved one (a root `tsconfig.json`
+  gives that file a project for the linter). **CI is unchanged:** a 4-vCPU runner
+  still gets 3, and the unit lane's `VITEST_MAX_WORKERS=$(nproc)` still wins, as vitest reads it
+  after the config; `packages/shared` has no config, and its six files start six workers at most.
+  **Measured on the PC**, the whole `npm test` from a worktree: at 15, 137, 147 and 161 s, the last
+  failing (the boot test's server killed at 20 s), and in the runs that passed the icon check took
+  4,992 and 4,981 ms of its 5,000; at 8, about 154 and 152 s, the icon check 3.6–4.0 s; at 6, 160
+  and 157 s, then three runs from the configs at 159, 156 and 157 s, none failing, the icon check
+  2.8–3.0 s (2.3 s alone), the boot test's first case 3.8–4.5 s (18.5 s at 15), node's memory
+  peaking at 3.6 GB (4.6 at 8, 7.5 at 15). **6, not 8:** about 3 % slower, for about twice the
+  icon check's headroom on a machine that is never only running tests. *Weighed:* longer timeouts or
+  retries (they hide the starvation, and a real failure takes longer to show); a cap on memory too
+  (the cap on workers already halves the peak).
+
 - **2026-10-15** — **#334: a polled read with no whole answer in 10 s fails as no answer; the polls
   alone.** The portal's API client set no time limit, so a read on a half-open connection (Wi-Fi
   dropping packets mid-request) held its poll until the browser gave up, minutes later: the
