@@ -155,7 +155,10 @@ its own and +5, +10 and End kept; after the bell PresentEnded's "Class is over"
 alone; and the reconnect pill there too, and for a first connect past 3 s.
 The unlock pop-up is v2's since PV10 (2026-10-14): ClassUnlock's, opened beside its
 tile's pulse, newest on top, each until it is closed, on the live page alone and never
-in Present; its Open student comes with PV11b's panel.
+in Present. The student panel is v2's since PV11b (2026-10-14): ClassStudent's, 372 px from
+the right over the live page, opened by a tile, a button there marked while its panel is open
+(`.tile.is-selected`), and by a pop-up's Open student; its states as PanelStates draws them;
+never in Present.
 Every
 portal source file is held to the tokens' utilities by `tokens.test.ts`, and
 since D2g the theme holds none of Tailwind's own colours, type sizes,
@@ -294,7 +297,8 @@ uppercase 12/16, `space-2` × `space-3`, §4) for sentence case at 13/18, 3 ×
 10 px; Q5 A's tinted chips on plain cells and Q4's standard density (§5) for
 tinted tiles; "surface-sunken fills nothing else" (§4, Card), now also the
 menu's current item, the length picker's track, a table's head, the recap's
-name pills, a code's chip and the bars' tracks; the grey field (§4, Inputs)
+name pills, a code's chip, the bars' tracks and the student panel's moment
+dots; the grey field (§4, Inputs)
 for a white one; "never a table that scrolls sideways" (§8) for the Reports
 table in a box that scrolls; the five radii (§5) for eight; the type scale
 (§3) and the 4-point grid (§5) for `v2.css`'s sizes and spacing (3, 6, 9, 10,
@@ -548,8 +552,8 @@ where they differ (Present's included: §5); the input size stands.
   in (`v2.css`'s stage card), a list's cards keeping `space-4` until the step
   that draws the list in v2's look (its tiles, rows or table); grey
   (`surface-sunken`) also fills the menu's current item, the
-  length picker's track, a table's head, the recap's name pills, a code's chip
-  and the bars' tracks, and no longer a field.
+  length picker's track, a table's head, the recap's name pills, a code's chip,
+  the bars' tracks and the student panel's moment dots, and no longer a field.
 - **State chip:** a pill (`radius-full`) filled with the state's tint, its
   icon and label in the state's ink, the `label` style in uppercase; padding
   `space-2` × `space-3` on the web (the tokens' values, kept by the owner's
