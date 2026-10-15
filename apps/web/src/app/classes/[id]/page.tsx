@@ -19,6 +19,7 @@ import { Field } from '@/components/field';
 import { JoinCode } from '@/components/join-code';
 import { LiveGrid, type StateCounts } from '@/components/live-grid';
 import { LiveCounts, LiveHeader } from '@/components/live-header';
+import { QuestionCard, useLiveQuestion } from '@/components/question-card';
 import { endedToday, RecapCard } from '@/components/recap-card';
 import { usePresenting } from '@/components/shell';
 import { getAccessToken } from '@/lib/auth';
@@ -144,6 +145,9 @@ export default function ClassDetailPage() {
   const [said, setSaid] = useState<{ kind: 'failed' | 'refused' | 'note'; message: string } | null>(
     null,
   );
+  // The live question (L7): its card over the grid, for the session running.
+  const live = klass !== null && grid !== null && !grid.over;
+  const { lesson, onEvent } = useLiveQuestion(live ? grid.id : null);
 
   const readRoster = useCallback(() => {
     api
@@ -430,11 +434,14 @@ export default function ClassDetailPage() {
           {counts ? <LiveCounts counts={counts} present={present} /> : null}
           {present ? null : presentToggle(true)}
         </div>
+        {/* The live question between the counts and the grid (LessonClass), never in Present. */}
+        {present ? null : <QuestionCard id={id} lesson={lesson} endsAt={grid.endsAt} />}
         <LiveGrid
           sessionId={grid.id}
           onEnded={onEnded}
           onSession={onSession}
           onCounts={onCounts}
+          onEvent={onEvent}
           present={present}
           livePage
         />

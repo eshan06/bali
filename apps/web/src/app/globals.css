@@ -359,6 +359,11 @@
      protection off's red; an unlock's is the pop-up's edge (`unlock-edge`). */
   --color-mark: var(--bali-stone-400);
   --color-mark-off: var(--bali-red-300);
+  /* A live question's results (L7), the primitives v2.css draws them with: an option's bar
+     (`.qbar`), the correct one's bar (`.right .qbar`) and its letter's circle (`.right .letter`). */
+  --color-bar: var(--bali-stone-500);
+  --color-bar-right: var(--bali-green-600);
+  --color-letter-right: var(--bali-green-100);
 }
 
 /* §6: the three shadows, by name. */

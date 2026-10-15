@@ -1,0 +1,338 @@
+'use client';
+
+import type { FeedEvent, SessionSnapshot, TeacherQuestion } from '@bali/shared';
+import { CircleCheck } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+
+import { Button } from '@/components/button';
+import { CARD_ALONE } from '@/components/card';
+import {
+  closeAttemptFor,
+  type CloseAttempt,
+  closeQuestion,
+  failureOf,
+  POLL_EVERY_MS,
+  pollResults,
+  questionAfter,
+  type ResultsPoll,
+  type ResultsState,
+} from '@/lib/live-question';
+import { keepUnanswered } from '@/lib/session-controls';
+import { useApi } from '@/lib/use-api';
+
+/** "A" to "F", an option's letter. */
+export const letterOf = (i: number) => String.fromCharCode(65 + i);
+/** An option's letter in its 28 px circle (v2.css's `.letter`), the correct one's green. */
+export const letterClass = (right: boolean) =>
+  `grid size-7 shrink-0 place-items-center rounded-full text-data font-semibold ${right ? 'bg-letter-right text-text-brand' : 'bg-surface-sunken text-text-primary'}`;
+
+/** The class page's live question (L6's logic), held for one session. */
+export interface LiveQuestion {
+  /** What the card shows: the open question, or a closed one until Done or the next; else none. */
+  question: TeacherQuestion | null;
+  /** Its results as last read, and when the read came: a close found past the bell is the bell's. */
+  results: (ResultsState & { at: number }) | null;
+  /** A close on its way: both close buttons hold. */
+  closing: boolean;
+  /** A close that didn't go through, with the choice Try again sends again. */
+  closeFailed: { reveal: boolean } | null;
+  close: (reveal: boolean) => void;
+  done: () => void;
+}
+
+/**
+ * Open by the server's clock, as last heard: this tab's close or the stream's, or a read of its
+ * results saying so first (the bell's close reaches the stream only once the sweep ends it all).
+ */
+export const isOpen = ({ question, results }: Pick<LiveQuestion, 'question' | 'results'>) =>
+  question?.open === true && results?.results?.open !== false;
+
+type Held = { session: string | null; question: TeacherQuestion | null };
+
+/**
+ * The live question of `sessionId` (null: none running). Its words come from the session's read,
+ * at the start and whenever the stream names a question this tab doesn't hold (`questionAfter`'s
+ * `'unknown'`); its results from `pollResults`. A read only ever
+ * brings a newer question (ids are UUIDv7, so a later one sorts after), so a slow read never puts
+ * back one closed or asked over meanwhile.
+ */
+export function useLiveQuestion(sessionId: string | null) {
+  const api = useApi();
+  const [held, setHeld] = useState<Held>({ session: null, question: null });
+  const now = useRef<Held>(held);
+  // The newest question this session has shown, and the poll reading the one shown.
+  const newest = useRef('');
+  const poll = useRef<{ id: string; poll: ResultsPoll } | null>(null);
+  const [results, setResults] = useState<{ id: string; state: ResultsState; at: number } | null>(
+    null,
+  );
+  const [closing, setClosing] = useState(false);
+  const [closeFailed, setCloseFailed] = useState<{ id: string; reveal: boolean } | null>(null);
+  const sending = useRef(false);
+  const unansweredClose = useRef<CloseAttempt | null>(null);
+  const retry = useRef<number | undefined>(undefined);
+  const reading = useRef<{ session: string; again: boolean } | null>(null);
+
+  const put = useCallback((session: string | null, question: TeacherQuestion | null) => {
+    const before = now.current.question;
+    if (now.current.session !== session) return;
+    if (question && question.id > newest.current) newest.current = question.id;
+    // Closed now: its poll reads once more for the final counts (L6).
+    if (before?.open && question?.id === before.id && !question.open) {
+      if (poll.current?.id === question.id) poll.current.poll.closed();
+    }
+    now.current = { session, question };
+    setHeld(now.current);
+  }, []);
+
+  const read = useCallback(
+    async (session: string): Promise<void> => {
+      // One read at a time: any asked for meanwhile (the stream's overlap as it starts) are one more.
+      if (reading.current?.session === session) {
+        reading.current.again = true;
+        return;
+      }
+      reading.current = { session, again: false };
+      window.clearTimeout(retry.current);
+      let failed = false;
+      try {
+        const snap = await api.get<SessionSnapshot>(`/v1/sessions/${session}`);
+        const q = snap.question ?? null;
+        if (q && q.id > newest.current) put(session, q);
+      } catch (e) {
+        failed = failureOf(e).kind === 'failed';
+      }
+      const again = reading.current?.session === session && reading.current.again;
+      if (reading.current?.session === session) reading.current = null;
+      // Gone, nothing more; else read again shortly, the grid saying meanwhile whether Bali is reached.
+      if (now.current.session !== session) return;
+      if (again) void read(session);
+      else if (failed) retry.current = window.setTimeout(() => void read(session), POLL_EVERY_MS);
+    },
+    [api, put],
+  );
+
+  // A new session starts with nothing shown, then reads what it has open; none once it is gone.
+  useEffect(() => {
+    now.current = { session: sessionId, question: null };
+    newest.current = '';
+    setHeld(now.current);
+    if (sessionId !== null) void read(sessionId);
+    return () => {
+      window.clearTimeout(retry.current);
+      now.current = { session: null, question: null };
+    };
+  }, [sessionId, read]);
+
+  const id = held.session === sessionId ? (held.question?.id ?? null) : null;
+  useEffect(() => {
+    if (id === null) return;
+    const p = pollResults(api, id, (state) =>
+      setResults((prev) => ({
+        id,
+        state,
+        // When it was first found closed: a close heard just before the bell is no bell's.
+        at: prev?.id === id && prev.state.results?.open === false ? prev.at : Date.now(),
+      })),
+    );
+    poll.current = { id, poll: p };
+    return () => p.stop();
+  }, [api, id]);
+
+  const onEvent = useCallback(
+    (e: FeedEvent) => {
+      if (e.type !== 'question_opened' && e.type !== 'question_closed') return;
+      const { session, question } = now.current;
+      if (session === null) return;
+      const next = questionAfter(question, e);
+      if (next === 'unknown') void read(session);
+      else if (next !== question) put(session, next);
+    },
+    [put, read],
+  );
+
+  const close = useCallback(
+    async (reveal: boolean) => {
+      const { session, question } = now.current;
+      if (sending.current || question === null) return;
+      sending.current = true;
+      setClosing(true);
+      setCloseFailed(null);
+      const attempt = closeAttemptFor(unansweredClose.current, question.id, reveal);
+      const answer = await closeQuestion(api, attempt);
+      unansweredClose.current = keepUnanswered(attempt, answer);
+      sending.current = false;
+      setClosing(false);
+      if (now.current.question?.id !== question.id) return;
+      if (answer.kind === 'closed') put(session, answer.question);
+      else setCloseFailed({ id: question.id, reveal });
+    },
+    [api, put],
+  );
+
+  const question = held.session === sessionId ? held.question : null;
+  const lesson: LiveQuestion = {
+    question,
+    results: question && results?.id === question.id ? { ...results.state, at: results.at } : null,
+    closing,
+    closeFailed: question && closeFailed?.id === question.id ? closeFailed : null,
+    close: (reveal) => void close(reveal),
+    done: () => put(now.current.session, null),
+  };
+  return { lesson, onEvent };
+}
+
+/** v2.css's `.lesson` head: the title or the kicker, then its buttons. */
+const HEAD = 'flex flex-wrap items-center justify-between gap-x-6 gap-y-3';
+const ROW = 'flex flex-wrap items-center gap-2.5';
+
+/**
+ * The class page's "Questions and slides" card with a question in it (L7; LessonWaiting, LessonLive,
+ * LessonClosed, LessonStates' lines), between the counts and the grid, never in Present. Open: Close,
+ * and Close and show answer when it has a correct one; closed: Done. Its options, and "N of M
+ * answered": only totals, the count per option and its bar once the server's guard gives them (3
+ * answers), never who answered. At rest, and asking, are L7-1b's: until then it shows nothing.
+ */
+export function QuestionCard({
+  id,
+  lesson,
+  endsAt,
+}: {
+  id: string;
+  lesson: LiveQuestion;
+  endsAt: string | null;
+}) {
+  const { question: q, results: r, closing, closeFailed } = lesson;
+  if (q === null) return null;
+  const totals = r?.results ?? null;
+  const open = isOpen(lesson);
+  // Found closed with no close heard, past the bell: the bell's (A17), until the sweep ends it all.
+  const bell = !open && q.open && endsAt !== null && (r?.at ?? 0) >= Date.parse(endsAt);
+  const revealed = q.revealed || totals?.revealed === true;
+  const counts = totals?.counts ?? null;
+  const caption = (words: string) => (
+    <p className="mt-3.5 text-caption text-text-tertiary">{words}</p>
+  );
+  return (
+    <section aria-labelledby={`${id}-q`} className={`flex flex-col gap-4 ${CARD_ALONE}`}>
+      <div className={HEAD}>
+        <p
+          className={`text-section-label uppercase ${open ? 'text-text-brand' : 'text-text-tertiary'}`}
+        >
+          {open ? 'Question · open' : 'Question · closed'}
+        </p>
+        <div className={ROW}>
+          {open ? (
+            <>
+              <Button
+                variant="secondary"
+                onClick={() => lesson.close(false)}
+                aria-disabled={closing}
+              >
+                Close
+              </Button>
+              {q.correctOption === null ? null : (
+                <Button
+                  variant="secondary"
+                  onClick={() => lesson.close(true)}
+                  aria-disabled={closing}
+                >
+                  Close and show answer
+                </Button>
+              )}
+            </>
+          ) : (
+            <Button variant="secondary" onClick={lesson.done}>
+              Done
+            </Button>
+          )}
+        </div>
+      </div>
+      {open && closeFailed ? (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+          <p role="alert" className="text-body">
+            Bali couldn&apos;t close the question.
+          </p>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => lesson.close(closeFailed.reveal)}
+            aria-disabled={closing}
+          >
+            Try again
+          </Button>
+        </div>
+      ) : null}
+      {r?.problem && !r.final ? (
+        <p
+          role="status"
+          className="rounded-sm border border-border-default bg-surface-sunken px-4 py-3 text-body text-text-primary"
+        >
+          These totals may be behind. Bali can&apos;t reach the server and keeps trying.
+        </p>
+      ) : null}
+      <div className="flex flex-wrap items-start gap-x-10 gap-y-5">
+        <div className="min-w-0 flex-[999_1_440px]">
+          <h2 id={`${id}-q`} className="text-h3 text-pretty wrap-break-word">
+            {q.prompt}
+          </h2>
+          {/* Under the question as the boards render it: `.app ul`'s margin 0 outranks `.opts`'s. */}
+          <ul className="flex flex-col gap-3.5">
+            {q.options.map((option, i) => {
+              const right = q.correctOption === i;
+              const n = counts?.[i];
+              return (
+                <li
+                  key={i}
+                  className="grid grid-cols-[28px_minmax(0,1fr)_3rem] items-center gap-x-3 gap-y-1.5"
+                >
+                  <span aria-hidden="true" className={letterClass(right)}>
+                    {letterOf(i)}
+                  </span>
+                  <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+                    <span className="min-w-0 wrap-break-word">{option}</span>
+                    {right ? (
+                      <span className="inline-flex items-center gap-1 text-section-label text-text-brand uppercase">
+                        <CircleCheck size={14} aria-hidden="true" />
+                        {!open && revealed ? 'Correct answer' : 'Correct'}
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="text-right text-data tabular-nums">{n ?? ''}</span>
+                  {n === undefined || !totals ? null : (
+                    <span
+                      aria-hidden="true"
+                      className={`col-start-2 h-2 rounded-full ${right ? 'bg-bar-right' : 'bg-bar'}`}
+                      style={{ width: `${Math.round((n / totals.answered) * 100)}%` }}
+                    />
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          {open ? null : bell ? (
+            <p className="mt-3.5 text-body">The bell closed this question.</p>
+          ) : q.correctOption === null ? null : (
+            caption(
+              revealed
+                ? 'Students see the correct answer on their phones.'
+                : "Students don't see which answer was correct.",
+            )
+          )}
+        </div>
+        {totals ? (
+          <div
+            aria-live="polite"
+            className="flex flex-[1_1_160px] flex-col gap-1 border-l border-border-default pl-6"
+          >
+            <p className="flex items-baseline gap-2">
+              <span className="font-num text-data-lg tabular-nums">{totals.answered}</span>
+              <span className="text-text-secondary">of {totals.eligible} answered</span>
+            </p>
+            {r?.final ? <p className="text-caption text-text-tertiary">Final count</p> : null}
+          </div>
+        ) : null}
+      </div>
+    </section>
+  );
+}

@@ -436,7 +436,7 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     }
   });
 
-  it('beside them, only border-input, the side menu’s avatar (PV5), a dialog’s backdrop (PV6), the reconnect pill’s dot (PV7), the unlock pop-up’s edge (PV10) and Open student (PV11b), the recap’s marks (PV12b), Reports’ opened row (PV13), and a live card’s edge (W3)', () => {
+  it('beside them, only border-input, the side menu’s avatar (PV5), a dialog’s backdrop (PV6), the reconnect pill’s dot (PV7), the unlock pop-up’s edge (PV10) and Open student (PV11b), the recap’s marks (PV12b), Reports’ opened row (PV13), a live card’s edge (W3), and a question’s bars and correct letter (L7)', () => {
     const named = [...inline.keys()].filter((k) => k.startsWith('--color-'));
     const semanticNames = semantic(tokens.color.tokens).map((t) =>
       t.name === 'focus-ring-color' ? '--color-focus-ring' : `--color-${t.name}`,
@@ -444,7 +444,10 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     expect(named.filter((k) => !semanticNames.includes(k)).sort()).toEqual([
       '--color-avatar-bg',
       '--color-avatar-fg',
+      '--color-bar',
+      '--color-bar-right',
       '--color-border-input',
+      '--color-letter-right',
       '--color-live-edge',
       '--color-mark',
       '--color-mark-off',
@@ -456,6 +459,12 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     ]);
     // A live card's edge: green-200, as v2.css's `.livecard` draws it.
     expect(inline.get('--color-live-edge')).toBe('var(--bali-green-200)');
+    // A live question's results (L7), as v2.css draws them: an option's bar stone-500, the correct
+    // one's green-600, its letter green-700 on green-100, small text at 4.5:1 and more.
+    expect(inline.get('--color-bar')).toBe('var(--bali-stone-500)');
+    expect(inline.get('--color-bar-right')).toBe('var(--bali-green-600)');
+    expect(inline.get('--color-letter-right')).toBe('var(--bali-green-100)');
+    expect(contrast(hexOf('green-700', 'light'), hexOf('green-100', 'light'))).toBeGreaterThan(4.5);
     // Reports' opened row: green-50, as v2.css's `.wtable tr.is-open` fills it, under the
     // primary ink at 4.5:1 and more.
     expect(inline.get('--color-row-open')).toBe('var(--bali-green-50)');
@@ -667,13 +676,15 @@ describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
     // picker's track, the join code's chip, the student panel's moments' dots and the recap's name
     // pills; on Reports (PV13) its table's head, its bars' tracks and the place-lost notice, drawn
     // as the stale banner is; and on Help (PV15, SupportPage) the two lists of what a teacher sees,
-    // drawn so too.
+    // drawn so too; a live question's (L7) options' letters, and its "Results can't refresh", drawn
+    // as the stale banner is.
     expect(filled).toEqual({
       [join('app', 'classes', '[id]', 'page.tsx')]: 1,
       [join('app', 'support', 'page.tsx')]: 1,
       [join('components', 'join-code.tsx')]: 1,
       [join('components', 'live-grid.tsx')]: 1,
       [join('components', 'policy-draft.tsx')]: 1,
+      [join('components', 'question-card.tsx')]: 2,
       [join('components', 'reports-list.tsx')]: 3,
       [join('components', 'student-panel.tsx')]: 1,
       [join('components', 'timeline.tsx')]: 1,
