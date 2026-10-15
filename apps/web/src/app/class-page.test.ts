@@ -106,6 +106,20 @@ describe('the class page while no session runs (ClassBefore)', () => {
     expect(before).toMatch(/<RecapCard[^>]*\bonFound=\{setLast\}/);
   });
 
+  it('reads the roster again as its session ends, so Didn’t join counts who enrolled during it', () => {
+    // A student who joins the class with the code mid-session and never taps in is someone who
+    // didn't join; one removed meanwhile is not (santa's review). The roster the page opened with
+    // knows neither, so the recap waits for a fresh one.
+    expect(page).toMatch(
+      /const over = grid\?\.over \?\? false;\s*useEffect\(\(\) => \{\s*if \(!over\) return;\s*setRoster\(null\);\s*setRosterError\(null\);\s*readRoster\(\);\s*\}, \[over, readRoster\]\);/,
+    );
+    // One read of the roster, the class's load's and this one's.
+    expect(page).toMatch(
+      /const readRoster = useCallback\(\(\) => \{\s*api\s*\.get<RosterResponse>/,
+    );
+    expect(page.match(/\/roster`\)/g)).toHaveLength(1);
+  });
+
   it('shows the recap with the roster, whose failure it says too, and no How it ended', () => {
     const [recap] = before.match(/<RecapCard\b[^]*?\/>/) ?? [];
     expect(recap).toMatch(/roster=\{roster\?\.students \?\? null\}/);

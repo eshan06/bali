@@ -145,6 +145,12 @@ export default function ClassDetailPage() {
     null,
   );
 
+  const readRoster = useCallback(() => {
+    api
+      .get<RosterResponse>(`/v1/classes/${classId}/roster`)
+      .then(setRoster, (e: unknown) => setRosterError(errText(e)));
+  }, [api, classId]);
+
   const load = useCallback(() => {
     setError(null);
     setRosterError(null);
@@ -165,10 +171,8 @@ export default function ClassDetailPage() {
       },
       (e: unknown) => setError(errText(e)),
     );
-    api
-      .get<RosterResponse>(`/v1/classes/${classId}/roster`)
-      .then(setRoster, (e: unknown) => setRosterError(errText(e)));
-  }, [api, classId]);
+    readRoster();
+  }, [api, classId, readRoster]);
 
   useEffect(() => {
     if (!getAccessToken()) {
@@ -177,6 +181,16 @@ export default function ClassDetailPage() {
     }
     load();
   }, [load, router]);
+
+  // A session over here: the roster read again, so the recap's Didn't join counts who joined the
+  // class during it and leaves out who left (PV12b); the card waits for it.
+  const over = grid?.over ?? false;
+  useEffect(() => {
+    if (!over) return;
+    setRoster(null);
+    setRosterError(null);
+    readRoster();
+  }, [over, readRoster]);
 
   // The class's last pick on this computer, and Present as this tab left it, read once the page is
   // in the browser (never at render, where the server has no storage), so before the class's read

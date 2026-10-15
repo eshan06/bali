@@ -65,6 +65,8 @@ export function RecapCard(props: Props) {
     if (state.kind === 'loading' && found === null) return;
     onFound?.(found);
   }, [found, state.kind, onFound]);
+  // Gone (a Start), none: the next session's end never paints with this one's.
+  useEffect(() => () => onFound?.(null), [onFound]);
 
   // Nothing until there is a session to recap: a class that never ran one shows no card.
   if (state.kind === 'finding' || state.kind === 'none') return null;

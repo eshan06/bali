@@ -8,12 +8,12 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-15 (Central) — M5's API half, M5a (#396; `docs/DECISIONS.md`, 2026-10-15),
-with no screen: a deck's removal refused `409 deck_in_use` names, in its `details`, every class
-whose running session shows the deck, each by id and name, in the order `/v1/me` lists the
-teacher's classes (`DeckInUseDetails`, additive), for the Slides page's "It's showing in Biology,
-period 3 right now". Before it, L7b's part 1a (#393). PV12b (#386), L7's two PRs (#389, #390) and
-L7b's parts 1b and 1c (#394, #395) wait on the owner as drafts. Next: M5b, the Slides page._
+_Last updated: 2026-10-15 (Central) — PV12b, the recap (#386; `docs/DECISIONS.md`, 2026-10-15),
+its states no board draws approved by the owner as built: the class page after the bell as
+ClassEnded draws it, the figures over who wasn't focused the whole time (each with their line, its
+marks and their moments in words), who was and who didn't join; "28 students · the session ended at
+9:55 AM"; How it ended gone. Before it, M5a (#396). L7's two PRs (#389, #390) and L7b's parts 1b
+and 1c (#394, #395), approved by the owner too, follow it. Next: M5b, the Slides page._
 
 ## Now
 
@@ -40,9 +40,9 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
   keeps D1's look until the owner approves a new one (its redesign rolled back, 2026-10-06). Left:
   the push's app half (not started), TestFlight build 9 for C7's phone test (📱), and the phone's
   Phase 7 screens (L8, M8). C2's legal words (⚖️) go into the portal's pages, on the Windows PC.
-- **The portal redesign in v2's look (PV0–PV17, the owner, 2026-10-12):** PV0–PV11, PV12a,
-  PV13 and PV15 done, with PV3b, PV4b, PV4c and PV5b; PV12b waits on the owner as draft #386; next
-  PV14, on the Windows PC. Phase 7's web screens, which followed PV15, may start.
+- **The portal redesign in v2's look (PV0–PV17, the owner, 2026-10-12):** PV0–PV13 and PV15
+  done, with PV3b, PV4b, PV4c and PV5b; next PV14, on the Windows PC. Phase 7's web screens, which
+  followed PV15, may start.
 - **The workflow review's last steps** ✅ (the owner, 2026-10-13; DECISIONS 2026-10-14): the
   migration guard (#369), docs-only PRs skipping the test jobs (#365), moved files (#368) and two
   tests (#364), each in full in `docs/PLAN-ARCHIVE.md`.
@@ -136,9 +136,9 @@ validation** (each 👀): vitest, `npm run typecheck && npm run lint && npm test
 - **PV9** 👀 Present — ✅ (#379; DECISIONS 2026-10-14)
 - **PV10** 👀 The unlock pop-up — ✅ (#381; DECISIONS 2026-10-14)
 - **PV11** 👀 The student panel — ✅ as PV11a (#382) and PV11b (#383; DECISIONS 2026-10-14)
-- **PV12** 👀 The recap (ClassEnded), in two: **PV12a** the grouping — ✅ (#384; DECISIONS 2026-10-14); **PV12b** the recap (~300; `components/recap-card.tsx`, `timeline.tsx`): the Start card, the last session's figures, those not focused the whole time first, then who was, then who didn't join, the roster and the join code (PV6's); the header's line after the bell, "28 students · the session ended at 9:55 AM", where PV6 says "no session running"; **"How it ended" removed**; the marks' icons at `v2.css`'s 2.25 (`.mk .ic`), by a class, since PV4b's 1.75 rule beats the `strokeWidth` prop; PV12a left it `recapGroups(session, report, events, roster)` (`partTime`, `wholeTime`, `notJoined`, each student's name, line and moments placed on the axis, and the axis's ticks), given the class page's roster (a failed roster read is the card's to say); its words are PV12b's (the board's "Other reason" and "no reason given" where `recap.ts` says "Other" and "No reason given"), and so is ClassEnded's tick each 10 minutes, where the axis gives one each 5 for 50; two states no board draws: a student who never joined but has an unlock or protection off here, under Didn't join with that moment (rare), and an unlock or protection off recorded after an early End or before the student's own tap-in, under Focused part of the time with its mark off their line (the owner's call, asked with PV12a) — validation: as above
+- **PV12** 👀 The recap (ClassEnded) — ✅ as PV12a (#384) and PV12b (#386; DECISIONS 2026-10-15)
 - **PV13** 👀 Reports — ✅ (#387; DECISIONS 2026-10-15)
-- **PV14** 👀 A session's report (~250; ReportOpened, ReportStates' "Loading this session…" and "Couldn't load this session."): one session on a page and a URL of its own, its recap card and its Unlocks table; its Questions card is L7c's — validation: as above
+- **PV14** 👀 A session's report (~250; ReportOpened, ReportStates' "Loading this session…" and "Couldn't load this session."): one session on a page and a URL of its own, its recap card and its Unlocks table, and the class page's recap gets ClassEnded's "Open its report" linking to it (PV12b left it out); its Questions card is L7c's — validation: as above
 - **PV15** 👀 The entry pages — ✅ (#388; DECISIONS 2026-10-15). **Then Phase 7's web screens** (Phase 7 steps)
 - **PV16** 👀 Classes (~350; Classes, ClassesNew, ClassesCreated, HomeStates' New class states): `/classes` in the menu, a card per class with its student count, last session (PV2) and Live chip, New class as a dialog (Creating…, a `5xx` with Try again) in place of the inline create row, "Period 4 Biology is ready" with its join code, Copy code and Done (its 40 px check at the board's 1.5 stroke, by a class, as PV4b says), and the block's card — validation: as above
 - **PV17** 👀 Home (Main, HomeIdle, HomeNew, HomeStates), in three: **PV17a** (~300) the greeting and date, each class once (Live and Open, or Start…), the block's card with Register block, and "Set up your first class" for a new teacher; Home's error state with a real heading, focus kept on Try again and one `<main>` while it waits (PV5b's review; the owner, 2026-10-14); **PV17b** (~300) the live class's card on the session's snapshot and stream (its ring, countdown, six state counts, Open the class, Present and the latest unlock); **PV17c** (~250) Last session (PV2; hidden until a class's first session ends) and Recent activity (PV3; hidden under 640 px; no empty state, a live class's own start always listed): for up to a minute after a bell `lastSession` names a session whose report still says `ended: false`, which means only "not swept yet" (PV2's review), so the card never reads that flag as still running; if Recent activity is polled rather than read once, its read is narrowed first to the three kinds and the reason changes (PV3's review) — validation: as above
@@ -284,7 +284,7 @@ Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect acc
 - 🔧 Production, still open: check that the next push to `main` deploys `bali-portal` on its own now that `vercel.json` is deleted (runbook 3, step 6); Railway 2FA, threat protection, CloudTrail, the backups (L0b) and the restore drill are on Phase 6's owner list above.
 - 👀 After the next deploy of `bali` and `bali prod` (P8's follow-up): the deploy log shows the migrations, then `Server listening`; a later redeploy's log for the old deployment shows `shutting down` with `signal: SIGTERM`.
 - Phase 7: **to decide**, #313 (what a teacher's own deletion, and the retention run, do with their words), kept as today for now (the owner's ruling, 2026-10-12); **tracked fixes**, #319 (saved questions' id case), #326 (a slow upload outliving its deck; M5 aborts it), #334 (a timeout on the portal's polls, before W4), #336 (capacity at the bell, before the class-started push reaches a school); L0b is the owner's (Railway, above). The calls confirmed on 2026-10-12: this line in full in `docs/PLAN-ARCHIVE.md`.
-- #380: Present after the bell has no Start, so starting the next class from a projected tab shows the last recap's unlock reasons (the owner, 2026-10-14: tracked, not now)
+- #380: Present after the bell has no Start, so starting the next class from a projected tab shows the last recap's unlock reasons (the owner, 2026-10-14: tracked, not now); PresentEnded's line, "the session ended at 9:55 AM", waits with it (PV12b kept Present's "no session running")
 - Left for the owner on finished steps' lines (in full in `docs/PLAN-ARCHIVE.md`): P7's App Review path (decide its section 4, then fill the accounts and paste); P6's restore drill, its result recorded once a backup exists; S4's CSP check on the deployed portal after each Next upgrade; ⚖️ whether C7-server's yes rides Other Data Types; device rounds still marked pending (B5b's round 2, steps 7 and 9; B5c's round 3, steps 1 and 3; round 4, B6a and B6b); smaller calls on F (a refused tap's end-of-day drop or dismiss button; the waiting card's Tap in), B6c-2 (`.keep`/`.retry`), B5b (a rule for a replaced window, a code step to schedule) and D2 (Present's key per class).
 - ✅ **Answered** (the owner, 2026-10-14; DECISIONS 2026-10-14): PV5b's whole-page error kept; its review notes folded into PV15 and PV17a; PV4c's two test limits left.
 - 🔧 Before the pilot's first class: the owner's prod block gets a fresh code (its first reached the repo's history in #228), and a session builds an owner command that retires a block, to retire the old code (`docs/PILOT.md`, setup step 6). The portal's three class-page controls are built (P10, P11).

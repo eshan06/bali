@@ -298,12 +298,17 @@ describe('the recap card on the class page, after the bell (ClassEnded)', () => 
       `${clock(45).replace(/ [AP]M$/, '')} @80%`,
       `${clock(55)} @100%`,
     ]);
+    // A fifth apart: on an axis under 25 rem the two beside the ends hide, under 13 rem the rest.
+    const hides = [...(axis ?? '').matchAll(/class="([^"]*)"/g)].map(
+      (m) => /@max-\[(\d+)rem\]\/axis:hidden/.exec(m[1] ?? '')?.[1] ?? 'always',
+    );
+    expect(hides).toEqual(['always', '25', '13', '13', '25', 'always']);
   });
 
   it('never says an unlock’s reason in Present, the projector the class can see', () => {
     const html = render(ready(board()), { present: true });
     expect(rows(html)).toContain(`Ethan Park: Unlocked at ${clock(31)}.`);
-    expect(html).not.toMatch(/Nurse|Bathroom|Other reason|no reason given/);
+    expect(html).not.toMatch(/nurse|bathroom|other reason|no reason given/i);
   });
 
   it('says there were no unlocks', () => {
@@ -403,6 +408,8 @@ describe('the card’s reads', () => {
     expect(source).toMatch(
       /const found = state\.kind === 'ready' \|\| state\.kind === 'loading' \? state\.session : null;\s*useEffect\(\(\) => \{[^]*?if \(state\.kind === 'loading' && found === null\) return;\s*onFound\?\.\(found\);/,
     );
+    // And none once it is gone (a Start), so the next session's end never paints with this one's.
+    expect(source).toMatch(/useEffect\(\(\) => \(\) => onFound\?\.\(null\), \[onFound\]\);/);
   });
 });
 
