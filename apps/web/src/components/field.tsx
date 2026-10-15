@@ -22,6 +22,22 @@ export type FieldProps = Omit<ComponentProps<'input'>, 'className'> & {
   trailing?: ReactNode;
 };
 
+/**
+ * The Field's input on its own, for a field labelled by its row rather than a label over it (an
+ * answer to a question, L7: "Answer A"), so every portal input is still this one.
+ */
+export function Input({
+  mono = false,
+  ...props
+}: Omit<ComponentProps<'input'>, 'className'> & { mono?: boolean }) {
+  return (
+    <input
+      {...props}
+      className={`block h-10 w-full rounded-sm border border-border-input bg-surface-card px-3 text-input text-text-primary aria-[invalid=true]:border-text-primary ${mono ? 'font-mono font-medium' : ''}`}
+    />
+  );
+}
+
 export function Field({
   id,
   label,
@@ -47,12 +63,12 @@ export function Field({
           input: with one, the input as wide as a name needs (280 to 440 px), the button beside. */}
       <div className={trailing ? 'mt-2 flex flex-wrap items-center gap-3' : 'mt-2'}>
         <div className={trailing ? 'max-w-110 min-w-0 grow basis-70' : undefined}>
-          <input
+          <Input
             id={id}
             {...props}
+            mono={mono}
             aria-invalid={refusal ? true : invalid}
             aria-describedby={describes || undefined}
-            className={`block h-10 w-full rounded-sm border border-border-input bg-surface-card px-3 text-input text-text-primary aria-[invalid=true]:border-text-primary ${mono ? 'font-mono font-medium' : ''}`}
           />
         </div>
         {trailing}

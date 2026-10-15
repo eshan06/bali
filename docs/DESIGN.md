@@ -188,7 +188,8 @@ bell) and the rest under it, none yet StudentHomeEmpty's card with its way to th
 at `/invite` for them; Open the lesson and the phone's chip come with the lesson page (W4).
 The class page's "Questions and slides" card is v2's since L7-1a (2026-10-15): between the counts
 and the grid, never in Present, a question's totals ("N of M answered", each option's count and bar
-from 3 answers), Close and Close and show answer, Done.
+from 3 answers), Close and Close and show answer, Done; and since L7-1b, at rest, Ask a question,
+which opens in the side panel, 460 px, where a student's panel shows, one at a time.
 Every
 portal source file is held to the tokens' utilities by `tokens.test.ts`, and
 since D2g the theme holds none of Tailwind's own colours, type sizes,

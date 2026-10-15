@@ -229,6 +229,33 @@ a real decision? Add a dated entry at the top: what was decided and why.
   results keep theirs. **Compatibility:** additive, a `/v1` route and two types; its S1 rows and
   the OpenAPI snapshot. No fixture and nothing in BaliCore: no phone reads it.
 
+- **2026-10-15** — **L7-1b: asking a question in the class page's side panel, built to the canvas;
+  three states it doesn't draw built plainest and parked for the owner.** L7's first part's second
+  half, stacked on L7-1a (#389). Built to
+  [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (version 21):
+  LessonClass, LessonWrite and LessonStates' lines for asking. **The card at rest** is LessonClass's
+  "Questions and slides" with Ask a question (Show slides is M6's, the drafts L7b's), and a closed
+  question's card gains Ask another question; Done gives focus back to Ask a question. **Asking**
+  opens the side panel, 460 px as LessonWrite draws it, where a student's panel shows (the canvas's
+  note): one at a time, a student's opening closing the asking and the asking closing a student's
+  (`asking`, `onStudentPanel` on the live grid). What is written is the page's until it is asked or
+  Cancel drops it; Close and Escape keep it, and a new session starts with none. Bali's refusals sit
+  under each field, the first focused, and follow the typing once tried; counted as the server counts
+  (trimmed, by code point); the question is held to 500 by its field, since the board draws its
+  counter and no refusal for it. A question asked goes through L6's open (the hook's `ask`), focus
+  coming to its prompt in the card; a failed ask is said above Ask the class with Try again, which
+  resends the same attempt (L6); "This session has ended, so Bali didn't ask the question." has no
+  Try again; a `429` is the portal's words for one. **As the boards render:** `.app p`'s margin 0
+  outranks `.help`'s and `.refusal`'s 8 px, so the counter and a refusal sit right under the field.
+  An answer's input is the Field's own (`Input`), so every portal input is still the one at 16 px.
+  **What the canvas doesn't draw**, the owner's to rule (the PR parked as a draft): the fresh panel
+  (no words, two empty answers; Remove hidden at two answers, Add an answer at six); where three of
+  LessonStates' lines sit (Asking failed and The session ended first above Ask the class, Asking
+  this closes the open question under the panel's last line); and the panel at phone width (the
+  width of the screen, as the student panel). *Weighed:* hiding Remove and Add an answer against
+  refusing (no refusal is drawn for either); starting with four empty answers, as the board's
+  example has (a two-answer question would need two removed first).
+
 - **2026-10-15** — **L7-1a: the class page's question card and its results, built to the canvas;
   asking split off to L7-1b; five states the canvas doesn't draw built plainest, approved by the
   owner as built.** L7's first part, the class page's, came to 768 changed lines without tests, so
