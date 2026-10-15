@@ -245,14 +245,25 @@ a real decision? Add a dated entry at the top: what was decided and why.
   counter and no refusal for it. A question asked goes through L6's open (the hook's `ask`), focus
   coming to its prompt in the card; a failed ask is said above Ask the class with Try again, which
   resends the same attempt (L6); "This session has ended, so Bali didn't ask the question." has no
-  Try again; a `429` is the portal's words for one. **As the boards render:** `.app p`'s margin 0
+  Try again; a `429` is the portal's words for one, and no refusal is blamed on the connection.
+  **Santa's review found two, fixed:** a tab or a hidden character pasted in (a numbered list, a
+  spreadsheet, a soft hyphen from a web page) was sent, refused `400` by the route's `Text` and said
+  as the connection's fault, Try again failing for ever: the panel now checks the server's two
+  patterns (`UNPRINTABLE`, `INVISIBLE`, pinned to the API's by a test) and refuses under the field,
+  in words the owner rules on ("This has a tab or a hidden character Bali can't show. Type it
+  again."); and an ask held by the panel alone could go twice under two ids, a Close, a tile or
+  Present unmounting the panel mid-send: the ask is the hook's now (`opening`), one at a time, a
+  panel opened again showing it busy and its failure, Cancel forgetting both. *For the owner* (an
+  edge case of doubtful reach): an ask whose answer was lost but which landed stays the one Try
+  again resends, so the same words asked again much later replay that closed question; recommended,
+  leave it. **As the boards render:** `.app p`'s margin 0
   outranks `.help`'s and `.refusal`'s 8 px, so the counter and a refusal sit right under the field.
   An answer's input is the Field's own (`Input`), so every portal input is still the one at 16 px.
   **What the canvas doesn't draw**, the owner's to rule (the PR parked as a draft): the fresh panel
   (no words, two empty answers; Remove hidden at two answers, Add an answer at six); where three of
   LessonStates' lines sit (Asking failed and The session ended first above Ask the class, Asking
-  this closes the open question under the panel's last line); and the panel at phone width (the
-  width of the screen, as the student panel). *Weighed:* hiding Remove and Add an answer against
+  this closes the open question under the panel's last line); the panel at phone width (the width of
+  the screen, as the student panel); and the words for a tab or a hidden character (above). *Weighed:* hiding Remove and Add an answer against
   refusing (no refusal is drawn for either); starting with four empty answers, as the board's
   example has (a two-answer question would need two removed first).
 

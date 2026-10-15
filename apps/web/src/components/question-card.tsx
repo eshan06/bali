@@ -182,16 +182,18 @@ export function useLiveQuestion(sessionId: string | null) {
       setOpening({ busy: true, failure: null });
       const attempt = openAttemptFor(unansweredOpen.current, session, draft);
       const answer = await openQuestion(api, attempt);
+      // A session gone meanwhile is the next one's no more: its own ask and attempt stand.
+      if (now.current.session !== session) return null;
       unansweredOpen.current = keepUnanswered(attempt, answer);
       askingNow.current = false;
-      if (now.current.session !== session) return null;
-      const failure = answer.kind === 'opened' || asks.current !== mine ? null : answer;
-      setOpening({ busy: false, failure });
+      const cancelled = asks.current !== mine;
+      setOpening({ busy: false, failure: answer.kind === 'opened' || cancelled ? null : answer });
       // Its replay too, closed since perhaps; never over a question asked after it.
       if (answer.kind === 'opened' && answer.question.id >= newest.current) {
         put(session, answer.question);
       }
-      return answer;
+      // Cancelled on its way: the card shows what it asked, and no panel opened since is closed.
+      return cancelled ? null : answer;
     },
     [api, put],
   );

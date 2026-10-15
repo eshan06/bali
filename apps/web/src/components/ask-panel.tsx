@@ -155,7 +155,7 @@ export function AskPanel({
       onKeyDown={(e) => {
         if (e.key === 'Escape') onClose();
       }}
-      className="fixed inset-y-0 right-0 z-5 flex w-115 max-w-full flex-col overflow-y-auto border-l border-border-default bg-surface-card shadow-3"
+      className="fixed inset-y-0 right-0 z-5 flex w-115 max-w-full flex-col overflow-y-auto overscroll-contain border-l border-border-default bg-surface-card shadow-3"
     >
       <div className="flex items-start gap-3 border-b border-border-default pt-5 pr-3.5 pb-4 pl-5">
         <div className="min-w-0 flex-1">
@@ -182,6 +182,7 @@ export function AskPanel({
             id={`${id}-prompt`}
             rows={3}
             maxLength={QUESTION_PROMPT_MAX_LENGTH}
+            autoComplete="off"
             value={draft.prompt}
             onChange={(e) => set({ prompt: e.target.value })}
             aria-invalid={refused?.prompt ? true : undefined}
@@ -215,6 +216,7 @@ export function AskPanel({
                   <Input
                     id={`${id}-a${i}`}
                     type="text"
+                    autoComplete="off"
                     aria-label={`Answer ${letterOf(i)}`}
                     value={option}
                     onChange={(e) =>

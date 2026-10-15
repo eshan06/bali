@@ -360,10 +360,13 @@ describe('its hook (L6’s logic, held for one session)', () => {
     // review): a second press, in a panel opened again, sends nothing.
     expect(hook).toMatch(/if \(session === null \|\| askingNow\.current\) return null;/);
     expect(hook).toMatch(/setOpening\(\{ busy: true, failure: null \}\);/);
-    // Its failure said unless Cancel forgot it meanwhile; a new session starts with none.
+    // Answered, it lets go: the guard and the busy look, its failure said unless Cancel forgot it
+    // meanwhile; an ask of a session gone touches the next one's nothing; one cancelled on its way
+    // closes no panel opened since. A new session starts with none.
     expect(hook).toMatch(
-      /const failure = answer\.kind === 'opened' \|\| asks\.current !== mine \? null : answer;/,
+      /if \(now\.current\.session !== session\) return null;\s*unansweredOpen\.current = keepUnanswered\(attempt, answer\);\s*askingNow\.current = false;\s*const cancelled = asks\.current !== mine;\s*setOpening\(\{ busy: false, failure: answer\.kind === 'opened' \|\| cancelled \? null : answer \}\);/,
     );
+    expect(hook).toMatch(/return cancelled \? null : answer;/);
     expect(hook).toMatch(/askingNow\.current = false;\s*setOpening\(IDLE\);/);
     // An open's answer, its replay's too, never over a question asked after it.
     expect(hook).toMatch(
