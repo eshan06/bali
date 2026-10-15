@@ -64,8 +64,10 @@ export interface ApiClient {
    */
   getTagged<T>(path: string, etag: string | null): Promise<{ body: T; etag: string | null } | null>;
   post<T>(path: string, body?: unknown): Promise<T>;
+  put<T>(path: string, body?: unknown): Promise<T>;
   patch<T>(path: string, body?: unknown): Promise<T>;
-  del<T>(path: string): Promise<T>;
+  /** A removal may carry its `eventId` in its body (a saved question's, L3b2). */
+  del<T>(path: string, body?: unknown): Promise<T>;
 }
 
 /** `Retry-After` as the API sends it, whole seconds; anything else (a date, none) is unknown. */
@@ -139,7 +141,8 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
       return { body: (await res.json()) as T, etag: res.headers.get('etag') };
     },
     post: (path, body) => request('POST', path, body),
+    put: (path, body) => request('PUT', path, body),
     patch: (path, body) => request('PATCH', path, body),
-    del: (path) => request('DELETE', path),
+    del: (path, body) => request('DELETE', path, body),
   };
 }
