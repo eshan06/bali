@@ -13,6 +13,8 @@ import {
   type Drafts,
   focusAfter,
   type Form,
+  formAfter,
+  nothingToSave,
   type QuestionsActions,
   QuestionsView,
   type Removal,
@@ -91,6 +93,7 @@ const form = (words: QuestionDraft, over: Partial<Form> = {}): Form => ({
   tried: false,
   busy: false,
   problem: null,
+  tries: 0,
   ...over,
 });
 const view = (
@@ -198,7 +201,7 @@ describe('the list (Questions)', () => {
   it('names each Edit and Remove by its question, for a screen reader', () => {
     const id = `q-${BOARD[0].id}`;
     expect(html).toContain(
-      `<button type="button" id="${id}-edit" aria-describedby="${id}" class="`,
+      `<button type="button" id="${id}-edit" aria-describedby="${id}" aria-disabled="false" class="`,
     );
     expect(html).toContain(
       `<button type="button" id="${id}-remove" aria-describedby="${id}" class="`,
@@ -270,6 +273,7 @@ describe('removing a draft (Questions’ third card)', () => {
       ),
     );
     expect(html).not.toContain('Edit');
+    expect(html).not.toContain(`id="${id}-remove"`);
     expect(html).toContain(`id="${id}-keep"`);
   });
 
@@ -501,6 +505,25 @@ describe('a save that didn’t go through', () => {
   });
 });
 
+describe('a save of the draft’s own words', () => {
+  const held = BOARD[0];
+  const own = { prompt: held.prompt, options: [...held.options], correctOption: 1 };
+
+  it('sends nothing for the draft’s own words, nor for a new question’s', () => {
+    expect(nothingToSave(held, own, null)).toBe(true);
+    expect(nothingToSave(held, { ...own, prompt: ` ${held.prompt} ` }, null)).toBe(true);
+    expect(nothingToSave(held, { ...own, correctOption: 2 }, null)).toBe(false);
+    expect(nothingToSave(null, own, null)).toBe(false);
+  });
+
+  it('sends them while a save whose answer never came is held: it may have landed (santa’s review)', () => {
+    // Edited B to C correct, saved, the answer lost though it landed; then B again: unless these
+    // words are sent, the server keeps C while the card says B.
+    const unanswered = { draftId: held.id, ...own, correctOption: 2, eventId: 'e1' };
+    expect(nothingToSave(held, own, unanswered)).toBe(false);
+  });
+});
+
 describe('the page’s wiring (app/questions/page.tsx)', () => {
   it('reads the list as it opens, signed in, and saves each answer’s draft into it', () => {
     expect(page).toMatch(
@@ -514,11 +537,14 @@ describe('the page’s wiring (app/questions/page.tsx)', () => {
 
   it('mints each save after the draft it holds, and sends one with no answer again', () => {
     expect(page).toMatch(
+      /if \(draft && nothingToSave\(draft, form\.words, unsaved\.current\)\) \{/,
+    );
+    expect(page).toMatch(
       /const attempt = saveAttemptFor\(unsaved\.current, draft, form\.words\);\s*unsaved\.current = attempt;/,
     );
     expect(page).toMatch(/if \(answer\.kind !== 'failed'\) unsaved\.current = null;/);
-    // Not saved: the draft now, whose id the next save is minted after.
-    expect(page).toMatch(/answer\.kind === 'not_saved' \? answer\.draft/);
+    // The form after the answer, from the words as last drawn: typed while it was sent included.
+    expect(page).toMatch(/const next = formAfter\(drawn\.current, attempt, answer\);/);
     expect(page).toMatch(
       /const attempt = removeAttemptFor\(unremoved\.current\.get\(draftId\), draftId\);/,
     );
@@ -540,9 +566,78 @@ describe('the page’s wiring (app/questions/page.tsx)', () => {
     );
   });
 
-  it('sends no save while one is on its way, and lets a closed form’s answer change only the list', () => {
+  it('holds Save, Cancel and Edit while a save is on its way, so its answer is always said', () => {
     expect(page).toMatch(/if \(!form \|\| form\.busy\) return;/);
-    expect(page).toMatch(/if \(mine !== opened\.current\) return;/);
+    expect(page).toMatch(/if \(draft && !form\?\.busy\) show\(draft, \[PROMPT\]\);/);
+    expect(page).toMatch(/cancel: \(\) => \{\s*if \(form\?\.busy\) return;/);
+    expect(page).toMatch(/if \(mine !== opened\.current \|\| !drawn\.current\) return;/);
+    // After a save whose answer never came, Cancel reads the list again: it may have landed.
+    expect(page).toMatch(/if \(unsaved\.current\) void reread\(\);/);
+  });
+});
+
+describe('the form once a save is answered', () => {
+  const held = BOARD[0];
+  const words = { prompt: 'Q', options: ['a', 'b'], correctOption: 0 };
+  const attempt = { draftId: held.id, ...words, eventId: 'e1' };
+  const sent = form(words, { draft: held, busy: true });
+  const now = { ...held, ...words, eventId: 'e1' };
+
+  it('closes once saved', () => {
+    expect(formAfter(sent, attempt, { kind: 'saved', draft: now })).toBeNull();
+  });
+
+  it('stays open over the draft now when words were typed while it was sent', () => {
+    const typed = { ...sent, words: { ...words, prompt: 'Q2' } };
+    expect(formAfter(typed, attempt, { kind: 'saved', draft: now })).toEqual({
+      ...typed,
+      draft: now,
+      busy: false,
+      problem: null,
+    });
+  });
+
+  it('says not saved over the draft another save left, whose id the next save is minted after', () => {
+    const theirs = { ...held, prompt: 'Theirs', eventId: 'e2' };
+    expect(formAfter(sent, attempt, { kind: 'not_saved', draft: theirs })).toEqual({
+      ...sent,
+      draft: theirs,
+      busy: false,
+      problem: { kind: 'not_saved', draft: theirs },
+      tries: 1,
+    });
+  });
+
+  it('turns a removed draft into a new question, and keeps the draft for any other failure', () => {
+    expect(formAfter(sent, attempt, { kind: 'gone' })).toMatchObject({
+      draft: null,
+      busy: false,
+      problem: { kind: 'gone' },
+      tries: 1,
+    });
+    const lost = { kind: 'failed', status: undefined, retryAfter: undefined } as const;
+    expect(formAfter({ ...sent, tries: 1 }, attempt, lost)).toMatchObject({
+      draft: held,
+      busy: false,
+      problem: lost,
+      tries: 2,
+    });
+  });
+
+  it('keeps a failure and its Try again, held, while it sends again, Cancel held too', () => {
+    const lost = { kind: 'failed', status: undefined, retryAfter: undefined } as const;
+    const html = render(view([], form(WRITTEN, { problem: lost, busy: true })));
+    expect(html).toMatch(/<button type="submit" aria-disabled="true" class="[^"]*">Try again</);
+    expect(html).toMatch(/<button type="button" aria-disabled="true" class="[^"]*">Cancel</);
+    // Each answer's toggle is described by its answer, for a screen reader.
+    expect(html).toMatch(/aria-pressed="true" aria-describedby="q-a0"/);
+  });
+
+  it('holds every card’s Edit while a save is on its way', () => {
+    const html = render(view(BOARD, form(WRITTEN, { busy: true })));
+    expect(
+      html.match(/id="q-[^"]+-edit" aria-describedby="[^"]+" aria-disabled="true"/g),
+    ).toHaveLength(4);
   });
 });
 

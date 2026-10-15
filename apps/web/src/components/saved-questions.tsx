@@ -11,7 +11,14 @@ import { Check, CircleCheck, Plus, X } from 'lucide-react';
 
 import { ACCOUNT_DELETED, TOO_MANY_TRIES } from '@/lib/errors';
 import type { Failure, QuestionDraft } from '@/lib/live-question';
-import { type Refusal, refusalsOf } from '@/lib/saved-questions';
+import {
+  type Refusal,
+  refusalsOf,
+  type SaveAnswer,
+  type SaveAttempt,
+  sameWords,
+  trimmed,
+} from '@/lib/saved-questions';
 
 import { Button } from './button';
 import { CARD_ALONE } from './card';
@@ -34,8 +41,38 @@ export interface Form {
   words: QuestionDraft;
   /** Save found something Bali won't save: each refusal is said, and follows the typing. */
   tried: boolean;
+  /** A save is on its way: Save, Try again, Cancel and the cards' Edit wait for its answer. */
   busy: boolean;
   problem: SaveProblem | null;
+  /** How many saves have been answered with a problem: each one said anew. */
+  tries: number;
+}
+
+/**
+ * Whether Save has nothing to send: the draft's own words, and no save whose answer never came,
+ * which may have landed with other words, and these would then put back.
+ */
+export const nothingToSave = (
+  draft: SavedQuestion | null,
+  words: QuestionDraft,
+  unanswered: SaveAttempt | null,
+): boolean => draft !== null && unanswered === null && sameWords(draft, trimmed(words));
+
+/**
+ * The form once `attempt` is answered: closed (null) once saved, unless other words were typed
+ * while it was sent, which stay open over the draft now; else open again with the problem said,
+ * over the draft now (one saved elsewhere, whose id the next save is minted after), or none if it
+ * was removed, so the next save writes it anew.
+ */
+export function formAfter(form: Form, attempt: SaveAttempt, answer: SaveAnswer): Form | null {
+  if (answer.kind === 'saved') {
+    return sameWords(trimmed(form.words), attempt)
+      ? null
+      : { ...form, draft: answer.draft, busy: false, problem: null };
+  }
+  const draft =
+    answer.kind === 'not_saved' ? answer.draft : answer.kind === 'gone' ? null : form.draft;
+  return { ...form, draft, busy: false, problem: answer, tries: form.tries + 1 };
 }
 
 /** A draft's Remove, pressed: asked, on its way (`busy`), or its last try's failure. */
@@ -183,7 +220,13 @@ export function QuestionsView({
       ) : drafts.length > 0 ? (
         <ul className="flex max-w-215 flex-col gap-2.5">
           {drafts.map((draft) => (
-            <DraftCard key={draft.id} draft={draft} removal={removals[draft.id]} on={on} />
+            <DraftCard
+              key={draft.id}
+              draft={draft}
+              removal={removals[draft.id]}
+              saving={form?.busy ?? false}
+              on={on}
+            />
           ))}
         </ul>
       ) : form ? null : (
@@ -199,14 +242,17 @@ export function QuestionsView({
  * A draft (`.qcard`): its question, its answers with their letters, the correct one marked, and
  * when it was added or last edited; Edit and Remove beside it, or, once Remove is pressed, the
  * board's question across the card's foot with Remove and Keep, or its failure in that line's place.
+ * Edit waits while a save is on its way (`saving`), so that save's answer is always said.
  */
 export function DraftCard({
   draft,
   removal,
+  saving = false,
   on,
 }: {
   draft: SavedQuestion;
   removal: Removal | undefined;
+  saving?: boolean;
   on: QuestionsActions;
 }) {
   const id = `q-${draft.id}`;
@@ -294,7 +340,10 @@ export function DraftCard({
             variant="secondary"
             size="sm"
             aria-describedby={id}
-            onClick={() => on.edit(draft.id)}
+            aria-disabled={saving}
+            onClick={() => {
+              if (!saving) on.edit(draft.id);
+            }}
           >
             Edit
           </Button>
@@ -403,6 +452,7 @@ export function QuestionForm({ form, on }: { form: Form; on: QuestionsActions })
                     variant="secondary"
                     size="sm"
                     aria-pressed={right}
+                    aria-describedby={answerId(i)}
                     onClick={() => on.change({ ...words, correctOption: right ? null : i })}
                   >
                     {right ? <Check size={16} aria-hidden="true" /> : null}
@@ -443,10 +493,11 @@ export function QuestionForm({ form, on }: { form: Form; on: QuestionsActions })
             students see it.
           </p>
         </fieldset>
-        {/* Right above the button that sends it again (DESIGN.md §4). */}
+        {/* Right above the button that sends it again (DESIGN.md §4), kept, held, while it does;
+            a new element for each answer, so a screen reader says each one. */}
         {said ? (
           <div className={SAID}>
-            <p role="alert" className="text-body">
+            <p key={form.tries} role="alert" className="text-body">
               {said.words}
             </p>
             {said.retry ? (
@@ -460,7 +511,7 @@ export function QuestionForm({ form, on }: { form: Form; on: QuestionsActions })
           <Button type="submit" aria-disabled={busy} aria-busy={busy}>
             Save
           </Button>
-          <Button variant="secondary" onClick={on.cancel}>
+          <Button variant="secondary" aria-disabled={busy} onClick={on.cancel}>
             Cancel
           </Button>
         </div>

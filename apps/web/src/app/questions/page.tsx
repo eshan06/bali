@@ -9,6 +9,8 @@ import {
   type Drafts,
   focusAfter,
   type Form,
+  formAfter,
+  nothingToSave,
   PROMPT,
   QuestionsView,
   type Removal,
@@ -24,7 +26,6 @@ import {
   removeAttemptFor,
   type RemoveAttempt,
   removeDraft,
-  sameWords,
   type SaveAttempt,
   saveAttemptFor,
   saveDraft,
@@ -54,6 +55,11 @@ export default function QuestionsPage() {
   const unremoved = useRef(new Map<string, RemoveAttempt>());
   // The form's number: a save answered once its form has closed changes only the list.
   const opened = useRef(0);
+  // The form as last drawn: a save's answer reads the words typed while it was sent.
+  const drawn = useRef<Form | null>(null);
+  useEffect(() => {
+    drawn.current = form;
+  });
   // Where focus goes once the page has drawn it: the first of these ids it finds.
   const [focus, setFocus] = useState<string[]>([]);
 
@@ -83,15 +89,21 @@ export default function QuestionsPage() {
   /** The list without the draft `gone`. */
   const unlisted = (gone: string) =>
     setDrafts((d) => (Array.isArray(d) ? d.filter((x) => x.id !== gone) : d));
+  /** The list read again quietly, as it stands if the read fails. */
+  const reread = async () => {
+    const answer = await readDrafts(api);
+    if (answer.kind === 'read') setDrafts(answer.drafts);
+  };
 
   /** Open the form, a new question (`draft` null) or a draft's edit, or close it (undefined). */
   function show(draft: SavedQuestion | null | undefined, to: string[]) {
     opened.current += 1;
     unsaved.current = null;
+    const start = draft ? trimmed(draft) : NEW;
     setForm(
       draft === undefined
         ? null
-        : { draft, words: draft ? trimmed(draft) : NEW, tried: false, busy: false, problem: null },
+        : { draft, words: start, tried: false, busy: false, problem: null, tries: 0 },
     );
     setFocus(to);
   }
@@ -107,21 +119,23 @@ export default function QuestionsPage() {
       return setFocus([refused.prompt ? PROMPT : answerId(first)]);
     }
     const { draft } = form;
-    // The draft's own words: nothing to save, so it isn't marked edited.
-    if (draft && sameWords(draft, trimmed(form.words))) return show(undefined, [editId(draft.id)]);
+    // The draft's own words, with no save held that may have landed: nothing to save, so it
+    // isn't marked edited.
+    if (draft && nothingToSave(draft, form.words, unsaved.current)) {
+      return show(undefined, [editId(draft.id)]);
+    }
     const attempt = saveAttemptFor(unsaved.current, draft, form.words);
     unsaved.current = attempt;
     const mine = opened.current;
-    setForm({ ...form, busy: true, problem: null });
+    setForm({ ...form, busy: true });
     const answer = await saveDraft(api, attempt);
     if (answer.kind === 'saved' || answer.kind === 'not_saved') listed(answer.draft);
     if (answer.kind === 'gone' && draft) unlisted(draft.id);
-    if (mine !== opened.current) return;
+    if (mine !== opened.current || !drawn.current) return;
     if (answer.kind !== 'failed') unsaved.current = null;
-    if (answer.kind === 'saved') return show(undefined, [editId(answer.draft.id), WRITE]);
-    // Not saved: the draft now, so the next save is minted after it; gone, a new question.
-    const now = answer.kind === 'not_saved' ? answer.draft : answer.kind === 'gone' ? null : draft;
-    setForm((f) => f && { ...f, draft: now, busy: false, problem: answer });
+    const next = formAfter(drawn.current, attempt, answer);
+    if (next) return setForm(next);
+    show(undefined, answer.kind === 'saved' ? [editId(answer.draft.id), WRITE] : [WRITE]);
   }
 
   /** A card's Remove as pressed now, or none (null). */
@@ -159,7 +173,7 @@ export default function QuestionsPage() {
         write: () => show(null, [PROMPT]),
         edit: (draftId) => {
           const draft = Array.isArray(drafts) && drafts.find((d) => d.id === draftId);
-          if (draft) show(draft, [PROMPT]);
+          if (draft && !form?.busy) show(draft, [PROMPT]);
         },
         change: (next) => words(() => next),
         addAnswer: () => {
@@ -171,7 +185,12 @@ export default function QuestionsPage() {
           setFocus([answerId(i), answerId(i - 1)]);
         },
         save: () => void save(),
-        cancel: () => show(undefined, form?.draft ? [editId(form.draft.id), WRITE] : [WRITE]),
+        cancel: () => {
+          if (form?.busy) return;
+          // A save whose answer never came may have landed: the card shows the draft as it is.
+          if (unsaved.current) void reread();
+          show(undefined, form?.draft ? [editId(form.draft.id), WRITE] : [WRITE]);
+        },
         ask: (draftId) => {
           removal(draftId, { busy: false, failure: null });
           setFocus([`q-${draftId}-keep`]);
