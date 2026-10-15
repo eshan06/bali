@@ -125,7 +125,7 @@ describe('a student’s home with a class in session (StudentHome)', () => {
     );
     // Each a white row 15/18 px in, the name over the teacher, whose line is the row's 15/22.
     expect(html).toContain(
-      '<li class="rounded-md border border-border-default bg-surface-card px-4.5 py-3.75 text-body"><span class="block text-tile-name wrap-anywhere">Chemistry, period 5</span><span class="text-countdown-sub text-text-tertiary">Mr. Okafor</span></li>',
+      '<li class="rounded-md border border-border-default bg-surface-card px-4.5 py-3.75 text-body"><span class="block text-tile-name wrap-anywhere">Chemistry, period 5</span><span class="text-countdown-sub text-text-tertiary wrap-anywhere">Mr. Okafor</span></li>',
     );
   });
 });

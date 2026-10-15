@@ -40,7 +40,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   (W1; W2's `phoneChip`): drawn from a one-time `/v1/me`, it would show a phone greener than the
   teacher's grid once it went quiet (decision 13), and its other states and "as of" are drawn for the
   lesson page (StudentPhoneStates). Both are on W4's line, with the home learning of a class that
-  starts while it is open only at its next read. **The ring's start, additive:** the canvas draws the
+  starts, or ends early, while it is open only at its next read (santa's review, both reviewers). **The ring's start, additive:** the canvas draws the
   student's ring as the share of the session left, and no student read gave the session's start; now
   `liveSession.startedAt` (`getEnrolledClasses` reads it beside the bell; `@bali/shared`; the contract
   fixture; BaliCore's `LiveSession`, optional, nil from an older API, which the app reads none of),
@@ -58,7 +58,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   throwaway page in the preview alone (this computer's clock held at 23:04 before a 9:55 bell),
   deleted after, at 390 by Chrome's DevTools protocol (its window can't go below ~500 px); no student
   signed in on the PC, Cognito's page never opened; the owner's teacher tab still lands on Home.
-  **Santa:** SANTA.
+  **Santa:** round 1, no blockers from either reviewer (Reviewer B the Claude fallback); fixed, a long
+  teacher's name wraps (`web-design-guidelines`); left, as WARNs in the PR: an early End or a class
+  starting shows at the home's next read (on W4's line), and after a redeem at `/invite` focus lands
+  on the new page as Next leaves it, not on the classes heading Home's own redeem focuses (a rare path).
 
 - **2026-10-15** — **L3c: a session's questions for its report, a route of its own beside R2's, each
   question's totals the results route's, in the order the opens took the session's lock.** For

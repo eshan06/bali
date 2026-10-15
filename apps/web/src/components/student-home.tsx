@@ -31,7 +31,7 @@ function LiveCard({ live }: { live: InSession }) {
         <h2 id={id} className="text-h3 wrap-anywhere">
           {live.name}
         </h2>
-        <p className="text-countdown-sub text-text-secondary">
+        <p className="text-countdown-sub text-text-secondary wrap-anywhere">
           {teacher ? `${teacher} · in class now` : 'In class now'}
         </p>
       </div>
@@ -63,7 +63,7 @@ function ClassRows({ classes }: { classes: StudentClass[] }) {
           >
             <span className="block text-tile-name wrap-anywhere">{c.name}</span>
             {teacher ? (
-              <span className="text-countdown-sub text-text-tertiary">{teacher}</span>
+              <span className="text-countdown-sub text-text-tertiary wrap-anywhere">{teacher}</span>
             ) : null}
           </li>
         );
