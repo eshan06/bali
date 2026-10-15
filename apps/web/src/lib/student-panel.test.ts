@@ -148,6 +148,36 @@ describe('studentPanel', () => {
     });
   });
 
+  it('lists no return the phone made before its next unlock: the tile keeps that unlock', () => {
+    // Back in focus at 9:15 by the phone's own order, unlocked again at 9:16, the return reaching
+    // the server last (A13): recorded, never applied, so no moment, as the recap marks none.
+    const events = [
+      event('tap_in', 'ana', 6),
+      event('unlock', 'ana', 10, { reason: 'bathroom' }),
+      event('unlock', 'ana', 16, { reason: 'nurse' }),
+      event('refocus', 'ana', 15, { recorded_as: 'superseded' }),
+    ];
+    expect(panel('ana', events)).toEqual({
+      display: 'unlocked',
+      tappedInAt: '09:06',
+      moments: ['in@09:06', 'unlock@09:10 bathroom', 'unlock@09:16 nurse'],
+      lastCheckIn: '09:16',
+    });
+    const tile = grid(events).ana;
+    expect(unlockNote(tile, gridDisplay(tile, new Date(at(17))))).toBe('nurse');
+  });
+
+  it('lists an event once, though it is handed over twice, as a replay in the overlap is', () => {
+    const tap = event('tap_in', 'ben', 6);
+    const unlock = event('unlock', 'ben', 12, { reason: 'other' });
+    const view = studentPanel(
+      grid([tap, unlock]).ben,
+      [tap, unlock, unlock, tap],
+      new Date(at(13)),
+    );
+    expect(view.moments.map((m) => m.key)).toEqual([tap.eventId, unlock.eventId]);
+  });
+
   it('says no reason for an unlock sent with none, or with one this tab does not know', () => {
     const events = [
       event('tap_in', 'ana', 6),
@@ -326,10 +356,9 @@ describe('studentPanel', () => {
       event('session_ended', null, 20),
       // Recorded after an early End, at its own time in the window.
       event('unlock', 'hal', 26, { reason: 'nurse', recorded_as: 'after_session_end' }),
-      // A phone whose clock ran 10 minutes ahead (S9): held to the bell, its claim kept aside.
+      // A phone whose clock ran 10 minutes ahead (S9): held to the bell, the note advice only.
       event('protection_off', 'hal', 55, {
         recorded_as: 'after_session_end',
-        device_time: '2026-10-14T10:05:00.000Z',
         clock_ahead_s: 600,
       }),
     ];
@@ -459,6 +488,21 @@ describe('readStudentEvents', () => {
       kind: 'ready',
       events: { events: [feed(1, 'ana')], cursor: 1 },
     });
+  });
+
+  it('keeps what the stream brought while the read was out, once folded into its answer', async () => {
+    // Out from the start: the stream meanwhile brings 3, then 1, which the read holds too.
+    const held = withEvents(noEvents('s1', 'ana'), 's1', [feed(3, 'ana'), feed(1, 'ana')]);
+    const api = fakeApi({
+      [FEED(0)]: page([feed(1, 'ana'), feed(2, 'ben')]),
+      [FEED(2)]: page([], 2),
+    });
+    const answer = await readStudentEvents(api, noEvents('s1', 'ana'));
+    if (answer.kind !== 'ready') throw new Error(answer.message);
+    const now = withEvents(answer.events, 's1', held.events);
+    expect(now.events.map((e) => e.seq)).toEqual([1, 3]);
+    // The read's own cursor: a read again resumes the overlap before it, and finds 3 once.
+    expect(now.cursor).toBe(2);
   });
 
   it('puts the session id in the path as one segment', async () => {

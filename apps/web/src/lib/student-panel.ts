@@ -61,7 +61,9 @@ export type StudentRead =
  * Read a student's events into `known`: every page of the session's feed from its start, or, read
  * before, from `EVENT_RESUME_OVERLAP` before its cursor, as a live screen resumes, so an event that
  * committed late under a lower `seq` is still found. A failure is a result, never thrown, said in
- * `errText`'s words; part of the feed is never given as the whole, and Try again reads again.
+ * `errText`'s words; part of the feed is never given as the whole, and Try again reads again. What
+ * the stream brought while the read was out is folded into its answer, never dropped:
+ * `withEvents(answer.events, sessionId, held.events)`.
  */
 export async function readStudentEvents(
   api: Pick<ApiClient, 'get'>,
@@ -114,7 +116,12 @@ export function studentPanel(
   events: readonly FeedEvent[],
   now: Date,
 ): StudentPanel {
-  const theirs = events.filter((e) => e.userId === student.studentId).sort((a, b) => a.seq - b.seq);
+  // Each once by its event id, as a replay in the overlap is, in the engine's order.
+  const theirs = [
+    ...new Map(
+      events.filter((e) => e.userId === student.studentId).map((e) => [e.eventId, e]),
+    ).values(),
+  ].sort((a, b) => a.seq - b.seq);
   // Each unlock's latest change, in the engine's order (A20).
   const changed = new Map<unknown, unknown>();
   for (const e of theirs) {
