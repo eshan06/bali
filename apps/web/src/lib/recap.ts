@@ -44,17 +44,18 @@ export type RecapState =
   | { kind: 'error'; message: string };
 
 /**
- * Every event of a session, oldest first, as the catch-up feed pages them (200 a request), until a
- * page comes back empty.
+ * Every event of a session after `from` (its start, unless given), oldest first, as the catch-up
+ * feed pages them (200 a request), until a page comes back empty.
  * ponytail: each page is a request on the teacher's budget, so a session of thousands of events
  * can meet a 429, said as any failure, with Try again; cap the pages if one ever does.
  */
 export async function readEvents(
   api: Pick<ApiClient, 'get'>,
   sessionId: string,
+  from = 0,
 ): Promise<FeedEvent[]> {
   const events: FeedEvent[] = [];
-  for (let after = 0; ;) {
+  for (let after = from; ;) {
     const page = await api.get<EventsPage>(
       `/v1/sessions/${encodeURIComponent(sessionId)}/events?after=${after}`,
     );
@@ -159,7 +160,7 @@ export function classFigures(
 export const MOMENTS = ['in', 'unlock', 'focus', 'off', 'on', 'silent', 'back', 'left'] as const;
 export type Moment = (typeof MOMENTS)[number];
 
-const payloadOf = (payload: unknown): Record<string, unknown> =>
+export const payloadOf = (payload: unknown): Record<string, unknown> =>
   typeof payload === 'object' && payload !== null ? (payload as Record<string, unknown>) : {};
 
 /** The mark each event draws: only what the consent card says a teacher sees. */
@@ -180,6 +181,15 @@ const MARK: Partial<Record<EventType, Moment>> = {
  * does, whatever it changed, as R2 lists them.
  */
 const LATE = new Set<EventType>(['tap_in', 'refocus', 'protection_on']);
+
+/**
+ * The moment an event is, or none: the one rule the recap's marks and the student panel's list
+ * (PV11a) both read, so the two never disagree.
+ */
+export function momentOf(e: Pick<FeedEvent, 'type' | 'payload'>): Moment | null {
+  const late = LATE.has(e.type) && (payloadOf(e.payload).recorded_as ?? null) !== null;
+  return late ? null : (MARK[e.type] ?? null);
+}
 
 /**
  * Where `at` falls on the axis from `start` to `end`, in percent to a hundredth: 0 at the start,
@@ -285,9 +295,8 @@ export function sessionTimeline(
     if (counted && e.userId !== null && !found.has(e.userId)) found.set(e.userId, []);
   }
   for (const e of feed) {
-    const moment = MARK[e.type];
-    const late = LATE.has(e.type) && (payloadOf(e.payload).recorded_as ?? null) !== null;
-    if (moment === undefined || late || e.userId === null) continue;
+    const moment = momentOf(e);
+    if (moment === null || e.userId === null) continue;
     found.get(e.userId)?.push({ e, moment, at: Date.parse(e.occurredAt) });
   }
   const start = Date.parse(session.startedAt);

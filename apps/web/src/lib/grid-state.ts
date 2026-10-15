@@ -320,12 +320,17 @@ export function gridDisplay(s: Student, now: Date): GridDisplay {
   );
 }
 
-/** Whole minutes since the server last heard from the phone: its last check-in, or its tap. */
+/** When the server last heard from the phone: its last check-in, or its tap. */
+export function lastContact(s: Pick<Student, 'lastSeenAt' | 'joinedAt'>): Date | null {
+  return s.lastSeenAt ?? s.joinedAt;
+}
+
+/** Whole minutes since the server last heard from the phone (`lastContact`). */
 export function minutesSinceContact(
   s: Pick<Student, 'lastSeenAt' | 'joinedAt'>,
   now: Date,
 ): number {
-  const last = s.lastSeenAt ?? s.joinedAt;
+  const last = lastContact(s);
   return last === null ? 0 : Math.max(0, Math.floor((now.getTime() - last.getTime()) / 60_000));
 }
 
