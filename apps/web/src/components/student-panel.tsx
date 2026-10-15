@@ -19,8 +19,9 @@ import {
 import { useApi } from '@/lib/use-api';
 
 /**
- * Clock off's line (S9), beside times that are the phone's own claim held to the session's window:
- * the owner's words (2026-10-14), where PanelStates' caption said Bali keeps its own clock.
+ * Clock off's words (S9), the panel's line and the tile's tooltip, beside times that are the
+ * phone's own claim held to the session's window: the owner's (2026-10-14), where PanelStates'
+ * caption and the tooltip said Bali keeps its own clock.
  */
 export const CLOCK_OFF = "This phone's clock is off, so its times may be off too.";
 

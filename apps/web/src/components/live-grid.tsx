@@ -19,7 +19,7 @@ import {
 import { Fragment, useEffect, useId, useReducer, useRef, useState } from 'react';
 
 import { Button } from '@/components/button';
-import { StudentPanel } from '@/components/student-panel';
+import { CLOCK_OFF, StudentPanel } from '@/components/student-panel';
 import { NO_POPUPS, popupsAfter, unlockNews, UnlockPopups } from '@/components/unlock-popups';
 import { getAccessToken } from '@/lib/auth';
 import { config } from '@/lib/config';
@@ -144,9 +144,6 @@ export function stateCounts(displays: readonly GridDisplay[]): StateCounts {
 export const COLUMNS =
   'grid-cols-[repeat(auto-fill,minmax(min(250px,100%),1fr))] gap-2.5 max-sm:grid-cols-2 max-sm:auto-rows-fr max-sm:gap-2';
 export const PRESENT_COLUMNS = 'grid-cols-2 gap-3 @2xl:grid-cols-3 @4xl:grid-cols-4';
-
-/** Clock off's tooltip (S9): advice, which changes no state. */
-const CLOCK_OFF = "This phone's clock is set ahead. Bali records the time by its own clock.";
 
 /** The tile whose panel is open (v2.css's `.tile.is-selected`): the focus ring's look. */
 const SELECTED = 'rounded-md ring-2 ring-focus-ring ring-offset-2 ring-offset-surface-page';

@@ -15,6 +15,7 @@ import {
   stateCounts,
   Tile,
 } from './live-grid';
+import { CLOCK_OFF } from './student-panel';
 
 /*
  * A student's tile on the live grid (PV8; ClassStates' twelve, ClassLive, PhoneClassLive at 390 px
@@ -148,7 +149,7 @@ describe('a tile on the live grid (PV8)', () => {
     expect(parts(render(student({ clockOff: true }), true)).line?.words).toBe('Clock off');
   });
 
-  it('says Clock off with its tooltip, after the reason and "last seen"', () => {
+  it('says Clock off with its tooltip in the panel’s words (the owner, 2026-10-14), after the reason and "last seen"', () => {
     const html = render(
       student({
         state: 'unlocked',
@@ -159,8 +160,9 @@ describe('a tile on the live grid (PV8)', () => {
     );
     expect(parts(html).line?.words).toBe('Nurse · last seen 2 min ago · Clock off');
     expect(html).toContain(
-      '<span title="This phone&#x27;s clock is set ahead. Bali records the time by its own clock.">Clock off</span>',
+      '<span title="This phone&#x27;s clock is off, so its times may be off too.">Clock off</span>',
     );
+    expect(CLOCK_OFF).toBe("This phone's clock is off, so its times may be off too.");
   });
 
   it('draws no line for a phone heard from in the last minute', () => {
