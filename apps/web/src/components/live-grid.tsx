@@ -1,6 +1,11 @@
 'use client';
 
-import { EVENT_RESUME_OVERLAP, type SessionSnapshot, STREAM_HEARTBEAT_MS } from '@bali/shared';
+import {
+  EVENT_RESUME_OVERLAP,
+  type FeedEvent,
+  type SessionSnapshot,
+  STREAM_HEARTBEAT_MS,
+} from '@bali/shared';
 import {
   Circle,
   CircleCheck,
@@ -11,9 +16,10 @@ import {
   ShieldOff,
   WifiOff,
 } from 'lucide-react';
-import { Fragment, useEffect, useReducer, useRef, useState } from 'react';
+import { Fragment, useEffect, useId, useReducer, useRef, useState } from 'react';
 
 import { Button } from '@/components/button';
+import { CLOCK_OFF, StudentPanel } from '@/components/student-panel';
 import { NO_POPUPS, popupsAfter, unlockNews, UnlockPopups } from '@/components/unlock-popups';
 import { getAccessToken } from '@/lib/auth';
 import { config } from '@/lib/config';
@@ -139,8 +145,8 @@ export const COLUMNS =
   'grid-cols-[repeat(auto-fill,minmax(min(250px,100%),1fr))] gap-2.5 max-sm:grid-cols-2 max-sm:auto-rows-fr max-sm:gap-2';
 export const PRESENT_COLUMNS = 'grid-cols-2 gap-3 @2xl:grid-cols-3 @4xl:grid-cols-4';
 
-/** Clock off's tooltip (S9): advice, which changes no state. */
-const CLOCK_OFF = "This phone's clock is set ahead. Bali records the time by its own clock.";
+/** The tile whose panel is open (v2.css's `.tile.is-selected`): the focus ring's look. */
+const SELECTED = 'rounded-md ring-2 ring-focus-ring ring-offset-2 ring-offset-surface-page';
 
 /** A dot between two parts of a line, after a no-break space, so a line never starts with one. */
 const DOT = '\u00a0· ';
@@ -155,7 +161,7 @@ const DOT = '\u00a0· ';
  */
 const TILE = {
   standard:
-    'grid h-21 grid-cols-[20px_minmax(0,1fr)] gap-x-2.5 px-3.5 py-3 max-sm:block max-sm:h-auto max-sm:px-3 max-sm:py-2.5',
+    'grid h-21 grid-cols-[20px_minmax(0,1fr)] gap-x-2.5 px-3.5 py-3 max-sm:flex max-sm:flex-col max-sm:h-auto max-sm:px-3 max-sm:py-2.5',
   present: 'grid h-25 grid-cols-[24px_minmax(0,1fr)] gap-x-3 px-4.5 py-3',
 };
 
@@ -193,19 +199,22 @@ export function Tile({
   present,
   pulse,
   onPulseEnd,
+  select,
 }: {
   student: Student;
   now: Date;
   present: boolean;
   pulse: boolean;
   onPulseEnd?: () => void;
+  /** On the live page (PV11b; ClassStates), a button that opens the student's panel and closes it. */
+  select?: { id: string; panel: string; selected: boolean; onSelect: () => void };
 }) {
   const display = gridDisplay(s, now);
-  const { label, icons, tone } = CHIP[display];
+  const { icons, tone } = CHIP[display];
   // The state's own icon at the side; a Left state's flag before its words.
   const flags = icons.slice(0, -1);
   const StateIcon = icons[icons.length - 1] ?? Circle;
-  const words = display === 'silent' ? `${label} · ${silentNote(s, now)}` : label;
+  const words = stateWords(s, display, now);
   const note = unlockNote(s, display, present);
   const reason = note === null ? null : note.charAt(0).toUpperCase() + note.slice(1);
   const seen = lastSeenNote(s, display, now);
@@ -215,19 +224,35 @@ export function Tile({
     ...(s.clockOff ? ['Clock off'] : []),
   ];
   // On a phone one detail at most, as PhoneClassLive draws them: an Unlocked tile's reason, a
-  // Focused tile's Clock off (the owner, 2026-10-14). The rest stays on a computer until PV11.
+  // Focused tile's Clock off (the owner, 2026-10-14). The rest stays on a computer, and the panel.
   const brief =
     display === 'unlocked' ? reason : display === 'focused' && s.clockOff ? 'Clock off' : null;
   const look = present ? 'present' : 'standard';
+  // On the live page a button, which opens the panel; else the tile alone.
+  const Box = select ? 'button' : 'div';
   return (
-    <li className="flex min-w-0">
-      {/* Keyed by its unlock, so each new one pulses from the start; once it has pulsed it leaves
-          the set, so a tile that turns red and back stays still. */}
-      <div
-        key={s.unlock?.eventId ?? 'none'}
-        onAnimationEnd={pulse ? onPulseEnd : undefined}
-        className={`${TILE[look]} w-full items-start rounded-md border-[1.5px] tabular-nums ${tone} ${pulse ? 'animate-softpulse' : ''}`}
+    <li className={select?.selected ? `flex min-w-0 ${SELECTED}` : 'flex min-w-0'}>
+      <Box
+        {...(select && {
+          type: 'button',
+          id: select.id,
+          'aria-expanded': select.selected,
+          'aria-controls': select.selected ? select.panel : undefined,
+          onClick: select.onSelect,
+        })}
+        className={`${TILE[look]} relative w-full items-start rounded-md border-[1.5px] text-left tabular-nums ${tone}${select ? ' cursor-pointer' : ''}`}
       >
+        {/* The pulse on a layer the tile's own size, keyed by its unlock, so each new one pulses
+            from the start while the tile, a button that may hold focus, stays; once it has pulsed
+            it leaves the set, so a tile that turns red and back stays still. */}
+        {pulse ? (
+          <span
+            key={s.unlock?.eventId}
+            aria-hidden="true"
+            onAnimationEnd={onPulseEnd}
+            className="pointer-events-none absolute -inset-[1.5px] animate-softpulse rounded-md"
+          />
+        ) : null}
         <StateIcon
           size={present ? 24 : 20}
           aria-hidden="true"
@@ -274,8 +299,32 @@ export function Tile({
             </span>
           )}
         </span>
-      </div>
+      </Box>
     </li>
+  );
+}
+
+/** A state's words: its label, Silent's with its minutes ("Silent · 5 min"). */
+function stateWords(s: Student, display: GridDisplay, now: Date): string {
+  const { label } = CHIP[display];
+  return display === 'silent' ? `${label} · ${silentNote(s, now)}` : label;
+}
+
+/**
+ * A student's state as a chip, their tile's state, icon and words in its tint, as the class page's
+ * counts draw a chip (`LiveCounts`): the student panel's (PV11b; ClassStudent, PanelStates).
+ */
+export function StateChip({ student: s, now }: { student: Student; now: Date }) {
+  const display = gridDisplay(s, now);
+  const { icons, tone } = CHIP[display];
+  const Icon = icons[icons.length - 1] ?? Circle;
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border-[1.5px] px-2.5 py-0.75 text-caption font-medium whitespace-nowrap tabular-nums ${tone}`}
+    >
+      <Icon size={13} aria-hidden="true" className="shrink-0" />
+      {stateWords(s, display, now).replaceAll(' · ', DOT)}
+    </span>
   );
 }
 
@@ -332,8 +381,10 @@ export function LiveGrid({
    * The class page's own grid while a session runs (PV7), in Present too (PV9), its said lines as
    * ClassStale and ClassStates draw them: a lost stream as the floating pill (`PILL`) in place of
    * the line over the grid, a stream open but quiet still that line, and a grid that didn't load
-   * said with a small Try again; and each unlock the stream brings as a pop-up (PV10; ClassUnlock),
-   * never in Present. Off, as before: How it ended until PV12.
+   * said with a small Try again; each unlock the stream brings as a pop-up (PV10; ClassUnlock); and
+   * each tile a button that opens the student's panel (PV11b; ClassStudent), as does a pop-up's
+   * Open student. Neither in Present: the panel closes as it turns on. Off, as before: How it ended
+   * until PV12.
    */
   livePage?: boolean;
 }) {
@@ -360,6 +411,14 @@ export function LiveGrid({
   // And each opens a pop-up (PV10), kept while Present is on and shown after it, until it is closed
   // or the session's live page goes, its grid with it.
   const [popups, tell] = useReducer(popupsAfter, NO_POPUPS);
+  // The student whose panel is open (PV11b), and how many times one has opened, so each open,
+  // the same student's again from a pop-up included, takes focus into it.
+  const [panel, setPanel] = useState<{ studentId: string; opens: number } | null>(null);
+  // Every event the stream has brought, which the open panel folds into its read (PV11a).
+  const [streamed, setStreamed] = useState<readonly FeedEvent[]>([]);
+  const id = useId();
+  const tileId = (studentId: string) => `${id}-tile-${studentId}`;
+  const panelId = `${id}-panel`;
   // Any sign of life from the server: an event, a heartbeat comment, or a
   // snapshot refresh that came back. A heartbeat is freshness and not just
   // liveness — a quiet class emits no events, so nothing arriving is normal
@@ -402,6 +461,7 @@ export function LiveGrid({
           overlap: EVENT_RESUME_OVERLAP,
           onEvent: (e) => {
             setStudents((prev) => (prev ? applyEvent(prev, e) : prev));
+            setStreamed((prev) => [...prev, e]);
             const live = landsLive(e, snap.latestSeq);
             if (live) setLiveUnlocks((prev) => new Set(prev).add(e.eventId));
             const news = unlockNews(e, live);
@@ -427,6 +487,15 @@ export function LiveGrid({
       sse?.close();
     };
   }, [api, sessionId, onUnauthorized, attempt]);
+
+  // Focus into the panel as it opens, at the student's name (`PanelView`).
+  useEffect(() => {
+    if (panel !== null) document.getElementById(`${panelId}-name`)?.focus();
+  }, [panel, panelId]);
+  // Present closes the panel: its moments carry each unlock's reason, never for the projector.
+  useEffect(() => {
+    if (present) setPanel(null);
+  }, [present]);
 
   // Local clock so the silent badge appears with zero event traffic.
   useEffect(() => {
@@ -513,6 +582,11 @@ export function LiveGrid({
     heartbeatMs: STREAM_HEARTBEAT_MS,
   });
   const rows = Object.values(students);
+  const open = (studentId: string) =>
+    setPanel((cur) => ({ studentId, opens: (cur?.opens ?? 0) + 1 }));
+  // Its tiles are buttons, and its panel shows, on the live page alone, and never in Present.
+  const selects = livePage && !present;
+  const shown = selects && panel !== null ? students[panel.studentId] : undefined;
 
   return (
     <div className="flex flex-col gap-3">
@@ -553,18 +627,52 @@ export function LiveGrid({
                       return next;
                     })
                   }
+                  select={
+                    selects
+                      ? {
+                          id: tileId(s.studentId),
+                          panel: panelId,
+                          selected: panel?.studentId === s.studentId,
+                          // A second press closes it again, focus staying on the tile.
+                          onSelect: () =>
+                            panel?.studentId === s.studentId ? setPanel(null) : open(s.studentId),
+                        }
+                      : undefined
+                  }
                 />
               );
             })}
           </ul>
         </div>
       )}
-      {/* The unlock pop-ups (ClassUnlock, ClassUnlocks), after the grid, never on the projector. */}
-      {livePage && !present ? (
+      {/* The student's panel (ClassStudent), read again for each student; Close or Escape gives
+          focus back to their tile. */}
+      {shown ? (
+        <StudentPanel
+          key={shown.studentId}
+          id={panelId}
+          sessionId={sessionId}
+          student={shown}
+          chip={<StateChip student={shown} now={now} />}
+          streamed={streamed}
+          now={now}
+          onClose={() => {
+            document.getElementById(tileId(shown.studentId))?.focus();
+            setPanel(null);
+          }}
+        />
+      ) : null}
+      {/* The unlock pop-ups (ClassUnlock, ClassUnlocks), after the grid, never on the projector.
+          Open student closes its pop-up, as ClassStudent draws none. */}
+      {selects ? (
         <UnlockPopups
           unlocks={popups.open}
           students={students}
           onClose={(eventId) => tell({ kind: 'close', eventId })}
+          onOpen={(u) => {
+            tell({ kind: 'close', eventId: u.eventId });
+            open(u.studentId);
+          }}
         />
       ) : null}
     </div>

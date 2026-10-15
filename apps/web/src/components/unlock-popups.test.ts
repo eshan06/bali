@@ -148,11 +148,16 @@ describe('what the stream tells the pop-ups', () => {
 describe('a pop-up, as ClassUnlock draws it', () => {
   const render = (unlocks: Unlock[], students: Students = STUDENTS) =>
     renderToStaticMarkup(
-      createElement(UnlockPopups, { unlocks, students, onClose: () => undefined }),
+      createElement(UnlockPopups, {
+        unlocks,
+        students,
+        onClose: () => undefined,
+        onOpen: () => undefined,
+      }),
     );
   /** Each pop-up's markup, top to bottom. */
   const popups = (html: string) =>
-    html.match(/<div class="pointer-events-auto[^]*?<\/button>/g) ?? [];
+    html.match(/<div class="pointer-events-auto[^]*?aria-label="Close"[^]*?<\/button>/g) ?? [];
   /** Markup as read, each tag a space; the no-break spaces kept, as the dot's and the time's are. */
   const text = (html: string) =>
     html
@@ -167,7 +172,7 @@ describe('a pop-up, as ClassUnlock draws it', () => {
 
   it('says who used Emergency Unlock, their reason and when, as an alert a screen reader says', () => {
     const [popup = ''] = popups(render([unlock('e1')]));
-    const words = /<div role="alert" class="min-w-0">([^]*?)<\/div>/.exec(popup)?.[1] ?? '';
+    const words = /<div class="min-w-0"><div role="alert">([^]*?)<\/div>/.exec(popup)?.[1] ?? '';
     expect(text(words)).toBe(`Ethan Park used Emergency Unlock Nurse\u00a0· ${bellTime(AT)}`);
     // The title 15/20 semibold, the line 13/18 in the secondary ink, 2 px under it.
     expect(words).toMatch(/<p id="unlock-e1" class="text-tile-name wrap-break-word">/);
@@ -217,13 +222,28 @@ describe('a pop-up, as ClassUnlock draws it', () => {
     }
   });
 
-  it('has Close, described by its words, and no Open student until PV11b builds the panel', () => {
+  it('has Open student under its words and Close, each described by its words (PV11b)', () => {
     const [popup = ''] = popups(render([unlock('e1')]));
     expect(popup).toMatch(
       /<button type="button" aria-label="Close" aria-describedby="unlock-e1" class="[^"]*">[^]*?lucide-x[^]*?<\/button>$/,
     );
+    // Out of the alert, so a screen reader says the unlock alone as it opens; v2.css's `.t-act`:
+    // 13/18 semibold in orange-700, 8 px under the words.
+    const [, open = ''] =
+      /<\/div><button type="button" aria-describedby="unlock-e1" class="([^"]*)">Open student<\/button><\/div>/.exec(
+        popup,
+      ) ?? [];
+    expect(open.split(' ')).toEqual(
+      expect.arrayContaining(['mt-2', 'text-caption', 'font-semibold', 'text-unlock-link']),
+    );
+    expect(popup.match(/<button\b/g)).toHaveLength(2);
+    expect(popup).not.toMatch(/<a\b/);
+  });
+
+  it('offers Open student once the student’s tile is on the grid, where their panel opens', () => {
+    const [popup = ''] = popups(render([unlock('e1', { studentId: 'u3-0000-cccc' })]));
+    expect(popup).not.toContain('Open student');
     expect(popup.match(/<button\b/g)).toHaveLength(1);
-    expect(popup).not.toMatch(/<a\b|Open student/);
   });
 
   it('is v2.css’s `.toast`: white, a 3 px orange top edge, 14 px corners, shadow-3, the lock in its well', () => {
@@ -251,7 +271,7 @@ describe('a pop-up, as ClassUnlock draws it', () => {
       /<span class="grid size-9 place-items-center rounded-sm bg-state-emergency-bg text-state-emergency-fg"><svg[^>]*width="18"[^>]*class="lucide lucide-lock-open/,
     );
     // Close 32 px, 6 px up, in the tertiary ink, grey on hover as the menu's Sign out.
-    expect(classes(popup, /<button[^>]*class="([^"]*)"/)).toEqual(
+    expect(classes(popup, /<button[^>]*aria-label="Close"[^>]*class="([^"]*)"/)).toEqual(
       expect.arrayContaining([
         'size-8',
         '-mt-1.5',
@@ -301,7 +321,7 @@ describe('a pop-up, as ClassUnlock draws it', () => {
   it('moves focus on a Close to the pop-up that takes its place, else the one above it', () => {
     const source = read('./unlock-popups.tsx');
     expect(source).toMatch(
-      /const popup = e\.currentTarget\.parentElement;\s*const next = popup\?\.nextElementSibling \?\? popup\?\.previousElementSibling;\s*if \(document\.activeElement === e\.currentTarget\) \{\s*next\?\.querySelector\('button'\)\?\.focus\(\);\s*\}\s*onClose\(u\.eventId\);/,
+      /const popup = e\.currentTarget\.parentElement;\s*const next = popup\?\.nextElementSibling \?\? popup\?\.previousElementSibling;\s*if \(document\.activeElement === e\.currentTarget\) \{\s*next\?\.querySelector<HTMLElement>\('button\[aria-label="Close"\]'\)\?\.focus\(\);\s*\}\s*onClose\(u\.eventId\);/,
     );
   });
 });
@@ -320,8 +340,11 @@ describe('the pop-ups on the class page', () => {
   it('draws them on the class page’s live grid alone, after it, and never on the projector', () => {
     // Held by the grid, so they go with the session's live page, as ClassUnlock draws them; kept
     // while Present is on, and shown again once it is off.
+    expect(grid).toMatch(/const selects = livePage && !present;/);
+    // Open student closes its pop-up and opens the student's panel (PV11b), as ClassStudent draws
+    // the panel with no pop-up over it.
     expect(grid).toMatch(
-      /\{livePage && !present \? \(\s*<UnlockPopups\s+unlocks=\{popups\.open\}\s+students=\{students\}\s+onClose=\{\(eventId\) => tell\(\{ kind: 'close', eventId \}\)\}\s*\/>\s*\) : null\}\s*<\/div>\s*\);\s*\}\s*$/,
+      /\{selects \? \(\s*<UnlockPopups\s+unlocks=\{popups\.open\}\s+students=\{students\}\s+onClose=\{\(eventId\) => tell\(\{ kind: 'close', eventId \}\)\}\s+onOpen=\{\(u\) => \{\s*tell\(\{ kind: 'close', eventId: u\.eventId \}\);\s*open\(u\.studentId\);\s*\}\}\s*\/>\s*\) : null\}\s*<\/div>\s*\);\s*\}\s*$/,
     );
     // Only the live page's grid takes `livePage`: How it ended's never streams, and opens none.
     const grids = page.match(/<LiveGrid\b[^]*?\/>/g) ?? [];

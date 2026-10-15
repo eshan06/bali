@@ -319,6 +319,8 @@
   --color-pip: var(--bali-stone-500);
   /* The unlock pop-up's top edge (PV10), the primitive v2.css draws it with. */
   --color-unlock-edge: var(--bali-orange-400);
+  /* And its Open student (PV11b), the primitive v2.css's `.t-act` draws with. */
+  --color-unlock-link: var(--bali-orange-700);
 }
 
 /* §6: the three shadows, by name. */

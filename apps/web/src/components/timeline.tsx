@@ -29,6 +29,8 @@ const MOMENT: Record<Moment, [label: string, Icon: LucideIcon | null, fill: stri
     back: ['Checked in again', Wifi, 'bg-state-notjoined-bg', 'text-state-notjoined-fg'],
     left: ['Left', Flag, 'bg-state-ended-bg', 'text-state-ended-fg'],
   };
+/** The student panel (PV11b) says each moment in these words too. */
+export { MOMENT };
 
 /**
  * A mark's look: a 20 px disc with its icon, edged in the card's colour so the line breaks around

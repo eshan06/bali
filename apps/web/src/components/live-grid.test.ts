@@ -15,6 +15,7 @@ import {
   stateCounts,
   Tile,
 } from './live-grid';
+import { CLOCK_OFF } from './student-panel';
 
 /*
  * A student's tile on the live grid (PV8; ClassStates' twelve, ClassLive, PhoneClassLive at 390 px
@@ -42,6 +43,7 @@ const unlocked = (reason: UnlockReason | null) => ({ eventId: 'v1', reason });
 
 const render = (s: Student, present = false, pulse = false) =>
   renderToStaticMarkup(createElement(Tile, { student: s, now: NOW, present, pulse }));
+const source = readFileSync(fileURLToPath(new URL('./live-grid.tsx', import.meta.url)), 'utf8');
 
 /**
  * Markup as read: each tag read as a space (never removed outright, so no tag can form from what
@@ -147,7 +149,7 @@ describe('a tile on the live grid (PV8)', () => {
     expect(parts(render(student({ clockOff: true }), true)).line?.words).toBe('Clock off');
   });
 
-  it('says Clock off with its tooltip, after the reason and "last seen"', () => {
+  it('says Clock off with its tooltip in the panel’s words (the owner, 2026-10-14), after the reason and "last seen"', () => {
     const html = render(
       student({
         state: 'unlocked',
@@ -158,8 +160,9 @@ describe('a tile on the live grid (PV8)', () => {
     );
     expect(parts(html).line?.words).toBe('Nurse · last seen 2 min ago · Clock off');
     expect(html).toContain(
-      '<span title="This phone&#x27;s clock is set ahead. Bali records the time by its own clock.">Clock off</span>',
+      '<span title="This phone&#x27;s clock is off, so its times may be off too.">Clock off</span>',
     );
+    expect(CLOCK_OFF).toBe("This phone's clock is off, so its times may be off too.");
   });
 
   it('draws no line for a phone heard from in the last minute', () => {
@@ -247,7 +250,13 @@ describe('a tile on the live grid (PV8)', () => {
     const html = render(student({ state: 'unlocked', unlock: unlocked('bathroom') }));
     const tile = parts(html);
     expect(tile.tile).toEqual(
-      expect.arrayContaining(['max-sm:block', 'max-sm:h-auto', 'max-sm:px-3', 'max-sm:py-2.5']),
+      expect.arrayContaining([
+        'max-sm:flex',
+        'max-sm:flex-col',
+        'max-sm:h-auto',
+        'max-sm:px-3',
+        'max-sm:py-2.5',
+      ]),
     );
     expect(tile.icons[0]?.classes).toContain('max-sm:hidden');
     // The state's icon before its words, and its one detail run on after them, nothing cut; the
@@ -320,10 +329,60 @@ describe('a tile on the live grid (PV8)', () => {
   });
 
   it('pulses the whole tile (bali-softpulse) when the stream brings its unlock', () => {
-    const tile = (pulse: boolean) =>
-      parts(render(student({ state: 'unlocked', unlock: unlocked('nurse') }), false, pulse)).tile;
-    expect(tile(true)).toContain('animate-softpulse');
-    expect(tile(false)).not.toContain('animate-softpulse');
+    const html = (pulse: boolean) =>
+      render(student({ state: 'unlocked', unlock: unlocked('nurse') }), false, pulse);
+    // On a layer at the tile's own edge, first in it, hidden from screen readers and clicks, so the
+    // tile itself, a button that may hold focus, never redraws as a new unlock restarts it.
+    expect(html(true)).toMatch(
+      /^<li class="flex min-w-0"><div class="[^"]*\brelative\b[^"]*"><span aria-hidden="true" class="pointer-events-none absolute -inset-\[1\.5px\] animate-softpulse rounded-md"><\/span><svg/,
+    );
+    expect(html(false)).not.toContain('animate-softpulse');
+    expect(source).toMatch(
+      /\{pulse \? \(\s*<span\s+key=\{s\.unlock\?\.eventId\}\s+aria-hidden="true"\s+onAnimationEnd=\{onPulseEnd\}/,
+    );
+  });
+});
+
+describe('a tile on the class page while a session runs (PV11b; ClassStates)', () => {
+  const tile = (selected: boolean, over: Partial<Student> = {}) =>
+    renderToStaticMarkup(
+      createElement(Tile, {
+        student: student(over),
+        now: NOW,
+        present: false,
+        pulse: false,
+        select: { id: 'g-tile-u1', panel: 'g-panel', selected, onSelect: () => undefined },
+      }),
+    );
+
+  it('is a button that opens the student’s panel, in the tile’s own look', () => {
+    const html = tile(false);
+    const [, attributes = '', classes = ''] =
+      /^<li class="flex min-w-0"><button ([^>]*?)class="([^"]*)">/.exec(html) ?? [];
+    expect(attributes).toBe('type="button" id="g-tile-u1" aria-expanded="false" ');
+    // The tile's own classes, its words left-aligned, and a pointer.
+    const plain = parts(render(student())).tile;
+    expect(plain).toContain('text-left');
+    expect(classes.split(' ')).toEqual([...plain, 'cursor-pointer']);
+    // Its name is its words, as the tile's.
+    expect(text(html)).toBe('Jaylen Brooks Focused');
+  });
+
+  it('is marked while its panel is open, as v2.css marks `.tile.is-selected`: the focus ring’s look', () => {
+    const html = tile(true, { state: 'unlocked', unlock: unlocked('nurse') });
+    expect(html).toMatch(
+      /^<li class="flex min-w-0 rounded-md ring-2 ring-focus-ring ring-offset-2 ring-offset-surface-page"><button type="button" id="g-tile-u1" aria-expanded="true" aria-controls="g-panel" /,
+    );
+    // Closed, it names no panel: none is there.
+    expect(tile(false)).not.toContain('aria-controls');
+  });
+
+  it('stays a tile alone in Present and under How it ended, where no panel opens', () => {
+    for (const present of [true, false]) {
+      const html = render(student(), present);
+      expect(html).toMatch(/^<li class="flex min-w-0"><div /);
+      expect(html).not.toMatch(/<button|aria-expanded|tabindex/);
+    }
   });
 });
 
@@ -427,7 +486,6 @@ describe('the grid counted for the class page (PV7)', () => {
 });
 
 describe('the grid’s lines on the class page while a session runs (PV7)', () => {
-  const source = readFileSync(fileURLToPath(new URL('./live-grid.tsx', import.meta.url)), 'utf8');
   /** A constant's class list, by its name. */
   const classes = (name: string) =>
     (new RegExp(`const ${name} =\\s*'([^']*)'`).exec(source)?.[1] ?? '').split(' ');

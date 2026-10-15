@@ -8,6 +8,67 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-14** — **PV11b: the student panel, built as drawn but for the owner's wording calls;
+  a tile is its button, Open student its other door, and Present closes it.** Built to
+  [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (version 21):
+  ClassStudent and PanelStates at 1440 px, ClassStates' tile as a button and ClassUnlock's Open
+  student, with PhoneClassLive's tiles at 390 (#383). **The panel** (`components/student-panel.tsx`)
+  is v2.css's `.panel`: 372 px from the right, white, a hairline on its left, `shadow-3`, scrolling
+  itself; the name at 18/24 over "Tapped in at 9:05 AM", their state as their tile has it (a chip
+  drawn by the grid, `StateChip`, so the two never disagree; the state's own icon, so "Left ·
+  unlocked" shows the lock alone, as PanelStates draws it) and Close; "This session", each moment
+  in the recap's own words (`MOMENT`, shared from `timeline.tsx`) on v2.css's `.tl`, a grey 26 px
+  dot each (`surface-sunken`, added to the grey it may fill), its time at the right and an unlock's
+  reason under it in the pop-up's words (`reasonWords`; none is "No reason given", as the recap
+  says it); Clock off's line, the last check-in and "Only you see this panel…". While the events
+  are read, the name and state alone with "Loading this session…"; a read that failed, "Couldn't load
+  this session." with `errText`'s words and Try again; nobody tapped in, "Zuri Mensah hasn't tapped in
+  this session.", with no check-in. **Fixed, where the board draws it absolute** on a page one
+  screen tall: at rest the two are one, and it stays in view as the page scrolls, as PV10 ruled for
+  the pop-ups; under the reconnect pill and the pop-ups (z 5, 10 and 20, v2.css's order), so a
+  pop-up that lands while it is open sits over it. **Its read** is PV11a's `readStudentEvents`, from
+  the feed's start, as it opens and by Try again; the grid keeps every event its stream brings
+  (`streamed`) and the panel folds them into its answer with `withEvents`, so what came while the
+  read was out is never lost and the panel follows the class live (seen on dev: a Not here panel
+  turned Focused as the student tapped in). **The tile is its button** on the live page
+  (ClassStates, PhoneClassLive): `aria-expanded`, `aria-controls` while open, a second press closes
+  it, and the open one is marked as v2.css marks `.tile.is-selected`, the focus ring's own look (2 px
+  of the page, then 2 px of green-600), on its list item. Its pulse moved onto a layer of its own
+  inside the tile, keyed by the unlock as the tile was: the tile, a button that may hold focus, would
+  otherwise be redrawn by each new unlock, and focus lost with it. **The keyboard:** focus goes to
+  the student's name as the panel opens (so a screen reader starts there), and to the name again as
+  Try again starts a read; Close or Escape from inside it gives focus back to the student's tile.
+  **Open student** (ClassUnlock's `.t-act`, 13/18 semibold in orange-700, the colour `unlock-link`)
+  closes its pop-up and opens the panel, as ClassStudent draws the panel with no pop-up over it; it
+  sits outside the pop-up's alert, so a screen reader still hears the unlock alone, and is described
+  by its words; it shows once the student's tile is on the grid, where their panel opens. **Never in
+  Present** (#265): the tiles stay plain there, the panel closes as Present turns on and stays closed
+  after it, and nothing of it, Open student included, is in Present's markup (checked on dev at 1920:
+  no `aside`, no `aria-expanded`, no reason). How it ended's tiles stay plain too. **Where it differs from
+  PanelStates, the owner's approvals (2026-10-14, the two wording questions PV11a left):** the panel
+  lists going silent ("Silent") and coming back ("Checked in again") among the moments, as the recap
+  marks them by the same rule (`momentOf`), where PanelStates' Silent board lists the tap-in alone;
+  and its Clock off line reads "This phone's clock is off, so its times may be off too.", where the
+  board's caption said Bali records the time by its own clock, beside times that are the phone's own
+  claim held to the session's window (dev showed "Tapped in at 9:21 PM" over "last checked in at
+  9:12 PM"). **And the owner's approvals of the parked PR (2026-10-14):** the tile's Clock off
+  tooltip takes the same words, one string (`CLOCK_OFF`) for both, in place of "This phone's clock
+  is set ahead. Bali records the time by its own clock."; and the panel at phone width, which no
+  board draws, stays as built (below). **From santa's review:** on a phone the
+  tile, now a button, is laid out as a column, since a button set as a block centres its words in
+  a tile stretched to the row's tallest (measured: 31 px down, against 11 at the top); and a
+  pop-up's Close hands focus to the next pop-up's Close, not to its Open student, now first in
+  it. **Weak spots,
+  as drawn:** at 1440 px the open panel covers +5, +10, End and Present, as ClassStudent draws it
+  (close it first; at 1920 they stay clear); at phone width, which no board draws, v2.css's numbers
+  make it 372 px of a 390 px screen, the page an 18 px strip beside it (asked with the PR parked;
+  approved as built, the owner, 2026-10-14). **The screenshots** used dev's demo students in the demo class: Cal unlocked then
+  protection off (the pop-up, Open student, the loading panel), Ana tapped in ten minutes ahead
+  (Clock off), Dana not here, then silent, then unlocked and left, Ben unlocked and then left, a
+  read made to fail in the browser and Try again; Left came from a short second session in an older
+  demo class (Ben and Dana are enrolled there), ended at once; a second session in the demo class
+  showed the owner's two changes. *Size:* about 395 changed lines without tests.
+
 - **2026-10-14** — **PV11a: the student panel's logic, with no words: its state is the tile's, its
   moments the recap's, its times the server's events'.** For PV11b's panel, as
   [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (version 21) draws it

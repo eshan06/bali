@@ -82,6 +82,9 @@ const REASON: Record<UnlockReason, string> = {
   nurse: 'Nurse',
   other: 'Other reason',
 };
+/** An unlock's reason in words, the pop-up's and the student panel's (PV11b). */
+export const reasonWords = (reason: UnlockReason | null) =>
+  reason === null ? 'No reason given' : REASON[reason];
 /** A dot between two parts of a line, after a no-break space, as the tiles' (`live-grid.tsx`). */
 const DOT = '\u00a0· ';
 
@@ -113,18 +116,23 @@ const POPUP =
  * ClassUnlock draws them on it alone; each unlock then shows on its tile under How it ended and in
  * the recap. Its words are an alert, so a screen reader says each as it opens
  * ("Ethan Park used Emergency Unlock. Nurse · 9:31 AM") without moving focus; Close is described by
- * them, and closing one moves focus to the pop-up that takes its place, else the one above it.
- * Open student is PV11b's, which builds the panel it opens.
+ * them, and closing one moves focus to the Close of the pop-up that takes its place, else the one
+ * above it.
+ * Open student (PV11b) opens the student's panel, described by the same words, once their tile is
+ * on the grid.
  */
 export function UnlockPopups({
   unlocks,
   students,
   onClose,
+  onOpen,
 }: {
   unlocks: readonly Unlock[];
   /** The grid's students, so a pop-up names each as their tile does now. */
   students: Students;
   onClose: (eventId: string) => void;
+  /** Open student: the panel for whoever unlocked. */
+  onOpen: (unlock: Unlock) => void;
 }) {
   if (unlocks.length === 0) return null;
   // As the tile names them: their display name, else the start of their id until the grid has it.
@@ -137,16 +145,29 @@ export function UnlockPopups({
             <span className="grid size-9 place-items-center rounded-sm bg-state-emergency-bg text-state-emergency-fg">
               <LockOpen size={18} aria-hidden="true" />
             </span>
-            <div role="alert" className="min-w-0">
-              {/* 15/20 semibold, the size of a tile's name. */}
-              <p id={`unlock-${u.eventId}`} className="text-tile-name wrap-break-word">
-                {nameOf(u)} used Emergency Unlock
-              </p>
-              <p className="mt-0.5 text-caption text-text-secondary">
-                {u.reason === null ? 'No reason given' : REASON[u.reason]}
-                {DOT}
-                {bellTime(u.at)}
-              </p>
+            <div className="min-w-0">
+              <div role="alert">
+                {/* 15/20 semibold, the size of a tile's name. */}
+                <p id={`unlock-${u.eventId}`} className="text-tile-name wrap-break-word">
+                  {nameOf(u)} used Emergency Unlock
+                </p>
+                <p className="mt-0.5 text-caption text-text-secondary">
+                  {reasonWords(u.reason)}
+                  {DOT}
+                  {bellTime(u.at)}
+                </p>
+              </div>
+              {/* v2.css's `.t-act`: 13/18 semibold in orange-700, 8 px under the words. */}
+              {students[u.studentId] ? (
+                <button
+                  type="button"
+                  aria-describedby={`unlock-${u.eventId}`}
+                  onClick={() => onOpen(u)}
+                  className="mt-2 cursor-pointer rounded-xs text-caption font-semibold text-unlock-link underline-offset-2 hover:underline"
+                >
+                  Open student
+                </button>
+              ) : null}
             </div>
             <button
               type="button"
@@ -156,7 +177,7 @@ export function UnlockPopups({
                 const popup = e.currentTarget.parentElement;
                 const next = popup?.nextElementSibling ?? popup?.previousElementSibling;
                 if (document.activeElement === e.currentTarget) {
-                  next?.querySelector('button')?.focus();
+                  next?.querySelector<HTMLElement>('button[aria-label="Close"]')?.focus();
                 }
                 onClose(u.eventId);
               }}
