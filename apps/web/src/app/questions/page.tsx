@@ -3,7 +3,13 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { type Drafts, QuestionsView, type Removal } from '@/components/saved-questions';
+import {
+  type Drafts,
+  focusAfter,
+  QuestionsView,
+  type Removal,
+  TITLE,
+} from '@/components/saved-questions';
 import { getAccessToken } from '@/lib/auth';
 import {
   readDrafts,
@@ -65,9 +71,12 @@ export default function QuestionsPage() {
     const answer = await removeDraft(api, attempt);
     if (answer.kind !== 'failed') unremoved.current.delete(draftId);
     if (answer.kind !== 'removed') return removal(draftId, { busy: false, failure: answer });
+    // Focus moves on from the card that goes, never from where the teacher has gone since.
+    const card = document.getElementById(`q-${draftId}`)?.closest('li');
+    const from = document.activeElement;
     unlisted(draftId);
     removal(draftId, null);
-    setFocus(near);
+    if (!from || from === document.body || card?.contains(from)) setFocus([...near, TITLE]);
   }
 
   return (
@@ -79,13 +88,8 @@ export default function QuestionsPage() {
           removal(draftId, { busy: false, failure: null });
           setFocus([`q-${draftId}-keep`]);
         },
-        remove: (draftId) => {
-          // The card after it, else the one before: where focus goes once it is gone.
-          const list = Array.isArray(drafts) ? drafts : [];
-          const at = list.findIndex((d) => d.id === draftId);
-          const near = [list[at + 1], list[at - 1]].flatMap((d) => (d ? [`q-${d.id}-remove`] : []));
-          void remove(draftId, near);
-        },
+        remove: (draftId) =>
+          void remove(draftId, focusAfter(Array.isArray(drafts) ? drafts : [], draftId, 'remove')),
         keep: (draftId) => {
           removal(draftId, null);
           setFocus([`q-${draftId}-remove`]);

@@ -10,10 +10,12 @@ import { TOO_MANY_TRIES } from '../lib/errors';
 import {
   DraftCard,
   type Drafts,
+  focusAfter,
   type QuestionsActions,
   QuestionsView,
   type Removal,
   removeSaid,
+  TITLE,
 } from './saved-questions';
 
 /*
@@ -125,7 +127,9 @@ describe('the list (Questions)', () => {
     expect(
       [...html.matchAll(/<p id="q-[^"]+" class="[^"]*">([^<]*)<\/p>/g)].map((m) => m[1]),
     ).toEqual(BOARD.map((d) => d.prompt));
-    expect(html).toMatch(/<h1 class="text-page-title">Your questions<\/h1>/);
+    expect(html).toMatch(
+      /<h1 id="q-title" tabindex="-1" class="text-page-title">Your questions<\/h1>/,
+    );
   });
 
   it('draws each draft as the board’s card: its question, its lettered answers, the correct one marked', () => {
@@ -281,5 +285,37 @@ describe('the page’s wiring (app/questions/page.tsx)', () => {
       /const attempt = removeAttemptFor\(unremoved\.current\.get\(draftId\), draftId\);/,
     );
     expect(page).toMatch(/if \(answer\.kind !== 'failed'\) unremoved\.current\.delete\(draftId\);/);
+  });
+
+  it('takes a removed draft off the list, its confirm with it, and moves focus on from its card', () => {
+    expect(page).toMatch(
+      /if \(answer\.kind !== 'removed'\) return removal\(draftId, \{ busy: false, failure: answer \}\);/,
+    );
+    expect(page).toMatch(/unlisted\(draftId\);\s*removal\(draftId, null\);/);
+    // Only from the card that went (or from nowhere): never from where the teacher has gone since.
+    expect(page).toMatch(
+      /if \(!from \|\| from === document\.body \|\| card\?\.contains\(from\)\) setFocus\(\[\.\.\.near, TITLE\]\);/,
+    );
+    expect(page).toMatch(
+      /focusAfter\(Array\.isArray\(drafts\) \? drafts : \[\], draftId, 'remove'\)/,
+    );
+  });
+});
+
+describe('where focus goes once a draft is removed', () => {
+  const ids = BOARD.map((d) => d.id);
+
+  it('to the card after it, else the one before, the page’s title last', () => {
+    expect(focusAfter(BOARD, ids[1], 'remove')).toEqual([
+      `q-${ids[2]}-remove`,
+      `q-${ids[0]}-remove`,
+    ]);
+    expect(focusAfter(BOARD, ids[3], 'remove')).toEqual([`q-${ids[2]}-remove`]);
+    expect(focusAfter(BOARD.slice(0, 1), ids[0], 'remove')).toEqual([]);
+    expect(focusAfter(BOARD, 'gone', 'remove')).toEqual([]);
+    // The title takes focus when nothing nearer is left: in the tab order only by a press.
+    expect(render(view(BOARD))).toContain(
+      `<h1 id="${TITLE}" tabindex="-1" class="text-page-title">Your questions</h1>`,
+    );
   });
 });

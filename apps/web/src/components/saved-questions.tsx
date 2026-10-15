@@ -30,6 +30,19 @@ export interface QuestionsActions {
   read: () => void;
 }
 
+/** The page's title: where focus goes when nothing nearer is left. */
+export const TITLE = 'q-title';
+
+/**
+ * Where focus goes once a draft is removed: the `button` of the card after it, else of the one
+ * before (the page's to fall back from).
+ */
+export function focusAfter(drafts: SavedQuestion[], draftId: string, button: string): string[] {
+  const at = drafts.findIndex((d) => d.id === draftId);
+  if (at === -1) return [];
+  return [drafts[at + 1], drafts[at - 1]].flatMap((d) => (d ? [`q-${d.id}-${button}`] : []));
+}
+
 const LETTERS = 'ABCDEF';
 /** An answer's letter (v2.css's `.mini-opts .letter`), 24 px; the correct one's green. */
 const letter = (right: boolean) =>
@@ -62,7 +75,9 @@ export function QuestionsView({
     <main className="flex flex-col gap-5.5">
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
         <div>
-          <h1 className="text-page-title">Your questions</h1>
+          <h1 id={TITLE} tabIndex={-1} className="text-page-title">
+            Your questions
+          </h1>
           <p className="mt-0.5 text-meta text-text-secondary">
             Write questions before class. In class, ask one with a click.
           </p>
@@ -152,7 +167,13 @@ export function DraftCard({
           aria-labelledby={`${id}-rm`}
           className={`col-span-full border-t border-border-default pt-3 ${SAID}`}
         >
-          <p id={`${id}-rm`} role={removal.failure ? 'alert' : undefined} className="text-body">
+          {/* A new element for a failure, so a screen reader says each one as it comes. */}
+          <p
+            key={removal.failure ? 'failed' : 'asked'}
+            id={`${id}-rm`}
+            role={removal.failure ? 'alert' : undefined}
+            className="text-body"
+          >
             {removal.failure
               ? removeSaid(removal.failure)
               : 'Remove this question? Questions you already asked keep their results.'}
