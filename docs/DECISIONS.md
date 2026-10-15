@@ -8,8 +8,8 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
-- **2026-10-14** — **PV11b: the student panel, built as drawn; a tile is its button, Open student
-  its other door, and Present closes it.** Built to
+- **2026-10-14** — **PV11b: the student panel, built as drawn but for the owner's two wording
+  calls; a tile is its button, Open student its other door, and Present closes it.** Built to
   [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (version 21):
   ClassStudent and PanelStates at 1440 px, ClassStates' tile as a button and ClassUnlock's Open
   student, with PhoneClassLive's tiles at 390 (#PRNUM). **The panel** (`components/student-panel.tsx`)
@@ -44,11 +44,18 @@ a real decision? Add a dated entry at the top: what was decided and why.
   by its words; it shows once the student's tile is on the grid, where their panel opens. **Never in
   Present** (#265): the tiles stay plain there, the panel closes as Present turns on and stays closed
   after it, and nothing of it, Open student included, is in Present's markup (checked on dev at 1920:
-  no `aside`, no `aria-expanded`, no reason). How it ended's tiles stay plain too. **As drawn, with
-  the owner's two wording questions open:** going silent is not listed, as PanelStates' Silent board
-  draws it (the chip and the last check-in say it), and so neither is coming back, which only ends a
-  silence (one set, `UNLISTED`, so an answer flips both); and the Clock off line beside a clock-ahead
-  phone's times (dev showed "Tapped in at 9:21 PM" over "last checked in at 9:12 PM"). **Weak spots,
+  no `aside`, no `aria-expanded`, no reason). How it ended's tiles stay plain too. **Where it differs from
+  PanelStates, the owner's approvals (2026-10-14, the two wording questions PV11a left):** the panel
+  lists going silent ("Silent") and coming back ("Checked in again") among the moments, as the recap
+  marks them by the same rule (`momentOf`), where PanelStates' Silent board lists the tap-in alone;
+  and its Clock off line reads "This phone's clock is off, so its times may be off too.", where the
+  board's caption said Bali records the time by its own clock, beside times that are the phone's own
+  claim held to the session's window (dev showed "Tapped in at 9:21 PM" over "last checked in at
+  9:12 PM"). The tile's Clock off tooltip keeps its words. **From santa's review:** on a phone the
+  tile, now a button, is laid out as a column, since a button set as a block centres its words in
+  a tile stretched to the row's tallest (measured: 31 px down, against 11 at the top); and a
+  pop-up's Close hands focus to the next pop-up's Close, not to its Open student, now first in
+  it. **Weak spots,
   as drawn:** at 1440 px the open panel covers +5, +10, End and Present, as ClassStudent draws it
   (close it first; at 1920 they stay clear); at phone width, which no board draws, v2.css's numbers
   make it 372 px of a 390 px screen, the page an 18 px strip beside it (the owner's call, asked with
@@ -56,8 +63,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   protection off (the pop-up, Open student, the loading panel), Ana tapped in ten minutes ahead
   (Clock off), Dana not here, then silent, then unlocked and left, Ben unlocked and then left, a
   read made to fail in the browser and Try again; Left came from a short second session in an older
-  demo class (Ben and Dana are enrolled there), ended at once. *Size:* 393 changed lines without
-  tests.
+  demo class (Ben and Dana are enrolled there), ended at once; a second session in the demo class
+  showed the owner's two changes. *Size:* 395 changed lines without tests.
 
 - **2026-10-14** — **PV11a: the student panel's logic, with no words: its state is the tile's, its
   moments the recap's, its times the server's events'.** For PV11b's panel, as

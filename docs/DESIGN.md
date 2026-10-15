@@ -157,8 +157,9 @@ The unlock pop-up is v2's since PV10 (2026-10-14): ClassUnlock's, opened beside 
 tile's pulse, newest on top, each until it is closed, on the live page alone and never
 in Present. The student panel is v2's since PV11b (2026-10-14): ClassStudent's, 372 px from
 the right over the live page, opened by a tile, a button there marked while its panel is open
-(`.tile.is-selected`), and by a pop-up's Open student; its states as PanelStates draws them;
-never in Present.
+(`.tile.is-selected`), and by a pop-up's Open student; its states as PanelStates draws them,
+but going silent and coming back listed as the recap marks them and Clock off's line "This
+phone's clock is off, so its times may be off too." (the owner, 2026-10-14); never in Present.
 Every
 portal source file is held to the tokens' utilities by `tokens.test.ts`, and
 since D2g the theme holds none of Tailwind's own colours, type sizes,
