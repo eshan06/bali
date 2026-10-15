@@ -89,8 +89,11 @@ intermediate state of an approved screen that no board draws (loading, empty,
 an error or refusal line, a narrow-width, large-text or rare-case variant,
 buttons held while sending) is the exception: it is drawn on the canvas
 first, labelled as an intermediate state, and then built from that drawing,
-without waiting for the owner's approval, and a state that may not be
-intermediate waits for the owner (CLAUDE.md, Working rules). The app keeps
+without waiting for the owner's approval. A new error or refusal line at
+sign-in or the 13+ check is an intermediate state like any other. Anything
+new shown about a student that no approved board shows is never one: it
+waits for the owner, as does a state that may not be intermediate (CLAUDE.md,
+Working rules). The app keeps
 its own canvases (the
 [Live lesson app screens](https://claude.ai/artifact/CZpFbFuxnRrLcuywtJGfVQ)
 for L8 and M8). It is built in PLAN's "Portal redesign (v2's look)" steps,

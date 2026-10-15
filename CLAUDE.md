@@ -107,10 +107,15 @@ lint && npm test`, plus `npm run demo` when API behavior changed), then run
   rare-case variant, buttons held while sending) is drawn on that screen's
   canvas first, labelled as an intermediate state, and then built from that
   drawing, without waiting for the owner's approval; the UI PR names that
-  board. Anything else no board draws counts as a new screen, and so does a
-  state you aren't sure is intermediate: a new screen or page still waits for
-  the owner's approval, and one with no approved design is a stop-and-ask.
-  Restoring a previously shipped look on the owner's order is the only
+  board. A new error or refusal line at sign-in or the 13+ check is an
+  intermediate state like any other. **Anything new shown about a student**
+  that no approved board shows (a fact, label, row or rare case, on the
+  recap, a report, the grid, the student panel or anywhere else) is never an
+  intermediate state: it waits for the owner's approval like a new screen.
+  Anything else no board draws counts as a new screen, and so does a state
+  you aren't sure is intermediate: a new screen or page still waits for the
+  owner's approval, and one with no approved design is a stop-and-ask.
+  Restoring a previously shipped look on the owner's order is the only other
   exception.
 - **User-facing UI work, and only that, uses the design framework.** That
   covers the portal's pages and components (`apps/web/src/app`,
@@ -189,7 +194,8 @@ and every session gets them.
   progress.
 - **UI:** build only from boards, never an undrawn state: a screen or page
   from boards the owner approved, an intermediate state of one from a board
-  you draw on its canvas first, without waiting for approval (Working
+  you draw on its canvas first, without waiting for approval, and anything
+  new shown about a student only from boards the owner approved (Working
   rules). Every user-facing string goes through `no-ai-slop`; send each
   build screenshot beside its board; after any canvas publish, open it and
   check every new or changed board before reporting.
