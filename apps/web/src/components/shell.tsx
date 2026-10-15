@@ -247,11 +247,13 @@ export function SideMenu({
   leaving: boolean;
   onSignOut: () => void;
 }) {
+  // Its own page, or one under it (a session's report under Reports, PV14; ReportOpened).
+  const here = (href: string) => path === href || (href !== '/' && path.startsWith(`${href}/`));
   const link = ({ href, label, Icon }: Item) => (
     <Link
       key={href}
       href={href}
-      aria-current={path === href ? 'page' : undefined}
+      aria-current={here(href) ? 'page' : undefined}
       className={`${ITEM} max-sm:order-3`}
     >
       <Icon size={17} aria-hidden="true" className="shrink-0" />

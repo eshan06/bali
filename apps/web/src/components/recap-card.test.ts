@@ -23,7 +23,7 @@ import { endedToday, RecapShown } from './recap-card';
  * session as its figures and three groups, who wasn't focused the whole time with their lines and
  * their moments in words, who was, who didn't join; and the two states no board draws. Each report
  * is R2's own `sessionReport` over the same events. The card says times in the viewer's own zone,
- * so these do too. And an opened report (R5), which keeps PB5's timeline until PV13 and PV14.
+ * so these do too. Its head opens the session's own page (PV14), and so does a Reports row.
  */
 
 /** 9:05 to 9:55 on the board's day, a minute from its start being 2 % of the axis. */
@@ -160,14 +160,19 @@ const TIMES = plain(sessionTimes(SESSION));
 type Shown = Exclude<RecapState, { kind: 'finding' | 'none' }>;
 type Over = {
   present?: boolean;
-  session?: SessionReportSummary;
   roster?: RosterStudent[] | null;
   rosterError?: string | null;
 };
 const render = (state: Shown, over: Over = {}) =>
   plain(
     renderToStaticMarkup(
-      createElement(RecapShown, { state, onRetry: () => undefined, roster: ROSTER, ...over }),
+      createElement(RecapShown, {
+        classId: 'c1',
+        state,
+        onRetry: () => undefined,
+        roster: ROSTER,
+        ...over,
+      }),
     ),
   );
 /** The text of the page, its tags dropped. */
@@ -225,7 +230,7 @@ describe('the recap card on the class page, after the bell (ClassEnded)', () => 
     const r = reportOf(events);
     const n = new Intl.NumberFormat();
     expect(text(html)).toContain(
-      `|Last session|${TIMES}|Joined|13|Class focus time|${n.format(r.focusMinutes)} min|Average per student|${r.averageFocusMinutes} min|Silent|${r.silentMinutes} min|${NOTE}|Focused part of the time · 8|`,
+      `|Last session|${TIMES}|Open its report|Joined|13|Class focus time|${n.format(r.focusMinutes)} min|Average per student|${r.averageFocusMinutes} min|Silent|${r.silentMinutes} min|${NOTE}|Focused part of the time · 8|`,
     );
     // By when each one's focus first broke; an unlock's reason after its time, as the board words it.
     expect(rows(html)).toEqual([
@@ -251,7 +256,7 @@ describe('the recap card on the class page, after the bell (ClassEnded)', () => 
       'Hannah Levi',
     ]);
     // No "No unlocks." where there were some, and no How it ended's grid or Present here.
-    expect(html).not.toMatch(/No unlocks|How it ended|aria-pressed/);
+    expect(html).not.toMatch(/No unlocks|How it ended|aria-pressed="/);
   });
 
   it('draws each line from the tap-in and each mark at its moment, a tap-in drawing none', () => {
@@ -269,7 +274,9 @@ describe('the recap card on the class page, after the bell (ClassEnded)', () => 
     ]);
     expect(rings[0]?.[1]).toMatch(/^min\(26%, /);
     // Every icon at v2.css's 2.25 stroke by a class (the 1.75 rule would win over the prop), 10 px.
-    const icons = [...html.matchAll(/<svg[^>]*class="lucide[^"]*"[^>]*>/g)].map((m) => m[0]);
+    const icons = [...html.matchAll(/<svg[^>]*class="lucide[^"]*"[^>]*>/g)]
+      .map((m) => m[0])
+      .filter((icon) => !icon.includes('lucide-chart-bar'));
     expect(icons.length).toBeGreaterThan(8);
     for (const icon of icons) {
       expect(icon).toMatch(/\bwidth="10"/);
@@ -320,7 +327,7 @@ describe('the recap card on the class page, after the bell (ClassEnded)', () => 
 
   it('says nobody joined, with no figures and no groups', () => {
     const html = render(ready([]));
-    expect(text(html)).toBe(`|Last session|${TIMES}|Nobody joined this session.|`);
+    expect(text(html)).toBe(`|Last session|${TIMES}|Open its report|Nobody joined this session.|`);
   });
 });
 
@@ -348,7 +355,7 @@ describe('two states no board draws (PV12b; the owner’s to look at)', () => {
     const roster = [enrolled('Zuri Mensah'), enrolled('Hannah Levi')];
     const html = render(ready(events), { roster });
     expect(text(html)).toMatch(
-      /^\|Last session\|[^|]*\|Nobody joined this session\.\|Didn't join · 2\|Hannah Levi\|/,
+      /^\|Last session\|[^|]*\|Open its report\|Nobody joined this session\.\|Didn't join · 2\|Hannah Levi\|/,
     );
     expect(rows(html)).toEqual([`Zuri Mensah: Unlocked at ${clock(9)}, no reason given.`]);
   });
@@ -413,62 +420,30 @@ describe('the card’s reads', () => {
   });
 });
 
-/* An opened report (R5) keeps PB5's timeline until PV13 and PV14 redraw Reports. */
-const lucas: ReportStudent = { id: 'u1', displayName: 'Lucas Ferreira' };
-const ana: ReportStudent = { id: 'u2', displayName: 'Ana Rodríguez' };
-const OPENED: SessionReportSummary = { ...SESSION, joinedCount: 2, focusMinutes: 1214 };
-const REPORT: SessionReportResponse = {
-  ended: true,
-  joined: [ana, lucas],
-  focusMinutes: 1214,
-  averageFocusMinutes: 45,
-  silentMinutes: 23,
-  unlocks: [
-    { eventId: 'o3', student: lucas, occurredAt: AT(37), reason: 'nurse', recordedAs: null },
-  ],
-  protectionOffs: [],
-};
-const feed = (n: number, type: FeedEvent['type'], userId: string, minute: number) => ({
-  seq: n,
-  eventId: `o${n}`,
-  type,
-  userId,
-  occurredAt: AT(minute),
-  payload: {},
-});
-const EVENTS: FeedEvent[] = [
-  feed(1, 'tap_in', ana.id, 5),
-  feed(2, 'tap_in', lucas.id, 12),
-  { ...feed(3, 'unlock', lucas.id, 37), payload: { reason: 'nurse' } },
-];
-const OPENED_READY: Ready = { kind: 'ready', session: OPENED, report: REPORT, events: EVENTS };
-const marks = (html: string) =>
-  [...html.matchAll(/<button[^>]*aria-label="([^"]*)"/g)].map((m) => m[1]);
+describe('Open its report (ClassEnded; PV14)', () => {
+  /** The head's link to the session's own page, as rendered. */
+  const link = (html: string) => /<a class="([^"]*)" href="([^"]*)">([^]*?)<\/a>/.exec(html);
 
-describe('an opened report', () => {
-  it('shows its timeline with no figures of its own, the row saying them', () => {
-    const html = render(OPENED_READY, { session: OPENED, roster: null });
-    expect(html).toMatch(new RegExp(`<h2 id="[^"]*" class="sr-only">${TIMES}</h2>`));
-    expect(html).not.toContain('Class focus time');
-    expect(text(html)).toContain(`|${NOTE}|Tapped in|`);
-    expect(marks(html)).toContain(`Lucas Ferreira, unlocked at ${clock(37)}, Nurse`);
+  it('opens the session’s own page from the card’s head, a small button with the chart', () => {
+    const html = render(ready(board()));
+    const [, classes, href, inside] = link(html) ?? [];
+    expect(href).toBe('/reports/c1/s1');
+    expect(classes?.split(' ')).toEqual(expect.arrayContaining(['h-8.5', 'text-button-sm']));
+    expect(inside).toMatch(/^<svg[^>]*\blucide-chart-bar\b[^>]*>[^]*<\/svg>Open its report$/);
+    // Beside the session's day and times, under them where the card is too narrow for both.
+    expect(html).toMatch(
+      /<div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-3"><div class="flex flex-col gap-0\.75"><h2 [^>]*>Last session<\/h2><p [^>]*>[^<]*<\/p><\/div><a class="[^"]*" href="\/reports\/c1\/s1"/,
+    );
   });
 
-  it('says it is loading, or why it couldn’t load, in the session’s words', () => {
-    expect(render({ kind: 'loading', session: OPENED }, { session: OPENED })).toMatch(
-      /<p role="status"[^>]*>Loading this session…<\/p>/,
-    );
-    const failed = render({ kind: 'error', message: 'x' }, { session: OPENED });
-    expect(text(failed)).toContain("|Couldn't load this session.|x|Try again|");
+  it('opens it when nobody joined too, whose page says so', () => {
+    expect(link(render(ready([])))?.[2]).toBe('/reports/c1/s1');
   });
 
-  it('says nobody joined, still marking an unlock from a student who never joined', () => {
-    const nobody = { ...REPORT, joined: [], averageFocusMinutes: null };
-    const html = render(
-      { ...OPENED_READY, report: nobody, events: EVENTS.slice(2) },
-      { session: OPENED },
-    );
-    expect(text(html)).toMatch(/^\|[^|]*\|Nobody joined this session\.\|Unlocked\|/);
-    expect(marks(html)).toEqual([`Lucas Ferreira, unlocked at ${clock(37)}, Nurse`]);
+  it('isn’t there while the session is read, nor when it couldn’t be', () => {
+    expect(link(render({ kind: 'loading', session: SESSION }))).toBeNull();
+    expect(link(render({ kind: 'error', message: 'x' }))).toBeNull();
+    // Nor while the roster, which who didn't join is read from, is.
+    expect(link(render(ready(board()), { roster: null }))).toBeNull();
   });
 });

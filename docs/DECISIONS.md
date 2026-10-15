@@ -8,6 +8,51 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-15** — **PV14: a session's report on a page and a URL of its own, as ReportOpened
+  draws it; R2 says when the session ran; the class page's recap opens it, and so does each Reports
+  row.** Built to [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4):
+  ReportOpened (its Questions card L7c's), ReportStates' "Loading this session…" and "Couldn't load
+  this session.", ClassEnded's Open its report, and two boards drawn first under #398's rule, each
+  labelled an intermediate state, version 38: ReportPageStates (the page loading and failed under
+  the way back, a class the account doesn't list with the way back saying Reports alone, no
+  unlocks and nobody joined with no Unlocks table, the recap's head on a phone with Open its report
+  under the session's times) and ReportPhone (the page at 390 px) (#401). **The URL:**
+  `/reports/<class>/<session>`, each id one the API mints (`UUID`, which Reports' `?class=` now
+  shares), anything else the not-found page any URL with no page gets, so no other path reaches the
+  API; Reports stays marked in the menu on it, as ReportOpened marks it. *Weighed:*
+  `/classes/<id>/reports/<session>` (under a path that is a redirect to Reports today), the session
+  alone with `?class=` (a page with a part that can be left off). **The read:** R2, the session's
+  events and the class's roster at once (who didn't join, as the class page's recap reads it), any
+  failure said with Try again reading all three. **R2 now says when the session ran**, R3's row's
+  `startedAt`, `endsAt` and `endedAt` (additive), since no read gave one session's window: its day
+  and times, and the recap's axis. *Weighed:* walking R3's pages until the row turns up (a read per
+  20 sessions back), the session's snapshot (no `endedAt`, so an early End would read as its bell),
+  a step of its own for three fields (W3's call, for its one). The portal can deploy minutes before
+  the API (Railway waits for CI): a report with no window is said as a failure with Try again
+  ("Something went wrong. Try again.", `errText`'s own), never a page that breaks. **The page** is
+  ReportOpened's: the way back (v2's `back`, 14/20 semibold, now `NAV_LINK`, which nothing used),
+  the day over its times, the recap card headed "This session" (the class page's own body,
+  `RecapBody`, so the two never differ) and the Unlocks table: every unlock R2 lists, oldest first,
+  the student as the row's header in bold (the board's `<b>`), the time, the reason in the tile's
+  words, "No reason given" in the tertiary ink, a reason this tab doesn't know read as none; none
+  when there were none, as the card says. **Open its report** sits in the class page's recap head
+  once the session is read, never while it loads or failed, as ReportStates draws those. **Reports'
+  rows link to the page**, the day and times both the link's words, so two sessions on one day stay
+  apart; the opened row went, and with it PB5's timeline (`Timeline`, `sessionTimeline`,
+  `recapView`, the axis's 12 gaps, `recap.ts`'s reason words), which only that row still drew, and
+  the colour `row-open`. *Size:* 447 lines added and 491 deleted outside tests and docs, the
+  deletions that timeline. **Left as they are:** a refusal the portal has no words of its own for is
+  said in the API's ("not your class"), as on every page; a running session's URL, which no link
+  leads to (Reports lists and the recap opens only sessions marked over), shows its report as if
+  over at its bell, those focused so far listed as the whole time (santa's review); and, as on the
+  class page's recap, who didn't join is read from the class's roster now, so an old session leaves
+  out a student removed since (santa's review; an enrollment history is a read of its own).
+  **The screenshots:** the real page in the owner's tab
+  on dev's demo class (a short session run for it, ended at once: Ana unlocked with no reason and
+  came back, Ben unlocked for the nurse and turned protection off, Cal tapped in late, Dana never
+  joined), its window read from R3's row by a shim in the preview alone until this API deploys; the
+  sharp ones from the same components in a throwaway page given dev's reads, deleted after.
+
 - **2026-10-15** — **M5b's part 2: Your slides, as the Slides board draws it, its intermediate
   states drawn on the canvas first; an upload's row turns into its deck, and leaving the page stops
   its uploads.** Built to [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4):

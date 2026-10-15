@@ -322,6 +322,10 @@ describe('the side menu', () => {
     expect(current('/questions')).toEqual(['Questions']);
     expect(current('/slides')).toEqual(['Slides']);
     expect(current('/classes/c1')).toEqual([]);
+    // A page under one it lists: a session's report under Reports (PV14, ReportOpened); none under
+    // Home's `/`, nor a page whose name only starts as another's does.
+    expect(current('/reports/c1/s1')).toEqual(['Reports']);
+    expect(current('/reportsx')).toEqual([]);
     // By its aria-current, which a screen reader says too, never by colour alone.
     const home = links(menu()).find((l) => l.text === 'Home');
     expect(home?.classes).toEqual(

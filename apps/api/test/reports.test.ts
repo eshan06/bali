@@ -7,6 +7,7 @@ import {
   endEnrollment,
   endSession,
   enrollments,
+  extendSession,
   markSilentParticipations,
   newUuidV7,
   openQuestion,
@@ -185,6 +186,9 @@ describe('GET /v1/classes/:id/reports/sessions/:sessionId', () => {
     // Ana 4 + 17, Ben 8, Cy 22: the late unlock never ended her focus.
     expect(res.json<SessionReportResponse>()).toEqual({
       ended: true,
+      startedAt: at(0).toISOString(),
+      endsAt: at(25).toISOString(),
+      endedAt: at(25).toISOString(),
       joined: [named(ana, 'Ana'), named(ben, 'Ben R.'), named(cy, null)],
       focusMinutes: 51,
       averageFocusMinutes: 17,
@@ -213,6 +217,32 @@ describe('GET /v1/classes/:id/reports/sessions/:sessionId', () => {
           recordedAs: null,
         },
       ],
+    });
+  });
+
+  it('says when it ran: its start, its bell as an extend moved it, and its End, as R3’s row does (PV14)', async () => {
+    const c = await seedClassroom(db, 'window');
+    const session = await lesson(c.klass.id);
+    const read = async () =>
+      (await reportAs(c.teacher.cognitoId, c.klass.id, session.id)).json<SessionReportResponse>();
+
+    // Running: its bell, moved on 10 minutes, and no end yet.
+    now = at(10);
+    await extendSession(db, { sessionId: session.id, durationMinutes: 10, at: now });
+    expect(await read()).toMatchObject({
+      ended: false,
+      startedAt: at(0).toISOString(),
+      endsAt: at(35).toISOString(),
+      endedAt: null,
+    });
+    // Ended early by its teacher: the End, the bell kept as it was.
+    now = at(20);
+    await endSession(db, { sessionId: session.id, at: now, reason: 'ended' });
+    expect(await read()).toMatchObject({
+      ended: true,
+      startedAt: at(0).toISOString(),
+      endsAt: at(35).toISOString(),
+      endedAt: at(20).toISOString(),
     });
   });
 
@@ -301,6 +331,9 @@ describe('GET /v1/classes/:id/reports/sessions/:sessionId', () => {
     const res = await reportAs(c.teacher.cognitoId, c.klass.id, session.id);
     expect(res.json<SessionReportResponse>()).toEqual({
       ended: false,
+      startedAt: at(0).toISOString(),
+      endsAt: at(25).toISOString(),
+      endedAt: null,
       joined: [],
       focusMinutes: 0,
       averageFocusMinutes: null,
@@ -321,6 +354,9 @@ describe('GET /v1/classes/:id/reports/sessions/:sessionId', () => {
       expect(res.statusCode).toBe(403);
       expect(res.json<ApiErrorBody>().error.code).toBe('forbidden');
       expect(res.body).not.toContain(c.student.id);
+      // The one error shape alone: nothing of the session, when it ran (PV14) included.
+      expect(Object.keys(res.json<object>())).toEqual(['error']);
+      expect(res.body).not.toContain(session.startedAt.toISOString());
     }
   });
 
@@ -367,6 +403,8 @@ describe('GET /v1/classes/:id/reports/sessions/:sessionId', () => {
         reason: 'session_not_found',
       });
       expect(res.body).not.toContain(other.student.id);
+      // Nor when another class's session ran (PV14's window): the error shape alone.
+      expect(Object.keys(res.json<object>())).toEqual(['error']);
     }
     const unknown = await reportAs(c.teacher.cognitoId, randomUUID(), mine.id);
     expect(unknown.statusCode).toBe(404);
@@ -849,6 +887,10 @@ describe('GET /v1/classes/:id/reports/sessions', () => {
       const res = await reportAs(c.teacher.cognitoId, c.klass.id, row.id);
       const report = res.json<SessionReportResponse>();
       expect(row, row.id).toMatchObject({
+        // Its window too: a session's page says when it ran from its report alone (PV14).
+        startedAt: report.startedAt,
+        endsAt: report.endsAt,
+        endedAt: report.endedAt,
         ended: report.ended,
         joinedCount: report.joined.length,
         focusMinutes: report.focusMinutes,

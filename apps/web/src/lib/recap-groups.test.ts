@@ -255,7 +255,7 @@ describe('recapGroups', () => {
   });
 
   it('runs the axis from the start to the end, a tick each 10 minutes, AM or PM at its ends', () => {
-    // ClassEnded's ticks (PV12b): 6 gaps or fewer, where the reports' timeline has 12.
+    // ClassEnded's ticks (PV12b): 6 gaps or fewer.
     const { ticks, step } = groups(board());
     expect(ticks.map((t) => [t.x, plain(t.label)])).toEqual([
       [0, '9:05 AM'],

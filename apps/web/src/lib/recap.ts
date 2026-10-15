@@ -15,11 +15,15 @@ import type { ApiClient } from './api-client';
 import { errText } from './errors';
 
 /*
- * The recap card's logic (R4; PB5's timeline), kept out of the component so it can be tested
- * directly, as the grid's is: which session it recaps, how it loads, and the words, numbers and
- * marks it shows. Class aggregates only, as R2 answers them, and each moment a mark at its time:
- * never one student's minutes, so nothing ranks them.
+ * The recap's logic (R4; ClassEnded since PV12), kept out of the component so it can be tested
+ * directly, as the grid's is: which session the class page recaps, how it loads, and the words,
+ * numbers and marks the recap shows there and on a session's report page (PV14). Class aggregates
+ * only, as R2 answers them, and each moment a mark at its time: never one student's minutes, so
+ * nothing ranks them.
  */
+
+/** When a session ran: its start, its bell and when it was marked over, as R3's row and R2 say. */
+export type SessionWindow = Pick<SessionReportSummary, 'startedAt' | 'endsAt' | 'endedAt'>;
 
 /**
  * The session the card recaps: the class's newest (R3's first row), once the server has marked
@@ -69,19 +73,18 @@ export async function readEvents(
 }
 
 /**
- * The class's last session (R3, one row), or `known` (R5's opened row): read its report (R2) and
- * its events, telling `show` each step after the first. Every failure ends in `error`, for Try
- * again: the timeline is the recap, so its figures are never shown without it.
+ * The class's last session (R3, one row): read its report (R2) and its events, telling `show` each
+ * step after the first. Every failure ends in `error`, for Try again: the moments are the recap, so
+ * its figures are never shown without them.
  */
 export async function loadRecap(
   api: Pick<ApiClient, 'get'>,
   classId: string,
-  known: SessionReportSummary | undefined,
   show: (state: RecapState) => void,
 ): Promise<void> {
   const reports = `/v1/classes/${encodeURIComponent(classId)}/reports/sessions`;
   try {
-    const session = known ?? latestEnded(await api.get<SessionReportsPage>(`${reports}?limit=1`));
+    const session = latestEnded(await api.get<SessionReportsPage>(`${reports}?limit=1`));
     if (session === null) {
       show({ kind: 'none' });
       return;
@@ -105,7 +108,7 @@ export interface RecapFormat {
 
 /** When the session ran: its day, "Sun, Oct 4", and its start to its end, "9:05 AM to 9:30 AM". */
 export function sessionWhen(
-  session: SessionReportSummary,
+  session: SessionWindow,
   { locale, timeZone }: RecapFormat = {},
 ): { day: string; times: string } {
   const day = new Intl.DateTimeFormat(locale, {
@@ -121,20 +124,13 @@ export function sessionWhen(
 }
 
 /** When the session ran, its start to its end: "Sun, Oct 4, 9:05 AM to 9:30 AM". */
-export function sessionTimes(session: SessionReportSummary, format: RecapFormat = {}): string {
+export function sessionTimes(session: SessionWindow, format: RecapFormat = {}): string {
   const { day, times } = sessionWhen(session, format);
   return `${day}, ${times}`;
 }
 
-/** The reasons as the student's phone shows them to pick. */
-const REASON_TEXT: Record<UnlockReason, string> = {
-  bathroom: 'Bathroom',
-  nurse: 'Nurse',
-  other: 'Other',
-};
-
 /** A student as the grid names them: their display name, else the start of their id. */
-function nameOf(s: ReportStudent): string {
+export function nameOf(s: ReportStudent): string {
   return s.displayName ?? s.id.slice(0, 8);
 }
 
@@ -157,7 +153,7 @@ export function classFigures(
   };
 }
 
-/** What a mark says happened, in the legend's order. */
+/** What a mark says happened. */
 export const MOMENTS = ['in', 'unlock', 'focus', 'off', 'on', 'silent', 'back', 'left'] as const;
 export type Moment = (typeof MOMENTS)[number];
 
@@ -249,16 +245,16 @@ export function placement(at: number, start: number, end: number): number {
   return Math.round(share * 10_000) / 100;
 }
 
-/** Minutes between the axis's ticks: the least of these that leaves it `gaps` gaps or fewer. */
+/** Minutes between the axis's ticks: the least of these that leaves it 6 gaps or fewer. */
 const STEPS = [5, 10, 15, 30, 60, 120];
 
 /**
- * The axis: its first and last times with AM or PM, the ticks between without. The timeline's has
- * 12 gaps or fewer, the recap's (ClassEnded) 6: a tick each 10 minutes for 50.
+ * The recap's axis (ClassEnded): its first and last times with AM or PM, the ticks between
+ * without, 6 gaps or fewer: a tick each 10 minutes for 50.
  */
-function axis(start: number, end: number, clock: Intl.DateTimeFormat, gaps = 12) {
+function axis(start: number, end: number, clock: Intl.DateTimeFormat) {
   const span = end - start;
-  const step = (STEPS.find((m) => span <= m * 60_000 * gaps) ?? 120) * 60_000;
+  const step = (STEPS.find((m) => span <= m * 60_000 * 6) ?? 120) * 60_000;
   const bare = (t: number) =>
     clock
       .formatToParts(t)
@@ -273,28 +269,6 @@ function axis(start: number, end: number, clock: Intl.DateTimeFormat, gaps = 12)
   }
   ticks.push({ x: 100, label: clock.format(end) });
   return { ticks, step: span > 0 ? (step / span) * 100 : 100 };
-}
-
-/** A moment on a student's row: where it falls, when, and an unlock's reason. */
-export interface Mark {
-  key: string;
-  moment: Moment;
-  x: number;
-  time: string;
-  /** In words; null but on an unlock, and in Present, the projector the class can see (#265). */
-  reason: string | null;
-}
-
-export interface Timeline {
-  /** The moments its marks show, in the legend's order. */
-  moments: Moment[];
-  /** Who joined, in R2's order; then anyone else with an unlock or protection off there. */
-  rows: { key: string; name: string; marks: Mark[] }[];
-  /** How many of `rows`, from the first, joined: the rest never did, so no one calls them so. */
-  joined: number;
-  ticks: { x: number; label: string }[];
-  /** The gap between ticks, in percent of the axis: a gridline each. */
-  step: number;
 }
 
 /** Everyone R2 names: who joined, then whoever has an unlock or protection off there. */
@@ -326,98 +300,6 @@ function recapFeed(report: SessionReportResponse, events: readonly FeedEvent[]):
         payload: {},
       })),
   ];
-}
-
-/**
- * The session as a timeline (the Recap & reports design): who joined down the side, the session's
- * own time across, from its start to its end (a record clamped after an early End stretches it, so
- * every mark sits at its time), and a mark at each moment. Marks only, never a bar: no student's
- * minutes. Names and each unlock's reason now (A20) are R2's.
- */
-export function sessionTimeline(
-  session: SessionReportSummary,
-  report: SessionReportResponse,
-  events: readonly FeedEvent[],
-  { locale, timeZone }: RecapFormat = {},
-  present = false,
-): Timeline {
-  const clock = new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit', timeZone });
-  const names = new Map(namedIn(report).map((s) => [s.id, nameOf(s)]));
-  const reasons = new Map(report.unlocks.map((u) => [u.eventId, u.reason]));
-  // Every unlock and protection off R2 lists is marked: never left out.
-  const feed = recapFeed(report, events);
-  const found = new Map(
-    report.joined.map((s) => [s.id, [] as { e: FeedEvent; moment: Moment; at: number }[]]),
-  );
-  const joined = found.size;
-  // Its student has a row, joined or not.
-  for (const e of feed) {
-    const counted = e.type === 'unlock' || e.type === 'protection_off';
-    if (counted && e.userId !== null && !found.has(e.userId)) found.set(e.userId, []);
-  }
-  for (const e of feed) {
-    const moment = momentOf(e);
-    if (moment === null || e.userId === null) continue;
-    found.get(e.userId)?.push({ e, moment, at: Date.parse(e.occurredAt) });
-  }
-  const start = Date.parse(session.startedAt);
-  const all = [...found.values()].flat();
-  const end = Math.max(Date.parse(session.endedAt ?? session.endsAt), ...all.map((m) => m.at));
-  const rows = [...found].map(([id, moments]) => ({
-    key: id,
-    name: names.get(id) ?? id.slice(0, 8),
-    marks: moments
-      .sort((a, b) => a.at - b.at)
-      .map(({ e, moment, at }) => {
-        // R2's reason, else the record's own: one that landed between the two reads.
-        const reason = reasons.has(e.eventId)
-          ? reasons.get(e.eventId)
-          : payloadOf(e.payload).reason;
-        return {
-          key: e.eventId,
-          moment,
-          x: placement(at, start, end),
-          time: clock.format(at),
-          reason:
-            moment !== 'unlock' || present
-              ? null
-              : isUnlockReason(reason)
-                ? REASON_TEXT[reason]
-                : 'No reason given',
-        };
-      }),
-  }));
-  return {
-    moments: MOMENTS.filter((m) => all.some((f) => f.moment === m)),
-    rows,
-    joined,
-    ...axis(start, end, clock),
-  };
-}
-
-export interface RecapView {
-  /** The class's figures; null when nobody joined, which the card says instead of zeros. */
-  stats: ReturnType<typeof classFigures> | null;
-  timeline: Timeline;
-}
-
-/**
- * The card's figures and its timeline, from R2's report and the session's events. In Present
- * (`present`), the projector the class can see, every unlock is still marked, but never with its
- * reason: the student shares it with the teacher alone (#265's rule, `unlockNote`).
- */
-export function recapView(
-  session: SessionReportSummary,
-  report: SessionReportResponse,
-  events: readonly FeedEvent[],
-  format: RecapFormat = {},
-  present = false,
-): RecapView {
-  return {
-    stats:
-      report.joined.length === 0 ? null : classFigures(report.joined.length, report, format.locale),
-    timeline: sessionTimeline(session, report, events, format, present),
-  };
 }
 
 /** One of a student's moments in the recap: their panel's own (`studentMoments`), on the axis. */
@@ -505,7 +387,7 @@ function lineOf(events: readonly FeedEvent[], studentId: string, end: number): [
  * only: PV12b says it.
  */
 export function recapGroups(
-  session: SessionReportSummary,
+  session: SessionWindow,
   report: SessionReportResponse,
   events: readonly FeedEvent[],
   roster: readonly RosterStudent[],
@@ -557,6 +439,6 @@ export function recapGroups(
     partTime: partTime.map(student),
     wholeTime: rows.filter((r) => joined.has(r.id) && r.broke === null).map(student),
     notJoined: notJoined.map(student),
-    ...axis(start, axisEnd, clock, 6),
+    ...axis(start, axisEnd, clock),
   };
 }

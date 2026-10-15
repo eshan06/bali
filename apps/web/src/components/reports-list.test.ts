@@ -13,16 +13,13 @@ import { FocusBars, focusBar, ReportsView, SessionsTable } from './reports-list'
 /*
  * Reports (PV13) as Bali portal in v2's look draws it on Reports and ReportStates: the heading
  * and its framing line in italic, the class picked with pills, the sessions as a table in a box
- * that scrolls sideways, newest first, with Show earlier, each session's average focus as a bar out
- * of its length, and every state ReportStates draws. Rendered, each state given as the page holds
- * it; the page's own wiring and the old URL's redirect from their sources.
+ * that scrolls sideways, newest first, each a link to its own page (PV14), with Show earlier, each
+ * session's average focus as a bar out of its length, and every state ReportStates draws. Rendered,
+ * each state given as the page holds it; the page's own wiring and the old URL's redirect from
+ * their sources.
  */
 const redirect = vi.hoisted(() => vi.fn());
-// An opened row's recap reads through the API, whose sign-out needs the router.
-vi.mock('next/navigation', () => ({
-  redirect,
-  useRouter: () => ({ replace: () => undefined, push: () => undefined }),
-}));
+vi.mock('next/navigation', () => ({ redirect }));
 const { default: ClassReports } = await import('../app/classes/[id]/reports/page');
 const source = (path: string) =>
   readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
@@ -76,16 +73,15 @@ const view = (over: Partial<Parameters<typeof ReportsView>[0]> = {}) =>
       classes: CLASSES,
       classId: 'c1',
       list: LOADED,
-      open: null,
-      onToggle: () => undefined,
       onRead: () => undefined,
       ...over,
     }),
   ).replace(/\s/g, ' ');
-const table = (open: string | null = null, sessions = [TUE, FRI, NOBODY]) =>
-  renderToStaticMarkup(
-    createElement(SessionsTable, { classId: 'c1', sessions, open, onToggle: () => undefined }),
-  ).replace(/\s/g, ' ');
+const table = (sessions = [TUE, FRI, NOBODY]) =>
+  renderToStaticMarkup(createElement(SessionsTable, { classId: 'c1', sessions })).replace(
+    /\s/g,
+    ' ',
+  );
 /** The text of some markup, its tags dropped. */
 const text = (html: string) =>
   html
@@ -158,22 +154,16 @@ describe('the sessions’ table (Reports)', () => {
     }
   });
 
-  it('heads each row with its session, a button opening its report under it', () => {
-    const shut = table();
-    expect(shut).toMatch(
-      /<th scope="row" class="[^"]*"><button type="button" aria-expanded="false" class="group block [^"]*">/,
-    );
-    expect(shut).not.toMatch(/bg-row-open|id="recap-/);
-    const open = table('s2');
-    // Its row in v2's open tint, the report in the next row across every column.
-    expect(open).toMatch(
-      /<tr class="bg-row-open"><th scope="row"[^>]*><button type="button" aria-expanded="true" aria-controls="recap-s2"/,
-    );
-    expect(open).toMatch(
-      /<tr id="recap-s2"><td colSpan="7" class="[^"]*"><div class="sticky left-4 w-\[calc\(100cqw-2rem\)\]">/i,
-    );
-    // The box is the report's container, so it keeps the box's width as the table scrolls.
-    expect(classesOf(open, /<div[^>]*>/)).toContain('@container');
+  it('heads each row with its session, a link to its own page (PV14)', () => {
+    const html = table();
+    const links = [
+      ...html.matchAll(/<th scope="row" class="[^"]*"><a class="([^"]*)" href="([^"]*)">/g),
+    ];
+    expect(links.map((m) => m[2])).toEqual(['/reports/c1/s3', '/reports/c1/s2', '/reports/c1/s1']);
+    expect(links[0]?.[1]).toBe('group block rounded-sm text-left');
+    // A row per session, none opening under it any more.
+    expect(html.match(/<tr>/g)).toHaveLength(4);
+    expect(html).not.toMatch(/<button|aria-expanded|bg-row-open|colSpan="7"/);
   });
 
   it('says a session’s day in semibold, underlined on hover, its times under it', () => {
@@ -278,7 +268,7 @@ describe('the Reports page in each state (ReportStates)', () => {
   it('shows the sessions as a table beside their bars, under the class’s name', () => {
     const html = view();
     expect(html).toMatch(
-      /<div class="flex flex-wrap items-start gap-5"><section aria-labelledby="([^"]+)" class="flex min-w-0 flex-\[999_1_520px\] flex-col gap-5"><h2 id="\1" class="mb-3 text-section-label text-text-tertiary uppercase">Sessions · Biology, period 3<\/h2><div class="@container overflow-x-auto/,
+      /<div class="flex flex-wrap items-start gap-5"><section aria-labelledby="([^"]+)" class="flex min-w-0 flex-\[999_1_520px\] flex-col gap-5"><h2 id="\1" class="mb-3 text-section-label text-text-tertiary uppercase">Sessions · Biology, period 3<\/h2><div class="overflow-x-auto/,
     );
     expect(html).toMatch(
       /<section aria-labelledby="([^"]+)" class="flex min-w-0 flex-\[1_1_320px\] flex-col gap-5"><h2 id="\1"[^>]*>Average focus per session<\/h2>/,
@@ -324,22 +314,16 @@ describe('the page’s wiring (read from its source)', () => {
   });
 
   it('takes only a class id from ?class=, so no other path reaches the API (santa’s review)', () => {
-    // `..` survives encodeURIComponent, and would read /v1/reports/sessions in the class's place.
-    const id = new RegExp(/const CLASS_ID = (\/.*\/i);/.exec(page)?.[1]?.slice(1, -2) ?? '$^', 'i');
-    expect(id.test('01a10de8-cc00-72ce-a3df-81a148608a72')).toBe(true);
-    for (const other of ['..', '.', '', 'c1', '01a10de8-cc00-72ce-a3df-81a148608a72/..']) {
-      expect(id.test(other), other).toBe(false);
-    }
-    expect(page).toMatch(
-      /const asked = param !== null && CLASS_ID\.test\(param\) \? param : null;/,
-    );
+    // `..` survives encodeURIComponent, and would read /v1/reports/sessions in the class's place:
+    // `UUID` takes ids as the API mints them, and nothing else (lib/reports.test.ts).
+    expect(page).toMatch(/const asked = param !== null && UUID\.test\(param\) \? param : null;/);
   });
 
-  it('starts another class’s list afresh in the render that picks it, its row closed (santa’s review)', () => {
-    // A row left open drew the last class's session under the new class's id for one render,
-    // which read that session from the new class; and a pick of no class kept the last failure.
+  it('starts another class’s list afresh in the render that picks it (santa’s review)', () => {
+    // A pick of no class kept the last failure; and, while a row opened under it (until PV14), the
+    // last class's session was drawn, and read, under the new class's id.
     expect(page).toMatch(
-      /if \(listed !== classId\) \{\s*setListed\(classId\);\s*setList\(FIRST_READ\);\s*setOpen\(null\);\s*\}/,
+      /if \(listed !== classId\) \{\s*setListed\(classId\);\s*setList\(FIRST_READ\);\s*\}/,
     );
   });
 
