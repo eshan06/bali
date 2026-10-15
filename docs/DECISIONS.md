@@ -17,12 +17,15 @@ a real decision? Add a dated entry at the top: what was decided and why.
   on the recap). Should those always wait for you?" The owner chose "Only student info waits":
   "New sign-in and 13+ refusals get drawn and built like any in-between state. Only something new
   shown about a student waits for you." **The rule** (CLAUDE.md, Working rules, and its "UI:"
-  standing order): a new error or refusal line at sign-in or the 13+ check is drawn on its
-  screen's canvas first, labelled as an intermediate state, and built from that drawing without
-  waiting for the owner's approval; anything new shown about a student that no approved board
-  shows (a fact, label, row or rare case, on the recap, a report, the grid, the student panel or
-  anywhere else) waits for it, and a state the worker isn't sure is intermediate still counts as a
-  new screen. DESIGN.md (Sources) and PLAN's redesign steps say so too. **Also:** "Restoring a
+  standing order): a new error or refusal line at sign-in or the 13+ check, even one that tells
+  someone about their own account, is drawn on its screen's canvas first, labelled as an
+  intermediate state, and built from that drawing without waiting for the owner's approval;
+  anything new shown about a student that no approved board shows there (a fact, label, row or
+  rare case, on the recap, a report, the grid, the student panel or anywhere else) waits for it,
+  and a state the worker isn't sure is intermediate still counts as a new screen. Santa's round 1
+  added "there" (new where it shows: an unlock's reason, which the teacher's grid shows, is still
+  new on Present, which the class sees) and "about their own account" (so no refusal line reads as
+  both). DESIGN.md (Sources) and PLAN's redesign steps say so too. **Also:** "Restoring a
   previously shipped look on the owner's order is the only exception" now says "the only other
   exception", since the intermediate state before it is an exception too (Claude Review's WARN
   on #398).

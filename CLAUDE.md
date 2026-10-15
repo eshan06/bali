@@ -108,10 +108,11 @@ lint && npm test`, plus `npm run demo` when API behavior changed), then run
   canvas first, labelled as an intermediate state, and then built from that
   drawing, without waiting for the owner's approval; the UI PR names that
   board. A new error or refusal line at sign-in or the 13+ check is an
-  intermediate state like any other. **Anything new shown about a student**
-  that no approved board shows (a fact, label, row or rare case, on the
-  recap, a report, the grid, the student panel or anywhere else) is never an
-  intermediate state: it waits for the owner's approval like a new screen.
+  intermediate state like any other, even when it tells someone about their
+  own account. **Anything new shown about a student** that no approved board
+  shows there (a fact, label, row or rare case, on the recap, a report, the
+  grid, the student panel or anywhere else) is never an intermediate state:
+  it waits for the owner's approval like a new screen.
   Anything else no board draws counts as a new screen, and so does a state
   you aren't sure is intermediate: a new screen or page still waits for the
   owner's approval, and one with no approved design is a stop-and-ask.
