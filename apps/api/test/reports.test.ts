@@ -1,11 +1,16 @@
 import {
+  answerQuestion,
   checkIn,
   classes,
+  closeQuestion,
   type Database,
   endEnrollment,
   endSession,
   enrollments,
   markSilentParticipations,
+  newUuidV7,
+  openQuestion,
+  type OpenQuestionInput,
   protectionOff,
   refocus,
   renameStudent,
@@ -19,10 +24,13 @@ import {
   type ActionOrder,
   type ApiErrorBody,
   type EventsPage,
+  type QuestionResults,
   SESSION_REPORTS_PAGE_LIMIT,
+  type SessionReportQuestionsResponse,
   type SessionReportResponse,
   type SessionReportsPage,
 } from '@bali/shared';
+import { eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -35,6 +43,12 @@ import { joinCodeFor, makeTestDb, seedClassroom } from './helpers/db.js';
  * counts is R1's, pinned rule by rule (packages/shared/src/report.test.ts,
  * packages/db/test/report.test.ts); here, what the route adds: the names, the
  * rounding, a session not over yet, and who may read it.
+ *
+ * L3c — GET /v1/classes/:id/reports/sessions/:sessionId/questions: the
+ * questions the session asked, for its report (Phase 7), each with its totals
+ * as the results route counts them, through the one guarded count (L3r, whose
+ * own tests pin what it counts: questions.test.ts); here, the order asked,
+ * the guard, what the read never shows, and who may read it, as R2's report.
  *
  * R3 — GET /v1/classes/:id/reports/sessions: the class's sessions, newest
  * first, a page at a time, each with its totals — R2's, figure for figure.
@@ -355,6 +369,363 @@ describe('GET /v1/classes/:id/reports/sessions/:sessionId', () => {
       expect(res.body).not.toContain(other.student.id);
     }
     const unknown = await reportAs(c.teacher.cognitoId, randomUUID(), mine.id);
+    expect(unknown.statusCode).toBe(404);
+    expect(unknown.json<ApiErrorBody>().error).toMatchObject({
+      code: 'not_found',
+      reason: 'class_not_found',
+    });
+  });
+});
+
+describe('GET /v1/classes/:id/reports/sessions/:sessionId/questions', () => {
+  async function questionsAs(cognitoId: string, classId: string, sessionId: string) {
+    return authedInject(ctx.app, await ctx.tokenFor(cognitoId), {
+      method: 'GET',
+      url: `/v1/classes/${classId}/reports/sessions/${sessionId}/questions`,
+    });
+  }
+
+  const questionsOf = async (c: Classroom, sessionId: string) => {
+    const res = await questionsAs(c.teacher.cognitoId, c.klass.id, sessionId);
+    expect(res.statusCode).toBe(200);
+    return res.json<SessionReportQuestionsResponse>().questions;
+  };
+
+  /** What the results route answers the class's teacher for the question. */
+  const resultsOf = async (c: Classroom, questionId: string) =>
+    (
+      await authedInject(ctx.app, await ctx.tokenFor(c.teacher.cognitoId), {
+        method: 'GET',
+        url: `/v1/questions/${questionId}/results`,
+      })
+    ).json<QuestionResults>();
+
+  /** The classroom's student and `more` classmates, each in the class from 09:00. */
+  async function classOf(c: Classroom, more: number) {
+    const students = [c.student];
+    for (let i = 0; i < more; i += 1) students.push(await classmate(c, `${c.klass.id}-${i}`));
+    // By the lesson's clock, which M's window reads (an enrollment's own time is the database's).
+    await db
+      .update(enrollments)
+      .set({ createdAt: at(0) })
+      .where(eq(enrollments.classId, c.klass.id));
+    return students;
+  }
+
+  /** The teacher asks in the session at 09:mm, as the engine records the route's open: "Which?". */
+  async function ask(
+    c: Classroom,
+    sessionId: string,
+    minute: number,
+    over: Partial<OpenQuestionInput> = {},
+  ) {
+    const { question } = await openQuestion(db, {
+      sessionId,
+      teacherId: c.teacher.id,
+      eventId: newUuidV7(),
+      prompt: 'Which?',
+      options: ['a', 'b', 'c'],
+      correctOption: 1,
+      now: at(minute),
+      ...over,
+    });
+    return question;
+  }
+
+  /** Each student's answer, given in order, at 09:mm. */
+  async function answered(questionId: string, minute: number, picks: [{ id: string }, number][]) {
+    for (const [student, option] of picks) {
+      const eventId = newUuidV7();
+      const now = at(minute);
+      const result = await answerQuestion(db, {
+        questionId,
+        studentId: student.id,
+        eventId,
+        option,
+        now,
+      });
+      expect(result.outcome).toBe('answered');
+    }
+  }
+
+  it('lists the questions it asked, each with its words, when it was asked, and its totals', async () => {
+    const c = await seedClassroom(db, 'questions');
+    const [ana, ben, cy] = await classOf(c, 2);
+    const session = await lesson(c.klass.id);
+
+    // The first: three answers, so its counts; closed by its teacher, the answer revealed.
+    const planets = await ask(c, session.id, 2, {
+      prompt: 'Which planet is the largest?',
+      options: ['Mars', 'Jupiter', 'Venus'],
+    });
+    await answered(planets.id, 3, [
+      [ana!, 1],
+      [ben!, 1],
+      [cy!, 0],
+    ]);
+    await closeQuestion(db, {
+      questionId: planets.id,
+      eventId: newUuidV7(),
+      reveal: true,
+      now: at(5),
+    });
+    // The second: no correct option, two answers, closed by the session's end.
+    const poll = await ask(c, session.id, 8, {
+      prompt: 'Ready for the quiz?',
+      options: ['Yes', 'No'],
+      correctOption: null,
+    });
+    await answered(poll.id, 9, [
+      [ana!, 0],
+      [ben!, 1],
+    ]);
+    await endSession(db, { sessionId: session.id, at: at(20), reason: 'ended' });
+
+    expect(await questionsOf(c, session.id)).toEqual([
+      {
+        id: planets.id,
+        prompt: 'Which planet is the largest?',
+        options: ['Mars', 'Jupiter', 'Venus'],
+        correctOption: 1,
+        revealed: true,
+        open: false,
+        openedAt: at(2).toISOString(),
+        answered: 3,
+        eligible: 3,
+        counts: [1, 2, 0],
+      },
+      {
+        id: poll.id,
+        prompt: 'Ready for the quiz?',
+        options: ['Yes', 'No'],
+        correctOption: null,
+        revealed: false,
+        open: false,
+        openedAt: at(8).toISOString(),
+        answered: 2,
+        eligible: 3,
+        counts: null,
+      },
+    ]);
+  });
+
+  it('shows a question’s counts only from 3 answers, as the results route does: before, N of M alone', async () => {
+    const c = await seedClassroom(db, 'questions-guard');
+    // Four in the class: three of them answer.
+    const [ana, ben, cy] = await classOf(c, 3);
+    const session = await lesson(c.klass.id);
+    now = at(10);
+    const question = await ask(c, session.id, 2);
+    // One count, the results route's: the two never disagree, open or not.
+    const agrees = async () => {
+      const [listed] = await questionsOf(c, session.id);
+      const { answered: n, eligible, open, correctOption, revealed, counts } = listed!;
+      expect({ answered: n, eligible, open, correctOption, revealed, counts }).toEqual(
+        await resultsOf(c, question.id),
+      );
+      return listed!;
+    };
+
+    await answered(question.id, 3, [
+      [ana!, 0],
+      [ben!, 1],
+    ]);
+    expect(await agrees()).toMatchObject({ open: true, answered: 2, eligible: 4, counts: null });
+
+    await answered(question.id, 4, [[cy!, 1]]);
+    expect(await agrees()).toMatchObject({
+      open: true,
+      answered: 3,
+      eligible: 4,
+      counts: [1, 2, 0],
+    });
+
+    // Past the bell, before the sweep: closed by the server's clock, as the results route says.
+    now = at(26);
+    expect(await agrees()).toMatchObject({ open: false, answered: 3, counts: [1, 2, 0] });
+  });
+
+  it('lists them in the order asked, whatever their times say', async () => {
+    const c = await seedClassroom(db, 'questions-order');
+    const session = await lesson(c.klass.id);
+    // Each route reads its clock before the session's lock. So of two opens racing (L4a), the one
+    // the lock lets in second can carry the earlier time, and it closes the first at that time;
+    // and an End that read its clock before the third's open closes the third before it opened.
+    const first = await ask(c, session.id, 5, { prompt: 'First?' });
+    const second = await ask(c, session.id, 4, { prompt: 'Second?' });
+    const third = await ask(c, session.id, 6, { prompt: 'Third?' });
+    await endSession(db, { sessionId: session.id, at: at(5), reason: 'ended' });
+
+    const listed = await questionsOf(c, session.id);
+    expect(listed.map((q) => q.prompt)).toEqual(['First?', 'Second?', 'Third?']);
+    expect(listed.map((q) => q.id)).toEqual([first.id, second.id, third.id]);
+    expect(listed.map((q) => q.openedAt)).toEqual(
+      [at(5), at(4), at(6)].map((d) => d.toISOString()),
+    );
+  });
+
+  it('answers a session that asked none with no questions, never another session’s', async () => {
+    const c = await seedClassroom(db, 'questions-none');
+    const quiet = await lessonFrom(c.klass.id, 0);
+    await endSession(db, { sessionId: quiet.id, at: at(25), reason: 'expired' });
+    // The class's next lesson asks one; the first still asked none.
+    const next = await lessonFrom(c.klass.id, 30);
+    await ask(c, next.id, 31);
+
+    const res = await questionsAs(c.teacher.cognitoId, c.klass.id, quiet.id);
+    expect(res.statusCode).toBe(200);
+    expect(res.json<SessionReportQuestionsResponse>()).toEqual({ questions: [] });
+    expect(await questionsOf(c, next.id)).toHaveLength(1);
+  });
+
+  it('names no student and no answer, and carries no count under the guard', async () => {
+    const c = await seedClassroom(db, 'questions-private');
+    const students = await classOf(c, 2);
+    const [ana, ben, cy] = students;
+    for (const [student, name] of [
+      [ana!, 'Ana Lima'],
+      [ben!, 'Ben Ortiz'],
+      [cy!, 'Cy Park'],
+    ] as const) {
+      await renameStudent(db, { studentId: student.id, displayName: name, eventId: randomUUID() });
+    }
+    const session = await lesson(c.klass.id);
+    // Each of them tapped in, so each is a participant too.
+    for (const student of students) await tapIn(db, move(session.id, student.id, at(1)));
+    const two = await ask(c, session.id, 2);
+    const answerIds: string[] = [];
+    for (const [student, option] of [
+      [ana!, 0],
+      [ben!, 2],
+    ] as const) {
+      const eventId = newUuidV7();
+      answerIds.push(eventId);
+      await answerQuestion(db, {
+        questionId: two.id,
+        studentId: student.id,
+        eventId,
+        option,
+        now: at(3),
+      });
+    }
+    const three = await ask(c, session.id, 6);
+    for (const [student, option] of [
+      [ana!, 0],
+      [ben!, 1],
+      [cy!, 2],
+    ] as const) {
+      const eventId = newUuidV7();
+      answerIds.push(eventId);
+      await answerQuestion(db, {
+        questionId: three.id,
+        studentId: student.id,
+        eventId,
+        option,
+        now: at(7),
+      });
+    }
+
+    const res = await questionsAs(c.teacher.cognitoId, c.klass.id, session.id);
+    expect(res.statusCode).toBe(200);
+    const [under, over] = res.json<SessionReportQuestionsResponse>().questions;
+    expect(under).toMatchObject({ id: two.id, answered: 2, eligible: 3, counts: null });
+    expect(over).toMatchObject({ id: three.id, answered: 3, eligible: 3, counts: [1, 1, 1] });
+    // A question's words and totals, nothing else.
+    for (const question of [under!, over!]) {
+      expect(Object.keys(question).sort()).toEqual([
+        'answered',
+        'correctOption',
+        'counts',
+        'eligible',
+        'id',
+        'open',
+        'openedAt',
+        'options',
+        'prompt',
+        'revealed',
+      ]);
+    }
+    for (const secret of [
+      ...students.flatMap((s) => [s.id, s.cognitoId]),
+      'Ana Lima',
+      'Ben Ortiz',
+      'Cy Park',
+      ...answerIds,
+      at(3).toISOString(),
+      at(7).toISOString(),
+    ]) {
+      expect(res.body).not.toContain(secret);
+    }
+  });
+
+  it('is the class’s own teacher’s: another teacher and any student 403, no sign-in and another app 401', async () => {
+    const c = await seedClassroom(db, 'questions-authz');
+    const other = await seedClassroom(db, 'questions-authz-other');
+    const session = await lesson(c.klass.id);
+    const question = await ask(c, session.id, 2, { prompt: 'Only the teacher’s?' });
+    const url = `/v1/classes/${c.klass.id}/reports/sessions/${session.id}/questions`;
+
+    for (const caller of [other.teacher, c.student, other.student]) {
+      const res = await questionsAs(caller.cognitoId, c.klass.id, session.id);
+      expect(res.statusCode).toBe(403);
+      expect(res.json<ApiErrorBody>().error.code).toBe('forbidden');
+      expect(res.body).not.toContain(question.id);
+      expect(res.body).not.toContain('Only the teacher’s?');
+    }
+    const anonymous = await ctx.app.inject({ method: 'GET', url });
+    expect(anonymous.statusCode).toBe(401);
+    // The owner's own sign-in, minted for an app client the API doesn't accept.
+    const anotherApp = await ctx.issuer.sign({
+      sub: c.teacher.cognitoId,
+      clientId: 'another-app-client-id',
+    });
+    const fromAnotherApp = await authedInject(ctx.app, anotherApp, { method: 'GET', url });
+    expect(fromAnotherApp.statusCode).toBe(401);
+    expect(await questionsOf(c, session.id)).toMatchObject([{ id: question.id }]);
+  });
+
+  it('refuses a malformed id (400) in the one error shape', async () => {
+    const c = await seedClassroom(db, 'questions-malformed');
+    const session = await lesson(c.klass.id);
+
+    for (const [classId, sessionId] of [
+      ['not-a-uuid', session.id],
+      [c.klass.id, 'not-a-uuid'],
+    ] as const) {
+      const res = await questionsAs(c.teacher.cognitoId, classId, sessionId);
+      expect(res.statusCode).toBe(400);
+      expect(res.json<ApiErrorBody>()).toMatchObject({
+        error: { code: 'bad_input', message: 'invalid request' },
+      });
+    }
+  });
+
+  it('answers a session in another class as an unknown one, and an unknown class (404)', async () => {
+    const c = await seedClassroom(db, 'questions-scope');
+    const other = await seedClassroom(db, 'questions-scope-other');
+    // The teacher's own second class, and another teacher's: neither session is this class's.
+    const second = await secondClass(c, 'questions-scope-second');
+    const mine = await lesson(second.id);
+    const theirs = await lesson(other.klass.id);
+    const asked = await openQuestion(db, {
+      sessionId: theirs.id,
+      teacherId: other.teacher.id,
+      eventId: newUuidV7(),
+      prompt: 'Theirs?',
+      options: ['a', 'b'],
+      now: at(2),
+    });
+
+    for (const sessionId of [mine.id, theirs.id, randomUUID()]) {
+      const res = await questionsAs(c.teacher.cognitoId, c.klass.id, sessionId);
+      expect(res.statusCode).toBe(404);
+      expect(res.json<ApiErrorBody>().error).toMatchObject({
+        code: 'not_found',
+        reason: 'session_not_found',
+      });
+      expect(res.body).not.toContain(asked.question.id);
+    }
+    const unknown = await questionsAs(c.teacher.cognitoId, randomUUID(), mine.id);
     expect(unknown.statusCode).toBe(404);
     expect(unknown.json<ApiErrorBody>().error).toMatchObject({
       code: 'not_found',

@@ -122,6 +122,8 @@ const MATRIX = {
   'GET /v1/classes/:id/reports/sessions':   [401, 401, 403,     403,     403,     403,       200],
   'GET /v1/classes/:id/reports/sessions/:sessionId':
                                             [401, 401, 403,     403,     403,     403,       200],
+  'GET /v1/classes/:id/reports/sessions/:sessionId/questions':
+                                            [401, 401, 403,     403,     403,     403,       200],
   'POST /v1/classes/:id/sessions':          [401, 401, 403,     403,     403,     403,       200],
   'POST /v1/blocks':                        [401, 401, 403,     403,     409,     409,       200],
   'GET /v1/blocks':                         [401, 401, 403,     403,     200,     200,       200],
@@ -274,6 +276,11 @@ const REQUESTS: Record<RouteKey, (w: World) => Sent | Promise<Sent>> = {
   'GET /v1/classes/:id/reports/sessions/:sessionId': (w) => ({
     url: `/v1/classes/${w.klass.id}/reports/sessions/${w.sessionId}`,
   }),
+  // The questions the session asked, for its report (L3c): the class's own teacher's, as R2's.
+  'GET /v1/classes/:id/reports/sessions/:sessionId/questions': async (w) => {
+    await asked(w);
+    return { url: `/v1/classes/${w.klass.id}/reports/sessions/${w.sessionId}/questions` };
+  },
   'POST /v1/classes/:id/sessions': (w) => ({
     url: `/v1/classes/${w.klass.id}/sessions`,
     body: { durationMinutes: 25 },

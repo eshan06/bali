@@ -499,7 +499,8 @@ export const questions = pgTable(
     uniqueIndex('questions_one_open_per_session')
       .on(t.sessionId)
       .where(sql`${t.closedAt} IS NULL`),
-    // A session's questions in the order asked: the poll's last closed one, results, the recap.
+    // A session's questions by when each opened: the poll's last closed one, and a report's list,
+    // whose order asked is their opens' `seq`, never `opened_at` (`sessionQuestions`, L3c).
     index('questions_session_opened_idx').on(t.sessionId, t.openedAt),
   ],
 );

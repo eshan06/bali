@@ -8,14 +8,13 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-15 (Central) — PV15, the entry pages (#388; `docs/DECISIONS.md`,
-2026-10-15): the shell reads the account as the home does, the 13+ check before `/v1/me`, so a web
-sign-in that never set up the app makes no account on any page; sign-in in v2's look and W3's words
-for teachers and students, the invite card under v2's bar with its line for students, the callback,
-Help and the two policy pages in v2's look, their words unchanged; a tab with no sign-in on a URL with
-no page goes to /login. A student who said 13+ keeps the invite card, without that line, until W3.
-Before it, PV13, Reports (#387). PV12b waits on the owner as draft #386. Next: PV14, a session's
-report; Phase 7's web screens may start._
+_Last updated: 2026-10-15 (Central) — L3c, a session's questions for its report (#391;
+`docs/DECISIONS.md`, 2026-10-15): `GET /v1/classes/{id}/reports/sessions/{sessionId}/questions`,
+beside R2's report and refused as it is, answers each question the session asked, in the order its
+opens took the session's lock, with its words, when it was asked and its totals, the results
+route's, through the one guarded count, for L7c's Questions card; every Phase 7 step with no screen
+is done. Before it, PV15, the entry pages (#388). PV12b (#386) and L7's two PRs (#389, #390) wait on
+the owner as drafts. Next: PV14, a session's report._
 
 ## Now
 
@@ -83,7 +82,7 @@ first class, production backups (L0b, the owner's console step; the owner, 2026-
 - The owner: the consoles (AWS, Railway, Vercel, Sentry, App Store Connect), Apple, the
   lawyer, the school, and every iPhone check.
 
-**Phase 7, Live lesson: building.** Every step with no screen is done but L3c (added 2026-10-12);
+**Phase 7, Live lesson: building.** Every step with no screen is done, L3c the last (2026-10-15);
 M0 is done (deck storage on, 2026-10-12); the web screens come after the redesign's PV15 (✅ #388),
 then the phone's (L8, M8). L0b, production backups, is the owner's, before the Vanderbilt pilot's first
 class.
@@ -148,7 +147,7 @@ validation** (each 👀): vitest, `npm run typecheck && npm run lint && npm test
 ### Phase 7 steps (live lesson; one PR each; 👀 = the owner looks at screenshots, 📱 = needs the owner's iPhone, 🔧 = the owner in a console)
 
 Planned 2026-10-05 (`docs/DECISIONS.md`); the design is ARCHITECTURE's "Live lesson (Phase 7)",
-and every step builds against it. **Status: building** (the owner lifted the hold and approved both canvases on 2026-10-10): the steps with no screen are done but L3c, and M0 is done (2026-10-12). **The web screens come after the portal redesign's PV15** (the owner, 2026-10-12: its groundwork, its side menu and the pages they sit on first; "Portal redesign (v2's look) steps"). Then the UI, **web first** (the owner, 2026-10-10): in each slice the teacher's portal, then the student web, then the phone (Slice 1: L7, W3, W4, L7b, L3c, L7c, then L8; Slice 2: M5, M6, W5, then M8); the redesign's PV16 and PV17 follow the web screens, not waiting for the phone's (L8, M8). Each step is one PR from a fresh worker, under ~400 changed
+and every step builds against it. **Status: building** (the owner lifted the hold and approved both canvases on 2026-10-10): the steps with no screen are done, and M0 is done (2026-10-12). **The web screens come after the portal redesign's PV15** (the owner, 2026-10-12: its groundwork, its side menu and the pages they sit on first; "Portal redesign (v2's look) steps"). Then the UI, **web first** (the owner, 2026-10-10): in each slice the teacher's portal, then the student web, then the phone (Slice 1: L7, W3, W4, L7b, L3c, L7c, then L8; Slice 2: M5, M6, W5, then M8); the redesign's PV16 and PV17 follow the web screens, not waiting for the phone's (L8, M8). Each step is one PR from a fresh worker, under ~400 changed
 lines not counting tests; a step that grows past that is split (L1a, L1b…). **Cloud-buildable:**
 L1–L6 (L3b and L3c included), M1–M4, M7, M9, W1, W2. **The UI steps:** the web's, L7, L7b, L7c, M5,
 M6, W3, W4, W5, on the Windows PC, and the phone's, L8 and M8, on the Mac (2026-10-14), each built to its canvas: the
@@ -170,7 +169,7 @@ Slice 1 — live questions:
 - **L3b** Saved questions — ✅ as L3b1 and L3b2
 - **L3b1** Their data, engine and privacy paths — ✅ (#316; DECISIONS 2026-10-11)
 - **L3b2** Their routes (for L7b) — ✅ (#318; DECISIONS 2026-10-11)
-- **L3c** A session's questions for its report, before L7c (v2's canvas draws L7c's Questions on a session's report page, `ReportOpened`, not on the class page's recap): a read of the questions asked in a session, in the order asked, each with its words and its totals through L3r's one guarded count (`questionCounts`: N of M, `counts` null under 3 answers); the class's own teacher only; S1 rows, the OpenAPI snapshot — validation: integration tests (the guard at 2 and 3 answers, the order asked, a session with none, validation of a malformed id, authz), `npm run typecheck && npm run lint && npm test`
+- **L3c** A session's questions for its report (for L7c) — ✅ (#391; DECISIONS 2026-10-15)
 - **L4** Student API — ✅ as L4a and L4b
 - **L4a** The poll and the answer — ✅ (#320; DECISIONS 2026-10-11)
 - **L4b** The demo's question and the load gate's polling classes — ✅ (#321; DECISIONS 2026-10-11)

@@ -1180,6 +1180,26 @@ export interface SessionReportResponse {
   protectionOffs: SessionReportProtectionOff[];
 }
 
+// GET /v1/classes/{id}/reports/sessions/{sessionId}/questions — the questions a session asked, for
+// its report (Phase 7, L3c; "Live lesson", decisions 3 and 6), for the class's own teacher as R2's
+// report is. Totals only: each question's are the results route's, through its one guarded count,
+// and nothing names a student or carries an answer's time.
+/** A question the session asked, with its totals as `QuestionResults` gives them. */
+export interface SessionReportQuestion extends TeacherQuestion {
+  /** When it was asked, by the server's clock. */
+  openedAt: string;
+  /** N: everyone with an answer to it, a student removed since included. */
+  answered: number;
+  /** M, as `QuestionResults.eligible`: never below N, and never changed by a removal. */
+  eligible: number;
+  /** Per option, by its index, totalling N; null until at least 3 have answered (the guard). */
+  counts: number[] | null;
+}
+export interface SessionReportQuestionsResponse {
+  /** In the order asked; empty when it asked none. */
+  questions: SessionReportQuestion[];
+}
+
 // GET /v1/classes/{id}/reports/sessions?before=&limit= — the class's sessions (R3), for its own
 // teacher, a page at a time, each with its totals: what its report says, counted by the same
 // `sessionReport` and rounded the same way, so a row never disagrees with its session's report.

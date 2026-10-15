@@ -13,6 +13,7 @@ import {
   findUserByCognitoId,
   type QuestionCounts,
   questionCounts,
+  sessionQuestions,
 } from '../src/queries.js';
 import { hasSqlState } from '../src/sql-errors.js';
 import {
@@ -4477,6 +4478,30 @@ describe.runIf(REAL_PG)('live lesson questions under contention (real Postgres, 
       expect(await eventsOfType(session.id, 'question_closed')).toMatchObject([
         { payload: { question_id: earlier.id, closed_by: 'newer_question' } },
       ]);
+    }
+  });
+
+  it('lists two opens racing in the order the lock took them, whatever times their routes read (L3c)', async () => {
+    for (let round = 0; round < 12; round += 1) {
+      const { classId, teacherId } = await seed(`race-open-order-${round}`);
+      const session = await openSession(classId);
+      // Each carries the time its route read before the lock, a millisecond apart; every other
+      // round sends the later time first, so the lock can let it in first and the other close it.
+      const read = Date.now();
+      const open = (ms: number) =>
+        openQuestion(db, {
+          sessionId: session.id,
+          teacherId,
+          eventId: newUuidV7(),
+          prompt: `At +${ms} ms?`,
+          options: ['a', 'b'],
+          now: new Date(read + ms),
+        });
+      await Promise.all((round % 2 ? [1, 0] : [0, 1]).map(open));
+
+      // The one the lock let in last closed the other and is open still: the last asked.
+      const listed = await sessionQuestions(db, session.id);
+      expect(listed.map((q) => q.closedAt === null)).toEqual([false, true]);
     }
   });
 
