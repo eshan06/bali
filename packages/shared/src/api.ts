@@ -83,9 +83,10 @@ export interface MeClassWithTeacher extends MeClass {
   /**
    * Its session running now by the server's clock, and its bell (C3c, additive):
    * Home says the class is in session to a student not in it. Null when none
-   * runs, and on a teacher's own class.
+   * runs, and on a teacher's own class. Its start too (W3, additive): the student
+   * web's ring is the share of the session still to run.
    */
-  liveSession: { id: string; endsAt: string } | null;
+  liveSession: { id: string; startedAt: string; endsAt: string } | null;
   /**
    * What the portal's Home and Classes show of a teacher's own class (PV2, added 2026-10-12,
    * additive). Absent on a student's class.
@@ -97,9 +98,9 @@ export interface ClassSummary {
   /** The students enrolled in it now: a join counts, a leave or a removal no longer does. */
   studentCount: number;
   /**
-   * Its session running now by the server's clock (A17), and its bell: `liveSession`'s shape,
-   * since `liveSession` stays null on a teacher's own class (the app would tell a teacher signed
-   * into it to tap in). Null when none runs.
+   * Its session running now by the server's clock (A17), and its bell: `liveSession`'s shape as
+   * PV2 found it, without the start W3 added there, since `liveSession` stays null on a teacher's
+   * own class (the app would tell a teacher signed into it to tap in). Null when none runs.
    */
   runningSession: { id: string; endsAt: string } | null;
   /**

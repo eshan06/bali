@@ -8,25 +8,25 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Blocks } from '@/components/blocks';
 import { Button } from '@/components/button';
 import { CARD } from '@/components/card';
-import { EntryPage, STAGE_FOOT } from '@/components/entry-page';
 import { Field } from '@/components/field';
-import { InviteCode } from '@/components/invite-code';
+import { InviteEntry } from '@/components/invite-code';
 import { useMe } from '@/components/shell';
+import { StudentHome } from '@/components/student-home';
 import { getAccessToken } from '@/lib/auth';
 import { CLASS_NAME_MAX, type CreateAnswer, createClass } from '@/lib/classes';
 import { useApi } from '@/lib/use-api';
 
 /**
- * The classes home (the approved Classes home design): the teacher's classes as cards, each
- * opening its class page, and the create row under them on a card of its own; beside them on a
- * desktop, under them on anything narrower, the teacher's block. A create's failure is said under
- * its field with Try again; a made class is said by the list, read again. An account that doesn't
- * teach gets the invite page (Invite, PV15) in place of all of it, its line for students only for
- * an account the 13+ check never passed: a student who passed has set up the app, and their home is
- * W3's (StudentHome), so until then they keep the invite card as it was. The account is the
- * shell's one read (`useMe`: the 13+ check, then `/v1/me`), which the side menu names too, read
- * again as the page opens; until it answers, the shell says Loading… or its failure in the page's
- * place (PV5b); the page sits in the shell's frame beside the menu (PV5).
+ * The home (decision 13), where the account belongs. A teacher's is the classes home (the approved
+ * Classes home design): their classes as cards, each opening its class page, and the create row
+ * under them on a card of its own; beside them on a desktop, under them on anything narrower, the
+ * teacher's block. A create's failure is said under its field with Try again; a made class is said
+ * by the list, read again. A student who said 13+ in the app gets their own home (W3;
+ * StudentHome); an account the 13+ check never passed, the invite page with its line for students
+ * (Invite, PV15). The account is the shell's one read (`useMe`: the 13+ check, then `/v1/me`),
+ * which the side menu names too, read again as the page opens; until it answers, the shell says
+ * Loading… or its failure in the page's place (PV5b); the page sits in the shell's frame beside
+ * the menu (PV5).
  */
 export default function HomePage() {
   const api = useApi();
@@ -86,19 +86,11 @@ export default function HomePage() {
   // The account not read yet, or its read failed: the shell says so in this page's place
   // (`AccountUnread`), as it does on every page.
   if (home === null) return null;
-  // Not a teacher: the invite code, in place of the classes or a 403.
-  if (home.kind !== 'teacher') {
-    return (
-      <EntryPage signedIn>
-        <InviteCode onTeacher={onTeacher} />
-        {home.kind === 'invite' ? (
-          <p className={STAGE_FOOT}>
-            Here as a student? Set up Bali in the app on your iPhone first, then refresh this page.
-          </p>
-        ) : null}
-      </EntryPage>
-    );
+  if (home.kind === 'student') {
+    return <StudentHome me={home.me} failed={error !== null} onRead={load} />;
   }
+  // Never through the 13+ check: the invite code, in place of the classes or a 403.
+  if (home.kind === 'invite') return <InviteEntry forStudents onTeacher={onTeacher} />;
   const { me } = home;
 
   return (

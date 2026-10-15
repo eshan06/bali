@@ -8,13 +8,14 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-15 (Central) — L3c, a session's questions for its report (#391;
-`docs/DECISIONS.md`, 2026-10-15): `GET /v1/classes/{id}/reports/sessions/{sessionId}/questions`,
-beside R2's report and refused as it is, answers each question the session asked, in the order its
-opens took the session's lock, with its words, when it was asked and its totals, the results
-route's, through the one guarded count, for L7c's Questions card; every Phase 7 step with no screen
-is done. Before it, PV15, the entry pages (#388). PV12b (#386) and L7's two PRs (#389, #390) wait on
-the owner as drafts. Next: PV14, a session's report._
+_Last updated: 2026-10-15 (Central) — W3, the student's home (#PR; `docs/DECISIONS.md`,
+2026-10-15): `/` sends a student who said 13+ in the app to their home in v2's look, the teacher's
+layout with Your classes and Help: each class in session on a live card (its ring, its teacher, the
+time left and the bell), the rest under it, none yet the empty card with a teacher's way to the
+invite page, now also at `/invite`; `/v1/me`'s live session carries its start for the ring
+(additive; BaliCore reads it as optional). Open the lesson and the phone's chip are W4's. Before it,
+L3c (#391). PV12b (#386) and L7's two PRs (#389, #390) wait on the owner as drafts. Next: PV14, a
+session's report._
 
 ## Now
 
@@ -84,7 +85,7 @@ first class, production backups (L0b, the owner's console step; the owner, 2026-
 
 **Phase 7, Live lesson: building.** Every step with no screen is done, L3c the last (2026-10-15);
 M0 is done (deck storage on, 2026-10-12); the web screens come after the redesign's PV15 (✅ #388),
-then the phone's (L8, M8). L0b, production backups, is the owner's, before the Vanderbilt pilot's first
+W3 the first (✅ #PR), then the phone's (L8, M8). L0b, production backups, is the owner's, before the Vanderbilt pilot's first
 class.
 
 ## Phases
@@ -203,8 +204,8 @@ Slice 2 — slides:
 Slice 3 — students on the web (added 2026-10-10; ARCHITECTURE, "Live lesson", decision 13; built web first, each step after the steps it reads):
 - **W1** The phone's state in the presentation read — ✅ (#322; DECISIONS 2026-10-11)
 - **W2** Portal student logic, `lib/student-web.ts` (for W3, W4) — ✅ (#333; DECISIONS 2026-10-12)
-- **W3** 👀 The student's home to v2's canvas (StudentHome, StudentHomeEmpty, StudentStates' W3 lines; after W2), in the teacher's layout, its menu holding Your classes and Help: the student's classes (the one in class now with "Open the lesson"; none yet, with a teacher's link to the invite page); the sign-in page's and the invite page's words for students landed in PV15 (#388); `/` sends a student who said 13+ in the app (`homeFor`'s `student`, the shell's `home`) to StudentHome, which PV15 left to W3: until then they keep the invite card without its line for students (`app/page.tsx`), and a signed-in student sees no classes though the sign-in page says students sign in to see theirs (no student uses the web before the pilot); the privacy policy names the student pages; after PV15 (M0 ✅; the canvas approved 2026-10-12) — validation: `/santa-loop` with `web-design-guidelines` and `no-ai-slop`, screenshots for the owner
-- **W4** 👀 The lesson page to v2's canvas (StudentLesson, StudentNotIn, StudentClosed, StudentWaiting, StudentEnded, StudentPhoneStates, StudentStates' W4 lines, StudentZoom at 720 px; after L7 and W3), in two PRs: the question card (answer, change, the revealed answer, the privacy line), the phone's chip and line (`phoneChip`'s kinds in the canvas's words, the unknown chip in the grid's Unknown look, the "as of" time passed so Silent's minutes freeze while Bali can't be reached, #333; the Unlocked line's bell from `/v1/me`'s `liveSession.endsAt`), nothing shared yet, class over, loading, every said line, 200% zoom (one column under 1024 px, the question first) — validation: `/santa-loop` with the UI skills, screenshots, one student answering from the web and then the phone; #334 (a timeout on the portal's polls) fixed before W4 ships
+- **W3** 👀 The student's home to v2's canvas — ✅ (#PR; DECISIONS 2026-10-15); left for the owner: the privacy policy names the student pages (C2's words, the lawyer's)
+- **W4** 👀 The lesson page to v2's canvas (StudentLesson, StudentNotIn, StudentClosed, StudentWaiting, StudentEnded, StudentPhoneStates, StudentStates' W4 lines, StudentZoom at 720 px; after L7 and W3), in two PRs: the question card (answer, change, the revealed answer, the privacy line), the phone's chip and line (`phoneChip`'s kinds in the canvas's words, the unknown chip in the grid's Unknown look, the "as of" time passed so Silent's minutes freeze while Bali can't be reached, #333; the Unlocked line's bell from `/v1/me`'s `liveSession.endsAt`), nothing shared yet, class over, loading, every said line, 200% zoom (one column under 1024 px, the question first), the class head's ring from `/v1/me`'s `liveSession.startedAt` (W3); and the student's home's live card's last row, which W3 left (StudentHome): Open the lesson, to this page, and the phone's chip from the lesson's read, never a one-time `/v1/me` (decision 13: never greener than the grid); the home reads the account as it opens and at each bell (W3), so a class that starts while it is open shows at the next, which Open the lesson may want sooner — validation: `/santa-loop` with the UI skills, screenshots, one student answering from the web and then the phone; #334 (a timeout on the portal's polls) fixed before W4 ships
 - **W5** 👀 Slides on the student web to v2's canvas (StudentLesson's slide, its full-screen view as PV1 draws it; after M3, M6 and W4): PDF.js as M6 configures it, the `sha256` check, the download's `no-store`, the text layer for screen readers, full screen — validation: CSP tests, a tampered deck refused, `/santa-loop`, screenshots
 - **W6** 📱 Exit check: a real class on prod follows a lesson on laptops and phones at once; each student's chip agrees with the teacher's grid
 

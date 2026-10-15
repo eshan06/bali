@@ -420,11 +420,12 @@ Student app:
   a teacher's own class; added 2026-09-30, A19, additive): what leaving it deletes. And its
   session running now by the server's clock, with its bell (`liveSession`, null when none runs
   and on a teacher's own class; added 2026-09-30, C3c, additive): Home says the class is in
-  session to a student not in it. And whether a tap of the caller's waits for a Start that would
-  join them (`armed`; added 2026-10-03, #166, additive): not taken by a Start, not past the end
-  of its school day by the server's clock, for a teacher of a class they are in — the taps a
-  Start converts; false for a teacher. A phone waiting for its teacher's Start stops waiting once
-  it is false. The classes come in a fixed order (2026-10-12, PV3b), so New code or a rename moves
+  session to a student not in it; and its start (`startedAt`; added 2026-10-15, W3, additive):
+  the student web's ring, the share of the session left. And whether a tap of the caller's
+  waits for a Start that would join them (`armed`; added 2026-10-03, #166, additive): not taken
+  by a Start, not past the end of its school day by the server's clock, for a teacher of a class
+  they are in — the taps a Start converts; false for a teacher. A phone waiting for its
+  teacher's Start stops waiting once it is false. The classes come in a fixed order (2026-10-12, PV3b), so New code or a rename moves
   none: a student's in the order they joined them, by their live enrollment, a teacher's oldest
   first, each then by id.
 - `DELETE /v1/me` — the caller deletes their own account (C3, added 2026-10-04, additive):
@@ -1484,8 +1485,9 @@ and keeps everything that enforces focus.
 - **Privacy.** Nothing new reaches a teacher, and totals-only stands (decision 2): a student's
   pages show only their own answer and their own phone. The consent list is unchanged (it lists
   what the teacher sees); the privacy policy names the student pages (W3).
-- **Compatibility.** Additive: the presentation read gains a field old phones ignore, and the
-  teacher's pages change only in the home's routing and the invite page's one line.
+- **Compatibility.** Additive: the presentation read gains a field old phones ignore, and so does
+  `/v1/me`'s live session, its start (W3); the teacher's pages change only in the home's routing
+  and the invite page's one line.
 - **Drawn** (2026-10-10, the canvas's three student rows): the sign-in page for both ("Sign in
   to Bali", where it said "Teacher portal"), the invite page's line for students, the student
   home with classes and with none, the lesson in each state of the phone, loading, every said

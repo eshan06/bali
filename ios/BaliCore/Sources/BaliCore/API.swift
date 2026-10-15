@@ -45,6 +45,9 @@ public struct MeClass: Codable, Sendable, Hashable {
 /// A class's session running now, as `GET /v1/me` names it under the class (C3c).
 public struct LiveSession: Codable, Sendable, Hashable {
     public let id: String
+    /// When it started (W3, additive): the student web's ring counts the session left from it; the
+    /// app reads none of it. Nil from an older API.
+    public let startedAt: Date?
     public let endsAt: Date
 }
 

@@ -1,7 +1,14 @@
 'use client';
 
 import type { MeResponse } from '@bali/shared';
-import { ChartBar, CircleQuestionMark, House, LogOut, type LucideIcon } from 'lucide-react';
+import {
+  ChartBar,
+  CircleQuestionMark,
+  House,
+  LayoutGrid,
+  LogOut,
+  type LucideIcon,
+} from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -41,13 +48,18 @@ export interface Frame {
   hidden: boolean;
 }
 
+/** Where the invite page is (Invite): `/` for an account the 13+ check never passed, and `/invite`. */
+const INVITE_PATHS = new Set(['/', '/invite']);
+
 /**
  * How a page is framed (the owner's rulings, 2026-10-13). A signed-out page draws its own bar, and
  * a page on the projector (Present) has no menu and no frame of the shell's, as ClassPresent draws
  * it. Otherwise the page waits for the account, so no frame flashes before it is known and no page
  * is drawn from an account that left: Loading… with no menu or bar while it is read, its failure
  * under the bar with Sign out (PV5b, the owner's approval of #352's review); then the side menu for
- * a teacher alone, and the bar for anyone else, the invite page framing itself (PV15).
+ * a teacher, and for a student who said 13+ in the app (W3), but on the invite page, which frames
+ * itself under the bar (Invite, PV15), as it does for an account the 13+ check never passed, whose
+ * every page has the bar.
  */
 export function frameFor(
   path: string,
@@ -58,8 +70,9 @@ export function frameFor(
   if (SIGNED_OUT_PATHS.test(path) || presenting)
     return { chrome: null, framed: false, hidden: false };
   if (home === null) return { chrome: error === null ? null : 'bar', framed: false, hidden: true };
-  if (home.kind === 'teacher') return { chrome: 'menu', framed: true, hidden: false };
-  return { chrome: 'bar', framed: path !== '/', hidden: false };
+  if (home.kind === 'teacher' || (home.kind === 'student' && path !== '/invite'))
+    return { chrome: 'menu', framed: true, hidden: false };
+  return { chrome: 'bar', framed: !INVITE_PATHS.has(path), hidden: false };
 }
 
 /**
@@ -169,15 +182,21 @@ interface Item {
   Icon: LucideIcon;
 }
 
+/** Whose menu it is: a teacher's, or a student's who said 13+ in the app (W3). */
+export type MenuRole = 'teacher' | 'student';
+
 /**
- * The menu's pages, each listed only once it exists, never as a dead or disabled link: Classes
- * comes with PV16 (between Home and Reports), Questions with L7b, Slides with M5. Help sits under
- * the gap.
+ * The menu's pages, each listed only once it exists, never as a dead or disabled link: a teacher's
+ * Classes comes with PV16 (between Home and Reports), Questions with L7b, Slides with M5; a
+ * student's is Your classes alone (StudentHome). Help sits under the gap, in both.
  */
-const PAGES: Item[] = [
-  { href: '/', label: 'Home', Icon: House },
-  { href: '/reports', label: 'Reports', Icon: ChartBar },
-];
+const PAGES: Record<MenuRole, Item[]> = {
+  teacher: [
+    { href: '/', label: 'Home', Icon: House },
+    { href: '/reports', label: 'Reports', Icon: ChartBar },
+  ],
+  student: [{ href: '/', label: 'Your classes', Icon: LayoutGrid }],
+};
 const HELP: Item = { href: '/support', label: 'Help', Icon: CircleQuestionMark };
 
 /*
@@ -207,16 +226,18 @@ export const PAGE =
   'max-w-[1260px] min-w-0 flex-1 px-9 pt-7.5 pb-14 max-sm:px-4 max-sm:pt-5.5 max-sm:pb-10';
 
 /**
- * The side menu, drawn from what it is given, for a teacher. Its foot names the account, its
- * initials beside the name and Sign out an icon; with no name on the account, Sign out in words
- * alone (HomeNoName).
+ * The side menu, drawn from what it is given: a teacher's, or a student's (StudentHome). Its foot
+ * names the account, its initials beside the name and Sign out an icon; with no name on the
+ * account, Sign out in words alone (HomeNoName).
  */
 export function SideMenu({
+  role,
   path,
   name,
   leaving,
   onSignOut,
 }: {
+  role: MenuRole;
   path: string;
   name: string | null;
   leaving: boolean;
@@ -239,7 +260,7 @@ export function SideMenu({
         <Mark size={20} />
         Bali
       </Link>
-      {PAGES.map(link)}
+      {PAGES[role].map(link)}
       <div className={GAP} />
       {link(HELP)}
       {name ? (
@@ -390,6 +411,7 @@ export function Shell({ children }: { children: ReactNode }) {
         <div className={frame.chrome === 'menu' ? SHELL : undefined}>
           {frame.chrome === 'menu' ? (
             <SideMenu
+              role={home?.kind === 'student' ? 'student' : 'teacher'}
               path={path}
               name={me?.user.displayName?.trim() || null}
               leaving={leaving}

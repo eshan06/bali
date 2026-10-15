@@ -32,7 +32,7 @@ export function nextTick(left: number): number | null {
 }
 
 /** This computer's clock, read as a bell arrives or moves, then as each second turns over. */
-function useClock(endsAt: string | null): number {
+export function useClock(endsAt: string | null): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (endsAt === null) return;
@@ -54,10 +54,10 @@ function useClock(endsAt: string | null): number {
 
 /**
  * The session's ring: the time left as a green arc from the top, on its track. ClassLive's is 44 px,
- * r 19.5, stroked 5; ClassPresent's one size up, 64 px, r 28.5, stroked 7.
+ * r 19.5, stroked 5; ClassPresent's one size up, 64 px, r 28.5, stroked 7; the student's live card
+ * and their home with no class 46 px, r 20.5, stroked 5 (StudentHome, StudentHomeEmpty).
  */
-function Ring({ share, big }: { share: number; big: boolean }) {
-  const [box, stroke] = big ? [64, 7] : [44, 5];
+export function Ring({ share, box, stroke }: { share: number; box: number; stroke: number }) {
   const c = box / 2;
   const r = c - stroke / 2;
   const around = 2 * Math.PI * r;
@@ -138,7 +138,7 @@ export function LiveHeader({
   const share = over !== null ? 1 : startedAt && endsAt ? shareLeft(startedAt, endsAt, now) : 0;
   return (
     <header className="flex flex-wrap items-center gap-x-4.5 gap-y-3.5 max-sm:gap-x-3.5">
-      <Ring share={share} big={present} />
+      <Ring share={share} box={present ? 64 : 44} stroke={present ? 7 : 5} />
       <div className="min-w-0 max-sm:flex-1">
         <h1 className={type.title}>{name}</h1>
         <p className={`mt-0.5 ${type.line} text-text-secondary`}>

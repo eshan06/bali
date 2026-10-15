@@ -32,7 +32,8 @@ import {
  * it. And how the account is read (PV5b, the owner's approval of #352's review): Loading… in the
  * page's place until it answers, its failure there with Try again, read again on the next page,
  * and only the newest read's answer counts; the 13+ check read before `/v1/me`, which makes the
- * account, and a tab with no sign-in sent to /login (PV15).
+ * account, and a tab with no sign-in sent to /login (PV15). And a student's menu, Your classes and
+ * Help, for an account that said 13+ in the app, the invite page at /invite under the bar (W3).
  */
 const nav = vi.hoisted(() => ({ path: '/' }));
 vi.mock('next/navigation', () => ({
@@ -58,6 +59,7 @@ const homeOf = (kind: Home['kind']): Home =>
 const menu = (over: Partial<Parameters<typeof SideMenu>[0]> = {}) =>
   renderToStaticMarkup(
     createElement(SideMenu, {
+      role: 'teacher',
       path: '/',
       name: 'Ms. Rivera',
       leaving: false,
@@ -111,20 +113,35 @@ describe('what frames a page', () => {
     }
   });
 
-  it('draws the bar for an account that doesn’t teach, never the menu; the invite page frames itself', () => {
-    // A student who passed the 13+ check, and an account that never did (PV15), alike.
-    for (const kind of ['student', 'invite'] as const) {
-      expect(frameFor('/', homeOf(kind), null, false), kind).toEqual({
+  it('draws the bar for an account the 13+ check never passed, never the menu; the invite page frames itself', () => {
+    for (const path of ['/', '/invite']) {
+      expect(frameFor(path, homeOf('invite'), null, false), path).toEqual({
         chrome: 'bar',
         framed: false,
         hidden: false,
       });
-      expect(frameFor('/classes/c1', homeOf(kind), null, false), kind).toEqual({
-        chrome: 'bar',
-        framed: true,
-        hidden: false,
-      });
     }
+    expect(frameFor('/classes/c1', homeOf('invite'), null, false)).toEqual({
+      chrome: 'bar',
+      framed: true,
+      hidden: false,
+    });
+  });
+
+  it('draws the side menu for a student who said 13+ in the app, their home in v2’s frame; the invite page under the bar (W3)', () => {
+    for (const path of ['/', '/reports', '/classes/c1', '/no-such-page']) {
+      expect(frameFor(path, homeOf('student'), null, false), path).toEqual(MENU);
+    }
+    // Help is its own page with its own bar, for a student as for a teacher.
+    expect(frameFor('/support', homeOf('student'), null, false)).toEqual(NONE);
+    // Their home's "Setting up a teacher account?" opens the Invite board's page, as drawn.
+    expect(frameFor('/invite', homeOf('student'), null, false)).toEqual({
+      chrome: 'bar',
+      framed: false,
+      hidden: false,
+    });
+    // A teacher there has the menu, and the page sends them to their classes.
+    expect(frameFor('/invite', homeOf('teacher'), null, false)).toEqual(MENU);
   });
 
   it('says a failed read in the page’s place under the bar, with Sign out, on every page (#352’s review)', () => {
@@ -235,6 +252,8 @@ describe('the shell’s wiring of the rulings (read from its source)', () => {
       /const me = home === null \|\| home\.kind === 'invite' \? null : home\.me;\s*const value = useMemo\(\(\) => \(\{ home, me, error, load \}\), \[home, me, error, load\]\);/,
     );
     expect(shell).toMatch(/name=\{me\?\.user\.displayName\?\.trim\(\) \|\| null\}/);
+    // A student's menu once the account reads as one, a teacher's otherwise (W3).
+    expect(shell).toMatch(/role=\{home\?\.kind === 'student' \? 'student' : 'teacher'\}/);
   });
 
   it('says the account unread in the page’s place, Try again reading it again (#352’s review)', () => {
@@ -320,6 +339,24 @@ describe('the side menu', () => {
     expect(html).toMatch(
       /<button type="button" aria-disabled="false"[^>]*><svg[^>]*>.*?<\/svg>Sign out<\/button><\/div><\/nav>$/,
     );
+  });
+
+  it('for a student, links Bali, Your classes and Help, as StudentHome draws it, and none of a teacher’s pages (W3)', () => {
+    const html = menu({ role: 'student', name: 'Ana Rodríguez' });
+    expect(links(html).map(({ href, text, current }) => [href, text, current])).toEqual([
+      ['/', 'Bali', false],
+      ['/', 'Your classes', true],
+      ['/support', 'Help', false],
+    ]);
+    expect(html).not.toMatch(/Home|Reports/);
+    // Your classes with the boards' icon, the grid of four.
+    expect(html).toMatch(/<a [^>]*href="\/"[^>]*><svg[^>]*\blucide-layout-grid\b/);
+    // The same foot: the initials beside the name, Sign out an icon.
+    expect(html).toMatch(
+      /<span aria-hidden="true" class="[^"]*\bbg-avatar-bg\b[^"]*">AR<\/span><span class="[^"]*\btext-menu-name\b[^"]*">Ana Rodríguez<\/span><button type="button" aria-label="Sign out"/,
+    );
+    // On a page the student has no item for, nothing is marked.
+    expect(links(menu({ role: 'student', path: '/invite' })).filter((l) => l.current)).toEqual([]);
   });
 
   it('holds Sign out while it signs out, as the bar does', () => {
