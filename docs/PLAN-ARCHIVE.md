@@ -10,6 +10,16 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-15 (Central) — M5b's part 1, the upload's logic for Your slides (#397;
+`docs/DECISIONS.md`, 2026-10-15), with no screen: a picked file judged before anything is sent (over
+25 MB, not a PDF), the upload (its SHA-256, the create, the PUT by XMLHttpRequest with its progress
+and Cancel, stopped 25 minutes after the create, #326, then the check), Try again going on from
+where it stopped, and a removal naming M5a's classes in use; the API client keeps an error's
+`details`, and the CSP's `connect-src` names the environment's deck bucket
+(`NEXT_PUBLIC_DECK_BUCKET_URL`; on Vercel the owner's, runbook 10, step 8). Before it, L7-1a, the
+class page's question card (#389). L7-1b (#390) and L7b's parts 1b and 1c (#394, #395), approved by
+the owner, follow it. Next: M5b's part 2, the Slides page._
+
 _Last updated: 2026-10-15 (Central) — L7-1a, the class page's question card (#389;
 `docs/DECISIONS.md`, 2026-10-15), its states the canvas doesn't draw approved by the owner as
 built: a question's card over the live grid, "N of M answered" under the guard, each option's count

@@ -8,15 +8,13 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-15 (Central) — M5b's part 1, the upload's logic for Your slides (#397;
-`docs/DECISIONS.md`, 2026-10-15), with no screen: a picked file judged before anything is sent (over
-25 MB, not a PDF), the upload (its SHA-256, the create, the PUT by XMLHttpRequest with its progress
-and Cancel, stopped 25 minutes after the create, #326, then the check), Try again going on from
-where it stopped, and a removal naming M5a's classes in use; the API client keeps an error's
-`details`, and the CSP's `connect-src` names the environment's deck bucket
-(`NEXT_PUBLIC_DECK_BUCKET_URL`; on Vercel the owner's, runbook 10, step 8). Before it, L7-1a, the
-class page's question card (#389). L7-1b (#390) and L7b's parts 1b and 1c (#394, #395), approved by
-the owner, follow it. Next: M5b's part 2, the Slides page._
+_Last updated: 2026-10-15 (Central) — L7-1b, asking in the class page's side panel (#390;
+`docs/DECISIONS.md`, 2026-10-15), its states the canvas doesn't draw approved by the owner as
+built: the card at rest with Ask a question, the panel where a student's shows, 2 to 6 answers and
+the correct one optional, Bali's refusals as the server checks them, a failed ask with Try again
+under the same id; L7's part 1, the class page, is done (L7-1a, #389). Before it, M5b's part 1, the
+upload's logic for Your slides (#397). L7b's parts 1b and 1c (#394, #395), approved by the owner
+too, follow it. Next: M5b's part 2, the Slides page._
 
 ## Now
 
@@ -179,7 +177,7 @@ Slice 1 — live questions:
 - **L4b** The demo's question and the load gate's polling classes — ✅ (#321; DECISIONS 2026-10-11)
 - **L5** BaliCore's poll and answer, `LiveLesson` (for L8) — ✅ (#330; DECISIONS 2026-10-12)
 - **L6** Portal logic, `lib/live-question.ts` (for L7) — ✅ (#332; DECISIONS 2026-10-12)
-- **L7** 👀 Portal UI to v2's canvas (LessonClass, LessonWrite, LessonWaiting, LessonLive, LessonClosed, LessonStates' L7 lines; PresentQuestion, PresentAnswer), on the redesign's shell (PV5) and class page (PV6–PV11): the class page's "Questions and slides" card, Ask in the side panel (prompt, 2–6 options, the correct one optional), the live results with "N of M answered" and the guard's wording, close and reveal, and Present showing the question in place of the live grid, the counts per option only once it closes (L6's poller already reads the results once more after a close); the three of its sentences the canvas drops are not built (DESIGN.md §1, The words); two PRs (the class page's, then Present's); after PV15 (M0 ✅; the canvas approved 2026-10-12) — validation: `/santa-loop` with `web-design-guidelines` and `no-ai-slop`, screenshots for the owner. **Part 1, the class page, in two** (DECISIONS 2026-10-15): **L7-1a** the card and its results — ✅ (#389); **L7-1b** asking in the side panel (#390), stacked on it. Part 2, Present's, after them
+- **L7** 👀 Portal UI to v2's canvas (LessonClass, LessonWrite, LessonWaiting, LessonLive, LessonClosed, LessonStates' L7 lines; PresentQuestion, PresentAnswer), on the redesign's shell (PV5) and class page (PV6–PV11): the class page's "Questions and slides" card, Ask in the side panel (prompt, 2–6 options, the correct one optional), the live results with "N of M answered" and the guard's wording, close and reveal, and Present showing the question in place of the live grid, the counts per option only once it closes (L6's poller already reads the results once more after a close); the three of its sentences the canvas drops are not built (DESIGN.md §1, The words); two PRs (the class page's, then Present's); after PV15 (M0 ✅; the canvas approved 2026-10-12) — validation: `/santa-loop` with `web-design-guidelines` and `no-ai-slop`, screenshots for the owner. **Part 1, the class page** — ✅ as L7-1a, the card and its results (#389), and L7-1b, asking in the side panel (#390; DECISIONS 2026-10-15). Part 2, Present's, after them
 - **L7b** 👀 Portal saved questions to v2's canvas (Questions, QuestionsEdit, LessonAsk's drafts, LessonStates' L7b lines): the questions page in the menu (write, edit and remove a draft; its empty state), the side panel's drafts with a one-click Ask and "Write a new question"; the classes home's "Questions and slides" card gives way to the menu's Questions and Slides (confirmed by the owner, 2026-10-12); each save's `eventId` minted after the draft's own, a reply under another `eventId` treated as not saved (#318); "Your questions" oldest first, as the canvas lists them, sorted in the portal (the API answers newest first); two PRs (the page, then the panel's drafts) — validation: `/santa-loop` with the UI skills, screenshots. **Part 1, the page, in three** (the conductor, 2026-10-15: 844 lines; DECISIONS 2026-10-15): **part 1a, the save logic** — ✅ (#393); **part 1b**, the list and Remove, then **part 1c**, writing, editing and the menu's Questions, drafts stacked on it for the owner's calls. Part 2, the panel's drafts, after them
 - **L7c** 👀 A session's Questions to v2's canvas (ReportOpened's Questions card, PV14's page; LessonStates' L7c lines): each question asked with its totals through L3c's read, the guard applied ("Too few answers to show a breakdown"); on the report page only, not under the class page's recap (the owner, 2026-10-12) — validation: vitest, `/santa-loop`, screenshots
 - **L8** 👀📱 iOS answer card to the app canvas: while a question or a slide shows, the Focus screen's ring as a strip and Emergency Unlock pinned at the bottom; a tap answers and changes it until the close; the revealed answer marked, never red; a closed question's Hide; the same card on Unlocked, Screen Time off and Home; the consent list's two new lines and the one-time screen for a student who saw the old list (`no-ai-slop`); M0 ✅ (the canvas approved 2026-10-10; L0b, before the first actual pilot since 2026-10-12, holds back no screen). **No build that can answer ships (TestFlight included) before L2's documents and this wording have landed** — validation: XCTest, then the device check on the owner's iPhone: a shielded phone answers, the battery cost of the 2 s poll over a lesson, VoiceOver

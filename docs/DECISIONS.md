@@ -230,8 +230,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the OpenAPI snapshot. No fixture and nothing in BaliCore: no phone reads it.
 
 - **2026-10-15** — **L7-1b: asking a question in the class page's side panel, built to the canvas;
-  three states it doesn't draw built plainest and parked for the owner.** L7's first part's second
-  half, stacked on L7-1a (#389). Built to
+  the states it doesn't draw built plainest, approved by the owner as built.** L7's first part's
+  second half (#390), stacked on L7-1a (#389). Built to
   [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (version 21):
   LessonClass, LessonWrite and LessonStates' lines for asking. **The card at rest** is LessonClass's
   "Questions and slides" with Ask a question (Show slides is M6's, the drafts L7b's), and a closed
@@ -253,19 +253,23 @@ a real decision? Add a dated entry at the top: what was decided and why.
   in words the owner rules on ("This has a tab or a hidden character Bali can't show. Type it
   again."); and an ask held by the panel alone could go twice under two ids, a Close, a tile or
   Present unmounting the panel mid-send: the ask is the hook's now (`opening`), one at a time, a
-  panel opened again showing it busy and its failure, Cancel forgetting both. *For the owner* (an
-  edge case of doubtful reach): an ask whose answer was lost but which landed stays the one Try
-  again resends, so the same words asked again much later replay that closed question; recommended,
-  leave it. **As the boards render:** `.app p`'s margin 0
+  panel opened again showing it busy and its failure, Cancel forgetting both. *Kept by the owner*
+  (2026-10-15, as recommended; an edge case of doubtful reach): an ask whose answer was lost but
+  which landed stays the one Try again resends, so the same words asked again much later replay that
+  closed question. **As the boards render:** `.app p`'s margin 0
   outranks `.help`'s and `.refusal`'s 8 px, so the counter and a refusal sit right under the field.
   An answer's input is the Field's own (`Input`), so every portal input is still the one at 16 px.
-  **What the canvas doesn't draw**, the owner's to rule (the PR parked as a draft): the fresh panel
-  (no words, two empty answers; Remove hidden at two answers, Add an answer at six); where three of
+  **What the canvas doesn't draw**, **approved by the owner (2026-10-15), each as built, after
+  their look at the screenshots** (asked with the PR parked as a draft): the fresh panel (no words,
+  two empty answers; Remove hidden at two answers, Add an answer at six); where three of
   LessonStates' lines sit (Asking failed and The session ended first above Ask the class, Asking
   this closes the open question under the panel's last line); the panel at phone width (the width of
-  the screen, as the student panel); and the words for a tab or a hidden character (above). *Weighed:* hiding Remove and Add an answer against
-  refusing (no refusal is drawn for either); starting with four empty answers, as the board's
-  example has (a two-answer question would need two removed first).
+  the screen, as the student panel); and the words for a tab or a hidden character (above).
+  *Weighed:* hiding Remove and Add an answer against refusing (no refusal is drawn for either);
+  starting with four empty answers, as the board's example has (a two-answer question would need two
+  removed first). These states were coded before any canvas drew them, which the owner accepted for
+  this PR and the four drafts approved with it (#386, #389, #394, #395); from now on a state no board
+  draws is drawn on the canvas first.
 
 - **2026-10-15** — **L7-1a: the class page's question card and its results, built to the canvas;
   asking split off to L7-1b; five states the canvas doesn't draw built plainest, approved by the
