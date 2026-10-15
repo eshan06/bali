@@ -78,9 +78,10 @@ export function SessionReport({
 }) {
   return (
     <main className="flex flex-col gap-5.5">
+      {/* A class's name of one long word breaks rather than pushing past a phone's width. */}
       <Link
         href={`/reports?class=${encodeURIComponent(classId)}`}
-        className={`self-start ${NAV_LINK}`}
+        className={`self-start wrap-anywhere ${NAV_LINK}`}
       >
         <ArrowLeft size={16} aria-hidden="true" />
         {className === null ? 'Reports' : `Reports · ${className}`}

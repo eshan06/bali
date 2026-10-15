@@ -142,6 +142,7 @@ describe('the way back (ReportOpened)', () => {
     expect(back?.[1]?.split(' ')).toEqual(
       expect.arrayContaining([
         'self-start',
+        'wrap-anywhere',
         'inline-flex',
         'gap-1.5',
         'text-data',

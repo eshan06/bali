@@ -43,7 +43,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the colour `row-open`. *Size:* 446 lines added and 491 deleted outside tests and docs, the
   deletions that timeline. **Left as they are:** a refusal the portal has no words of its own for is
   said in the API's ("not your class"), as on every page; a running session's URL, which no link
-  leads to, shows its report counted to now. **The screenshots:** the real page in the owner's tab
+  leads to (Reports lists and the recap opens only sessions marked over), shows its report as if
+  over at its bell, those focused so far listed as the whole time (santa's review); and, as on the
+  class page's recap, who didn't join is read from the class's roster now, so an old session leaves
+  out a student removed since (santa's review; an enrollment history is a read of its own).
+  **The screenshots:** the real page in the owner's tab
   on dev's demo class (a short session run for it, ended at once: Ana unlocked with no reason and
   came back, Ben unlocked for the nurse and turned protection off, Cal tapped in late, Dana never
   joined), its window read from R3's row by a shim in the preview alone until this API deploys; the
