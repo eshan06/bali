@@ -11,7 +11,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
 - **2026-10-15** — **L7b's part 1a: the save logic for Your questions, with no screen; each save
   minted after the draft's own `eventId`, and a reply under another one read as not saved.** L7b's
   first part, the Questions page, came to 844 changed lines without tests, so the conductor split it
-  in three (2026-10-15): this logic (`apps/web/src/lib/saved-questions.ts`, #NNN), then the page as
+  in three (2026-10-15): this logic (`apps/web/src/lib/saved-questions.ts`, #393), then the page as
   two drafts stacked on it for the owner's calls, the list with Remove, then writing, editing and the
   menu's Questions. **Oldest first** (`oldestFirst`): by each draft's first write, then its id, as
   the canvas lists them; the API answers newest first. **What Bali refuses before it saves**
