@@ -4,13 +4,15 @@ import type { ReactNode } from 'react';
 
 import { CARD_ALONE } from '@/components/card';
 import { LockupBar } from '@/components/mark';
-import { TEXT_LINK, TextLink } from '@/components/text-link';
+import { QUIET_LINK, TEXT_LINK, TextLink } from '@/components/text-link';
 
 /*
  * The public help page (Phase 5, P4): read without signing in, so it calls no API and keeps no
  * state. It renders per request like every page (the root layout's `dynamic`), for the CSP nonce.
  * The teacher-sees lists are the student app's own (`ConsentCard`, ios/Bali/UI/JoinView.swift),
- * word for word; if the app's lists change, these change with them.
+ * word for word; if the app's lists change, these change with them. Drawn as PV1 draws it in v2's
+ * look (SupportPage; built in PV15), its words unchanged: under the white bar with Bali, one
+ * column 860 px wide at most, each section a card.
  */
 
 export const metadata: Metadata = {
@@ -33,6 +35,10 @@ const TEACHER_NEVER_SEES = [
   'Your messages or where you are',
 ];
 
+/** A list of what a teacher sees, in a calm grey box (SupportPage), two side by side. */
+const SEEN =
+  'min-w-0 flex-[1_1_300px] rounded-sm border border-border-default bg-surface-sunken px-4 py-3';
+
 const SECTIONS = [
   { id: 'students', title: 'For students' },
   { id: 'teachers', title: 'For teachers' },
@@ -40,27 +46,27 @@ const SECTIONS = [
   { id: 'help', title: 'Get help' },
 ];
 
-/** A section: its title on the left spine from a laptop's width, its questions beside it. */
+/** A section: a card on its own (v2's look, the SupportPage board), its questions 18 px apart. */
 function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
     <section
       id={id}
       aria-labelledby={`${id}-title`}
-      className="mt-12 grid scroll-mt-6 grid-cols-1 gap-x-16 gap-y-6 border-t border-border-default pt-8 sm:mt-16 sm:pt-10 lg:grid-cols-[240px_minmax(0,1fr)]"
+      className={`flex scroll-mt-6 flex-col gap-4.5 ${CARD_ALONE}`}
     >
-      <h2 id={`${id}-title`} className="text-h2">
+      <h2 id={`${id}-title`} className="text-h3">
         {title}
       </h2>
-      <div className="flex min-w-0 flex-col gap-8">{children}</div>
+      {children}
     </section>
   );
 }
 
 function Question({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div>
+    <div className="flex flex-col gap-1.5">
       <h3 className="text-h3">{title}</h3>
-      <div className="mt-2 flex max-w-[62ch] flex-col gap-3 text-text-secondary">{children}</div>
+      <div className="flex flex-col gap-1.5 text-text-secondary">{children}</div>
     </div>
   );
 }
@@ -69,19 +75,19 @@ export default function SupportPage() {
   return (
     <>
       <LockupBar />
-      <main className="mx-auto max-w-280 px-4 pt-8 pb-16 text-body sm:px-10 sm:pt-12 sm:pb-24">
-        <div className="max-w-180">
-          <h1 className="text-h1 text-balance">Help</h1>
-          <p className="mt-4 max-w-160 text-body-lg text-pretty text-text-secondary">
+      <main className="mx-auto flex max-w-215 flex-col gap-5.5 px-9 pt-7.5 pb-14 text-body max-sm:px-4 max-sm:pt-5.5 max-sm:pb-10">
+        <div>
+          <h1 className="text-page-title text-balance">Help</h1>
+          <p className="mt-2 text-text-secondary">
             Bali keeps your iPhone out of the way during class. You tap your phone on your
             teacher&apos;s Bali block, your apps go quiet until the bell, and Emergency Unlock gets
             you out any time.
           </p>
-          <nav aria-label="On this page">
-            <ul className="mt-6 flex flex-wrap gap-x-6 gap-y-2">
+          <nav aria-label="On this page" className="mt-5.5">
+            <ul className="flex flex-wrap items-center gap-x-5.5 gap-y-2.5">
               {SECTIONS.map((s) => (
                 <li key={s.id}>
-                  <a href={`#${s.id}`} className={TEXT_LINK}>
+                  <a href={`#${s.id}`} className={QUIET_LINK}>
                     {s.title}
                   </a>
                 </li>
@@ -130,28 +136,25 @@ export default function SupportPage() {
               Settings any time. If you do during class, your teacher sees Screen Time off.
             </p>
           </Question>
-          {/* The app's consent card's two lists (ConsentCard), as two cards side by side. */}
-          <div
-            id="teacher-sees"
-            className="grid scroll-mt-6 grid-cols-1 items-start gap-4 sm:grid-cols-2"
-          >
-            <div className={CARD_ALONE}>
+          {/* The app's consent card's two lists (ConsentCard), side by side in calm grey boxes. */}
+          <div id="teacher-sees" className="flex scroll-mt-6 flex-wrap items-start gap-3.5">
+            <div className={SEEN}>
               <h3 className="flex items-center gap-2 text-h3">
-                <Eye size={20} aria-hidden="true" className="shrink-0 text-text-brand" />
+                <Eye size={18} aria-hidden="true" className="shrink-0 text-text-brand" />
                 What your teacher sees
               </h3>
-              <ul className="mt-3 list-disc space-y-2 pl-5 text-text-secondary">
+              <ul className="mt-2.5 flex flex-col gap-1.5 text-text-secondary">
                 {TEACHER_SEES.map((line) => (
                   <li key={line}>{line}</li>
                 ))}
               </ul>
             </div>
-            <div className={CARD_ALONE}>
+            <div className={SEEN}>
               <h3 className="flex items-center gap-2 text-h3">
-                <EyeOff size={20} aria-hidden="true" className="shrink-0 text-text-brand" />
+                <EyeOff size={18} aria-hidden="true" className="shrink-0 text-text-brand" />
                 What your teacher never sees
               </h3>
-              <ul className="mt-3 list-disc space-y-2 pl-5 text-text-secondary">
+              <ul className="mt-2.5 flex flex-col gap-1.5 text-text-secondary">
                 {TEACHER_NEVER_SEES.map((line) => (
                   <li key={line}>{line}</li>
                 ))}
@@ -216,7 +219,7 @@ export default function SupportPage() {
         </Section>
 
         <Section id="help" title="Get help">
-          <p className="max-w-[62ch] text-body-lg text-pretty">
+          <p>
             Email{' '}
             <a href={`mailto:${SUPPORT_EMAIL}`} className={`${TEXT_LINK} break-all`}>
               {SUPPORT_EMAIL}

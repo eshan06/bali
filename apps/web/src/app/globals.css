@@ -278,6 +278,15 @@
   --text-cell-sub: 12px;
   --text-cell-sub--line-height: 16px;
   --text-cell-sub--font-weight: 400;
+
+  /* The entry pages' two (PV15), as v2.css draws them and §1's facts don't list: an entry page's
+     card title ("Sign in to Bali") and the sign-in's 48 px button's label. */
+  --text-entry-title: 20px;
+  --text-entry-title--line-height: 26px;
+  --text-entry-title--font-weight: 600;
+  --text-button-lg: 16px;
+  --text-button-lg--line-height: 20px;
+  --text-button-lg--font-weight: 600;
 }
 
 @theme inline {

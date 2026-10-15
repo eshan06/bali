@@ -8,7 +8,13 @@ import type {
 } from '@bali/shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { type ApiClient, ApiError, createApiClient, NetworkError } from './api-client';
+import {
+  type ApiClient,
+  ApiError,
+  createApiClient,
+  NetworkError,
+  UnauthorizedError,
+} from './api-client';
 import { newEventId } from './event-id';
 import { type PageVisibility, POLL_EVERY_MS } from './live-question';
 import {
@@ -95,27 +101,25 @@ describe('homeFor', () => {
     expect(asked).toEqual(['/v1/me/age-check']);
   });
 
-  it('answers a read that failed as its failure, never a guess', async () => {
+  it('throws a read that failed, for the page to say in its words, never a guess (PV15)', async () => {
     const down = client({ '/v1/me/age-check': offline, '/v1/me': json(200, me('teacher')) });
-    expect(await homeFor(down.api)).toEqual({
-      kind: 'failed',
-      status: undefined,
-      retryAfter: undefined,
-    });
+    await expect(homeFor(down.api)).rejects.toBeInstanceOf(NetworkError);
+    // Never /v1/me after a check that didn't answer: it could make an account the check never let.
     expect(down.asked).toEqual(['/v1/me/age-check']);
     const failing = client({
       '/v1/me/age-check': json(200, { passed: true }),
       '/v1/me': json(503, { error: { code: 'unavailable', message: 'a log line' } }),
     });
-    expect(await homeFor(failing.api)).toMatchObject({ kind: 'failed', status: 503 });
+    await expect(homeFor(failing.api)).rejects.toMatchObject({ status: 503 });
     expect(down.onUnauthorized).not.toHaveBeenCalled();
     expect(failing.onUnauthorized).not.toHaveBeenCalled();
   });
 
-  it('signs out only on a 401', async () => {
-    const { api, onUnauthorized } = client({ '/v1/me/age-check': json(401, {}) });
-    expect(await homeFor(api)).toEqual({ kind: 'refused', status: 401, reason: undefined });
+  it('signs out only on a 401, and reads nothing after it', async () => {
+    const { api, asked, onUnauthorized } = client({ '/v1/me/age-check': json(401, {}) });
+    await expect(homeFor(api)).rejects.toBeInstanceOf(UnauthorizedError);
     expect(onUnauthorized).toHaveBeenCalledTimes(1);
+    expect(asked).toEqual(['/v1/me/age-check']);
   });
 });
 

@@ -85,14 +85,16 @@ export function InviteCode({ onTeacher }: { onTeacher: () => void }) {
   }
 
   return (
-    // An entry page's card (DESIGN.md §4), as /login's: one step, one card, centred under the bar.
-    <div className={CARD_ENTRY}>
-      <h1 className="text-h1 text-balance">Enter your invite code</h1>
-      <p className="mt-2 text-body-lg text-pretty text-text-secondary">
+    // An entry page's card, as /login's (the Invite board): one step, one card, under the bar.
+    <section aria-labelledby={`${id}-title`} className={CARD_ENTRY}>
+      <h1 id={`${id}-title`} className="text-entry-title">
+        Enter your invite code
+      </h1>
+      <p className="-mt-2.5 text-body text-text-secondary">
         You need it once, to set up this account for teaching.
       </p>
 
-      <form onSubmit={(e) => void onSubmit(e)} className="mt-8">
+      <form onSubmit={(e) => void onSubmit(e)} className="flex flex-col gap-4.5">
         <Field
           ref={field}
           id={`${id}-code`}
@@ -112,7 +114,7 @@ export function InviteCode({ onTeacher }: { onTeacher: () => void }) {
           aria-describedby={aboveButton ? `${id}-said` : undefined}
         />
         {aboveButton ? (
-          <p id={`${id}-said`} role="alert" className="mt-6 text-body text-pretty">
+          <p id={`${id}-said`} role="alert" className="text-body text-pretty">
             {aboveButton.message}
           </p>
         ) : null}
@@ -122,7 +124,7 @@ export function InviteCode({ onTeacher }: { onTeacher: () => void }) {
           type={teaches ? 'button' : 'submit'}
           onClick={teaches ? onTeacher : undefined}
           aria-disabled={busy}
-          className="mt-6 w-full"
+          className="w-full"
         >
           {busy
             ? 'Redeeming…'
@@ -133,6 +135,6 @@ export function InviteCode({ onTeacher }: { onTeacher: () => void }) {
                 : 'Redeem code'}
         </Button>
       </form>
-    </div>
+    </section>
   );
 }

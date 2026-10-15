@@ -15,9 +15,10 @@ import {
   useState,
 } from 'react';
 
-import type { ApiClient } from '@/lib/api-client';
+import { type ApiClient, UnauthorizedError } from '@/lib/api-client';
 import { endSession, getAccessToken } from '@/lib/auth';
 import { errText } from '@/lib/errors';
+import { type Home, homeFor } from '@/lib/student-web';
 import { useApi } from '@/lib/use-api';
 
 import { Button } from './button';
@@ -28,7 +29,7 @@ import { PortalBar } from './portal-bar';
 /** The pages read without signing in (sign-in, its callback, Help, the policies), each with a bar. */
 export const SIGNED_OUT_PATHS = /^\/(login|auth|support|privacy|terms)(\/|$)/;
 
-/** How the shell frames a page: the side menu or today's bar, the page's frame, or nothing yet. */
+/** How the shell frames a page: the side menu or the bar, the page's frame, or nothing yet. */
 export interface Frame {
   chrome: 'menu' | 'bar' | null;
   /** The page at v2's width and gutters (`PAGE`). */
@@ -45,59 +46,67 @@ export interface Frame {
  * a page on the projector (Present) has no menu and no frame of the shell's, as ClassPresent draws
  * it. Otherwise the page waits for the account, so no frame flashes before it is known and no page
  * is drawn from an account that left: Loading… with no menu or bar while it is read, its failure
- * under today's bar with Sign out (PV5b, the owner's approval of #352's review); then the side menu
- * for a teacher alone, and today's bar for anyone else, the invite page framing itself (PV15 draws
- * it).
+ * under the bar with Sign out (PV5b, the owner's approval of #352's review); then the side menu for
+ * a teacher alone, and the bar for anyone else, the invite page framing itself (PV15).
  */
 export function frameFor(
   path: string,
-  me: MeResponse | null,
+  home: Home | null,
   error: string | null,
   presenting: boolean,
 ): Frame {
   if (SIGNED_OUT_PATHS.test(path) || presenting)
     return { chrome: null, framed: false, hidden: false };
-  if (me === null) return { chrome: error === null ? null : 'bar', framed: false, hidden: true };
-  if (me.user.role === 'teacher') return { chrome: 'menu', framed: true, hidden: false };
+  if (home === null) return { chrome: error === null ? null : 'bar', framed: false, hidden: true };
+  if (home.kind === 'teacher') return { chrome: 'menu', framed: true, hidden: false };
   return { chrome: 'bar', framed: path !== '/', hidden: false };
 }
 
 /**
  * What the shell does with the account as a page opens: forgets one whose sign-in is gone (a Sign
- * out or an expired session, which both land on /login), so going back never shows it; reads one
- * not read yet on a signed-in page, and one whose last read failed once another page opens (PV5b);
- * or keeps what it has. A failure is never read again on its own page, so never a loop of reads:
- * there its Try again reads it.
+ * out or an expired session, which both land on /login), so going back never shows it; sends a tab
+ * with no sign-in on a signed-in page to /login, a URL with no page among them, where it would
+ * otherwise say Loading… for ever (PV5b's review; the owner, 2026-10-14); reads one not read yet on
+ * a signed-in page, and one whose last read failed once another page opens (PV5b); or keeps what it
+ * has. A failure is never read again on its own page, so never a loop of reads: there its Try again
+ * reads it.
  */
 export function accountStep(
   path: string,
   signedIn: boolean,
-  me: MeResponse | null,
+  home: Home | null,
   error: string | null,
   reading: boolean,
   newPage: boolean,
-): 'forget' | 'read' | 'keep' {
-  if (!signedIn) return me !== null || error !== null ? 'forget' : 'keep';
-  if (SIGNED_OUT_PATHS.test(path) || reading) return 'keep';
+): 'forget' | 'sign in' | 'read' | 'keep' {
+  const open = SIGNED_OUT_PATHS.test(path);
+  if (!signedIn) {
+    if (home !== null || error !== null) return 'forget';
+    return open ? 'keep' : 'sign in';
+  }
+  if (open || reading) return 'keep';
   if (error !== null) return newPage ? 'read' : 'keep';
-  return me === null ? 'read' : 'keep';
+  return home === null ? 'read' : 'keep';
 }
 
 /**
- * One read of the account (`GET /v1/me`), numbered in `reads` as it starts: its answer, or its
- * failure in words (`errText`), or null once a newer read has begun, so a read that settles late
- * never says a past failure over fresh data, nor an old answer over a newer word (PV5b).
+ * One read of the account, as the home reads it (`homeFor`: the 13+ check first, and `/v1/me`,
+ * which makes the account, only for one that passed it, so a web sign-in that never set up the app
+ * makes no account; PV15), numbered in `reads` as it starts: its answer, its failure in words
+ * (`errText`), or null once a newer read has begun, so a read that settles late never says a past
+ * failure over fresh data, nor an old answer over a newer word (PV5b). A `401` says nothing: the
+ * client has signed this tab out and sent it to /login, the one sign-out.
  */
 export async function readAccount(
   api: Pick<ApiClient, 'get'>,
   reads: { current: number },
-): Promise<{ me: MeResponse } | { error: string } | null> {
+): Promise<{ home: Home } | { error: string | null } | null> {
   const mine = ++reads.current;
-  let said: { me: MeResponse } | { error: string };
+  let said: { home: Home } | { error: string | null };
   try {
-    said = { me: await api.get<MeResponse>('/v1/me') };
+    said = { home: await homeFor(api) };
   } catch (e) {
-    said = { error: errText(e) };
+    said = { error: e instanceof UnauthorizedError ? null : errText(e) };
   }
   return mine === reads.current ? said : null;
 }
@@ -110,9 +119,15 @@ export async function readAccount(
 export const reloadOnRestore = (persisted: boolean, path: string): boolean =>
   persisted && !SIGNED_OUT_PATHS.test(path);
 
-/** Who is signed in, as `GET /v1/me` last said: one read, for the menu's foot and for Home. */
+/** Who is signed in, as the shell last read them: one read, for the menu's foot and for Home. */
 export interface Me {
-  /** The last answer; null before the first, and while a fresh read (a redeem's) is under way. */
+  /**
+   * Where the account belongs (`homeFor`): a teacher or a student, with `/v1/me`'s answer, or an
+   * account the 13+ check never passed, read no further. Null before the first answer, and while a
+   * fresh read (a redeem's) is under way.
+   */
+  home: Home | null;
+  /** `/v1/me`'s answer in `home`: null with no answer, and for an account read no further. */
   me: MeResponse | null;
   /**
    * The last read's failure (`errText`), said with Try again: by the shell while no answer is held
@@ -123,7 +138,7 @@ export interface Me {
   load: (fresh?: boolean) => void;
 }
 
-const MeContext = createContext<Me>({ me: null, error: null, load: () => undefined });
+const MeContext = createContext<Me>({ home: null, me: null, error: null, load: () => undefined });
 const PresentingContext = createContext<(on: boolean) => void>(() => undefined);
 
 export const useMe = (): Me => useContext(MeContext);
@@ -292,17 +307,18 @@ export function AccountUnread({ error, onRetry }: { error: string | null; onRetr
 }
 
 /**
- * The frame of every page (the root layout's), and who is signed in: one read of `/v1/me` as a
- * signed-in page first opens (Home reads it again as it opens), kept as pages change and forgotten
- * once the sign-in is gone; a failed one read again by Try again and on the next page opened.
- * `frameFor` says what to draw. One tree throughout, so the page under it is never remounted as its
- * frame changes (a redeem's turn from the bar to the menu, Present).
+ * The frame of every page (the root layout's), and who is signed in: one read of the account
+ * (`readAccount`, the 13+ check before `/v1/me`) as a signed-in page first opens (Home reads it
+ * again as it opens), kept as pages change and forgotten once the sign-in is gone; a failed one read
+ * again by Try again and on the next page opened; a tab with no sign-in sent to /login. `frameFor`
+ * says what to draw. One tree throughout, so the page under it is never remounted as its frame
+ * changes (a redeem's turn from the bar to the menu, Present).
  */
 export function Shell({ children }: { children: ReactNode }) {
   const api = useApi();
   const router = useRouter();
   const path = usePathname();
-  const [me, setMe] = useState<MeResponse | null>(null);
+  const [home, setHome] = useState<Home | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [presenting, setPresenting] = useState(false);
   // A read under way: the frame asks only when none is.
@@ -316,14 +332,14 @@ export function Shell({ children }: { children: ReactNode }) {
 
   const load = useCallback(
     (fresh = false) => {
-      if (fresh) setMe(null);
+      if (fresh) setHome(null);
       setError(null);
       reading.current = true;
       void readAccount(api, reads).then((said) => {
         // A newer read is under way: its answer is the one that counts.
         if (said === null) return;
         reading.current = false;
-        if ('me' in said) setMe(said.me);
+        if ('home' in said) setHome(said.home);
         else setError(said.error);
       });
     },
@@ -334,13 +350,15 @@ export function Shell({ children }: { children: ReactNode }) {
   useEffect(() => {
     const newPage = seen.current !== path;
     seen.current = path;
-    const step = accountStep(path, getAccessToken() !== null, me, error, reading.current, newPage);
+    const signedIn = getAccessToken() !== null;
+    const step = accountStep(path, signedIn, home, error, reading.current, newPage);
     if (step === 'read') load();
+    if (step === 'sign in') router.replace('/login');
     if (step === 'forget') {
-      setMe(null);
+      setHome(null);
       setError(null);
     }
-  }, [path, me, error, load]);
+  }, [path, home, error, load, router]);
 
   // Back here by the back button with the page kept whole: a signed-in page reloads, so it never
   // shows an account that has since left (`reloadOnRestore`), and its Sign out starts afresh.
@@ -363,8 +381,9 @@ export function Shell({ children }: { children: ReactNode }) {
     if (endSession() === 'local') router.replace('/login');
   }
 
-  const frame = frameFor(path, me, error, presenting);
-  const value = useMemo(() => ({ me, error, load }), [me, error, load]);
+  const frame = frameFor(path, home, error, presenting);
+  const me = home === null || home.kind === 'invite' ? null : home.me;
+  const value = useMemo(() => ({ home, me, error, load }), [home, me, error, load]);
   return (
     <MeContext value={value}>
       <PresentingContext value={setPresenting}>

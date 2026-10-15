@@ -19,30 +19,27 @@ import { type Failure, failureOf, type PageVisibility, pollTagged } from './live
  * chip of their own phone.
  */
 
-/** Where the portal's home sends an account (decision 13), or why it can't tell. */
+/** Where the portal's home sends an account (decision 13). */
 export type Home =
   /** A teacher to their classes; a student whose account said 13+ in the app to theirs. */
   | { kind: 'teacher' | 'student'; me: MeResponse }
-  /** Anyone else: today's invite-code page. */
-  | { kind: 'invite' }
-  | Failure;
+  /** Anyone else: the invite-code page, with its line for students. */
+  | { kind: 'invite' };
 
 /**
  * Where the home sends this account, read in the app's order: the age check first, a read that
  * creates nothing (C7), so a sign-in that never set up the app goes to the invite page with no
  * account made for it (the invite's redeem makes one); then `/v1/me`, whose role tells a teacher
- * (whose check always passed) from a student. A read that fails is its failure, for the page to say
- * with a Try again, never a guess; only a `401` has signed out, as the client does on one.
+ * (whose check always passed) from a student. The shell's one read of the account (PV15), so every
+ * page reads it so, a class page's link too. A read that fails throws its error, as the client's
+ * reads do, for the page to say in its words with a Try again, never a guess; only a `401` has
+ * signed out, as the client does on one.
  */
 export async function homeFor(api: Pick<ApiClient, 'get'>): Promise<Home> {
-  try {
-    const { passed } = await api.get<AgeCheckResponse>('/v1/me/age-check');
-    if (!passed) return { kind: 'invite' };
-    const me = await api.get<MeResponse>('/v1/me');
-    return { kind: me.user.role === 'teacher' ? 'teacher' : 'student', me };
-  } catch (e) {
-    return failureOf(e);
-  }
+  const { passed } = await api.get<AgeCheckResponse>('/v1/me/age-check');
+  if (!passed) return { kind: 'invite' };
+  const me = await api.get<MeResponse>('/v1/me');
+  return { kind: me.user.role === 'teacher' ? 'teacher' : 'student', me };
 }
 
 /** What the lesson page knows of a running session's lesson. */

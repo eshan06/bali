@@ -5,41 +5,73 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
-import { EntryPage } from './entry-page';
+import { EntryPage, STAGE_FOOT } from './entry-page';
+import { TOP_BAR } from './mark';
 
 /*
- * An entry page (the approved Entry & info design), rendered: one card's column, 440 px at most,
- * centred in the window under a bar. Signed out, the lockup's bar opens it; signed in, the
- * layout's Sign out bar is above it, so it fills the window less that bar and no more, or an
- * empty page would scroll. The window is the one that shows (`dvh`): iPhone Safari's `vh` is the
- * window behind its toolbars, so a page that fills it is taller than the screen (PB2's review).
+ * An entry page in v2's look (v2.css's stage: SignIn, Invite, AuthCallback; PV15), rendered: one
+ * column 400 px wide at most, its parts 6 px apart, centred in the window. Signed out, the brand
+ * opens it (the mark at 40 px, Bali and its line) where a bar was; signed in, the shell's bar with
+ * Sign out is above it, 60 px with its hairline, so it fills the window less that bar and no more,
+ * or an empty page would scroll. The window is the one that shows (`dvh`): iPhone Safari's `vh` is
+ * the window behind its toolbars, so a page that fills it is taller than the screen (PB2's review).
  */
 const render = (signedIn: boolean) =>
   renderToStaticMarkup(
     createElement(EntryPage, { signedIn, children: createElement('p', null, 'card') }),
   );
-const COLUMN = '<div class="w-full max-w-110"><p>card</p></div></main>';
+const read = (path: string) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
+const classesOf = (html: string, tag: RegExp) =>
+  /\bclass="([^"]*)"/.exec(tag.exec(html)?.[0] ?? '')?.[1]?.split(' ') ?? [];
 
 describe('the entry page', () => {
-  it('signed out, opens with the lockup’s bar and fills the window under it', () => {
-    const html = render(false);
-    expect(html).toMatch(
-      /^<div class="flex min-h-dvh flex-col"><header[^>]*>.*Bali<\/p><\/header><main class="[^"]*\bflex-1\b/,
-    );
-    expect(html).toContain(COLUMN);
+  it('centres one column, 400 px at most, its parts 6 px apart, 48/24/72 in', () => {
+    for (const html of [render(false), render(true)]) {
+      expect(classesOf(html, /<main\b[^>]*>/)).toEqual(
+        expect.arrayContaining([
+          'flex',
+          'flex-col',
+          'items-center',
+          'justify-center',
+          'px-6',
+          'pt-12',
+          'pb-18',
+        ]),
+      );
+      expect(classesOf(html, /<div\b[^>]*>/)).toEqual(
+        expect.arrayContaining(['w-full', 'max-w-100', 'flex-col', 'items-center', 'gap-1.5']),
+      );
+      expect(html).toMatch(/<p>card<\/p><\/div><\/main>$/);
+    }
   });
 
-  it('signed in, leaves the bar to the layout and fills the window less its 56 px and hairline', () => {
+  it('signed out, opens with the brand, no bar: the mark at 40 px, Bali, and its line, 28 px over the card', () => {
+    const html = render(false);
+    expect(html).not.toContain('<header');
+    expect(classesOf(html, /<main\b[^>]*>/)).toContain('min-h-dvh');
+    // 6 px apart, as the boards render them: v2.css's `.app p` outranks `.stage-name`'s 10 px.
+    expect(html).toMatch(
+      /<svg width="40" height="40"[^>]*>.*<\/svg><p translate="no" class="text-h2">Bali<\/p><p class="mb-5\.5 text-data font-normal text-text-secondary">Focus sessions for your classroom<\/p><p>card<\/p>/,
+    );
+  });
+
+  it('signed in, leaves the bar to the shell and fills the window less its 60 px', () => {
     const html = render(true);
     expect(html).not.toContain('<header');
-    expect(html).toMatch(/^<main class="[^"]*\bmin-h-\[calc\(100dvh-57px\)\]/);
-    expect(html).toContain(COLUMN);
-    const read = (path: string) =>
-      readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
-    expect(read('./portal-bar.tsx')).toMatch(
-      /<header className="border-b border-border-default">\s*<div className="flex h-14 /,
+    expect(html).not.toContain('Focus sessions for your classroom');
+    expect(classesOf(html, /<main\b[^>]*>/)).toContain('min-h-[calc(100dvh-60px)]');
+    // The bar above it: v2's, 60 px tall with its hairline inside.
+    expect(TOP_BAR.split(' ')).toEqual(
+      expect.arrayContaining(['h-15', 'border-b', 'bg-surface-card', 'px-8', 'max-sm:px-4']),
     );
+    expect(read('./portal-bar.tsx')).toMatch(/<header className=\{TOP_BAR\}>/);
     // The body under them no taller than the window that shows, or the page scrolls anyway.
     expect(read('../app/layout.tsx')).toMatch(/<body className="min-h-dvh /);
+  });
+
+  it('sets a line under the card as the stage’s foot: 13.5/19, centred, in the secondary ink, 6 px under it', () => {
+    expect(STAGE_FOOT.split(' ').sort()).toEqual(
+      ['w-full', 'text-center', 'text-meta', 'text-text-secondary'].sort(),
+    );
   });
 });

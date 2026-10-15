@@ -16,6 +16,10 @@ export const TEXT_LINK =
 export const NAV_LINK =
   'inline-flex items-center gap-2 rounded-xs text-body font-semibold text-text-brand underline-offset-2 hover:underline';
 
+/** A link standing on its own in v2's look (DESIGN.md §4, Links): `quiet`, underlined on hover. */
+export const QUIET_LINK =
+  'rounded-xs text-caption font-semibold text-text-brand underline-offset-2 hover:underline';
+
 export function TextLink({ href, children }: { href: string; children: ReactNode }) {
   return (
     <Link href={href} className={TEXT_LINK}>
