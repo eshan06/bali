@@ -49,10 +49,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   snapshot's latest event, shows on its tile but opens no pop-up, the pulse's boundary since D2f-1.
   **The screenshots** used dev's demo students: one unlock, three at once, Present with an unlock
   arriving, back from Present, after End, and a phone's pop-ups and "Left · unlocked" tiles.
-  **Asked of the owner** (the PR parked as a draft, each recommended as built): the pop-up at phone
-  width, which no board draws; the pop-ups going with the live page at the session's end; and the
-  pop-ups held while Present is on, shown after it with their reasons, a student's already back in
-  focus among them (a privacy call, santa's Reviewer B).
+  **The owner's calls** (2026-10-14, asked with the PR parked as a draft; each approved as built, as
+  recommended): the pop-up at phone width, which no board draws, as the screenshots show it, over
+  +5, +10 and End until closed; the pop-ups going with the live page at the session's end; the
+  pop-ups held while Present is on and shown after it with their reasons, a student's already back
+  in focus among them (a privacy call, santa's Reviewer B: the class page shows those reasons on
+  its tiles anyway); and the unlock in the milliseconds the grid boots, above, left as it is.
 
 - **2026-10-14** — **PV9: Present in v2's look, built as drawn; and the owner's two calls on PV8's
   results, the pill for a first connect past 3 s and a phone tile's one detail.** Built to
