@@ -90,10 +90,30 @@ describe('the class page while no session runs (ClassBefore)', () => {
     expect(page).toMatch(
       /const noSession = roster\s*\?\s*`\$\{students\(roster\.students\.length\)\} · no session running`\s*:\s*'No session running';/,
     );
-    expect(before).toMatch(/\{klass === null \? '\\u00a0' : noSession\}/);
+    expect(before).toMatch(/\{klass === null \? '\\u00a0' : headLine\}/);
     // On a phone the name takes the card titles' size and Reports a line of its own (v2.css).
     expect(before).toMatch(/max-sm:ml-0 max-sm:basis-full/);
     expect(before).toMatch(/buttonClass\('secondary', '', 'sm'\)[^]*<ChartBar size=\{16\}/);
+  });
+
+  it('says "28 students · the session ended at 9:55 AM" after the bell, as ClassEnded does', () => {
+    // The end the recap found, as the server marked it, for a session that ended today
+    // (`endedToday`, recap-card.test.ts); else, and in Present, "no session running" (PV9's).
+    expect(page).toMatch(
+      /const endedAt = endedToday\(last\);\s*const headLine =\s*endedAt === null\s*\? noSession\s*: roster\s*\? `\$\{students\(roster\.students\.length\)\} · the session ended at \$\{endedAt\}`\s*: `The session ended at \$\{endedAt\}`;/,
+    );
+    expect(page).toMatch(/useState<SessionReportSummary \| null>\(null\)/);
+    expect(before).toMatch(/<RecapCard[^>]*\bonFound=\{setLast\}/);
+  });
+
+  it('shows the recap with the roster, whose failure it says too, and no How it ended', () => {
+    const [recap] = before.match(/<RecapCard\b[^]*?\/>/) ?? [];
+    expect(recap).toMatch(/roster=\{roster\?\.students \?\? null\}/);
+    expect(recap).toMatch(/rosterError=\{rosterError\}/);
+    expect(recap).toMatch(/onRetryRoster=\{load\}/);
+    // ClassEnded draws no How it ended (it repeated the list) and no Present after the bell.
+    expect(page).not.toMatch(/How it ended<|-ended`/);
+    expect(before).not.toMatch(/presentToggle|<LiveGrid/);
   });
 
   it('counts the students the roster already read: "1 student", "28 students"', () => {

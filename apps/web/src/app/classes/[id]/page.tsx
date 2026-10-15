@@ -4,6 +4,7 @@ import {
   type ClassDetail,
   MAX_SESSION_MINUTES,
   type RosterResponse,
+  type SessionReportSummary,
   type SessionView,
   type StartSessionResponse,
 } from '@bali/shared';
@@ -18,7 +19,7 @@ import { Field } from '@/components/field';
 import { JoinCode } from '@/components/join-code';
 import { LiveGrid, type StateCounts } from '@/components/live-grid';
 import { LiveCounts, LiveHeader } from '@/components/live-header';
-import { RecapCard } from '@/components/recap-card';
+import { endedToday, RecapCard } from '@/components/recap-card';
 import { usePresenting } from '@/components/shell';
 import { getAccessToken } from '@/lib/auth';
 import { errText, NOT_A_SESSION_LENGTH, SESSION_ALREADY_RUNNING } from '@/lib/errors';
@@ -69,7 +70,8 @@ const students = (count: number) => `${count} ${count === 1 ? 'student' : 'stude
 /**
  * A class's page. While no session runs (PV6; ClassBefore, ClassNewCode, ClassStates' lines before
  * a session, CopyStates): its name over "28 students · no session running" with Reports, the length
- * picker and Start, the last session's recap and how it ended, with Present (PV12's to draw), then
+ * picker and Start, the last session's recap (PV12b; ClassEnded: its line then "28 students · the
+ * session ended at 9:55 AM" for one that ended today, and no How it ended, which repeated it), then
  * the roster in three columns beside the join code's card. Until the class is read, a Loading or
  * Error card holds the session's place: a session may be live. While one runs (PV7; ClassLive,
  * ClassStale, ClassStates' lines during a session): the header with the ring, "Live · 25 of 28
@@ -102,6 +104,9 @@ export default function ClassDetailPage() {
   } | null>(null);
   // The live grid counted, for the header's line and the counts over the grid (PV7), by session.
   const [counted, setCounted] = useState<{ session: string; counts: StateCounts } | null>(null);
+  // The last session the recap found, for the header's line after the bell (PV12b): its end as the
+  // server marked it, never this computer's clock.
+  const [last, setLast] = useState<SessionReportSummary | null>(null);
   // The class didn't load: said in the session's place, with Try again. Its roster didn't, or a
   // read again of the class failed: said under the header, with Try again.
   const [error, setError] = useState<string | null>(null);
@@ -290,9 +295,10 @@ export default function ClassDetailPage() {
   }
 
   // Present, the projector the class can see (DESIGN.md §5): beside the live grid's counts, small
-  // and hidden on a phone, which never drives a projector (PV1; `beside`), in Present's header, and
-  // beside How it ended. Pressed, the Button's sunken fill and `text-primary` edge, never colour
-  // alone; its icon the same both ways, as ClassPresent draws it.
+  // and hidden on a phone, which never drives a projector (PV1; `beside`), and in Present's header,
+  // after the bell too; none on the page after the bell, as ClassEnded draws it. Pressed, the
+  // Button's sunken fill and `text-primary` edge, never colour alone; its icon the same both ways,
+  // as ClassPresent draws it.
   const presentToggle = (beside = false, className = '') => (
     <Button
       ref={toggle}
@@ -339,6 +345,15 @@ export default function ClassDetailPage() {
   const noSession = roster
     ? `${students(roster.students.length)} · no session running`
     : 'No session running';
+  // After the bell (ClassEnded), once the recap has found a session that ended today: "28 students ·
+  // the session ended at 9:55 AM". Present's stays `noSession` (PV9's, as it is).
+  const endedAt = endedToday(last);
+  const headLine =
+    endedAt === null
+      ? noSession
+      : roster
+        ? `${students(roster.students.length)} · the session ended at ${endedAt}`
+        : `The session ended at ${endedAt}`;
   // A read again of the class failed, or its roster didn't load: said under the header.
   const cantLoad = (message: string | null) =>
     message === null ? null : (
@@ -450,7 +465,7 @@ export default function ClassDetailPage() {
           </h1>
           {/* Its line's place held while the class is read, so nothing under it moves. */}
           <p className="mt-0.5 text-meta text-text-secondary">
-            {klass === null ? '\u00a0' : noSession}
+            {klass === null ? '\u00a0' : headLine}
           </p>
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2 max-sm:ml-0 max-sm:basis-full">
@@ -569,24 +584,19 @@ export default function ClassDetailPage() {
               ) : null}
             </fieldset>
           </form>
-          {/* The last session's recap (R4) until a new one starts; only once the class is read,
-              so a session already running never shows it. Present after the bell is its own page,
-              which says only that class is over, so `present` is off here; passed all the same, so
-              no reason ever reaches the projector should that change. */}
-          <RecapCard classId={classId} present={present} />
-          {/* As it ended, until the next Start (R5): who was still unlocked stays in view. Present,
-              beside it, shows the room only that class is over. */}
-          {grid ? (
-            <section aria-labelledby={`${id}-ended`} className="flex flex-col gap-4">
-              <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-                <h2 id={`${id}-ended`} className="text-h2">
-                  How it ended
-                </h2>
-                {presentToggle()}
-              </div>
-              <LiveGrid sessionId={grid.id} present={present} />
-            </section>
-          ) : null}
+          {/* The last session's recap (R4; ClassEnded since PV12b) until a new one starts; only
+              once the class is read, so a session already running never shows it. Who didn't join
+              is the roster's, whose failure the card says too. Present after the bell is its own
+              page, which says only that class is over, so `present` is off here; passed all the
+              same, so no reason ever reaches the projector should that change. */}
+          <RecapCard
+            classId={classId}
+            present={present}
+            roster={roster?.students ?? null}
+            rosterError={rosterError}
+            onRetryRoster={load}
+            onFound={setLast}
+          />
           {/* The roster beside the join code's card; on a narrow page the card goes under it. */}
           <div className="flex flex-wrap items-start gap-5">
             <section

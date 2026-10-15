@@ -100,17 +100,16 @@ describe('the class page in Present after the bell (PresentEnded)', () => {
     expect(ended).not.toMatch(/RecapCard|LiveGrid|How it ended|extend|end\(/);
   });
 
-  it('never shows the recap or How it ended in Present, so no figure or reason reaches the room', () => {
-    // Present after the bell is its own page, so the recap and How it ended only show off it; each
-    // still takes Present, so no reason could reach the projector should that ever change (#265).
-    expect(tags('LiveGrid')).toHaveLength(2);
+  it('never shows the recap in Present, so no figure or reason reaches the room', () => {
+    // Present after the bell is its own page, so the recap only shows off it; it still takes
+    // Present, so no reason could reach the projector should that ever change (#265). How it ended
+    // is gone (PV12b), and with it the toggle beside it: ClassEnded draws no Present.
+    expect(tags('LiveGrid')).toHaveLength(1);
     expect(tags('RecapCard')).toHaveLength(1);
     for (const tag of [...tags('RecapCard'), ...tags('LiveGrid')]) {
       expect(tag).toMatch(/\bpresent=\{present\}/);
     }
-    const ending = page.slice(page.indexOf('<h2 id={`${id}-ended`}'));
-    expect(ending.slice(0, ending.indexOf('<LiveGrid'))).toMatch(/\{presentToggle\(\)\}/);
-    expect(page).not.toMatch(/openedInPresent|toggle=\{/);
+    expect(page).not.toMatch(/How it ended<|openedInPresent|toggle=\{/);
   });
 });
 

@@ -128,6 +128,8 @@ const V2_SIZES: Record<string, [string, string, number, string?]> = {
   // The entry pages' (PV15): an entry page's card title and the sign-in's 48 px button's label.
   'entry-title': ['20px', '26px', 600],
   'button-lg': ['16px', '20px', 600],
+  // The recap's (PV12b): its axis's times.
+  axis: ['12px', '16px', 400],
 };
 /** The sizes §1 lists that the scale has, each its style: [style, size, line height]. */
 const ON_SCALE = [
@@ -434,7 +436,7 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     }
   });
 
-  it('beside them, only border-input, the side menu’s avatar (PV5), a dialog’s backdrop (PV6), the reconnect pill’s dot (PV7), the unlock pop-up’s edge (PV10) and Open student (PV11b), Reports’ opened row (PV13), and a live card’s edge (W3)', () => {
+  it('beside them, only border-input, the side menu’s avatar (PV5), a dialog’s backdrop (PV6), the reconnect pill’s dot (PV7), the unlock pop-up’s edge (PV10) and Open student (PV11b), the recap’s marks (PV12b), Reports’ opened row (PV13), and a live card’s edge (W3)', () => {
     const named = [...inline.keys()].filter((k) => k.startsWith('--color-'));
     const semanticNames = semantic(tokens.color.tokens).map((t) =>
       t.name === 'focus-ring-color' ? '--color-focus-ring' : `--color-${t.name}`,
@@ -444,6 +446,8 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
       '--color-avatar-fg',
       '--color-border-input',
       '--color-live-edge',
+      '--color-mark',
+      '--color-mark-off',
       '--color-pip',
       '--color-row-open',
       '--color-scrim',
@@ -458,6 +462,11 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     expect(contrast(hexOf('text-primary', 'light'), hexOf('green-50', 'light'))).toBeGreaterThan(
       4.5,
     );
+    // The recap's marks' rings, as v2.css's `.mk` draws them: stone-400, and red-300 for a
+    // protection off (an unlock's is `unlock-edge`). Graphics, not text: 1.4.11 asks 3:1 of a
+    // control's edge, and a mark is no control; its icon is in its state's ink.
+    expect(inline.get('--color-mark')).toBe('var(--bali-stone-400)');
+    expect(inline.get('--color-mark-off')).toBe('var(--bali-red-300)');
     // The reconnect pill's dot (DESIGN.md §4): stone-500, as v2.css draws it.
     expect(inline.get('--color-pip')).toBe('var(--bali-stone-500)');
     // The unlock pop-up's 3 px top edge: orange-400, as v2.css's `.toast` draws it.
@@ -623,8 +632,8 @@ describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
   // control's hover, pressed or open state, the side menu's item on its own page (PV5) among them;
   // a chip's fill is its state's own tint, the Placeholder chip's Not here's (PV15). A field is
   // white in v2's look (PV4); the grey v2 adds comes with the step that draws each: the length
-  // picker's track and the join code's chip (PV6); a table's head and the bars' tracks (PV13); the
-  // help page's two lists of what a teacher sees (PV15); the recap's name pills to come.
+  // picker's track and the join code's chip (PV6); the recap's name pills (PV12b); a table's head
+  // and the bars' tracks (PV13); the help page's two lists of what a teacher sees (PV15).
   const src = fileURLToPath(new URL('../', import.meta.url));
   const files = sources(src).filter((file) => /\.tsx?$/.test(file));
 
@@ -655,9 +664,10 @@ describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
       files.filter((file) => bare(file) > 0).map((file) => [relative(src, file), bare(file)]),
     );
     // The stale banner, the policy draft's banner, and v2's on the class page: the length
-    // picker's track, the join code's chip and the student panel's moments' dots; on Reports
-    // (PV13) its table's head, its bars' tracks and the place-lost notice, drawn as the stale
-    // banner is; and on Help (PV15, SupportPage) the two lists of what a teacher sees, drawn so too.
+    // picker's track, the join code's chip, the student panel's moments' dots and the recap's name
+    // pills; on Reports (PV13) its table's head, its bars' tracks and the place-lost notice, drawn
+    // as the stale banner is; and on Help (PV15, SupportPage) the two lists of what a teacher sees,
+    // drawn so too.
     expect(filled).toEqual({
       [join('app', 'classes', '[id]', 'page.tsx')]: 1,
       [join('app', 'support', 'page.tsx')]: 1,
@@ -666,6 +676,7 @@ describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
       [join('components', 'policy-draft.tsx')]: 1,
       [join('components', 'reports-list.tsx')]: 3,
       [join('components', 'student-panel.tsx')]: 1,
+      [join('components', 'timeline.tsx')]: 1,
     });
   });
 

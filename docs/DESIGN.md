@@ -146,9 +146,13 @@ v2's since PV6 (2026-10-13): its header, the length picker, the roster beside th
 join code's card with Copy, and New code's confirm a dialog (`JoinCode`). The page
 while one runs is v2's since PV7 (2026-10-14):
 ClassLive's header with the ring and the countdown, the state counts, the
-reconnect pill, no roster and no New code;
-the recap keeps its layout until PV12. The grid's cells are v2's tinted tiles since
-PV8 (2026-10-14), on the class page, in Present and under How it ended alike, a
+reconnect pill, no roster and no New code.
+The page after the bell is v2's since PV12b (2026-10-15): ClassEnded's line, "28 students ·
+the session ended at 9:55 AM" for a session that ended today, and its recap, the figures
+over who wasn't focused the whole time (a row each: the name, a thin line with its marks,
+the moments in words), who was and who didn't join, by name; How it ended is gone; an
+opened report keeps PB5's timeline until PV13 and PV14. The grid's cells are v2's tinted
+tiles since PV8 (2026-10-14), on the class page and in Present alike, a
 phone's with one detail at most since PV9. Present is v2's since PV9 (2026-10-14):
 ClassPresent's page, the class page's own parts one size up, its code in a well of
 its own and +5, +10 and End kept; after the bell PresentEnded's "Class is over"
@@ -358,8 +362,10 @@ the live header's `countdown-sub` (12.5/17, regular, "ends 9:55 AM") and the
 reconnect pill's dot as the colour `pip` (stone-500); PV9 Present's
 `present-caption` (16/22, regular: the line under its countdown, its code's label
 and its counts), its line under the name `h3` at regular weight, and retired
-`code-lg` (§3), Present's code being `code-present`; PV13 Reports' four, `pill`
-(13.5/18, medium: a class's pill), `bar-row` (13.5/18, regular: a bar's row),
+`code-lg` (§3), Present's code being `code-present`; PV12b the recap's `axis` (12/16,
+regular: its times) and its marks' two colours, `mark` (stone-400, a ring's edge) and
+`mark-off` (red-300, a protection off's), an unlock's ring taking `unlock-edge`; PV13
+Reports' four, `pill` (13.5/18, medium: a class's pill), `bar-row` (13.5/18, regular: a bar's row),
 `cell` (14/19, regular: a table's cell) and `cell-sub` (12/16, regular: the line
 under a cell's words), and the opened row's tint as the colour `row-open`
 (green-50, v2.css's `.wtable tr.is-open`); PV15 the entry pages' two, both
@@ -824,8 +830,10 @@ every unlock is the teacher's to see.
   question first; Reports' sessions are a table in a box that scrolls sideways
   (superseding the card per session and "never a table that scrolls
   sideways"); the recap's rows set each name, its thin line and its moments in
-  words side by side, its marks spaced as `lefts` spaces them. A teacher's page
-  at phone width is drawn in PV1 first.
+  words side by side, its marks spaced as `lefts` spaces them; on a card under
+  40 rem (a phone, which no board draws; PV12b) each part under the one before,
+  and the axis's times between its ends hide where two would touch. A teacher's
+  page at phone width is drawn in PV1 first.
 
 ## 9. Agent prompt guide
 
