@@ -8,6 +8,38 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-14** — **PV11a: the student panel's logic, with no words: its state is the tile's, its
+  moments the recap's, its times the server's events'.** For PV11b's panel, as
+  [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (version 21) draws it
+  on ClassStudent and PanelStates (`apps/web/src/lib/student-panel.ts`, #382). **The state and the
+  last check-in are the grid's:** `studentPanel(student, events, now)` takes the grid's own `Student`
+  for the tile and answers its `gridDisplay`, so the panel can never disagree with the tile (rule 2);
+  the last check-in is the grid's `lastSeenAt`, the server's stamp that the tile's "last seen" and
+  Silent's minutes count from, since a check-in writes no event (decision 7); none until the student
+  tapped in here. **When they tapped in, and each moment, are the session's events':** their first
+  tap-in the engine applied (a late one, A13 and A14, is none), at its record's time; the moments are
+  the recap's own by one rule both now read (`momentOf`, in `recap.ts`): tapped in, unlocked, back in
+  focus, protection off, Screen Time back on, went silent, came back and left; no late return; every
+  unlock, whatever it changed, as R2 lists it. Each is at the time on the server's record
+  (`occurredAt`, held to the session's window by rule 1's clamp), never the phone's own clock (S9's
+  `clock_ahead_s` is advice only), oldest first and, at one instant, in the engine's order; each
+  event once by its id, so a replay handed over twice is one moment; an unlock's reason is its
+  latest change's (A20), one this tab doesn't know read as none, as the tile reads it. *Weighed:*
+  the grid's `joinedAt` for the tap-in, which is the current stint's (a switch away and back resets
+  it), and the moments in the engine's order, which can run backwards in time where clamps or a
+  phone's clock differ. **The read** (`readStudentEvents`): every page of the session's catch-up
+  feed from its start, this student's events alone kept; read again, from `EVENT_RESUME_OVERLAP`
+  before its cursor, as a live screen resumes, and `withEvents` folds the stream's events in, this
+  session's only; both keep each event once by its id, so one a read and the stream both bring
+  counts once. A read answers with what was held when it began, so what the stream brought while it
+  was out is folded into its answer (`withEvents(answer.events, sessionId, held.events)`), never
+  dropped. A failure is a result, never thrown, in `errText`'s words for Try again, and part of the
+  feed is never given as the whole. **Left for PV11b:** the panel itself, and how it hears what
+  happens while it is open: the grid's stream through `withEvents`, which needs `LiveGrid` to pass
+  its events on, or a read again. PanelStates' Silent board lists no "went silent" moment where the
+  recap's ClassEnded marks one; the logic gives both, and which the panel lists is PV11b's to settle
+  with the board. *Size:* about 180 changed lines of code without tests.
+
 - **2026-10-14** — **PV10: the unlock pop-up, built as drawn; it lives with the session's live
   page; Open student waits for PV11b.** Built to
   [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (version 21):
