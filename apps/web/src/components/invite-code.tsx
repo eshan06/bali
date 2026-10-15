@@ -4,6 +4,7 @@ import { useId, useLayoutEffect, useRef, useState } from 'react';
 
 import { Button } from '@/components/button';
 import { CARD_ENTRY } from '@/components/card';
+import { EntryPage, STAGE_FOOT } from '@/components/entry-page';
 import { Field } from '@/components/field';
 import {
   type Attempt,
@@ -15,6 +16,31 @@ import {
   typedCode,
 } from '@/lib/invite';
 import { useApi } from '@/lib/use-api';
+
+/**
+ * The invite page (Invite): the invite card under the shell's bar, and under the card, for an
+ * account the 13+ check never passed, the line for students (PV15). A student who passed has set up
+ * the app, so the line would tell them to do what they did: their home's "Setting up a teacher
+ * account?" brings them here without it (W3; `app/invite`).
+ */
+export function InviteEntry({
+  forStudents,
+  onTeacher,
+}: {
+  forStudents: boolean;
+  onTeacher: () => void;
+}) {
+  return (
+    <EntryPage signedIn>
+      <InviteCode onTeacher={onTeacher} />
+      {forStudents ? (
+        <p className={STAGE_FOOT}>
+          Here as a student? Set up Bali in the app on your iPhone first, then refresh this page.
+        </p>
+      ) : null}
+    </EntryPage>
+  );
+}
 
 /**
  * The invite-code screen (T2): what a signed-in account that isn't a teacher yet sees in place of

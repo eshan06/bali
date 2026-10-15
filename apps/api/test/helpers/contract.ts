@@ -129,6 +129,7 @@ const meClassWithTeacher = object<MeClassWithTeacher>()({
   enrollmentId: z.uuid().nullable(),
   liveSession: object<NonNullable<MeClassWithTeacher['liveSession']>>()({
     id: z.uuid(),
+    startedAt: z.iso.datetime(),
     endsAt: z.iso.datetime(),
   }).nullable(),
   // A teacher's own class's (PV2): absent on every class a student's answer lists.

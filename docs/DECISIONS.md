@@ -8,6 +8,61 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-15** — **W3: the student's home in v2's look, in the teacher's layout with Your classes
+  and Help; `/` sends a student who said 13+ there; `/v1/me`'s live session gains its start, for the
+  ring.** Built to [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4)
+  (version 21): StudentHome, StudentHomeEmpty and StudentStates' "The classes didn't load", at 1440
+  and 390 px (#392). **The routing** (`components/shell.tsx`, `app/page.tsx`): the side menu for a
+  student who passed the 13+ check (`homeFor`'s `student`), as for a teacher, its items Your classes
+  (`/`, the boards' grid icon) and Help; Home gives them `StudentHome` (`components/student-home.tsx`).
+  An account the check never passed keeps the invite card with its line for students, and a teacher
+  their classes, as PV15 left them; `/v1/me` is still read only through `homeFor`, after the check.
+  **The invite page at `/invite`** (`app/invite/page.tsx`): `/` being that student's home,
+  StudentHomeEmpty's "Setting up a teacher account? Enter your invite code" opens the Invite board's
+  page at an address of its own, under the bar, without the line for students (PV15's card for
+  them); an account never passed gets the page Home gives it; a teacher goes to `/`; a redeem there
+  reads the account afresh, as Home's does. *Weighed:* the card swapped in on `/` (a button where the
+  board draws a link, and no way back). **The home:** each class in session on StudentHome's live
+  card (the 46 px ring, its arc the share of the session left; the name over "Ms. Rivera · in class
+  now", "In class now" for a teacher with no name, the one new string, through `no-ai-slop`'s Edit job
+  unchanged; the time left on this computer's clock to the server's bell, as the class page counts
+  it, and "ends 9:55 AM"), then the rest as its rows, under "Other classes" only beside a live card.
+  **Three states the board doesn't draw, built from its own pieces:** none in session, the rows with
+  no label, the list Live lesson's StudentHome drew (approved 2026-10-10, its states carried over);
+  two in session at once (rare), a card each; a teacher with no name, the row's name alone, as the
+  app's Home lists it. A class leaves its card at its bell by this computer's clock, as the app's Home
+  counts it, and the page reads the account again then (`homeClasses`, `nextBell` in
+  `lib/student-web.ts`), so minutes the teacher added bring it back with its new bell; one read a
+  bell, never a loop, so a clock ahead of the server's shows the class over that much early. A read
+  that fails while the home is held says StudentStates' line with a small Try again over the
+  classes. **Left out, W4's** (guard 1 of the brief, the conductor's): the live card's last row, Open
+  the lesson, whose page is W4's, and the phone's chip beside it, whose state is the lesson's read
+  (W1; W2's `phoneChip`): drawn from a one-time `/v1/me`, it would show a phone greener than the
+  teacher's grid once it went quiet (decision 13), and its other states and "as of" are drawn for the
+  lesson page (StudentPhoneStates). Both are on W4's line, with the home learning of a class that
+  starts, or ends early, while it is open only at its next read (santa's review, both reviewers). **The ring's start, additive:** the canvas draws the
+  student's ring as the share of the session left, and no student read gave the session's start; now
+  `liveSession.startedAt` (`getEnrolledClasses` reads it beside the bell; `@bali/shared`; the contract
+  fixture; BaliCore's `LiveSession`, optional, nil from an older API, which the app reads none of),
+  for W4's class head too. *Weighed:* the ring without its arc (a visual no board draws, and the empty
+  card's emblem); the read as a step of its own (PV2's and PV3's way), a whole cycle for about 25
+  lines. **The meta line** "Your teacher's slides and questions show up here during class." ships as
+  drawn though the lesson page is W4's, as PV15 shipped the sign-in page's line before W3; no student
+  uses the web before the pilot. **Built as the boards render** (`.app p` outranks `.lc-meta`'s 1 px;
+  a row's teacher line sits in the row's 15/22 line, as the board's inline span does), checked by the
+  DOM's boxes against the boards rendered from their own markup, within the 0.7 px the boards' menu
+  takes from their flex (216.7 px). **Tokens:** the colour `live-edge` (green-200, v2.css's
+  `.livecard`), Home's live card's too (PV17b); its sizes are named already (`page-title`, `meta`,
+  `h3`, `countdown-sub`, `home-countdown`, `cell-sub`, `tile-name`, `section-label`, `entry-title`).
+  **The screenshots:** the home's states with the real components and the boards' sample data in a
+  throwaway page in the preview alone (this computer's clock held at 23:04 before a 9:55 bell),
+  deleted after, at 390 by Chrome's DevTools protocol (its window can't go below ~500 px); no student
+  signed in on the PC, Cognito's page never opened; the owner's teacher tab still lands on Home.
+  **Santa:** round 1, no blockers from either reviewer (Reviewer B the Claude fallback); fixed, a long
+  teacher's name wraps (`web-design-guidelines`); left, as WARNs in the PR: an early End or a class
+  starting shows at the home's next read (on W4's line), and after a redeem at `/invite` focus lands
+  on the new page as Next leaves it, not on the classes heading Home's own redeem focuses (a rare path).
+
 - **2026-10-15** — **L3c: a session's questions for its report, a route of its own beside R2's, each
   question's totals the results route's, in the order the opens took the session's lock.** For
   L7c's Questions card, which [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4)

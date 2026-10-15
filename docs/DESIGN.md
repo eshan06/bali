@@ -170,6 +170,10 @@ The entry pages are v2's since PV15 (2026-10-15): sign-in and its callback on v2
 the invite card under v2's white bar with Sign out, and Help and the policy pages under
 that bar in one column 860 px wide, Help's sections cards, the policy outline one card
 with a Placeholder chip per section, their words unchanged.
+The student's home is v2's since W3 (2026-10-15): the side menu with Your classes and Help,
+each class in session on StudentHome's live card (its ring, its teacher, the time left and the
+bell) and the rest under it, none yet StudentHomeEmpty's card with its way to the invite page,
+at `/invite` for them; Open the lesson and the phone's chip come with the lesson page (W4).
 Every
 portal source file is held to the tokens' utilities by `tokens.test.ts`, and
 since D2g the theme holds none of Tailwind's own colours, type sizes,
@@ -360,7 +364,8 @@ and its counts), its line under the name `h3` at regular weight, and retired
 under a cell's words), and the opened row's tint as the colour `row-open`
 (green-50, v2.css's `.wtable tr.is-open`); PV15 the entry pages' two, both
 semibold, `entry-title` (20/26: an entry page's card title) and `button-lg`
-(16/20: the sign-in's 48 px button's label, `Button`'s `size="lg"`).
+(16/20: the sign-in's 48 px button's label, `Button`'s `size="lg"`); W3 the colour
+`live-edge` (green-200, a live card's edge, v2.css's `.livecard`), its sizes all named already.
 
 Density: the teacher's live grid is dense (many students at a glance); the
 student app is airy and simple. Theme: **light, everywhere.** The app and the

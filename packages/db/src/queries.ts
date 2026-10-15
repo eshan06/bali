@@ -125,8 +125,8 @@ export async function findOrCreateStudent(
  * A student's active classes in the order they joined them (their live enrollment's, then the
  * class's id: PV3b), each with its teacher's display name (C2a), the
  * enrollment leaving it deletes (A19) and its session not marked over, if any
- * (C3c): a class has at most one (`sessions_one_running_per_class`). Whether it
- * runs is the engine's one rule, `sessionRunning`, the caller's to apply.
+ * (C3c), with its start (W3): a class has at most one (`sessions_one_running_per_class`). Whether
+ * it runs is the engine's one rule, `sessionRunning`, the caller's to apply.
  */
 export async function getEnrolledClasses(
   db: Database,
@@ -135,7 +135,7 @@ export async function getEnrolledClasses(
   (ClassRow & {
     teacherDisplayName: string | null;
     enrollmentId: string;
-    live: { id: string; endsAt: Date; endedAt: null } | null;
+    live: { id: string; startedAt: Date; endsAt: Date; endedAt: null } | null;
   })[]
 > {
   const rows = await db
@@ -144,6 +144,7 @@ export async function getEnrolledClasses(
       teacherDisplayName: users.displayName,
       enrollmentId: enrollments.id,
       liveId: sessions.id,
+      liveStartedAt: sessions.startedAt,
       liveEndsAt: sessions.endsAt,
     })
     .from(classes)
@@ -158,11 +159,11 @@ export async function getEnrolledClasses(
       ),
     )
     .orderBy(asc(enrollments.createdAt), asc(classes.id));
-  return rows.map(({ liveId, liveEndsAt, ...row }) => ({
+  return rows.map(({ liveId, liveStartedAt, liveEndsAt, ...row }) => ({
     ...row,
     live:
-      liveId !== null && liveEndsAt !== null
-        ? { id: liveId, endsAt: liveEndsAt, endedAt: null }
+      liveId !== null && liveStartedAt !== null && liveEndsAt !== null
+        ? { id: liveId, startedAt: liveStartedAt, endsAt: liveEndsAt, endedAt: null }
         : null,
   }));
 }

@@ -42,6 +42,35 @@ export async function homeFor(api: Pick<ApiClient, 'get'>): Promise<Home> {
   return { kind: me.user.role === 'teacher' ? 'teacher' : 'student', me };
 }
 
+/** A student's class as `/v1/me` lists it. */
+export type StudentClass = MeResponse['classes'][number];
+/** One in session: its session's id, start and bell. */
+export type InSession = StudentClass & { liveSession: NonNullable<StudentClass['liveSession']> };
+
+/**
+ * A student's classes as their home shows them at `now`, by this computer's clock (W3): those in
+ * session, each by the last read of `/v1/me` (running by the server's clock then) until its bell,
+ * as the app's Home counts it; then the rest. Each part in `/v1/me`'s order (PV3b).
+ */
+export function homeClasses(
+  me: MeResponse,
+  now: number,
+): { inSession: InSession[]; others: StudentClass[] } {
+  const live = (c: StudentClass): c is InSession =>
+    c.liveSession !== null && Date.parse(c.liveSession.endsAt) > now;
+  return { inSession: me.classes.filter(live), others: me.classes.filter((c) => !live(c)) };
+}
+
+/**
+ * The first bell still to ring among the classes in session at `now` (ms), or null: when the home
+ * reads the account again, so a class leaves the live card at its bell, or stays with the later
+ * bell its teacher's added minutes gave it.
+ */
+export function nextBell(me: MeResponse, now: number): number | null {
+  const bells = homeClasses(me, now).inSession.map((c) => Date.parse(c.liveSession.endsAt));
+  return bells.length > 0 ? Math.min(...bells) : null;
+}
+
 /** What the lesson page knows of a running session's lesson. */
 export interface LessonState {
   /**

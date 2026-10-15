@@ -122,10 +122,15 @@ export function registerMeRoute(
             name: c.name,
             teacher: { displayName: c.teacherDisplayName },
             enrollmentId: c.enrollmentId,
-            // Running by the server's clock, the engine's one rule (A17), or none (C3c).
+            // Running by the server's clock, the engine's one rule (A17), or none (C3c); its start
+            // for the student web's ring (W3).
             liveSession:
               c.live && sessionRunning(c.live, now)
-                ? { id: c.live.id, endsAt: c.live.endsAt.toISOString() }
+                ? {
+                    id: c.live.id,
+                    startedAt: c.live.startedAt.toISOString(),
+                    endsAt: c.live.endsAt.toISOString(),
+                  }
                 : null,
           }));
 

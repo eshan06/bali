@@ -434,7 +434,7 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     }
   });
 
-  it('beside them, only border-input, the side menu’s avatar (PV5), a dialog’s backdrop (PV6), the reconnect pill’s dot (PV7), the unlock pop-up’s edge (PV10) and Open student (PV11b), and Reports’ opened row (PV13)', () => {
+  it('beside them, only border-input, the side menu’s avatar (PV5), a dialog’s backdrop (PV6), the reconnect pill’s dot (PV7), the unlock pop-up’s edge (PV10) and Open student (PV11b), Reports’ opened row (PV13), and a live card’s edge (W3)', () => {
     const named = [...inline.keys()].filter((k) => k.startsWith('--color-'));
     const semanticNames = semantic(tokens.color.tokens).map((t) =>
       t.name === 'focus-ring-color' ? '--color-focus-ring' : `--color-${t.name}`,
@@ -443,12 +443,15 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
       '--color-avatar-bg',
       '--color-avatar-fg',
       '--color-border-input',
+      '--color-live-edge',
       '--color-pip',
       '--color-row-open',
       '--color-scrim',
       '--color-unlock-edge',
       '--color-unlock-link',
     ]);
+    // A live card's edge: green-200, as v2.css's `.livecard` draws it.
+    expect(inline.get('--color-live-edge')).toBe('var(--bali-green-200)');
     // Reports' opened row: green-50, as v2.css's `.wtable tr.is-open` fills it, under the
     // primary ink at 4.5:1 and more.
     expect(inline.get('--color-row-open')).toBe('var(--bali-green-50)');

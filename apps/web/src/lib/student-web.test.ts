@@ -20,8 +20,10 @@ import { type PageVisibility, POLL_EVERY_MS } from './live-question';
 import {
   type AnswerResult,
   followLesson,
+  homeClasses,
   homeFor,
   type LessonState,
+  nextBell,
   phoneChip,
 } from './student-web';
 
@@ -120,6 +122,81 @@ describe('homeFor', () => {
     await expect(homeFor(api)).rejects.toBeInstanceOf(UnauthorizedError);
     expect(onUnauthorized).toHaveBeenCalledTimes(1);
     expect(asked).toEqual(['/v1/me/age-check']);
+  });
+});
+
+describe('the student’s home: who is in class now, and when to look again (W3)', () => {
+  const minutes = (n: number) => new Date(AT + n * 60_000).toISOString();
+  /** A class as `/v1/me` lists it for a student, in session from `from` to `to` minutes, or not. */
+  const klass = (id: string, live?: [number, number]): MeResponse['classes'][number] => ({
+    id,
+    name: `Class ${id}`,
+    teacher: { displayName: 'Ms. Rivera' },
+    enrollmentId: `e-${id}`,
+    liveSession: live
+      ? { id: `s-${id}`, startedAt: minutes(live[0]), endsAt: minutes(live[1]) }
+      : null,
+  });
+  const me = (...classes: MeResponse['classes']): MeResponse => ({
+    user: { id: 'u1', role: 'student', displayName: 'Ana Rodríguez' },
+    classes,
+    session: null,
+    armed: false,
+  });
+  const ids = (list: { id: string }[]) => list.map((c) => c.id);
+
+  it('puts a class in session first, by the read, the rest after it in /v1/me’s order', () => {
+    const { inSession, others } = homeClasses(
+      me(klass('a'), klass('b', [-26, 24]), klass('c')),
+      AT,
+    );
+    expect(ids(inSession)).toEqual(['b']);
+    expect(ids(others)).toEqual(['a', 'c']);
+    // Each whole, as the read gave it: its teacher and its session's start and bell.
+    expect(inSession[0]?.liveSession).toEqual({
+      id: 's-b',
+      startedAt: minutes(-26),
+      endsAt: minutes(24),
+    });
+  });
+
+  it('keeps a class in session until its bell by this computer’s clock, then lists it with the rest', () => {
+    const read = me(klass('a', [-26, 24]), klass('b'));
+    const bell = AT + 24 * 60_000;
+    expect(ids(homeClasses(read, bell - 1).inSession)).toEqual(['a']);
+    // At the bell itself the class is over (A17), whatever a read said before it.
+    expect(ids(homeClasses(read, bell).inSession)).toEqual([]);
+    expect(ids(homeClasses(read, bell).others)).toEqual(['a', 'b']);
+  });
+
+  it('lists every class in session, each in /v1/me’s order, and none when none is', () => {
+    const both = me(klass('a', [-10, 40]), klass('b'), klass('c', [-5, 20]));
+    expect(ids(homeClasses(both, AT).inSession)).toEqual(['a', 'c']);
+    expect(homeClasses(me(klass('a'), klass('b')), AT)).toEqual({
+      inSession: [],
+      others: [klass('a'), klass('b')],
+    });
+    expect(homeClasses(me(), AT)).toEqual({ inSession: [], others: [] });
+  });
+
+  it('looks again at the first bell still to ring, and at none once every bell has rung', () => {
+    const read = me(klass('a', [-10, 40]), klass('b'), klass('c', [-5, 20]));
+    expect(nextBell(read, AT)).toBe(AT + 20 * 60_000);
+    // Past c's bell, a's is next; past both, none: a read showing them still in session (a clock
+    // ahead of the server's) waits for the page to open again, never reads again and again.
+    expect(nextBell(read, AT + 20 * 60_000)).toBe(AT + 40 * 60_000);
+    expect(nextBell(read, AT + 40 * 60_000)).toBeNull();
+    expect(nextBell(me(klass('a')), AT)).toBeNull();
+  });
+
+  it('keeps a class whose teacher added minutes in session to its new bell, once read again', () => {
+    // Read at 9:41 with its bell at 9:55; the teacher adds 5 minutes; at 9:55 the page reads again.
+    const before = me(klass('a', [-26, 14]));
+    const bell = nextBell(before, AT);
+    expect(bell).toBe(AT + 14 * 60_000);
+    const after = me(klass('a', [-26, 19]));
+    expect(ids(homeClasses(after, bell ?? 0).inSession)).toEqual(['a']);
+    expect(nextBell(after, bell ?? 0)).toBe(AT + 19 * 60_000);
   });
 });
 

@@ -535,7 +535,7 @@ describe('GET /v1/me', () => {
     expect(body.classes).toHaveLength(2);
   });
 
-  it('gives each of a student’s classes its session running by the server’s clock, and its bell (C3c)', async () => {
+  it('gives each of a student’s classes its session running by the server’s clock, its start and its bell (C3c; W3)', async () => {
     const { student, klass: running } = await seedClassroom(db, 'me-live');
     const others = await Promise.all(
       ['me-live-past', 'me-live-ended', 'me-live-none'].map((tag) => seedClassroom(db, tag)),
@@ -561,7 +561,15 @@ describe('GET /v1/me', () => {
     const { body } = await me(await ctx.tokenFor(student.cognitoId));
     expect(new Map(body.classes.map((c) => [c.id, c.liveSession]))).toEqual(
       new Map([
-        [running.id, { id: session.id, endsAt: session.endsAt.toISOString() }],
+        [
+          running.id,
+          {
+            id: session.id,
+            // The session's own start, which the student web's ring counts from (W3).
+            startedAt: session.startedAt.toISOString(),
+            endsAt: session.endsAt.toISOString(),
+          },
+        ],
         ...others.map((c) => [c.klass.id, null] as const),
       ]),
     );
@@ -633,7 +641,11 @@ describe('GET /v1/me', () => {
     expect(body.armed).toBe(false);
     expect(body.session).toBeNull();
     expect(body.classes.map((c) => c.liveSession)).toEqual([
-      { id: started.session.id, endsAt: started.session.endsAt.toISOString() },
+      {
+        id: started.session.id,
+        startedAt: clock.now.toISOString(),
+        endsAt: started.session.endsAt.toISOString(),
+      },
     ]);
   });
 
@@ -905,7 +917,11 @@ describe('GET /v1/me', () => {
         name: klass.name,
         teacher: { displayName: null },
         enrollmentId: enrollment!.id,
-        liveSession: { id: session.id, endsAt: session.endsAt.toISOString() },
+        liveSession: {
+          id: session.id,
+          startedAt: session.startedAt.toISOString(),
+          endsAt: session.endsAt.toISOString(),
+        },
       },
     ]);
   });
