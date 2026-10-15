@@ -115,7 +115,8 @@ own plan, beside Phase 7: the drawings, the reads and the pages Phase 7's web sc
 (PV1–PV15), then Phase 7's web screens (Phase 7 steps: L7, W3, W4, L7b, L3c, L7c; M5, M6, W5), then
 the rest (PV16, PV17). Each UI step builds its boards with every state they draw, the words and
 states of the canvases v2's replaces carried over except where it changes them (DESIGN.md,
-Sources); a state no board draws is built only once PV1 has drawn it and the owner approved it; a
+Sources); an intermediate state no board draws is drawn on the canvas first and then built from that
+drawing, without waiting for the owner's approval (CLAUDE.md, Working rules); a
 page keeps today's layout until its step lands, while PV4's shared pieces (buttons, fields, chips,
 cards) change on every page at once. Each step is one PR from a fresh worker, under ~400
 changed lines not counting tests (the estimates below are from the boards; a step past it splits,

@@ -8,6 +8,27 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-15** — **An intermediate state of an approved screen that no board draws is drawn on
+  the canvas first and then built from that drawing, without waiting for the owner's approval; a
+  new screen or page still waits for the owner (the owner's rule).** The owner, to the conductor:
+  "just know that before you make those 'intermediate' type screens make them in the claude design
+  artifact and then use them. for those intermediate screens you dont need my approval". **Why:**
+  workers had coded 28 states no board drew (loading lines, error and refusal lines, a phone-width
+  panel, rare-case variants, buttons held while sending) straight into code, never drawn on the
+  canvas first; the owner approved them after the fact, from screenshots, and set this rule. **The
+  rule** (CLAUDE.md, Working rules, and its "UI:" standing order): such a state (loading, empty, an
+  error or refusal line, a narrow-width, large-text or rare-case variant, buttons held while
+  sending) goes on its screen's canvas first and is built from that drawing, and the UI PR names
+  that board. Never code an undrawn state; restoring a previously shipped look on the owner's order
+  is still the only exception. **What it doesn't change:** a new screen or page still waits for the
+  owner's approval, and one with no approved design is a stop-and-ask; every user-facing string
+  still goes through `no-ai-slop`; after any canvas publish, the worker opens it and checks every
+  new or changed board before reporting, and sends each build screenshot beside its board. **What it
+  amends,** for intermediate states only: 2026-10-12's "what no board draws is drawn first … for the
+  owner to check and approve before it is built" (PV1's) and 2026-10-14's "the owner approves it
+  before anything is built from it" (a board changed on the Windows PC); DESIGN.md's Sources and
+  PLAN's redesign steps say so too.
+
 - **2026-10-15** — **M5b's part 1: the upload's logic for Your slides, with no screen; the PUT by
   XMLHttpRequest, stopped by the browser 25 minutes after the create, and the bucket in the CSP by
   a build variable per environment.** M5b whole came to over ~400 changed lines, so it ships as the

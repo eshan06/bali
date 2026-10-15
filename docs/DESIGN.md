@@ -82,9 +82,13 @@ designs of 2026-10-06,
 PB1–PB5, `docs/PLAN-ARCHIVE.md`), and the portal and student-web boards of the
 [Live lesson portal screens](https://claude.ai/artifact/BxHbGud1xMeyXLUUvsewHM)
 (2026-10-10): their words and states carry over except where this canvas
-changes them. A page or a state it doesn't draw is drawn on it, for the owner
-to check and approve, before it is built (PLAN's PV1). The app keeps its own
-canvases (the
+changes them. A page or a screen it doesn't draw is drawn on it, for the owner
+to check and approve, before it is built (PLAN's PV1). An intermediate state
+of an approved screen that no board draws (loading, empty, an error or
+refusal line, a narrow-width, large-text or rare-case variant, buttons held
+while sending) is drawn on it first and then built from that drawing,
+without waiting for the owner's approval (CLAUDE.md, Working rules). The app
+keeps its own canvases (the
 [Live lesson app screens](https://claude.ai/artifact/CZpFbFuxnRrLcuywtJGfVQ)
 for L8 and M8). It is built in PLAN's "Portal redesign (v2's look)" steps,
 PV0–PV17, Phase 7's web screens among them, each page keeping today's layout
