@@ -90,7 +90,7 @@ export function InviteCode({ onTeacher }: { onTeacher: () => void }) {
       <h1 id={`${id}-title`} className="text-entry-title">
         Enter your invite code
       </h1>
-      <p className="-mt-2.5 text-body text-pretty text-text-secondary">
+      <p className="-mt-2.5 text-body text-text-secondary">
         You need it once, to set up this account for teaching.
       </p>
 

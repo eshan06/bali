@@ -49,8 +49,9 @@ describe('the entry page', () => {
     const html = render(false);
     expect(html).not.toContain('<header');
     expect(classesOf(html, /<main\b[^>]*>/)).toContain('min-h-dvh');
+    // 6 px apart, as the boards render them: v2.css's `.app p` outranks `.stage-name`'s 10 px.
     expect(html).toMatch(
-      /<svg width="40" height="40"[^>]*>.*<\/svg><p translate="no" class="mt-2\.5 text-h2">Bali<\/p><p class="mb-5\.5 text-data font-normal text-text-secondary">Focus sessions for your classroom<\/p><p>card<\/p>/,
+      /<svg width="40" height="40"[^>]*>.*<\/svg><p translate="no" class="text-h2">Bali<\/p><p class="mb-5\.5 text-data font-normal text-text-secondary">Focus sessions for your classroom<\/p><p>card<\/p>/,
     );
   });
 
@@ -68,15 +69,9 @@ describe('the entry page', () => {
     expect(read('../app/layout.tsx')).toMatch(/<body className="min-h-dvh /);
   });
 
-  it('sets a line under the card as the stage’s foot: 13.5/19, centred, in the secondary ink', () => {
-    expect(STAGE_FOOT.split(' ')).toEqual(
-      expect.arrayContaining([
-        'w-full',
-        'pt-3.5',
-        'text-center',
-        'text-meta',
-        'text-text-secondary',
-      ]),
+  it('sets a line under the card as the stage’s foot: 13.5/19, centred, in the secondary ink, 6 px under it', () => {
+    expect(STAGE_FOOT.split(' ').sort()).toEqual(
+      ['w-full', 'text-center', 'text-meta', 'text-text-secondary'].sort(),
     );
   });
 });

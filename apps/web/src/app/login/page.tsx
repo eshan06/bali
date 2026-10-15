@@ -45,7 +45,7 @@ export default function LoginPage() {
         <h1 id="sign-in-title" className="text-entry-title">
           Sign in to Bali
         </h1>
-        <p className="-mt-2.5 text-body text-pretty text-text-secondary">
+        <p className="-mt-2.5 text-body text-text-secondary">
           Teachers and students sign in here to see their classes.
         </p>
         {left ? (

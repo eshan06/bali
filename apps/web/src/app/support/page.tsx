@@ -65,7 +65,7 @@ function Section({ id, title, children }: { id: string; title: string; children:
 function Question({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <h3 className="font-semibold">{title}</h3>
+      <h3 className="text-h3">{title}</h3>
       <div className="flex flex-col gap-1.5 text-text-secondary">{children}</div>
     </div>
   );
@@ -78,7 +78,7 @@ export default function SupportPage() {
       <main className="mx-auto flex max-w-215 flex-col gap-5.5 px-9 pt-7.5 pb-14 text-body max-sm:px-4 max-sm:pt-5.5 max-sm:pb-10">
         <div>
           <h1 className="text-page-title text-balance">Help</h1>
-          <p className="mt-2 text-pretty text-text-secondary">
+          <p className="mt-2 text-text-secondary">
             Bali keeps your iPhone out of the way during class. You tap your phone on your
             teacher&apos;s Bali block, your apps go quiet until the bell, and Emergency Unlock gets
             you out any time.
@@ -139,7 +139,7 @@ export default function SupportPage() {
           {/* The app's consent card's two lists (ConsentCard), side by side in calm grey boxes. */}
           <div id="teacher-sees" className="flex scroll-mt-6 flex-wrap items-start gap-3.5">
             <div className={SEEN}>
-              <h3 className="flex items-center gap-2 font-semibold">
+              <h3 className="flex items-center gap-2 text-h3">
                 <Eye size={18} aria-hidden="true" className="shrink-0 text-text-brand" />
                 What your teacher sees
               </h3>
@@ -150,7 +150,7 @@ export default function SupportPage() {
               </ul>
             </div>
             <div className={SEEN}>
-              <h3 className="flex items-center gap-2 font-semibold">
+              <h3 className="flex items-center gap-2 text-h3">
                 <EyeOff size={18} aria-hidden="true" className="shrink-0 text-text-brand" />
                 What your teacher never sees
               </h3>
@@ -219,7 +219,7 @@ export default function SupportPage() {
         </Section>
 
         <Section id="help" title="Get help">
-          <p className="text-pretty">
+          <p>
             Email{' '}
             <a href={`mailto:${SUPPORT_EMAIL}`} className={`${TEXT_LINK} break-all`}>
               {SUPPORT_EMAIL}

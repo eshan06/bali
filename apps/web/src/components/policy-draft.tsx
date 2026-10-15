@@ -44,8 +44,8 @@ export function PolicyDraft({
         <div className="flex flex-col gap-5.5">
           <h1 className="text-page-title text-balance">{title}</h1>
           <div className="rounded-sm border border-border-default bg-surface-sunken px-4 py-3">
-            <p className="font-semibold text-pretty">{notice.lead}</p>
-            <p className="mt-0.75 text-pretty">{notice.body}</p>
+            <p className="font-semibold">{notice.lead}</p>
+            <p className="mt-0.75">{notice.body}</p>
           </div>
 
           {/* One card on its own (DESIGN.md §4), its sections between hairlines. */}
@@ -65,7 +65,7 @@ export function PolicyDraft({
                     Placeholder
                   </span>
                 </div>
-                <p className="mt-1.5 text-pretty text-text-secondary">{section.placeholder}</p>
+                <p className="mt-1.5 text-text-secondary">{section.placeholder}</p>
               </section>
             ))}
           </div>
@@ -74,7 +74,7 @@ export function PolicyDraft({
             <h2 id="contact-title" className="text-h3">
               Contact
             </h2>
-            <p className="mt-1.5 text-pretty text-text-secondary">
+            <p className="mt-1.5 text-text-secondary">
               Email{' '}
               <a href={`mailto:${SUPPORT_EMAIL}`} className={`${TEXT_LINK} break-all`}>
                 {SUPPORT_EMAIL}

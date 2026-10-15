@@ -7,9 +7,10 @@ import { Mark } from './mark';
  * wide at most, its parts 6 px apart, centred in the window. Signed out (/login, the callback), the
  * brand opens it: the mark at 40 px, Bali, and its line. Signed in (the invite page), the shell's
  * bar with Sign out is above it (`PortalBar`, 60 px with its hairline), so it fills the window less
- * the bar and no more, or an empty page would scroll. The window is the one that shows (`dvh`, as
- * the layout's body is): `vh` on iPhone Safari is the window behind its toolbars, taller than what
- * shows.
+ * the bar and no more, or an empty page would scroll: where SignIn draws the stage as the board's
+ * root, v2.css adds its 120 px of padding to the window's height, which a page would scroll by. The
+ * window is the one that shows (`dvh`, as the layout's body is): `vh` on iPhone Safari is the
+ * window behind its toolbars, taller than what shows.
  */
 export function EntryPage({
   signedIn = false,
@@ -26,7 +27,7 @@ export function EntryPage({
         {signedIn ? null : (
           <>
             <Mark size={40} />
-            <p translate="no" className="mt-2.5 text-h2">
+            <p translate="no" className="text-h2">
               Bali
             </p>
             <p className="mb-5.5 text-data font-normal text-text-secondary">
@@ -40,5 +41,8 @@ export function EntryPage({
   );
 }
 
-/** A line under an entry page's card (v2.css's `.stage-foot`): 13.5/19, centred, secondary. */
-export const STAGE_FOOT = 'w-full px-1 pt-3.5 text-center text-meta text-text-secondary';
+/**
+ * A line under an entry page's card (v2.css's `.stage-foot`): 13.5/19, centred, secondary, 6 px
+ * under it as the boards render it (v2.css's `.app p` outranks the foot's own 14 px).
+ */
+export const STAGE_FOOT = 'w-full text-center text-meta text-text-secondary';
