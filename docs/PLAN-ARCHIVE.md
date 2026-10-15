@@ -10,6 +10,13 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-15 (Central) — L7b's part 1b, Your questions' list (#394;
+`docs/DECISIONS.md`, 2026-10-15), its states the canvas doesn't draw approved by the owner as
+built: `/questions` lists the teacher's drafts oldest first as the Questions board draws them, each
+removed after the board's confirm, the list loading, failed with Try again, or none yet; not in the
+menu until part 1c, writing and editing (#395, approved by the owner too), which follows it. Before
+it, L7-1b, asking in the side panel (#390). Next: M5b's part 2, the Slides page._
+
 _Last updated: 2026-10-15 (Central) — L7-1b, asking in the class page's side panel (#390;
 `docs/DECISIONS.md`, 2026-10-15), its states the canvas doesn't draw approved by the owner as
 built: the card at rest with Ask a question, the panel where a student's shows, 2 to 6 answers and

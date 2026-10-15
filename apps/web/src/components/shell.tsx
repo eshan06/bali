@@ -8,6 +8,7 @@ import {
   LayoutGrid,
   LogOut,
   type LucideIcon,
+  MessageCircleQuestionMark,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -187,13 +188,14 @@ export type MenuRole = 'teacher' | 'student';
 
 /**
  * The menu's pages, each listed only once it exists, never as a dead or disabled link: a teacher's
- * Classes comes with PV16 (between Home and Reports), Questions with L7b, Slides with M5; a
+ * Classes comes with PV16 (between Home and Reports), Slides with M5 (after Questions, L7b's); a
  * student's is Your classes alone (StudentHome). Help sits under the gap, in both.
  */
 const PAGES: Record<MenuRole, Item[]> = {
   teacher: [
     { href: '/', label: 'Home', Icon: House },
     { href: '/reports', label: 'Reports', Icon: ChartBar },
+    { href: '/questions', label: 'Questions', Icon: MessageCircleQuestionMark },
   ],
   student: [{ href: '/', label: 'Your classes', Icon: LayoutGrid }],
 };
