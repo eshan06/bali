@@ -197,7 +197,7 @@ describe('the student panel’s states, as PanelStates draws them', () => {
   it('says Clock off before the last check-in', () => {
     const html = render(student({ clockOff: true }), ready(event('tap_in', 6)));
     expect(notes(html)).toEqual([
-      CLOCK_OFF.replace("'", '’'),
+      CLOCK_OFF.replaceAll("'", '’'),
       `The phone last checked in at ${t(31)}.`,
       PRIVATE,
     ]);
