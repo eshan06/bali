@@ -150,7 +150,7 @@ export default function ClassDetailPage() {
   // student's panel shows; what is written is kept until it is asked or cancelled. A new session
   // starts with neither.
   const live = klass !== null && grid !== null && !grid.over;
-  const { lesson, onEvent, ask } = useLiveQuestion(live ? grid.id : null);
+  const { lesson, onEvent, ask, opening, forgetAsk } = useLiveQuestion(live ? grid.id : null);
   const [asking, setAsking] = useState(false);
   const [draft, setDraft] = useState<Draft>(NEW_DRAFT);
   useEffect(() => {
@@ -158,9 +158,10 @@ export default function ClassDetailPage() {
     setDraft(NEW_DRAFT);
   }, [grid?.id]);
   const panel = asking && !present;
+  // Back to Ask a question; the question, when one shows (opened meanwhile, from another tab).
   const closePanel = () => {
     setAsking(false);
-    document.getElementById(`${id}-ask`)?.focus();
+    (document.getElementById(`${id}-ask`) ?? document.getElementById(`${id}-q`))?.focus();
   };
 
   const readRoster = useCallback(() => {
@@ -476,6 +477,7 @@ export default function ClassDetailPage() {
           draft={draft}
           onDraft={setDraft}
           openNow={isOpen(lesson)}
+          opening={opening}
           onAsk={ask}
           onAsked={() => {
             setAsking(false);
@@ -484,6 +486,7 @@ export default function ClassDetailPage() {
           }}
           onCancel={() => {
             setDraft(NEW_DRAFT);
+            forgetAsk();
             closePanel();
           }}
           onClose={closePanel}

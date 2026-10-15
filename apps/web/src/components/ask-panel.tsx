@@ -11,7 +11,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { Button } from '@/components/button';
 import { Input } from '@/components/field';
-import { letterClass, letterOf } from '@/components/question-card';
+import { letterClass, letterOf, type Opening } from '@/components/question-card';
 import { TOO_MANY_TRIES } from '@/lib/errors';
 import type { Failure, OpenAnswer, QuestionDraft } from '@/lib/live-question';
 
@@ -25,13 +25,31 @@ export interface Draft {
 /** A fresh one: no words yet, and the two answers a question needs at least. */
 export const NEW_DRAFT: Draft = { prompt: '', options: ['', ''], correct: null };
 
-/** What Bali refuses before it asks (LessonStates), null where nothing: as the server counts. */
+/**
+ * The server's own checks of a question's words (`Text`, `apps/api/src/routes/questions.ts`, after
+ * `display-name.ts`), so nothing it would refuse is sent: words no one could see (`INVISIBLE`, so
+ * blank) or a character that can't be shown (`UNPRINTABLE`: a tab, a control or format character
+ * pasted in; the question's line breaks allowed). Pinned to the API's by ask-panel.test.ts.
+ */
+const UNPRINTABLE = /[\p{Cc}\p{Cs}\p{Zl}\p{Zp}]|(?![\u200c\u200d])\p{Cf}/u;
+const INVISIBLE = /^[\p{White_Space}\p{Default_Ignorable_Code_Point}\u2800\u{1D159}]*$/u;
+/** A tab or a hidden character pasted in: the server refuses it rather than store what isn't seen. */
+export const UNSHOWABLE = "This has a tab or a hidden character Bali can't show. Type it again.";
+
+/** What Bali refuses before it asks (LessonStates), null where nothing: as the server checks. */
 export function refusals(draft: Draft): { prompt: string | null; options: (string | null)[] } {
+  const prompt = draft.prompt.trim();
   return {
-    prompt: draft.prompt.trim() === '' ? 'Write the question first.' : null,
-    options: draft.options.map((option) => {
-      const n = [...option.trim()].length;
-      if (n === 0) return 'Fill in this answer or remove it.';
+    prompt: INVISIBLE.test(prompt)
+      ? 'Write the question first.'
+      : UNPRINTABLE.test(prompt.replaceAll('\n', ''))
+        ? UNSHOWABLE
+        : null,
+    options: draft.options.map((typed) => {
+      const option = typed.trim();
+      if (INVISIBLE.test(option)) return 'Fill in this answer or remove it.';
+      if (UNPRINTABLE.test(option)) return UNSHOWABLE;
+      const n = [...option].length;
       return n > QUESTION_OPTION_MAX_LENGTH
         ? `Keep each answer to ${QUESTION_OPTION_MAX_LENGTH} characters. This one has ${n}.`
         : null;
@@ -41,16 +59,18 @@ export function refusals(draft: Draft): { prompt: string | null; options: (strin
 
 /**
  * An ask that didn't go through, in LessonStates' words, and whether Try again can help: never once
- * the session ended first; a `429` in the portal's words for it.
+ * the session ended first; a `429` in the portal's words for it; a refusal of another kind (a spent
+ * id, or a check this panel didn't make) never blamed on the connection.
  */
 export function askSaid(failure: Failure): { words: string; retry: boolean } {
   if (failure.kind === 'refused' && failure.reason === 'session_not_running') {
     return { words: "This session has ended, so Bali didn't ask the question.", retry: false };
   }
+  if (failure.status === 429) return { words: TOO_MANY_TRIES, retry: true };
   return {
     words:
-      failure.status === 429
-        ? TOO_MANY_TRIES
+      failure.kind === 'refused'
+        ? "Bali couldn't ask the question."
         : "Bali couldn't ask the question. Check your connection and try again.",
     retry: true,
   };
@@ -66,13 +86,16 @@ const CAPTION = 'text-caption text-text-tertiary';
  * shows, 460 px from the right, so the grid stays in view; "Write a new question" only (the drafts
  * are L7b's). The question and 2 to 6 answers, one marked correct if the teacher likes; what Bali
  * refuses said under each, the first focused; a failed ask above Ask the class, Try again sending
- * it again under its id (L6). Cancel drops what was written; Close and Escape keep it for later.
+ * it again under its id (L6). The ask itself, on its way or failed, is the live question's
+ * (`opening`), so a panel opened again shows it. Cancel drops what was written; Close and Escape
+ * keep it for later.
  */
 export function AskPanel({
   id,
   draft,
   onDraft,
   openNow,
+  opening,
   onAsk,
   onAsked,
   onCancel,
@@ -83,15 +106,16 @@ export function AskPanel({
   onDraft: (draft: Draft) => void;
   /** A question is open: asking this one closes it. */
   openNow: boolean;
-  onAsk: (question: QuestionDraft) => Promise<OpenAnswer>;
+  /** The ask on its way, or the last one's failure (`useLiveQuestion`). */
+  opening: Opening;
+  /** Null: one is on its way already, so this one wasn't sent. */
+  onAsk: (question: QuestionDraft) => Promise<OpenAnswer | null>;
   onAsked: () => void;
   onCancel: () => void;
   onClose: () => void;
 }) {
   const [tried, setTried] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [said, setSaid] = useState<Failure | null>(null);
-  const sending = useRef(false);
+  const { busy, failure } = opening;
   const added = useRef(false);
   const refused = tried ? refusals(draft) : null;
   const set = (change: Partial<Draft>) => onDraft({ ...draft, ...change });
@@ -107,7 +131,7 @@ export function AskPanel({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (sending.current) return;
+    if (busy) return;
     const found = refusals(draft);
     const first = found.prompt ? 'prompt' : found.options.findIndex((r) => r !== null);
     if (first !== -1) {
@@ -115,21 +139,15 @@ export function AskPanel({
       document.getElementById(`${id}-${first === 'prompt' ? 'prompt' : `a${first}`}`)?.focus();
       return;
     }
-    sending.current = true;
-    setBusy(true);
-    setSaid(null);
     const answer = await onAsk({
       prompt: draft.prompt.trim(),
       options: draft.options.map((option) => option.trim()),
       correctOption: draft.correct,
     });
-    sending.current = false;
-    setBusy(false);
-    if (answer.kind === 'opened') onAsked();
-    else setSaid(answer);
+    if (answer?.kind === 'opened') onAsked();
   }
 
-  const failed = said ? askSaid(said) : null;
+  const failed = failure ? askSaid(failure) : null;
   return (
     <aside
       id={id}
@@ -219,7 +237,7 @@ export function AskPanel({
                     <button
                       type="button"
                       aria-label={`Remove answer ${letterOf(i)}`}
-                      onClick={() =>
+                      onClick={() => {
                         set({
                           options: draft.options.filter((_, j) => j !== i),
                           correct:
@@ -228,8 +246,12 @@ export function AskPanel({
                               : draft.correct === i
                                 ? null
                                 : draft.correct - 1,
-                        })
-                      }
+                        });
+                        // Its button goes with it: on to the answer now in its place.
+                        window.requestAnimationFrame(() =>
+                          document.getElementById(`${id}-a${Math.min(i, count - 2)}`)?.focus(),
+                        );
+                      }}
                       className={ICON_BUTTON}
                     >
                       <X size={16} aria-hidden="true" />

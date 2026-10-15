@@ -344,7 +344,7 @@ describe('its hook (L6’s logic, held for one session)', () => {
     );
     const grid = readFileSync(fileURLToPath(new URL('./live-grid.tsx', import.meta.url)), 'utf8');
     expect(page).toMatch(
-      /const \{ lesson, onEvent, ask \} = useLiveQuestion\(live \? grid\.id : null\);/,
+      /const \{ lesson, onEvent, ask, opening, forgetAsk \} = useLiveQuestion\(\s*live \? grid\.id : null,?\s*\);/,
     );
     expect(page).toMatch(/onEvent=\{onEvent\}/);
     expect(grid).toMatch(
@@ -356,6 +356,15 @@ describe('its hook (L6’s logic, held for one session)', () => {
     expect(hook).toMatch(
       /openAttemptFor\(unansweredOpen\.current, session, draft\);[^]*?unansweredOpen\.current = keepUnanswered\(attempt, answer\);/,
     );
+    // One ask at a time, held by the hook, never by a panel that can unmount mid-send (santa's
+    // review): a second press, in a panel opened again, sends nothing.
+    expect(hook).toMatch(/if \(session === null \|\| askingNow\.current\) return null;/);
+    expect(hook).toMatch(/setOpening\(\{ busy: true, failure: null \}\);/);
+    // Its failure said unless Cancel forgot it meanwhile; a new session starts with none.
+    expect(hook).toMatch(
+      /const failure = answer\.kind === 'opened' \|\| asks\.current !== mine \? null : answer;/,
+    );
+    expect(hook).toMatch(/askingNow\.current = false;\s*setOpening\(IDLE\);/);
     // An open's answer, its replay's too, never over a question asked after it.
     expect(hook).toMatch(
       /if \(answer\.kind === 'opened' && answer\.question\.id >= newest\.current\) \{\s*put\(session, answer\.question\);/,

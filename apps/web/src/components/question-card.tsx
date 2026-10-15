@@ -10,6 +10,7 @@ import {
   closeAttemptFor,
   type CloseAttempt,
   closeQuestion,
+  type Failure,
   failureOf,
   type OpenAnswer,
   type OpenAttempt,
@@ -54,6 +55,13 @@ export const isOpen = ({ question, results }: Pick<LiveQuestion, 'question' | 'r
 
 type Held = { session: string | null; question: TeacherQuestion | null };
 
+/** An ask as the side panel shows it (L7-1b): on its way, or how the last one failed. */
+export interface Opening {
+  busy: boolean;
+  failure: Failure | null;
+}
+const IDLE: Opening = { busy: false, failure: null };
+
 /**
  * The live question of `sessionId` (null: none running). Its words come from the session's read,
  * at the start and whenever the stream names a question this tab doesn't hold (`questionAfter`'s
@@ -78,6 +86,12 @@ export function useLiveQuestion(sessionId: string | null) {
   const unansweredClose = useRef<CloseAttempt | null>(null);
   const retry = useRef<number | undefined>(undefined);
   const reading = useRef<{ session: string; again: boolean } | null>(null);
+  // An ask on its way, held here, not by the panel, which a Close or a tile can unmount meanwhile:
+  // a panel opened again shows it busy, so no second press sends the words under a second id.
+  const [opening, setOpening] = useState<Opening>(IDLE);
+  const askingNow = useRef(false);
+  // Cancel forgets the last ask's failure, and one still on its way.
+  const asks = useRef(0);
 
   const put = useCallback((session: string | null, question: TeacherQuestion | null) => {
     const before = now.current.question;
@@ -123,6 +137,8 @@ export function useLiveQuestion(sessionId: string | null) {
     now.current = { session: sessionId, question: null };
     newest.current = '';
     setHeld(now.current);
+    askingNow.current = false;
+    setOpening(IDLE);
     if (sessionId !== null) void read(sessionId);
     return () => {
       window.clearTimeout(retry.current);
@@ -158,12 +174,19 @@ export function useLiveQuestion(sessionId: string | null) {
   );
 
   const ask = useCallback(
-    async (draft: QuestionDraft): Promise<OpenAnswer> => {
+    async (draft: QuestionDraft): Promise<OpenAnswer | null> => {
       const session = now.current.session;
-      if (session === null) return { kind: 'refused', status: 409, reason: 'session_not_running' };
+      if (session === null || askingNow.current) return null;
+      askingNow.current = true;
+      const mine = (asks.current += 1);
+      setOpening({ busy: true, failure: null });
       const attempt = openAttemptFor(unansweredOpen.current, session, draft);
       const answer = await openQuestion(api, attempt);
       unansweredOpen.current = keepUnanswered(attempt, answer);
+      askingNow.current = false;
+      if (now.current.session !== session) return null;
+      const failure = answer.kind === 'opened' || asks.current !== mine ? null : answer;
+      setOpening({ busy: false, failure });
       // Its replay too, closed since perhaps; never over a question asked after it.
       if (answer.kind === 'opened' && answer.question.id >= newest.current) {
         put(session, answer.question);
@@ -172,6 +195,10 @@ export function useLiveQuestion(sessionId: string | null) {
     },
     [api, put],
   );
+  const forgetAsk = useCallback(() => {
+    asks.current += 1;
+    setOpening((cur) => ({ busy: cur.busy, failure: null }));
+  }, []);
 
   const close = useCallback(
     async (reveal: boolean) => {
@@ -201,7 +228,7 @@ export function useLiveQuestion(sessionId: string | null) {
     close: (reveal) => void close(reveal),
     done: () => put(now.current.session, null),
   };
-  return { lesson, onEvent, ask };
+  return { lesson, onEvent, ask, opening, forgetAsk };
 }
 
 /** v2.css's `.lesson` head: the title or the kicker, then its buttons. */

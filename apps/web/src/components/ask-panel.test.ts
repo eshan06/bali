@@ -6,7 +6,9 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
 import { TOO_MANY_TRIES } from '../lib/errors';
-import { askSaid, AskPanel, type Draft, NEW_DRAFT, refusals } from './ask-panel';
+import type { Failure } from '../lib/live-question';
+import { askSaid, AskPanel, type Draft, NEW_DRAFT, refusals, UNSHOWABLE } from './ask-panel';
+import type { Opening } from './question-card';
 
 /*
  * Asking a question in the side panel (L7; LessonWrite, LessonStates' lines): rendered fresh, with
@@ -19,13 +21,14 @@ const page = readFileSync(
   'utf8',
 );
 
-const render = (draft: Draft, openNow = false) =>
+const render = (draft: Draft, openNow = false, opening: Opening = { busy: false, failure: null }) =>
   renderToStaticMarkup(
     createElement(AskPanel, {
       id: 'P',
       draft,
       onDraft: vi.fn(),
       openNow,
+      opening,
       onAsk: vi.fn(),
       onAsked: vi.fn(),
       onCancel: vi.fn(),
@@ -130,6 +133,44 @@ describe('what Bali refuses before it asks (LessonStates)', () => {
     );
   });
 
+  it('a tab or a hidden character pasted in, as the server refuses it, never sent to be refused', () => {
+    // santa's review (#389's stack): a tab from a numbered list or a spreadsheet, or a soft
+    // hyphen or a zero-width space from a web page, was sent, refused 400, and said as the
+    // connection's fault, Try again failing for ever.
+    expect(
+      refusals({
+        prompt: '1.\tWhich value of x?',
+        options: ['x\u00ad= 1', 'x =\u200b2'],
+        correct: null,
+      }),
+    ).toEqual({ prompt: UNSHOWABLE, options: [UNSHOWABLE, UNSHOWABLE] });
+    expect(UNSHOWABLE).toBe("This has a tab or a hidden character Bali can't show. Type it again.");
+    // A question's line breaks are its own; words no one could see are no words.
+    expect(refusals({ prompt: 'Line one\nline two', options: ['A', 'B'], correct: null })).toEqual({
+      prompt: null,
+      options: [null, null],
+    });
+    expect(refusals({ prompt: '\u200b', options: ['\u2800', 'B'], correct: null })).toEqual({
+      prompt: 'Write the question first.',
+      options: ['Fill in this answer or remove it.', null],
+    });
+  });
+
+  it('checks as the API does: its two patterns, word for word', () => {
+    const api = readFileSync(
+      fileURLToPath(new URL('../../../api/src/display-name.ts', import.meta.url)),
+      'utf8',
+    );
+    const pattern = (text: string, name: string) =>
+      new RegExp(`const ${name} = (/.*/)[a-z]*;`).exec(text)?.[1];
+    for (const name of ['UNPRINTABLE', 'INVISIBLE']) {
+      expect(pattern(source, name), name).toBe(pattern(api, name));
+      expect(pattern(source, name), name).toBeDefined();
+    }
+    // The question's line breaks allowed, as the route's `Text(…, true)`.
+    expect(source).toMatch(/UNPRINTABLE\.test\(prompt\.replaceAll\('\\n', ''\)\)/);
+  });
+
   it('says each under its field, marks it, and focuses the first; nothing is sent', () => {
     expect(source).toMatch(
       /if \(first !== -1\) \{\s*setTried\(true\);\s*document\.getElementById\([^)]*\)\?\.focus\(\);\s*return;\s*\}/,
@@ -164,13 +205,46 @@ describe('a failed ask (LessonStates)', () => {
     expect(askSaid({ kind: 'failed', status: 429, retryAfter: 1 }).words).toBe(TOO_MANY_TRIES);
   });
 
-  it('is said right above Ask the class, as an alert; asked, the panel goes', () => {
-    expect(source).toMatch(
-      /\{failed \? \([^]*?<p role="alert" className="text-body">\s*\{failed\.words\}[^]*?\) : null\}\s*<div className="[^"]*border-t[^"]*">\s*<Button type="submit"/,
+  it('a refusal of another kind is never blamed on the connection', () => {
+    for (const status of [400, 403, 404]) {
+      expect(askSaid({ kind: 'refused', status, reason: undefined }).words).toBe(
+        "Bali couldn't ask the question.",
+      );
+    }
+    expect(askSaid({ kind: 'refused', status: 409, reason: 'event_id_conflict' }).words).toBe(
+      "Bali couldn't ask the question.",
     );
-    expect(source).toMatch(
-      /if \(answer\.kind === 'opened'\) onAsked\(\);\s*else setSaid\(answer\);/,
+  });
+
+  it('is said right above Ask the class, as an alert, with Try again; asked, the panel goes', () => {
+    const failure: Failure = { kind: 'failed', status: undefined, retryAfter: undefined };
+    const html = render({ prompt: 'Q', options: ['A', 'B'], correct: null }, false, {
+      busy: false,
+      failure,
+    });
+    expect(html).toMatch(
+      /<p role="alert" class="text-body">Bali couldn&#x27;t ask the question\. Check your connection and try again\.<\/p><button type="submit" aria-disabled="false" class="[^"]*\bh-8\.5\b[^"]*">Try again<\/button><\/div><div class="[^"]*border-t[^"]*"><button type="submit"/,
     );
+    const ended = render({ prompt: 'Q', options: ['A', 'B'], correct: null }, false, {
+      busy: false,
+      failure: { kind: 'refused', status: 409, reason: 'session_not_running' },
+    });
+    expect(text(ended)).toContain("This session has ended, so Bali didn't ask the question.");
+    expect(ended).not.toContain('Try again');
+    expect(source).toMatch(/if \(answer\?\.kind === 'opened'\) onAsked\(\);/);
+  });
+
+  it('on its way, holds Ask the class and Try again, also in a panel opened again meanwhile', () => {
+    const html = render({ prompt: 'Q', options: ['A', 'B'], correct: null }, false, {
+      busy: true,
+      failure: null,
+    });
+    expect(html).toMatch(/<button type="submit" aria-disabled="true" aria-busy="true"/);
+    // The ask is the live question's, not the panel's (santa's review: a panel unmounted mid-send
+    // and opened again sent the same words under a second id, a second question closing the first).
+    expect(source).not.toMatch(/useState<Failure|sending\.current/);
+    expect(source).toMatch(/const \{ busy, failure \} = opening;/);
+    expect(source).toMatch(/if \(busy\) return;/);
   });
 });
 
@@ -185,13 +259,23 @@ describe('on the class page', () => {
     );
   });
 
-  it('Cancel drops what was written; Close and Escape keep it, focus back on Ask', () => {
-    expect(page).toMatch(/onCancel=\{\(\) => \{\s*setDraft\(NEW_DRAFT\);\s*closePanel\(\);/);
-    expect(page).toMatch(/onClose=\{closePanel\}/);
+  it('Cancel drops what was written and a failure said; Close and Escape keep both', () => {
     expect(page).toMatch(
-      /const closePanel = \(\) => \{\s*setAsking\(false\);\s*document\.getElementById\(`\$\{id\}-ask`\)\?\.focus\(\);/,
+      /onCancel=\{\(\) => \{\s*setDraft\(NEW_DRAFT\);\s*forgetAsk\(\);\s*closePanel\(\);/,
+    );
+    expect(page).toMatch(/onClose=\{closePanel\}/);
+    expect(page).toMatch(/opening=\{opening\}/);
+    // Focus back on Ask a question, or on the question when one shows (opened from another tab).
+    expect(page).toMatch(
+      /const closePanel = \(\) => \{\s*setAsking\(false\);\s*\(document\.getElementById\(`\$\{id\}-ask`\) \?\? document\.getElementById\(`\$\{id\}-q`\)\)\?\.focus\(\);/,
     );
     expect(source).toMatch(/if \(e\.key === 'Escape'\) onClose\(\);/);
+  });
+
+  it('removing an answer moves focus to the one in its place, its button gone', () => {
+    expect(source).toMatch(
+      /window\.requestAnimationFrame\(\(\) =>\s*document\.getElementById\(`\$\{id\}-a\$\{Math\.min\(i, count - 2\)\}`\)\?\.focus\(\),\s*\);/,
+    );
   });
 
   it('shares the student panel’s place: one opening closes the other', () => {
