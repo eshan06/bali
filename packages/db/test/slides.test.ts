@@ -388,14 +388,15 @@ describe('a slide change’s eventId, spent both ways (settled 2026-10-10)', () 
 });
 
 describe('a deck’s removal while a session shows it (decision 5)', () => {
-  it('is refused deck_in_use while a running session shows it, and goes once it shows another, stops, or rings its bell', async () => {
-    const { deck, show } = await lesson('s-in-use');
+  it('is refused deck_in_use, naming the class, while a running session shows it, and goes once it shows another, stops, or rings its bell', async () => {
+    const { klass, deck, show } = await lesson('s-in-use');
     const [cells, atoms, ions] = [await deck(), await deck(), await deck()];
     const remove = (shown: DeckRow, minute: number) =>
       removeDeck(db, { deckId: shown.id, eventId: newUuidV7(), now: at(minute) });
+    const inUse = { outcome: 'deck_in_use', classes: [{ id: klass.id, name: 's-in-use' }] };
     await show(cells.id, 2, 5);
 
-    expect(await remove(cells, 6)).toEqual({ outcome: 'deck_in_use' });
+    expect(await remove(cells, 6)).toEqual(inUse);
     expect(await deckNow(cells)).toEqual(cells);
 
     await show(atoms.id, 1, 7);
@@ -404,7 +405,7 @@ describe('a deck’s removal while a session shows it (decision 5)', () => {
     expect(await remove(atoms, 10)).toMatchObject({ outcome: 'removed' });
     // Past the bell, though the sweep has not ended it, the session shows nothing (A17).
     await show(ions.id, 1, 11);
-    expect(await remove(ions, 24)).toEqual({ outcome: 'deck_in_use' });
+    expect(await remove(ions, 24)).toEqual(inUse);
     expect(await remove(ions, 25)).toMatchObject({ outcome: 'removed' });
   });
 

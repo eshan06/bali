@@ -19,6 +19,7 @@ import {
   type CreateDeckResponse,
   type Deck,
   type DeckDownload,
+  type DeckInUseDetails,
   DECK_MAX_BYTES,
   DECK_TITLE_MAX_LENGTH,
   type DeckResponse,
@@ -231,7 +232,9 @@ export function registerDecksRoutes(
       const result = await mapTransitionError(() => removeDeck(db, { deckId: id, eventId, now }));
       if (result.outcome === 'deck_not_found') throw deckNotFound();
       if (result.outcome === 'deck_in_use') {
-        throw ApiError.conflict('a running session shows the deck', 'deck_in_use');
+        // Its classes (M5a): the deck is the caller's, so each class showing it is theirs too.
+        const details: DeckInUseDetails = { classes: result.classes };
+        throw new ApiError('conflict', 'a running session shows the deck', details, 'deck_in_use');
       }
       if (!result.deck.objectDeletedAt)
         await dropObject(db, storage, request.log, result.deck, now);

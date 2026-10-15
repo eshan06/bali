@@ -949,6 +949,16 @@ export interface DecksResponse {
   /** Newest first; never a removed one. */
   decks: Deck[];
 }
+/**
+ * A removal's `409 deck_in_use`, its `error.details` (M5a, added 2026-10-15, additive): the classes
+ * whose sessions, running by the server's clock, show the deck — each its teacher's own, the caller's
+ * — by id and name, in the order the teacher's classes are listed (`/v1/me`: oldest first, then by
+ * id). One or more. A server before it sent no details: a client reads none, or any other shape, as
+ * the refusal alone.
+ */
+export interface DeckInUseDetails {
+  classes: MeClass[];
+}
 
 // POST /v1/sessions/{id}/slide — show a page of a deck in a running session, or stop presenting
 // (Phase 7, M3; "Live lesson", decisions 4–6): the class's own teacher, their own ready decks.

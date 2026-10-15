@@ -3857,16 +3857,20 @@ export interface RemoveDeckInput {
 
 /** A removal's answer: the deck, or why there is none to remove now. */
 export type RemoveDeckResult =
-  DeckResult | { outcome: 'deck_not_found' } | { outcome: 'deck_in_use' };
+  | DeckResult
+  | { outcome: 'deck_not_found' }
+  /** Each class whose running session shows it, as its teacher's classes are listed (M5a). */
+  | { outcome: 'deck_in_use'; classes: { id: string; name: string }[] };
 
 /**
  * The teacher removes a deck: marked removed (data-model decision 3). Its row alone, FOR UPDATE
  * (decision 5): the one transition whose only lock is the deck row, since it can't know which
- * session shows the deck before it looks. So it reads the presentation rows here, unlocked: a
- * running session showing the deck is `deck_in_use`, nothing written, and a slide change's FOR SHARE
- * on this row is where the two meet, so they never deadlock. Its replay, the id it holds with the
- * deck removed, answers the deck now; the id it holds from another write, or one any other row
- * holds, is EVENT_ID_CONFLICT. A deck removed already, or none, is `deck_not_found`.
+ * session shows the deck before it looks. So it reads the presentation rows here, unlocked, their
+ * sessions' classes in the same statement: a running session showing the deck is `deck_in_use`,
+ * naming each such class, nothing written, and a slide change's FOR SHARE on this row is where the
+ * two meet, so they never deadlock. Its replay, the id it holds with the deck removed, answers the
+ * deck now; the id it holds from another write, or one any other row holds, is EVENT_ID_CONFLICT. A
+ * deck removed already, or none, is `deck_not_found`.
  */
 export function removeDeck(db: Database, input: RemoveDeckInput): Promise<RemoveDeckResult> {
   return onceMoreOnUnique(() =>
@@ -3882,13 +3886,25 @@ export function removeDeck(db: Database, input: RemoveDeckInput): Promise<Remove
       }
       const now = input.now ?? new Date();
       // Only a session not marked over can be running: one a class at most, so a handful of rows.
+      // Each with its class, named as `/v1/me` lists a teacher's (PV3b), so a rename never reorders
+      // them. Unlocked, as one statement: a rename or an end not yet committed is read as before it.
       const showing = await tx
-        .select({ endedAt: sessions.endedAt, endsAt: sessions.endsAt })
+        .select({
+          endedAt: sessions.endedAt,
+          endsAt: sessions.endsAt,
+          classId: classes.id,
+          className: classes.name,
+        })
         .from(sessionPresentations)
         .innerJoin(sessions, eq(sessions.id, sessionPresentations.sessionId))
-        .where(and(eq(sessionPresentations.deckId, deck.id), isNull(sessions.endedAt)));
-      if (showing.some((session) => sessionRunning(session, now)))
-        return { outcome: 'deck_in_use' };
+        .innerJoin(classes, eq(classes.id, sessions.classId))
+        .where(and(eq(sessionPresentations.deckId, deck.id), isNull(sessions.endedAt)))
+        .orderBy(asc(classes.createdAt), asc(classes.id));
+      const shownIn = showing.filter((session) => sessionRunning(session, now));
+      if (shownIn.length > 0) {
+        const named = shownIn.map(({ classId, className }) => ({ id: classId, name: className }));
+        return { outcome: 'deck_in_use', classes: named };
+      }
       const [removed] = await tx
         .update(decks)
         .set({ removedAt: now, eventId: input.eventId })

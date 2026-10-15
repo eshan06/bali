@@ -5342,8 +5342,31 @@ describe.runIf(REAL_PG)('live lesson questions under contention (real Postgres, 
       () => removeDeck(db, { deckId: shown.deck.id, eventId: newUuidV7() }),
     );
     if (removal.status === 'rejected') throw removal.reason as Error;
-    expect(removal.value).toEqual({ outcome: 'deck_in_use' });
+    // Its read, after the lock it waited on, names the class the slide change showed it in (M5a).
+    const named = [{ id: shown.classId, name: 'Class race-slide-remove-ahead' }];
+    expect(removal.value).toEqual({ outcome: 'deck_in_use', classes: named });
     expect(one(await decksOf(shown.teacherId))).toEqual(shown.deck);
+  }, 20_000);
+
+  it('a deck’s removal waits on no class and no session: with a rename and the session’s end held, it names the class as it stood (M5a)', async () => {
+    // It locks the deck's row alone (decision 5): its read of the sessions showing the deck, and of
+    // their classes, takes no lock, so writes held on them are read as before them, never waited on.
+    // A read that locked them would park here behind the holder, which waits on it: the test hangs.
+    const p = await presenting('race-slide-remove-unlocked');
+    const shown = await p.show(db);
+    if (shown.outcome !== 'shown') throw new Error(shown.outcome);
+    const remove = () => removeDeck(db, { deckId: p.deck.id, eventId: newUuidV7() });
+
+    const whileHeld = await db.transaction(async (tx) => {
+      await tx.update(classes).set({ name: 'Renamed' }).where(eq(classes.id, p.classId));
+      await endSession(tx, { sessionId: p.session.id, at: new Date(), reason: 'ended' });
+      return remove();
+    });
+
+    const named = [{ id: p.classId, name: 'Class race-slide-remove-unlocked' }];
+    expect(whileHeld).toEqual({ outcome: 'deck_in_use', classes: named });
+    // Both committed: the session is over, so the removal goes.
+    expect(await remove()).toMatchObject({ outcome: 'removed' });
   }, 20_000);
 
   it('two deliveries of one slide change at once are one, never a 500 (M3)', async () => {
