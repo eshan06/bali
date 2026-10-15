@@ -14,8 +14,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   15 files at once, and three workers' runs that day failed on `main`'s own code where each file
   passes alone: the boot test's server start overran its 20 s, `slides.test.ts` ran out of memory,
   and `tokens.test.ts`'s icon-stroke check (PV4b) overran its 5 s. The api, web and db configs now
-  take `maxWorkers` from the root's `vitest.workers.ts`: vitest's own count, up to 6 (a root
-  `tsconfig.json` gives that file a project for the linter). **CI is unchanged:** a 4-vCPU runner
+  take `maxWorkers` from the root's `vitest.workers.ts`: `vitest run`'s own count, up to 6, which
+  watch mode, used by no script here, now takes in place of its halved one (a root `tsconfig.json`
+  gives that file a project for the linter). **CI is unchanged:** a 4-vCPU runner
   still gets 3, and the unit lane's `VITEST_MAX_WORKERS=$(nproc)` still wins, as vitest reads it
   after the config; `packages/shared` has no config, and its six files start six workers at most.
   **Measured on the PC**, the whole `npm test` from a worktree: at 15, 137, 147 and 161 s, the last
