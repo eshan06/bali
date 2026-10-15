@@ -118,7 +118,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
 - **2026-10-15** — **L7b's part 1c: writing and editing on Your questions, and Questions in the
   menu; a draft for the owner's calls, stacked on part 1b.** Built to
   [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (version 21): the
-  QuestionsEdit board and LessonStates' lines for writing (#NNN), on parts 1a (#393) and 1b (#394).
+  QuestionsEdit board and LessonStates' lines for writing (#395), on parts 1a (#393) and 1b (#394).
   **The form** (`QuestionForm`, `components/saved-questions.tsx`): Write a question, in the page's
   head, and each card's Edit open QuestionsEdit's card over the list, "Write a question" and its
   line, with the draft's words for an edit (both buttons lead to that board); the question in a
