@@ -40,7 +40,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   rows link to the page**, the day and times both the link's words, so two sessions on one day stay
   apart; the opened row went, and with it PB5's timeline (`Timeline`, `sessionTimeline`,
   `recapView`, the axis's 12 gaps, `recap.ts`'s reason words), which only that row still drew, and
-  the colour `row-open`. *Size:* 446 lines added and 491 deleted outside tests and docs, the
+  the colour `row-open`. *Size:* 447 lines added and 491 deleted outside tests and docs, the
   deletions that timeline. **Left as they are:** a refusal the portal has no words of its own for is
   said in the API's ("not your class"), as on every page; a running session's URL, which no link
   leads to (Reports lists and the recap opens only sessions marked over), shows its report as if
