@@ -116,14 +116,14 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `packages/db/test/slides.test.ts`, `races.test.ts`.
 
 - **2026-10-15** — **L7b's part 1c: writing and editing on Your questions, and Questions in the
-  menu; a draft for the owner's calls, stacked on part 1b.** Built to
+  menu; what the canvas doesn't draw approved by the owner as built; stacked on part 1b.** Built to
   [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (version 21): the
   QuestionsEdit board and LessonStates' lines for writing (#395), on parts 1a (#393) and 1b (#394).
   **The form** (`QuestionForm`, `components/saved-questions.tsx`): Write a question, in the page's
   head, and each card's Edit open QuestionsEdit's card over the list, "Write a question" and its
   line, with the draft's words for an edit (both buttons lead to that board); the question in a
   field held to its 500 by `maxLength`, its count under it; 2 to 6 answers, each the Field's own
-  input (`Input`, a copy of #390's, for whichever lands second to reuse), its Correct or Mark
+  input (`Input`, #390's, which landed first with the same code), its Correct or Mark
   correct, and its remove; Add an answer; the board's help line; Save and Cancel. **Its letters stay
   grey**, as the board draws them, the Correct button saying which. **What Bali refuses** (part 1a's
   `refusalsOf`) is said under each field once Save is pressed, the field marked and the first one
@@ -140,8 +140,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the list again, so each card shows its draft as Bali holds it, or the list says it didn't load.
   **Questions joins the menu**
   (lucide's `message-circle-question-mark`, the boards' glyph by name). **What the canvas doesn't
-  draw**, each built the plainest way its pieces allow, the owner's to rule (the PR parked as a
-  draft): Save, Try again, Cancel and the cards' Edit held while a save is sent, the failure's line
+  draw**, each built the plainest way its pieces allow, **approved by the owner (2026-10-15), each as
+  built, after their look at the screenshots** (asked with the PR parked as a draft): Save, Try
+  again, Cancel and the cards' Edit held while a save is sent, the failure's line
   kept, Try again held, while it sends again; the form left open over the saved draft when words
   were typed while it was sent; the list read again ("Loading…") on leaving a save whose answer
   never came; a save that didn't go through, above Save with Try again, in
@@ -155,7 +156,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   Bali can't show. Type it again."; a fresh form, no words and two empty answers, Remove hidden at
   two and Add an answer at six; "Fill in this answer." where Remove isn't offered; Edit on another
   question while writing, which takes its words in place of what was written, as Cancel drops it.
-  *Known limits:* a new question's save whose answer never came, then other words saved, makes a
+  These states were coded before any canvas drew them, which the owner accepted for this PR and the
+  four drafts approved with it (#386, #389, #390, #394); from now on a state no board draws is drawn
+  on the canvas first (the rule of 2026-10-15, #398). *Known limits:* a new question's save whose answer never came, then other words saved, makes a
   second draft if the first landed (part 1a's); both show in the list. The API client sets no
   timeout, so a save that hangs holds Save, Try again, Cancel and the cards' Edit until the browser
   gives up, and only the menu or a reload gets the teacher out (#334 tracks a timeout for the
