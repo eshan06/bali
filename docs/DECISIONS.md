@@ -8,6 +8,58 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-14** — **PV12a: the recap's grouping, with no words: who joined and every unlock are
+  R2's, the moments the panel's, and an unlock always breaks "the whole time".** For PV12b's recap,
+  as [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (version 21) draws
+  it on ClassEnded (`recapGroups`, `apps/web/src/lib/recap.ts`, #384). **The groups:** `partTime`,
+  who joined and wasn't focused the whole time, by when that first broke (ClassEnded's order);
+  `wholeTime`, who joined and was; `notJoined`. Each student is `{ key, name, spans, moments }`: named
+  as the grid names them, their line on the axis from each tap-in to their leaving or the session's
+  end (two spans for a switch away and back; a late tap-in starts it late; none for who never
+  joined), walked in the engine's order with each time held to no earlier than the one before, as R2
+  holds them (santa's review: by the times alone, a phone set ahead whose tap reads after the removal
+  the server stamped drew a line to the bell for a student R2 counts no focus), and their moments,
+  each placed on the axis. **Who joined is R2's `joined`, and every
+  unlock and protection off R2's lists** (`sessionReport`), so the recap and the report never
+  disagree: each student in the report's Unlocks table has that unlock on their row, as ClassEnded and
+  ReportOpened draw it. **"Focused the whole time"**, the owner's rule (2026-10-12), as built: joined,
+  with no unlock or protection off of theirs here **whenever it was recorded** (a late one, A10; one
+  after the bell, an offline phone's; one before their tap-in, A14's late tap), and no going silent
+  or leaving **before the session's end**. *Why every unlock:* the whole-time list shows names only,
+  so an unlock placed there would be on no row of the class page's recap, while the report lists it;
+  and no clock can move one out of the session (a phone set ahead has its unlock held to the bell).
+  *Why silence and leaving only before the end:* one stamped at the bell or after came once class was
+  over: a removal past the bell before the sweep, held to the bell, and a tap into the next class
+  before the sweep, whose switch out here is stamped with that tap's time (`endParticipationsElsewhere`),
+  would otherwise put a student focused all class under "part of the time" on any back-to-back
+  schedule; the report counts each to the end, and a silence the sweep first marks at the bell has no
+  silent minutes there. A removal and a silence are the server's own times; a switch's is the next
+  class's tap, the phone's claim held to that class's window, so a next class that started before
+  this one's bell and a phone running slow can stamp a switch just before the bell, which the recap
+  and the report both count as leaving (santa's review; rare, left as it is). **Didn't join** is the roster now, those
+  enrolled by the session's end (`RosterStudent.joinedAt`; a student new to the class since never
+  "didn't join" a session before their time), and anyone who never joined with an unlock or
+  protection off here, carrying it, as the report places them (outside `joined`, in its lists): rare
+  (A14's late tap and the unlock sent under it), and drawn on no board. **The moments are the
+  panel's own:** `studentMoments`, moved out of `studentPanel` into `recap.ts`, which both now read
+  (`PanelMoment` is its type), so the two can't drift; each unlock R2 lists says R2's reason now
+  (A20), should a change land between the two reads. `recapFeed` and `namedIn`, shared with
+  `sessionTimeline`, keep an unlock or protection off R2 lists that the feed's read missed. **Order:**
+  each group in the roster's order, as ClassEnded lists its names, anyone off the roster (who left the
+  class since) after, in R2's; `partTime` then by its first break, a tie in the roster's order. **The
+  axis** runs from the start to the end, stretched only for a moment on a row it draws (`partTime`,
+  `notJoined`), so a whole-time leave after the bell moves nothing; its ticks are the timeline's (one
+  each 5 minutes for 50, where ClassEnded draws one each 10: PV12b's). *Not built:* no words, no
+  Present switch (the recap is never in Present since PV9, and the panel's data carries reasons the
+  same way), and no roster read (the class page holds one; PV12b passes it, PV14 reads its own).
+  **Asked of the owner:** an Emergency Unlock or Screen Time off recorded outside the student's own
+  tap-in to the end puts them under "Focused part of the time", its mark off their line, though they
+  were focused all that span: after an early End, from a phone that hadn't heard the End yet; or
+  before their tap-in, A14's late tap and the unlock sent under it, then a tap that joins (rare;
+  santa's review). The rule read by the times would list them as focused the whole time, their
+  unlock then on no row of the class page. Recommended: as built. *Size:* about 300 changed lines of
+  code without tests, about 70 of them moved.
+
 - **2026-10-14** — **PV11b: the student panel, built as drawn but for the owner's wording calls;
   a tile is its button, Open student its other door, and Present closes it.** Built to
   [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (version 21):
