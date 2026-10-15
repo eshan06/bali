@@ -284,18 +284,23 @@ describe('the avatar’s initials', () => {
 });
 
 describe('the side menu', () => {
-  it('links Bali, Home, Reports and Help, and no page that doesn’t exist yet, dead or disabled', () => {
+  it('links Bali, Home, Reports, Questions and Help, and no page that doesn’t exist yet, dead or disabled', () => {
     const html = menu();
     expect(html).toMatch(/^<nav aria-label="Main" /);
     expect(links(html).map(({ href, text }) => [href, text])).toEqual([
       ['/', 'Bali'],
       ['/', 'Home'],
       ['/reports', 'Reports'],
+      ['/questions', 'Questions'],
       ['/support', 'Help'],
     ]);
-    expect(html).not.toMatch(/Classes|Questions|Slides/);
-    // Reports with the boards' icon, the class page's Reports button's (PV13).
+    expect(html).not.toMatch(/Classes|Slides/);
+    // Reports with the boards' icon, the class page's Reports button's (PV13); Questions with
+    // theirs, the speech bubble with a question mark (L7b).
     expect(html).toMatch(/<a [^>]*href="\/reports"><svg[^>]*\blucide-chart-bar\b/);
+    expect(html).toMatch(
+      /<a [^>]*href="\/questions"><svg[^>]*\blucide-message-circle-question-mark\b/,
+    );
     // The lockup, the mark at 20 px and its word at 16/22 in the brand's ink, as the boards render
     // it (v2.css's links take that ink, `.brand` among them).
     expect(html).toMatch(/<a [^>]*translate="no"[^>]*><svg[^>]*width="20"/);
@@ -311,6 +316,7 @@ describe('the side menu', () => {
         .map((l) => l.text);
     expect(current('/')).toEqual(['Home']);
     expect(current('/reports')).toEqual(['Reports']);
+    expect(current('/questions')).toEqual(['Questions']);
     expect(current('/classes/c1')).toEqual([]);
     // By its aria-current, which a screen reader says too, never by colour alone.
     const home = links(menu()).find((l) => l.text === 'Home');
@@ -348,7 +354,7 @@ describe('the side menu', () => {
       ['/', 'Your classes', true],
       ['/support', 'Help', false],
     ]);
-    expect(html).not.toMatch(/Home|Reports/);
+    expect(html).not.toMatch(/Home|Reports|Questions/);
     // Your classes with the boards' icon, the grid of four.
     expect(html).toMatch(/<a [^>]*href="\/"[^>]*><svg[^>]*\blucide-layout-grid\b/);
     // The same foot: the initials beside the name, Sign out an icon.

@@ -1,35 +1,59 @@
 'use client';
 
+import type { SavedQuestion } from '@bali/shared';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
+  answerId,
   type Drafts,
   focusAfter,
+  type Form,
+  PROMPT,
   QuestionsView,
   type Removal,
   TITLE,
+  WRITE,
 } from '@/components/saved-questions';
 import { getAccessToken } from '@/lib/auth';
+import type { QuestionDraft } from '@/lib/live-question';
 import {
+  oldestFirst,
   readDrafts,
+  refusalsOf,
   removeAttemptFor,
   type RemoveAttempt,
   removeDraft,
+  sameWords,
+  type SaveAttempt,
+  saveAttemptFor,
+  saveDraft,
+  trimmed,
+  withoutAnswer,
 } from '@/lib/saved-questions';
 import { useApi } from '@/lib/use-api';
 
+/** A new question: no words yet, and the two answers a question needs at least. */
+const NEW: QuestionDraft = { prompt: '', options: ['', ''], correctOption: null };
+const editId = (draftId: string) => `q-${draftId}-edit`;
+
 /**
- * Your questions (L7b, part 1): the teacher's drafts, oldest first, each removable, asked in class
- * (part 2). A removal whose answer never came is sent again under its id by its Remove.
+ * Your questions, in the menu (L7b, part 1): the teacher's drafts, oldest first, written, edited and
+ * removed here, asked in class (part 2). Each save is minted after the draft's own `eventId`, one at
+ * a time, and one answered under another is said as not saved (#318); a save or a removal whose
+ * answer never came is sent again under its id by Try again, or by its Remove.
  */
 export default function QuestionsPage() {
   const api = useApi();
   const router = useRouter();
   const [drafts, setDrafts] = useState<Drafts>('loading');
+  const [form, setForm] = useState<Form | null>(null);
   const [removals, setRemovals] = useState<Record<string, Removal>>({});
-  // Each removal whose answer never came: it may have landed.
+  // The last save, and each removal, whose answer never came: they may have landed.
+  const unsaved = useRef<SaveAttempt | null>(null);
   const unremoved = useRef(new Map<string, RemoveAttempt>());
+  // The form's number: a save answered once its form has closed changes only the list.
+  const opened = useRef(0);
   // Where focus goes once the page has drawn it: the first of these ids it finds.
   const [focus, setFocus] = useState<string[]>([]);
 
@@ -51,9 +75,54 @@ export default function QuestionsPage() {
     else router.replace('/login');
   }, [read, router]);
 
+  /** The list with `draft` as it is now, in its place. */
+  const listed = (draft: SavedQuestion) =>
+    setDrafts((d) =>
+      Array.isArray(d) ? oldestFirst([...d.filter((x) => x.id !== draft.id), draft]) : d,
+    );
   /** The list without the draft `gone`. */
   const unlisted = (gone: string) =>
     setDrafts((d) => (Array.isArray(d) ? d.filter((x) => x.id !== gone) : d));
+
+  /** Open the form, a new question (`draft` null) or a draft's edit, or close it (undefined). */
+  function show(draft: SavedQuestion | null | undefined, to: string[]) {
+    opened.current += 1;
+    unsaved.current = null;
+    setForm(
+      draft === undefined
+        ? null
+        : { draft, words: draft ? trimmed(draft) : NEW, tried: false, busy: false, problem: null },
+    );
+    setFocus(to);
+  }
+  const words = (change: (w: QuestionDraft) => QuestionDraft) =>
+    setForm((f) => f && { ...f, words: change(f.words) });
+
+  async function save() {
+    if (!form || form.busy) return;
+    const refused = refusalsOf(form.words);
+    const first = refused.options.findIndex((r) => r !== null);
+    if (refused.prompt || first !== -1) {
+      setForm({ ...form, tried: true });
+      return setFocus([refused.prompt ? PROMPT : answerId(first)]);
+    }
+    const { draft } = form;
+    // The draft's own words: nothing to save, so it isn't marked edited.
+    if (draft && sameWords(draft, trimmed(form.words))) return show(undefined, [editId(draft.id)]);
+    const attempt = saveAttemptFor(unsaved.current, draft, form.words);
+    unsaved.current = attempt;
+    const mine = opened.current;
+    setForm({ ...form, busy: true, problem: null });
+    const answer = await saveDraft(api, attempt);
+    if (answer.kind === 'saved' || answer.kind === 'not_saved') listed(answer.draft);
+    if (answer.kind === 'gone' && draft) unlisted(draft.id);
+    if (mine !== opened.current) return;
+    if (answer.kind !== 'failed') unsaved.current = null;
+    if (answer.kind === 'saved') return show(undefined, [editId(answer.draft.id), WRITE]);
+    // Not saved: the draft now, so the next save is minted after it; gone, a new question.
+    const now = answer.kind === 'not_saved' ? answer.draft : answer.kind === 'gone' ? null : draft;
+    setForm((f) => f && { ...f, draft: now, busy: false, problem: answer });
+  }
 
   /** A card's Remove as pressed now, or none (null). */
   const removal = (draftId: string, now: Removal | null) =>
@@ -76,20 +145,39 @@ export default function QuestionsPage() {
     const from = document.activeElement;
     unlisted(draftId);
     removal(draftId, null);
-    if (!from || from === document.body || card?.contains(from)) setFocus([...near, TITLE]);
+    if (!from || from === document.body || card?.contains(from)) {
+      setFocus([...near, WRITE, TITLE]);
+    }
   }
 
   return (
     <QuestionsView
       drafts={drafts}
+      form={form}
       removals={removals}
       on={{
+        write: () => show(null, [PROMPT]),
+        edit: (draftId) => {
+          const draft = Array.isArray(drafts) && drafts.find((d) => d.id === draftId);
+          if (draft) show(draft, [PROMPT]);
+        },
+        change: (next) => words(() => next),
+        addAnswer: () => {
+          words((w) => ({ ...w, options: [...w.options, ''] }));
+          setFocus([answerId(form?.words.options.length ?? 0)]);
+        },
+        removeAnswer: (i) => {
+          words((w) => withoutAnswer(w, i));
+          setFocus([answerId(i), answerId(i - 1)]);
+        },
+        save: () => void save(),
+        cancel: () => show(undefined, form?.draft ? [editId(form.draft.id), WRITE] : [WRITE]),
         ask: (draftId) => {
           removal(draftId, { busy: false, failure: null });
           setFocus([`q-${draftId}-keep`]);
         },
         remove: (draftId) =>
-          void remove(draftId, focusAfter(Array.isArray(drafts) ? drafts : [], draftId, 'remove')),
+          void remove(draftId, focusAfter(Array.isArray(drafts) ? drafts : [], draftId, 'edit')),
         keep: (draftId) => {
           removal(draftId, null);
           setFocus([`q-${draftId}-remove`]);
