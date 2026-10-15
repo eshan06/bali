@@ -462,7 +462,7 @@ describe('GET /v1/classes/:id/reports/sessions', () => {
     const stuck = move(eventful.id, ben.id, at(66), { install, seq: 2 });
     await tapIn(db, move(eventful.id, ben.id, at(67), { install, seq: 3 }));
     expect((await unlock(db, stuck)).recordedAs).toBe('superseded');
-    await checkIn(db, { sessionId: eventful.id, studentId: ana.id, deviceTime: at(68, 30) });
+    await checkIn(db, { sessionId: eventful.id, studentId: ana.id, now: at(68, 30) });
     await protectionOff(db, move(eventful.id, ben.id, at(77, 20)));
     await endSession(db, { sessionId: eventful.id, at: at(85), reason: 'expired' });
     // No one joined.

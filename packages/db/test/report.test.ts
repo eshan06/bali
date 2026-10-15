@@ -434,7 +434,7 @@ describe('sessionReport over what the engine stores', () => {
     await tapIn(db, move(session, student, 1));
     await backdateLastSeen(db, { sessionId: session.id, studentId: student.id }, at(1));
     expect(await markSilentParticipations(db, at(5))).toBe(1);
-    await checkIn(db, { sessionId: session.id, studentId: student.id, deviceTime: at(8) });
+    await checkIn(db, { sessionId: session.id, studentId: student.id, now: at(8) });
     await endSession(db, { sessionId: session.id, at: at(25), reason: 'expired' });
 
     expect(await typesIn(session.id)).toEqual(expect.arrayContaining(['went_silent', 'came_back']));

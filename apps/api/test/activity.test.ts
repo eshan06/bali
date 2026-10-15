@@ -249,7 +249,7 @@ describe('GET /v1/me/activity', () => {
     await tapIn(db, move(session.id, ben.id, at(9, 2)));
     await backdateLastSeen(db, { sessionId: session.id, studentId: ben.id }, at(9, 2));
     expect(await markSilentParticipations(db, at(9, 7))).toBe(1);
-    await checkIn(db, { sessionId: session.id, studentId: ben.id, deviceTime: at(9, 8) });
+    await checkIn(db, { sessionId: session.id, studentId: ben.id, now: at(9, 8) });
     // Cy: in, then removed; time added, a question asked, and the lesson ended early.
     await tapIn(db, move(session.id, cy.id, at(9, 2)));
     const removal = { enrollmentId: cy.enrollmentId, at: at(9, 9) };

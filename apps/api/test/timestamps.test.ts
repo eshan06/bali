@@ -44,9 +44,9 @@ import { makeTestDb, seedClassroom } from './helpers/db.js';
  *
  *   tap / unlock / refocus / protection-off
  *                           the event's `occurred_at` (clamped device time)
- *   check-in                the `came_back` event's `occurred_at` — the one
- *                           place check-in uses the device clock at all, since
- *                           `last_seen_at` is server-stamped (rule 1)
+ *   check-in                nothing: `last_seen_at` and the `came_back` that
+ *                           closes a silence are the server's (rule 1, decision
+ *                           7), so its case pins only that the form is accepted
  *   join                    the event's `payload.device_time`, since the
  *                           enrolment event's `occurred_at` is server-stamped
  *
@@ -97,7 +97,14 @@ function withOffset(at: Date): string {
 /** The single event of this type in the session, or unattached (`sessionId: null`). */
 async function oneEvent(
   sessionId: string | null,
-  type: 'tap_in' | 'unlock' | 'refocus' | 'protection_off' | 'came_back' | 'enrollment_joined',
+  type:
+    | 'tap_in'
+    | 'unlock'
+    | 'refocus'
+    | 'protection_off'
+    | 'went_silent'
+    | 'came_back'
+    | 'enrollment_joined',
 ) {
   const rows = await db
     .select()
@@ -213,12 +220,11 @@ describe('ISO 8601 timestamps with a UTC offset', () => {
     sameInstant((await oneEvent(session.id, 'protection_off')).occurredAt, at);
   });
 
-  it("records a check-in's came_back at the instant its offset deviceTime names", async () => {
-    // A plain heartbeat writes no history and stamps `last_seen_at` from the
-    // server's clock (rule 1), so it persists nothing from `deviceTime` to
-    // assert against. Closing a silence episode is the one place check-in does
-    // use the device clock — so open one first, and the came_back it earns
-    // carries the instant.
+  it("accepts a check-in's offset deviceTime, and stamps nothing with it", async () => {
+    // A check-in persists nothing from `deviceTime`: `last_seen_at` and the
+    // came_back closing a silence episode are the server's (rule 1, decision 7).
+    // So open one, and the came_back it earns is the went_silent's own instant
+    // (the sweep ran 95 s ahead here), never the claim, a minute behind.
     const { student, block, session } = await seedRunning('ts-checkin');
     const token = await ctx.tokenFor(student.cognitoId);
     await joinSession(token, block.tagId);
@@ -227,15 +233,15 @@ describe('ISO 8601 timestamps with a UTC offset', () => {
       new Date(Date.now() + SILENCE_THRESHOLD_MS + 5_000),
     );
     expect(silenced).toBe(1);
-    const at = new Date(Date.now() - 1_000);
 
     const res = await post(token, `/v1/sessions/${session.id}/checkin`, {
-      deviceTime: withOffset(at),
+      deviceTime: withOffset(new Date(Date.now() - 60_000)),
     });
 
     expect(res.statusCode).toBe(200);
     expect(res.json<CheckInResponse>().status).toBe('live');
-    sameInstant((await oneEvent(session.id, 'came_back')).occurredAt, at);
+    const wentSilent = await oneEvent(session.id, 'went_silent');
+    expect((await oneEvent(session.id, 'came_back')).occurredAt).toEqual(wentSilent.occurredAt);
   });
 
   it('records a join at the instant its offset deviceTime names', async () => {

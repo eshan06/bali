@@ -8,6 +8,40 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-14** — **A `came_back` is the server's: stamped when the server heard the phone, held to
+  the window and never before the `went_silent` it closes (a fix, #385).** Found by PV11b's santa
+  review (#383). Decision 7 says the pair is server-minted, but the engine stamped the `came_back`
+  with the claim of whatever closed the episode: a check-in's `deviceTime`, or the clamped time of a
+  tap, refocus, unlock or protection off. So a phone whose clock is behind, and any record made out of
+  contact (an unlock queued offline, sent on reconnect, from an honest phone too), put the return
+  before the silence. R2 holds each time to no earlier than the one before it, so that silence
+  counted 0 minutes and its time went to focus: 24 focused and 0 silent where it was 21 and 3 (the
+  regression test, `apps/api/test/reports.test.ts`), and a clock set back shrank any silence by its
+  skew, rule 1's v2 bug. The student panel and the recap, which place moments by time, listed
+  "back" before "silent". **The fix:** `closeOpenSilence` is the one place a `came_back` is minted
+  now (the check-in closes its episode through it), stamped `heard`: the request's `now`, the API's
+  clock, where the engine takes one (check-in, tap, refocus, Screen Time back on), else `heardNow()`
+  (unlock, protection off), the clock `last_seen_at` takes. Clamped to the window, and never before
+  the student's latest `went_silent` in the session, read from the event: the sweep stamps it by its
+  own clock, which another process's or a test's can put ahead. A check-in takes no time from the
+  phone at all (`CheckInInput` lost `deviceTime` and gained `now`), so the engine cannot stamp with
+  it again; the route still requires and checks `deviceTime`, as /v1 ships it. The device's time
+  keeps every other role: each record's own clamped time, and A10–A14's order. *Weighed:* the
+  marker's own time (`silent_since`) as the floor: no read, but a check-in reads it before its
+  transaction, and an extend moves the window the `went_silent` was clamped to; the event is exact,
+  one indexed read when an episode closes. **Where a figure moves:** R2 ends a silence at the next
+  record. On the check-in path that is the `came_back`; a tap, a return, an unlock or a protection off
+  that closes an episode is recorded just before its `came_back` and ends the silence at its own
+  time, so there the fix moves the moments' order, and for a clock behind holds what follows to the
+  server's time, as R2 holds any time to the one before it. **Compatibility:** no shape changes, and a correction, not a behaviour
+  change (API decision 2). Events already recorded on dev and prod stay as they are: an old session
+  whose silence a slow clock closed early still reports it short or at 0, its time as focus, and
+  lists that "back" before its "silent"; from this deploy on, new episodes are timed right. **Tests:**
+  R2 and the feed through the real check-in route; each other contact path claiming a time before
+  the silence; a sweep's clock ahead; the timestamps suite's check-in (it pinned the claim); a fast
+  and a slow clock's check-in moved to the route's tests, where the claim arrives now; and on real
+  Postgres, two check-ins racing to close one episode, one `came_back` at the server's time.
+
 - **2026-10-14** — **PV12a: the recap's grouping, with no words: who joined and every unlock are
   R2's, the moments the panel's, and an unlock always breaks "the whole time".** For PV12b's recap,
   as [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (version 21) draws

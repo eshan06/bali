@@ -1231,20 +1231,19 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
             : rival === 'refocus'
               ? refocus(db, change())
               : protectionOff(db, change());
-        const [back] = await Promise.all([
-          checkIn(db, { sessionId: session.id, studentId, deviceTime: new Date() }),
-          move,
-        ]);
+        const [back] = await Promise.all([checkIn(db, { sessionId: session.id, studentId }), move]);
 
         expect(back.status).toBe('live');
         const row = one(await liveParticipations(session.id));
         expect(row.state).toBe(
           rival === 'unlock' ? 'unlocked' : rival === 'refocus' ? 'focused' : 'protection_off',
         );
-        // One episode, closed exactly once, by whichever contact won.
+        // One episode, closed exactly once, by whichever contact won, and at the
+        // server's time, so never before it opened.
         expect(row.silentSince).toBeNull();
-        expect(await eventsOfType(session.id, 'went_silent')).toHaveLength(1);
-        expect(await eventsOfType(session.id, 'came_back')).toHaveLength(1);
+        const silent = one(await eventsOfType(session.id, 'went_silent'));
+        const cameBack = one(await eventsOfType(session.id, 'came_back'));
+        expect(cameBack.occurredAt.getTime()).toBeGreaterThanOrEqual(silent.occurredAt.getTime());
       }
     }
   }, 120_000);
@@ -1690,9 +1689,10 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
   });
 
   // The mirror of the sweep race, on the close side: two heartbeats landing at
-  // once on one open episode must close it with exactly one came_back. The
-  // guarded UPDATE (silent_since IS NOT NULL) in checkIn is what holds this.
-  it('two concurrent check-ins closing one episode emit exactly one came_back', async () => {
+  // once on one open episode must close it with exactly one came_back, stamped
+  // when the server heard them (decision 7). The guarded UPDATE (silent_since
+  // IS NOT NULL) in closeOpenSilence, which checkIn closes it through, holds this.
+  it('two concurrent check-ins closing one episode emit exactly one came_back, at the server’s time', async () => {
     for (let round = 0; round < 12; round += 1) {
       const tag = `race-comeback-${round}`;
       const school = one(
@@ -1745,9 +1745,10 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
         .where(eq(participations.sessionId, session.id));
       await markSilentParticipations(db, new Date());
 
+      const heard = Date.now();
       await Promise.all([
-        checkIn(db, { sessionId: session.id, studentId: student.id, deviceTime: new Date() }),
-        checkIn(db, { sessionId: session.id, studentId: student.id, deviceTime: new Date() }),
+        checkIn(db, { sessionId: session.id, studentId: student.id }),
+        checkIn(db, { sessionId: session.id, studentId: student.id }),
       ]);
 
       const comebacks = await db
@@ -1755,6 +1756,9 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
         .from(events)
         .where(and(eq(events.sessionId, session.id), eq(events.type, 'came_back')));
       expect(comebacks).toHaveLength(1);
+      const back = one(comebacks).occurredAt.getTime();
+      expect(back).toBeGreaterThanOrEqual(heard);
+      expect(back).toBeLessThanOrEqual(Date.now());
       const participation = one(
         await db.select().from(participations).where(eq(participations.sessionId, session.id)),
       );
