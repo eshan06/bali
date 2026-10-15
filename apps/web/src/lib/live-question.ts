@@ -6,7 +6,8 @@ import { newEventId } from './event-id';
 /*
  * The class page's live question (Phase 7, L6; ARCHITECTURE, "Live lesson", decisions 3, 6, 7 and
  * 11), tested and holding no words: L7 says each answer as the approved portal canvas does. Asking
- * it and closing it, what the stream says of it, and its results, polled.
+ * it and closing it, what the stream says of it, its results, polled, and a Done told to the
+ * browser's other Bali windows.
  */
 
 /** Why a call didn't go through, typed for the screen to say; never thrown. */
@@ -150,6 +151,48 @@ export function questionAfter(
     return { ...current, open: false, revealed: revealed === true };
   }
   return current;
+}
+
+/**
+ * A Done one window tells the others (L7, part 3): the question it put away, and its session. Every
+ * Bali window of this browser holding that question, or an older one of that session, puts it away
+ * too, so Present in a second window goes back to its grid as this one does.
+ */
+export interface DoneNews {
+  sessionId: string;
+  questionId: string;
+}
+
+/** The channel every Bali window of this browser tells its Done on. */
+export const DONE_CHANNEL = 'bali-question-done';
+
+/** One window's end of the channel: `tell` the others its Done; `close`, and it hears no more. */
+export interface DoneChannel {
+  tell(news: DoneNews): void;
+  close(): void;
+}
+
+/**
+ * Hear the Done every other Bali window of this browser tells (`onDone`), and tell them this one's,
+ * on a `BroadcastChannel`, which never hands a window its own; a message of another shape is no
+ * news. A browser without one tells and hears nothing, and Done stays the window's own.
+ */
+export function doneChannel(
+  onDone: (news: DoneNews) => void,
+  Channel: typeof BroadcastChannel | undefined = globalThis.BroadcastChannel,
+): DoneChannel {
+  if (Channel === undefined) return { tell: () => {}, close: () => {} };
+  const channel = new Channel(DONE_CHANNEL);
+  channel.onmessage = ({ data }: MessageEvent<unknown>) => {
+    const { sessionId, questionId } = (data ?? {}) as Partial<Record<keyof DoneNews, unknown>>;
+    if (typeof sessionId === 'string' && typeof questionId === 'string') {
+      onDone({ sessionId, questionId });
+    }
+  };
+  return {
+    tell: ({ sessionId, questionId }) => channel.postMessage({ sessionId, questionId }),
+    close: () => channel.close(),
+  };
 }
 
 /** A results poll as the card shows it. */

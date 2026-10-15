@@ -171,7 +171,11 @@ alone; and the reconnect pill there too, and for a first connect past 3 s. A liv
 there in the grid's place since L7's part 2 (2026-10-15), as PresentQuestion and PresentAnswer draw
 it: "N of M answered" while it is open, each answer's count once it is closed and its last read is
 in, the correct answer only once shown; its intermediate states as PresentQuestionStates and
-PresentQuestionPhone draw them (drawn on the canvas first).
+PresentQuestionPhone draw them (drawn on the canvas first). Since L7's part 3 (2026-10-15) its card's
+foot holds the class page's own Close and Close and show answer, then Done in their place once it is
+closed, as PresentQuestionControls, PresentAnswerControls and PresentControlsStates draw them (the
+owner's approval, 2026-10-15); Ask another question stays off it. Done, there or on the class page,
+puts the question away in every Bali window of the browser.
 The unlock pop-up is v2's since PV10 (2026-10-14): ClassUnlock's, opened beside its
 tile's pulse, newest on top, each until it is closed, on the live page alone and never
 in Present. The student panel is v2's since PV11b (2026-10-14): ClassStudent's, 372 px from

@@ -1,6 +1,18 @@
-import { CircleCheck } from 'lucide-react';
+'use client';
 
-import { BEHIND, isOpen, letterOf, type LiveQuestion } from '@/components/question-card';
+import { CircleCheck } from 'lucide-react';
+import { useEffect, useRef } from 'react';
+
+import {
+  BEHIND,
+  closeButtons,
+  closeFailedLine,
+  doneButton,
+  isOpen,
+  letterOf,
+  type LiveQuestion,
+  ROW,
+} from '@/components/question-card';
 
 /**
  * v2.css's `.p-card`: 20 px corners, 36 × 44 px in, its parts 28 px apart, the card "Class is
@@ -28,11 +40,27 @@ const RIGHT = 'border-2 border-bar-right bg-option-right px-5.75 py-5.25';
  * answers (ARCHITECTURE, Live lesson, decision 11); under 3 answers no count at all, the server's
  * guard (`counts` null), never one of the portal's own. The correct answer only once students are
  * shown it. Under 1024 px the count goes under the question and the answers one to a row.
+ *
+ * Its foot (L7, part 3; PresentQuestionControls, PresentAnswerControls, PresentControlsStates): the
+ * class page's own Close and Close and show answer at its right while the question is open, so the
+ * teacher closes it without leaving Present, and Done in their place once it is closed, the live
+ * grid coming back; Ask another question stays on the class page, whose panel lists the saved
+ * questions with their answers. Under the buttons, a close that didn't go through.
  */
 export function PresentQuestion({ id, lesson }: { id: string; lesson: LiveQuestion }) {
-  const { question: q, results: r } = lesson;
-  if (q === null) return null;
+  const { question: q, results: r, closing } = lesson;
   const open = isOpen(lesson);
+  // A close sent from here that landed: Done takes its buttons' place, and the focus they took
+  // with them; never focus that went elsewhere meanwhile.
+  const foot = useRef<HTMLDivElement>(null);
+  const sent = useRef(false);
+  useEffect(() => {
+    if (sent.current && !open && document.activeElement === document.body) {
+      foot.current?.querySelector('button')?.focus();
+    }
+    sent.current = closing;
+  });
+  if (q === null) return null;
   const totals = r?.results ?? null;
   const last = !open && r?.final === true;
   // The server's guarded count: null under 3 answers (decision 3).
@@ -114,11 +142,22 @@ export function PresentQuestion({ id, lesson }: { id: string; lesson: LiveQuesti
           );
         })}
       </ul>
-      <p className="text-present-line text-text-secondary">
-        {open
-          ? 'Answer in Bali on your phone.'
-          : 'Bali shows only these totals, never who picked what.'}
-      </p>
+      {/* The foot line, the buttons at its right or, too narrow for both, under it; under them a
+          close that didn't go through. */}
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+          <p className="text-present-line text-text-secondary">
+            {open
+              ? 'Answer in Bali on your phone.'
+              : 'Bali shows only these totals, never who picked what.'}
+          </p>
+          {/* Done gives way to the live grid: focus on to Present in the header. */}
+          <div ref={foot} className={ROW}>
+            {open ? closeButtons(lesson) : doneButton(lesson, `${id}-present`)}
+          </div>
+        </div>
+        {closeFailedLine(lesson, true)}
+      </div>
     </section>
   );
 }

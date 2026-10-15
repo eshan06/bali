@@ -10,6 +10,8 @@ import {
   closeAttemptFor,
   type CloseAttempt,
   closeQuestion,
+  type DoneChannel,
+  doneChannel,
   type Failure,
   failureOf,
   type OpenAnswer,
@@ -45,6 +47,7 @@ export interface LiveQuestion {
   /** A close that didn't go through, with the choice Try again sends again. */
   closeFailed: { reveal: boolean } | null;
   close: (reveal: boolean) => void;
+  /** Put it away (Done), here and in every Bali window of this browser. */
   done: () => void;
 }
 
@@ -148,6 +151,25 @@ export function useLiveQuestion(sessionId: string | null) {
     };
   }, [sessionId, read]);
 
+  // Done reaches every Bali window of this browser (L7, part 3): one pressed here puts the question
+  // away in the others too, so Present in a second window goes back to its grid, and theirs here.
+  const told = useRef<DoneChannel | null>(null);
+  useEffect(() => {
+    const channel = doneChannel((news) => {
+      const { session, question } = now.current;
+      if (session !== news.sessionId) return;
+      // Closed, and so is any older question of its session (the newer one's open closed it), so
+      // no read brings either back.
+      if (news.questionId > newest.current) newest.current = news.questionId;
+      if (question !== null && question.id <= news.questionId) put(session, null);
+    });
+    told.current = channel;
+    return () => {
+      channel.close();
+      told.current = null;
+    };
+  }, [put]);
+
   const id = held.session === sessionId ? (held.question?.id ?? null) : null;
   useEffect(() => {
     if (id === null) return;
@@ -230,14 +252,85 @@ export function useLiveQuestion(sessionId: string | null) {
     closing,
     closeFailed: question && closeFailed?.id === question.id ? closeFailed : null,
     close: (reveal) => void close(reveal),
-    done: () => put(now.current.session, null),
+    done: () => {
+      const { session, question: shown } = now.current;
+      put(session, null);
+      if (session !== null && shown !== null) {
+        told.current?.tell({ sessionId: session, questionId: shown.id });
+      }
+    },
   };
   return { lesson, onEvent, ask, opening, forgetAsk };
 }
 
 /** v2.css's `.lesson` head: the title or the kicker, then its buttons. */
 const HEAD = 'flex flex-wrap items-center justify-between gap-x-6 gap-y-3';
-const ROW = 'flex flex-wrap items-center gap-2.5';
+/** v2.css's `.row`: a card's buttons, 10 px apart. */
+export const ROW = 'flex flex-wrap items-center gap-2.5';
+
+/*
+ * A question's own buttons, the class page's card and Present's alike (L7; LessonLive, LessonClosed,
+ * LessonStates; PresentQuestionControls, PresentAnswerControls, PresentControlsStates), in the class
+ * page's words and through the hook's one close and one Done.
+ */
+
+/**
+ * While it is open: Close, and Close and show answer when it has a correct one, both held while a
+ * close is on its way.
+ */
+export const closeButtons = ({ question, closing, close }: LiveQuestion) => (
+  <>
+    <Button variant="secondary" onClick={() => close(false)} aria-disabled={closing}>
+      Close
+    </Button>
+    {question === null || question.correctOption === null ? null : (
+      <Button variant="secondary" onClick={() => close(true)} aria-disabled={closing}>
+        Close and show answer
+      </Button>
+    )}
+  </>
+);
+
+/**
+ * A close that didn't go through, said while the question is still open, Try again sending the same
+ * choice again: on the class page under the card's head; in Present at its size, under the buttons
+ * and at their right, Try again a full-size button (PresentControlsStates).
+ */
+export function closeFailedLine(lesson: LiveQuestion, present = false) {
+  const { closeFailed: failed, closing, close } = lesson;
+  if (failed === null || !isOpen(lesson)) return null;
+  return (
+    <div className={`flex flex-wrap items-center gap-x-4 gap-y-3${present ? ' justify-end' : ''}`}>
+      <p role="alert" className={present ? 'text-present-line' : 'text-body'}>
+        Bali couldn&apos;t close the question.
+      </p>
+      <Button
+        variant="secondary"
+        size={present ? 'md' : 'sm'}
+        onClick={() => close(failed.reveal)}
+        aria-disabled={closing}
+      >
+        Try again
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * Once it is closed: Done, which puts it away here and in every Bali window of this browser (the
+ * hook's `done`), focus going on to `then`, what is left in its place.
+ */
+export const doneButton = ({ done }: LiveQuestion, then: string) => (
+  <Button
+    variant="secondary"
+    onClick={() => {
+      done();
+      window.requestAnimationFrame(() => document.getElementById(then)?.focus());
+    }}
+  >
+    Done
+  </Button>
+);
 
 /**
  * The class page's "Questions and slides" card (L7; LessonClass, LessonWaiting, LessonLive,
@@ -260,7 +353,7 @@ export function QuestionCard({
   asking: boolean;
   onAsk: () => void;
 }) {
-  const { question: q, results: r, closing, closeFailed } = lesson;
+  const { question: q, results: r } = lesson;
   const ask = (words: string, variant: 'primary' | 'secondary') => (
     <Button
       id={`${id}-ask`}
@@ -304,56 +397,17 @@ export function QuestionCard({
         </p>
         <div className={ROW}>
           {open ? (
-            <>
-              <Button
-                variant="secondary"
-                onClick={() => lesson.close(false)}
-                aria-disabled={closing}
-              >
-                Close
-              </Button>
-              {q.correctOption === null ? null : (
-                <Button
-                  variant="secondary"
-                  onClick={() => lesson.close(true)}
-                  aria-disabled={closing}
-                >
-                  Close and show answer
-                </Button>
-              )}
-            </>
+            closeButtons(lesson)
           ) : (
             <>
               {ask('Ask another question', 'secondary')}
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  lesson.done();
-                  // Its place goes with it: on to the card's own Ask a question.
-                  window.requestAnimationFrame(() => document.getElementById(`${id}-ask`)?.focus());
-                }}
-              >
-                Done
-              </Button>
+              {/* Its place goes with it: on to the card's own Ask a question. */}
+              {doneButton(lesson, `${id}-ask`)}
             </>
           )}
         </div>
       </div>
-      {open && closeFailed ? (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-          <p role="alert" className="text-body">
-            Bali couldn&apos;t close the question.
-          </p>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => lesson.close(closeFailed.reveal)}
-            aria-disabled={closing}
-          >
-            Try again
-          </Button>
-        </div>
-      ) : null}
+      {closeFailedLine(lesson)}
       {r?.problem && !r.final ? (
         <p
           role="status"

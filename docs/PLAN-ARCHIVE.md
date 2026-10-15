@@ -10,6 +10,13 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-15 (Central) — #334, a time limit on the portal's polls (#403;
+`docs/DECISIONS.md`, 2026-10-15), W4's prerequisite: a polled read (`getTagged`: the student's
+lesson and L6's results) with no whole answer in 10 s fails as no answer, so a read that hangs is
+said as any failed read is ("as of" on the lesson) and the next read goes on; the stream, the slide
+upload and every other call keep no limit. Before it, L7's part 2, Present's question (#402). Next:
+M6, the presenter; L7c's Questions card goes on PV14's page._
+
 _Last updated: 2026-10-15 (Central) — L7's part 2, Present's question (#402; `docs/DECISIONS.md`,
 2026-10-15), and with it L7: on the projector a live question shows in the grid's place, as
 PresentQuestion and PresentAnswer draw it, totals only: "N of M answered" while it is open, each

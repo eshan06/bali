@@ -6,7 +6,14 @@ import { createElement, type ReactElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
-import { isOpen, type LiveQuestion, QuestionCard } from './question-card';
+import {
+  closeButtons,
+  closeFailedLine,
+  doneButton,
+  isOpen,
+  type LiveQuestion,
+  QuestionCard,
+} from './question-card';
 
 /*
  * The class page's "Questions and slides" card with a question in it (L7-1a; LessonWaiting,
@@ -259,15 +266,19 @@ describe('a question closed (LessonClosed, LessonStates)', () => {
     expect(html).toMatch(
       /<button type="button" id="L-ask" aria-expanded="false" class="[^"]*">[^]*?Ask another question<\/button>/,
     );
-    const frame = vi.fn();
+    const frame = vi.fn<(then: () => void) => void>();
+    const focus = vi.fn();
+    const getElementById = vi.fn(() => ({ focus }));
     vi.stubGlobal('window', { requestAnimationFrame: frame });
+    vi.stubGlobal('document', { getElementById });
     press(l, 'Done');
-    vi.unstubAllGlobals();
     expect(l.done).toHaveBeenCalled();
     expect(frame).toHaveBeenCalledOnce();
-    expect(source).toMatch(
-      /window\.requestAnimationFrame\(\(\) => document\.getElementById\(`\$\{id\}-ask`\)\?\.focus\(\)\);/,
-    );
+    // The next frame, once the card is at rest: focus on its Ask a question.
+    frame.mock.calls[0]?.[0]();
+    vi.unstubAllGlobals();
+    expect(getElementById).toHaveBeenCalledWith('L-ask');
+    expect(focus).toHaveBeenCalledOnce();
     expect(html).not.toMatch(/>Close</);
   });
 
@@ -281,6 +292,89 @@ describe('a question closed (LessonClosed, LessonStates)', () => {
     expect(html).toContain('<p class="mt-3.5 text-body">The bell closed this question.</p>');
     // Before the bell, another tab's close on its way: closed, said as any close.
     expect(render(l, '2026-10-15T15:05:00Z')).not.toContain('The bell');
+  });
+});
+
+describe('its buttons, the class page’s card and Present’s alike (L7, part 3)', () => {
+  /** A piece rendered on its own, and its buttons by their words, to press. */
+  const markup = (node: ReactNode) => renderToStaticMarkup(createElement('div', null, node));
+
+  it('are one copy, in the class page’s words: the card says them through it', () => {
+    // Close and Close and show answer, Done and the close that didn't go through: one copy each,
+    // which Present's foot says too (present-question.tsx).
+    for (const words of [
+      '>\\s*Close\\s*<',
+      '>\\s*Close and show answer\\s*<',
+      '>\\s*Done\\s*<',
+      'Bali couldn&apos;t close the question\\.',
+      '>\\s*Try again\\s*<',
+    ]) {
+      expect(source.match(new RegExp(words, 'g'))).toHaveLength(1);
+    }
+    expect(source).toMatch(/\{open \? \(\s*closeButtons\(lesson\)\s*\) : \(/);
+    expect(source).toMatch(/\{doneButton\(lesson, `\$\{id\}-ask`\)\}/);
+    expect(source).toMatch(/\{closeFailedLine\(lesson\)\}/);
+  });
+
+  it('Close and Close and show answer close through the hook, held while a close is on its way', () => {
+    const close = vi.fn();
+    const l = lesson({ close });
+    expect(markup(closeButtons(l))).toMatch(
+      /^<div><button type="button" aria-disabled="false" class="[^"]*\bh-10\b[^"]*">Close<\/button><button type="button" aria-disabled="false" class="[^"]*\bh-10\b[^"]*">Close and show answer<\/button><\/div>$/,
+    );
+    const click = buttons(closeButtons(l));
+    click.get('Close')?.();
+    click.get('Close and show answer')?.();
+    expect(close.mock.calls).toEqual([[false], [true]]);
+    expect(
+      markup(closeButtons(lesson({ closing: true }))).match(/aria-disabled="true"/g),
+    ).toHaveLength(2);
+    // No correct answer: Close alone (PresentControlsStates, as on the class page).
+    expect(markup(closeButtons(lesson({ question: question({ correctOption: null }) })))).toMatch(
+      /^<div><button [^>]*>Close<\/button><\/div>$/,
+    );
+  });
+
+  it('says a close that didn’t go through while the question is open, Present’s at its size', () => {
+    const l = lesson({ closeFailed: { reveal: false } });
+    // The class page's, under its head: the body's size, a small Try again.
+    expect(markup(closeFailedLine(l))).toMatch(
+      /^<div><div class="flex flex-wrap items-center gap-x-4 gap-y-3"><p role="alert" class="text-body">Bali couldn&#x27;t close the question\.<\/p><button type="button" aria-disabled="false" class="[^"]*\bh-8\.5\b[^"]*">Try again<\/button><\/div><\/div>$/,
+    );
+    // Present's (PresentControlsStates): 20/28, at the right, a full-size Try again.
+    expect(markup(closeFailedLine(l, true))).toMatch(
+      /^<div><div class="flex flex-wrap items-center gap-x-4 gap-y-3 justify-end"><p role="alert" class="text-present-line">Bali couldn&#x27;t close the question\.<\/p><button type="button" aria-disabled="false" class="[^"]*\bh-10\b[^"]*">Try again<\/button><\/div><\/div>$/,
+    );
+    buttons(closeFailedLine(l, true)).get('Try again')?.();
+    expect(l.close).toHaveBeenCalledWith(false);
+    // Held while the close is on its way again; none once it is closed, or with nothing failed.
+    expect(markup(closeFailedLine({ ...l, closing: true }, true))).toContain(
+      'aria-disabled="true"',
+    );
+    const closedSince = lesson(
+      { question: question({ open: false }), closeFailed: { reveal: true } },
+      totals({ open: false }),
+    );
+    expect(closeFailedLine(closedSince, true)).toBeNull();
+    expect(closeFailedLine(lesson(), true)).toBeNull();
+  });
+
+  it('Done puts the question away through the hook, focus going on to what takes its place', () => {
+    const l = lesson({ question: question({ open: false }) });
+    expect(markup(doneButton(l, 'L-present'))).toMatch(
+      /^<div><button type="button" class="[^"]*\bh-10\b[^"]*">Done<\/button><\/div>$/,
+    );
+    const frame = vi.fn<(then: () => void) => void>();
+    const focus = vi.fn();
+    const getElementById = vi.fn(() => ({ focus }));
+    vi.stubGlobal('window', { requestAnimationFrame: frame });
+    vi.stubGlobal('document', { getElementById });
+    buttons(doneButton(l, 'L-present')).get('Done')?.();
+    frame.mock.calls[0]?.[0]();
+    vi.unstubAllGlobals();
+    expect(l.done).toHaveBeenCalledOnce();
+    expect(getElementById).toHaveBeenCalledWith('L-present');
+    expect(focus).toHaveBeenCalledOnce();
   });
 });
 
@@ -377,6 +471,23 @@ describe('its hook (L6’s logic, held for one session)', () => {
     );
     expect(hook).toMatch(
       /if \(answer\.kind === 'closed'\) put\(session, answer\.question\);\s*else setCloseFailed\(\{ id: question\.id, reveal \}\);/,
+    );
+  });
+
+  it('tells its Done to every Bali window of this browser, and puts away what another’s Done names', () => {
+    // Done: away here, then told, with the session and the question's id alone.
+    expect(hook).toMatch(
+      /done: \(\) => \{\s*const \{ session, question: shown \} = now\.current;\s*put\(session, null\);\s*if \(session !== null && shown !== null\) \{\s*told\.current\?\.tell\(\{ sessionId: session, questionId: shown\.id \}\);/,
+    );
+    // Heard: this session's alone, the question it names or an older one (closed when a newer one
+    // opened), and no read brings either back (a read only ever brings a newer one).
+    expect(hook).toMatch(
+      /const channel = doneChannel\(\(news\) => \{\s*const \{ session, question \} = now\.current;\s*if \(session !== news\.sessionId\) return;[^]*?if \(news\.questionId > newest\.current\) newest\.current = news\.questionId;\s*if \(question !== null && question\.id <= news\.questionId\) put\(session, null\);\s*\}\);/,
+    );
+    expect(hook).toMatch(/if \(q && q\.id > newest\.current\) put\(session, q\);/);
+    // One channel for the page's life, closed as it goes.
+    expect(hook).toMatch(
+      /told\.current = channel;\s*return \(\) => \{\s*channel\.close\(\);\s*told\.current = null;\s*\};\s*\}, \[put\]\);/,
     );
   });
 
