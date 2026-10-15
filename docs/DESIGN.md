@@ -167,7 +167,11 @@ tiles since PV8 (2026-10-14), on the class page and in Present alike, a
 phone's with one detail at most since PV9. Present is v2's since PV9 (2026-10-14):
 ClassPresent's page, the class page's own parts one size up, its code in a well of
 its own and +5, +10 and End kept; after the bell PresentEnded's "Class is over"
-alone; and the reconnect pill there too, and for a first connect past 3 s.
+alone; and the reconnect pill there too, and for a first connect past 3 s. A live question shows
+there in the grid's place since L7's part 2 (2026-10-15), as PresentQuestion and PresentAnswer draw
+it: "N of M answered" while it is open, each answer's count once it is closed and its last read is
+in, the correct answer only once shown; its intermediate states as PresentQuestionStates and
+PresentQuestionPhone draw them (drawn on the canvas first).
 The unlock pop-up is v2's since PV10 (2026-10-14): ClassUnlock's, opened beside its
 tile's pulse, newest on top, each until it is closed, on the live page alone and never
 in Present. The student panel is v2's since PV11b (2026-10-14): ClassStudent's, 372 px from
@@ -403,7 +407,11 @@ semibold, `entry-title` (20/26: an entry page's card title) and `button-lg`
 `live-edge` (green-200, a live card's edge, v2.css's `.livecard`), its sizes all named already; L7
 a live question's results' three colours, `bar` (stone-500, an option's bar), `bar-right`
 (green-600, the correct one's) and `letter-right` (green-100, the correct option's letter, v2.css's
-`.right .letter`), which L7b's Your questions takes for its correct answer's letter too.
+`.right .letter`), which L7b's Your questions takes for its correct answer's letter too; and L7's
+part 2, Present's question, three sizes, `present-kicker` (14/15, semibold, uppercase: its
+"Question"), `present-tag` (14/20, semibold, uppercase: "Correct answer") and `present-line` (20/28,
+regular: its count's words, its foot and the guard's line), and the colour `option-right` (green-50,
+the correct answer's fill once shown, v2.css's `.p-opt.right`).
 
 Density: the teacher's live grid is dense (many students at a glance); the
 student app is airy and simple. Theme: **light, everywhere.** The app and the

@@ -1,7 +1,7 @@
 import { STREAM_HEARTBEAT_MS, type UnlockReason } from '@bali/shared';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -11,10 +11,16 @@ import {
   COLUMNS,
   FIRST_CONNECT_MS,
   healthOf,
+  LiveGrid,
   PRESENT_COLUMNS,
   stateCounts,
   Tile,
 } from './live-grid';
+
+// The grid's sign-out routes to /login; its first render needs no router beyond this.
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ replace: () => undefined, push: () => undefined }),
+}));
 import { CLOCK_OFF } from './student-panel';
 
 /*
@@ -492,7 +498,37 @@ describe('the grid’s lines on the class page while a session runs (PV7)', () =
 
   it('says a lost stream in the floating pill, and a quiet one in the stone line over the grid', () => {
     expect(source).toMatch(
-      /\{stale && !over \? \(\s*livePage && stale\.reason === 'reconnecting' \? \(\s*<div className=\{PILL_LAYER\}>\s*<p className=\{PILL\}>\s*<span aria-hidden="true" className="size-1\.75 shrink-0 rounded-full bg-pip" \/>\s*\{staleWords\(stale\)\}[^]*?\) : \(\s*<p className="rounded-sm border border-border-default bg-surface-sunken px-4 py-3 text-body text-text-primary tabular-nums">/,
+      /const health =\s*stale && !over \? \(\s*livePage && stale\.reason === 'reconnecting' \? \(\s*<div className=\{PILL_LAYER\}>\s*<p className=\{PILL\}>\s*<span aria-hidden="true" className="size-1\.75 shrink-0 rounded-full bg-pip" \/>\s*\{staleWords\(stale\)\}[^]*?\) : \(\s*<p className="rounded-sm border border-border-default bg-surface-sunken px-4 py-3 text-body text-text-primary tabular-nums">/,
+    );
+    // Over the tiles.
+    expect(source).toMatch(
+      /<div className="flex flex-col gap-3">\s*\{health\}\s*\{rows\.length === 0/,
+    );
+  });
+
+  it('gives its tiles’ place to Present’s question, its stream and its own lines kept (L7, part 2)', () => {
+    // Off, no tile and no loading line; a boot that failed still says so with Try again, and the
+    // grid's health is said alone, so a lost stream is still the pill over the question.
+    expect(source).toMatch(/tiles = true,/);
+    expect(source).toMatch(
+      /if \(!students\) \{\s*return tiles \? \(\s*<p role="status" className="text-body text-text-secondary">\s*Loading grid…\s*<\/p>\s*\) : null;\s*\}/,
+    );
+    expect(source).toMatch(
+      /if \(!tiles\) return health;\s*const rows = Object\.values\(students\);/,
+    );
+    const error = source.indexOf('if (error) {');
+    expect(error).toBeGreaterThan(-1);
+    expect(error).toBeLessThan(source.indexOf('if (!tiles) return health;'));
+    // Every hook runs before either return, so the stream and the counts go on underneath.
+    expect(source.slice(source.indexOf('if (error) {'))).not.toMatch(/\buse[A-Z]\w*\(/);
+  });
+
+  it('draws no tile and no loading line while the question has its place, and both otherwise', () => {
+    const before = (tiles: boolean) =>
+      renderToStaticMarkup(createElement(LiveGrid, { sessionId: 's1', tiles }));
+    expect(before(false)).toBe('');
+    expect(before(true)).toBe(
+      '<p role="status" class="text-body text-text-secondary">Loading grid…</p>',
     );
   });
 

@@ -130,6 +130,11 @@ const V2_SIZES: Record<string, [string, string, number, string?]> = {
   'button-lg': ['16px', '20px', 600],
   // The recap's (PV12b): its axis's times.
   axis: ['12px', '16px', 400],
+  // Present's question (L7, part 2): its kicker, the correct answer's tag, and its lines (the
+  // count's words, its foot and the guard's line).
+  'present-kicker': ['14px', '15px', 600, '0.05em'],
+  'present-tag': ['14px', '20px', 600, '0.05em'],
+  'present-line': ['20px', '28px', 400],
 };
 /** The sizes §1 lists that the scale has, each its style: [style, size, line height]. */
 const ON_SCALE = [
@@ -436,7 +441,7 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     }
   });
 
-  it('beside them, only border-input, the side menu’s avatar (PV5), a dialog’s backdrop (PV6), the reconnect pill’s dot (PV7), the unlock pop-up’s edge (PV10) and Open student (PV11b), the recap’s marks (PV12b), a live card’s edge (W3), and a question’s bars and correct letter (L7; the letter on Your questions too, L7b)', () => {
+  it('beside them, only border-input, the side menu’s avatar (PV5), a dialog’s backdrop (PV6), the reconnect pill’s dot (PV7), the unlock pop-up’s edge (PV10) and Open student (PV11b), the recap’s marks (PV12b), a live card’s edge (W3), a question’s bars and correct letter (L7; the letter on Your questions too, L7b), and the correct answer’s fill on the projector (L7, part 2)', () => {
     const named = [...inline.keys()].filter((k) => k.startsWith('--color-'));
     const semanticNames = semantic(tokens.color.tokens).map((t) =>
       t.name === 'focus-ring-color' ? '--color-focus-ring' : `--color-${t.name}`,
@@ -451,6 +456,7 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
       '--color-live-edge',
       '--color-mark',
       '--color-mark-off',
+      '--color-option-right',
       '--color-pip',
       '--color-scrim',
       '--color-unlock-edge',
@@ -465,7 +471,15 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     expect(inline.get('--color-bar-right')).toBe('var(--bali-green-600)');
     expect(inline.get('--color-letter-right')).toBe('var(--bali-green-100)');
     expect(contrast(hexOf('green-700', 'light'), hexOf('green-100', 'light'))).toBeGreaterThan(4.5);
-    // Reports' opened row's green-50 (PV13) went with the row: a session has its own page (PV14).
+    // The correct answer on the projector once shown (L7, part 2): green-50, as v2.css's
+    // `.p-opt.right` fills it, its 2 px edge the correct bar's green-600; its words in the primary
+    // ink and its tag in the brand's, small text at 4.5:1 and more. (Reports' opened row had
+    // green-50 first, PV13, and it went with the row in PV14.)
+    expect(inline.get('--color-option-right')).toBe('var(--bali-green-50)');
+    expect(contrast(hexOf('green-700', 'light'), hexOf('green-50', 'light'))).toBeGreaterThan(4.5);
+    expect(contrast(hexOf('text-primary', 'light'), hexOf('green-50', 'light'))).toBeGreaterThan(
+      4.5,
+    );
     // The recap's marks' rings, as v2.css's `.mk` draws them: stone-400, and red-300 for a
     // protection off (an unlock's is `unlock-edge`). Graphics, not text: 1.4.11 asks 3:1 of a
     // control's edge, and a mark is no control; its icon is in its state's ink.
@@ -682,14 +696,15 @@ describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
     // pills; on Reports (PV13) its table's head, its bars' tracks and the place-lost notice, drawn
     // as the stale banner is; and on Help (PV15, SupportPage) the two lists of what a teacher sees,
     // drawn so too; a live question's (L7) options' letters, and its "Results can't refresh", drawn
-    // as the stale banner is; on Your questions (L7b) the answers' letters; and Your slides' (M5b)
-    // file tiles and an upload's progress track.
+    // as the stale banner is, on the class page and in Present (L7, part 2); on Your questions
+    // (L7b) the answers' letters; and Your slides' (M5b) file tiles and an upload's progress track.
     expect(filled).toEqual({
       [join('app', 'classes', '[id]', 'page.tsx')]: 1,
       [join('app', 'support', 'page.tsx')]: 1,
       [join('components', 'join-code.tsx')]: 1,
       [join('components', 'live-grid.tsx')]: 1,
       [join('components', 'policy-draft.tsx')]: 1,
+      [join('components', 'present-question.tsx')]: 2,
       [join('components', 'question-card.tsx')]: 2,
       [join('components', 'reports-list.tsx')]: 3,
       [join('components', 'saved-questions.tsx')]: 1,

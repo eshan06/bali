@@ -366,6 +366,7 @@ export function LiveGrid({
   onStudentPanel,
   present = false,
   livePage = false,
+  tiles = true,
 }: {
   sessionId: string;
   /** Called with `sessionId` once the server marks the session over: an end event, or a snapshot. */
@@ -398,6 +399,12 @@ export function LiveGrid({
    * until PV12.
    */
   livePage?: boolean;
+  /**
+   * Off while Present's question shows in the grid's place (L7, part 2; PresentQuestion): the
+   * tiles and their loading line give way, and the stream, the counts and the grid's own lines
+   * (its health, a boot that failed) stay, so nothing reboots as the question comes and goes.
+   */
+  tiles?: boolean;
 }) {
   const api = useApi();
   const onUnauthorized = useSignOut();
@@ -584,11 +591,11 @@ export function LiveGrid({
     );
   }
   if (!students) {
-    return (
+    return tiles ? (
       <p role="status" className="text-body text-text-secondary">
         Loading grid…
       </p>
-    );
+    ) : null;
   }
 
   const stale = staleness({
@@ -598,6 +605,24 @@ export function LiveGrid({
     now: now.getTime(),
     heartbeatMs: STREAM_HEARTBEAT_MS,
   });
+  // The grid's health (§4): stone, never amber; honest, not alarmed.
+  const health =
+    stale && !over ? (
+      livePage && stale.reason === 'reconnecting' ? (
+        <div className={PILL_LAYER}>
+          <p className={PILL}>
+            <span aria-hidden="true" className="size-1.75 shrink-0 rounded-full bg-pip" />
+            {staleWords(stale)}
+          </p>
+        </div>
+      ) : (
+        <p className="rounded-sm border border-border-default bg-surface-sunken px-4 py-3 text-body text-text-primary tabular-nums">
+          {staleWords(stale)}
+        </p>
+      )
+    ) : null;
+  // Present's question in the tiles' place (PresentQuestionStates): the grid's own line alone.
+  if (!tiles) return health;
   const rows = Object.values(students);
   const open = (studentId: string) => {
     onStudentPanel?.();
@@ -609,21 +634,7 @@ export function LiveGrid({
 
   return (
     <div className="flex flex-col gap-3">
-      {/* The grid's health (§4): stone, never amber; honest, not alarmed. */}
-      {stale && !over ? (
-        livePage && stale.reason === 'reconnecting' ? (
-          <div className={PILL_LAYER}>
-            <p className={PILL}>
-              <span aria-hidden="true" className="size-1.75 shrink-0 rounded-full bg-pip" />
-              {staleWords(stale)}
-            </p>
-          </div>
-        ) : (
-          <p className="rounded-sm border border-border-default bg-surface-sunken px-4 py-3 text-body text-text-primary tabular-nums">
-            {staleWords(stale)}
-          </p>
-        )
-      ) : null}
+      {health}
       {rows.length === 0 ? (
         <p className="text-body text-text-secondary">No students enrolled yet.</p>
       ) : (

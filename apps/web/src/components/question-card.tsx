@@ -28,6 +28,8 @@ import { useApi } from '@/lib/use-api';
 
 /** "A" to "F", an option's letter. */
 export const letterOf = (i: number) => String.fromCharCode(65 + i);
+/** Results that can't refresh (LessonStates), said on the class page's card and in Present's. */
+export const BEHIND = "These totals may be behind. Bali can't reach the server and keeps trying.";
 /** An option's letter in its 28 px circle (v2.css's `.letter`), the correct one's green. */
 export const letterClass = (right: boolean) =>
   `grid size-7 shrink-0 place-items-center rounded-full text-data font-semibold ${right ? 'bg-letter-right text-text-brand' : 'bg-surface-sunken text-text-primary'}`;
@@ -357,7 +359,7 @@ export function QuestionCard({
           role="status"
           className="rounded-sm border border-border-default bg-surface-sunken px-4 py-3 text-body text-text-primary"
         >
-          These totals may be behind. Bali can&apos;t reach the server and keeps trying.
+          {BEHIND}
         </p>
       ) : null}
       <div className="flex flex-wrap items-start gap-x-10 gap-y-5">

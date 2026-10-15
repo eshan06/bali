@@ -8,6 +8,52 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-15** — **L7's part 2: Present's question in the live grid's place, built to the canvas;
+  its intermediate states drawn on the canvas first; each answer's count only from Bali's last read
+  after the close.** Built to
+  [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4): PresentQuestion and
+  PresentAnswer at 1920 × 1080, and two boards drawn for it under #398's rule, each labelled an
+  intermediate state, version 41: PresentQuestionStates (before Bali's first count, the totals that
+  can't refresh, closed with its last count on its way, closed without the answer shown, closed
+  under 3 answers, and the reconnect pill, the quiet line and a grid that didn't load over the
+  question) and PresentQuestionPhone (the question at 390 px) (#402). **The room sees totals only,
+  never anything about one student** (ARCHITECTURE, Live lesson, decision 11): "N of M answered"
+  while the question is open, however many have answered (past the guard the teacher's own card has
+  the breakdown, the projector never), and each answer's count and bar only once it is closed and
+  Bali's last read after the close is in (L6's `final`, the read the class page's card calls "Final
+  count"), so the room sees each count once and never watches one move. *Weighed:* the counts as the
+  close is heard, from the last read while it was open, the final read then correcting them (a count
+  could step once on the projector, after a classmate's last-second answer). Under 3 answers none,
+  by the server's guard alone (`counts` null, no threshold of the portal's), said as the report says
+  it: "Too few answers to show a breakdown." under the question. **The correct answer only once
+  students are shown it** (Close and show answer), marked as PresentAnswer draws it, its bar green;
+  closed without it (Close, the bell, no correct answer) nothing is marked and every bar is grey, so
+  the projector never tells the class what Close kept from their phones; while open nothing is
+  marked. **The grid stays underneath:** Present shows the class page's one live question (the open
+  one, or a closed one until Done or the next), so the projector and the teacher's card never
+  differ; `LiveGrid`'s new `tiles` is off while it shows: no tile and no loading line, while the
+  stream, the header's counts and the grid's own lines stay (the pill, the quiet line, a boot that
+  failed, as PresentQuestionStates draws them over the question), so nothing reboots as the
+  question comes and goes. The counts' bar goes too, as the boards draw none, and the section names
+  no live grid while it holds the question; the class page's card and its side panel stay out of
+  Present. **As the boards render:** `.app h2`'s margin 0 outranks `.p-prompt`'s 10 px, so the
+  question sits right under its kicker. But PresentAnswer's closed kicker renders 14/18, its
+  `.kicker.quiet` taking the line height of v2.css's link class `.quiet`: built 14/15 like the open
+  one, as L7-1a built the class page's closed kicker like its open one, so nothing moves 3 px as the
+  question closes. **Narrow** (PresentQuestionPhone): under 1024 px the count goes under the
+  question and the answers one to a row, so no width breaks it. **Tokens:** the sizes
+  `present-kicker` (14/15), `present-tag` (14/20) and `present-line` (20/28), and the colour
+  `option-right` (green-50, `.p-opt.right`'s fill, its 2 px edge `bar-right`'s green-600); "These
+  totals may be behind…" one constant both cards say (`BEHIND`). **Left as it is:** Done is the
+  tab's own (L7-1a), so with Present in a second tab (a projector window beside the teacher's) a
+  closed question stays there until the next is asked or Done is pressed in that tab; and
+  PresentQuestion's "Answer in Bali on your phone." stands though students answer on the web too
+  once W4 lands. **The screenshots:** on dev from the owner's tab, Present on the demo class with
+  Ana, Ben, Cal and Dana answering through the API: two and then four while open, closed with the
+  answer shown, closed under 3 answers, closed without it, Present after Done, and at 390 px; the
+  sharp ones from the real components with the boards' data in a throwaway page in the preview
+  alone, deleted after.
+
 - **2026-10-15** — **PV14: a session's report on a page and a URL of its own, as ReportOpened
   draws it; R2 says when the session ran; the class page's recap opens it, and so does each Reports
   row.** Built to [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4):
