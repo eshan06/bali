@@ -223,7 +223,10 @@ export async function runUpload(
   const { signal, onStep, onCreated, now = () => performance.now(), put = putPdf } = opts;
   let upload = start;
   let deck = upload.deck;
-  const stopped = (failure: Failure): UploadEnd => ({ kind: 'stopped', failure, upload });
+  // A Cancel ends the run cancelled, whatever came after it: a step it couldn't stop (the read, the
+  // create or the check, which take no signal) that then failed is no stop to show (santa's review).
+  const stopped = (failure: Failure): UploadEnd =>
+    signal.aborted ? { kind: 'cancelled', upload } : { kind: 'stopped', failure, upload };
   if (!upload.uploaded || deck === null) {
     onStep({ step: 'uploading', fraction: 0 });
     try {
@@ -259,6 +262,8 @@ export async function runUpload(
     }
     upload = { ...upload, uploaded: true };
   }
+  // A Cancel that came as the bucket answered: no check is asked, and the deck is the Cancel's.
+  if (signal.aborted) return { kind: 'cancelled', upload };
   onStep({ step: 'checking' });
   try {
     const checked = await api.post<DeckResponse>(`${PATH}/${deck.id}/complete`, {

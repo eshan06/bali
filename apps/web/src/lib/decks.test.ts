@@ -570,6 +570,63 @@ describe('an upload, from the file to the server’s verdict', () => {
     expect(again.completeId).not.toBe(upload.completeId);
   });
 
+  it.each([
+    ['no answer', new NetworkError()],
+    ['a 503', new ApiError(503, 'unavailable', 'down')],
+    ['a 429', new ApiError(429, 'too_many_requests', 'slow down', undefined, 1)],
+  ])(
+    'ends cancelled, never stopped, when Cancel came while the create was on its way and it got %s (santa’s review)',
+    async (_, error) => {
+      let fail: (e: unknown) => void = () => undefined;
+      const { api, calls } = fakeApi(
+        () =>
+          new Promise((_resolve, reject) => {
+            fail = reject;
+          }),
+      );
+      const { ended, controller } = run(api, newUpload(file(), 'Unit 3 review'));
+      await vi.waitFor(() => expect(calls).toHaveLength(1));
+      controller.abort();
+      fail(error);
+      expect(await ended).toMatchObject({ kind: 'cancelled', upload: { deck: null } });
+      expect(FakeXhr.made).toHaveLength(0);
+    },
+  );
+
+  it('ends cancelled when Cancel came as the PDF finished sending: no check is asked', async () => {
+    const { api, calls } = deckApi();
+    const controller = new AbortController();
+    const end = await runUpload(api, newUpload(file(), 'Unit 3 review'), {
+      signal: controller.signal,
+      onStep: () => undefined,
+      put: () => {
+        // The bucket's answer and the Cancel at once: the PUT ended before its abort.
+        controller.abort();
+        return Promise.resolve('uploaded');
+      },
+    });
+    expect(end).toMatchObject({ kind: 'cancelled', upload: { deck: deck(), uploaded: true } });
+    expect(calls.map(([, path]) => path)).toEqual(['/v1/decks']);
+  });
+
+  it('ends cancelled when Cancel came while the file was read and the read then failed', async () => {
+    const { api, calls } = deckApi();
+    const controller = new AbortController();
+    const unreadable = {
+      size: 10,
+      arrayBuffer: () => {
+        controller.abort();
+        return Promise.reject(new Error('NotReadableError'));
+      },
+    } as unknown as Blob;
+    const end = await runUpload(api, newUpload(unreadable, 'Offline'), {
+      signal: controller.signal,
+      onStep: () => undefined,
+    });
+    expect(end).toMatchObject({ kind: 'cancelled', upload: { deck: null } });
+    expect(calls).toEqual([]);
+  });
+
   it('stops on a refused create, the refusal typed for the page', async () => {
     const { api } = fakeApi(() => {
       throw new ApiError(429, 'too_many_requests', 'slow down', undefined, 2);

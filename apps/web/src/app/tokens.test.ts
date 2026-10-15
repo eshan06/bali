@@ -622,20 +622,27 @@ describe('every page and piece uses the tokens’ utilities, never a Tailwind de
   const SIZE = /\btext-(?:xs|sm|base|lg|\d?xl)\b/;
   const TYPE =
     /\b(?:tracking|leading)-(?:tighter|tight|snug|normal|relaxed|loose|wide|wider|widest)\b/;
+  // A field is the Field, so what is typed in it is the input size (the owner's ruling); a radio
+  // types nothing (the class page's length picker), nor does a hidden file picker (Your slides'
+  // Upload a PDF, M5b): `hidden` the attribute, never `aria-hidden`, which leaves one in sight.
+  const RAW_INPUT = /<input\b(?![^>]*type="radio")(?![^>]*type="file"[^>]*\shidden(?=[\s/>=]))/;
+
+  it('lets no raw input through but a radio or a hidden file picker', () => {
+    expect('<input type="radio" name="len" />').not.toMatch(RAW_INPUT);
+    expect('<input ref={picker} type="file" accept=".pdf" hidden onChange={x} />').not.toMatch(
+      RAW_INPUT,
+    );
+    expect('<input type="file" aria-hidden="true" />').toMatch(RAW_INPUT);
+    expect('<input type="file" />').toMatch(RAW_INPUT);
+    expect('<input type="text" hidden />').toMatch(RAW_INPUT);
+  });
 
   it.each(DRAWN)('%s', (file) => {
     const source = read(`../${file}`);
     expect(source).not.toMatch(COLOUR);
     expect(source).not.toMatch(SIZE);
     expect(source).not.toMatch(TYPE);
-    // A field is the Field, so what is typed in it is the input size (the owner's ruling); a radio
-    // types nothing (the class page's length picker), nor does a hidden file picker (Your slides'
-    // Upload a PDF, M5b).
-    if (file !== 'components/field.tsx') {
-      expect(source).not.toMatch(
-        /<input\b(?![^>]*type="radio")(?![^>]*type="file"[^>]*\bhidden\b)/,
-      );
-    }
+    if (file !== 'components/field.tsx') expect(source).not.toMatch(RAW_INPUT);
   });
 });
 

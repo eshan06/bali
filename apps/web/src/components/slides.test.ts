@@ -564,6 +564,15 @@ describe('the page’s wiring (app/slides/page.tsx)', () => {
     );
   });
 
+  it('frees a stopped row’s buttons, and takes a cancelled or gone deck off the list (santa’s review)', () => {
+    // A stop never follows a Cancel (`runUpload` ends it cancelled); the row's buttons are free.
+    expect(page).toMatch(
+      /state: \{ step: 'stopped', why: failure \?\? \{ kind: 'too_slow' \} \},\s*cancelling: false,/,
+    );
+    expect(page).toMatch(/if \(deck\) unlist\(deck\.id\);\s*show\(key, null\);/);
+    expect(page).toMatch(/\} else if \(deckId\) unlist\(deckId\);/);
+  });
+
   it('runs Try again on from where it stopped, or afresh once the API refused it', () => {
     expect(page).toMatch(/uploadAgain\(\{ failure: at\.failure, upload: at\.upload \}\)/);
   });

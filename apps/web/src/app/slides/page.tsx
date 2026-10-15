@@ -123,10 +123,12 @@ export default function SlidesPage() {
     const controller = new AbortController();
     held.current.set(key, { upload, controller, running: true, failure: null, near: [] });
     let percent = 0;
+    let deckId = upload.deck?.id ?? null;
     const end = await runUpload(api, upload, {
       signal: controller.signal,
       onCreated: (deck) => {
-        if (open.current) show(key, { deckId: deck.id });
+        deckId = deck.id;
+        if (open.current) show(key, { deckId });
       },
       onStep: (step) => {
         if (!open.current || controller.signal.aborted) return;
@@ -140,19 +142,29 @@ export default function SlidesPage() {
     if (!open.current) return;
     const at = held.current.get(key);
     if (end.kind === 'cancelled') return void cancelled(key, end.upload, at?.near ?? []);
+    // The check took the row's buttons away: focus it lost comes back to the row's button now.
+    if (document.activeElement === document.body) setFocus([`${idOf(key)}-act`]);
     if (end.kind === 'checked' || end.kind === 'gone') {
       held.current.delete(key);
       // The verdict: the row turns into its deck, the same element, so its line is said.
       if (end.kind === 'checked') {
         setMade((m) => [{ key, deck: end.deck }, ...m.filter((x) => x.deck.id !== end.deck.id)]);
-        // Its Cancel went with the check: focus it lost lands on the deck's Remove.
-        if (document.activeElement === document.body) setFocus([`${idOf(key)}-act`]);
-      }
+      } else if (deckId) unlist(deckId);
       return show(key, null);
     }
     const failure = end.kind === 'stopped' ? end.failure : null;
     held.current.set(key, { upload: end.upload, controller, running: false, failure, near: [] });
-    show(key, { state: { step: 'stopped', why: failure ?? { kind: 'too_slow' } } });
+    // A stop never follows a Cancel (`runUpload` ends it cancelled); its buttons are free all the same.
+    show(key, {
+      state: { step: 'stopped', why: failure ?? { kind: 'too_slow' } },
+      cancelling: false,
+    });
+  }
+
+  /** A deck gone from the list: the API's, and those made here. */
+  function unlist(deckId: string) {
+    setDecks((d) => (Array.isArray(d) ? d.filter((x) => x.id !== deckId) : d));
+    setMade((m) => m.filter((x) => x.deck.id !== deckId));
   }
 
   /**
@@ -171,6 +183,7 @@ export default function SlidesPage() {
     }
     const row = document.getElementById(`${idOf(key)}-name`)?.closest('li');
     const from = document.activeElement;
+    if (deck) unlist(deck.id);
     show(key, null);
     if (!from || from === document.body || row?.contains(from)) setFocus([...near, TITLE]);
   }
@@ -208,8 +221,7 @@ export default function SlidesPage() {
     // Focus moves on from the row that goes, never from where the teacher has gone since.
     const row = document.getElementById(`${idOf(key)}-name`)?.closest('li');
     const from = document.activeElement;
-    setDecks((d) => (Array.isArray(d) ? d.filter((x) => x.id !== deckId) : d));
-    setMade((m) => m.filter((x) => x.deck.id !== deckId));
+    unlist(deckId);
     removal(deckId, null);
     if (!from || from === document.body || row?.contains(from)) setFocus([...near, TITLE]);
   }
