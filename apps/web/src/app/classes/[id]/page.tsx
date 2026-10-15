@@ -7,7 +7,7 @@ import {
   type SessionView,
   type StartSessionResponse,
 } from '@bali/shared';
-import { ArrowLeft, ArrowRight, ChartBar, Check, Presentation } from 'lucide-react';
+import { ChartBar, Check, Presentation } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
@@ -20,11 +20,9 @@ import { LiveGrid, type StateCounts } from '@/components/live-grid';
 import { LiveCounts, LiveHeader } from '@/components/live-header';
 import { RecapCard } from '@/components/recap-card';
 import { usePresenting } from '@/components/shell';
-import { NAV_LINK } from '@/components/text-link';
 import { getAccessToken } from '@/lib/auth';
 import { errText, NOT_A_SESSION_LENGTH, SESSION_ALREADY_RUNNING } from '@/lib/errors';
 import {
-  bellTime,
   DEFAULT_MINUTES,
   EXTEND_PRESETS,
   type ExtendAttempt,
@@ -43,14 +41,11 @@ import {
 import { useApi } from '@/lib/use-api';
 
 /**
- * The page in Present, the projector's view, with no menu (the owner's ruling, 2026-10-13, as
- * ClassPresent draws it): its own column as before the menu, 1400 px at most with 40 px gutters, so
- * a 1024 px projector keeps Present's four columns, until PV9 draws Present.
+ * The page in Present, the projector's view (ClassPresent, PresentEnded): no menu, the shell
+ * drawing none (PV5), the page 36/48/40 in and at least the screen's height, its parts 22 px apart,
+ * as v2.css's `.proj` draws it. A 1024 px projector still shows four columns (`PRESENT_COLUMNS`).
  */
-const PRESENT_PAGE = 'mx-auto max-w-[1400px] px-4 pb-16 sm:px-10';
-
-/** A hairline between the bell and the controls, 40 px tall as the buttons are. */
-const DIVIDER = 'h-10 w-px shrink-0 bg-border-default';
+const PRESENT_PAGE = 'relative flex min-h-dvh flex-col gap-5.5 px-4 pt-9 pb-10 sm:px-12';
 
 /**
  * The length picker, v2's segmented control (ClassBefore): a grey track holding each length as a
@@ -79,12 +74,13 @@ const students = (count: number) => `${count} ${count === 1 ? 'student' : 'stude
  * Error card holds the session's place: a session may be live. While one runs (PV7; ClassLive,
  * ClassStale, ClassStates' lines during a session): the header with the ring, "Live · 25 of 28
  * joined" and the join code, the countdown and the bell, +5, +10 and End; the class counted by state
- * beside Present, then the live grid, and no roster: the grid names every student. In Present, the
- * projector's page as it was until PV9 draws it: the header folds the bell, the code with New code
- * and the controls into one row, so a class of 28 fits one 1080p screen, the roster under the grid.
- * Each failure is said where it happened. It sits in the shell's frame beside the side menu (PV5),
- * which sets its width and gutters; in Present the shell draws neither, and the page keeps its own
- * column (`PRESENT_PAGE`).
+ * beside Present, then the live grid, and no roster: the grid names every student. In Present
+ * (PV9; ClassPresent), the same parts one size up for the projector, the code in a well of its own
+ * and +5, +10 and End kept beside Present (the owner, 2026-10-12), so a class of 28 fits one 1080p
+ * screen; after the bell there "Class is over" alone (PresentEnded, as PV1 approved), the figures
+ * left to the recap. Each failure is said where it happened. It sits in the shell's frame beside
+ * the side menu (PV5), which sets its width and gutters; in Present the shell draws neither, and
+ * the page sets its own (`PRESENT_PAGE`).
  */
 export default function ClassDetailPage() {
   const api = useApi();
@@ -127,9 +123,15 @@ export default function ClassDetailPage() {
   const [present, setPresent] = useState(false);
   // On the projector, no menu: the shell draws none while Present is on.
   usePresenting(present);
-  // The page opened in Present: with no session to show, the recap carries the toggle, so the
-  // teacher can always leave it.
-  const [openedInPresent, setOpenedInPresent] = useState(false);
+  // The toggle moves as it is pressed (beside the counts, into Present's header), so focus follows;
+  // to Start where none is left to follow (Present left with no session to show).
+  const toggle = useRef<HTMLButtonElement>(null);
+  const start = useRef<HTMLButtonElement>(null);
+  const toggled = useRef(false);
+  useEffect(() => {
+    if (toggled.current) (toggle.current ?? start.current)?.focus();
+    toggled.current = false;
+  }, [present]);
   // Extend (P10): the last attempt whose answer never came, resent by Try again; and what is said
   // beside the grid: a failure (with Try again), a refusal or an End that failed (its button is
   // the retry), or a note on the session shown.
@@ -178,9 +180,7 @@ export default function ClassDetailPage() {
     const remembered = pickFor(rememberedMinutes(classId));
     setPick(remembered.pick);
     setOther(remembered.other);
-    const kept = rememberedPresent(classId);
-    setPresent(kept);
-    setOpenedInPresent(kept);
+    setPresent(rememberedPresent(classId));
   }, [classId]);
 
   // The grid says when the server marks its session over (the bell's sweep, an End from another
@@ -289,21 +289,22 @@ export default function ClassDetailPage() {
     });
   }
 
-  // Present, the projector the class can see (DESIGN.md §5), beside the grid, live or ended: it
-  // reaches the recap too, so a session that ends while projected shows no unlock's reason, and
-  // pressing it again shows them. Pressed is its check, with the Button's sunken fill and
-  // `text-primary` edge, never colour alone. `beside` is the live page's (PV7): small, beside the
-  // counts at the bar's end, and hidden on a phone, which never drives a projector (PV1).
-  const presentToggle = (beside = false) => (
+  // Present, the projector the class can see (DESIGN.md §5): beside the live grid's counts, small
+  // and hidden on a phone, which never drives a projector (PV1; `beside`), in Present's header, and
+  // beside How it ended. Pressed is its check, with the Button's sunken fill and `text-primary`
+  // edge, never colour alone.
+  const presentToggle = (beside = false, className = '') => (
     <Button
+      ref={toggle}
       variant="secondary"
       size={beside ? 'sm' : 'md'}
       aria-pressed={present}
       onClick={() => {
         rememberPresent(classId, !present);
+        toggled.current = true;
         setPresent(!present);
       }}
-      className={beside ? 'ml-auto max-sm:hidden' : ''}
+      className={beside ? 'ml-auto max-sm:hidden' : className}
     >
       {present ? (
         <Check size={16} aria-hidden="true" />
@@ -314,20 +315,6 @@ export default function ClassDetailPage() {
     </Button>
   );
 
-  // The bell in Present's header, the page's biggest number; "…" until an answer or a snapshot
-  // says it.
-  const endsAt = (
-    <p className="flex flex-col">
-      <span className="text-caption text-text-tertiary">Ends at</span>
-      {grid?.endsAt ? (
-        <time dateTime={grid.endsAt} className="font-num text-data-lg tabular-nums">
-          {bellTime(grid.endsAt)}
-        </time>
-      ) : (
-        <span className="font-num text-data-lg text-text-tertiary">…</span>
-      )}
-    </p>
-  );
   const extend = EXTEND_PRESETS.map((add) => (
     <Button
       key={add}
@@ -352,154 +339,110 @@ export default function ClassDetailPage() {
   // The live grid counted, once its session's grid is read.
   const counts = grid !== null && counted?.session === grid.id ? counted.counts : null;
 
-  // While a session runs (PV7): one tree in both views, each part in its place whether Present is
-  // on or off, so the grid never restarts or reconnects as it turns on, and the toggle keeps focus.
+  // The class's line with no session running: "28 students · no session running".
+  const noSession = roster
+    ? `${students(roster.students.length)} · no session running`
+    : 'No session running';
+  // A read again of the class failed, or its roster didn't load: said under the header.
+  const cantLoad = (message: string | null) =>
+    message === null ? null : (
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <p role="alert" className="text-body">
+          Couldn&apos;t load this class. {message}
+        </p>
+        <Button variant="secondary" size="sm" onClick={load}>
+          Try again
+        </Button>
+      </div>
+    );
+
+  // While a session runs (PV7; in Present, PV9): one tree in both views, each part in its place
+  // whether Present is on or off, so the grid never restarts or reconnects as it turns on.
   return klass !== null && grid !== null && !grid.over ? (
-    <main className={present ? `${PRESENT_PAGE} pt-5` : 'relative flex flex-col gap-5.5'}>
-      {present ? (
-        <nav aria-label="Class" className="flex justify-between gap-4">
-          <Link href="/" className={NAV_LINK}>
-            <ArrowLeft size={16} aria-hidden="true" />
-            All classes
-          </Link>
-          <Link href={`/classes/${classId}/reports`} className={NAV_LINK}>
-            Reports
-            <ArrowRight size={16} aria-hidden="true" />
-          </Link>
-        </nav>
-      ) : null}
+    <main className={present ? PRESENT_PAGE : 'relative flex flex-col gap-5.5'}>
+      {/* ClassLive's header, End set apart from adding time, and no New code, which it doesn't
+          draw; ClassPresent's in Present, +5, +10 and End kept there beside Present. */}
+      <LiveHeader
+        name={klass.name}
+        joinCode={klass.joinCode}
+        counts={counts}
+        startedAt={grid.startedAt}
+        endsAt={grid.endsAt}
+        present={present}
+      >
+        {extend}
+        {end('ml-2')}
+        {present ? presentToggle(false, 'ml-2') : null}
+      </LiveHeader>
 
-      {present ? (
-        // Present's header, until PV9 draws it: the bell, the code with New code and the controls
-        // in one row, so a class of 28 fits one 1080p screen.
-        <header className="mt-4 flex min-h-10 flex-wrap items-center gap-x-8 gap-y-4">
-          <h1 className="min-w-0 text-h1 text-balance break-words">{klass.name}</h1>
-          {endsAt}
-          <div className="grow" />
-          <JoinCode classId={classId} code={klass.joinCode} onClass={setKlass} large />
-          <div aria-hidden="true" className={`${DIVIDER} max-lg:hidden`} />
-          <div className="flex flex-wrap items-center gap-2">
-            {extend}
-            {end()}
-          </div>
-        </header>
-      ) : (
-        // ClassLive's header, End set apart from adding time; no New code, which it doesn't draw.
-        <LiveHeader
-          name={klass.name}
-          joinCode={klass.joinCode}
-          counts={counts}
-          startedAt={grid.startedAt}
-          endsAt={grid.endsAt}
-        >
-          {extend}
-          {end('ml-2')}
-        </LiveHeader>
-      )}
+      {/* A roster's failure waits for the page that shows one, after the bell. */}
+      {cantLoad(error)}
 
-      {/* A read again of the class failed, or its roster didn't load where a roster shows
-          (Present's): said under the header. Off Present a roster's failure waits for the page
-          that shows one, after the bell. */}
-      {(present ? (error ?? rosterError) : error) ? (
-        <div className={`flex flex-wrap items-center gap-x-4 gap-y-3 ${present ? 'mt-6' : ''}`}>
-          <p role="alert" className="text-body">
-            Couldn&apos;t load this class.{' '}
-            <span className={present ? 'text-text-secondary' : undefined}>
-              {present ? (error ?? rosterError) : error}
-            </span>
+      {/* Said right under the controls, where they are. */}
+      {said ? (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+          <p role={said.kind === 'note' ? 'status' : 'alert'} className="text-body">
+            {said.message}
           </p>
-          <Button variant="secondary" size={present ? 'md' : 'sm'} onClick={load}>
-            Try again
-          </Button>
+          {said.kind === 'failed' ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                const again = unanswered.current;
+                if (again) addTime(again);
+              }}
+              aria-disabled={busy !== null}
+            >
+              Try again
+            </Button>
+          ) : null}
         </div>
       ) : null}
-
-      {/* The said line and the grid's section in one place in both views; off Present they are the
-          page's own parts, 22 px apart. */}
-      <div className={present ? undefined : 'contents'}>
-        {/* Said right under the controls, where they are. */}
-        {said ? (
-          <div className={`flex flex-wrap items-center gap-x-4 gap-y-3 ${present ? 'mt-4' : ''}`}>
-            <p role={said.kind === 'note' ? 'status' : 'alert'} className="text-body">
-              {said.message}
-            </p>
-            {said.kind === 'failed' ? (
-              <Button
-                variant="secondary"
-                size={present ? 'md' : 'sm'}
-                onClick={() => {
-                  const again = unanswered.current;
-                  if (again) addTime(again);
-                }}
-                aria-disabled={busy !== null}
-              >
-                Try again
-              </Button>
-            ) : null}
-          </div>
-        ) : null}
-        <section
-          aria-labelledby={present ? `${id}-live` : undefined}
-          aria-label={present ? undefined : 'Live grid'}
-          className={`flex flex-col ${present ? 'mt-5 gap-3' : 'gap-5.5'}`}
-        >
-          {/* The counts and Present over the grid (ClassLive); in Present, its heading and Present. */}
-          <div
-            className={`flex flex-wrap items-center justify-between ${present ? 'gap-x-6 gap-y-3' : 'gap-x-4 gap-y-2.5'}`}
-          >
-            {present ? (
-              <h2 id={`${id}-live`} className="text-h2">
-                Live grid
-              </h2>
-            ) : counts ? (
-              <LiveCounts counts={counts} />
-            ) : null}
-            {presentToggle(!present)}
-          </div>
-          <LiveGrid
-            sessionId={grid.id}
-            onEnded={onEnded}
-            onSession={onSession}
-            onCounts={onCounts}
-            present={present}
-            livePage={!present}
-          />
-        </section>
-      </div>
-
-      {/* No roster while a session runs: the grid names every student. Present keeps it until PV9. */}
-      {present ? (
-        <section
-          aria-labelledby={`${id}-roster`}
-          className="mt-14 border-t border-border-default pt-8"
-        >
-          <h2 id={`${id}-roster`} className="text-h2">
-            Roster
-          </h2>
-          {/* Unread, it says so under the header with Try again, never "Loading…" here. */}
-          {roster === null ? (
-            rosterError ? null : (
-              <p role="status" className="mt-4 text-body text-text-secondary">
-                Loading…
-              </p>
-            )
-          ) : roster.students.length === 0 ? (
-            <p className="mt-4 text-body text-text-secondary">No students have joined yet.</p>
-          ) : (
-            <ul className="mt-4 columns-2 gap-x-6 sm:columns-3 sm:gap-x-10 lg:columns-4">
-              {roster.students.map((s) => (
-                <li key={s.enrollmentId} className="break-inside-avoid py-2 text-body break-words">
-                  {s.displayName ?? s.studentId.slice(0, 8)}
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      ) : null}
+      <section aria-label="Live grid" className="flex flex-col gap-5.5">
+        {/* The counts and Present over the grid (ClassLive); in Present the counts alone. */}
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5">
+          {counts ? <LiveCounts counts={counts} present={present} /> : null}
+          {present ? null : presentToggle(true)}
+        </div>
+        <LiveGrid
+          sessionId={grid.id}
+          onEnded={onEnded}
+          onSession={onSession}
+          onCounts={onCounts}
+          present={present}
+          livePage
+        />
+      </section>
+    </main>
+  ) : klass !== null && present ? (
+    // After the bell in Present (PresentEnded, as PV1 approved): the header, its ring whole, and
+    // "Class is over" alone, the figures left to the recap, where the class can't misread them.
+    <main className={PRESENT_PAGE}>
+      <LiveHeader
+        name={klass.name}
+        joinCode={klass.joinCode}
+        counts={null}
+        startedAt={null}
+        endsAt={null}
+        present
+        over={noSession}
+      >
+        {presentToggle()}
+      </LiveHeader>
+      {cantLoad(error ?? rosterError)}
+      <section
+        aria-labelledby={`${id}-over`}
+        className="flex flex-1 flex-col items-center justify-center rounded-lg border border-border-default bg-surface-card px-11 py-9 shadow-1"
+      >
+        <h2 id={`${id}-over`} className="text-present-question">
+          Class is over
+        </h2>
+      </section>
     </main>
   ) : (
     // No session running (PV6), or the class not read yet: v2's look, its parts 22 px apart.
-    <main className={`flex flex-col gap-5.5 ${present ? `${PRESENT_PAGE} pt-8` : ''}`}>
+    <main className={present ? PRESENT_PAGE : 'flex flex-col gap-5.5'}>
       {/* The name over its line, Reports at the end; on a phone the name at the card titles' size and
           Reports on a line of its own. */}
       <header className="flex flex-wrap items-center gap-x-4.5 gap-y-3.5 max-sm:gap-x-3.5">
@@ -511,11 +454,7 @@ export default function ClassDetailPage() {
           </h1>
           {/* Its line's place held while the class is read, so nothing under it moves. */}
           <p className="mt-0.5 text-meta text-text-secondary">
-            {klass === null
-              ? '\u00a0'
-              : roster
-                ? `${students(roster.students.length)} · no session running`
-                : 'No session running'}
+            {klass === null ? '\u00a0' : noSession}
           </p>
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2 max-sm:ml-0 max-sm:basis-full">
@@ -527,16 +466,7 @@ export default function ClassDetailPage() {
       </header>
 
       {/* The class is read and its roster isn't (or a read again failed): said under the header. */}
-      {klass && (error ?? rosterError) ? (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-          <p role="alert" className="text-body">
-            Couldn&apos;t load this class. {error ?? rosterError}
-          </p>
-          <Button variant="secondary" size="sm" onClick={load}>
-            Try again
-          </Button>
-        </div>
-      ) : null}
+      {klass ? cantLoad(error ?? rosterError) : null}
 
       {klass === null ? (
         // Until the class is read, the session's place holds no Start: one may already be live.
@@ -588,7 +518,12 @@ export default function ClassDetailPage() {
                   ))}
                 </div>
                 {/* One button throughout, so focus stays on it whatever it comes to say. */}
-                <Button type="submit" aria-disabled={busy !== null} aria-busy={busy === 'start'}>
+                <Button
+                  ref={start}
+                  type="submit"
+                  aria-disabled={busy !== null}
+                  aria-busy={busy === 'start'}
+                >
                   {busy === 'start'
                     ? 'Starting…'
                     : minutes === null
@@ -636,14 +571,12 @@ export default function ClassDetailPage() {
             </fieldset>
           </form>
           {/* The last session's recap (R4) until a new one starts; only once the class is read,
-              so a session already running never shows it. Opened in Present with no grid under
-              it, the recap carries the toggle. */}
-          <RecapCard
-            classId={classId}
-            present={present}
-            toggle={grid === null && openedInPresent ? presentToggle() : null}
-          />
-          {/* As it ended, until the next Start (R5): who was still unlocked stays in view. */}
+              so a session already running never shows it. Present after the bell is its own page,
+              which says only that class is over, so `present` is off here; passed all the same, so
+              no reason ever reaches the projector should that change. */}
+          <RecapCard classId={classId} present={present} />
+          {/* As it ended, until the next Start (R5): who was still unlocked stays in view. Present,
+              beside it, shows the room only that class is over. */}
           {grid ? (
             <section aria-labelledby={`${id}-ended`} className="flex flex-col gap-4">
               <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
@@ -697,7 +630,7 @@ export default function ClassDetailPage() {
                 Join code
               </h2>
               <div className={CARD_ALONE}>
-                <JoinCode classId={classId} code={klass.joinCode} onClass={setKlass} card />
+                <JoinCode classId={classId} code={klass.joinCode} onClass={setKlass} />
               </div>
             </section>
           </div>

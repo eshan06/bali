@@ -4,11 +4,8 @@ import { type ReactNode, useEffect, useState } from 'react';
 
 import { bellTime } from '@/lib/session-controls';
 
+import { CODE_CHIP } from './join-code';
 import { CHIP, COUNTED, type StateCounts } from './live-grid';
-
-/** The ring's circle (ClassLive): r 19.5 in a 44 px box, stroked 5. */
-const R = 19.5;
-const AROUND = 2 * Math.PI * R;
 
 /** "23:14", "1:05:00": the time left in whole seconds, rounded up, so the bell itself reads 0:00. */
 export function timeLeft(ms: number): string {
@@ -55,21 +52,34 @@ function useClock(endsAt: string | null): number {
   return now;
 }
 
-/** The session's ring (ClassLive): the time left as a green arc from the top, on its track. */
-function Ring({ share }: { share: number }) {
+/**
+ * The session's ring: the time left as a green arc from the top, on its track. ClassLive's is 44 px,
+ * r 19.5, stroked 5; ClassPresent's one size up, 64 px, r 28.5, stroked 7.
+ */
+function Ring({ share, big }: { share: number; big: boolean }) {
+  const [box, stroke] = big ? [64, 7] : [44, 5];
+  const c = box / 2;
+  const r = c - stroke / 2;
+  const around = 2 * Math.PI * r;
   return (
-    <svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true" className="shrink-0">
-      <circle cx="22" cy="22" r={R} fill="none" strokeWidth="5" className="stroke-arc-track" />
+    <svg
+      width={box}
+      height={box}
+      viewBox={`0 0 ${box} ${box}`}
+      aria-hidden="true"
+      className="shrink-0"
+    >
+      <circle cx={c} cy={c} r={r} fill="none" strokeWidth={stroke} className="stroke-arc-track" />
       {share > 0 ? (
         <circle
-          cx="22"
-          cy="22"
-          r={R}
+          cx={c}
+          cy={c}
+          r={r}
           fill="none"
-          strokeWidth="5"
+          strokeWidth={stroke}
           strokeLinecap="round"
-          strokeDasharray={`${(share * AROUND).toFixed(1)} ${AROUND.toFixed(1)}`}
-          transform="rotate(-90 22 22)"
+          strokeDasharray={`${(share * around).toFixed(1)} ${around.toFixed(1)}`}
+          transform={`rotate(-90 ${c} ${c})`}
           className="stroke-arc-fill"
         />
       ) : null}
@@ -77,13 +87,31 @@ function Ring({ share }: { share: number }) {
   );
 }
 
+/** The header's type: ClassLive's, and ClassPresent's one size up, read from the back of the room. */
+const TYPE = {
+  live: {
+    title: 'text-page-title text-balance wrap-anywhere max-sm:text-h3',
+    line: 'text-meta',
+    time: 'text-data-lg',
+    sub: 'text-countdown-sub',
+  },
+  present: {
+    title: 'text-present-title text-balance wrap-anywhere',
+    line: 'text-h3 font-normal',
+    time: 'text-present-countdown',
+    sub: 'text-present-caption',
+  },
+};
+
 /**
  * A class's header while a session runs (PV7; ClassLive): the ring, the name over "Live · 25 of 28
  * joined · join code VMAF7E", the countdown to the server's bell on this computer's clock with the
  * bell's time under it, then the controls (`children`) at the end. Until the grid is counted the
  * line says "Live" and the code; until the bell is known the countdown says "…". On a phone, as
  * PhoneClassLive draws it: the name at the card titles' size, the countdown at the right, the
- * controls on a line of their own.
+ * controls on a line of their own. In Present (PV9; ClassPresent) one size up, the code out of the
+ * line in a well of its own at 34/44; after the bell there (`over`, PresentEnded) the ring whole,
+ * that line in place of the live one, and no countdown.
  */
 export function LiveHeader({
   name,
@@ -91,6 +119,8 @@ export function LiveHeader({
   counts,
   startedAt,
   endsAt,
+  present = false,
+  over = null,
   children,
 }: {
   name: string;
@@ -98,39 +128,63 @@ export function LiveHeader({
   counts: StateCounts | null;
   startedAt: string | null;
   endsAt: string | null;
+  present?: boolean;
+  over?: string | null;
   children: ReactNode;
 }) {
-  const now = useClock(endsAt);
+  const now = useClock(over === null ? endsAt : null);
+  const type = TYPE[present ? 'present' : 'live'];
+  const line = over ?? (counts ? `Live · ${counts.joined} of ${counts.total} joined` : 'Live');
+  const share = over !== null ? 1 : startedAt && endsAt ? shareLeft(startedAt, endsAt, now) : 0;
   return (
     <header className="flex flex-wrap items-center gap-x-4.5 gap-y-3.5 max-sm:gap-x-3.5">
-      <Ring share={startedAt && endsAt ? shareLeft(startedAt, endsAt, now) : 0} />
+      <Ring share={share} big={present} />
       <div className="min-w-0 max-sm:flex-1">
-        <h1 className="text-page-title text-balance wrap-anywhere max-sm:text-h3">{name}</h1>
-        <p className="mt-0.5 text-meta text-text-secondary">
-          {counts ? `Live · ${counts.joined} of ${counts.total} joined · ` : 'Live · '}
-          {'join\u00a0code\u00a0'}
-          <span translate="no" className="font-mono font-medium">
+        <h1 className={type.title}>{name}</h1>
+        <p className={`mt-0.5 ${type.line} text-text-secondary`}>
+          {present ? (
+            line
+          ) : (
+            <>
+              {`${line} · `}
+              {'join\u00a0code\u00a0'}
+              <span translate="no" className="font-mono font-medium">
+                {joinCode}
+              </span>
+            </>
+          )}
+        </p>
+      </div>
+      {over === null ? (
+        <p className="flex flex-col border-l border-border-default pl-4.5 max-sm:border-l-0 max-sm:pl-0 max-sm:text-right">
+          {endsAt ? (
+            <>
+              <span className={`font-num ${type.time} tabular-nums`}>
+                {timeLeft(Date.parse(endsAt) - now)}
+              </span>
+              <span className={`${type.sub} text-text-secondary`}>
+                ends <time dateTime={endsAt}>{bellTime(endsAt)}</time>
+              </span>
+            </>
+          ) : (
+            <>
+              <span className={`font-num ${type.time} text-text-tertiary`}>…</span>
+              <span className={type.sub}>{'\u00a0'}</span>
+            </>
+          )}
+        </p>
+      ) : null}
+      {present ? (
+        <p className="ml-3 flex flex-wrap items-center gap-2.5">
+          <span className="text-present-caption text-text-tertiary">Join code</span>
+          <span
+            translate="no"
+            className={`${CODE_CHIP} rounded-frame py-2 pr-4.5 pl-[calc(18px+0.16em)] text-code-present`}
+          >
             {joinCode}
           </span>
         </p>
-      </div>
-      <p className="flex flex-col border-l border-border-default pl-4.5 max-sm:border-l-0 max-sm:pl-0 max-sm:text-right">
-        {endsAt ? (
-          <>
-            <span className="font-num text-data-lg tabular-nums">
-              {timeLeft(Date.parse(endsAt) - now)}
-            </span>
-            <span className="text-countdown-sub text-text-secondary">
-              ends <time dateTime={endsAt}>{bellTime(endsAt)}</time>
-            </span>
-          </>
-        ) : (
-          <>
-            <span className="font-num text-data-lg text-text-tertiary">…</span>
-            <span className="text-countdown-sub">{'\u00a0'}</span>
-          </>
-        )}
-      </p>
+      ) : null}
       <div className="ml-auto flex flex-wrap items-center gap-2 max-sm:ml-0 max-sm:basis-full">
         {children}
       </div>
@@ -141,9 +195,18 @@ export function LiveHeader({
 /**
  * The class right now, counted over the grid (ClassLive): six small chips in their states' tints,
  * icons and words, the count first ("17 Focused", "3 Not here"), a zero too, so none moves as
- * another comes and goes.
+ * another comes and goes. In Present (ClassPresent) one size up: 16/22, 8 × 15 px in, 18 px icons.
  */
-export function LiveCounts({ counts }: { counts: StateCounts }) {
+export function LiveCounts({
+  counts,
+  present = false,
+}: {
+  counts: StateCounts;
+  present?: boolean;
+}) {
+  const size = present
+    ? 'gap-2.25 px-3.75 py-2 text-present-caption'
+    : 'gap-1.5 px-2.5 py-0.75 text-caption';
   return (
     <ul aria-label="The class right now" className="flex flex-wrap items-center gap-2">
       {COUNTED.map((state) => {
@@ -152,9 +215,11 @@ export function LiveCounts({ counts }: { counts: StateCounts }) {
         return (
           <li
             key={state}
-            className={`inline-flex items-center gap-1.5 rounded-full border-[1.5px] px-2.5 py-0.75 text-caption font-medium whitespace-nowrap tabular-nums ${tone}`}
+            className={`inline-flex items-center rounded-full border-[1.5px] ${size} font-medium whitespace-nowrap tabular-nums ${tone}`}
           >
-            {Icon ? <Icon size={13} aria-hidden="true" className="shrink-0" /> : null}
+            {Icon ? (
+              <Icon size={present ? 18 : 13} aria-hidden="true" className="shrink-0" />
+            ) : null}
             {`${counts.counts[state]} ${label}`}
           </li>
         );

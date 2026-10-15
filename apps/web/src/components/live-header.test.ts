@@ -143,6 +143,77 @@ describe('the live header (ClassLive)', () => {
   });
 });
 
+describe('Present’s header (ClassPresent, PresentEnded), one size up', () => {
+  const around = 2 * Math.PI * 28.5;
+  const ring = (html: string) => /<svg[^]*?<\/svg>/.exec(html)?.[0] ?? '';
+
+  it('draws the ring at 64 px, r 28.5, stroked 7, as drawn', () => {
+    vi.useFakeTimers({ now: NOW });
+    const drawn = ring(header({ present: true }));
+    expect(drawn).toMatch(/^<svg width="64" height="64" viewBox="0 0 64 64" aria-hidden="true"/);
+    expect(drawn).toMatch(
+      /<circle cx="32" cy="32" r="28\.5" fill="none" stroke-width="7" class="stroke-arc-track"><\/circle>/,
+    );
+    expect(drawn).toContain(
+      `stroke-dasharray="${((1394 / 3000) * around).toFixed(1)} ${around.toFixed(1)}" transform="rotate(-90 32 32)"`,
+    );
+  });
+
+  it('draws the name at 36/42 over its line at 18/24, the countdown at 44/48, the bell at 16/22', () => {
+    vi.useFakeTimers({ now: NOW });
+    const html = header({ present: true });
+    expect(html).toContain(
+      '<h1 class="text-present-title text-balance wrap-anywhere">Biology, period 3</h1>',
+    );
+    // The code out of the line: it has a well of its own.
+    expect(html).toContain(
+      '<p class="mt-0.5 text-h3 font-normal text-text-secondary">Live · 25 of 28 joined</p>',
+    );
+    expect(html).toContain(
+      `<span class="font-num text-present-countdown tabular-nums">23:14</span><span class="text-present-caption text-text-secondary">ends <time dateTime="${BELL}">${bellTime(BELL)}</time></span>`,
+    );
+    expect(header({ present: true, counts: null })).toContain('text-text-secondary">Live</p>');
+  });
+
+  it('sets the join code in its own well: its label, then the code at 34/44 on its grey chip', () => {
+    vi.useFakeTimers({ now: NOW });
+    const html = header({ present: true });
+    const well =
+      /<p class="ml-3 flex flex-wrap items-center gap-2\.5"><span class="text-present-caption text-text-tertiary">Join code<\/span><span translate="no" class="([^"]*)">VMAF7E<\/span><\/p>/.exec(
+        html,
+      );
+    expect(well?.[1]?.split(' ')).toEqual(
+      expect.arrayContaining([
+        'bg-surface-sunken',
+        'border',
+        'border-border-default',
+        'font-mono',
+        'select-all',
+        'rounded-frame',
+        'py-2',
+        'pr-4.5',
+        'pl-[calc(18px+0.16em)]',
+        'text-code-present',
+      ]),
+    );
+    // Before the controls, as ClassPresent draws it.
+    expect(html.indexOf('Join code')).toBeLessThan(html.indexOf('End session'));
+    expect(header()).not.toContain('text-code-present');
+  });
+
+  it('after the bell draws the ring whole, its line and no countdown (PresentEnded)', () => {
+    vi.useFakeTimers({ now: NOW });
+    const over = '28 students · no session running';
+    const html = header({ present: true, over, counts: null, startedAt: null, endsAt: null });
+    expect(ring(html)).toContain(
+      `stroke-dasharray="${around.toFixed(1)} ${around.toFixed(1)}" transform="rotate(-90 32 32)"`,
+    );
+    expect(html).toContain(`<p class="mt-0.5 text-h3 font-normal text-text-secondary">${over}</p>`);
+    expect(html).not.toMatch(/font-num|ends <time|…/);
+    expect(html).toContain('>VMAF7E</span>');
+  });
+});
+
 describe('the counts over the grid (ClassLive)', () => {
   const html = renderToStaticMarkup(createElement(LiveCounts, { counts: stateCounts(CLASS_LIVE) }));
   const chips = [...html.matchAll(/<li class="([^"]*)">([^]*?)<\/li>/g)];
@@ -195,5 +266,27 @@ describe('the counts over the grid (ClassLive)', () => {
     const none = renderToStaticMarkup(createElement(LiveCounts, { counts: stateCounts([]) }));
     expect(none.match(/<li /g)).toHaveLength(6);
     expect(none).toContain('0 Focused');
+  });
+
+  it('is one size up in Present (ClassPresent): 16/22, 8 × 15 px in, 9 apart, 18 px icons', () => {
+    const big = renderToStaticMarkup(
+      createElement(LiveCounts, { counts: stateCounts(CLASS_LIVE), present: true }),
+    );
+    const items = [...big.matchAll(/<li class="([^"]*)">([^]*?)<\/li>/g)];
+    expect(items).toHaveLength(6);
+    for (const [, classes = '', inner = ''] of items) {
+      const list = classes.split(' ');
+      expect(list).toEqual(
+        expect.arrayContaining([
+          'text-present-caption',
+          'font-medium',
+          'px-3.75',
+          'py-2',
+          'gap-2.25',
+        ]),
+      );
+      expect(list).not.toContain('text-caption');
+      expect(inner).toMatch(/^<svg[^>]*\bwidth="18"/);
+    }
   });
 });
