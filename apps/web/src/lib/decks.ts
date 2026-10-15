@@ -195,6 +195,8 @@ export interface RunOptions {
   /** Cancel, and the page closing. */
   signal: AbortSignal;
   onStep: (step: UploadStep) => void;
+  /** Its deck, pending, as the create answers it: the list then shows it as this upload, once. */
+  onCreated?: (deck: Deck) => void;
   /** A clock that only moves forward, for the upload's limit. */
   now?: () => number;
   /** The PUT, `putPdf`; a test's stand-in. */
@@ -218,7 +220,7 @@ export async function runUpload(
   start: Upload,
   opts: RunOptions,
 ): Promise<UploadEnd> {
-  const { signal, onStep, now = () => performance.now(), put = putPdf } = opts;
+  const { signal, onStep, onCreated, now = () => performance.now(), put = putPdf } = opts;
   let upload = start;
   let deck = upload.deck;
   const stopped = (failure: Failure): UploadEnd => ({ kind: 'stopped', failure, upload });
@@ -244,6 +246,7 @@ export async function runUpload(
     }
     deck = made.deck;
     upload = { ...upload, deck };
+    onCreated?.(deck);
     const sentAll = await put(made.uploadUrl, upload.file, {
       deadline: sent + UPLOAD_LIMIT_MS,
       now,

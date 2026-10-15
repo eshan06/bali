@@ -9,6 +9,7 @@ import {
   LogOut,
   type LucideIcon,
   MessageCircleQuestionMark,
+  Presentation,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -188,14 +189,15 @@ export type MenuRole = 'teacher' | 'student';
 
 /**
  * The menu's pages, each listed only once it exists, never as a dead or disabled link: a teacher's
- * Classes comes with PV16 (between Home and Reports), Slides with M5 (after Questions, L7b's); a
- * student's is Your classes alone (StudentHome). Help sits under the gap, in both.
+ * Classes comes with PV16 (between Home and Reports); a student's is Your classes alone
+ * (StudentHome). Help sits under the gap, in both.
  */
 const PAGES: Record<MenuRole, Item[]> = {
   teacher: [
     { href: '/', label: 'Home', Icon: House },
     { href: '/reports', label: 'Reports', Icon: ChartBar },
     { href: '/questions', label: 'Questions', Icon: MessageCircleQuestionMark },
+    { href: '/slides', label: 'Slides', Icon: Presentation },
   ],
   student: [{ href: '/', label: 'Your classes', Icon: LayoutGrid }],
 };

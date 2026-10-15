@@ -373,6 +373,23 @@ describe('an upload, from the file to the server’s verdict', () => {
     ]);
   });
 
+  it('says its deck as the create answers it, before anything is sent to the bucket', async () => {
+    const { api } = deckApi();
+    const created: Deck[] = [];
+    const ended = runUpload(api, newUpload(file(), 'Unit 3 review'), {
+      signal: new AbortController().signal,
+      onStep: () => undefined,
+      onCreated: (made) => created.push(made),
+      now: () => 0,
+      put: (url, body, opts) => putPdf(url, body, { ...opts, Xhr }),
+    });
+    const xhr = await untilPut();
+    expect(created).toEqual([deck()]);
+    xhr.answer(200);
+    await ended;
+    expect(created).toHaveLength(1);
+  });
+
   it('answers a rejection as the server’s verdict, with why', async () => {
     const rejected = deck({ status: 'rejected', rejection: 'encrypted' });
     const { api } = deckApi(() => ({ outcome: 'checked', deck: rejected }));
