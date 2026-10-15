@@ -53,7 +53,8 @@ describe('the class page before its class is read', () => {
   });
 
   it('has Reports as a small button at the header’s end, and no All classes: the menu has Home', () => {
-    const reports = /<a [^>]*href="\/classes\/c1\/reports"[^>]*>[^]*?<\/a>/.exec(html)?.[0] ?? '';
+    // Reports in the menu, this class picked (PV13).
+    const reports = /<a [^>]*href="\/reports\?class=c1"[^>]*>[^]*?<\/a>/.exec(html)?.[0] ?? '';
     expect(reports).toMatch(/\bh-8\.5\b/);
     expect(reports).toMatch(/\btext-button-sm\b/);
     expect(reports).toMatch(/<svg[^>]*\blucide-chart-bar\b[^>]*>[^]*<\/svg>Reports<\/a>$/);

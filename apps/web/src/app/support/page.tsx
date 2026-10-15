@@ -186,9 +186,9 @@ export default function SupportPage() {
           <Question title="Reports">
             <p>
               When a session ends, its recap shows who joined, the class&apos;s focus and silent
-              minutes, every unlock with its reason, and every time protection went off. Reports, on
-              the class page, lists your past sessions; open one to see its recap. Reports show the
-              class as a whole and never rank students.
+              minutes, every unlock with its reason, and every time protection went off. Reports, in
+              the menu, lists each class&apos;s past sessions; open one to see its recap. Reports
+              show the class as a whole and never rank students.
             </p>
           </Question>
         </Section>

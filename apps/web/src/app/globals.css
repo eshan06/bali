@@ -263,6 +263,21 @@
   --text-present-caption: 16px;
   --text-present-caption--line-height: 22px;
   --text-present-caption--font-weight: 400;
+
+  /* Reports' four (PV13), as v2.css draws them and §1's facts don't list: a class's pill, a bar's
+     row, a table's cell and the line under a cell's words. */
+  --text-pill: 13.5px;
+  --text-pill--line-height: 18px;
+  --text-pill--font-weight: 500;
+  --text-bar-row: 13.5px;
+  --text-bar-row--line-height: 18px;
+  --text-bar-row--font-weight: 400;
+  --text-cell: 14px;
+  --text-cell--line-height: 19px;
+  --text-cell--font-weight: 400;
+  --text-cell-sub: 12px;
+  --text-cell-sub--line-height: 16px;
+  --text-cell-sub--font-weight: 400;
 }
 
 @theme inline {
@@ -321,6 +336,8 @@
   --color-unlock-edge: var(--bali-orange-400);
   /* And its Open student (PV11b), the primitive v2.css's `.t-act` draws with. */
   --color-unlock-link: var(--bali-orange-700);
+  /* Reports' opened row (PV13), the primitive v2.css's `.wtable tr.is-open` fills it with. */
+  --color-row-open: var(--bali-green-50);
 }
 
 /* §6: the three shadows, by name. */

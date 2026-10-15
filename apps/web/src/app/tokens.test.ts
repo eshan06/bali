@@ -120,6 +120,11 @@ const V2_SIZES: Record<string, [string, string, number, string?]> = {
   'countdown-sub': ['12.5px', '17px', 400],
   // Present's (PV9): the line under its countdown, its code's label and its counts.
   'present-caption': ['16px', '22px', 400],
+  // Reports' (PV13): a class's pill, a bar's row, a table's cell and the line under its words.
+  pill: ['13.5px', '18px', 500],
+  'bar-row': ['13.5px', '18px', 400],
+  cell: ['14px', '19px', 400],
+  'cell-sub': ['12px', '16px', 400],
 };
 /** The sizes §1 lists that the scale has, each its style: [style, size, line height]. */
 const ON_SCALE = [
@@ -426,7 +431,7 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     }
   });
 
-  it('beside them, only border-input, the side menu’s avatar (PV5), a dialog’s backdrop (PV6), the reconnect pill’s dot (PV7) and the unlock pop-up’s edge (PV10) and Open student (PV11b)', () => {
+  it('beside them, only border-input, the side menu’s avatar (PV5), a dialog’s backdrop (PV6), the reconnect pill’s dot (PV7), the unlock pop-up’s edge (PV10) and Open student (PV11b), and Reports’ opened row (PV13)', () => {
     const named = [...inline.keys()].filter((k) => k.startsWith('--color-'));
     const semanticNames = semantic(tokens.color.tokens).map((t) =>
       t.name === 'focus-ring-color' ? '--color-focus-ring' : `--color-${t.name}`,
@@ -436,10 +441,17 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
       '--color-avatar-fg',
       '--color-border-input',
       '--color-pip',
+      '--color-row-open',
       '--color-scrim',
       '--color-unlock-edge',
       '--color-unlock-link',
     ]);
+    // Reports' opened row: green-50, as v2.css's `.wtable tr.is-open` fills it, under the
+    // primary ink at 4.5:1 and more.
+    expect(inline.get('--color-row-open')).toBe('var(--bali-green-50)');
+    expect(contrast(hexOf('text-primary', 'light'), hexOf('green-50', 'light'))).toBeGreaterThan(
+      4.5,
+    );
     // The reconnect pill's dot (DESIGN.md §4): stone-500, as v2.css draws it.
     expect(inline.get('--color-pip')).toBe('var(--bali-stone-500)');
     // The unlock pop-up's 3 px top edge: orange-400, as v2.css's `.toast` draws it.
@@ -572,10 +584,10 @@ describe('every page and piece uses the tokens’ utilities, never a Tailwind de
     .filter((file) => /\.tsx?$/.test(file))
     .map((file) => relative(src, file).split(sep).join('/'));
 
-  it('covers the redrawn screens, the recap and the reports page included', () => {
+  it('covers the redrawn screens, the recap and Reports included', () => {
     expect(DRAWN.length).toBeGreaterThan(30);
     expect(DRAWN).toContain('components/recap-card.tsx');
-    expect(DRAWN).toContain('app/classes/[id]/reports/page.tsx');
+    expect(DRAWN).toContain('app/reports/page.tsx');
     expect(DRAWN).toContain('components/reports-list.tsx');
   });
 
@@ -636,12 +648,15 @@ describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
       files.filter((file) => bare(file) > 0).map((file) => [relative(src, file), bare(file)]),
     );
     // The stale banner, the policy draft's banner and Placeholder badge, and v2's on the class
-    // page: the length picker's track, the join code's chip and the student panel's moments' dots.
+    // page: the length picker's track, the join code's chip and the student panel's moments' dots;
+    // and on Reports (PV13) its table's head, its bars' tracks and the place-lost notice, drawn as
+    // the stale banner is.
     expect(filled).toEqual({
       [join('app', 'classes', '[id]', 'page.tsx')]: 1,
       [join('components', 'join-code.tsx')]: 1,
       [join('components', 'live-grid.tsx')]: 1,
       [join('components', 'policy-draft.tsx')]: 2,
+      [join('components', 'reports-list.tsx')]: 3,
       [join('components', 'student-panel.tsx')]: 1,
     });
   });
@@ -690,18 +705,20 @@ describe('the buttons in v2’s look (DESIGN.md §1 and §4, PV4)', () => {
   });
 });
 
-describe('the reports list reflows by its own width (D2g)', () => {
-  // At ~600 px the table ran off the right edge (DESIGN.md §8: a layout reflows by column count,
-  // never by smaller type). Each session is a card whose figures sit under their own names when
-  // the list is narrow, so no column is ever out of view in a box that scrolls sideways.
-  const page = read('./classes/[id]/reports/page.tsx') + read('../components/reports-list.tsx');
+describe('Reports’ sessions are a table in a box that scrolls sideways (PV13; DESIGN.md §8)', () => {
+  // v2's look superseded the card per session (D2g) and "never a table that scrolls sideways": the
+  // box scrolls, never the page, and no figure wraps or shrinks below its size to fit.
+  const list = read('../components/reports-list.tsx');
 
-  it('is no table, and nothing in it scrolls sideways or refuses to wrap', () => {
-    expect(page).not.toMatch(/<table\b|overflow-x-(?:auto|scroll)|whitespace-nowrap/);
+  it('scrolls in its own box, and only there', () => {
+    expect(list.match(/<table\b/g)).toHaveLength(1);
+    expect(list.match(/overflow-x-auto/g)).toHaveLength(1);
+    expect(list).toMatch(/<div className="@container overflow-x-auto [^"]*">\s*<table\b/);
+    expect(read('./reports/page.tsx')).not.toMatch(/overflow-x|<table\b/);
   });
 
-  it('lays its rows out by the list’s own width, its figures named on a narrow row', () => {
-    expect(page).toMatch(/className="mt-6 @container"/);
-    expect(page).toMatch(/<dt className="[^"]*@4xl:sr-only[^"]*">/);
+  it('keeps each figure on one line in the cells’ own size', () => {
+    expect(list).toMatch(/const FIGURE = `\$\{CELL\} text-right whitespace-nowrap`;/);
+    expect(list).toMatch(/const CELL = '[^']*\btext-cell\b[^']*';/);
   });
 });

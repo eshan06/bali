@@ -1,7 +1,7 @@
 'use client';
 
 import type { MeResponse } from '@bali/shared';
-import { CircleQuestionMark, House, LogOut, type LucideIcon } from 'lucide-react';
+import { ChartBar, CircleQuestionMark, House, LogOut, type LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -156,9 +156,13 @@ interface Item {
 
 /**
  * The menu's pages, each listed only once it exists, never as a dead or disabled link: Classes
- * comes with PV16, Reports with PV13, Questions with L7b, Slides with M5. Help sits under the gap.
+ * comes with PV16 (between Home and Reports), Questions with L7b, Slides with M5. Help sits under
+ * the gap.
  */
-const PAGES: Item[] = [{ href: '/', label: 'Home', Icon: House }];
+const PAGES: Item[] = [
+  { href: '/', label: 'Home', Icon: House },
+  { href: '/reports', label: 'Reports', Icon: ChartBar },
+];
 const HELP: Item = { href: '/support', label: 'Help', Icon: CircleQuestionMark };
 
 /*
