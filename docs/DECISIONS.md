@@ -28,7 +28,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   stopped. **Cancel removes the pending deck its upload made**; one Bali didn't hear stays as the
   list will show it, "The upload didn't finish. Upload it again." with Remove, as a pending deck no
   upload here is sending does (a tab closed mid-upload), as the sweep says it after 24 hours.
-  **Leaving the page stops its uploads**, removing nothing: they then read as unfinished. *Weighed:*
+  **A Cancel always ends a run cancelled** (santa's review, both reviewers): a Cancel that came while
+  a step took no signal (the file's read, the create, the check) and that step then failed ended
+  the run stopped, its row's Try again and Cancel held for good; `runUpload` now ends any run its
+  signal stopped as cancelled, and asks no check once the bucket's answer and a Cancel met, so the
+  deck goes with the Cancel. **Leaving the page stops its uploads**, removing nothing: they then read
+  as unfinished. *Weighed:*
   uploads carried across pages by a store outside the page, whose check could land after a sign-out
   or under the next sign-in in the tab; a warning before leaving (no board draws one, and Next's own
   navigation fires none). **A removal** is Your questions' (#394): Remove asks across the row's foot

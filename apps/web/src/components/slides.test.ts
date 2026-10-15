@@ -579,9 +579,10 @@ describe('the page’s wiring (app/slides/page.tsx)', () => {
 
   it('turns a checked upload into its deck under the same key, so its line is said', () => {
     expect(page).toMatch(/setMade\(\(m\) => \[\{ key, deck: end\.deck \}, \.\.\.m\.filter/);
-    // Its Cancel went with the check: focus it lost lands on the deck's Remove.
+    // Its buttons went with the check: focus lost to the page comes back to the row's button at
+    // every end of a run but a Cancel's (a verdict, a stop), else to the title (santa's review).
     expect(page).toMatch(
-      /if \(document\.activeElement === document\.body\) setFocus\(\[`\$\{idOf\(key\)\}-act`\]\);/,
+      /if \(end\.kind === 'cancelled'\) return void cancelled\(key, end\.upload, at\?\.near \?\? \[\]\);\s*(?:\/\/[^\n]*\n\s*)*if \(document\.activeElement === document\.body\) setFocus\(\[`\$\{idOf\(key\)\}-act`, TITLE\]\);\s*if \(end\.kind === 'checked' \|\| end\.kind === 'gone'\)/,
     );
   });
 

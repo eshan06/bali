@@ -142,8 +142,9 @@ export default function SlidesPage() {
     if (!open.current) return;
     const at = held.current.get(key);
     if (end.kind === 'cancelled') return void cancelled(key, end.upload, at?.near ?? []);
-    // The check took the row's buttons away: focus it lost comes back to the row's button now.
-    if (document.activeElement === document.body) setFocus([`${idOf(key)}-act`]);
+    // The check took the row's buttons away: focus it lost comes back to the row's button now, or
+    // to the page's title once the row has gone with its deck.
+    if (document.activeElement === document.body) setFocus([`${idOf(key)}-act`, TITLE]);
     if (end.kind === 'checked' || end.kind === 'gone') {
       held.current.delete(key);
       // The verdict: the row turns into its deck, the same element, so its line is said.

@@ -609,6 +609,23 @@ describe('an upload, from the file to the server’s verdict', () => {
     expect(calls.map(([, path]) => path)).toEqual(['/v1/decks']);
   });
 
+  it('ends cancelled when Cancel came while the check was on its way and it then failed', async () => {
+    const controller = new AbortController();
+    const { api } = deckApi(() => {
+      controller.abort();
+      throw new ApiError(500, 'internal', 'the parser stopped');
+    });
+    const end = await runUpload(
+      api,
+      { ...newUpload(file(), 'Unit 3 review'), sha256: SHA, deck: deck(), uploaded: true },
+      {
+        signal: controller.signal,
+        onStep: () => undefined,
+      },
+    );
+    expect(end).toMatchObject({ kind: 'cancelled', upload: { deck: deck(), uploaded: true } });
+  });
+
   it('ends cancelled when Cancel came while the file was read and the read then failed', async () => {
     const { api, calls } = deckApi();
     const controller = new AbortController();
