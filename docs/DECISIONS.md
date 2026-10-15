@@ -116,7 +116,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `packages/db/test/slides.test.ts`, `races.test.ts`.
 
 - **2026-10-15** — **L7b's part 1b: Your questions' list, each draft removable after the board's
-  confirm; a draft for the owner's calls, not in the menu until part 1c.** Built to
+  confirm; what the canvas doesn't draw approved by the owner as built; not in the menu until part
+  1c.** Built to
   [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (version 21): the
   Questions board and LessonStates' "Your questions" lines (#394), on part 1a's logic (#393).
   **The page** (`app/questions/page.tsx`, `components/saved-questions.tsx`): the head and its line;
@@ -132,12 +133,19 @@ a real decision? Add a dated entry at the top: what was decided and why.
   never in a teacher's way, and the menu lists a page once it is whole. **As the boards render:** the
   card's words at the body's 15/22 (`.app`'s), the answers' list right under the question
   (`.app ul`'s margin 0 outranks `.mini-opts`'). **Token:** the colour `letter-right` (green-100,
-  v2.css's `.right .letter`). **What the canvas doesn't draw**, each built the plainest way its
-  pieces allow, the owner's to rule (the PR parked as a draft): the list loading ("Loading…", the
-  portal's word); Remove and Keep held while the removal is sent; a removal that didn't go through,
-  said in the confirm's line, "Bali couldn't remove the question. Check your connection and try
-  again.", or "Bali couldn't remove the question." for a refusal, Remove there trying again; and, on
-  a narrow card, the Correct tag going under its answer, the letter kept beside it.
+  v2.css's `.right .letter`), the one L7-1a (#389) added first with the same value. **What the
+  canvas doesn't draw**, each built the plainest way its pieces allow, **approved by the owner
+  (2026-10-15), each as built, after their look at the screenshots** (asked with the PR parked as a
+  draft): the list loading ("Loading…", the portal's word); Remove and Keep held while the removal is
+  sent; a removal that didn't go through, said in the confirm's line, "Bali couldn't remove the
+  question. Check your connection and try again.", or "Bali couldn't remove the question." for a
+  refusal, Remove there trying again; and, on a narrow card, the Correct tag going under its answer,
+  the letter kept beside it. The owner also kept, as recommended, the edge the PR's review notes left
+  with the third: a removal whose answer never came may still have landed, and Keep then leaves the
+  card listed until the page is read again (Remove again settles it under the same id). These states
+  were coded before any canvas drew them, which the owner accepted for this PR and the four drafts
+  approved with it (#386, #389, #390, #395); from now on a state no board draws is drawn on the
+  canvas first.
   **Screenshots** (`.claude/shots/L7b-1/`): on dev, the owner's demo teacher's four questions
   written through part 1c's form and removed through this page's Remove, none left behind; sharp
   renders of the real components with the boards' data in a throwaway page in the preview, deleted
