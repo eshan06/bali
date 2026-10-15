@@ -46,7 +46,13 @@ function lesson(over: Partial<LiveQuestion> = {}, read: QuestionResults | null =
     ...over,
   } satisfies LiveQuestion;
 }
-const props = (l: LiveQuestion, endsAt: string | null = null) => ({ id: 'L', lesson: l, endsAt });
+const props = (l: LiveQuestion, endsAt: string | null = null) => ({
+  id: 'L',
+  lesson: l,
+  endsAt,
+  asking: false,
+  onAsk: vi.fn(),
+});
 const render = (l: LiveQuestion, endsAt: string | null = null) =>
   renderToStaticMarkup(createElement(QuestionCard, props(l, endsAt)));
 
@@ -90,15 +96,33 @@ const press = (l: LiveQuestion, words: string, endsAt: string | null = null) => 
   click();
 };
 
-describe('the card', () => {
-  it('draws nothing with no question: at rest, and asking, are L7-1b’s', () => {
-    expect(render(lesson({ question: null }, null))).toBe('');
+describe('the card at rest (LessonClass, L7-1b)', () => {
+  const html = render(lesson({ question: null }, null));
+
+  it('is titled Questions and slides, with Ask a question, its panel closed; Show slides is M6’s', () => {
+    expect(html).toMatch(
+      /^<section aria-labelledby="L-lesson" class="[^"]*"><div class="[^"]*"><h2 id="L-lesson" class="text-h3">Questions and slides<\/h2>/,
+    );
+    expect(html).toMatch(
+      /<button type="button" id="L-ask" aria-expanded="false" class="[^"]*\bbg-action-primary-bg\b[^"]*"><svg[^>]*\blucide-message-circle-question-mark\b[^>]*>[^]*<\/svg>Ask a question<\/button>/,
+    );
+    expect(html).not.toMatch(/Show slides|Question ·|answered/);
   });
 
+  it('marks Ask a question as controlling the panel while it is open', () => {
+    const open = renderToStaticMarkup(
+      createElement(QuestionCard, { ...props(lesson({ question: null }, null)), asking: true }),
+    );
+    expect(open).toMatch(/id="L-ask" aria-expanded="true" aria-controls="L-panel"/);
+  });
+});
+
+describe('the card', () => {
   it('is v2’s card on its own, its parts 16 px apart, titled by its question', () => {
     const html = render(lesson());
     expect(html).toMatch(/^<section aria-labelledby="L-q" class="[^"]*">/);
-    expect(html).toMatch(/<h2 id="L-q" class="[^"]*">Which value of x solves/);
+    // Focusable from code (L7-1b): asked, focus comes to the question.
+    expect(html).toMatch(/<h2 id="L-q" tabindex="-1" class="[^"]*">Which value of x solves/);
     const card = /^<section [^>]*class="([^"]*)"/.exec(html)?.[1]?.split(' ');
     expect(card).toEqual(
       expect.arrayContaining(['rounded-md', 'p-5', 'shadow-1', 'flex-col', 'gap-4']),
@@ -228,12 +252,22 @@ describe('a question closed (LessonClosed, LessonStates)', () => {
     expect(html).not.toMatch(/Correct|correct answer|Students/);
   });
 
-  it('offers Done, which puts the question away', () => {
+  it('offers Ask another question and Done, which leaves the card at rest, focus on its Ask', () => {
     const l = closed(true);
     const html = render(l);
-    expect(text(html)).toMatch(/^Question · closed Done Which value/);
+    expect(text(html)).toMatch(/^Question · closed Ask another question Done Which value/);
+    expect(html).toMatch(
+      /<button type="button" id="L-ask" aria-expanded="false" class="[^"]*">[^]*?Ask another question<\/button>/,
+    );
+    const frame = vi.fn();
+    vi.stubGlobal('window', { requestAnimationFrame: frame });
     press(l, 'Done');
+    vi.unstubAllGlobals();
     expect(l.done).toHaveBeenCalled();
+    expect(frame).toHaveBeenCalledOnce();
+    expect(source).toMatch(
+      /window\.requestAnimationFrame\(\(\) => document\.getElementById\(`\$\{id\}-ask`\)\?\.focus\(\)\);/,
+    );
     expect(html).not.toMatch(/>Close</);
   });
 
@@ -310,7 +344,7 @@ describe('its hook (L6’s logic, held for one session)', () => {
     );
     const grid = readFileSync(fileURLToPath(new URL('./live-grid.tsx', import.meta.url)), 'utf8');
     expect(page).toMatch(
-      /const \{ lesson, onEvent \} = useLiveQuestion\(live \? grid\.id : null\);/,
+      /const \{ lesson, onEvent, ask, opening, forgetAsk \} = useLiveQuestion\(\s*live \? grid\.id : null,?\s*\);/,
     );
     expect(page).toMatch(/onEvent=\{onEvent\}/);
     expect(grid).toMatch(
@@ -318,7 +352,26 @@ describe('its hook (L6’s logic, held for one session)', () => {
     );
   });
 
-  it('closes through L6, an unanswered attempt resent under its id', () => {
+  it('asks and closes through L6, an unanswered attempt resent under its id', () => {
+    expect(hook).toMatch(
+      /openAttemptFor\(unansweredOpen\.current, session, draft\);[^]*?unansweredOpen\.current = keepUnanswered\(attempt, answer\);/,
+    );
+    // One ask at a time, held by the hook, never by a panel that can unmount mid-send (santa's
+    // review): a second press, in a panel opened again, sends nothing.
+    expect(hook).toMatch(/if \(session === null \|\| askingNow\.current\) return null;/);
+    expect(hook).toMatch(/setOpening\(\{ busy: true, failure: null \}\);/);
+    // Answered, it lets go: the guard and the busy look, its failure said unless Cancel forgot it
+    // meanwhile; an ask of a session gone touches the next one's nothing; one cancelled on its way
+    // closes no panel opened since. A new session starts with none.
+    expect(hook).toMatch(
+      /if \(now\.current\.session !== session\) return null;\s*unansweredOpen\.current = keepUnanswered\(attempt, answer\);\s*askingNow\.current = false;\s*const cancelled = asks\.current !== mine;\s*setOpening\(\{ busy: false, failure: answer\.kind === 'opened' \|\| cancelled \? null : answer \}\);/,
+    );
+    expect(hook).toMatch(/return cancelled \? null : answer;/);
+    expect(hook).toMatch(/askingNow\.current = false;\s*setOpening\(IDLE\);/);
+    // An open's answer, its replay's too, never over a question asked after it.
+    expect(hook).toMatch(
+      /if \(answer\.kind === 'opened' && answer\.question\.id >= newest\.current\) \{\s*put\(session, answer\.question\);/,
+    );
     expect(hook).toMatch(
       /closeAttemptFor\(unansweredClose\.current, question\.id, reveal\);[^]*?unansweredClose\.current = keepUnanswered\(attempt, answer\);/,
     );

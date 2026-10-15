@@ -1,7 +1,7 @@
 'use client';
 
 import type { FeedEvent, SessionSnapshot, TeacherQuestion } from '@bali/shared';
-import { CircleCheck } from 'lucide-react';
+import { CircleCheck, MessageCircleQuestionMark } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Button } from '@/components/button';
@@ -10,9 +10,15 @@ import {
   closeAttemptFor,
   type CloseAttempt,
   closeQuestion,
+  type Failure,
   failureOf,
+  type OpenAnswer,
+  type OpenAttempt,
+  openAttemptFor,
+  openQuestion,
   POLL_EVERY_MS,
   pollResults,
+  type QuestionDraft,
   questionAfter,
   type ResultsPoll,
   type ResultsState,
@@ -49,10 +55,17 @@ export const isOpen = ({ question, results }: Pick<LiveQuestion, 'question' | 'r
 
 type Held = { session: string | null; question: TeacherQuestion | null };
 
+/** An ask as the side panel shows it (L7-1b): on its way, or how the last one failed. */
+export interface Opening {
+  busy: boolean;
+  failure: Failure | null;
+}
+const IDLE: Opening = { busy: false, failure: null };
+
 /**
  * The live question of `sessionId` (null: none running). Its words come from the session's read,
  * at the start and whenever the stream names a question this tab doesn't hold (`questionAfter`'s
- * `'unknown'`); its results from `pollResults`. A read only ever
+ * `'unknown'`), and from this tab's own open; its results from `pollResults`. A read only ever
  * brings a newer question (ids are UUIDv7, so a later one sorts after), so a slow read never puts
  * back one closed or asked over meanwhile.
  */
@@ -69,9 +82,16 @@ export function useLiveQuestion(sessionId: string | null) {
   const [closing, setClosing] = useState(false);
   const [closeFailed, setCloseFailed] = useState<{ id: string; reveal: boolean } | null>(null);
   const sending = useRef(false);
+  const unansweredOpen = useRef<OpenAttempt | null>(null);
   const unansweredClose = useRef<CloseAttempt | null>(null);
   const retry = useRef<number | undefined>(undefined);
   const reading = useRef<{ session: string; again: boolean } | null>(null);
+  // An ask on its way, held here, not by the panel, which a Close or a tile can unmount meanwhile:
+  // a panel opened again shows it busy, so no second press sends the words under a second id.
+  const [opening, setOpening] = useState<Opening>(IDLE);
+  const askingNow = useRef(false);
+  // Cancel forgets the last ask's failure, and one still on its way.
+  const asks = useRef(0);
 
   const put = useCallback((session: string | null, question: TeacherQuestion | null) => {
     const before = now.current.question;
@@ -117,6 +137,8 @@ export function useLiveQuestion(sessionId: string | null) {
     now.current = { session: sessionId, question: null };
     newest.current = '';
     setHeld(now.current);
+    askingNow.current = false;
+    setOpening(IDLE);
     if (sessionId !== null) void read(sessionId);
     return () => {
       window.clearTimeout(retry.current);
@@ -151,6 +173,35 @@ export function useLiveQuestion(sessionId: string | null) {
     [put, read],
   );
 
+  const ask = useCallback(
+    async (draft: QuestionDraft): Promise<OpenAnswer | null> => {
+      const session = now.current.session;
+      if (session === null || askingNow.current) return null;
+      askingNow.current = true;
+      const mine = (asks.current += 1);
+      setOpening({ busy: true, failure: null });
+      const attempt = openAttemptFor(unansweredOpen.current, session, draft);
+      const answer = await openQuestion(api, attempt);
+      // A session gone meanwhile is the next one's no more: its own ask and attempt stand.
+      if (now.current.session !== session) return null;
+      unansweredOpen.current = keepUnanswered(attempt, answer);
+      askingNow.current = false;
+      const cancelled = asks.current !== mine;
+      setOpening({ busy: false, failure: answer.kind === 'opened' || cancelled ? null : answer });
+      // Its replay too, closed since perhaps; never over a question asked after it.
+      if (answer.kind === 'opened' && answer.question.id >= newest.current) {
+        put(session, answer.question);
+      }
+      // Cancelled on its way: the card shows what it asked, and no panel opened since is closed.
+      return cancelled ? null : answer;
+    },
+    [api, put],
+  );
+  const forgetAsk = useCallback(() => {
+    asks.current += 1;
+    setOpening((cur) => ({ busy: cur.busy, failure: null }));
+  }, []);
+
   const close = useCallback(
     async (reveal: boolean) => {
       const { session, question } = now.current;
@@ -179,7 +230,7 @@ export function useLiveQuestion(sessionId: string | null) {
     close: (reveal) => void close(reveal),
     done: () => put(now.current.session, null),
   };
-  return { lesson, onEvent };
+  return { lesson, onEvent, ask, opening, forgetAsk };
 }
 
 /** v2.css's `.lesson` head: the title or the kicker, then its buttons. */
@@ -187,23 +238,51 @@ const HEAD = 'flex flex-wrap items-center justify-between gap-x-6 gap-y-3';
 const ROW = 'flex flex-wrap items-center gap-2.5';
 
 /**
- * The class page's "Questions and slides" card with a question in it (L7; LessonWaiting, LessonLive,
- * LessonClosed, LessonStates' lines), between the counts and the grid, never in Present. Open: Close,
- * and Close and show answer when it has a correct one; closed: Done. Its options, and "N of M
- * answered": only totals, the count per option and its bar once the server's guard gives them (3
- * answers), never who answered. At rest, and asking, are L7-1b's: until then it shows nothing.
+ * The class page's "Questions and slides" card (L7; LessonClass, LessonWaiting, LessonLive,
+ * LessonClosed, LessonStates' lines), between the counts and the grid, never in Present. At rest,
+ * Ask a question (Show slides is M6's). A question open: Close, and Close and show answer when it
+ * has a correct one; closed: Ask another question and Done. Its options, and "N of M answered":
+ * only totals, the count per option and its bar once the server's guard gives them (3 answers),
+ * never who answered. `asking`: the side panel is open, which Ask a question controls (L7-1b).
  */
 export function QuestionCard({
   id,
   lesson,
   endsAt,
+  asking,
+  onAsk,
 }: {
   id: string;
   lesson: LiveQuestion;
   endsAt: string | null;
+  asking: boolean;
+  onAsk: () => void;
 }) {
   const { question: q, results: r, closing, closeFailed } = lesson;
-  if (q === null) return null;
+  const ask = (words: string, variant: 'primary' | 'secondary') => (
+    <Button
+      id={`${id}-ask`}
+      variant={variant}
+      onClick={onAsk}
+      aria-expanded={asking}
+      aria-controls={asking ? `${id}-panel` : undefined}
+    >
+      <MessageCircleQuestionMark size={16} aria-hidden="true" />
+      {words}
+    </Button>
+  );
+  if (q === null) {
+    return (
+      <section aria-labelledby={`${id}-lesson`} className={`flex flex-col gap-4 ${CARD_ALONE}`}>
+        <div className={HEAD}>
+          <h2 id={`${id}-lesson`} className="text-h3">
+            Questions and slides
+          </h2>
+          <div className={ROW}>{ask('Ask a question', 'primary')}</div>
+        </div>
+      </section>
+    );
+  }
   const totals = r?.results ?? null;
   const open = isOpen(lesson);
   // Found closed with no close heard, past the bell: the bell's (A17), until the sweep ends it all.
@@ -242,9 +321,19 @@ export function QuestionCard({
               )}
             </>
           ) : (
-            <Button variant="secondary" onClick={lesson.done}>
-              Done
-            </Button>
+            <>
+              {ask('Ask another question', 'secondary')}
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  lesson.done();
+                  // Its place goes with it: on to the card's own Ask a question.
+                  window.requestAnimationFrame(() => document.getElementById(`${id}-ask`)?.focus());
+                }}
+              >
+                Done
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -273,7 +362,8 @@ export function QuestionCard({
       ) : null}
       <div className="flex flex-wrap items-start gap-x-10 gap-y-5">
         <div className="min-w-0 flex-[999_1_440px]">
-          <h2 id={`${id}-q`} className="text-h3 text-pretty wrap-break-word">
+          {/* Focus comes here once it is asked, so a screen reader starts at the question. */}
+          <h2 id={`${id}-q`} tabIndex={-1} className="text-h3 text-pretty wrap-break-word">
             {q.prompt}
           </h2>
           {/* Under the question as the boards render it: `.app ul`'s margin 0 outranks `.opts`'s. */}

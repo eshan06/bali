@@ -36,6 +36,9 @@ describe('the class page in Present while a session runs (ClassPresent)', () => 
     expect(live).toMatch(
       /<main className=\{present \? PRESENT_PAGE : 'relative flex flex-col gap-5\.5'\}>\s*\{\/\*[^]*?\*\/\}\s*<LiveHeader[^>]*present=\{present\}\s*>[^]*?<\/LiveHeader>\s*\{\/\*[^]*?\*\/\}\s*\{cantLoad\(error\)\}\s*\{\/\*[^]*?\*\/\}\s*\{said \? \([^]*?\) : null\}\s*<section aria-label="Live grid" className="flex flex-col gap-5\.5">\s*\{\/\*[^]*?\*\/\}\s*<div[^>]*>\s*\{counts \? <LiveCounts counts=\{counts\} present=\{present\} \/> : null\}\s*\{present \? null : presentToggle\(true\)\}\s*<\/div>\s*\{\/\*[^]*?\*\/\}\s*\{present \? null : \(?\s*<QuestionCard[^]*?\/>\s*\)?\}\s*<LiveGrid/,
     );
+    // And the side panel's asking only out of Present, as the student's panel (L7-1b).
+    expect(page).toMatch(/const panel = asking && !present;/);
+    expect(live).toMatch(/\{panel \? \(\s*<AskPanel/);
     const [grid] = tags('LiveGrid');
     expect(grid).toMatch(/\bpresent=\{present\}/);
     expect(grid).toMatch(/\blivePage\s/);

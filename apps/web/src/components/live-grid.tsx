@@ -362,6 +362,8 @@ export function LiveGrid({
   onSession,
   onCounts,
   onEvent,
+  asking = false,
+  onStudentPanel,
   present = false,
   livePage = false,
 }: {
@@ -374,6 +376,12 @@ export function LiveGrid({
   onCounts?: (sessionId: string, counts: StateCounts) => void;
   /** Called with each event the stream brings: a live question's open and close (L7). */
   onEvent?: (e: FeedEvent) => void;
+  /**
+   * Asking a question holds the side panel (L7-1b), where a student's shows: theirs closes; and
+   * `onStudentPanel` hears one open there, so the asking gives way to it.
+   */
+  asking?: boolean;
+  onStudentPanel?: () => void;
   /**
    * The projector view (DESIGN.md §5; ClassPresent): four columns of tiles one size up, readable
    * from the back of a classroom; the same states and words, but never an unlock's reason: the
@@ -502,6 +510,9 @@ export function LiveGrid({
   useEffect(() => {
     if (present) setPanel(null);
   }, [present]);
+  useEffect(() => {
+    if (asking) setPanel(null);
+  }, [asking]);
 
   // Local clock so the silent badge appears with zero event traffic.
   useEffect(() => {
@@ -588,8 +599,10 @@ export function LiveGrid({
     heartbeatMs: STREAM_HEARTBEAT_MS,
   });
   const rows = Object.values(students);
-  const open = (studentId: string) =>
+  const open = (studentId: string) => {
+    onStudentPanel?.();
     setPanel((cur) => ({ studentId, opens: (cur?.opens ?? 0) + 1 }));
+  };
   // Its tiles are buttons, and its panel shows, on the live page alone, and never in Present.
   const selects = livePage && !present;
   const shown = selects && panel !== null ? students[panel.studentId] : undefined;

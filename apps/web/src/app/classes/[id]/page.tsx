@@ -13,13 +13,14 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
+import { AskPanel, type Draft, NEW_DRAFT } from '@/components/ask-panel';
 import { Button, buttonClass } from '@/components/button';
 import { CARD_ALONE } from '@/components/card';
 import { Field } from '@/components/field';
 import { JoinCode } from '@/components/join-code';
 import { LiveGrid, type StateCounts } from '@/components/live-grid';
 import { LiveCounts, LiveHeader } from '@/components/live-header';
-import { QuestionCard, useLiveQuestion } from '@/components/question-card';
+import { isOpen, QuestionCard, useLiveQuestion } from '@/components/question-card';
 import { endedToday, RecapCard } from '@/components/recap-card';
 import { usePresenting } from '@/components/shell';
 import { getAccessToken } from '@/lib/auth';
@@ -145,9 +146,23 @@ export default function ClassDetailPage() {
   const [said, setSaid] = useState<{ kind: 'failed' | 'refused' | 'note'; message: string } | null>(
     null,
   );
-  // The live question (L7): its card over the grid, for the session running.
+  // The live question (L7): its card over the grid, and asking one in the side panel, where a
+  // student's panel shows; what is written is kept until it is asked or cancelled. A new session
+  // starts with neither.
   const live = klass !== null && grid !== null && !grid.over;
-  const { lesson, onEvent } = useLiveQuestion(live ? grid.id : null);
+  const { lesson, onEvent, ask, opening, forgetAsk } = useLiveQuestion(live ? grid.id : null);
+  const [asking, setAsking] = useState(false);
+  const [draft, setDraft] = useState<Draft>(NEW_DRAFT);
+  useEffect(() => {
+    setAsking(false);
+    setDraft(NEW_DRAFT);
+  }, [grid?.id]);
+  const panel = asking && !present;
+  // Back to Ask a question; the question, when one shows (opened meanwhile, from another tab).
+  const closePanel = () => {
+    setAsking(false);
+    (document.getElementById(`${id}-ask`) ?? document.getElementById(`${id}-q`))?.focus();
+  };
 
   const readRoster = useCallback(() => {
     api
@@ -435,17 +450,48 @@ export default function ClassDetailPage() {
           {present ? null : presentToggle(true)}
         </div>
         {/* The live question between the counts and the grid (LessonClass), never in Present. */}
-        {present ? null : <QuestionCard id={id} lesson={lesson} endsAt={grid.endsAt} />}
+        {present ? null : (
+          <QuestionCard
+            id={id}
+            lesson={lesson}
+            endsAt={grid.endsAt}
+            asking={panel}
+            onAsk={() => setAsking(true)}
+          />
+        )}
         <LiveGrid
           sessionId={grid.id}
           onEnded={onEnded}
           onSession={onSession}
           onCounts={onCounts}
           onEvent={onEvent}
+          asking={panel}
+          onStudentPanel={() => setAsking(false)}
           present={present}
           livePage
         />
       </section>
+      {panel ? (
+        <AskPanel
+          id={`${id}-panel`}
+          draft={draft}
+          onDraft={setDraft}
+          openNow={isOpen(lesson)}
+          opening={opening}
+          onAsk={ask}
+          onAsked={() => {
+            setAsking(false);
+            setDraft(NEW_DRAFT);
+            window.requestAnimationFrame(() => document.getElementById(`${id}-q`)?.focus());
+          }}
+          onCancel={() => {
+            setDraft(NEW_DRAFT);
+            forgetAsk();
+            closePanel();
+          }}
+          onClose={closePanel}
+        />
+      ) : null}
     </main>
   ) : klass !== null && present ? (
     // After the bell in Present (PresentEnded, as PV1 approved): the header, its ring whole, and
