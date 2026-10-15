@@ -354,6 +354,9 @@ describe('GET /v1/classes/:id/reports/sessions/:sessionId', () => {
       expect(res.statusCode).toBe(403);
       expect(res.json<ApiErrorBody>().error.code).toBe('forbidden');
       expect(res.body).not.toContain(c.student.id);
+      // The one error shape alone: nothing of the session, when it ran (PV14) included.
+      expect(Object.keys(res.json<object>())).toEqual(['error']);
+      expect(res.body).not.toContain(session.startedAt.toISOString());
     }
   });
 
@@ -400,6 +403,8 @@ describe('GET /v1/classes/:id/reports/sessions/:sessionId', () => {
         reason: 'session_not_found',
       });
       expect(res.body).not.toContain(other.student.id);
+      // Nor when another class's session ran (PV14's window): the error shape alone.
+      expect(Object.keys(res.json<object>())).toEqual(['error']);
     }
     const unknown = await reportAs(c.teacher.cognitoId, randomUUID(), mine.id);
     expect(unknown.statusCode).toBe(404);
