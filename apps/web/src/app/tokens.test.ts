@@ -622,17 +622,27 @@ describe('every page and piece uses the tokens’ utilities, never a Tailwind de
   const SIZE = /\btext-(?:xs|sm|base|lg|\d?xl)\b/;
   const TYPE =
     /\b(?:tracking|leading)-(?:tighter|tight|snug|normal|relaxed|loose|wide|wider|widest)\b/;
+  // A field is the Field, so what is typed in it is the input size (the owner's ruling); a radio
+  // types nothing (the class page's length picker), nor does a hidden file picker (Your slides'
+  // Upload a PDF, M5b): `hidden` the attribute, never `aria-hidden`, which leaves one in sight.
+  const RAW_INPUT = /<input\b(?![^>]*type="radio")(?![^>]*type="file"[^>]*\shidden(?=[\s/>=]))/;
+
+  it('lets no raw input through but a radio or a hidden file picker', () => {
+    expect('<input type="radio" name="len" />').not.toMatch(RAW_INPUT);
+    expect('<input ref={picker} type="file" accept=".pdf" hidden onChange={x} />').not.toMatch(
+      RAW_INPUT,
+    );
+    expect('<input type="file" aria-hidden="true" />').toMatch(RAW_INPUT);
+    expect('<input type="file" />').toMatch(RAW_INPUT);
+    expect('<input type="text" hidden />').toMatch(RAW_INPUT);
+  });
 
   it.each(DRAWN)('%s', (file) => {
     const source = read(`../${file}`);
     expect(source).not.toMatch(COLOUR);
     expect(source).not.toMatch(SIZE);
     expect(source).not.toMatch(TYPE);
-    // A field is the Field, so what is typed in it is the input size (the owner's ruling); a radio
-    // types nothing (the class page's length picker).
-    if (file !== 'components/field.tsx') {
-      expect(source).not.toMatch(/<input\b(?![^>]*type="radio")/);
-    }
+    if (file !== 'components/field.tsx') expect(source).not.toMatch(RAW_INPUT);
   });
 });
 
@@ -678,7 +688,8 @@ describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
     // pills; on Reports (PV13) its table's head, its bars' tracks and the place-lost notice, drawn
     // as the stale banner is; and on Help (PV15, SupportPage) the two lists of what a teacher sees,
     // drawn so too; a live question's (L7) options' letters, and its "Results can't refresh", drawn
-    // as the stale banner is; and on Your questions (L7b) the answers' letters.
+    // as the stale banner is; on Your questions (L7b) the answers' letters; and Your slides' (M5b)
+    // file tiles and an upload's progress track.
     expect(filled).toEqual({
       [join('app', 'classes', '[id]', 'page.tsx')]: 1,
       [join('app', 'support', 'page.tsx')]: 1,
@@ -688,6 +699,7 @@ describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
       [join('components', 'question-card.tsx')]: 2,
       [join('components', 'reports-list.tsx')]: 3,
       [join('components', 'saved-questions.tsx')]: 1,
+      [join('components', 'slides.tsx')]: 2,
       [join('components', 'student-panel.tsx')]: 1,
       [join('components', 'timeline.tsx')]: 1,
     });
