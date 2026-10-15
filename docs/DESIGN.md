@@ -161,6 +161,10 @@ the right over the live page, opened by a tile, a button there marked while its 
 but going silent and coming back listed as the recap marks them and Clock off's line "This
 phone's clock is off, so its times may be off too.", the tile's Clock off tooltip too (the owner,
 2026-10-14); never in Present.
+Reports is v2's since PV13 (2026-10-15): a menu page, one class at a time picked
+with pills, its sessions as a table in a box that scrolls sideways beside each
+one's average focus as a bar, and `/classes/[id]/reports` a redirect to it with
+that class picked; until PV14 a row opens its report under it, as the reports list did.
 Every
 portal source file is held to the tokens' utilities by `tokens.test.ts`, and
 since D2g the theme holds none of Tailwind's own colours, type sizes,
@@ -345,7 +349,11 @@ the live header's `countdown-sub` (12.5/17, regular, "ends 9:55 AM") and the
 reconnect pill's dot as the colour `pip` (stone-500); PV9 Present's
 `present-caption` (16/22, regular: the line under its countdown, its code's label
 and its counts), its line under the name `h3` at regular weight, and retired
-`code-lg` (§3), Present's code being `code-present`.
+`code-lg` (§3), Present's code being `code-present`; PV13 Reports' four, `pill`
+(13.5/18, medium: a class's pill), `bar-row` (13.5/18, regular: a bar's row),
+`cell` (14/19, regular: a table's cell) and `cell-sub` (12/16, regular: the line
+under a cell's words), and the opened row's tint as the colour `row-open`
+(green-50, v2.css's `.wtable tr.is-open`).
 
 Density: the teacher's live grid is dense (many students at a glance); the
 student app is airy and simple. Theme: **light, everywhere.** The app and the
@@ -555,7 +563,8 @@ where they differ (Present's included: §5); the input size stands.
   that draws the list in v2's look (its tiles, rows or table); grey
   (`surface-sunken`) also fills the menu's current item, the
   length picker's track, a table's head, the recap's name pills, a code's chip,
-  the bars' tracks and the student panel's moment dots, and no longer a field.
+  the bars' tracks, the student panel's moment dots and Reports' place-lost
+  notice (drawn as the stale banner is), and no longer a field.
 - **State chip:** a pill (`radius-full`) filled with the state's tint, its
   icon and label in the state's ink, the `label` style in uppercase; padding
   `space-2` × `space-3` on the web (the tokens' values, kept by the owner's

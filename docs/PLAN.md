@@ -8,12 +8,12 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-15 (Central) — A fix in the engine (#385; `docs/DECISIONS.md`, 2026-10-15):
-a `came_back` is stamped when the server heard the phone, held to the window and never before the
-`went_silent` it closes, no longer with the phone's claim, which a slow clock or a record made out of
-contact put before the silence, so R2 counted that silence as focus; R2 counts a silence to its
-`came_back`, and a check-in takes no time from the phone now. Found by PV11b's review (#383). Before
-it, PV12a, the recap's grouping (#384). Next: PV12b, the recap._
+_Last updated: 2026-10-15 (Central) — PV13, Reports (#387; `docs/DECISIONS.md`, 2026-10-15):
+`/reports` in the menu, one class at a time picked with pills, its sessions as v2's table in a box
+that scrolls sideways, newest first with Show earlier, beside each session's average focus as a bar
+out of its length; `/classes/[id]/reports` redirects there with that class picked, and until PV14 a
+row opens its report under it. Before it, a fix in the engine (#385). PV12b, the recap, waits on the
+owner as draft #386. Next: PV14, a session's report._
 
 ## Now
 
@@ -40,9 +40,9 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
   keeps D1's look until the owner approves a new one (its redesign rolled back, 2026-10-06). Left:
   the push's app half (not started), TestFlight build 9 for C7's phone test (📱), and the phone's
   Phase 7 screens (L8, M8). C2's legal words (⚖️) go into the portal's pages, on the Windows PC.
-- **The portal redesign in v2's look (PV0–PV17, the owner, 2026-10-12):** PV0–PV11 and PV12a
-  done, with PV3b, PV4b, PV4c and PV5b; next PV12b, on the Windows PC. Phase 7's web screens follow
-  PV15.
+- **The portal redesign in v2's look (PV0–PV17, the owner, 2026-10-12):** PV0–PV11, PV12a
+  and PV13 done, with PV3b, PV4b, PV4c and PV5b; PV12b waits on the owner as draft #386; next PV14,
+  on the Windows PC. Phase 7's web screens follow PV15.
 - **The workflow review's last steps** ✅ (the owner, 2026-10-13; DECISIONS 2026-10-14): the
   migration guard (#369), docs-only PRs skipping the test jobs (#365), moved files (#368) and two
   tests (#364), each in full in `docs/PLAN-ARCHIVE.md`.
@@ -137,7 +137,7 @@ validation** (each 👀): vitest, `npm run typecheck && npm run lint && npm test
 - **PV10** 👀 The unlock pop-up — ✅ (#381; DECISIONS 2026-10-14)
 - **PV11** 👀 The student panel — ✅ as PV11a (#382) and PV11b (#383; DECISIONS 2026-10-14)
 - **PV12** 👀 The recap (ClassEnded), in two: **PV12a** the grouping — ✅ (#384; DECISIONS 2026-10-14); **PV12b** the recap (~300; `components/recap-card.tsx`, `timeline.tsx`): the Start card, the last session's figures, those not focused the whole time first, then who was, then who didn't join, the roster and the join code (PV6's); the header's line after the bell, "28 students · the session ended at 9:55 AM", where PV6 says "no session running"; **"How it ended" removed**; the marks' icons at `v2.css`'s 2.25 (`.mk .ic`), by a class, since PV4b's 1.75 rule beats the `strokeWidth` prop; PV12a left it `recapGroups(session, report, events, roster)` (`partTime`, `wholeTime`, `notJoined`, each student's name, line and moments placed on the axis, and the axis's ticks), given the class page's roster (a failed roster read is the card's to say); its words are PV12b's (the board's "Other reason" and "no reason given" where `recap.ts` says "Other" and "No reason given"), and so is ClassEnded's tick each 10 minutes, where the axis gives one each 5 for 50; two states no board draws: a student who never joined but has an unlock or protection off here, under Didn't join with that moment (rare), and an unlock or protection off recorded after an early End or before the student's own tap-in, under Focused part of the time with its mark off their line (the owner's call, asked with PV12a) — validation: as above
-- **PV13** 👀 Reports (~350; Reports, ReportStates): `/reports` in the menu, the class picked with pills (no "All classes"), the framing line in italic (the `italic` class alone, never with `font-sans`, which re-slants the upright; PV4's review), the sessions as a table, newest first, with Show earlier, each session's average focus as a bar; `/classes/[id]/reports` redirects to it with that class picked; downloading waits for #339; Help's "Reports, on the class page, lists your past sessions." becomes "Reports, in the menu, lists each class's past sessions." (PV1) — validation: as above, the old URL's redirect
+- **PV13** 👀 Reports — ✅ (#387; DECISIONS 2026-10-15)
 - **PV14** 👀 A session's report (~250; ReportOpened, ReportStates' "Loading this session…" and "Couldn't load this session."): one session on a page and a URL of its own, its recap card and its Unlocks table; its Questions card is L7c's — validation: as above
 - **PV15** 👀 The entry pages (~250; SignIn, Invite, EntryStates): v2's centred sign-in with W3's words for students ("Sign in to Bali", its line for teachers and students, and "Students: set up Bali in the app on your iPhone first."), the invite card under a bar with Sign out and its line for students; `/auth/callback`, `/support`, `/privacy` and `/terms` as PV1 draws them (`app/login/page.tsx`, `components/entry-page.tsx`, `components/invite-code.tsx`); and W2's `homeFor` routing wired into `/` here (PV0's review), so a student who said 13+ in the app no longer lands on the invite page and `/` reads the 13+ check before `/v1/me`, which covers the shell's `/v1/me` read too (PV5's `useMe`, which a class page's link also makes; the owner, 2026-10-13); and a tab with no sign-in on a URL with no page goes to `/login` instead of "Loading…" forever (PV5b's review; the owner, 2026-10-14) — validation: as above. **Then Phase 7's web screens** (Phase 7 steps)
 - **PV16** 👀 Classes (~350; Classes, ClassesNew, ClassesCreated, HomeStates' New class states): `/classes` in the menu, a card per class with its student count, last session (PV2) and Live chip, New class as a dialog (Creating…, a `5xx` with Try again) in place of the inline create row, "Period 4 Biology is ready" with its join code, Copy code and Done (its 40 px check at the board's 1.5 stroke, by a class, as PV4b says), and the block's card — validation: as above

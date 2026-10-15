@@ -454,7 +454,10 @@ export default function ClassDetailPage() {
           </p>
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2 max-sm:ml-0 max-sm:basis-full">
-          <Link href={`/classes/${classId}/reports`} className={buttonClass('secondary', '', 'sm')}>
+          <Link
+            href={`/reports?class=${encodeURIComponent(classId)}`}
+            className={buttonClass('secondary', '', 'sm')}
+          >
             <ChartBar size={16} aria-hidden="true" />
             Reports
           </Link>

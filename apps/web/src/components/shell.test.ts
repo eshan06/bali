@@ -83,7 +83,7 @@ describe('what frames a page', () => {
   });
 
   it('draws the side menu for a teacher, the page beside it in v2’s frame', () => {
-    for (const path of ['/', '/classes/c1', '/classes/c1/reports']) {
+    for (const path of ['/', '/classes/c1', '/reports']) {
       expect(frameFor(path, account('teacher'), null, false), path).toEqual(MENU);
     }
   });
@@ -95,7 +95,7 @@ describe('what frames a page', () => {
   });
 
   it('draws no menu or bar while the account is read, so none flashes for anyone; the page waits (the owner, 2026-10-13)', () => {
-    for (const path of ['/', '/classes/c1', '/classes/c1/reports']) {
+    for (const path of ['/', '/classes/c1', '/reports']) {
       expect(frameFor(path, null, null, false), path).toEqual({
         chrome: null,
         framed: false,
@@ -120,7 +120,7 @@ describe('what frames a page', () => {
   it('says a failed read in the page’s place under today’s bar, with Sign out, on every page (#352’s review)', () => {
     // A class page under a failed read showed itself with no menu and nothing said: the page waits
     // for the account on every page, its failure said where the page would be (`AccountUnread`).
-    for (const path of ['/', '/classes/c1', '/classes/c1/reports']) {
+    for (const path of ['/', '/classes/c1', '/reports']) {
       expect(frameFor(path, null, CANT_REACH, false), path).toEqual({
         chrome: 'bar',
         framed: false,
@@ -153,7 +153,7 @@ describe('the account as pages change (the owner, 2026-10-13)', () => {
   it('is read again after a failure on the next page opened, never again on its own page (#352’s review)', () => {
     // A failed read used to wait for Home, so a class page kept no menu until the teacher went
     // there: any page opened next reads it again, as Try again does on the page it failed on.
-    for (const path of ['/', '/classes/c1', '/classes/c1/reports']) {
+    for (const path of ['/', '/classes/c1', '/reports']) {
       expect(accountStep(path, true, null, CANT_REACH, false, true), path).toBe('read');
     }
     // A later read of a known account that failed (Home's list after a create) too.
@@ -229,15 +229,18 @@ describe('the avatar’s initials', () => {
 });
 
 describe('the side menu', () => {
-  it('links Bali, Home and Help, and no page that doesn’t exist yet, dead or disabled', () => {
+  it('links Bali, Home, Reports and Help, and no page that doesn’t exist yet, dead or disabled', () => {
     const html = menu();
     expect(html).toMatch(/^<nav aria-label="Main" /);
     expect(links(html).map(({ href, text }) => [href, text])).toEqual([
       ['/', 'Bali'],
       ['/', 'Home'],
+      ['/reports', 'Reports'],
       ['/support', 'Help'],
     ]);
-    expect(html).not.toMatch(/Classes|Reports|Questions|Slides/);
+    expect(html).not.toMatch(/Classes|Questions|Slides/);
+    // Reports with the boards' icon, the class page's Reports button's (PV13).
+    expect(html).toMatch(/<a [^>]*href="\/reports"><svg[^>]*\blucide-chart-bar\b/);
     // The lockup, the mark at 20 px and its word at 16/22 in the brand's ink, as the boards render
     // it (v2.css's links take that ink, `.brand` among them).
     expect(html).toMatch(/<a [^>]*translate="no"[^>]*><svg[^>]*width="20"/);
@@ -252,8 +255,8 @@ describe('the side menu', () => {
         .filter((l) => l.current)
         .map((l) => l.text);
     expect(current('/')).toEqual(['Home']);
+    expect(current('/reports')).toEqual(['Reports']);
     expect(current('/classes/c1')).toEqual([]);
-    expect(current('/classes/c1/reports')).toEqual([]);
     // By its aria-current, which a screen reader says too, never by colour alone.
     const home = links(menu()).find((l) => l.text === 'Home');
     expect(home?.classes).toEqual(

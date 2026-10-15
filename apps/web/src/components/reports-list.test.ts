@@ -7,24 +7,25 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
 import { sessionWhen } from '../lib/recap';
-import { Row } from './reports-list';
+import { FIRST_READ, type SessionList } from '../lib/reports';
+import { FocusBars, focusBar, ReportsView, SessionsTable } from './reports-list';
 
 /*
- * A class's reports as the Recap & reports canvas draws them. Each session's card rendered: its
- * day over its times, its figures with "min" beside the minutes, a zero quiet, an unlock or
- * protection-off count in its state's ink with its icon, never colour alone, and opened, its
- * recap under a hairline. The page's own states, which need a read to answer, from its source.
+ * Reports (PV13) as Bali portal in v2's look draws it on Reports and ReportStates: the heading
+ * and its framing line in italic, the class picked with pills, the sessions as a table in a box
+ * that scrolls sideways, newest first, with Show earlier, each session's average focus as a bar out
+ * of its length, and every state ReportStates draws. Rendered, each state given as the page holds
+ * it; the page's own wiring and the old URL's redirect from their sources.
  */
-// An opened card's recap reads through the API, whose sign-out needs the router.
+const redirect = vi.hoisted(() => vi.fn());
+// An opened row's recap reads through the API, whose sign-out needs the router.
 vi.mock('next/navigation', () => ({
-  useParams: () => ({ id: 'c1' }),
+  redirect,
   useRouter: () => ({ replace: () => undefined, push: () => undefined }),
 }));
-const { default: ReportsPage } = await import('../app/classes/[id]/reports/page');
-const page = readFileSync(
-  fileURLToPath(new URL('../app/classes/[id]/reports/page.tsx', import.meta.url)),
-  'utf8',
-);
+const { default: ClassReports } = await import('../app/classes/[id]/reports/page');
+const source = (path: string) =>
+  readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
 
 function lesson(id: string, day: number, over: Partial<SessionReportSummary> = {}) {
   const at = (minute: number) =>
@@ -45,7 +46,8 @@ function lesson(id: string, day: number, over: Partial<SessionReportSummary> = {
   } satisfies SessionReportSummary;
 }
 const TUE = lesson('s3', 6);
-const MON = lesson('s2', 5, { silentMinutes: 0, unlockCount: 0, protectionOffCount: 0 });
+// Ended early, at 9:41 for a 9:05 start: 36 minutes long.
+const FRI = lesson('s2', 2, { endedAt: '2026-10-02T14:41:00.000Z', averageFocusMinutes: 35 });
 const NOBODY = lesson('s1', 1, {
   joinedCount: 0,
   focusMinutes: 0,
@@ -55,83 +57,309 @@ const NOBODY = lesson('s1', 1, {
   protectionOffCount: 0,
 });
 
-const render = (session: SessionReportSummary, open = false) =>
+const CLASSES = [
+  { id: 'c1', name: 'Biology, period 3' },
+  { id: 'c2', name: 'Period 1 Biology' },
+];
+const LOADED: SessionList = {
+  ...FIRST_READ,
+  className: 'Biology, period 3',
+  sessions: [TUE, FRI, NOBODY],
+  nextBefore: 's1',
+  loaded: true,
+  reading: null,
+};
+
+const view = (over: Partial<Parameters<typeof ReportsView>[0]> = {}) =>
   renderToStaticMarkup(
-    createElement(Row, { classId: 'c1', session, open, onToggle: () => undefined }),
+    createElement(ReportsView, {
+      classes: CLASSES,
+      classId: 'c1',
+      list: LOADED,
+      open: null,
+      onToggle: () => undefined,
+      onRead: () => undefined,
+      ...over,
+    }),
   ).replace(/\s/g, ' ');
-/** The text of a card, its tags dropped. */
-const text = (html: string) => html.replace(/<[^>]+>/g, '|').replace(/\|+/g, '|');
+const table = (open: string | null = null, sessions = [TUE, FRI, NOBODY]) =>
+  renderToStaticMarkup(
+    createElement(SessionsTable, { classId: 'c1', sessions, open, onToggle: () => undefined }),
+  ).replace(/\s/g, ' ');
+/** The text of some markup, its tags dropped. */
+const text = (html: string) =>
+  html
+    .replace(/<[^>]+>/g, '|')
+    .replace(/\|+/g, '|')
+    .replace(/&#x27;/g, "'");
 const when = (session: SessionReportSummary) => {
   const { day, times } = sessionWhen(session);
   return `${day}|,|${times.replace(/\s/g, ' ')}`;
 };
+const classesOf = (html: string, tag: RegExp) =>
+  /\bclass="([^"]*)"/.exec(tag.exec(html)?.[0] ?? '')?.[1]?.split(' ') ?? [];
 
-describe('a session’s card in the reports', () => {
-  it('says its day over its times, then its figures, the minutes with "min"', () => {
-    const html = render(TUE);
-    expect(text(html)).toBe(
-      `|${when(TUE)}|Joined|27|Focus time|${new Intl.NumberFormat().format(1214)}| min|Average|45| min|Silent|23| min|Unlocks|4|Protection off|1|`,
-    );
-    // The unit in the secondary ink, at the regular weight.
-    expect(html).toMatch(/<span class="font-normal text-text-secondary"> min<\/span>/);
-    // Each figure's name for a screen reader on a wide row, for the eye on a narrow one.
-    expect(html.match(/<dt class="[^"]*@4xl:sr-only[^"]*">/g)).toHaveLength(6);
+describe('a session’s average focus as its bar', () => {
+  it('is its average out of its length, start to end in whole minutes', () => {
+    expect(focusBar(TUE)).toEqual({ words: '45 of 50 min', percent: 90 });
+    // An early End counts to the End, as the table's times say it.
+    expect(focusBar(FRI)).toEqual({ words: '35 of 36 min', percent: (35 / 36) * 100 });
+    // Not marked over yet: to its bell.
+    expect(focusBar({ ...TUE, endedAt: null })?.words).toBe('45 of 50 min');
+    // Its exact length rounded, as R2 rounds the average: 35 min 20 s is 35.
+    const seconds = { startedAt: '2026-10-02T14:05:50.000Z', endedAt: '2026-10-02T14:41:10.000Z' };
+    expect(focusBar({ ...FRI, ...seconds })?.words).toBe('35 of 35 min');
   });
 
-  it('says a count in its state’s ink and icon, and a zero quietly', () => {
-    const tue = render(TUE);
-    expect(tue).toMatch(
-      /<span class="[^"]*\btext-state-emergency-fg\b[^"]*"><svg[^>]*lucide-lock-open/,
-    );
-    expect(tue).toMatch(
-      /<span class="[^"]*\btext-state-revoked-fg\b[^"]*"><svg[^>]*lucide-shield-off/,
-    );
-    const mon = render(MON);
-    expect(mon).not.toMatch(
-      /text-state-emergency-fg|text-state-revoked-fg|lucide-lock|lucide-shield/,
-    );
-    // Silent 0 min, Unlocks 0 and Protection off 0: each quiet, the unit too.
-    expect(mon.match(/<span class="text-text-tertiary">0/g)).toHaveLength(3);
-  });
-
-  it('says nobody joined in the four figures’ place, never zeros', () => {
-    expect(text(render(NOBODY))).toBe(
-      `|${when(NOBODY)}|Joined|Nobody joined|Unlocks|0|Protection off|0|`,
-    );
-  });
-
-  it('opens its recap under a hairline, the button saying so', () => {
-    const open = render(MON, true);
-    expect(open).toMatch(
-      /<button type="button" aria-expanded="true" aria-controls="recap-s2"[^>]*><svg[^>]*lucide-chevron-down/,
-    );
-    expect(open).toMatch(/<div id="recap-s2" class="[^"]*\bborder-t\b[^"]*\bpt-4\b/);
-    expect(render(MON)).toMatch(/aria-expanded="false"[^>]*><svg[^>]*lucide-chevron-right/);
+  it('has none for a session nobody joined, and never runs past its track', () => {
+    expect(focusBar(NOBODY)).toBeNull();
+    expect(focusBar({ ...TUE, endedAt: TUE.startedAt })).toEqual({
+      words: '45 of 0 min',
+      percent: 0,
+    });
+    expect(focusBar({ ...TUE, averageFocusMinutes: 51 })?.percent).toBe(100);
+    expect(focusBar({ ...TUE, averageFocusMinutes: 1250 }, 'en-US')?.words).toBe('1,250 of 50 min');
   });
 });
 
-describe('the reports page', () => {
-  it('says it is loading the sessions, under the way back and the heading', () => {
-    const html = renderToStaticMarkup(createElement(ReportsPage));
+describe('the sessions’ table (Reports)', () => {
+  it('names its columns in the grey head, then a row per session, newest first', () => {
+    const html = table();
+    expect(text(/<thead>.*<\/thead>/.exec(html)?.[0] ?? '')).toBe(
+      '|Session|Joined|Focus time|Average|Silent|Unlocks|Protection off|',
+    );
+    expect(html.match(/<th scope="col" class="[^"]*\bbg-surface-sunken\b[^"]*">/g)).toHaveLength(7);
+    expect(html).toMatch(/<table aria-label="Sessions, newest first"/);
+    const rows = [...html.matchAll(/<tr[^>]*>(.*?)<\/tr>/g)].map(([, row = '']) => text(row));
+    expect(rows.slice(1)).toEqual([
+      `|${when(TUE)}|27|${new Intl.NumberFormat().format(1214)} min|45 min|23 min|4|1|`,
+      `|${when(FRI)}|27|${new Intl.NumberFormat().format(1214)} min|35 min|23 min|4|1|`,
+      `|${when(NOBODY)}|Nobody joined|0|0|`,
+    ]);
+  });
+
+  it('says nobody joined across the four figures, never zeros', () => {
+    expect(table()).toMatch(
+      /<td colSpan="4" class="[^"]*\btext-text-secondary\b[^"]*">Nobody joined<\/td>/i,
+    );
+  });
+
+  it('scrolls sideways in its box, its figures on one line each (DESIGN.md §8)', () => {
+    const html = table();
+    expect(classesOf(html, /<div[^>]*>/)).toEqual(
+      expect.arrayContaining(['overflow-x-auto', 'rounded-frame', 'border-border-default']),
+    );
+    for (const figure of html.match(/<td class="[^"]*"/g) ?? []) {
+      expect(figure).toMatch(/\btext-right\b.*\bwhitespace-nowrap\b/);
+    }
+    // Its session too, its day and times one line each: on a phone the box scrolls, never wraps.
+    for (const session of html.match(/<th scope="row" class="[^"]*"/g) ?? []) {
+      expect(session).toMatch(/\bwhitespace-nowrap\b/);
+    }
+  });
+
+  it('heads each row with its session, a button opening its report under it', () => {
+    const shut = table();
+    expect(shut).toMatch(
+      /<th scope="row" class="[^"]*"><button type="button" aria-expanded="false" class="group block [^"]*">/,
+    );
+    expect(shut).not.toMatch(/bg-row-open|id="recap-/);
+    const open = table('s2');
+    // Its row in v2's open tint, the report in the next row across every column.
+    expect(open).toMatch(
+      /<tr class="bg-row-open"><th scope="row"[^>]*><button type="button" aria-expanded="true" aria-controls="recap-s2"/,
+    );
+    expect(open).toMatch(
+      /<tr id="recap-s2"><td colSpan="7" class="[^"]*"><div class="sticky left-4 w-\[calc\(100cqw-2rem\)\]">/i,
+    );
+    // The box is the report's container, so it keeps the box's width as the table scrolls.
+    expect(classesOf(open, /<div[^>]*>/)).toContain('@container');
+  });
+
+  it('says a session’s day in semibold, underlined on hover, its times under it', () => {
+    expect(table()).toMatch(
+      /<span class="block font-semibold underline-offset-2 group-hover:underline">[^<]+<span class="sr-only">,<\/span><\/span><span class="block text-cell-sub text-text-tertiary">/,
+    );
+  });
+});
+
+describe('each session’s average focus, beside the table', () => {
+  const bars = (sessions: SessionReportSummary[]) =>
+    renderToStaticMarkup(createElement(FocusBars, { sessions })).replace(/\s/g, ' ');
+
+  it('is a bar per session someone joined, out of its length, and the board’s caption', () => {
+    const html = bars([TUE, NOBODY, FRI]);
+    expect(text(html)).toBe(
+      `|Average focus per session|${sessionWhen(TUE).day}|,|45 of 50 min|${sessionWhen(FRI).day}|,|35 of 36 min|Out of each session's length. Averages only: Bali never ranks students.|`,
+    );
+    expect(html).toMatch(/style="width:90%"/);
+    // The track is grey, hidden from a screen reader: its words say the figure.
     expect(html).toMatch(
-      /Back to the class<\/a><h1[^>]*>Reports<\/h1><p role="status"[^>]*>Loading sessions…<\/p>/,
+      /<span aria-hidden="true" class="[^"]*\bbg-surface-sunken\b[^"]*"><span class="[^"]*\bbg-surface-brand\b/,
+    );
+    expect(html).toMatch(
+      /<ul class="grid grid-cols-\[116px_minmax\(0,1fr\)_minmax\(70px,max-content\)\]/,
     );
   });
 
-  it('says why the sessions couldn’t load, its reason on its own line, Try again under both', () => {
+  it('is nothing when no session has one', () => {
+    expect(bars([NOBODY])).toBe('');
+    expect(bars([])).toBe('');
+  });
+});
+
+describe('the Reports page in each state (ReportStates)', () => {
+  it('heads it Reports over its framing line, in the italic face alone (PV4)', () => {
+    const html = view();
+    expect(html).toMatch(
+      /^<main class="flex flex-col gap-5\.5"><header><h1 class="text-page-title">Reports<\/h1><p class="[^"]*">Patterns are conversation starters, not verdicts\.<\/p><\/header>/,
+    );
+    const framing = classesOf(html, /<p class="[^"]*\bitalic\b[^"]*">/);
+    expect(framing).toEqual(expect.arrayContaining(['italic', 'text-body', 'text-text-secondary']));
+    // `font-sans` would set the upright face, slanted, over the italic one.
+    expect(framing).not.toContain('font-sans');
+  });
+
+  it('picks the class with pills, one marked, filled and semibold, no "All classes"', () => {
+    const html = view({ classId: 'c2' });
+    const pills = [...html.matchAll(/<a ([^>]*)>([^<]*)<\/a>/g)].map(([, attrs = '', name]) => ({
+      name,
+      href: /href="([^"]*)"/.exec(attrs)?.[1],
+      current: attrs.includes('aria-current="page"'),
+    }));
+    expect(pills).toEqual([
+      { name: 'Biology, period 3', href: '/reports?class=c1', current: false },
+      { name: 'Period 1 Biology', href: '/reports?class=c2', current: true },
+    ]);
+    expect(html).toMatch(/<nav aria-label="Class" class="flex flex-wrap gap-2">/);
+    expect(classesOf(html, /<a [^>]*>/)).toEqual(
+      expect.arrayContaining([
+        'rounded-full',
+        'text-pill',
+        'aria-[current=page]:bg-surface-brand',
+        'aria-[current=page]:font-semibold',
+        'aria-[current=page]:text-text-on-brand',
+      ]),
+    );
+    expect(html).not.toContain('All classes');
+  });
+
+  it('says it is loading the sessions under the pills, and nothing else', () => {
+    const html = view({ list: FIRST_READ });
+    expect(html).toMatch(
+      /<\/nav><div><div role="status"><p class="text-body text-text-secondary">Loading sessions…<\/p><\/div><\/div><\/main>$/,
+    );
+  });
+
+  it('says why the sessions couldn’t load, in a card, Try again reading them again', () => {
+    const failed = {
+      ...FIRST_READ,
+      reading: null,
+      failure: { at: 'newest' as const, message: 'x' },
+    };
+    const html = view({ list: failed });
+    expect(html).toMatch(
+      /<div class="[^"]*\bshadow-1\b[^"]*"><p role="alert" class="text-body"><span class="block font-semibold">Couldn(&#x27;|')t load the sessions\.<\/span><span class="text-text-secondary">x<\/span><\/p><button type="button" class="[^"]*\bmt-3\.5\b[^"]*">Try again<\/button><\/div>/,
+    );
+    expect(html).not.toMatch(/No reports yet|Loading sessions/);
+  });
+
+  it('says there are none yet over when one will show, for a class or an account with none', () => {
+    const empty = { ...LOADED, sessions: [], nextBefore: null };
+    const words =
+      /<p class="flex flex-col text-body text-text-secondary"><span class="font-semibold text-text-primary">No reports yet\.<\/span><span>When a session ends, its report shows here\.<\/span><\/p>/;
+    expect(view({ list: empty })).toMatch(words);
+    // A teacher with no class yet: no pills, nothing loading, the same words.
+    const none = view({ classes: [], classId: null, list: FIRST_READ });
+    expect(none).toMatch(words);
+    expect(none).not.toMatch(/<nav|Loading sessions/);
+  });
+
+  it('shows the sessions as a table beside their bars, under the class’s name', () => {
+    const html = view();
+    expect(html).toMatch(
+      /<div class="flex flex-wrap items-start gap-5"><section aria-labelledby="([^"]+)" class="flex min-w-0 flex-\[999_1_520px\] flex-col gap-5"><h2 id="\1" class="mb-3 text-section-label text-text-tertiary uppercase">Sessions · Biology, period 3<\/h2><div class="@container overflow-x-auto/,
+    );
+    expect(html).toMatch(
+      /<section aria-labelledby="([^"]+)" class="flex min-w-0 flex-\[1_1_320px\] flex-col gap-5"><h2 id="\1"[^>]*>Average focus per session<\/h2>/,
+    );
+  });
+
+  it('offers Show earlier, small, held while it reads, gone at the end', () => {
+    expect(view()).toMatch(
+      /<div class="mt-3"><button type="button" aria-disabled="false" class="[^"]*\bh-8\.5\b[^"]*">Show earlier<\/button><\/div>/,
+    );
+    expect(view({ list: { ...LOADED, reading: 'earlier' } })).toMatch(
+      /aria-disabled="true"[^>]*>Loading…<\/button>/,
+    );
+    expect(view({ list: { ...LOADED, nextBefore: null } })).not.toMatch(/Show earlier/);
+  });
+
+  it('says earlier sessions didn’t load in one line, a small Try again beside it', () => {
+    const failed = { ...LOADED, failure: { at: 'earlier' as const, message: 'x' } };
+    expect(view({ list: failed })).toMatch(
+      /<div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-3"><p role="alert" class="text-body">Couldn(&#x27;|')t load earlier sessions\. x<\/p><button type="button" class="[^"]*\bh-8\.5\b[^"]*">Try again<\/button><\/div>/,
+    );
+    expect(view({ list: failed })).not.toMatch(/Show earlier/);
+  });
+
+  it('says the place was lost in v2’s grey notice, over the sessions it read again', () => {
+    expect(view({ list: { ...LOADED, restarted: true } })).toMatch(
+      /<div role="status"><p class="mb-5\.5 rounded-sm border border-border-default bg-surface-sunken px-4 py-3 text-body">Bali lost your place in the list, so it starts again from the newest session\.<\/p><\/div><div class="flex flex-wrap/,
+    );
+  });
+});
+
+describe('the page’s wiring (read from its source)', () => {
+  const page = source('../app/reports/page.tsx');
+
+  it('reads the class ?class= names, else the account’s first, and again as another is picked', () => {
+    expect(page).toMatch(/const param = useSearchParams\(\)\.get\('class'\);/);
+    expect(page).toMatch(/const classId = asked \?\? classes\?\.\[0\]\?\.id \?\? null;/);
     expect(page).toMatch(
-      /list\.failure\?\.at === 'newest' \? \(\s*<div className="mt-6">\s*<div role="alert" className="text-body">\s*<p className="font-semibold">Couldn&apos;t load the sessions\.<\/p>\s*<p className="text-text-secondary">\{list\.failure\.message\}<\/p>\s*<\/div>\s*<Button variant="secondary" onClick=\{\(\) => void read\(list, 'newest'\)\} className="mt-4">\s*Try again/,
+      /if \(classId === null\) return;\s*void read\(FIRST_READ, 'newest'\);\s*return \(\) => \{\s*latest\.current \+= 1;\s*\};\s*\}, \[api, classId, router\]\);/,
     );
+    // Only the newest read's answer counts.
+    expect(page).toMatch(/if \(mine === latest\.current\) setList\(next\);/);
   });
 
-  it('says there are none yet over when one will show', () => {
+  it('takes only a class id from ?class=, so no other path reaches the API (santa’s review)', () => {
+    // `..` survives encodeURIComponent, and would read /v1/reports/sessions in the class's place.
+    const id = new RegExp(/const CLASS_ID = (\/.*\/i);/.exec(page)?.[1]?.slice(1, -2) ?? '$^', 'i');
+    expect(id.test('01a10de8-cc00-72ce-a3df-81a148608a72')).toBe(true);
+    for (const other of ['..', '.', '', 'c1', '01a10de8-cc00-72ce-a3df-81a148608a72/..']) {
+      expect(id.test(other), other).toBe(false);
+    }
     expect(page).toMatch(
-      /<span className="font-semibold text-text-primary">No reports yet\.<\/span>\s*<span>When a session ends, its report shows here\.<\/span>/,
+      /const asked = param !== null && CLASS_ID\.test\(param\) \? param : null;/,
     );
   });
 
-  it('keeps the list 72 rem in the shell’s frame beside the side menu, its column names quiet', () => {
-    expect(page).toMatch(/const PAGE = '\*:max-w-6xl';/);
-    expect(page).toMatch(/className=\{`hidden [^`]*\$\{QUIET\} \$\{ROW\}`\}/);
+  it('starts another class’s list afresh in the render that picks it, its row closed (santa’s review)', () => {
+    // A row left open drew the last class's session under the new class's id for one render,
+    // which read that session from the new class; and a pick of no class kept the last failure.
+    expect(page).toMatch(
+      /if \(listed !== classId\) \{\s*setListed\(classId\);\s*setList\(FIRST_READ\);\s*setOpen\(null\);\s*\}/,
+    );
+  });
+
+  it('takes the classes from the shell’s one read of the account', () => {
+    expect(page).toMatch(/const \{ me \} = useMe\(\);/);
+    expect(page).not.toContain("'/v1/me'");
+  });
+});
+
+describe('a class’s old reports URL', () => {
+  it('lands on Reports with that class picked', async () => {
+    await ClassReports({ params: Promise.resolve({ id: 'c1' }) });
+    expect(redirect).toHaveBeenLastCalledWith('/reports?class=c1');
+    await ClassReports({ params: Promise.resolve({ id: 'a&b' }) });
+    expect(redirect).toHaveBeenLastCalledWith('/reports?class=a%26b');
+  });
+
+  it('is gone from the class page, whose Reports opens Reports with its class picked', () => {
+    expect(source('../app/classes/[id]/page.tsx')).toMatch(
+      /href=\{`\/reports\?class=\$\{encodeURIComponent\(classId\)\}`\}/,
+    );
   });
 });

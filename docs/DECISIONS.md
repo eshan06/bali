@@ -8,6 +8,44 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-15** — **PV13: Reports in the menu, one class at a time, its sessions as v2's table
+  beside their average focus; until PV14 a row opens its report under it.** Built to
+  [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (version 21):
+  Reports and ReportStates at 1440 px (#387). **The class** is the one `?class=` names, else the
+  account's first, read from the shell's one read of `/v1/me` (no read of its own), picked with
+  v2.css's `.filters` pills, each a link, so a class's reports have a URL and the back button
+  returns to the last class; no "All classes", which v3 has none of. `?class=` takes a class id only
+  (the API's UUIDs): anything else names no class, since `..` survives `encodeURIComponent` and
+  would read `/v1/reports/sessions` in the class's place (santa's review; harmless, the teacher's own
+  token on a GET, closed all the same). Another class's list starts afresh in the render that picks
+  it, its open row closed, so the last class's session is never drawn, or read, under the new
+  class's id (santa's review: one wasted read and a 404 per switch). **The table** is v2.css's
+  `.wtable` in its `.table-box`, which scrolls sideways (DESIGN.md §8, v2's look), each figure and
+  each session's day and times on one line: at 390 px the session column wrapped to four lines a
+  row while the box scrolled anyway. **The bar** is a session's average focus out of its length, its
+  start to its end rounded to whole minutes as R2 rounds the average ("43 of 50 min"; an early End
+  counts to the End), none for a session nobody joined, and no panel when no session has one; its
+  figure's column grows to keep the words on one line, where v2.css's fixed 70 px wraps "43 of 50
+  min" onto two, as the board renders itself. **Two calls the canvas doesn't draw** (the
+  conductor's, not parked): until PV14 gives a session its own page and URL, a row's session is a
+  button that opens its report in a full-width row under it, as the reports list did since PB5 (a
+  page keeping today's layout until its step lands), the open row in v2.css's own open-row tint
+  (`.wtable tr.is-open`, green-50, the colour `row-open`), the report held at the box's width and
+  in its view as the table scrolls (`sticky`, `100cqw`); and a teacher with no class sees
+  ReportStates' "No reports yet." with no pills. Santa's Reviewer A held both a blocker, states no
+  board draws; dismissed, and round 2's two reviewers upheld it: PB5's opened row is the owner's
+  approved state (Recap & reports, 2026-10-06), carried over as a page keeps today's layout until
+  its step lands (PLAN's PV rules; DESIGN.md, Sources) in v2.css's own open-row piece, and
+  ReportStates draws "None yet" on its own. **The old URL**, `/classes/[id]/reports`, is a redirect to
+  `/reports?class=<id>`, a server component, so no page flashes; the class page's Reports links
+  straight there. **The words** are the boards' and today's, Help's sentence the owner's (PV1).
+  **Tokens** (DESIGN.md §1, Its call): `pill` (13.5/18 medium), `bar-row` (13.5/18 regular), `cell`
+  (14/19 regular) and `cell-sub` (12/16 regular), and `row-open`; grey also fills the table's head,
+  the bars' tracks and the place-lost notice, drawn as the stale banner is. *Not on the preview:*
+  Show earlier and its two states (no class on dev holds more than 20 ended sessions), loading and
+  the failures; each is rendered in the tests. *Size:* 651 changed lines without tests, 267 of them
+  PB5's list of cards and the old page deleted; the new code 384 (the conductor kept it one PR).
+
 - **2026-10-15** — **A `came_back` is the server's: stamped when the server heard the phone, held to
   the window and never before the `went_silent` it closes (a fix, #385).** Found by PV11b's santa
   review (#383). Decision 7 says the pair is server-minted, but the engine stamped the `came_back`
