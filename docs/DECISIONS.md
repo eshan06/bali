@@ -8,8 +8,8 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
-- **2026-10-14** — **PV11b: the student panel, built as drawn but for the owner's two wording
-  calls; a tile is its button, Open student its other door, and Present closes it.** Built to
+- **2026-10-14** — **PV11b: the student panel, built as drawn but for the owner's wording calls;
+  a tile is its button, Open student its other door, and Present closes it.** Built to
   [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (version 21):
   ClassStudent and PanelStates at 1440 px, ClassStates' tile as a button and ClassUnlock's Open
   student, with PhoneClassLive's tiles at 390 (#383). **The panel** (`components/student-panel.tsx`)
@@ -51,20 +51,23 @@ a real decision? Add a dated entry at the top: what was decided and why.
   and its Clock off line reads "This phone's clock is off, so its times may be off too.", where the
   board's caption said Bali records the time by its own clock, beside times that are the phone's own
   claim held to the session's window (dev showed "Tapped in at 9:21 PM" over "last checked in at
-  9:12 PM"). The tile's Clock off tooltip keeps its words. **From santa's review:** on a phone the
+  9:12 PM"). **And the owner's approvals of the parked PR (2026-10-14):** the tile's Clock off
+  tooltip takes the same words, one string (`CLOCK_OFF`) for both, in place of "This phone's clock
+  is set ahead. Bali records the time by its own clock."; and the panel at phone width, which no
+  board draws, stays as built (below). **From santa's review:** on a phone the
   tile, now a button, is laid out as a column, since a button set as a block centres its words in
   a tile stretched to the row's tallest (measured: 31 px down, against 11 at the top); and a
   pop-up's Close hands focus to the next pop-up's Close, not to its Open student, now first in
   it. **Weak spots,
   as drawn:** at 1440 px the open panel covers +5, +10, End and Present, as ClassStudent draws it
   (close it first; at 1920 they stay clear); at phone width, which no board draws, v2.css's numbers
-  make it 372 px of a 390 px screen, the page an 18 px strip beside it (the owner's call, asked with
-  the PR parked). **The screenshots** used dev's demo students in the demo class: Cal unlocked then
+  make it 372 px of a 390 px screen, the page an 18 px strip beside it (asked with the PR parked;
+  approved as built, the owner, 2026-10-14). **The screenshots** used dev's demo students in the demo class: Cal unlocked then
   protection off (the pop-up, Open student, the loading panel), Ana tapped in ten minutes ahead
   (Clock off), Dana not here, then silent, then unlocked and left, Ben unlocked and then left, a
   read made to fail in the browser and Try again; Left came from a short second session in an older
   demo class (Ben and Dana are enrolled there), ended at once; a second session in the demo class
-  showed the owner's two changes. *Size:* 395 changed lines without tests.
+  showed the owner's two changes. *Size:* about 395 changed lines without tests.
 
 - **2026-10-14** — **PV11a: the student panel's logic, with no words: its state is the tile's, its
   moments the recap's, its times the server's events'.** For PV11b's panel, as
