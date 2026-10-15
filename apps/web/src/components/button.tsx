@@ -9,7 +9,8 @@ import type { ComponentProps } from 'react';
  * `text-primary` edge, never by colour alone; destructive only for removing a student or deleting
  * a class (its tokens name no hover shade, so it has none). Dimmed to 55 %, as v2.css draws it,
  * while disabled, or while busy but kept focusable with `aria-disabled`. Small (PV6, the class
- * page's Reports, Copy and New code) is 34 px tall, 14 px in, its label 13.5/18.
+ * page's Reports, Copy and New code) is 34 px tall, 14 px in, its label 13.5/18; large (PV15, the
+ * sign-in's Sign in and its callback's Back to sign in) 48 px tall, its label 16/20.
  */
 const VARIANTS = {
   primary:
@@ -19,7 +20,11 @@ const VARIANTS = {
   destructive: 'border border-transparent bg-action-destructive-bg text-action-destructive-fg',
 };
 
-const SIZES = { md: 'h-10 px-4.5 text-button', sm: 'h-8.5 px-3.5 text-button-sm' };
+const SIZES = {
+  md: 'h-10 px-4.5 text-button',
+  sm: 'h-8.5 px-3.5 text-button-sm',
+  lg: 'h-12 px-4.5 text-button-lg',
+};
 
 type Variant = keyof typeof VARIANTS;
 type Size = keyof typeof SIZES;

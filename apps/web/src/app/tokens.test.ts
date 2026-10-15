@@ -125,6 +125,9 @@ const V2_SIZES: Record<string, [string, string, number, string?]> = {
   'bar-row': ['13.5px', '18px', 400],
   cell: ['14px', '19px', 400],
   'cell-sub': ['12px', '16px', 400],
+  // The entry pages' (PV15): an entry page's card title and the sign-in's 48 px button's label.
+  'entry-title': ['20px', '26px', 600],
+  'button-lg': ['16px', '20px', 600],
 };
 /** The sizes §1 lists that the scale has, each its style: [style, size, line height]. */
 const ON_SCALE = [
@@ -613,11 +616,12 @@ describe('every page and piece uses the tokens’ utilities, never a Tailwind de
 
 describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
   // Cards sit straight on the page with their own hairline (DESIGN.md §4). Grey stays only where
-  // the approved designs keep it: the grid's stale banner, the policy draft's banner and badge,
-  // and a control's hover, pressed or open state, the side menu's item on its own page (PV5)
-  // among them; a chip's fill is its state's own tint. A field is white in v2's look (PV4); the
-  // grey v2 adds comes with the step that draws each: the length picker's track and the join
-  // code's chip (PV6); a table's head and the bars' tracks (PV13); the recap's name pills to come.
+  // the approved designs keep it: the grid's stale banner, the policy draft's banner, and a
+  // control's hover, pressed or open state, the side menu's item on its own page (PV5) among them;
+  // a chip's fill is its state's own tint, the Placeholder chip's Not here's (PV15). A field is
+  // white in v2's look (PV4); the grey v2 adds comes with the step that draws each: the length
+  // picker's track and the join code's chip (PV6); a table's head and the bars' tracks (PV13); the
+  // help page's two lists of what a teacher sees (PV15); the recap's name pills to come.
   const src = fileURLToPath(new URL('../', import.meta.url));
   const files = sources(src).filter((file) => /\.tsx?$/.test(file));
 
@@ -647,15 +651,16 @@ describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
     const filled = Object.fromEntries(
       files.filter((file) => bare(file) > 0).map((file) => [relative(src, file), bare(file)]),
     );
-    // The stale banner, the policy draft's banner and Placeholder badge, and v2's on the class
-    // page: the length picker's track, the join code's chip and the student panel's moments' dots;
-    // and on Reports (PV13) its table's head, its bars' tracks and the place-lost notice, drawn as
-    // the stale banner is.
+    // The stale banner, the policy draft's banner, and v2's on the class page: the length
+    // picker's track, the join code's chip and the student panel's moments' dots; on Reports
+    // (PV13) its table's head, its bars' tracks and the place-lost notice, drawn as the stale
+    // banner is; and on Help (PV15, SupportPage) the two lists of what a teacher sees, drawn so too.
     expect(filled).toEqual({
       [join('app', 'classes', '[id]', 'page.tsx')]: 1,
+      [join('app', 'support', 'page.tsx')]: 1,
       [join('components', 'join-code.tsx')]: 1,
       [join('components', 'live-grid.tsx')]: 1,
-      [join('components', 'policy-draft.tsx')]: 2,
+      [join('components', 'policy-draft.tsx')]: 1,
       [join('components', 'reports-list.tsx')]: 3,
       [join('components', 'student-panel.tsx')]: 1,
     });
@@ -702,6 +707,15 @@ describe('the buttons in v2’s look (DESIGN.md §1 and §4, PV4)', () => {
     );
     expect(small).not.toEqual(expect.arrayContaining(['h-10']));
     expect(small).not.toEqual(expect.arrayContaining(['text-button']));
+  });
+
+  it('come large too (PV15, the sign-in’s): 48 px tall, 18 px in, a 16/20 label, the rest as the others', () => {
+    const large = buttonClass('primary', '', 'lg').split(' ');
+    expect(large).toEqual(
+      expect.arrayContaining(['h-12', 'px-4.5', 'text-button-lg', 'rounded-sm', 'gap-2']),
+    );
+    expect(large).not.toEqual(expect.arrayContaining(['h-10']));
+    expect(large).not.toEqual(expect.arrayContaining(['text-button']));
   });
 });
 

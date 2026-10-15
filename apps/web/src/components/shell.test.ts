@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import type { MeResponse } from '@bali/shared';
@@ -6,8 +7,9 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
-import { NetworkError } from '../lib/api-client';
+import { createApiClient, NetworkError } from '../lib/api-client';
 import { CANT_REACH } from '../lib/errors';
+import type { Home } from '../lib/student-web';
 import {
   AccountUnread,
   accountStep,
@@ -29,7 +31,8 @@ import {
  * with and without a name, its bar under 776 px and its three rows under 640 px, and the page beside
  * it. And how the account is read (PV5b, the owner's approval of #352's review): Loading… in the
  * page's place until it answers, its failure there with Try again, read again on the next page,
- * and only the newest read's answer counts.
+ * and only the newest read's answer counts; the 13+ check read before `/v1/me`, which makes the
+ * account, and a tab with no sign-in sent to /login (PV15).
  */
 const nav = vi.hoisted(() => ({ path: '/' }));
 vi.mock('next/navigation', () => ({
@@ -47,6 +50,10 @@ function account(role: 'teacher' | 'student'): MeResponse {
     armed: false,
   };
 }
+
+/** Where the home sends a teacher, a student who passed the 13+ check, or anyone else. */
+const homeOf = (kind: Home['kind']): Home =>
+  kind === 'invite' ? { kind } : { kind, me: account(kind) };
 
 const menu = (over: Partial<Parameters<typeof SideMenu>[0]> = {}) =>
   renderToStaticMarkup(
@@ -78,18 +85,18 @@ const MENU = { chrome: 'menu', framed: true, hidden: false };
 describe('what frames a page', () => {
   it('draws nothing on a page read without signing in: each has its own bar', () => {
     for (const path of ['/login', '/auth/callback', '/support', '/privacy', '/terms']) {
-      expect(frameFor(path, account('teacher'), null, false), path).toEqual(NONE);
+      expect(frameFor(path, homeOf('teacher'), null, false), path).toEqual(NONE);
     }
   });
 
   it('draws the side menu for a teacher, the page beside it in v2’s frame', () => {
     for (const path of ['/', '/classes/c1', '/reports']) {
-      expect(frameFor(path, account('teacher'), null, false), path).toEqual(MENU);
+      expect(frameFor(path, homeOf('teacher'), null, false), path).toEqual(MENU);
     }
   });
 
   it('draws no menu or frame on the projector, as ClassPresent draws it (the owner, 2026-10-13)', () => {
-    expect(frameFor('/classes/c1', account('teacher'), null, true)).toEqual(NONE);
+    expect(frameFor('/classes/c1', homeOf('teacher'), null, true)).toEqual(NONE);
     // Whether or not the account is read yet: a reload in Present comes back without the menu.
     expect(frameFor('/classes/c1', null, null, true)).toEqual(NONE);
   });
@@ -104,20 +111,23 @@ describe('what frames a page', () => {
     }
   });
 
-  it('keeps today’s bar for an account that doesn’t teach, never the menu; the invite page frames itself', () => {
-    expect(frameFor('/', account('student'), null, false)).toEqual({
-      chrome: 'bar',
-      framed: false,
-      hidden: false,
-    });
-    expect(frameFor('/classes/c1', account('student'), null, false)).toEqual({
-      chrome: 'bar',
-      framed: true,
-      hidden: false,
-    });
+  it('draws the bar for an account that doesn’t teach, never the menu; the invite page frames itself', () => {
+    // A student who passed the 13+ check, and an account that never did (PV15), alike.
+    for (const kind of ['student', 'invite'] as const) {
+      expect(frameFor('/', homeOf(kind), null, false), kind).toEqual({
+        chrome: 'bar',
+        framed: false,
+        hidden: false,
+      });
+      expect(frameFor('/classes/c1', homeOf(kind), null, false), kind).toEqual({
+        chrome: 'bar',
+        framed: true,
+        hidden: false,
+      });
+    }
   });
 
-  it('says a failed read in the page’s place under today’s bar, with Sign out, on every page (#352’s review)', () => {
+  it('says a failed read in the page’s place under the bar, with Sign out, on every page (#352’s review)', () => {
     // A class page under a failed read showed itself with no menu and nothing said: the page waits
     // for the account on every page, its failure said where the page would be (`AccountUnread`).
     for (const path of ['/', '/classes/c1', '/reports']) {
@@ -131,15 +141,31 @@ describe('what frames a page', () => {
 });
 
 describe('the account as pages change (the owner, 2026-10-13)', () => {
-  const teacher = account('teacher');
+  const teacher = homeOf('teacher');
 
   it('is forgotten once the sign-in is gone, so going back never shows it', () => {
     // A Sign out and an expired session both land on /login, the token gone.
     expect(accountStep('/login', false, teacher, null, false, true)).toBe('forget');
+    expect(accountStep('/login', false, homeOf('invite'), null, false, true)).toBe('forget');
     expect(accountStep('/login', false, null, CANT_REACH, false, true)).toBe('forget');
     // An answer that lands after the Sign out is forgotten too.
     expect(accountStep('/', false, teacher, null, false, false)).toBe('forget');
     expect(accountStep('/login', false, null, null, false, true)).toBe('keep');
+  });
+
+  it('sends a tab with no sign-in on a signed-in page to /login, a URL with no page too (PV5b’s review)', () => {
+    // A URL with no page has no page of its own to send it there: the shell said Loading… for ever.
+    for (const path of ['/no-such-page', '/classes/c1/nothing', '/', '/classes/c1', '/reports']) {
+      expect(accountStep(path, false, null, null, false, true), path).toBe('sign in');
+    }
+    // Never from a page read without signing in, the sign-in page itself among them.
+    for (const path of ['/login', '/auth/callback', '/support', '/privacy', '/terms']) {
+      expect(accountStep(path, false, null, null, false, true), path).toBe('keep');
+    }
+    // What the tab still holds is forgotten first, as it is on /login.
+    expect(accountStep('/no-such-page', false, teacher, null, false, true)).toBe('forget');
+    // Signed in, a URL with no page reads the account like any page, its frame the account's.
+    expect(accountStep('/no-such-page', true, null, null, false, true)).toBe('read');
   });
 
   it('is read once on a signed-in page, and kept as pages change, Help included', () => {
@@ -179,7 +205,7 @@ describe('the shell’s wiring of the rulings (read from its source)', () => {
   const shell = read('./shell.tsx');
 
   it('frames the page by Present, the account and its failure', () => {
-    expect(shell).toMatch(/const frame = frameFor\(path, me, error, presenting\);/);
+    expect(shell).toMatch(/const frame = frameFor\(path, home, error, presenting\);/);
     // A page's usePresenting reaches the shell's own state, on and back off.
     expect(shell).toMatch(/const \[presenting, setPresenting\] = useState\(false\);/);
     expect(shell).toMatch(/<PresentingContext value=\{setPresenting\}>/);
@@ -188,17 +214,27 @@ describe('the shell’s wiring of the rulings (read from its source)', () => {
     );
   });
 
-  it('reads, keeps or forgets the account as accountStep says, on every page and every answer', () => {
+  it('reads, keeps or forgets the account, or signs the tab in, as accountStep says, on every page and every answer', () => {
     // A new page is one the effect hasn't seen yet: the same page's answers never read again.
     expect(shell).toMatch(
-      /const newPage = seen\.current !== path;\s*seen\.current = path;\s*const step = accountStep\(\s*path,\s*getAccessToken\(\) !== null,\s*me,\s*error,\s*reading\.current,\s*newPage,?\s*\);\s*if \(step === 'read'\) load\(\);\s*if \(step === 'forget'\) \{\s*setMe\(null\);\s*setError\(null\);\s*\}\s*\}, \[path, me, error, load\]\);/,
+      /const newPage = seen\.current !== path;\s*seen\.current = path;\s*const signedIn = getAccessToken\(\) !== null;\s*const step = accountStep\(path, signedIn, home, error, reading\.current, newPage\);\s*if \(step === 'read'\) load\(\);\s*if \(step === 'sign in'\) router\.replace\('\/login'\);\s*if \(step === 'forget'\) \{\s*setHome\(null\);\s*setError\(null\);\s*\}\s*\}, \[path, home, error, load, router\]\);/,
     );
   });
 
   it('applies only the newest read’s answer, so a past failure never shows over fresh data (#352’s review)', () => {
     expect(shell).toMatch(
-      /void readAccount\(api, reads\)\.then\(\(said\) => \{\s*(\/\/[^\n]*\s*)*if \(said === null\) return;\s*reading\.current = false;\s*if \('me' in said\) setMe\(said\.me\);\s*else setError\(said\.error\);\s*\}\);/,
+      /void readAccount\(api, reads\)\.then\(\(said\) => \{\s*(\/\/[^\n]*\s*)*if \(said === null\) return;\s*reading\.current = false;\s*if \('home' in said\) setHome\(said\.home\);\s*else setError\(said\.error\);\s*\}\);/,
     );
+  });
+
+  it('reads the account as the home does, the 13+ check first, and never /v1/me itself (PV15)', () => {
+    expect(shell).toMatch(/said = \{ home: await homeFor\(api\) \};/);
+    expect(shell).not.toMatch(/['"]\/v1\/me['"?]/);
+    // The menu names the account `/v1/me` read, none for one the check never let it read.
+    expect(shell).toMatch(
+      /const me = home === null \|\| home\.kind === 'invite' \? null : home\.me;\s*const value = useMemo\(\(\) => \(\{ home, me, error, load \}\), \[home, me, error, load\]\);/,
+    );
+    expect(shell).toMatch(/name=\{me\?\.user\.displayName\?\.trim\(\) \|\| null\}/);
   });
 
   it('says the account unread in the page’s place, Try again reading it again (#352’s review)', () => {
@@ -349,8 +385,9 @@ describe('the shell', () => {
   });
 
   it('first paints Loading… in a signed-in page’s place, with no menu or bar, the page kept for later (#352’s review)', () => {
-    // It painted a blank window (Home's own Loading… hidden with the page), after a redeem too.
-    for (const path of ['/', '/classes/c1']) {
+    // It painted a blank window (Home's own Loading… hidden with the page), after a redeem too. A
+    // URL with no page paints the same, until the shell reads the account or sends it to /login.
+    for (const path of ['/', '/classes/c1', '/no-such-page']) {
       nav.path = path;
       expect(renderToStaticMarkup(createElement(Shell, null, page)), path).toMatch(
         /^<div><main class="[^"]*"><p role="status" class="[^"]*">Loading…<\/p><\/main><div hidden=""><main>page<\/main><\/div><\/div>$/,
@@ -386,14 +423,14 @@ describe('the shell', () => {
 
   it('holds the one read of the account that Home shows and the menu names', () => {
     const home = read('../app/page.tsx');
-    expect(home).toContain('const { me, error, load } = useMe();');
+    expect(home).toContain('const { home, error, load } = useMe();');
     expect(home).not.toContain("'/v1/me'");
     // A redeem forgets the account and reads it again, so the menu comes with the classes; until
     // it answers, the shell says Loading… in Home's place, as it does for every page.
     expect(home).toMatch(/redeemed\.current = true;\s*load\(true\);/);
-    expect(read('./shell.tsx')).toMatch(/\(fresh = false\) => \{\s*if \(fresh\) setMe\(null\);/);
+    expect(read('./shell.tsx')).toMatch(/\(fresh = false\) => \{\s*if \(fresh\) setHome\(null\);/);
     // Home draws nothing of its own for an account not read: the shell's words are the only ones.
-    expect(home).toMatch(/if \(me === null\) return null;/);
+    expect(home).toMatch(/if \(home === null\) return null;/);
     expect(home).not.toMatch(/>\s*Loading…\s*<|Couldn&apos;t load your account/);
   });
 });
@@ -401,14 +438,15 @@ describe('the shell', () => {
 describe('the account’s reads (#352’s review)', () => {
   const teacher = account('teacher');
 
-  /** An API whose reads answer in the order given, each settled by hand. */
+  /** An API whose reads answer in the order asked, each settled by hand, each path kept. */
   function api() {
-    const settles: { answer: (me: MeResponse) => void; fail: (e: unknown) => void }[] = [];
+    const settles: { path: string; answer: (body: unknown) => void; fail: (e: unknown) => void }[] =
+      [];
     return {
       settles,
-      get: <T>() =>
+      get: <T>(path: string) =>
         new Promise<T>((resolve, reject) => {
-          settles.push({ answer: (me) => resolve(me as T), fail: reject });
+          settles.push({ path, answer: (body) => resolve(body as T), fail: reject });
         }),
     };
   }
@@ -419,8 +457,10 @@ describe('the account’s reads (#352’s review)', () => {
     const fake = api();
     const older = readAccount(fake, reads);
     const newer = readAccount(fake, reads);
-    fake.settles[1]?.answer(teacher);
-    expect(await newer).toEqual({ me: teacher });
+    fake.settles[1]?.answer({ passed: true });
+    await vi.waitFor(() => expect(fake.settles).toHaveLength(3));
+    fake.settles[2]?.answer(teacher);
+    expect(await newer).toEqual({ home: { kind: 'teacher', me: teacher } });
     fake.settles[0]?.fail(new NetworkError());
     expect(await older).toBeNull();
   });
@@ -432,7 +472,9 @@ describe('the account’s reads (#352’s review)', () => {
     const newer = readAccount(fake, reads);
     fake.settles[1]?.fail(new NetworkError());
     expect(await newer).toEqual({ error: CANT_REACH });
-    fake.settles[0]?.answer(teacher);
+    fake.settles[0]?.answer({ passed: true });
+    await vi.waitFor(() => expect(fake.settles).toHaveLength(3));
+    fake.settles[2]?.answer(teacher);
     expect(await older).toBeNull();
   });
 
@@ -441,5 +483,115 @@ describe('the account’s reads (#352’s review)', () => {
     const read = readAccount(fake, { current: 0 });
     fake.settles[0]?.fail(new NetworkError());
     expect(await read).toEqual({ error: CANT_REACH });
+  });
+});
+
+describe('where the account’s read sends it, the 13+ check before /v1/me (PV15)', () => {
+  /** The API client over a fetch answering each path from `routes`, every path asked kept. */
+  function client(routes: Record<string, () => Promise<Response>>) {
+    const asked: string[] = [];
+    const onUnauthorized = vi.fn();
+    const api = createApiClient({
+      baseUrl: 'http://api',
+      getToken: () => 'tok',
+      onUnauthorized,
+      fetchImpl: (url) => {
+        const path = (url as string).replace('http://api', '');
+        asked.push(path);
+        const route = routes[path];
+        return route ? route() : Promise.resolve(Response.json({}, { status: 404 }));
+      },
+    });
+    return { api, asked, onUnauthorized };
+  }
+  const json = (status: number, body: unknown) => () =>
+    Promise.resolve(Response.json(body, { status }));
+  const offline = () => Promise.reject(new Error('offline'));
+  const reads = () => ({ current: 0 });
+
+  it('a teacher: the check, then /v1/me, whose role sends them to their classes', async () => {
+    const { api, asked } = client({
+      '/v1/me/age-check': json(200, { passed: true }),
+      '/v1/me': json(200, account('teacher')),
+    });
+    expect(await readAccount(api, reads())).toEqual({ home: homeOf('teacher') });
+    expect(asked).toEqual(['/v1/me/age-check', '/v1/me']);
+  });
+
+  it('a student who said 13+ in the app: the check, then /v1/me, their account the app made', async () => {
+    const { api, asked } = client({
+      '/v1/me/age-check': json(200, { passed: true }),
+      '/v1/me': json(200, account('student')),
+    });
+    expect(await readAccount(api, reads())).toEqual({ home: homeOf('student') });
+    expect(asked).toEqual(['/v1/me/age-check', '/v1/me']);
+  });
+
+  it('a web sign-in that never set up the app: the invite page, and no /v1/me, so no account made', async () => {
+    // On any signed-in page: the shell reads the account so on every one, a class page's link too.
+    const { api, asked } = client({
+      '/v1/me/age-check': json(200, { passed: false }),
+      '/v1/me': json(200, account('student')),
+    });
+    expect(await readAccount(api, reads())).toEqual({ home: { kind: 'invite' } });
+    expect(asked).toEqual(['/v1/me/age-check']);
+  });
+
+  it('a read that failed: said in words, nothing guessed, and Try again reads it all again', async () => {
+    const routes: Record<string, () => Promise<Response>> = {
+      '/v1/me/age-check': offline,
+      '/v1/me': json(200, account('teacher')),
+    };
+    const { api, asked, onUnauthorized } = client(routes);
+    expect(await readAccount(api, reads())).toEqual({ error: CANT_REACH });
+    // Never /v1/me after a check that didn't answer: it could make an account the check never let.
+    expect(asked).toEqual(['/v1/me/age-check']);
+    // The check answered, /v1/me didn't: still the failure, never a guess at the account.
+    routes['/v1/me/age-check'] = json(200, { passed: true });
+    routes['/v1/me'] = offline;
+    expect(await readAccount(api, reads())).toEqual({ error: CANT_REACH });
+    // Try again, the connection back: the check first again, then the account.
+    routes['/v1/me'] = json(200, account('teacher'));
+    expect(await readAccount(api, reads())).toEqual({ home: homeOf('teacher') });
+    expect(asked).toEqual([
+      '/v1/me/age-check',
+      '/v1/me/age-check',
+      '/v1/me',
+      '/v1/me/age-check',
+      '/v1/me',
+    ]);
+    expect(onUnauthorized).not.toHaveBeenCalled();
+  });
+
+  it('a 401: the tab signs out once, toward /login, reads nothing more and says no failure', async () => {
+    const { api, asked, onUnauthorized } = client({
+      '/v1/me/age-check': json(401, { error: { code: 'unauthorized', message: 'expired' } }),
+      '/v1/me': json(200, account('teacher')),
+    });
+    // Loading… stays in the page's place until /login opens: no "Couldn't load your account."
+    expect(await readAccount(api, reads())).toEqual({ error: null });
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+    expect(asked).toEqual(['/v1/me/age-check']);
+  });
+
+  it('reads /v1/me, which makes the account, nowhere in the portal but homeFor, after the check', () => {
+    // A page or a piece that read it itself would make an account for a sign-in that never set
+    // up the app (ARCHITECTURE, Live lesson, decision 13).
+    const src = fileURLToPath(new URL('../', import.meta.url));
+    const files = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+        const path = join(dir, entry.name);
+        if (entry.isDirectory()) return files(path);
+        return /\.tsx?$/.test(entry.name) && !entry.name.includes('.test.') ? [path] : [];
+      });
+    // Its code, its comments set aside: a path quoted, a template's included.
+    const code = (file: string) =>
+      readFileSync(file, 'utf8')
+        .replace(/\/\*[^]*?\*\//g, '')
+        .replace(/^\s*\/\/.*$/gm, '');
+    const readers = files(src)
+      .filter((file) => /['"`]\/v1\/me['"`?]/.test(code(file)))
+      .map((file) => relative(src, file).split(sep).join('/'));
+    expect(readers).toEqual(['lib/student-web.ts']);
   });
 });

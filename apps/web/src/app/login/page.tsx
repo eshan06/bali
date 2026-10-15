@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 
 import { Button } from '@/components/button';
 import { CARD_ENTRY } from '@/components/card';
-import { EntryPage } from '@/components/entry-page';
+import { EntryPage, STAGE_FOOT } from '@/components/entry-page';
 import { TextLink } from '@/components/text-link';
 import { type SignedOut, signedOut, startLogin } from '@/lib/auth';
 
@@ -22,6 +22,11 @@ const PUBLIC_PAGES = [
   { href: '/terms', label: 'Terms' },
 ];
 
+/**
+ * Sign in, for teachers and students (SignIn, EntryStates; PV15): v2's stage, its card with the
+ * words for both (W3's, decision 13), the line for students under it, then the public pages. A Sign
+ * out's word sits over Sign in, a page that didn't open under it, as Entry & info placed them.
+ */
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [left, setLeft] = useState<SignedOut | null>(null);
@@ -36,29 +41,31 @@ export default function LoginPage() {
 
   return (
     <EntryPage>
-      {/* An entry page's card (DESIGN.md §4): radius-md, 24 px padding, its own hairline edge. */}
-      <div className={CARD_ENTRY}>
-        <h1 className="text-h1 text-balance">Teacher portal</h1>
-        <p className="mt-2 text-body-lg text-pretty text-text-secondary">
-          Sign in to see your classes.
+      <section aria-labelledby="sign-in-title" className={CARD_ENTRY}>
+        <h1 id="sign-in-title" className="text-entry-title">
+          Sign in to Bali
+        </h1>
+        <p className="-mt-2.5 text-body text-pretty text-text-secondary">
+          Teachers and students sign in here to see their classes.
         </p>
         {left ? (
-          <p role="status" className="mt-6 text-body text-pretty">
+          <p role="status" className="text-body text-pretty">
             {SIGNED_OUT[left]}
           </p>
         ) : null}
-        <Button onClick={onSignIn} className="mt-8 w-full">
+        <Button size="lg" onClick={onSignIn} className="w-full">
           Sign in
         </Button>
         {error ? (
-          <p role="alert" className="mt-4 text-body text-pretty">
+          <p role="alert" className="text-body text-pretty">
             {error}
           </p>
         ) : null}
-      </div>
-      {/* The public pages, under the card and in line with its text: the card keeps to signing in. */}
-      <nav aria-label="Help and policies" className="mt-4 px-6">
-        <ul className="flex flex-wrap gap-x-5 gap-y-2 text-body">
+      </section>
+      <p className={STAGE_FOOT}>Students: set up Bali in the app on your iPhone first.</p>
+      {/* The public pages, under the card: the card keeps to signing in. */}
+      <nav aria-label="Help and policies" className="w-full pt-2.5">
+        <ul className="flex flex-wrap justify-center gap-x-4.5 gap-y-1.5 text-meta">
           {PUBLIC_PAGES.map((page) => (
             <li key={page.href}>
               <TextLink href={page.href}>{page.label}</TextLink>

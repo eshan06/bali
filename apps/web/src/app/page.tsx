@@ -8,7 +8,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Blocks } from '@/components/blocks';
 import { Button } from '@/components/button';
 import { CARD } from '@/components/card';
-import { EntryPage } from '@/components/entry-page';
+import { EntryPage, STAGE_FOOT } from '@/components/entry-page';
 import { Field } from '@/components/field';
 import { InviteCode } from '@/components/invite-code';
 import { useMe } from '@/components/shell';
@@ -21,10 +21,12 @@ import { useApi } from '@/lib/use-api';
  * opening its class page, and the create row under them on a card of its own; beside them on a
  * desktop, under them on anything narrower, the teacher's block. A create's failure is said under
  * its field with Try again; a made class is said by the list, read again. An account that doesn't
- * teach yet gets the invite code in place of all of it. The account is the shell's one read of
- * `/v1/me` (`useMe`), which the side menu names too, read again as the page opens; until it
- * answers, the shell says Loading… or its failure in the page's place (PV5b); the page sits in the
- * shell's frame beside the menu (PV5).
+ * teach gets the invite page (Invite, PV15) in place of all of it, its line for students only for
+ * an account the 13+ check never passed: a student who passed has set up the app, and their home is
+ * W3's (StudentHome), so until then they keep the invite card as it was. The account is the
+ * shell's one read (`useMe`: the 13+ check, then `/v1/me`), which the side menu names too, read
+ * again as the page opens; until it answers, the shell says Loading… or its failure in the page's
+ * place (PV5b); the page sits in the shell's frame beside the menu (PV5).
  */
 export default function HomePage() {
   const api = useApi();
@@ -32,7 +34,7 @@ export default function HomePage() {
   const id = useId();
   // A create under way: a second Enter before the page redraws sends nothing.
   const sending = useRef(false);
-  const { me, error, load } = useMe();
+  const { home, error, load } = useMe();
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   // The last create's failure, said under the field; Try again sends the name again, but after a
@@ -58,10 +60,10 @@ export default function HomePage() {
   }, [load]);
 
   useEffect(() => {
-    if (!redeemed.current || me?.user.role !== 'teacher') return;
+    if (!redeemed.current || home?.kind !== 'teacher') return;
     redeemed.current = false;
     heading.current?.focus();
-  }, [me]);
+  }, [home]);
 
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -83,15 +85,21 @@ export default function HomePage() {
 
   // The account not read yet, or its read failed: the shell says so in this page's place
   // (`AccountUnread`), as it does on every page.
-  if (me === null) return null;
-  // Not a teacher yet, as `/v1/me` says: the invite code, in place of the classes or a 403.
-  if (me.user.role !== 'teacher') {
+  if (home === null) return null;
+  // Not a teacher: the invite code, in place of the classes or a 403.
+  if (home.kind !== 'teacher') {
     return (
       <EntryPage signedIn>
         <InviteCode onTeacher={onTeacher} />
+        {home.kind === 'invite' ? (
+          <p className={STAGE_FOOT}>
+            Here as a student? Set up Bali in the app on your iPhone first, then refresh this page.
+          </p>
+        ) : null}
       </EntryPage>
     );
   }
+  const { me } = home;
 
   return (
     <main>

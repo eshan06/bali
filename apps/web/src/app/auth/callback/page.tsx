@@ -11,8 +11,9 @@ import { completeLogin } from '@/lib/auth';
 
 /**
  * Where the sign-in page sends the browser back (PKCE): the code is swapped for a token, then
- * home. Drawn as /login's card, so signing in reads as one place from Sign in to the classes; a
- * failure says so there, with the way back to try again.
+ * home. On sign-in's own stage (AuthCallback, AuthCallbackFailed; PV1, built in PV15), so signing
+ * in reads as one place from Sign in to the classes; a failure says so there, with the way back to
+ * try again.
  */
 export default function CallbackPage() {
   const router = useRouter();
@@ -28,22 +29,22 @@ export default function CallbackPage() {
 
   return (
     <EntryPage>
-      <div className={CARD_ENTRY}>
+      <section aria-label="Signing in" className={CARD_ENTRY}>
         {failed ? (
           <>
-            <p role="alert" className="text-body-lg text-pretty">
+            <p role="alert" className="text-body text-pretty">
               Bali couldn&apos;t finish signing you in.
             </p>
-            <Link href="/login" className={buttonClass('primary', 'mt-6 w-full')}>
+            <Link href="/login" className={buttonClass('primary', 'w-full', 'lg')}>
               Back to sign in
             </Link>
           </>
         ) : (
-          <p role="status" className="text-body-lg text-pretty text-text-secondary">
+          <p role="status" className="text-body text-pretty text-text-secondary">
             Signing in…
           </p>
         )}
-      </div>
+      </section>
     </EntryPage>
   );
 }
