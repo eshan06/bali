@@ -76,9 +76,12 @@ export function focusAfter(drafts: SavedQuestion[], draftId: string, button: str
 }
 
 const LETTERS = 'ABCDEF';
-/** An answer's letter (v2.css's `.letter`), 28 px, 24 in a list; the correct one's green. */
-const letter = (right: boolean, small = false) =>
-  `grid shrink-0 place-items-center rounded-full font-semibold ${small ? 'size-6 text-caption' : 'size-7 text-data'} ${right ? 'bg-letter-right text-text-brand' : 'bg-surface-sunken text-text-primary'}`;
+/**
+ * An answer's letter (v2.css's `.letter`): 24 px in a list, the correct one's green; 28 px in the
+ * form, grey, as QuestionsEdit draws it (its Correct button says which).
+ */
+const letter = (right: boolean, form = false) =>
+  `grid shrink-0 place-items-center rounded-full font-semibold ${form ? 'size-7 text-data' : 'size-6 text-caption'} ${right ? 'bg-letter-right text-text-brand' : 'bg-surface-sunken text-text-primary'}`;
 const SAID = 'flex flex-wrap items-center gap-x-4 gap-y-3';
 const CAPTION = 'text-caption text-text-tertiary';
 
@@ -224,7 +227,7 @@ export function DraftCard({
             // On a narrow card the tag goes under the answer, which keeps its letter beside it.
             <li key={i} className="inline-flex min-w-0 flex-wrap items-center gap-2">
               <span className="inline-flex min-w-0 items-center gap-2">
-                <span aria-hidden="true" className={letter(i === draft.correctOption, true)}>
+                <span aria-hidden="true" className={letter(i === draft.correctOption)}>
                   {LETTERS[i]}
                 </span>
                 <span className="min-w-0 wrap-anywhere">{option}</span>
@@ -378,7 +381,7 @@ export function QuestionForm({ form, on }: { form: Form; on: QuestionsActions })
                   key={i}
                   className="grid grid-cols-[28px_minmax(0,1fr)_auto_36px] items-center gap-2.5"
                 >
-                  <span aria-hidden="true" className={letter(right)}>
+                  <span aria-hidden="true" className={letter(false, true)}>
                     {LETTERS[i]}
                   </span>
                   <Input
@@ -429,7 +432,7 @@ export function QuestionForm({ form, on }: { form: Form; on: QuestionsActions })
             <button
               type="button"
               onClick={on.addAnswer}
-              className="mt-1 inline-flex h-9 cursor-pointer items-center gap-2 rounded-xs font-semibold text-text-brand"
+              className="mt-1 inline-flex h-9 cursor-pointer items-center gap-2 rounded-xs text-body font-semibold text-text-brand"
             >
               <Plus size={16} aria-hidden="true" />
               Add an answer

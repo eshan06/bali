@@ -358,6 +358,10 @@ describe('writing a question (QuestionsEdit)', () => {
     expect(html).toMatch(
       /aria-pressed="true"[^>]*><svg[^>]*lucide-check[^>]*>.*?<\/svg>Correct<\/button>/,
     );
+    // Its letter stays grey, 28 px, as QuestionsEdit draws it: the Correct button says which.
+    expect(html).toMatch(
+      /<span aria-hidden="true" class="[^"]*\bsize-7\b[^"]*\bbg-surface-sunken\b[^"]*">A<\/span>/,
+    );
     expect(html.match(/aria-label="Remove answer [A-C]"/g)).toHaveLength(3);
     expect(html).toContain('Add an answer');
   });
