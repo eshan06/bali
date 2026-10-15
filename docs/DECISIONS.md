@@ -8,6 +8,44 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-15** — **M5b's part 2: Your slides, as the Slides board draws it, its intermediate
+  states drawn on the canvas first; an upload's row turns into its deck, and leaving the page stops
+  its uploads.** Built to [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4):
+  Slides and LessonStates' Your slides lines, and two boards drawn for it under #398's rule (the
+  owner, 2026-10-15), SlidesStates (loading, the isn't-a-PDF line's place, Cancel held, a stopped
+  upload with Try again, the 25 minutes, 429, an upload left unfinished, Remove held, a removal that
+  didn't go through, refused, 429, and the in-use line naming two classes) and SlidesPhone (the page
+  at 390 px), each labelled an intermediate state, version 37 (#400). **The rows:** this page's
+  uploads first, newest first, then the decks checked here, then the API's list, each deck once and
+  none an upload is still sending (`rowsOf`). A checked upload keeps its row's key as it turns into
+  its deck, so its line, a polite live region, says "Checking the file…" and then the verdict; the
+  percentage is hidden from it and given by the bar (a `progressbar`), so a screen reader hears the
+  steps, never each percent. **A stopped upload says why in its row**, as the confirm line sits
+  (LessonStates' "The upload stopped. Check your connection and try again."; the 25 minutes, #326,
+  in words of its own through `no-ai-slop`: "The upload was still going after 25 minutes, so Bali
+  stopped it. Try again on a faster connection."), with Try again (#397's `uploadAgain`) and Cancel.
+  *Weighed:* the line under the head, as a refused pick sits, which can't say which of two uploads
+  stopped. **Cancel removes the pending deck its upload made**; one Bali didn't hear stays as the
+  list will show it, "The upload didn't finish. Upload it again." with Remove, as a pending deck no
+  upload here is sending does (a tab closed mid-upload), as the sweep says it after 24 hours.
+  **Leaving the page stops its uploads**, removing nothing: they then read as unfinished. *Weighed:*
+  uploads carried across pages by a store outside the page, whose check could land after a sign-out
+  or under the next sign-in in the tab; a warning before leaving (no board draws one, and Next's own
+  navigation fires none). **A removal** is Your questions' (#394): Remove asks across the row's foot
+  and holds with Keep while sent; one that didn't go through is said in its question's place,
+  Remove trying again under the same id; a deck already gone counts as removed; in use, the line
+  under the row names each class, joined as the browser lists words (`Intl.ListFormat`), with Remove
+  to ask again. A 429 is "Too many tries for now. Wait a moment, then try again.", the deck routes
+  spending the account's budget. **Sizes and days** as the boards write them, tenths under 10 MB
+  and whole from there, never 0.0, and a file just over 25 MB never reads as within it; each kept on
+  one line (`Oct 6`, `4.2 MB`), as SlidesPhone draws them. **The hidden file picker** is the one raw
+  `<input>` besides the length picker's radios: `tokens.test.ts` lets a hidden file input through,
+  since it types nothing. **On dev, from the owner's tab:** a 3-page and a 20 MB PDF uploaded and
+  checked `ready`, a 24 MB one cancelled at 3 % (its deck removed), the password-protected, the
+  not-a-PDF and the 201-page verdicts, the size and the isn't-a-PDF refusals, a PUT dropped and Try
+  again landing one deck, and the in-use line for two classes and then one, two sessions started
+  and ended through the API; every test deck removed through the page.
+
 - **2026-10-15** — **Anything new shown about a student is never an intermediate state: it waits
   for the owner's approval like a new screen. A new error or refusal line at sign-in or the 13+
   check is an intermediate state like any other (the owner's answer).** It closes the limit left

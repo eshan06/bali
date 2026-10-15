@@ -8,12 +8,13 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-15 (Central) — L7b's part 1c, writing and editing on Your questions (#395;
-`docs/DECISIONS.md`, 2026-10-15), its states the canvas doesn't draw approved by the owner as
-built: Write a question and Edit open QuestionsEdit's card, its refusals as LessonStates words them,
-each save minted after the draft's own `eventId` and one answered under another said as not saved
-(#318); Questions joins the menu; L7b's part 1, the page, is done. Before it, part 1b, the list
-(#394). Next: M5b's part 2, the Slides page._
+_Last updated: 2026-10-15 (Central) — M5b's part 2, Your slides (#400; `docs/DECISIONS.md`,
+2026-10-15), and with it M5: the Slides page in the menu, as the Slides board draws it, a PDF
+picked and uploaded with its percentage and Cancel, Checking the file… and the server's verdict, a
+removal's confirm, the in-use line naming each class; its intermediate states drawn on the canvas
+first (SlidesStates, SlidesPhone; the owner's rule, #398) and built from them. Real uploads on dev
+from the owner's tab: the bucket takes the browser's PUT. Before it, L7b's part 1c, writing and
+editing on Your questions (#395). Next: M6, the presenter._
 
 ## Now
 
@@ -83,7 +84,7 @@ first class, production backups (L0b, the owner's console step; the owner, 2026-
 
 **Phase 7, Live lesson: building.** Every step with no screen is done, L3c the last (2026-10-15);
 M0 is done (deck storage on, 2026-10-12); the web screens come after the redesign's PV15 (✅ #388),
-W3 the first (✅ #392), then the phone's (L8, M8). L0b, production backups, is the owner's, before the Vanderbilt pilot's first
+W3 the first (✅ #392), M5 (✅ #400), then the phone's (L8, M8). L0b, production backups, is the owner's, before the Vanderbilt pilot's first
 class.
 
 ## Phases
@@ -194,7 +195,7 @@ Slice 2 — slides:
 - **M3a** The slide change — ✅ (#327; DECISIONS 2026-10-12)
 - **M3b** The poll's slide and a deck's download (for M6) — ✅ (#328; DECISIONS 2026-10-12)
 - **M4** Decks in the privacy paths — ✅ (#329; DECISIONS 2026-10-12)
-- **M5** 👀 The slides page and upload to v2's canvas (Slides, LessonStates' M5 lines): the page in the menu; pick a PDF, upload with its percentage and Cancel (XHR's upload progress: `fetch` gives none), Checking…, the server's verdict said honestly (the size refusal, password-protected), "showing right now", a removal's confirm line; its in-use line names the class ("It's showing in Biology, period 3 right now"), from `409 deck_in_use`'s `details`: **its API half, M5a** — ✅ (#396; DECISIONS 2026-10-15): `DeckInUseDetails`, every class whose running session shows the deck, by id and name, the order `/v1/me`'s; **M5b in two** (the worker's split, over ~400 lines whole): **part 1, the upload's logic** — ✅ (#397; DECISIONS 2026-10-15): `lib/decks.ts`, the API client's `details`, and the bucket's origin in the CSP's `connect-src` (moved here from M6: without it the browser refuses the upload), `NEXT_PUBLIC_DECK_BUCKET_URL`, on Vercel the owner's (runbook 10, step 8); an upload still running 25 minutes after its create is stopped (#326); **left, part 2, the page**, each state its boards don't draw drawn on the canvas first (the owner, 2026-10-15), the stopped upload said honestly — validation: `/santa-loop` with the UI skills, screenshots
+- **M5** 👀 The slides page and upload — ✅ as M5a (#396), M5b part 1 (#397) and M5b part 2 (#400); DECISIONS 2026-10-15
 - **M6** 👀 Portal presenter to v2's canvas (LessonDecks, LessonSlide, PresentSlide, LessonStates' M6 lines: picking a deck in the side panel, the class page's slide controls and Present's slide; the presenter card's "Every phone in this class shows this slide, and so does Present." not built), in two PRs (PDF.js and the CSP, then the presenter): PDF.js ≥ 4.2.67, `isEvalSupported: false`, its worker self-hosted; the bytes checked against the slide's `sha256`, a mismatch refused with a retry (settled 2026-10-10); the CSP's `worker-src` (the bucket's `connect-src` came with M5) — validation: CSP tests, a tampered deck refused, `/santa-loop`, screenshots
 - **M7** BaliCore's deck download and cache (for M8) — ✅ (#331; DECISIONS 2026-10-12)
 - **M8** 👀📱 iOS slide view to the app canvas: PDFKit, pinch zoom, each page's text as its VoiceOver label, Emergency Unlock untouched — validation: XCTest, the device check on a shielded phone

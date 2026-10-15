@@ -24,9 +24,9 @@ Try again.", "Bali couldn't lock your apps. Try again."). In
 badges); `api-client.ts` (`UnauthorizedError`'s words; a `NetworkError` is
 said as `errors.ts`'s `CANT_REACH`, its own message a log line, D2c-2);
 `recap.ts` ("No reason given", the reasons, and the session's "9:05 AM to
-9:30 AM"). `blocks.ts`, `classes.ts`, `reports.ts` and `invite.ts` hold none:
-their words are in `blocks.tsx`, the classes home (`app/page.tsx`), the
-reports page, `invite-code.tsx` and `errors.ts`. In
+9:30 AM"). `blocks.ts`, `classes.ts`, `reports.ts`, `invite.ts` and `decks.ts` hold
+none: their words are in `blocks.tsx`, the classes home (`app/page.tsx`), the
+reports page, `invite-code.tsx`, `slides.tsx` and `errors.ts`. In
 `ios/Bali/` outside `UI/`: the NFC sheet's words in `BlockReader.swift`
 ("Hold the top of your iPhone to your teacher's Bali block.", "This isn't a
 Bali block.", "Bali block read.", "A scan is under way."); the `problem` a
@@ -197,6 +197,9 @@ Your questions is v2's since L7b part 1 (2026-10-15): Questions in the menu, the
 first as Questions draws them, each removed after its confirm across the card's foot, and Write a
 question and Edit opening QuestionsEdit's card over the list, its letters grey and its refusals
 under each field as LessonStates words them.
+Your slides is v2's since M5b (2026-10-15): the Slides board's page, Slides in the menu, each deck
+a `.deck-row` with no shadow, an upload's percentage and bar, and its intermediate states as
+SlidesStates and SlidesPhone draw them (drawn on the canvas first, #398's rule).
 Every
 portal source file is held to the tokens' utilities by `tokens.test.ts`, and
 since D2g the theme holds none of Tailwind's own colours, type sizes,
@@ -605,8 +608,9 @@ where they differ (Present's included: §5); the input size stands.
   (`surface-sunken`) also fills the menu's current item, the
   length picker's track, a table's head, the recap's name pills, a code's chip,
   the bars' tracks, the student panel's moment dots, Reports' place-lost
-  notice (drawn as the stale banner is) and Help's two lists of what a teacher
-  sees (SupportPage's `.notice`, PV15), and no longer a field.
+  notice (drawn as the stale banner is), Help's two lists of what a teacher
+  sees (SupportPage's `.notice`, PV15), and Your slides' file tiles and an
+  upload's progress track (M5b), and no longer a field.
 - **State chip:** a pill (`radius-full`) filled with the state's tint, its
   icon and label in the state's ink, the `label` style in uppercase; padding
   `space-2` × `space-3` on the web (the tokens' values, kept by the owner's
