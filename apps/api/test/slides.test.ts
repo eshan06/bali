@@ -319,13 +319,13 @@ describe('DELETE /v1/decks/:id while a session shows it (M3)', () => {
   it('names every class whose running session shows it, in the order the teacher’s classes are listed (M5a)', async () => {
     const l = await lesson('slide-in-use-two');
     // A class of the same teacher's made before this one: named first, though its session starts,
-    // and shows the deck, after this one's.
+    // and shows the deck, after this one's, and its name and id both sort after this one's.
     const [older] = await db
       .insert(classes)
       .values({
         teacherId: l.teacher.id,
         schoolId: l.school.id,
-        name: 'Biology, period 3',
+        name: 'Zoology, period 3',
         joinCode: joinCodeFor('slide-in-use-two-older'),
         createdAt: new Date('2020-01-01T00:00:00Z'),
       })
