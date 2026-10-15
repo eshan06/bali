@@ -7,6 +7,8 @@ import {
   checkIn,
   endSession,
   markSilentParticipations,
+  protectionOff,
+  refocus,
   startSession,
   tapIn,
   unlock,
@@ -32,8 +34,8 @@ function one<T>(rows: T[]): T {
   return row;
 }
 
-/** A running session with one enrolled, tapped-in (focused) student. */
-async function seed(tag: string) {
+/** A session that started `ago` back (a minute by default), and one enrolled student it focused. */
+async function seed(tag: string, ago = 60_000) {
   const school = one(
     await db
       .insert(schools)
@@ -67,7 +69,7 @@ async function seed(tag: string) {
   const session = (
     await startSession(db, {
       classId: klass.id,
-      startedAt: new Date(Date.now() - 60_000),
+      startedAt: new Date(Date.now() - ago),
       endsAt: new Date(Date.now() + 25 * 60_000),
     })
   ).session;
@@ -75,7 +77,7 @@ async function seed(tag: string) {
     sessionId: session.id,
     studentId: student.id,
     eventId: randomUUID(),
-    deviceTime: new Date(),
+    deviceTime: session.startedAt,
   });
   return { session, studentId: student.id };
 }
@@ -288,5 +290,65 @@ describe('checkIn and silence episodes', () => {
     // Nothing to open: the contact is genuinely recent, so no episode flaps.
     await markSilentParticipations(db, new Date());
     expect(await eventsOf(session.id, 'went_silent')).toHaveLength(0);
+  });
+});
+
+describe('a came_back is the server’s, never the phone’s claim (decision 7)', () => {
+  const MINUTE = 60_000;
+
+  /**
+   * A phone 20 minutes into a lesson, quiet since 12 minutes ago, which the sweep marked silent 10
+   * minutes ago. What it sends next claims 15 minutes ago: a record made out of contact reads so,
+   * and so does every record from a clock set back.
+   */
+  async function wentQuiet(tag: string) {
+    const { session, studentId } = await seed(tag, 20 * MINUTE);
+    await backdateContact(session.id, studentId, 12 * MINUTE);
+    // Counted in this session alone: the suite shares one database.
+    await markSilentParticipations(db, new Date(Date.now() - 10 * MINUTE));
+    expect(await eventsOf(session.id, 'went_silent')).toHaveLength(1);
+    const sent = () => ({
+      sessionId: session.id,
+      studentId,
+      eventId: randomUUID(),
+      deviceTime: new Date(Date.now() - 15 * MINUTE),
+    });
+    return { session, studentId, sent };
+  }
+
+  it.each(['tap', 'refocus', 'unlock', 'protection off'] as const)(
+    'closed by the phone’s %s, which claims a time before the silence: stamped when the server heard it',
+    async (kind) => {
+      const { session, sent } = await wentQuiet(`back-${kind.replace(' ', '-')}`);
+      const heard = Date.now();
+      if (kind === 'tap') await tapIn(db, sent());
+      else if (kind === 'refocus') await refocus(db, sent());
+      else if (kind === 'unlock') await unlock(db, sent());
+      else await protectionOff(db, sent());
+
+      const silent = one(await eventsOf(session.id, 'went_silent'));
+      const back = one(await eventsOf(session.id, 'came_back'));
+      // Stamped with the claim, it fell 5 minutes before the went_silent it closes.
+      expect(back.occurredAt.getTime()).toBeGreaterThan(silent.occurredAt.getTime());
+      expect(back.occurredAt.getTime()).toBeGreaterThanOrEqual(heard);
+      expect(back.occurredAt.getTime()).toBeLessThanOrEqual(Date.now());
+    },
+  );
+
+  it('is never before the went_silent it closes, though the sweep’s clock ran ahead', async () => {
+    // Two processes sweep and hear phones, each by its own clock: a went_silent stamped a little
+    // ahead of the contact that closes it still comes first.
+    const { session, studentId } = await seed('back-sweep-ahead');
+    await backdateContact(session.id, studentId, SILENT_AGO);
+    await markSilentParticipations(db, new Date(Date.now() + 2 * MINUTE));
+    await tapIn(db, {
+      sessionId: session.id,
+      studentId,
+      eventId: randomUUID(),
+      deviceTime: new Date(),
+    });
+
+    const silent = one(await eventsOf(session.id, 'went_silent'));
+    expect(one(await eventsOf(session.id, 'came_back')).occurredAt).toEqual(silent.occurredAt);
   });
 });
