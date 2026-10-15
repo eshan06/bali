@@ -36,8 +36,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   ended the silence at its claim, counted as focus (santa's review, both reviewers; the tests in
   `packages/shared/src/report.test.ts` and `packages/db/test/report.test.ts`). Now a silence lasts
   through such a record to its `came_back`, and a stint's end (a switch away, a leave, a removal),
-  which records no `came_back`, ends it as before. An unlock or a protection off still ends focus at
-  its own time, so neither moves a figure. Safe for what is stored: every contact has recorded its
+  which records no `came_back`, ends it as before: a switch at its tap's own claim, so a switch away
+  and straight back, its tap set back, still ends one early (round 2's review; rare, since it takes
+  two of the student's classes in session at once; raised for the owner). An unlock or a protection
+  off still ends focus at its own time, so neither moves a figure. Safe for what is stored: every contact has recorded its
   `came_back` since 2026-09-20 (#6), before prod. **Compatibility:** no shape changes, and a correction, not a behaviour
   change (API decision 2). Events already recorded on dev and prod stay as they are. An old session
   whose silence a check-in's slow clock closed early still reports it short or at 0, its time as

@@ -322,7 +322,7 @@ One line each; every row's full notes, as they stood on 2026-10-13, are in `docs
 | Minimal student personal history + edit own name | 3 | backs the privacy contract · ✅ (A7, A8, C6b) |
 | Sign in with Apple (App Review guideline 4.8) | 5 | Cognito IdP |
 | End-of-session recap card (portal) | 4 | ✅ (R4) |
-| Reports: class focus minutes + unlock list; aggregates only, never rankings | 4 | ✅ (R1–R3, R5); `sessionReport` counts by this row's rules, in its full notes; a silence counted from its `went_silent` to its `came_back`, both the server's (#385) |
+| Reports: class focus minutes + unlock list; aggregates only, never rankings | 4 | ✅ (R1–R3, R5); `sessionReport` counts by this row's rules, in its full notes; a silence counted from its `went_silent` to its `came_back` or its stint's end, the pair the server's (#385) |
 | Teacher signup gating (invite code) | 4 | ✅ (T1a, T1b, T2) |
 | Block provisioning: pre-written tags + portal register-by-ID fallback | 5 | no teacher iOS app at launch · ✅ the portal's half (P3) |
 | Privacy policy, terms, pilot agreement, support/FAQ page | 5 | policy work, launch-blocking |
