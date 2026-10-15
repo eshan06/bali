@@ -6,10 +6,11 @@ import { describe, expect, it } from 'vitest';
 /*
  * Present is the projector the class can see (PV9; ClassPresent at 1920 × 1080, PresentEnded): no
  * menu, the class page's own parts one size up, the code in a well of its own, +5, +10 and End kept
- * beside Present (the owner, 2026-10-12), and never an unlock's reason. After the bell it says only
- * "Class is over" (PV1), the figures left to the recap. Present is kept for the browser tab, so a
- * reload or a return from Reports comes back in it. Read from the class page's source; its header
- * and counts are rendered in live-header.test.ts, its tiles in live-grid.test.ts.
+ * beside Present (the owner, 2026-10-12), and never an unlock's reason. A live question shows in the
+ * grid's place, totals only (L7, part 2). After the bell it says only "Class is over" (PV1), the
+ * figures left to the recap. Present is kept for the browser tab, so a reload or a return from
+ * Reports comes back in it. Read from the class page's source; its header and counts are rendered
+ * in live-header.test.ts, its tiles in live-grid.test.ts, its question in present-question.test.ts.
  */
 const read = (path: string) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
 const page = read('./classes/[id]/page.tsx');
@@ -31,10 +32,11 @@ const ended = page.slice(
 describe('the class page in Present while a session runs (ClassPresent)', () => {
   it('is the class page’s own tree, one size up, so the grid never reboots as Present turns on', () => {
     // React keeps a child by its place: the header, the read's failure, the said line, then the
-    // grid's section, in both views; inside it the counts' bar, the live question's place (L7:
-    // none in Present, so nothing of a question reaches the projector), then the grid.
+    // grid's section, in both views; inside it the counts' bar (none while Present shows a
+    // question), the class page's question card (never in Present), the grid, then Present's
+    // question in the tiles' place (L7, part 2).
     expect(live).toMatch(
-      /<main className=\{present \? PRESENT_PAGE : 'relative flex flex-col gap-5\.5'\}>\s*\{\/\*[^]*?\*\/\}\s*<LiveHeader[^>]*present=\{present\}\s*>[^]*?<\/LiveHeader>\s*\{\/\*[^]*?\*\/\}\s*\{cantLoad\(error\)\}\s*\{\/\*[^]*?\*\/\}\s*\{said \? \([^]*?\) : null\}\s*<section aria-label="Live grid" className="flex flex-col gap-5\.5">\s*\{\/\*[^]*?\*\/\}\s*<div[^>]*>\s*\{counts \? <LiveCounts counts=\{counts\} present=\{present\} \/> : null\}\s*\{present \? null : presentToggle\(true\)\}\s*<\/div>\s*\{\/\*[^]*?\*\/\}\s*\{present \? null : \(?\s*<QuestionCard[^]*?\/>\s*\)?\}\s*<LiveGrid/,
+      /<main className=\{present \? PRESENT_PAGE : 'relative flex flex-col gap-5\.5'\}>\s*\{\/\*[^]*?\*\/\}\s*<LiveHeader[^>]*present=\{present\}\s*>[^]*?<\/LiveHeader>\s*\{\/\*[^]*?\*\/\}\s*\{cantLoad\(error\)\}\s*\{\/\*[^]*?\*\/\}\s*\{said \? \([^]*?\) : null\}\s*<section aria-label=\{projected \? undefined : 'Live grid'\} className="flex flex-col gap-5\.5">\s*\{\/\*[^]*?\*\/\}\s*\{projected \? null : \(\s*<div[^>]*>\s*\{counts \? <LiveCounts counts=\{counts\} present=\{present\} \/> : null\}\s*\{present \? null : presentToggle\(true\)\}\s*<\/div>\s*\)\}\s*\{\/\*[^]*?\*\/\}\s*\{present \? null : \(?\s*<QuestionCard[^]*?\/>\s*\)?\}\s*<LiveGrid[^]*?\/>\s*\{\/\*[^]*?\*\/\}\s*\{projected \? <PresentQuestion id=\{id\} lesson=\{lesson\} \/> : null\}\s*<\/section>/,
     );
     // And the side panel's asking only out of Present, as the student's panel (L7-1b).
     expect(page).toMatch(/const panel = asking && !present;/);
@@ -49,6 +51,23 @@ describe('the class page in Present while a session runs (ClassPresent)', () => 
     expect(live).toMatch(
       /<LiveHeader[^>]*>\s*\{extend\}\s*\{end\('ml-2'\)\}\s*\{present \? presentToggle\(false, 'ml-2'\) : null\}\s*<\/LiveHeader>/,
     );
+  });
+
+  it('shows a question in the live grid’s place while one shows (L7, part 2; PresentQuestion, PresentAnswer)', () => {
+    // The class page's own question, open or closed until Done or the next: one live question, so
+    // the projector and the teacher's card never differ on which.
+    expect(page).toMatch(/const projected = present && lesson\.question !== null;/);
+    // The grid stays, its stream with it (the question's close, the session's end, the counts in
+    // the header), its tiles giving way to the question; the counts' bar goes too, as
+    // PresentQuestion draws none; the section names no live grid while it holds a question.
+    const [grid] = tags('LiveGrid');
+    expect(grid).toMatch(/\btiles=\{!projected\}/);
+    expect(grid).toMatch(/\bonEvent=\{onEvent\}/);
+    expect(tags('PresentQuestion')).toEqual(['<PresentQuestion id={id} lesson={lesson} />']);
+    // Never the class page's card or its side panel there: their controls and the teacher's live
+    // breakdown are the teacher's alone.
+    expect(live).toMatch(/\{present \? null : \(\s*<QuestionCard/);
+    expect(page).toMatch(/const panel = asking && !present;/);
   });
 
   it('draws nothing ClassPresent leaves off: no nav, no roster, no New code, no heading', () => {

@@ -8,13 +8,13 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-15 (Central) — PV14, a session's report (#401; `docs/DECISIONS.md`,
-2026-10-15): one session on a page and a URL of its own, as ReportOpened draws it, its recap card
-and its Unlocks table; the class page's recap opens it (Open its report), and so does each Reports
-row; R2 now says when the session ran (additive). Its intermediate states drawn on the canvas first
-(ReportPageStates, ReportPhone) and built from them; PB5's timeline, which only Reports' opened row
-still drew, removed with that row. Before it, M5b's part 2, Your slides (#400). Next: M6, the
-presenter; L7c's Questions card goes on this page._
+_Last updated: 2026-10-15 (Central) — L7's part 2, Present's question (#402; `docs/DECISIONS.md`,
+2026-10-15), and with it L7: on the projector a live question shows in the grid's place, as
+PresentQuestion and PresentAnswer draw it, totals only: "N of M answered" while it is open, each
+answer's count once it is closed and Bali's last read after the close is in, never under the
+server's guard, the correct answer only once shown. Its intermediate states drawn on the canvas
+first (PresentQuestionStates, PresentQuestionPhone) and built from them. Before it, PV14, a
+session's report (#401). Next: M6, the presenter; L7c's Questions card goes on PV14's page._
 
 ## Now
 
@@ -83,7 +83,7 @@ first class, production backups (L0b, the owner's console step; the owner, 2026-
 
 **Phase 7, Live lesson: building.** Every step with no screen is done, L3c the last (2026-10-15);
 M0 is done (deck storage on, 2026-10-12); the web screens come after the redesign's PV15 (✅ #388),
-W3 the first (✅ #392), M5 (✅ #400), then the phone's (L8, M8). L0b, production backups, is the owner's, before the Vanderbilt pilot's first
+W3 the first (✅ #392), M5 (✅ #400), L7 (✅ #402), then the phone's (L8, M8). L0b, production backups, is the owner's, before the Vanderbilt pilot's first
 class.
 
 ## Phases
@@ -176,7 +176,7 @@ Slice 1 — live questions:
 - **L4b** The demo's question and the load gate's polling classes — ✅ (#321; DECISIONS 2026-10-11)
 - **L5** BaliCore's poll and answer, `LiveLesson` (for L8) — ✅ (#330; DECISIONS 2026-10-12)
 - **L6** Portal logic, `lib/live-question.ts` (for L7) — ✅ (#332; DECISIONS 2026-10-12)
-- **L7** 👀 Portal UI to v2's canvas (LessonClass, LessonWrite, LessonWaiting, LessonLive, LessonClosed, LessonStates' L7 lines; PresentQuestion, PresentAnswer), on the redesign's shell (PV5) and class page (PV6–PV11): the class page's "Questions and slides" card, Ask in the side panel (prompt, 2–6 options, the correct one optional), the live results with "N of M answered" and the guard's wording, close and reveal, and Present showing the question in place of the live grid, the counts per option only once it closes (L6's poller already reads the results once more after a close); the three of its sentences the canvas drops are not built (DESIGN.md §1, The words); two PRs (the class page's, then Present's); after PV15 (M0 ✅; the canvas approved 2026-10-12) — validation: `/santa-loop` with `web-design-guidelines` and `no-ai-slop`, screenshots for the owner. **Part 1, the class page** — ✅ as L7-1a, the card and its results (#389), and L7-1b, asking in the side panel (#390; DECISIONS 2026-10-15). Part 2, Present's, after them
+- **L7** 👀 Portal UI to v2's canvas: the class page's question and Present's — ✅ as L7-1a (#389), L7-1b (#390) and L7-2 (#402); DECISIONS 2026-10-15
 - **L7b** 👀 Portal saved questions to v2's canvas (Questions, QuestionsEdit, LessonAsk's drafts, LessonStates' L7b lines): the questions page in the menu (write, edit and remove a draft; its empty state), the side panel's drafts with a one-click Ask and "Write a new question"; the classes home's "Questions and slides" card gives way to the menu's Questions and Slides (confirmed by the owner, 2026-10-12); each save's `eventId` minted after the draft's own, a reply under another `eventId` treated as not saved (#318); "Your questions" oldest first, as the canvas lists them, sorted in the portal (the API answers newest first); two PRs (the page, then the panel's drafts) — validation: `/santa-loop` with the UI skills, screenshots. **Part 1, the page, in three** (the conductor, 2026-10-15: 844 lines; DECISIONS 2026-10-15) — ✅ as part 1a, the save logic (#393), part 1b, the list and Remove (#394), and part 1c, writing, editing and the menu's Questions (#395). Part 2, the panel's drafts, after them
 - **L7c** 👀 A session's Questions to v2's canvas (ReportOpened's Questions card, PV14's page; LessonStates' L7c lines): each question asked with its totals through L3c's read, the guard applied ("Too few answers to show a breakdown"); on the report page only, not under the class page's recap (the owner, 2026-10-12) — validation: vitest, `/santa-loop`, screenshots
 - **L8** 👀📱 iOS answer card to the app canvas: while a question or a slide shows, the Focus screen's ring as a strip and Emergency Unlock pinned at the bottom; a tap answers and changes it until the close; the revealed answer marked, never red; a closed question's Hide; the same card on Unlocked, Screen Time off and Home; the consent list's two new lines and the one-time screen for a student who saw the old list (`no-ai-slop`); M0 ✅ (the canvas approved 2026-10-10; L0b, before the first actual pilot since 2026-10-12, holds back no screen). **No build that can answer ships (TestFlight included) before L2's documents and this wording have landed** — validation: XCTest, then the device check on the owner's iPhone: a shielded phone answers, the battery cost of the 2 s poll over a lesson, VoiceOver

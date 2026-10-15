@@ -292,6 +292,21 @@
   --text-axis: 12px;
   --text-axis--line-height: 16px;
   --text-axis--font-weight: 400;
+
+  /* Present's question (L7, part 2), as v2.css draws it and §1's facts don't list: its kicker,
+     "Question" (14/15, uppercase, as `section-label`), the correct answer's tag (14/20, uppercase)
+     and its lines, 20/28: the count's words, its foot and the guard's line. */
+  --text-present-kicker: 14px;
+  --text-present-kicker--line-height: 15px;
+  --text-present-kicker--font-weight: 600;
+  --text-present-kicker--letter-spacing: 0.05em;
+  --text-present-tag: 14px;
+  --text-present-tag--line-height: 20px;
+  --text-present-tag--font-weight: 600;
+  --text-present-tag--letter-spacing: 0.05em;
+  --text-present-line: 20px;
+  --text-present-line--line-height: 28px;
+  --text-present-line--font-weight: 400;
 }
 
 @theme inline {
@@ -363,6 +378,9 @@
   --color-bar: var(--bali-stone-500);
   --color-bar-right: var(--bali-green-600);
   --color-letter-right: var(--bali-green-100);
+  /* The correct answer on the projector once students are shown it (L7, part 2): its fill, the
+     primitive v2.css's `.p-opt.right` draws with; its 2 px edge is the correct bar's green. */
+  --color-option-right: var(--bali-green-50);
 }
 
 /* §6: the three shadows, by name. */

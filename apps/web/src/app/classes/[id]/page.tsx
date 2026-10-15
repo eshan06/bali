@@ -20,6 +20,7 @@ import { Field } from '@/components/field';
 import { JoinCode } from '@/components/join-code';
 import { LiveGrid, type StateCounts } from '@/components/live-grid';
 import { LiveCounts, LiveHeader } from '@/components/live-header';
+import { PresentQuestion } from '@/components/present-question';
 import { isOpen, QuestionCard, useLiveQuestion } from '@/components/question-card';
 import { endedToday, RecapCard } from '@/components/recap-card';
 import { usePresenting } from '@/components/shell';
@@ -81,8 +82,9 @@ const students = (count: number) => `${count} ${count === 1 ? 'student' : 'stude
  * beside Present, then the live grid, and no roster: the grid names every student. In Present
  * (PV9; ClassPresent), the same parts one size up for the projector, the code in a well of its own
  * and +5, +10 and End kept beside Present (the owner, 2026-10-12), so a class of 28 fits one 1080p
- * screen; after the bell there "Class is over" alone (PresentEnded, as PV1 approved), the figures
- * left to the recap. Each failure is said where it happened. It sits in the shell's frame beside
+ * screen; a question there in the grid's place, totals only (L7, part 2; PresentQuestion,
+ * PresentAnswer); after the bell there "Class is over" alone (PresentEnded, as PV1 approved), the
+ * figures left to the recap. Each failure is said where it happened. It sits in the shell's frame beside
  * the side menu (PV5), which sets its width and gutters; in Present the shell draws neither, and
  * the page sets its own (`PRESENT_PAGE`).
  */
@@ -158,6 +160,9 @@ export default function ClassDetailPage() {
     setDraft(NEW_DRAFT);
   }, [grid?.id]);
   const panel = asking && !present;
+  // In Present the question shows in the live grid's place (L7, part 2; PresentQuestion,
+  // PresentAnswer), its totals the room's alone; the grid stays underneath, its stream with it.
+  const projected = present && lesson.question !== null;
   // Back to Ask a question; the question, when one shows (opened meanwhile, from another tab).
   const closePanel = () => {
     setAsking(false);
@@ -443,12 +448,15 @@ export default function ClassDetailPage() {
           ) : null}
         </div>
       ) : null}
-      <section aria-label="Live grid" className="flex flex-col gap-5.5">
-        {/* The counts and Present over the grid (ClassLive); in Present the counts alone. */}
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5">
-          {counts ? <LiveCounts counts={counts} present={present} /> : null}
-          {present ? null : presentToggle(true)}
-        </div>
+      <section aria-label={projected ? undefined : 'Live grid'} className="flex flex-col gap-5.5">
+        {/* The counts and Present over the grid (ClassLive); in Present the counts alone, and
+            none while the question shows in the grid's place (PresentQuestion). */}
+        {projected ? null : (
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5">
+            {counts ? <LiveCounts counts={counts} present={present} /> : null}
+            {present ? null : presentToggle(true)}
+          </div>
+        )}
         {/* The live question between the counts and the grid (LessonClass), never in Present. */}
         {present ? null : (
           <QuestionCard
@@ -469,7 +477,10 @@ export default function ClassDetailPage() {
           onStudentPanel={() => setAsking(false)}
           present={present}
           livePage
+          tiles={!projected}
         />
+        {/* In Present, the question in the tiles' place, after the grid's own lines. */}
+        {projected ? <PresentQuestion id={id} lesson={lesson} /> : null}
       </section>
       {panel ? (
         <AskPanel
