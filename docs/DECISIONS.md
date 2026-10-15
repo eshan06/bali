@@ -115,6 +115,42 @@ a real decision? Add a dated entry at the top: what was decided and why.
   first though its session started later, then each alone; nothing named to anyone else),
   `packages/db/test/slides.test.ts`, `races.test.ts`.
 
+- **2026-10-15** — **L7b's part 1b: Your questions' list, each draft removable after the board's
+  confirm; what the canvas doesn't draw approved by the owner as built; not in the menu until part
+  1c.** Built to
+  [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (version 21): the
+  Questions board and LessonStates' "Your questions" lines (#394), on part 1a's logic (#393).
+  **The page** (`app/questions/page.tsx`, `components/saved-questions.tsx`): the head and its line;
+  the drafts oldest first (`readDrafts`), each a card as the board draws it, its question, its
+  answers with their letters, the correct one's green and tagged Correct, and "Added Oct 6", or
+  "Edited Oct 7" once its last write is later than its first; Remove beside it. **Remove** opens the
+  board's question across the card's foot, "Remove this question? Questions you already asked keep
+  their results." with Remove and Keep, focus on Keep; Remove sends the removal (part 1a's: one whose
+  answer never came is sent again under its id, a draft already gone counts as removed), and focus
+  goes to the next card's Remove, or the one before. **The list's states:** none yet,
+  LessonStates' line; the list didn't load, its line with Try again. **Not in the menu, and no Write
+  a question or Edit, until part 1c** (the conductor's split): a page that offers no writing is
+  never in a teacher's way, and the menu lists a page once it is whole. **As the boards render:** the
+  card's words at the body's 15/22 (`.app`'s), the answers' list right under the question
+  (`.app ul`'s margin 0 outranks `.mini-opts`'). **Token:** the colour `letter-right` (green-100,
+  v2.css's `.right .letter`), the one L7-1a (#389) added first with the same value. **What the
+  canvas doesn't draw**, each built the plainest way its pieces allow, **approved by the owner
+  (2026-10-15), each as built, after their look at the screenshots** (asked with the PR parked as a
+  draft): the list loading ("Loading…", the portal's word); Remove and Keep held while the removal is
+  sent; a removal that didn't go through, said in the confirm's line, "Bali couldn't remove the
+  question. Check your connection and try again.", or "Bali couldn't remove the question." for a
+  refusal, Remove there trying again; and, on a narrow card, the Correct tag going under its answer,
+  the letter kept beside it. The owner also kept, as recommended, the edge the PR's review notes left
+  with the third: a removal whose answer never came may still have landed, and Keep then leaves the
+  card listed until the page is read again (Remove again settles it under the same id). These states
+  were coded before any canvas drew them, which the owner accepted for this PR and the four drafts
+  approved with it (#386, #389, #390, #395); from now on a state no board draws is drawn on the
+  canvas first.
+  **Screenshots** (`.claude/shots/L7b-1/`): on dev, the owner's demo teacher's four questions
+  written through part 1c's form and removed through this page's Remove, none left behind; sharp
+  renders of the real components with the boards' data in a throwaway page in the preview, deleted
+  after, beside the boards at their own sizes.
+
 - **2026-10-15** — **L7b's part 1a: the save logic for Your questions, with no screen; each save
   minted after the draft's own `eventId`, and a reply under another one read as not saved.** L7b's
   first part, the Questions page, came to 844 changed lines without tests, so the conductor split it
