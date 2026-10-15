@@ -1,14 +1,9 @@
-import {
-  EVENT_RESUME_OVERLAP,
-  type FeedEvent,
-  isUnlockReason,
-  type UnlockReason,
-} from '@bali/shared';
+import { EVENT_RESUME_OVERLAP, type FeedEvent } from '@bali/shared';
 
 import type { ApiClient } from './api-client';
 import { errText } from './errors';
 import { gridDisplay, type GridDisplay, lastContact, type Student } from './grid-state';
-import { type Moment, momentOf, payloadOf, readEvents } from './recap';
+import { readEvents, type StudentMoment, studentMoments } from './recap';
 
 /*
  * The student panel's logic (PV11a; the canvas's ClassStudent and PanelStates), kept out of the
@@ -79,19 +74,8 @@ export async function readStudentEvents(
   }
 }
 
-/** One of the student's moments here: what happened, as the recap marks it, and when. */
-export interface PanelMoment {
-  /** Its event id. */
-  key: string;
-  moment: Moment;
-  /** When, by the server's record (rule 1: the phone's claim held to the session's window). */
-  at: Date;
-  /**
-   * An unlock's reason now: its latest change's (A20), else the one it was sent with; null when
-   * none, or one this tab doesn't know, as the tile reads it, and on any other moment.
-   */
-  reason: UnlockReason | null;
-}
+/** One of the student's moments here: the recap's own (`studentMoments`), what happened and when. */
+export type PanelMoment = StudentMoment;
 
 export interface StudentPanel {
   /** Their tile's own state (`gridDisplay`, on the shared state function): never another (rule 2). */
@@ -118,33 +102,7 @@ export function studentPanel(
   events: readonly FeedEvent[],
   now: Date,
 ): StudentPanel {
-  // Each once by its event id, as a replay in the overlap is, in the engine's order.
-  const theirs = [
-    ...new Map(
-      events.filter((e) => e.userId === student.studentId).map((e) => [e.eventId, e]),
-    ).values(),
-  ].sort((a, b) => a.seq - b.seq);
-  // Each unlock's latest change, in the engine's order (A20).
-  const changed = new Map<unknown, unknown>();
-  for (const e of theirs) {
-    if (e.type !== 'unlock_reason_changed') continue;
-    const { unlock_event_id: of, reason } = payloadOf(e.payload);
-    changed.set(of, reason);
-  }
-  const moments: PanelMoment[] = [];
-  for (const e of theirs) {
-    const moment = momentOf(e);
-    if (moment === null) continue;
-    const reason = changed.has(e.eventId) ? changed.get(e.eventId) : payloadOf(e.payload).reason;
-    moments.push({
-      key: e.eventId,
-      moment,
-      at: new Date(e.occurredAt),
-      reason: moment === 'unlock' && isUnlockReason(reason) ? reason : null,
-    });
-  }
-  // Oldest first, as the recap places them; the sort keeps the engine's order at one instant.
-  moments.sort((a, b) => a.at.getTime() - b.at.getTime());
+  const moments = studentMoments(events, student.studentId);
   const contact = student.joinedAt === null ? null : lastContact(student);
   return {
     display: gridDisplay(student, now),
