@@ -19,10 +19,11 @@ const CLASS_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
 export default function ReportsPage() {
   const api = useApi();
   const router = useRouter();
-  const { me } = useMe();
+  const { home } = useMe();
   const param = useSearchParams().get('class');
   const asked = param !== null && CLASS_ID.test(param) ? param : null;
-  const classes = me?.classes ?? null;
+  // An account the 13+ check never passed is read no further (PV15): it has no classes.
+  const classes = home === null ? null : home.kind === 'invite' ? [] : home.me.classes;
   const classId = asked ?? classes?.[0]?.id ?? null;
   const [list, setList] = useState(FIRST_READ);
   const [open, setOpen] = useState<string | null>(null);

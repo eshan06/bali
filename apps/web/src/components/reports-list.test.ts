@@ -344,8 +344,13 @@ describe('the page’s wiring (read from its source)', () => {
   });
 
   it('takes the classes from the shell’s one read of the account', () => {
-    expect(page).toMatch(/const \{ me \} = useMe\(\);/);
+    expect(page).toMatch(/const \{ home \} = useMe\(\);/);
     expect(page).not.toContain("'/v1/me'");
+    // None until it is read; none for an account the 13+ check never passed (PV15), read no
+    // further, so it says "No reports yet." as one with no classes does.
+    expect(page).toMatch(
+      /const classes = home === null \? null : home\.kind === 'invite' \? \[\] : home\.me\.classes;/,
+    );
   });
 });
 
