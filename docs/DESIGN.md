@@ -178,6 +178,9 @@ The student's home is v2's since W3 (2026-10-15): the side menu with Your classe
 each class in session on StudentHome's live card (its ring, its teacher, the time left and the
 bell) and the rest under it, none yet StudentHomeEmpty's card with its way to the invite page,
 at `/invite` for them; Open the lesson and the phone's chip come with the lesson page (W4).
+The class page's "Questions and slides" card is v2's since L7-1a (2026-10-15): between the counts
+and the grid, never in Present, a question's totals ("N of M answered", each option's count and bar
+from 3 answers), Close and Close and show answer, Done.
 Every
 portal source file is held to the tokens' utilities by `tokens.test.ts`, and
 since D2g the theme holds none of Tailwind's own colours, type sizes,
@@ -371,7 +374,9 @@ under a cell's words), and the opened row's tint as the colour `row-open`
 (green-50, v2.css's `.wtable tr.is-open`); PV15 the entry pages' two, both
 semibold, `entry-title` (20/26: an entry page's card title) and `button-lg`
 (16/20: the sign-in's 48 px button's label, `Button`'s `size="lg"`); W3 the colour
-`live-edge` (green-200, a live card's edge, v2.css's `.livecard`), its sizes all named already.
+`live-edge` (green-200, a live card's edge, v2.css's `.livecard`), its sizes all named already; L7
+a live question's results' three colours, `bar` (stone-500, an option's bar), `bar-right`
+(green-600, the correct one's) and `letter-right` (green-100, the correct option's letter).
 
 Density: the teacher's live grid is dense (many students at a glance); the
 student app is airy and simple. Theme: **light, everywhere.** The app and the

@@ -361,6 +361,7 @@ export function LiveGrid({
   onEnded,
   onSession,
   onCounts,
+  onEvent,
   present = false,
   livePage = false,
 }: {
@@ -371,6 +372,8 @@ export function LiveGrid({
   onSession?: (session: SessionSnapshot['session']) => void;
   /** Called with `sessionId` and the grid counted (`stateCounts`) whenever a count changes (PV7). */
   onCounts?: (sessionId: string, counts: StateCounts) => void;
+  /** Called with each event the stream brings: a live question's open and close (L7). */
+  onEvent?: (e: FeedEvent) => void;
   /**
    * The projector view (DESIGN.md §5; ClassPresent): four columns of tiles one size up, readable
    * from the back of a classroom; the same states and words, but never an unlock's reason: the
@@ -394,11 +397,13 @@ export function LiveGrid({
   const onEndedRef = useRef(onEnded);
   const onSessionRef = useRef(onSession);
   const onCountsRef = useRef(onCounts);
+  const onEventRef = useRef(onEvent);
   useEffect(() => {
     onEndedRef.current = onEnded;
     onSessionRef.current = onSession;
     onCountsRef.current = onCounts;
-  }, [onEnded, onSession, onCounts]);
+    onEventRef.current = onEvent;
+  }, [onEnded, onSession, onCounts, onEvent]);
   const [students, setStudents] = useState<Students | null>(null);
   // Over when it boots (R5's grid under the recap card): drawn once, holding none of the streams.
   const [over, setOver] = useState(false);
@@ -470,6 +475,7 @@ export function LiveGrid({
             lastStreamActivity.current = Date.now();
             lastGridActivity.current = Date.now();
             if (endsSession(e)) onEndedRef.current?.(sessionId);
+            onEventRef.current?.(e);
           },
           onActivity: () => {
             lastStreamActivity.current = Date.now();

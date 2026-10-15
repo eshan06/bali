@@ -155,6 +155,46 @@ a real decision? Add a dated entry at the top: what was decided and why.
   results keep theirs. **Compatibility:** additive, a `/v1` route and two types; its S1 rows and
   the OpenAPI snapshot. No fixture and nothing in BaliCore: no phone reads it.
 
+- **2026-10-15** — **L7-1a: the class page's question card and its results, built to the canvas;
+  asking split off to L7-1b; five states the canvas doesn't draw built plainest and parked for the
+  owner.** L7's first part, the class page's, came to 768 changed lines without tests, so the
+  conductor split it (2026-10-15): this half, the card with a question in it and its results (draft
+  #389), then L7-1b, asking in the side panel (stacked on it). Built to
+  [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (version 21):
+  LessonWaiting, LessonLive, LessonClosed and LessonStates' lines for them; Present and its
+  projector untouched, nothing of a question in its markup (L7's part 2). **The live question**
+  (`useLiveQuestion`, `components/question-card.tsx`) holds L6's logic for one session: the words
+  come from the session's read as it starts and whenever the stream names a question this tab
+  doesn't hold (`questionAfter`'s `'unknown'`), the stream reaching it through the live grid's new
+  `onEvent`; a read only ever brings a newer question (ids are UUIDv7, so a later one sorts after),
+  so a slow read never puts back one closed or asked over meanwhile; a read that failed for want of
+  an answer is read again in 2 s, the grid saying meanwhile whether Bali can be reached. Its results
+  are `pollResults`', once more after the close, so "Final count" shows only for the final read.
+  **Only totals:** the counts per option and their bars only when the server's guard gives them
+  (`counts` not null, from 3 answers), the portal computing none of its own, and "N of M answered"
+  from the same read; the card takes no student and draws no name; the three sentences the canvas
+  drops are not built. **Closing:** Close, and Close and show answer only for a question with a
+  correct option; closed, "Correct answer" once shown to students and "Correct" otherwise
+  (ReportOpened's two words), with LessonClosed's or LessonStates' line on what students see; Done
+  puts it away. A read finding it closed with no close heard, past the bell, says "The bell closed
+  this question." where that line goes (A17: closed by the server's clock before the sweep ends the
+  session). **Until L7-1b** the card shows only with a question in it: at rest, its title and Ask a
+  question, and the closed card's Ask another question come with the panel they open, so no button
+  opens nothing; no phone can answer before L8, so no teacher meets the gap. **As the boards
+  render:** `.app ul`'s margin 0 outranks `.opts`' 14 px, so the options sit right under the
+  question (as PV6 and PV15 built the boards' tight lines). **Tokens:** the colours `bar`
+  (stone-500), `bar-right` (green-600) and `letter-right` (green-100), as v2.css draws the results.
+  **What the canvas doesn't draw**, each built in the plainest way its pieces allow, the owner's to
+  rule (the PR parked as a draft): a question with no correct option (Close alone; closed, no tag
+  and no line on what students see); a closed question under 3 answers (LessonWaiting's options with
+  no counts under LessonClosed's head and "Final count"); where Closing failed and Results can't
+  refresh sit (under the card's head); the bell's line in the closed card; and the card before its
+  first read (the question, no count yet). **Screenshots** (`.claude/shots/L7-1/`, taken before the
+  split): on dev, the demo class with Ana, Ben, Cal and Dana answering through the API (two, the
+  guard; four, the breakdown), closed with and without the answer, and Present with no question; the
+  pane's 1440 px shots are soft, so the real components were also rendered sharp with the boards'
+  data in a throwaway public page in the preview, deleted after.
+
 - **2026-10-15** — **PV15: the entry pages in v2's look, and the account read behind the 13+ check
   on every page; a student who said 13+ keeps the invite card, without its line for students,
   until W3.** Built to [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4)

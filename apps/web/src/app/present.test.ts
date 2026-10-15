@@ -31,9 +31,10 @@ const ended = page.slice(
 describe('the class page in Present while a session runs (ClassPresent)', () => {
   it('is the class page’s own tree, one size up, so the grid never reboots as Present turns on', () => {
     // React keeps a child by its place: the header, the read's failure, the said line, then the
-    // grid's section, in both views; inside it the counts' bar, then the grid.
+    // grid's section, in both views; inside it the counts' bar, the live question's place (L7:
+    // none in Present, so nothing of a question reaches the projector), then the grid.
     expect(live).toMatch(
-      /<main className=\{present \? PRESENT_PAGE : 'relative flex flex-col gap-5\.5'\}>\s*\{\/\*[^]*?\*\/\}\s*<LiveHeader[^>]*present=\{present\}\s*>[^]*?<\/LiveHeader>\s*\{\/\*[^]*?\*\/\}\s*\{cantLoad\(error\)\}\s*\{\/\*[^]*?\*\/\}\s*\{said \? \([^]*?\) : null\}\s*<section aria-label="Live grid" className="flex flex-col gap-5\.5">\s*\{\/\*[^]*?\*\/\}\s*<div[^>]*>\s*\{counts \? <LiveCounts counts=\{counts\} present=\{present\} \/> : null\}\s*\{present \? null : presentToggle\(true\)\}\s*<\/div>\s*<LiveGrid/,
+      /<main className=\{present \? PRESENT_PAGE : 'relative flex flex-col gap-5\.5'\}>\s*\{\/\*[^]*?\*\/\}\s*<LiveHeader[^>]*present=\{present\}\s*>[^]*?<\/LiveHeader>\s*\{\/\*[^]*?\*\/\}\s*\{cantLoad\(error\)\}\s*\{\/\*[^]*?\*\/\}\s*\{said \? \([^]*?\) : null\}\s*<section aria-label="Live grid" className="flex flex-col gap-5\.5">\s*\{\/\*[^]*?\*\/\}\s*<div[^>]*>\s*\{counts \? <LiveCounts counts=\{counts\} present=\{present\} \/> : null\}\s*\{present \? null : presentToggle\(true\)\}\s*<\/div>\s*\{\/\*[^]*?\*\/\}\s*\{present \? null : \(?\s*<QuestionCard[^]*?\/>\s*\)?\}\s*<LiveGrid/,
     );
     const [grid] = tags('LiveGrid');
     expect(grid).toMatch(/\bpresent=\{present\}/);
