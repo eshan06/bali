@@ -118,7 +118,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
 - **2026-10-15** — **L7b's part 1b: Your questions' list, each draft removable after the board's
   confirm; a draft for the owner's calls, not in the menu until part 1c.** Built to
   [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (version 21): the
-  Questions board and LessonStates' "Your questions" lines (#NNN), on part 1a's logic (#393).
+  Questions board and LessonStates' "Your questions" lines (#394), on part 1a's logic (#393).
   **The page** (`app/questions/page.tsx`, `components/saved-questions.tsx`): the head and its line;
   the drafts oldest first (`readDrafts`), each a card as the board draws it, its question, its
   answers with their letters, the correct one's green and tagged Correct, and "Added Oct 6", or
