@@ -103,7 +103,7 @@ export function saveSaid(problem: SaveProblem): { words: string; retry: boolean 
   if (problem.kind === 'not_saved') {
     return {
       words:
-        "This question was changed in another tab or on another computer, so Bali didn't save your changes.",
+        "This question was edited in another tab or on another computer, so Bali didn't save your changes.",
       retry: true,
     };
   }
