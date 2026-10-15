@@ -20,6 +20,11 @@ export class ApiError extends Error {
     readonly reason?: string,
     /** A 429's `Retry-After`, in whole seconds, when the server sent one. */
     readonly retryAfter?: number,
+    /**
+     * The refusal's `details`, as sent and unchecked: a reader checks its shape (a deck in use
+     * names its classes, M5a's `DeckInUseDetails`).
+     */
+    readonly details?: unknown,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -122,6 +127,7 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
         parsed?.error?.message ?? `request failed (${res.status})`,
         parsed?.error?.reason,
         retryAfterSeconds(res.headers.get('retry-after')),
+        parsed?.error?.details,
       );
     }
     return res;

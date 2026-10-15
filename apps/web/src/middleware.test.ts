@@ -26,6 +26,28 @@ describe('middleware', () => {
     expect(forwardedCsp(response)).toBe(csp);
   });
 
+  it('lets the page reach the deck bucket its build names, and none without one (M5)', () => {
+    const before = process.env.NEXT_PUBLIC_DECK_BUCKET_URL;
+    const connect = () =>
+      /connect-src ([^;]+)/.exec(
+        middleware(new NextRequest('http://localhost:3000/slides')).headers.get(
+          'Content-Security-Policy',
+        ) ?? '',
+      )?.[1];
+    try {
+      delete process.env.NEXT_PUBLIC_DECK_BUCKET_URL;
+      expect(connect()).not.toContain('amazonaws');
+      process.env.NEXT_PUBLIC_DECK_BUCKET_URL =
+        'https://bali-decks-dev-eshshah.s3.us-east-1.amazonaws.com';
+      expect(connect()?.split(' ')).toContain(
+        'https://bali-decks-dev-eshshah.s3.us-east-1.amazonaws.com',
+      );
+    } finally {
+      if (before === undefined) delete process.env.NEXT_PUBLIC_DECK_BUCKET_URL;
+      else process.env.NEXT_PUBLIC_DECK_BUCKET_URL = before;
+    }
+  });
+
   it('mints a fresh nonce per request', () => {
     const nonce = () =>
       /'nonce-([^']+)'/.exec(

@@ -10,6 +10,7 @@ const BASE: CspOptions = {
   apiUrl: 'https://api.bali.example/',
   cognitoDomain: 'https://bali-dev.auth.us-east-1.amazoncognito.com',
   sentryDsn: 'https://publickey@o123.ingest.us.sentry.io/456',
+  deckBucketUrl: 'https://bali-decks-dev-eshshah.s3.us-east-1.amazonaws.com',
   nonce: 'bm9uY2U=',
   dev: false,
 };
@@ -34,6 +35,8 @@ describe('contentSecurityPolicy', () => {
       'https://bali-dev.auth.us-east-1.amazoncognito.com',
       // The DSN's host, never its key or project path.
       'https://o123.ingest.us.sentry.io',
+      // The environment's deck bucket: a teacher's browser uploads a PDF to it (M5).
+      'https://bali-decks-dev-eshshah.s3.us-east-1.amazonaws.com',
     ]);
     expect(csp.get('form-action')).toEqual([
       "'self'",
@@ -63,13 +66,64 @@ describe('contentSecurityPolicy', () => {
     }
   });
 
-  it('leaves out Cognito and Sentry when they are not configured', () => {
-    const csp = parse(contentSecurityPolicy({ ...BASE, cognitoDomain: '', sentryDsn: undefined }));
+  it('leaves out Cognito, Sentry and the deck bucket when they are not configured', () => {
+    const csp = parse(
+      contentSecurityPolicy({
+        ...BASE,
+        cognitoDomain: '',
+        sentryDsn: undefined,
+        deckBucketUrl: undefined,
+      }),
+    );
     expect(csp.get('connect-src')).toEqual(["'self'", 'https://api.bali.example']);
     expect(csp.get('form-action')).toEqual(["'self'"]);
     expect(
       parse(contentSecurityPolicy({ ...BASE, sentryDsn: ' ' })).get('connect-src'),
     ).not.toContain('https://o123.ingest.us.sentry.io');
+    expect(
+      parse(contentSecurityPolicy({ ...BASE, deckBucketUrl: ' ' })).get('connect-src'),
+    ).toEqual([
+      "'self'",
+      'https://api.bali.example',
+      'https://bali-dev.auth.us-east-1.amazoncognito.com',
+      'https://o123.ingest.us.sentry.io',
+    ]);
+  });
+
+  it('names the deck bucket by its origin alone, in connect-src only: never a wildcard', () => {
+    const text = contentSecurityPolicy({
+      ...BASE,
+      deckBucketUrl: 'https://bali-decks-prod-eshshah.s3.us-east-1.amazonaws.com/decks/x.pdf?a=b',
+    });
+    const bucket = 'https://bali-decks-prod-eshshah.s3.us-east-1.amazonaws.com';
+    expect(parse(text).get('connect-src')).toContain(bucket);
+    for (const [name, sources] of parse(text)) {
+      if (name !== 'connect-src') expect(sources).not.toContain(bucket);
+    }
+    expect(text).not.toContain('amazonaws.com/');
+    expect(text).not.toMatch(/\*\.s3|\*\.amazonaws/);
+  });
+
+  it('refuses a bucket address that would name more than the one bucket, or none the API uses', () => {
+    for (const bad of [
+      // S3's path style: its origin is every bucket of the region.
+      'https://s3.us-east-1.amazonaws.com/bali-decks-prod-eshshah',
+      'https://*.s3.us-east-1.amazonaws.com',
+      'http://bali-decks-prod-eshshah.s3.us-east-1.amazonaws.com',
+      'https://bali-decks-prod-eshshah.s3.us-east-1.amazonaws.com:8443',
+      'https://bali.example',
+    ]) {
+      expect(() => contentSecurityPolicy({ ...BASE, deckBucketUrl: bad }), bad).toThrow();
+    }
+  });
+
+  it('refuses a wildcard in any configured origin', () => {
+    expect(() => contentSecurityPolicy({ ...BASE, apiUrl: 'https://*.example' })).toThrow(
+      /wildcard/,
+    );
+    expect(() =>
+      contentSecurityPolicy({ ...BASE, cognitoDomain: 'https://*.amazoncognito.com' }),
+    ).toThrow(/wildcard/);
   });
 
   it('keeps a local API on its own port', () => {
@@ -88,6 +142,7 @@ describe('contentSecurityPolicy', () => {
     // Parses, but its origin is the string 'null': every call would be refused.
     expect(() => contentSecurityPolicy({ ...BASE, apiUrl: 'mailto:x@y' })).toThrow(/http\(s\)/);
     expect(() => contentSecurityPolicy({ ...BASE, sentryDsn: 'javascript:alert(1)' })).toThrow();
+    expect(() => contentSecurityPolicy({ ...BASE, deckBucketUrl: 'not a url' })).toThrow();
     // A blank API would drop it from connect-src.
     expect(() => contentSecurityPolicy({ ...BASE, apiUrl: ' ' })).toThrow(/blank/);
   });
@@ -98,13 +153,19 @@ describe('checkBuildEnv: a production build refuses an origin the CSP cannot hol
     NEXT_PUBLIC_API_URL: 'https://api.bali.example',
     NEXT_PUBLIC_COGNITO_DOMAIN: 'https://bali-dev.auth.us-east-1.amazoncognito.com',
     NEXT_PUBLIC_SENTRY_DSN: 'https://publickey@o123.ingest.us.sentry.io/456',
+    NEXT_PUBLIC_DECK_BUCKET_URL: 'https://bali-decks-dev-eshshah.s3.us-east-1.amazonaws.com',
   };
 
-  it('passes configured http(s) URLs, and Cognito or Sentry left unset or blank', () => {
+  it('passes configured http(s) URLs, and Cognito, Sentry or the bucket left unset or blank', () => {
     expect(() => checkBuildEnv(GOOD)).not.toThrow();
     expect(() => checkBuildEnv({ NEXT_PUBLIC_API_URL: 'http://127.0.0.1:3001' })).not.toThrow();
     expect(() =>
-      checkBuildEnv({ ...GOOD, NEXT_PUBLIC_COGNITO_DOMAIN: '', NEXT_PUBLIC_SENTRY_DSN: ' ' }),
+      checkBuildEnv({
+        ...GOOD,
+        NEXT_PUBLIC_COGNITO_DOMAIN: '',
+        NEXT_PUBLIC_SENTRY_DSN: ' ',
+        NEXT_PUBLIC_DECK_BUCKET_URL: '',
+      }),
     ).not.toThrow();
   });
 
@@ -124,6 +185,18 @@ describe('checkBuildEnv: a production build refuses an origin the CSP cannot hol
           `${name} is not an http(s) URL`,
         );
       }
+    }
+  });
+
+  it('requires the deck bucket’s own address when it is set', () => {
+    for (const bad of [
+      'https://s3.us-east-1.amazonaws.com/bali-decks-prod-eshshah',
+      'https://*.s3.us-east-1.amazonaws.com',
+      'http://bali-decks-prod-eshshah.s3.us-east-1.amazonaws.com',
+    ]) {
+      expect(() => checkBuildEnv({ ...GOOD, NEXT_PUBLIC_DECK_BUCKET_URL: bad }), bad).toThrow(
+        /NEXT_PUBLIC_DECK_BUCKET_URL is not/,
+      );
     }
   });
 

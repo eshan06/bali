@@ -31,6 +31,7 @@ in `apps/web/.env.local`:
 | `NEXT_PUBLIC_COGNITO_SCOPES` | `openid email profile` | Space-separated OAuth scopes. |
 | `NEXT_PUBLIC_SENTRY_DSN` | `https://<key>@o<org>.ingest.sentry.io/<project>` | Optional. Unset (dev, tests), error monitoring is off. Set at build time, an uncaught error, an API 5xx or an API call that got no answer is reported with the path's template (`/v1/classes/:id`), never the URL, a token, a body, a form value or breadcrumbs (`src/lib/monitoring.ts`). A 4xx is never reported. |
 | `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | `dev` | Optional. The environment Sentry files the portal's events under; unset, `NODE_ENV` (`production` in every build). Vercel's `NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA` is the release, nothing to set. |
+| `NEXT_PUBLIC_DECK_BUCKET_URL` | `https://bali-decks-dev-eshshah.s3.us-east-1.amazonaws.com` | The environment's deck bucket (`docs/RUNBOOKS.md`, runbook 10): Your slides uploads a PDF to it by the presigned PUT the API mints, so the CSP's `connect-src` names its origin. Its own address, as the API presigns it (`https://<bucket>.s3.<region>.amazonaws.com`): S3's path style is refused, since its origin is every bucket of the region. Unset, the browser refuses every upload. Dev's bucket for a portal against the dev API. |
 
 The defaults in `src/lib/config.ts` already point at a local setup
 (`http://localhost:3001` API, `http://localhost:3000/auth/callback` redirect), so
@@ -258,11 +259,12 @@ Every page carries a Content-Security-Policy with a fresh nonce
 (`apps/web/src/middleware.ts`, built by `contentSecurityPolicy` in
 `apps/web/src/lib/csp.ts`); HSTS, `nosniff`, the referrer policy and the
 Permissions-Policy come from `next.config.ts`'s `headers()`. The page may
-connect only to its own origin, `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_COGNITO_DOMAIN`
-and the ingest host of `NEXT_PUBLIC_SENTRY_DSN`, read at build time.
+connect only to its own origin, `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_COGNITO_DOMAIN`,
+the ingest host of `NEXT_PUBLIC_SENTRY_DSN` and the deck bucket of
+`NEXT_PUBLIC_DECK_BUCKET_URL` (M5), each by its origin alone, read at build time.
 
 - **A production build needs `NEXT_PUBLIC_API_URL`** (no localhost default there),
-  and fails on any of the three that is not an http(s) URL (`checkBuildEnv`).
+  and fails on any of the four that is not an http(s) URL (`checkBuildEnv`).
 - **Every route renders per request** (the root layout's `dynamic`): a route built
   ahead has no nonce, so it would be blank. A test and CI's build step guard it.
 - **Any new origin the portal loads or calls** (an API, a font, an image host,

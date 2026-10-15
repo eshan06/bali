@@ -514,6 +514,7 @@ your Vercel projects; step 1 tells you which case you're in.
      | `NEXT_PUBLIC_COGNITO_SCOPES` | `openid email profile` |
      | `NEXT_PUBLIC_SENTRY_DSN` | the portal's Sentry project DSN (optional) |
      | `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | `production` |
+     | `NEXT_PUBLIC_DECK_BUCKET_URL` | `https://<prod's deck bucket>.s3.us-east-1.amazonaws.com` (runbook 10, step 8) |
 
      None is secret (`docs/WEB.md`), but each is baked in at build time: change one,
      then **Redeploy**.
@@ -1098,7 +1099,16 @@ locally, `http://localhost:3000`, unless you added more).
    **Check:** prod's deploy log says `deck storage is on`, and the check run there, `railway link`
    (environment `production`) then `railway ssh --service "bali prod" -- npm run --silent
    deck-bucket:check`, ends `PASS`. It leaves nothing in the bucket.
-8. **Rotate a key: at once if it leaks, else yearly.** IAM → that environment's user →
+8. **The portal's CSP** (M5): a teacher's browser uploads a PDF straight to the bucket, so each
+   portal's Content-Security-Policy names its environment's bucket, and refuses any other. Vercel
+   → `bali-portal` → **Settings → Environment Variables** → add `NEXT_PUBLIC_DECK_BUCKET_URL`,
+   scope **Production** only: `https://<prod's bucket name>.s3.us-east-1.amazonaws.com`, no path,
+   no trailing slash, never dev's. **Redeploy** (it is baked in at build time). A portal run
+   locally against the dev API takes dev's bucket the same way, in `apps/web/.env.local`
+   (`docs/WEB.md`).
+   **Check:** the portal's sign-in page → the browser's developer tools → **Network** → the page's
+   response headers: `content-security-policy`'s `connect-src` lists that bucket's address.
+9. **Rotate a key: at once if it leaks, else yearly.** IAM → that environment's user →
    **Security credentials** → **Create access key** (a user holds two at most); put it on that
    environment's service (step 5) and deploy; run the check (step 6); then the old key →
    **Deactivate**, and once the check passes again, **Delete**. A leaked key can only read, write
