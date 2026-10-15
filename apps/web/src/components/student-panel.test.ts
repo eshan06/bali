@@ -141,14 +141,29 @@ describe('the student panel’s states, as PanelStates draws them', () => {
     );
   });
 
-  it('lists no going silent and no coming back, as its Silent board draws it', () => {
+  it('lists going silent and coming back as the recap marks them (the owner, 2026-10-14)', () => {
+    // Where PanelStates' Silent board lists the tap-in alone.
     const silent = student({ lastSeenAt: at(27) });
     const html = render(
       silent,
-      ready(event('tap_in', 7), event('went_silent', 20), event('came_back', 22)),
+      ready(
+        event('tap_in', 7),
+        event('went_silent', 20),
+        event('came_back', 22),
+        event('went_silent', 29),
+      ),
     );
     expect(head(html)).toBe(`Ethan Park Tapped in at ${t(7)} Silent · 5 min`);
-    expect(moments(html)).toEqual([`Tapped in ${t(7)}`]);
+    expect(moments(html)).toEqual([
+      `Tapped in ${t(7)}`,
+      `Silent ${t(20)}`,
+      `Checked in again ${t(22)}`,
+      `Silent ${t(29)}`,
+    ]);
+    const dots = [
+      ...html.matchAll(/<span class="relative z-1 grid[^"]*"><svg[^>]*?lucide-([\w-]+)/g),
+    ];
+    expect(dots.map((d) => d[1])).toEqual(['circle-check', 'wifi-off', 'wifi', 'wifi-off']);
     expect(notes(html)).toEqual([`The phone last checked in at ${t(27)}.`, PRIVATE]);
   });
 

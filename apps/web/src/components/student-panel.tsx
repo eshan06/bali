@@ -8,7 +8,6 @@ import { Button } from '@/components/button';
 import { MOMENT } from '@/components/timeline';
 import { reasonWords } from '@/components/unlock-popups';
 import type { Student } from '@/lib/grid-state';
-import type { Moment } from '@/lib/recap';
 import { bellTime } from '@/lib/session-controls';
 import {
   noEvents,
@@ -19,15 +18,11 @@ import {
 } from '@/lib/student-panel';
 import { useApi } from '@/lib/use-api';
 
-/** Clock off's words (S9): advice, which changes no state; the panel's line and the tile's tooltip. */
-export const CLOCK_OFF = "This phone's clock is set ahead. Bali records the time by its own clock.";
-
 /**
- * The moments the panel leaves out, as PanelStates draws it: its Silent board lists no going
- * silent, the chip and the last check-in saying it, and so no coming back, which only ends one.
- * The recap marks both; which the panel lists is the owner's open question (DECISIONS 2026-10-14).
+ * Clock off's line (S9), beside times that are the phone's own claim held to the session's window:
+ * the owner's words (2026-10-14), where PanelStates' caption said Bali keeps its own clock.
  */
-const UNLISTED: ReadonlySet<Moment> = new Set(['silent', 'back']);
+export const CLOCK_OFF = "This phone's clock is off, so its times may be off too.";
 
 /** "9:31 AM", as the bell and the pop-ups say a time. */
 const time = (at: Date) => bellTime(at.toISOString());
@@ -58,13 +53,14 @@ export interface PanelProps {
 /**
  * The student panel (PV11b; ClassStudent, PanelStates): the name, when they tapped in, their state
  * and Close; this session's moments, oldest first, with their times and each unlock's reason (so
- * never in Present, #265); Clock off, the last check-in and who sees it. While the events are read,
- * the name and state alone; a read that failed, with Try again. Escape closes it from inside.
+ * never in Present, #265), going silent and coming back among them as the recap marks them (the
+ * owner, 2026-10-14); Clock off, the last check-in and who sees it. While the events are read, the
+ * name and state alone; a read that failed, with Try again. Escape closes it from inside.
  */
 export function PanelView({ id, student, chip, read, now, onClose, onRetry }: PanelProps) {
   const name = student.displayName ?? student.studentId.slice(0, 8);
   const panel = read.kind === 'ready' ? studentPanel(student, read.events.events, now) : null;
-  const moments = panel?.moments.filter((m) => !UNLISTED.has(m.moment)) ?? [];
+  const moments = panel?.moments ?? [];
   return (
     <aside
       id={id}
