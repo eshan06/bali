@@ -223,7 +223,7 @@ describe('the shell’s wiring of the rulings (read from its source)', () => {
 
   it('applies only the newest read’s answer, so a past failure never shows over fresh data (#352’s review)', () => {
     expect(shell).toMatch(
-      /void readAccount\(api, reads\)\.then\(\(said\) => \{\s*(\/\/[^\n]*\s*)*if \(said === null\) return;\s*reading\.current = false;\s*if \('home' in said\) setHome\(said\.home\);\s*else setError\(said\.error\);\s*\}\);/,
+      /void readAccount\(api, reads\)\.then\(\(said\) => \{\s*\/\/ A newer read is under way: its answer is the one that counts\.\s*if \(said === null\) return;\s*reading\.current = false;\s*if \('home' in said\) setHome\(said\.home\);\s*else setError\(said\.error\);\s*\}\);/,
     );
   });
 
