@@ -169,7 +169,7 @@ export const removeAttemptFor = (
   unanswered: RemoveAttempt | undefined,
   draftId: string,
   mint = newEventId,
-): RemoveAttempt => unanswered ?? { draftId, eventId: mint() };
+): RemoveAttempt => (unanswered?.draftId === draftId ? unanswered : { draftId, eventId: mint() });
 
 /** Remove it (`DELETE`). One already gone, removed in another tab, is as good as removed. */
 export async function removeDraft(

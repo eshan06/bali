@@ -337,6 +337,8 @@ describe('a removal', () => {
     const first = removeAttemptFor(undefined, 'q1', () => 'e1');
     expect(first).toEqual({ draftId: 'q1', eventId: 'e1' });
     expect(removeAttemptFor(first, 'q1', () => 'e2')).toBe(first);
+    // Another draft's unanswered removal is never this one's (santa's review).
+    expect(removeAttemptFor(first, 'q2', () => 'e3')).toEqual({ draftId: 'q2', eventId: 'e3' });
   });
 
   it('is `DELETE` with its eventId in the body, removed when answered', async () => {
