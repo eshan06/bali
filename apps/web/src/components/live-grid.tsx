@@ -161,7 +161,7 @@ const DOT = '\u00a0· ';
  */
 const TILE = {
   standard:
-    'grid h-21 grid-cols-[20px_minmax(0,1fr)] gap-x-2.5 px-3.5 py-3 max-sm:block max-sm:h-auto max-sm:px-3 max-sm:py-2.5',
+    'grid h-21 grid-cols-[20px_minmax(0,1fr)] gap-x-2.5 px-3.5 py-3 max-sm:flex max-sm:flex-col max-sm:h-auto max-sm:px-3 max-sm:py-2.5',
   present: 'grid h-25 grid-cols-[24px_minmax(0,1fr)] gap-x-3 px-4.5 py-3',
 };
 

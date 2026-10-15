@@ -268,6 +268,13 @@ describe('the panel on the class page', () => {
     );
   });
 
+  it('reads again on Try again, saying it loads, with focus kept on the name', () => {
+    expect(panel).toMatch(
+      /onRetry=\{\(\) => \{\s*setAnswer\(\{ kind: 'loading' \}\);\s*setAttempt\(\(n\) => n \+ 1\);[^]*?document\.getElementById\(`\$\{view\.id\}-name`\)\?\.focus\(\);/,
+    );
+    expect(panel).toMatch(/\}, \[api, sessionId, studentId, attempt\]\);/);
+  });
+
   it('never opens in Present, closes as it turns on, and opens on the live page alone', () => {
     expect(grid).toMatch(/const selects = livePage && !present;/);
     expect(grid).toMatch(

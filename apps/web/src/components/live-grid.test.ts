@@ -248,7 +248,13 @@ describe('a tile on the live grid (PV8)', () => {
     const html = render(student({ state: 'unlocked', unlock: unlocked('bathroom') }));
     const tile = parts(html);
     expect(tile.tile).toEqual(
-      expect.arrayContaining(['max-sm:block', 'max-sm:h-auto', 'max-sm:px-3', 'max-sm:py-2.5']),
+      expect.arrayContaining([
+        'max-sm:flex',
+        'max-sm:flex-col',
+        'max-sm:h-auto',
+        'max-sm:px-3',
+        'max-sm:py-2.5',
+      ]),
     );
     expect(tile.icons[0]?.classes).toContain('max-sm:hidden');
     // The state's icon before its words, and its one detail run on after them, nothing cut; the

@@ -116,7 +116,8 @@ const POPUP =
  * ClassUnlock draws them on it alone; each unlock then shows on its tile under How it ended and in
  * the recap. Its words are an alert, so a screen reader says each as it opens
  * ("Ethan Park used Emergency Unlock. Nurse · 9:31 AM") without moving focus; Close is described by
- * them, and closing one moves focus to the pop-up that takes its place, else the one above it.
+ * them, and closing one moves focus to the Close of the pop-up that takes its place, else the one
+ * above it.
  * Open student (PV11b) opens the student's panel, described by the same words, once their tile is
  * on the grid.
  */
@@ -176,7 +177,7 @@ export function UnlockPopups({
                 const popup = e.currentTarget.parentElement;
                 const next = popup?.nextElementSibling ?? popup?.previousElementSibling;
                 if (document.activeElement === e.currentTarget) {
-                  next?.querySelector('button')?.focus();
+                  next?.querySelector<HTMLElement>('button[aria-label="Close"]')?.focus();
                 }
                 onClose(u.eventId);
               }}

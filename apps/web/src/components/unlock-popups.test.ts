@@ -321,7 +321,7 @@ describe('a pop-up, as ClassUnlock draws it', () => {
   it('moves focus on a Close to the pop-up that takes its place, else the one above it', () => {
     const source = read('./unlock-popups.tsx');
     expect(source).toMatch(
-      /const popup = e\.currentTarget\.parentElement;\s*const next = popup\?\.nextElementSibling \?\? popup\?\.previousElementSibling;\s*if \(document\.activeElement === e\.currentTarget\) \{\s*next\?\.querySelector\('button'\)\?\.focus\(\);\s*\}\s*onClose\(u\.eventId\);/,
+      /const popup = e\.currentTarget\.parentElement;\s*const next = popup\?\.nextElementSibling \?\? popup\?\.previousElementSibling;\s*if \(document\.activeElement === e\.currentTarget\) \{\s*next\?\.querySelector<HTMLElement>\('button\[aria-label="Close"\]'\)\?\.focus\(\);\s*\}\s*onClose\(u\.eventId\);/,
     );
   });
 });
