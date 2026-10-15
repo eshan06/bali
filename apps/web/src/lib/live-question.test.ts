@@ -1,7 +1,13 @@
 import type { QuestionResults, TeacherQuestion } from '@bali/shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { type ApiClient, ApiError, createApiClient, NetworkError } from './api-client';
+import {
+  type ApiClient,
+  ApiError,
+  createApiClient,
+  NetworkError,
+  POLL_TIMEOUT_MS,
+} from './api-client';
 import {
   closeAttemptFor,
   closeQuestion,
@@ -450,6 +456,42 @@ describe('pollResults', () => {
     await after(POLL_EVERY_MS);
     expect(last()).toEqual({ results: results({ open: false }), final: true, problem: null });
     expect(reads.map((read) => read.at)).toEqual([0, 2000, 4000, 6000]);
+  });
+
+  it('fails a read that never answers once POLL_TIMEOUT_MS is up, the counts kept, then reads on (#334)', async () => {
+    const answering = (body: QuestionResults) => () =>
+      Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
+    // A request the network swallows (a half-open connection): no answer until its signal gives up.
+    const swallowed = (init?: RequestInit) =>
+      new Promise<Response>((_, reject) => {
+        init?.signal?.addEventListener('abort', () =>
+          reject(new DOMException('aborted', 'AbortError')),
+        );
+      });
+    const replies = [answering(results()), swallowed, answering(results({ answered: 3 }))];
+    const fetched = vi.fn((_url: string | URL | Request, init?: RequestInit) =>
+      (replies.shift() ?? swallowed)(init),
+    );
+    const client = createApiClient({
+      baseUrl: 'http://api',
+      getToken: () => 'tok',
+      fetchImpl: fetched,
+    });
+    const poll = pollResults(client, QUESTION, onChange, page().doc);
+    await after(0);
+    await after(POLL_EVERY_MS); // the second read: the network swallows it
+    await after(POLL_TIMEOUT_MS - 1);
+    expect(last()).toEqual({ results: results(), final: false, problem: null });
+    await after(1);
+    expect(last()).toEqual({
+      results: results(),
+      final: false,
+      problem: { kind: 'failed', status: undefined, retryAfter: undefined },
+    });
+    await after(POLL_EVERY_MS); // the next read, as ever
+    expect(last()).toEqual({ results: results({ answered: 3 }), final: false, problem: null });
+    expect(fetched).toHaveBeenCalledTimes(3);
+    poll.stop();
   });
 
   it('reads again in 2 s after a refusal, typed by its reason', async () => {

@@ -1,11 +1,32 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ApiError, createApiClient, NetworkError, UnauthorizedError } from './api-client';
+import {
+  ApiError,
+  createApiClient,
+  NetworkError,
+  POLL_TIMEOUT_MS,
+  UnauthorizedError,
+} from './api-client';
+import { captureApiFailure } from './monitoring';
+
+vi.mock('./monitoring', () => ({ captureApiFailure: vi.fn() }));
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: { 'content-type': 'application/json' },
+  });
+}
+
+/**
+ * A request the network swallows (a half-open connection): no answer ever, until its signal gives
+ * up on it, as the browser's fetch does.
+ */
+function swallowed(init?: RequestInit): Promise<Response> {
+  return new Promise((_, reject) => {
+    init?.signal?.addEventListener('abort', () =>
+      reject(new DOMException('aborted', 'AbortError')),
+    );
   });
 }
 
@@ -231,6 +252,120 @@ describe('api-client', () => {
     });
     await expect(stray.getTagged('/x', null)).rejects.toMatchObject({ status: 304 });
     expect(onUnauthorized).toHaveBeenCalledOnce();
+  });
+
+  describe('a tagged read with no answer (#334)', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.mocked(captureApiFailure).mockClear();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('fails as unreached once POLL_TIMEOUT_MS is up, never a sign-out, leaving no timer', async () => {
+      const onUnauthorized = vi.fn();
+      const api = createApiClient({
+        baseUrl: 'http://api',
+        getToken: () => 'tok',
+        onUnauthorized,
+        fetchImpl: (_url, init) => swallowed(init),
+      });
+      const read = api.getTagged('/x', '"a"');
+      const settled = vi.fn();
+      read.then(settled, settled);
+      await vi.advanceTimersByTimeAsync(POLL_TIMEOUT_MS - 1);
+      expect(settled).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      await expect(read).rejects.toBeInstanceOf(NetworkError);
+      expect(onUnauthorized).not.toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+      expect(vi.mocked(captureApiFailure).mock.calls).toEqual([['GET', '/x', 'network']]);
+    });
+
+    it('fails a body that stops on its way the same way: the limit is on the whole answer', async () => {
+      const api = createApiClient({
+        baseUrl: 'http://api',
+        getToken: () => 'tok',
+        fetchImpl: (_url, init) => {
+          const body = new ReadableStream<Uint8Array>({
+            start(stream) {
+              stream.enqueue(new TextEncoder().encode('{"answered":'));
+              init?.signal?.addEventListener('abort', () =>
+                stream.error(new DOMException('aborted', 'AbortError')),
+              );
+            },
+          });
+          return Promise.resolve(new Response(body, { status: 200 }));
+        },
+      });
+      const read = api.getTagged('/x', null);
+      const settled = vi.fn();
+      read.then(settled, settled);
+      await vi.advanceTimersByTimeAsync(POLL_TIMEOUT_MS - 1);
+      expect(settled).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      await expect(read).rejects.toBeInstanceOf(NetworkError);
+      expect(vi.getTimerCount()).toBe(0);
+      expect(vi.mocked(captureApiFailure).mock.calls).toEqual([['GET', '/x', 'network']]);
+    });
+
+    it('clears its timer once answered: a body, a 304, a refusal, a 401, no network, not JSON', async () => {
+      const replies: (() => Promise<Response>)[] = [
+        () => Promise.resolve(new Response('{"answered":1}', { headers: { etag: '"a"' } })),
+        () => Promise.resolve(new Response(null, { status: 304 })),
+        () => Promise.resolve(jsonResponse({ error: { code: 'x', message: 'no' } }, 503)),
+        () => Promise.resolve(new Response('', { status: 401 })),
+        () => Promise.reject(new TypeError('Failed to fetch')),
+        // A proxy's page: a body that came whole, so its own error, never the limit's no answer.
+        () => Promise.resolve(new Response('<html>', { status: 200 })),
+      ];
+      const api = createApiClient({
+        baseUrl: 'http://api',
+        getToken: () => 'tok',
+        fetchImpl: () => replies.shift()!(),
+      });
+      const answers: unknown[] = [];
+      for (let i = 0; i < 6; i += 1) {
+        answers.push(await api.getTagged('/x', '"a"').catch((e: unknown) => e));
+        expect(vi.getTimerCount(), `after answer ${i + 1}`).toBe(0);
+      }
+      expect(answers[0]).toEqual({ body: { answered: 1 }, etag: '"a"' });
+      expect(answers[1]).toBeNull();
+      expect(answers.slice(2).map((e) => (e as Error).name)).toEqual([
+        'ApiError',
+        'UnauthorizedError',
+        'NetworkError',
+        'SyntaxError',
+      ]);
+      expect(vi.mocked(captureApiFailure).mock.calls).toEqual([
+        ['GET', '/x', 503],
+        ['GET', '/x', 'network'],
+      ]);
+    });
+
+    it('puts no limit on any other call: a deck’s check can take longer than a poll waits', async () => {
+      const api = createApiClient({
+        baseUrl: 'http://api',
+        getToken: () => 'tok',
+        fetchImpl: (_url, init) =>
+          Promise.race([
+            swallowed(init),
+            new Promise<Response>((answer) => {
+              setTimeout(() => answer(jsonResponse({ ok: 1 })), 4 * POLL_TIMEOUT_MS);
+            }),
+          ]),
+      });
+      const calls = [
+        api.get('/v1/decks'),
+        api.post('/v1/decks/d1/complete', { eventId: 'e1' }),
+        api.put('/v1/saved-questions/q1', { eventId: 'e2' }),
+        api.patch('/v1/me', { eventId: 'e3' }),
+        api.del('/v1/decks/d1', { eventId: 'e4' }),
+      ];
+      await vi.advanceTimersByTimeAsync(4 * POLL_TIMEOUT_MS);
+      expect(await Promise.all(calls)).toEqual(calls.map(() => ({ ok: 1 })));
+    });
   });
 
   it('surfaces a clean ApiError (not a TypeError) on a non-conforming error body', async () => {

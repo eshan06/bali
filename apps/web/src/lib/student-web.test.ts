@@ -13,6 +13,7 @@ import {
   ApiError,
   createApiClient,
   NetworkError,
+  POLL_TIMEOUT_MS,
   UnauthorizedError,
 } from './api-client';
 import { newEventId } from './event-id';
@@ -54,17 +55,17 @@ const lesson = (over: Partial<Presentation> = {}): Presentation => ({
 });
 
 /** The API client over a fetch answering each path from `routes`, every path asked recorded. */
-function client(routes: Record<string, () => Promise<Response>>) {
+function client(routes: Record<string, (init?: RequestInit) => Promise<Response>>) {
   const asked: string[] = [];
   const onUnauthorized = vi.fn();
   const api = createApiClient({
     baseUrl: 'http://api',
     getToken: () => 'tok',
     onUnauthorized,
-    fetchImpl: (url) => {
+    fetchImpl: (url, init) => {
       const path = (url as string).replace('http://api', '');
       asked.push(path);
-      return routes[path]?.() ?? Promise.reject(new Error(`no route for ${path}`));
+      return routes[path]?.(init) ?? Promise.reject(new Error(`no route for ${path}`));
     },
   });
   return { api, asked, onUnauthorized };
@@ -77,6 +78,13 @@ const json = (status: number, body: unknown) => () =>
     }),
   );
 const offline = () => Promise.reject(new Error('offline'));
+/** A request the network swallows (a half-open connection): no answer until its signal gives up. */
+const swallowed = (init?: RequestInit) =>
+  new Promise<Response>((_, reject) => {
+    init?.signal?.addEventListener('abort', () =>
+      reject(new DOMException('aborted', 'AbortError')),
+    );
+  });
 
 describe('homeFor', () => {
   const me = (role: 'teacher' | 'student'): MeResponse => ({
@@ -320,6 +328,31 @@ describe('followLesson', () => {
     await after(POLL_EVERY_MS); // a 304: what it kept is current again
     expect(last()).toEqual({ presentation: lesson(), problem: null, asOf: null });
     expect(reads.map((read) => read.at)).toEqual([0, 2000, 4000, 6000]);
+    followed.stop();
+  });
+
+  it('fails a read that never answers once POLL_TIMEOUT_MS is up, the chip as of the last good read, then reads on (#334)', async () => {
+    const unlocked = lesson({ phone: { state: 'unlocked', lastSeenAt: null } });
+    const replies = [json(200, lesson()), swallowed, json(200, unlocked)];
+    const { api, asked } = client({
+      [`/v1/sessions/${SESSION}/presentation`]: (init) => (replies.shift() ?? swallowed)(init),
+    });
+    const followed = followLesson(api, SESSION, onChange, page().doc);
+    await after(0);
+    await after(POLL_EVERY_MS); // the second read: the network swallows it
+    await after(POLL_TIMEOUT_MS - 1);
+    expect(last()).toEqual({ presentation: lesson(), problem: null, asOf: null });
+    await after(1);
+    const failing = last();
+    expect(failing).toEqual({
+      presentation: lesson(),
+      problem: { kind: 'failed', status: undefined, retryAfter: undefined },
+      asOf: AT,
+    });
+    expect(failing && phoneChip(failing)).toEqual({ kind: 'focused' });
+    await after(POLL_EVERY_MS); // the next read, as ever
+    expect(last()).toEqual({ presentation: unlocked, problem: null, asOf: null });
+    expect(asked).toHaveLength(3);
     followed.stop();
   });
 

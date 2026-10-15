@@ -8,6 +8,26 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-15** — **#334: a polled read with no whole answer in 10 s fails as no answer; the polls
+  alone.** The portal's API client set no time limit, so a read on a half-open connection (Wi-Fi
+  dropping packets mid-request) held its poll until the browser gave up, minutes later: the
+  student's lesson kept the phone's chip with no "as of", and L6's results kept their counts with
+  nothing saying they may be behind (#333's review). `getTagged`, which both polls read through
+  (`pollTagged`), now aborts its request at `POLL_TIMEOUT_MS`, 10 s, the issue's "about 10 s": the
+  load gate measured a poll's p95 at 5–11 ms at the server (L4b, M9), so 10 s leaves a school's
+  network at the bell room to be slow and still says a hang about 12 s after the last answer. The
+  limit is on the whole answer, its body too, and its timer is cleared as the read settles, however
+  it settles. Timed out, before its headers or in its body, the read fails as a read with no answer
+  does (a `NetworkError`, reported to monitoring as no answer; the poll's `failed` with no status),
+  and the poll reads again 2 s later (#403). **Not on the other calls:**
+  the live grid's stream is long-lived by design, with its own reconnect; the slide upload is XHR,
+  with its own 25-minute stop (#326); and a limit on every call, in `send`, would cut `POST
+  /v1/decks/{id}/complete`, which on the API reads up to 25 MB from the bucket (its 30 s limit) and
+  checks it in a worker (10 s more), so a good upload's check could fail at the client. So a save
+  keeps #395's known limit, a save that hangs holding its buttons until the browser gives up; a
+  limit of the saves' own could lift it later. *Weighed:* `AbortSignal.timeout` (no timer to clear,
+  but Node's own timer, which a test's fake clock can't move).
+
 - **2026-10-15** — **L7's part 2: Present's question in the live grid's place, built to the canvas;
   its intermediate states drawn on the canvas first; each answer's count only from Bali's last read
   after the close.** Built to
