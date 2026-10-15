@@ -16,11 +16,15 @@ import {
   runUpload,
   titleOf,
   type Upload,
+  uploadAgain,
   type UploadEnd,
   UPLOAD_LIMIT_MS,
   type UploadStep,
   type XhrClass,
 } from './decks';
+import { captureApiFailure } from './monitoring';
+
+vi.mock('./monitoring', () => ({ captureApiFailure: vi.fn() }));
 
 /*
  * Your slides' logic (M5): the decks read, a picked file judged before anything is sent, the
@@ -123,6 +127,7 @@ const lastXhr = () => FakeXhr.made.at(-1);
 afterEach(() => {
   FakeXhr.made = [];
   vi.useRealTimers();
+  vi.mocked(captureApiFailure).mockClear();
 });
 
 describe('the decks (Your slides)', () => {
@@ -275,6 +280,24 @@ describe('the PUT to the bucket (XMLHttpRequest, for its progress)', () => {
     cancelled.controller.abort();
     expect(lastXhr()!.aborted).toBe(true);
     expect(await cancelled.ended).toBe('cancelled');
+  });
+
+  it('reports the bucket’s 5xx and no answer as an API call’s, by the key alone, never a 4xx', async () => {
+    const failing = put();
+    lastXhr()!.answer(503);
+    await failing.ended;
+    const offline = put();
+    lastXhr()!.fail();
+    await offline.ended;
+    const refused = put();
+    lastXhr()!.answer(403);
+    await refused.ended;
+    const key = '/bucket/decks/0199b000-0000-7000-8000-0000000000d1.pdf';
+    // No query: the presigned URL's signature never leaves.
+    expect(vi.mocked(captureApiFailure).mock.calls).toEqual([
+      ['PUT', key, 503],
+      ['PUT', key, 'network'],
+    ]);
   });
 
   it('sends nothing once cancelled, or past its deadline', async () => {
@@ -506,6 +529,28 @@ describe('an upload, from the file to the server’s verdict', () => {
     const { ended } = run(api, newUpload(file(), 'Unit 3 review'));
     (await untilPut()).answer(200);
     expect(await ended).toEqual({ kind: 'gone' });
+  });
+
+  it('starts afresh, under new ids, once the API refused it; else goes on from where it stopped', () => {
+    const upload: Upload = {
+      ...newUpload(file(), 'Unit 3 review'),
+      sha256: SHA,
+      deck: deck(),
+    };
+    const failed = { kind: 'failed', status: undefined, retryAfter: undefined } as const;
+    expect(uploadAgain({ failure: failed, upload })).toBe(upload);
+    // The sweep rejected its deck `unfinished`, its id still held: the same create is refused.
+    const refused = { kind: 'refused', status: 409, reason: 'event_id_conflict' } as const;
+    const again = uploadAgain({ failure: refused, upload });
+    expect(again).toMatchObject({
+      file: upload.file,
+      title: 'Unit 3 review',
+      sha256: SHA,
+      deck: null,
+      uploaded: false,
+    });
+    expect(again.createId).not.toBe(upload.createId);
+    expect(again.completeId).not.toBe(upload.completeId);
   });
 
   it('stops on a refused create, the refusal typed for the page', async () => {

@@ -22,8 +22,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   its own; each step said (`uploading` with the fraction sent, `checking`). **Try again goes on from
   where it stopped:** a hash once read is kept; a create or a PUT that failed sends the create again
   under its id, whose replay mints a fresh URL (M2b2) and so a fresh limit; a check that failed is
-  asked again alone, a lost answer's replay answering its verdict. A check answered
-  `deck_not_found` is `gone` (removed in another tab). **The PUT** (`putPdf`) is XMLHttpRequest's,
+  asked again alone, a lost answer's replay answering its verdict; but once the API has refused it,
+  Try again starts afresh under new ids (`uploadAgain`), since the same ids would only be refused
+  again: a create sent again after the sweep rejected its deck `unfinished` finds its id held, `409
+  event_id_conflict` (santa's review). A check answered `deck_not_found` is `gone` (removed in another
+  tab). **The PUT** (`putPdf`) is XMLHttpRequest's,
   whose upload reports its progress (`fetch` reports none), signed as the URL was: `Content-Type:
   application/pdf` and the length, which the browser sets from the body. **The 25 minutes (#326)**
   count from before the create is sent, so never past the server's own mint, on a clock that only
@@ -32,14 +35,16 @@ a real decision? Add a dated entry at the top: what was decided and why.
   progress events checking the clock (none come while a stalled upload sends nothing). **The
   bucket's origin in `connect-src`** comes from `NEXT_PUBLIC_DECK_BUCKET_URL`, cut to its origin as
   the others are, per environment: dev's bucket in a local `.env.local`, prod's on Vercel (the
-  owner's, runbook 10, step 8). *Weighed:* any S3 origin (`*.s3.amazonaws.com`, a wildcard the brief
-  and S4 rule out: any bucket anywhere could then take a page's data); a map from the API's URL to
-  its bucket in code; the origin read from the API at each page (a call before every page). **Not
-  required by a production build**, as the API's URL is: required, Vercel's next build of `main`
-  would fail until the owner adds it; unset, the browser refuses an upload, which the page says
-  stopped, and Sentry hears of. **A failed PUT is reported** as an API call is (`captureApiFailure`),
-  by its key's template (`PUT /bucket/decks/:id`) with the bucket's status or no answer, never the
-  URL, whose query is its signature. **A removal** (`removeDeck`) reads M5a's `details` into the
+  owner's, runbook 10, step 8), and only as the bucket's own address, the one the API presigns
+  (`<bucket>.s3.<region>.amazonaws.com`, over https): S3's path style, whose origin is every bucket
+  of a region, and a `*` in any origin are refused (santa's review). *Weighed:* any S3 origin
+  (`*.s3.amazonaws.com`, a wildcard the brief and S4 rule out: any bucket anywhere could then take a
+  page's data); a map from the API's URL to its bucket in code; the origin read from the API at
+  each page (a call before every page). **Not required by a production build**, as the API's URL
+  is: required, Vercel's next build of `main` would fail until the owner adds it; unset, the browser
+  refuses an upload, which the page says stopped, and Sentry hears of. **A failed PUT is reported**
+  as an API call is (`captureApiFailure`: the bucket's 5xx or no answer, never a 4xx), by its key's
+  template (`PUT /bucket/decks/:id`), never the URL, whose query is its signature. **A removal** (`removeDeck`) reads M5a's `details` into the
   classes in use (`inUseClasses`: `{ classes: [{ id, name }] }`, one or more, else none read); a
   refusal in use that names none it can read is refused, as from a server before M5a; a deck already
   gone counts as removed, as a saved question's does. **The API client** keeps an error's `details`

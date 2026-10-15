@@ -27,7 +27,8 @@ export interface CspOptions {
 
 /**
  * The http(s) origin a configured URL names (a DSN's key and path go); null when it is unset or
- * blank. Anything else throws: an origin of `null` would silently block every call.
+ * blank. Anything else throws: an origin of `null` would silently block every call, and a `*` in
+ * its host would make it a wildcard, open to every host it matches.
  */
 function originOf(url: string | undefined): string | null {
   if (url === undefined || url.trim() === '') return null;
@@ -35,14 +36,29 @@ function originOf(url: string | undefined): string | null {
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
     throw new Error(`not an http(s) URL: ${parsed.protocol}`);
   }
+  if (parsed.hostname.includes('*')) throw new Error(`a wildcard is no origin: ${parsed.hostname}`);
   return parsed.origin;
+}
+
+/**
+ * The deck bucket's own address, as the API presigns its URLs (`deck-storage.ts`): any other, S3's
+ * path style included, would name every bucket of a region, or none the API uploads to.
+ */
+const BUCKET_HOST = /^[a-z0-9][a-z0-9-]*\.s3\.[a-z0-9-]+\.amazonaws\.com$/;
+
+/** The deck bucket's origin (`BUCKET_HOST`, over https), or null when unset or blank. */
+function bucketOriginOf(url: string | undefined): string | null {
+  const origin = originOf(url);
+  if (origin !== null && !(origin.startsWith('https://') && BUCKET_HOST.test(new URL(origin).host)))
+    throw new Error(`not a deck bucket's own address: ${origin}`);
+  return origin;
 }
 
 /**
  * A production build's check of the origins the CSP is built from (next.config.ts), so a bad one
  * fails the build rather than every page: the API's URL must be set (unset, the portal would
  * call its localhost default) and be an http(s) URL; Cognito's, Sentry's and the deck bucket's, when
- * set, too.
+ * set, too, the bucket's its own address.
  */
 export function checkBuildEnv(env: Record<string, string | undefined>): void {
   const urls = {
@@ -62,6 +78,13 @@ export function checkBuildEnv(env: Record<string, string | undefined>): void {
       throw new Error('set NEXT_PUBLIC_API_URL for a production build: the API the portal calls');
     }
   }
+  try {
+    bucketOriginOf(env.NEXT_PUBLIC_DECK_BUCKET_URL);
+  } catch {
+    throw new Error(
+      'NEXT_PUBLIC_DECK_BUCKET_URL is not a deck bucket’s own address: https://<bucket>.s3.<region>.amazonaws.com',
+    );
+  }
 }
 
 export function contentSecurityPolicy(options: CspOptions): string {
@@ -70,7 +93,7 @@ export function contentSecurityPolicy(options: CspOptions): string {
   if (api === null) throw new Error('the API URL is blank: the portal could call nothing');
   const cognito = originOf(options.cognitoDomain);
   const sentry = originOf(options.sentryDsn);
-  const bucket = originOf(options.deckBucketUrl);
+  const bucket = bucketOriginOf(options.deckBucketUrl);
   const list = (...sources: (string | null | false)[]) =>
     sources.filter((s): s is string => typeof s === 'string').join(' ');
 

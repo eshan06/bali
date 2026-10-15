@@ -95,9 +95,9 @@ export interface PutOptions {
  * The PDF to the bucket by its presigned PUT, as it was signed: `Content-Type: application/pdf`
  * and the file's exact length, which the browser sets from the body. By XMLHttpRequest, whose
  * upload reports its progress (`fetch` reports none). Stopped by `signal`, and at `deadline` by the
- * browser itself (XHR's own timeout, which no throttling of a background tab's timers delays). A
- * failure is reported as an API call's is, by the key's template: the URL carries its signature,
- * so it never leaves.
+ * browser itself (XHR's own timeout, not a page timer a hidden tab may throttle). The bucket's 5xx,
+ * or no answer, is reported as an API call's is (`captureApiFailure`, never a 4xx), by the key's
+ * template: the URL carries its signature, so it never leaves.
  */
 export function putPdf(url: string, body: Blob, opts: PutOptions): Promise<PutEnd> {
   const { deadline, now, onProgress, signal, Xhr = XMLHttpRequest } = opts;
@@ -112,7 +112,9 @@ export function putPdf(url: string, body: Blob, opts: PutOptions): Promise<PutEn
       resolve(how);
     };
     const failed = (status: number | undefined) => {
-      captureApiFailure('PUT', `/bucket${new URL(url).pathname}`, status ?? 'network');
+      if (status === undefined || status >= 500) {
+        captureApiFailure('PUT', `/bucket${new URL(url).pathname}`, status ?? 'network');
+      }
       end({ failed: status });
     };
     xhr.open('PUT', url);
@@ -156,6 +158,23 @@ export const newUpload = (file: Blob, title: string, mint = newEventId): Upload 
   deck: null,
   uploaded: false,
 });
+
+/**
+ * The upload a stopped one's Try again runs: on from where it got to, but afresh, under new ids and
+ * its SHA-256 kept, once the API has refused it, since the same ids would only be refused again (a
+ * create sent again after the sweep rejected its deck `unfinished`, its id still held, is `409
+ * event_id_conflict`).
+ */
+export const uploadAgain = (
+  stopped: { failure: Failure; upload: Upload },
+  mint = newEventId,
+): Upload =>
+  stopped.failure.kind === 'refused'
+    ? {
+        ...newUpload(stopped.upload.file, stopped.upload.title, mint),
+        sha256: stopped.upload.sha256,
+      }
+    : stopped.upload;
 
 /** Where a running upload stands: how much is sent, or its check. */
 export type UploadStep = { step: 'uploading'; fraction: number } | { step: 'checking' };

@@ -104,6 +104,28 @@ describe('contentSecurityPolicy', () => {
     expect(text).not.toMatch(/\*\.s3|\*\.amazonaws/);
   });
 
+  it('refuses a bucket address that would name more than the one bucket, or none the API uses', () => {
+    for (const bad of [
+      // S3's path style: its origin is every bucket of the region.
+      'https://s3.us-east-1.amazonaws.com/bali-decks-prod-eshshah',
+      'https://*.s3.us-east-1.amazonaws.com',
+      'http://bali-decks-prod-eshshah.s3.us-east-1.amazonaws.com',
+      'https://bali-decks-prod-eshshah.s3.us-east-1.amazonaws.com:8443',
+      'https://bali.example',
+    ]) {
+      expect(() => contentSecurityPolicy({ ...BASE, deckBucketUrl: bad }), bad).toThrow();
+    }
+  });
+
+  it('refuses a wildcard in any configured origin', () => {
+    expect(() => contentSecurityPolicy({ ...BASE, apiUrl: 'https://*.example' })).toThrow(
+      /wildcard/,
+    );
+    expect(() =>
+      contentSecurityPolicy({ ...BASE, cognitoDomain: 'https://*.amazoncognito.com' }),
+    ).toThrow(/wildcard/);
+  });
+
   it('keeps a local API on its own port', () => {
     const csp = parse(contentSecurityPolicy({ ...BASE, apiUrl: 'http://127.0.0.1:3001' }));
     expect(csp.get('connect-src')).toContain('http://127.0.0.1:3001');
@@ -163,6 +185,18 @@ describe('checkBuildEnv: a production build refuses an origin the CSP cannot hol
           `${name} is not an http(s) URL`,
         );
       }
+    }
+  });
+
+  it('requires the deck bucket’s own address when it is set', () => {
+    for (const bad of [
+      'https://s3.us-east-1.amazonaws.com/bali-decks-prod-eshshah',
+      'https://*.s3.us-east-1.amazonaws.com',
+      'http://bali-decks-prod-eshshah.s3.us-east-1.amazonaws.com',
+    ]) {
+      expect(() => checkBuildEnv({ ...GOOD, NEXT_PUBLIC_DECK_BUCKET_URL: bad }), bad).toThrow(
+        /NEXT_PUBLIC_DECK_BUCKET_URL is not/,
+      );
     }
   });
 
