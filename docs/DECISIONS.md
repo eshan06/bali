@@ -12,7 +12,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   and Help; `/` sends a student who said 13+ there; `/v1/me`'s live session gains its start, for the
   ring.** Built to [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4)
   (version 21): StudentHome, StudentHomeEmpty and StudentStates' "The classes didn't load", at 1440
-  and 390 px (#PR). **The routing** (`components/shell.tsx`, `app/page.tsx`): the side menu for a
+  and 390 px (#392). **The routing** (`components/shell.tsx`, `app/page.tsx`): the side menu for a
   student who passed the 13+ check (`homeFor`'s `student`), as for a teacher, its items Your classes
   (`/`, the boards' grid icon) and Help; Home gives them `StudentHome` (`components/student-home.tsx`).
   An account the check never passed keeps the invite card with its line for students, and a teacher
