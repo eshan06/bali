@@ -79,7 +79,7 @@ export function ReportsView({
       <header>
         <h1 className="text-page-title">Reports</h1>
         {/* The italic class alone: `font-sans` would set the upright face, slanted (PV4). */}
-        <p className="mt-1 text-body text-text-secondary italic">
+        <p className="text-body text-text-secondary italic">
           Patterns are conversation starters, not verdicts.
         </p>
       </header>
@@ -216,13 +216,13 @@ export function SessionsTable({
             const recap = `recap-${session.id}`;
             return [
               <tr key={session.id} className={isOpen ? 'bg-row-open' : undefined}>
-                <th scope="row" className={`${CELL} text-left font-normal`}>
+                <th scope="row" className={`${CELL} text-left font-normal whitespace-nowrap`}>
                   <button
                     type="button"
                     aria-expanded={isOpen}
                     aria-controls={isOpen ? recap : undefined}
                     onClick={() => onToggle(session.id)}
-                    className="group cursor-pointer rounded-sm text-left"
+                    className="group block cursor-pointer rounded-sm text-left"
                   >
                     <span className="block font-semibold underline-offset-2 group-hover:underline">
                       {row.day}

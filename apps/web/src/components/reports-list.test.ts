@@ -149,12 +149,16 @@ describe('the sessions’ table (Reports)', () => {
     for (const figure of html.match(/<td class="[^"]*"/g) ?? []) {
       expect(figure).toMatch(/\btext-right\b.*\bwhitespace-nowrap\b/);
     }
+    // Its session too, its day and times one line each: on a phone the box scrolls, never wraps.
+    for (const session of html.match(/<th scope="row" class="[^"]*"/g) ?? []) {
+      expect(session).toMatch(/\bwhitespace-nowrap\b/);
+    }
   });
 
   it('heads each row with its session, a button opening its report under it', () => {
     const shut = table();
     expect(shut).toMatch(
-      /<th scope="row" class="[^"]*"><button type="button" aria-expanded="false" class="group [^"]*">/,
+      /<th scope="row" class="[^"]*"><button type="button" aria-expanded="false" class="group block [^"]*">/,
     );
     expect(shut).not.toMatch(/bg-row-open|id="recap-/);
     const open = table('s2');
