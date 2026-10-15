@@ -153,6 +153,9 @@ phone's with one detail at most since PV9. Present is v2's since PV9 (2026-10-14
 ClassPresent's page, the class page's own parts one size up, its code in a well of
 its own and +5, +10 and End kept; after the bell PresentEnded's "Class is over"
 alone; and the reconnect pill there too, and for a first connect past 3 s.
+The unlock pop-up is v2's since PV10 (2026-10-14): ClassUnlock's, opened beside its
+tile's pulse, newest on top, each until it is closed, on the live page alone and never
+in Present; its Open student comes with PV11b's panel.
 Every
 portal source file is held to the tokens' utilities by `tokens.test.ts`, and
 since D2g the theme holds none of Tailwind's own colours, type sizes,
@@ -762,7 +765,9 @@ alone.) In the portal (D2f-1) it is the `animate-softpulse` utility
 (`globals.css`, pinned by `tokens.test.ts`), on the tile (the chip until PV8) of
 an unlock the stream brings while the grid is open, orange only (`softpulses`,
 `grid-state.ts`), once per unlock: never one the grid booted with or the stream's
-overlap replays, never a red tile.
+overlap replays, never a red tile. The same unlock opens the class page's pop-up beside it (PV10),
+and so does one whose tile stays still (an unlock under protection off, or one recorded late):
+every unlock is the teacher's to see.
 
 ## 8. Responsive behaviour
 

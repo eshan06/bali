@@ -426,7 +426,7 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     }
   });
 
-  it('beside them, only border-input, the side menu’s avatar (PV5), a dialog’s backdrop (PV6) and the reconnect pill’s dot (PV7)', () => {
+  it('beside them, only border-input, the side menu’s avatar (PV5), a dialog’s backdrop (PV6), the reconnect pill’s dot (PV7) and the unlock pop-up’s edge (PV10)', () => {
     const named = [...inline.keys()].filter((k) => k.startsWith('--color-'));
     const semanticNames = semantic(tokens.color.tokens).map((t) =>
       t.name === 'focus-ring-color' ? '--color-focus-ring' : `--color-${t.name}`,
@@ -437,9 +437,12 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
       '--color-border-input',
       '--color-pip',
       '--color-scrim',
+      '--color-unlock-edge',
     ]);
     // The reconnect pill's dot (DESIGN.md §4): stone-500, as v2.css draws it.
     expect(inline.get('--color-pip')).toBe('var(--bali-stone-500)');
+    // The unlock pop-up's 3 px top edge: orange-400, as v2.css's `.toast` draws it.
+    expect(inline.get('--color-unlock-edge')).toBe('var(--bali-orange-400)');
     expect(inline.get('--color-avatar-bg')).toBe('var(--bali-green-200)');
     expect(inline.get('--color-avatar-fg')).toBe('var(--bali-green-800)');
     // Its initials are small text: 4.5:1 at least, as every chip's ink on its fill.

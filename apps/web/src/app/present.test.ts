@@ -52,6 +52,13 @@ describe('the class page in Present while a session runs (ClassPresent)', () => 
     expect(page).not.toMatch(/NAV_LINK|ArrowLeft|DIVIDER/);
   });
 
+  it('keeps its slides icon while pressed, as ClassPresent draws it, never a check', () => {
+    const toggle = page.slice(page.indexOf('const presentToggle'));
+    expect(toggle.slice(0, toggle.indexOf('</Button>'))).toMatch(
+      /aria-pressed=\{present\}[^]*>\s*<Presentation size=\{16\} aria-hidden="true" \/>\s*Present\s*$/,
+    );
+  });
+
   it('follows the toggle with focus as it moves into the header and back', () => {
     const toggle = page.slice(page.indexOf('const presentToggle'));
     expect(toggle).toMatch(

@@ -228,12 +228,15 @@ describe('a tile on the live grid (PV8)', () => {
   it('draws a Left state’s flag before its words, the state’s own icon at the side', () => {
     const html = render(student({ state: 'unlocked', unlock: unlocked(null), endedAt: ago(60) }));
     const tile = parts(html);
-    // The lock at the side (20 px), then the flag (13 px) and, on a phone only, the lock again.
+    // The lock at the side (20 px); before the words, on a phone only, the lock again, then the
+    // flag (13 px), the lock first as PhoneClassLive draws "Left · unlocked".
     expect(tile.icons.map((icon) => icon.size)).toEqual([20, 13, 13]);
     expect(html).toMatch(/<svg[^>]*width="20"[^>]*class="lucide lucide-lock-open/);
-    expect(tile.state?.html).toMatch(/^<svg[^>]*class="lucide lucide-flag[^"]*"/);
-    expect(tile.icons[1]?.classes).not.toContain('sm:hidden');
-    expect(tile.icons[2]?.classes).toContain('sm:hidden');
+    expect(tile.state?.html).toMatch(
+      /^<svg[^>]*class="lucide lucide-lock-open[^"]*"[^]*?<\/svg><svg[^>]*class="lucide lucide-flag[^"]*"[^]*?<\/svg>Left/,
+    );
+    expect(tile.icons[1]?.classes).toContain('sm:hidden');
+    expect(tile.icons[2]?.classes).not.toContain('sm:hidden');
     // A plain Left: its flag at the side, none before its words but the phone's.
     const left = parts(render(student({ endedAt: ago(60) })));
     expect(left.icons.map((icon) => icon.size)).toEqual([20, 13]);

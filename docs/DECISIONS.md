@@ -8,6 +8,54 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-14** — **PV10: the unlock pop-up, built as drawn; it lives with the session's live
+  page; Open student waits for PV11b.** Built to
+  [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (version 21):
+  ClassUnlock and ClassUnlocks at 1440 px, ClassPresent at 1920 and PhoneClassLive at 390 (#381).
+  **The pop-up** (`components/unlock-popups.tsx`) is v2.css's `.toast`: white, a hairline and a 3 px
+  orange-400 top edge (the colour `unlock-edge`), 14 px corners, `shadow-3`, 14/10/14/16 px in; the
+  lock in its tint's 36 px well; "Ethan Park used Emergency Unlock" at 15/20 semibold (the tile name's
+  size) over "Nurse · 9:31 AM" at 13/18, the student named as their tile names them now (a joiner
+  the grid learns of after their unlock is named once the grid's refresh names them; santa's
+  review), the reason as the tile says it ("Other reason") and none as the recap says it ("No
+  reason given"); Close, 32 px. The stack is 380 px wide, 96 px from the
+  page frame's top and 18 px from its right, 10 px apart, newest on top, as ClassUnlocks draws it.
+  **When one opens:** for each unlock the live stream brings, the same cue as the tile's pulse
+  (`landsLive`), so never for one the page booted with; and for one whose tile stays still too (an
+  unlock under protection off, or one recorded late, its time saying when): every unlock is the
+  teacher's to see. **Never twice:** the stream's resume overlap is de-duped by `event_id` already
+  (the SSE client), and `popupsAfter` keeps every unlock it has opened for, so one shown, open or
+  closed, never opens again. A new reason (A20) changes the open pop-up's line and opens none.
+  **Each until it is closed, on the live page:** `LiveGrid` holds them, so they last as long as
+  ClassLive's page, where the board draws them; kept while Present is on (never on the projector,
+  not even in its markup) and shown again after it, those that came meanwhile on top. *A call made
+  here:* when the session ends (End or the bell) they go with the live page, rather than staying over
+  the page after the bell, which no board draws and where they covered Start; each unlock then shows
+  on its tile under How it ended and in the recap. A reload or leaving the page drops them too, the
+  unlock still on its tile. **In view as the page scrolls** (sticky, 18 px from the top, v2.css's
+  `.toast` default), where the board draws it absolute: at rest the two are one, as PV7 ruled for the
+  pill, and an unlock is never left above a grid scrolled to its last row. **A screen reader:** each
+  pop-up's words are an alert, announced as it opens without moving focus; Close is described by
+  them; closing one moves focus to the pop-up that takes its place, else the one above it.
+  Leaving Present announces the open ones again, since they were not shown meanwhile. **Open
+  student is not built:** its panel is PV11's, and a control that opens nothing would be a control
+  that does nothing, so PV11b adds it; the pop-up's layout holds no place for it meanwhile, its
+  words ending after the time. **Weak spots, as drawn:** on a computer the stack covers Present
+  until closed (ClassUnlock draws it so); on a phone, where no board draws a pop-up, v2.css's numbers
+  put it over the header's +5, +10 and End and the counts until closed. **Two fixes left by PV8 and
+  PV9:** Present's pressed button keeps its slides icon, as ClassPresent draws it, where it showed a
+  check; and a phone's "Left · unlocked" tile puts the lock before the flag, as PhoneClassLive draws
+  it. *Not covered:* an unlock committing in the milliseconds the page's grid boots, past the
+  snapshot's latest event, shows on its tile but opens no pop-up, the pulse's boundary since D2f-1.
+  **The screenshots** used dev's demo students: one unlock, three at once, Present with an unlock
+  arriving, back from Present, after End, and a phone's pop-ups and "Left · unlocked" tiles.
+  **The owner's calls** (2026-10-14, asked with the PR parked as a draft; each approved as built, as
+  recommended): the pop-up at phone width, which no board draws, as the screenshots show it, over
+  +5, +10 and End until closed; the pop-ups going with the live page at the session's end; the
+  pop-ups held while Present is on and shown after it with their reasons, a student's already back
+  in focus among them (a privacy call, santa's Reviewer B: the class page shows those reasons on
+  its tiles anyway); and the unlock in the milliseconds the grid boots, above, left as it is.
+
 - **2026-10-14** — **PV9: Present in v2's look, built as drawn; and the owner's two calls on PV8's
   results, the pill for a first connect past 3 s and a phone tile's one detail.** Built to
   [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (version 21):
