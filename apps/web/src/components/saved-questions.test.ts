@@ -453,7 +453,7 @@ describe('what Bali refuses while writing (LessonStates)', () => {
       'q-prompt-said',
     );
     expect(said({ prompt: `Q${tab}x`, options: ['a', 'b'], correctOption: null })).toContain(
-      `<p id="q-prompt-said" class="text-body">${UNSHOWABLE.replace("'", '&#x27;')}</p>`,
+      `<p id="q-prompt-said" class="text-body">${UNSHOWABLE.replaceAll("'", '&#x27;')}</p>`,
     );
   });
 
