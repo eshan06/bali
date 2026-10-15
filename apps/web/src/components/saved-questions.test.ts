@@ -569,10 +569,13 @@ describe('the page’s wiring (app/questions/page.tsx)', () => {
   it('holds Save, Cancel and Edit while a save is on its way, so its answer is always said', () => {
     expect(page).toMatch(/if \(!form \|\| form\.busy\) return;/);
     expect(page).toMatch(/if \(draft && !form\?\.busy\) show\(draft, \[PROMPT\]\);/);
-    expect(page).toMatch(/cancel: \(\) => \{\s*if \(form\?\.busy\) return;/);
+    expect(page).toMatch(/cancel: \(\) => \{\s*if \(!form\?\.busy\) show\(/);
     expect(page).toMatch(/if \(mine !== opened\.current \|\| !drawn\.current\) return;/);
-    // After a save whose answer never came, Cancel reads the list again: it may have landed.
-    expect(page).toMatch(/if \(unsaved\.current\) void reread\(\);/);
+    // Leaving a save whose answer never came (Cancel, Edit, Write) reads the list again: it may
+    // have landed, and the cards then show the drafts as they are, or that they couldn't load.
+    expect(page).toMatch(
+      /opened\.current \+= 1;[^]*?if \(unsaved\.current\) void read\(\);\s*unsaved\.current = null;/,
+    );
   });
 });
 

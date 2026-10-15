@@ -129,13 +129,22 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `refusalsOf`) is said under each field once Save is pressed, the field marked and the first one
   focused, then following the typing: LessonStates' "Write the question first.", "Keep each answer
   to 200 characters. This one has 214." and "Fill in this answer or remove it.". **A save**
-  (`saveDraft`) goes one at a time, Save held while it is sent; saved, the form closes and focus
-  goes to the card's Edit. Each is minted after the draft's own `eventId` and the last one whose
-  answer never came (part 1a), and Try again sends that one again under its id. The draft's own words
-  send nothing, so "Edited" is never a save that changed nothing. **Questions joins the menu**
+  (`saveDraft`) goes one at a time: Save, Try again, Cancel and every card's Edit wait for its
+  answer, so it is always said. Saved, the form closes and focus goes to the card's Edit, unless
+  words were typed while it was sent, which stay open over the draft now (`formAfter`). Each is
+  minted after the draft's own `eventId` and the last one whose answer never came (part 1a), and
+  Try again sends that one again under its id. The draft's own words send nothing, so "Edited" is
+  never a save that changed nothing, but while a save whose answer never came is held
+  (`nothingToSave`): it may have landed with other words, which these then put back (santa's round
+  1, both reviewers: a lost write). Leaving such a save, by Cancel, Edit or Write a question, reads
+  the list again, so each card shows its draft as Bali holds it, or the list says it didn't load.
+  **Questions joins the menu**
   (lucide's `message-circle-question-mark`, the boards' glyph by name). **What the canvas doesn't
   draw**, each built the plainest way its pieces allow, the owner's to rule (the PR parked as a
-  draft): Save held while it is sent; a save that didn't go through, above Save with Try again, in
+  draft): Save, Try again, Cancel and the cards' Edit held while a save is sent, the failure's line
+  kept, Try again held, while it sends again; the form left open over the saved draft when words
+  were typed while it was sent; the list read again ("Loading…") on leaving a save whose answer
+  never came; a save that didn't go through, above Save with Try again, in
   LessonStates' "Bali couldn't save the question. Check your connection and try again.", or "Bali
   couldn't save the question." for a refusal, the portal's words for a `429`, and the account
   deletion's words with no Try again; answered under another `eventId` (#318), "This question was
@@ -146,8 +155,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   Bali can't show. Type it again."; a fresh form, no words and two empty answers, Remove hidden at
   two and Add an answer at six; "Fill in this answer." where Remove isn't offered; Edit on another
   question while writing, which takes its words in place of what was written, as Cancel drops it.
-  *Known limit* (part 1a's): a new question's save whose answer never came, then other words saved,
-  makes a second draft if the first landed; both show in the list. **Screenshots**
+  *Known limits:* a new question's save whose answer never came, then other words saved, makes a
+  second draft if the first landed (part 1a's); both show in the list. The API client sets no
+  timeout, so a save that hangs holds Save, Try again, Cancel and the cards' Edit until the browser
+  gives up, and only the menu or a reload gets the teacher out (#334 tracks a timeout for the
+  polls). **Screenshots**
   (`.claude/shots/L7b-1/`): on dev, the owner's demo teacher writing the Questions board's four
   questions, editing one, Bali refusing an empty answer, the confirm and a cancelled writing; sharp
   renders of every state with the boards' data, beside the boards.

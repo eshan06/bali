@@ -89,15 +89,12 @@ export default function QuestionsPage() {
   /** The list without the draft `gone`. */
   const unlisted = (gone: string) =>
     setDrafts((d) => (Array.isArray(d) ? d.filter((x) => x.id !== gone) : d));
-  /** The list read again quietly, as it stands if the read fails. */
-  const reread = async () => {
-    const answer = await readDrafts(api);
-    if (answer.kind === 'read') setDrafts(answer.drafts);
-  };
 
   /** Open the form, a new question (`draft` null) or a draft's edit, or close it (undefined). */
   function show(draft: SavedQuestion | null | undefined, to: string[]) {
     opened.current += 1;
+    // A save whose answer never came may have landed: the list reads the drafts as they are.
+    if (unsaved.current) void read();
     unsaved.current = null;
     const start = draft ? trimmed(draft) : NEW;
     setForm(
@@ -186,10 +183,7 @@ export default function QuestionsPage() {
         },
         save: () => void save(),
         cancel: () => {
-          if (form?.busy) return;
-          // A save whose answer never came may have landed: the card shows the draft as it is.
-          if (unsaved.current) void reread();
-          show(undefined, form?.draft ? [editId(form.draft.id), WRITE] : [WRITE]);
+          if (!form?.busy) show(undefined, form?.draft ? [editId(form.draft.id), WRITE] : [WRITE]);
         },
         ask: (draftId) => {
           removal(draftId, { busy: false, failure: null });
