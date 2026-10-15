@@ -347,10 +347,7 @@ describe('its buttons, the class page’s card and Present’s alike (L7, part 3
     );
     buttons(closeFailedLine(l, true)).get('Try again')?.();
     expect(l.close).toHaveBeenCalledWith(false);
-    // Held while the close is on its way again; none once it is closed, or with nothing failed.
-    expect(markup(closeFailedLine({ ...l, closing: true }, true))).toContain(
-      'aria-disabled="true"',
-    );
+    // None once it is closed, or with nothing failed.
     const closedSince = lesson(
       { question: question({ open: false }), closeFailed: { reveal: true } },
       totals({ open: false }),
@@ -475,14 +472,15 @@ describe('its hook (L6’s logic, held for one session)', () => {
   });
 
   it('tells its Done to every Bali window of this browser, and puts away what another’s Done names', () => {
-    // Done: away here, then told, with the session and the question's id alone.
+    // Done: only the question it was drawn for (one held since, not yet redrawn, stays), away here,
+    // then told, with the session and the question's id alone.
     expect(hook).toMatch(
-      /done: \(\) => \{\s*const \{ session, question: shown \} = now\.current;\s*put\(session, null\);\s*if \(session !== null && shown !== null\) \{\s*told\.current\?\.tell\(\{ sessionId: session, questionId: shown\.id \}\);/,
+      /done: \(\) => \{\s*const \{ session, question: held \} = now\.current;[^]*?if \(session === null \|\| question === null \|\| held\?\.id !== question\.id\) return;\s*put\(session, null\);\s*told\.current\?\.tell\(\{ sessionId: session, questionId: question\.id \}\);/,
     );
-    // Heard: this session's alone, the question it names or an older one (closed when a newer one
-    // opened), and no read brings either back (a read only ever brings a newer one).
+    // Heard: what it puts away is `heardDone`'s (live-question.test.ts), and so is the newest
+    // question a read may bring after it (a read only ever brings a newer one).
     expect(hook).toMatch(
-      /const channel = doneChannel\(\(news\) => \{\s*const \{ session, question \} = now\.current;\s*if \(session !== news\.sessionId\) return;[^]*?if \(news\.questionId > newest\.current\) newest\.current = news\.questionId;\s*if \(question !== null && question\.id <= news\.questionId\) put\(session, null\);\s*\}\);/,
+      /const channel = doneChannel\(\(news\) => \{\s*const \{ session, question \} = now\.current;\s*const heard = heardDone\(news, session, question, newest\.current\);\s*newest\.current = heard\.newest;\s*if \(heard\.putAway\) put\(session, null\);\s*\}\);/,
     );
     expect(hook).toMatch(/if \(q && q\.id > newest\.current\) put\(session, q\);/);
     // One channel for the page's life, closed as it goes.

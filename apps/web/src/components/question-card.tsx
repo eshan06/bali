@@ -14,6 +14,7 @@ import {
   doneChannel,
   type Failure,
   failureOf,
+  heardDone,
   type OpenAnswer,
   type OpenAttempt,
   openAttemptFor,
@@ -157,11 +158,9 @@ export function useLiveQuestion(sessionId: string | null) {
   useEffect(() => {
     const channel = doneChannel((news) => {
       const { session, question } = now.current;
-      if (session !== news.sessionId) return;
-      // Closed, and so is any older question of its session (the newer one's open closed it), so
-      // no read brings either back.
-      if (news.questionId > newest.current) newest.current = news.questionId;
-      if (question !== null && question.id <= news.questionId) put(session, null);
+      const heard = heardDone(news, session, question, newest.current);
+      newest.current = heard.newest;
+      if (heard.putAway) put(session, null);
     });
     told.current = channel;
     return () => {
@@ -253,11 +252,11 @@ export function useLiveQuestion(sessionId: string | null) {
     closeFailed: question && closeFailed?.id === question.id ? closeFailed : null,
     close: (reveal) => void close(reveal),
     done: () => {
-      const { session, question: shown } = now.current;
+      const { session, question: held } = now.current;
+      // Only the question this Done was drawn for: one held since, not yet redrawn, stays.
+      if (session === null || question === null || held?.id !== question.id) return;
       put(session, null);
-      if (session !== null && shown !== null) {
-        told.current?.tell({ sessionId: session, questionId: shown.id });
-      }
+      told.current?.tell({ sessionId: session, questionId: question.id });
     },
   };
   return { lesson, onEvent, ask, opening, forgetAsk };

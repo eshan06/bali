@@ -14,6 +14,7 @@ import {
   DONE_CHANNEL,
   doneChannel,
   type DoneNews,
+  heardDone,
   LONGEST_WAIT_MS,
   openAttemptFor,
   openQuestion,
@@ -344,6 +345,57 @@ describe('doneChannel: a Done told to every Bali window of this browser (L7, par
     }
     doneChannel(vi.fn(), Named as unknown as typeof BroadcastChannel).close();
     expect(names).toEqual([DONE_CHANNEL]);
+  });
+
+  describe('heardDone: what a window puts away on hearing one', () => {
+    // UUIDv7s, minted in order: an older question sorts first.
+    const OLDER = '01924b2c-0000-7000-8000-000000000002';
+    const NAMED = QUESTION;
+    const NEWER = '01924b2c-0000-7000-8000-000000000004';
+    const OTHER = '01924b2c-0000-7000-8000-0000000000aa';
+    const done = (questionId = NAMED, sessionId = SESSION): DoneNews => ({ sessionId, questionId });
+
+    it('puts away the question it names, and no read brings it back', () => {
+      expect(heardDone(done(), SESSION, { id: NAMED }, OLDER)).toEqual({
+        putAway: true,
+        newest: NAMED,
+      });
+      expect(heardDone(done(), SESSION, { id: NAMED }, NAMED)).toEqual({
+        putAway: true,
+        newest: NAMED,
+      });
+    });
+
+    it('puts away an older question of its session, closed when the named one opened', () => {
+      expect(heardDone(done(), SESSION, { id: OLDER }, OLDER)).toEqual({
+        putAway: true,
+        newest: NAMED,
+      });
+    });
+
+    it('keeps a newer question, and the newest question it has shown', () => {
+      expect(heardDone(done(), SESSION, { id: NEWER }, NEWER)).toEqual({
+        putAway: false,
+        newest: NEWER,
+      });
+    });
+
+    it('holding none, puts nothing away but never shows the named one after', () => {
+      expect(heardDone(done(), SESSION, null, '')).toEqual({ putAway: false, newest: NAMED });
+    });
+
+    it('changes nothing for another session’s news, or with no session', () => {
+      for (const [news, session] of [
+        [done(NAMED, OTHER), SESSION],
+        [done(), OTHER],
+        [done(), null],
+      ] as const) {
+        expect(heardDone(news, session, { id: NAMED }, OLDER)).toEqual({
+          putAway: false,
+          newest: OLDER,
+        });
+      }
+    });
   });
 
   it('tells and hears nothing in a browser without one: Done stays the window’s own', () => {

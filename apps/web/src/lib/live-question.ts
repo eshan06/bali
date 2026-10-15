@@ -195,6 +195,25 @@ export function doneChannel(
   };
 }
 
+/**
+ * What a window showing `shown` in `sessionId` (the newest question it has shown, `newest`) does on
+ * hearing another window's Done (`news`). Another session's news changes nothing. Of its own
+ * session, it puts away the question named, or an older one (closed when a newer one opened), never
+ * a newer one; and no read brings back a question as old as the one named (`newest`).
+ */
+export function heardDone(
+  news: DoneNews,
+  sessionId: string | null,
+  shown: Pick<TeacherQuestion, 'id'> | null,
+  newest: string,
+): { putAway: boolean; newest: string } {
+  if (news.sessionId !== sessionId) return { putAway: false, newest };
+  return {
+    putAway: shown !== null && shown.id <= news.questionId,
+    newest: news.questionId > newest ? news.questionId : newest,
+  };
+}
+
 /** A results poll as the card shows it. */
 export interface ResultsState {
   /**
