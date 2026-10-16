@@ -87,6 +87,66 @@ export function Ring({ share, box, stroke }: { share: number; box: number; strok
   );
 }
 
+/**
+ * A live card (v2.css's `.livecard`; StudentHome's, W3, and Home's, Main, PV17b): the live edge, 16 px
+ * corners, 22 px in, its parts 16 px apart.
+ */
+export const LIVE_CARD =
+  'flex flex-col gap-4 rounded-live border border-live-edge bg-surface-card p-5.5 shadow-1';
+
+/**
+ * A live card's head (`.lc-head`; StudentHome's, W3, and Home's, Main, PV17b): the 46 px ring, the
+ * share of the session left, its track alone until the session's start is known; the name over its
+ * line; the time left on this computer's clock (`now`) to the server's bell, the bell under it. Home's
+ * card says its name alone while its session is read or didn't load (HomeMoreStates).
+ */
+export function LiveCardHead({
+  id,
+  name,
+  line = null,
+  startedAt = null,
+  endsAt = null,
+  now,
+}: {
+  id: string;
+  name: string;
+  line?: string | null;
+  startedAt?: string | null;
+  endsAt?: string | null;
+  now: number;
+}) {
+  return (
+    <div className="flex items-center gap-3.5">
+      <Ring
+        share={startedAt && endsAt ? shareLeft(startedAt, endsAt, now) : 0}
+        box={46}
+        stroke={5}
+      />
+      <div className="min-w-0 flex-1">
+        <h2 id={id} className="text-h3 wrap-anywhere">
+          {name}
+        </h2>
+        {line === null ? null : (
+          <p className="text-countdown-sub text-text-secondary wrap-anywhere">{line}</p>
+        )}
+      </div>
+      {endsAt === null ? null : (
+        <p className="flex shrink-0 flex-col text-right">
+          <span className="font-num text-home-countdown tabular-nums">
+            {timeLeft(Date.parse(endsAt) - now)}
+          </span>
+          <span className="text-cell-sub text-text-secondary">
+            ends <time dateTime={endsAt}>{bellTime(endsAt)}</time>
+          </span>
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** The class counted, as ClassLive's header and Home's live card (Main) say it. */
+export const joinedLine = ({ joined, total }: StateCounts) => `Live · ${joined} of ${total} joined`;
+
 /** The header's type: ClassLive's, and ClassPresent's one size up, read from the back of the room. */
 const TYPE = {
   live: {
@@ -170,7 +230,7 @@ export function LiveHeader({
 }) {
   const now = useClock(over === null ? endsAt : null);
   const type = TYPE[present ? 'present' : 'live'];
-  const line = over ?? (counts ? `Live · ${counts.joined} of ${counts.total} joined` : 'Live');
+  const line = over ?? (counts ? joinedLine(counts) : 'Live');
   const share = over !== null ? 1 : startedAt && endsAt ? shareLeft(startedAt, endsAt, now) : 0;
   return (
     <header className="flex flex-wrap items-center gap-x-4.5 gap-y-3.5 max-sm:gap-x-3.5">

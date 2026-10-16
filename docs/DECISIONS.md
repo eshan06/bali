@@ -8,6 +8,47 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-16** — **PV17b: Home's live card (#423); the latest unlock is the newest on the grid;
+  Home's Present opens the class in Present.** Built to [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4):
+  Main's live card, PhoneHome and HomeMoreStates' live card, and one board drawn first as
+  intermediate states (version 72, its stale line padded in 73): HomeLiveStates (no unlock on the
+  grid, the live feed lost, two classes live at once, a session ending while Home is open, a long
+  class name). HomeInterim is redrawn with the card, the page until PV17c; HomeInterimPhone is
+  relabelled as no longer built, PhoneHome drawing a phone's Home whole (Recent activity is hidden
+  there). **One grid, not two:** the card is the class page's own `LiveGrid` (its snapshot, its live
+  feed, its 15 s read), which hands the card the grid as it stands through a new `card` prop
+  (`GridNow`: the students, the clock, a failed read with its retry, its health), so Home makes no
+  read and holds no stream logic of its own. *Weighed:* the grid's logic moved into a hook both
+  share (some 150 lines moved, the class page's tests re-pinned), and `tiles={false}`, whose lines
+  are the class page's own words where HomeMoreStates draws Home's. **The card** (`LiveCardView`,
+  `components/home.tsx`): the student home's head, now shared (`LiveCardHead`, `LIVE_CARD`), the ring
+  from the snapshot's start, "Live · 25 of 28 joined" (`joinedLine`, LiveHeader's) and the countdown;
+  the six counts (`LiveCounts`); Open the class and Present, each described by the class's name, so a
+  list of links tells two cards apart; the live feed lost or quiet in the grid's own words in v2.css's
+  `.notice` under the counts; Loading this session… and Couldn't load this session. with the grid's
+  own Try again (HomeMoreStates). **The latest unlock** (`latestUnlock`, `lib/grid-state.ts`): the
+  newest unlock a chip carries, by when it was recorded (`Student.unlock.at`, new), its student named
+  as their tile names them and its time, Main's words and never its reason; none while no chip
+  carries one. A chip carries an unlock only since its student last tapped in or returned to focus,
+  and never a late one, so the line goes as they come back, and a reload says the same, the snapshot
+  carrying exactly what the stream did. *Weighed:* the session's newest unlock whatever followed,
+  which after a reload only the events read or the report can give, so a reload would change it.
+  **Present** is a link to the class page with `?present`, which turns Present on and keeps it for
+  the tab as its toggle does, the address forgetting it (`replaceState`), so it opens in a new tab
+  too; hidden under 640 px, as PhoneHome and v2.css hide it. *Weighed:* keeping Present for the tab
+  on the link's click, which a ctrl-click also does to the tab it leaves. **Its bell and its end:** a
+  card for each class live by this computer's clock to the server's bell, as its row is, gone at the
+  bell; a later bell in a snapshot (time added on the class page) reads the account again, so the row,
+  the date's line and the card keep to it; the server ending the session (End elsewhere, the sweep)
+  takes the card off at once and reads the account again. Each live card is one more stream for the
+  account (5 at most), closed as Home closes. **Seen:** on dev as the demo teacher, in the owner's tab
+  (one session, four students tapped in, Ana's Emergency Unlock with a reason, Present from the card
+  opening the class in Present and turned off again, Open the class, Ana back in focus taking the
+  line off live, the session ended with Home open taking its card off) and in a browser of its own
+  signed in by the demo world (two classes live, one ended from outside Home, 390 px); the card's other
+  states through the real component; sharp beside every board. About 360 lines changed without tests,
+  so one PR.
+
 - **2026-10-16** — **PV17a: Home's first part (#422); the account's failure headed and its Try
   again held.** Built to [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4):
   Main, HomeIdle, HomeNew, HomeNoName and HomeStates' account states, and four boards drawn first as

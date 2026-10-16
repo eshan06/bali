@@ -15,6 +15,7 @@ import {
   gridDisplay,
   landsLive,
   lastSeenNote,
+  latestUnlock,
   mergeSnapshot,
   minutesSinceContact,
   silentNote,
@@ -1134,5 +1135,89 @@ describe('the health line in words (D2f)', () => {
     for (const reason of ['reconnecting', 'stale'] as const) {
       expect(staleWords({ reason, secondsAgo: 5 })).not.toMatch(/[—–]/);
     }
+  });
+});
+
+describe('Home’s latest unlock (PV17b; Main’s live card)', () => {
+  const at = (minute: number) => `2026-01-01T08:${String(minute).padStart(2, '0')}:00.000Z`;
+  const unlock = (seq: number, id: string, minute: number, payload: Record<string, unknown> = {}) =>
+    evt(seq, 'unlock', id, at(minute), { reason: 'nurse', ...payload });
+  const latest = (s: Students) => {
+    const found = latestUnlock(s);
+    return found === null ? null : { who: found.studentId, at: found.unlock?.at.toISOString() };
+  };
+
+  it('is none while no chip carries an unlock', () => {
+    expect(latestUnlock(fromSnapshot(snapshot(1, [{ id: 'ana' }, { id: 'ben' }])))).toBeNull();
+    expect(latestUnlock({})).toBeNull();
+  });
+
+  it('is the newest unlock by when it was recorded, the stream’s as the snapshot’s', () => {
+    let s = fromSnapshot(
+      snapshot(5, [
+        {
+          id: 'ana',
+          state: 'unlocked',
+          unlock: { eventId: 'ev-a', reason: 'bathroom', recordedAs: null, occurredAt: at(3) },
+        },
+        { id: 'ben' },
+        { id: 'cal' },
+      ]),
+    );
+    expect(latest(s)).toEqual({ who: 'ana', at: at(3) });
+    s = applyEvent(s, unlock(6, 'ben', 4));
+    expect(latest(s)).toEqual({ who: 'ben', at: at(4) });
+    // One recorded earlier, landing later (an offline phone's): the newest stays the newest.
+    s = applyEvent(s, unlock(7, 'cal', 2));
+    expect(latest(s)).toEqual({ who: 'ben', at: at(4) });
+  });
+
+  it('keeps its time through a change of reason (A20)', () => {
+    let s = applyEvent(fromSnapshot(snapshot(1, [{ id: 'ana' }])), unlock(2, 'ana', 4));
+    s = applyEvent(
+      s,
+      evt(3, 'unlock_reason_changed', 'ana', at(6), { unlock_event_id: 'ev-2', reason: 'other' }),
+    );
+    expect(latest(s)).toEqual({ who: 'ana', at: at(4) });
+  });
+
+  it('is gone once its student is back in focus, the one before it then the newest', () => {
+    let s = fromSnapshot(snapshot(1, [{ id: 'ana' }, { id: 'ben' }]));
+    s = applyEvent(s, unlock(2, 'ana', 3));
+    s = applyEvent(s, unlock(3, 'ben', 4));
+    s = applyEvent(s, evt(4, 'refocus', 'ben', at(5)));
+    expect(latest(s)).toEqual({ who: 'ana', at: at(3) });
+    s = applyEvent(s, evt(5, 'tap_in', 'ana', at(6)));
+    expect(latestUnlock(s)).toBeNull();
+  });
+
+  it('counts an unlock under protection off, as its chip carries it; never a late one', () => {
+    let s = fromSnapshot(snapshot(1, [{ id: 'ana', state: 'protection_off' }, { id: 'ben' }]));
+    s = applyEvent(s, unlock(2, 'ana', 4, { recorded_as: 'protection_off' }));
+    expect(latest(s)).toEqual({ who: 'ana', at: at(4) });
+    // Ben's own return went ahead of it: recorded, on no chip, and so not Home's either.
+    s = applyEvent(s, unlock(3, 'ben', 5, { recorded_as: 'superseded' }));
+    expect(latest(s)).toEqual({ who: 'ana', at: at(4) });
+  });
+
+  it('says the same after a reload: the snapshot carries what the stream had', () => {
+    const live = applyEvent(fromSnapshot(snapshot(1, [{ id: 'ana' }])), unlock(2, 'ana', 4));
+    const reloaded = fromSnapshot(
+      snapshot(2, [
+        {
+          id: 'ana',
+          state: 'unlocked',
+          unlock: { eventId: 'ev-2', reason: 'nurse', recordedAs: null, occurredAt: at(4) },
+        },
+      ]),
+    );
+    expect(latest(reloaded)).toEqual(latest(live));
+  });
+
+  it('settles two at one instant by their event ids, so every tab names the same student', () => {
+    let s = fromSnapshot(snapshot(1, [{ id: 'ana' }, { id: 'ben' }]));
+    s = applyEvent(s, { ...unlock(2, 'ana', 4), eventId: 'ev-b' });
+    s = applyEvent(s, { ...unlock(3, 'ben', 4), eventId: 'ev-a' });
+    expect(latest(s)?.who).toBe('ana');
   });
 });

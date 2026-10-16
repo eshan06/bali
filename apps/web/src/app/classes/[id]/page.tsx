@@ -271,12 +271,19 @@ export default function ClassDetailPage() {
 
   // The class's last pick on this computer, and Present as this tab left it, read once the page is
   // in the browser (never at render, where the server has no storage), so before the class's read
-  // can show a grid or the recap; a length that isn't a preset reopens Other with it.
+  // can show a grid or the recap; a length that isn't a preset reopens Other with it. Opened from
+  // Home's Present (`?present`, Main), Present is on and kept for the tab as its toggle keeps it, and
+  // the address forgets it, so a reload or a way back opens as the tab left it.
   useEffect(() => {
     const remembered = pickFor(rememberedMinutes(classId));
     setPick(remembered.pick);
     setOther(remembered.other);
-    setPresent(rememberedPresent(classId));
+    const asked = new URLSearchParams(window.location.search).has('present');
+    if (asked) {
+      rememberPresent(classId, true);
+      window.history.replaceState(null, '', `/classes/${classId}`);
+    }
+    setPresent(asked || rememberedPresent(classId));
   }, [classId]);
 
   // The grid says when the server marks its session over (the bell's sweep, an End from another

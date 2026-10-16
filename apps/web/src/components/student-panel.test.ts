@@ -90,9 +90,10 @@ const PRIVATE = 'Only you see this panel. Present never shows it, or an unlock�
 
 describe('the student panel’s states, as PanelStates draws them', () => {
   it('names the student and their state from the grid while the session is read', () => {
-    const html = render(student({ state: 'unlocked', unlock: { eventId: 'v', reason: 'nurse' } }), {
-      kind: 'loading',
-    });
+    const html = render(
+      student({ state: 'unlocked', unlock: { eventId: 'v', reason: 'nurse', at: at(24) } }),
+      { kind: 'loading' },
+    );
     expect(head(html)).toBe('Ethan Park Unlocked');
     expect(html).toMatch(
       /<h3[^>]*>This session<\/h3><p role="status" class="text-body text-text-secondary">Loading this session…<\/p>/,
@@ -119,7 +120,10 @@ describe('the student panel’s states, as PanelStates draws them', () => {
 
   it('says each unlock with its reason, and none as the recap says it', () => {
     const html = render(
-      student({ state: 'protection_off', unlock: { eventId: 'e-u', reason: 'nurse' } }),
+      student({
+        state: 'protection_off',
+        unlock: { eventId: 'e-u', reason: 'nurse', at: at(24) },
+      }),
       ready(
         event('tap_in', 5),
         { ...event('unlock', 24, { reason: 'nurse' }), eventId: 'e-u' },
@@ -170,7 +174,7 @@ describe('the student panel’s states, as PanelStates draws them', () => {
   it('draws Left, and Left · unlocked with the state’s own icon', () => {
     const left = student({
       state: 'unlocked',
-      unlock: { eventId: 'e-o', reason: 'other' },
+      unlock: { eventId: 'e-o', reason: 'other', at: at(20) },
       endedAt: at(22),
       lastSeenAt: at(22),
     });

@@ -42,9 +42,10 @@ export interface Student {
   /**
    * The student's latest unlock since they last tapped in or refocused: the
    * chip shows it, with its reason — a protection-off chip too, which it never
-   * relabels. Its event id is what a change of its reason names (A20).
+   * relabels. Its event id is what a change of its reason names (A20); `at`,
+   * when it was recorded, is what Home's live card says of it (PV17b).
    */
-  unlock: { eventId: string; reason: UnlockReason | null } | null;
+  unlock: { eventId: string; reason: UnlockReason | null; at: Date } | null;
   /**
    * A record of theirs here came from a phone clock set ahead of the server's
    * (S9): the chip carries a "Clock off" badge beside its state, never instead
@@ -77,7 +78,7 @@ const NOTHING_LIVE: readonly unknown[] = [
  */
 function applyUnlock(s: Student, eventId: string, reason: unknown, note: unknown, at: Date): void {
   if (note === ('superseded' satisfies UnlockRecordedAs)) return;
-  s.unlock = { eventId, reason: isUnlockReason(reason) ? reason : null };
+  s.unlock = { eventId, reason: isUnlockReason(reason) ? reason : null, at };
   s.state =
     note === ('protection_off' satisfies UnlockRecordedAs) || s.state === 'protection_off'
       ? 'protection_off'
@@ -371,6 +372,26 @@ export function softpulses(s: Student, display: GridDisplay, live: ReadonlySet<s
     live.has(s.unlock.eventId) &&
     (display === 'unlocked' || display === 'left_unprotected')
   );
+}
+
+/**
+ * Home's latest unlock (PV17b; Main's live card): the student whose chip carries the newest unlock,
+ * by when it was recorded (its event id, a UUIDv7, settling a tie); null when no chip carries one.
+ * A chip carries one only since its student last tapped in or returned to focus, and never a late
+ * one (`applyUnlock`), as the snapshot and the stream both read it, so a reload says the same.
+ */
+export function latestUnlock(students: Students): Student | null {
+  let latest: Student | null = null;
+  for (const s of Object.values(students)) {
+    const [mine, top] = [s.unlock, latest?.unlock ?? null];
+    if (mine === null) continue;
+    const newer =
+      top === null ||
+      mine.at.getTime() > top.at.getTime() ||
+      (mine.at.getTime() === top.at.getTime() && mine.eventId > top.eventId);
+    if (newer) latest = s;
+  }
+  return latest;
 }
 
 const REASON_TEXT: Record<UnlockReason, string> = {

@@ -4,7 +4,6 @@ import type { MeResponse } from '@bali/shared';
 import Link from 'next/link';
 import { useEffect, useId, useState } from 'react';
 
-import { bellTime } from '@/lib/session-controls';
 import {
   followLesson,
   homeClasses,
@@ -20,7 +19,7 @@ import {
 import { useApi } from '@/lib/use-api';
 
 import { Button, buttonClass } from './button';
-import { Ring, shareLeft, timeLeft, useClock } from './live-header';
+import { LIVE_CARD, LiveCardHead, Ring, useClock } from './live-header';
 import { TextLink } from './text-link';
 import { CantReach, YourPhone } from './your-phone';
 
@@ -56,29 +55,15 @@ function LiveCard({ live, onGone }: { live: InSession; onGone: () => void }) {
   }, [api, sessionId, onGone]);
 
   return (
-    <section
-      aria-labelledby={id}
-      className="flex flex-col gap-4 rounded-live border border-live-edge bg-surface-card p-5.5 shadow-1"
-    >
-      <div className="flex items-center gap-3.5">
-        <Ring share={shareLeft(startedAt, endsAt, now)} box={46} stroke={5} />
-        <div className="min-w-0 flex-1">
-          <h2 id={id} className="text-h3 wrap-anywhere">
-            {live.name}
-          </h2>
-          <p className="text-countdown-sub text-text-secondary wrap-anywhere">
-            {teacher ? `${teacher} · in class now` : 'In class now'}
-          </p>
-        </div>
-        <p className="flex shrink-0 flex-col text-right">
-          <span className="font-num text-home-countdown tabular-nums">
-            {timeLeft(Date.parse(endsAt) - now)}
-          </span>
-          <span className="text-cell-sub text-text-secondary">
-            ends <time dateTime={endsAt}>{bellTime(endsAt)}</time>
-          </span>
-        </p>
-      </div>
+    <section aria-labelledby={id} className={LIVE_CARD}>
+      <LiveCardHead
+        id={id}
+        name={live.name}
+        line={teacher ? `${teacher} · in class now` : 'In class now'}
+        startedAt={startedAt}
+        endsAt={endsAt}
+        now={now}
+      />
       <div className="flex flex-wrap items-center gap-2.5">
         <Link href={`/lessons/${live.id}/${sessionId}`} className={buttonClass('primary')}>
           Open the lesson

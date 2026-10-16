@@ -10,6 +10,7 @@ import { staleness, staleWords, type Student } from '../lib/grid-state';
 import {
   COLUMNS,
   FIRST_CONNECT_MS,
+  type GridNow,
   healthOf,
   LiveGrid,
   PRESENT_COLUMNS,
@@ -45,7 +46,7 @@ function student(over: Partial<Student> = {}): Student {
     ...over,
   };
 }
-const unlocked = (reason: UnlockReason | null) => ({ eventId: 'v1', reason });
+const unlocked = (reason: UnlockReason | null) => ({ eventId: 'v1', reason, at: ago(60) });
 
 const render = (s: Student, present = false, pulse = false) =>
   renderToStaticMarkup(createElement(Tile, { student: s, now: NOW, present, pulse }));
@@ -454,11 +455,43 @@ describe('the stream’s first connect (PV7’s find; the owner, 2026-10-14)', (
 
   it('is how the grid reads its stream’s health, timed from the stream’s own start', () => {
     const source = readFileSync(fileURLToPath(new URL('./live-grid.tsx', import.meta.url)), 'utf8');
+    // Once the grid is read; none before, when there is nothing yet to call out of date.
     expect(source).toMatch(
-      /const stale = staleness\(\{\s*status: healthOf\(status, now\.getTime\(\) - connectStart\.current\),/,
+      /const stale =\s*students === null\s*\? null\s*: staleness\(\{\s*status: healthOf\(status, now\.getTime\(\) - connectStart\.current\),/,
     );
     // Started as the stream is made, after the grid's own read: the read's time is no connect's.
     expect(source).toMatch(/connectStart\.current = Date\.now\(\);\s*sse = createSseClient\(\{/);
+  });
+});
+
+describe('the grid handed to Home’s live card (PV17b)', () => {
+  it('hands the card the grid as it stands, in place of all it draws: before its read, no students, no failure, no health', () => {
+    const seen: GridNow[] = [];
+    const html = renderToStaticMarkup(
+      createElement(LiveGrid, {
+        sessionId: 's1',
+        card: (grid) => {
+          seen.push(grid);
+          return createElement('p', null, 'the card');
+        },
+      }),
+    );
+    expect(html).toBe('<p>the card</p>');
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toMatchObject({ students: null, error: null, stale: null });
+    expect(seen[0]?.now).toBeInstanceOf(Date);
+    expect(typeof seen[0]?.retry).toBe('function');
+  });
+
+  it('runs every hook first, so the snapshot, the stream and the 15 s read are the class page’s own', () => {
+    const at = source.indexOf('if (card) {');
+    expect(at).toBeGreaterThan(-1);
+    expect(at).toBeLessThan(source.indexOf('if (error) {'));
+    expect(source.slice(at)).not.toMatch(/\buse[A-Z]\w*\(/);
+    // A boot that failed is read again by the grid's own Try again; once over, no health to say.
+    expect(source).toMatch(
+      /const retry = \(\) => setAttempt\(\(n\) => n \+ 1\);\s*return card\(\{ students, now, error, retry, stale: over \? null : stale \}\);/,
+    );
   });
 });
 
