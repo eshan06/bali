@@ -577,7 +577,12 @@ describe('on the class page', () => {
   it('asks through the live question either way; asked, the panel goes and focus goes to it', () => {
     expect(page.match(/onAsk=\{ask\}/g)).toHaveLength(2);
     expect(page).toMatch(
-      /const asked = \(\) => \{\s*setSide\(\(cur\) => \(cur === 'ask' \? null : cur\)\);\s*window\.requestAnimationFrame\(\(\) => document\.getElementById\(`\$\{id\}-q`\)\?\.focus\(\)\);\s*\};/,
+      /const asked = \(\) => \{\s*if \(sideNow\.current === 'decks'\) return;\s*setSide\(null\);\s*window\.requestAnimationFrame\(\(\) => document\.getElementById\(`\$\{id\}-q`\)\?\.focus\(\)\);\s*\};/,
+    );
+    // The decks' panel, opened while an ask was on its way, keeps its place and its focus (santa's
+    // review): the panel open now, as the last render left it.
+    expect(page).toMatch(
+      /const sideNow = useRef\(side\);\s*useEffect\(\(\) => \{\s*sideNow\.current = side;\s*\}, \[side\]\);/,
     );
     // What was written goes once it is asked; a question picked leaves it as it was.
     expect(page).toMatch(

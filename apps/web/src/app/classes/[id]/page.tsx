@@ -200,9 +200,14 @@ export default function ClassDetailPage() {
     )?.focus();
   };
   // Asked: the panel goes, and focus to the question in the card; the decks' panel, opened while the
-  // ask was on its way, stays (santa's review).
+  // ask was on its way, stays, focus with it (santa's review).
+  const sideNow = useRef(side);
+  useEffect(() => {
+    sideNow.current = side;
+  }, [side]);
   const asked = () => {
-    setSide((cur) => (cur === 'ask' ? null : cur));
+    if (sideNow.current === 'decks') return;
+    setSide(null);
     window.requestAnimationFrame(() => document.getElementById(`${id}-q`)?.focus());
   };
   // Shown: the panel goes, and focus to the slide card's title; to the question, when one shows
