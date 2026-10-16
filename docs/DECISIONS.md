@@ -8,6 +8,47 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-16** — **PV16a: Classes, the page (#PV16A); the menu's foot for a long name; PV16 in
+  two.** Built to [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4):
+  Classes, ClassesEmpty, HomeStates' lines for the list and the block, and four boards drawn first as
+  intermediate states (versions 65 and 66): ClassesStates (New class's states, for PV16b, and the
+  cards': a class just made, one student, a last session a week ago or more, one in another year, a
+  live class at its bell, the list's failure as the page opens), ClassesPhone (the page at 390 px),
+  MenuNameStates (the foot) and ClassesInterim (below). **In two:** PV16 came to about 590 changed
+  lines without tests, so the worker split it and the conductor took the split: PV16a the page,
+  PV16b New class's dialog and ClassesCreated's "is ready", with the shared Copy hook. **Until PV16b**
+  Classes has no New class at its head and the first class's card no Create a class
+  (ClassesInterim, drawn first); Home's create row makes classes meanwhile, and no teacher uses the
+  portal before the pilot (the conductor's call). **The page** (`app/classes/page.tsx`,
+  `components/classes.tsx`): the classes from the shell's one read of the account, read again as
+  the page opens; a card per class, the whole card its link (Classes' `.classcard`, 18 × 20 px in):
+  the name at the new portal size `card-name` (17/22, semibold), its students ("1 student", "0
+  students") and its last session as PV2 gives it, or "no sessions yet". The last session's day is by
+  this computer's calendar: today with its start time ("today, 8:00 AM", as Classes and HomeIdle
+  draw it), a day of the last six by its weekday ("Friday"), else its date ("Oct 2"), its year once
+  not this one; *weighed:* "yesterday", which no board draws. While its session runs, the Live chip
+  ("Live · ends 9:55 AM", the grid's Focused chip) and the live card's green edge, on this
+  computer's clock to the server's bell, as the student's home (W3) counts it: at the bell both go
+  and the account is read again, so the card says its last session. Anyone but a teacher is sent to
+  their own home. **The block's card in v2's look** (`components/blocks.tsx`, Home's too): its
+  section label with the tag's icon, its line 14 px under it as the boards render it, its rows 11 px
+  in, each ID in the code face at 15/22, a refusal or a registered line right under the field's help
+  and Register block 14 px under that, its load failure with a small Try again (HomeStates). The
+  shared Field keeps its help's 8 px (PV6's call), so the card stands 8 px taller than the board.
+  **Classes in the menu** between Home and Reports, the boards' grid of four, marked on a class's
+  page and on its reports' old address too. **Home keeps its list and its create row** until PV17a,
+  its own step, as every page keeps its layout until then. **The menu's foot** (the conductor's
+  brief): an account with no name of its own shows its sign-in, which the API fills from the token's
+  username (`displayNameFromClaims`), the demo teacher's an email, which the foot broke mid-word over
+  three lines. Now every name stays on one line, cut with an ellipsis when it doesn't fit (about 14
+  characters at 216 px), its `title` the whole name on hover and its text whole for a screen reader;
+  on a phone the foot keeps its place beside Bali on the bar's top row, taking the room there, the
+  name cut to fit (MenuNameStates). *Weighed:* two lines with an ellipsis, where an email still breaks
+  mid-word; and HomeNoName's Sign out in words for a name that looks like a sign-in, which the shell
+  can't tell from a name without reading the token, and the brief left the account's read as it is.
+  **Seen:** on dev as the demo teacher, signed in (four classes, their counts and last sessions, six
+  blocks, the email's foot at 1440 and whole at 390 px), and sharp beside every board.
+
 - **2026-10-16** — **W5: the slide on the student's lesson page and in full screen (#419); the
   page's text the slide's label; its intermediate states drawn first (canvas version 63). W5 is
   done.** Built to [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4):

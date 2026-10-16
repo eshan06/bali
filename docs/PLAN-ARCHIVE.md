@@ -10,6 +10,16 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-16 (Central) — W5 done, slides on the student web (#419;
+`docs/DECISIONS.md`, 2026-10-16): the lesson page shows the slide the teacher shows, the question card
+first, beside it from 1024 px; the deck through the student's own download, `no-store`, checked
+against its SHA-256 before PDF.js, drawn as the presenter's, the page's text its label for a screen
+reader, and dropped once the teacher stops; a student turns no page. Full screen (PV1's
+StudentSlideFull) turns with the teacher's slide, Exit full screen or Esc leaves it, and a question
+asked, the slides stopped or the class over closes it by itself. Its intermediate states drawn first
+(canvas version 63). Checked on dev as Ana, a tampered deck refused, and sharp beside every board.
+Before it, M6 (#413–#418). Next on the Windows PC: PV16, Classes; on the Mac, the phone's L8 and M8._
+
 _Last updated: 2026-10-16 (Central) — M6 done, its part 2d, Present's slide (#418;
 `docs/DECISIONS.md`, 2026-10-16): PresentSlide in the live grid's place, a question first and the
 slide back after its Done; the page in a white frame the page's width, as the board renders it, as

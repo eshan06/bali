@@ -25,8 +25,8 @@ badges); `api-client.ts` (`UnauthorizedError`'s words; a `NetworkError` is
 said as `errors.ts`'s `CANT_REACH`, its own message a log line, D2c-2);
 `recap.ts` (the session's "9:05 AM to 9:30 AM"; PB5's timeline took its reasons
 and "No reason given" with it in PV14). `blocks.ts`, `classes.ts`, `reports.ts`, `invite.ts` and `decks.ts` hold
-none: their words are in `blocks.tsx`, the classes home (`app/page.tsx`), the
-reports page, `invite-code.tsx`, `slides.tsx` and `errors.ts`. In
+none: their words are in `blocks.tsx`, the classes home (`app/page.tsx`), Classes'
+cards (`classes.tsx`, PV16a), the reports page, `invite-code.tsx`, `slides.tsx` and `errors.ts`. In
 `ios/Bali/` outside `UI/`: the NFC sheet's words in `BlockReader.swift`
 ("Hold the top of your iPhone to your teacher's Bali block.", "This isn't a
 Bali block.", "Bali block read.", "A scan is under way."); the `problem` a
@@ -271,6 +271,16 @@ under each field as LessonStates words them.
 Your slides is v2's since M5b (2026-10-15): the Slides board's page, Slides in the menu, each deck
 a `.deck-row` with no shadow, an upload's percentage and bar, and its intermediate states as
 SlidesStates and SlidesPhone draw them (drawn on the canvas first, #398's rule).
+Classes is v2's since PV16a (2026-10-16): Classes in the menu, marked on a class's page too, a
+`.classcard` per class, its students and its last session (today with its time, a day of the last
+six, else its date) or "no sessions yet", and while it runs the Live chip and the live card's edge,
+both gone at its bell by this computer's clock, when the list is read again; ClassesEmpty's card;
+the list's failure over the classes read before; the block's card beside them in v2's look, on Home
+too; its intermediate states as ClassesStates and ClassesPhone draw them (drawn on the canvas first).
+Until PV16b brings New class's dialog, its head has no New class and the first class's card no
+Create a class (ClassesInterim, drawn first): Home's create row makes classes until then. The menu's
+foot keeps a name too long for it on one line, cut with an ellipsis, whole on hover and to a screen
+reader (MenuNameStates, drawn first).
 Every
 portal source file is held to the tokens' utilities by `tokens.test.ts`, and
 since D2g the theme holds none of Tailwind's own colours, type sizes,
@@ -349,7 +359,8 @@ question card 20; pills `radius-full`. *Shadows:* the tokens' three (above).
 since PV4b), but the recap's marks at 2.25 and the "is ready" dialog's check at 1.5.
 *Layout:* the side menu 216 px, white with a hairline on its right, padding
 32/12/14, the current item grey (`surface-sunken`) and semibold, its foot a
-28 px avatar of initials, the name and a Sign out icon; the page beside it,
+28 px avatar of initials, the name (one line, cut with an ellipsis when too long; PV16a) and a Sign
+out icon; the page beside it,
 left-aligned, at most 1260 px, padding 30/36/56, 22 px between its parts;
 Home in two columns (the main from 520 px, the side from 320 px); the side
 panel 372 px, the unlock pop-up 380 px, a dialog 460 px; tiles
@@ -471,7 +482,8 @@ a live question's results' three colours, `bar` (stone-500, an option's bar), `b
 part 2, Present's question, three sizes, `present-kicker` (14/15, semibold, uppercase: its
 "Question"), `present-tag` (14/20, semibold, uppercase: "Correct answer") and `present-line` (20/28,
 regular: its count's words, its foot and the guard's line), and the colour `option-right` (green-50,
-the correct answer's fill once shown, v2.css's `.p-opt.right`).
+the correct answer's fill once shown, v2.css's `.p-opt.right`); and PV16a Classes' `card-name`
+(17/22, semibold: a class's name on its card, v2.css's `.classcard .name`).
 
 Density: the teacher's live grid is dense (many students at a glance); the
 student app is airy and simple. Theme: **light, everywhere.** The app and the
@@ -723,7 +735,7 @@ where they differ (Present's included: §5); the input size stands.
   well with the same green edge. *v2's look (§1):* a field is white
   (`surface-card`) with the `border-input` edge, 10 px corners, 40 px tall;
   the classes home's inline create row goes with Classes' New class dialog
-  (PLAN's PV16).
+  (PLAN's PV16b; Home keeps it until PV17a).
 - **Links:** `text-brand`, medium, underlined, so a link never rests on colour
   alone: the portal's `TextLink` (`components/text-link.tsx`). A link across
   the portal (All classes, Reports, back to the class) is `text-brand`
