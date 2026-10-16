@@ -278,12 +278,12 @@ export default function ClassDetailPage() {
     const remembered = pickFor(rememberedMinutes(classId));
     setPick(remembered.pick);
     setOther(remembered.other);
-    const asked = new URLSearchParams(window.location.search).has('present');
-    if (asked) {
+    const fromHome = new URLSearchParams(window.location.search).has('present');
+    if (fromHome) {
       rememberPresent(classId, true);
       window.history.replaceState(null, '', `/classes/${classId}`);
     }
-    setPresent(asked || rememberedPresent(classId));
+    setPresent(fromHome || rememberedPresent(classId));
   }, [classId]);
 
   // The grid says when the server marks its session over (the bell's sweep, an End from another

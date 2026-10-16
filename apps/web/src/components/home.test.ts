@@ -431,8 +431,9 @@ describe('the live card (PV17b; Main, HomeMoreStates, HomeLiveStates)', () => {
 
   it('says the newest unlock on the grid, its student and when, after them (Main; PhoneHome under them)', () => {
     const html = card(grid());
+    // A name with no break in it wraps rather than run out of the card on a phone.
     expect(html).toContain(
-      `<p class="ml-auto text-countdown-sub text-text-tertiary max-sm:ml-0">Ethan Park used Emergency Unlock at <time dateTime="${UNLOCK_AT}">${clock(UNLOCK_AT)}</time></p></div></section>`,
+      `<p class="ml-auto text-countdown-sub text-text-tertiary wrap-anywhere max-sm:ml-0">Ethan Park used Emergency Unlock at <time dateTime="${UNLOCK_AT}">${clock(UNLOCK_AT)}</time></p></div></section>`,
     );
     // Never its reason: Recent activity's, and only the teacher's own screen.
     expect(html).not.toMatch(/Nurse|nurse/);

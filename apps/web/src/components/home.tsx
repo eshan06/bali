@@ -101,7 +101,7 @@ export function LiveCardView({
           Present
         </Link>
         {latest !== null && at !== null ? (
-          <p className="ml-auto text-countdown-sub text-text-tertiary max-sm:ml-0">
+          <p className="ml-auto text-countdown-sub text-text-tertiary wrap-anywhere max-sm:ml-0">
             {latest.displayName ?? latest.studentId.slice(0, 8)} used Emergency Unlock at{' '}
             <time dateTime={at}>{bellTime(at)}</time>
           </p>
