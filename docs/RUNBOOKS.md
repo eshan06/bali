@@ -497,7 +497,10 @@ your Vercel projects; step 1 tells you which case you're in.
 3. **The new project.** Vercel → **Add New… → Project** → import `eshan06/bali`:
    - **Root Directory:** `apps/web`. Leave **Include files outside the root
      directory** on *(wording unsure)*: the portal imports `packages/shared`.
-   - **Framework:** Next.js (detected). **Build command:** default (`next build`).
+   - **Framework:** Next.js (detected). **Build command:** default, never overridden:
+     with a `build` script in `apps/web/package.json`, Vercel runs it (`npm run build`),
+     whose `prebuild` copies PDF.js's worker into `public/pdfjs/` (M6). A bare
+     `next build` copies nothing, and the build then fails on purpose (`next.config.ts`).
      **Install command:** default; Vercel installs the npm workspace from the
      repo's lockfile. Name it `bali-portal`.
    - **Settings → Build and Deployment → Node.js Version: 22.x.** Vercel's default

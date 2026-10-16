@@ -15,6 +15,7 @@ import {
   CLOSE_WAIT_MS,
   loadDeck,
   type LoadOptions,
+  OPEN_LIMIT_MS,
   PDF_OPTIONS,
   PDFJS_WORKER,
   type Pdfjs,
@@ -378,7 +379,7 @@ describe('loadDeck: why a deck isn’t open, typed for the screen', () => {
     for (const answer of [{}, { url: 42 }, null]) {
       const bucket = fakeBucket();
       const loaded = await loadDeck(
-        fakeApi(() => answer ?? {}).api,
+        fakeApi(() => answer).api,
         SLIDE,
         options({ fetchImpl: bucket.fetchImpl }),
       );
@@ -499,6 +500,22 @@ describe('loadDeck: stopped, and closed', () => {
     expect(FakeWorker.made[0]?.terminated).toBe(true);
   });
 
+  it('says one PDF.js never answers about, at its limit, and ends its worker', async () => {
+    FakeWorker.made = [];
+    // The limit's clock alone: the wait for the worker below runs on the real one.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const { pdfjs } = fakePdfjs('silent');
+    const loading = loadDeck(fakeApi().api, SLIDE, options({ pdfjs }));
+    while (FakeWorker.made.length === 0) await new Promise((resolve) => setImmediate(resolve));
+    let said: unknown = null;
+    void loading.then((result) => (said = result));
+    await vi.advanceTimersByTimeAsync(OPEN_LIMIT_MS - 1);
+    expect(said).toBeNull();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(said).toEqual({ kind: 'unopened' });
+    expect(FakeWorker.made[0]?.terminated).toBe(true);
+  });
+
   it('ends the worker of a deck whose destroy never answers, after a moment', async () => {
     FakeWorker.made = [];
     const { pdfjs } = fakePdfjs('opens', 'silent');
@@ -540,7 +557,8 @@ describe('PDF.js as the portal runs it', () => {
       PDFJS_ASSETS['openjpeg_nowasm_fallback.js'],
     ]) {
       const code = read(path);
-      expect(code, path).not.toMatch(/(^|[^\w$.])eval\s*\(/);
+      // No `eval` at all, called or held: `(0, eval)(…)` and `globalThis.eval(…)` too.
+      expect(code, path).not.toMatch(/\beval\b/);
       expect(code, path).not.toMatch(/new\s+Function\s*\(/);
       // The one `Function(` is core-js's last way to find the global object, after `globalThis`,
       // `window`, `self` and `this`: never reached in a browser, and refused by the CSP if it were.

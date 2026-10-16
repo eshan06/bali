@@ -15,8 +15,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   presenter. **The version: pdfjs-dist 6.4.299, pinned exactly,** the newest (2026-10-03), Apache-2.0,
   with SLSA provenance. It pulls in only the optional `@napi-rs/canvas` 1.0.11 (MIT, provenance, no
   install script) and its prebuilt binary for the platform (about 35 MB), which PDF.js loads under
-  Node alone, never in a browser; the API's image installs every workspace's production dependencies,
-  so it carries both, unused. `npm audit --omit=dev` finds nothing in either. Of its 35 MB, a page
+  Node alone, never in a browser. The API's image installs every workspace's production dependencies,
+  so it carries both, and the API's own PDF check (unpdf, M2b1, parsing with the PDF.js it bundles)
+  now finds pdfjs-dist installed and points its Node defaults, standard fonts and CMaps, into its
+  folders: the check reads no text, so nothing it does changes (its tests pass), but a later text or
+  render use there would mix two versions. `npm audit --omit=dev` finds nothing in either. Of its 35 MB, a page
   that shows a deck loads the legacy build's 490 KB chunk, only then, and its worker the 1.3 MB
   worker. **`isEvalSupported`:** PDF.js 5.7 (#21002, #21005) replaced the PostScript compiler, its
   last `new Function`, with an interpreter and a WebAssembly compiler, and dropped the option, so
@@ -34,7 +37,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   portal serves beside the worker. **The worker** is PDF.js's own file, copied from pdfjs-dist into
   `public/pdfjs/` (gitignored) by `scripts/pdfjs-assets.mjs` before each `npm run dev` and `npm run
   build`, so it is always the installed version's; Vercel builds a Next.js project by its `build`
-  script when it has one (its docs), so `prebuild` runs there too. PDF.js gets it as a port
+  script when it has one (its docs), so `prebuild` runs there too, and a production build that finds
+  the files missing (a bare `next build`) fails rather than deploy a presenter that can't open a deck
+  (`checkPdfjsScripts`, `next.config.ts`). PDF.js gets it as a port
   (`PDFWorker.create({ port })`), never by `workerSrc`: with one, a worker that fails to start makes
   PDF.js parse the deck on the page's own thread, beside the access token; with a port, the load says
   `unopened`. *Weighed:* webpack's `new URL()` asset (served from `_next/static`, where the middleware
@@ -52,9 +57,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   SHA-256 by Web Crypto against the slide's; a mismatch is `mismatch`, and PDF.js isn't even loaded.
   Each end is typed for part 2's screen (LessonStates' "These slides don't match the PDF you
   uploaded…" for a mismatch, "Bali couldn't load these slides." with Try again for the rest); the
-  bucket's 5xx and no answer go to Sentry by the object's path alone, as the upload's PUT does. A
-  close waits up to 2 s for PDF.js's own destroy, which clears the deck's fonts once the worker
-  answers, then ends the worker. *Weighed:* `fetch`'s `integrity` (a mismatch reads as a network
+  bucket's 5xx and no answer go to Sentry by the object's path alone, as the upload's PUT does.
+  PDF.js has 30 s to open checked bytes (three times the API's own parse limit, which every ready
+  deck passed), so a parse that never answers is `unopened`, never a wait without end; a stalled
+  download is the screen's to stop, since no one limit fits 25 MB on a slow link. A close waits up to
+  2 s for PDF.js's own destroy, which clears the deck's fonts once the worker answers, then ends the
+  worker. *Weighed:* `fetch`'s `integrity` (a mismatch reads as a network
   error). **Checked:** in headless Chrome, a JPEG, a JPEG 2000, a CCITT image, a PostScript shading
   and embedded fonts drawn with no CSP refusal; a tampered deck refused with no worker started; a
   worker that 404s, or that the CSP refuses, `unopened`. On dev, a deck uploaded and checked ready,

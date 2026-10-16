@@ -51,7 +51,10 @@ export type DeckFailure =
    * PDF.js never sees them.
    */
   | { kind: 'mismatch' }
-  /** PDF.js didn't open them: its code didn't load, its worker didn't start, or it can't read them. */
+  /**
+   * PDF.js didn't open them: its code didn't load, its worker didn't start, it can't read them, or
+   * it took past `OPEN_LIMIT_MS`.
+   */
   | { kind: 'unopened' }
   /** `signal` stopped it. */
   | { kind: 'cancelled' };
@@ -111,7 +114,7 @@ async function fetchChecked(
   try {
     // Within a poll's limit (#334): an answer the network swallows fails, for Try again.
     const path = `/v1/decks/${encodeURIComponent(deckId)}/download`;
-    ({ url } = await api.get<DeckDownload>(path, POLL_TIMEOUT_MS));
+    url = (await api.get<Partial<DeckDownload> | null>(path, POLL_TIMEOUT_MS))?.url;
   } catch (e) {
     return signal?.aborted ? { kind: 'cancelled' } : failureOf(e);
   }
@@ -190,6 +193,13 @@ async function readUpTo(
 }
 
 /**
+ * How long PDF.js may take to open checked bytes before the load says `unopened`, never a wait
+ * without end: three times the API's own parse limit for the same file (`PARSE_TIME_LIMIT_MS`, M2),
+ * which every ready deck passed, so only a parse that never answers reaches it.
+ */
+export const OPEN_LIMIT_MS = 30_000;
+
+/**
  * How long a close waits for PDF.js's own destroy, which clears the fonts a deck put on the page
  * once its worker answers: a worker gone meanwhile never answers, and is ended anyway.
  */
@@ -240,11 +250,14 @@ async function open(
     end();
     return { kind: 'unopened' };
   }
-  // A worker that never starts never answers either: its `error` ends the wait, as `signal` does.
+  // A worker that never starts never answers either: its `error` ends the wait, as `signal` does,
+  // and as `OPEN_LIMIT_MS` does for one that starts and never answers.
   const listening = new AbortController();
+  let limit: ReturnType<typeof setTimeout> | undefined;
   const stopped = new Promise<'stopped'>((resolve) => {
     worker.addEventListener('error', () => resolve('stopped'), { signal: listening.signal });
     signal?.addEventListener('abort', () => resolve('stopped'), { signal: listening.signal });
+    limit = setTimeout(() => resolve('stopped'), OPEN_LIMIT_MS);
   });
   let pdf: PDFDocumentProxy | 'stopped';
   try {
@@ -253,6 +266,7 @@ async function open(
     pdf = 'stopped';
   } finally {
     listening.abort();
+    clearTimeout(limit);
   }
   if (pdf === 'stopped' || signal?.aborted) {
     end();

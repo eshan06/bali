@@ -1,7 +1,10 @@
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+
 import type { NextConfig } from 'next';
 import { PHASE_PRODUCTION_BUILD } from 'next/constants';
 
-import { checkBuildEnv } from './src/lib/csp';
+import { checkBuildEnv, PDFJS_DIR, PDFJS_SCRIPTS } from './src/lib/csp';
 
 /**
  * Sent with every response, assets included (Phase 6, S4). The CSP is per request, with its
@@ -38,9 +41,30 @@ export const nextConfig: NextConfig = {
   },
 };
 
+/**
+ * A production build's check that PDF.js's worker and decoders are in `public/pdfjs/` (M6), which
+ * `npm run build` copies first (its `prebuild`, scripts/pdfjs-assets.mjs): a build run another way,
+ * a bare `next build`, would deploy none, and every deck would fail to open. `webDir` is the
+ * portal's folder, where every build runs.
+ */
+export function checkPdfjsScripts(webDir: string = process.cwd()): void {
+  const missing = PDFJS_SCRIPTS.filter(
+    (name) => !existsSync(join(webDir, 'public', PDFJS_DIR, name)),
+  );
+  if (missing.length > 0) {
+    throw new Error(
+      `public${PDFJS_DIR} lacks ${missing.join(', ')}: build with \`npm run build\`, whose prebuild copies PDF.js's files there`,
+    );
+  }
+}
+
 // A production build checks the CSP's origins first: a bad one fails the build, not every page.
+// Then PDF.js's files: none, and it fails rather than deploy a presenter that can't open a deck.
 // Only the build: `next start` reads this file too, with the build's values already baked in.
 export default function config(phase: string): NextConfig {
-  if (phase === PHASE_PRODUCTION_BUILD) checkBuildEnv(process.env);
+  if (phase === PHASE_PRODUCTION_BUILD) {
+    checkBuildEnv(process.env);
+    checkPdfjsScripts();
+  }
   return nextConfig;
 }

@@ -1,10 +1,21 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import { PHASE_PRODUCTION_BUILD, PHASE_PRODUCTION_SERVER } from 'next/constants';
 
-import config, { nextConfig, securityHeaders } from '../../next.config';
+import config, { checkPdfjsScripts, nextConfig, securityHeaders } from '../../next.config';
 
-import { checkBuildEnv, contentSecurityPolicy, type CspOptions, PDFJS_CSP, PDFJS_DIR } from './csp';
+import {
+  checkBuildEnv,
+  contentSecurityPolicy,
+  type CspOptions,
+  PDFJS_CSP,
+  PDFJS_DIR,
+  PDFJS_SCRIPTS,
+} from './csp';
 
 const BASE: CspOptions = {
   apiUrl: 'https://api.bali.example/',
@@ -229,6 +240,25 @@ describe('checkBuildEnv: a production build refuses an origin the CSP cannot hol
     } finally {
       if (before === undefined) delete process.env.NEXT_PUBLIC_API_URL;
       else process.env.NEXT_PUBLIC_API_URL = before;
+    }
+  });
+});
+
+describe('checkPdfjsScripts: a production build refuses to ship without PDF.js’s worker (M6)', () => {
+  it('passes once prebuild has copied the worker and its decoders, and names each one missing', () => {
+    const web = mkdtempSync(join(tmpdir(), 'web-'));
+    try {
+      expect(() => checkPdfjsScripts(web)).toThrow(
+        'public/pdfjs/ lacks pdf.worker.min.mjs, jbig2_nowasm_fallback.js, openjpeg_nowasm_fallback.js: build with `npm run build`',
+      );
+      mkdirSync(join(web, 'public', 'pdfjs'), { recursive: true });
+      for (const name of PDFJS_SCRIPTS.slice(1))
+        writeFileSync(join(web, 'public', 'pdfjs', name), '');
+      expect(() => checkPdfjsScripts(web)).toThrow(/lacks pdf\.worker\.min\.mjs:/);
+      writeFileSync(join(web, 'public', 'pdfjs', PDFJS_SCRIPTS[0]), '');
+      expect(() => checkPdfjsScripts(web)).not.toThrow();
+    } finally {
+      rmSync(web, { recursive: true, force: true });
     }
   });
 });

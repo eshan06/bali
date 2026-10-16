@@ -3,11 +3,11 @@
 // installed pdfjs-dist, the version package.json pins, into public/pdfjs/ (gitignored) before each
 // `npm run dev` and `npm run build` (predev, prebuild), so they are always the library's own files
 // at the library's version. src/lib/deck-pdf.ts loads them; the middleware gives them their CSP.
-import { copyFileSync, mkdirSync, rmSync } from 'node:fs';
+import { copyFileSync, mkdirSync, realpathSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import process from 'node:process';
-import { fileURLToPath, pathToFileURL, URL } from 'node:url';
+import { fileURLToPath, URL } from 'node:url';
 
 /** Each file served under /pdfjs/, by its name there, from its path in pdfjs-dist. */
 export const PDFJS_ASSETS = {
@@ -39,4 +39,7 @@ export function copyPdfjsAssets(to = fileURLToPath(new URL('../public/pdfjs/', i
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) copyPdfjsAssets();
+// Run as a script (`node scripts/pdfjs-assets.mjs`), by any path to it, a link's too: copy. Imported
+// (its test), nothing happens. A build that copied nothing fails anyway (next.config.ts).
+const self = realpathSync.native(fileURLToPath(import.meta.url));
+if (process.argv[1] && realpathSync.native(process.argv[1]) === self) copyPdfjsAssets();
