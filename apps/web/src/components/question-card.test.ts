@@ -415,6 +415,21 @@ describe('its hook (L6’s logic, held for one session)', () => {
     );
   });
 
+  it('keeps each read of the session for the slide’s hook, and reads it again when asked (M6, part 2b)', () => {
+    // One read for both cards: the slide's hook takes what the session shows from it, this
+    // session's only.
+    expect(hook).toMatch(
+      /const snap = await api\.get<SessionSnapshot>\(`\/v1\/sessions\/\$\{session\}`\);\s*if \(now\.current\.session === session\) setSnapshot\(\{ session, snap \}\);/,
+    );
+    // Again through the one read at a time, never beside it.
+    expect(hook).toMatch(
+      /const reread = useCallback\(\(\) => \{\s*const session = now\.current\.session;\s*if \(session !== null\) void read\(session\);\s*\}, \[read\]\);/,
+    );
+    expect(hook).toMatch(
+      /return \{ lesson, onEvent, ask, opening, forgetAsk, snapshot, reread \};/,
+    );
+  });
+
   it('reads one at a time, and nothing once the page has gone', () => {
     // The stream's overlap as it starts can name many old questions: one more read, not a burst.
     expect(hook).toMatch(

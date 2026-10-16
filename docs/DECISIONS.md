@@ -8,6 +8,54 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-16** — **M6's part 2b-1: the slide's hook, no screen (#415); 2b in two; the card's
+  intermediate states drawn first (LessonSlideStates, version 60).** **The split:** 2b whole came to
+  about 610 changed lines without tests (the worker's count), so the conductor split it: 2b-1, this
+  logic; 2b-2, the class page's slide card, built from LessonSlide and LessonSlideStates, its commits
+  left on a branch stacked on this one's. As 2a went before it, **2b-1 is `lib/use-slide.ts`, tested
+  and holding no words**, with two small pieces beside it. *What a session shows* (`useSlide`) comes
+  from the session's read, the question card's own: `useLiveQuestion` now keeps each read's snapshot
+  and offers `reread`, through its one read at a time, so a reload reads the session once for both
+  cards (#414's note); from the stream (2a's `slideAfter`, its deck named from the teacher's ready
+  decks, the session read again for one it can't name); and from this tab's own changes: only ever a
+  later change (`newer`). *Its title* comes from the teacher's decks (`readDecks`), read while the
+  deck shown isn't among them, again every 2 s while Bali gives no answer, the card saying "…"
+  meanwhile, as a class's name before it is read. *Its deck* is loaded (`loadShown`, through
+  `loadDeck`) for each deck shown and each Try again, and closed with `close()` once the session shows
+  another deck, or none, or the page goes; one that opened as the page moved on is closed too.
+  **A stalled download is stopped:** `watchStall` (`lib/deck-pdf.ts`) watches the bucket's GET and
+  says when 20 s pass with nothing arriving, no answer yet or no byte since the last (`STALL_MS`); the
+  hook then aborts the load's `signal`, and the card says it didn't load, with Try again. A download
+  that keeps arriving is never cut, however slow: no one limit on the whole fits 25 MB on a slow link
+  (#413). *Weighed:* a limit on the whole download (a slow link's big deck cut every time); a Stop
+  button while loading (new words, and a teacher in front of a class can't tell a stall from a slow
+  link). *Its changes* go one at a time through 2a (`slideAttemptFor`, `showSlide`,
+  `keepUnanswered`), and `changeEnd` reads each answer: what the session shows now, or the session
+  ended first (`over`), the deck gone (`gone`, the session read again), or anything else as a change
+  that didn't go through (`failed`: Try again sends the last change again, under its id while its
+  answer never came). A change heard since settles what the last one said, as a moved bell settles an
+  extend (P10): the lost one landed, or another tab's did, or the read after a deck gone says what the
+  session shows now. **The board** for 2b-2, LessonSlideStates (version 60), drawn first as
+  intermediate states: the slides loading; didn't load, or stopped after 20 s; the file changed (a
+  mismatch, with Try again, as settled 2026-10-10); couldn't open, with a reload hint (most often a
+  tab left open across a deploy, #413); a page not drawn; a page of another shape; a change on its
+  way; the first and last pages; a change that didn't go through, the session ended first, the slides
+  removed meanwhile; the title not read yet; a question and a slide at once, the question first; the
+  card at 390 px. Its four new lines went through `no-ai-slop`: "Bali couldn't open these slides. Try
+  again, or reload this page.", "This session has ended, so Bali didn't change the slide.", "These
+  slides aren't in Your slides anymore, so Bali can't show them." and "Bali couldn't draw this page."
+  **Santa's review** (both reviewers): the deck a load held outlived its close, so the same deck shown
+  again, after another or none, was handed back closed until its new load landed (every page then
+  "Bali couldn't draw this page."); the held deck is now cleared as it closes, and a failure is never
+  said again for a load that hasn't failed. And a change whose answer gave up after the stream had
+  shown it was said not to have gone through; it says nothing now. The decks' read waits a `429`'s
+  `Retry-After` (`waitAfter`, the polls' rule), and the stall's watch ends with its body cancelled
+  or failed, not only read to its end. **Checked:** vitest, `watchStall` and `loadShown` against
+  stand-ins (dropping a chunk's 20 s more, the stall's own failure, or the guard that keeps a late
+  stall off a load that ended each fails tests); the hook as it runs, under a stand-in for the four
+  React hooks it uses (no DOM here), each failing first for both review findings
+  (`use-slide-hook.test.ts`); and its wiring read from its source, as the question card's is.
+
 - **2026-10-16** — **M6's part 2a: the presenter's logic, no screen (#414); part 2 in three PRs; and
   the conductor's two calls for its screens, awaiting the owner.** **The split:** part 2 whole came to
   about 1,000 changed lines without tests (the worker's sizing), so the conductor split it in three:
