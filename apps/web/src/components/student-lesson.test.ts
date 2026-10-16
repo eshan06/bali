@@ -325,15 +325,23 @@ describe('the lesson page while the class runs', () => {
   });
 
   it('says Bali can’t be reached under the head, the lesson as last read under it (StudentStates, StudentCardStates)', () => {
-    const html = render(live({ question: question({ answer: yours(1) }) }, true));
-    expect(words(html).slice(0, 6)).toEqual([
-      ...HEAD,
-      "Can't reach Bali right now, so this page may be behind. It keeps trying.",
-    ]);
+    const BEHIND = "Can't reach Bali right now, so this page may be behind. It keeps trying.";
+    const html = render(live({}, true));
+    expect(words(html)).toEqual([...HEAD, BEHIND, NOTHING]);
     expect(html).toMatch(
       /<\/header><p role="status" class="rounded-sm border border-border-default bg-surface-sunken px-4 py-3 text-body text-text-primary">/,
     );
-    expect(buttons(html).map((b) => b.pressed)).toEqual([false, true, false, false]);
+    const card = render(live({ question: question({ answer: yours(1) }) }, true));
+    expect(words(card)).toEqual([
+      ...HEAD,
+      BEHIND,
+      'Question',
+      PROMPT,
+      ...ANSWERS,
+      ANSWERED,
+      PRIVACY,
+    ]);
+    expect(buttons(card).map((b) => b.pressed)).toEqual([false, true, false, false]);
     expect(render(live())).not.toContain('role="status"');
   });
 
