@@ -1,7 +1,7 @@
 'use client';
 
 import type { FeedEvent, SessionSnapshot, TeacherQuestion } from '@bali/shared';
-import { CircleCheck, MessageCircleQuestionMark } from 'lucide-react';
+import { CircleCheck, MessageCircleQuestionMark, Presentation } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Button } from '@/components/button';
@@ -458,10 +458,11 @@ export const askButton = (
 /**
  * The class page's "Questions and slides" card (L7; LessonClass, LessonWaiting, LessonLive,
  * LessonClosed, LessonStates' lines), between the counts and the grid, never in Present. At rest,
- * Ask a question (Show slides is M6's). A question open: Close, and Close and show answer when it
- * has a correct one; closed: Ask another question and Done. Its options, and "N of M answered":
- * only totals, the count per option and its bar once the server's guard gives them (3 answers),
- * never who answered. `asking`: the side panel is open, which Ask a question controls (L7-1b).
+ * Ask a question and Show slides (M6, part 2c). A question open: Close, and Close and show answer
+ * when it has a correct one; closed: Ask another question and Done. Its options, and "N of M
+ * answered": only totals, the count per option and its bar once the server's guard gives them (3
+ * answers), never who answered. `asking` and `showing`: the side panel is open on asking (L7-1b)
+ * or on the decks (LessonDecks), which their buttons control.
  */
 export function QuestionCard({
   id,
@@ -469,12 +470,16 @@ export function QuestionCard({
   endsAt,
   asking,
   onAsk,
+  showing,
+  onShow,
 }: {
   id: string;
   lesson: LiveQuestion;
   endsAt: string | null;
   asking: boolean;
   onAsk: () => void;
+  showing: boolean;
+  onShow: () => void;
 }) {
   const { question: q, results: r } = lesson;
   const ask = (words: string, variant: 'primary' | 'secondary') =>
@@ -486,7 +491,19 @@ export function QuestionCard({
           <h2 id={`${id}-lesson`} className="text-h3">
             Questions and slides
           </h2>
-          <div className={ROW}>{ask('Ask a question', 'primary')}</div>
+          <div className={ROW}>
+            {ask('Ask a question', 'primary')}
+            <Button
+              id={`${id}-show`}
+              variant="secondary"
+              onClick={onShow}
+              aria-expanded={showing}
+              aria-controls={showing ? `${id}-panel` : undefined}
+            >
+              <Presentation size={16} aria-hidden="true" />
+              Show slides
+            </Button>
+          </div>
         </div>
       </section>
     );

@@ -328,7 +328,8 @@ describe('useSlide: its changes', () => {
     await h.settle();
     h.slides.turn(1);
     await h.settle();
-    expect(h.slides.said).toBe('failed');
+    // Said with the change it is about, for wherever that change was made.
+    expect(h.slides.said).toEqual({ why: 'failed', change: { deckId: X.id, page: 5 } });
     h.slides.again();
     await h.settle();
     const [first, again] = io.post.mock.calls.map(([, body]) => body);
@@ -378,13 +379,48 @@ describe('useSlide: its changes', () => {
     await h.settle();
     h.slides.turn(1);
     await h.settle();
-    expect(h.slides.said).toBe('over');
+    expect(h.slides.said).toEqual({ why: 'over', change: { deckId: X.id, page: 5 } });
     expect(reread).not.toHaveBeenCalled();
     io.post.mockRejectedValueOnce(new ApiError(404, 'not_found', 'gone', 'deck_not_found'));
     h.slides.turn(1);
     await h.settle();
-    expect(h.slides.said).toBe('gone');
+    expect(h.slides.said).toEqual({ why: 'gone', change: { deckId: X.id, page: 5 } });
     expect(reread).toHaveBeenCalledOnce();
+  });
+
+  it('shows a deck from its first page through Bali (the side panel’s Show), true once it is on screen', async () => {
+    let answer!: (res: SlideResponse) => void;
+    io.post.mockImplementation(() => new Promise((resolve) => (answer = resolve)));
+    // Nothing shown yet: the change is minted with no change held.
+    const h = mount(SESSION, read(null, id(1)), vi.fn());
+    await h.settle();
+    let shown: boolean | undefined;
+    void h.slides.show(X.id).then((done) => (shown = done));
+    await h.settle();
+    expect(h.slides.changing).toEqual({ deckId: X.id, page: 1 });
+    const sent = io.post.mock.calls[0]?.[1] as { eventId: string };
+    expect(sent).toMatchObject({ deckId: X.id, page: 1 });
+    expect(sent.eventId > id(1)).toBe(true);
+    // One at a time: a second Show meanwhile sends nothing, and says it didn't go.
+    expect(await h.slides.show(X.id)).toBe(false);
+    expect(io.post).toHaveBeenCalledOnce();
+    answer(shownAnswer(slideOf(1), sent.eventId));
+    await h.settle();
+    expect(shown).toBe(true);
+    expect(h.slides.slide).toEqual(slideOf(1));
+    expect(h.slides.changing).toBeNull();
+  });
+
+  it('says a Show that didn’t go through with its deck, and sends it again under its id', async () => {
+    io.post.mockRejectedValue(new NetworkError());
+    const h = mount(SESSION, read(null, id(1)), vi.fn());
+    await h.settle();
+    expect(await h.slides.show(X.id)).toBe(false);
+    await h.settle();
+    expect(h.slides.said).toEqual({ why: 'failed', change: { deckId: X.id, page: 1 } });
+    await h.slides.show(X.id);
+    const [first, again] = io.post.mock.calls.map(([, body]) => body);
+    expect(again).toEqual(first);
   });
 
   it('stops showing, answered with nothing shown', async () => {

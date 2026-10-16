@@ -1,0 +1,163 @@
+'use client';
+
+import type { Deck } from '@bali/shared';
+import Link from 'next/link';
+import { useCallback, useEffect, useRef, useState } from 'react';
+
+import { Panel } from '@/components/ask-panel';
+import { Button } from '@/components/button';
+import { SaidLine } from '@/components/slide-card';
+import { CANT_LOAD_SLIDES, type Decks, showLine } from '@/components/slides';
+import { QUIET_LINK } from '@/components/text-link';
+import { readDecks } from '@/lib/decks';
+import { readyDecks, type SlideChange } from '@/lib/presenter';
+import { useApi } from '@/lib/use-api';
+import type { SlideLesson } from '@/lib/use-slide';
+
+/** A deck's own Show: the change to its first page. */
+const showOf = (deck: Deck, change: SlideChange | null | undefined) =>
+  change?.deckId === deck.id && change.page === 1;
+
+/**
+ * Show slides in the side panel (M6, part 2c; LessonDecks, and its intermediate states as
+ * LessonDecksStates draws them, drawn on the canvas first): "Pick a deck." over the teacher's ready
+ * decks, newest first, each with its pages, the day it was added and Show; the list loading, failed
+ * with Try again, or none ready; then the way to Your slides. Its line leaves out "Every phone in
+ * this class shows the page you're on, and so does Present." until W5 and M8 make it true (the
+ * conductor's call, 2026-10-16). A Show is the slide's own change (`useSlide`'s `show`), one at a
+ * time: every Show held meanwhile, its own busy, and what it left to say under its deck, Try again
+ * showing it again. Never in Present.
+ */
+export function DecksView({
+  id,
+  decks,
+  lesson,
+  onRead,
+  onShow,
+  onClose,
+}: {
+  id: string;
+  decks: Decks;
+  lesson: Pick<SlideLesson, 'changing' | 'said'>;
+  onRead: () => void;
+  onShow: (deck: Deck) => void;
+  onClose: () => void;
+}) {
+  const { changing, said } = lesson;
+  const ready = Array.isArray(decks) ? readyDecks(decks) : [];
+  return (
+    <Panel id={id} title="Show slides" line="Pick a deck." onClose={onClose}>
+      {/* `.panel-body`, its words at the body's 15/22 as `.app` sets them. */}
+      <div className="flex flex-col gap-5.5 px-5 pt-4.5 pb-6 text-body">
+        {decks === 'loading' ? (
+          <p role="status" className="text-text-secondary">
+            Loading…
+          </p>
+        ) : decks === 'failed' ? (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+            <p role="alert">{CANT_LOAD_SLIDES}</p>
+            <Button variant="secondary" size="sm" onClick={onRead}>
+              Try again
+            </Button>
+          </div>
+        ) : ready.length === 0 ? (
+          <p>You have no slides ready yet.</p>
+        ) : (
+          <ul>
+            {ready.map((deck) => {
+              const name = `${id}-${deck.id}`;
+              return (
+                <li
+                  key={deck.id}
+                  className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3.5 gap-y-1 border-t border-border-default py-3 last:border-b"
+                >
+                  <div className="min-w-0">
+                    <p id={name} className="font-semibold wrap-anywhere">
+                      {deck.title}
+                    </p>
+                    <p className="text-caption text-text-tertiary">{showLine(deck)}</p>
+                  </div>
+                  {/* Held, not disabled, while a change is on its way: focus stays where it is. */}
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    aria-describedby={name}
+                    aria-disabled={changing !== null}
+                    aria-busy={showOf(deck, changing)}
+                    onClick={() => onShow(deck)}
+                  >
+                    Show
+                  </Button>
+                  {/* Under its deck, where it happened (LessonDecksStates). */}
+                  {said !== null && showOf(deck, said.change) ? (
+                    <SaidLine
+                      why={said.why}
+                      held={changing !== null}
+                      onAgain={() => onShow(deck)}
+                      className="col-span-full mt-1.5"
+                    />
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <Link href="/slides" className={QUIET_LINK}>
+          Upload a PDF in Your slides
+        </Link>
+      </div>
+    </Panel>
+  );
+}
+
+/**
+ * The panel as Show slides opens it (LessonDecks): the teacher's decks read from Bali each time it
+ * opens, and again by Try again, focus coming to its title. A deck shown while the panel is still
+ * open closes it, the slide card in the question card's place (`onShown`).
+ */
+export function DecksPanel({
+  id,
+  lesson,
+  onShown,
+  onClose,
+}: {
+  id: string;
+  lesson: Pick<SlideLesson, 'changing' | 'said' | 'show'>;
+  onShown: () => void;
+  onClose: () => void;
+}) {
+  const api = useApi();
+  const [decks, setDecks] = useState<Decks>('loading');
+  const read = useCallback(async () => {
+    setDecks('loading');
+    const answer = await readDecks(api);
+    setDecks(answer.kind === 'read' ? answer.decks : 'failed');
+  }, [api]);
+  useEffect(() => {
+    void read();
+  }, [read]);
+  // Focus into the panel as it opens, at its title.
+  useEffect(() => document.getElementById(`${id}-h`)?.focus(), [id]);
+  // Open still: a Show that lands after the panel was closed, or another opened, moves nothing.
+  const open = useRef(false);
+  useEffect(() => {
+    open.current = true;
+    return () => {
+      open.current = false;
+    };
+  }, []);
+  const show = (deck: Deck) =>
+    void lesson.show(deck.id).then((shown) => {
+      if (shown && open.current) onShown();
+    });
+  return (
+    <DecksView
+      id={id}
+      decks={decks}
+      lesson={lesson}
+      onRead={() => void read()}
+      onShow={show}
+      onClose={onClose}
+    />
+  );
+}

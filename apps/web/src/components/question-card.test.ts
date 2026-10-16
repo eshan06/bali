@@ -59,6 +59,8 @@ const props = (l: LiveQuestion, endsAt: string | null = null) => ({
   endsAt,
   asking: false,
   onAsk: vi.fn(),
+  showing: false,
+  onShow: vi.fn(),
 });
 const render = (l: LiveQuestion, endsAt: string | null = null) =>
   renderToStaticMarkup(createElement(QuestionCard, props(l, endsAt)));
@@ -106,21 +108,43 @@ const press = (l: LiveQuestion, words: string, endsAt: string | null = null) => 
 describe('the card at rest (LessonClass, L7-1b)', () => {
   const html = render(lesson({ question: null }, null));
 
-  it('is titled Questions and slides, with Ask a question, its panel closed; Show slides is M6’s', () => {
+  it('is titled Questions and slides, with Ask a question and Show slides, its panel closed', () => {
     expect(html).toMatch(
       /^<section aria-labelledby="L-lesson" class="[^"]*"><div class="[^"]*"><h2 id="L-lesson" class="text-h3">Questions and slides<\/h2>/,
     );
     expect(html).toMatch(
       /<button type="button" id="L-ask" aria-expanded="false" class="[^"]*\bbg-action-primary-bg\b[^"]*"><svg[^>]*\blucide-message-circle-question-mark\b[^>]*>[^]*<\/svg>Ask a question<\/button>/,
     );
-    expect(html).not.toMatch(/Show slides|Question ·|answered/);
+    // Show slides beside it, secondary, with the slides' icon, as LessonClass draws it (M6, 2c).
+    expect(html).toMatch(
+      /<\/svg>Ask a question<\/button><button type="button" id="L-show" aria-expanded="false" class="[^"]*\bbg-surface-card\b[^"]*"><svg[^>]*\blucide-presentation\b[^>]*>[^]*?<\/svg>Show slides<\/button>/,
+    );
+    expect(html).not.toMatch(/Question ·|answered/);
   });
 
-  it('marks Ask a question as controlling the panel while it is open', () => {
-    const open = renderToStaticMarkup(
-      createElement(QuestionCard, { ...props(lesson({ question: null }, null)), asking: true }),
+  it('marks each button as controlling the panel while it is open on what it opened', () => {
+    const at = (over: object) =>
+      renderToStaticMarkup(
+        createElement(QuestionCard, { ...props(lesson({ question: null }, null)), ...over }),
+      );
+    expect(at({ asking: true })).toMatch(/id="L-ask" aria-expanded="true" aria-controls="L-panel"/);
+    expect(at({ asking: true })).toMatch(/id="L-show" aria-expanded="false" class/);
+    expect(at({ showing: true })).toMatch(
+      /id="L-show" aria-expanded="true" aria-controls="L-panel"/,
     );
-    expect(open).toMatch(/id="L-ask" aria-expanded="true" aria-controls="L-panel"/);
+    expect(at({ showing: true })).toMatch(/id="L-ask" aria-expanded="false" class/);
+  });
+
+  it('opens the panel on the decks with Show slides', () => {
+    const p = props(lesson({ question: null }, null));
+    buttons(QuestionCard(p)).get('Show slides')?.();
+    expect(p.onShow).toHaveBeenCalledOnce();
+    expect(p.onAsk).not.toHaveBeenCalled();
+  });
+
+  it('offers Show slides at rest alone, never beside a question', () => {
+    expect(render(lesson())).not.toMatch(/Show slides/);
+    expect(render(lesson({ question: question({ open: false }) }))).not.toMatch(/Show slides/);
   });
 });
 

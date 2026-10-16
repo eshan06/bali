@@ -123,11 +123,18 @@ const dayOf = (iso: string) =>
     .format(new Date(iso))
     .replace(/\s/g, NBSP);
 
+/** "12 pages", "1 page". */
+const pagesOf = ({ pageCount }: Deck) => `${pageCount ?? 0} ${pageCount === 1 ? 'page' : 'pages'}`;
+
 /** A ready deck's line, as the board writes it: "12 pages · 4.2 MB · Added Oct 6". */
-export function readyLine(deck: Deck): string {
-  const pages = deck.pageCount ?? 0;
-  return `${pages} ${pages === 1 ? 'page' : 'pages'} · ${megabytes(deck.bytes)} · Added ${dayOf(deck.createdAt)}`;
-}
+export const readyLine = (deck: Deck): string =>
+  `${pagesOf(deck)} · ${megabytes(deck.bytes)} · Added ${dayOf(deck.createdAt)}`;
+
+/** A deck's line in the class page's side panel (LessonDecks): "12 pages · Added Oct 6". */
+export const showLine = (deck: Deck): string => `${pagesOf(deck)} · Added ${dayOf(deck.createdAt)}`;
+
+/** Your slides that didn't load: on their page, and in the class page's side panel. */
+export const CANT_LOAD_SLIDES = "Bali couldn't load your slides.";
 
 /** Why a deck was refused, in the boards' words (LessonStates' Refused; Slides' password line). */
 const REJECTED: Record<DeckRejection, string> = {
@@ -244,7 +251,7 @@ export function SlidesView({
       ) : decks === 'failed' ? (
         <div className={SAID}>
           <p role="alert" className="text-body">
-            Bali couldn&apos;t load your slides.
+            {CANT_LOAD_SLIDES}
           </p>
           <Button variant="secondary" size="sm" onClick={on.read}>
             Try again

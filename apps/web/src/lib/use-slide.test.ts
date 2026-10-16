@@ -251,7 +251,7 @@ describe('useSlide: what a session shows, held for one session (read from its so
       /if \(now\.current\.session !== session\) return false;\s*unanswered\.current = keepUnanswered\(attempt, answer\);\s*const end = changeEnd\(answer\);/,
     );
     expect(hook).toMatch(
-      /if \('shown' in end\) \{\s*put\(session, end\.shown\);\s*return true;\s*\}[^]*?setSaid\(end\.said\);[^]*?if \(end\.said === 'gone'\) reread\(\);/,
+      /if \('shown' in end\) \{\s*put\(session, end\.shown\);\s*return true;\s*\}[^]*?setSaid\(\{ why: end\.said, change: to \}\);[^]*?if \(end\.said === 'gone'\) reread\(\);/,
     );
     // Its answer gave up after the stream showed it: nothing said, and done, as its answer would
     // have said (use-slide-hook.test.ts).
@@ -261,6 +261,8 @@ describe('useSlide: what a session shows, held for one session (read from its so
     // Try again: the last change again, through the same rule.
     expect(hook).toMatch(/again: \(\) => \{\s*if \(last\.current\) void change\(last\.current\);/);
     expect(hook).toMatch(/stop: \(\) => change\(\{ deckId: null, page: null \}\),/);
+    // The side panel's Show (M6, part 2c): the deck's first page, through the same rule.
+    expect(hook).toMatch(/show: \(deck\) => change\(\{ deckId: deck, page: 1 \}\),/);
   });
 
   it('settles what a change said once a later one is heard, and turns pages within the deck', () => {

@@ -148,11 +148,46 @@ export const typesText = (target: EventTarget | null) => {
   );
 };
 
-/** What a change that ended the session first, or found its deck gone, says (LessonSlideStates). */
-const SAID: Record<Exclude<ChangeSaid, 'failed'>, string> = {
+/**
+ * What a slide change left to say (LessonStates, LessonSlideStates): it didn't go through, the
+ * session ended first, or its deck is gone.
+ */
+const SAID: Record<ChangeSaid, string> = {
+  failed: "Bali couldn't change the slide.",
   over: "This session has ended, so Bali didn't change the slide.",
   gone: "These slides aren't in Your slides anymore, so Bali can't show them.",
 };
+
+/**
+ * What a slide change left to say, where it was made (the card, a deck in the side panel); one
+ * that didn't go through with Try again, held while another is on its way.
+ */
+export function SaidLine({
+  why,
+  held,
+  onAgain,
+  className = '',
+}: {
+  why: ChangeSaid;
+  held: boolean;
+  onAgain: () => void;
+  className?: string;
+}) {
+  return why === 'failed' ? (
+    <div className={`flex flex-wrap items-center gap-x-4 gap-y-3 ${className}`}>
+      <p role="alert" className="text-body">
+        {SAID.failed}
+      </p>
+      <Button variant="secondary" size="sm" onClick={onAgain} aria-disabled={held}>
+        Try again
+      </Button>
+    </div>
+  ) : (
+    <p role="alert" className={`text-body ${className}`}>
+      {SAID[why]}
+    </p>
+  );
+}
 
 /** Stop showing's change: nothing shown. */
 const STOP: SlideChange = { deckId: null, page: null };
@@ -217,8 +252,10 @@ export function slideCard({ id, lesson, slide, asking, onAsk }: CardProps) {
       <div className={HEAD}>
         <div className="flex min-w-0 flex-col gap-0.75">
           <p className="text-section-label text-text-brand uppercase">Slides · showing</p>
+          {/* Focus comes here once a deck is shown from the side panel (LessonDecksStates). */}
           <h2
             id={`${id}-slides`}
+            tabIndex={-1}
             className={`text-h3 text-pretty wrap-break-word${title === null ? ' text-text-tertiary' : ''}`}
           >
             {title ?? '…'}
@@ -231,20 +268,7 @@ export function slideCard({ id, lesson, slide, asking, onAsk }: CardProps) {
           </Button>
         </div>
       </div>
-      {said === 'failed' ? (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-          <p role="alert" className="text-body">
-            Bali couldn&apos;t change the slide.
-          </p>
-          <Button variant="secondary" size="sm" onClick={lesson.again} aria-disabled={held}>
-            Try again
-          </Button>
-        </div>
-      ) : said === null ? null : (
-        <p role="alert" className="text-body">
-          {SAID[said]}
-        </p>
-      )}
+      {said === null ? null : <SaidLine why={said.why} held={held} onAgain={lesson.again} />}
       <div className="flex flex-wrap items-start gap-x-7 gap-y-5">
         <SlideFrame deck={deck} slide={slide} onReload={lesson.reload} />
         <div className="flex min-w-0 flex-[1_1_260px] flex-col gap-3">

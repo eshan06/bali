@@ -127,7 +127,13 @@ export function AskPanel({
 
   const failed = failure ? askSaid(failure) : null;
   return (
-    <Panel id={id} line="Phones in this class show it within a few seconds." wide onClose={onClose}>
+    <Panel
+      id={id}
+      title="Ask a question"
+      line="Phones in this class show it within a few seconds."
+      wide
+      onClose={onClose}
+    >
       {/* noValidate: what Bali refuses is said in its words under each field. */}
       <form
         onSubmit={(e) => void submit(e)}
@@ -272,17 +278,20 @@ export function AskPanel({
 
 /**
  * The side panel (v2.css's `.panel`), where a student's panel shows, from the right, so the grid
- * stays in view: "Ask a question" over its line, Close, and Escape closing it from inside. 372 px,
- * as LessonAsk draws it; 460 to write a question in (`wide`), as LessonWrite does.
+ * stays in view: its title ("Ask a question", "Show slides") over its line, Close, and Escape
+ * closing it from inside. 372 px, as LessonAsk and LessonDecks draw it; 460 to write a question in
+ * (`wide`), as LessonWrite does.
  */
-function Panel({
+export function Panel({
   id,
+  title,
   line,
   wide = false,
   onClose,
   children,
 }: {
   id: string;
+  title: string;
   line: string;
   wide?: boolean;
   onClose: () => void;
@@ -300,7 +309,7 @@ function Panel({
       <div className="flex items-start gap-3 border-b border-border-default pt-5 pr-3.5 pb-4 pl-5">
         <div className="min-w-0 flex-1">
           <h2 id={`${id}-h`} tabIndex={-1} className="text-h3">
-            Ask a question
+            {title}
           </h2>
           <p className={CAPTION}>{line}</p>
         </div>
@@ -351,7 +360,12 @@ export function PickView({
     if (!busy) onPick(draft);
   };
   return (
-    <Panel id={id} line="Pick one you wrote ahead, or write a new one." onClose={onClose}>
+    <Panel
+      id={id}
+      title="Ask a question"
+      line="Pick one you wrote ahead, or write a new one."
+      onClose={onClose}
+    >
       {/* `.panel-body`, its words at the body's 15/22 as `.app` sets them. */}
       <div className="flex flex-col gap-5.5 px-5 pt-4.5 pb-6 text-body">
         <section aria-labelledby={`${id}-ahead`}>
