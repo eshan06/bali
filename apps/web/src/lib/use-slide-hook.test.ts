@@ -1,9 +1,9 @@
 import type { Deck, FeedEvent, SessionSnapshot, Slide, SlideResponse } from '@bali/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ApiError, NetworkError } from './api-client';
+import { type ApiClient, ApiError, NetworkError } from './api-client';
 import type { OpenDeck } from './deck-pdf';
-import { useSlide } from './use-slide';
+import { useShownDeck, useSlide } from './use-slide';
 
 /*
  * useSlide as it runs (M6, part 2b-1): no DOM here, so a stand-in for the four React hooks it uses
@@ -88,11 +88,27 @@ type Args = Parameters<typeof useSlide>;
 
 /** `useSlide` mounted: rendered with `args`, again after each change of its state, and unmounted. */
 function mount(...first: Args) {
+  const h = mountHook(useSlide, ...first);
+  return {
+    render: h.render,
+    settle: h.settle,
+    unmount: h.unmount,
+    get slides() {
+      return h.result.slides;
+    },
+    get onEvent() {
+      return h.result.onEvent;
+    },
+  };
+}
+
+/** A hook mounted: rendered with `args`, again after each change of its state, and unmounted. */
+function mountHook<A extends unknown[], R>(hook: (...args: A) => R, ...first: A) {
   fake.s.slots = [];
   fake.s.effects = new Set();
   fake.s.queued = [];
   let args = first;
-  let result = undefined as unknown as ReturnType<typeof useSlide>;
+  let result = undefined as unknown as R;
   const commit = () => {
     const queued = fake.s.queued;
     fake.s.queued = [];
@@ -103,13 +119,13 @@ function mount(...first: Args) {
       fake.s.slots[k] = { deps, cleanup: typeof cleanup === 'function' ? cleanup : undefined };
     }
   };
-  const render = (...next: Args) => {
+  const render = (...next: A) => {
     args = next;
     for (let n = 0; n === 0 || fake.s.dirty; n += 1) {
       if (n > 50) throw new Error('renders without end');
       fake.s.i = 0;
       fake.s.dirty = false;
-      result = useSlide(...args);
+      result = hook(...args);
       commit();
     }
   };
@@ -129,11 +145,8 @@ function mount(...first: Args) {
         (fake.s.slots[k] as { cleanup?: () => void } | undefined)?.cleanup?.();
       }
     },
-    get slides() {
-      return result.slides;
-    },
-    get onEvent() {
-      return result.onEvent;
+    get result() {
+      return result;
     },
   };
 }
@@ -246,6 +259,85 @@ describe('useSlide: its deck', () => {
     await h.settle();
     expect(h.slides.deck).toEqual({ kind: 'loading' });
     expect(io.loads).toHaveLength(2);
+  });
+});
+
+describe('useShownDeck: the deck a slide names, as the student’s lesson page holds it (W5)', () => {
+  const api = io.api as unknown as Pick<ApiClient, 'get'>;
+  const other: Slide = {
+    deckId: '0199b000-0000-7000-8000-0000000000d2',
+    sha256: 'b'.repeat(64),
+    page: 1,
+    pageCount: 3,
+  };
+  /** The hook mounted on `slide`, then rendered again on another, or on none. */
+  const mountDeck = (slide: Slide | null) =>
+    mountHook<Parameters<typeof useShownDeck>, ReturnType<typeof useShownDeck>>(
+      useShownDeck,
+      api,
+      slide,
+    );
+
+  it('loads the deck once, a page turn loading nothing, and closes it once no slide shows', async () => {
+    const h = mountDeck(slideOf(4));
+    await h.settle();
+    expect(io.loads.map((l) => l.slide)).toEqual([{ deckId: X.id, sha256: X.sha256 }]);
+    expect(h.result.deck).toEqual({ kind: 'loading' });
+    const deck = openDeck();
+    io.loads[0]?.resolve({ kind: 'loaded', deck });
+    await h.settle();
+    expect(h.result.deck).toEqual({ kind: 'open', deck });
+
+    // The teacher turns: the same deck, nothing loaded again.
+    h.render(api, slideOf(5));
+    await h.settle();
+    expect(io.loads).toHaveLength(1);
+    expect(h.result.deck).toEqual({ kind: 'open', deck });
+
+    // The teacher stops, or the class is over: the deck closes, its worker with it.
+    h.render(api, null);
+    await h.settle();
+    expect(deck.close).toHaveBeenCalledOnce();
+    expect(h.result.deck).toEqual({ kind: 'loading' });
+    expect(io.loads).toHaveLength(1);
+  });
+
+  it('closes the deck it holds as the teacher shows another, and loads that one', async () => {
+    const h = mountDeck(slideOf(4));
+    await h.settle();
+    const deck = openDeck();
+    io.loads[0]?.resolve({ kind: 'loaded', deck });
+    await h.settle();
+    h.render(api, other);
+    await h.settle();
+    expect(deck.close).toHaveBeenCalledOnce();
+    expect(io.loads.map((l) => l.slide)).toEqual([
+      { deckId: X.id, sha256: X.sha256 },
+      { deckId: other.deckId, sha256: other.sha256 },
+    ]);
+    expect(h.result.deck).toEqual({ kind: 'loading' });
+  });
+
+  it('says why a deck didn’t open, and loads it afresh on Try again', async () => {
+    const h = mountDeck(slideOf(4));
+    await h.settle();
+    io.loads[0]?.resolve({ kind: 'mismatch' });
+    await h.settle();
+    expect(h.result.deck).toEqual({ kind: 'failed', why: 'mismatch' });
+    h.result.reload();
+    await h.settle();
+    expect(h.result.deck).toEqual({ kind: 'loading' });
+    expect(io.loads).toHaveLength(2);
+  });
+
+  it('closes a deck that opens once the page has gone', async () => {
+    const h = mountDeck(slideOf(4));
+    await h.settle();
+    h.unmount();
+    const late = openDeck();
+    io.loads[0]?.resolve({ kind: 'loaded', deck: late });
+    await h.settle();
+    expect(late.close).toHaveBeenCalledOnce();
   });
 });
 

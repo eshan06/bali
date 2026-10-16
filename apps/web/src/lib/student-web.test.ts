@@ -27,13 +27,17 @@ import {
   CLOCK_SKEW_MS,
   ENDED_WITHIN_MS,
   endedAt,
+  enterFullscreen,
   followLesson,
+  fullEnds,
   homeClasses,
   homeFor,
   keptBell,
+  leaveFullscreen,
   lessonGone,
   type LessonState,
   lessonView,
+  type LessonView,
   nextBell,
   phoneChip,
   picker,
@@ -1228,5 +1232,102 @@ describe('lessonView: what the lesson page shows (W4)', () => {
     expect(lessonView(biology, 'fresh', SOON, { ...over, ended: { after: null, by: AT } })).toEqual(
       { kind: 'over', klass: biology, at: null },
     );
+  });
+});
+
+describe('fullEnds: when the full-screen slide closes by itself (W5; PV1)', () => {
+  const SLIDE = { deckId: 'd1', sha256: 'a'.repeat(64), page: 4, pageCount: 12 };
+  const biology: StudentClass = {
+    id: 'bio',
+    name: 'Biology, period 3',
+    teacher: { displayName: 'Ms. Rivera' },
+    enrollmentId: 'e-bio',
+    liveSession: { id: SESSION, startedAt: new Date(AT).toISOString(), endsAt: '' },
+  };
+  const live = (over: Partial<Presentation> = {}): Extract<LessonView, { kind: 'live' }> => ({
+    kind: 'live',
+    klass: biology,
+    bell: { id: SESSION, startedAt: new Date(AT).toISOString(), endsAt: '' },
+    presentation: lesson({ slide: SLIDE, ...over }),
+    behind: false,
+    asOf: null,
+  });
+  const LATER = '01924b2c-0000-7000-8000-000000000004';
+
+  it('stays while the slide shows and no question was asked since it opened, the page turning or not', () => {
+    expect(fullEnds({ questionId: null }, live())).toBeNull();
+    expect(fullEnds({ questionId: null }, live({ slide: { ...SLIDE, page: 5 } }))).toBeNull();
+    expect(fullEnds({ questionId: null }, live({ slide: { ...SLIDE, deckId: 'd2' } }))).toBeNull();
+    // The question showing as it opened, closed since or its answer shown: no question asked.
+    const open = question();
+    expect(fullEnds({ questionId: QUESTION }, live({ question: open }))).toBeNull();
+    const closed = question({ open: false, correctOption: 1 });
+    expect(fullEnds({ questionId: QUESTION }, live({ question: closed }))).toBeNull();
+    // Behind, the lesson as last read: nothing new to show.
+    expect(fullEnds({ questionId: null }, { ...live(), behind: true, asOf: AT })).toBeNull();
+  });
+
+  it('closes once a question is asked: the first, or another after the one it opened beside', () => {
+    expect(fullEnds({ questionId: null }, live({ question: question() }))).toBe('question');
+    const next = question({ id: LATER });
+    expect(fullEnds({ questionId: QUESTION }, live({ question: next }))).toBe('question');
+    // Asked as the slides stop: the question is what the page shows.
+    expect(fullEnds({ questionId: null }, live({ question: next, slide: null }))).toBe('question');
+  });
+
+  it('closes once the slides stop, the class is over, or the lesson is gone', () => {
+    expect(fullEnds({ questionId: null }, live({ slide: null }))).toBe('gone');
+    expect(fullEnds({ questionId: null }, { kind: 'over', klass: biology, at: null })).toBe('gone');
+    expect(fullEnds({ questionId: null }, { kind: 'not_in_class' })).toBe('gone');
+    expect(fullEnds({ questionId: null }, { kind: 'failed' })).toBe('gone');
+    expect(fullEnds({ questionId: null }, { kind: 'loading' })).toBe('gone');
+  });
+});
+
+describe('enterFullscreen and leaveFullscreen: the page itself, where the browser allows it (W5)', () => {
+  /** A document whose page goes full screen, or refuses to, as asked. */
+  function page({ refuses = false, without = false } = {}) {
+    const doc = {
+      fullscreenElement: null as Element | null,
+      documentElement: {
+        requestFullscreen: without
+          ? undefined
+          : vi.fn(() => {
+              if (refuses) return Promise.reject(new TypeError('not allowed'));
+              doc.fullscreenElement = doc.documentElement as unknown as Element;
+              return Promise.resolve();
+            }),
+      },
+      exitFullscreen: vi.fn(() => {
+        doc.fullscreenElement = null;
+        return Promise.resolve();
+      }),
+    };
+    return doc;
+  }
+  const as = (doc: ReturnType<typeof page>) =>
+    doc as unknown as Parameters<typeof enterFullscreen>[0];
+
+  it('asks for the whole page full screen, once, and leaves it only when it is in it', () => {
+    const doc = page();
+    enterFullscreen(as(doc));
+    expect(doc.documentElement.requestFullscreen).toHaveBeenCalledOnce();
+    enterFullscreen(as(doc));
+    expect(doc.documentElement.requestFullscreen).toHaveBeenCalledOnce();
+    leaveFullscreen(as(doc));
+    expect(doc.exitFullscreen).toHaveBeenCalledOnce();
+    leaveFullscreen(as(doc));
+    expect(doc.exitFullscreen).toHaveBeenCalledOnce();
+  });
+
+  it('takes a refusal, or a browser with no full screen (an iPhone’s), as nothing: the slide covers the window anyway', async () => {
+    const refused = page({ refuses: true });
+    expect(() => enterFullscreen(as(refused))).not.toThrow();
+    await Promise.resolve();
+    expect(refused.fullscreenElement).toBeNull();
+    const iphone = page({ without: true });
+    expect(() => enterFullscreen(as(iphone))).not.toThrow();
+    expect(() => leaveFullscreen(as(iphone))).not.toThrow();
+    expect(iphone.exitFullscreen).not.toHaveBeenCalled();
   });
 });

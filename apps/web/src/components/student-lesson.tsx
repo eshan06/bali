@@ -4,14 +4,17 @@ import type { StudentQuestion } from '@bali/shared';
 import { Check, CircleCheck, EyeOff, type LucideIcon, Nfc, Smartphone } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useId, useRef, useState } from 'react';
 
 import { getAccessToken } from '@/lib/auth';
 import { bellTime } from '@/lib/session-controls';
 import {
   type Bell,
+  enterFullscreen,
   followLesson,
+  fullEnds,
   keptBell,
+  leaveFullscreen,
   type Lesson,
   type LessonState,
   lessonView,
@@ -26,12 +29,14 @@ import {
   type StudentClass,
 } from '@/lib/student-web';
 import { useApi } from '@/lib/use-api';
+import { type DeckState, useShownDeck } from '@/lib/use-slide';
 
 import { Button, buttonClass } from './button';
 import { CARD_ALONE } from './card';
 import { Countdown, Ring, shareLeft, useClock } from './live-header';
 import { letterClass, letterOf } from './question-card';
 import { useMe } from './shell';
+import { SlideFull, StudentSlide } from './student-slide';
 import { CantReach, NOTICE, YourPhone } from './your-phone';
 
 /** The line under every question (StudentLesson), the board's own words. */
@@ -43,9 +48,11 @@ const EMPTY: LessonState = { presentation: null, problem: null, asOf: null };
  * A student's lesson (W4; StudentLesson, StudentNotIn, StudentClosed, StudentWaiting, StudentEnded,
  * StudentPhoneStates, StudentStates, and StudentNoSlide, StudentCardStates and StudentChipStates,
  * drawn first): the class `classId`'s session `sessionId`, followed once the account lists it as the
- * class's (`followLesson`, W2), its question answered here and the student's own phone beside its
- * name. The account is the shell's one read, read again as the page opens and at the bell, so
- * minutes the teacher added move it; a class the account doesn't list isn't the student's.
+ * class's (`followLesson`, W2), its question answered here, the slide its teacher shows (W5) and the
+ * student's own phone beside its name. The account is the shell's one read, read again as the page
+ * opens and at the bell, so minutes the teacher added move it; a class the account doesn't list
+ * isn't the student's. The slide's deck is loaded only while the lesson shows it (`useShownDeck`),
+ * and closed once the teacher stops, shows another, or the class is over.
  */
 export function StudentLessonPage({ classId, sessionId }: { classId: string; sessionId: string }) {
   const api = useApi();
@@ -100,11 +107,17 @@ export function StudentLessonPage({ classId, sessionId }: { classId: string; ses
     return () => window.clearTimeout(timer);
   }, [endsAt, load]);
 
-  if (home === null || home.kind !== 'student') return null;
   const account = me !== opened ? 'fresh' : asked.current && error !== null ? 'failed' : 'stale';
+  const view = lessonView(klass, account, bell, lesson);
+  const shown = view.kind === 'live' ? view.presentation.slide : null;
+  const { deck, reload } = useShownDeck(api, shown);
+
+  if (home === null || home.kind !== 'student') return null;
   return (
     <StudentLesson
-      view={lessonView(klass, account, bell, lesson)}
+      view={view}
+      deck={deck}
+      onReloadDeck={reload}
       sending={picks.sending}
       said={picks.said}
       onPick={(questionId, option) => void pick(following.current, questionId, option)}
@@ -120,29 +133,61 @@ export function StudentLessonPage({ classId, sessionId }: { classId: string; ses
 /** A line said in the lesson's place, beside what to do (StudentStates' `.said`). */
 const SAID = 'flex flex-wrap items-center gap-x-4 gap-y-3';
 
+/** Full screen (W5): open, with the question it opened beside; or why it last closed, for focus. */
+interface Full {
+  open: { questionId: string | null } | null;
+  back: 'left' | 'question' | 'gone' | null;
+}
+
 /**
  * The lesson page as its state draws it (W4): Loading… and the lesson that didn't load, with Try
  * again (StudentStates); not in this class (StudentCardStates); class over (StudentEnded, its line
  * without a time when the page can't say when, StudentCardStates); and the class's head, the
  * student's own phone at its end, over the phone's line when it isn't focused (StudentPhoneStates),
- * then "Can't reach Bali" while reads fail (StudentChipStates), then the question card
- * (StudentNoSlide), "Nothing shared yet" (StudentWaiting), or, a slide alone, nothing until W5 draws
- * slides here.
+ * then "Can't reach Bali" while reads fail (StudentChipStates), then the question card and the slide
+ * its teacher shows (StudentLesson; W5), the card alone (StudentNoSlide), the slide alone
+ * (StudentSlideAlone), or "Nothing shared yet" (StudentWaiting). The slide's Full screen
+ * (StudentSlideFull) closes by itself once a question is asked, the slides stop or the class is
+ * over (PV1), focus then on the question, or on the class's name; left by the student, on Full
+ * screen.
  */
 export function StudentLesson({
   view,
+  deck,
+  onReloadDeck,
   sending,
   said,
   onPick,
   onRetry,
 }: {
   view: LessonView;
+  /** The slide's deck, as `useShownDeck` holds it: loading, open, or why not. */
+  deck: DeckState;
+  onReloadDeck: () => void;
   sending: Sending;
   said: Said;
   onPick: (questionId: string, option: number) => void;
   onRetry: () => void;
 }) {
   const over = useId();
+  const id = useId();
+  const [full, setFull] = useState<Full>({ open: null, back: null });
+  const ends = full.open === null ? null : fullEnds(full.open, view);
+  if (ends !== null) setFull({ open: null, back: ends });
+  const leave = useCallback(
+    () => setFull((cur) => (cur.open === null ? cur : { open: null, back: 'left' })),
+    [],
+  );
+  // Closed: the page out of full screen, and focus where the student is now.
+  useEffect(() => {
+    if (full.open !== null || full.back === null) return;
+    leaveFullscreen();
+    const to = { left: 'full', question: 'question', gone: 'class' }[full.back];
+    document.getElementById(`${id}-${to}`)?.focus();
+  }, [full, id]);
+  // The page gone, full screen goes with it.
+  useEffect(() => () => leaveFullscreen(), []);
+
   if (view.kind === 'loading') {
     return (
       <main>
@@ -180,7 +225,7 @@ export function StudentLesson({
     const at = view.at === null ? null : new Date(view.at).toISOString();
     return (
       <main className="flex flex-col gap-5.5">
-        <LessonHead klass={view.klass} bell={null} />
+        <LessonHead klass={view.klass} bell={null} headingId={`${id}-class`} />
         <section
           aria-labelledby={over}
           className={`flex max-w-160 flex-col items-start gap-3 ${CARD_ALONE}`}
@@ -207,27 +252,58 @@ export function StudentLesson({
   }
   const { klass, bell, presentation, behind } = view;
   const q = presentation.question;
+  const { slide } = presentation;
+  // A pick that said it didn't send but a read since shows held is in (`saidNow`).
+  const card = q ? (
+    <QuestionCard
+      headingId={`${id}-question`}
+      question={q}
+      sending={sending?.questionId === q.id ? sending.option : null}
+      said={saidNow(said, q)}
+      onPick={(option) => onPick(q.id, option)}
+    />
+  ) : null;
   return (
     <main className="flex flex-col gap-5.5">
-      <LessonHead klass={klass} bell={bell} phone={view} />
+      <LessonHead klass={klass} bell={bell} phone={view} headingId={`${id}-class`} />
       <PhoneLine chip={phoneChip(view)} endsAt={bell.endsAt} />
       {behind ? <CantReach /> : null}
-      {q ? (
-        // At its own width beside where a slide goes (StudentNoSlide); a column of its own under
-        // 1024 px, as StudentZoom draws it. A pick that said it didn't send but a read since shows
-        // held is in (`saidNow`).
-        <div className="lg:max-w-100">
-          <QuestionCard
-            question={q}
-            sending={sending?.questionId === q.id ? sending.option : null}
-            said={saidNow(said, q)}
-            onPick={(option) => onPick(q.id, option)}
+      {slide ? (
+        // The card first in the page's order at every width, so the keyboard and a screen reader
+        // reach the question first: beside the slide from 1024 px (StudentLesson), over it under
+        // that (StudentZoom). The slide alone keeps the width it has beside a card
+        // (StudentSlideAlone).
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_25rem]">
+          {card ? <div className="lg:col-start-2 lg:row-start-1">{card}</div> : null}
+          <StudentSlide
+            slide={slide}
+            deck={deck}
+            onReload={onReloadDeck}
+            fullId={`${id}-full`}
+            onFull={() => {
+              // On the press itself: a browser lets a page go full screen only then.
+              enterFullscreen();
+              setFull({ open: { questionId: q?.id ?? null }, back: null });
+            }}
           />
         </div>
-      ) : presentation.slide === null ? (
+      ) : card ? (
+        // At its own width at the start of the page (StudentNoSlide); a column of its own under
+        // 1024 px, as StudentZoom draws it.
+        <div className="lg:max-w-100">{card}</div>
+      ) : (
         <p className="text-body text-text-secondary">
           Nothing shared yet. Slides and questions from your teacher show up here.
         </p>
+      )}
+      {full.open && slide ? (
+        <SlideFull
+          slide={slide}
+          deck={deck}
+          behind={behind}
+          onReload={onReloadDeck}
+          onLeave={leave}
+        />
       ) : null}
     </main>
   );
@@ -244,10 +320,13 @@ function LessonHead({
   klass,
   bell,
   phone,
+  headingId,
 }: {
   klass: StudentClass;
   bell: Bell | null;
   phone?: Pick<LessonState, 'presentation' | 'asOf'>;
+  /** The class's name: focus comes here once full screen closes with its slide gone (W5). */
+  headingId: string;
 }) {
   const now = useClock(bell?.endsAt ?? null);
   const teacher = klass.teacher.displayName?.trim();
@@ -257,7 +336,13 @@ function LessonHead({
         <Ring share={shareLeft(bell.startedAt, bell.endsAt, now)} box={44} stroke={5} />
       ) : null}
       <div className="min-w-0 max-sm:flex-1">
-        <h1 className="text-page-title text-balance wrap-anywhere max-sm:text-h3">{klass.name}</h1>
+        <h1
+          id={headingId}
+          tabIndex={-1}
+          className="text-page-title text-balance wrap-anywhere max-sm:text-h3"
+        >
+          {klass.name}
+        </h1>
         {teacher ? (
           <p className="mt-0.5 text-meta text-text-secondary wrap-anywhere">with {teacher}</p>
         ) : null}
@@ -363,19 +448,21 @@ function caption(q: StudentQuestion, open: boolean, sending: boolean): string {
  * changes it until the close, no Submit; closed, the correct answer marked once shown, never red,
  * and the student's own as Your answer; never a count, nor anyone else's answer. `sending`: the
  * answer on its way; `said`: what the last one's request said, the line's place taken by it.
+ * `headingId`: its question's, where focus comes once a question asked closes full screen (W5).
  */
 function QuestionCard({
+  headingId: id,
   question: q,
   sending,
   said,
   onPick,
 }: {
+  headingId: string;
   question: StudentQuestion;
   sending: number | null;
   said: 'too_late' | 'failed' | null;
   onPick: (option: number) => void;
 }) {
-  const id = useId();
   // Closed once a read says so, or once Bali said this question closed before the answer reached
   // it: too late is said on the closed card (StudentCardStates), the read saying so due within 2 s.
   const open = q.open && said !== 'too_late';
@@ -398,7 +485,7 @@ function QuestionCard({
         >
           {open ? 'Question' : 'Question · closed'}
         </p>
-        <h2 id={id} className="mt-2 text-h3 text-pretty wrap-break-word">
+        <h2 id={id} tabIndex={-1} className="mt-2 text-h3 text-pretty wrap-break-word">
           {q.prompt}
         </h2>
       </div>

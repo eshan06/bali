@@ -228,18 +228,29 @@ describe('useSlide: what a session shows, held for one session (read from its so
   });
 
   it('loads each deck shown and each Try again, closing it as the next starts, the page moves on or goes', () => {
-    expect(hook).toMatch(/const key = `\$\{deckId\}:\$\{sha256\}:\$\{tries\}`;/);
-    expect(hook).toMatch(
+    // Through useShownDeck, which the student's slide loads its deck with too (W5).
+    const shownDeck = source.slice(
+      source.indexOf('export function useShownDeck'),
+      source.indexOf('export function useSlide'),
+    );
+    expect(shownDeck).toMatch(/const key = `\$\{deckId\}:\$\{sha256\}:\$\{tries\}`;/);
+    expect(shownDeck).toMatch(
       /void loadShown\(api, \{ deckId, sha256 \}, stop\)\.then\(\(state\) => \{[^]*?if \(gone && state\?\.kind === 'open'\) void state\.deck\.close\(\);\s*if \(gone \|\| state === null\) return;\s*if \(state\.kind === 'open'\) open = state\.deck;\s*setLoaded\(\{ key, state \}\);/,
     );
     // Cleared as it closes, so the same deck shown again loads afresh (use-slide-hook.test.ts).
-    expect(hook).toMatch(
+    expect(shownDeck).toMatch(
       /return \(\) => \{\s*gone = true;\s*stop\.abort\(\);\s*void open\?\.close\(\);[^]*?setLoaded\(null\);\s*\};\s*\}, \[api, deckId, sha256, key\]\);/,
     );
     // Not open() but close(), which ends the worker too (#413).
-    expect(hook).not.toMatch(/\.destroy\(/);
-    expect(hook).toMatch(/deck: loaded\?\.key === key \? loaded\.state : \{ kind: 'loading' \},/);
-    expect(hook).toMatch(/reload: \(\) => setTries\(\(n\) => n \+ 1\),/);
+    expect(source).not.toMatch(/\.destroy\(/);
+    expect(shownDeck).toMatch(
+      /return \{ deck: loaded\?\.key === key \? loaded\.state : \{ kind: 'loading' \}, reload \};/,
+    );
+    expect(shownDeck).toMatch(
+      /const reload = useCallback\(\(\) => setTries\(\(n\) => n \+ 1\), \[\]\);/,
+    );
+    expect(hook).toMatch(/const \{ deck, reload \} = useShownDeck\(api, shown\.slide\);/);
+    expect(hook).toMatch(/\n\s*deck,\n[^]*?\n\s*reload,\n\s*\};/);
   });
 
   it('sends one change at a time through 2a, resent under its id while its answer never came', () => {

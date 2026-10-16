@@ -8,6 +8,58 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-16** — **W5: the slide on the student's lesson page and in full screen (#419); the
+  page's text the slide's label; its intermediate states drawn first (canvas version 63). W5 is
+  done.** Built to [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4):
+  StudentLesson's slide, StudentNotIn's and StudentClosed's, StudentZoom at 720 px, PV1's
+  StudentSlideFull, and three boards drawn first as intermediate states (version 63):
+  StudentSlideAlone (a slide and no question), StudentSlideStates (the slide's place loading, didn't
+  load or stopped, the file changed, couldn't open, a page not drawn, a page of another shape; full
+  screen on a screen of another shape, with a line in the slide's place, while the page can't reach
+  Bali, and on a phone) and StudentSlidePhone (the page at 390 px). **The slide**
+  (`components/student-slide.tsx`): "Slide 4 of 12", said as the teacher turns, and Full screen over
+  the page, drawn by the presenter's own `SlideFrame` in a student look (v2.css's `.slide`, 16:9 at
+  its column's width). The question card comes first in the page's order at every width, beside the
+  slide from 1024 px and over it narrower, as v2.css's `.s-lesson` lays it; the slide alone keeps the
+  width it has beside a card, so nothing moves when a question opens (StudentSlideAlone, as
+  StudentNoSlide keeps the card's). A student never turns a page. **Its deck** comes from the
+  student's own read (`GET /v1/decks/{id}/download`, only while a running session of the class shows
+  it, M3b) through the presenter's own `loadDeck`: `cache: 'no-store'`, the bytes checked against
+  the slide's SHA-256 before PDF.js sees them, a stalled download stopped at 20 s, PDF.js as M6
+  configures it. `useSlide`'s deck load moved into `useShownDeck` (`lib/use-slide.ts`), which both
+  pages call, so there is one copy: loaded for each deck shown and each Try again, a page turn
+  loading nothing, closed once the teacher stops, shows another or the class is over. **The lines**
+  are the teacher's but for whose PDF it is: StudentStates' "Bali couldn't load the slides.", and,
+  drawn first and through `no-ai-slop`, "These slides don't match the PDF your teacher uploaded, so
+  Bali won't show them." (the teacher's says to upload it again, which a student can't) and "Bali
+  couldn't open the slides. Try again, or reload this page."; "Bali couldn't draw this page." as is.
+  **The text layer for screen readers is the slide's label** ("Slide 4 of 12." and the page's text,
+  as PDF.js reads it), as decision 8 says, M6 built it and StudentLesson's board marks it up.
+  *Weighed:* PDF.js's `TextLayer`, transparent text over the canvas a screen reader could move
+  through line by line, but read twice beside the board's label, with PDF.js's own stylesheet to keep
+  in step at each upgrade. **Full screen** (StudentSlideFull, PV1 as the owner approved it on
+  2026-10-12): a native modal over the window, so the page behind is inert, and the page itself full
+  screen where the browser allows it, asked on Full screen's own press (`enterFullscreen`; an
+  iPhone's browser allows none, and the modal covers the window anyway). Only the slide, turning
+  with the teacher's, as large as fits over its row, 16:9, in the middle. Exit full screen and Esc
+  leave it, the browser's Esc too (`fullscreenchange`); a question asked since it opened, the slides
+  stopped or the class over closes it by itself (`fullEnds`). Focus then goes back to Full screen,
+  to the question asked, or to the class's name. *Weighed:* the browser's full screen alone (an
+  iPhone has none, and Tab could reach the page under it), and a bar saying a question was asked (PV1
+  weighed it; the owner took closing by itself). **Privacy:** the slide is the teacher's; nothing
+  about any other student is read or shown. **Checked on dev** (the demo teacher and Ana, through the
+  API): nothing shown, Ana's download refused `403`; page 4 shown, Ana's read naming it with no URL,
+  her download the bucket's `200` with `Cache-Control: no-store` and the slide's SHA-256, the real
+  `loadDeck` opening it; page 5 read after a turn; a second deck checked ready, then its object
+  replaced through its own upload URL (the same length, within its 5 minutes), refused `mismatch`
+  with PDF.js never reached; presenting stopped, the slide gone from Ana's read and her download
+  refused `403`; the decks removed and the session ended. **Sharp:** the real lesson page in a
+  throwaway page in the preview (deleted after), its deck the test PDF through the real `loadDeck`,
+  PDF.js and the CSP, beside every board (`.claude/shots/W5/`), at 1440, 1024, 720 and 390 px, full
+  screen at 1440 × 900, 1920 × 1080 and on a phone, the tampered copy refused by the browser's own
+  check. Full screen's closes measured there: Esc, Exit full screen, a turn (stays), a question
+  asked, the slides stopped and the class over. About 416 changed lines without tests.
+
 - **2026-10-16** — **M6's part 2d: Present's slide in the live grid's place, a question first (#418);
   its frame as the board renders it, the page's width and as tall as the screen leaves; #416's two
   fixes. M6 is done.** Built from the code left on `m6-2d-present-slide` (rebased onto main after

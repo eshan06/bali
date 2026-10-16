@@ -39,22 +39,34 @@ const UNSHOWN: Record<Unshown, string> = {
 };
 
 /**
+ * The same lines on a student's lesson page (W5), StudentStates' and StudentSlideStates' words
+ * (drawn first): the slides are their teacher's, never theirs to upload again.
+ */
+const STUDENT_UNSHOWN: Record<Unshown, string> = {
+  unloaded: "Bali couldn't load the slides.",
+  mismatch: "These slides don't match the PDF your teacher uploaded, so Bali won't show them.",
+  unopened: "Bali couldn't open the slides. Try again, or reload this page.",
+  undrawn: "Bali couldn't draw this page.",
+};
+
+/**
  * A line in the slide's place with its Try again, centred in the white frame; in Present one size
- * up.
+ * up; on a student's page in their words.
  */
 export function UnshownLine({
   why,
   onAgain,
-  present = false,
+  look = 'card',
 }: {
   why: Unshown;
   onAgain: () => void;
-  present?: boolean;
+  look?: Look;
 }) {
+  const present = look === 'present';
   return (
     <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-3">
       <p role="alert" className={present ? 'text-present-line' : 'text-body'}>
-        {UNSHOWN[why]}
+        {(look === 'student' ? STUDENT_UNSHOWN : UNSHOWN)[why]}
       </p>
       <Button variant="secondary" size={present ? 'md' : 'sm'} onClick={onAgain}>
         Try again
@@ -70,13 +82,16 @@ export function UnshownLine({
  * tall as the screen leaves under Present's header and over its row (its section and the grid's fill
  * the page: `flex-1`), so a header on two lines never pushes the row off the screen: 760 px at
  * 1920 × 1080, never past 16:9 (its section a container: `100cqw`), and 9 rem at least; on a phone
- * the screen's width at 16:9, the page scrolling under it (PresentSlidePhone).
+ * the screen's width at 16:9, the page scrolling under it (PresentSlidePhone). Or a student's
+ * (W5; StudentLesson, StudentSlideFull): v2.css's `.slide`, 16:9 at the width it is given.
  */
 const FRAME = {
   card: 'aspect-video w-full min-w-0 flex-[0_1_420px] rounded-frame',
   present:
     'min-h-36 w-full flex-[1_1_0] max-h-[min(760px,calc(100cqw*9/16))] rounded-md max-sm:flex-none max-sm:aspect-video',
+  student: 'aspect-video w-full rounded-frame',
 };
+type Look = keyof typeof FRAME;
 
 /**
  * The slide: a white frame (`FRAME`), its page drawn on a canvas as large as fits (2a's
@@ -94,7 +109,7 @@ export function SlideFrame({
   deck: DeckState;
   slide: Slide;
   onReload: () => void;
-  look?: keyof typeof FRAME;
+  look?: Look;
 }) {
   const frame = useRef<HTMLElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -170,7 +185,7 @@ export function SlideFrame({
           ) : (
             <UnshownLine
               why={place}
-              present={present}
+              look={look}
               onAgain={
                 place === 'undrawn' && !failed?.unanswered
                   ? () => setRedraws((n) => n + 1)
