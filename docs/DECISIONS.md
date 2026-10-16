@@ -12,7 +12,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   click through Ask the class's own ask; its states drawn first; the panel's refusal checks are Your
   questions' one copy. L7b is done.** Built to
   [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4): LessonAsk, and
-  LessonAskStates, drawn first as intermediate states (versions 56, 57): the list loading, didn't load and
+  LessonAskStates, drawn first as intermediate states (versions 56 to 58): the list loading, didn't load and
   none saved; an Ask on its way, with no answer, after the session ended, too many tries and refused;
   a question opened elsewhere meanwhile (#PRNUM). **The panel** (`PickPanel`, `components/ask-panel.tsx`):
   Ask a question, and a closed question's Ask another question, open it on Written ahead, the
@@ -22,7 +22,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   question turns it into LessonWrite's 460 px form, as drawn, what is written kept until it is asked or
   cancelled (Close and Escape keep the form, so the panel opens on it again). **Read each time it
   opens**, as the student panel reads its moments: Loading… under Written ahead, Your questions' line
-  with Try again, or LessonStates' "No saved questions yet."; Write a new question works throughout.
+  with Try again, or LessonStates' "No saved questions yet."; Write a new question works throughout,
+  but while an ask is on its way.
   **An Ask is Ask the class's own** (`useLiveQuestion`'s `ask`, #390's guards): one at a time, every
   Ask held meanwhile, the same words resent under the same id while their answer never came (L6), the
   panel closing once Bali has asked it and focus going to the question on the card; the ask's `from`
@@ -30,11 +31,14 @@ a real decision? Add a dated entry at the top: what was decided and why.
   over the words written, nor theirs under a question. Write a new question holds with the Asks
   (santa's review, both reviewers): left for the form while a question's ask was on its way, that
   ask's failure had nowhere to be said, the form saying only an ask of what is written and its Cancel
-  forgetting a failure; LessonAskStates' on-its-way panel draws it held (version 57). A question's
-  words are sent as saved: they passed the same checks when they were saved (one schema, L3b2).
-  *Known limit:* a question's ask that fails while the panel is closed, the question then removed in
-  another tab, is said nowhere, its row gone when the panel opens again; the card shows no question,
-  which is true, and every other question asks as ever. **Never in Present** (the owner,
+  forgetting a failure; LessonAskStates' on-its-way panel draws it held (version 57). And that Cancel
+  forgets only an ask of what is written (round 2: an ask that failed with the panel closed, the list
+  still loading as it opened again, then Write a new question and Cancel, was erased unsaid): a
+  question's failure waits under it however the panel is left, until another ask (version 58's
+  label). A question's words are sent as saved: they passed the same checks when they were saved (one
+  schema, L3b2). *Known limit:* a question's ask that fails while the panel is closed, the question
+  then removed in another tab, is said nowhere, its row gone when the panel opens again; the card
+  shows no question, which is true, and every other question asks as ever. **Never in Present** (the owner,
   2026-10-15): it names the correct answers, so both views draw only while `panel` holds, which
   Present never does, pinned by `present.test.ts`. **One copy of the refusal checks** (#390's review):
   the panel's write form checked and worded what Bali refuses in a copy of its own; it now checks with

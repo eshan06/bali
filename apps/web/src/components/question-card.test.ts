@@ -465,8 +465,15 @@ describe('its hook (L6’s logic, held for one session)', () => {
     expect(hook).toMatch(/return cancelled \? null : answer;/);
     expect(hook).toMatch(/askingNow\.current = false;\s*setOpening\(IDLE\);/);
     expect(source).toMatch(/const IDLE: Opening = \{ busy: false, failure: null, from: null \};/);
-    // Cancel forgets a failure said, whichever ask it was.
-    expect(hook).toMatch(/setOpening\(\(cur\) => \(\{ \.\.\.cur, failure: null \}\)\);/);
+    // Cancel, the write form's, forgets what was written: its ask's failure, and one still on its
+    // way; never an ask of one of the teacher's questions, whose failure waits under it in their list
+    // however the panel was left meanwhile (santa's review, round 2).
+    expect(hook).toMatch(
+      /askedFrom\.current = from;\s*setOpening\(\{ busy: true, failure: null, from \}\);/,
+    );
+    expect(hook).toMatch(
+      /const forgetAsk = useCallback\(\(\) => \{\s*if \(askedFrom\.current !== null\) return;\s*asks\.current \+= 1;\s*setOpening\(\(cur\) => \(\{ \.\.\.cur, failure: null \}\)\);\s*\}, \[\]\);/,
+    );
     // An open's answer, its replay's too, never over a question asked after it.
     expect(hook).toMatch(
       /if \(answer\.kind === 'opened' && answer\.question\.id >= newest\.current\) \{\s*put\(session, answer\.question\);/,

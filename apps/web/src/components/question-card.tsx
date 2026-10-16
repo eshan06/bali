@@ -101,8 +101,10 @@ export function useLiveQuestion(sessionId: string | null) {
   // a panel opened again shows it busy, so no second press sends the words under a second id.
   const [opening, setOpening] = useState<Opening>(IDLE);
   const askingNow = useRef(false);
-  // Cancel forgets the last ask's failure, and one still on its way.
+  // Cancel forgets the last ask's failure, and one still on its way, of the words written alone:
+  // what the last ask asked (`Opening.from`), null for them.
   const asks = useRef(0);
+  const askedFrom = useRef<string | null>(null);
 
   const put = useCallback((session: string | null, question: TeacherQuestion | null) => {
     const before = now.current.question;
@@ -150,6 +152,7 @@ export function useLiveQuestion(sessionId: string | null) {
     setHeld(now.current);
     askingNow.current = false;
     setOpening(IDLE);
+    askedFrom.current = null;
     if (sessionId !== null) void read(sessionId);
     return () => {
       window.clearTimeout(retry.current);
@@ -207,6 +210,7 @@ export function useLiveQuestion(sessionId: string | null) {
       if (session === null || askingNow.current) return null;
       askingNow.current = true;
       const mine = (asks.current += 1);
+      askedFrom.current = from;
       setOpening({ busy: true, failure: null, from });
       const attempt = openAttemptFor(unansweredOpen.current, session, draft);
       const answer = await openQuestion(api, attempt);
@@ -229,7 +233,10 @@ export function useLiveQuestion(sessionId: string | null) {
     },
     [api, put],
   );
+  // The write form's Cancel: never an ask of one of the teacher's questions, whose failure waits
+  // under it in their list however the panel was left meanwhile (santa's review, round 2).
   const forgetAsk = useCallback(() => {
+    if (askedFrom.current !== null) return;
     asks.current += 1;
     setOpening((cur) => ({ ...cur, failure: null }));
   }, []);

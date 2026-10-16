@@ -584,7 +584,7 @@ describe('on the class page', () => {
     expect(page).toMatch(/<PickPanel[^]*?onAsked=\{asked\}/);
   });
 
-  it('Cancel drops what was written and a failure said; Close and Escape keep both', () => {
+  it('Cancel drops what was written and its ask’s failure; Close and Escape keep both', () => {
     expect(page).toMatch(
       /onCancel=\{\(\) => \{\s*setWriting\(false\);\s*setDraft\(NEW_DRAFT\);\s*forgetAsk\(\);\s*closePanel\(\);/,
     );
