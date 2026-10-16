@@ -27,8 +27,14 @@ describe('YourPhone', () => {
       [{ kind: 'not_in' }, 'absent', 'Not in', 'class="lucide lucide-circle shrink-0"'],
       [{ kind: 'unlocked' }, 'unlocked', 'Unlocked', 'lucide-lock-open'],
       [{ kind: 'protection_off' }, 'protection_off', 'Screen Time off', 'lucide-shield-off'],
-      [{ kind: 'silent', minutes: 3, since: SINCE }, 'silent', 'Silent · 3 min', 'lucide-wifi-off'],
-      [{ kind: 'unknown' }, 'unknown', 'Unknown · refresh', 'lucide-circle-question-mark'],
+      // Silent's minutes in a span of their own: kept out of what a screen reader hears each minute.
+      [
+        { kind: 'silent', minutes: 3, since: SINCE },
+        'silent',
+        'Silent|\u00a0· 3 min',
+        'lucide-wifi-off',
+      ],
+      [{ kind: 'unknown' }, 'unknown', 'Unknown\u00a0· refresh', 'lucide-circle-question-mark'],
     ];
     for (const [chip, grid, label, icon] of cases) {
       const html = phone(chip);
@@ -61,6 +67,15 @@ describe('YourPhone', () => {
       expect(html).toMatch(/border-dashed border-border-strong/);
       expect(html).not.toMatch(/focused/);
     }
+  });
+
+  it('says Silent’s minutes with the state as it changes, never on their own as each one turns', () => {
+    // The board's `.lbl`: one span for the words, the minutes in it, out of the status region's
+    // announcements, which still say the whole chip whenever its state changes.
+    expect(phone({ kind: 'silent', minutes: 3, since: SINCE })).toMatch(
+      /<\/svg><span>Silent<span aria-live="off">\u00a0· 3 min<\/span><\/span><\/span><\/p>$/,
+    );
+    expect(phone({ kind: 'focused' })).toMatch(/<\/svg><span>Focused<\/span><\/span><\/p>$/);
   });
 
   it('says Checking… before Bali first answers, and nothing as of then', () => {

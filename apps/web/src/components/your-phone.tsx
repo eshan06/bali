@@ -11,7 +11,7 @@ import { CHIP, CHIP_PILL, DOT } from './live-grid';
  * reads greener than the teacher's tile, in the app's words ("Not in", "Screen Time off"); a state
  * this page has no chip for in the grid's Unknown, its words saying what to do (StudentChipStates).
  */
-function look(chip: PhoneChip): { display: GridDisplay; label: string } {
+function look(chip: PhoneChip): { display: GridDisplay; label: string; minutes?: number } {
   switch (chip.kind) {
     case 'focused':
       return { display: 'focused', label: 'Focused' };
@@ -22,7 +22,7 @@ function look(chip: PhoneChip): { display: GridDisplay; label: string } {
     case 'protection_off':
       return { display: 'protection_off', label: 'Screen Time off' };
     case 'silent':
-      return { display: 'silent', label: `Silent · ${chip.minutes} min` };
+      return { display: 'silent', label: 'Silent', minutes: chip.minutes };
     case 'unknown':
       return { display: 'unknown', label: CHIP.unknown.label };
   }
@@ -32,7 +32,8 @@ function look(chip: PhoneChip): { display: GridDisplay; label: string } {
  * "Your phone" and its chip (`.s-phone`; StudentLesson's head, StudentHome's live card): the
  * student's own phone as the lesson's read says it (`phoneChip`); Checking… before Bali first
  * answers (`chip` null; StudentPhoneStates); and while the page can't reach Bali, the chip kept
- * "as of" the last good read (`asOf`; StudentPhoneStates, StudentChipStates).
+ * "as of" the last good read (`asOf`; StudentPhoneStates, StudentChipStates). A status region, so
+ * a screen reader hears each change, but Silent's minutes as they tick: those are said with it.
  */
 export function YourPhone({
   chip,
@@ -54,7 +55,12 @@ export function YourPhone({
       ) : (
         <span className={`${CHIP_PILL} ${CHIP[shown.display].tone}`}>
           {Icon ? <Icon size={13} aria-hidden="true" className="shrink-0" /> : null}
-          {shown.label.replaceAll(' · ', DOT)}
+          <span>
+            {shown.label.replaceAll(' · ', DOT)}
+            {shown.minutes === undefined ? null : (
+              <span aria-live="off">{`${DOT}${shown.minutes} min`}</span>
+            )}
+          </span>
         </span>
       )}
       {at === null ? null : (

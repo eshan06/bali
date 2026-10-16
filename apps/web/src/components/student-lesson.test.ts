@@ -319,7 +319,7 @@ describe('the lesson page while the class runs', () => {
     expect(html).toContain(`ends <time dateTime="${BELL}">${bellTime(BELL)}</time>`);
     // The student's own phone at its end, on a line of its own on a phone, as ClassLive's controls.
     expect(html).toMatch(
-      /<\/p><div class="ml-auto flex flex-wrap items-center gap-2 max-sm:ml-0 max-sm:basis-full"><p role="status" class="inline-flex flex-wrap items-center gap-2"><span class="text-caption text-text-tertiary">Your phone<\/span><span class="[^"]*">[^]*?Focused<\/span><\/p><\/div><\/header>/,
+      /<\/p><div class="ml-auto flex flex-wrap items-center gap-2 max-sm:ml-0 max-sm:basis-full"><p role="status" class="inline-flex flex-wrap items-center gap-2"><span class="text-caption text-text-tertiary">Your phone<\/span><span class="[^"]*">[^]*?<span>Focused<\/span><\/span><\/p><\/div><\/header>/,
     );
   });
 
@@ -373,10 +373,11 @@ describe('the student’s own phone beside the class’s name (StudentPhoneState
   /** The phone's chip in the head: its classes, its icon, its words. */
   const chip = (html: string) => {
     const m =
-      /<span class="text-caption text-text-tertiary">Your phone<\/span><span class="([^"]*)">(<svg[^>]*>)[^]*?<\/svg>([^<]*)<\/span>/.exec(
+      /<span class="text-caption text-text-tertiary">Your phone<\/span><span class="([^"]*)">(<svg[^>]*>)[^]*?<\/svg><span>([^]*?)<\/span><\/span>/.exec(
         html,
       );
-    return { classes: (m?.[1] ?? '').split(' '), icon: m?.[2] ?? '', words: m?.[3] ?? '' };
+    const said = words(m?.[3] ?? '').join('');
+    return { classes: (m?.[1] ?? '').split(' '), icon: m?.[2] ?? '', words: said };
   };
   /** The phone's line under the head: its icon and its words. */
   const line = (html: string) => {
@@ -471,7 +472,7 @@ describe('the student’s own phone beside the class’s name (StudentPhoneState
         onRetry: () => {},
       }),
     );
-    expect(chip(html).words).toBe('Silent · 3 min');
+    expect(chip(html).words).toBe('Silent\u00a0· 3 min');
     expect(chip(html).classes).toEqual(
       expect.arrayContaining([
         'border-dashed',
@@ -491,7 +492,7 @@ describe('the student’s own phone beside the class’s name (StudentPhoneState
   it('is the grid’s Unknown for a state this page has no chip for, with no line (StudentChipStates)', () => {
     const newer = { state: 'charging', lastSeenAt: null } as unknown as Presentation['phone'];
     const html = render(live({ phone: newer }));
-    expect(chip(html).words).toBe('Unknown · refresh');
+    expect(chip(html).words).toBe('Unknown\u00a0· refresh');
     expect(chip(html).classes).toEqual(
       expect.arrayContaining([
         'border-dashed',
@@ -518,7 +519,7 @@ describe('the student’s own phone beside the class’s name (StudentPhoneState
       }),
     );
     const asOf = new Date(AS_OF).toISOString();
-    expect(chip(html).words).toBe('Silent · 3 min');
+    expect(chip(html).words).toBe('Silent\u00a0· 3 min');
     expect(html).toContain(
       `<span class="text-caption text-text-tertiary">as of <time dateTime="${asOf}">${bellTime(asOf)}</time></span></p></div></header>`,
     );

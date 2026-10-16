@@ -19,7 +19,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   (`YourPhone`, `components/your-phone.tsx`): "Your phone" and the chip in the grid's tint, icon and
   edge for its state (`CHIP`), so it never reads greener than the teacher's tile, in the app's words
   (Not in, Screen Time off), Silent with its minutes; Checking… before Bali first answers; and while
-  reads fail, the last good read's chip "as of" its time. **Silent's minutes stop at that time**
+  reads fail, the last good read's chip "as of" its time. It is a status region, as the boards mark
+  it, so a screen reader hears each change of state; Silent's minutes sit in a part of it that
+  announces nothing (`aria-live="off"`), so they're said with the state, never on their own each
+  minute (santa's review). **Silent's minutes stop at that time**
   (W2 left the call to W4, #333): a chip "as of 9:41" whose minutes counted on would claim minutes no
   read vouched for; read again, they count on as the grid's do. A Silent with no time, which W1 never
   sends, reads as Unknown. **The line under the head** is StudentPhoneStates' words, the Unlocked
@@ -31,7 +34,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   banner over everything (the phone's line jumps down as the network drops). **The home's live
   card** ends on Open the lesson (`/lessons/<class>/<session>`) and the chip, which the card reads
   from the lesson's own read (`followLesson`, every 2 s while the tab is visible), never from `/v1/me`
-  (decision 13: never greener than the grid), with no line (the lines are the lesson page's). A read
+  (decision 13: never greener than the grid), with no line (the lines are the lesson page's). Each
+  card reads its own lesson, so two classes in session at once (rare) read twice: 60 of the
+  account's 120 a minute while the home is in view, as two lesson tabs in view would (decision 6's
+  known limit, which the owner kept on 2026-10-12). A read
   saying the session is over, or refusing it (the student left or was removed from the class), has
   the home read the account again at once and stops that card's reads (`lessonGone`), so a class
   the teacher ends early leaves its card within about 2 s (W3's review); and the home reads the
