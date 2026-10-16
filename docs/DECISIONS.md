@@ -58,8 +58,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   PDF.js and the CSP, beside every board (`.claude/shots/W5/`), at 1440, 1024, 720 and 390 px, full
   screen at 1440 × 900, 1920 × 1080 and on a phone, the tampered copy refused by the browser's own
   check. Full screen's closes measured there: Esc, Exit full screen, a turn (stays), a question
-  asked, the slides stopped and the class over. About 425 changed lines without tests. **Santa's
-  review** (both reviewers, round 1): no blockers. Taken from the WARNs both raised: a full-screen
+  asked, the slides stopped and the class over. About 431 changed lines without tests, some 35 of
+  them `useSlide`'s deck load moved unchanged, so one PR. **Santa's review** (both reviewers, round
+  1): no blockers. Taken from the WARNs both raised: a full-screen
   slide closed while the browser was still going full screen (Esc, a second Enter on Exit full
   screen, a question arriving that moment) left the page in the browser's full screen with no slide;
   the request now takes the page out again once it lands (`enterFullscreen` keeps whether the page
