@@ -219,10 +219,34 @@ describe('the guard is the server’s alone (ARCHITECTURE, Live lesson, decision
     expect(bars(withheld)).toEqual([]);
   });
 
+  // A comparison of N, either way round, or of anything with the guard's 3 (or 2), either way round.
+  const THRESHOLD =
+    /\banswered\s*[<>]=?\s*\w|\w\s*[<>]=?\s*(?:[\w?]+\.)*answered\b|[<>]=?\s*[23]\b(?!\.)|\b[23]\s*[<>]/;
+
+  it('sees a threshold written either way round, and none in the card’s own markup', () => {
+    for (const threshold of [
+      'question.answered < 3',
+      'totals?.answered >= MIN',
+      '3 <= question.answered',
+      'MIN > totals?.answered',
+      'counts.length >= 3',
+      '2 < n',
+    ]) {
+      expect(threshold).toMatch(THRESHOLD);
+    }
+    for (const markup of [
+      'answered={totals?.answered ?? 0}',
+      '<span className="text-text-secondary">of {eligible} answered</span>',
+      '<span className="font-num text-data-lg tabular-nums">{answered}</span>',
+      'className="flex flex-wrap items-center gap-x-4 gap-y-3">',
+    ]) {
+      expect(markup).not.toMatch(THRESHOLD);
+    }
+  });
+
   it('works out no threshold of its own, in either file that draws a question’s totals', () => {
-    // No comparison of N, and none against the guard's 3 (or 2), anywhere in either file's code.
     for (const file of ['./report-questions.tsx', './question-card.tsx']) {
-      expect(source(file)).not.toMatch(/\banswered\s*[<>]=?\s*\w|[<>]=?\s*[23]\b(?!\.)/);
+      expect(source(file)).not.toMatch(THRESHOLD);
     }
     expect(source('./report-questions.tsx')).toMatch(/question\.counts === null \?/);
   });

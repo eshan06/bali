@@ -26,8 +26,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   moved out of `QuestionCard` into `Options` and `answeredLine` (`components/question-card.tsx`), which
   both cards draw, so the two never differ; the class page's card renders as before, its tests
   unchanged. **The guard is the server's alone** ("Settled": the guard wherever counts are read): the
-  card keys on `counts`, null under 3 answers, never on N, and a test fails if either file compares N
-  or holds a threshold. **Its own read** (`readSessionQuestions`, `lib/reports.ts`), started with the
+  card keys on `counts`, null under 3 answers, never on N (its tests draw a breakdown the server gave
+  at 2 answers, and withhold one it didn't at 21), and a test fails if either file's code compares N,
+  or anything with 2 or 3, either way round (santa's review). **Its own read** (`readSessionQuestions`,
+  `lib/reports.ts`), started with the
   page's three, fails on its own, as L3c's route was made for: the report stands, the card's Try
   again reads the questions again, and the page's Try again reads them too. **None asked: no card**,
   as no Unlocks table follows a session with no unlocks; most sessions ask none. *Weighed:* a line
