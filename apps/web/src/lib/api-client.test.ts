@@ -428,6 +428,35 @@ describe('api-client', () => {
       expect(vi.mocked(captureApiFailure).mock.calls).toEqual([['POST', PATH, 'network']]);
     });
 
+    it('fails a read given one the same way: the student home’s 30 s read of the account (W4’s follow-up)', async () => {
+      const onUnauthorized = vi.fn();
+      const api = createApiClient({
+        baseUrl: 'http://api',
+        getToken: () => 'tok',
+        onUnauthorized,
+        fetchImpl: (_url, init) => swallowed(init),
+      });
+      const read = api.get('/v1/me', LIMIT);
+      const settled = vi.fn();
+      read.then(settled, settled);
+      await vi.advanceTimersByTimeAsync(LIMIT - 1);
+      expect(settled).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(settled).toHaveBeenCalledOnce();
+      await expect(read).rejects.toBeInstanceOf(NetworkError);
+      expect(onUnauthorized).not.toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+      expect(vi.mocked(captureApiFailure).mock.calls).toEqual([['GET', '/v1/me', 'network']]);
+      // Answered in time: its body, and no timer left.
+      const answered = createApiClient({
+        baseUrl: 'http://api',
+        getToken: () => 'tok',
+        fetchImpl: () => Promise.resolve(jsonResponse({ ok: 1 })),
+      });
+      await expect(answered.get('/v1/me', LIMIT)).resolves.toEqual({ ok: 1 });
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
     it('clears its timer once answered: a body, a refusal, a 401, no network, not JSON', async () => {
       const replies: (() => Promise<Response>)[] = [
         () => Promise.resolve(jsonResponse({ outcome: 'answered' })),

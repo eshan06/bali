@@ -16,8 +16,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   reads 30 s after each answer, one read at a time; nothing while the tab is hidden, its read as the
   tab comes back covering that, and 30 s counted afresh from there; the home stops it while a class is
   in session, the bell and the lesson's reads taking over. The read is the shell's `refresh`: none
-  over a read on its way, and what the page shows kept until the answer, so a failure is said once,
-  as "Bali couldn't load your classes." with Try again, and the next read tries again 30 s on. Two
+  over a read on its way; within a poll's 10 s (`get` takes `post`'s limit, as #334 gave the polls;
+  santa's review), so a read the network swallows fails and is said like any, never holding the next
+  for minutes; and what the page shows kept until the answer, so a failure is said once, as "Bali
+  couldn't load your classes." with Try again, and the next read tries again 30 s on. Two
   requests a read (the 13+ check, then `/v1/me`): 4 a minute of the account's 120, none while a class
   is in session. No new screen and no new words (#409). *Weighed:* the shell's own `load`, which
   clears the failure as it starts: while Bali can't be reached, the failure line would go and come

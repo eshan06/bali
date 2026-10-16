@@ -240,7 +240,7 @@ describe('the shell’s wiring of the rulings (read from its source)', () => {
 
   it('reads again for the student home’s 30 s only when no read is on its way, its failure kept until an answer, so it isn’t said afresh each time (the owner, 2026-10-16)', () => {
     expect(shell).toMatch(
-      /const refresh = useCallback\(async \(\) => \{\s*if \(reading\.current\) return;\s*reading\.current = true;\s*const said = await readAccount\(api, reads\);\s*\/\/ A newer read is under way: its answer is the one that counts\.\s*if \(said === null\) return;\s*reading\.current = false;\s*if \('home' in said\) \{\s*setHome\(said\.home\);\s*setError\(null\);\s*\} else setError\(said\.error\);\s*\}, \[api\]\);/,
+      /const refresh = useCallback\(async \(\) => \{\s*if \(reading\.current\) return;\s*reading\.current = true;\s*const limited = \{ get: <T,>\(path: string\) => api\.get<T>\(path, POLL_TIMEOUT_MS\) \};\s*const said = await readAccount\(limited, reads\);\s*\/\/ A newer read is under way: its answer is the one that counts\.\s*if \(said === null\) return;\s*reading\.current = false;\s*if \('home' in said\) \{\s*setHome\(said\.home\);\s*setError\(null\);\s*\} else setError\(said\.error\);\s*\}, \[api\]\);/,
     );
     // Every read sets `reading` as it starts, the shell's own (`load`) too.
     expect(shell).toMatch(

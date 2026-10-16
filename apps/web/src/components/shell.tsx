@@ -24,7 +24,7 @@ import {
   useState,
 } from 'react';
 
-import { type ApiClient, UnauthorizedError } from '@/lib/api-client';
+import { type ApiClient, POLL_TIMEOUT_MS, UnauthorizedError } from '@/lib/api-client';
 import { endSession, getAccessToken } from '@/lib/auth';
 import { errText } from '@/lib/errors';
 import { type Home, homeFor } from '@/lib/student-web';
@@ -390,12 +390,14 @@ export function Shell({ children }: { children: ReactNode }) {
     [api],
   );
 
-  // The student home's read every 30 s: never over a read on its way, and its failure, if one was
-  // said, kept until an answer, so it isn't said afresh every 30 s while Bali can't be reached.
+  // The student home's read every 30 s: never over a read on its way, within a poll's 10 s (#334),
+  // and its failure, if one was said, kept until an answer, so it isn't said afresh every 30 s
+  // while Bali can't be reached.
   const refresh = useCallback(async () => {
     if (reading.current) return;
     reading.current = true;
-    const said = await readAccount(api, reads);
+    const limited = { get: <T,>(path: string) => api.get<T>(path, POLL_TIMEOUT_MS) };
+    const said = await readAccount(limited, reads);
     // A newer read is under way: its answer is the one that counts.
     if (said === null) return;
     reading.current = false;
