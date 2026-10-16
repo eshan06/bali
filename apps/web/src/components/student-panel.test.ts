@@ -139,9 +139,12 @@ describe('the student panel’s states, as PanelStates draws them', () => {
       `Back in focus ${t(28)}`,
       `Unlocked No reason given ${t(29)}`,
     ]);
-    // The reason in the secondary ink under its words; the time at the right, tertiary.
+    // The reason in the secondary ink under its words; the time at the right, tertiary, its
+    // instant in machine-readable form (the shared timeline's since PV17c).
     expect(html).toMatch(
-      /<p class="pt-0\.75 text-data font-normal">Unlocked<small class="block text-tile-line font-normal text-text-secondary">Nurse<\/small><\/p><span class="pt-1 text-tile-line text-text-tertiary">/,
+      new RegExp(
+        `<p class="pt-0\\.75 text-data font-normal wrap-anywhere">Unlocked<small class="block text-tile-line font-normal text-text-secondary">Nurse<\\/small><\\/p><time dateTime="${at(24).toISOString()}" class="pt-1 text-tile-line text-text-tertiary">`,
+      ),
     );
   });
 

@@ -249,23 +249,33 @@ export function placement(at: number, start: number, end: number): number {
 const STEPS = [5, 10, 15, 30, 60, 120];
 
 /**
+ * A time without its AM or PM, "9:31", by `clock` (the viewer's locale and zone unless given): the
+ * recap's ticks between its axis's ends, and each of today's moments in Home's Recent activity
+ * (Main).
+ */
+export function bareTime(
+  at: number,
+  clock = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }),
+): string {
+  return clock
+    .formatToParts(at)
+    .filter((p) => p.type !== 'dayPeriod')
+    .map((p) => p.value)
+    .join('')
+    .trim();
+}
+
+/**
  * The recap's axis (ClassEnded): its first and last times with AM or PM, the ticks between
  * without, 6 gaps or fewer: a tick each 10 minutes for 50.
  */
 function axis(start: number, end: number, clock: Intl.DateTimeFormat) {
   const span = end - start;
   const step = (STEPS.find((m) => span <= m * 60_000 * 6) ?? 120) * 60_000;
-  const bare = (t: number) =>
-    clock
-      .formatToParts(t)
-      .filter((p) => p.type !== 'dayPeriod')
-      .map((p) => p.value)
-      .join('')
-      .trim();
   const ticks = [{ x: 0, label: clock.format(start) }];
   // None nearer the end than a whole gap, so its label never runs into the end's.
   for (let t = start + step; end - t >= step; t += step) {
-    ticks.push({ x: placement(t, start, end), label: bare(t) });
+    ticks.push({ x: placement(t, start, end), label: bareTime(t, clock) });
   }
   ticks.push({ x: 100, label: clock.format(end) });
   return { ticks, step: span > 0 ? (step / span) * 100 : 100 };

@@ -9,6 +9,7 @@ import {
   taughtSessionsSince,
 } from '@bali/db';
 import {
+  ACTIVITY_EVENT_TYPES,
   ACTIVITY_LIMIT,
   type ActivityEventType,
   type ActivityResponse,
@@ -28,6 +29,14 @@ import { requireOwnClass, requireTeacher } from '../auth/teacher.js';
 import { ApiError, parseRequest } from '../errors.js';
 import { refusal } from './errors.js';
 import { teacherQuestion } from './questions.js';
+
+/**
+ * What Recent activity reads of today's sessions: its three kinds, and the reasons' changes that
+ * give an unlock its reason now (A20). All `sessionReport` needs to list a session's unlocks and
+ * protection offs, whatever else happened (PV3's review: narrowed once Home reads it again every
+ * 15 s, PV17c); the tests hold its answer to each session's report, read whole.
+ */
+const ACTIVITY_READ = [...ACTIVITY_EVENT_TYPES, 'unlock_reason_changed'] as const;
 
 const Params = z.object({ id: z.string().uuid(), sessionId: z.string().uuid() });
 const ClassParams = z.object({ id: z.string().uuid() });
@@ -220,10 +229,11 @@ export function registerReportsRoutes(app: FastifyInstance, db: Database, clock:
       const todays = await taughtSessionsSince(db, teacher.id, today);
       if (todays.length === 0) return { events: [] };
 
-      // Every event of those sessions in one statement, as R3 reads a page's.
+      // Those sessions' events of the kinds it lists in one statement, as R3 reads a page's.
       const events = await sessionEvents(
         db,
         todays.map(({ session }) => session.id),
+        ACTIVITY_READ,
       );
       const moments = todays.flatMap(({ session, className }) => {
         const own = events.filter((e) => e.sessionId === session.id);

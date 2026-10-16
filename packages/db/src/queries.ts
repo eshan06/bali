@@ -984,9 +984,11 @@ export interface ReportEventRow extends FeedEventRow {
  * Every event of these sessions, in seq order: what each one's report counts (R2, R3:
  * `sessionReport`), each with its session and its student's display name now, read in one
  * statement. By the session, never the roster, so a student removed from the class since is still
- * there. Unexecuted, so a test can EXPLAIN it.
+ * there. `types`, when given, reads those kinds alone: Recent activity's, which Home reads again
+ * every 15 s (PV17c). Unexecuted, so a test can EXPLAIN it.
  */
-export function sessionEvents(db: Database, sessionIds: string[]) {
+export function sessionEvents(db: Database, sessionIds: string[], types?: readonly EventType[]) {
+  const ofSessions = inArray(events.sessionId, sessionIds);
   return db
     .select({
       sessionId: events.sessionId,
@@ -1000,7 +1002,7 @@ export function sessionEvents(db: Database, sessionIds: string[]) {
     })
     .from(events)
     .leftJoin(users, eq(users.id, events.userId))
-    .where(inArray(events.sessionId, sessionIds))
+    .where(types ? and(ofSessions, inArray(events.type, [...types])) : ofSessions)
     .orderBy(asc(events.seq));
 }
 
