@@ -107,9 +107,11 @@ export interface SlideAttempt extends SlideChange {
 /**
  * The attempt to send `change` to `sessionId` as. The last one sent whose answer never came may
  * have landed, so the same change for the same session resends it, under its id, answered by its
- * replay. Else a fresh one, its id minted after the change the session holds (`held`) and after
- * that unanswered one, however far behind this computer's clock stands: a change applies only
- * when its id sorts after the one held (M3a), so the teacher's last press is the one shown.
+ * replay, while no later change is held: under one (another window's, heard since), it could only
+ * replay that one, and the press would change nothing. Else a fresh one, its id minted after the
+ * change the session holds (`held`) and after that unanswered one, however far behind this
+ * computer's clock stands: a change applies only when its id sorts after the one held (M3a), so
+ * the teacher's last press is the one shown.
  */
 export function slideAttemptFor(
   unanswered: SlideAttempt | null,
@@ -119,7 +121,8 @@ export function slideAttemptFor(
   now = Date.now(),
 ): SlideAttempt {
   const mine = unanswered?.sessionId === sessionId ? unanswered : null;
-  if (mine && mine.deckId === change.deckId && mine.page === change.page) return mine;
+  const same = mine?.deckId === change.deckId && mine.page === change.page;
+  if (mine && same && (held === null || !after(held, mine.eventId))) return mine;
   const latest = [held, mine?.eventId]
     .flatMap((id) => (id ? [key(id)] : []))
     .sort()
@@ -144,6 +147,14 @@ export type SlideAnswer =
 /** The refusals that say a deck can't be shown. */
 const GONE: readonly string[] = ['deck_not_found', 'deck_not_ready', 'deck_rejected'];
 
+/**
+ * How long a slide change waits for its whole answer before it fails as no answer, for Try again
+ * to resend it under its id: as a student's answer does (#407's review), and about what a poll
+ * waits (`POLL_TIMEOUT_MS`, #334). A half-open connection never fails by itself, and a page turned
+ * in front of a class can't wait minutes for the browser to give up.
+ */
+export const SLIDE_TIMEOUT_MS = 10_000;
+
 /** Send `attempt` (`POST /v1/sessions/{id}/slide`): show its page, or stop presenting. */
 export async function showSlide(
   api: Pick<ApiClient, 'post'>,
@@ -151,7 +162,8 @@ export async function showSlide(
 ): Promise<SlideAnswer> {
   const { sessionId, ...body } = attempt;
   try {
-    const res = await api.post<SlideResponse>(`/v1/sessions/${sessionId}/slide`, body);
+    const path = `/v1/sessions/${sessionId}/slide`;
+    const res = await api.post<SlideResponse>(path, body, SLIDE_TIMEOUT_MS);
     return { kind: 'shown', slide: res.slide, eventId: res.eventId };
   } catch (e) {
     if (e instanceof ApiError && e.reason === 'session_not_running') return { kind: 'over' };
@@ -184,7 +196,11 @@ const drawing = new WeakMap<HTMLCanvasElement, () => void>();
  * projector alike. Drawn first on a canvas of its own, then copied whole, so a page turning never
  * shows a blank one. A draw still running on the same canvas is cancelled, so the last page asked
  * for is the one shown, never an older one that finished later; `signal` stops it too (the page
- * going). Its text comes back for the slide's label, empty when PDF.js reads none.
+ * going). Its text comes back for the slide's label, empty when PDF.js reads none. What a draw
+ * holds is let go once it ends, as PDF.js's own viewer lets go of pages it no longer shows: its
+ * own canvas, emptied (Safari caps a tab's canvases), and the page's drawing instructions and
+ * decoded images (`cleanup`), so paging through a deck of 200 photos never holds them all until
+ * the deck closes; drawing the page again reads them again.
  */
 export async function drawPage(
   pdf: Pick<PDFDocumentProxy, 'getPage'>,
@@ -196,6 +212,8 @@ export async function drawPage(
   drawing.get(canvas)?.();
   let stopped = false;
   let task: RenderTask | null = null;
+  let proxy: PDFPageProxy | null = null;
+  let scratch: HTMLCanvasElement | null = null;
   const stop = () => {
     stopped = true;
     task?.cancel();
@@ -204,27 +222,38 @@ export async function drawPage(
   signal?.addEventListener('abort', stop);
   if (signal?.aborted) stop();
   try {
-    const proxy = await pdf.getPage(page);
+    proxy = await pdf.getPage(page);
     if (stopped) return { kind: 'cancelled' };
     const ratio = canvas.ownerDocument.defaultView?.devicePixelRatio ?? 1;
     const whole = proxy.getViewport({ scale: 1 });
     const scale = Math.min(box.width / whole.width, box.height / whole.height) * ratio;
     const viewport = proxy.getViewport({ scale });
-    const scratch = canvas.ownerDocument.createElement('canvas');
-    scratch.width = Math.max(1, Math.round(viewport.width));
-    scratch.height = Math.max(1, Math.round(viewport.height));
+    const width = Math.max(1, Math.round(viewport.width));
+    const height = Math.max(1, Math.round(viewport.height));
+    // A page whose size is no number (a crafted file's, read as Infinity), or a box that isn't
+    // one: nothing to draw, and the canvas kept as it was.
+    if (!Number.isFinite(width) || !Number.isFinite(height)) return { kind: 'undrawn' };
+    scratch = canvas.ownerDocument.createElement('canvas');
+    scratch.width = width;
+    scratch.height = height;
     task = proxy.render({ canvas: scratch, viewport });
     const [, text] = await Promise.all([task.promise, textOf(proxy)]);
     const context = canvas.getContext('2d');
     if (stopped) return { kind: 'cancelled' };
     if (!context) return { kind: 'undrawn' };
-    canvas.width = scratch.width;
-    canvas.height = scratch.height;
+    canvas.width = width;
+    canvas.height = height;
     context.drawImage(scratch, 0, 0);
     return { kind: 'drawn', text };
   } catch {
     return stopped ? { kind: 'cancelled' } : { kind: 'undrawn' };
   } finally {
+    // PDF.js waits while a draw of the page still runs, on this canvas or another.
+    proxy?.cleanup();
+    if (scratch) {
+      scratch.width = 0;
+      scratch.height = 0;
+    }
     signal?.removeEventListener('abort', stop);
     if (drawing.get(canvas) === stop) drawing.delete(canvas);
   }

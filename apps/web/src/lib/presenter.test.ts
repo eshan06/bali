@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 
 import type { Deck, FeedEvent, Slide } from '@bali/shared';
 import type { PDFDocumentProxy } from 'pdfjs-dist/legacy/build/pdf.mjs';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createApiClient } from './api-client';
 import { newEventId } from './event-id';
@@ -15,6 +15,7 @@ import {
   type Shown,
   showSlide,
   shownIn,
+  SLIDE_TIMEOUT_MS,
   slideAfter,
   type SlideAnswer,
   type SlideAttempt,
@@ -223,10 +224,25 @@ describe('slideAttemptFor', () => {
   it('resends the change whose answer never came, under its id: its replay answers it', () => {
     const unanswered = slideAttemptFor(null, SESSION, idAt(0), next, AT + 1_000);
     expect(slideAttemptFor(unanswered, SESSION, idAt(0), { ...next }, AT + 9_000)).toBe(unanswered);
-    // A later change heard meanwhile changes nothing: the resend's replay answers what is shown.
-    expect(slideAttemptFor(unanswered, SESSION, idAt(5_000), next, AT + 9_000)).toBe(unanswered);
+    // Its own change heard on the stream since: it landed, and its resend replays it.
+    const landed = unanswered.eventId;
+    expect(slideAttemptFor(unanswered, SESSION, landed, next, AT + 9_000)).toBe(unanswered);
     const stop = slideAttemptFor(null, SESSION, idAt(0), { deckId: null, page: null }, AT);
     expect(slideAttemptFor(stop, SESSION, idAt(0), { deckId: null, page: null })).toBe(stop);
+  });
+
+  it('sends the same change fresh once a later one is held: its resend could only replay that one', () => {
+    // Next to page 5 went unanswered; Present, in another window, then turned to 5 and 6, and this
+    // window heard 6: Previous asks for page 5 again, a press that must show.
+    const unanswered = slideAttemptFor(null, SESSION, idAt(0), next, AT + 1_000);
+    const later = idAt(5_000);
+    const again = slideAttemptFor(unanswered, SESSION, later, next, AT + 9_000);
+    expect(again).not.toBe(unanswered);
+    expect(again).toEqual({ sessionId: SESSION, ...next, eventId: again.eventId });
+    expect(again.eventId > later).toBe(true);
+    // Uppercase or not, as the server orders them.
+    const loud = slideAttemptFor(unanswered, SESSION, later.toUpperCase(), next, AT + 9_000);
+    expect(loud).not.toBe(unanswered);
   });
 
   it('sends another change fresh, after both the change held and the unanswered one', () => {
@@ -296,6 +312,9 @@ const unreachable = createApiClient({
 
 describe('showSlide', () => {
   const attempt: SlideAttempt = { sessionId: SESSION, deckId: DECK_A, page: 5, eventId: idAt(0) };
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
   it('sends the page under the eventId, and answers what the session shows now', async () => {
     const { client, sent } = api(200, {
@@ -386,6 +405,31 @@ describe('showSlide', () => {
     // A 200 whose body isn't JSON (a proxy's page): answered, never thrown.
     expect(await showSlide(api(200, '<html>').client, attempt)).toEqual(failed(undefined));
   });
+
+  it('fails a change whose answer never comes once SLIDE_TIMEOUT_MS is up, for Try again', async () => {
+    vi.useFakeTimers();
+    // A half-open connection: the request goes, and nothing ever answers it.
+    const swallowing = createApiClient({
+      baseUrl: 'http://api',
+      getToken: () => 'tok',
+      fetchImpl: (_, init) =>
+        new Promise<Response>((_, reject) => {
+          init?.signal?.addEventListener('abort', () =>
+            reject(new DOMException('aborted', 'AbortError')),
+          );
+        }),
+    });
+    const sent = showSlide(swallowing, attempt);
+    const settled = vi.fn();
+    void sent.then(settled);
+    await vi.advanceTimersByTimeAsync(SLIDE_TIMEOUT_MS - 1);
+    expect(settled).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(settled).toHaveBeenCalledOnce();
+    expect(await sent).toEqual({ kind: 'failed', status: undefined, retryAfter: undefined });
+    // So it stays unanswered, and Try again resends it under its id.
+    expect(keepUnanswered(attempt, await sent)).toBe(attempt);
+  });
 });
 
 // ---- drawing a page ----
@@ -428,9 +472,19 @@ function fakeScreen(ratio = 1) {
   };
 }
 
-/** One draw PDF.js was asked for: its parameters, whether it was cancelled, and its ending. */
+/** A size, in device pixels. */
+interface Size {
+  width: number;
+  height: number;
+}
+
+/**
+ * One draw PDF.js was asked for: its parameters, the size of the canvas it drew on then, whether
+ * it was cancelled, and its ending.
+ */
 interface Render {
-  params: { canvas: unknown; viewport: { width: number; height: number } };
+  params: { canvas: Size; viewport: Size };
+  size: Size;
   cancelled: boolean;
   finish: () => void;
 }
@@ -450,8 +504,8 @@ interface DeckOptions {
 }
 
 /**
- * A stand-in open deck: its pages asked for, each draw PDF.js was asked for, and each text read
- * still waiting.
+ * A stand-in open deck: its pages asked for, each draw PDF.js was asked for, each text read still
+ * waiting, and how many times a page was let go (`cleanup`).
  */
 function fakeDeck({
   width = 1600,
@@ -464,6 +518,7 @@ function fakeDeck({
   const renders: Render[] = [];
   const asked: number[] = [];
   const reads: (() => void)[] = [];
+  const counts = { cleaned: 0 };
   const proxy = {
     getViewport: ({ scale }: { scale: number }) => ({
       width: width * scale,
@@ -476,7 +531,8 @@ function fakeDeck({
         finish = resolve;
         fail = reject;
       });
-      const render: Render = { params, cancelled: false, finish };
+      const size = { width: params.canvas.width, height: params.canvas.height };
+      const render: Render = { params, size, cancelled: false, finish };
       renders.push(render);
       if (draws === 'finish') finish();
       if (draws === 'fail') fail(new Error('Invalid PDF structure.'));
@@ -494,6 +550,10 @@ function fakeDeck({
         : text === 'waits'
           ? new Promise((resolve) => reads.push(() => resolve({ items })))
           : Promise.reject(new Error('no text')),
+    cleanup: () => {
+      counts.cleaned += 1;
+      return true;
+    },
   };
   const pdf = {
     getPage: (n: number) => {
@@ -501,7 +561,7 @@ function fakeDeck({
       return page === 'opens' ? Promise.resolve(proxy) : Promise.reject(new Error('bad page'));
     },
   } as unknown as Pick<PDFDocumentProxy, 'getPage'>;
-  return { pdf, renders, asked, reads };
+  return { pdf, renders, asked, reads, counts };
 }
 
 /** A run of text as PDF.js reads one. */
@@ -524,9 +584,53 @@ describe('drawPage', () => {
     const scratch = screen.scratches[0];
     expect(renders[0]?.params.canvas).toBe(scratch);
     expect(renders[0]?.params.viewport).toEqual({ width: 840, height: 472.5 });
-    expect(scratch).toEqual({ width: 840, height: 473 });
+    expect(renders[0]?.size).toEqual({ width: 840, height: 473 });
     // …then copied whole onto the page's canvas, sized to it.
     expect(screen.copies).toEqual([{ image: scratch, x: 0, y: 0, width: 840, height: 473 }]);
+  });
+
+  it('lets go of what a draw held, however it ended: its own canvas emptied, the page cleaned up', async () => {
+    const box = { width: 420, height: 236 };
+    const drawn = fakeDeck();
+    const screen = fakeScreen();
+    await drawPage(drawn.pdf, 4, screen.canvas, box);
+    expect(screen.scratches[0]).toEqual({ width: 0, height: 0 });
+    expect(drawn.counts.cleaned).toBe(1);
+    // Cancelled mid-draw by a later one.
+    const waiting = fakeDeck({ draws: 'waits' });
+    const turning = fakeScreen();
+    const first = drawPage(waiting.pdf, 4, turning.canvas, box);
+    await settle();
+    const second = drawPage(waiting.pdf, 5, turning.canvas, box);
+    await settle();
+    expect(await first).toEqual({ kind: 'cancelled' });
+    expect(turning.scratches[0]).toEqual({ width: 0, height: 0 });
+    waiting.renders[1]?.finish();
+    await second;
+    expect(waiting.counts.cleaned).toBe(2);
+    // A draw PDF.js couldn't make.
+    const failing = fakeDeck({ draws: 'fail' });
+    const broken = fakeScreen();
+    expect(await drawPage(failing.pdf, 4, broken.canvas, box)).toEqual({ kind: 'undrawn' });
+    expect(broken.scratches[0]).toEqual({ width: 0, height: 0 });
+    expect(failing.counts.cleaned).toBe(1);
+  });
+
+  it('draws nothing for a page whose size is no number, or a box that isn’t one: the canvas kept', async () => {
+    // A crafted file's page box, read by PDF.js as Infinity.
+    const endless = fakeDeck({ width: Infinity });
+    const screen = fakeScreen();
+    const box = { width: 420, height: 236 };
+    expect(await drawPage(endless.pdf, 1, screen.canvas, box)).toEqual({ kind: 'undrawn' });
+    const plain = fakeDeck();
+    expect(await drawPage(plain.pdf, 1, screen.canvas, { width: NaN, height: 236 })).toEqual({
+      kind: 'undrawn',
+    });
+    expect(endless.renders).toEqual([]);
+    expect(plain.renders).toEqual([]);
+    expect(screen.scratches).toEqual([]);
+    expect(screen.copies).toEqual([]);
+    expect(screen.canvas).toMatchObject({ width: 300, height: 150 });
   });
 
   it('keeps a page’s shape: one taller than the box fits by its height', async () => {
