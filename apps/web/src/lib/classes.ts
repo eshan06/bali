@@ -21,6 +21,31 @@ export function liveNow(c: TaughtClass, now: number): { id: string; endsAt: stri
   return running !== null && Date.parse(running.endsAt) > now ? running : null;
 }
 
+/** A class's last session over (PV2's `lastSession`), with the class: Home's Last session. */
+export interface LastSession {
+  classId: string;
+  name: string;
+  session: NonNullable<NonNullable<TaughtClass['summary']>['lastSession']>;
+}
+
+/**
+ * The last session over among the classes (PV17c; HomeIdle): the one that ended last, of two that
+ * ended together the one that started last, then the first in the account's order. Null until a
+ * class's first session ends (PV1: no card before then).
+ */
+export function lastOf(classes: TaughtClass[]): LastSession | null {
+  const ended = classes.flatMap((c) => {
+    const session = c.summary?.lastSession ?? null;
+    return session ? [{ classId: c.id, name: c.name, session }] : [];
+  });
+  const at = (s: LastSession, end: 'endedAt' | 'startedAt') => Date.parse(s.session[end]);
+  return (
+    ended.sort(
+      (a, b) => at(b, 'endedAt') - at(a, 'endedAt') || at(b, 'startedAt') - at(a, 'startedAt'),
+    )[0] ?? null
+  );
+}
+
 /**
  * How long after a bell Classes reads the account again: a computer's clock a little ahead of the
  * server's would otherwise read it before the server's bell and still find the session running.

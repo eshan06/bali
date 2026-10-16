@@ -9,6 +9,7 @@ import {
   CLASS_NAME_MAX,
   createClass,
   daysBefore,
+  lastOf,
   liveNow,
   nextBell,
   type TaughtClass,
@@ -182,6 +183,47 @@ describe('a class live on Classes, by this computer’s clock (PV16a)', () => {
     expect(nextBell(classes, AT + 60_000)).toBe(AT + 600_000);
     expect(nextBell(classes, AT + 600_000)).toBeNull();
     expect(nextBell([], AT)).toBeNull();
+  });
+});
+
+describe('lastOf: Home’s Last session, the last session over among the classes (PV17c)', () => {
+  /** A class whose last session over ran `from` to `to` (ISO), as PV2 gives it. */
+  const ran = (id: string, from: string, to: string): TaughtClass => ({
+    ...taught(id),
+    summary: {
+      studentCount: 28,
+      runningSession: null,
+      lastSession: { id: `l-${id}`, startedAt: from, endedAt: to },
+    },
+  });
+  const t = (hhmm: string) => `2026-10-12T${hhmm}:00.000Z`;
+
+  it('is none until a class’s first session ends (PV1: no card before then)', () => {
+    expect(lastOf([])).toBeNull();
+    expect(lastOf([taught('a'), taught('b', t('15:00'))])).toBeNull();
+    expect(lastOf([{ ...taught('a'), summary: undefined }])).toBeNull();
+  });
+
+  it('is the one that ended last, with its class, whatever the classes’ order', () => {
+    const first = ran('Period 1 Biology', t('08:00'), t('08:50'));
+    const third = ran('Biology, period 3', t('09:05'), t('09:55'));
+    const friday = ran('Period 2 Biology', '2026-10-09T13:15:00.000Z', '2026-10-09T14:05:00.000Z');
+    expect(lastOf([first, third, friday, taught('none')])).toEqual({
+      classId: 'Biology, period 3',
+      name: 'Biology, period 3',
+      session: { id: 'l-Biology, period 3', startedAt: t('09:05'), endedAt: t('09:55') },
+    });
+    expect(lastOf([friday, third, first])?.classId).toBe('Biology, period 3');
+  });
+
+  it('of two that ended together, the one that started last; then the account’s order', () => {
+    const long = ran('a', t('08:00'), t('09:00'));
+    const short = ran('b', t('08:30'), t('09:00'));
+    expect(lastOf([short, long])?.classId).toBe('b');
+    expect(lastOf([long, short])?.classId).toBe('b');
+    const twin = ran('c', t('08:30'), t('09:00'));
+    expect(lastOf([short, twin])?.classId).toBe('b');
+    expect(lastOf([twin, short])?.classId).toBe('c');
   });
 });
 

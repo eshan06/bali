@@ -8,17 +8,18 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-16 (Central) — PV17c-1, Home's Recent activity (#424; `docs/DECISIONS.md`,
-2026-10-16): while a class is live, Main's Recent activity over the block's card, today's unlocks
-with their reasons, protection offs and starts, newest first, four at most, then Open the class
-while one class is live; read again every 15 s while Home is in view and at once as its tab comes
-back, never on a phone; its API read narrowed to its kinds and the reasons' changes, the same
-answer. PV17c came to about 620 changed lines without tests, so it is two PRs (the worker's split,
-the conductor's call). Its intermediate states drawn first (canvas version 74: HomeRailStates,
-HomeIdlePhone; HomeInterim no longer built). Checked on dev as the demo teacher in a browser of its
-own, an unlock read in within 15 s with no reload, two classes live and a phone's width included,
-and sharp beside every board. Before it, PV17b (#423). Next on the Windows PC: PV17c-2, Home's Last
-session, on the branch `pv17c-2-last-session`; on the Mac, the phone's L8 and M8._
+_Last updated: 2026-10-16 (Central) — PV17c-2, Home's Last session (#425; `docs/DECISIONS.md`,
+2026-10-16), the portal redesign's last step, so PV0–PV17 are done: while no class is live, the
+rail holds the last session over across the classes over the block's card, on a phone too, its class
+and times from the account, its figures from its report (who joined, the average per student, the
+unlocks, or "Nobody joined this session."), never read as running before the sweep marks it; none
+until a class's first session ends, and none from a bell until the account's read says no class
+runs, never the one before it (drawn first, canvas version 77: HomeRailStates). Checked on dev as
+the demo teacher in a browser of its own: a 2-minute session's card 3.7 s after its bell while its
+report still said `ended: false`, the same card after the sweep; nobody joined, with and without an
+unlock, after an End with Home open; a phone's width; every card the height of its board. Before
+it, PV17c-1 (#424). Next on the Windows PC: the four steps for sessions before the pilot's first
+class (Open owner items; after PV17c, the owner, 2026-10-14); on the Mac, the phone's L8 and M8._
 
 ## Now
 
@@ -45,9 +46,8 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
   keeps D1's look until the owner approves a new one (its redesign rolled back, 2026-10-06). Left:
   the push's app half (not started), TestFlight build 9 for C7's phone test (📱), and the phone's
   Phase 7 screens (L8, M8). C2's legal words (⚖️) go into the portal's pages, on the Windows PC.
-- **The portal redesign in v2's look (PV0–PV17, the owner, 2026-10-12):** PV0–PV16, PV17a, PV17b
-  and PV17c-1 done, with PV3b, PV4b, PV4c and PV5b; PV17c-2, Home's Last session, the redesign's
-  last, next on the Windows PC (its code on the branch `pv17c-2-last-session`).
+- **The portal redesign in v2's look (PV0–PV17, the owner, 2026-10-12)** ✅ (2026-10-16): every step
+  done, with PV3b, PV4b, PV4c and PV5b; the last, PV17c-2, Home's Last session (#425).
 - **The workflow review's last steps** ✅ (the owner, 2026-10-13; DECISIONS 2026-10-14): the
   migration guard (#369), docs-only PRs skipping the test jobs (#365), moved files (#368) and two
   tests (#364), each in full in `docs/PLAN-ARCHIVE.md`.
@@ -109,7 +109,7 @@ One line each. Phases 3–6's step lists, the push's (N1–N6) and this table in
 
 ### Portal redesign (v2's look) steps (PV; one PR each; 👀 = the owner looks at screenshots)
 
-Approved by the owner 2026-10-12 (`docs/DECISIONS.md`): the portal and the student web redrawn in
+**Done** (2026-10-16): PV0–PV17, the last PV17c-2 (#425). Approved by the owner 2026-10-12 (`docs/DECISIONS.md`): the portal and the student web redrawn in
 v2's look, to the canvas [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (its boards named on each
 step; its row "An idea, not in the plan: questions suggested from your slides" is out), its look
 `v2.css` (DESIGN.md §1: the style facts, what it changes, what it supersedes, its call). Its
@@ -148,7 +148,7 @@ validation** (each 👀): vitest, `npm run typecheck && npm run lint && npm test
 - **PV14** 👀 A session's report — ✅ (#401; DECISIONS 2026-10-15)
 - **PV15** 👀 The entry pages — ✅ (#388; DECISIONS 2026-10-15). **Then Phase 7's web screens** (Phase 7 steps)
 - **PV16** 👀 Classes — ✅ as PV16a (#420) and PV16b (#421); DECISIONS 2026-10-16
-- **PV17** 👀 Home (Main, HomeIdle, HomeNew, HomeStates), in three: **PV17a** — ✅ (#422; DECISIONS 2026-10-16); **PV17b** — ✅ (#423; DECISIONS 2026-10-16); **PV17c** in two (the worker's split, the conductor's call, 2026-10-16): **PV17c-1**, Recent activity — ✅ (#424; DECISIONS 2026-10-16); **PV17c-2** (~240) Last session (PV2; hidden until a class's first session ends; HomeIdle, HomeMoreStates, HomeRailStates and HomeIdlePhone, drawn first): for up to a minute after a bell `lastSession` names a session whose report still says `ended: false`, which means only "not swept yet" (PV2's review), so the card never reads that flag as still running; built on the branch `pv17c-2-last-session`, stacked on PV17c-1's, to rebase onto `main` — validation: as above
+- **PV17** 👀 Home (Main, HomeIdle, HomeNew, HomeStates) — ✅ as PV17a (#422), PV17b (#423), PV17c-1 (#424) and PV17c-2 (#425); DECISIONS 2026-10-16
 
 ### Phase 7 steps (live lesson; one PR each; 👀 = the owner looks at screenshots, 📱 = needs the owner's iPhone, 🔧 = the owner in a console)
 

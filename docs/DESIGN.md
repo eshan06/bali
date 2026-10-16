@@ -25,7 +25,7 @@ badges); `api-client.ts` (`UnauthorizedError`'s words; a `NetworkError` is
 said as `errors.ts`'s `CANT_REACH`, its own message a log line, D2c-2);
 `recap.ts` (the session's "9:05 AM to 9:30 AM"; PB5's timeline took its reasons
 and "No reason given" with it in PV14). `blocks.ts`, `classes.ts`, `reports.ts`, `invite.ts`, `decks.ts` and `activity.ts` hold
-none: their words are in `blocks.tsx`, Home (`home.tsx`, PV17a, its live card, PV17b, and Recent activity, PV17c-1), Classes'
+none: their words are in `blocks.tsx`, Home (`home.tsx`, PV17a, its live card, PV17b, Recent activity, PV17c-1, and Last session, PV17c-2), Classes'
 cards (`classes.tsx`, PV16a) and New class's dialog (`new-class.tsx`, PV16b), the reports page, `invite-code.tsx`, `slides.tsx` and `errors.ts`. In
 `ios/Bali/` outside `UI/`: the NFC sheet's words in `BlockReader.swift`
 ("Hold the top of your iPhone to your teacher's Bali block.", "This isn't a
@@ -302,10 +302,17 @@ reasons ("No reason given" for none), protection offs and starts across the clas
 four at most, each on v2.css's timeline (`Timeline`, the student panel's too) with its time without
 AM or PM, then Open the class while one class is live alone; read again every 15 s while Home is in
 view; its loading and its failure as HomeMoreStates draws them, its other states as HomeRailStates
-draws them (drawn on the canvas first); never on a phone, as PhoneHome draws it. Until PV17c-2 the
-rail holds no Last session (HomeNoName's rail); Home's other intermediate states as
-HomeInterimStates and HomeNewPhone draw them (drawn on the canvas first), HomeInterim no longer
-built. The account not read is said as HomeStates draws it, its failure headed as the page (an
+draws them (drawn on the canvas first); never on a phone, as PhoneHome draws it. Since PV17c-2
+(2026-10-16), while no class is live, the rail holds HomeIdle's Last session over the block's card,
+on a phone too (HomeIdlePhone): the last session over across the classes, its class, day and times
+from the account, then its report's who joined, average per student and unlocks in v2.css's `.stats`
+(`Figures`, the recap's too), or the recap's "Nobody joined this session." with the unlocks if any,
+and Open the recap to the class page; its report read once as it shows and never read as still
+running before the sweep marks it; none until a class's first session ends, and none from a bell, or
+an End elsewhere, until the account's read says no class runs, so never the session before it; its
+loading and its failure as HomeMoreStates draws them, its other states as HomeRailStates draws them
+(drawn on the canvas first). Home's other intermediate states as HomeInterimStates and HomeNewPhone
+draw them (drawn on the canvas first), HomeInterim no longer built. The account not read is said as HomeStates draws it, its failure headed as the page (an
 `h1`), Try again held as Loading… until Bali answers so focus stays on it, a failure said again.
 Every
 portal source file is held to the tokens' utilities by `tokens.test.ts`, and

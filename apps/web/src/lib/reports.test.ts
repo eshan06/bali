@@ -14,6 +14,7 @@ import { CANT_REACH, TOO_MANY_TRIES } from './errors';
 import { classFigures } from './recap';
 import {
   FIRST_READ,
+  readReport,
   readSessionPage,
   readSessionQuestions,
   readSessions,
@@ -449,5 +450,51 @@ describe('a session’s questions, its report page’s Questions card (L7c)', ()
     const api = fakeApi({});
     await readSessionQuestions(api, 'a/b', 'c/d');
     expect(api.asked).toEqual(['/v1/classes/a%2Fb/reports/sessions/c%2Fd/questions']);
+  });
+});
+
+describe('readReport: Home’s Last session, its report alone (PV17c)', () => {
+  const SESSION = '0199e3a1-0000-7000-8000-00000000000a';
+  const CLASS_ID = '0199e3a1-0000-7000-8000-00000000000c';
+  const REPORT_PATH = `/v1/classes/${CLASS_ID}/reports/sessions/${SESSION}`;
+  const REPORT: SessionReportResponse = {
+    ended: true,
+    startedAt: MON.startedAt,
+    endsAt: MON.endsAt,
+    endedAt: MON.endedAt,
+    joined: [{ id: 'u1', displayName: 'Ana' }],
+    focusMinutes: 25,
+    averageFocusMinutes: 25,
+    silentMinutes: 0,
+    unlocks: [],
+    protectionOffs: [],
+  };
+
+  it('reads R2’s report, and nothing else', async () => {
+    const api = fakeApi({ [REPORT_PATH]: [REPORT] });
+    expect(await readReport(api, CLASS_ID, SESSION)).toEqual({ kind: 'ready', report: REPORT });
+    expect(api.asked).toEqual([REPORT_PATH]);
+  });
+
+  it('reads one the sweep hasn’t marked yet as it reads any: within a minute of the bell', async () => {
+    const unswept = { ...REPORT, ended: false, endedAt: null };
+    const api = fakeApi({ [REPORT_PATH]: [unswept] });
+    expect(await readReport(api, CLASS_ID, SESSION)).toEqual({ kind: 'ready', report: unswept });
+  });
+
+  it('says why a read failed, never thrown, for its Try again', async () => {
+    for (const [failure, said] of [
+      [new NetworkError(), CANT_REACH],
+      [new ApiError(429, 'rate_limited', 'too many requests', undefined, 1), TOO_MANY_TRIES],
+    ] as const) {
+      const api = fakeApi({ [REPORT_PATH]: [failure] });
+      expect(await readReport(api, CLASS_ID, SESSION)).toEqual({ kind: 'error', message: said });
+    }
+  });
+
+  it('puts the class and the session in its path as one segment each', async () => {
+    const api = fakeApi({});
+    await readReport(api, 'a/b', 'c/d');
+    expect(api.asked).toEqual(['/v1/classes/a%2Fb/reports/sessions/c%2Fd']);
   });
 });
