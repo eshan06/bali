@@ -48,6 +48,12 @@ export type DeckState =
  */
 export type ChangeSaid = 'failed' | 'over' | 'gone';
 
+/** What the last slide change left to say, and that change: said where it was made. */
+export interface Said {
+  why: ChangeSaid;
+  change: SlideChange;
+}
+
 /** The class page's slide, held for one session. */
 export interface SlideLesson {
   /** What the session shows, as last heard: null for nothing. */
@@ -57,9 +63,12 @@ export interface SlideLesson {
   deck: DeckState;
   /** The slide change on its way, its button busy: every slide control holds until its answer. */
   changing: SlideChange | null;
-  said: ChangeSaid | null;
+  /** Said where its change was made: the card, Present, or under its deck in the side panel. */
+  said: Said | null;
   /** Previous (−1) and Next (+1); nothing past either end. */
   turn: (by: -1 | 1) => void;
+  /** Show a deck from its first page (the side panel's Show); true once it is on screen. */
+  show: (deckId: string) => Promise<boolean>;
   /**
    * Stop showing; true once what the session shows now is on screen: Bali's answer, or the stream
    * showing it before an answer that gave up.
@@ -149,7 +158,7 @@ export function useSlide(
   const last = useRef<SlideChange | null>(null);
   const sending = useRef(false);
   const [changing, setChanging] = useState<SlideChange | null>(null);
-  const [said, setSaid] = useState<ChangeSaid | null>(null);
+  const [said, setSaid] = useState<Said | null>(null);
 
   const put = useCallback((session: string, next: Shown) => {
     const shown = newer(now.current.shown, next);
@@ -158,10 +167,13 @@ export function useSlide(
     setHeld(now.current);
   }, []);
 
-  // A new session starts with nothing shown, then takes what its read says.
+  // A new session starts with nothing shown and nothing said, then takes what its read says: a
+  // Show the last one refused is no line of this one's, though no change was ever heard in either
+  // (santa's review).
   useEffect(() => {
     now.current = { session: sessionId, shown: NOTHING_SHOWN };
     setHeld(now.current);
+    setSaid(null);
   }, [sessionId]);
   useEffect(() => {
     if (snapshot !== null) put(snapshot.session, shownIn(snapshot.snap));
@@ -252,7 +264,7 @@ export function useSlide(
         unanswered.current = null;
         return true;
       }
-      setSaid(end.said);
+      setSaid({ why: end.said, change: to });
       // Gone: the session read again, for what it shows now.
       if (end.said === 'gone') reread();
       return false;
@@ -283,6 +295,7 @@ export function useSlide(
     changing,
     said,
     turn,
+    show: (deck) => change({ deckId: deck, page: 1 }),
     stop: () => change({ deckId: null, page: null }),
     again: () => {
       if (last.current) void change(last.current);

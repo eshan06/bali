@@ -39,10 +39,10 @@ describe('the class page in Present while a session runs (ClassPresent)', () => 
     expect(live).toMatch(
       /<main className=\{present \? PRESENT_PAGE : 'relative flex flex-col gap-5\.5'\}>\s*\{\/\*[^]*?\*\/\}\s*<LiveHeader[^>]*present=\{present\}\s*>[^]*?<\/LiveHeader>\s*\{\/\*[^]*?\*\/\}\s*\{cantLoad\(error\)\}\s*\{\/\*[^]*?\*\/\}\s*\{said \? \([^]*?\) : null\}\s*<section aria-label=\{projected \? undefined : 'Live grid'\} className="flex flex-col gap-5\.5">\s*\{\/\*[^]*?\*\/\}\s*\{projected \? null : \(\s*<div[^>]*>\s*\{counts \? <LiveCounts counts=\{counts\} present=\{present\} \/> : null\}\s*\{present \? null : presentToggle\(true\)\}\s*<\/div>\s*\)\}\s*\{\/\*[^]*?\*\/\}\s*\{present \? null : lesson\.question === null && slides\.slide !== null \? \(\s*<SlideCard[^]*?\/>\s*\) : \(\s*<QuestionCard[^]*?\/>\s*\)\}\s*<LiveGrid[^]*?\/>\s*\{\/\*[^]*?\*\/\}\s*\{projected \? <PresentQuestion id=\{id\} lesson=\{lesson\} \/> : null\}\s*<\/section>/,
     );
-    // And the side panel's asking only out of Present, as the student's panel (L7-1b).
-    expect(page).toMatch(/const panel = asking && !present;/);
+    // And the side panel only out of Present, as the student's panel (L7-1b), whatever it holds.
+    expect(page).toMatch(/const panel = present \? null : side;/);
     expect(live).toMatch(
-      /\{panel && !writing \? \(\s*<PickPanel[^]*?\{panel && writing \? \(\s*<AskPanel/,
+      /\{panel === 'decks' \? \(\s*<DecksPanel[^]*?\{panel === 'ask' && !writing \? \(\s*<PickPanel[^]*?\{panel === 'ask' && writing \? \(\s*<AskPanel/,
     );
     const [grid] = tags('LiveGrid');
     expect(grid).toMatch(/\bpresent=\{present\}/);
@@ -69,11 +69,11 @@ describe('the class page in Present while a session runs (ClassPresent)', () => 
     expect(tags('PresentQuestion')).toEqual(['<PresentQuestion id={id} lesson={lesson} />']);
     // Never the class page's card or its side panel there: their controls and the teacher's live
     // breakdown are the teacher's alone; nor its slide card (M6, part 2b-2), Present's slide being
-    // PresentSlide's (2c+2d).
+    // PresentSlide's (2d).
     expect(live).toMatch(
       /\{present \? null : lesson\.question === null && slides\.slide !== null \? \(\s*<SlideCard[^]*?\) : \(\s*<QuestionCard/,
     );
-    expect(page).toMatch(/const panel = asking && !present;/);
+    expect(page).toMatch(/const panel = present \? null : side;/);
   });
 
   it('shows the slide card in the question card’s place while no question shows, the question first (M6, part 2b-2)', () => {
@@ -83,7 +83,7 @@ describe('the class page in Present while a session runs (ClassPresent)', () => 
     const [card] = tags('SlideCard');
     expect(card).toMatch(/\blesson=\{slides\}/);
     expect(card).toMatch(/\bslide=\{slides\.slide\}/);
-    expect(card).toMatch(/\basking=\{panel\}/);
+    expect(card).toMatch(/\basking=\{panel === 'ask'\}/);
     // Both cards hear the stream through the grid; the slide's state from the question's read.
     expect(page).toMatch(
       /const \{ slides, onEvent: onSlideEvent \} = useSlide\(live \? grid\.id : null, snapshot, reread\);/,
@@ -105,17 +105,19 @@ describe('the class page in Present while a session runs (ClassPresent)', () => 
     );
     // Ask another question stays on the class page: its panel lists the saved questions with their
     // answers, which the room must never see.
-    expect(page).toMatch(/const panel = asking && !present;/);
+    expect(page).toMatch(/const panel = present \? null : side;/);
   });
 
   it('never shows the panel of your questions, which names their correct answers (the owner, 2026-10-15)', () => {
     // L7b, part 2: the panel lists the teacher's questions with each one's correct answer, so
     // it is drawn only while `panel` holds, which Present never does, both its views alike; and
-    // nothing Present draws in its place reads the teacher's questions.
-    expect(page).toMatch(/const panel = asking && !present;/);
+    // nothing Present draws in its place reads the teacher's questions. Nor the decks' (M6, part
+    // 2c): the teacher's to pick, never the room's.
+    expect(page).toMatch(/const panel = present \? null : side;/);
     for (const [name, when] of [
-      ['PickPanel', '{panel && !writing ? ('],
-      ['AskPanel', '{panel && writing ? ('],
+      ['PickPanel', "{panel === 'ask' && !writing ? ("],
+      ['AskPanel', "{panel === 'ask' && writing ? ("],
+      ['DecksPanel', "{panel === 'decks' ? ("],
     ]) {
       const at = [...page.matchAll(new RegExp(`<${name}\\b`, 'g'))].map((m) => m.index);
       expect(at, name).toHaveLength(1);
@@ -123,10 +125,10 @@ describe('the class page in Present while a session runs (ClassPresent)', () => 
       const before = page.slice(0, at[0]);
       expect(before.slice(before.lastIndexOf('{panel')).trimEnd(), name).toBe(when);
     }
-    expect(ended).not.toMatch(/AskPanel|PickPanel|saved-questions/);
+    expect(ended).not.toMatch(/AskPanel|PickPanel|DecksPanel|saved-questions/);
     for (const part of ['present-question', 'live-header', 'live-grid']) {
       expect(read(`../components/${part}.tsx`), part).not.toMatch(
-        /ask-panel|saved-questions|PickPanel|PickView/,
+        /ask-panel|decks-panel|saved-questions|PickPanel|PickView|DecksPanel/,
       );
     }
   });

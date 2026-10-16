@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { OpenDeck } from '@/lib/deck-pdf';
 import type { DeckState, DeckUnopened, SlideLesson } from '@/lib/use-slide';
 
-import { placeOf, SlideCard, slideCard, typesText, UnshownLine } from './slide-card';
+import { placeOf, SaidLine, SlideCard, slideCard, typesText, UnshownLine } from './slide-card';
 
 /*
  * The class page's slide card (M6, part 2b-2; LessonSlide, LessonStates' slide lines and the
@@ -33,6 +33,7 @@ function lesson(over: Partial<SlideLesson> = {}): SlideLesson {
     changing: null,
     said: null,
     turn: vi.fn(),
+    show: vi.fn(() => Promise.resolve(true)),
     stop: vi.fn(() => Promise.resolve(true)),
     again: vi.fn(),
     reload: vi.fn(),
@@ -97,7 +98,7 @@ describe('the card while a slide shows (LessonSlide)', () => {
       /^Slides · showing Factoring quadratics Ask a question Stop showing /,
     );
     expect(html).toMatch(
-      /<p class="text-section-label text-text-brand uppercase">Slides · showing<\/p><h2 id="L-slides" class="text-h3 text-pretty wrap-break-word">Factoring quadratics<\/h2>/,
+      /<p class="text-section-label text-text-brand uppercase">Slides · showing<\/p><h2 id="L-slides" tabindex="-1" class="text-h3 text-pretty wrap-break-word">Factoring quadratics<\/h2>/,
     );
     // Ask a question is the question card's own, secondary here as LessonSlide draws it.
     expect(buttonTag(html, 'Ask a question')).toMatch(
@@ -138,7 +139,7 @@ describe('the card while a slide shows (LessonSlide)', () => {
 
   it('says “…” for its title until the teacher’s decks are read, as a class’s name before it is', () => {
     expect(render(lesson({ title: null }))).toMatch(
-      /<h2 id="L-slides" class="text-h3 text-pretty wrap-break-word text-text-tertiary">…<\/h2>/,
+      /<h2 id="L-slides" tabindex="-1" class="text-h3 text-pretty wrap-break-word text-text-tertiary">…<\/h2>/,
     );
   });
 });
@@ -281,21 +282,31 @@ describe('turning pages', () => {
 });
 
 describe('what a change said, under the card’s head (LessonStates, LessonSlideStates)', () => {
+  const turnTo = { deckId: slide().deckId, page: 5 };
+
   it('says a change that didn’t go through, Try again sending it again', () => {
-    const l = lesson({ said: 'failed' });
+    const l = lesson({ said: { why: 'failed', change: turnTo } });
     const html = render(l);
     expect(html).toMatch(
       /<p role="alert" class="text-body">Bali couldn&#x27;t change the slide\.<\/p><button type="button" aria-disabled="false" class="[^"]*\bh-8\.5\b[^"]*">Try again<\/button>/,
     );
-    press(slideCard(props(l)), 'Try again');
-    expect(l.again).toHaveBeenCalledOnce();
+    // The line's Try again is the hook's own: the last change again.
+    expect(source).toMatch(
+      /<SaidLine why=\{said\.why\} held=\{held\} onAgain=\{lesson\.again\} \/>/,
+    );
+    const again = vi.fn();
+    press(SaidLine({ why: 'failed', held: false, onAgain: again }), 'Try again');
+    expect(again).toHaveBeenCalledOnce();
+    // Held while another change is on its way.
+    const busy = render(lesson({ said: { why: 'failed', change: turnTo }, changing: turnTo }));
+    expect(buttonTag(busy, 'Try again')).toMatch(/aria-disabled="true"/);
   });
 
   it('says the session ended first, and the slides gone, with no Try again', () => {
-    expect(text(render(lesson({ said: 'over' })))).toContain(
+    expect(text(render(lesson({ said: { why: 'over', change: turnTo } })))).toContain(
       "This session has ended, so Bali didn't change the slide.",
     );
-    const gone = render(lesson({ said: 'gone' }));
+    const gone = render(lesson({ said: { why: 'gone', change: turnTo } }));
     expect(text(gone)).toContain(
       "These slides aren't in Your slides anymore, so Bali can't show them.",
     );

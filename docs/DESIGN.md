@@ -239,7 +239,12 @@ card while no question shows, a question first and the slide back after its Done
 call), never in Present: "Slides · showing" over the deck's title, Ask a question and Stop showing,
 the page drawn at its frame's size and the screen's pixel ratio beside "4 of 12", Previous, Next and
 the ← → keys, and its intermediate states as LessonSlideStates draws them (drawn on the canvas
-first).
+first). Since M6's part 2c (2026-10-16) the card at rest also holds Show slides, LessonClass's, which
+opens LessonDecks' panel where Ask a question's shows, one at a time, never in Present: "Pick a
+deck." (its second sentence waits for W5 and M8, the conductor's call), the teacher's ready decks
+newest first, each with its pages, its day and Show, a Show's line under its deck, and once shown
+the slide card in the card's place, focus on its title; its intermediate states as LessonDecksStates
+draws them (drawn on the canvas first).
 Your questions is v2's since L7b part 1 (2026-10-15): Questions in the menu, the drafts oldest
 first as Questions draws them, each removed after its confirm across the card's foot, and Write a
 question and Edit opening QuestionsEdit's card over the list, its letters grey and its refusals

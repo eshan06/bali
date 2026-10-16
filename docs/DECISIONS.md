@@ -8,6 +8,38 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-16** — **M6's part 2c: Show slides on the card at rest, opening LessonDecks' side panel
+  (#417); 2c and 2d split in two; their states drawn first (canvas version 62).** **The split:** 2c,
+  2d and #416's two fixes came to about 650 changed lines without tests (`git diff --stat`, the measure
+  #416 used for its 352), so the worker pushed them as two stacked commits and the conductor split
+  them: this PR, 2c, about 360; 2d, Present's slide with the two fixes, about 300, waits on the branch
+  `m6-2d-present-slide`, built and tested, to be rebased onto main after this one merges. **Drawn
+  first:** LessonDecksStates (the list loading, didn't load, none ready; a Show on its way, with no
+  answer or refused, after the session ended, the slides removed meanwhile; Show slides open; 390 px),
+  and for 2d PresentSlideStates and PresentSlidePhone; no new words, every line LessonStates' or
+  LessonSlideStates'. **The panel** (`components/decks-panel.tsx`): "Show slides" over "Pick a deck.",
+  its second sentence left out until W5 and M8 make it true (the conductor's call 2); the teacher's
+  ready decks as `GET /v1/decks` lists them, newest first, each "12 pages · Added Oct 6" (Your slides'
+  line without the size) and Show; read each time it opens, as the questions' panel reads its list.
+  One side panel at a time (`side`: asking, the decks or none), never in Present, closed by a
+  student's panel and by a new session. **A Show** is the slide hook's own change (`useSlide`'s
+  `show`, the deck's first page), one at a time, every Show held meanwhile, its own busy. What it left
+  to say goes under its deck: the hook's `said` now names the change it is about (`Said`), so the
+  card says its own turns' lines and the panel a Show's. Shown, the panel closes and focus goes to
+  the slide card's title (or the question, when one shows first); a Show that lands after the panel
+  closed moves nothing. **Santa's review:** one blocker, fixed with its test failing first: a Show
+  refused past the bell in a session where nothing was ever shown kept its line into the next session
+  on the same page, since no slide change heard would clear it; a new session now starts with nothing
+  said. Taken from the WARNs: an ask that lands while the decks' panel is open leaves that panel open
+  and focused, and the panel's Try again names its deck. *Left* (rare, both needing the panel open
+  beside a slide another tab showed): the card also says a Show's line, and a turn back to page 1 of
+  the same deck reads as that deck's Show; and a Show that fails with the panel closed is said when
+  it opens again, as an ask's is. **Checked on dev** (`.claude/shots/M6-2cd/`): the demo teacher's two
+  test decks, a Show caught on its way, the slide card on page 1 of 8 with focus on its title, Stop
+  showing, a deck removed meanwhile said under its Show, Escape back to Show slides, Present with no
+  panel, and the panel at 390 px; the decks removed and the session ended after. Sharp renders of the
+  real panel in each state beside its board, from a throwaway page in the preview, deleted after.
+
 - **2026-10-16** — **M6's part 2b-2: the class page's slide card, LessonSlide's, in the question
   card's place while no question shows (#416); its states as LessonSlideStates draws them; the
   button of a change on its way busy.** Built from the code left on `m6-2b-2-slide-card` (rebased

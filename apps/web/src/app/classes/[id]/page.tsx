@@ -17,6 +17,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { AskPanel, NEW_DRAFT, PickPanel } from '@/components/ask-panel';
 import { Button, buttonClass } from '@/components/button';
 import { CARD_ALONE } from '@/components/card';
+import { DecksPanel } from '@/components/decks-panel';
 import { Field } from '@/components/field';
 import { JoinCode } from '@/components/join-code';
 import { LiveGrid, type StateCounts } from '@/components/live-grid';
@@ -172,29 +173,50 @@ export default function ClassDetailPage() {
     },
     [onEvent, onSlideEvent],
   );
-  const [asking, setAsking] = useState(false);
+  // The side panel, one at a time: asking a question (L7-1b), or picking a deck to show (M6, part
+  // 2c; LessonDecks).
+  const [side, setSide] = useState<'ask' | 'decks' | null>(null);
   const [writing, setWriting] = useState(false);
   const [draft, setDraft] = useState<QuestionDraft>(NEW_DRAFT);
   useEffect(() => {
-    setAsking(false);
+    setSide(null);
     setWriting(false);
     setDraft(NEW_DRAFT);
   }, [grid?.id]);
-  // Never in Present: it lists the teacher's questions with their correct answers (the owner,
-  // 2026-10-15), and what is written in it.
-  const panel = asking && !present;
+  // Never in Present: asking lists the teacher's questions with their correct answers (the owner,
+  // 2026-10-15), and what is written in it; the decks are the teacher's to pick, not the room's.
+  const panel = present ? null : side;
   // In Present the question shows in the live grid's place (L7, part 2; PresentQuestion,
   // PresentAnswer), its totals the room's alone; the grid stays underneath, its stream with it.
   const projected = present && lesson.question !== null;
-  // Back to Ask a question; the question, when one shows (opened meanwhile, from another tab).
+  // Back to the button that opened it (Show slides, or Ask a question, on whichever card shows);
+  // the question, when one shows (opened meanwhile, from another tab).
   const closePanel = () => {
-    setAsking(false);
-    (document.getElementById(`${id}-ask`) ?? document.getElementById(`${id}-q`))?.focus();
+    setSide(null);
+    (
+      document.getElementById(`${id}-${side === 'decks' ? 'show' : 'ask'}`) ??
+      document.getElementById(`${id}-ask`) ??
+      document.getElementById(`${id}-q`)
+    )?.focus();
   };
-  // Asked: the panel goes, and focus to the question in the card.
+  // Asked: the panel goes, and focus to the question in the card; the decks' panel, opened while the
+  // ask was on its way, stays, focus with it (santa's review).
+  const sideNow = useRef(side);
+  useEffect(() => {
+    sideNow.current = side;
+  }, [side]);
   const asked = () => {
-    setAsking(false);
+    if (sideNow.current === 'decks') return;
+    setSide(null);
     window.requestAnimationFrame(() => document.getElementById(`${id}-q`)?.focus());
+  };
+  // Shown: the panel goes, and focus to the slide card's title; to the question, when one shows
+  // first.
+  const shown = () => {
+    setSide(null);
+    window.requestAnimationFrame(() =>
+      (document.getElementById(`${id}-slides`) ?? document.getElementById(`${id}-q`))?.focus(),
+    );
   };
 
   const readRoster = useCallback(() => {
@@ -493,16 +515,18 @@ export default function ClassDetailPage() {
             id={id}
             lesson={slides}
             slide={slides.slide}
-            asking={panel}
-            onAsk={() => setAsking(true)}
+            asking={panel === 'ask'}
+            onAsk={() => setSide('ask')}
           />
         ) : (
           <QuestionCard
             id={id}
             lesson={lesson}
             endsAt={grid.endsAt}
-            asking={panel}
-            onAsk={() => setAsking(true)}
+            asking={panel === 'ask'}
+            onAsk={() => setSide('ask')}
+            showing={panel === 'decks'}
+            onShow={() => setSide('decks')}
           />
         )}
         <LiveGrid
@@ -511,8 +535,8 @@ export default function ClassDetailPage() {
           onSession={onSession}
           onCounts={onCounts}
           onEvent={onLessonEvent}
-          asking={panel}
-          onStudentPanel={() => setAsking(false)}
+          asking={panel !== null}
+          onStudentPanel={() => setSide(null)}
           present={present}
           livePage
           tiles={!projected}
@@ -520,7 +544,10 @@ export default function ClassDetailPage() {
         {/* In Present, the question in the tiles' place, after the grid's own lines. */}
         {projected ? <PresentQuestion id={id} lesson={lesson} /> : null}
       </section>
-      {panel && !writing ? (
+      {panel === 'decks' ? (
+        <DecksPanel id={`${id}-panel`} lesson={slides} onShown={shown} onClose={closePanel} />
+      ) : null}
+      {panel === 'ask' && !writing ? (
         <PickPanel
           id={`${id}-panel`}
           openNow={isOpen(lesson)}
@@ -531,7 +558,7 @@ export default function ClassDetailPage() {
           onClose={closePanel}
         />
       ) : null}
-      {panel && writing ? (
+      {panel === 'ask' && writing ? (
         <AskPanel
           id={`${id}-panel`}
           draft={draft}
