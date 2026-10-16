@@ -44,7 +44,14 @@ a real decision? Add a dated entry at the top: what was decided and why.
   on its Ask a question, a second deck whose bucket bytes were swapped after its check refused with
   the mismatch line and Try again, the card at 390 px, Stop showing leaving the card at rest with
   focus on its Ask a question, and a reload saying "…" and Loading… before the title and the page;
-  the decks removed and the session ended after.
+  the decks removed and the session ended after. **Santa's review** (both reviewers, and the design
+  check): no blockers. Taken from the WARNs: a line and its Try again that a narrow frame can't hold
+  now scroll inside it (a 320 px phone; from 360 px they fit), the page count is said as it changes
+  (`aria-live`), and a long title wraps evenly. *Left:* a page's draw has no time limit (2a's
+  `drawPage`), so a PDF.js worker that stops answering after the deck opened leaves Loading…, or the
+  page before it, with no line: the limit belongs in `drawPage`, which PresentSlide (2c+2d) and the
+  student web (W5) draw with too; and the keys turn pages while focus is in a side panel, as the
+  board's line says they do.
 
 - **2026-10-16** — **M6's part 2b-1: the slide's hook, no screen (#415); 2b in two; the card's
   intermediate states drawn first (LessonSlideStates, version 60).** **The split:** 2b whole came to

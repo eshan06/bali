@@ -122,7 +122,8 @@ function SlideFrame({
         className={`absolute inset-0 size-full object-contain ${place === 'page' ? '' : 'invisible'}`}
       />
       {place === 'page' ? null : (
-        <div className="absolute inset-0 grid place-items-center p-5 text-center">
+        // Scrolls where a narrow frame can't hold a line and its Try again (a phone under 390 px).
+        <div className="absolute inset-0 grid place-items-center overflow-y-auto p-5 text-center">
           {place === 'loading' ? (
             <p role="status" className="text-body text-text-secondary">
               Loading…
@@ -218,7 +219,7 @@ export function slideCard({ id, lesson, slide, asking, onAsk }: CardProps) {
           <p className="text-section-label text-text-brand uppercase">Slides · showing</p>
           <h2
             id={`${id}-slides`}
-            className={`text-h3 wrap-break-word${title === null ? ' text-text-tertiary' : ''}`}
+            className={`text-h3 text-pretty wrap-break-word${title === null ? ' text-text-tertiary' : ''}`}
           >
             {title ?? '…'}
           </h2>
@@ -247,7 +248,8 @@ export function slideCard({ id, lesson, slide, asking, onAsk }: CardProps) {
       <div className="flex flex-wrap items-start gap-x-7 gap-y-5">
         <SlideFrame deck={deck} slide={slide} onReload={lesson.reload} />
         <div className="flex min-w-0 flex-[1_1_260px] flex-col gap-3">
-          <p className="flex items-baseline gap-2">
+          {/* Said as it changes, so a turn is heard before its page is drawn. */}
+          <p aria-live="polite" aria-atomic="true" className="flex items-baseline gap-2">
             <span className="font-num text-data-lg tabular-nums">{slide.page}</span>
             <span className="text-text-secondary">of {slide.pageCount}</span>
           </p>

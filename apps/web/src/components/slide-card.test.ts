@@ -97,7 +97,7 @@ describe('the card while a slide shows (LessonSlide)', () => {
       /^Slides · showing Factoring quadratics Ask a question Stop showing /,
     );
     expect(html).toMatch(
-      /<p class="text-section-label text-text-brand uppercase">Slides · showing<\/p><h2 id="L-slides" class="text-h3 wrap-break-word">Factoring quadratics<\/h2>/,
+      /<p class="text-section-label text-text-brand uppercase">Slides · showing<\/p><h2 id="L-slides" class="text-h3 text-pretty wrap-break-word">Factoring quadratics<\/h2>/,
     );
     // Ask a question is the question card's own, secondary here as LessonSlide draws it.
     expect(buttonTag(html, 'Ask a question')).toMatch(
@@ -108,6 +108,10 @@ describe('the card while a slide shows (LessonSlide)', () => {
 
   it('shows the slide beside “4 of 12”, Previous, Next and the keys’ line', () => {
     expect(text(html)).toMatch(/4 of 12 Previous Next The ← and → keys turn pages too\.$/);
+    // Said whole as it changes, so a turn is heard before its page is drawn.
+    expect(html).toMatch(
+      /<p aria-live="polite" aria-atomic="true" class="flex items-baseline gap-2"><span [^>]*>4<\/span><span [^>]*>of 12<\/span><\/p>/,
+    );
     expect(buttonTag(html, 'Next')).toMatch(/\bbg-action-primary-bg\b/);
     expect(buttonTag(html, 'Previous')).toMatch(/\bbg-surface-card\b/);
     // The frame: white, 16:9, 420 px at most, its canvas filling it, the page fitted in it.
@@ -126,11 +130,15 @@ describe('the card while a slide shows (LessonSlide)', () => {
       expect(card).toMatch(/<p role="status" class="text-body text-text-secondary">Loading…<\/p>/);
       expect(card).toMatch(/<canvas [^>]*class="[^"]*\binvisible\b/);
     }
+    // In the frame's middle, scrolling where a narrow frame can't hold a line and its Try again.
+    expect(render(lesson())).toMatch(
+      /<div class="absolute inset-0 grid place-items-center overflow-y-auto p-5 text-center"><p role="status"/,
+    );
   });
 
   it('says “…” for its title until the teacher’s decks are read, as a class’s name before it is', () => {
     expect(render(lesson({ title: null }))).toMatch(
-      /<h2 id="L-slides" class="text-h3 wrap-break-word text-text-tertiary">…<\/h2>/,
+      /<h2 id="L-slides" class="text-h3 text-pretty wrap-break-word text-text-tertiary">…<\/h2>/,
     );
   });
 });
