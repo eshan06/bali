@@ -8,14 +8,14 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-15 (Central) — W4's part 2, and with it W4 (#408; `docs/DECISIONS.md`,
-2026-10-15): the student's own phone beside the class's name on the lesson page, in the app's words
-and the grid's tints, its line under the head, kept "as of" the last read while Bali can't be reached
-(Silent's minutes stopped then); the home's live card ending on Open the lesson and that chip, read
-from the lesson; an answer's send that hangs says it didn't send after 10 s; built to v2's canvas and
-a board drawn first (version 54); checked on dev with Ana's phone through every state by the API.
-Before it, W4's part 1b, the question card (#407). Next: M6, the presenter; L7c's Questions card goes
-on PV14's page._
+_Last updated: 2026-10-15 (Central) — W4's follow-up (#409; `docs/DECISIONS.md`, 2026-10-15), two
+limits #408 shipped with, against "no silent failures": the home's live card says Bali can't be
+reached when its lesson's reads fail before one answers (Checking… over the lesson page's line, a
+board drawn first, version 55), and an answer whose send gave up at 10 s but landed is in once a read
+shows it held, not at the next pick; and, the owner's call of 2026-10-16, the home reads the account
+every 30 s while in view with no class in session, so a class that starts shows with Open the lesson
+within 30 s. Before it, W4's part 2 (#408). Next: M6, the presenter; L7c's Questions card goes on
+PV14's page._
 
 ## Now
 
@@ -84,7 +84,7 @@ first class, production backups (L0b, the owner's console step; the owner, 2026-
 
 **Phase 7, Live lesson: building.** Every step with no screen is done, L3c the last (2026-10-15);
 M0 is done (deck storage on, 2026-10-12); the web screens come after the redesign's PV15 (✅ #388),
-W3 the first (✅ #392), M5 (✅ #400), L7 (✅ #402, #405), W4 (✅ #406, #407, #408), then the phone's (L8, M8). L0b, production backups, is the owner's, before the Vanderbilt pilot's first
+W3 the first (✅ #392), M5 (✅ #400), L7 (✅ #402, #405), W4 (✅ #406, #407, #408, its follow-up #409), then the phone's (L8, M8). L0b, production backups, is the owner's, before the Vanderbilt pilot's first
 class.
 
 ## Phases
@@ -207,6 +207,7 @@ Slice 3 — students on the web (added 2026-10-10; ARCHITECTURE, "Live lesson", 
 - **W2** Portal student logic, `lib/student-web.ts` (for W3, W4) — ✅ (#333; DECISIONS 2026-10-12)
 - **W3** 👀 The student's home to v2's canvas — ✅ (#392; DECISIONS 2026-10-15); left for the owner: the privacy policy names the student pages (C2's words, the lawyer's)
 - **W4** 👀 The lesson page to v2's canvas — ✅ as part 1a (#406), part 1b (#407) and part 2 (#408); DECISIONS 2026-10-15; left for the owner: the same check with a real iPhone once the app's card (L8) can answer (📱)
+- **W4 follow-up** 👀 The home's chip says Bali can't be reached before its lesson's first read answers, an answer that landed after 10 s is in once a read shows it, and the home reads the account every 30 s while in view with no class in session (the owner, 2026-10-16) — ✅ (#409; DECISIONS 2026-10-15, 2026-10-16)
 - **W5** 👀 Slides on the student web to v2's canvas (StudentLesson's slide, its full-screen view as PV1 draws it; after M3, M6 and W4): PDF.js as M6 configures it, the `sha256` check, the download's `no-store`, the text layer for screen readers, full screen — validation: CSP tests, a tampered deck refused, `/santa-loop`, screenshots
 - **W6** 📱 Exit check: a real class on prod follows a lesson on laptops and phones at once; each student's chip agrees with the teacher's grid
 

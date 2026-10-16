@@ -205,7 +205,9 @@ each class in session on StudentHome's live card (its ring, its teacher, the tim
 bell) and the rest under it, none yet StudentHomeEmpty's card with its way to the invite page,
 at `/invite` for them; since W4's part 2 (2026-10-15) the live card ends on Open the lesson and the
 student's own phone, its chip from the lesson's read, never from the account's, and no line under
-it, its states as StudentChipStates draws them (drawn on the canvas first).
+it, its states as StudentChipStates draws them (drawn on the canvas first), but the lesson page's
+"Can't reach Bali" under Checking… while the lesson's reads fail before one answers
+(StudentChipUnreached, drawn first; W4's follow-up).
 The student's lesson page is v2's since W4's part 1a (2026-10-15): `/lessons/<class>/<session>`,
 Your classes marked in the menu, StudentLesson's head (its ring and the class page's countdown) over
 StudentWaiting's line, StudentEnded's card and StudentStates' lines, and its intermediate states as

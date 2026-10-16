@@ -6,6 +6,24 @@ import type { PhoneChip } from '@/lib/student-web';
 
 import { CHIP, CHIP_PILL, DOT } from './live-grid';
 
+/** A line under the head, drawn as the grid's stale banner is (v2.css's `.notice`). */
+export const NOTICE =
+  'rounded-sm border border-border-default bg-surface-sunken px-4 py-3 text-body text-text-primary';
+
+/**
+ * "Can't reach Bali" (StudentStates' line): under the lesson page's head while its reads fail, the
+ * chip kept "as of" the last good read (StudentPhoneStates); and on the home's live card, under
+ * Checking…, while its lesson's reads fail before one answers (StudentChipUnreached, drawn first).
+ * Nothing to press: the reads go on every 2 s.
+ */
+export function CantReach() {
+  return (
+    <p role="status" className={NOTICE}>
+      Can&apos;t reach Bali right now, so this page may be behind. It keeps trying.
+    </p>
+  );
+}
+
 /**
  * A chip's look and words (StudentPhoneStates): the grid's state's tint, icon and edge, so it never
  * reads greener than the teacher's tile, in the app's words ("Not in", "Screen Time off"); a state

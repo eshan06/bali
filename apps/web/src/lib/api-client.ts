@@ -61,7 +61,11 @@ export interface ApiClientOptions {
 }
 
 export interface ApiClient {
-  get<T>(path: string): Promise<T>;
+  /**
+   * `limitMs`, as `post`'s: the student home's 30 s read of the account takes a poll's
+   * (`POLL_TIMEOUT_MS`), so a read the network swallows never holds the next for minutes.
+   */
+  get<T>(path: string, limitMs?: number): Promise<T>;
   /**
    * A polled read under an ETag (L3r): `If-None-Match` with `etag` when one is kept, answered with
    * the body and its tag, or null for a `304`, the body unchanged. Every `/v1` answer is
@@ -71,8 +75,8 @@ export interface ApiClient {
   getTagged<T>(path: string, etag: string | null): Promise<{ body: T; etag: string | null } | null>;
   /**
    * `limitMs`: an answer not whole within it fails as no answer, as a poll's does (an answer's send,
-   * #407's review). None else is given one: a deck's check (`POST /v1/decks/{id}/complete`) can take
-   * longer than a poll waits.
+   * #407's review). No other write is given one: a deck's check (`POST /v1/decks/{id}/complete`) can
+   * take longer than a poll waits.
    */
   post<T>(path: string, body?: unknown, limitMs?: number): Promise<T>;
   put<T>(path: string, body?: unknown): Promise<T>;
@@ -185,7 +189,10 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
   }
 
   return {
-    get: (path) => request('GET', path),
+    get: (path, limitMs) =>
+      limitMs === undefined
+        ? request('GET', path)
+        : within(limitMs, (signal) => request('GET', path, undefined, signal)),
     getTagged: <T>(path: string, etag: string | null) =>
       within(POLL_TIMEOUT_MS, async (signal) => {
         const res = await send('GET', path, undefined, etag, signal);

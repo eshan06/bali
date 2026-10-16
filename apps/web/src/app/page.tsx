@@ -34,7 +34,7 @@ export default function HomePage() {
   const id = useId();
   // A create under way: a second Enter before the page redraws sends nothing.
   const sending = useRef(false);
-  const { home, error, load } = useMe();
+  const { home, error, load, refresh } = useMe();
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   // The last create's failure, said under the field; Try again sends the name again, but after a
@@ -87,7 +87,7 @@ export default function HomePage() {
   // (`AccountUnread`), as it does on every page.
   if (home === null) return null;
   if (home.kind === 'student') {
-    return <StudentHome me={home.me} failed={error !== null} onRead={load} />;
+    return <StudentHome me={home.me} failed={error !== null} onRead={load} onRefresh={refresh} />;
   }
   // Never through the 13+ check: the invite code, in place of the classes or a 403.
   if (home.kind === 'invite') return <InviteEntry forStudents onTeacher={onTeacher} />;

@@ -5,11 +5,12 @@ import { describe, expect, it } from 'vitest';
 import { bellTime } from '../lib/session-controls';
 import type { PhoneChip } from '../lib/student-web';
 import { CHIP, CHIP_PILL } from './live-grid';
-import { YourPhone } from './your-phone';
+import { CantReach, YourPhone } from './your-phone';
 
 /*
  * "Your phone" and its chip (W4), as StudentPhoneStates draws each state and StudentChipStates the
- * ones drawn first: the lesson page's head and the home's live card both draw it.
+ * ones drawn first: the lesson page's head and the home's live card both draw it; and the line said
+ * while the page can't reach Bali, under the chip it qualifies (StudentChipUnreached, drawn first).
  */
 const phone = (chip: PhoneChip | null, asOf: number | null = null, className?: string) =>
   renderToStaticMarkup(createElement(YourPhone, { chip, asOf, className }));
@@ -98,6 +99,14 @@ describe('YourPhone', () => {
   it('takes the place’s own margin: the home’s card puts it at the right', () => {
     expect(phone({ kind: 'focused' }, null, 'ml-auto')).toMatch(
       /^<p role="status" class="inline-flex flex-wrap items-center gap-2 ml-auto">/,
+    );
+  });
+});
+
+describe('CantReach', () => {
+  it('says the page can’t reach Bali in StudentStates’ words, drawn as the stale banner is, with nothing to press: the reads go on', () => {
+    expect(renderToStaticMarkup(createElement(CantReach))).toBe(
+      '<p role="status" class="rounded-sm border border-border-default bg-surface-sunken px-4 py-3 text-body text-text-primary">Can&#x27;t reach Bali right now, so this page may be behind. It keeps trying.</p>',
     );
   });
 });

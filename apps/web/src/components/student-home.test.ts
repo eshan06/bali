@@ -14,8 +14,9 @@ import { StudentHome } from './student-home';
  * sample data in it: StudentHome (Biology, period 3 in class now with Ms. Rivera, 23:04 left to a
  * 9:55 bell, Open the lesson and the phone's chip; Chemistry, period 5 with Mr. Okafor and AP
  * English, period 6 with Ms. Chen under Other classes), StudentHomeEmpty, StudentStates' "The
- * classes didn't load" and StudentChipStates' Checking…, drawn first. The chip's other states are
- * the lesson's read's, after the first draw: `your-phone.test.ts` and `student-web.test.ts`.
+ * classes didn't load" and StudentChipStates' Checking…, drawn first. The chip's other states, and
+ * StudentChipUnreached's line (drawn first), are the lesson's read's, after the first draw:
+ * `your-phone.test.ts`, `student-web.test.ts` and the card's wiring below.
  */
 vi.mock('next/navigation', () => ({ useRouter: vi.fn() }));
 const STARTED = '2026-10-12T14:05:00.000Z';
@@ -42,11 +43,14 @@ const me = (...classes: Class[]): MeResponse => ({
   armed: false,
 });
 
+const onRead = () => {};
+const onRefresh = () => Promise.resolve();
+
 /** The home as it first draws for `account` at NOW, its last read failed or not. */
 function home(account: MeResponse, failed = false): string {
   vi.useFakeTimers({ now: NOW });
   return renderToStaticMarkup(
-    createElement(StudentHome, { me: account, failed, onRead: () => {} }),
+    createElement(StudentHome, { me: account, failed, onRead, onRefresh }),
   );
 }
 afterEach(() => vi.useRealTimers());
@@ -134,6 +138,8 @@ describe('a student’s home with a class in session (StudentHome)', () => {
     );
     // Never a chip from this one-time /v1/me (decision 13): only the lesson's read says it.
     expect(html).not.toMatch(/Focused|as of/);
+    // Nor that Bali can't be reached: no read has failed yet (StudentChipUnreached).
+    expect(html).not.toMatch(/Can.t reach/);
     // The one control on the card is its way into the lesson.
     expect(html.match(/<a\b|<button\b/g)).toHaveLength(1);
   });
@@ -168,7 +174,7 @@ describe('a student’s home in other states', () => {
   it('shows a class past its bell by this computer’s clock with the rest, though the read said in session', () => {
     vi.useFakeTimers({ now: Date.parse(BELL) });
     const html = renderToStaticMarkup(
-      createElement(StudentHome, { me: me(BIOLOGY, CHEMISTRY), failed: false, onRead: () => {} }),
+      createElement(StudentHome, { me: me(BIOLOGY, CHEMISTRY), failed: false, onRead, onRefresh }),
     );
     expect(html).not.toContain('in class now');
     expect(html).not.toContain('Other classes');
@@ -259,14 +265,32 @@ describe('the home’s wiring (read from its source)', () => {
     expect(source).not.toMatch(/api\.get\b/);
   });
 
+  it('says Bali can’t be reached under the card’s last row while its lesson’s reads fail before one answers (StudentChipUnreached)', () => {
+    // Checking… stays in the chip's place, the line under the row (tested in student-web.test.ts
+    // and your-phone.test.ts): the reads go on every 2 s, so there's nothing to press.
+    expect(source).toMatch(
+      /<YourPhone chip=\{phoneChip\(lesson, new Date\(now\)\)\} asOf=\{lesson\.asOf\} className="ml-auto" \/>\s*<\/div>\s*\{unreached\(lesson\) \? <CantReach \/> : null\}\s*<\/section>/,
+    );
+  });
+
   it('reads the account again as its tab comes back into view, so a class that started shows with its way in', () => {
     expect(source).toMatch(
       /const back = \(\) => \{\s*if \(document\.visibilityState === 'visible'\) onRead\(\);\s*\};\s*document\.addEventListener\('visibilitychange', back\);\s*return \(\) => document\.removeEventListener\('visibilitychange', back\);/,
     );
   });
 
+  it('reads it again every 30 s while no class is in session, and stops once one is: the bell and the lesson’s reads take over (the owner, 2026-10-16)', () => {
+    // Its timing, its pause in a hidden tab and one read at a time: rereadEvery, tested in
+    // student-web.test.ts; the shell's refresh never reads over a read on its way.
+    expect(source).toMatch(
+      /const idle = classes\.inSession\.length === 0;\s*useEffect\(\(\) => \{\s*if \(!idle\) return;\s*const reread = rereadEvery\(onRefresh\);\s*return \(\) => reread\.stop\(\);\s*\}, \[idle, onRefresh\]\);/,
+    );
+  });
+
   it('gives the home its own read: Home passes the shell’s, never one of its own', () => {
     const page = readFileSync(fileURLToPath(new URL('../app/page.tsx', import.meta.url)), 'utf8');
-    expect(page).toContain('<StudentHome me={home.me} failed={error !== null} onRead={load} />');
+    expect(page).toContain(
+      '<StudentHome me={home.me} failed={error !== null} onRead={load} onRefresh={refresh} />',
+    );
   });
 });

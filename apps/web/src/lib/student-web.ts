@@ -5,6 +5,7 @@ import type {
   MeResponse,
   Presentation,
   StudentAnswer,
+  StudentQuestion,
 } from '@bali/shared';
 
 import type { ApiClient } from './api-client';
@@ -71,6 +72,56 @@ export function nextBell(me: MeResponse, now: number): number | null {
   return bells.length > 0 ? Math.min(...bells) : null;
 }
 
+/**
+ * How long the home waits after the account's last answer to read it again while it's in view with
+ * no class in session (the owner, 2026-10-16): a class that starts shows within about 30 s.
+ */
+export const ACCOUNT_EVERY_MS = 30_000;
+
+/**
+ * Read the account again `ACCOUNT_EVERY_MS` after each answer while the page is in view (W4's
+ * follow-up; the owner, 2026-10-16), one read at a time: `read` settles once its answer has landed.
+ * Hidden, it reads nothing, and back in view it counts 30 s afresh, the home having read at once as
+ * its tab came back. The home stops it while a class is in session: the bell and the lesson's reads
+ * take over.
+ */
+export function rereadEvery(
+  read: () => Promise<void>,
+  doc: PageVisibility = document,
+): { stop(): void } {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let reading = false;
+  let stopped = false;
+
+  const schedule = () => {
+    if (stopped || reading || timer !== undefined || doc.visibilityState === 'hidden') return;
+    timer = setTimeout(() => {
+      timer = undefined;
+      reading = true;
+      const settled = () => {
+        reading = false;
+        schedule();
+      };
+      void read().then(settled, settled);
+    }, ACCOUNT_EVERY_MS);
+  };
+  const onVisibility = () => {
+    if (doc.visibilityState !== 'hidden') return schedule();
+    clearTimeout(timer);
+    timer = undefined;
+  };
+
+  doc.addEventListener('visibilitychange', onVisibility);
+  schedule();
+  return {
+    stop() {
+      stopped = true;
+      clearTimeout(timer);
+      doc.removeEventListener('visibilitychange', onVisibility);
+    },
+  };
+}
+
 /** What the lesson page knows of a running session's lesson. */
 export interface LessonState {
   /**
@@ -101,8 +152,12 @@ export interface LessonState {
  */
 export const ANSWER_TIMEOUT_MS = 10_000;
 
-/** An answer's one request: the answer Bali holds now, this one or a later one, or why not. */
-export type AnswerResult = { kind: 'answered'; answer: StudentAnswer } | Failure;
+/**
+ * An answer's one request: the answer Bali holds now, this one or a later one, or why not, with the
+ * id it went under (none when nothing went), so a read since can say whether Bali took it after all.
+ */
+export type AnswerResult =
+  { kind: 'answered'; answer: StudentAnswer } | (Failure & { eventId?: string });
 
 /** A lesson the page follows. */
 export interface Lesson {
@@ -111,8 +166,8 @@ export interface Lesson {
    * an id minted after the answer held and after the last minted here, so it counts however far
    * behind this computer's clock stands. Refused by `reason`: `question_closed` (it closed, or the
    * bell rang, first), `invalid_option`, `event_id_conflict`, `account_deleted`; with no whole
-   * answer in `ANSWER_TIMEOUT_MS`, failed as no answer. A pick again sends a new one, minted after
-   * this one, so this one landing late never wins over it.
+   * answer in `ANSWER_TIMEOUT_MS`, failed as no answer; either with the id it went under. A pick
+   * again sends a new one, minted after this one, so this one landing late never wins over it.
    */
   answer(questionId: string, option: number): Promise<AnswerResult>;
   /** No more reads, and nothing more handed on: the page is done with the lesson. */
@@ -203,7 +258,7 @@ export function followLesson(
         set({ ...state, presentation: keepLater(state.presentation, questionId, res.answer) });
         return { kind: 'answered', answer: res.answer };
       } catch (e) {
-        return failureOf(e);
+        return { ...failureOf(e), eventId };
       }
     },
     stop() {
@@ -245,8 +300,8 @@ export function answerSaid(result: AnswerResult): 'too_late' | 'failed' | null {
 
 /** An answer on its way to Bali (W4): its question and the option picked. */
 export type Sending = { questionId: string; option: number } | null;
-/** What the last answer's request said (`answerSaid`), for its question. */
-export type Said = { questionId: string; said: 'too_late' | 'failed' } | null;
+/** What the last answer's request said (`answerSaid`), for its question, and the id it went under. */
+export type Said = { questionId: string; said: 'too_late' | 'failed'; eventId?: string } | null;
 /** The question card's picks as they go: the answer on its way, and what the last one said. */
 export interface Picks {
   sending: Sending;
@@ -271,8 +326,26 @@ export function picker(
       : { kind: 'failed', status: undefined, retryAfter: undefined };
     if (last !== mine) return;
     const said = answerSaid(result);
-    onChange({ sending: null, said: said === null ? null : { questionId, said } });
+    const eventId = result.kind === 'answered' ? undefined : result.eventId;
+    onChange({ sending: null, said: said === null ? null : { questionId, said, eventId } });
   };
+}
+
+/**
+ * What the question card says of the last pick's request, by the read since (W4's follow-up): only
+ * for its own question; and a send that said it didn't send says nothing once a read shows Bali
+ * holding its answer, or one taken after it (an id that sorts at or after the one it went under,
+ * decision 4): its reply was lost or came after `ANSWER_TIMEOUT_MS`, or a pick on another device
+ * since stands. The card then says the answer is in, as for any answer Bali holds.
+ */
+export function saidNow(
+  said: Said,
+  question: Pick<StudentQuestion, 'id' | 'answer'>,
+): 'too_late' | 'failed' | null {
+  if (said?.questionId !== question.id) return null;
+  const held = question.answer?.eventId;
+  const landed = said.eventId !== undefined && held !== undefined && held >= said.eventId;
+  return said.said === 'failed' && landed ? null : said.said;
 }
 
 /** A session's start and bell, as `/v1/me` lists them (W3). */
@@ -389,4 +462,14 @@ export function phoneChip(
 export function lessonGone(state: LessonState): boolean {
   const { presentation, problem } = state;
   return presentation?.running === false || (problem?.kind === 'refused' && problem.status !== 401);
+}
+
+/**
+ * Whether the home's live card says it can't reach Bali (W4's follow-up; StudentChipUnreached,
+ * drawn first): its lesson's reads fail and none has answered, so there's no read to keep the chip
+ * "as of" and Checking… alone would hide the failure; they're read again every 2 s, as ever. Never
+ * for a refusal, which has the account read again (`lessonGone`), nor a `401`, which signed out.
+ */
+export function unreached(state: LessonState): boolean {
+  return state.presentation === null && state.problem?.kind === 'failed';
 }

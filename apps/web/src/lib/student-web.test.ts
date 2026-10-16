@@ -3,6 +3,7 @@ import type {
   AnswerResponse,
   MeResponse,
   Presentation,
+  StudentAnswer,
   StudentPhone,
   StudentQuestion,
 } from '@bali/shared';
@@ -19,6 +20,7 @@ import {
 import { newEventId } from './event-id';
 import { type PageVisibility, POLL_EVERY_MS } from './live-question';
 import {
+  ACCOUNT_EVERY_MS,
   ANSWER_TIMEOUT_MS,
   answerSaid,
   type AnswerResult,
@@ -35,7 +37,12 @@ import {
   nextBell,
   phoneChip,
   picker,
+  type Picks,
+  rereadEvery,
+  type Said,
+  saidNow,
   type StudentClass,
+  unreached,
 } from './student-web';
 
 const SESSION = '01924b2c-0000-7000-8000-000000000001';
@@ -215,6 +222,131 @@ describe('the student’s home: who is in class now, and when to look again (W3)
     const after = me(klass('a', [-26, 19]));
     expect(ids(homeClasses(after, bell ?? 0).inSession)).toEqual(['a']);
     expect(nextBell(after, bell ?? 0)).toBe(AT + 19 * 60_000);
+  });
+});
+
+describe('rereadEvery: the home’s account, read again every 30 s while in view (the owner, 2026-10-16)', () => {
+  /** A page whose visibility a test turns, as a browser does on a tab switch. */
+  function page(visibilityState: DocumentVisibilityState = 'visible') {
+    const doc = Object.assign(new EventTarget(), { visibilityState });
+    const turn = (to: DocumentVisibilityState) => {
+      doc.visibilityState = to;
+      doc.dispatchEvent(new Event('visibilitychange'));
+    };
+    return { doc: doc as unknown as PageVisibility, turn };
+  }
+  /** Reads whose answers land when the test says, each read's in turn. */
+  function reads() {
+    const pending: { resolve: () => void; reject: (e: Error) => void }[] = [];
+    const read = vi.fn(
+      () => new Promise<void>((resolve, reject) => pending.push({ resolve, reject })),
+    );
+    return {
+      read,
+      answer: (i: number) => pending[i]?.resolve(),
+      fail: (i: number) => pending[i]?.reject(new Error('offline')),
+    };
+  }
+  const after = (ms: number) => vi.advanceTimersByTimeAsync(ms);
+
+  beforeEach(() => {
+    vi.useFakeTimers({ now: AT });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('reads 30 s after the page shows, then 30 s after each answer', async () => {
+    // The owner's 30 s: a class that starts shows with Open the lesson within about that.
+    expect(ACCOUNT_EVERY_MS).toBe(30_000);
+    const { read, answer } = reads();
+    const reread = rereadEvery(read, page().doc);
+    await after(ACCOUNT_EVERY_MS - 1);
+    expect(read).not.toHaveBeenCalled();
+    await after(1);
+    expect(read).toHaveBeenCalledOnce();
+    answer(0);
+    await after(ACCOUNT_EVERY_MS - 1);
+    expect(read).toHaveBeenCalledOnce();
+    await after(1);
+    expect(read).toHaveBeenCalledTimes(2);
+    reread.stop();
+  });
+
+  it('never reads twice at once: a read on its way holds the next until 30 s after its answer', async () => {
+    const { read, answer } = reads();
+    const reread = rereadEvery(read, page().doc);
+    await after(ACCOUNT_EVERY_MS);
+    expect(read).toHaveBeenCalledOnce();
+    // The read hangs for minutes: nothing stacks on it.
+    await after(10 * ACCOUNT_EVERY_MS);
+    expect(read).toHaveBeenCalledOnce();
+    answer(0);
+    await after(ACCOUNT_EVERY_MS - 1);
+    expect(read).toHaveBeenCalledOnce();
+    await after(1);
+    expect(read).toHaveBeenCalledTimes(2);
+    reread.stop();
+  });
+
+  it('reads again 30 s after a read that failed, the home saying the failure as ever meanwhile', async () => {
+    const { read, fail } = reads();
+    const reread = rereadEvery(read, page().doc);
+    await after(ACCOUNT_EVERY_MS);
+    fail(0);
+    await after(ACCOUNT_EVERY_MS);
+    expect(read).toHaveBeenCalledTimes(2);
+    reread.stop();
+  });
+
+  it('reads nothing while the tab is hidden, and counts 30 s afresh back in view', async () => {
+    const { read, answer } = reads();
+    const { doc, turn } = page();
+    const reread = rereadEvery(read, doc);
+    await after(ACCOUNT_EVERY_MS - 5_000);
+    turn('hidden');
+    await after(10 * ACCOUNT_EVERY_MS);
+    expect(read).not.toHaveBeenCalled();
+    // Back in view (the home reads at once then itself): 30 s from now, not from before.
+    turn('visible');
+    await after(ACCOUNT_EVERY_MS - 1);
+    expect(read).not.toHaveBeenCalled();
+    await after(1);
+    expect(read).toHaveBeenCalledOnce();
+    // Hidden with a read on its way: it answers, and nothing more until back in view.
+    turn('hidden');
+    answer(0);
+    await after(10 * ACCOUNT_EVERY_MS);
+    expect(read).toHaveBeenCalledOnce();
+    turn('visible');
+    await after(ACCOUNT_EVERY_MS);
+    expect(read).toHaveBeenCalledTimes(2);
+    reread.stop();
+  });
+
+  it('starts nothing in a hidden tab until it comes into view', async () => {
+    const { read } = reads();
+    const { doc, turn } = page('hidden');
+    const reread = rereadEvery(read, doc);
+    await after(10 * ACCOUNT_EVERY_MS);
+    expect(read).not.toHaveBeenCalled();
+    turn('visible');
+    await after(ACCOUNT_EVERY_MS);
+    expect(read).toHaveBeenCalledOnce();
+    reread.stop();
+  });
+
+  it('reads nothing once stopped, as a class comes into session: not after an answer on its way, nor back in view', async () => {
+    const { read, answer } = reads();
+    const { doc, turn } = page();
+    const reread = rereadEvery(read, doc);
+    await after(ACCOUNT_EVERY_MS);
+    reread.stop();
+    answer(0);
+    turn('hidden');
+    turn('visible');
+    await after(10 * ACCOUNT_EVERY_MS);
+    expect(read).toHaveBeenCalledOnce();
   });
 });
 
@@ -508,7 +640,13 @@ describe('followLesson', () => {
     await after(1);
     expect(settled).toHaveBeenCalledOnce();
     const result = await sent;
-    expect(result).toEqual({ kind: 'failed', status: undefined, retryAfter: undefined });
+    // With the id it went under, for a read since to say whether Bali took it (W4's follow-up).
+    expect(result).toEqual({
+      kind: 'failed',
+      status: undefined,
+      retryAfter: undefined,
+      eventId: expect.stringMatching(V7) as string,
+    });
     // The card's drawn "didn't send", with its retry: a pick again.
     expect(answerSaid(result)).toBe('failed');
     expect(shownAnswer()).toBeNull();
@@ -519,8 +657,76 @@ describe('followLesson', () => {
     followed.stop();
   });
 
-  it('types an answer’s failures by reason, the answer shown left as it was', async () => {
-    const { api, answers } = server(tagged('"a"', lesson({ question: question() })));
+  it('says an answer whose send gave up at ANSWER_TIMEOUT_MS but landed is in once a read shows it, not only at the next pick (W4’s follow-up)', async () => {
+    // Bali takes the answer half a second after its send gave up: the reply never comes back.
+    let held: StudentAnswer | null = null;
+    const { api } = client({
+      [`/v1/sessions/${SESSION}/presentation`]: () =>
+        json(200, lesson({ question: question({ answer: held }) }))(),
+      [`/v1/questions/${QUESTION}/answers`]: (init) => {
+        const { eventId, option } = JSON.parse(init?.body as string) as AnswerRequest;
+        setTimeout(() => {
+          held = { option, eventId };
+        }, ANSWER_TIMEOUT_MS + 500);
+        return swallowed(init);
+      },
+    });
+    const followed = followLesson(api, SESSION, onChange, page().doc);
+    await after(0);
+    let picks: Picks = { sending: null, said: null };
+    const picking = picker((next) => {
+      picks = next;
+    })(followed, QUESTION, 1);
+    const card = () => {
+      const shown = last()?.presentation?.question;
+      if (!shown) throw new Error('no question shown');
+      return shown;
+    };
+    await after(ANSWER_TIMEOUT_MS);
+    await picking;
+    // Didn't send, with the id it went under, while the reads show no answer held.
+    expect(picks.said).toEqual({
+      questionId: QUESTION,
+      said: 'failed',
+      eventId: expect.stringMatching(V7) as string,
+    });
+    expect(card().answer).toBeNull();
+    expect(saidNow(picks.said, card())).toBe('failed');
+    // The next read shows it held under that id: the card says the answer is in, no pick needed.
+    await after(POLL_EVERY_MS);
+    expect(card().answer).toEqual({ option: 1, eventId: picks.said?.eventId });
+    expect(saidNow(picks.said, card())).toBeNull();
+    followed.stop();
+  });
+
+  it('keeps no lesson and nothing as of while its reads fail before one answers, reading again every 2 s: the home’s card says it can’t reach Bali (W4’s follow-up)', async () => {
+    const { api, reads } = server(
+      new NetworkError(),
+      new ApiError(503, 'unavailable', 'down'),
+      tagged('"a"', lesson()),
+    );
+    const followed = followLesson(api, SESSION, onChange, page().doc);
+    const now = (): LessonState => last() ?? { presentation: null, problem: null, asOf: null };
+    await after(0);
+    expect(last()).toEqual({
+      presentation: null,
+      problem: { kind: 'failed', status: undefined, retryAfter: undefined },
+      asOf: null,
+    });
+    expect(phoneChip(now())).toBeNull();
+    expect(unreached(now())).toBe(true);
+    await after(POLL_EVERY_MS);
+    expect(last()?.problem).toMatchObject({ kind: 'failed', status: 503 });
+    expect(unreached(now())).toBe(true);
+    await after(POLL_EVERY_MS); // the first read that answers: the chip says it
+    expect(last()).toEqual({ presentation: lesson(), problem: null, asOf: null });
+    expect(unreached(now())).toBe(false);
+    expect(reads.map((read) => read.at)).toEqual([0, 2000, 4000]);
+    followed.stop();
+  });
+
+  it('types an answer’s failures by reason, each with the id it went under, the answer shown left as it was', async () => {
+    const { api, answers, posts } = server(tagged('"a"', lesson({ question: question() })));
     const followed = followLesson(api, SESSION, onChange, page().doc);
     await after(0);
     answers.push(
@@ -533,14 +739,16 @@ describe('followLesson', () => {
     );
     const said: AnswerResult[] = [];
     for (let i = 0; i < 6; i += 1) said.push(await followed.answer(QUESTION, 1));
-    expect(said).toEqual([
-      { kind: 'refused', status: 409, reason: 'question_closed' },
-      { kind: 'refused', status: 400, reason: 'invalid_option' },
-      { kind: 'refused', status: 409, reason: 'event_id_conflict' },
-      { kind: 'refused', status: 409, reason: 'account_deleted' },
-      { kind: 'failed', status: undefined, retryAfter: undefined },
-      { kind: 'failed', status: 429, retryAfter: 3 },
-    ]);
+    expect(said).toEqual(
+      [
+        { kind: 'refused', status: 409, reason: 'question_closed' },
+        { kind: 'refused', status: 400, reason: 'invalid_option' },
+        { kind: 'refused', status: 409, reason: 'event_id_conflict' },
+        { kind: 'refused', status: 409, reason: 'account_deleted' },
+        { kind: 'failed', status: undefined, retryAfter: undefined },
+        { kind: 'failed', status: 429, retryAfter: 3 },
+      ].map((failure, i) => ({ ...failure, eventId: posts[i]?.body.eventId })),
+    );
     expect(shownAnswer()).toBeNull();
     followed.stop();
   });
@@ -665,6 +873,34 @@ describe('lessonGone: when the home reads the account again for a class’s less
       { kind: 'failed', status: 429, retryAfter: 7 },
     ] as const) {
       expect(lessonGone({ ...read(), problem, asOf: AT })).toBe(false);
+    }
+  });
+});
+
+describe('unreached: when the home’s live card says it can’t reach Bali (W4’s follow-up)', () => {
+  const none: LessonState = { presentation: null, problem: null, asOf: null };
+  const failed = { kind: 'failed', status: undefined, retryAfter: undefined } as const;
+
+  it('is a lesson whose reads fail before one answers: no chip to keep as of a time, so Checking… alone would hide it', () => {
+    for (const problem of [
+      failed,
+      { kind: 'failed', status: 503, retryAfter: undefined },
+      { kind: 'failed', status: 429, retryAfter: 7 },
+    ] as const) {
+      expect(unreached({ ...none, problem })).toBe(true);
+    }
+  });
+
+  it('is never before the first read, nor once one answered: then the chip says it, as of that read', () => {
+    expect(unreached(none)).toBe(false);
+    expect(unreached({ presentation: lesson(), problem: failed, asOf: AT })).toBe(false);
+    expect(unreached({ presentation: lesson(), problem: null, asOf: null })).toBe(false);
+  });
+
+  it('is never a refusal: the home reads the account again for one (lessonGone), and a 401 signed out', () => {
+    for (const status of [401, 403, 404]) {
+      const refused = { kind: 'refused', status, reason: undefined } as const;
+      expect(unreached({ ...none, problem: refused })).toBe(false);
     }
   });
 });
@@ -861,6 +1097,54 @@ describe('picker: the question card’s picks (W4)', () => {
       [{ sending: { questionId: QUESTION, option: 0 }, said: null }],
       [{ sending: null, said: { questionId: QUESTION, said: 'failed' } }],
     ]);
+  });
+
+  it('keeps the id a send that didn’t send went under, for a read since to say whether Bali took it (W4’s follow-up)', async () => {
+    const { lesson, settle } = sends();
+    const onChange = vi.fn();
+    const done = picker(onChange)(lesson, QUESTION, 2);
+    const sent = idAt(AT);
+    settle(0, { kind: 'failed', status: undefined, retryAfter: undefined, eventId: sent });
+    await done;
+    expect(onChange).toHaveBeenLastCalledWith({
+      sending: null,
+      said: { questionId: QUESTION, said: 'failed', eventId: sent },
+    });
+  });
+});
+
+describe('saidNow: what the question card says of the last pick, by the read since (W4’s follow-up)', () => {
+  const SENT = idAt(AT);
+  const failed: Said = { questionId: QUESTION, said: 'failed', eventId: SENT };
+  const held = (option: number, eventId: string) => question({ answer: { option, eventId } });
+
+  it('says what the last pick’s request said, for its own question alone', () => {
+    expect(saidNow(failed, question())).toBe('failed');
+    const late: Said = { questionId: QUESTION, said: 'too_late', eventId: SENT };
+    expect(saidNow(late, question({ open: false }))).toBe('too_late');
+    expect(saidNow(failed, question({ id: 'q2' }))).toBeNull();
+    expect(saidNow(null, question())).toBeNull();
+  });
+
+  it('says nothing of a send that didn’t send once a read shows Bali holding its answer, or one taken after it', () => {
+    // Its reply lost, or later than ANSWER_TIMEOUT_MS: Bali took it after all.
+    expect(saidNow(failed, held(1, SENT))).toBeNull();
+    // A pick on the phone since, its id after this one's: that answer stands, and is in.
+    expect(saidNow(failed, held(3, idAt(AT + 1)))).toBeNull();
+  });
+
+  it('still says it didn’t send while the read holds an older answer, or none, or the send had no id', () => {
+    expect(saidNow(failed, held(0, idAt(AT - 1)))).toBe('failed');
+    expect(saidNow(failed, question())).toBe('failed');
+    // Nothing went (no lesson to send through): no read can say it landed.
+    expect(saidNow({ questionId: QUESTION, said: 'failed' }, held(1, SENT))).toBe('failed');
+  });
+
+  it('keeps too late as said: Bali refused that answer, so no read can show it held', () => {
+    const late: Said = { questionId: QUESTION, said: 'too_late', eventId: SENT };
+    expect(saidNow(late, question({ open: false, answer: { option: 1, eventId: SENT } }))).toBe(
+      'too_late',
+    );
   });
 });
 
