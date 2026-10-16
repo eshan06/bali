@@ -8,6 +8,51 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-16** — **M6's part 2d: Present's slide in the live grid's place, a question first (#418);
+  its frame as the board renders it, the page's width and as tall as the screen leaves; #416's two
+  fixes. M6 is done.** Built from the code left on `m6-2d-present-slide` (rebased onto main after
+  2c's squash) and reviewed against the boards. **PresentSlide** (`components/present-slide.tsx`):
+  while no question shows, the page the session shows; under it the deck's title and "4 of 12" at
+  18/24 in the secondary ink, said as it changes, then Previous, Next and Stop showing, the class
+  page's own (`holdFor`, `STOP`), and the ← → keys (`useSlideKeys`); Stop showing done, the grid back
+  and focus on Present. Its lines one size up (`text-present-line`, Try again full size), in the
+  slide's place 24 px in and under the row, as PresentSlideStates and PresentSlidePhone draw them
+  (canvas version 62, drawn first). A question first (the conductor's call, the owner's): PresentQuestion
+  while one shows, open or closed until Done, then the slide on the page the session shows then.
+  **The frame, as the board renders it** (this step's review): `.p-slide` asks for `margin: 0 auto`,
+  760 px tall at 16:9, but v2.css's `.app figure { margin: 0 }` outranks it, so PresentSlide's white
+  frame spans the page (1824 × 760 at 1920 × 1080), the page 1351 × 760 in its middle, as the
+  question's card spans it; the branch drew the stylesheet's intent, a 1351 px frame on the stone. Built
+  as the boards render, as L7's part 2 built `.p-prompt` under `.app h2`'s margin. **As tall as the
+  screen leaves:** the branch sized the frame from the screen's height less 232 px, Present's header on
+  one line, but a header on two lines (measured at 1280 × 720 and 800, 1366 × 768 and 1024 × 768, the
+  usual projectors) put the row of buttons off the screen. Now the grid's section and the slide's fill
+  Present's page (`flex-1`; the page is at least the screen's height), and the frame takes what the
+  header and the row leave: 760 px at most, never past 16:9 (`100cqw`: the slide's section is an
+  inline-size container, whose width reads true there), 9 rem at least; on a phone the screen's width
+  at 16:9, the page scrolling, as PresentSlidePhone draws it. Measured at 1920 × 1080 (the board's
+  1824 × 760), 1440 × 900, 1366 × 768, 1280 × 800, 1280 × 720 and 1024 × 768, every one fitting the
+  screen, 800 × 1280 (16:9, 704 × 396) and 390 × 844 and 667 (358 × 201). *Weighed:* measuring the
+  header in a script (a resize observer more, for what layout gives). **#416's two fixes**, each with
+  its test failing first (in the branch's one commit, so this PR's history doesn't show the red run):
+  `drawPage` gives PDF.js 20 s (`DRAW_LIMIT_MS`), every wait on it raced against the limit and a stop,
+  so a worker that stops answering after the deck opened ends in "Bali couldn't draw this page." with
+  Try again, which then opens the deck again (`unanswered`: drawing again would ask the same worker);
+  and the ← → keys never turn the slide from inside an open side panel (`keyTurn`: focus in an
+  `aside`, the ask, write, decks and student panels), nor in a field or with a key held, the card's
+  and Present's alike. LessonSlideStates' undrawn label and its line on the keys say so (version 62).
+  **Checked on dev**, the demo teacher's 12-page test deck uploaded and checked, and a session of the
+  demo class started, through the API: in the owner's signed-in tab Show slides and Show; Present on,
+  the slide in the grid's place (1 of 12, Previous held), Next to 2, → twice to 4, ← to 3 and → to 4;
+  a question asked through the API taking the slide's place there, closed with Close and put away with
+  Done, the slide back on 4 with focus on Present; Present off, the Ask panel's heading and the write
+  form's Mark correct taking → and ← with the slide unturned, the form's field moving its caret, then
+  Cancel, and → turning it again with no panel; Present on, Stop showing, the grid back with focus on
+  Present; Present off; the deck removed and the session ended through the API. **Sharp:** every
+  board beside the real class page in Present (`.claude/shots/M6-2d/`), rendered in headless Chrome
+  against stand-ins for the API and the bucket from a throwaway page in the preview, deleted after,
+  the test deck drawn by the portal's own PDF.js.
+
 - **2026-10-16** — **M6's part 2c: Show slides on the card at rest, opening LessonDecks' side panel
   (#417); 2c and 2d split in two; their states drawn first (canvas version 62).** **The split:** 2c,
   2d and #416's two fixes came to about 650 changed lines without tests (`git diff --stat`, the measure
@@ -134,7 +179,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   (`use-slide-hook.test.ts`); and its wiring read from its source, as the question card's is.
 
 - **2026-10-16** — **M6's part 2a: the presenter's logic, no screen (#414); part 2 in three PRs; and
-  the conductor's two calls for its screens, awaiting the owner.** **The split:** part 2 whole came to
+  the conductor's two calls for its screens, approved by the owner the same day ("your decisions are
+  fine").** **The split:** part 2 whole came to
   about 1,000 changed lines without tests (the worker's sizing), so the conductor split it in three:
   2a, this logic; 2b, the class page's slide card (LessonSlide); 2c+2d, one PR, picking a deck in the
   side panel (LessonClass's Show slides, LessonDecks) and Present's slide (PresentSlide). As L6 went
@@ -181,8 +227,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   PDF.js the portal ships, in Node on its own canvas (`@napi-rs/canvas`): a two-page deck drawn (840 ×
   473 at a ratio of 2 in the class page's 420 px slide, and again after its cleanup; a letter-sized
   page 587 × 760 in Present's frame), its text read, a second draw cancelling the first, and a stop
-  as PDF.js began drawing cancelling its task and leaving the canvas as it was. **The conductor's two calls (2026-10-16, for the owner's morning
-  look; both reversible), which 2b and 2c+2d follow:** (1) **a question and a slide at once: the
+  as PDF.js began drawing cancelling its task and leaving the canvas as it was. **The conductor's two calls (2026-10-16), which 2b and 2c+2d
+  follow, approved by the owner the same day, in their words "your decisions are fine":** (1) **a question and a slide at once: the
   question first**, ARCHITECTURE decision 11's order on the phone, and the approved boards' own way
   (LessonSlide's Ask a question leads on to LessonWaiting). While a question shows, open or closed
   until Done, the class page's card and Present show it as approved, the slide card coming back after
