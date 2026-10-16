@@ -20,11 +20,13 @@ import { newEventId } from './event-id';
 import { type PageVisibility, POLL_EVERY_MS } from './live-question';
 import {
   type AnswerResult,
+  CLOCK_SKEW_MS,
   ENDED_WITHIN_MS,
   endedAt,
   followLesson,
   homeClasses,
   homeFor,
+  keptBell,
   type LessonState,
   lessonView,
   nextBell,
@@ -588,10 +590,26 @@ describe('endedAt: when the class ended, only as this page can vouch for it (W4)
     expect(endedAt({ after: bell - 1_500, by: bell + 500 }, BELL)).toBe(bell);
   });
 
+  it('is still the bell from a clock a few seconds behind the server’s, never a minute early', () => {
+    const bell = Date.parse(BELL);
+    // Over by the server's clock at 9:55:01, read at 9:54:56 on this one, 5 s behind.
+    expect(endedAt({ after: bell - 6_000, by: bell - 4_000 }, BELL)).toBe(bell);
+    expect(endedAt({ after: bell - 12_000, by: bell - CLOCK_SKEW_MS }, BELL)).toBe(bell);
+  });
+
   it('is the read that saw it over when that came before the bell: an End', () => {
     expect(endedAt({ after: AT - 2_000, by: AT }, BELL)).toBe(AT);
     // With no bell to weigh it against, that read's time too.
     expect(endedAt({ after: AT - 2_000, by: AT }, null)).toBe(AT);
+  });
+
+  it('is the read that saw it over when a read saw the class run past the bell: added minutes it never heard of (santa’s review)', () => {
+    const bell = Date.parse(BELL);
+    const later = bell + 10 * 60_000;
+    expect(endedAt({ after: later - 1_000, by: later + 1_000 }, BELL)).toBe(later + 1_000);
+    expect(
+      endedAt({ after: bell + CLOCK_SKEW_MS + 1, by: bell + CLOCK_SKEW_MS + 2_000 }, BELL),
+    ).toBe(bell + CLOCK_SKEW_MS + 2_000);
   });
 
   it('is none for a page that never saw it run, or saw it last too long before', () => {
@@ -599,6 +617,37 @@ describe('endedAt: when the class ended, only as this page can vouch for it (W4)
     expect(endedAt({ after: AT - ENDED_WITHIN_MS - 1, by: AT }, BELL)).toBeNull();
     expect(endedAt({ after: AT - ENDED_WITHIN_MS, by: AT }, BELL)).toBe(AT);
     expect(endedAt(undefined, BELL)).toBeNull();
+  });
+});
+
+describe('keptBell: the session’s start and bell, as the lesson page keeps them (W4)', () => {
+  const STARTED = new Date(AT - 36 * 60_000).toISOString();
+  const BELL = new Date(AT + 14 * 60_000).toISOString();
+  const LISTED = { id: SESSION, startedAt: STARTED, endsAt: BELL };
+  const klass = (liveSession: StudentClass['liveSession']): StudentClass => ({
+    id: 'bio',
+    name: 'Biology, period 3',
+    teacher: { displayName: 'Ms. Rivera' },
+    enrollmentId: 'e-bio',
+    liveSession,
+  });
+
+  it('takes them from a read that lists the session as the class’s, and none before', () => {
+    expect(keptBell(null, klass(LISTED), SESSION)).toBe(LISTED);
+    expect(keptBell(null, klass(null), SESSION)).toBeNull();
+    expect(keptBell(null, undefined, SESSION)).toBeNull();
+  });
+
+  it('keeps them once a read lists none, another session, or no such class', () => {
+    expect(keptBell(LISTED, klass(null), SESSION)).toBe(LISTED);
+    expect(keptBell(LISTED, klass({ ...LISTED, id: 'next' }), SESSION)).toBe(LISTED);
+    expect(keptBell(LISTED, undefined, SESSION)).toBe(LISTED);
+  });
+
+  it('takes the later bell the teacher’s added minutes bring, and keeps the same ones as they were', () => {
+    const later = { ...LISTED, endsAt: new Date(AT + 24 * 60_000).toISOString() };
+    expect(keptBell(LISTED, klass(later), SESSION)).toBe(later);
+    expect(keptBell(LISTED, klass({ ...LISTED }), SESSION)).toBe(LISTED);
   });
 });
 

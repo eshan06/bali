@@ -206,21 +206,41 @@ export function followLesson(
 
 /** How close the last read saying the session ran must come before the one saying it ended. */
 export const ENDED_WITHIN_MS = 30_000;
+/** How far this computer's clock may stand from the server's when the bell is weighed. */
+export const CLOCK_SKEW_MS = 10_000;
 
 /**
  * When the session ended, as this page can vouch for it (ms), or null when it can't: only when a
  * read that saw it run came within `ENDED_WITHIN_MS` of the one that saw it over, the end between
- * them; then the bell, the server's own time, when it came before that read, else that read's time
- * (an End before the bell). A page opened after the end, or away when it came, can't say.
+ * them; then the bell, the server's own time, when it fell between them, give or take
+ * `CLOCK_SKEW_MS`, else that read's time: an End before the bell, or a bell moved later that this
+ * page didn't hear of (it saw the class run past it). A page opened after the end, or away when it
+ * came, can't say.
  */
 export function endedAt(ended: LessonState['ended'], bell: string | null): number | null {
   if (!ended || ended.after === null || ended.by - ended.after > ENDED_WITHIN_MS) return null;
   const at = bell === null ? NaN : Date.parse(bell);
-  return Number.isNaN(at) ? ended.by : Math.min(ended.by, at);
+  const between = at >= ended.after - CLOCK_SKEW_MS && at <= ended.by + CLOCK_SKEW_MS;
+  return between ? at : ended.by;
 }
 
 /** A session's start and bell, as `/v1/me` lists them (W3). */
 export type Bell = InSession['liveSession'];
+
+/**
+ * The session's start and bell as the lesson page keeps them (W4): as the account's last read lists
+ * them for the class, a later bell once the teacher added minutes; else, once a read lists the
+ * class with no such session (it ended, or another began), the last ones listed, kept (`kept`).
+ */
+export function keptBell(
+  kept: Bell | null,
+  klass: StudentClass | undefined,
+  sessionId: string,
+): Bell | null {
+  const listed = klass?.liveSession;
+  if (listed?.id !== sessionId) return kept;
+  return listed.endsAt === kept?.endsAt && listed.startedAt === kept.startedAt ? kept : listed;
+}
 
 /** What the lesson page shows (W4), as kinds: its words are the page's. */
 export type LessonView =

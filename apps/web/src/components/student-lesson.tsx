@@ -9,6 +9,7 @@ import { bellTime } from '@/lib/session-controls';
 import {
   type Bell,
   followLesson,
+  keptBell,
   type LessonState,
   lessonView,
   type LessonView,
@@ -56,14 +57,13 @@ export function StudentLessonPage({ classId, sessionId }: { classId: string; ses
   }, [home, router]);
 
   const klass = me?.classes.find((c) => c.id === classId);
-  const listed = klass?.liveSession?.id === sessionId ? klass.liveSession : null;
   // The session's start and bell, kept once a read lists it: a read after its end lists none.
-  const [bell, setBell] = useState<Bell | null>(listed);
-  if (listed && (listed.endsAt !== bell?.endsAt || listed.startedAt !== bell?.startedAt)) {
-    setBell(listed);
-  }
+  const [bell, setBell] = useState(() => keptBell(null, klass, sessionId));
+  const kept = keptBell(bell, klass, sessionId);
+  if (kept !== bell) setBell(kept);
   const endsAt = bell?.endsAt ?? null;
-  const follows = endsAt !== null;
+  // Never once the account no longer lists the class: its reads would only be refused.
+  const follows = endsAt !== null && klass !== undefined;
 
   useEffect(() => {
     if (!follows) return;

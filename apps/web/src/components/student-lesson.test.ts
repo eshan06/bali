@@ -214,10 +214,13 @@ describe('its URL and its reads (from their sources)', () => {
     expect(component).not.toMatch(/api\.get\b/);
   });
 
-  it('follows the session only once a read lists it as the class’s, and Try again starts afresh', () => {
+  it('follows the session only once a read lists it as the class’s, while the class is listed, and Try again starts afresh', () => {
+    // Its start and bell as keptBell keeps them (tested in student-web.test.ts), every read.
     expect(component).toMatch(
-      /const listed = klass\?\.liveSession\?\.id === sessionId \? klass\.liveSession : null;/,
+      /const \[bell, setBell\] = useState\(\(\) => keptBell\(null, klass, sessionId\)\);\s*const kept = keptBell\(bell, klass, sessionId\);\s*if \(kept !== bell\) setBell\(kept\);/,
     );
+    // A class the account no longer lists is followed no more: its reads would only be refused.
+    expect(component).toMatch(/const follows = endsAt !== null && klass !== undefined;/);
     expect(component).toMatch(
       /if \(!follows\) return;\s*const followed = followLesson\(api, sessionId, setLesson\);/,
     );
