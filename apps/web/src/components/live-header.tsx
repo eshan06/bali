@@ -104,6 +104,42 @@ const TYPE = {
 };
 
 /**
+ * The time left to the server's bell on this computer's clock (`now`), the bell's time under it,
+ * after a hairline (ClassLive's; StudentLesson's, W4); "…" until the bell is known. In Present one
+ * size up (ClassPresent); on a phone at the header's right, with no hairline (PhoneClassLive).
+ */
+export function Countdown({
+  endsAt,
+  now,
+  present = false,
+}: {
+  endsAt: string | null;
+  now: number;
+  present?: boolean;
+}) {
+  const type = TYPE[present ? 'present' : 'live'];
+  return (
+    <p className="flex flex-col border-l border-border-default pl-4.5 max-sm:border-l-0 max-sm:pl-0 max-sm:text-right">
+      {endsAt ? (
+        <>
+          <span className={`font-num ${type.time} tabular-nums`}>
+            {timeLeft(Date.parse(endsAt) - now)}
+          </span>
+          <span className={`${type.sub} text-text-secondary`}>
+            ends <time dateTime={endsAt}>{bellTime(endsAt)}</time>
+          </span>
+        </>
+      ) : (
+        <>
+          <span className={`font-num ${type.time} text-text-tertiary`}>…</span>
+          <span className={type.sub}>{'\u00a0'}</span>
+        </>
+      )}
+    </p>
+  );
+}
+
+/**
  * A class's header while a session runs (PV7; ClassLive): the ring, the name over "Live · 25 of 28
  * joined · join code VMAF7E", the countdown to the server's bell on this computer's clock with the
  * bell's time under it, then the controls (`children`) at the end. Until the grid is counted the
@@ -155,25 +191,7 @@ export function LiveHeader({
           )}
         </p>
       </div>
-      {over === null ? (
-        <p className="flex flex-col border-l border-border-default pl-4.5 max-sm:border-l-0 max-sm:pl-0 max-sm:text-right">
-          {endsAt ? (
-            <>
-              <span className={`font-num ${type.time} tabular-nums`}>
-                {timeLeft(Date.parse(endsAt) - now)}
-              </span>
-              <span className={`${type.sub} text-text-secondary`}>
-                ends <time dateTime={endsAt}>{bellTime(endsAt)}</time>
-              </span>
-            </>
-          ) : (
-            <>
-              <span className={`font-num ${type.time} text-text-tertiary`}>…</span>
-              <span className={type.sub}>{'\u00a0'}</span>
-            </>
-          )}
-        </p>
-      ) : null}
+      {over === null ? <Countdown endsAt={endsAt} now={now} present={present} /> : null}
       {present ? (
         <p className="ml-3 flex flex-wrap items-center gap-2.5">
           <span className="text-present-caption text-text-tertiary">Join code</span>

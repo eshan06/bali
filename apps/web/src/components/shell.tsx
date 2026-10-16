@@ -182,6 +182,8 @@ interface Item {
   href: string;
   label: string;
   Icon: LucideIcon;
+  /** Pages under it at another path: a student's lessons under Your classes (W4). */
+  under?: string;
 }
 
 /** Whose menu it is: a teacher's, or a student's who said 13+ in the app (W3). */
@@ -190,7 +192,7 @@ export type MenuRole = 'teacher' | 'student';
 /**
  * The menu's pages, each listed only once it exists, never as a dead or disabled link: a teacher's
  * Classes comes with PV16 (between Home and Reports); a student's is Your classes alone
- * (StudentHome). Help sits under the gap, in both.
+ * (StudentHome), its lessons under it (StudentLesson). Help sits under the gap, in both.
  */
 const PAGES: Record<MenuRole, Item[]> = {
   teacher: [
@@ -199,7 +201,7 @@ const PAGES: Record<MenuRole, Item[]> = {
     { href: '/questions', label: 'Questions', Icon: MessageCircleQuestionMark },
     { href: '/slides', label: 'Slides', Icon: Presentation },
   ],
-  student: [{ href: '/', label: 'Your classes', Icon: LayoutGrid }],
+  student: [{ href: '/', label: 'Your classes', Icon: LayoutGrid, under: '/lessons' }],
 };
 const HELP: Item = { href: '/support', label: 'Help', Icon: CircleQuestionMark };
 
@@ -247,13 +249,16 @@ export function SideMenu({
   leaving: boolean;
   onSignOut: () => void;
 }) {
-  // Its own page, or one under it (a session's report under Reports, PV14; ReportOpened).
-  const here = (href: string) => path === href || (href !== '/' && path.startsWith(`${href}/`));
-  const link = ({ href, label, Icon }: Item) => (
+  // Its own page, or one under it (a session's report under Reports, PV14; ReportOpened), or under
+  // its other path (a lesson under Your classes, W4; StudentLesson).
+  const here = (href: string, under?: string) =>
+    path === href ||
+    [href !== '/' && href, under].some((root) => root && path.startsWith(`${root}/`));
+  const link = ({ href, label, Icon, under }: Item) => (
     <Link
       key={href}
       href={href}
-      aria-current={here(href) ? 'page' : undefined}
+      aria-current={here(href, under) ? 'page' : undefined}
       className={`${ITEM} max-sm:order-3`}
     >
       <Icon size={17} aria-hidden="true" className="shrink-0" />

@@ -8,6 +8,47 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-15** — **W4's part 1a: the student's lesson page at `/lessons/<class>/<session>`, its
+  head and its states; the question card split off as part 1b.** Built to
+  [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4): StudentLesson's
+  head, StudentWaiting, StudentEnded and StudentStates' lines, and two boards drawn first as
+  intermediate states (version 49; one label widened in version 51): StudentNoSlide (a question with
+  no slide, its card alone at 25rem, part 1b's) and StudentCardStates (the card's states, part 1b's,
+  and the page's: Bali can't be reached, class over with no time, a question or a slide this page
+  doesn't draw yet, not in this class). **The split** (the conductor, 2026-10-15): part 1 came to
+  about 600 changed lines without tests, so the page (about 390) ships first and the card (about
+  200) follows from a stacked branch, `w4-1b-question-card`. **The URL:** a class of the student's
+  and its session, as PV14's report is: the page names its class from the account even once the
+  session is over (a session's id alone can't), and a link to an old lesson says class is over,
+  never shows another session. *Weighed:* the class alone, which would follow whatever session runs
+  and say class is over before one starts. **Whose lesson:** the shell's one read of the account,
+  read again as the page opens and at the bell (once, never a loop), so minutes the teacher added move
+  it; the page follows the session only once a read lists it as the class's (`liveSession`), and only
+  while the account lists the class, keeping its start and bell after a later read lists none
+  (`keptBell`); a class that a read since the page opened doesn't
+  list says "This lesson is for a class you're not in." with Your classes (removed from it, or someone
+  else's link); a teacher, or an account never through the 13+ check, goes home. **Class over:** the
+  presentation read says only that the session isn't running, so `followLesson` now notes between
+  which reads it ended (`ended`), and the page says StudentEnded's time only when a read that saw it
+  run came within 30 s of the one that saw it over: the bell when it fell between the two, give or
+  take 10 s of clock skew, else that read's time (an End, or minutes the teacher added that the page
+  never heard of, santa's review); a page opened after the end, or away when it came, says "This
+  class has ended." (`endedAt`). *Weighed:* the bell always (wrong after an End), the time this page learned it (wrong
+  after a hidden tab), and the end's time on the presentation read (an API change for one line).
+  **Drawn first, then built:** "Can't reach Bali" under the head, padded as every built notice is
+  (the boards' `<p class="notice">` loses its padding to `.app p`, as the class page's line found);
+  a question or a slide this page doesn't draw yet leaves the head alone (the card until part 1b,
+  slides until W5), since "Nothing shared yet" would be untrue. **The head** shares the class page's
+  countdown (`Countdown`, taken out of `LiveHeader`, unchanged) and takes its ring in part 1, as no
+  board draws a live head without it; the phone's chip and its "as of" are part 2's (the conductor,
+  2026-10-15). **Checked on dev:** the demo teacher started a 10-minute session in the demo class
+  and the page's own logic (`followLesson`, `lessonView`, `endedAt`) read it as Ana: nothing shared,
+  a question asked (the head alone), then the teacher's End, whose time it said 0.6 s after the End
+  was sent, its reads 2.1 s apart; the question closed and the session ended. **The screenshots:**
+  the real components with those reads in a throwaway page in the preview alone, deleted after,
+  beside the boards at 1440 px, box for box within the menu's 0.7 px. No link leads to the page until
+  part 2 (the home's Open the lesson).
+
 - **2026-10-15** — **L7's part 3: Close and Done on Present, built to the boards the owner
   approved that day; Done puts the question away in every Bali window of the browser.** Present
   (#402) showed a question in the grid's place but could neither close nor put it away, so a
