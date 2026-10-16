@@ -8,7 +8,7 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
-- **2026-10-16** — **PV16a: Classes, the page (#PV16A); the menu's foot for a long name; PV16 in
+- **2026-10-16** — **PV16a: Classes, the page (#420); the menu's foot for a long name; PV16 in
   two.** Built to [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4):
   Classes, ClassesEmpty, HomeStates' lines for the list and the block, and four boards drawn first as
   intermediate states (versions 65 and 66): ClassesStates (New class's states, for PV16b, and the
