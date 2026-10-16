@@ -69,7 +69,12 @@ export interface ApiClient {
    * whole within `POLL_TIMEOUT_MS` fails as no answer, for the poll to read again (#334).
    */
   getTagged<T>(path: string, etag: string | null): Promise<{ body: T; etag: string | null } | null>;
-  post<T>(path: string, body?: unknown): Promise<T>;
+  /**
+   * `limitMs`: an answer not whole within it fails as no answer, as a poll's does (an answer's send,
+   * #407's review). None else is given one: a deck's check (`POST /v1/decks/{id}/complete`) can take
+   * longer than a poll waits.
+   */
+  post<T>(path: string, body?: unknown, limitMs?: number): Promise<T>;
   put<T>(path: string, body?: unknown): Promise<T>;
   patch<T>(path: string, body?: unknown): Promise<T>;
   /** A removal may carry its `eventId` in its body (a saved question's, L3b2). */
@@ -143,32 +148,54 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
     return res;
   }
 
-  async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const res = await send(method, path, body);
+  /**
+   * `run` with a signal that aborts once `limitMs` is up, and no timer left however it settles:
+   * at the limit, no answer, said by `send` before the headers and by `json` in the body.
+   */
+  async function within<R>(limitMs: number, run: (signal: AbortSignal) => Promise<R>): Promise<R> {
+    const abort = new AbortController();
+    const timer = setTimeout(() => abort.abort(), limitMs);
+    try {
+      return await run(abort.signal);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /** The answer's body, or no answer when the limit (`signal`) stopped it on its way. */
+  async function json<T>(res: Response, method: string, path: string, signal?: AbortSignal) {
+    try {
+      return (await res.json()) as T;
+    } catch (e) {
+      if (!signal?.aborted) throw e;
+      captureApiFailure(method, path, 'network');
+      throw new NetworkError();
+    }
+  }
+
+  async function request<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+    signal?: AbortSignal,
+  ): Promise<T> {
+    const res = await send(method, path, body, null, signal);
     if (res.status === 204) return undefined as T;
-    return (await res.json()) as T;
+    return json<T>(res, method, path, signal);
   }
 
   return {
     get: (path) => request('GET', path),
-    getTagged: async <T>(path: string, etag: string | null) => {
-      // At the limit, no answer: before the headers `send` says so, during the body this does.
-      const abort = new AbortController();
-      const timer = setTimeout(() => abort.abort(), POLL_TIMEOUT_MS);
-      try {
-        const res = await send('GET', path, undefined, etag, abort.signal);
+    getTagged: <T>(path: string, etag: string | null) =>
+      within(POLL_TIMEOUT_MS, async (signal) => {
+        const res = await send('GET', path, undefined, etag, signal);
         if (res.status === 304) return null;
-        const body = (await res.json().catch((e: unknown) => {
-          if (!abort.signal.aborted) throw e;
-          captureApiFailure('GET', path, 'network');
-          throw new NetworkError();
-        })) as T;
-        return { body, etag: res.headers.get('etag') };
-      } finally {
-        clearTimeout(timer);
-      }
-    },
-    post: (path, body) => request('POST', path, body),
+        return { body: await json<T>(res, 'GET', path, signal), etag: res.headers.get('etag') };
+      }),
+    post: (path, body, limitMs) =>
+      limitMs === undefined
+        ? request('POST', path, body)
+        : within(limitMs, (signal) => request('POST', path, body, signal)),
     put: (path, body) => request('PUT', path, body),
     patch: (path, body) => request('PATCH', path, body),
     del: (path, body) => request('DELETE', path, body),

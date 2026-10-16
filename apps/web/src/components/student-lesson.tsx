@@ -1,10 +1,10 @@
 'use client';
 
 import type { StudentQuestion } from '@bali/shared';
-import { Check, CircleCheck, EyeOff } from 'lucide-react';
+import { Check, CircleCheck, EyeOff, type LucideIcon, Nfc, Smartphone } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useId, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
 
 import { getAccessToken } from '@/lib/auth';
 import { bellTime } from '@/lib/session-controls';
@@ -16,6 +16,8 @@ import {
   type LessonState,
   lessonView,
   type LessonView,
+  phoneChip,
+  type PhoneChip,
   picker,
   type Picks,
   type Said,
@@ -29,6 +31,7 @@ import { CARD_ALONE } from './card';
 import { Countdown, Ring, shareLeft, useClock } from './live-header';
 import { letterClass, letterOf } from './question-card';
 import { useMe } from './shell';
+import { YourPhone } from './your-phone';
 
 /** The line under every question (StudentLesson), the board's own words. */
 export const PRIVACY = "Your teacher sees the class's totals, never which answer is yours.";
@@ -36,12 +39,12 @@ export const PRIVACY = "Your teacher sees the class's totals, never which answer
 const EMPTY: LessonState = { presentation: null, problem: null, asOf: null };
 
 /**
- * A student's lesson (W4; StudentLesson, StudentClosed, StudentWaiting, StudentEnded, StudentStates,
- * and StudentNoSlide and StudentCardStates, drawn first): the class `classId`'s session
- * `sessionId`, followed once the account lists it as the class's (`followLesson`, W2), its question
- * answered here. The account is the shell's one read, read again as the page opens and at the bell,
- * so minutes the teacher added move it; a class the account doesn't list isn't the student's. The
- * phone's chip and its line are W4's part 2.
+ * A student's lesson (W4; StudentLesson, StudentNotIn, StudentClosed, StudentWaiting, StudentEnded,
+ * StudentPhoneStates, StudentStates, and StudentNoSlide, StudentCardStates and StudentChipStates,
+ * drawn first): the class `classId`'s session `sessionId`, followed once the account lists it as the
+ * class's (`followLesson`, W2), its question answered here and the student's own phone beside its
+ * name. The account is the shell's one read, read again as the page opens and at the bell, so
+ * minutes the teacher added move it; a class the account doesn't list isn't the student's.
  */
 export function StudentLessonPage({ classId, sessionId }: { classId: string; sessionId: string }) {
   const api = useApi();
@@ -115,13 +118,18 @@ export function StudentLessonPage({ classId, sessionId }: { classId: string; ses
 
 /** A line said in the lesson's place, beside what to do (StudentStates' `.said`). */
 const SAID = 'flex flex-wrap items-center gap-x-4 gap-y-3';
+/** A line under the head, drawn as the grid's stale banner is (v2.css's `.notice`). */
+const NOTICE =
+  'rounded-sm border border-border-default bg-surface-sunken px-4 py-3 text-body text-text-primary';
 
 /**
  * The lesson page as its state draws it (W4): Loading… and the lesson that didn't load, with Try
  * again (StudentStates); not in this class (StudentCardStates); class over (StudentEnded, its line
- * without a time when the page can't say when, StudentCardStates); and the class's head over the
- * question card (StudentNoSlide), "Nothing shared yet" (StudentWaiting), or, a slide alone, the head
- * alone until W5 draws slides here; "Can't reach Bali" under the head while reads fail.
+ * without a time when the page can't say when, StudentCardStates); and the class's head, the
+ * student's own phone at its end, over the phone's line when it isn't focused (StudentPhoneStates),
+ * then "Can't reach Bali" while reads fail (StudentChipStates), then the question card
+ * (StudentNoSlide), "Nothing shared yet" (StudentWaiting), or, a slide alone, nothing until W5 draws
+ * slides here.
  */
 export function StudentLesson({
   view,
@@ -203,12 +211,10 @@ export function StudentLesson({
   const q = presentation.question;
   return (
     <main className="flex flex-col gap-5.5">
-      <LessonHead klass={klass} bell={bell} />
+      <LessonHead klass={klass} bell={bell} phone={view} />
+      <PhoneLine chip={phoneChip(view)} endsAt={bell.endsAt} />
       {behind ? (
-        <p
-          role="status"
-          className="rounded-sm border border-border-default bg-surface-sunken px-4 py-3 text-body text-text-primary"
-        >
+        <p role="status" className={NOTICE}>
           Can&apos;t reach Bali right now, so this page may be behind. It keeps trying.
         </p>
       ) : null}
@@ -234,11 +240,20 @@ export function StudentLesson({
 
 /**
  * The class's head (StudentLesson): the ring, the share of the session left, the class over "with
- * Ms. Rivera", and the time left to the server's bell on this computer's clock with the bell under
- * it; once the class is over (StudentEnded), the class and its teacher alone. The phone's chip at
- * its end is W4's part 2.
+ * Ms. Rivera", the time left to the server's bell on this computer's clock with the bell under it,
+ * and at its end the student's own phone as the lesson's last read says it (`phone`), on a line of
+ * its own on a phone, as ClassLive's controls go; once the class is over (StudentEnded), the class
+ * and its teacher alone.
  */
-function LessonHead({ klass, bell }: { klass: StudentClass; bell: Bell | null }) {
+function LessonHead({
+  klass,
+  bell,
+  phone,
+}: {
+  klass: StudentClass;
+  bell: Bell | null;
+  phone?: Pick<LessonState, 'presentation' | 'asOf'>;
+}) {
   const now = useClock(bell?.endsAt ?? null);
   const teacher = klass.teacher.displayName?.trim();
   return (
@@ -253,7 +268,70 @@ function LessonHead({ klass, bell }: { klass: StudentClass; bell: Bell | null })
         ) : null}
       </div>
       {bell ? <Countdown endsAt={bell.endsAt} now={now} /> : null}
+      {phone ? (
+        <div className="ml-auto flex flex-wrap items-center gap-2 max-sm:ml-0 max-sm:basis-full">
+          <YourPhone chip={phoneChip(phone, new Date(now))} asOf={phone.asOf} />
+        </div>
+      ) : null}
     </header>
+  );
+}
+
+/** What the phone's line says (StudentPhoneStates), beside its icon, for a phone not focused. */
+function lineFor(chip: PhoneChip, endsAt: string): { Icon: LucideIcon; words: ReactNode } | null {
+  const at = (iso: string) => <time dateTime={iso}>{bellTime(iso)}</time>;
+  switch (chip.kind) {
+    case 'not_in':
+      return {
+        Icon: Nfc,
+        words: "You're not tapped in yet. Tap your teacher's block with your phone.",
+      };
+    case 'unlocked':
+      return {
+        Icon: Smartphone,
+        words: (
+          <>
+            Everything on your phone is open until you lock your apps again in the Bali app, or
+            until the bell at {at(endsAt)}. Your teacher can see you unlocked.
+          </>
+        ),
+      };
+    case 'protection_off':
+      return {
+        Icon: Smartphone,
+        words:
+          "Screen Time is off for Bali, so no app on your phone is paused and your teacher sees that it's off. Open the Bali app on your phone to turn it back on.",
+      };
+    case 'silent':
+      return {
+        Icon: Smartphone,
+        words: (
+          <>
+            Bali hasn&apos;t heard from your phone since {at(chip.since)}, and your teacher sees
+            that. Open the Bali app on your phone so it can check in.
+          </>
+        ),
+      };
+    default:
+      return null;
+  }
+}
+
+/**
+ * The line under the head for a phone not focused (StudentPhoneStates; StudentNotIn's `.s-remind`):
+ * what it means and what to do on the phone, the Unlocked one's bell the account's (`/v1/me`'s
+ * `liveSession.endsAt`); none for Focused, nor for a state this page has no chip for, whose chip
+ * says what to do (StudentChipStates).
+ */
+function PhoneLine({ chip, endsAt }: { chip: PhoneChip | null; endsAt: string }) {
+  const line = chip === null ? null : lineFor(chip, endsAt);
+  if (line === null) return null;
+  const { Icon, words } = line;
+  return (
+    <div className={`flex items-start gap-3 ${NOTICE}`}>
+      <Icon size={20} aria-hidden="true" className="mt-px shrink-0" />
+      <p>{words}</p>
+    </div>
   );
 }
 

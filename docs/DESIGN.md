@@ -203,14 +203,21 @@ with a Placeholder chip per section, their words unchanged.
 The student's home is v2's since W3 (2026-10-15): the side menu with Your classes and Help,
 each class in session on StudentHome's live card (its ring, its teacher, the time left and the
 bell) and the rest under it, none yet StudentHomeEmpty's card with its way to the invite page,
-at `/invite` for them; Open the lesson and the phone's chip come with the lesson page (W4).
+at `/invite` for them; since W4's part 2 (2026-10-15) the live card ends on Open the lesson and the
+student's own phone, its chip from the lesson's read, never from the account's, and no line under
+it, its states as StudentChipStates draws them (drawn on the canvas first).
 The student's lesson page is v2's since W4's part 1a (2026-10-15): `/lessons/<class>/<session>`,
 Your classes marked in the menu, StudentLesson's head (its ring and the class page's countdown) over
 StudentWaiting's line, StudentEnded's card and StudentStates' lines, and its intermediate states as
 StudentCardStates draws them (drawn on the canvas first); its question card since part 1b
 (2026-10-15), StudentLesson's, StudentNotIn's and StudentClosed's, alone at its own width until W5
 draws the slide beside it (StudentNoSlide), its states as StudentCardStates draws them, too late
-closing it at once; the phone's chip is part 2's, and no link leads to the page until then.
+closing it at once; and since part 2 (2026-10-15) "Your phone" at the head's end, the chip in the
+grid's tint, icon and edge and the app's words, its line under the head (StudentPhoneStates), kept
+"as of" the last read while Bali can't be reached, Silent's minutes stopped then, the phone's line
+over "Can't reach Bali", and the grid's Unknown for a state the page has no chip for, with no line
+(StudentChipStates, drawn on the canvas first); on a phone the chip takes a line of its own; the
+home's Open the lesson leads to it.
 The class page's "Questions and slides" card is v2's since L7-1a (2026-10-15): between the counts
 and the grid, never in Present, a question's totals ("N of M answered", each option's count and bar
 from 3 answers), Close and Close and show answer, Done; and since L7-1b, at rest, Ask a question,
@@ -518,11 +525,13 @@ in focus or unlocked, so it is never focus's green. A sentence that tells the
 student what their teacher sees says it in its own words and quotes neither
 label (D2j): "your teacher sees that Screen Time is off", never "your teacher
 sees “Screen Time off”", which the grid never says. The student web (Phase 7's
-Slice 3, drafted 2026-10-10, not built) shows a student their own phone in the
-app's chips and words ("Not in", "Screen Time off"), and Silent as the grid
-draws and words it, with its minutes: only the server can tell a student their
-phone went quiet. Any state but Focused takes one line under the page's head,
-saying what it means and what to do on the phone.
+Slice 3, drafted 2026-10-10, built in W4 on 2026-10-15) shows a student their own
+phone in the app's chips and words ("Not in", "Screen Time off") on the grid's
+tints, and Silent as the grid draws and words it, with its minutes: only the
+server can tell a student their phone went quiet. Any state but Focused takes one
+line under the page's head, saying what it means and what to do on the phone; a
+state the page has no chip for shows the grid's Unknown, whose "refresh" says what
+to do, and no line (StudentChipStates).
 
 **Colour rules (law):**
 
