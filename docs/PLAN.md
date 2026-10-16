@@ -8,13 +8,13 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-16 (Central) — L7b's part 2, and with it L7b (#411; `docs/DECISIONS.md`,
-2026-10-16): Ask a question opens on the teacher's questions, LessonAsk's panel, each asked with one
-click through the same ask as Ask the class, Write a new question and Your questions under them; its
-states drawn on the canvas first (LessonAskStates, versions 56 to 58); never in Present; and the panel's
-write form checks and says what Bali refuses through Your questions' one copy (#390's review).
-Checked on dev with the demo teacher's four questions. Before it, W4's follow-up (#409). Next: M6, the
-presenter; L7c's Questions card goes on PV14's page._
+_Last updated: 2026-10-16 (Central) — L7c (#412; `docs/DECISIONS.md`, 2026-10-16): a session's
+Questions card on its report page, ReportOpened's, after the Unlocks table: each question asked, in
+the order asked, with its totals through L3c's read and the class page's card's own options and bars
+(one copy now), the guard the server's alone ("Too few answers to show a breakdown."); its own read,
+failing on its own with Try again; none asked, no card; its states drawn on the canvas first
+(ReportQuestionsStates, version 59). Checked on dev with the demo class. Before it, L7b's part 2
+(#411). Next: M6, the presenter._
 
 ## Now
 
@@ -83,7 +83,7 @@ first class, production backups (L0b, the owner's console step; the owner, 2026-
 
 **Phase 7, Live lesson: building.** Every step with no screen is done, L3c the last (2026-10-15);
 M0 is done (deck storage on, 2026-10-12); the web screens come after the redesign's PV15 (✅ #388),
-W3 the first (✅ #392), M5 (✅ #400), L7 (✅ #402, #405), W4 (✅ #406, #407, #408, its follow-up #409), L7b (✅ #393, #394, #395, #411), then the phone's (L8, M8). L0b, production backups, is the owner's, before the Vanderbilt pilot's first
+W3 the first (✅ #392), M5 (✅ #400), L7 (✅ #402, #405), W4 (✅ #406, #407, #408, its follow-up #409), L7b (✅ #393, #394, #395, #411), L7c (✅ #412), then the phone's (L8, M8). L0b, production backups, is the owner's, before the Vanderbilt pilot's first
 class.
 
 ## Phases
@@ -178,7 +178,7 @@ Slice 1 — live questions:
 - **L6** Portal logic, `lib/live-question.ts` (for L7) — ✅ (#332; DECISIONS 2026-10-12)
 - **L7** 👀 Portal UI to v2's canvas: the class page's question and Present's — ✅ as L7-1a (#389), L7-1b (#390), L7-2 (#402) and L7-3, Close and Done on Present, Done in every window of the browser (#405); DECISIONS 2026-10-15
 - **L7b** 👀 Portal saved questions to v2's canvas — ✅ as part 1a (#393), part 1b (#394), part 1c (#395) and part 2, the panel's drafts (#411); DECISIONS 2026-10-15, 2026-10-16
-- **L7c** 👀 A session's Questions to v2's canvas (ReportOpened's Questions card, PV14's page; LessonStates' L7c lines): each question asked with its totals through L3c's read, the guard applied ("Too few answers to show a breakdown"); on the report page only, not under the class page's recap (the owner, 2026-10-12) — validation: vitest, `/santa-loop`, screenshots
+- **L7c** 👀 A session's Questions to v2's canvas — ✅ (#412; DECISIONS 2026-10-16)
 - **L8** 👀📱 iOS answer card to the app canvas: while a question or a slide shows, the Focus screen's ring as a strip and Emergency Unlock pinned at the bottom; a tap answers and changes it until the close; the revealed answer marked, never red; a closed question's Hide; the same card on Unlocked, Screen Time off and Home; the consent list's two new lines and the one-time screen for a student who saw the old list (`no-ai-slop`); M0 ✅ (the canvas approved 2026-10-10; L0b, before the first actual pilot since 2026-10-12, holds back no screen). **No build that can answer ships (TestFlight included) before L2's documents and this wording have landed** — validation: XCTest, then the device check on the owner's iPhone: a shielded phone answers, the battery cost of the 2 s poll over a lesson, VoiceOver
 - **L9** 📱 Exit check: a real class on prod asks and answers, the recap and the stream show the lifecycle, no screen names an answer
 

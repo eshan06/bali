@@ -193,8 +193,14 @@ A session's report is v2's since PV14 (2026-10-15): a page and a URL of its own
 (`/reports/<class>/<session>`, Reports marked in the menu), ReportOpened's page: the way back to
 Reports with its class picked, the session's day over its times, its recap card ("This session",
 the class page's recap) and its Unlocks table, none when there were none; ReportStates' two lines
-and its other states as ReportPageStates and ReportPhone draw them (drawn on the canvas first);
-its Questions card L7c's. PB5's timeline, which only an opened row still drew, went with it.
+and its other states as ReportPageStates and ReportPhone draw them (drawn on the canvas first).
+PB5's timeline, which only an opened row still drew, went with it. Its Questions card is
+ReportOpened's since L7c (2026-10-16), after the Unlocks table and none when the session asked none:
+each question in the order asked, when, whether its answer was shown, its words, LessonStates'
+"Too few answers to show a breakdown." while the server gives none, and its options and "N of M
+answered" drawn by the class page's card's own pieces; its read failing on its own with LessonStates'
+line and Try again, and its other states as ReportQuestionsStates draws them (drawn on the canvas
+first).
 The entry pages are v2's since PV15 (2026-10-15): sign-in and its callback on v2's stage
 (the mark at 40 px, Bali and "Focus sessions for your classroom" over the card, no bar),
 the invite card under v2's white bar with Sign out, and Help and the policy pages under

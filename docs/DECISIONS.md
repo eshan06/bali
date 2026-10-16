@@ -8,6 +8,40 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-16** — **L7c: a session's Questions card on its report page, as ReportOpened draws it; its
+  own read beside the page's; the guard the server's alone; its states drawn first. L7c is done.**
+  Built to [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4):
+  ReportOpened's Questions card and LessonStates' two lines for it ("Bali couldn't load this
+  session's questions." with Try again; "Too few answers to show a breakdown."), and
+  ReportQuestionsStates, drawn first as intermediate states (version 59): the card loading and not
+  loaded under its title, none asked with no card, a question with no correct answer, and the card at
+  390 px (#412). **The card** (`ReportQuestions`, `components/report-questions.tsx`) is the page's
+  last part, after the Unlocks table: "Questions" over "N asked in this session", then each question
+  in the order the server gives it (L3c's, its open's `seq`): when it was asked, with "Answer shown"
+  or "Answer not shown" when it has a correct answer and its time alone when it has none (nothing
+  marked, every bar grey); its words; the guard's line while the server gives no breakdown; its
+  options, each with its count and bar from 3 answers; and "N of M answered" beside them, under them
+  on a narrow card, as on the class page's. **One copy of the options:** the class page's card's rows
+  (the letter, the "Correct" or "Correct answer" tag, the count and the bar) and its "N of M answered"
+  moved out of `QuestionCard` into `Options` and `answeredLine` (`components/question-card.tsx`), which
+  both cards draw, so the two never differ; the class page's card renders as before, its tests
+  unchanged. **The guard is the server's alone** ("Settled": the guard wherever counts are read): the
+  card keys on `counts`, null under 3 answers, never on N (its tests draw a breakdown the server gave
+  at 2 answers, and withhold one it didn't at 21), and a test fails if either file's code compares N,
+  or anything with 2 or 3, either way round (santa's review). **Its own read** (`readSessionQuestions`,
+  `lib/reports.ts`), started with the
+  page's three, fails on its own, as L3c's route was made for: the report stands, the card's Try
+  again reads the questions again, and the page's Try again reads them too. **None asked: no card**,
+  as no Unlocks table follows a session with no unlocks; most sessions ask none. *Weighed:* a line
+  saying none were asked (a card on every report of a session with no questions); the questions read
+  inside the page's (no Loading… of the card's own, but its failure would take the whole page, or
+  need a state of its own for its Try again anyway). Totals only: the card's file names no student,
+  and a read's other fields are never drawn. **Checked on dev** (`.claude/shots/L7c/`): the demo
+  class, a session asking three questions, 4 of 4 answered with the answer shown, 2 of 4 under the
+  guard, 3 of 4 with no correct answer, each closed and the session ended, in the owner's tab at 1440
+  and 390 px; sharp renders of the real components with dev's reads in a throwaway page in the
+  preview, deleted after, beside ReportOpened, ReportQuestionsStates and ReportPhone.
+
 - **2026-10-16** — **L7b's part 2: Ask a question opens on the teacher's questions, each asked with one
   click through Ask the class's own ask; its states drawn first; the panel's refusal checks are Your
   questions' one copy. L7b is done.** Built to

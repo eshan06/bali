@@ -6,6 +6,7 @@ import type {
   FeedEvent,
   ReportStudent,
   RosterStudent,
+  SessionReportQuestion,
   SessionReportResponse,
   UnlockReason,
 } from '@bali/shared';
@@ -15,15 +16,15 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
 import { sessionWhen, type SessionWindow } from '../lib/recap';
-import type { SessionPage } from '../lib/reports';
+import type { SessionPage, SessionQuestions } from '../lib/reports';
 import { SessionReport, SessionReportPage } from './session-report';
 
 /*
  * A session's report on its own page (PV14), as ReportOpened draws it, ReportStates' two lines for
  * it, and the intermediate states drawn first on the canvas (ReportPageStates, ReportPhone):
  * rendered in each, the way back to Reports, the session's day over its times, its recap card
- * ("This session") and its Unlocks table; the route's ids and the page's reads from their sources.
- * Its Questions card is L7c's.
+ * ("This session"), its Unlocks table and its Questions card (L7c, report-questions.test.ts
+ * draws it in each state); the route's ids and the page's reads from their sources.
  */
 const notFound = vi.hoisted(() =>
   vi.fn(() => {
@@ -110,12 +111,39 @@ const ready = (events: FeedEvent[], report = reportOf(events)): SessionPage => (
   roster: ROSTER,
 });
 
+/** A question it asked, ReportOpened's first: its answer shown, its breakdown in. */
+const ASKED: SessionReportQuestion = {
+  id: '0199e3a1-0000-7000-8000-000000000001',
+  prompt: 'Which value of x solves x² − 5x + 6 = 0?',
+  options: ['x = 1', 'x = 2', 'x = 4', 'x = 6'],
+  correctOption: 1,
+  revealed: true,
+  open: false,
+  openedAt: AT(18),
+  answered: 21,
+  eligible: 28,
+  counts: [3, 14, 1, 3],
+};
+/** It asked none: no Questions card. */
+const NONE_ASKED: SessionQuestions = { kind: 'ready', questions: [] };
+
 /** Every space read as one, as Intl's narrow no-break space before AM and PM. */
 const plain = (s: string) => s.replace(/\s/g, ' ').replace(/&#x27;/g, "'");
-const render = (page: SessionPage, className: string | null = 'Biology, period 3') =>
+const render = (
+  page: SessionPage,
+  className: string | null = 'Biology, period 3',
+  questions: SessionQuestions = NONE_ASKED,
+) =>
   plain(
     renderToStaticMarkup(
-      createElement(SessionReport, { classId: 'c1', className, page, onRetry: () => undefined }),
+      createElement(SessionReport, {
+        classId: 'c1',
+        className,
+        page,
+        questions,
+        onRetry: () => undefined,
+        onRetryQuestions: () => undefined,
+      }),
     ),
   );
 /** The text of the page, its tags dropped. */
@@ -243,6 +271,51 @@ describe('a session’s page in each state', () => {
   });
 });
 
+describe('its Questions card (L7c; ReportOpened, ReportQuestionsStates)', () => {
+  const sections = (html: string) =>
+    [...html.matchAll(/<h2 [^>]*>([^<]*)<\/h2>/g)].map(([, words]) => words);
+
+  it('comes last, after the Unlocks table, or after the card when there were no unlocks', () => {
+    const asked: SessionQuestions = { kind: 'ready', questions: [ASKED] };
+    const html = render(ready(board()), 'Biology, period 3', asked);
+    expect(sections(html)).toEqual(['This session', 'Unlocks · 2', 'Questions']);
+    expect(text(html)).toContain(`|Questions|1 asked in this session|${clock(18)} · Answer shown|`);
+    expect(html).toMatch(/<\/section><\/main>$/);
+    const calm = render(ready([event('tap_in', 'Ana Rodríguez', 5)]), 'Biology, period 3', asked);
+    expect(sections(calm)).toEqual(['This session', 'Questions']);
+  });
+
+  it('none asked: the page ends at its Unlocks table, or at its card', () => {
+    expect(sections(render(ready(board())))).toEqual(['This session', 'Unlocks · 2']);
+    expect(render(ready(board()))).toMatch(/<\/table><\/div><\/section><\/main>$/);
+    expect(sections(render(ready([event('tap_in', 'Ana Rodríguez', 5)])))).toEqual([
+      'This session',
+    ]);
+  });
+
+  it('says its own loading and failure under its title, the report above it kept', () => {
+    const loading = render(ready(board()), 'Biology, period 3', { kind: 'loading' });
+    expect(text(loading)).toMatch(/\|Unlocks · 2\|[^]*\|Questions\|Loading…\|$/);
+    const failed = render(ready(board()), 'Biology, period 3', { kind: 'error' });
+    expect(text(failed)).toContain(`|${plain(day)}|${plain(times)}|This session|`);
+    expect(text(failed)).toMatch(
+      /\|Questions\|Bali couldn't load this session's questions\.\|Try again\|$/,
+    );
+    expect(failed).not.toContain("Couldn't load this session.");
+  });
+
+  it('shows nothing of it while the page itself loads or didn’t load', () => {
+    const asked: SessionQuestions = { kind: 'ready', questions: [ASKED] };
+    expect(render({ kind: 'loading' }, 'Biology, period 3', asked)).not.toContain('Questions');
+    const failed = render({ kind: 'error', message: "Couldn't reach Bali." }, null, {
+      kind: 'error',
+    });
+    expect(text(failed)).toBe(
+      "|Reports|Couldn't load this session.|Couldn't reach Bali.|Try again|",
+    );
+  });
+});
+
 describe('its URL and its reads (from their sources)', () => {
   const ID = '0199e3a1-0000-7000-8000-00000000000a';
   const CLASS = '0199e3a1-0000-7000-8000-00000000000c';
@@ -272,12 +345,28 @@ describe('its URL and its reads (from their sources)', () => {
     );
     expect(component).toMatch(/\}, \[api, classId, sessionId, attempt, router\]\);/);
     expect(component).toMatch(
-      /onRetry=\{\(\) => \{\s*setPage\(\{ kind: 'loading' \}\);\s*setAttempt\(\(n\) => n \+ 1\);\s*\}\}/,
+      /onRetry=\{\(\) => \{\s*setPage\(\{ kind: 'loading' \}\);\s*setQuestions\(\{ kind: 'loading' \}\);\s*setAttempt\(\(n\) => n \+ 1\);\s*\}\}/,
     );
     // The account the shell read once: no read of the class's own for its name.
     expect(component).toMatch(
       /className=\{me\?\.classes\.find\(\(c\) => c\.id === classId\)\?\.name \?\? null\}/,
     );
     expect(component).not.toMatch(/api\.get/);
+  });
+
+  it('reads its questions at once with the page, again by the page’s Try again and by the card’s own', () => {
+    const component = source('./session-report.tsx');
+    // Signed in only (the page's read sends anyone else to sign in), and nothing from a read the
+    // page or the card has asked again since.
+    expect(component).toMatch(
+      /useEffect\(\(\) => \{\s*if \(!getAccessToken\(\)\) return;\s*let live = true;\s*void readSessionQuestions\(api, classId, sessionId\)\.then\(\(next\) => \{\s*if \(live\) setQuestions\(next\);\s*\}\);\s*return \(\) => \{\s*live = false;\s*\};\s*\}, \[api, classId, sessionId, attempt, asked\]\);/,
+    );
+    expect(component).toMatch(
+      /onRetryQuestions=\{\(\) => \{\s*setQuestions\(\{ kind: 'loading' \}\);\s*setAsked\(\(n\) => n \+ 1\);\s*\}\}/,
+    );
+    // Drawn once the page is read, after the report's own parts.
+    expect(component).toMatch(
+      /<Report page=\{page\} \/>\s*<ReportQuestions questions=\{questions\} onRetry=\{onRetryQuestions\} \/>/,
+    );
   });
 });

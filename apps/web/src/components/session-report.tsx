@@ -9,19 +9,26 @@ import { useEffect, useId, useState } from 'react';
 import { Button } from '@/components/button';
 import { CARD_ALONE } from '@/components/card';
 import { RecapBody } from '@/components/recap-card';
+import { ReportQuestions } from '@/components/report-questions';
 import { CELL, FIGURE, HEAD, LABEL, TABLE_BOX } from '@/components/reports-list';
 import { useMe } from '@/components/shell';
 import { NAV_LINK } from '@/components/text-link';
 import { reasonWords } from '@/components/unlock-popups';
 import { getAccessToken } from '@/lib/auth';
 import { nameOf, sessionWhen } from '@/lib/recap';
-import { readSessionPage, type SessionPage } from '@/lib/reports';
+import {
+  readSessionPage,
+  readSessionQuestions,
+  type SessionPage,
+  type SessionQuestions,
+} from '@/lib/reports';
 import { bellTime } from '@/lib/session-controls';
 import { useApi } from '@/lib/use-api';
 
 /**
  * A session's report on its own page (PV14): read as it opens, and again by Try again, its class
  * named as the shell's one read of the account names it (none when the class isn't the teacher's).
+ * Its questions (L7c) are read beside it, and again by the page's Try again or the card's own.
  */
 export function SessionReportPage({ classId, sessionId }: { classId: string; sessionId: string }) {
   const api = useApi();
@@ -29,6 +36,8 @@ export function SessionReportPage({ classId, sessionId }: { classId: string; ses
   const { me } = useMe();
   const [page, setPage] = useState<SessionPage>({ kind: 'loading' });
   const [attempt, setAttempt] = useState(0);
+  const [questions, setQuestions] = useState<SessionQuestions>({ kind: 'loading' });
+  const [asked, setAsked] = useState(0);
 
   useEffect(() => {
     if (!getAccessToken()) {
@@ -44,14 +53,32 @@ export function SessionReportPage({ classId, sessionId }: { classId: string; ses
     };
   }, [api, classId, sessionId, attempt, router]);
 
+  // The Questions card's own read, at once with the page's: its failure is the card's alone.
+  useEffect(() => {
+    if (!getAccessToken()) return;
+    let live = true;
+    void readSessionQuestions(api, classId, sessionId).then((next) => {
+      if (live) setQuestions(next);
+    });
+    return () => {
+      live = false;
+    };
+  }, [api, classId, sessionId, attempt, asked]);
+
   return (
     <SessionReport
       classId={classId}
       className={me?.classes.find((c) => c.id === classId)?.name ?? null}
       page={page}
+      questions={questions}
       onRetry={() => {
         setPage({ kind: 'loading' });
+        setQuestions({ kind: 'loading' });
         setAttempt((n) => n + 1);
+      }}
+      onRetryQuestions={() => {
+        setQuestions({ kind: 'loading' });
+        setAsked((n) => n + 1);
       }}
     />
   );
@@ -61,20 +88,25 @@ export function SessionReportPage({ classId, sessionId }: { classId: string; ses
  * The page as its state draws it (ReportOpened; ReportStates' "Loading this session…" and
  * "Couldn't load this session."; ReportPageStates and ReportPhone, intermediate states drawn on the
  * canvas first): the way back to Reports with its class picked, then the session's day over its
- * times, its recap card ("This session", the class page's recap) and its Unlocks table, none when
- * there were none, as the card says. Its Questions card is L7c's.
+ * times, its recap card ("This session", the class page's recap), its Unlocks table, none when
+ * there were none, as the card says, and its Questions card (L7c), none when it asked none.
  */
 export function SessionReport({
   classId,
   className,
   page,
+  questions,
   onRetry,
+  onRetryQuestions,
 }: {
   classId: string;
   /** The class's name; null when the account doesn't list the class: the way back says Reports. */
   className: string | null;
   page: SessionPage;
+  /** The questions it asked, read on their own: shown once the page is read. */
+  questions: SessionQuestions;
   onRetry: () => void;
+  onRetryQuestions: () => void;
 }) {
   return (
     <main className="flex flex-col gap-5.5">
@@ -101,7 +133,10 @@ export function SessionReport({
           </Button>
         </div>
       ) : (
-        <Report page={page} />
+        <>
+          <Report page={page} />
+          <ReportQuestions questions={questions} onRetry={onRetryQuestions} />
+        </>
       )}
     </main>
   );

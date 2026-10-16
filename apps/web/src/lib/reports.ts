@@ -3,6 +3,8 @@ import type {
   FeedEvent,
   RosterResponse,
   RosterStudent,
+  SessionReportQuestion,
+  SessionReportQuestionsResponse,
   SessionReportResponse,
   SessionReportsPage,
   SessionReportSummary,
@@ -151,6 +153,36 @@ export async function readSessionPage(
     };
   } catch (e) {
     return { kind: 'error', message: errText(e) };
+  }
+}
+
+/** A session's Questions card as it reads (L7c): loading, read, or not read. */
+export type SessionQuestions =
+  | { kind: 'loading' }
+  | {
+      kind: 'ready';
+      /** In the order asked, each with its totals as the server counts them; none: none asked. */
+      questions: SessionReportQuestion[];
+    }
+  | { kind: 'error' };
+
+/**
+ * Read the questions a session asked (L3c's read), for its report page's Questions card: each with
+ * its totals through the server's one guarded count, `counts` null under 3 answers. Its failure is
+ * the card's own, said with Try again (LessonStates' line), the rest of the page left as it is.
+ */
+export async function readSessionQuestions(
+  api: Pick<ApiClient, 'get'>,
+  classId: string,
+  sessionId: string,
+): Promise<SessionQuestions> {
+  try {
+    const { questions } = await api.get<SessionReportQuestionsResponse>(
+      `/v1/classes/${encodeURIComponent(classId)}/reports/sessions/${encodeURIComponent(sessionId)}/questions`,
+    );
+    return { kind: 'ready', questions };
+  } catch {
+    return { kind: 'error' };
   }
 }
 
