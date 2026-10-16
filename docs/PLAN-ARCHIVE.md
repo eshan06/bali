@@ -10,6 +10,14 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-16 (Central) — M6's part 1, PDF.js and the CSP (#413; `docs/DECISIONS.md`,
+2026-10-16): pdfjs-dist 6.4.299 pinned, its legacy build in a worker of its own served from the
+portal (`public/pdfjs/`, copied at each dev and build), eval and WebAssembly off; `loadDeck` checks a
+deck's bytes against the slide's SHA-256 before PDF.js sees them, a mismatch refused and each failure
+typed for the presenter; the CSP's `worker-src 'self'`, and the worker's own CSP. No screen; checked
+in headless Chrome, and on dev with a deck tampered in the bucket. Before it, L7c (#412). Next: M6's
+part 2, the presenter._
+
 _Last updated: 2026-10-16 (Central) — L7c (#412; `docs/DECISIONS.md`, 2026-10-16): a session's
 Questions card on its report page, ReportOpened's, after the Unlocks table: each question asked, in
 the order asked, with its totals through L3c's read and the class page's card's own options and bars
