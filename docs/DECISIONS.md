@@ -24,11 +24,13 @@ a real decision? Add a dated entry at the top: what was decided and why.
   close (with the correct answer, if shown) follows within 2 s. *Weighed:* the line on the card as
   last read (an open card, its answers still pickable, saying the question closed: undrawn) and the
   line held back until that read (2 s of "Your answer is in" over a pick that wasn't counted). **A tap
-  on the answer still on its way sends it again**, the answer Bali holds nothing: an answer's `POST`
-  has no time limit (#334 gave one to the polls alone), so a send that hangs would leave the student
-  a dead control. **The closed kicker** is 11.5/15 like the open one, as L7-1a and L7's part 2 built
-  theirs (the board's `.kicker.quiet` takes v2.css's link class `.quiet`'s 13/18), so nothing moves 3
-  px as the question closes. **Privacy:** the card shows the student's own answer and, once shown,
+  on the answer Bali holds sends nothing, but while one is on its way or after one didn't send:**
+  an answer's `POST` has no time limit (#334 gave one to the polls alone), so a send that hangs would
+  leave a dead control; and a send whose reply was lost after Bali took it shows that answer held
+  under the didn't-send line, which says to pick it again (santa's review). The picks' sequence is
+  `picker` (`lib/student-web.ts`), so it runs in tests. **The closed kicker** is 11.5/15 like the
+  open one, as L7-1a and L7's part 2 built theirs (the board's `.kicker.quiet` takes v2.css's link
+  class `.quiet`'s 13/18), so nothing moves 3 px as the question closes. **Privacy:** the card shows the student's own answer and, once shown,
   the correct one; the presentation read carries no count and no one else's answer, so there is no
   count to guard here (the teacher's side keeps #389's). **Checked on dev:** the demo teacher asked
   five questions in a 30-minute session of the demo class while Ana followed it through the page's own
