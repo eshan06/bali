@@ -272,6 +272,16 @@ the ingest host of `NEXT_PUBLIC_SENTRY_DSN` and the deck bucket of
   `csp.ts`, with its test, or the browser refuses it.
 - **No inline script, `eval` or `<style>` element of our own:** scripts run only
   with the nonce Next stamps on them; styles come from the stylesheet.
+- **Workers only from the portal's own origin** (`worker-src 'self'`, M6): PDF.js's
+  worker and the image decoders it imports are copied from `pdfjs-dist` into
+  `public/pdfjs/` (gitignored) by `scripts/pdfjs-assets.mjs`, before each
+  `npm run dev` and `npm run build`; never a CDN. A worker obeys its own script's
+  CSP, so the middleware sends those three files `default-src 'none'; script-src
+  'self'` (`PDFJS_CSP`): no fetch, eval or WebAssembly in the worker. PDF.js runs
+  with WebAssembly off and its JavaScript decoders, so neither CSP needs
+  `'wasm-unsafe-eval'` (`lib/deck-pdf.ts`; `docs/DECISIONS.md`, 2026-10-16).
+- **A deck's bytes are checked before PDF.js reads them:** `loadDeck` checks the
+  download against the slide's SHA-256 and refuses a mismatch, PDF.js unloaded.
 - **The CSP is the access token's defence** (it sits in sessionStorage): a
   refresh token, when one comes, never goes in web storage
   (`docs/DECISIONS.md`, S4).

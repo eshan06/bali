@@ -1,15 +1,21 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
 import { config as webConfig } from './lib/config';
-import { contentSecurityPolicy } from './lib/csp';
+import { contentSecurityPolicy, isPdfjsScript, PDFJS_CSP } from './lib/csp';
 
 /*
  * Every page gets a CSP with a fresh nonce (Phase 6, S4). Next reads the nonce from the request's
  * own Content-Security-Policy header and stamps it on each script it renders, which is why the
  * pages render per request (the root layout's `dynamic`): a page built ahead would carry no nonce.
  * The headers that never change ride on every response from next.config.ts's `headers()`.
+ * PDF.js's worker and its decoders (`public/pdfjs/`) get the worker's own policy instead (M6).
  */
 export function middleware(request: NextRequest) {
+  if (isPdfjsScript(request.nextUrl.pathname)) {
+    const response = NextResponse.next();
+    response.headers.set('Content-Security-Policy', PDFJS_CSP);
+    return response;
+  }
   const csp = contentSecurityPolicy({
     apiUrl: webConfig.apiUrl,
     cognitoDomain: webConfig.cognito.domain,
@@ -26,8 +32,8 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Pages only: built assets and the icons in `public/` carry no script of their own, and a
-  // prefetch renders no HTML.
+  // Pages, and PDF.js's worker: built assets and the icons in `public/` carry no script of their
+  // own, and a prefetch renders no HTML.
   matcher: [
     {
       source: '/((?!_next/static|_next/image|favicon.ico|icon.svg|icon.png|apple-icon.png).*)',

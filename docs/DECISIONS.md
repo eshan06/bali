@@ -8,6 +8,67 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-16** — **M6's part 1: PDF.js 6.4.299's legacy build, in a worker of its own from the
+  portal's origin, eval and WebAssembly off; a deck's bytes checked against its SHA-256 before PDF.js
+  sees them; the CSP's `worker-src 'self'`, and the worker's own CSP. No screen: the presenter is
+  part 2.** M6 is two PRs (PLAN): this groundwork in `apps/web/src/lib` and config (#413), then the
+  presenter. **The version: pdfjs-dist 6.4.299, pinned exactly,** the newest (2026-10-03), Apache-2.0,
+  with SLSA provenance. It pulls in only the optional `@napi-rs/canvas` 1.0.11 (MIT, provenance, no
+  install script) and its prebuilt binary for the platform (about 35 MB), which PDF.js loads under
+  Node alone, never in a browser. The API's image installs every workspace's production dependencies,
+  so it carries both, and the API's own PDF check (unpdf, M2b1, parsing with the PDF.js it bundles)
+  now finds pdfjs-dist installed and points its Node defaults, standard fonts and CMaps, into its
+  folders: the check reads no text, so nothing it does changes (its tests pass), but a later text or
+  render use there would mix two versions. `npm audit --omit=dev` finds nothing in either. Of its 35 MB, a page
+  that shows a deck loads the legacy build's 490 KB chunk, only then, and its worker the 1.3 MB
+  worker. **`isEvalSupported`:** PDF.js 5.7 (#21002, #21005) replaced the PostScript compiler, its
+  last `new Function`, with an interpreter and a WebAssembly compiler, and dropped the option, so
+  6.4.299 has no eval to turn off. It stays in `PDF_OPTIONS` (decision 8 names it, and a version that
+  reads it gets it off), and a test reads the shipped files and fails on any `eval(`, `new Function(`
+  or `Function(` but core-js's way to find the global object, after `globalThis`, never reached in a
+  browser. *Weighed:* 5.6, the last version that reads the option, keeping the eval it guards. **The
+  legacy build:** the modern one calls, unguarded, methods only the newest browsers have
+  (`Map.prototype.getOrInsertComputed`, on every page it draws), and PDF.js's FAQ gives it no
+  minimum but "the latest"; the legacy one runs in Chrome 125+, Safari 18+ and Firefox ESR.
+  **WebAssembly off (`useWasm: false`):** since 5.7 PDF.js compiles a PDF's PostScript functions to
+  WebAssembly, and decodes JBIG2, CCITT and JPEG 2000 images (scans, often) with it, which the CSP
+  would have to allow (`'wasm-unsafe-eval'`, a call for the owner). Off, it interprets the functions,
+  and imports the JavaScript builds of the same decoders (wasm2js: no eval) from `wasmUrl`, which the
+  portal serves beside the worker. **The worker** is PDF.js's own file, copied from pdfjs-dist into
+  `public/pdfjs/` (gitignored) by `scripts/pdfjs-assets.mjs` before each `npm run dev` and `npm run
+  build`, so it is always the installed version's; Vercel builds a Next.js project by its `build`
+  script when it has one (its docs), so `prebuild` runs there too, and a production build that finds
+  the files missing (a bare `next build`) fails rather than deploy a presenter that can't open a deck
+  (`checkPdfjsScripts`, `next.config.ts`). PDF.js gets it as a port
+  (`PDFWorker.create({ port })`), never by `workerSrc`: with one, a worker that fails to start makes
+  PDF.js parse the deck on the page's own thread, beside the access token; with a port, the load says
+  `unopened`. *Weighed:* webpack's `new URL()` asset (served from `_next/static`, where the middleware
+  sends no CSP, and rewritten by Next's minifier); a CDN (never); committing the files (1.9 MB of
+  minified code per upgrade). **The CSPs.** The page's gains `worker-src 'self'`: without it, a worker
+  fell back to `script-src`, whose `'strict-dynamic'` let any script start one from a `blob:` URL
+  (seen in Chrome; refused now). A worker obeys its own script's policy, never the page's, so the
+  middleware sends PDF.js's three scripts `default-src 'none'; script-src 'self'`: no fetch (the page
+  hands it the bytes), no eval, no WebAssembly, imports from the portal alone; any other path there, a
+  404 page included, keeps the page's. `script-src` is unchanged: PDF.js's own code is a Next chunk.
+  **The check** (`loadDeck`, `lib/deck-pdf.ts`): a SHA-256 that isn't 64 lowercase hex, the API's own
+  pattern, is refused before anything is fetched (`unverifiable`); the URL from `GET
+  /v1/decks/{id}/download`, within a poll's limit (#334); the bytes with `cache: 'no-store'`
+  (decision 13) and no cookie, read no further than `DECK_MAX_BYTES` whatever the answer says; their
+  SHA-256 by Web Crypto against the slide's; a mismatch is `mismatch`, and PDF.js isn't even loaded.
+  Each end is typed for part 2's screen (LessonStates' "These slides don't match the PDF you
+  uploaded…" for a mismatch, "Bali couldn't load these slides." with Try again for the rest); the
+  bucket's 5xx and no answer go to Sentry by the object's path alone, as the upload's PUT does.
+  PDF.js has 30 s to open checked bytes (three times the API's own parse limit, which every ready
+  deck passed), so a parse that never answers is `unopened`, never a wait without end; a stalled
+  download is the screen's to stop, since no one limit fits 25 MB on a slow link. A close waits up to
+  2 s for PDF.js's own destroy, which clears the deck's fonts once the worker answers, then ends the
+  worker. *Weighed:* `fetch`'s `integrity` (a mismatch reads as a network
+  error). **Checked:** in headless Chrome, a JPEG, a JPEG 2000, a CCITT image, a PostScript shading
+  and embedded fonts drawn with no CSP refusal; a tampered deck refused with no worker started; a
+  worker that 404s, or that the CSP refuses, `unopened`. On dev, a deck uploaded and checked ready,
+  its object then replaced in the bucket by its own presigned PUT (the same length: decision 6's case
+  of a PUT over a ready deck), refused `mismatch`, PDF.js never reached; the deck removed.
+
 - **2026-10-16** — **L7c: a session's Questions card on its report page, as ReportOpened draws it; its
   own read beside the page's; the guard the server's alone; its states drawn first. L7c is done.**
   Built to [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4):

@@ -203,11 +203,14 @@ export interface RunOptions {
   put?: (url: string, body: Blob, opts: PutOptions) => Promise<PutEnd>;
 }
 
-/** A file's SHA-256, lowercase hex, as the create declares it. */
-async function sha256Of(file: Blob): Promise<string> {
-  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', await file.arrayBuffer()));
+/** Bytes' SHA-256, lowercase hex: as the create declares a file's, and as a download is checked. */
+export async function sha256Hex(bytes: ArrayBuffer | Uint8Array<ArrayBuffer>): Promise<string> {
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
   return Array.from(digest, (b) => b.toString(16).padStart(2, '0')).join('');
 }
+
+/** A file's SHA-256, as the create declares it. */
+const sha256Of = async (file: Blob) => sha256Hex(await file.arrayBuffer());
 
 /**
  * An upload, run on from where `start` got to: the file read for its SHA-256, the pending deck and

@@ -8,13 +8,13 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-16 (Central) — L7c (#412; `docs/DECISIONS.md`, 2026-10-16): a session's
-Questions card on its report page, ReportOpened's, after the Unlocks table: each question asked, in
-the order asked, with its totals through L3c's read and the class page's card's own options and bars
-(one copy now), the guard the server's alone ("Too few answers to show a breakdown."); its own read,
-failing on its own with Try again; none asked, no card; its states drawn on the canvas first
-(ReportQuestionsStates, version 59). Checked on dev with the demo class. Before it, L7b's part 2
-(#411). Next: M6, the presenter._
+_Last updated: 2026-10-16 (Central) — M6's part 1, PDF.js and the CSP (#413; `docs/DECISIONS.md`,
+2026-10-16): pdfjs-dist 6.4.299 pinned, its legacy build in a worker of its own served from the
+portal (`public/pdfjs/`, copied at each dev and build), eval and WebAssembly off; `loadDeck` checks a
+deck's bytes against the slide's SHA-256 before PDF.js sees them, a mismatch refused and each failure
+typed for the presenter; the CSP's `worker-src 'self'`, and the worker's own CSP. No screen; checked
+in headless Chrome, and on dev with a deck tampered in the bucket. Before it, L7c (#412). Next: M6's
+part 2, the presenter._
 
 ## Now
 
@@ -83,7 +83,7 @@ first class, production backups (L0b, the owner's console step; the owner, 2026-
 
 **Phase 7, Live lesson: building.** Every step with no screen is done, L3c the last (2026-10-15);
 M0 is done (deck storage on, 2026-10-12); the web screens come after the redesign's PV15 (✅ #388),
-W3 the first (✅ #392), M5 (✅ #400), L7 (✅ #402, #405), W4 (✅ #406, #407, #408, its follow-up #409), L7b (✅ #393, #394, #395, #411), L7c (✅ #412), then the phone's (L8, M8). L0b, production backups, is the owner's, before the Vanderbilt pilot's first
+W3 the first (✅ #392), M5 (✅ #400), L7 (✅ #402, #405), W4 (✅ #406, #407, #408, its follow-up #409), L7b (✅ #393, #394, #395, #411), L7c (✅ #412), M6 (part 1 ✅ #413; part 2, the presenter, next), then the phone's (L8, M8). L0b, production backups, is the owner's, before the Vanderbilt pilot's first
 class.
 
 ## Phases
@@ -195,7 +195,7 @@ Slice 2 — slides:
 - **M3b** The poll's slide and a deck's download (for M6) — ✅ (#328; DECISIONS 2026-10-12)
 - **M4** Decks in the privacy paths — ✅ (#329; DECISIONS 2026-10-12)
 - **M5** 👀 The slides page and upload — ✅ as M5a (#396), M5b part 1 (#397) and M5b part 2 (#400); DECISIONS 2026-10-15
-- **M6** 👀 Portal presenter to v2's canvas (LessonDecks, LessonSlide, PresentSlide, LessonStates' M6 lines: picking a deck in the side panel, the class page's slide controls and Present's slide; the presenter card's "Every phone in this class shows this slide, and so does Present." not built), in two PRs (PDF.js and the CSP, then the presenter): PDF.js ≥ 4.2.67, `isEvalSupported: false`, its worker self-hosted; the bytes checked against the slide's `sha256`, a mismatch refused with a retry (settled 2026-10-10); the CSP's `worker-src` (the bucket's `connect-src` came with M5) — validation: CSP tests, a tampered deck refused, `/santa-loop`, screenshots
+- **M6** 👀 Portal presenter to v2's canvas (LessonDecks, LessonSlide, PresentSlide, LessonStates' M6 lines: picking a deck in the side panel, the class page's slide controls and Present's slide; the presenter card's "Every phone in this class shows this slide, and so does Present." not built), in two PRs: **part 1, PDF.js and the CSP** — ✅ (#413; DECISIONS 2026-10-16): pdfjs-dist 6.4.299 pinned, its legacy build in a worker of its own from `/pdfjs/` (copied at each dev and build), `isEvalSupported: false` (5.7 removed the eval it guarded) and WebAssembly off; `lib/deck-pdf.ts`'s `loadDeck`, the bytes checked against the slide's `sha256` before PDF.js sees them, each failure typed for the screen; the CSP's `worker-src 'self'` and the worker's own CSP; **left, part 2, the presenter**: the boards above through `loadDeck`, a mismatch refused with a retry (settled 2026-10-10; LessonStates draws its words), a stalled download the screen's to stop — validation: `/santa-loop` with the UI skills, screenshots
 - **M7** BaliCore's deck download and cache (for M8) — ✅ (#331; DECISIONS 2026-10-12)
 - **M8** 👀📱 iOS slide view to the app canvas: PDFKit, pinch zoom, each page's text as its VoiceOver label, Emergency Unlock untouched — validation: XCTest, the device check on a shielded phone
 - **M9** Load and demo with a deck — ✅ (#335; DECISIONS 2026-10-12)

@@ -10,6 +10,14 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-16 (Central) — L7c (#412; `docs/DECISIONS.md`, 2026-10-16): a session's
+Questions card on its report page, ReportOpened's, after the Unlocks table: each question asked, in
+the order asked, with its totals through L3c's read and the class page's card's own options and bars
+(one copy now), the guard the server's alone ("Too few answers to show a breakdown."); its own read,
+failing on its own with Try again; none asked, no card; its states drawn on the canvas first
+(ReportQuestionsStates, version 59). Checked on dev with the demo class. Before it, L7b's part 2
+(#411). Next: M6, the presenter._
+
 _Last updated: 2026-10-16 (Central) — L7b's part 2, and with it L7b (#411; `docs/DECISIONS.md`,
 2026-10-16): Ask a question opens on the teacher's questions, LessonAsk's panel, each asked with one
 click through the same ask as Ask the class, Write a new question and Your questions under them; its

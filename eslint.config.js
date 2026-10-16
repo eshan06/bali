@@ -6,6 +6,7 @@ import tseslint from 'typescript-eslint';
 export default tseslint.config(
   { ignores: ['**/node_modules/', '**/dist/', '**/coverage/', '**/.next/', '**/next-env.d.ts'] },
   { ignores: ['**/.build/'] }, // SwiftPM's: dependencies' checkouts, GRDB's JavaScript too
+  { ignores: ['apps/web/public/pdfjs/'] }, // PDF.js's own minified files, copied at each dev or build
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   {
