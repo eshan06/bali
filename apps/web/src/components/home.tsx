@@ -518,7 +518,8 @@ function useWide(): boolean {
  * once the last read has none running, the last session over, if any has ended; then the block's
  * card. A session the server ends while Home is open loses its card at once, and the classes are
  * read again (HomeLiveStates, drawn first), Last session showing once the read says none runs, so
- * it never shows an older session meanwhile. `ref` is the greeting's, for focus after a redeem.
+ * it never shows an older session meanwhile (HomeRailStates, drawn first). `ref` is the greeting's,
+ * for focus after a redeem.
  */
 export function TeacherHome({
   ref,
@@ -551,7 +552,7 @@ export function TeacherHome({
   });
   const wide = useWide();
   // Past a bell, or past an End elsewhere, the read still counts the session running until it is
-  // read again; until then there is no Last session to show, never an older one.
+  // read again; until then there is no Last session to show, never an older one (HomeRailStates).
   const running = me.classes.some((c) => (c.summary?.runningSession ?? null) !== null);
   const last = running ? null : lastOf(me.classes);
   return (

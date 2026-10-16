@@ -8,6 +8,45 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-16** — **PV17c-2: Home's Last session (#425), the portal redesign's last step; never read
+  as running before the sweep, and none from a bell until the account's read.** Built to [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4):
+  HomeIdle's Last session, HomeMoreStates' (loading, didn't load), HomeRailStates' Last session items
+  (nobody joined, nobody joined with an unlock, a long class name, within a minute of the bell) and
+  HomeIdlePhone, drawn first for PV17c-1 (version 74), and one item more drawn first as an
+  intermediate state (version 77, HomeRailStates): no Last session from a bell until Bali answers.
+  With it PV0–PV17 are done. **Which session:** the last one over across the classes (`lastOf`,
+  `lib/classes.ts`), from the account's `lastSession` (PV2): the one that ended last, of two that
+  ended together the one that started last, then the account's order; its class, day and times from
+  the account, ended at its End or its bell. **Its figures** come from its report (R2, `readReport`):
+  who joined, the average per student and the unlocks, as HomeIdle draws them, in v2.css's `.stats`,
+  now `Figures`, the recap's too; with nobody joined, the recap's own line in their place, the
+  unlocks kept when a student who never tapped in unlocked (HomeRailStates). **Never read as
+  running:** for up to a minute after a bell the report says `ended: false`, which means only "not
+  swept yet" (PV2's review), its figures already counted to the bell; the card never reads that
+  flag, and its times come from the account, so it says the same before and after the sweep.
+  **Read once,** as the card shows, keyed by its session, again only by Try again; *weighed:* every
+  15 s as Recent activity, for figures that stop changing at the bell but for a late unlock or
+  protection off, which the next Home shows. **Only once the account's last read counts no session
+  running:** from a bell by this computer's clock, or an End elsewhere, until that read answers (3 s
+  after the bell, PV17a), the rail holds the block's card alone, never the session before it (drawn
+  first); with this computer's clock more than 3 s ahead of Bali's, until Home next reads the account
+  (PV17a's one read per bell). *Weighed:* the session just ended taken from the running one by this
+  computer's clock, whose report, read before Bali's bell, would count it to now and whose End time
+  the account alone knows. **On a phone too** (HomeIdlePhone), under your classes and over your block:
+  it reads nothing again, unlike Recent activity. **HomeNoName** draws the same rail as HomeIdle, Last
+  session included, so PV1's ruling stands, hidden only until a class's first session ends; PV17c-1's
+  entry (below) read that board's rail as the block's card alone. **Seen:** on dev as the demo teacher
+  in a browser of its own signed in by the demo world (its profile deleted): a 2-minute session with
+  4 joined and two unlocks, the rail the block's card alone at the bell, Last session 3.4 s after it
+  and its figures 3.7 s after it while the report still said `ended: false`, the sweep 54 s after the
+  bell, the same card after it; at 390 px under your classes and over your blocks; a session nobody
+  joined in which Ana unlocked without tapping in (`no_live_participation`), ended with End with
+  Home open, "Nobody joined this session." and Unlocks 1 within a second; one nobody joined, the line
+  alone; the rest through the real component, each card the height of its board to the pixel.
+  *Found:* Open the recap in that minute before the sweep opens the class page, which still shows the
+  session at 0:00 with its grid until the sweep's end comes down its live feed, then the recap (seen:
+  54 s); the class page's own wait for the server's mark (PV7, PV12b), left as it is.
+
 - **2026-10-16** — **PV17c-1: Home's Recent activity (#424), read again every 15 s while Home is in
   view, its read narrowed to its kinds; PV17c in two.** Built to [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4):
   Main's Recent activity and HomeMoreStates' (loading, didn't load), and two boards drawn first as
