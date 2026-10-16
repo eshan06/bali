@@ -4,7 +4,7 @@ import { PHASE_PRODUCTION_BUILD, PHASE_PRODUCTION_SERVER } from 'next/constants'
 
 import config, { nextConfig, securityHeaders } from '../../next.config';
 
-import { checkBuildEnv, contentSecurityPolicy, type CspOptions } from './csp';
+import { checkBuildEnv, contentSecurityPolicy, type CspOptions, PDFJS_CSP, PDFJS_DIR } from './csp';
 
 const BASE: CspOptions = {
   apiUrl: 'https://api.bali.example/',
@@ -46,6 +46,7 @@ describe('contentSecurityPolicy', () => {
     expect(csp.get('object-src')).toEqual(["'none'"]);
     expect(csp.get('base-uri')).toEqual(["'self'"]);
     expect(csp.get('img-src')).toEqual(["'self'", 'data:']);
+    expect(csp.get('worker-src')).toEqual(["'self'"]);
   });
 
   it('runs only nonced scripts and styles in production, never inline or eval but a style attribute', () => {
@@ -135,6 +136,15 @@ describe('contentSecurityPolicy', () => {
     const csp = parse(contentSecurityPolicy({ ...BASE, dev: true }));
     expect(csp.get('script-src')).toContain("'unsafe-eval'");
     expect(csp.get('style-src')).toEqual(["'self'", "'unsafe-inline'"]);
+    expect(csp.get('worker-src')).toEqual(["'self'"]);
+  });
+
+  it("starts a worker only from the portal's own origin: never blob:, data: or another (M6)", () => {
+    // Unset, workers would fall back to script-src, whose 'strict-dynamic' lets a script start one
+    // from a blob: URL (seen in Chrome): PDF.js's worker is the portal's own file.
+    for (const dev of [false, true]) {
+      expect(parse(contentSecurityPolicy({ ...BASE, dev })).get('worker-src')).toEqual(["'self'"]);
+    }
   });
 
   it('fails loudly on a configured URL that is not one', () => {
@@ -145,6 +155,16 @@ describe('contentSecurityPolicy', () => {
     expect(() => contentSecurityPolicy({ ...BASE, deckBucketUrl: 'not a url' })).toThrow();
     // A blank API would drop it from connect-src.
     expect(() => contentSecurityPolicy({ ...BASE, apiUrl: ' ' })).toThrow(/blank/);
+  });
+});
+
+describe("PDF.js's worker's own CSP (M6)", () => {
+  it('lets it import only the portal’s own scripts: no fetch, eval or WebAssembly', () => {
+    expect(PDFJS_DIR).toBe('/pdfjs/');
+    expect(PDFJS_CSP).toBe("default-src 'none'; script-src 'self'");
+    const csp = parse(PDFJS_CSP);
+    expect([...csp.keys()]).toEqual(['default-src', 'script-src']);
+    expect(PDFJS_CSP).not.toMatch(/unsafe|blob:|data:|\*|https?:/);
   });
 });
 

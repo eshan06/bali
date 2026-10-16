@@ -108,6 +108,9 @@ export function contentSecurityPolicy(options: CspOptions): string {
     // by attribute. An attribute selects nothing, and any URL in it still meets img-src.
     'style-src-attr': "'unsafe-inline'",
     'connect-src': list("'self'", api, cognito, sentry, bucket),
+    // PDF.js's worker, from the portal's own origin (M6). Without it, workers would fall back to
+    // script-src, where 'strict-dynamic' lets a script start one from any URL, a blob: one too.
+    'worker-src': "'self'",
     'img-src': "'self' data:",
     'object-src': "'none'",
     'base-uri': "'self'",
@@ -118,3 +121,29 @@ export function contentSecurityPolicy(options: CspOptions): string {
     .map(([name, value]) => `${name} ${value}`)
     .join('; ');
 }
+
+/**
+ * Where the portal serves PDF.js's worker and the image decoders it loads (M6), from its own origin:
+ * `scripts/pdfjs-assets.mjs` copies them from pdfjs-dist into `public/pdfjs/` at each `npm run dev`
+ * and `npm run build`, and `lib/deck-pdf.ts` loads them from here.
+ */
+export const PDFJS_DIR = '/pdfjs/';
+
+/** The scripts served there: PDF.js's worker, and the image decoders it imports. */
+export const PDFJS_SCRIPTS = [
+  'pdf.worker.min.mjs',
+  'jbig2_nowasm_fallback.js',
+  'openjpeg_nowasm_fallback.js',
+] as const;
+
+/**
+ * The CSP PDF.js's worker runs under, sent with `PDFJS_SCRIPTS` alone: a worker obeys its own
+ * script's policy, never the page's. It reads a deck the page hands it, so it may fetch nothing, run
+ * no eval and compile no WebAssembly; it may import only the portal's own scripts, its image
+ * decoders. Any other path there, a 404 page among them, keeps the page's.
+ */
+export const PDFJS_CSP = "default-src 'none'; script-src 'self'";
+
+/** Whether `path` is one of PDF.js's scripts, which get `PDFJS_CSP`. */
+export const isPdfjsScript = (path: string): boolean =>
+  PDFJS_SCRIPTS.some((name) => path === `${PDFJS_DIR}${name}`);

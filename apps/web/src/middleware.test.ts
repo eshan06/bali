@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { describe, expect, it } from 'vitest';
 
+import { PDFJS_CSP, PDFJS_SCRIPTS } from './lib/csp';
 import { config, middleware } from './middleware';
 
 /** The CSP Next reads its nonce from: the forwarded request's, as middleware passes it on. */
@@ -59,10 +60,40 @@ describe('middleware', () => {
     expect(nonce()).not.toBe(nonce());
   });
 
-  it('runs on pages, not on built assets or prefetches', () => {
+  it("gives PDF.js's worker and its decoders their own CSP, never the page's (M6)", () => {
+    expect(PDFJS_SCRIPTS).toHaveLength(3);
+    for (const file of PDFJS_SCRIPTS) {
+      const response = middleware(new NextRequest(`http://localhost:3000/pdfjs/${file}`));
+      expect(response.headers.get('Content-Security-Policy')).toBe(PDFJS_CSP);
+      // No page renders there, so Next is handed no nonce.
+      expect(forwardedCsp(response)).toBeNull();
+    }
+  });
+
+  it("keeps the page's CSP, starting workers from its own origin alone, on any other path", () => {
+    // Beside them, and under /pdfjs/ but none of them: a 404 page there is still a page.
+    for (const path of [
+      '/',
+      '/pdfjs',
+      '/pdfjs-check',
+      '/classes/pdfjs/',
+      '/pdfjs/nope.mjs',
+      '/pdfjs/LICENSE',
+      '/pdfjs/pdf.worker.min.mjs/x',
+    ]) {
+      const csp = middleware(new NextRequest(`http://localhost:3000${path}`)).headers.get(
+        'Content-Security-Policy',
+      );
+      expect(csp, path).toMatch(/script-src 'self' 'nonce-/);
+      expect(csp, path).toContain("worker-src 'self';");
+    }
+  });
+
+  it('runs on pages and on the worker, not on built assets or prefetches', () => {
     const [rule] = config.matcher;
     const pages = new RegExp(`^${rule.source}$`);
     expect(pages.test('/classes/abc/reports')).toBe(true);
+    expect(pages.test('/pdfjs/pdf.worker.min.mjs')).toBe(true);
     expect(pages.test('/_next/static/chunks/main.js')).toBe(false);
     for (const icon of ['/icon.svg', '/icon.png', '/apple-icon.png']) {
       expect(pages.test(icon)).toBe(false);

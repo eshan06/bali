@@ -21,6 +21,8 @@ node_modules/
 dist/
 build/
 .next/
+# PDF.js's worker and decoders, copied from pdfjs-dist before each portal dev or build (M6)
+apps/web/public/pdfjs/
 next-env.d.ts
 coverage/
 *.tsbuildinfo
