@@ -10,6 +10,15 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-15 (Central) — W4's part 2, and with it W4 (#408; `docs/DECISIONS.md`,
+2026-10-15): the student's own phone beside the class's name on the lesson page, in the app's words
+and the grid's tints, its line under the head, kept "as of" the last read while Bali can't be reached
+(Silent's minutes stopped then); the home's live card ending on Open the lesson and that chip, read
+from the lesson; an answer's send that hangs says it didn't send after 10 s; built to v2's canvas and
+a board drawn first (version 54); checked on dev with Ana's phone through every state by the API.
+Before it, W4's part 1b, the question card (#407). Next: M6, the presenter; L7c's Questions card goes
+on PV14's page._
+
 _Last updated: 2026-10-15 (Central) — W4's part 1b, the student's question card (#407;
 `docs/DECISIONS.md`, 2026-10-15): answering and changing it until the close, an answer on its way,
 didn't send, too late (the card closed at once), the closed marks, never red, and the privacy line,

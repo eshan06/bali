@@ -98,6 +98,10 @@ The conductor's machine since 2026-10-14 (`docs/DECISIONS.md`); the clone is `C:
   `packages/db/src/cleanup-students.ts` and a v2 `.env`, which v3's API reads from the root. Never
   run the API or the tests from `C:\dev\bali` itself (workers use their own worktrees), and never
   touch those files without the owner.
+- **Headless Chrome lays a page out 500 px wide at least.** `--window-size=390,…` renders at 500 and
+  crops the shot to 390, a layout no phone has, with no error. For a phone-width shot, emulate the
+  width over DevTools: start it with `--remote-debugging-port`, then `Emulation.setDeviceMetricsOverride`
+  and `Page.captureScreenshot` (Node 22's built-in `WebSocket` is enough).
 
 ## Cloud sessions / dev environment
 

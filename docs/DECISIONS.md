@@ -8,6 +8,33 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-15** — **W4's follow-up: the home's live card says Bali can't be reached when its
+  lesson's reads fail before one answers, and an answer whose send gave up at 10 s but landed is in
+  once a read shows it held.** Two limits #408 shipped with (its review's notes), each against
+  CLAUDE.md's "no silent failures". **The home's card** said Checking… for as long as its lesson's
+  reads failed before one answered (that route down while `/v1/me` works, or the network gone after
+  the account's read), as StudentChipStates' label allowed. Now Checking… stays in the chip's place,
+  the reads going on every 2 s as ever, and the lesson page's own line, word for word, "Can't reach
+  Bali right now, so this page may be behind. It keeps trying.", goes under the card's last row
+  (`unreached`, `CantReach`): StudentChipUnreached, drawn first as an intermediate state (version 55;
+  StudentChipStates' label now points to it), at 1440 and on a phone. Once a read answers, the chip
+  says it, and a failing read after that keeps it "as of" with no line, as #408 built. *Weighed:* the
+  grid's Unknown chip (its "refresh" asks for a newer page, DESIGN.md keeping it for a state the page
+  has no chip for, and it would contradict "It keeps trying"); "Can't reach Bali" in the chip's place
+  (beside "Your phone" it reads as the phone that can't reach Bali). The lesson page has no such gap:
+  before its first read answers, a failed read is "Bali couldn't load this lesson." with Try again,
+  and the reads go on. **The answer's send:** one that gave up at `ANSWER_TIMEOUT_MS` but landed said
+  it didn't send until the next pick, though the read since showed it held. The presentation read
+  carries the caller's own answer with its id (decision 6), so no API change: a failed send keeps
+  the id it went under (`AnswerResult`, `Said`), and the card says what `saidNow` says: a "didn't
+  send" says nothing once a read shows Bali holding that answer, or one taken after it (an id at or
+  after it, decision 4), and the card says the answer is in. *Weighed:* that same id alone (an answer
+  picked on the phone since would keep "pick it again" over it, and picking again would undo the
+  newer answer). The failing tests came first (6e04d61). **The screenshots:** the real components in
+  a throwaway page in the preview alone, deleted after, the home's lesson reads failed by the page
+  (offline), the browser's clock held at the boards' time, beside StudentChipUnreached at 1440 and
+  390 px, StudentLesson and StudentCardStates at 1440. No iPhone check is needed for either.
+
 - **2026-10-15** — **W4's part 2: the student's own phone on the lesson page and on the home's live
   card, both from the lesson's read; Silent's minutes stop at the time they're "as of"; an answer's
   send that hangs says it didn't send after 10 s. W4 is done.** Built to
