@@ -8,13 +8,13 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-15 (Central) — W4's part 1a, the student's lesson page (#406;
-`docs/DECISIONS.md`, 2026-10-15): `/lessons/<class>/<session>`, its head with the ring and the
-countdown, nothing shared yet, class over, Loading…, the lesson that didn't load, not in this class
-and "Can't reach Bali", built to v2's canvas and two boards drawn first (version 49); no link leads to
-it until W4's part 2. Before it, L7's part 3, Close and Done on Present (#405). Next: W4's part 1b,
-the question card, built on branch `w4-1b-question-card`, then its part 2; M6, the presenter; L7c's
-Questions card goes on PV14's page._
+_Last updated: 2026-10-15 (Central) — W4's part 1b, the student's question card (#407;
+`docs/DECISIONS.md`, 2026-10-15): answering and changing it until the close, an answer on its way,
+didn't send, too late (the card closed at once), the closed marks, never red, and the privacy line,
+built to v2's canvas and two states drawn first (version 53); checked on dev with one student
+answering from the web and then the phone (through the API: the app's card is L8's). Before it,
+W4's part 1a, the lesson page (#406). Next: W4's part 2, the phone's chip, 200% zoom and the home's
+Open the lesson; M6, the presenter; L7c's Questions card goes on PV14's page._
 
 ## Now
 
@@ -83,7 +83,7 @@ first class, production backups (L0b, the owner's console step; the owner, 2026-
 
 **Phase 7, Live lesson: building.** Every step with no screen is done, L3c the last (2026-10-15);
 M0 is done (deck storage on, 2026-10-12); the web screens come after the redesign's PV15 (✅ #388),
-W3 the first (✅ #392), M5 (✅ #400), L7 (✅ #402, #405), W4 (part 1a ✅ #406), then the phone's (L8, M8). L0b, production backups, is the owner's, before the Vanderbilt pilot's first
+W3 the first (✅ #392), M5 (✅ #400), L7 (✅ #402, #405), W4 (parts 1a ✅ #406 and 1b ✅ #407), then the phone's (L8, M8). L0b, production backups, is the owner's, before the Vanderbilt pilot's first
 class.
 
 ## Phases
@@ -205,7 +205,7 @@ Slice 3 — students on the web (added 2026-10-10; ARCHITECTURE, "Live lesson", 
 - **W1** The phone's state in the presentation read — ✅ (#322; DECISIONS 2026-10-11)
 - **W2** Portal student logic, `lib/student-web.ts` (for W3, W4) — ✅ (#333; DECISIONS 2026-10-12)
 - **W3** 👀 The student's home to v2's canvas — ✅ (#392; DECISIONS 2026-10-15); left for the owner: the privacy policy names the student pages (C2's words, the lawyer's)
-- **W4** 👀 The lesson page to v2's canvas (StudentLesson, StudentNotIn, StudentClosed, StudentWaiting, StudentEnded, StudentPhoneStates, StudentStates' W4 lines, StudentZoom at 720 px; after L7 and W3; its intermediate states drawn first, StudentNoSlide and StudentCardStates, canvas version 49), in three PRs, part 1 split in two (the conductor, 2026-10-15: about 600 lines). **Part 1a, the lesson page** — ✅ (#406; DECISIONS 2026-10-15): `/lessons/<class>/<session>`, Your classes marked in the menu, the class head with its ring from `/v1/me`'s `liveSession.startedAt` (W3) and the class page's countdown, nothing shared yet, class over (its time when the page can vouch for it), Loading…, the lesson that didn't load, not in this class and "Can't reach Bali"; no link leads to it until part 2. **Part 1b, the question card**, next: answer, change, the revealed answer, the privacy line, an answer on its way, didn't send, too late, the closed marks; built, its commits on branch `w4-1b-question-card` stacked on 1a's, for a fresh worker to rebase onto `main` and ship, with its screenshots and one student answering from the web and then the phone. **Part 2:** the phone's chip and line (`phoneChip`'s kinds in the canvas's words, the unknown chip in the grid's Unknown look, the "as of" time beside the chip, passed so Silent's minutes freeze while Bali can't be reached, #333; the Unlocked line's bell from `/v1/me`'s `liveSession.endsAt`), 200% zoom (one column under 1024 px, the question first), and the student's home's live card's last row, which W3 left (StudentHome): Open the lesson, to this page, and the phone's chip from the lesson's read, never a one-time `/v1/me` (decision 13: never greener than the grid); the home reads the account as it opens and at each bell (W3), so a class that starts, or ends early, while it is open shows at the next read, which Open the lesson may want sooner (when its tab comes back into view, say) — validation: `/santa-loop` with the UI skills, screenshots, one student answering from the web and then the phone; #334 (a timeout on the portal's polls) ✅ (#403; DECISIONS 2026-10-15)
+- **W4** 👀 The lesson page to v2's canvas (StudentLesson, StudentNotIn, StudentClosed, StudentWaiting, StudentEnded, StudentPhoneStates, StudentStates' W4 lines, StudentZoom at 720 px; after L7 and W3; its intermediate states drawn first, StudentNoSlide and StudentCardStates, canvas version 49), in three PRs, part 1 split in two (the conductor, 2026-10-15: about 600 lines). **Part 1a, the lesson page** — ✅ (#406; DECISIONS 2026-10-15): `/lessons/<class>/<session>`, Your classes marked in the menu, the class head with its ring from `/v1/me`'s `liveSession.startedAt` (W3) and the class page's countdown, nothing shared yet, class over (its time when the page can vouch for it), Loading…, the lesson that didn't load, not in this class and "Can't reach Bali"; no link leads to it until part 2. **Part 1b, the question card** — ✅ (#407; DECISIONS 2026-10-15): answer, change until the close, an answer on its way, didn't send, too late (the card closed at once), the closed marks with the revealed answer, never red, and the privacy line; two states drawn first (version 53); checked on dev with one student answering from the web and then the phone through the API, the same on a real iPhone the owner's once the app's card (L8) can answer (📱). **Part 2**, next: the phone's chip and line (`phoneChip`'s kinds in the canvas's words, the unknown chip in the grid's Unknown look, the "as of" time beside the chip, passed so Silent's minutes freeze while Bali can't be reached, #333; the Unlocked line's bell from `/v1/me`'s `liveSession.endsAt`), 200% zoom (one column under 1024 px, the question first), and the student's home's live card's last row, which W3 left (StudentHome): Open the lesson, to this page, and the phone's chip from the lesson's read, never a one-time `/v1/me` (decision 13: never greener than the grid); the home reads the account as it opens and at each bell (W3), so a class that starts, or ends early, while it is open shows at the next read, which Open the lesson may want sooner (when its tab comes back into view, say) — validation: `/santa-loop` with the UI skills, screenshots, one student answering from the web and then the phone; #334 (a timeout on the portal's polls) ✅ (#403; DECISIONS 2026-10-15)
 - **W5** 👀 Slides on the student web to v2's canvas (StudentLesson's slide, its full-screen view as PV1 draws it; after M3, M6 and W4): PDF.js as M6 configures it, the `sha256` check, the download's `no-store`, the text layer for screen readers, full screen — validation: CSP tests, a tampered deck refused, `/santa-loop`, screenshots
 - **W6** 📱 Exit check: a real class on prod follows a lesson on laptops and phones at once; each student's chip agrees with the teacher's grid
 

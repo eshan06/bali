@@ -698,7 +698,8 @@ describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
     // drawn so too; a live question's (L7) options' letters, and its "Results can't refresh", drawn
     // as the stale banner is, on the class page and in Present (L7, part 2); on Your questions
     // (L7b) the answers' letters; Your slides' (M5b) file tiles and an upload's progress track; and
-    // on a student's lesson (W4) "Can't reach Bali", drawn as the stale banner is.
+    // on a student's lesson (W4) "Can't reach Bali", drawn as the stale banner is, and their own
+    // answer once the question closes (StudentClosed).
     expect(filled).toEqual({
       [join('app', 'classes', '[id]', 'page.tsx')]: 1,
       [join('app', 'support', 'page.tsx')]: 1,
@@ -710,7 +711,7 @@ describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
       [join('components', 'reports-list.tsx')]: 3,
       [join('components', 'saved-questions.tsx')]: 1,
       [join('components', 'slides.tsx')]: 2,
-      [join('components', 'student-lesson.tsx')]: 1,
+      [join('components', 'student-lesson.tsx')]: 2,
       [join('components', 'student-panel.tsx')]: 1,
       [join('components', 'timeline.tsx')]: 1,
     });

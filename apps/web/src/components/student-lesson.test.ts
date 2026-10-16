@@ -7,15 +7,15 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { bellTime } from '../lib/session-controls';
-import type { LessonView, StudentClass } from '../lib/student-web';
-import { StudentLesson, StudentLessonPage } from './student-lesson';
+import type { LessonView, Said, Sending, StudentClass } from '../lib/student-web';
+import { PRIVACY, StudentLesson, StudentLessonPage } from './student-lesson';
 
 /*
- * A student's lesson page (W4, part 1a), rendered as it first draws, the boards' sample data in it:
- * StudentLesson's head (Biology, period 3 with Ms. Rivera, 23:14 left to a 9:55 bell),
- * StudentWaiting, StudentEnded and StudentStates' lines; and the states drawn first on the canvas,
- * StudentCardStates'. The question card is part 1b's; the phone's chip and its line part 2's: no
- * state here shows them.
+ * A student's lesson (W4, parts 1a and 1b), rendered as it first draws, the boards' sample data in
+ * it: StudentLesson's (Biology, period 3 with Ms. Rivera, 23:14 left to a 9:55 bell, its question
+ * answered B), StudentNotIn's card, StudentClosed, StudentWaiting, StudentEnded and StudentStates'
+ * lines; and the states drawn first on the canvas, StudentNoSlide and StudentCardStates. The
+ * phone's chip and its line are part 2's: no state here shows them.
  */
 const notFound = vi.hoisted(() =>
   vi.fn(() => {
@@ -31,6 +31,7 @@ const STARTED = '2026-10-12T14:05:00.000Z';
 const BELL = '2026-10-12T14:55:00.000Z';
 /** 23:14 before the bell, as StudentLesson draws it. */
 const NOW = Date.parse(BELL) - (23 * 60 + 14) * 1000;
+const QUESTION = '01924b2c-0000-7000-8000-000000000003';
 const SESSION = '01924b2c-0000-7000-8000-000000000001';
 const bell = { id: SESSION, startedAt: STARTED, endsAt: BELL };
 const biology: StudentClass = {
@@ -40,14 +41,18 @@ const biology: StudentClass = {
   enrollmentId: 'e-bio',
   liveSession: bell,
 };
-const question: StudentQuestion = {
-  id: '01924b2c-0000-7000-8000-000000000003',
-  prompt: 'Which value of x solves x² − 5x + 6 = 0?',
-  options: ['x = 1', 'x = 2', 'x = 4', 'x = 6'],
+const PROMPT = 'Which value of x solves x² − 5x + 6 = 0?';
+const OPTIONS = ['x = 1', 'x = 2', 'x = 4', 'x = 6'];
+const question = (over: Partial<StudentQuestion> = {}): StudentQuestion => ({
+  id: QUESTION,
+  prompt: PROMPT,
+  options: OPTIONS,
   open: true,
   correctOption: null,
   answer: null,
-};
+  ...over,
+});
+const yours = (option: number) => ({ option, eventId: '01924b2c-0000-7000-8000-00000000000a' });
 const slide = { deckId: 'd1', sha256: 'ab', page: 4, pageCount: 12 };
 const live = (over: Partial<Presentation> = {}, behind = false, klass = biology): LessonView => ({
   kind: 'live',
@@ -63,10 +68,12 @@ const live = (over: Partial<Presentation> = {}, behind = false, klass = biology)
   behind,
 });
 
-/** The page as it first draws `view`, at NOW. */
-function render(view: LessonView): string {
+/** The page as it first draws `view`, at NOW, with an answer on its way or said. */
+function render(view: LessonView, sending: Sending = null, said: Said = null): string {
   vi.useFakeTimers({ now: NOW });
-  return renderToStaticMarkup(createElement(StudentLesson, { view, onRetry: () => {} }));
+  return renderToStaticMarkup(
+    createElement(StudentLesson, { view, sending, said, onPick: () => {}, onRetry: () => {} }),
+  );
 }
 afterEach(() => vi.useRealTimers());
 
@@ -76,8 +83,209 @@ const words = (html: string) =>
     .split(/<[^>]+>/)
     .map((s) => s.replace(/&#x27;|&apos;/g, "'").replace(/&amp;/g, '&'))
     .filter((s) => s.trim() !== '');
+/** Each option's button: its pressed state, and whether it ends on a check. */
+const buttons = (html: string) =>
+  [
+    ...html.matchAll(/<button type="button" aria-pressed="(true|false)"[^>]*>([^]*?)<\/button>/g),
+  ].map((m) => ({ pressed: m[1] === 'true', checked: /lucide-check\b/.test(m[2] ?? '') }));
+/** Each closed answer's row: its classes and its words. */
+const rows = (html: string) =>
+  [...html.matchAll(/<div class="(flex min-h-13 [^"]*)">([^]*?<\/span><\/span>)<\/div>/g)].map(
+    (m) => ({ classes: (m[1] ?? '').split(' '), words: words(m[2] ?? '') }),
+  );
 const HEAD = ['Biology, period 3', 'with Ms. Rivera', '23:14', 'ends ', bellTime(BELL)];
+const ANSWERS = ['A', 'x = 1', 'B', 'x = 2', 'C', 'x = 4', 'D', 'x = 6'];
+const ANSWERED = 'Your answer is in. You can change it until the question closes.';
 const NOTHING = 'Nothing shared yet. Slides and questions from your teacher show up here.';
+
+describe('the lesson with a question (StudentLesson, StudentNoSlide)', () => {
+  const html = render(live({ question: question({ answer: yours(1) }) }));
+
+  it('says the class’s head, then the card: its question, its answers, its line and the privacy line', () => {
+    expect(words(html)).toEqual([...HEAD, 'Question', PROMPT, ...ANSWERS, ANSWERED, PRIVACY]);
+    expect(PRIVACY).toBe("Your teacher sees the class's totals, never which answer is yours.");
+  });
+
+  it('shows the answer Bali holds picked, the brand’s fill and a check, the rest to pick, no Submit', () => {
+    expect(buttons(html)).toEqual([
+      { pressed: false, checked: false },
+      { pressed: true, checked: true },
+      { pressed: false, checked: false },
+      { pressed: false, checked: false },
+    ]);
+    const option = /<button type="button" aria-pressed="true" class="([^"]*)"/.exec(html)?.[1];
+    expect(option?.split(' ')).toEqual(
+      expect.arrayContaining([
+        'min-h-13',
+        'rounded-sm',
+        'border-border-strong',
+        'text-body-lg',
+        'aria-pressed:bg-action-primary-bg',
+        'aria-pressed:text-action-primary-fg',
+        'aria-pressed:font-semibold',
+      ]),
+    );
+    expect(html).not.toMatch(/Submit/);
+  });
+
+  it('is v2’s lesson card, at its own width beside where a slide goes and a column of its own under 1024 px', () => {
+    expect(html).toMatch(
+      /<div class="lg:max-w-100"><section aria-labelledby="([^"]+)" class="flex flex-col gap-3\.5 rounded-live border border-border-default bg-surface-card p-5\.5 shadow-1">/,
+    );
+  });
+
+  it('never shows a count, nor anyone else’s answer: the read carries neither', () => {
+    // Every word on the card is the question's, its letters, its lines or the privacy line.
+    const card = /<section[^]*<\/section>/.exec(html)?.[0] ?? '';
+    expect(words(card)).toEqual(['Question', PROMPT, ...ANSWERS, ANSWERED, PRIVACY]);
+  });
+
+  it('shows the card beside a slide too, the slide W5’s', () => {
+    const both = render(live({ question: question({ answer: yours(1) }), slide }));
+    expect(words(both)).toEqual([...HEAD, 'Question', PROMPT, ...ANSWERS, ANSWERED, PRIVACY]);
+  });
+});
+
+describe('the question card, every state', () => {
+  it('asks for a pick while none is in (StudentNotIn’s card)', () => {
+    const html = render(live({ question: question() }));
+    expect(words(html)).toContain('Pick an answer. You can change it until the question closes.');
+    expect(buttons(html).some((b) => b.pressed)).toBe(false);
+  });
+
+  it('shows a pick on its way picked, and says so (StudentCardStates)', () => {
+    const sending = { questionId: QUESTION, option: 3 };
+    const html = render(live({ question: question({ answer: yours(1) }) }), sending);
+    expect(buttons(html).map((b) => b.pressed)).toEqual([false, false, false, true]);
+    expect(words(html)).toContain('Sending your answer…');
+    // Another question's sending is none of this card's.
+    const other = render(live({ question: question() }), { questionId: 'q0', option: 3 });
+    expect(buttons(other).some((b) => b.pressed)).toBe(false);
+  });
+
+  it('says an answer that didn’t send in the line’s place, the answer Bali holds left picked', () => {
+    const said: Said = { questionId: QUESTION, said: 'failed' };
+    const html = render(live({ question: question({ answer: yours(1) }) }), null, said);
+    expect(html).toContain(
+      '<p role="alert" class="text-body">Bali couldn&#x27;t send your answer. Check your connection and pick it again.</p>',
+    );
+    expect(words(html)).not.toContain(ANSWERED);
+    expect(buttons(html).map((b) => b.pressed)).toEqual([false, true, false, false]);
+    // Once closed there's no picking it again: the closed line in its place.
+    const closed = render(live({ question: question({ open: false }) }), null, said);
+    expect(closed).not.toContain('role="alert"');
+  });
+
+  it('says a pick that reached Bali too late, on the closed card, until another question', () => {
+    const said: Said = { questionId: QUESTION, said: 'too_late' };
+    const closed = render(live({ question: question({ open: false }) }), null, said);
+    expect(closed).toContain(
+      '<p role="alert" class="text-body">This question closed before your answer reached Bali, so it wasn&#x27;t counted.</p>',
+    );
+    const next = render(live({ question: question({ id: 'q2' }) }), null, said);
+    expect(next).not.toContain('role="alert"');
+  });
+
+  it('closes the card as Bali says too late, before a read shows it closed, the answer it holds marked', () => {
+    const said: Said = { questionId: QUESTION, said: 'too_late' };
+    const html = render(live({ question: question({ answer: yours(3) }) }), null, said);
+    expect(buttons(html)).toEqual([]);
+    expect(words(html)).toEqual([
+      ...HEAD,
+      'Question · closed',
+      PROMPT,
+      ...ANSWERS.slice(0, 6),
+      'D',
+      'x = 6',
+      'Your answer',
+      "This question closed before your answer reached Bali, so it wasn't counted.",
+      PRIVACY,
+    ]);
+    // No answer marked correct until a read shows it.
+    expect(rows(html)[1]?.classes).toEqual(expect.arrayContaining(['text-text-secondary']));
+  });
+
+  it('closed without the answer shown, marks nothing for a student who didn’t answer (StudentCardStates)', () => {
+    const html = render(live({ question: question({ open: false }) }));
+    expect(words(html)).toEqual([
+      ...HEAD,
+      'Question · closed',
+      PROMPT,
+      ...ANSWERS,
+      'Your teacher closed this question.',
+      PRIVACY,
+    ]);
+    expect(rows(html).map((r) => r.classes.includes('text-text-secondary'))).toEqual([
+      true,
+      true,
+      true,
+      true,
+    ]);
+  });
+
+  it('marks the correct answer once shown, and the student’s own, never red (StudentClosed)', () => {
+    const html = render(
+      live({ question: question({ open: false, correctOption: 1, answer: yours(3) }) }),
+    );
+    expect(words(html)).toEqual([
+      ...HEAD,
+      'Question · closed',
+      PROMPT,
+      'A',
+      'x = 1',
+      'B',
+      'x = 2',
+      'Correct answer',
+      'C',
+      'x = 4',
+      'D',
+      'x = 6',
+      'Your answer',
+      'Your teacher closed it and showed the answer.',
+      PRIVACY,
+    ]);
+    expect(buttons(html)).toEqual([]);
+    const [a, b, , d] = rows(html);
+    expect(a?.classes).toEqual(expect.arrayContaining(['bg-surface-card', 'text-text-secondary']));
+    expect(b?.classes).toEqual(
+      expect.arrayContaining([
+        'border-2',
+        'border-bar-right',
+        'bg-option-right',
+        'text-text-primary',
+      ]),
+    );
+    expect(d?.classes).toEqual(
+      expect.arrayContaining(['bg-surface-sunken', 'border-border-strong', 'text-text-primary']),
+    );
+    expect(html).toMatch(
+      /<span class="[^"]*\btext-text-brand\b[^"]*"><svg[^>]*lucide-circle-check[^]*?<\/svg>Correct answer<\/span>/,
+    );
+    expect(html).toMatch(/<span class="[^"]*\btext-state-notjoined-fg\b[^"]*">Your answer<\/span>/);
+    expect(html).not.toMatch(/red|revoked|destructive/);
+  });
+
+  it('puts both marks on one answer when the student’s was right (StudentCardStates)', () => {
+    const html = render(
+      live({ question: question({ open: false, correctOption: 1, answer: yours(1) }) }),
+    );
+    expect(rows(html)[1]?.words).toEqual(['B', 'x = 2', 'Correct answer', 'Your answer']);
+    expect(words(html).filter((w) => w === 'Your answer')).toHaveLength(1);
+  });
+
+  it('marks only the correct answer for a student who didn’t answer (StudentCardStates)', () => {
+    const html = render(live({ question: question({ open: false, correctOption: 2 }) }));
+    expect(words(html)).not.toContain('Your answer');
+    expect(rows(html)[2]?.words).toEqual(['C', 'x = 4', 'Correct answer']);
+  });
+
+  it('closed without the answer shown, marks only the student’s own (StudentCardStates)', () => {
+    const html = render(live({ question: question({ open: false, answer: yours(3) }) }));
+    expect(words(html)).not.toContain('Correct answer');
+    expect(rows(html)[3]?.words).toEqual(['D', 'x = 6', 'Your answer']);
+    expect(words(html)).toContain('Your teacher closed this question.');
+  });
+});
 
 describe('the lesson page while the class runs', () => {
   it('draws the head as ClassLive’s: the 44 px ring the session left, the countdown to the server’s bell (StudentLesson)', () => {
@@ -106,23 +314,28 @@ describe('the lesson page while the class runs', () => {
     expect(words(render(live()))).toEqual([...HEAD, NOTHING]);
   });
 
-  it('draws the head alone while a question or a slide shows that it doesn’t draw yet, never “nothing shared” (StudentCardStates)', () => {
-    // The question card is part 1b's, slides W5's.
-    for (const over of [{ question }, { slide }, { question, slide }]) {
-      expect(words(render(live(over)))).toEqual(HEAD);
-    }
+  it('draws the head alone while a slide shows and no question, until W5 draws slides here (StudentCardStates)', () => {
+    expect(words(render(live({ slide })))).toEqual(HEAD);
   });
 
-  it('says Bali can’t be reached under the head, as the stale banner is drawn (StudentStates, StudentCardStates)', () => {
+  it('says Bali can’t be reached under the head, the lesson as last read under it (StudentStates, StudentCardStates)', () => {
+    const BEHIND = "Can't reach Bali right now, so this page may be behind. It keeps trying.";
     const html = render(live({}, true));
-    expect(words(html)).toEqual([
-      ...HEAD,
-      "Can't reach Bali right now, so this page may be behind. It keeps trying.",
-      NOTHING,
-    ]);
+    expect(words(html)).toEqual([...HEAD, BEHIND, NOTHING]);
     expect(html).toMatch(
       /<\/header><p role="status" class="rounded-sm border border-border-default bg-surface-sunken px-4 py-3 text-body text-text-primary">/,
     );
+    const card = render(live({ question: question({ answer: yours(1) }) }, true));
+    expect(words(card)).toEqual([
+      ...HEAD,
+      BEHIND,
+      'Question',
+      PROMPT,
+      ...ANSWERS,
+      ANSWERED,
+      PRIVACY,
+    ]);
+    expect(buttons(card).map((b) => b.pressed)).toEqual([false, true, false, false]);
     expect(render(live())).not.toContain('role="status"');
   });
 
@@ -151,7 +364,7 @@ describe('the lesson page in its other states', () => {
       'Your classes',
     ]);
     // Over: no ring, no countdown, nothing of the lesson.
-    expect(html).not.toMatch(/<svg|23:14|Nothing shared/);
+    expect(html).not.toMatch(/<svg|23:14|Nothing shared|Question/);
     expect(html).toMatch(
       /<section aria-labelledby="([^"]+)" class="flex max-w-160 flex-col items-start gap-3 rounded-md border border-border-default bg-surface-card p-5 shadow-1"><h2 id="\1" class="text-h3">Class is over<\/h2>/,
     );
@@ -230,6 +443,19 @@ describe('its URL and its reads (from their sources)', () => {
     // The account's last read decides: one since the page opened answers for it.
     expect(component).toMatch(
       /const account = me !== opened \? 'fresh' : asked\.current && error !== null \? 'failed' : 'stale';/,
+    );
+  });
+
+  it('answers through the lesson it follows, its picks as picker says them (tested in student-web.test.ts)', () => {
+    expect(component).toMatch(/const \[pick\] = useState\(\(\) => picker\(setPicks\)\);/);
+    expect(component).toMatch(
+      /onPick=\{\(questionId, option\) => void pick\(following\.current, questionId, option\)\}/,
+    );
+    expect(component).toMatch(/sending=\{picks\.sending\}\s*said=\{picks\.said\}/);
+    // A tap on the answer Bali holds sends nothing, but while one is on its way or after one
+    // didn't send: then it's sent again.
+    expect(component).toMatch(
+      /if \(picked !== i \|\| sending !== null \|\| said === 'failed'\) onPick\(i\);/,
     );
   });
 

@@ -207,8 +207,10 @@ at `/invite` for them; Open the lesson and the phone's chip come with the lesson
 The student's lesson page is v2's since W4's part 1a (2026-10-15): `/lessons/<class>/<session>`,
 Your classes marked in the menu, StudentLesson's head (its ring and the class page's countdown) over
 StudentWaiting's line, StudentEnded's card and StudentStates' lines, and its intermediate states as
-StudentCardStates draws them (drawn on the canvas first); its question card is part 1b's, the phone's
-chip part 2's, and no link leads to the page until then.
+StudentCardStates draws them (drawn on the canvas first); its question card since part 1b
+(2026-10-15), StudentLesson's, StudentNotIn's and StudentClosed's, alone at its own width until W5
+draws the slide beside it (StudentNoSlide), its states as StudentCardStates draws them, too late
+closing it at once; the phone's chip is part 2's, and no link leads to the page until then.
 The class page's "Questions and slides" card is v2's since L7-1a (2026-10-15): between the counts
 and the grid, never in Present, a question's totals ("N of M answered", each option's count and bar
 from 3 answers), Close and Close and show answer, Done; and since L7-1b, at rest, Ask a question,
