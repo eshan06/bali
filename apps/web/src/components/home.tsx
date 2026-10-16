@@ -1,21 +1,39 @@
 'use client';
 
-import type { MeResponse, SessionSnapshot } from '@bali/shared';
-import { Presentation } from 'lucide-react';
+import {
+  type ActivityEvent,
+  type ActivityEventType,
+  isUnlockReason,
+  type MeResponse,
+  type SessionSnapshot,
+} from '@bali/shared';
+import {
+  CircleCheck,
+  LockOpen,
+  type LucideIcon,
+  Presentation,
+  ScrollText,
+  ShieldOff,
+} from 'lucide-react';
 import Link from 'next/link';
-import { type Ref, useCallback, useId, useState } from 'react';
+import { type Ref, useCallback, useEffect, useId, useState, useSyncExternalStore } from 'react';
 
+import { type ActivityRead, pollActivity } from '@/lib/activity';
 import { liveNow, type TaughtClass } from '@/lib/classes';
 import { gridDisplay, latestUnlock, staleWords } from '@/lib/grid-state';
-import type { RecapFormat } from '@/lib/recap';
+import { bareTime, nameOf, type RecapFormat } from '@/lib/recap';
 import { bellTime, laterBell } from '@/lib/session-controls';
+import { useApi } from '@/lib/use-api';
 
 import { Blocks } from './blocks';
 import { Button, buttonClass } from './button';
+import { CARD_ALONE } from './card';
 import { classLine, FirstClass, LiveChip } from './classes';
 import { DOT, type GridNow, LiveGrid, stateCounts } from './live-grid';
 import { joinedLine, LIVE_CARD, LiveCardHead, LiveCounts, useClock } from './live-header';
 import { QUIET_LINK } from './text-link';
+import { Timeline, type TimelineMoment } from './timeline';
+import { reasonWords } from './unlock-popups';
 import { NOTICE } from './your-phone';
 
 /** Where Home's Create a class goes: Classes, its New class open (HomeNew to ClassesNew). */
@@ -245,14 +263,144 @@ function ClassRow({ c, now }: { c: TaughtClass; now: number }) {
   );
 }
 
+/** A rail card's label (v2.css's `.wlabel`) with its icon, as the block's card has it. */
+const RAIL_LABEL = 'flex items-center gap-2 text-section-label text-text-tertiary uppercase';
+
+/** Each moment's dot (Main): an unlock's open lock, protection off's shield, a start's check. */
+const ACTIVITY_ICON: Record<ActivityEventType, LucideIcon> = {
+  unlock: LockOpen,
+  protection_off: ShieldOff,
+  session_started: CircleCheck,
+};
+
 /**
- * A teacher's Home (PV17a; Main, HomeIdle, HomeNew; until PV17c, the rail as HomeInterim draws it,
- * drawn first): the greeting and the date, the list's failure with Try again over the classes read
- * before (HomeInterimStates), each class live by this computer's clock to the server's bell on its
- * live card (PV17b), then each class once, or for a new teacher the first class's card, its Create a
- * class to Classes' New class; beside them, under them on anything narrower, the block's card. A
- * session the server ends while Home is open loses its card at once, and the classes are read again
- * (HomeLiveStates, drawn first). `ref` is the greeting's, for focus after a redeem.
+ * A moment of Recent activity as Main says it: who did what, the student named as their tile names
+ * them, then an unlock's reason as the pop-up says it and the class, or the class alone; its time
+ * without AM or PM, all of them today's.
+ */
+export function activityMoment(e: ActivityEvent, clock?: Intl.DateTimeFormat): TimelineMoment {
+  const who = e.student === null ? '' : nameOf(e.student);
+  const reason = reasonWords(isUnlockReason(e.reason) ? e.reason : null);
+  const [words, under] =
+    e.type === 'unlock'
+      ? [`${who} used Emergency Unlock`, `${reason}${DOT}${e.class.name}`]
+      : e.type === 'protection_off'
+        ? [`${who} turned protection off`, e.class.name]
+        : ['Session started', e.class.name];
+  const at = new Date(e.occurredAt);
+  return {
+    key: e.eventId,
+    Icon: ACTIVITY_ICON[e.type],
+    words,
+    under,
+    at,
+    time: bareTime(+at, clock),
+  };
+}
+
+/**
+ * Recent activity (PV17c; Main): today's unlocks with their reasons, protection offs and starts
+ * across the teacher's classes, newest first, four at most, then Open the class while one class is
+ * live (with more, each live card has its own: HomeRailStates, drawn first). Loading and a failure
+ * as HomeMoreStates draws them, the failure in the list's place until a read works. None at all for
+ * a list that came back empty: a live class's own start is always in it (PV1), but for one that
+ * started before midnight.
+ */
+export function RecentActivityView({
+  read,
+  only,
+  onRetry,
+}: {
+  read: ActivityRead;
+  /** The class live, when there is one alone. */
+  only: string | null;
+  onRetry: () => void;
+}) {
+  const id = useId();
+  if (read.kind === 'ready' && read.events.length === 0) return null;
+  return (
+    <section aria-labelledby={id} className={CARD_ALONE}>
+      <h2 id={id} className={RAIL_LABEL}>
+        <ScrollText size={14} aria-hidden="true" className="shrink-0" />
+        Recent activity
+      </h2>
+      {read.kind === 'loading' ? (
+        <p role="status" className="mt-3.5 text-body text-text-secondary">
+          Loading…
+        </p>
+      ) : read.kind === 'error' ? (
+        <div className="mt-3.5">
+          <div role="alert" className="text-body">
+            <p className="font-semibold">Couldn&apos;t load recent activity.</p>
+            <p className="text-text-secondary">{read.message}</p>
+          </div>
+          <Button variant="secondary" size="sm" onClick={onRetry} className="mt-3.5">
+            Try again
+          </Button>
+        </div>
+      ) : (
+        <>
+          <Timeline moments={read.events.map((e) => activityMoment(e))} className="mt-3.5" />
+          {/* In a line of the body's height, as the board sets it: 14 px under the list. */}
+          {only !== null ? (
+            <div className="mt-3.5 text-body">
+              <Link href={`/classes/${only}`} className={QUIET_LINK}>
+                Open the class
+              </Link>
+            </div>
+          ) : null}
+        </>
+      )}
+    </section>
+  );
+}
+
+/** Recent activity, read as Home shows it and again while it is in view (`pollActivity`). */
+function RecentActivity({ only }: { only: string | null }) {
+  const api = useApi();
+  const [read, setRead] = useState<ActivityRead>({ kind: 'loading' });
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    const poll = pollActivity(api, setRead);
+    return () => poll.stop();
+  }, [api, attempt]);
+  return (
+    <RecentActivityView
+      read={read}
+      only={only}
+      onRetry={() => {
+        setRead({ kind: 'loading' });
+        setAttempt((n) => n + 1);
+      }}
+    />
+  );
+}
+
+/** v2.css's phone width, Tailwind's `sm`: under it Recent activity is hidden (PV1; PhoneHome). */
+const WIDE = '(min-width: 40rem)';
+
+/** Whether the page is at least `WIDE`, so a phone never reads what it hides. */
+function useWide(): boolean {
+  return useSyncExternalStore(
+    (changed) => {
+      const query = window.matchMedia(WIDE);
+      query.addEventListener('change', changed);
+      return () => query.removeEventListener('change', changed);
+    },
+    () => window.matchMedia(WIDE).matches,
+    () => true,
+  );
+}
+
+/**
+ * A teacher's Home (PV17a; Main, HomeIdle, HomeNew): the greeting and the date, the list's failure
+ * with Try again over the classes read before (HomeInterimStates), each class live by this
+ * computer's clock to the server's bell on its live card (PV17b), then each class once, or for a new
+ * teacher the first class's card, its Create a class to Classes' New class; beside them, under them
+ * on anything narrower, the rail (PV17c): while a class is live Recent activity, never on a phone;
+ * then the block's card. A session the server ends while Home is open loses its card at once, and
+ * the classes are read again (HomeLiveStates, drawn first). `ref` is the greeting's, for focus after
+ * a redeem.
  */
 export function TeacherHome({
   ref,
@@ -283,6 +431,7 @@ export function TeacherHome({
     const session = liveNow(c, now);
     return session && !ended.has(session.id) ? [{ c, session }] : [];
   });
+  const wide = useWide();
   return (
     <main className="flex flex-col gap-5.5">
       <div>
@@ -322,6 +471,9 @@ export function TeacherHome({
           )}
         </div>
         <div className="flex min-w-0 grow basis-80 flex-col gap-5">
+          {live.length > 0 && wide ? (
+            <RecentActivity only={live.length === 1 ? (live[0]?.c.id ?? null) : null} />
+          ) : null}
           <Blocks />
         </div>
       </div>

@@ -10,7 +10,14 @@ import { describe, expect, it } from 'vitest';
 
 import { ApiError, NetworkError } from './api-client';
 import { CANT_REACH, TOO_MANY_TRIES } from './errors';
-import { classFigures, latestEnded, loadRecap, type RecapState, sessionTimes } from './recap';
+import {
+  bareTime,
+  classFigures,
+  latestEnded,
+  loadRecap,
+  type RecapState,
+  sessionTimes,
+} from './recap';
 
 // A 25-minute lesson at 9:05 in New York, ended by the sweep at its bell.
 const NY = { locale: 'en-US', timeZone: 'America/New_York' };
@@ -185,6 +192,24 @@ describe('sessionTimes', () => {
     const early = { ...SESSION, endedAt: '2026-10-04T13:21:00.000Z' };
     expect(plain(sessionTimes(early, NY))).toBe('Sun, Oct 4, 9:05 AM to 9:21 AM');
     expect(plain(sessionTimes(RUNNING, NY))).toBe('Sun, Oct 4, 9:05 AM to 9:30 AM');
+  });
+});
+
+describe('bareTime', () => {
+  const clock = (locale: string) =>
+    new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit', timeZone: NY.timeZone });
+
+  it('says a time without its AM or PM, as the axis’s ticks and Recent activity’s moments do', () => {
+    expect(bareTime(Date.parse('2026-10-04T13:31:00.000Z'), clock('en-US'))).toBe('9:31');
+    expect(bareTime(Date.parse('2026-10-04T17:12:00.000Z'), clock('en-US'))).toBe('1:12');
+    // A clock with no AM or PM keeps its own form.
+    expect(bareTime(Date.parse('2026-10-04T17:12:00.000Z'), clock('en-GB'))).toBe('13:12');
+  });
+
+  it('takes the viewer’s own clock unless given one', () => {
+    const at = Date.parse('2026-10-04T13:31:00.000Z');
+    const own = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+    expect(bareTime(at)).toBe(bareTime(at, own));
   });
 });
 

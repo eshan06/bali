@@ -1,4 +1,11 @@
-import { sessionReport, type ActionOrder, type ReportEvent } from '@bali/shared';
+import {
+  ACTIVITY_EVENT_TYPES,
+  type ActionOrder,
+  type EventType,
+  REPORT_LISTING_TYPES,
+  type ReportEvent,
+  sessionReport,
+} from '@bali/shared';
 import { and, eq, isNull, sql, type SQLWrapper } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -539,5 +546,65 @@ describe('the reports list’s reads', () => {
     const plan = await planOf(sessionEvents(db, [newUuidV7(), newUuidV7()]));
     expect(plan, plan).toContain('events_session_seq_idx');
     expect(plan, plan).not.toContain('Seq Scan');
+  });
+
+  it('read some kinds of them through the session’s index too: Recent activity’s (PV17c)', async () => {
+    const plan = await planOf(sessionEvents(db, [newUuidV7()], ACTIVITY_KINDS));
+    expect(plan, plan).toContain('events_session_seq_idx');
+    expect(plan, plan).not.toContain('Seq Scan');
+  });
+});
+
+/**
+ * Recent activity's read, as the API composes it (`ACTIVITY_READ`): its three kinds, and the kinds
+ * the report's listing reads (`REPORT_LISTING_TYPES`), each once.
+ */
+const ACTIVITY_KINDS = [...new Set<EventType>([...ACTIVITY_EVENT_TYPES, ...REPORT_LISTING_TYPES])];
+
+/*
+ * PV17c-1: Home reads Recent activity again every 15 s, so its read takes only the kinds the report
+ * needs to list a session's unlocks and protection offs (PV3's review). Behaviour is tested through
+ * the endpoint (apps/api/test/activity.test.ts), held there to each session's report read whole.
+ */
+describe('the events read by kind', () => {
+  it('gives only the kinds asked for, and the report lists the same unlocks and protection offs from them', async () => {
+    const { klass, student: ana } = await seedClass('by-kind');
+    const ben = await enrol(klass, 'by-kind-2');
+    const session = await lesson(klass);
+    const ana1 = phone();
+    await tapIn(db, move(session, ana, 1, ana1(1)));
+    // Ana's unlock, its reason changed, then a return to focus; a later unlock of hers, made
+    // before that return by her phone's order, is late (A12).
+    const sent = { ...move(session, ana, 3, ana1(2)), reason: 'bathroom' as const };
+    await unlock(db, sent);
+    const change = { unlockEventId: sent.eventId, studentId: ana.id, eventId: newUuidV7() };
+    await changeUnlockReason(db, { ...change, reason: 'nurse', now: at(4) });
+    await refocus(db, move(session, ana, 6, ana1(4)));
+    expect((await unlock(db, move(session, ana, 7, ana1(3)))).recordedAs).toBe('superseded');
+    // Ben's Screen Time off, then an unlock while it is.
+    await tapIn(db, move(session, ben, 2));
+    await protectionOff(db, move(session, ben, 8));
+    expect((await unlock(db, move(session, ben, 9))).recordedAs).toBe('protection_off');
+    await endSession(db, { sessionId: session.id, at: at(25), reason: 'expired' });
+
+    const whole = await sessionEvents(db, [session.id]);
+    const some = await sessionEvents(db, [session.id], ACTIVITY_KINDS);
+    expect(new Set(whole.map((e) => e.type))).toEqual(
+      new Set([...ACTIVITY_KINDS, 'tap_in', 'refocus', 'session_expired']),
+    );
+    expect(some).toEqual(
+      whole.filter((e) => (ACTIVITY_KINDS as readonly string[]).includes(e.type)),
+    );
+    const row = one(await db.select().from(sessions).where(eq(sessions.id, session.id)));
+    const listed = (events: ReportEvent[]) => {
+      const { unlocks, protectionOffs } = sessionReport(row, events, LATER);
+      return { unlocks, protectionOffs };
+    };
+    expect(listed(some)).toEqual(listed(whole));
+    expect(listed(some).unlocks.map((u) => [u.reason, u.recordedAs])).toEqual([
+      ['nurse', null],
+      [null, 'superseded'],
+      [null, 'protection_off'],
+    ]);
   });
 });

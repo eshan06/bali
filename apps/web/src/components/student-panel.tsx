@@ -5,7 +5,7 @@ import { CircleCheck, X } from 'lucide-react';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 
 import { Button } from '@/components/button';
-import { MOMENT } from '@/components/timeline';
+import { MOMENT, Timeline } from '@/components/timeline';
 import { reasonWords } from '@/components/unlock-popups';
 import type { Student } from '@/lib/grid-state';
 import { bellTime } from '@/lib/session-controls';
@@ -113,33 +113,19 @@ export function PanelView({ id, student, chip, read, now, onClose, onRetry }: Pa
               {name} hasn&apos;t tapped in this session.
             </p>
           ) : (
-            // v2.css's `.tl`: a 26 px grey dot each, joined by a hairline; the icon and the words say
-            // what happened, with no colour behind them.
-            <ol className="flex flex-col">
-              {moments.map((m) => {
+            <Timeline
+              moments={moments.map((m) => {
                 const [words, Icon] = MOMENT[m.moment];
-                const Dot = Icon ?? CircleCheck;
-                return (
-                  <li
-                    key={m.key}
-                    className="relative grid grid-cols-[26px_minmax(0,1fr)_auto] items-start gap-2.5 pb-4.5 before:absolute before:top-6.5 before:bottom-0.5 before:left-[12.5px] before:w-px before:bg-border-default last:pb-0 last:before:hidden"
-                  >
-                    <span className="relative z-1 grid size-6.5 place-items-center rounded-full bg-surface-sunken text-text-secondary">
-                      <Dot size={13} aria-hidden="true" />
-                    </span>
-                    <p className="pt-0.75 text-data font-normal">
-                      {words}
-                      {m.moment === 'unlock' ? (
-                        <small className="block text-tile-line font-normal text-text-secondary">
-                          {reasonWords(m.reason)}
-                        </small>
-                      ) : null}
-                    </p>
-                    <span className="pt-1 text-tile-line text-text-tertiary">{time(m.at)}</span>
-                  </li>
-                );
+                return {
+                  key: m.key,
+                  Icon: Icon ?? CircleCheck,
+                  words,
+                  under: m.moment === 'unlock' ? reasonWords(m.reason) : null,
+                  at: m.at,
+                  time: time(m.at),
+                };
               })}
-            </ol>
+            />
           )}
         </section>
         {panel && student.clockOff ? <p className={NOTE}>{CLOCK_OFF}</p> : null}

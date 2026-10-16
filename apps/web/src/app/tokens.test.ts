@@ -701,7 +701,8 @@ describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
       files.filter((file) => bare(file) > 0).map((file) => [relative(src, file), bare(file)]),
     );
     // The stale banner, the policy draft's banner, and v2's on the class page: the length
-    // picker's track, the join code's chip, the student panel's moments' dots and the recap's name
+    // picker's track, the join code's chip, the timeline's dots (the student panel's moments, and
+    // Home's Recent activity since PV17c) and the recap's name
     // pills; on Reports (PV13) its table's head, its bars' tracks and the place-lost notice, drawn
     // as the stale banner is; and on Help (PV15, SupportPage) the two lists of what a teacher sees,
     // drawn so too; a live question's (L7) options' letters, and its "Results can't refresh", drawn
@@ -722,8 +723,7 @@ describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
       [join('components', 'saved-questions.tsx')]: 1,
       [join('components', 'slides.tsx')]: 2,
       [join('components', 'student-lesson.tsx')]: 1,
-      [join('components', 'student-panel.tsx')]: 1,
-      [join('components', 'timeline.tsx')]: 1,
+      [join('components', 'timeline.tsx')]: 2,
       [join('components', 'your-phone.tsx')]: 1,
     });
   });

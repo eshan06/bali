@@ -1,11 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import type { MeResponse } from '@bali/shared';
+import type { ActivityEvent, MeResponse } from '@bali/shared';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
+import type { ActivityRead } from '../lib/activity';
 import type { TaughtClass } from '../lib/classes';
 import { CANT_REACH } from '../lib/errors';
 import type { Student, Students } from '../lib/grid-state';
@@ -16,13 +17,22 @@ import { DOT, type GridNow } from './live-grid';
  * HomeNoName; the evening and two classes live drawn first, HomeInterimStates), each class once with
  * Live and Open or Start… (Main, HomeIdle), a new teacher's first class card going to Classes' New
  * class (HomeNew to ClassesNew), the list's failure over the classes read before, and the block's
- * card beside them; Main's live card waits for PV17b (HomeInterim, drawn first).
+ * card beside them; Main's live card (PV17b), and the rail's Recent activity (PV17c).
  */
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: () => undefined, push: () => undefined }),
 }));
-const { TeacherHome, dayLine, greeting, nextTurn, NEW_CLASS, LiveCardView, presentHref } =
-  await import('./home');
+const {
+  TeacherHome,
+  dayLine,
+  greeting,
+  nextTurn,
+  NEW_CLASS,
+  LiveCardView,
+  presentHref,
+  RecentActivityView,
+  activityMoment,
+} = await import('./home');
 const source = readFileSync(fileURLToPath(new URL('./home.tsx', import.meta.url)), 'utf8');
 
 const UTC = { locale: 'en-US', timeZone: 'UTC' };
@@ -274,9 +284,164 @@ describe('Home’s page (PV17a)', () => {
     }
   });
 
-  it('draws no Recent activity or Last session yet: PV17c’s (HomeInterim)', () => {
+  it('sets Recent activity over the block’s card while a class is live, never Last session (Main)', () => {
     const html = plain(view());
-    expect(html).not.toMatch(/Recent activity|Last session/);
+    expect(html).toMatch(
+      /<div class="flex min-w-0 grow basis-80 flex-col gap-5"><section aria-labelledby="([^"]+)" class="[^"]*"><h2 id="\1" class="[^"]*"><svg[^]*?<\/svg>Recent activity<\/h2><p role="status" class="mt-3\.5 text-body text-text-secondary">Loading…<\/p><\/section><section [^>]*>.*Your block<\/h2>/,
+    );
+    expect(html).not.toContain('Last session');
+  });
+
+  it('draws no Last session yet: PV17c’s second part (HomeIdle’s rail, as HomeNoName draws it)', () => {
+    const third = taught('Biology, period 3', { count: 28, lastStart: '2026-10-12T13:05:00.000Z' });
+    for (const classes of [[third, TODAY, NONE], [NONE], []]) {
+      const html = plain(view({ me: me(classes) }));
+      expect(html).not.toMatch(/Recent activity|Last session/);
+      expect(html).toContain('Your block');
+    }
+    // Past the bell by this computer's clock: no live class, so no Recent activity either.
+    expect(plain(view({ now: Date.parse(BELL) }))).not.toContain('Recent activity');
+  });
+
+  it('reads Recent activity only on a page wide enough to show it, and again while in view (sources)', () => {
+    // Hidden under 640 px (PV1, PhoneHome), so a phone never reads what it hides.
+    expect(source).toContain("const WIDE = '(min-width: 40rem)';");
+    expect(source).toMatch(
+      /\{live\.length > 0 && wide \? \(\s*<RecentActivity only=\{live\.length === 1 \? \(live\[0\]\?\.c\.id \?\? null\) : null\} \/>\s*\) : null\}\s*<Blocks \/>/,
+    );
+    // Read again while in view, stopped as it goes (pollActivity, tested in lib/activity).
+    expect(source).toMatch(
+      /useEffect\(\(\) => \{\s*const poll = pollActivity\(api, setRead\);\s*return \(\) => poll\.stop\(\);\s*\}, \[api, attempt\]\);/,
+    );
+  });
+});
+
+/*
+ * The rail (PV17c): Recent activity while a class is live (Main); loading and failing as
+ * HomeMoreStates draws them, and its other states as HomeRailStates draws them (drawn first).
+ */
+describe('Recent activity (PV17c; Main, HomeMoreStates, HomeRailStates)', () => {
+  const CLASS = { id: 'c1', name: 'Biology, period 3' };
+  const event = (
+    eventId: string,
+    type: ActivityEvent['type'],
+    hhmm: string,
+    over: Partial<ActivityEvent> = {},
+  ): ActivityEvent => ({
+    eventId,
+    type,
+    occurredAt: `2026-10-12T${hhmm}:00.000Z`,
+    class: CLASS,
+    student: null,
+    reason: null,
+    ...over,
+  });
+  // Main's four, newest first.
+  const MAIN = [
+    event('e4', 'unlock', '13:31', {
+      student: { id: 'u1', displayName: 'Ethan Park' },
+      reason: 'nurse',
+    }),
+    event('e3', 'protection_off', '13:22', { student: { id: 'u2', displayName: 'Amara Okafor' } }),
+    event('e2', 'unlock', '13:18', {
+      student: { id: 'u3', displayName: 'Jaylen Brooks' },
+      reason: 'bathroom',
+    }),
+    event('e1', 'session_started', '13:05'),
+  ];
+  const UTC = new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'UTC',
+  });
+  const card = (read: ActivityRead, only: string | null = 'c1', onRetry = () => undefined) =>
+    plain(renderToStaticMarkup(createElement(RecentActivityView, { read, only, onRetry })));
+  /** Each moment as read: its icon, its words, the line under them, its time. */
+  const moments = (html: string) =>
+    [...html.matchAll(/<li class="relative[^"]*">([^]*?)<\/li>/g)].map(([, inner = '']) => ({
+      icon: /lucide-([\w-]+)/.exec(inner)?.[1],
+      words: /<p [^>]*>([^<]*)/.exec(inner)?.[1],
+      under: /<small [^>]*>([^<]*)<\/small>/.exec(inner)?.[1],
+      time: /<time dateTime="([^"]+)"[^>]*>([^<]*)<\/time>/.exec(inner)?.slice(1),
+    }));
+
+  it('says each moment as Main does: who did what, the reason and the class, the time without AM or PM', () => {
+    expect(
+      MAIN.map((e) => activityMoment(e, UTC)).map(({ words, under, time }) => [words, under, time]),
+    ).toEqual([
+      ['Ethan Park used Emergency Unlock', `Nurse${DOT}Biology, period 3`, '1:31'],
+      ['Amara Okafor turned protection off', 'Biology, period 3', '1:22'],
+      ['Jaylen Brooks used Emergency Unlock', `Bathroom${DOT}Biology, period 3`, '1:18'],
+      ['Session started', 'Biology, period 3', '1:05'],
+    ]);
+  });
+
+  it('says "No reason given" for an unlock with none, or with one this build doesn’t know (HomeRailStates)', () => {
+    const none = event('e5', 'unlock', '13:40', {
+      student: { id: 'u4', displayName: 'Diego Ramírez' },
+    });
+    expect(activityMoment(none, UTC).under).toBe(`No reason given${DOT}Biology, period 3`);
+    const newer = { ...none, reason: 'library' } as unknown as ActivityEvent;
+    expect(activityMoment(newer, UTC).under).toBe(`No reason given${DOT}Biology, period 3`);
+  });
+
+  it('names a student as their tile does: the start of their id for an account with no name', () => {
+    const deleted = event('e6', 'protection_off', '13:41', {
+      student: { id: '0199b0a1-ffff-7000-8000-000000000004', displayName: null },
+    });
+    expect(activityMoment(deleted, UTC).words).toBe('0199b0a1 turned protection off');
+  });
+
+  it('lists them on v2’s timeline, each dot its kind’s icon, then Open the class to the one live', () => {
+    const html = card({ kind: 'ready', events: MAIN });
+    expect(moments(html)).toEqual(
+      MAIN.map((e) => {
+        const { words, under, time } = activityMoment(e);
+        return {
+          icon: {
+            unlock: 'lock-open',
+            protection_off: 'shield-off',
+            session_started: 'circle-check',
+          }[e.type],
+          words,
+          under,
+          time: [e.occurredAt, time],
+        };
+      }),
+    );
+    // The card on its own, its label with the scroll's icon, 14 px between its parts.
+    expect(html).toMatch(
+      /^<section aria-labelledby="([^"]+)" class="rounded-md border border-border-default bg-surface-card p-5 shadow-1"><h2 id="\1" class="flex items-center gap-2 text-section-label text-text-tertiary uppercase"><svg(?=[^>]*\bwidth="14")[^>]*\blucide-scroll-text\b[^>]*>[^]*?<\/svg>Recent activity<\/h2><ol class="flex flex-col mt-3\.5">/,
+    );
+    // Open the class in a line of the body's height 14 px under the list, as the board sets it.
+    expect(html).toMatch(
+      /<\/ol><div class="mt-3\.5 text-body"><a class="rounded-xs text-caption font-semibold text-text-brand [^"]*" href="\/classes\/c1">Open the class<\/a><\/div><\/section>$/,
+    );
+  });
+
+  it('ends on the list with two classes live: each live card has its own Open the class (HomeRailStates)', () => {
+    const html = card({ kind: 'ready', events: MAIN }, null);
+    expect(html).not.toContain('Open the class');
+    expect(html).toMatch(/<\/ol><\/section>$/);
+  });
+
+  it('says Loading… until it is read, and a read that failed with its reason and a small Try again (HomeMoreStates)', () => {
+    expect(card({ kind: 'loading' })).toMatch(
+      /Recent activity<\/h2><p role="status" class="mt-3\.5 text-body text-text-secondary">Loading…<\/p><\/section>$/,
+    );
+    const retry = vi.fn();
+    const failed = card({ kind: 'error', message: CANT_REACH }, 'c1', retry);
+    expect(failed).toMatch(
+      new RegExp(
+        `Recent activity<\\/h2><div class="mt-3\\.5"><div role="alert" class="text-body"><p class="font-semibold">Couldn't load recent activity\\.<\\/p><p class="text-text-secondary">${CANT_REACH.replaceAll('.', '\\.')}<\\/p><\\/div><button type="button" class="[^"]*\\bh-8\\.5\\b[^"]*\\bmt-3\\.5\\b[^"]*">Try again<\\/button><\\/div><\\/section>$`,
+      ),
+    );
+    // Neither the list nor Open the class until a read works.
+    expect(failed).not.toMatch(/<ol|Open the class/);
+  });
+
+  it('draws nothing for a list that came back empty: never an empty state (PV1)', () => {
+    expect(card({ kind: 'ready', events: [] })).toBe('');
   });
 });
 
@@ -531,7 +696,8 @@ describe('the live card (PV17b; Main, HomeMoreStates, HomeLiveStates)', () => {
     expect(source).toMatch(
       /<LiveGrid\s*sessionId=\{session\.id\}\s*onEnded=\{onEnded\}\s*onSession=\{onSession\}\s*card=\{\(grid\) => \(/,
     );
-    // No read of its own: the grid's snapshot and stream are the only ones.
+    // No read of its own: the grid's snapshot and stream are the only ones. Recent activity's read
+    // (PV17c-1) is lib's (`pollActivity`), never written out here.
     expect(source).not.toMatch(/api\.get|createSseClient|\/v1\//);
   });
 });

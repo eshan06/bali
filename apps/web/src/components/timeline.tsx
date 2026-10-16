@@ -10,6 +10,7 @@ import {
   Wifi,
   WifiOff,
 } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 import { reasonWords } from '@/components/unlock-popups';
 import type { Moment, RecapFormat, RecapGroups, RecapStudent } from '@/lib/recap';
@@ -56,6 +57,57 @@ export function lefts(marks: readonly { x: number }[], size: number): string[] {
     const room = end - centre;
     return `min(${at}, ${room > 0 ? `max(0%, calc(100% - ${room}px))` : '100%'})`;
   });
+}
+
+/** One moment on a timeline: what happened, in its icon and its words, and when. */
+export interface TimelineMoment {
+  key: string;
+  Icon: LucideIcon;
+  words: ReactNode;
+  /** A line under the words, in the secondary ink: an unlock's reason, Recent activity's class. */
+  under?: ReactNode;
+  at: Date;
+  /** Its time as the list says it. */
+  time: string;
+}
+
+/**
+ * v2.css's `.tl`: a 26 px grey dot each, joined by a hairline; the icon and the words say what
+ * happened, with no colour behind them, and the time sits at the right. The student panel's moments
+ * (PV11b) and Home's Recent activity (PV17c).
+ */
+export function Timeline({
+  moments,
+  className = '',
+}: {
+  moments: readonly TimelineMoment[];
+  className?: string;
+}) {
+  return (
+    <ol className={['flex flex-col', className].filter(Boolean).join(' ')}>
+      {moments.map(({ key, Icon, words, under, at, time }) => (
+        <li
+          key={key}
+          className="relative grid grid-cols-[26px_minmax(0,1fr)_auto] items-start gap-2.5 pb-4.5 before:absolute before:top-6.5 before:bottom-0.5 before:left-[12.5px] before:w-px before:bg-border-default last:pb-0 last:before:hidden"
+        >
+          <span className="relative z-1 grid size-6.5 place-items-center rounded-full bg-surface-sunken text-text-secondary">
+            <Icon size={13} aria-hidden="true" />
+          </span>
+          <p className="pt-0.75 text-data font-normal wrap-anywhere">
+            {words}
+            {under ? (
+              <small className="block text-tile-line font-normal text-text-secondary">
+                {under}
+              </small>
+            ) : null}
+          </p>
+          <time dateTime={at.toISOString()} className="pt-1 text-tile-line text-text-tertiary">
+            {time}
+          </time>
+        </li>
+      ))}
+    </ol>
+  );
 }
 
 /**

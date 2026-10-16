@@ -83,11 +83,12 @@ export const ACCOUNT_EVERY_MS = 30_000;
  * follow-up; the owner, 2026-10-16), one read at a time: `read` settles once its answer has landed.
  * Hidden, it reads nothing, and back in view it counts 30 s afresh, the home having read at once as
  * its tab came back. The home stops it while a class is in session: the bell and the lesson's reads
- * take over.
+ * take over. A teacher's Home reads its Recent activity so too, `every` 15 s (PV17c).
  */
 export function rereadEvery(
   read: () => Promise<void>,
   doc: PageVisibility = document,
+  every = ACCOUNT_EVERY_MS,
 ): { stop(): void } {
   let timer: ReturnType<typeof setTimeout> | undefined;
   let reading = false;
@@ -103,7 +104,7 @@ export function rereadEvery(
         schedule();
       };
       void read().then(settled, settled);
-    }, ACCOUNT_EVERY_MS);
+    }, every);
   };
   const onVisibility = () => {
     if (doc.visibilityState !== 'hidden') return schedule();

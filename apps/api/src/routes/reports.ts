@@ -9,9 +9,12 @@ import {
   taughtSessionsSince,
 } from '@bali/db';
 import {
+  ACTIVITY_EVENT_TYPES,
   ACTIVITY_LIMIT,
   type ActivityEventType,
   type ActivityResponse,
+  type EventType,
+  REPORT_LISTING_TYPES,
   type ReportEvent,
   type ReportStudent,
   type ReportWindow,
@@ -28,6 +31,14 @@ import { requireOwnClass, requireTeacher } from '../auth/teacher.js';
 import { ApiError, parseRequest } from '../errors.js';
 import { refusal } from './errors.js';
 import { teacherQuestion } from './questions.js';
+
+/**
+ * What Recent activity reads of today's sessions: its three kinds, and every kind the report's
+ * listing reads (`REPORT_LISTING_TYPES`: its unlocks, protection offs and each reason now, A20).
+ * All it needs, whatever else happened (PV3's review: narrowed once Home reads it again every 15 s,
+ * PV17c-1); the tests hold its answer to each session's report, read whole.
+ */
+const ACTIVITY_READ = [...new Set<EventType>([...ACTIVITY_EVENT_TYPES, ...REPORT_LISTING_TYPES])];
 
 const Params = z.object({ id: z.string().uuid(), sessionId: z.string().uuid() });
 const ClassParams = z.object({ id: z.string().uuid() });
@@ -220,10 +231,11 @@ export function registerReportsRoutes(app: FastifyInstance, db: Database, clock:
       const todays = await taughtSessionsSince(db, teacher.id, today);
       if (todays.length === 0) return { events: [] };
 
-      // Every event of those sessions in one statement, as R3 reads a page's.
+      // Those sessions' events of the kinds it lists in one statement, as R3 reads a page's.
       const events = await sessionEvents(
         db,
         todays.map(({ session }) => session.id),
+        ACTIVITY_READ,
       );
       const moments = todays.flatMap(({ session, className }) => {
         const own = events.filter((e) => e.sessionId === session.id);

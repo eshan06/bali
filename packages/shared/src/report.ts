@@ -91,6 +91,18 @@ export interface SessionReport {
 }
 
 /**
+ * The kinds `sessionReport`'s listing reads: its unlocks and protection offs, and each unlock's
+ * reason now. Every other kind only moves focus and silence. Recent activity (`GET /v1/me/activity`)
+ * reads only these, with its starts, of today's sessions, since Home reads it every 15 s (PV17c-1):
+ * a listing rule that comes to read another kind adds it here, or Home and the report disagree.
+ */
+export const REPORT_LISTING_TYPES = [
+  'unlock',
+  'protection_off',
+  'unlock_reason_changed',
+] as const satisfies readonly EventType[];
+
+/**
  * Unlocks kept with no class (ISSUES #2: never discarded): in none until filed.
  * Filing records a new unlock in the session, naming the kept one
  * (`unattached_event_id`), and that one counts — the kept one never does. Nor

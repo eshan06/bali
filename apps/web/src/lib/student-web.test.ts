@@ -277,6 +277,21 @@ describe('rereadEvery: the home’s account, read again every 30 s while in view
     reread.stop();
   });
 
+  it('waits as long as it is told instead, after the page shows and after each answer (PV17c)', async () => {
+    const { read, answer } = reads();
+    const reread = rereadEvery(read, page().doc, 15_000);
+    await after(14_999);
+    expect(read).not.toHaveBeenCalled();
+    await after(1);
+    expect(read).toHaveBeenCalledOnce();
+    answer(0);
+    await after(14_999);
+    expect(read).toHaveBeenCalledOnce();
+    await after(1);
+    expect(read).toHaveBeenCalledTimes(2);
+    reread.stop();
+  });
+
   it('never reads twice at once: a read on its way holds the next until 30 s after its answer', async () => {
     const { read, answer } = reads();
     const reread = rereadEvery(read, page().doc);

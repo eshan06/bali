@@ -24,8 +24,8 @@ Try again.", "Bali couldn't lock your apps. Try again."). In
 badges); `api-client.ts` (`UnauthorizedError`'s words; a `NetworkError` is
 said as `errors.ts`'s `CANT_REACH`, its own message a log line, D2c-2);
 `recap.ts` (the session's "9:05 AM to 9:30 AM"; PB5's timeline took its reasons
-and "No reason given" with it in PV14). `blocks.ts`, `classes.ts`, `reports.ts`, `invite.ts` and `decks.ts` hold
-none: their words are in `blocks.tsx`, Home (`home.tsx`, PV17a and its live card, PV17b), Classes'
+and "No reason given" with it in PV14). `blocks.ts`, `classes.ts`, `reports.ts`, `invite.ts`, `decks.ts` and `activity.ts` hold
+none: their words are in `blocks.tsx`, Home (`home.tsx`, PV17a, its live card, PV17b, and Recent activity, PV17c-1), Classes'
 cards (`classes.tsx`, PV16a) and New class's dialog (`new-class.tsx`, PV16b), the reports page, `invite-code.tsx`, `slides.tsx` and `errors.ts`. In
 `ios/Bali/` outside `UI/`: the NFC sheet's words in `BlockReader.swift`
 ("Hold the top of your iPhone to your teacher's Bali block.", "This isn't a
@@ -296,11 +296,17 @@ countdown, the six counts, Open the class, Present (the class page in Present, n
 the latest unlock on the grid, its student and when, none while no chip carries one; the live feed
 lost said in the class page's own line under the counts; its loading and its failure as HomeMoreStates
 draws them, and on a phone as PhoneHome; a session the server ends while Home is open loses its card
-at once (HomeLiveStates, drawn on the canvas first). Until PV17c the rail holds no Recent activity
-or Last session; these and Home's other intermediate states as HomeInterim (redrawn with the live
-card), HomeInterimStates and HomeNewPhone draw them (drawn on the canvas first). The
-account not read is said as HomeStates draws it, its failure headed as the page (an `h1`), Try again
-held as Loading… until Bali answers so focus stays on it, a failure said again.
+at once (HomeLiveStates, drawn on the canvas first). Since PV17c-1 (2026-10-16), while a class is
+live, the rail holds Main's Recent activity over the block's card: today's unlocks with their
+reasons ("No reason given" for none), protection offs and starts across the classes, newest first,
+four at most, each on v2.css's timeline (`Timeline`, the student panel's too) with its time without
+AM or PM, then Open the class while one class is live alone; read again every 15 s while Home is in
+view; its loading and its failure as HomeMoreStates draws them, its other states as HomeRailStates
+draws them (drawn on the canvas first); never on a phone, as PhoneHome draws it. Until PV17c-2 the
+rail holds no Last session (HomeNoName's rail); Home's other intermediate states as
+HomeInterimStates and HomeNewPhone draw them (drawn on the canvas first), HomeInterim no longer
+built. The account not read is said as HomeStates draws it, its failure headed as the page (an
+`h1`), Try again held as Loading… until Bali answers so focus stays on it, a failure said again.
 Every
 portal source file is held to the tokens' utilities by `tokens.test.ts`, and
 since D2g the theme holds none of Tailwind's own colours, type sizes,
@@ -717,7 +723,8 @@ where they differ (Present's included: §5); the input size stands.
   v2's look draws them (its tiles, rows or table; Home's rows the last, PV17a); grey
   (`surface-sunken`) also fills the menu's current item, the
   length picker's track, a table's head, the recap's name pills, a code's chip,
-  the bars' tracks, the student panel's moment dots, Reports' place-lost
+  the bars' tracks, the timeline's dots (the student panel's moments, Home's
+  Recent activity since PV17c-1), Reports' place-lost
   notice (drawn as the stale banner is), Help's two lists of what a teacher
   sees (SupportPage's `.notice`, PV15), and Your slides' file tiles and an
   upload's progress track (M5b), and no longer a field.
