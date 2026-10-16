@@ -24,6 +24,7 @@ export default function ClassesPage() {
   const asked = useSearchParams().has('new');
   const { home, error, load } = useMe();
   const newClass = useRef<NewClassHandle>(null);
+  const newButton = useRef<HTMLButtonElement>(null);
   const [now, setNow] = useState(() => Date.now());
   const classes = home?.kind === 'teacher' ? home.me.classes : null;
   const shown = classes !== null;
@@ -44,9 +45,11 @@ export default function ClassesPage() {
     if (home !== null && home.kind !== 'teacher') router.replace('/');
   }, [home, router]);
 
-  // Once: the address forgets it, so a reload or a way back here opens the page alone.
+  // Once: the address forgets it, so a reload or a way back here opens the page alone. Opened as if
+  // from New class, so Cancel and Escape give focus back to it.
   useEffect(() => {
     if (!asked || !shown) return;
+    newButton.current?.focus();
     newClass.current?.open();
     window.history.replaceState(null, '', '/classes');
   }, [asked, shown]);
@@ -75,6 +78,7 @@ export default function ClassesPage() {
       now={now}
       onRead={() => load()}
       onNew={() => newClass.current?.open()}
+      newButton={newButton}
     >
       <NewClass ref={newClass} onAnswer={() => load()} />
     </ClassesView>

@@ -131,7 +131,7 @@ export function TeacherHome({
   return (
     <main className="flex flex-col gap-5.5">
       <div>
-        <h1 ref={ref} tabIndex={-1} className="text-greeting wrap-anywhere">
+        <h1 ref={ref} tabIndex={-1} className="text-greeting text-balance wrap-anywhere">
           {greeting(now, name)}
         </h1>
         <p className="mt-0.75 text-meta text-text-secondary">{dayLine(me.classes, now)}</p>

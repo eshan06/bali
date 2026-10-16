@@ -55,7 +55,7 @@ describe('the home sends each account where it belongs (PV15; decision 13)', () 
   it('a teacher: v2’s Home, the greeting heading it, no invite card (PV17a)', () => {
     const html = drawnFor({ kind: 'teacher', me: account('teacher') });
     expect(html).toMatch(
-      /^<main class="flex flex-col gap-5\.5"><div><h1 tabindex="-1" class="text-greeting wrap-anywhere">Good (morning|afternoon|evening), Ana Rodríguez<\/h1>/,
+      /^<main class="flex flex-col gap-5\.5"><div><h1 tabindex="-1" class="text-greeting text-balance wrap-anywhere">Good (morning|afternoon|evening), Ana Rodríguez<\/h1>/,
     );
     // One page heading and one main: the shell's own main is gone once the account is read.
     expect(html.match(/<h1\b/g)).toHaveLength(1);
@@ -69,6 +69,8 @@ describe('the home sends each account where it belongs (PV15; decision 13)', () 
       /^<main class="[^"]*\bmin-h-\[calc\(100dvh-60px\)\][^"]*"><div class="[^"]*"><section aria-labelledby="[^"]*" class="[^"]*">.*<h1 [^>]*>Enter your invite code<\/h1>.*<\/section><p class="[^"]*">([^<]*)<\/p><\/div><\/main>$/,
     );
     expect(html).toContain(`>${STUDENTS_LINE}</p>`);
+    // Neither a teacher's Home nor a student's.
+    expect(html).not.toContain('Your classes');
     expect(html).not.toContain('Good ');
   });
 
@@ -137,6 +139,12 @@ describe('a teacher’s Home, as the page runs it (PV17a)', () => {
     expect(page).toMatch(/const bell = classes === null \? null : nextBell\(classes, now\);/);
     expect(page).toMatch(
       /if \(!teacher\) return;\s*const next = Math\.min\(bell \?\? Infinity, nextTurn\(now\)\);\s*const timer = window\.setTimeout\(\(\) => setNow\(Math\.max\(Date\.now\(\), next\)\), next - Date\.now\(\)\);\s*return \(\) => window\.clearTimeout\(timer\);\s*\}, \[teacher, bell, now\]\);/,
+    );
+  });
+
+  it('reads the clock afresh as the tab comes back into view, a timer having slept with the computer', () => {
+    expect(page).toMatch(
+      /const back = \(\) => \{\s*if \(document\.visibilityState === 'visible'\) setNow\(Date\.now\(\)\);\s*\};\s*document\.addEventListener\('visibilitychange', back\);\s*return \(\) => document\.removeEventListener\('visibilitychange', back\);\s*\}, \[\]\);/,
     );
   });
 

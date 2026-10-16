@@ -2,7 +2,7 @@
 
 import { ChevronRight, CircleCheck, Plus } from 'lucide-react';
 import Link from 'next/link';
-import { type ReactNode, useId } from 'react';
+import { type ReactNode, type Ref, useId } from 'react';
 
 import { daysBefore, liveNow, type TaughtClass } from '@/lib/classes';
 import type { RecapFormat } from '@/lib/recap';
@@ -125,6 +125,7 @@ export function ClassesView({
   now,
   onRead,
   onNew,
+  newButton,
   children,
 }: {
   classes: TaughtClass[];
@@ -133,13 +134,15 @@ export function ClassesView({
   now: number;
   onRead: () => void;
   onNew: () => void;
+  /** The head's New class, which focus comes back to after a dialog Home asked for (`?new`). */
+  newButton?: Ref<HTMLButtonElement>;
   children?: ReactNode;
 }) {
   return (
     <main className="flex flex-col gap-5.5">
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
         <h1 className="text-page-title">Classes</h1>
-        <Button variant="secondary" aria-haspopup="dialog" onClick={onNew}>
+        <Button ref={newButton} variant="secondary" aria-haspopup="dialog" onClick={onNew}>
           <Plus size={16} aria-hidden="true" />
           New class
         </Button>

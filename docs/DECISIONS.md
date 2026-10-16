@@ -22,15 +22,17 @@ a real decision? Add a dated entry at the top: what was decided and why.
   says "no class in session" (HomeIdle), the date alone with no class yet (HomeNew), and with more
   than one live how many ("2 classes in session", drawn first); *weighed:* every live class's name
   and bell on the line, long, and PV17b's live cards carry each. The page redraws at a live class's
-  bell or the greeting's turn (noon, 5 PM, midnight), whichever comes first, and reads the account
-  again 3 s after a bell, as Classes does. **A row** is v2's `.schedrow`: its line Classes' own
+  bell or the greeting's turn (noon, 5 PM, midnight), whichever comes first, reads the clock afresh
+  as its tab comes back into view, since a timer can sleep with the computer (santa's review), and
+  reads the account again 3 s after a bell, as Classes does. **A row** is v2's `.schedrow`: its line Classes' own
   (`classLine`), while its session runs the live edge, Classes' Live chip (now `LiveChip`, shared)
   and Open, else Start…, a small secondary button, both links to the class page, each described by
   the class's name (decks' Show's way), so a screen reader's list of links tells the Start…s apart.
   **Create a class** goes to Classes with New class open (`/classes?new`), as HomeNew links to
   ClassesNew and ClassesNew's Cancel and ClassesCreated's Done stay on Classes; Classes opens it as
-  the page shows and the address forgets it (`window.history.replaceState`), so a reload or a way
-  back opens the page alone. *Weighed:* New class's dialog over Home itself, which no board draws
+  the page shows, as if from its own New class, so Cancel and Escape give focus back there (santa's
+  review: it fell to the page's top), and the address forgets it (`window.history.replaceState`), so
+  a reload or a way back opens the page alone. *Weighed:* New class's dialog over Home itself, which no board draws
   (ClassesNew draws Classes behind it), and New class lives on Classes since #421. Home's create row
   is gone, and with it `CARD`, the old list card it was the last to use. **The account not read**
   (`AccountUnread`, HomeStates' "The account didn't load"; PV5b's review, the owner, 2026-10-14):
@@ -47,9 +49,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   has it:* the list's Try again reads with `load`, which clears the line first, so its focus drops
   to the page, on Home as on Classes. **The canvas:** ClassesStates moved clear of ClassStudent to
   the Classes row's free end (x 11160), its content unchanged. **Seen:** on dev as the demo teacher,
-  Home only, nothing made (the demo teacher has classes, so HomeNew and Create a class are shown
-  through the real components); sharp beside every board. About 300 lines added and 170 removed
-  without tests, some 140 of those removed Home's old list and create row, so one PR.
+  in the owner's tab on Home only, and in a browser of its own signed in by the demo world: Home at
+  1440 and 390 px with one `<main>`; `/classes?new` opening New class, focus in its name, the address
+  `/classes`; Escape giving focus to New class; a reload opening the page alone; nothing made (the
+  demo teacher has classes, so HomeNew is shown through the real components); sharp beside every
+  board. About 300 lines added and 170 removed without tests, some 140 of those removed Home's old
+  list and create row, so one PR.
 
 - **2026-10-16** — **PV16b: New class's dialog and "<name> is ready" (#421); PV16 is done.** Built
   to [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4): ClassesNew,

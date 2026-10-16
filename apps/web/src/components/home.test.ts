@@ -146,7 +146,7 @@ describe('Home’s page (PV17a)', () => {
   it('greets the teacher at the greeting’s size, focusable for a redeem, the date under it', () => {
     const html = plain(view());
     expect(html).toMatch(
-      /^<main class="flex flex-col gap-5\.5"><div><h1 tabindex="-1" class="text-greeting wrap-anywhere">Good (morning|afternoon|evening), Ms\. Rivera<\/h1><p class="mt-0\.75 text-meta text-text-secondary">[^<]+<\/p><\/div>/,
+      /^<main class="flex flex-col gap-5\.5"><div><h1 tabindex="-1" class="text-greeting text-balance wrap-anywhere">Good (morning|afternoon|evening), Ms\. Rivera<\/h1><p class="mt-0\.75 text-meta text-text-secondary">[^<]+<\/p><\/div>/,
     );
     expect(plain(view({ me: me(CLASSES, null) }))).toMatch(
       /<h1 [^>]*>Good (morning|afternoon|evening)<\/h1>/,

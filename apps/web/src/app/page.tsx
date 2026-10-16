@@ -68,6 +68,15 @@ export default function HomePage() {
     return () => window.clearTimeout(timer);
   }, [teacher, bell, now]);
 
+  // Back in view, the clock read afresh: a timer can sleep with the computer (a tab left overnight).
+  useEffect(() => {
+    const back = () => {
+      if (document.visibilityState === 'visible') setNow(Date.now());
+    };
+    document.addEventListener('visibilitychange', back);
+    return () => document.removeEventListener('visibilitychange', back);
+  }, []);
+
   // Once per bell: an answer still counting it running (a clock well ahead) waits for a later read.
   useEffect(() => {
     if (readAt === null) return;

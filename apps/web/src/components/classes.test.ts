@@ -318,9 +318,14 @@ describe('the Classes page', () => {
     nav.query = '';
     expect(source).toMatch(/const asked = useSearchParams\(\)\.has\('new'\);/);
     expect(source).toMatch(/const shown = classes !== null;/);
-    // The address forgets it as it opens, so a reload or a way back opens the page alone.
+    // Opened as if from the head's New class, so Cancel and Escape give focus back to it; and the
+    // address forgets it as it opens, so a reload or a way back opens the page alone.
     expect(source).toMatch(
-      /useEffect\(\(\) => \{\s*if \(!asked \|\| !shown\) return;\s*newClass\.current\?\.open\(\);\s*window\.history\.replaceState\(null, '', '\/classes'\);\s*\}, \[asked, shown\]\);/,
+      /useEffect\(\(\) => \{\s*if \(!asked \|\| !shown\) return;\s*newButton\.current\?\.focus\(\);\s*newClass\.current\?\.open\(\);\s*window\.history\.replaceState\(null, '', '\/classes'\);\s*\}, \[asked, shown\]\);/,
+    );
+    expect(source).toMatch(/newButton=\{newButton\}/);
+    expect(read('./classes.tsx')).toMatch(
+      /<Button ref=\{newButton\} variant="secondary" aria-haspopup="dialog" onClick=\{onNew\}>/,
     );
   });
 
