@@ -203,12 +203,13 @@ export type MenuRole = 'teacher' | 'student';
 
 /**
  * The menu's pages, each listed only once it exists, never as a dead or disabled link: a teacher's
- * Classes comes with PV16 (between Home and Reports); a student's is Your classes alone
- * (StudentHome), its lessons under it (StudentLesson). Help sits under the gap, in both.
+ * Classes (PV16) is marked on a class's page too; a student's is Your classes alone (StudentHome),
+ * its lessons under it (StudentLesson). Help sits under the gap, in both.
  */
 const PAGES: Record<MenuRole, Item[]> = {
   teacher: [
     { href: '/', label: 'Home', Icon: House },
+    { href: '/classes', label: 'Classes', Icon: LayoutGrid },
     { href: '/reports', label: 'Reports', Icon: ChartBar },
     { href: '/questions', label: 'Questions', Icon: MessageCircleQuestionMark },
     { href: '/slides', label: 'Slides', Icon: Presentation },
@@ -246,7 +247,10 @@ export const PAGE =
 /**
  * The side menu, drawn from what it is given: a teacher's, or a student's (StudentHome). Its foot
  * names the account, its initials beside the name and Sign out an icon; with no name on the
- * account, Sign out in words alone (HomeNoName).
+ * account, Sign out in words alone (HomeNoName). A name too long for the foot, such as the sign-in's
+ * email that an account with no name of its own shows, stays on one line cut with an ellipsis, whole
+ * on hover and to a screen reader; on a phone the foot keeps its place beside Bali, the name cut to
+ * fit (MenuNameStates, drawn first).
  */
 export function SideMenu({
   role,
@@ -287,20 +291,24 @@ export function SideMenu({
       <div className={GAP} />
       {link(HELP)}
       {name ? (
-        <div className={`flex items-center gap-2.25 pr-1.5 pl-2.5 max-[776px]:p-0 ${FOOT}`}>
+        <div
+          className={`flex items-center gap-2.25 pr-1.5 pl-2.5 max-[776px]:p-0 max-sm:min-w-0 max-sm:flex-1 max-sm:basis-0 max-sm:justify-end ${FOOT}`}
+        >
           <span
             aria-hidden="true"
             className="grid size-7 shrink-0 place-items-center rounded-full bg-avatar-bg text-menu-initials text-avatar-fg"
           >
             {initials(name)}
           </span>
-          <span className="min-w-0 text-menu-name wrap-anywhere">{name}</span>
+          <span title={name} className="min-w-0 truncate text-menu-name">
+            {name}
+          </span>
           <button
             type="button"
             aria-label="Sign out"
             aria-disabled={leaving}
             onClick={onSignOut}
-            className="ml-auto grid size-9 shrink-0 cursor-pointer place-items-center rounded-item text-text-tertiary hover:bg-surface-sunken hover:text-text-primary aria-disabled:cursor-default aria-disabled:opacity-55"
+            className="ml-auto grid size-9 shrink-0 cursor-pointer place-items-center rounded-item text-text-tertiary hover:bg-surface-sunken hover:text-text-primary aria-disabled:cursor-default aria-disabled:opacity-55 max-sm:ml-0"
           >
             <LogOut size={16} aria-hidden="true" />
           </button>

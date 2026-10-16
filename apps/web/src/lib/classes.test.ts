@@ -5,7 +5,14 @@ import type { ClassDetail } from '@bali/shared';
 import { describe, expect, it } from 'vitest';
 
 import { createApiClient } from './api-client';
-import { CLASS_NAME_MAX, createClass } from './classes';
+import {
+  CLASS_NAME_MAX,
+  createClass,
+  daysBefore,
+  liveNow,
+  nextBell,
+  type TaughtClass,
+} from './classes';
 import * as errors from './errors';
 import {
   ACCOUNT_DELETED,
@@ -135,5 +142,58 @@ describe('createClass', () => {
       "Bali couldn't finish creating the class. If it isn't in your list above, try again.",
     );
     expect(CANT_CREATE).not.toMatch(/[—–!]/);
+  });
+});
+
+const AT = Date.parse('2026-10-12T14:30:00.000Z');
+/** A teacher's class with its summary (PV2): running until `endsAt`, if given. */
+function taught(id: string, endsAt?: string): TaughtClass {
+  return {
+    id,
+    name: id,
+    teacher: { displayName: 'Ms. Rivera' },
+    enrollmentId: null,
+    liveSession: null,
+    summary: {
+      studentCount: 28,
+      runningSession: endsAt ? { id: `s-${id}`, endsAt } : null,
+      lastSession: null,
+    },
+  };
+}
+
+describe('a class live on Classes, by this computer’s clock (PV16a)', () => {
+  it('is its running session until its bell, and none from it', () => {
+    const bell = new Date(AT + 60_000).toISOString();
+    expect(liveNow(taught('a', bell), AT)).toEqual({ id: 's-a', endsAt: bell });
+    expect(liveNow(taught('a', bell), AT + 59_999)).not.toBeNull();
+    expect(liveNow(taught('a', bell), AT + 60_000)).toBeNull();
+    expect(liveNow(taught('a'), AT)).toBeNull();
+    // A class with no summary, as a student's is: never live here.
+    expect(liveNow({ ...taught('a', bell), summary: undefined }, AT)).toBeNull();
+  });
+
+  it('reads the list again at the first bell still to ring, and none once every bell has', () => {
+    const soon = new Date(AT + 60_000).toISOString();
+    const later = new Date(AT + 600_000).toISOString();
+    const gone = new Date(AT - 1).toISOString();
+    const classes = [taught('a', later), taught('b'), taught('c', soon), taught('d', gone)];
+    expect(nextBell(classes, AT)).toBe(AT + 60_000);
+    expect(nextBell(classes, AT + 60_000)).toBe(AT + 600_000);
+    expect(nextBell(classes, AT + 600_000)).toBeNull();
+    expect(nextBell([], AT)).toBeNull();
+  });
+});
+
+describe('daysBefore, the calendar days between two moments, in a zone', () => {
+  it('counts calendar days, never 24-hour spans', () => {
+    const now = new Date('2026-10-12T14:30:00.000Z');
+    expect(daysBefore(new Date('2026-10-12T00:00:00.000Z'), now, 'UTC')).toBe(0);
+    expect(daysBefore(new Date('2026-10-11T23:59:00.000Z'), now, 'UTC')).toBe(1);
+    expect(daysBefore(new Date('2026-10-05T14:30:00.000Z'), now, 'UTC')).toBe(7);
+    expect(daysBefore(new Date('2025-12-18T09:00:00.000Z'), now, 'UTC')).toBe(298);
+    // The same two moments in Chicago, where 01:00 UTC on the 12th is still the 11th.
+    expect(daysBefore(new Date('2026-10-12T01:00:00.000Z'), now, 'America/Chicago')).toBe(1);
+    expect(daysBefore(new Date('2026-10-12T01:00:00.000Z'), now, 'UTC')).toBe(0);
   });
 });

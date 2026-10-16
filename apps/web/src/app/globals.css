@@ -307,6 +307,11 @@
   --text-present-line: 20px;
   --text-present-line--line-height: 28px;
   --text-present-line--font-weight: 400;
+
+  /* Classes' (PV16), as v2.css draws it and §1's facts don't list: a class's name on its card. */
+  --text-card-name: 17px;
+  --text-card-name--line-height: 22px;
+  --text-card-name--font-weight: 600;
 }
 
 @theme inline {
@@ -365,8 +370,8 @@
   --color-unlock-edge: var(--bali-orange-400);
   /* And its Open student (PV11b), the primitive v2.css's `.t-act` draws with. */
   --color-unlock-link: var(--bali-orange-700);
-  /* A live card's edge (W3, the student's home; Home's with PV17b), the primitive v2.css's
-     `.livecard` draws it with. */
+  /* A live card's edge (W3, the student's home; Home's with PV17b; a live class's card on Classes,
+     PV16), the primitive v2.css's `.livecard` draws it with. */
   --color-live-edge: var(--bali-green-200);
   /* The recap's marks (PV12b), the primitives v2.css's `.mk` rings them with: stone, and a
      protection off's red; an unlock's is the pop-up's edge (`unlock-edge`). */
