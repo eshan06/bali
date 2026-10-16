@@ -25,7 +25,7 @@ badges); `api-client.ts` (`UnauthorizedError`'s words; a `NetworkError` is
 said as `errors.ts`'s `CANT_REACH`, its own message a log line, D2c-2);
 `recap.ts` (the session's "9:05 AM to 9:30 AM"; PB5's timeline took its reasons
 and "No reason given" with it in PV14). `blocks.ts`, `classes.ts`, `reports.ts`, `invite.ts` and `decks.ts` hold
-none: their words are in `blocks.tsx`, the classes home (`app/page.tsx`), Classes'
+none: their words are in `blocks.tsx`, Home (`home.tsx`, PV17a), Classes'
 cards (`classes.tsx`, PV16a) and New class's dialog (`new-class.tsx`, PV16b), the reports page, `invite-code.tsx`, `slides.tsx` and `errors.ts`. In
 `ios/Bali/` outside `UI/`: the NFC sheet's words in `BlockReader.swift`
 ("Hold the top of your iPhone to your teacher's Bali block.", "This isn't a
@@ -281,9 +281,19 @@ Since PV16b (2026-10-16) its head's New class and the first class's card's Creat
 ClassesNew's dialog, the class page's New code's own, its states as ClassesStates draws them; a class
 made turns it into ClassesCreated's "<name> is ready", its join code with Copy code (CopyStates) and
 Done, which puts focus on the class's card; on a phone as ClassesNewPhone and ClassesCreatedPhone
-draw it (drawn on the canvas first). Home keeps its create row until PV17a. The menu's foot keeps a
-name too long for it on one line, cut with an ellipsis, whole on hover and to a screen reader
-(MenuNameStates, drawn first).
+draw it (drawn on the canvas first); opened from Home (`/classes?new`), New class opens as the page
+shows. The menu's foot keeps a name too long for it on one line, cut with an ellipsis, whole on hover
+and to a screen reader (MenuNameStates, drawn first).
+Home is v2's since PV17a (2026-10-16): Main's, HomeIdle's and HomeNew's greeting, Good morning,
+afternoon or evening by this computer's clock, over the date and what is in session (none, the one
+live and its bell, or how many); each class once, a `.schedrow` with its line as Classes says it,
+Live and Open or Start…, both to its page; for a new teacher HomeNew's card, its Create a class to
+Classes' New class; the list's failure over the classes read before; the block's card beside them;
+and the create row gone. Until PV17b the live class has no live card, and until PV17c the rail holds
+no Recent activity or Last session; these and Home's other intermediate states as HomeInterim,
+HomeInterimStates, HomeInterimPhone and HomeNewPhone draw them (drawn on the canvas first). The
+account not read is said as HomeStates draws it, its failure headed as the page (an `h1`), Try again
+held as Loading… until Bali answers so focus stays on it, a failure said again.
 Every
 portal source file is held to the tokens' utilities by `tokens.test.ts`, and
 since D2g the theme holds none of Tailwind's own colours, type sizes,
@@ -696,8 +706,8 @@ where they differ (Present's included: §5); the input size stands.
   otherwise group with spacing or a hairline. *v2's look (§1):* a card is
   `radius-md` with 20 px padding, Home's live card and the student's lesson
   card 16 px, an entry page's (sign-in, its callback, the invite code) 24 px
-  in (`v2.css`'s stage card), a list's cards keeping `space-4` until the step
-  that draws the list in v2's look (its tiles, rows or table); grey
+  in (`v2.css`'s stage card), a list's cards as the step that drew the list in
+  v2's look draws them (its tiles, rows or table; Home's rows the last, PV17a); grey
   (`surface-sunken`) also fills the menu's current item, the
   length picker's track, a table's head, the recap's name pills, a code's chip,
   the bars' tracks, the student panel's moment dots, Reports' place-lost
@@ -727,9 +737,9 @@ where they differ (Present's included: §5); the input size stands.
   refusal draws the edge in `text-primary`, never red. What is typed is the
   input size (§3), 16 px, so
   iPhone Safari never zooms in; a label is always a real label, never a
-  placeholder standing in for one. A button that acts on one field (the
-  classes home's Create class) may sit on the input's row, wrapping under it
-  on a narrow form (the Field's `trailing`). A refusal of what was typed sits
+  placeholder standing in for one. A button that acts on one field may sit on
+  the input's row, wrapping under it on a narrow form (the Field's `trailing`;
+  the classes home's Create class until PV17a). A refusal of what was typed sits
   right under the input, before the help (the Field's `refusal`), and any
   other answer right above the button that retries it: the invite code (PB2),
   so an error never reads as help. The app keeps D1's fields (2026-10-06's
@@ -738,8 +748,8 @@ where they differ (Present's included: §5); the input size stands.
   in the name's type (the approved Sign in & sign up design), Me's name a sunken
   well with the same green edge. *v2's look (§1):* a field is white
   (`surface-card`) with the `border-input` edge, 10 px corners, 40 px tall;
-  the classes home's inline create row goes with Classes' New class dialog
-  (PLAN's PV16b; Home keeps it until PV17a).
+  the classes home's inline create row went with PV17a, New class being
+  Classes' dialog (PV16b).
 - **Links:** `text-brand`, medium, underlined, so a link never rests on colour
   alone: the portal's `TextLink` (`components/text-link.tsx`). A link across
   the portal (All classes, Reports, back to the class) is `text-brand`

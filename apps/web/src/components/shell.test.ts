@@ -7,6 +7,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
+import HomePage from '../app/page';
 import { createApiClient, NetworkError } from '../lib/api-client';
 import { CANT_REACH } from '../lib/errors';
 import type { Home } from '../lib/student-web';
@@ -267,8 +268,10 @@ describe('the shell’s wiring of the rulings (read from its source)', () => {
   });
 
   it('says the account unread in the page’s place, Try again reading it again (#352’s review)', () => {
+    // Read as the student home's 30 s read is (`refresh`): its failure kept until the answer, so
+    // the card and its Try again stay while it reads (PV17a).
     expect(shell).toMatch(
-      /\{frame\.hidden \? <AccountUnread error=\{error\} onRetry=\{\(\) => load\(\)\} \/> : null\}\s*<div hidden=\{frame\.hidden\}/,
+      /\{frame\.hidden \? <AccountUnread error=\{error\} onRetry=\{refresh\} \/> : null\}\s*<div hidden=\{frame\.hidden\}/,
     );
   });
 
@@ -501,17 +504,44 @@ describe('the shell', () => {
     }
   });
 
-  it('says the account unread as Home said it (HomeStates): Loading…, or its failure with Try again', () => {
-    const unread = (error: string | null) =>
-      renderToStaticMarkup(createElement(AccountUnread, { error, onRetry: () => undefined }));
+  const unread = (error: string | null) =>
+    renderToStaticMarkup(createElement(AccountUnread, { error, onRetry: () => Promise.resolve() }));
+
+  it('says the account unread as Home says it (HomeStates): Loading…, or its failure with Try again', () => {
     expect(unread(null)).toMatch(
       /^<main class="[^"]*"><p role="status" class="[^"]*\btext-text-secondary\b[^"]*">Loading…<\/p><\/main>$/,
     );
+    // HomeStates' card: its title semibold over its words, Try again 14 px under them.
     expect(unread(CANT_REACH)).toMatch(
-      /<p role="alert"><span class="block text-h3">Couldn(’|'|&#x27;)t load your account\.<\/span><span class="[^"]*">Couldn(’|'|&#x27;)t reach Bali\. Check your connection, then try again\.<\/span><\/p><button type="button"[^>]*>Try again<\/button>/,
+      /<div role="alert"><h1 class="text-body font-semibold">Couldn(’|'|&#x27;)t load your account\.<\/h1><p class="text-body text-text-secondary">Couldn(’|'|&#x27;)t reach Bali\. Check your connection, then try again\.<\/p><\/div><button type="button" aria-disabled="false" aria-busy="false" class="[^"]*\bmt-3\.5\b[^"]*">Try again<\/button>/,
     );
     // In the page's frame, beside no menu: v2's gutters, as the page would have them.
     expect(classesOf(unread(null), /<main\b[^>]*>/)).toEqual(PAGE.split(' '));
+  });
+
+  it('heads its failure as the page, and is the one <main> while Home waits (PV5b’s review; PV17a)', () => {
+    // A real heading: the page's only one while it waits, Home drawing nothing of its own.
+    expect(unread(CANT_REACH).match(/<h1\b/g)).toHaveLength(1);
+    for (const error of [null, CANT_REACH]) expect(unread(error).match(/<main\b/g)).toHaveLength(1);
+    nav.path = '/';
+    const waiting = renderToStaticMarkup(createElement(Shell, null, createElement(HomePage)));
+    expect(waiting).toMatch(
+      /^<div><main class="[^"]*"><p role="status" class="[^"]*">Loading…<\/p><\/main><div hidden=""><\/div><\/div>$/,
+    );
+  });
+
+  it('holds Try again while it reads, so focus stays on it, and says a failure again (PV5b’s review; PV17a)', () => {
+    const source = read('./shell.tsx');
+    // One button throughout: Loading… and held (aria-disabled keeps its focus) until Bali answers.
+    expect(source).toMatch(
+      /<Button\s*variant="secondary"\s*aria-disabled=\{held\}\s*aria-busy=\{held\}\s*onClick=\{\(\) => void again\(\)\}\s*className="mt-3\.5"\s*>\s*\{held \? 'Loading…' : 'Try again'\}\s*<\/Button>/,
+    );
+    // A press while it reads sends nothing; each answer remounts the alert, so even the same words
+    // are said again.
+    expect(source).toMatch(
+      /async function again\(\) \{\s*if \(held\) return;\s*setHeld\(true\);\s*await onRetry\(\);\s*setHeld\(false\);\s*setTries\(\(n\) => n \+ 1\);\s*\}/,
+    );
+    expect(source).toMatch(/<div key=\{tries\} role="alert">/);
   });
 
   it('draws nothing around a page read without signing in, the page in the same place', () => {

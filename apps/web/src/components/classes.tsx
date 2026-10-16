@@ -9,7 +9,7 @@ import type { RecapFormat } from '@/lib/recap';
 import { bellTime } from '@/lib/session-controls';
 
 import { Blocks } from './blocks';
-import { Button } from './button';
+import { Button, buttonClass } from './button';
 import { Ring } from './live-header';
 import { CHIP, CHIP_PILL, DOT } from './live-grid';
 import { cardId } from './new-class';
@@ -49,6 +49,16 @@ export function classLine(c: TaughtClass, now: number, format?: RecapFormat): st
   return `${count}${DOT}${when}`;
 }
 
+/** A class whose session runs (Classes, Main): the Live chip with its bell, in Focused's tint. */
+export function LiveChip({ endsAt }: { endsAt: string }) {
+  return (
+    <span className={`${CHIP_PILL} ${CHIP.focused.tone}`}>
+      <CircleCheck size={13} aria-hidden="true" className="shrink-0" />
+      Live{DOT}ends {bellTime(endsAt)}
+    </span>
+  );
+}
+
 /**
  * A class on the list (Classes' `.classcard`), the whole card its link: its name over its line, and
  * while its session runs by this computer's clock to the server's bell, the Live chip and the live
@@ -66,19 +76,17 @@ function ClassCard({ c, now }: { c: TaughtClass; now: number }) {
         <span className="block text-card-name wrap-anywhere">{c.name}</span>
         <span className="mt-0.5 block text-caption text-text-tertiary">{classLine(c, now)}</span>
       </span>
-      {live ? (
-        <span className={`${CHIP_PILL} ${CHIP.focused.tone}`}>
-          <CircleCheck size={13} aria-hidden="true" className="shrink-0" />
-          Live{DOT}ends {bellTime(live.endsAt)}
-        </span>
-      ) : null}
+      {live ? <LiveChip endsAt={live.endsAt} /> : null}
       <ChevronRight size={20} aria-hidden="true" className="shrink-0 text-text-tertiary" />
     </Link>
   );
 }
 
-/** No classes yet (ClassesEmpty): the card Home shows a new teacher, word for word. */
-function FirstClass({ onNew }: { onNew: () => void }) {
+/**
+ * No classes yet (ClassesEmpty, HomeNew), word for word on both: its Create a class opens New class
+ * on Classes (`onNew`), or, on Home, goes there to open it (`href`), as HomeNew links to ClassesNew.
+ */
+export function FirstClass({ onNew, href }: { onNew?: () => void; href?: string }) {
   const id = useId();
   return (
     <section
@@ -92,9 +100,15 @@ function FirstClass({ onNew }: { onNew: () => void }) {
       <p className="max-w-144 text-body text-text-secondary">
         Name it, then put its join code on the board. Students join with it in the Bali app.
       </p>
-      <Button aria-haspopup="dialog" onClick={onNew} className="mt-1.5">
-        Create a class
-      </Button>
+      {href ? (
+        <Link href={href} className={buttonClass('primary', 'mt-1.5')}>
+          Create a class
+        </Link>
+      ) : (
+        <Button aria-haspopup="dialog" onClick={onNew} className="mt-1.5">
+          Create a class
+        </Button>
+      )}
     </section>
   );
 }

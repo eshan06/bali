@@ -9,7 +9,7 @@ import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 import { buttonClass } from '../components/button';
-import { CARD, CARD_ALONE, CARD_ENTRY } from '../components/card';
+import { CARD_ALONE, CARD_ENTRY } from '../components/card';
 
 /*
  * The portal's tokens are the design system's own file, ios/Bali/UI/bali-tokens.json, as
@@ -729,17 +729,16 @@ describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
   });
 
   it('a card keeps its own hairline and soft shadow, at radius-md', () => {
-    for (const card of [CARD, CARD_ALONE, CARD_ENTRY]) {
+    for (const card of [CARD_ALONE, CARD_ENTRY]) {
       expect(card).toMatch(/\bbg-surface-card\b/);
       expect(card).toMatch(/\bborder border-border-default\b/);
       expect(card).toMatch(/\bshadow-1\b/);
       expect(card).toMatch(/\brounded-md\b/);
     }
-    // v2's card on its own, 20 px in, and an entry page's, 24 px in (DESIGN.md §4); a list's cards
-    // keep space-4 until the step that draws the list in v2's look.
+    // v2's card on its own, 20 px in, and an entry page's, 24 px in (DESIGN.md §4). A list's cards
+    // are drawn by their own steps since Home's list went (PV17a), the last on the old `CARD`.
     expect(CARD_ALONE).toMatch(/\bp-5\b/);
     expect(CARD_ENTRY).toMatch(/\bp-6\b/);
-    expect(CARD).toMatch(/\bp-4\b/);
   });
 });
 

@@ -21,8 +21,10 @@ import type { Me } from './shell';
  * New class's dialog (new-class.test.ts).
  */
 const shell = vi.hoisted((): { me: unknown } => ({ me: null }));
+const nav = vi.hoisted(() => ({ query: '' }));
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: () => undefined, push: () => undefined }),
+  useSearchParams: () => new URLSearchParams(nav.query),
 }));
 vi.mock('@/components/shell', () => ({ useMe: () => shell.me }));
 const { ClassesView, classLine, lastSessionDay, students } = await import('./classes');
@@ -305,6 +307,21 @@ describe('the Classes page', () => {
     expect(html).not.toMatch(/<dialog[^>]*\sopen[\s=>]/);
     expect(source).toMatch(/onNew=\{\(\) => newClass\.current\?\.open\(\)\}/);
     expect(source).toMatch(/<NewClass ref=\{newClass\} onAnswer=\{\(\) => load\(\)\} \/>/);
+  });
+
+  it('opens New class as the page shows when Home’s Create a class sent it there, once (HomeNew to ClassesNew)', () => {
+    // Drawn as the page always is, the dialog closed until the page has shown; then opened.
+    nav.query = 'new';
+    expect(drawnFor({ kind: 'teacher', me: account('teacher') })).toMatch(
+      /<dialog aria-labelledby="[^"]+-title" class="[^"]*">/,
+    );
+    nav.query = '';
+    expect(source).toMatch(/const asked = useSearchParams\(\)\.has\('new'\);/);
+    expect(source).toMatch(/const shown = classes !== null;/);
+    // The address forgets it as it opens, so a reload or a way back opens the page alone.
+    expect(source).toMatch(
+      /useEffect\(\(\) => \{\s*if \(!asked \|\| !shown\) return;\s*newClass\.current\?\.open\(\);\s*window\.history\.replaceState\(null, '', '\/classes'\);\s*\}, \[asked, shown\]\);/,
+    );
   });
 
   it('draws nothing before the account is read, nor for anyone but a teacher, whom it sends home', () => {

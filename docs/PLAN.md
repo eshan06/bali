@@ -8,16 +8,15 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-16 (Central) — PV16 done, its PV16b, New class (#421; `docs/DECISIONS.md`,
-2026-10-16): New class at the head of Classes and the first class's card's Create a class open v2's
-dialog (ClassesNew): the class's name, Create class held until one is typed, Creating… holding the
-name, Cancel and Escape, each failure under the help with Try again but after a final refusal; a
-class made turns it into "<name> is ready" (ClassesCreated), its join code, Copy code (the class
-page's Copy, now shared) and Done, which puts focus on the class's card. ClassesInterim is gone, and
-relabelled on the canvas as no longer built; the dialog on a phone drawn first (canvas version 68).
-Checked on dev as the demo teacher (one test class, "PV16 test", which stays: no route removes a
-class), and sharp beside every board. Before it, PV16a (#420). Next on the Windows PC: PV17a, Home;
-on the Mac, the phone's L8 and M8._
+_Last updated: 2026-10-16 (Central) — PV17a, Home's first part (#422; `docs/DECISIONS.md`,
+2026-10-16): Home in v2's look: the greeting by this computer's clock over the date and what is in
+session, each class once with Live and Open or Start…, the block's card beside them, and for a new
+teacher the first class card, its Create a class opening New class on Classes; Home's create row
+gone; the account's failure headed as the page, its Try again held until Bali answers so focus stays
+on it. Home's intermediate states drawn first (canvas version 71: HomeInterim, HomeInterimStates,
+HomeInterimPhone, HomeNewPhone), and ClassesStates moved clear of ClassStudent. Checked on dev as
+the demo teacher (Home only, nothing made) and sharp beside every board. Before it, PV16 (#420,
+#421). Next on the Windows PC: PV17b, Home's live card; on the Mac, the phone's L8 and M8._
 
 ## Now
 
@@ -44,8 +43,8 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
   keeps D1's look until the owner approves a new one (its redesign rolled back, 2026-10-06). Left:
   the push's app half (not started), TestFlight build 9 for C7's phone test (📱), and the phone's
   Phase 7 screens (L8, M8). C2's legal words (⚖️) go into the portal's pages, on the Windows PC.
-- **The portal redesign in v2's look (PV0–PV17, the owner, 2026-10-12):** PV0–PV16 done, with
-  PV3b, PV4b, PV4c and PV5b; PV17, Home, next, on the Windows PC.
+- **The portal redesign in v2's look (PV0–PV17, the owner, 2026-10-12):** PV0–PV16 and PV17a
+  done, with PV3b, PV4b, PV4c and PV5b; PV17b, Home's live card, next, on the Windows PC.
 - **The workflow review's last steps** ✅ (the owner, 2026-10-13; DECISIONS 2026-10-14): the
   migration guard (#369), docs-only PRs skipping the test jobs (#365), moved files (#368) and two
   tests (#364), each in full in `docs/PLAN-ARCHIVE.md`.
@@ -146,7 +145,7 @@ validation** (each 👀): vitest, `npm run typecheck && npm run lint && npm test
 - **PV14** 👀 A session's report — ✅ (#401; DECISIONS 2026-10-15)
 - **PV15** 👀 The entry pages — ✅ (#388; DECISIONS 2026-10-15). **Then Phase 7's web screens** (Phase 7 steps)
 - **PV16** 👀 Classes — ✅ as PV16a (#420) and PV16b (#421); DECISIONS 2026-10-16
-- **PV17** 👀 Home (Main, HomeIdle, HomeNew, HomeStates), in three: **PV17a** (~300) the greeting and date, each class once (Live and Open, or Start…), the block's card with Register block, and "Set up your first class" for a new teacher; Home's error state with a real heading, focus kept on Try again and one `<main>` while it waits (PV5b's review; the owner, 2026-10-14); **PV17b** (~300) the live class's card on the session's snapshot and stream (its ring, countdown, six state counts, Open the class, Present and the latest unlock); **PV17c** (~250) Last session (PV2; hidden until a class's first session ends) and Recent activity (PV3; hidden under 640 px; no empty state, a live class's own start always listed): for up to a minute after a bell `lastSession` names a session whose report still says `ended: false`, which means only "not swept yet" (PV2's review), so the card never reads that flag as still running; if Recent activity is polled rather than read once, its read is narrowed first to the three kinds and the reason changes (PV3's review) — validation: as above
+- **PV17** 👀 Home (Main, HomeIdle, HomeNew, HomeStates), in three: **PV17a** — ✅ (#422; DECISIONS 2026-10-16); **PV17b** (~300) the live class's card on the session's snapshot and stream (its ring, countdown, six state counts, Open the class, Present and the latest unlock), in Main's place over Your classes in `TeacherHome` (`components/home.tsx`), the page's clock (`now`, redrawn at each bell and the account read just after it) PV17a's; two classes can be live at once (HomeInterimStates says how many on the date's line); **PV17c** (~250) Last session (PV2; hidden until a class's first session ends) and Recent activity (PV3; hidden under 640 px; no empty state, a live class's own start always listed): for up to a minute after a bell `lastSession` names a session whose report still says `ended: false`, which means only "not swept yet" (PV2's review), so the card never reads that flag as still running; if Recent activity is polled rather than read once, its read is narrowed first to the three kinds and the reason changes (PV3's review) — validation: as above
 
 ### Phase 7 steps (live lesson; one PR each; 👀 = the owner looks at screenshots, 📱 = needs the owner's iPhone, 🔧 = the owner in a console)
 
