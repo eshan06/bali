@@ -60,7 +60,10 @@ export interface SlideLesson {
   said: ChangeSaid | null;
   /** Previous (−1) and Next (+1); nothing past either end. */
   turn: (by: -1 | 1) => void;
-  /** Stop showing; true once Bali answered with what the session shows now. */
+  /**
+   * Stop showing; true once what the session shows now is on screen: Bali's answer, or the stream
+   * showing it before an answer that gave up.
+   */
   stop: () => Promise<boolean>;
   /** Try again: the last change, under its id while its answer never came. */
   again: () => void;
@@ -242,11 +245,12 @@ export function useSlide(
         put(session, end.shown);
         return true;
       }
-      // Its answer gave up after the stream showed it, or a later change: the truth is on screen.
+      // Its answer gave up after the stream showed it, or a later change: the truth is on screen,
+      // as when its answer says so.
       const heard = newer(now.current.shown, { slide: null, eventId: attempt.eventId });
       if (end.said === 'failed' && heard === now.current.shown) {
         unanswered.current = null;
-        return false;
+        return true;
       }
       setSaid(end.said);
       // Gone: the session read again, for what it shows now.

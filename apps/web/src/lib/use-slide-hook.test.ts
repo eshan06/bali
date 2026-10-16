@@ -355,6 +355,18 @@ describe('useSlide: its changes', () => {
     await h.settle();
     expect(h.slides.slide).toEqual(slideOf(5));
     expect(h.slides.said).toBeNull();
+
+    // A stop the same way: done, as its answer would have said, so the card moves focus on.
+    const stopping = h.slides.stop();
+    await h.settle();
+    const stop = io.post.mock.calls[1]?.[1] as { eventId: string };
+    h.onEvent({ ...shownEvent(stop.eventId, null), seq: 2 });
+    await h.settle();
+    fail(new NetworkError());
+    expect(await stopping).toBe(true);
+    await h.settle();
+    expect(h.slides.slide).toBeNull();
+    expect(h.slides.said).toBeNull();
   });
 
   it('says the session ended first, and the deck gone, reading the session again', async () => {

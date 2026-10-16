@@ -253,9 +253,10 @@ describe('useSlide: what a session shows, held for one session (read from its so
     expect(hook).toMatch(
       /if \('shown' in end\) \{\s*put\(session, end\.shown\);\s*return true;\s*\}[^]*?setSaid\(end\.said\);[^]*?if \(end\.said === 'gone'\) reread\(\);/,
     );
-    // Its answer gave up after the stream showed it: nothing said (use-slide-hook.test.ts).
+    // Its answer gave up after the stream showed it: nothing said, and done, as its answer would
+    // have said (use-slide-hook.test.ts).
     expect(hook).toMatch(
-      /const heard = newer\(now\.current\.shown, \{ slide: null, eventId: attempt\.eventId \}\);\s*if \(end\.said === 'failed' && heard === now\.current\.shown\) \{\s*unanswered\.current = null;\s*return false;\s*\}/,
+      /const heard = newer\(now\.current\.shown, \{ slide: null, eventId: attempt\.eventId \}\);\s*if \(end\.said === 'failed' && heard === now\.current\.shown\) \{\s*unanswered\.current = null;\s*return true;\s*\}/,
     );
     // Try again: the last change again, through the same rule.
     expect(hook).toMatch(/again: \(\) => \{\s*if \(last\.current\) void change\(last\.current\);/);
