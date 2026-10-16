@@ -16,7 +16,7 @@ import {
   ShieldOff,
   WifiOff,
 } from 'lucide-react';
-import { Fragment, useEffect, useId, useReducer, useRef, useState } from 'react';
+import { Fragment, type ReactNode, useEffect, useId, useReducer, useRef, useState } from 'react';
 
 import { Button } from '@/components/button';
 import { CLOCK_OFF, StudentPanel } from '@/components/student-panel';
@@ -36,6 +36,7 @@ import {
   silentNote,
   snapshotIsFresh,
   softpulses,
+  type Staleness,
   staleness,
   staleWords,
   type Student,
@@ -358,6 +359,19 @@ const PILL_LAYER = 'pointer-events-none absolute inset-x-0 -top-4 bottom-0 z-10 
 const PILL =
   'sticky top-3.5 mx-auto flex w-fit max-w-full items-center gap-2 rounded-full border border-border-strong bg-surface-card px-3.5 py-1.5 text-caption font-medium text-text-secondary shadow-2';
 
+/** The grid as it stands, for Home's live card to draw in its own words (`LiveGrid`'s `card`). */
+export interface GridNow {
+  /** Every student, once the snapshot is read; null until then. */
+  students: Students | null;
+  /** This tab's clock, read each second. */
+  now: Date;
+  /** The snapshot didn't load, in `errText`'s words; `retry` reads it again. */
+  error: string | null;
+  retry: () => void;
+  /** Why the grid may be out of date, and how old it is (`staleness`); null while it is current. */
+  stale: Staleness | null;
+}
+
 export function LiveGrid({
   sessionId,
   onEnded,
@@ -369,6 +383,7 @@ export function LiveGrid({
   present = false,
   livePage = false,
   tiles = true,
+  card,
 }: {
   sessionId: string;
   /** Called with `sessionId` once the server marks the session over: an end event, or a snapshot. */
@@ -407,6 +422,12 @@ export function LiveGrid({
    * (its health, a boot that failed) stay, so nothing reboots as the question comes and goes.
    */
   tiles?: boolean;
+  /**
+   * Home's live card (PV17b; Main): the grid handed to it as it stands (`GridNow`), drawn there in
+   * place of all the grid draws, so Home counts the class from the class page's own snapshot,
+   * stream and 15 s read.
+   */
+  card?: (grid: GridNow) => ReactNode;
 }) {
   const api = useApi();
   const onUnauthorized = useSignOut();
@@ -576,6 +597,23 @@ export function LiveGrid({
     return () => clearInterval(t);
   }, [api, sessionId, over]);
 
+  // How fresh the grid is, once it is read (`staleness`).
+  const stale =
+    students === null
+      ? null
+      : staleness({
+          status: healthOf(status, now.getTime() - connectStart.current),
+          lastStreamActivityAt: lastStreamActivity.current,
+          lastGridActivityAt: lastGridActivity.current,
+          now: now.getTime(),
+          heartbeatMs: STREAM_HEARTBEAT_MS,
+        });
+  // Home's live card draws the grid as it stands, every line in its own words (PV17b).
+  if (card) {
+    const retry = () => setAttempt((n) => n + 1);
+    return card({ students, now, error, retry, stale: over ? null : stale });
+  }
+
   if (error) {
     return (
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
@@ -599,14 +637,6 @@ export function LiveGrid({
       </p>
     ) : null;
   }
-
-  const stale = staleness({
-    status: healthOf(status, now.getTime() - connectStart.current),
-    lastStreamActivityAt: lastStreamActivity.current,
-    lastGridActivityAt: lastGridActivity.current,
-    now: now.getTime(),
-    heartbeatMs: STREAM_HEARTBEAT_MS,
-  });
   // The grid's health (§4): stone, never amber; honest, not alarmed.
   const health =
     stale && !over ? (

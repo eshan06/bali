@@ -226,7 +226,14 @@ describe('Present’s page', () => {
   it('comes back in Present after a reload or a return from Reports, as this tab left it', () => {
     const start = page.indexOf('rememberedMinutes(classId)');
     expect(page.slice(start, page.indexOf('}, [classId]);', start))).toMatch(
-      /setPresent\(rememberedPresent\(classId\)\);/,
+      /setPresent\(fromHome \|\| rememberedPresent\(classId\)\);/,
+    );
+  });
+
+  it('opens in Present from Home’s Present (`?present`, Main), kept for the tab, the address forgetting it (PV17b)', () => {
+    const start = page.indexOf('rememberedMinutes(classId)');
+    expect(page.slice(start, page.indexOf('}, [classId]);', start))).toMatch(
+      /const fromHome = new URLSearchParams\(window\.location\.search\)\.has\('present'\);\s*if \(fromHome\) \{\s*rememberPresent\(classId, true\);\s*window\.history\.replaceState\(null, '', `\/classes\/\$\{classId\}`\);\s*\}\s*setPresent\(fromHome \|\| rememberedPresent\(classId\)\);/,
     );
   });
 

@@ -208,7 +208,7 @@ describe('a pop-up, as ClassUnlock draws it', () => {
             joinedAt: new Date(AT),
             lastSeenAt: new Date(AT),
             endedAt: null,
-            unlock: { eventId: 'e1', reason },
+            unlock: { eventId: 'e1', reason, at: new Date(AT) },
             clockOff: false,
           },
           now: new Date(AT),

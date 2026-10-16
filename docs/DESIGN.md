@@ -25,7 +25,7 @@ badges); `api-client.ts` (`UnauthorizedError`'s words; a `NetworkError` is
 said as `errors.ts`'s `CANT_REACH`, its own message a log line, D2c-2);
 `recap.ts` (the session's "9:05 AM to 9:30 AM"; PB5's timeline took its reasons
 and "No reason given" with it in PV14). `blocks.ts`, `classes.ts`, `reports.ts`, `invite.ts` and `decks.ts` hold
-none: their words are in `blocks.tsx`, Home (`home.tsx`, PV17a), Classes'
+none: their words are in `blocks.tsx`, Home (`home.tsx`, PV17a and its live card, PV17b), Classes'
 cards (`classes.tsx`, PV16a) and New class's dialog (`new-class.tsx`, PV16b), the reports page, `invite-code.tsx`, `slides.tsx` and `errors.ts`. In
 `ios/Bali/` outside `UI/`: the NFC sheet's words in `BlockReader.swift`
 ("Hold the top of your iPhone to your teacher's Bali block.", "This isn't a
@@ -289,9 +289,16 @@ afternoon or evening by this computer's clock, over the date and what is in sess
 live and its bell, or how many); each class once, a `.schedrow` with its line as Classes says it,
 Live and Open or Start…, both to its page; for a new teacher HomeNew's card, its Create a class to
 Classes' New class; the list's failure over the classes read before; the block's card beside them;
-and the create row gone. Until PV17b the live class has no live card, and until PV17c the rail holds
-no Recent activity or Last session; these and Home's other intermediate states as HomeInterim,
-HomeInterimStates, HomeInterimPhone and HomeNewPhone draw them (drawn on the canvas first). The
+and the create row gone. Since PV17b (2026-10-16) each class live by this computer's clock to the
+server's bell has Main's live card over Your classes, in the account's order: the class page's own
+grid counted (its snapshot, its live feed, its 15 s read), the ring, "Live · 25 of 28 joined" and the
+countdown, the six counts, Open the class, Present (the class page in Present, never on a phone) and
+the latest unlock on the grid, its student and when, none while no chip carries one; the live feed
+lost said in the class page's own line under the counts; its loading and its failure as HomeMoreStates
+draws them, and on a phone as PhoneHome; a session the server ends while Home is open loses its card
+at once (HomeLiveStates, drawn on the canvas first). Until PV17c the rail holds no Recent activity
+or Last session; these and Home's other intermediate states as HomeInterim (redrawn with the live
+card), HomeInterimStates and HomeNewPhone draw them (drawn on the canvas first). The
 account not read is said as HomeStates draws it, its failure headed as the page (an `h1`), Try again
 held as Loading… until Bali answers so focus stays on it, a failure said again.
 Every
