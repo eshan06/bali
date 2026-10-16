@@ -20,12 +20,16 @@ import { newEventId } from './event-id';
 import { type PageVisibility, POLL_EVERY_MS } from './live-question';
 import {
   type AnswerResult,
+  ENDED_WITHIN_MS,
+  endedAt,
   followLesson,
   homeClasses,
   homeFor,
   type LessonState,
+  lessonView,
   nextBell,
   phoneChip,
+  type StudentClass,
 } from './student-web';
 
 const SESSION = '01924b2c-0000-7000-8000-000000000001';
@@ -297,15 +301,41 @@ describe('followLesson', () => {
     followed.stop();
   });
 
-  it('stops for good at the first read saying the session isn’t running', async () => {
+  it('stops for good at the first read saying the session isn’t running, between which reads it ended (W4)', async () => {
     const over = lesson({ running: false, phone: null });
-    const { api, reads } = server(tagged('"a"', lesson()), tagged('"b"', over));
+    const { api, reads } = server(tagged('"a"', lesson()), null, tagged('"c"', over));
     followLesson(api, SESSION, onChange, page().doc);
     await after(0);
+    await after(POLL_EVERY_MS); // a 304: it still ran 2 s in
     await after(POLL_EVERY_MS);
-    expect(last()).toEqual({ presentation: over, problem: null, asOf: null });
+    expect(last()).toEqual({
+      presentation: over,
+      problem: null,
+      asOf: null,
+      ended: { after: AT + 2000, by: AT + 4000 },
+    });
     await after(10 * POLL_EVERY_MS);
-    expect(reads).toHaveLength(2);
+    expect(reads).toHaveLength(3);
+  });
+
+  it('says no read saw it run when the first said it was over, and how long reads failed before (W4)', async () => {
+    const over = lesson({ running: false, phone: null, question: null });
+    const opened = server(tagged('"a"', over));
+    followLesson(opened.api, SESSION, onChange, page().doc);
+    await after(0);
+    expect(last()?.ended).toEqual({ after: null, by: AT });
+    // Reads that failed between: the end lies anywhere from the last good one.
+    states.length = 0;
+    const away = server(
+      tagged('"a"', lesson()),
+      new NetworkError(),
+      new NetworkError(),
+      tagged('"b"', over),
+    );
+    followLesson(away.api, SESSION, onChange, page().doc);
+    await after(0);
+    await after(3 * POLL_EVERY_MS);
+    expect(last()?.ended).toEqual({ after: AT, by: AT + 6000 });
   });
 
   it('keeps the last good read through a failure, as of when it came, and reads again in 2 s', async () => {
@@ -546,5 +576,107 @@ describe('phoneChip', () => {
       asOf: AT - 30_000,
     };
     expect(phoneChip(failing, now)).toEqual({ kind: 'unlocked' });
+  });
+});
+
+describe('endedAt: when the class ended, only as this page can vouch for it (W4)', () => {
+  /** 9:55, the bell, 14 minutes after AT. */
+  const BELL = new Date(AT + 14 * 60_000).toISOString();
+
+  it('is the bell when a read just before it saw the class run and one just after saw it over', () => {
+    const bell = Date.parse(BELL);
+    expect(endedAt({ after: bell - 1_500, by: bell + 500 }, BELL)).toBe(bell);
+  });
+
+  it('is the read that saw it over when that came before the bell: an End', () => {
+    expect(endedAt({ after: AT - 2_000, by: AT }, BELL)).toBe(AT);
+    // With no bell to weigh it against, that read's time too.
+    expect(endedAt({ after: AT - 2_000, by: AT }, null)).toBe(AT);
+  });
+
+  it('is none for a page that never saw it run, or saw it last too long before', () => {
+    expect(endedAt({ after: null, by: AT }, BELL)).toBeNull();
+    expect(endedAt({ after: AT - ENDED_WITHIN_MS - 1, by: AT }, BELL)).toBeNull();
+    expect(endedAt({ after: AT - ENDED_WITHIN_MS, by: AT }, BELL)).toBe(AT);
+    expect(endedAt(undefined, BELL)).toBeNull();
+  });
+});
+
+describe('lessonView: what the lesson page shows (W4)', () => {
+  const STARTED = new Date(AT - 36 * 60_000).toISOString();
+  const BELL = new Date(AT + 14 * 60_000).toISOString();
+  const SOON = { id: SESSION, startedAt: STARTED, endsAt: BELL };
+  const biology: StudentClass = {
+    id: 'bio',
+    name: 'Biology, period 3',
+    teacher: { displayName: 'Ms. Rivera' },
+    enrollmentId: 'e-bio',
+    liveSession: SOON,
+  };
+  const none: LessonState = { presentation: null, problem: null, asOf: null };
+  const read = (over: Partial<Presentation> = {}): LessonState => ({
+    ...none,
+    presentation: lesson(over),
+  });
+  const failed = { kind: 'failed', status: undefined, retryAfter: undefined } as const;
+
+  it('waits for the account while the page hasn’t read it, and says a read that failed', () => {
+    expect(lessonView(undefined, 'stale', null, none)).toEqual({ kind: 'loading' });
+    expect(lessonView(biology, 'stale', null, none)).toEqual({ kind: 'loading' });
+    expect(lessonView(undefined, 'failed', null, none)).toEqual({ kind: 'failed' });
+  });
+
+  it('is not the student’s once a read since the page opened lists no such class of theirs', () => {
+    expect(lessonView(undefined, 'fresh', null, none)).toEqual({ kind: 'not_in_class' });
+    // Followed once, then gone from the account: removed from the class since.
+    expect(lessonView(undefined, 'fresh', SOON, read())).toEqual({ kind: 'not_in_class' });
+  });
+
+  it('is over, with no time it can vouch for, when no read listed the session as the class’s', () => {
+    expect(lessonView(biology, 'fresh', null, none)).toEqual({
+      kind: 'over',
+      klass: biology,
+      at: null,
+    });
+  });
+
+  it('follows the session once listed: Loading… to its first read, a failure said with Try again', () => {
+    expect(lessonView(biology, 'stale', SOON, none)).toEqual({ kind: 'loading' });
+    expect(lessonView(biology, 'fresh', SOON, { ...none, problem: failed })).toEqual({
+      kind: 'failed',
+    });
+  });
+
+  it('shows the lesson as read, behind while reads fail; a refusal is no lesson to show', () => {
+    const asked = read({ question: question() });
+    expect(lessonView(biology, 'fresh', SOON, asked)).toEqual({
+      kind: 'live',
+      klass: biology,
+      bell: SOON,
+      presentation: asked.presentation,
+      behind: false,
+    });
+    expect(lessonView(biology, 'fresh', SOON, { ...asked, problem: failed })).toMatchObject({
+      kind: 'live',
+      behind: true,
+    });
+    const refused = { kind: 'refused', status: 403, reason: undefined } as const;
+    expect(lessonView(biology, 'fresh', SOON, { ...asked, problem: refused })).toEqual({
+      kind: 'failed',
+    });
+  });
+
+  it('is over once a read says so, when it ended as the page can vouch for it', () => {
+    const over = read({ running: false, phone: null });
+    const bell = Date.parse(BELL);
+    expect(
+      lessonView(biology, 'fresh', SOON, {
+        ...over,
+        ended: { after: bell - 1_000, by: bell + 900 },
+      }),
+    ).toEqual({ kind: 'over', klass: biology, at: bell });
+    expect(lessonView(biology, 'fresh', SOON, { ...over, ended: { after: null, by: AT } })).toEqual(
+      { kind: 'over', klass: biology, at: null },
+    );
   });
 });

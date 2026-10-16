@@ -86,6 +86,12 @@ export interface LessonState {
    * the kept state, the phone's chip with it, is "as of". Null before any, and while reads work.
    */
   asOf: number | null;
+  /**
+   * Once a read said the session is over (W4): `by`, when that read answered, and `after`, when the
+   * last read before it that said it ran did, by this computer's clock (ms); null when no read here
+   * saw it run. The session ended between the two (`endedAt`). Absent while it runs.
+   */
+  ended?: { after: number | null; by: number };
 }
 
 /** An answer's one request: the answer Bali holds now, this one or a later one, or why not. */
@@ -156,12 +162,19 @@ export function followLesson(
         set({ ...state, problem: read.problem, asOf: readAt });
         return true;
       }
+      const ran = state.presentation?.running === true ? readAt : null;
       readAt = Date.now();
       let presentation = read.body ?? state.presentation;
       const shown = state.presentation?.question;
       if (read.body && shown) presentation = keepLater(read.body, shown.id, shown.answer);
-      set({ presentation, problem: null, asOf: null });
-      return presentation?.running !== false;
+      const over = presentation?.running === false;
+      set({
+        presentation,
+        problem: null,
+        asOf: null,
+        ...(over ? { ended: { after: ran, by: readAt } } : {}),
+      });
+      return !over;
     },
     doc,
   );
@@ -189,6 +202,68 @@ export function followLesson(
       poll.stop();
     },
   };
+}
+
+/** How close the last read saying the session ran must come before the one saying it ended. */
+export const ENDED_WITHIN_MS = 30_000;
+
+/**
+ * When the session ended, as this page can vouch for it (ms), or null when it can't: only when a
+ * read that saw it run came within `ENDED_WITHIN_MS` of the one that saw it over, the end between
+ * them; then the bell, the server's own time, when it came before that read, else that read's time
+ * (an End before the bell). A page opened after the end, or away when it came, can't say.
+ */
+export function endedAt(ended: LessonState['ended'], bell: string | null): number | null {
+  if (!ended || ended.after === null || ended.by - ended.after > ENDED_WITHIN_MS) return null;
+  const at = bell === null ? NaN : Date.parse(bell);
+  return Number.isNaN(at) ? ended.by : Math.min(ended.by, at);
+}
+
+/** A session's start and bell, as `/v1/me` lists them (W3). */
+export type Bell = InSession['liveSession'];
+
+/** What the lesson page shows (W4), as kinds: its words are the page's. */
+export type LessonView =
+  | { kind: 'loading' }
+  /** No read to show: the lesson's first, or the account's, failed, or Bali refused the lesson. */
+  | { kind: 'failed' }
+  | { kind: 'not_in_class' }
+  /** `at`: when it ended, when this page can say (`endedAt`). */
+  | { kind: 'over'; klass: StudentClass; at: number | null }
+  /** `behind`: the last read failed, so what shows is the last good one's. */
+  | {
+      kind: 'live';
+      klass: StudentClass;
+      bell: Bell;
+      presentation: Presentation;
+      behind: boolean;
+    };
+
+/**
+ * The lesson page's state (W4), from the account (`/v1/me`, as last read: `klass`, the page's class
+ * in it, if listed; `account`, whether a read answered since the page opened, failed, or is still
+ * to come), the session's start and bell once a read listed it as the class's session (the page
+ * follows it from then, never before), and the lesson's own reads. A class the account doesn't
+ * list is never the student's to follow; a session no read listed is over (or not this class's).
+ */
+export function lessonView(
+  klass: StudentClass | undefined,
+  account: 'stale' | 'fresh' | 'failed',
+  bell: Bell | null,
+  lesson: LessonState,
+): LessonView {
+  if (!klass || !bell) {
+    if (account !== 'fresh') return { kind: account === 'failed' ? 'failed' : 'loading' };
+    return klass ? { kind: 'over', klass, at: null } : { kind: 'not_in_class' };
+  }
+  const { presentation, problem } = lesson;
+  if (presentation?.running === false) {
+    return { kind: 'over', klass, at: endedAt(lesson.ended, bell.endsAt) };
+  }
+  if (presentation === null || problem?.kind === 'refused') {
+    return { kind: problem ? 'failed' : 'loading' };
+  }
+  return { kind: 'live', klass, bell, presentation, behind: problem !== null };
 }
 
 /**

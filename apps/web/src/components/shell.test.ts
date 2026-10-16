@@ -373,6 +373,18 @@ describe('the side menu', () => {
     expect(links(menu({ role: 'student', path: '/invite' })).filter((l) => l.current)).toEqual([]);
   });
 
+  it('marks Your classes on a student’s lesson too, as StudentLesson draws it, and on no page merely named alike (W4)', () => {
+    const current = (path: string) =>
+      links(menu({ role: 'student', path }))
+        .filter((l) => l.current)
+        .map((l) => l.text);
+    expect(current('/lessons/c1/s1')).toEqual(['Your classes']);
+    expect(current('/lessonsx')).toEqual([]);
+    expect(current('/support')).toEqual(['Help']);
+    // A teacher's menu has no lessons under Home.
+    expect(links(menu({ path: '/lessons/c1/s1' })).filter((l) => l.current)).toEqual([]);
+  });
+
   it('holds Sign out while it signs out, as the bar does', () => {
     expect(menu({ leaving: true })).toMatch(/aria-label="Sign out" aria-disabled="true"/);
     expect(menu({ name: null, leaving: true })).toMatch(
