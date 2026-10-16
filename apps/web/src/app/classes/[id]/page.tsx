@@ -13,7 +13,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
-import { AskPanel, type Draft, NEW_DRAFT } from '@/components/ask-panel';
+import { AskPanel, NEW_DRAFT, PickPanel } from '@/components/ask-panel';
 import { Button, buttonClass } from '@/components/button';
 import { CARD_ALONE } from '@/components/card';
 import { Field } from '@/components/field';
@@ -26,6 +26,7 @@ import { endedToday, RecapCard } from '@/components/recap-card';
 import { usePresenting } from '@/components/shell';
 import { getAccessToken } from '@/lib/auth';
 import { errText, NOT_A_SESSION_LENGTH, SESSION_ALREADY_RUNNING } from '@/lib/errors';
+import type { QuestionDraft } from '@/lib/live-question';
 import {
   DEFAULT_MINUTES,
   EXTEND_PRESETS,
@@ -150,16 +151,21 @@ export default function ClassDetailPage() {
     null,
   );
   // The live question (L7): its card over the grid, and asking one in the side panel, where a
-  // student's panel shows; what is written is kept until it is asked or cancelled. A new session
+  // student's panel shows: one of the teacher's questions picked (L7b, part 2; LessonAsk), or one
+  // written there (LessonWrite), what is written kept until it is asked or cancelled. A new session
   // starts with neither.
   const live = klass !== null && grid !== null && !grid.over;
   const { lesson, onEvent, ask, opening, forgetAsk } = useLiveQuestion(live ? grid.id : null);
   const [asking, setAsking] = useState(false);
-  const [draft, setDraft] = useState<Draft>(NEW_DRAFT);
+  const [writing, setWriting] = useState(false);
+  const [draft, setDraft] = useState<QuestionDraft>(NEW_DRAFT);
   useEffect(() => {
     setAsking(false);
+    setWriting(false);
     setDraft(NEW_DRAFT);
   }, [grid?.id]);
+  // Never in Present: it lists the teacher's questions with their correct answers (the owner,
+  // 2026-10-15), and what is written in it.
   const panel = asking && !present;
   // In Present the question shows in the live grid's place (L7, part 2; PresentQuestion,
   // PresentAnswer), its totals the room's alone; the grid stays underneath, its stream with it.
@@ -168,6 +174,11 @@ export default function ClassDetailPage() {
   const closePanel = () => {
     setAsking(false);
     (document.getElementById(`${id}-ask`) ?? document.getElementById(`${id}-q`))?.focus();
+  };
+  // Asked: the panel goes, and focus to the question in the card.
+  const asked = () => {
+    setAsking(false);
+    window.requestAnimationFrame(() => document.getElementById(`${id}-q`)?.focus());
   };
 
   const readRoster = useCallback(() => {
@@ -484,7 +495,18 @@ export default function ClassDetailPage() {
         {/* In Present, the question in the tiles' place, after the grid's own lines. */}
         {projected ? <PresentQuestion id={id} lesson={lesson} /> : null}
       </section>
-      {panel ? (
+      {panel && !writing ? (
+        <PickPanel
+          id={`${id}-panel`}
+          openNow={isOpen(lesson)}
+          opening={opening}
+          onAsk={ask}
+          onAsked={asked}
+          onWrite={() => setWriting(true)}
+          onClose={closePanel}
+        />
+      ) : null}
+      {panel && writing ? (
         <AskPanel
           id={`${id}-panel`}
           draft={draft}
@@ -493,11 +515,12 @@ export default function ClassDetailPage() {
           opening={opening}
           onAsk={ask}
           onAsked={() => {
-            setAsking(false);
+            setWriting(false);
             setDraft(NEW_DRAFT);
-            window.requestAnimationFrame(() => document.getElementById(`${id}-q`)?.focus());
+            asked();
           }}
           onCancel={() => {
+            setWriting(false);
             setDraft(NEW_DRAFT);
             forgetAsk();
             closePanel();

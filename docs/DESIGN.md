@@ -223,7 +223,11 @@ home's Open the lesson leads to it.
 The class page's "Questions and slides" card is v2's since L7-1a (2026-10-15): between the counts
 and the grid, never in Present, a question's totals ("N of M answered", each option's count and bar
 from 3 answers), Close and Close and show answer, Done; and since L7-1b, at rest, Ask a question,
-which opens in the side panel, 460 px, where a student's panel shows, one at a time.
+which opens in the side panel where a student's panel shows, one at a time: since L7b part 2
+(2026-10-16) on the teacher's questions, LessonAsk's, 372 px, each asked with one click, its
+intermediate states as LessonAskStates draws them (drawn on the canvas first), and Write a new
+question there LessonWrite's form, 460 px, saying what Bali refuses in Your questions' words; never
+in Present, since it names the correct answers.
 Your questions is v2's since L7b part 1 (2026-10-15): Questions in the menu, the drafts oldest
 first as Questions draws them, each removed after its confirm across the card's foot, and Write a
 question and Edit opening QuestionsEdit's card over the list, its letters grey and its refusals

@@ -449,16 +449,31 @@ describe('its hook (L6’s logic, held for one session)', () => {
     );
     // One ask at a time, held by the hook, never by a panel that can unmount mid-send (santa's
     // review): a second press, in a panel opened again, sends nothing.
+    // The same one ask whatever it asks, the words written or one of the teacher's questions
+    // (L7b, part 2), its `from` saying which, so the panel says it where it was pressed.
+    expect(hook).toMatch(
+      /const ask = useCallback\(\s*async \(draft: QuestionDraft, from: string \| null = null\): Promise<OpenAnswer \| null> => \{/,
+    );
     expect(hook).toMatch(/if \(session === null \|\| askingNow\.current\) return null;/);
-    expect(hook).toMatch(/setOpening\(\{ busy: true, failure: null \}\);/);
+    expect(hook).toMatch(/setOpening\(\{ busy: true, failure: null, from \}\);/);
     // Answered, it lets go: the guard and the busy look, its failure said unless Cancel forgot it
     // meanwhile; an ask of a session gone touches the next one's nothing; one cancelled on its way
     // closes no panel opened since. A new session starts with none.
     expect(hook).toMatch(
-      /if \(now\.current\.session !== session\) return null;\s*unansweredOpen\.current = keepUnanswered\(attempt, answer\);\s*askingNow\.current = false;\s*const cancelled = asks\.current !== mine;\s*setOpening\(\{ busy: false, failure: answer\.kind === 'opened' \|\| cancelled \? null : answer \}\);/,
+      /if \(now\.current\.session !== session\) return null;\s*unansweredOpen\.current = keepUnanswered\(attempt, answer\);\s*askingNow\.current = false;\s*const cancelled = asks\.current !== mine;\s*setOpening\(\{\s*busy: false,\s*failure: answer\.kind === 'opened' \|\| cancelled \? null : answer,\s*from,\s*\}\);/,
     );
     expect(hook).toMatch(/return cancelled \? null : answer;/);
     expect(hook).toMatch(/askingNow\.current = false;\s*setOpening\(IDLE\);/);
+    expect(source).toMatch(/const IDLE: Opening = \{ busy: false, failure: null, from: null \};/);
+    // Cancel, the write form's, forgets what was written: its ask's failure, and one still on its
+    // way; never an ask of one of the teacher's questions, whose failure waits under it in their list
+    // however the panel was left meanwhile (santa's review, round 2).
+    expect(hook).toMatch(
+      /askedFrom\.current = from;\s*setOpening\(\{ busy: true, failure: null, from \}\);/,
+    );
+    expect(hook).toMatch(
+      /const forgetAsk = useCallback\(\(\) => \{\s*if \(askedFrom\.current !== null\) return;\s*asks\.current \+= 1;\s*setOpening\(\(cur\) => \(\{ \.\.\.cur, failure: null \}\)\);\s*\}, \[\]\);/,
+    );
     // An open's answer, its replay's too, never over a question asked after it.
     expect(hook).toMatch(
       /if \(answer\.kind === 'opened' && answer\.question\.id >= newest\.current\) \{\s*put\(session, answer\.question\);/,

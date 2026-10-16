@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import type { SavedQuestion } from '@bali/shared';
@@ -179,6 +179,26 @@ describe('what Bali refuses before it saves (decision 3, as the server checks)',
     expect(text).toMatch(/prompt: Text\(QUESTION_PROMPT_MAX_LENGTH, true\)/);
     expect(text).toMatch(
       /options: z\s*\.array\(Text\(QUESTION_OPTION_MAX_LENGTH\)\)\s*\.min\(QUESTION_OPTIONS_MIN\)\s*\.max\(QUESTION_OPTIONS_MAX\)/,
+    );
+  });
+
+  it('is the portal’s one copy: the class page’s panel checks and says through it (#390’s review)', () => {
+    // Every source file of the portal but its tests: only this one holds the server's patterns,
+    // and only Your questions' form the words for what they refuse, so the panel that asks a
+    // written question and the page that saves one can never drift apart.
+    const src = fileURLToPath(new URL('..', import.meta.url));
+    const files = readdirSync(src, { recursive: true, encoding: 'utf8' })
+      .map((f) => f.replaceAll('\\', '/'))
+      .filter((f) => /\.tsx?$/.test(f) && !/\.test\.tsx?$/.test(f));
+    const holding = (pattern: RegExp) =>
+      files.filter((f) => pattern.test(readFileSync(`${src}/${f}`, 'utf8')));
+    expect(holding(/\\p\{Cc\}|Default_Ignorable_Code_Point/)).toEqual(['lib/saved-questions.ts']);
+    expect(
+      holding(/Write the question first|Fill in this answer|Keep each answer to|hidden character/),
+    ).toEqual(['components/saved-questions.tsx']);
+    // Both ways in to asking go through it: the panel's form imports both, and copies neither.
+    expect(read('../components/ask-panel.tsx')).toMatch(
+      /import \{ readDrafts, refusalsOf, trimmed, withoutAnswer \} from '@\/lib\/saved-questions';/,
     );
   });
 });

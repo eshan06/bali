@@ -8,6 +8,55 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-16** — **L7b's part 2: Ask a question opens on the teacher's questions, each asked with one
+  click through Ask the class's own ask; its states drawn first; the panel's refusal checks are Your
+  questions' one copy. L7b is done.** Built to
+  [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4): LessonAsk, and
+  LessonAskStates, drawn first as intermediate states (versions 56 to 58): the list loading, didn't load and
+  none saved; an Ask on its way, with no answer, after the session ended, too many tries and refused;
+  a question opened elsewhere meanwhile (#411). **The panel** (`PickPanel`, `components/ask-panel.tsx`):
+  Ask a question, and a closed question's Ask another question, open it on Written ahead, the
+  teacher's questions oldest first (`readDrafts`, as Your questions lists them), each with its answers
+  counted and the correct one named ("4 answers · B marked correct") and Ask, then Write a new question
+  and Your questions (the menu's page). 372 px, `.panel`'s width as LessonAsk draws it; Write a new
+  question turns it into LessonWrite's 460 px form, as drawn, what is written kept until it is asked or
+  cancelled (Close and Escape keep the form, so the panel opens on it again). **Read each time it
+  opens**, as the student panel reads its moments: Loading… under Written ahead, Your questions' line
+  with Try again, or LessonStates' "No saved questions yet."; Write a new question works throughout,
+  but while an ask is on its way.
+  **An Ask is Ask the class's own** (`useLiveQuestion`'s `ask`, #390's guards): one at a time, every
+  Ask held meanwhile, the same words resent under the same id while their answer never came (L6), the
+  panel closing once Bali has asked it and focus going to the question on the card; the ask's `from`
+  names the question asked, so a failure is said under it, with Try again where it can help, and never
+  over the words written, nor theirs under a question. Write a new question holds with the Asks
+  (santa's review, both reviewers): left for the form while a question's ask was on its way, that
+  ask's failure had nowhere to be said, the form saying only an ask of what is written and its Cancel
+  forgetting a failure; LessonAskStates' on-its-way panel draws it held (version 57). And that Cancel
+  forgets only an ask of what is written (round 2: an ask that failed with the panel closed, the list
+  still loading as it opened again, then Write a new question and Cancel, was erased unsaid): a
+  question's failure waits under it however the panel is left, until another ask (version 58's
+  label). A question's words are sent as saved: they passed the same checks when they were saved (one
+  schema, L3b2). *Known limit:* a question's ask that fails while the panel is closed, the question
+  then removed in another tab, is said nowhere, its row gone when the panel opens again; the card
+  shows no question, which is true, and every other question asks as ever. **Never in Present** (the owner,
+  2026-10-15): it names the correct answers, so both views draw only while `panel` holds, which
+  Present never does, pinned by `present.test.ts`. **One copy of the refusal checks** (#390's review):
+  the panel's write form checked and worded what Bali refuses in a copy of its own; it now checks with
+  Your questions' `refusalsOf` and says it with `refusalSaid`, and a test fails if any other portal
+  file holds the server's patterns or those words. So at two answers an empty one says "Fill in this
+  answer.", as Your questions' form says it since #395, where the panel said "or remove it" with no
+  Remove to press. And Add an answer, sharing `.link-btn` with Write a new question, is at the body's
+  15/22 as LessonWrite draws it, where it took the page's 16 px. **The classes home's "Questions and
+  slides" card** was never built in v3 (the menu has had Questions since #395 and Slides since #400),
+  so nothing gives way. *Weighed:* keeping the list between opens (no Loading… each time, but a list
+  that misses a question written in another tab); a failure at the panel's foot (one place, but which
+  question it means is lost with several). **Checked on dev** (`.claude/shots/L7b-2/`): the demo
+  teacher's four questions, the board's, and a session of the demo class: the panel loading and then
+  listing them, an Ask held on its way and the question on the card, Ask another question, Write a new
+  question and its refusals in the shared words, Cancel, Escape and Close, and 390 px; the question
+  closed, the session ended and the four removed after. Sharp renders of the real panel with the
+  boards' data in a throwaway page in the preview, deleted after, beside LessonAsk and LessonAskStates.
+
 - **2026-10-16** — **The student's home reads the account again every 30 s while it's in view with no
   class in session** (the owner, about 04:05 UTC: "Yes: while the student's home is open and in view
   with no class running, re-read the account every 30 seconds so Open the lesson shows up within 30 s

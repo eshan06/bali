@@ -455,6 +455,8 @@ describe('what Bali refuses while writing (LessonStates)', () => {
     expect(said({ prompt: `Q${tab}x`, options: ['a', 'b'], correctOption: null })).toContain(
       `<p id="q-prompt-said" class="text-body">${UNSHOWABLE.replaceAll("'", '&#x27;')}</p>`,
     );
+    // #390's words, the portal's one copy since the class page's panel says them through it too.
+    expect(UNSHOWABLE).toBe("This has a tab or a hidden character Bali can't show. Type it again.");
   });
 
   it('says nothing before Save is pressed', () => {

@@ -42,7 +42,8 @@ export async function readDrafts(
  * The server's own checks of a question's words (`Text`, `apps/api/src/routes/questions.ts`, with
  * `display-name.ts`'s patterns, pinned to them by the test): nothing anyone could see (`INVISIBLE`),
  * or a character that can't be shown (`UNPRINTABLE`: a tab, a control or format character pasted in;
- * the question's own line breaks allowed). A deck's title is held to the same checks (`decks.ts`).
+ * the question's own line breaks allowed). The portal's one copy: the class page's panel checks a
+ * question written there with them too (#390), and a deck's title is held to them (`decks.ts`).
  */
 export const UNPRINTABLE = /[\p{Cc}\p{Cs}\p{Zl}\p{Zp}]|(?![\u200c\u200d])\p{Cf}/u;
 export const INVISIBLE = /^[\p{White_Space}\p{Default_Ignorable_Code_Point}\u2800\u{1D159}]*$/u;
