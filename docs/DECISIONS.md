@@ -8,6 +8,21 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-16** — **The student's home reads the account again every 30 s while it's in view with no
+  class in session** (the owner, about 04:05 UTC: "Yes: while the student's home is open and in view
+  with no class running, re-read the account every 30 seconds so Open the lesson shows up within 30 s
+  of the start."), lifting W4's part 2 known limit, where a class that started while the home stayed
+  in view showed only once its tab came back into view or the page reloaded (#408). `rereadEvery`
+  reads 30 s after each answer, one read at a time; nothing while the tab is hidden, its read as the
+  tab comes back covering that, and 30 s counted afresh from there; the home stops it while a class is
+  in session, the bell and the lesson's reads taking over. The read is the shell's `refresh`: none
+  over a read on its way, and what the page shows kept until the answer, so a failure is said once,
+  as "Bali couldn't load your classes." with Try again, and the next read tries again 30 s on. Two
+  requests a read (the 13+ check, then `/v1/me`): 4 a minute of the account's 120, none while a class
+  is in session. No new screen and no new words (#409). *Weighed:* the shell's own `load`, which
+  clears the failure as it starts: while Bali can't be reached, the failure line would go and come
+  back, said afresh, every 30 s.
+
 - **2026-10-15** — **W4's follow-up: the home's live card says Bali can't be reached when its
   lesson's reads fail before one answers, and an answer whose send gave up at 10 s but landed is in
   once a read shows it held.** Two limits #408 shipped with (its review's notes), each against
