@@ -7,17 +7,14 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { Me } from '../components/shell';
-import * as errors from '../lib/errors';
 import type { Home } from '../lib/student-web';
 
 /*
- * The classes home's create row (the approved Classes home design), read from the source as the
- * invite-code screen's test reads its own: the page needs a browser to reach it. An empty name
- * leaves Create disabled and says nothing (Phase 2's behaviour; the design draws no line for it);
- * a made class is said by the list, read again, never a line of its own (D2e's "is ready" went).
- * And where the home sends each account (PV15; a student to their own home since W3), and the
- * invite page at `/invite` (W3), rendered as the server first draws them, the shell's read of the
- * account given.
+ * Where the home sends each account (PV15; a student to their own home since W3; a teacher to v2's
+ * Home since PV17a, whose view is home.test's in components/), and the invite page at `/invite`
+ * (W3), rendered as the server first draws them, the shell's read of the account given; what needs
+ * a clock or a press (the account read again at a bell, the greeting's turn, a redeem's focus) is
+ * read from the source, as Classes' page is.
  */
 const page = readFileSync(fileURLToPath(new URL('./page.tsx', import.meta.url)), 'utf8');
 
@@ -55,9 +52,14 @@ describe('the home sends each account where it belongs (PV15; decision 13)', () 
     expect(drawnFor(null)).toBe('');
   });
 
-  it('a teacher: their classes, no invite card', () => {
+  it('a teacher: v2’s Home, the greeting heading it, no invite card (PV17a)', () => {
     const html = drawnFor({ kind: 'teacher', me: account('teacher') });
-    expect(html).toMatch(/<h1 [^>]*>Your classes<\/h1>/);
+    expect(html).toMatch(
+      /^<main class="flex flex-col gap-5\.5"><div><h1 tabindex="-1" class="text-greeting text-balance wrap-anywhere">Good (morning|afternoon|evening), Ana Rodríguez<\/h1>/,
+    );
+    // One page heading and one main: the shell's own main is gone once the account is read.
+    expect(html.match(/<h1\b/g)).toHaveLength(1);
+    expect(html.match(/<main\b/g)).toHaveLength(1);
     expect(html).not.toContain('Enter your invite code');
   });
 
@@ -67,7 +69,9 @@ describe('the home sends each account where it belongs (PV15; decision 13)', () 
       /^<main class="[^"]*\bmin-h-\[calc\(100dvh-60px\)\][^"]*"><div class="[^"]*"><section aria-labelledby="[^"]*" class="[^"]*">.*<h1 [^>]*>Enter your invite code<\/h1>.*<\/section><p class="[^"]*">([^<]*)<\/p><\/div><\/main>$/,
     );
     expect(html).toContain(`>${STUDENTS_LINE}</p>`);
+    // Neither a teacher's Home nor a student's.
     expect(html).not.toContain('Your classes');
+    expect(html).not.toContain('Good ');
   });
 
   it('a student who said 13+ in the app: their own home, their classes, never the invite card (W3)', () => {
@@ -116,36 +120,47 @@ describe('the invite page at /invite, where a student’s home sends a teacher w
   });
 });
 
-describe('the classes home’s create row', () => {
-  it('disables Create while the name is empty, and sends nothing for one', () => {
-    const button = /<Button type="submit"[^>]*>/.exec(page)?.[0] ?? '';
-    expect(button).toContain('aria-disabled={busy || !name.trim()}');
-    const guard = page.indexOf('if (sending.current || !trimmed) return;');
-    expect(guard).toBeGreaterThan(-1);
-    expect(guard).toBeLessThan(page.indexOf('await createClass('));
-  });
-
-  it('says nothing for an empty name, and nothing for a made class but the list', () => {
-    expect(Object.keys(errors)).not.toContain('NO_CLASS_NAME');
-    expect(page).not.toMatch(/Enter a name|is ready/);
-    // What the row does say: a create's failure, under the field, and Try again on its button,
-    // but after a final refusal (a deleted account), which no resend can change (PB5's review).
-    expect(page).toContain(
-      "{busy ? 'Creating…' : failed?.kind === 'failed' ? 'Try again' : 'Create class'}",
+describe('a teacher’s Home, as the page runs it (PV17a)', () => {
+  it('reads the account as it opens, and after a redeem gives the greeting focus', () => {
+    expect(page).toMatch(
+      /if \(!getAccessToken\(\)\) \{\s*router\.replace\('\/login'\);\s*return;\s*\}\s*load\(\);/,
     );
-    // The list says a made class out loud too: it sits in a polite live region, the empty line
-    // with it, so a first class replacing that line is heard as well; the form stays outside it,
-    // its failure already an alert of its own.
-    const live = page.indexOf('<div aria-live="polite">');
-    const end = page.indexOf('</div>', page.indexOf('</ul>'));
-    expect(live).toBeGreaterThan(-1);
-    for (const inside of ['No classes yet.', '{me.classes.map(']) {
-      expect(page.indexOf(inside), inside).toBeGreaterThan(live);
-      expect(page.indexOf(inside), inside).toBeLessThan(end);
-    }
-    expect(page.indexOf('<form')).toBeGreaterThan(end);
+    expect(page).toMatch(/redeemed\.current = true;\s*load\(true\);/);
+    expect(page).toMatch(
+      /if \(!redeemed\.current \|\| home\?\.kind !== 'teacher'\) return;\s*redeemed\.current = false;\s*heading\.current\?\.focus\(\);/,
+    );
+    expect(page).toMatch(
+      /<TeacherHome ref=\{heading\} me=\{home\.me\} failed=\{error\} now=\{now\}/,
+    );
   });
 
+  it('dates each answer as it lands, and redraws at a bell or the greeting’s turn, whichever comes first', () => {
+    expect(page).toMatch(/useEffect\(\(\) => setNow\(Date\.now\(\)\), \[home\]\);/);
+    expect(page).toMatch(/const bell = classes === null \? null : nextBell\(classes, now\);/);
+    expect(page).toMatch(
+      /if \(!teacher\) return;\s*const next = Math\.min\(bell \?\? Infinity, nextTurn\(now\)\);\s*const timer = window\.setTimeout\(\(\) => setNow\(Math\.max\(Date\.now\(\), next\)\), next - Date\.now\(\)\);\s*return \(\) => window\.clearTimeout\(timer\);\s*\}, \[teacher, bell, now\]\);/,
+    );
+  });
+
+  it('reads the clock afresh as the tab comes back into view, a timer having slept with the computer', () => {
+    expect(page).toMatch(
+      /const back = \(\) => \{\s*if \(document\.visibilityState === 'visible'\) setNow\(Date\.now\(\)\);\s*\};\s*document\.addEventListener\('visibilitychange', back\);\s*return \(\) => document\.removeEventListener\('visibilitychange', back\);\s*\}, \[\]\);/,
+    );
+  });
+
+  it('reads the account again just after a live class’s bell, once per bell, as Classes does', () => {
+    expect(page).toMatch(/const readAt = classes === null \? null : nextBell\(classes, 0\);/);
+    expect(page).toMatch(
+      /const timer = window\.setTimeout\(load, readAt \+ AFTER_BELL_MS - Date\.now\(\)\);\s*return \(\) => window\.clearTimeout\(timer\);\s*\}, \[readAt, load\]\);/,
+    );
+  });
+
+  it('makes no class itself: New class lives on Classes (#421)', () => {
+    expect(page).not.toMatch(/createClass|New class name|<form/);
+  });
+});
+
+describe('the block’s card', () => {
   it('offers Try again on the block’s register only for an answer that never came (PB5’s review)', () => {
     // A refusal, of the ID or a deleted account's (`final`), keeps the button's own words.
     const blocks = readFileSync(

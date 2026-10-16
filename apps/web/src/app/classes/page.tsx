@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
 import { ClassesView } from '@/components/classes';
@@ -16,14 +16,18 @@ import { AFTER_BELL_MS, nextBell } from '@/lib/classes';
  * New class's dialog (PV16b). At a live class's bell by that clock its Live chip goes, and the
  * account is read again just after it, so its last session shows. Anyone but a teacher goes to
  * their own home. Until the account is read, the shell says Loading… or its failure in the page's
- * place (PV5b).
+ * place (PV5b). Opened from Home's Create a class (`?new`, HomeNew), New class opens as the page
+ * shows, as ClassesNew draws it.
  */
 export default function ClassesPage() {
   const router = useRouter();
+  const asked = useSearchParams().has('new');
   const { home, error, load } = useMe();
   const newClass = useRef<NewClassHandle>(null);
+  const newButton = useRef<HTMLButtonElement>(null);
   const [now, setNow] = useState(() => Date.now());
   const classes = home?.kind === 'teacher' ? home.me.classes : null;
+  const shown = classes !== null;
   // The next bell by this computer's clock, when a card's Live chip goes; and the first bell of
   // the classes the last read counts running, past ones too, when the account is read again.
   const bell = classes === null ? null : nextBell(classes, now);
@@ -40,6 +44,15 @@ export default function ClassesPage() {
   useEffect(() => {
     if (home !== null && home.kind !== 'teacher') router.replace('/');
   }, [home, router]);
+
+  // Once: the address forgets it, so a reload or a way back here opens the page alone. Opened as if
+  // from New class, so Cancel and Escape give focus back to it.
+  useEffect(() => {
+    if (!asked || !shown) return;
+    newButton.current?.focus();
+    newClass.current?.open();
+    window.history.replaceState(null, '', '/classes');
+  }, [asked, shown]);
 
   // Each read's answer is dated as it lands: "today" stays today's after a Try again past midnight.
   useEffect(() => setNow(Date.now()), [home]);
@@ -65,6 +78,7 @@ export default function ClassesPage() {
       now={now}
       onRead={() => load()}
       onNew={() => newClass.current?.open()}
+      newButton={newButton}
     >
       <NewClass ref={newClass} onAnswer={() => load()} />
     </ClassesView>

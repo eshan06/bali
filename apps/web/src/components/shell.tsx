@@ -153,8 +153,8 @@ export interface Me {
   load: (fresh?: boolean) => void;
   /**
    * Read it again unless a read is on its way, keeping what the page shows, its failure too, until
-   * the answer: the student home's read every 30 s (W4's follow-up). Settles once that answer has
-   * landed, or at once when no read began.
+   * the answer: the student home's read every 30 s (W4's follow-up), and the account's Try again
+   * (`AccountUnread`, PV17a). Settles once that answer has landed, or at once when no read began.
    */
   refresh: () => Promise<void>;
 }
@@ -331,22 +331,51 @@ export function SideMenu({
 }
 
 /**
- * The account not read, said in the page's place on every signed-in page, as Home said it
+ * The account not read, said in the page's place on every signed-in page, as Home says it
  * (HomeStates' "Loading, before the account answers" and "The account didn't load"): Loading…
- * while it is read, or its failure with Try again, which reads it again. In the page's frame, with
- * no menu: nothing of a teacher's shows before the account reads as one.
+ * while it is read, or its failure, headed as the page, with Try again. Try again reads it again
+ * keeping the card, its button held as Loading… until Bali answers, so focus stays on it, and a
+ * failure is said again however it is worded (PV17a; HomeInterimStates, drawn first). The only
+ * `<main>` while the page waits: Home draws nothing of its own until the account is read. In the
+ * page's frame, with no menu: nothing of a teacher's shows before the account reads as one.
  */
-export function AccountUnread({ error, onRetry }: { error: string | null; onRetry: () => void }) {
+export function AccountUnread({
+  error,
+  onRetry,
+}: {
+  error: string | null;
+  onRetry: () => Promise<void>;
+}) {
+  // Try again under way.
+  const [held, setHeld] = useState(false);
+  // How many answers Try again has had: each failure's alert is a new one, so it is said again.
+  const [tries, setTries] = useState(0);
+
+  async function again() {
+    if (held) return;
+    setHeld(true);
+    await onRetry();
+    setHeld(false);
+    setTries((n) => n + 1);
+  }
+
   return (
     <main className={PAGE}>
       {error ? (
         <div className={`mx-auto max-w-md ${CARD_ALONE}`}>
-          <p role="alert">
-            <span className="block text-h3">Couldn&apos;t load your account.</span>
-            <span className="mt-2 block text-body text-text-secondary">{error}</span>
-          </p>
-          <Button variant="secondary" onClick={onRetry} className="mt-6">
-            Try again
+          <div key={tries} role="alert">
+            <h1 className="text-body font-semibold">Couldn&apos;t load your account.</h1>
+            <p className="text-body text-text-secondary">{error}</p>
+          </div>
+          {/* One button throughout, held while it reads, so focus stays on it. */}
+          <Button
+            variant="secondary"
+            aria-disabled={held}
+            aria-busy={held}
+            onClick={() => void again()}
+            className="mt-3.5"
+          >
+            {held ? 'Loading…' : 'Try again'}
           </Button>
         </div>
       ) : (
@@ -398,9 +427,9 @@ export function Shell({ children }: { children: ReactNode }) {
     [api],
   );
 
-  // The student home's read every 30 s: never over a read on its way, within a poll's 10 s (#334),
-  // and its failure, if one was said, kept until an answer, so it isn't said afresh every 30 s
-  // while Bali can't be reached.
+  // The student home's read every 30 s, and the account's Try again (PV17a): never over a read on
+  // its way, within a poll's 10 s (#334), and its failure, if one was said, kept until an answer, so
+  // it isn't said afresh every 30 s while Bali can't be reached, and Try again keeps its card.
   const refresh = useCallback(async () => {
     if (reading.current) return;
     reading.current = true;
@@ -471,7 +500,7 @@ export function Shell({ children }: { children: ReactNode }) {
           ) : frame.chrome === 'bar' ? (
             <PortalBar leaving={leaving} onSignOut={onSignOut} />
           ) : null}
-          {frame.hidden ? <AccountUnread error={error} onRetry={() => load()} /> : null}
+          {frame.hidden ? <AccountUnread error={error} onRetry={refresh} /> : null}
           <div hidden={frame.hidden} className={frame.framed ? PAGE : undefined}>
             {children}
           </div>
