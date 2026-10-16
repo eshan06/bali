@@ -2,6 +2,7 @@
 
 import {
   type ClassDetail,
+  type FeedEvent,
   MAX_SESSION_MINUTES,
   type RosterResponse,
   type SessionReportSummary,
@@ -24,6 +25,7 @@ import { PresentQuestion } from '@/components/present-question';
 import { isOpen, QuestionCard, useLiveQuestion } from '@/components/question-card';
 import { endedToday, RecapCard } from '@/components/recap-card';
 import { usePresenting } from '@/components/shell';
+import { SlideCard } from '@/components/slide-card';
 import { getAccessToken } from '@/lib/auth';
 import { errText, NOT_A_SESSION_LENGTH, SESSION_ALREADY_RUNNING } from '@/lib/errors';
 import type { QuestionDraft } from '@/lib/live-question';
@@ -44,6 +46,7 @@ import {
   rememberPresent,
 } from '@/lib/session-controls';
 import { useApi } from '@/lib/use-api';
+import { useSlide } from '@/lib/use-slide';
 
 /**
  * The page in Present, the projector's view (ClassPresent, PresentEnded): no menu, the shell
@@ -155,7 +158,20 @@ export default function ClassDetailPage() {
   // written there (LessonWrite), what is written kept until it is asked or cancelled. A new session
   // starts with neither.
   const live = klass !== null && grid !== null && !grid.over;
-  const { lesson, onEvent, ask, opening, forgetAsk } = useLiveQuestion(live ? grid.id : null);
+  const { lesson, onEvent, ask, opening, forgetAsk, snapshot, reread } = useLiveQuestion(
+    live ? grid.id : null,
+  );
+  // What the session shows (M6, part 2b): from the question's read of the session, the stream and
+  // this tab's own changes, its card in the question card's place while no question shows, the
+  // question first (the conductor's call, 2026-10-16), the slide card back after Done.
+  const { slides, onEvent: onSlideEvent } = useSlide(live ? grid.id : null, snapshot, reread);
+  const onLessonEvent = useCallback(
+    (e: FeedEvent) => {
+      onEvent(e);
+      onSlideEvent(e);
+    },
+    [onEvent, onSlideEvent],
+  );
   const [asking, setAsking] = useState(false);
   const [writing, setWriting] = useState(false);
   const [draft, setDraft] = useState<QuestionDraft>(NEW_DRAFT);
@@ -470,8 +486,17 @@ export default function ClassDetailPage() {
             {present ? null : presentToggle(true)}
           </div>
         )}
-        {/* The live question between the counts and the grid (LessonClass), never in Present. */}
-        {present ? null : (
+        {/* The live question between the counts and the grid (LessonClass), never in Present; the
+            slide shown in its place while no question shows (LessonSlide). */}
+        {present ? null : lesson.question === null && slides.slide !== null ? (
+          <SlideCard
+            id={id}
+            lesson={slides}
+            slide={slides.slide}
+            asking={panel}
+            onAsk={() => setAsking(true)}
+          />
+        ) : (
           <QuestionCard
             id={id}
             lesson={lesson}
@@ -485,7 +510,7 @@ export default function ClassDetailPage() {
           onEnded={onEnded}
           onSession={onSession}
           onCounts={onCounts}
-          onEvent={onEvent}
+          onEvent={onLessonEvent}
           asking={panel}
           onStudentPanel={() => setAsking(false)}
           present={present}

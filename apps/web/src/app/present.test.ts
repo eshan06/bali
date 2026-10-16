@@ -37,7 +37,7 @@ describe('the class page in Present while a session runs (ClassPresent)', () => 
     // question), the class page's question card (never in Present), the grid, then Present's
     // question in the tiles' place (L7, part 2).
     expect(live).toMatch(
-      /<main className=\{present \? PRESENT_PAGE : 'relative flex flex-col gap-5\.5'\}>\s*\{\/\*[^]*?\*\/\}\s*<LiveHeader[^>]*present=\{present\}\s*>[^]*?<\/LiveHeader>\s*\{\/\*[^]*?\*\/\}\s*\{cantLoad\(error\)\}\s*\{\/\*[^]*?\*\/\}\s*\{said \? \([^]*?\) : null\}\s*<section aria-label=\{projected \? undefined : 'Live grid'\} className="flex flex-col gap-5\.5">\s*\{\/\*[^]*?\*\/\}\s*\{projected \? null : \(\s*<div[^>]*>\s*\{counts \? <LiveCounts counts=\{counts\} present=\{present\} \/> : null\}\s*\{present \? null : presentToggle\(true\)\}\s*<\/div>\s*\)\}\s*\{\/\*[^]*?\*\/\}\s*\{present \? null : \(?\s*<QuestionCard[^]*?\/>\s*\)?\}\s*<LiveGrid[^]*?\/>\s*\{\/\*[^]*?\*\/\}\s*\{projected \? <PresentQuestion id=\{id\} lesson=\{lesson\} \/> : null\}\s*<\/section>/,
+      /<main className=\{present \? PRESENT_PAGE : 'relative flex flex-col gap-5\.5'\}>\s*\{\/\*[^]*?\*\/\}\s*<LiveHeader[^>]*present=\{present\}\s*>[^]*?<\/LiveHeader>\s*\{\/\*[^]*?\*\/\}\s*\{cantLoad\(error\)\}\s*\{\/\*[^]*?\*\/\}\s*\{said \? \([^]*?\) : null\}\s*<section aria-label=\{projected \? undefined : 'Live grid'\} className="flex flex-col gap-5\.5">\s*\{\/\*[^]*?\*\/\}\s*\{projected \? null : \(\s*<div[^>]*>\s*\{counts \? <LiveCounts counts=\{counts\} present=\{present\} \/> : null\}\s*\{present \? null : presentToggle\(true\)\}\s*<\/div>\s*\)\}\s*\{\/\*[^]*?\*\/\}\s*\{present \? null : lesson\.question === null && slides\.slide !== null \? \(\s*<SlideCard[^]*?\/>\s*\) : \(\s*<QuestionCard[^]*?\/>\s*\)\}\s*<LiveGrid[^]*?\/>\s*\{\/\*[^]*?\*\/\}\s*\{projected \? <PresentQuestion id=\{id\} lesson=\{lesson\} \/> : null\}\s*<\/section>/,
     );
     // And the side panel's asking only out of Present, as the student's panel (L7-1b).
     expect(page).toMatch(/const panel = asking && !present;/);
@@ -65,12 +65,32 @@ describe('the class page in Present while a session runs (ClassPresent)', () => 
     // PresentQuestion draws none; the section names no live grid while it holds a question.
     const [grid] = tags('LiveGrid');
     expect(grid).toMatch(/\btiles=\{!projected\}/);
-    expect(grid).toMatch(/\bonEvent=\{onEvent\}/);
+    expect(grid).toMatch(/\bonEvent=\{onLessonEvent\}/);
     expect(tags('PresentQuestion')).toEqual(['<PresentQuestion id={id} lesson={lesson} />']);
     // Never the class page's card or its side panel there: their controls and the teacher's live
-    // breakdown are the teacher's alone.
-    expect(live).toMatch(/\{present \? null : \(\s*<QuestionCard/);
+    // breakdown are the teacher's alone; nor its slide card (M6, part 2b-2), Present's slide being
+    // PresentSlide's (2c+2d).
+    expect(live).toMatch(
+      /\{present \? null : lesson\.question === null && slides\.slide !== null \? \(\s*<SlideCard[^]*?\) : \(\s*<QuestionCard/,
+    );
     expect(page).toMatch(/const panel = asking && !present;/);
+  });
+
+  it('shows the slide card in the question card’s place while no question shows, the question first (M6, part 2b-2)', () => {
+    // A question shows, open or closed until Done: the question card, as approved (the conductor's
+    // call, 2026-10-16); the slide card back after Done. One slot, so the grid never moves.
+    expect(live).toMatch(/lesson\.question === null && slides\.slide !== null \? \(\s*<SlideCard/);
+    const [card] = tags('SlideCard');
+    expect(card).toMatch(/\blesson=\{slides\}/);
+    expect(card).toMatch(/\bslide=\{slides\.slide\}/);
+    expect(card).toMatch(/\basking=\{panel\}/);
+    // Both cards hear the stream through the grid; the slide's state from the question's read.
+    expect(page).toMatch(
+      /const \{ slides, onEvent: onSlideEvent \} = useSlide\(live \? grid\.id : null, snapshot, reread\);/,
+    );
+    expect(page).toMatch(
+      /const onLessonEvent = useCallback\(\s*\(e: FeedEvent\) => \{\s*onEvent\(e\);\s*onSlideEvent\(e\);\s*\},\s*\[onEvent, onSlideEvent\],?\s*\);/,
+    );
   });
 
   it('closes and puts away its question there, Done sending focus to Present in the header (L7, part 3)', () => {

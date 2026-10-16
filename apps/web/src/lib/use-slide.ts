@@ -55,8 +55,8 @@ export interface SlideLesson {
   /** Its deck's title, once the teacher's decks are read. */
   title: string | null;
   deck: DeckState;
-  /** A slide change on its way: every slide control holds until it is answered. */
-  changing: boolean;
+  /** The slide change on its way, its button busy: every slide control holds until its answer. */
+  changing: SlideChange | null;
   said: ChangeSaid | null;
   /** Previous (−1) and Next (+1); nothing past either end. */
   turn: (by: -1 | 1) => void;
@@ -148,7 +148,7 @@ export function useSlide(
   const unanswered = useRef<SlideAttempt | null>(null);
   const last = useRef<SlideChange | null>(null);
   const sending = useRef(false);
-  const [changing, setChanging] = useState(false);
+  const [changing, setChanging] = useState<SlideChange | null>(null);
   const [said, setSaid] = useState<ChangeSaid | null>(null);
 
   const put = useCallback((session: string, next: Shown) => {
@@ -232,12 +232,12 @@ export function useSlide(
       if (session === null || sending.current) return false;
       sending.current = true;
       last.current = to;
-      setChanging(true);
+      setChanging(to);
       setSaid(null);
       const attempt = slideAttemptFor(unanswered.current, session, at.eventId, to);
       const answer = await showSlide(api, attempt);
       sending.current = false;
-      setChanging(false);
+      setChanging(null);
       if (now.current.session !== session) return false;
       unanswered.current = keepUnanswered(attempt, answer);
       const end = changeEnd(answer);

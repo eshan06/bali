@@ -8,6 +8,51 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-16** — **M6's part 2b-2: the class page's slide card, LessonSlide's, in the question
+  card's place while no question shows (#416); its states as LessonSlideStates draws them; the
+  button of a change on its way busy.** Built from the code left on `m6-2b-2-slide-card` (rebased
+  onto main after 2b-1's squash) and reviewed against the boards. **The card**
+  (`components/slide-card.tsx`): "Slides · showing" over the deck's title ("…" in the captions' ink
+  until Your slides are read), Ask a question and Stop showing; the slide beside "4 of 12", Previous,
+  Next and "The ← and → keys turn pages too."; the keys turn pages but in a field (an input, a text
+  area, a select, an editor), with a modifier held, or once a control has taken the key. Ask a
+  question is the question card's own button (`askButton`), so `${id}-ask` is on whichever card
+  shows and focus comes back to it after Stop showing, Done or the side panel's Close. **The question
+  first** (the conductor's call): one place between the counts and the grid, the question card while
+  a question shows, open or closed until Done, the slide card back after it on the page the session
+  shows then; never in Present, which keeps its grid until PresentSlide (2c+2d). **The page** is
+  drawn by 2a's `drawPage` at the frame's size as the browser lays it out (a `ResizeObserver`), on a
+  canvas that fills the frame with its picture fitted (`object-contain`): Loading… until the deck's
+  first page is drawn, a turn keeping the page before it until the next is drawn, and each line in
+  the page's stead with Try again, which loads the deck again or, for a page Bali couldn't draw,
+  draws it again. **Sharp, checked** (the conductor's ask): the real card with a test deck opened by
+  `loadDeck`, in headless Chrome at pixel ratios 1, 1.25, 1.5 and 2, its bitmap the page fitted at
+  the screen's ratio, within 0.3% of the frame's device pixels: at 1 the screen shows it pixel for
+  pixel, and above it a resample that small, which no look at full size tells from the bitmap; and
+  in the Browser pane at its own 1.5, a bitmap of 626 × 352 for a frame of 628 × 352 device pixels.
+  *Weighed:* a bitmap of the frame's
+  `devicePixelContentBoxSize` with the page centred in it (a change to 2a's `drawPage`, and no
+  closer under Chrome's emulation). **A change on its way** holds Previous, Next and Stop showing,
+  the keys with them, and marks its own button busy, as LessonSlideStates draws it (`aria-busy` on
+  Next there): the hook's `changing` names the change now, where it was true or false. **Checked on
+  dev**, in the owner's signed-in tab, the demo teacher's 12-page test deck uploaded and shown
+  through the API: Next and Previous from the card and → from the keys, a change on its way caught
+  (each control held, Next busy, answered in 0.4 s), pages shown from outside heard within a second
+  (the first, Previous held; the last, Next held), a letter-sized page in the middle of the white
+  frame, Ask a question's panel opened and closed with focus back on it, a question asked through
+  the API taking the card's place until its Done, then the slide card again on its page with focus
+  on its Ask a question, a second deck whose bucket bytes were swapped after its check refused with
+  the mismatch line and Try again, the card at 390 px, Stop showing leaving the card at rest with
+  focus on its Ask a question, and a reload saying "…" and Loading… before the title and the page;
+  the decks removed and the session ended after. **Santa's review** (both reviewers, and the design
+  check): no blockers. Taken from the WARNs: a line and its Try again that a narrow frame can't hold
+  now scroll inside it (a 320 px phone; from 360 px they fit), the page count is said as it changes
+  (`aria-live`), and a long title wraps evenly. *Left:* a page's draw has no time limit (2a's
+  `drawPage`), so a PDF.js worker that stops answering after the deck opened leaves Loading…, or the
+  page before it, with no line: the limit belongs in `drawPage`, which PresentSlide (2c+2d) and the
+  student web (W5) draw with too; and the keys turn pages while focus is in a side panel, as the
+  board's line says they do.
+
 - **2026-10-16** — **M6's part 2b-1: the slide's hook, no screen (#415); 2b in two; the card's
   intermediate states drawn first (LessonSlideStates, version 60).** **The split:** 2b whole came to
   about 610 changed lines without tests (the worker's count), so the conductor split it: 2b-1, this

@@ -10,6 +10,14 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-16 (Central) — M6's part 2b-1, the slide's hook (#415; `docs/DECISIONS.md`,
+2026-10-16): `lib/use-slide.ts`, no screen: what a session shows, from the question card's own read
+of the session, the stream and the teacher's own changes; the deck's title from the teacher's decks;
+the deck loaded and closed, a download with nothing arriving for 20 s stopped (`watchStall`); slide
+changes one at a time, each answer read for the card. 2b is two PRs now (the worker's sizing), and
+the card's intermediate states are drawn on the canvas (LessonSlideStates, version 60). Before it,
+M6's part 2a (#414). Next: M6's 2b-2, the class page's slide card, then 2c+2d._
+
 _Last updated: 2026-10-16 (Central) — M6's part 2a, the presenter's logic (#414; `docs/DECISIONS.md`,
 2026-10-16): `lib/presenter.ts`, no screen: what a session shows, from its snapshot, its stream and
 the teacher's own slide changes, always the latest change by the server's order; a slide change
