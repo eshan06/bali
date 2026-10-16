@@ -19,6 +19,7 @@ import {
 import { newEventId } from './event-id';
 import { type PageVisibility, POLL_EVERY_MS } from './live-question';
 import {
+  answerSaid,
   type AnswerResult,
   CLOCK_SKEW_MS,
   ENDED_WITHIN_MS,
@@ -648,6 +649,30 @@ describe('keptBell: the session’s start and bell, as the lesson page keeps the
     const later = { ...LISTED, endsAt: new Date(AT + 24 * 60_000).toISOString() };
     expect(keptBell(LISTED, klass(later), SESSION)).toBe(later);
     expect(keptBell(LISTED, klass({ ...LISTED }), SESSION)).toBe(LISTED);
+  });
+});
+
+describe('answerSaid: what the card says of an answer’s request (W4)', () => {
+  it('says nothing once Bali holds the answer', () => {
+    expect(answerSaid({ kind: 'answered', answer: { option: 1, eventId: idAt(AT) } })).toBeNull();
+  });
+
+  it('says too late only for a question closed first, which picking again can’t change', () => {
+    expect(answerSaid({ kind: 'refused', status: 409, reason: 'question_closed' })).toBe(
+      'too_late',
+    );
+  });
+
+  it('says every other failure didn’t send, for the student to pick again', () => {
+    for (const result of [
+      { kind: 'failed', status: undefined, retryAfter: undefined },
+      { kind: 'failed', status: 503, retryAfter: undefined },
+      { kind: 'failed', status: 429, retryAfter: 3 },
+      { kind: 'refused', status: 409, reason: 'event_id_conflict' },
+      { kind: 'refused', status: 403, reason: undefined },
+    ] satisfies AnswerResult[]) {
+      expect(answerSaid(result)).toBe('failed');
+    }
   });
 });
 

@@ -224,6 +224,16 @@ export function endedAt(ended: LessonState['ended'], bell: string | null): numbe
   return between ? at : ended.by;
 }
 
+/**
+ * What an answer's card says of its request (W4): nothing once Bali holds it; too late when the
+ * question closed (or the bell rang) before it reached Bali (`question_closed`), which nothing here
+ * can change; else that it didn't send, for the student to pick again.
+ */
+export function answerSaid(result: AnswerResult): 'too_late' | 'failed' | null {
+  if (result.kind === 'answered') return null;
+  return result.kind === 'refused' && result.reason === 'question_closed' ? 'too_late' : 'failed';
+}
+
 /** A session's start and bell, as `/v1/me` lists them (W3). */
 export type Bell = InSession['liveSession'];
 
