@@ -1328,7 +1328,10 @@ device, so a student following on a phone and a laptop at once spends 60 of the 
 the owner, 2026-10-12: L5, L6, W2), so the poll never spends the headroom an Emergency Unlock
 needs (an unlock refused `429` is still kept and resent, never lost); the portal polls results,
 and the student web the presentation, from each tab while it is visible (a hidden tab reads
-nothing). L4's load gate measures several
+nothing). The student home reads the account every 30 s while it is in view, two requests a read
+(the 13+ check, then `/v1/me`): 4 a minute of the 120, and none while it shows a class in
+session, the bell and the lesson's reads taking over, so it never spends what a lesson's polls or
+an Emergency Unlock needs (`docs/DECISIONS.md`, 2026-10-16). L4's load gate measures several
 classes polling at once behind one school's address, each student on a phone and a laptop
 (settled 2026-10-10), and adds a dedicated budget only if it must.
 
