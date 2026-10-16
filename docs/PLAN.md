@@ -8,17 +8,17 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-16 (Central) — PV17b, Home's live card (#423; `docs/DECISIONS.md`,
-2026-10-16): each class live has Main's card over Your classes, the class page's own grid (its
-snapshot, live feed and 15 s read) handed to it: the ring, the class counted, the countdown, the six
-counts, Open the class, Present (the class page in Present) and the latest unlock on the grid, its
-student and when; the live feed lost said under the counts, its loading and failure as HomeMoreStates
-draws them; a session ended elsewhere takes its card off at once and the classes are read again.
-Its intermediate states drawn first (canvas versions 72 and 73: HomeLiveStates; HomeInterim redrawn
-with the card, HomeInterimPhone no longer built). Checked on dev as the demo teacher in the owner's
-tab and a browser of its own, two classes live included, and sharp beside every board. Before it,
-PV17a (#422). Next on the Windows PC: PV17c, Home's Last session and Recent activity; on the Mac, the
-phone's L8 and M8._
+_Last updated: 2026-10-16 (Central) — PV17c-1, Home's Recent activity (#424; `docs/DECISIONS.md`,
+2026-10-16): while a class is live, Main's Recent activity over the block's card, today's unlocks
+with their reasons, protection offs and starts, newest first, four at most, then Open the class
+while one class is live; read again every 15 s while Home is in view and at once as its tab comes
+back, never on a phone; its API read narrowed to its kinds and the reasons' changes, the same
+answer. PV17c came to about 620 changed lines without tests, so it is two PRs (the worker's split,
+the conductor's call). Its intermediate states drawn first (canvas version 74: HomeRailStates,
+HomeIdlePhone; HomeInterim no longer built). Checked on dev as the demo teacher in a browser of its
+own, an unlock read in within 15 s with no reload, two classes live and a phone's width included,
+and sharp beside every board. Before it, PV17b (#423). Next on the Windows PC: PV17c-2, Home's Last
+session, on the branch `pv17c-2-last-session`; on the Mac, the phone's L8 and M8._
 
 ## Now
 
@@ -45,9 +45,9 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
   keeps D1's look until the owner approves a new one (its redesign rolled back, 2026-10-06). Left:
   the push's app half (not started), TestFlight build 9 for C7's phone test (📱), and the phone's
   Phase 7 screens (L8, M8). C2's legal words (⚖️) go into the portal's pages, on the Windows PC.
-- **The portal redesign in v2's look (PV0–PV17, the owner, 2026-10-12):** PV0–PV16, PV17a and
-  PV17b done, with PV3b, PV4b, PV4c and PV5b; PV17c, Home's Last session and Recent activity, next,
-  on the Windows PC.
+- **The portal redesign in v2's look (PV0–PV17, the owner, 2026-10-12):** PV0–PV16, PV17a, PV17b
+  and PV17c-1 done, with PV3b, PV4b, PV4c and PV5b; PV17c-2, Home's Last session, the redesign's
+  last, next on the Windows PC (its code on the branch `pv17c-2-last-session`).
 - **The workflow review's last steps** ✅ (the owner, 2026-10-13; DECISIONS 2026-10-14): the
   migration guard (#369), docs-only PRs skipping the test jobs (#365), moved files (#368) and two
   tests (#364), each in full in `docs/PLAN-ARCHIVE.md`.
@@ -148,7 +148,7 @@ validation** (each 👀): vitest, `npm run typecheck && npm run lint && npm test
 - **PV14** 👀 A session's report — ✅ (#401; DECISIONS 2026-10-15)
 - **PV15** 👀 The entry pages — ✅ (#388; DECISIONS 2026-10-15). **Then Phase 7's web screens** (Phase 7 steps)
 - **PV16** 👀 Classes — ✅ as PV16a (#420) and PV16b (#421); DECISIONS 2026-10-16
-- **PV17** 👀 Home (Main, HomeIdle, HomeNew, HomeStates), in three: **PV17a** — ✅ (#422; DECISIONS 2026-10-16); **PV17b** — ✅ (#423; DECISIONS 2026-10-16); **PV17c** (~250) Last session (PV2; hidden until a class's first session ends) and Recent activity (PV3; hidden under 640 px; no empty state, a live class's own start always listed): for up to a minute after a bell `lastSession` names a session whose report still says `ended: false`, which means only "not swept yet" (PV2's review), so the card never reads that flag as still running; if Recent activity is polled rather than read once, its read is narrowed first to the three kinds and the reason changes (PV3's review) — validation: as above
+- **PV17** 👀 Home (Main, HomeIdle, HomeNew, HomeStates), in three: **PV17a** — ✅ (#422; DECISIONS 2026-10-16); **PV17b** — ✅ (#423; DECISIONS 2026-10-16); **PV17c** in two (the worker's split, the conductor's call, 2026-10-16): **PV17c-1**, Recent activity — ✅ (#424; DECISIONS 2026-10-16); **PV17c-2** (~240) Last session (PV2; hidden until a class's first session ends; HomeIdle, HomeMoreStates, HomeRailStates and HomeIdlePhone, drawn first): for up to a minute after a bell `lastSession` names a session whose report still says `ended: false`, which means only "not swept yet" (PV2's review), so the card never reads that flag as still running; built on the branch `pv17c-2-last-session`, stacked on PV17c-1's, to rebase onto `main` — validation: as above
 
 ### Phase 7 steps (live lesson; one PR each; 👀 = the owner looks at screenshots, 📱 = needs the owner's iPhone, 🔧 = the owner in a console)
 

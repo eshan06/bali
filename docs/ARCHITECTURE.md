@@ -589,7 +589,9 @@ Teacher app and web portal:
   are the ones each session's report lists, by R2's own `sessionReport`, late ones and ones after
   the bell included, so Home and the report never disagree. Newest first (at one instant, the later
   record), four at most (`ACTIVITY_LIMIT`, the board's count); no paging and no query. A student is
-  `403`.
+  `403`. Home reads it again every 15 s while it shows it (PV17c-1), so the route reads only those
+  three kinds and the reasons' changes of today's sessions, all the report's listing needs: the
+  same answer, at a few events a read.
 - `POST /v1/teacher-invites/redeem` — how an account becomes a teacher (T1b): `{ code, eventId }`,
   the code the owner minted for a school (data model, `teacher_invites`), matched as the command
   printed it with its case, spaces and dashes set aside, and looked up by its hash; in the body,
@@ -1331,7 +1333,9 @@ and the student web the presentation, from each tab while it is visible (a hidde
 nothing). The student home reads the account every 30 s while it is in view, two requests a read
 (the 13+ check, then `/v1/me`): 4 a minute of the 120, and none while it shows a class in
 session, the bell and the lesson's reads taking over, so it never spends what a lesson's polls or
-an Emergency Unlock needs (`docs/DECISIONS.md`, 2026-10-16). L4's load gate measures several
+an Emergency Unlock needs (`docs/DECISIONS.md`, 2026-10-16). A teacher's Home reads its Recent
+activity every 15 s while it is in view with a class live, never on a phone (PV17c-1): 4 a minute,
+beside the class page's grid's own 15 s read of each live session. L4's load gate measures several
 classes polling at once behind one school's address, each student on a phone and a laptop
 (settled 2026-10-10), and adds a dedicated budget only if it must.
 

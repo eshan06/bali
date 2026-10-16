@@ -413,8 +413,9 @@ describe('Recent activity (PV17c; Main, HomeMoreStates, HomeRailStates)', () => 
     expect(html).toMatch(
       /^<section aria-labelledby="([^"]+)" class="rounded-md border border-border-default bg-surface-card p-5 shadow-1"><h2 id="\1" class="flex items-center gap-2 text-section-label text-text-tertiary uppercase"><svg(?=[^>]*\bwidth="14")[^>]*\blucide-scroll-text\b[^>]*>[^]*?<\/svg>Recent activity<\/h2><ol class="flex flex-col mt-3\.5">/,
     );
+    // Open the class in a line of the body's height 14 px under the list, as the board sets it.
     expect(html).toMatch(
-      /<\/ol><a class="mt-3\.5 inline-block rounded-xs text-caption font-semibold text-text-brand [^"]*" href="\/classes\/c1">Open the class<\/a><\/section>$/,
+      /<\/ol><div class="mt-3\.5 text-body"><a class="rounded-xs text-caption font-semibold text-text-brand [^"]*" href="\/classes\/c1">Open the class<\/a><\/div><\/section>$/,
     );
   });
 

@@ -8,6 +8,46 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-16** — **PV17c-1: Home's Recent activity (#424), read again every 15 s while Home is in
+  view, its read narrowed to its kinds; PV17c in two.** Built to [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4):
+  Main's Recent activity and HomeMoreStates' (loading, didn't load), and two boards drawn first as
+  intermediate states (version 74): HomeRailStates (an unlock with no reason given, two classes live
+  at once, a long name, a read again that failed; and Last session's for PV17c-2) and HomeIdlePhone
+  (for PV17c-2). HomeInterim, the page until now, is relabelled as no longer built. **In two:** PV17c
+  came to about 620 changed lines without tests, twice PV17b's, so the worker split it and the
+  conductor took the split: PV17c-1 Recent activity, PV17c-2 Last session, whose code waits on the
+  branch `pv17c-2-last-session`; until it lands, a Home with no class live keeps the block's card
+  alone in the rail, as HomeNoName draws it. **The card** (`RecentActivityView`, `components/home.tsx`):
+  while a class is live, over the block's card; each moment Main's words, the student as their tile
+  names them, an unlock's reason as the pop-up says it ("No reason given" for none, drawn first)
+  before the class, its time without AM or PM as the board draws it (`bareTime`, the recap axis's,
+  now shared); Open the class at its foot while one class is live alone (with two, each live card
+  has its own: drawn first); no card at all for a list that came back empty, which PV1 rules out but
+  for a session started before midnight. **Read again:** at once as Home shows it, then 15 s after
+  each answer while the page is in view, the class page's grid's own pace, and at once as the tab
+  comes back (`pollActivity`, `lib/activity.ts`, on the student home's `rereadEvery`, which now takes
+  its interval); a poll's 10 s limit (#334); only the newest read's answer is shown; a failure in the
+  list's place until a read works, as HomeMoreStates draws it (drawn first). *Weighed:* read once as
+  Home opens, which leaves the list standing still while the live card beside it moves on, one fact
+  said two ways. **Narrowed first** (PV3's review): the route reads today's sessions' `unlock`,
+  `protection_off`, `session_started` and `unlock_reason_changed` alone (`sessionEvents`' new
+  `types`), all `sessionReport` needs to list a session's unlocks and protection offs and say each
+  reason now, so the answer is unchanged: the activity integration tests (happy path, the kinds, own
+  classes only, today, order and limit, the report's listing late and after the bell, names, a
+  student `403`, `401`) hold it to each session's report read whole, and a db test pins the narrowed
+  read to the session's index and to the whole read's listing. No route, field or `403` changes.
+  **Never on a phone:** under 640 px (PV1; PhoneHome) the card is not drawn, and so never read
+  (`useWide`, the width query); *weighed:* v2.css's CSS hiding, which reads every 15 s what it hides.
+  **Shared, not copied:** v2.css's `.tl` is `Timeline` (`components/timeline.tsx`), the student
+  panel's moments and Recent activity's, the panel's time now a `<time>`. **Seen:** on dev as the
+  demo teacher in a browser of its own signed in by the demo world (its profile deleted): a session
+  with Ana's unlock with Nurse, Ben's protection off and Cal's unlock with no reason, listed as Main
+  lists them; Dana's unlock in the list 15 s later with no reload; two classes live, no Open the
+  class; at 390 px no card and no read in 26 s; the session ended with Home open, the card gone with
+  the live card; the rest through the real component, each within a pixel of its board. *Found:*
+  Chrome's full-page capture lays the page out 1 px wide for a moment, which unmounts and remounts
+  the card (a screenshot's artifact, no teacher's: the shots now stay inside the viewport).
+
 - **2026-10-16** — **PV17b: Home's live card (#423); the latest unlock is the newest on the grid;
   Home's Present opens the class in Present.** Built to [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4):
   Main's live card, PhoneHome and HomeMoreStates' live card, and one board drawn first as

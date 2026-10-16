@@ -341,10 +341,13 @@ export function RecentActivityView({
       ) : (
         <>
           <Timeline moments={read.events.map((e) => activityMoment(e))} className="mt-3.5" />
+          {/* In a line of the body's height, as the board sets it: 14 px under the list. */}
           {only !== null ? (
-            <Link href={`/classes/${only}`} className={`mt-3.5 inline-block ${QUIET_LINK}`}>
-              Open the class
-            </Link>
+            <div className="mt-3.5 text-body">
+              <Link href={`/classes/${only}`} className={QUIET_LINK}>
+                Open the class
+              </Link>
+            </div>
           ) : null}
         </>
       )}
