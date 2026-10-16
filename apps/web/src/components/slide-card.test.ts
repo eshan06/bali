@@ -241,23 +241,31 @@ describe('Present’s frame (PresentSlide, PresentSlideStates)', () => {
       createElement(SlideFrame, { deck, slide: slide(), onReload: vi.fn(), look: 'present' }),
     );
 
-  it('is as large as fits the screen under the header, 1351 × 760 at most, in the middle', () => {
+  it('is the page’s width and as tall as the screen leaves, 760 px and 16:9 at most, as PresentSlide renders', () => {
+    // The board's `.app figure` margin 0 outranks `.p-slide`'s auto one: the white frame spans the
+    // page, as the question's card does, the page drawn in its middle (1351 × 760 at 1920 × 1080).
+    // It grows into what Present's header and its row leave (its section fills the page), so a
+    // header on two lines (a 1280 px projector) never pushes the row off the screen.
     const frame = /<figure class="([^"]*)">/.exec(draw(open))?.[1]?.split(' ');
     expect(frame).toEqual(
       expect.arrayContaining([
-        'aspect-video',
-        'mx-auto',
-        'shrink-0',
+        'w-full',
+        'flex-[1_1_0]',
+        'min-h-36',
+        'max-h-[min(760px,calc(100cqw*9/16))]',
         'rounded-md',
-        'w-[min(100%,max(16rem,calc((100dvh_-_232px)*16/9)),1351px)]',
       ]),
     );
+    // Never the card's 16:9 by its width alone, which would keep the frame from shrinking to fit,
+    // but on a phone: the screen's width at 16:9, the page scrolling (PresentSlidePhone).
+    expect(frame).not.toContain('aspect-video');
+    expect(frame).toEqual(expect.arrayContaining(['max-sm:flex-none', 'max-sm:aspect-video']));
     expect(frame).not.toContain('flex-[0_1_420px]');
   });
 
-  it('says Loading… and each line one size up, Try again full size', () => {
+  it('says Loading… and each line one size up, 24 px in, Try again full size', () => {
     expect(draw(open)).toMatch(
-      /<p role="status" class="text-present-line text-text-secondary">Loading…<\/p>/,
+      /<div class="absolute inset-0 grid place-items-center overflow-y-auto p-6 text-center"><p role="status" class="text-present-line text-text-secondary">Loading…<\/p>/,
     );
     const failed = draw({ kind: 'failed', why: 'unloaded' });
     expect(failed).toMatch(/<p role="alert" class="text-present-line">Bali couldn&#x27;t load/);

@@ -37,7 +37,7 @@ describe('the class page in Present while a session runs (ClassPresent)', () => 
     // question or a slide), the class page's question card (never in Present), the grid, then
     // Present's question in the tiles' place (L7, part 2), or else its slide (M6, part 2d).
     expect(live).toMatch(
-      /<main className=\{present \? PRESENT_PAGE : 'relative flex flex-col gap-5\.5'\}>\s*\{\/\*[^]*?\*\/\}\s*<LiveHeader[^>]*present=\{present\}\s*>[^]*?<\/LiveHeader>\s*\{\/\*[^]*?\*\/\}\s*\{cantLoad\(error\)\}\s*\{\/\*[^]*?\*\/\}\s*\{said \? \([^]*?\) : null\}\s*<section aria-label=\{projected \? undefined : 'Live grid'\} className="flex flex-col gap-5\.5">\s*\{\/\*[^]*?\*\/\}\s*\{projected \? null : \(\s*<div[^>]*>\s*\{counts \? <LiveCounts counts=\{counts\} present=\{present\} \/> : null\}\s*\{present \? null : presentToggle\(true\)\}\s*<\/div>\s*\)\}\s*\{\/\*[^]*?\*\/\}\s*\{present \? null : lesson\.question === null && slides\.slide !== null \? \(\s*<SlideCard[^]*?\/>\s*\) : \(\s*<QuestionCard[^]*?\/>\s*\)\}\s*<LiveGrid[^]*?\/>\s*\{\/\*[^]*?\*\/\}\s*\{projected && lesson\.question !== null \? <PresentQuestion id=\{id\} lesson=\{lesson\} \/> : null\}\s*\{projected && lesson\.question === null && slides\.slide !== null \? \(\s*<PresentSlide id=\{id\} lesson=\{slides\} slide=\{slides\.slide\} \/>\s*\) : null\}\s*<\/section>/,
+      /<main className=\{present \? PRESENT_PAGE : 'relative flex flex-col gap-5\.5'\}>\s*\{\/\*[^]*?\*\/\}\s*<LiveHeader[^>]*present=\{present\}\s*>[^]*?<\/LiveHeader>\s*\{\/\*[^]*?\*\/\}\s*\{cantLoad\(error\)\}\s*\{\/\*[^]*?\*\/\}\s*\{said \? \([^]*?\) : null\}\s*\{\/\*[^]*?\*\/\}\s*<section\s+aria-label=\{projected \? undefined : 'Live grid'\}\s+className="flex flex-1 flex-col gap-5\.5"\s*>\s*\{\/\*[^]*?\*\/\}\s*\{projected \? null : \(\s*<div[^>]*>\s*\{counts \? <LiveCounts counts=\{counts\} present=\{present\} \/> : null\}\s*\{present \? null : presentToggle\(true\)\}\s*<\/div>\s*\)\}\s*\{\/\*[^]*?\*\/\}\s*\{present \? null : lesson\.question === null && slides\.slide !== null \? \(\s*<SlideCard[^]*?\/>\s*\) : \(\s*<QuestionCard[^]*?\/>\s*\)\}\s*<LiveGrid[^]*?\/>\s*\{\/\*[^]*?\*\/\}\s*\{projected && lesson\.question !== null \? <PresentQuestion id=\{id\} lesson=\{lesson\} \/> : null\}\s*\{projected && lesson\.question === null && slides\.slide !== null \? \(\s*<PresentSlide id=\{id\} lesson=\{slides\} slide=\{slides\.slide\} \/>\s*\) : null\}\s*<\/section>/,
     );
     // And the side panel only out of Present, as the student's panel (L7-1b), whatever it holds.
     expect(page).toMatch(/const panel = present \? null : side;/);
@@ -91,6 +91,12 @@ describe('the class page in Present while a session runs (ClassPresent)', () => 
     // The grid stays underneath, its tiles and the counts giving way, as for a question.
     const [grid] = tags('LiveGrid');
     expect(grid).toMatch(/\btiles=\{!projected\}/);
+    // Its section fills the rest of Present's page, at least the screen's height, so the slide's
+    // frame takes what the header leaves (present-slide.test.ts).
+    expect(page).toMatch(/const PRESENT_PAGE = '[^']*\bflex min-h-dvh flex-col\b/);
+    expect(live).toMatch(
+      /aria-label=\{projected \? undefined : 'Live grid'\}\s+className="flex flex-1 /,
+    );
   });
 
   it('shows the slide card in the question card’s place while no question shows, the question first (M6, part 2b-2)', () => {

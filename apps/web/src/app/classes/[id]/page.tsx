@@ -502,7 +502,11 @@ export default function ClassDetailPage() {
           ) : null}
         </div>
       ) : null}
-      <section aria-label={projected ? undefined : 'Live grid'} className="flex flex-col gap-5.5">
+      {/* The rest of the page, so Present's slide fills what the screen leaves under the header. */}
+      <section
+        aria-label={projected ? undefined : 'Live grid'}
+        className="flex flex-1 flex-col gap-5.5"
+      >
         {/* The counts and Present over the grid (ClassLive); in Present the counts alone, and
             none while the question or the slide shows in the grid's place (PresentQuestion,
             PresentSlide). */}

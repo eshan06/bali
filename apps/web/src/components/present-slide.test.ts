@@ -83,12 +83,14 @@ describe('Present’s slide (PresentSlide)', () => {
   const html = render(lesson());
 
   it('is its frame, as large as fits under the header, one size up, then its title, page and buttons', () => {
+    // The rest of the page, a container, so its frame is never past 16:9 (`100cqw`).
     expect(html).toMatch(
-      /^<section aria-labelledby="L-ps" class="flex flex-col gap-5\.5"><figure /,
+      /^<section aria-labelledby="L-ps" class="@container flex flex-1 flex-col gap-5\.5"><figure /,
     );
-    // Present's frame, its Loading… one size up (slide-card.test.ts).
+    // Present's frame, the page's width and as tall as the screen leaves, its Loading… one size up
+    // (slide-card.test.ts).
     expect(html).toMatch(
-      /<figure class="[^"]*\bw-\[min\(100%,max\(16rem,calc\(\(100dvh_-_232px\)\*16\/9\)\),1351px\)\]/,
+      /<figure class="[^"]*\bw-full flex-\[1_1_0\] max-h-\[min\(760px,calc\(100cqw\*9\/16\)\)\]/,
     );
     expect(html).toMatch(
       /<p role="status" class="text-present-line text-text-secondary">Loading…<\/p>/,

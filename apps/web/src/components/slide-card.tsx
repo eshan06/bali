@@ -64,19 +64,22 @@ export function UnshownLine({
 }
 
 /**
- * The slide's frame: the class page's card's (v2.css's `.slide`), 420 px wide at most beside its
- * controls; or Present's (`.p-slide`), as large as fits the screen with Present's header, its row
- * and the page's own padding and gaps in sight (232 px at 1920 × 1080), 1351 × 760 at most, as
- * PresentSlide draws it, and 16 rem wide at least where the page is wider.
+ * The slide's frame: the class page's card's (v2.css's `.slide`), 16:9 and 420 px wide at most
+ * beside its controls; or Present's (`.p-slide`), as PresentSlide renders it: the page's whole
+ * width, as the question's card is (`.app figure`'s margin 0 outranks `.p-slide`'s auto one), and as
+ * tall as the screen leaves under Present's header and over its row (its section and the grid's fill
+ * the page: `flex-1`), so a header on two lines never pushes the row off the screen: 760 px at
+ * 1920 × 1080, never past 16:9 (its section a container: `100cqw`), and 9 rem at least; on a phone
+ * the screen's width at 16:9, the page scrolling under it (PresentSlidePhone).
  */
 const FRAME = {
-  card: 'w-full min-w-0 flex-[0_1_420px] rounded-frame',
+  card: 'aspect-video w-full min-w-0 flex-[0_1_420px] rounded-frame',
   present:
-    'mx-auto w-[min(100%,max(16rem,calc((100dvh_-_232px)*16/9)),1351px)] shrink-0 rounded-md',
+    'min-h-36 w-full flex-[1_1_0] max-h-[min(760px,calc(100cqw*9/16))] rounded-md max-sm:flex-none max-sm:aspect-video',
 };
 
 /**
- * The slide: a white 16:9 frame (`FRAME`), its page drawn on a canvas as large as fits (2a's
+ * The slide: a white frame (`FRAME`), its page drawn on a canvas as large as fits (2a's
  * `drawPage`, given the frame's size as the browser lays it out), its shape kept, the canvas
  * filling the frame and its picture fitted in it. Its label is "Slide 4 of 12." and the page's text
  * (decision 8). A turn keeps the page before it until the next is drawn. A page Bali couldn't draw
@@ -139,7 +142,7 @@ export function SlideFrame({
   return (
     <figure
       ref={frame}
-      className={`relative aspect-video overflow-hidden border border-border-default bg-surface-card shadow-1 ${FRAME[look]}`}
+      className={`relative overflow-hidden border border-border-default bg-surface-card shadow-1 ${FRAME[look]}`}
     >
       <canvas
         ref={canvas}
@@ -152,8 +155,11 @@ export function SlideFrame({
         className={`absolute inset-0 size-full object-contain ${place === 'page' ? '' : 'invisible'}`}
       />
       {place === 'page' ? null : (
-        // Scrolls where a narrow frame can't hold a line and its Try again (a phone under 390 px).
-        <div className="absolute inset-0 grid place-items-center overflow-y-auto p-5 text-center">
+        // Scrolls where a narrow frame can't hold a line and its Try again (a phone under 390 px);
+        // 24 px in on Present, as PresentSlideStates draws it.
+        <div
+          className={`absolute inset-0 grid place-items-center overflow-y-auto ${present ? 'p-6' : 'p-5'} text-center`}
+        >
           {place === 'loading' ? (
             <p
               role="status"
