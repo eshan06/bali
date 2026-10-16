@@ -357,11 +357,17 @@ describe('the live card (PV17b; Main, HomeMoreStates, HomeLiveStates)', () => {
       vi.useRealTimers();
     }
   };
-  /** Each link in the card: where it goes, its words, what describes it, its classes. */
+  /**
+   * Each link in the card: where it goes, its words (each tag read as a space, never removed
+   * outright, so no tag can form from what is left), what describes it, its classes.
+   */
   const links = (html: string) =>
     [...html.matchAll(/<a ([^>]*)>(.*?)<\/a>/g)].map(([, attrs = '', inner = '']) => ({
       href: /\bhref="([^"]*)"/.exec(attrs)?.[1],
-      text: inner.replace(/<[^>]+>/g, ''),
+      text: inner
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim(),
       describedBy: /\baria-describedby="([^"]*)"/.exec(attrs)?.[1],
       classes: /\bclass="([^"]*)"/.exec(attrs)?.[1]?.split(' ') ?? [],
       inner,
