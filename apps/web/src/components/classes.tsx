@@ -1,8 +1,8 @@
 'use client';
 
-import { ChevronRight, CircleCheck } from 'lucide-react';
+import { ChevronRight, CircleCheck, Plus } from 'lucide-react';
 import Link from 'next/link';
-import { useId } from 'react';
+import { type ReactNode, useId } from 'react';
 
 import { daysBefore, liveNow, type TaughtClass } from '@/lib/classes';
 import type { RecapFormat } from '@/lib/recap';
@@ -12,6 +12,7 @@ import { Blocks } from './blocks';
 import { Button } from './button';
 import { Ring } from './live-header';
 import { CHIP, CHIP_PILL, DOT } from './live-grid';
+import { cardId } from './new-class';
 
 /** "1 student", "28 students". */
 export const students = (count: number) => `${count} ${count === 1 ? 'student' : 'students'}`;
@@ -51,12 +52,13 @@ export function classLine(c: TaughtClass, now: number, format?: RecapFormat): st
 /**
  * A class on the list (Classes' `.classcard`), the whole card its link: its name over its line, and
  * while its session runs by this computer's clock to the server's bell, the Live chip and the live
- * card's green edge.
+ * card's green edge. Its id lets focus come to a class just made (`NewClass`).
  */
 function ClassCard({ c, now }: { c: TaughtClass; now: number }) {
   const live = liveNow(c, now);
   return (
     <Link
+      id={cardId(c.id)}
       href={`/classes/${c.id}`}
       className={`flex flex-wrap items-center gap-x-4 gap-y-3 rounded-md border bg-surface-card px-5 py-4.5 shadow-1 ${live ? 'border-live-edge' : 'border-border-default hover:border-border-strong'}`}
     >
@@ -75,11 +77,8 @@ function ClassCard({ c, now }: { c: TaughtClass; now: number }) {
   );
 }
 
-/**
- * No classes yet (ClassesEmpty): the card Home shows a new teacher, word for word; its Create a
- * class comes with PV16b's New class dialog (ClassesInterim, drawn first).
- */
-function FirstClass() {
+/** No classes yet (ClassesEmpty): the card Home shows a new teacher, word for word. */
+function FirstClass({ onNew }: { onNew: () => void }) {
   const id = useId();
   return (
     <section
@@ -93,32 +92,44 @@ function FirstClass() {
       <p className="max-w-144 text-body text-text-secondary">
         Name it, then put its join code on the board. Students join with it in the Bali app.
       </p>
+      <Button aria-haspopup="dialog" onClick={onNew} className="mt-1.5">
+        Create a class
+      </Button>
     </section>
   );
 }
 
 /**
- * Classes, in the menu (PV16a; Classes, ClassesEmpty): its head, the list's failure with Try again
- * over the classes read before (HomeStates; as the page opens too, ClassesStates), a card per class
- * or the first class's card, and beside them the block's card, under them on anything narrower.
- * Until PV16b brings New class, its head is the title alone (ClassesInterim, drawn first): Home's
- * create row makes classes meanwhile.
+ * Classes, in the menu (PV16; Classes, ClassesEmpty): its head with New class, the list's failure
+ * with Try again over the classes read before (HomeStates; as the page opens too, ClassesStates), a
+ * card per class or the first class's card, and beside them the block's card, under them on
+ * anything narrower. `children` is the New class dialog, which New class and Create a class open.
  */
 export function ClassesView({
   classes,
   failed,
   now,
   onRead,
+  onNew,
+  children,
 }: {
   classes: TaughtClass[];
   /** The list's last read failed, in `errText`'s words; null once one works. */
   failed: string | null;
   now: number;
   onRead: () => void;
+  onNew: () => void;
+  children?: ReactNode;
 }) {
   return (
     <main className="flex flex-col gap-5.5">
-      <h1 className="text-page-title">Classes</h1>
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+        <h1 className="text-page-title">Classes</h1>
+        <Button variant="secondary" aria-haspopup="dialog" onClick={onNew}>
+          <Plus size={16} aria-hidden="true" />
+          New class
+        </Button>
+      </div>
       {failed !== null ? (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
           <p role="alert" className="text-body">
@@ -132,7 +143,7 @@ export function ClassesView({
       <div className="flex flex-wrap items-start gap-5">
         <div className="flex min-w-0 grow-999 basis-130 flex-col gap-5">
           {classes.length === 0 ? (
-            <FirstClass />
+            <FirstClass onNew={onNew} />
           ) : (
             <ul className="flex flex-col gap-2.5">
               {classes.map((c) => (
@@ -147,6 +158,7 @@ export function ClassesView({
           <Blocks />
         </div>
       </div>
+      {children}
     </main>
   );
 }

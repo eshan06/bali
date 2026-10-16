@@ -13,12 +13,12 @@ import { DOT } from './live-grid';
 import type { Me } from './shell';
 
 /*
- * Classes, in the menu (PV16a): a card per class with its students, its last session or none, and
- * while it runs the Live chip and the live card's edge (Classes); the first class's card with none
- * yet (ClassesEmpty), and until PV16b no New class and no Create a class (ClassesInterim, drawn
- * first); the list's failure over the classes read before (HomeStates); the block's card beside
- * them in v2's look; and the page that reads the account again as it opens and at each live
- * class's bell, for a teacher only.
+ * Classes, in the menu (PV16): its head with New class (PV16b), a card per class with its students,
+ * its last session or none, and while it runs the Live chip and the live card's edge (Classes); the
+ * first class's card with none yet and its Create a class (ClassesEmpty); the list's failure over
+ * the classes read before (HomeStates); the block's card beside them in v2's look; and the page
+ * that reads the account again as it opens and at each live class's bell, for a teacher only, with
+ * New class's dialog (new-class.test.ts).
  */
 const shell = vi.hoisted((): { me: unknown } => ({ me: null }));
 vi.mock('next/navigation', () => ({
@@ -26,6 +26,7 @@ vi.mock('next/navigation', () => ({
 }));
 vi.mock('@/components/shell', () => ({ useMe: () => shell.me }));
 const { ClassesView, classLine, lastSessionDay, students } = await import('./classes');
+const { cardId } = await import('./new-class');
 const { default: ClassesPage } = await import('../app/classes/page');
 
 const read = (path: string) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
@@ -74,6 +75,7 @@ const view = (over: Partial<Parameters<typeof ClassesView>[0]> = {}) =>
       failed: null,
       now: NOW,
       onRead: () => undefined,
+      onNew: () => undefined,
       ...over,
     }),
   );
@@ -121,18 +123,21 @@ describe('a card’s line (Classes; ClassesStates)', () => {
   });
 });
 
-describe('Classes (Classes, ClassesEmpty; ClassesInterim until PV16b)', () => {
-  it('is headed Classes alone, with no New class until PV16b brings its dialog', () => {
+describe('Classes (Classes, ClassesEmpty)', () => {
+  it('is headed by Classes and New class, a secondary button with its plus that opens a dialog', () => {
     const html = view();
     expect(html).toMatch(
-      /^<main class="flex flex-col gap-5\.5"><h1 class="text-page-title">Classes<\/h1>/,
+      /^<main class="flex flex-col gap-5\.5"><div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-3"><h1 class="text-page-title">Classes<\/h1><button type="button" aria-haspopup="dialog" class="[^"]*\bborder-border-strong\b[^"]*"><svg(?=[^>]*\bwidth="16")[^>]*\blucide-plus\b[^]*?<\/svg>New class<\/button><\/div>/,
     );
-    expect(html).not.toMatch(/New class|Create a class|aria-haspopup/);
+    // ClassesInterim's head, the title alone, went with PV16b.
+    expect(html).not.toContain('Create a class');
   });
 
-  it('draws a card per class, the whole card its link, in the list’s order', () => {
+  it('draws a card per class, the whole card its link, in the list’s order, each with its id', () => {
     const list = cards(view());
     expect(list.map((c) => c.href)).toEqual(CLASSES.map((c) => `/classes/${c.id}`));
+    // Focus comes to a class just made by its card's id (NewClass's Done).
+    expect(view()).toMatch(new RegExp(`<a id="${cardId(CLASSES[0]?.id ?? '')}" `));
     expect(list.map((c) => c.words[0])).toEqual([
       'Biology, period 3',
       'Period 1 Biology',
@@ -184,13 +189,31 @@ describe('Classes (Classes, ClassesEmpty; ClassesInterim until PV16b)', () => {
     expect(after?.inner).not.toContain('Live');
   });
 
-  it('with no classes yet, the first class’s card, word for word, and no Create a class until PV16b', () => {
+  it('with no classes yet, the first class’s card, word for word, its Create a class opening the dialog', () => {
     const html = view({ classes: [] });
     expect(cards(html)).toEqual([]);
     expect(html).toMatch(
-      /<section aria-labelledby="([^"]+)" class="flex flex-col items-start gap-2\.5 rounded-md border border-border-default bg-surface-card p-8 shadow-1"><svg width="46" height="46"[^]*?<\/svg><h2 id="\1" class="text-entry-title">Set up your first class<\/h2><p class="max-w-144 text-body text-text-secondary">Name it, then put its join code on the board\. Students join with it in the Bali app\.<\/p><\/section>/,
+      /<section aria-labelledby="([^"]+)" class="flex flex-col items-start gap-2\.5 rounded-md border border-border-default bg-surface-card p-8 shadow-1"><svg width="46" height="46"[^]*?<\/svg><h2 id="\1" class="text-entry-title">Set up your first class<\/h2><p class="max-w-144 text-body text-text-secondary">Name it, then put its join code on the board\. Students join with it in the Bali app\.<\/p><button type="button" aria-haspopup="dialog" class="[^"]*\bbg-action-primary-bg\b[^"]*\bmt-1\.5\b[^"]*">Create a class<\/button><\/section>/,
     );
-    expect(html).not.toMatch(/<button[^>]*>Create a class/);
+    // New class stays at the top (PV1's note on ClassesEmpty).
+    expect(html).toContain('>New class</button>');
+  });
+
+  it('puts the New class dialog it is given after the columns', () => {
+    const html = renderToStaticMarkup(
+      createElement(
+        ClassesView,
+        {
+          classes: CLASSES,
+          failed: null,
+          now: NOW,
+          onRead: () => undefined,
+          onNew: () => undefined,
+        },
+        createElement('dialog', { id: 'new' }),
+      ),
+    );
+    expect(html).toMatch(/<\/div><\/div><dialog id="new"><\/dialog><\/main>$/);
   });
 
   it('says a list that didn’t load over the classes read before, with Try again (HomeStates)', () => {
@@ -269,11 +292,19 @@ describe('the Classes page', () => {
 
   it('draws a teacher’s classes from the shell’s read, its failure over them', () => {
     const html = drawnFor({ kind: 'teacher', me: account('teacher') });
-    expect(html).toMatch(/^<main [^>]*><h1 class="text-page-title">Classes<\/h1>/);
+    expect(html).toMatch(/^<main [^>]*><div [^>]*><h1 class="text-page-title">Classes<\/h1>/);
     expect(cards(html)).toHaveLength(3);
     expect(drawnFor({ kind: 'teacher', me: account('teacher') }, CANT_REACH)).toContain(
       'role="alert"',
     );
+  });
+
+  it('holds New class’s dialog, closed, which New class and Create a class open, every answer reading the account again', () => {
+    const html = drawnFor({ kind: 'teacher', me: account('teacher') });
+    expect(html).toMatch(/<dialog aria-labelledby="[^"]+-title" class="[^"]*">/);
+    expect(html).not.toMatch(/<dialog[^>]*\sopen[\s=>]/);
+    expect(source).toMatch(/onNew=\{\(\) => newClass\.current\?\.open\(\)\}/);
+    expect(source).toMatch(/<NewClass ref=\{newClass\} onAnswer=\{\(\) => load\(\)\} \/>/);
   });
 
   it('draws nothing before the account is read, nor for anyone but a teacher, whom it sends home', () => {

@@ -373,6 +373,8 @@
   /* A live card's edge (W3, the student's home; Home's with PV17b; a live class's card on Classes,
      PV16), the primitive v2.css's `.livecard` draws it with. */
   --color-live-edge: var(--bali-green-200);
+  /* The "is ready" dialog's check (PV16b, ClassesCreated), the primitive v2.css draws it in. */
+  --color-ready: var(--bali-green-600);
   /* The recap's marks (PV12b), the primitives v2.css's `.mk` rings them with: stone, and a
      protection off's red; an unlock's is the pop-up's edge (`unlock-edge`). */
   --color-mark: var(--bali-stone-400);

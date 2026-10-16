@@ -56,15 +56,27 @@ describe('the join code’s card, before a session (ClassBefore)', () => {
   });
 
   it('says Copied for a few seconds, or, where the browser refuses, how to copy it by hand', () => {
+    // The Copy hook, which New class's "is ready" dialog shares (PV16b).
     expect(source).toMatch(/const COPIED_FOR = 2000;/);
     expect(source).toMatch(
       /if \(await copyText\(code\)\) \{\s*setCopy\('copied'\);\s*copied\.current = window\.setTimeout\(\(\) => setCopy\(null\), COPIED_FOR\);\s*\} else setCopy\('failed'\);/,
     );
     expect(source).toMatch(
+      /const forget = useCallback\(\(\) => \{\s*window\.clearTimeout\(copied\.current\);\s*setCopy\(null\);\s*\}, \[\]\);/,
+    );
+    // A Copied still showing when the page goes is forgotten with it.
+    expect(source).toMatch(
+      /useEffect\(\(\) => \(\) => window\.clearTimeout\(copied\.current\), \[\]\);/,
+    );
+    expect(source).toMatch(/const \{ copy, copyCode, forget \} = useCopy\(\);/);
+    expect(source).toMatch(/onClick=\{\(\) => void copyCode\(code\)\}/);
+    expect(source).toMatch(
       /\{copy === 'copied' \? 'Copied' : 'Copy'\}[^]*\{copy === 'failed' \? \(\s*<p role="alert" className="mt-3 text-body">\s*\{CANT_COPY\}/,
     );
     // A new code makes the old one's Copied or failure moot.
-    expect(source).toMatch(/window\.clearTimeout\(copied\.current\);\s*setCopy\(null\);/);
+    expect(source).toMatch(
+      /dialog\.current\?\.close\(\);\s*\/\/ Copy's answer was about the old code\.\s*forget\(\);/,
+    );
   });
 });
 
