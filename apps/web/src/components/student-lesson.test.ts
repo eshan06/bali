@@ -11,11 +11,11 @@ import type { LessonView, Said, Sending, StudentClass } from '../lib/student-web
 import { PRIVACY, StudentLesson, StudentLessonPage } from './student-lesson';
 
 /*
- * A student's lesson (W4, parts 1a and 1b), rendered as it first draws, the boards' sample data in
- * it: StudentLesson's (Biology, period 3 with Ms. Rivera, 23:14 left to a 9:55 bell, its question
- * answered B), StudentNotIn's card, StudentClosed, StudentWaiting, StudentEnded and StudentStates'
- * lines; and the states drawn first on the canvas, StudentNoSlide and StudentCardStates. The
- * phone's chip and its line are part 2's: no state here shows them.
+ * A student's lesson (W4), rendered as it first draws, the boards' sample data in it:
+ * StudentLesson's (Biology, period 3 with Ms. Rivera, 23:14 left to a 9:55 bell, its question
+ * answered B, the phone focused), StudentNotIn, StudentClosed, StudentWaiting, StudentEnded,
+ * StudentPhoneStates and StudentStates' lines; and the states drawn first on the canvas,
+ * StudentNoSlide, StudentCardStates and StudentChipStates.
  */
 const notFound = vi.hoisted(() =>
   vi.fn(() => {
@@ -54,6 +54,8 @@ const question = (over: Partial<StudentQuestion> = {}): StudentQuestion => ({
 });
 const yours = (option: number) => ({ option, eventId: '01924b2c-0000-7000-8000-00000000000a' });
 const slide = { deckId: 'd1', sha256: 'ab', page: 4, pageCount: 12 };
+/** 9:41, the last good read's time while reads fail, as StudentPhoneStates draws it. */
+const AS_OF = Date.parse(BELL) - 14 * 60_000;
 const live = (over: Partial<Presentation> = {}, behind = false, klass = biology): LessonView => ({
   kind: 'live',
   klass,
@@ -66,6 +68,7 @@ const live = (over: Partial<Presentation> = {}, behind = false, klass = biology)
     ...over,
   },
   behind,
+  asOf: behind ? AS_OF : null,
 });
 
 /** The page as it first draws `view`, at NOW, with an answer on its way or said. */
@@ -93,7 +96,15 @@ const rows = (html: string) =>
   [...html.matchAll(/<div class="(flex min-h-13 [^"]*)">([^]*?<\/span><\/span>)<\/div>/g)].map(
     (m) => ({ classes: (m[1] ?? '').split(' '), words: words(m[2] ?? '') }),
   );
-const HEAD = ['Biology, period 3', 'with Ms. Rivera', '23:14', 'ends ', bellTime(BELL)];
+const HEAD = [
+  'Biology, period 3',
+  'with Ms. Rivera',
+  '23:14',
+  'ends ',
+  bellTime(BELL),
+  'Your phone',
+  'Focused',
+];
 const ANSWERS = ['A', 'x = 1', 'B', 'x = 2', 'C', 'x = 4', 'D', 'x = 6'];
 const ANSWERED = 'Your answer is in. You can change it until the question closes.';
 const NOTHING = 'Nothing shared yet. Slides and questions from your teacher show up here.';
@@ -306,8 +317,10 @@ describe('the lesson page while the class runs', () => {
     );
     expect(html).toContain('<span class="font-num text-data-lg tabular-nums">23:14</span>');
     expect(html).toContain(`ends <time dateTime="${BELL}">${bellTime(BELL)}</time>`);
-    // The phone's chip is part 2's.
-    expect(html).not.toMatch(/Your phone|Focused/);
+    // The student's own phone at its end, on a line of its own on a phone, as ClassLive's controls.
+    expect(html).toMatch(
+      /<\/p><div class="ml-auto flex flex-wrap items-center gap-2 max-sm:ml-0 max-sm:basis-full"><p role="status" class="inline-flex flex-wrap items-center gap-2"><span class="text-caption text-text-tertiary">Your phone<\/span><span class="[^"]*">[^]*?Focused<\/span><\/p><\/div><\/header>/,
+    );
   });
 
   it('says nothing is shared yet while no question or slide shows (StudentWaiting)', () => {
@@ -320,14 +333,17 @@ describe('the lesson page while the class runs', () => {
 
   it('says Bali can’t be reached under the head, the lesson as last read under it (StudentStates, StudentCardStates)', () => {
     const BEHIND = "Can't reach Bali right now, so this page may be behind. It keeps trying.";
+    // The phone's chip kept "as of" the last good read beside it (StudentPhoneStates).
+    const AS_OF_WORDS = ['as of ', bellTime(new Date(AS_OF).toISOString())];
     const html = render(live({}, true));
-    expect(words(html)).toEqual([...HEAD, BEHIND, NOTHING]);
+    expect(words(html)).toEqual([...HEAD, ...AS_OF_WORDS, BEHIND, NOTHING]);
     expect(html).toMatch(
       /<\/header><p role="status" class="rounded-sm border border-border-default bg-surface-sunken px-4 py-3 text-body text-text-primary">/,
     );
     const card = render(live({ question: question({ answer: yours(1) }) }, true));
     expect(words(card)).toEqual([
       ...HEAD,
+      ...AS_OF_WORDS,
       BEHIND,
       'Question',
       PROMPT,
@@ -336,7 +352,7 @@ describe('the lesson page while the class runs', () => {
       PRIVACY,
     ]);
     expect(buttons(card).map((b) => b.pressed)).toEqual([false, true, false, false]);
-    expect(render(live())).not.toContain('role="status"');
+    expect(render(live())).not.toMatch(/Can.t reach|as of/);
   });
 
   it('names a teacher with no name nowhere: the class alone', () => {
@@ -346,8 +362,185 @@ describe('the lesson page while the class runs', () => {
       '23:14',
       'ends ',
       bellTime(BELL),
+      'Your phone',
+      'Focused',
       NOTHING,
     ]);
+  });
+});
+
+describe('the student’s own phone beside the class’s name (StudentPhoneStates, StudentChipStates)', () => {
+  /** The phone's chip in the head: its classes, its icon, its words. */
+  const chip = (html: string) => {
+    const m =
+      /<span class="text-caption text-text-tertiary">Your phone<\/span><span class="([^"]*)">(<svg[^>]*>)[^]*?<\/svg>([^<]*)<\/span>/.exec(
+        html,
+      );
+    return { classes: (m?.[1] ?? '').split(' '), icon: m?.[2] ?? '', words: m?.[3] ?? '' };
+  };
+  /** The phone's line under the head: its icon and its words. */
+  const line = (html: string) => {
+    const m =
+      /<\/header><div class="flex items-start gap-3 rounded-sm border border-border-default bg-surface-sunken px-4 py-3 text-body text-text-primary">(<svg[^>]*>)[^]*?<\/svg><p>([^]*?)<\/p><\/div>/.exec(
+        html,
+      );
+    return m ? { icon: m[1] ?? '', words: words(m[2] ?? '').join('') } : null;
+  };
+  const NOT_IN = "You're not tapped in yet. Tap your teacher's block with your phone.";
+  /** 9:41, three minutes after the phone last checked in at 9:38. */
+  const SINCE = new Date(AS_OF - 3 * 60_000).toISOString();
+
+  it('is Focused in focus’s green, with no line (StudentLesson)', () => {
+    const html = render(live());
+    expect(chip(html)).toMatchObject({ words: 'Focused' });
+    expect(chip(html).classes).toEqual(
+      expect.arrayContaining([
+        'rounded-full',
+        'border-[1.5px]',
+        'border-transparent',
+        'bg-state-focused-bg',
+        'text-state-focused-fg',
+        'text-caption',
+        'font-medium',
+      ]),
+    );
+    expect(chip(html).icon).toMatch(/lucide-circle-check/);
+    expect(line(html)).toBeNull();
+  });
+
+  it('is Not in, in not here’s grey, its line under the head saying to tap in (StudentNotIn)', () => {
+    const html = render(live({ phone: null, question: question() }));
+    expect(chip(html)).toMatchObject({ words: 'Not in' });
+    expect(chip(html).classes).toEqual(
+      expect.arrayContaining(['bg-state-notjoined-bg', 'text-state-notjoined-fg']),
+    );
+    expect(chip(html).icon).toContain('class="lucide lucide-circle shrink-0"');
+    expect(line(html)).toEqual({
+      icon: expect.stringMatching(/lucide-nfc/) as string,
+      words: NOT_IN,
+    });
+    // Right under the head, then the card.
+    expect(words(html)).toEqual([
+      ...HEAD.slice(0, -1),
+      'Not in',
+      NOT_IN,
+      'Question',
+      PROMPT,
+      ...ANSWERS,
+      'Pick an answer. You can change it until the question closes.',
+      PRIVACY,
+    ]);
+  });
+
+  it('is Unlocked in emergency orange, its line naming the bell the account says', () => {
+    const html = render(live({ phone: { state: 'unlocked', lastSeenAt: null } }));
+    expect(chip(html)).toMatchObject({ words: 'Unlocked' });
+    expect(chip(html).classes).toEqual(
+      expect.arrayContaining(['bg-state-emergency-bg', 'text-state-emergency-fg']),
+    );
+    expect(chip(html).icon).toMatch(/lucide-lock-open/);
+    expect(line(html)).toEqual({
+      icon: expect.stringMatching(/lucide-smartphone/) as string,
+      words: `Everything on your phone is open until you lock your apps again in the Bali app, or until the bell at ${bellTime(BELL)}. Your teacher can see you unlocked.`,
+    });
+    expect(html).toContain(`until the bell at <time dateTime="${BELL}">${bellTime(BELL)}</time>.`);
+  });
+
+  it('is Screen Time off in protection off’s red, its line saying how to turn it back on', () => {
+    const html = render(live({ phone: { state: 'protection_off', lastSeenAt: null } }));
+    expect(chip(html)).toMatchObject({ words: 'Screen Time off' });
+    expect(chip(html).classes).toEqual(
+      expect.arrayContaining(['bg-state-revoked-bg', 'text-state-revoked-fg']),
+    );
+    expect(chip(html).icon).toMatch(/lucide-shield-off/);
+    expect(line(html)).toEqual({
+      icon: expect.stringMatching(/lucide-smartphone/) as string,
+      words:
+        "Screen Time is off for Bali, so no app on your phone is paused and your teacher sees that it's off. Open the Bali app on your phone to turn it back on.",
+    });
+  });
+
+  it('is Silent with its minutes, dashed, never green, its line naming when Bali last heard from it', () => {
+    vi.useFakeTimers({ now: AS_OF });
+    const html = renderToStaticMarkup(
+      createElement(StudentLesson, {
+        view: live({ phone: { state: 'silent', lastSeenAt: SINCE } }),
+        sending: null,
+        said: null,
+        onPick: () => {},
+        onRetry: () => {},
+      }),
+    );
+    expect(chip(html).words).toBe('Silent · 3 min');
+    expect(chip(html).classes).toEqual(
+      expect.arrayContaining([
+        'border-dashed',
+        'border-border-strong',
+        'bg-state-ended-bg',
+        'text-state-ended-fg',
+      ]),
+    );
+    expect(chip(html).icon).toMatch(/lucide-wifi-off/);
+    expect(line(html)).toEqual({
+      icon: expect.stringMatching(/lucide-smartphone/) as string,
+      words: `Bali hasn't heard from your phone since ${bellTime(SINCE)}, and your teacher sees that. Open the Bali app on your phone so it can check in.`,
+    });
+    expect(html).toContain(`since <time dateTime="${SINCE}">${bellTime(SINCE)}</time>,`);
+  });
+
+  it('is the grid’s Unknown for a state this page has no chip for, with no line (StudentChipStates)', () => {
+    const newer = { state: 'charging', lastSeenAt: null } as unknown as Presentation['phone'];
+    const html = render(live({ phone: newer }));
+    expect(chip(html).words).toBe('Unknown · refresh');
+    expect(chip(html).classes).toEqual(
+      expect.arrayContaining([
+        'border-dashed',
+        'border-border-strong',
+        'bg-state-nodevice-bg',
+        'text-text-primary',
+      ]),
+    );
+    expect(chip(html).icon).toMatch(/lucide-circle-question-mark|lucide-circle-help/);
+    expect(line(html)).toBeNull();
+  });
+
+  it('keeps its state as of the last good read while Bali can’t be reached, Silent’s minutes stopped then (StudentPhoneStates, StudentChipStates)', () => {
+    // Ten minutes on, still unreached: the chip says what the read at 9:41 said.
+    vi.useFakeTimers({ now: AS_OF + 10 * 60_000 });
+    const view = live({ phone: { state: 'silent', lastSeenAt: SINCE } }, true);
+    const html = renderToStaticMarkup(
+      createElement(StudentLesson, {
+        view,
+        sending: null,
+        said: null,
+        onPick: () => {},
+        onRetry: () => {},
+      }),
+    );
+    const asOf = new Date(AS_OF).toISOString();
+    expect(chip(html).words).toBe('Silent · 3 min');
+    expect(html).toContain(
+      `<span class="text-caption text-text-tertiary">as of <time dateTime="${asOf}">${bellTime(asOf)}</time></span></p></div></header>`,
+    );
+  });
+
+  it('says the phone’s line, then that Bali can’t be reached, then the lesson as last read (StudentChipStates)', () => {
+    const html = render(live({ phone: null }, true));
+    const asOf = new Date(AS_OF).toISOString();
+    expect(words(html)).toEqual([
+      ...HEAD.slice(0, -1),
+      'Not in',
+      'as of ',
+      bellTime(asOf),
+      NOT_IN,
+      "Can't reach Bali right now, so this page may be behind. It keeps trying.",
+      NOTHING,
+    ]);
+  });
+
+  it('shows no phone once the class is over (StudentEnded)', () => {
+    const html = render({ kind: 'over', klass: biology, at: Date.parse(BELL) });
+    expect(html).not.toMatch(/Your phone|Focused|Checking/);
   });
 });
 

@@ -10,12 +10,14 @@ import { bellTime } from '../lib/session-controls';
 import { StudentHome } from './student-home';
 
 /*
- * A student's home (W3), rendered as it first draws, the boards' sample data in it: StudentHome
- * (Biology, period 3 in class now with Ms. Rivera, 23:04 left to a 9:55 bell; Chemistry, period 5
- * with Mr. Okafor and AP English, period 6 with Ms. Chen under Other classes), StudentHomeEmpty and
- * StudentStates' "The classes didn't load". Open the lesson and the phone's chip are W4's: the live
- * card has neither, so it offers nothing that does nothing.
+ * A student's home (W3, and W4's live card's last row), rendered as it first draws, the boards'
+ * sample data in it: StudentHome (Biology, period 3 in class now with Ms. Rivera, 23:04 left to a
+ * 9:55 bell, Open the lesson and the phone's chip; Chemistry, period 5 with Mr. Okafor and AP
+ * English, period 6 with Ms. Chen under Other classes), StudentHomeEmpty, StudentStates' "The
+ * classes didn't load" and StudentChipStates' Checking…, drawn first. The chip's other states are
+ * the lesson's read's, after the first draw: `your-phone.test.ts` and `student-web.test.ts`.
  */
+vi.mock('next/navigation', () => ({ useRouter: vi.fn() }));
 const STARTED = '2026-10-12T14:05:00.000Z';
 const BELL = '2026-10-12T14:55:00.000Z';
 /** 23:04 before the bell, as StudentHome draws it. */
@@ -71,6 +73,9 @@ describe('a student’s home with a class in session (StudentHome)', () => {
       '23:04',
       'ends ',
       bellTime(BELL),
+      'Open the lesson',
+      'Your phone',
+      'Checking…',
       'Other classes',
       'Chemistry, period 5',
       'Mr. Okafor',
@@ -91,11 +96,13 @@ describe('a student’s home with a class in session (StudentHome)', () => {
         'p-5.5',
         'shadow-1',
         'flex',
-        'items-center',
-        'gap-3.5',
+        'flex-col',
+        'gap-4',
       ]),
     );
     const inside = card?.[3] ?? '';
+    // Its head a row 14 px apart, as `.lc-head`.
+    expect(inside).toMatch(/^<div class="flex items-center gap-3\.5"><svg width="46"/);
     // Named by its heading, the class's name.
     expect(inside).toMatch(
       new RegExp(`<h2 id="${card?.[1]}" class="text-h3[^"]*">Biology, period 3</h2>`),
@@ -114,9 +121,21 @@ describe('a student’s home with a class in session (StudentHome)', () => {
     expect(inside).toContain(`ends <time dateTime="${BELL}">${bellTime(BELL)}</time>`);
   });
 
-  it('has no Open the lesson and no phone chip until the lesson page reads them (W4)', () => {
-    expect(html).not.toMatch(/Open the lesson|Your phone|Focused/);
-    expect(html).not.toMatch(/<a\b|<button\b/);
+  it('ends on Open the lesson, to the lesson’s page, and the phone’s chip at the right, Checking… until the lesson’s first read (W4)', () => {
+    const row =
+      /<\/p><\/div><div class="flex flex-wrap items-center gap-2\.5">([^]*?)<\/div><\/section>/.exec(
+        html,
+      )?.[1] ?? '';
+    expect(row).toMatch(
+      /^<a class="[^"]*\bh-10\b[^"]*\bbg-action-primary-bg\b[^"]*" href="\/lessons\/bio\/s-bio">Open the lesson<\/a>/,
+    );
+    expect(row).toContain(
+      '<p role="status" class="inline-flex flex-wrap items-center gap-2 ml-auto"><span class="text-caption text-text-tertiary">Your phone</span><span class="text-caption text-text-secondary">Checking…</span></p>',
+    );
+    // Never a chip from this one-time /v1/me (decision 13): only the lesson's read says it.
+    expect(html).not.toMatch(/Focused|as of/);
+    // The one control on the card is its way into the lesson.
+    expect(html.match(/<a\b|<button\b/g)).toHaveLength(1);
   });
 
   it('lists the other classes under their label, each with its teacher, in the read’s order', () => {
@@ -226,6 +245,24 @@ describe('the home’s wiring (read from its source)', () => {
     );
     // Try again reads it too, never with its click as `load`'s fresh flag (which would forget the page).
     expect(source).toContain('onClick={() => onRead()}');
+  });
+
+  it('gives each live card its phone from its lesson’s own read, never a one-time /v1/me (decision 13)', () => {
+    // A card per session, so another session of the class starts from Checking… afresh.
+    expect(source).toContain('<LiveCard key={live.liveSession.id} live={live} onGone={onRead} />');
+    expect(source).toMatch(
+      /const followed = followLesson\(api, sessionId, \(state\) => \{\s*setLesson\(state\);\s*if \(!lessonGone\(state\)\) return;\s*followed\.stop\(\);\s*onGone\(\);\s*\}\);\s*return \(\) => followed\.stop\(\);/,
+    );
+    expect(source).toContain(
+      '<YourPhone chip={phoneChip(lesson, new Date(now))} asOf={lesson.asOf} className="ml-auto" />',
+    );
+    expect(source).not.toMatch(/api\.get\b/);
+  });
+
+  it('reads the account again as its tab comes back into view, so a class that started shows with its way in', () => {
+    expect(source).toMatch(
+      /const back = \(\) => \{\s*if \(document\.visibilityState === 'visible'\) onRead\(\);\s*\};\s*document\.addEventListener\('visibilitychange', back\);\s*return \(\) => document\.removeEventListener\('visibilitychange', back\);/,
+    );
   });
 
   it('gives the home its own read: Home passes the shell’s, never one of its own', () => {

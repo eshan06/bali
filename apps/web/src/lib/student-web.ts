@@ -110,8 +110,9 @@ export interface Lesson {
    * Send the student's pick (`POST /v1/questions/{id}/answers`) in one request (decision 5), under
    * an id minted after the answer held and after the last minted here, so it counts however far
    * behind this computer's clock stands. Refused by `reason`: `question_closed` (it closed, or the
-   * bell rang, first), `invalid_option`, `event_id_conflict`, `account_deleted`. A pick again sends
-   * a new one.
+   * bell rang, first), `invalid_option`, `event_id_conflict`, `account_deleted`; with no whole
+   * answer in `ANSWER_TIMEOUT_MS`, failed as no answer. A pick again sends a new one, minted after
+   * this one, so this one landing late never wins over it.
    */
   answer(questionId: string, option: number): Promise<AnswerResult>;
   /** No more reads, and nothing more handed on: the page is done with the lesson. */
@@ -197,7 +198,8 @@ export function followLesson(
       minted = { questionId, eventId };
       try {
         const body: AnswerRequest = { eventId, option };
-        const res = await api.post<AnswerResponse>(`/v1/questions/${questionId}/answers`, body);
+        const path = `/v1/questions/${questionId}/answers`;
+        const res = await api.post<AnswerResponse>(path, body, ANSWER_TIMEOUT_MS);
         set({ ...state, presentation: keepLater(state.presentation, questionId, res.answer) });
         return { kind: 'answered', answer: res.answer };
       } catch (e) {
@@ -299,13 +301,14 @@ export type LessonView =
   | { kind: 'not_in_class' }
   /** `at`: when it ended, when this page can say (`endedAt`). */
   | { kind: 'over'; klass: StudentClass; at: number | null }
-  /** `behind`: the last read failed, so what shows is the last good one's. */
+  /** `behind`: the last read failed, so what shows is the last good one's, as of `asOf`. */
   | {
       kind: 'live';
       klass: StudentClass;
       bell: Bell;
       presentation: Presentation;
       behind: boolean;
+      asOf: number | null;
     };
 
 /**
@@ -325,34 +328,39 @@ export function lessonView(
     if (account !== 'fresh') return { kind: account === 'failed' ? 'failed' : 'loading' };
     return klass ? { kind: 'over', klass, at: null } : { kind: 'not_in_class' };
   }
-  const { presentation, problem } = lesson;
+  const { presentation, problem, asOf } = lesson;
   if (presentation?.running === false) {
     return { kind: 'over', klass, at: endedAt(lesson.ended, bell.endsAt) };
   }
   if (presentation === null || problem?.kind === 'refused') {
     return { kind: problem ? 'failed' : 'loading' };
   }
-  return { kind: 'live', klass, bell, presentation, behind: problem !== null };
+  return { kind: 'live', klass, bell, presentation, behind: problem !== null, asOf };
 }
 
 /**
  * The chip beside the class's name (decision 13): the app's (DESIGN.md §2), Silent with the whole
  * minutes since Bali last heard from the phone (`since`), as the grid counts them. Any chip but
- * `focused` takes its line under the head; the words, the canvas's, are the lesson page's (W4).
- * `unknown`: a state this page has no chip for (a newer server), never a calm guess.
+ * `focused` and `unknown` takes its line under the head; the words, the canvas's, are the lesson
+ * page's (W4). `unknown`: a state this page has no chip for (a newer server), never a calm guess.
  */
 export type PhoneChip =
   | { kind: 'focused' | 'not_in' | 'unlocked' | 'protection_off' | 'unknown' }
-  | { kind: 'silent'; minutes: number; since: string | null };
+  | { kind: 'silent'; minutes: number; since: string };
 
 /**
  * The student's own phone in the lesson, from the read's `phone` (W1): the state the teacher's grid
  * shows, derived by the server at its clock, so never greener than that; not in while the student
  * has no live participation here. Null before the first good read (the page is checking) and once
  * the session is over. While a read fails, its state is the last good read's, as of `state.asOf`,
- * and Silent's minutes count on to `now`, as the grid's do.
+ * and so are Silent's minutes, which stop at that time beside its "as of" (W4; #333's review);
+ * otherwise they count on to `now`, as the grid's do. A Silent with no time, which W1 never sends,
+ * is `unknown`.
  */
-export function phoneChip(state: LessonState, now: Date = new Date()): PhoneChip | null {
+export function phoneChip(
+  state: Pick<LessonState, 'presentation' | 'asOf'>,
+  now: Date = new Date(),
+): PhoneChip | null {
   if (!state.presentation?.running) return null;
   const phone = state.presentation.phone;
   if (!phone) return { kind: 'not_in' };
@@ -363,11 +371,22 @@ export function phoneChip(state: LessonState, now: Date = new Date()): PhoneChip
       return { kind: phone.state };
     case 'silent': {
       const since = phone.lastSeenAt;
-      const lastSeenAt = since === null ? null : new Date(since);
-      const minutes = minutesSinceContact({ lastSeenAt, joinedAt: null }, now);
+      if (since === null) return { kind: 'unknown' };
+      const at = state.asOf === null ? now : new Date(state.asOf);
+      const minutes = minutesSinceContact({ lastSeenAt: new Date(since), joinedAt: null }, at);
       return { kind: 'silent', minutes, since };
     }
     default:
       return { kind: 'unknown' };
   }
+}
+
+/**
+ * Whether the home should read the account again for a class's lesson (W4): a read said its session
+ * is over, or Bali refused it (the student left or was removed from the class since, or the session
+ * isn't the class's), so the account now lists the class without it. A `401` has signed out.
+ */
+export function lessonGone(state: LessonState): boolean {
+  const { presentation, problem } = state;
+  return presentation?.running === false || (problem?.kind === 'refused' && problem.status !== 401);
 }

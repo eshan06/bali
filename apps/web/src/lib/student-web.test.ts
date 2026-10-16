@@ -29,6 +29,7 @@ import {
   homeClasses,
   homeFor,
   keptBell,
+  lessonGone,
   type LessonState,
   lessonView,
   nextBell,
@@ -598,10 +599,14 @@ describe('phoneChip', () => {
   it('says a state it has no chip for as unknown, never a calmer one', () => {
     const newer = { state: 'charging', lastSeenAt: null } as unknown as StudentPhone;
     expect(phoneChip(read(newer), now)).toEqual({ kind: 'unknown' });
+    // Silent with no time to count from, which W1 never sends: no minutes to vouch for.
+    expect(phoneChip(read({ state: 'silent', lastSeenAt: null }), now)).toEqual({
+      kind: 'unknown',
+    });
   });
 
   it('is none before the first good read, and once the session is over', () => {
-    expect(phoneChip({ presentation: null, problem: null, asOf: null }, now)).toBeNull();
+    expect(phoneChip({ presentation: null, asOf: null }, now)).toBeNull();
     expect(phoneChip(read(null, { running: false }), now)).toBeNull();
   });
 
@@ -612,6 +617,55 @@ describe('phoneChip', () => {
       asOf: AT - 30_000,
     };
     expect(phoneChip(failing, now)).toEqual({ kind: 'unlocked' });
+  });
+
+  it('stops Silent’s minutes at the time it is as of while Bali can’t be reached, counting on once it can (W4)', () => {
+    // Silent since 9:38 by the last good read, at 9:41; reads fail from then on.
+    const since = new Date(AT - 3 * 60_000).toISOString();
+    const failing: LessonState = {
+      ...read({ state: 'silent', lastSeenAt: since }),
+      problem: { kind: 'failed', status: undefined, retryAfter: undefined },
+      asOf: AT,
+    };
+    const later = new Date(AT + 10 * 60_000);
+    expect(phoneChip(failing, later)).toEqual({ kind: 'silent', minutes: 3, since });
+    // Read again: the minutes the grid counts now.
+    const reached: LessonState = { ...failing, problem: null, asOf: null };
+    expect(phoneChip(reached, later)).toMatchObject({ minutes: 13 });
+  });
+});
+
+describe('lessonGone: when the home reads the account again for a class’s lesson (W4)', () => {
+  const read = (over: Partial<Presentation> = {}): LessonState => ({
+    presentation: lesson(over),
+    problem: null,
+    asOf: null,
+  });
+
+  it('is a read saying the session is over', () => {
+    expect(lessonGone(read({ running: false, phone: null }))).toBe(true);
+    expect(lessonGone(read())).toBe(false);
+    expect(lessonGone({ presentation: null, problem: null, asOf: null })).toBe(false);
+  });
+
+  it('is a refusal: the class left, or the session not the class’s; never a 401, which signed out', () => {
+    for (const status of [403, 404]) {
+      const refused = { kind: 'refused', status, reason: undefined } as const;
+      expect(lessonGone({ ...read(), problem: refused })).toBe(true);
+      expect(lessonGone({ presentation: null, problem: refused, asOf: null })).toBe(true);
+    }
+    const signedOut = { kind: 'refused', status: 401, reason: undefined } as const;
+    expect(lessonGone({ presentation: null, problem: signedOut, asOf: null })).toBe(false);
+  });
+
+  it('is never a read with no answer, nor a 429: those are read again', () => {
+    for (const problem of [
+      { kind: 'failed', status: undefined, retryAfter: undefined },
+      { kind: 'failed', status: 503, retryAfter: undefined },
+      { kind: 'failed', status: 429, retryAfter: 7 },
+    ] as const) {
+      expect(lessonGone({ ...read(), problem, asOf: AT })).toBe(false);
+    }
   });
 });
 
@@ -855,7 +909,7 @@ describe('lessonView: what the lesson page shows (W4)', () => {
     });
   });
 
-  it('shows the lesson as read, behind while reads fail; a refusal is no lesson to show', () => {
+  it('shows the lesson as read, behind while reads fail, as of the last good read; a refusal is no lesson to show', () => {
     const asked = read({ question: question() });
     expect(lessonView(biology, 'fresh', SOON, asked)).toEqual({
       kind: 'live',
@@ -863,10 +917,14 @@ describe('lessonView: what the lesson page shows (W4)', () => {
       bell: SOON,
       presentation: asked.presentation,
       behind: false,
+      asOf: null,
     });
-    expect(lessonView(biology, 'fresh', SOON, { ...asked, problem: failed })).toMatchObject({
+    expect(
+      lessonView(biology, 'fresh', SOON, { ...asked, problem: failed, asOf: AT }),
+    ).toMatchObject({
       kind: 'live',
       behind: true,
+      asOf: AT,
     });
     const refused = { kind: 'refused', status: 403, reason: undefined } as const;
     expect(lessonView(biology, 'fresh', SOON, { ...asked, problem: refused })).toEqual({

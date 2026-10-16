@@ -1,48 +1,86 @@
 'use client';
 
 import type { MeResponse } from '@bali/shared';
+import Link from 'next/link';
 import { useEffect, useId, useState } from 'react';
 
 import { bellTime } from '@/lib/session-controls';
-import { homeClasses, type InSession, nextBell, type StudentClass } from '@/lib/student-web';
+import {
+  followLesson,
+  homeClasses,
+  type InSession,
+  lessonGone,
+  type LessonState,
+  nextBell,
+  phoneChip,
+  type StudentClass,
+} from '@/lib/student-web';
+import { useApi } from '@/lib/use-api';
 
-import { Button } from './button';
+import { Button, buttonClass } from './button';
 import { Ring, shareLeft, timeLeft, useClock } from './live-header';
 import { TextLink } from './text-link';
+import { YourPhone } from './your-phone';
+
+const UNREAD: LessonState = { presentation: null, problem: null, asOf: null };
 
 /**
  * A class in session (StudentHome's live card): the ring, the share of the session left; the name
  * over its teacher and "in class now", right under it as the board renders it; the time left on
- * this computer's clock to the server's bell, the bell under it. Its last row, Open the lesson and
- * the phone's chip, is W4's, with the lesson page and its read.
+ * this computer's clock to the server's bell, the bell under it; then Open the lesson, to its page
+ * (W4), and the student's own phone, from the lesson's own read, as the lesson page reads it, never
+ * a one-time `/v1/me` (decision 13: never greener than the teacher's grid), its states as
+ * StudentChipStates draws them (drawn first). A read saying the session is over, or refusing it,
+ * has the account read again (`onGone`), so the class leaves the card at once.
  */
-function LiveCard({ live }: { live: InSession }) {
+function LiveCard({ live, onGone }: { live: InSession; onGone: () => void }) {
+  const api = useApi();
   const id = useId();
-  const { startedAt, endsAt } = live.liveSession;
+  const { id: sessionId, startedAt, endsAt } = live.liveSession;
   const now = useClock(endsAt);
+  const [lesson, setLesson] = useState(UNREAD);
   const teacher = live.teacher.displayName?.trim();
+
+  useEffect(() => {
+    const followed = followLesson(api, sessionId, (state) => {
+      setLesson(state);
+      if (!lessonGone(state)) return;
+      followed.stop();
+      onGone();
+    });
+    return () => followed.stop();
+  }, [api, sessionId, onGone]);
+
   return (
     <section
       aria-labelledby={id}
-      className="flex items-center gap-3.5 rounded-live border border-live-edge bg-surface-card p-5.5 shadow-1"
+      className="flex flex-col gap-4 rounded-live border border-live-edge bg-surface-card p-5.5 shadow-1"
     >
-      <Ring share={shareLeft(startedAt, endsAt, now)} box={46} stroke={5} />
-      <div className="min-w-0 flex-1">
-        <h2 id={id} className="text-h3 wrap-anywhere">
-          {live.name}
-        </h2>
-        <p className="text-countdown-sub text-text-secondary wrap-anywhere">
-          {teacher ? `${teacher} · in class now` : 'In class now'}
+      <div className="flex items-center gap-3.5">
+        <Ring share={shareLeft(startedAt, endsAt, now)} box={46} stroke={5} />
+        <div className="min-w-0 flex-1">
+          <h2 id={id} className="text-h3 wrap-anywhere">
+            {live.name}
+          </h2>
+          <p className="text-countdown-sub text-text-secondary wrap-anywhere">
+            {teacher ? `${teacher} · in class now` : 'In class now'}
+          </p>
+        </div>
+        <p className="flex shrink-0 flex-col text-right">
+          <span className="font-num text-home-countdown tabular-nums">
+            {timeLeft(Date.parse(endsAt) - now)}
+          </span>
+          <span className="text-cell-sub text-text-secondary">
+            ends <time dateTime={endsAt}>{bellTime(endsAt)}</time>
+          </span>
         </p>
       </div>
-      <p className="flex shrink-0 flex-col text-right">
-        <span className="font-num text-home-countdown tabular-nums">
-          {timeLeft(Date.parse(endsAt) - now)}
-        </span>
-        <span className="text-cell-sub text-text-secondary">
-          ends <time dateTime={endsAt}>{bellTime(endsAt)}</time>
-        </span>
-      </p>
+      <div className="flex flex-wrap items-center gap-2.5">
+        <Link href={`/lessons/${live.id}/${sessionId}`} className={buttonClass('primary')}>
+          Open the lesson
+        </Link>
+        <YourPhone chip={phoneChip(lesson, new Date(now))} asOf={lesson.asOf} className="ml-auto" />
+      </div>
     </section>
   );
 }
@@ -78,6 +116,8 @@ function ClassRows({ classes }: { classes: StudentClass[] }) {
  * teacher's way to the invite page (decision 13). `failed`: the account's last read failed, said as
  * StudentStates draws it, Try again reading it again (`onRead`). At its bell by this computer's
  * clock a class leaves its card and the page reads the account again: added minutes bring it back.
+ * It reads it again too as its tab comes back into view, so a class that started while it was away
+ * shows with its way into the lesson (W4), and as a live card's lesson says it is over.
  */
 export function StudentHome({
   me,
@@ -102,6 +142,14 @@ export function StudentHome({
     }, bell - Date.now());
     return () => window.clearTimeout(timer);
   }, [bell, onRead]);
+
+  useEffect(() => {
+    const back = () => {
+      if (document.visibilityState === 'visible') onRead();
+    };
+    document.addEventListener('visibilitychange', back);
+    return () => document.removeEventListener('visibilitychange', back);
+  }, [onRead]);
 
   return (
     <main className="flex flex-col gap-5.5">
@@ -144,7 +192,7 @@ export function StudentHome({
       ) : (
         <div className="flex max-w-215 flex-col gap-5">
           {classes.inSession.map((live) => (
-            <LiveCard key={live.id} live={live} />
+            <LiveCard key={live.liveSession.id} live={live} onGone={onRead} />
           ))}
           {classes.others.length === 0 ? null : classes.inSession.length === 0 ? (
             <ClassRows classes={classes.others} />

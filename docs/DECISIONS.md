@@ -8,6 +8,60 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-15** — **W4's part 2: the student's own phone on the lesson page and on the home's live
+  card, both from the lesson's read; Silent's minutes stop at the time they're "as of"; an answer's
+  send that hangs says it didn't send after 10 s. W4 is done.** Built to
+  [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4): StudentLesson's and
+  StudentNotIn's heads, StudentPhoneStates, StudentHome's live card, StudentZoom at 720 px, and one
+  board drawn first as intermediate states (version 54), StudentChipStates: the grid's Unknown for a
+  state the page has no chip for, Silent kept "as of" the last read, the phone's line and "Can't reach
+  Bali" together, and the home's card checking, with a chip alone, and "as of" (#408). **The chip**
+  (`YourPhone`, `components/your-phone.tsx`): "Your phone" and the chip in the grid's tint, icon and
+  edge for its state (`CHIP`), so it never reads greener than the teacher's tile, in the app's words
+  (Not in, Screen Time off), Silent with its minutes; Checking… before Bali first answers; and while
+  reads fail, the last good read's chip "as of" its time. **Silent's minutes stop at that time**
+  (W2 left the call to W4, #333): a chip "as of 9:41" whose minutes counted on would claim minutes no
+  read vouched for; read again, they count on as the grid's do. A Silent with no time, which W1 never
+  sends, reads as Unknown. **The line under the head** is StudentPhoneStates' words, the Unlocked
+  one's bell the account's (`/v1/me`'s `liveSession.endsAt`, kept by `keptBell`) and the Silent one's
+  time the read's `lastSeenAt`; none for Focused, and none for Unknown, whose "refresh" says what to
+  do. **While Bali can't be reached:** the head, the phone's line, "Can't reach Bali", then the
+  lesson as last read (drawn first): the phone's line stays under the chip it explains, and the
+  can't-reach line sits over the lesson it qualifies. *Weighed:* "Can't reach Bali" first, as a
+  banner over everything (the phone's line jumps down as the network drops). **The home's live
+  card** ends on Open the lesson (`/lessons/<class>/<session>`) and the chip, which the card reads
+  from the lesson's own read (`followLesson`, every 2 s while the tab is visible), never from `/v1/me`
+  (decision 13: never greener than the grid), with no line (the lines are the lesson page's). A read
+  saying the session is over, or refusing it (the student left or was removed from the class), has
+  the home read the account again at once and stops that card's reads (`lessonGone`), so a class
+  the teacher ends early leaves its card within about 2 s (W3's review); and the home reads the
+  account again as its tab comes back into view, so a class that started while it was away shows
+  with its way in. *Weighed:* reading `/v1/me` every few seconds while the home is in view (two
+  reads each time, where the lesson's read already says when a class ends); keeping the card's last
+  chip until that account read lands (the chip of a session that is over: Checking… instead, for the
+  moment). *Known limit:* a class that starts while the home stays in view shows when its tab next
+  comes back into view or the page reloads. **The answer's send** (#407's review): `ApiClient.post` takes
+  a limit (`limitMs`), and only the answer's send passes one (`ANSWER_TIMEOUT_MS`, the polls' 10 s),
+  ending in the card's drawn "didn't send" with its retry, a pick again; the deck check and every
+  other write keep none, for #403's reasons. A pick again mints its id after the one that timed out
+  (W2), so the first, landing late, never wins over it. The failing tests came first. **200% zoom:**
+  StudentZoom at 720 px builds as drawn (the menu a bar on top, the head on one row with the chip at
+  its end, the card a column of its own); on a phone the chip takes a line of its own under the
+  head, as ClassLive's controls do. **Checked on dev:** the demo teacher started a 30-minute session
+  of the demo class; Ana's web followed it through the page's own logic while her phone went through
+  the API as the app sends: Not in (with a question open, which she answered B from the web through
+  the 10 s limit), a tap at the teacher's block (Focused), Emergency Unlock (Unlocked), refocus,
+  Screen Time off and back on, then silence, read as Silent 89 s after the phone's last word by this
+  computer's clock, its minutes stopped as of that read and counting on once read again; a check-in
+  brought her back. The teacher's End was read as over 2.0 s later, `lessonGone` said so, and the
+  account read then listed the class with no session. The question was closed and the session ended.
+  **The screenshots:** the real components with those reads in a throwaway page in the preview alone,
+  deleted after, the browser's clock held at each read's time (the home's lesson reads answered from
+  them), beside the boards at 1440, 720 and 390 px, the chip, its line and the home's row box for box
+  within the menu's 0.7 px; at 720 and 390 also with the boards' class name, for a like-for-like
+  check, since the dev class's long name wraps the head. A real iPhone's half is the owner's, once
+  the app's card (L8) can answer.
+
 - **2026-10-15** — **W4's part 1b: the student's question card; too late closes it at once.** Built
   to [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4): StudentLesson's,
   StudentNotIn's and StudentClosed's card, alone at its own width (StudentNoSlide) and a column of

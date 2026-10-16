@@ -148,8 +148,12 @@ export const PRESENT_COLUMNS = 'grid-cols-2 gap-3 @2xl:grid-cols-3 @4xl:grid-col
 /** The tile whose panel is open (v2.css's `.tile.is-selected`): the focus ring's look. */
 const SELECTED = 'rounded-md ring-2 ring-focus-ring ring-offset-2 ring-offset-surface-page';
 
+/** A state's chip (v2.css's `.chip-mini`): a pill 3 × 10 px in, its words 13/18, its edge 1.5 px. */
+export const CHIP_PILL =
+  'inline-flex shrink-0 items-center gap-1.5 rounded-full border-[1.5px] px-2.5 py-0.75 text-caption font-medium whitespace-nowrap tabular-nums';
+
 /** A dot between two parts of a line, after a no-break space, so a line never starts with one. */
-const DOT = '\u00a0· ';
+export const DOT = '\u00a0· ';
 
 /**
  * A tile in v2's look (ClassStates): filled with its state's tint, its edge 1.5 px (dashed for
@@ -319,9 +323,7 @@ export function StateChip({ student: s, now }: { student: Student; now: Date }) 
   const { icons, tone } = CHIP[display];
   const Icon = icons[icons.length - 1] ?? Circle;
   return (
-    <span
-      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border-[1.5px] px-2.5 py-0.75 text-caption font-medium whitespace-nowrap tabular-nums ${tone}`}
-    >
+    <span className={`${CHIP_PILL} ${tone}`}>
       <Icon size={13} aria-hidden="true" className="shrink-0" />
       {stateWords(s, display, now).replaceAll(' · ', DOT)}
     </span>
