@@ -11,6 +11,10 @@ import {
 import {
   closeAttemptFor,
   closeQuestion,
+  DONE_CHANNEL,
+  doneChannel,
+  type DoneNews,
+  heardDone,
   LONGEST_WAIT_MS,
   openAttemptFor,
   openQuestion,
@@ -257,6 +261,152 @@ describe('questionAfter', () => {
     // Held or not (#332's review): an open naming no question is one only the snapshot knows.
     expect(questionAfter(null, { type: 'question_opened', payload: null })).toBe('unknown');
     expect(questionAfter(null, { type: 'question_opened', payload: {} })).toBe('unknown');
+  });
+});
+
+describe('doneChannel: a Done told to every Bali window of this browser (L7, part 3)', () => {
+  // Node's BroadcastChannel, as a browser's: every other channel of the name, never the teller.
+  const NEWS: DoneNews = { sessionId: SESSION, questionId: QUESTION };
+  const ends: { close(): void }[] = [];
+  /** One window's end of the channel, closed after each test. */
+  function aWindow() {
+    const onDone = vi.fn<(news: DoneNews) => void>();
+    const channel = doneChannel(onDone);
+    ends.push(channel);
+    return { channel, onDone };
+  }
+  afterEach(() => {
+    for (const end of ends.splice(0)) end.close();
+    vi.unstubAllGlobals();
+  });
+
+  it('tells every other window, never the one that told it', async () => {
+    const [a, b, c] = [aWindow(), aWindow(), aWindow()];
+    a.channel.tell(NEWS);
+    await vi.waitFor(() => {
+      expect(b.onDone).toHaveBeenCalledWith(NEWS);
+      expect(c.onDone).toHaveBeenCalledWith(NEWS);
+    });
+    // Another window's Done after it: the first hears that one, and never heard its own.
+    const later = { ...NEWS, questionId: EVENT };
+    b.channel.tell(later);
+    await vi.waitFor(() => expect(a.onDone).toHaveBeenCalledOnce());
+    expect(a.onDone).toHaveBeenCalledWith(later);
+    expect(b.onDone.mock.calls).toEqual([[NEWS]]);
+    expect(c.onDone.mock.calls).toEqual([[NEWS], [later]]);
+  });
+
+  it('tells the two ids alone, and hears only news of that shape', async () => {
+    const heard = aWindow();
+    const other = new BroadcastChannel(DONE_CHANNEL);
+    try {
+      for (const junk of [
+        'x',
+        null,
+        7,
+        {},
+        { sessionId: SESSION },
+        { sessionId: 1, questionId: QUESTION },
+        { sessionId: SESSION, questionId: [QUESTION] },
+      ]) {
+        other.postMessage(junk);
+      }
+      other.postMessage({ ...NEWS, student: 'Ana Rodríguez' });
+      await vi.waitFor(() => expect(heard.onDone).toHaveBeenCalled());
+      expect(heard.onDone.mock.calls).toEqual([[NEWS]]);
+      // Whatever else a caller's news held, the channel carries the two ids.
+      const carried = new Promise<unknown>((resolve) => {
+        other.onmessage = (e: MessageEvent<unknown>) => resolve(e.data);
+      });
+      aWindow().channel.tell({ ...NEWS, student: 'Ana Rodríguez' } as DoneNews);
+      expect(await carried).toEqual(NEWS);
+    } finally {
+      other.close();
+    }
+  });
+
+  it('hears nothing once closed', async () => {
+    const [gone, still, teller] = [aWindow(), aWindow(), aWindow()];
+    gone.channel.close();
+    teller.channel.tell(NEWS);
+    await vi.waitFor(() => expect(still.onDone).toHaveBeenCalledOnce());
+    expect(gone.onDone).not.toHaveBeenCalled();
+  });
+
+  it('is one channel for the browser, by its name', () => {
+    const names: string[] = [];
+    class Named {
+      onmessage = null;
+      constructor(name: string) {
+        names.push(name);
+      }
+      postMessage() {}
+      close() {}
+    }
+    doneChannel(vi.fn(), Named as unknown as typeof BroadcastChannel).close();
+    expect(names).toEqual([DONE_CHANNEL]);
+  });
+
+  describe('heardDone: what a window puts away on hearing one', () => {
+    // UUIDv7s, minted in order: an older question sorts first.
+    const OLDER = '01924b2c-0000-7000-8000-000000000002';
+    const NAMED = QUESTION;
+    const NEWER = '01924b2c-0000-7000-8000-000000000004';
+    const OTHER = '01924b2c-0000-7000-8000-0000000000aa';
+    const done = (questionId = NAMED, sessionId = SESSION): DoneNews => ({ sessionId, questionId });
+
+    it('puts away the question it names, and no read brings it back', () => {
+      expect(heardDone(done(), SESSION, { id: NAMED }, OLDER)).toEqual({
+        putAway: true,
+        newest: NAMED,
+      });
+      expect(heardDone(done(), SESSION, { id: NAMED }, NAMED)).toEqual({
+        putAway: true,
+        newest: NAMED,
+      });
+    });
+
+    it('puts away an older question of its session, closed when the named one opened', () => {
+      expect(heardDone(done(), SESSION, { id: OLDER }, OLDER)).toEqual({
+        putAway: true,
+        newest: NAMED,
+      });
+    });
+
+    it('keeps a newer question, and the newest question it has shown', () => {
+      expect(heardDone(done(), SESSION, { id: NEWER }, NEWER)).toEqual({
+        putAway: false,
+        newest: NEWER,
+      });
+    });
+
+    it('holding none, puts nothing away but never shows the named one after', () => {
+      expect(heardDone(done(), SESSION, null, '')).toEqual({ putAway: false, newest: NAMED });
+    });
+
+    it('changes nothing for another session’s news, or with no session', () => {
+      for (const [news, session] of [
+        [done(NAMED, OTHER), SESSION],
+        [done(), OTHER],
+        [done(), null],
+      ] as const) {
+        expect(heardDone(news, session, { id: NAMED }, OLDER)).toEqual({
+          putAway: false,
+          newest: OLDER,
+        });
+      }
+    });
+  });
+
+  it('tells and hears nothing in a browser without one: Done stays the window’s own', () => {
+    vi.stubGlobal('BroadcastChannel', undefined);
+    const onDone = vi.fn();
+    const none = doneChannel(onDone);
+    expect(() => {
+      none.tell(NEWS);
+      none.close();
+    }).not.toThrow();
+    expect(onDone).not.toHaveBeenCalled();
   });
 });
 

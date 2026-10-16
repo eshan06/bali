@@ -8,6 +8,46 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-15** — **L7's part 3: Close and Done on Present, built to the boards the owner
+  approved that day; Done puts the question away in every Bali window of the browser.** Present
+  (#402) showed a question in the grid's place but could neither close nor put it away, so a
+  teacher with one screen mirrored to the projector had to leave Present to close it, and the class
+  page's card then showed the room the correct answer while the question was still open. **The
+  owner's choices (2026-10-15):** "Draw Close on Present" (about 21:45 UTC); for the drawing
+  (version 43: PresentQuestionControls, PresentAnswerControls, PresentControlsStates), "Approve as
+  drawn: Close and Close and show answer sit in the question card's corner, as on the class page.
+  Ask another question stays off Present, because its panel shows saved questions with their right
+  answers." (about 22:05 UTC); and for Present in a second window, which kept a closed question
+  after Done until the next was asked, "Fix it": "Done clears the question in every Bali window of
+  that browser. Small change, no new screen." (#405). **Present's foot:** the foot line, and at its
+  right the class page's Close and Close and show answer (the latter for a question with a correct
+  answer), both dimmed while a close is on its way; one that didn't go through said under them at
+  their right, at Present's size, with a full-size Try again sending the same choice; once closed,
+  Done in their place at once, before the last count is in; never Close and show answer after a
+  plain Close (the API can't reveal a closed question), never Ask another question. Too narrow for
+  both, the buttons go under the foot line. **One copy:** the buttons, the failed close's line and
+  Done are the class page card's own (`closeButtons`, `closeFailedLine`, `doneButton`), through the
+  hook's one close and one Done; no second close, guard or wording (a test counts each word once).
+  **Focus:** a close sent from Present that lands gives Done the focus its button took with it,
+  never focus that moved on meanwhile; Done there sends focus to Present in the header, as the
+  question's place goes to the grid. **Done in every window:** a `BroadcastChannel` the browser's
+  Bali windows share (`doneChannel`, `lib/live-question.ts`), carrying the session's and the
+  question's ids alone; a window hearing one puts away that question or an older one of that
+  session (an older one closed when the newer opened), and no read brings either back; another
+  session's question, or a newer one, stays. A window never hears its own; a browser without the
+  channel keeps Done the window's own, as before. *Weighed:* the `storage` event (a localStorage
+  write per Done, whose value must change each time to be heard); a channel per class (the
+  session's id in the message scopes it as well, and one channel lives as long as the page). **Left
+  as it is:** Done reaches the windows of one browser only, so Present on another computer still
+  keeps a closed question until Done is pressed there or the next is asked. **The canvas:** the
+  three boards, their row's title and its note relabelled "Approved by the owner, 2026-10-15"
+  (version 47). **The screenshots:** sharp ones from the real components with the boards' data in
+  a throwaway page in the preview alone, deleted after, the 390 px ones laid out by Chrome's
+  DevTools emulation (a headless window lays a 390 px page out about 500 px wide); and on dev from
+  the owner's tab, the demo class with Ana, Ben, Cal and Dana answering through the API: Present
+  with Close, Close and show answer then Done, a plain Close, and Done both ways between Present
+  and a second, unsigned window of the preview telling and hearing through the shipped channel.
+
 - **2026-10-15** — **Vitest runs at most 6 test files at once in each package, so a machine with
   many cores runs `npm test` as CI does (CLAUDE.md's "critical or recurring issue" rule).** On the
   Windows PC (8 cores, 16 threads, 14 GiB) vitest's default, a worker per logical core but one, ran

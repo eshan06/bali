@@ -83,10 +83,11 @@ const students = (count: number) => `${count} ${count === 1 ? 'student' : 'stude
  * (PV9; ClassPresent), the same parts one size up for the projector, the code in a well of its own
  * and +5, +10 and End kept beside Present (the owner, 2026-10-12), so a class of 28 fits one 1080p
  * screen; a question there in the grid's place, totals only (L7, part 2; PresentQuestion,
- * PresentAnswer); after the bell there "Class is over" alone (PresentEnded, as PV1 approved), the
- * figures left to the recap. Each failure is said where it happened. It sits in the shell's frame beside
- * the side menu (PV5), which sets its width and gutters; in Present the shell draws neither, and
- * the page sets its own (`PRESENT_PAGE`).
+ * PresentAnswer), closed and put away there too (L7, part 3; PresentQuestionControls,
+ * PresentAnswerControls); after the bell there "Class is over" alone (PresentEnded, as PV1
+ * approved), the figures left to the recap. Each failure is said where it happened. It sits in the
+ * shell's frame beside the side menu (PV5), which sets its width and gutters; in Present the shell
+ * draws neither, and the page sets its own (`PRESENT_PAGE`).
  */
 export default function ClassDetailPage() {
   const api = useApi();
@@ -336,10 +337,11 @@ export default function ClassDetailPage() {
   // and hidden on a phone, which never drives a projector (PV1; `beside`), and in Present's header,
   // after the bell too; none on the page after the bell, as ClassEnded draws it. Pressed, the
   // Button's sunken fill and `text-primary` edge, never colour alone; its icon the same both ways,
-  // as ClassPresent draws it.
+  // as ClassPresent draws it. Present's Done sends focus to it (`${id}-present`).
   const presentToggle = (beside = false, className = '') => (
     <Button
       ref={toggle}
+      id={`${id}-present`}
       variant="secondary"
       size={beside ? 'sm' : 'md'}
       aria-pressed={present}

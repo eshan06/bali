@@ -7,10 +7,11 @@ import { describe, expect, it } from 'vitest';
  * Present is the projector the class can see (PV9; ClassPresent at 1920 × 1080, PresentEnded): no
  * menu, the class page's own parts one size up, the code in a well of its own, +5, +10 and End kept
  * beside Present (the owner, 2026-10-12), and never an unlock's reason. A live question shows in the
- * grid's place, totals only (L7, part 2). After the bell it says only "Class is over" (PV1), the
- * figures left to the recap. Present is kept for the browser tab, so a reload or a return from
- * Reports comes back in it. Read from the class page's source; its header and counts are rendered
- * in live-header.test.ts, its tiles in live-grid.test.ts, its question in present-question.test.ts.
+ * grid's place, totals only (L7, part 2), closed and put away there (L7, part 3). After the bell it
+ * says only "Class is over" (PV1), the figures left to the recap. Present is kept for the browser
+ * tab, so a reload or a return from Reports comes back in it. Read from the class page's source;
+ * its header and counts are rendered in live-header.test.ts, its tiles in live-grid.test.ts, its
+ * question in present-question.test.ts.
  */
 const read = (path: string) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
 const page = read('./classes/[id]/page.tsx');
@@ -67,6 +68,21 @@ describe('the class page in Present while a session runs (ClassPresent)', () => 
     // Never the class page's card or its side panel there: their controls and the teacher's live
     // breakdown are the teacher's alone.
     expect(live).toMatch(/\{present \? null : \(\s*<QuestionCard/);
+    expect(page).toMatch(/const panel = asking && !present;/);
+  });
+
+  it('closes and puts away its question there, Done sending focus to Present in the header (L7, part 3)', () => {
+    // PresentQuestion's foot holds Close, Close and show answer and Done (present-question.test.ts);
+    // Done leaves the live grid, and focus goes on to the toggle, the header's last control.
+    const toggle = page.slice(page.indexOf('const presentToggle'));
+    expect(toggle).toMatch(
+      /^const presentToggle = \(beside = false, className = ''\) => \(\s*<Button\s+ref=\{toggle\}\s+id=\{`\$\{id\}-present`\}/,
+    );
+    expect(read('../components/present-question.tsx')).toMatch(
+      /doneButton\(lesson, `\$\{id\}-present`\)/,
+    );
+    // Ask another question stays on the class page: its panel lists the saved questions with their
+    // answers, which the room must never see.
     expect(page).toMatch(/const panel = asking && !present;/);
   });
 

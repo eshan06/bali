@@ -15,7 +15,9 @@ import type { LiveQuestion } from './question-card';
  * PresentQuestionPhone), rendered in each state. The class sees it, so it shows totals only, never
  * anything about one student: "N of M answered" while the question is open, each answer's count
  * only once it is closed and Bali's last read after the close is in, never under the server's
- * small-group guard, and the correct answer only once students are shown it.
+ * small-group guard, and the correct answer only once students are shown it. Its foot (L7, part 3;
+ * PresentQuestionControls, PresentAnswerControls, PresentControlsStates): the class page's own
+ * Close and Close and show answer, then Done in their place, never Ask another question.
  */
 const source = readFileSync(
   fileURLToPath(new URL('./present-question.tsx', import.meta.url)),
@@ -147,9 +149,11 @@ describe('the card (PresentQuestion)', () => {
     expect(html).toMatch(/<ul class="grid gap-4 lg:grid-cols-2">/);
   });
 
-  it('says where to answer at its foot, and none of the sentences the canvas drops', () => {
+  it('says where to answer at its foot, Close and Close and show answer at its right, and none of the sentences the canvas drops', () => {
+    // PresentQuestionControls: the foot line, the buttons beside it (under it when they don't fit),
+    // and under them the place a close that didn't go through is said.
     expect(html).toMatch(
-      /<p class="text-present-line text-text-secondary">Answer in Bali on your phone\.<\/p><\/section>$/,
+      /<div class="flex flex-col gap-4"><div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-3"><p class="text-present-line text-text-secondary">Answer in Bali on your phone\.<\/p><div class="flex flex-wrap items-center gap-2\.5"><button type="button" aria-disabled="false" class="[^"]*">Close<\/button><button type="button" aria-disabled="false" class="[^"]*">Close and show answer<\/button><\/div><\/div><\/div><\/section>$/,
     );
     // DESIGN.md §1, The words.
     expect(html).not.toMatch(/The breakdown shows|Updates every few seconds|Every phone/);
@@ -234,7 +238,8 @@ describe('a question closed (PresentAnswer, PresentQuestionStates)', () => {
       /<span class="inline-flex items-center gap-1 text-present-tag text-text-brand uppercase"><svg[^>]*\blucide-circle-check\b[^>]*>[^]*<\/svg>Correct answer<\/span>/,
     );
     expect(right?.html).toMatch(/<svg[^>]*width="14"/);
-    expect(text(html)).toMatch(/Bali shows only these totals, never who picked what\.$/);
+    // Its foot, and Done in the buttons' place (PresentAnswerControls).
+    expect(text(html)).toMatch(/Bali shows only these totals, never who picked what\. Done$/);
   });
 
   it('without it (Close, or the bell): the counts, no answer marked, every bar grey', () => {
@@ -296,6 +301,103 @@ describe('a question closed (PresentAnswer, PresentQuestionStates)', () => {
     expect(render(behind)).toContain('These totals may be behind.');
     behind.results = { ...behind.results, final: true, problem: null };
     expect(render(behind)).not.toContain('may be behind');
+  });
+});
+
+describe('its buttons (L7, part 3; PresentQuestionControls, PresentAnswerControls, PresentControlsStates)', () => {
+  /** The card's foot: the foot line, the buttons, a close that didn't go through. */
+  const foot = (html: string) => html.slice(html.indexOf('<div class="flex flex-col gap-4">'));
+  /** The words of each button, in order. */
+  const words = (html: string) =>
+    [...foot(html).matchAll(/<button [^>]*>([^<]*)<\/button>/g)].map((m) => m[1]);
+
+  it('holds Close and Close and show answer, dimmed, while a close is on its way', () => {
+    const sending = { ...lesson(), closing: true };
+    expect(foot(render(sending)).match(/<button type="button" aria-disabled="true"/g)).toHaveLength(
+      2,
+    );
+    expect(words(render(sending))).toEqual(['Close', 'Close and show answer']);
+  });
+
+  it('says a close that didn’t go through under the buttons, at their right, with Try again; the question stays open', () => {
+    const failed = { ...lesson(), closeFailed: { reveal: true } };
+    const html = render(failed);
+    expect(foot(html)).toMatch(
+      /Close and show answer<\/button><\/div><\/div><div class="flex flex-wrap items-center gap-x-4 gap-y-3 justify-end"><p role="alert" class="text-present-line">Bali couldn&#x27;t close the question\.<\/p><button type="button" aria-disabled="false" class="[^"]*\bh-10\b[^"]*">Try again<\/button><\/div><\/div><\/section>$/,
+    );
+    expect(html).toContain('<p class="text-present-kicker uppercase text-text-brand">Question</p>');
+    expect(text(html)).toContain('Answer in Bali on your phone.');
+    // Closed since (another window, the stream, the bell): Done, and the line goes.
+    const closedSince = { ...closed(false, {}, false), closeFailed: { reveal: true } };
+    expect(render(closedSince)).not.toContain('couldn');
+    expect(words(render(closedSince))).toEqual(['Done']);
+  });
+
+  it('offers Close alone for a question with no correct answer, as the class page does', () => {
+    const none = lesson({ correctOption: null }, totals({ correctOption: null, counts: null }));
+    expect(words(render(none))).toEqual(['Close']);
+  });
+
+  it('puts Done in their place once it is closed, before its last count is in too', () => {
+    for (const l of [closed(false, {}, false), closed(true, {}, false), closed(true)]) {
+      const html = render(l);
+      expect(foot(html)).toMatch(
+        /^<div class="flex flex-col gap-4"><div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-3"><p class="text-present-line text-text-secondary">Bali shows only these totals, never who picked what\.<\/p><div class="flex flex-wrap items-center gap-2\.5"><button type="button" class="[^"]*\bh-10\b[^"]*">Done<\/button><\/div><\/div><\/div><\/section>$/,
+      );
+    }
+    // Its last count not in yet: Done at once, no count per answer.
+    expect(counts(render(closed(true, {}, false)))).toEqual([
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+    ]);
+    // Closed by the bell, found by a read: the same.
+    const bell = lesson({}, totals({ answered: 21, open: false, counts: [3, 14, 1, 3] }), true);
+    expect(words(render(bell))).toEqual(['Done']);
+  });
+
+  it('never offers Ask another question, nor shows the answer after a plain Close', () => {
+    for (const l of [
+      lesson(),
+      { ...lesson(), closing: true },
+      { ...lesson(), closeFailed: { reveal: false } },
+      closed(false, {}, false),
+      closed(false),
+      closed(true),
+    ]) {
+      expect(render(l)).not.toMatch(/Ask another|Write a new|Ask a question/);
+    }
+    // The API can't reveal a closed question: once closed, Done alone.
+    expect(words(render(closed(false)))).toEqual(['Done']);
+  });
+
+  it('marks no answer while it is open, whatever its buttons are doing', () => {
+    for (const l of [
+      lesson(),
+      { ...lesson(), closing: true },
+      { ...lesson(), closeFailed: { reveal: true } },
+    ]) {
+      expect(render(l)).not.toMatch(/Correct|bg-option-right|bg-letter-right|bg-bar-right/);
+    }
+  });
+
+  it('says them through the class page’s own pieces: one close, one Done, one copy of the words', () => {
+    expect(source).toMatch(
+      /\{open \? closeButtons\(lesson\) : doneButton\(lesson, `\$\{id\}-present`\)\}/,
+    );
+    expect(source).toMatch(/\{closeFailedLine\(lesson, true\)\}/);
+    // No close or Done of its own, and none of the buttons' words.
+    expect(source).not.toMatch(/\.close\(|\.done\(|closeQuestion|closeAttemptFor/);
+    expect(source).not.toMatch(/>\s*(Close|Close and show answer|Done|Try again)\s*</);
+    expect(source).not.toMatch(/couldn/);
+  });
+
+  it('gives Done the focus a close sent from here took with its buttons, never focus that moved on', () => {
+    expect(source).toMatch(
+      /useEffect\(\(\) => \{\s*if \(sent\.current && !open && document\.activeElement === document\.body\) \{\s*foot\.current\?\.querySelector\('button'\)\?\.focus\(\);\s*\}\s*sent\.current = closing;\s*\}\);/,
+    );
+    expect(source).toMatch(/<div ref=\{foot\} className=\{ROW\}>/);
   });
 });
 
