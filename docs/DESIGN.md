@@ -176,6 +176,15 @@ foot holds the class page's own Close and Close and show answer, then Done in th
 closed, as PresentQuestionControls, PresentAnswerControls and PresentControlsStates draw them (the
 owner's approval, 2026-10-15); Ask another question stays off it. Done, there or on the class page,
 puts the question away in every Bali window of the browser.
+A slide the session shows takes the grid's place there since M6's part 2d (2026-10-16), as
+PresentSlide draws it, while no question shows (a question first, the slide back after its Done: the
+conductor's call, the owner's approval of 2026-10-16): the page in a white frame the page's width, as
+the board renders it (`.app figure`'s margin 0 outranks `.p-slide`'s auto one), as tall as the screen
+leaves under the header, 760 px at 1920 × 1080 and never past 16:9 (on a phone the screen's width at
+16:9, the page scrolling); under it the deck's title and "4 of 12" at 18/24, then Previous, Next and
+Stop showing, the class page's own, and the ← → keys; Stop showing gives the grid back, focus on
+Present. Its lines one size up, in the slide's place and under its row, and its intermediate states
+as PresentSlideStates and PresentSlidePhone draw them (drawn on the canvas first).
 The unlock pop-up is v2's since PV10 (2026-10-14): ClassUnlock's, opened beside its
 tile's pulse, newest on top, each until it is closed, on the live page alone and never
 in Present. The student panel is v2's since PV11b (2026-10-14): ClassStudent's, 372 px from
@@ -236,12 +245,15 @@ question there LessonWrite's form, 460 px, saying what Bali refuses in Your ques
 in Present, since it names the correct answers.
 A slide the session shows takes that card's place since M6's part 2b-2 (2026-10-16), LessonSlide's
 card while no question shows, a question first and the slide back after its Done (the conductor's
-call), never in Present: "Slides · showing" over the deck's title, Ask a question and Stop showing,
-the page drawn at its frame's size and the screen's pixel ratio beside "4 of 12", Previous, Next and
-the ← → keys, and its intermediate states as LessonSlideStates draws them (drawn on the canvas
-first). Since M6's part 2c (2026-10-16) the card at rest also holds Show slides, LessonClass's, which
-opens LessonDecks' panel where Ask a question's shows, one at a time, never in Present: "Pick a
-deck." (its second sentence waits for W5 and M8, the conductor's call), the teacher's ready decks
+call, the owner's approval of 2026-10-16), never in Present: "Slides · showing" over the deck's
+title, Ask a question and Stop showing, the page drawn at its frame's size and the screen's pixel
+ratio beside "4 of 12", Previous, Next and the ← → keys (never in a field nor, since 2d, in a side
+panel), and its intermediate states as LessonSlideStates draws them (drawn on the canvas first; a
+page PDF.js gave no answer for in 20 s in view said as one not drawn since 2d, its Try again
+opening the slides again). Since M6's part 2c (2026-10-16) the card at rest also holds Show slides,
+LessonClass's, which opens LessonDecks' panel where Ask a question's shows, one at a time, never in
+Present: "Pick a deck." (its second sentence waits for W5 and M8: the conductor's call, the owner's
+approval of 2026-10-16), the teacher's ready decks
 newest first, each with its pages, its day and Show, a Show's line under its deck, and once shown
 the slide card in the card's place, focus on its title; its intermediate states as LessonDecksStates
 draws them (drawn on the canvas first).

@@ -9,7 +9,17 @@ import { describe, expect, it, vi } from 'vitest';
 import type { OpenDeck } from '@/lib/deck-pdf';
 import type { DeckState, DeckUnopened, SlideLesson } from '@/lib/use-slide';
 
-import { placeOf, SaidLine, SlideCard, slideCard, typesText, UnshownLine } from './slide-card';
+import {
+  type Key,
+  keyTurn,
+  placeOf,
+  SaidLine,
+  SlideCard,
+  slideCard,
+  SlideFrame,
+  typesText,
+  UnshownLine,
+} from './slide-card';
 
 /*
  * The class page's slide card (M6, part 2b-2; LessonSlide, LessonStates' slide lines and the
@@ -89,6 +99,17 @@ const press = (node: ReactNode, words: string) => {
 
 const open: DeckState = { kind: 'open', deck: { pdf: {}, close: vi.fn() } as unknown as OpenDeck };
 
+/** A key pressed on `target`, nothing held. */
+const keyOn = (key: string, target: unknown): Key => ({
+  key,
+  target: target as EventTarget | null,
+  defaultPrevented: false,
+  altKey: false,
+  ctrlKey: false,
+  metaKey: false,
+  shiftKey: false,
+});
+
 describe('the card while a slide shows (LessonSlide)', () => {
   const html = render(lesson({ deck: open }));
 
@@ -116,8 +137,21 @@ describe('the card while a slide shows (LessonSlide)', () => {
     expect(buttonTag(html, 'Next')).toMatch(/\bbg-action-primary-bg\b/);
     expect(buttonTag(html, 'Previous')).toMatch(/\bbg-surface-card\b/);
     // The frame: white, 16:9, 420 px at most, its canvas filling it, the page fitted in it.
-    expect(html).toMatch(
-      /<figure class="relative aspect-video w-full min-w-0 flex-\[0_1_420px\] overflow-hidden rounded-frame border border-border-default bg-surface-card shadow-1">/,
+    const frame = /<figure class="([^"]*)">/.exec(html)?.[1]?.split(' ');
+    expect(frame?.sort()).toEqual(
+      [
+        'relative',
+        'aspect-video',
+        'w-full',
+        'min-w-0',
+        'flex-[0_1_420px]',
+        'overflow-hidden',
+        'rounded-frame',
+        'border',
+        'border-border-default',
+        'bg-surface-card',
+        'shadow-1',
+      ].sort(),
     );
     expect(html).toMatch(/<canvas role="img" class="absolute inset-0 size-full object-contain/);
     // The presenter card's sentence is not built (PLAN, M6).
@@ -190,10 +224,52 @@ describe('its slide’s place (LessonSlideStates)', () => {
     expect(source).toMatch(
       /`Slide \$\{held\.page\} of \$\{slide\.pageCount\}\.\$\{held\.text \? ` \$\{held\.text\}` : ''\}`/,
     );
-    // Try again: a deck loaded afresh (2b-1), a page drawn again.
+    // Try again: a deck loaded afresh (2b-1), a page drawn again, but one PDF.js gave no answer
+    // for, whose deck is opened again (its worker most likely gone).
     expect(source).toMatch(
-      /onAgain=\{place === 'undrawn' \? \(\) => setRedraws\(\(n\) => n \+ 1\) : onReload\}/,
+      /onAgain=\{\s*place === 'undrawn' && !failed\?\.unanswered\s*\? \(\) => setRedraws\(\(n\) => n \+ 1\)\s*: onReload\s*\}/,
     );
+    expect(source).toMatch(
+      /setUndrawn\(\s*end\.kind === 'undrawn' \? \{ deck: open, page, unanswered: end\.unanswered === true \} : null,\s*\);/,
+    );
+  });
+});
+
+describe('Present’s frame (PresentSlide, PresentSlideStates)', () => {
+  const draw = (deck: DeckState) =>
+    renderToStaticMarkup(
+      createElement(SlideFrame, { deck, slide: slide(), onReload: vi.fn(), look: 'present' }),
+    );
+
+  it('is the page’s width and as tall as the screen leaves, 760 px and 16:9 at most, as PresentSlide renders', () => {
+    // The board's `.app figure` margin 0 outranks `.p-slide`'s auto one: the white frame spans the
+    // page, as the question's card does, the page drawn in its middle (1351 × 760 at 1920 × 1080).
+    // It grows into what Present's header and its row leave (its section fills the page), so a
+    // header on two lines (a 1280 px projector) never pushes the row off the screen.
+    const frame = /<figure class="([^"]*)">/.exec(draw(open))?.[1]?.split(' ');
+    expect(frame).toEqual(
+      expect.arrayContaining([
+        'w-full',
+        'flex-[1_1_0]',
+        'min-h-36',
+        'max-h-[min(760px,calc(100cqw*9/16))]',
+        'rounded-md',
+      ]),
+    );
+    // Never the card's 16:9 by its width alone, which would keep the frame from shrinking to fit,
+    // but on a phone: the screen's width at 16:9, the page scrolling (PresentSlidePhone).
+    expect(frame).not.toContain('aspect-video');
+    expect(frame).toEqual(expect.arrayContaining(['max-sm:flex-none', 'max-sm:aspect-video']));
+    expect(frame).not.toContain('flex-[0_1_420px]');
+  });
+
+  it('says Loading… and each line one size up, 24 px in, Try again full size', () => {
+    expect(draw(open)).toMatch(
+      /<div class="absolute inset-0 grid place-items-center overflow-y-auto p-6 text-center"><p role="status" class="text-present-line text-text-secondary">Loading…<\/p>/,
+    );
+    const failed = draw({ kind: 'failed', why: 'unloaded' });
+    expect(failed).toMatch(/<p role="alert" class="text-present-line">Bali couldn&#x27;t load/);
+    expect(buttonTag(failed, 'Try again')).toMatch(/\bh-10\b/);
   });
 });
 
@@ -246,10 +322,24 @@ describe('turning pages', () => {
   });
 
   it('turns pages with the ← and → keys too, but in a field, or with a key held', () => {
+    // Heard on the window while the card or Present's slide shows, the key then the card's own.
     expect(source).toMatch(
-      /const by = e\.key === 'ArrowLeft' \? -1 : e\.key === 'ArrowRight' \? 1 : 0;\s*if \(by === 0 \|\| e\.defaultPrevented \|\| e\.altKey \|\| e\.ctrlKey \|\| e\.metaKey \|\| e\.shiftKey\) \{\s*return;\s*\}\s*if \(typesText\(e\.target\)\) return;\s*e\.preventDefault\(\);\s*turn\(by\);/,
+      /const onKey = \(e: KeyboardEvent\) => \{\s*const by = keyTurn\(e\);\s*if \(by === null\) return;\s*e\.preventDefault\(\);\s*turn\(by\);\s*\};\s*window\.addEventListener\('keydown', onKey\);\s*return \(\) => window\.removeEventListener\('keydown', onKey\);/,
     );
-    expect(source).toMatch(/return \(\) => window\.removeEventListener\('keydown', onKey\);/);
+    expect(source).toMatch(/export function SlideCard\(props: CardProps\) \{\s*useSlideKeys\(/);
+    const page = { tagName: 'BODY', closest: () => null };
+    expect(keyTurn(keyOn('ArrowLeft', page))).toBe(-1);
+    expect(keyTurn(keyOn('ArrowRight', page))).toBe(1);
+    expect(keyTurn(keyOn('ArrowUp', page))).toBeNull();
+    for (const held of ['altKey', 'ctrlKey', 'metaKey', 'shiftKey', 'defaultPrevented']) {
+      expect(keyTurn({ ...keyOn('ArrowRight', page), [held]: true }), held).toBeNull();
+    }
+    for (const field of ['INPUT', 'TEXTAREA', 'SELECT']) {
+      expect(
+        keyTurn(keyOn('ArrowRight', { tagName: field, closest: () => null })),
+        field,
+      ).toBeNull();
+    }
     expect(typesText({ tagName: 'INPUT' } as unknown as EventTarget)).toBe(true);
     expect(typesText({ tagName: 'TEXTAREA' } as unknown as EventTarget)).toBe(true);
     expect(typesText({ tagName: 'SELECT' } as unknown as EventTarget)).toBe(true);
@@ -258,6 +348,23 @@ describe('turning pages', () => {
     );
     expect(typesText({ tagName: 'BUTTON' } as unknown as EventTarget)).toBe(false);
     expect(typesText(null)).toBe(false);
+  });
+
+  it('leaves the keys alone anywhere in an open side panel: a question being written, a student’s moments, a deck being picked', () => {
+    // #416's review: a teacher in the write form, or on a button in a panel, turned the class's slide.
+    const inPanel = (tagName: string) => ({
+      tagName,
+      closest: (selector: string) => (selector === 'aside' ? { tagName: 'ASIDE' } : null),
+    });
+    for (const tagName of ['BUTTON', 'A', 'H2', 'ASIDE']) {
+      expect(keyTurn(keyOn('ArrowRight', inPanel(tagName))), tagName).toBeNull();
+      expect(keyTurn(keyOn('ArrowLeft', inPanel(tagName))), tagName).toBeNull();
+    }
+    // Anywhere else on the page, a button there included, they turn it.
+    expect(keyTurn(keyOn('ArrowRight', { tagName: 'BUTTON', closest: () => null }))).toBe(1);
+    // A target that is no element (the window, the document) is the page's.
+    expect(keyTurn(keyOn('ArrowRight', {}))).toBe(1);
+    expect(keyTurn(keyOn('ArrowRight', null))).toBe(1);
   });
 
   it('sends focus to the card at rest’s Ask a question once stopped, and nowhere if not', async () => {
@@ -292,14 +399,18 @@ describe('what a change said, under the card’s head (LessonStates, LessonSlide
     );
     // The line's Try again is the hook's own: the last change again.
     expect(source).toMatch(
-      /<SaidLine why=\{said\.why\} held=\{held\} onAgain=\{lesson\.again\} \/>/,
+      /<SaidLine why=\{said\.why\} held=\{changing !== null\} onAgain=\{lesson\.again\} \/>/,
     );
     const again = vi.fn();
     press(SaidLine({ why: 'failed', held: false, onAgain: again }), 'Try again');
     expect(again).toHaveBeenCalledOnce();
     // Held while another change is on its way.
-    const busy = render(lesson({ said: { why: 'failed', change: turnTo }, changing: turnTo }));
-    expect(buttonTag(busy, 'Try again')).toMatch(/aria-disabled="true"/);
+    expect(
+      buttonTag(
+        render(lesson({ said: { why: 'failed', change: turnTo }, changing: turnTo })),
+        'Try again',
+      ),
+    ).toMatch(/aria-disabled="true"/);
   });
 
   it('says the session ended first, and the slides gone, with no Try again', () => {
@@ -311,6 +422,17 @@ describe('what a change said, under the card’s head (LessonStates, LessonSlide
       "These slides aren't in Your slides anymore, so Bali can't show them.",
     );
     expect(text(gone)).not.toContain('Try again');
+  });
+
+  it('says each one Present’s size there, Try again full size', () => {
+    const failed = renderToStaticMarkup(
+      SaidLine({ why: 'failed', held: false, onAgain: vi.fn(), present: true }),
+    );
+    expect(failed).toMatch(/<p role="alert" class="text-present-line">Bali couldn&#x27;t change/);
+    expect(buttonTag(failed, 'Try again')).toMatch(/\bh-10\b/);
+    expect(
+      renderToStaticMarkup(SaidLine({ why: 'over', held: false, onAgain: vi.fn(), present: true })),
+    ).toMatch(/^<p role="alert" class="text-present-line ">This session has ended/);
   });
 });
 

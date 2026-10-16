@@ -434,19 +434,36 @@ describe('showSlide', () => {
 
 // ---- drawing a page ----
 
-/** A canvas as `drawPage` uses one, and its window's pixel ratio; what was copied onto it, kept. */
-function fakeScreen(ratio = 1) {
+/**
+ * A canvas as `drawPage` uses one, and its window's pixel ratio; what was copied onto it, kept. Its
+ * page in view or hidden (a background tab), `show` and `hide` turning it, as the browser does.
+ */
+function fakeScreen(ratio = 1, visibility: DocumentVisibilityState = 'visible') {
   const scratches: { width: number; height: number }[] = [];
   const copies: { image: unknown; x: number; y: number; width: number; height: number }[] = [];
   let context = true;
+  const listeners = new Set<() => void>();
   const doc = {
     defaultView: { devicePixelRatio: ratio },
+    visibilityState: visibility,
+    addEventListener: (type: string, listener: () => void) => {
+      expect(type).toBe('visibilitychange');
+      listeners.add(listener);
+    },
+    removeEventListener: (type: string, listener: () => void) => {
+      expect(type).toBe('visibilitychange');
+      listeners.delete(listener);
+    },
     createElement: (tag: string) => {
       expect(tag).toBe('canvas');
       const scratch = { width: 300, height: 150 };
       scratches.push(scratch);
       return scratch;
     },
+  };
+  const turn = (to: DocumentVisibilityState) => {
+    doc.visibilityState = to;
+    for (const listener of [...listeners]) listener();
   };
   const canvas = {
     width: 300,
@@ -469,6 +486,10 @@ function fakeScreen(ratio = 1) {
     noContext: () => {
       context = false;
     },
+    show: () => turn('visible'),
+    hide: () => turn('hidden'),
+    /** How many listen for the page's visibility now. */
+    listening: () => listeners.size,
   };
 }
 
@@ -570,6 +591,10 @@ const run = (str: string, hasEOL = false) => ({ str, hasEOL, dir: 'ltr', transfo
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe('drawPage', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('draws the page as large as fits the box, at the screen’s pixel ratio, then copies it whole', async () => {
     const { pdf, renders, asked } = fakeDeck();
     const screen = fakeScreen(2);
@@ -790,6 +815,109 @@ describe('drawPage', () => {
     screen.noContext();
     expect(await drawPage(plain.pdf, 4, screen.canvas, box)).toEqual({ kind: 'undrawn' });
     expect(screen.canvas.width).toBe(300);
+  });
+
+  it('answers undrawn once PDF.js gives no answer for 20 s, never a moment before: its page, its draw or its text', async () => {
+    // A worker that stops answering after the deck opened (#416's review): its draw would
+    // otherwise never end, and the slide stay on Loading… or the page before it, unsaid.
+    vi.useFakeTimers();
+    const box = { width: 420, height: 236 };
+    const hung = {
+      getPage: () => new Promise(() => {}),
+    } as unknown as Pick<PDFDocumentProxy, 'getPage'>;
+    const drawing = fakeDeck({ draws: 'waits' });
+    const reading = fakeDeck({ text: 'waits' });
+    for (const pdf of [hung, drawing.pdf, reading.pdf]) {
+      const screen = fakeScreen();
+      let end: unknown;
+      void drawPage(pdf, 4, screen.canvas, box).then((e) => (end = e));
+      await vi.advanceTimersByTimeAsync(20_000 - 1);
+      expect(end).toBeUndefined();
+      await vi.advanceTimersByTimeAsync(1);
+      // Said apart from a page PDF.js failed to draw: Try again then opens the deck again.
+      expect(end).toEqual({ kind: 'undrawn', unanswered: true });
+      expect(screen.copies).toEqual([]);
+      expect(screen.canvas).toMatchObject({ width: 300, height: 150 });
+    }
+    // The draw PDF.js never finished is cancelled, and what it held let go.
+    expect(drawing.renders[0]?.cancelled).toBe(true);
+    expect(drawing.counts.cleaned).toBe(1);
+    expect(reading.counts.cleaned).toBe(1);
+  });
+
+  it('counts its 20 s only while the page is in view, since PDF.js draws on animation frames, which a hidden page never runs', async () => {
+    // Santa's review: a page turned from Present's tab while the class page's tab was hidden, or a
+    // deck that opened in a hidden tab, waited there for a frame; at 20 s it was said not drawn, and
+    // its Try again downloaded the whole deck again.
+    vi.useFakeTimers();
+    const box = { width: 420, height: 236 };
+    const drawing = fakeDeck({ draws: 'waits' });
+    const screen = fakeScreen(1, 'hidden');
+    let end: unknown;
+    void drawPage(drawing.pdf, 4, screen.canvas, box).then((e) => (end = e));
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    expect(end).toBeUndefined();
+    expect(drawing.renders[0]?.cancelled).toBe(false);
+    // In view: its 20 s start; hidden again midway, the time hidden doesn't count either.
+    screen.show();
+    await vi.advanceTimersByTimeAsync(12_000);
+    screen.hide();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(end).toBeUndefined();
+    screen.show();
+    await vi.advanceTimersByTimeAsync(8_000 - 1);
+    expect(end).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(end).toEqual({ kind: 'undrawn', unanswered: true });
+    expect(drawing.renders[0]?.cancelled).toBe(true);
+    expect(screen.listening()).toBe(0);
+  });
+
+  it('draws a page that waited in a hidden page once its frames come, and keeps no clock or listener after', async () => {
+    vi.useFakeTimers();
+    const box = { width: 420, height: 236 };
+    const drawing = fakeDeck({ draws: 'waits' });
+    const screen = fakeScreen(1, 'hidden');
+    const drawn = drawPage(drawing.pdf, 4, screen.canvas, box);
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    screen.show();
+    await vi.advanceTimersByTimeAsync(3_000);
+    drawing.renders[0]?.finish();
+    expect(await drawn).toEqual({ kind: 'drawn', text: '' });
+    expect(screen.copies).toHaveLength(1);
+    expect(vi.getTimerCount()).toBe(0);
+    expect(screen.listening()).toBe(0);
+  });
+
+  it('keeps no clock for a draw that ended, however it ended', async () => {
+    vi.useFakeTimers();
+    const box = { width: 420, height: 236 };
+    await drawPage(fakeDeck().pdf, 4, fakeScreen().canvas, box);
+    await drawPage(fakeDeck({ draws: 'fail' }).pdf, 4, fakeScreen().canvas, box);
+    const waiting = fakeDeck({ draws: 'waits' });
+    const screen = fakeScreen();
+    const first = drawPage(waiting.pdf, 4, screen.canvas, box);
+    await vi.advanceTimersByTimeAsync(0);
+    void drawPage(waiting.pdf, 5, screen.canvas, box);
+    expect(await first).toEqual({ kind: 'cancelled' });
+    // The second still runs, its own clock alone left.
+    expect(vi.getTimerCount()).toBe(1);
+  });
+
+  it('stops a draw still waiting for PDF.js at once: a later draw, or its signal', async () => {
+    vi.useFakeTimers();
+    const box = { width: 420, height: 236 };
+    const hung = {
+      getPage: () => new Promise(() => {}),
+    } as unknown as Pick<PDFDocumentProxy, 'getPage'>;
+    const screen = fakeScreen();
+    const going = new AbortController();
+    const first = drawPage(hung, 4, screen.canvas, box, going.signal);
+    going.abort();
+    expect(await first).toEqual({ kind: 'cancelled' });
+    const second = drawPage(hung, 4, screen.canvas, box);
+    void drawPage(hung, 5, screen.canvas, box);
+    expect(await second).toEqual({ kind: 'cancelled' });
   });
 });
 

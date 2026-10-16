@@ -23,6 +23,7 @@ import { JoinCode } from '@/components/join-code';
 import { LiveGrid, type StateCounts } from '@/components/live-grid';
 import { LiveCounts, LiveHeader } from '@/components/live-header';
 import { PresentQuestion } from '@/components/present-question';
+import { PresentSlide } from '@/components/present-slide';
 import { isOpen, QuestionCard, useLiveQuestion } from '@/components/question-card';
 import { endedToday, RecapCard } from '@/components/recap-card';
 import { usePresenting } from '@/components/shell';
@@ -187,8 +188,10 @@ export default function ClassDetailPage() {
   // 2026-10-15), and what is written in it; the decks are the teacher's to pick, not the room's.
   const panel = present ? null : side;
   // In Present the question shows in the live grid's place (L7, part 2; PresentQuestion,
-  // PresentAnswer), its totals the room's alone; the grid stays underneath, its stream with it.
-  const projected = present && lesson.question !== null;
+  // PresentAnswer), its totals the room's alone, else the slide the session shows (M6, part 2d;
+  // PresentSlide): the question first (the conductor's call, 2026-10-16). The grid stays
+  // underneath, its stream with it.
+  const projected = present && (lesson.question !== null || slides.slide !== null);
   // Back to the button that opened it (Show slides, or Ask a question, on whichever card shows);
   // the question, when one shows (opened meanwhile, from another tab).
   const closePanel = () => {
@@ -499,9 +502,14 @@ export default function ClassDetailPage() {
           ) : null}
         </div>
       ) : null}
-      <section aria-label={projected ? undefined : 'Live grid'} className="flex flex-col gap-5.5">
+      {/* The rest of the page, so Present's slide fills what the screen leaves under the header. */}
+      <section
+        aria-label={projected ? undefined : 'Live grid'}
+        className="flex flex-1 flex-col gap-5.5"
+      >
         {/* The counts and Present over the grid (ClassLive); in Present the counts alone, and
-            none while the question shows in the grid's place (PresentQuestion). */}
+            none while the question or the slide shows in the grid's place (PresentQuestion,
+            PresentSlide). */}
         {projected ? null : (
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5">
             {counts ? <LiveCounts counts={counts} present={present} /> : null}
@@ -541,8 +549,12 @@ export default function ClassDetailPage() {
           livePage
           tiles={!projected}
         />
-        {/* In Present, the question in the tiles' place, after the grid's own lines. */}
-        {projected ? <PresentQuestion id={id} lesson={lesson} /> : null}
+        {/* In Present, the question in the tiles' place, after the grid's own lines; else the
+            slide. */}
+        {projected && lesson.question !== null ? <PresentQuestion id={id} lesson={lesson} /> : null}
+        {projected && lesson.question === null && slides.slide !== null ? (
+          <PresentSlide id={id} lesson={slides} slide={slides.slide} />
+        ) : null}
       </section>
       {panel === 'decks' ? (
         <DecksPanel id={`${id}-panel`} lesson={slides} onShown={shown} onClose={closePanel} />

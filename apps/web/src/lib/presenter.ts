@@ -184,8 +184,49 @@ export type DrawEnd =
   | { kind: 'drawn'; text: string }
   /** A later draw on the same canvas, or `signal`, stopped it. */
   | { kind: 'cancelled' }
-  /** PDF.js couldn't draw it. */
-  | { kind: 'undrawn' };
+  /**
+   * PDF.js couldn't draw it; `unanswered`, it gave no answer within `DRAW_LIMIT_MS`, its worker
+   * most likely gone, so only the deck opened again can draw it.
+   */
+  | { kind: 'undrawn'; unanswered?: true };
+
+/**
+ * How long PDF.js has to draw a page, from asking for it to its text, while the page is in view:
+ * far past any page a laptop draws, as long as a download may go with nothing arriving
+ * (`STALL_MS`). A worker that stops answering after the deck opened answers nothing at all, so
+ * without it the slide would stay on Loading…, or the page before it, unsaid (#416's review).
+ */
+export const DRAW_LIMIT_MS = 20_000;
+
+/**
+ * `onLimit`, once `ms` have passed with `doc` in view; its stop returned. PDF.js draws a page on
+ * animation frames, which a hidden page never runs (a background tab, a window minimised), so time
+ * spent hidden is no sign of a worker gone: the clock waits for the page to be in view again
+ * (santa's review).
+ */
+function inViewFor(doc: Document, ms: number, onLimit: () => void): () => void {
+  let left = ms;
+  let since = 0;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const run = () => {
+    if (timer !== undefined || doc.visibilityState === 'hidden') return;
+    since = Date.now();
+    timer = setTimeout(onLimit, left);
+  };
+  const pause = () => {
+    if (timer === undefined) return;
+    clearTimeout(timer);
+    timer = undefined;
+    left -= Date.now() - since;
+  };
+  const onChange = () => (doc.visibilityState === 'hidden' ? pause() : run());
+  doc.addEventListener('visibilitychange', onChange);
+  run();
+  return () => {
+    clearTimeout(timer);
+    doc.removeEventListener('visibilitychange', onChange);
+  };
+}
 
 /** The stop of the draw running on each canvas: the next draw there calls it. */
 const drawing = new WeakMap<HTMLCanvasElement, () => void>();
@@ -200,7 +241,8 @@ const drawing = new WeakMap<HTMLCanvasElement, () => void>();
  * holds is let go once it ends, as PDF.js's own viewer lets go of pages it no longer shows: its
  * own canvas, emptied (Safari caps a tab's canvases), and the page's drawing instructions and
  * decoded images (`cleanup`), so paging through a deck of 200 photos never holds them all until
- * the deck closes; drawing the page again reads them again.
+ * the deck closes; drawing the page again reads them again. PDF.js has `DRAW_LIMIT_MS` with the
+ * page in view to answer, and a stop ends a draw at once, its answer from PDF.js or not.
  */
 export async function drawPage(
   pdf: Pick<PDFDocumentProxy, 'getPage'>,
@@ -211,18 +253,30 @@ export async function drawPage(
 ): Promise<DrawEnd> {
   drawing.get(canvas)?.();
   let stopped = false;
+  let unanswered = false;
   let task: RenderTask | null = null;
   let proxy: PDFPageProxy | null = null;
   let scratch: HTMLCanvasElement | null = null;
+  // Every wait on PDF.js races this: it fails at the limit, or as the draw is stopped.
+  let end: (why: Error) => void = () => {};
+  const ended = new Promise<never>((_, reject) => (end = reject));
+  ended.catch(() => {});
+  const answered = <T>(work: Promise<T>) => Promise.race([work, ended]);
+  const unlimit = inViewFor(canvas.ownerDocument, DRAW_LIMIT_MS, () => {
+    unanswered = true;
+    task?.cancel();
+    end(new Error('PDF.js gave no answer'));
+  });
   const stop = () => {
     stopped = true;
     task?.cancel();
+    end(new Error('stopped'));
   };
   drawing.set(canvas, stop);
   signal?.addEventListener('abort', stop);
   if (signal?.aborted) stop();
   try {
-    proxy = await pdf.getPage(page);
+    proxy = await answered(pdf.getPage(page));
     if (stopped) return { kind: 'cancelled' };
     const ratio = canvas.ownerDocument.defaultView?.devicePixelRatio ?? 1;
     const whole = proxy.getViewport({ scale: 1 });
@@ -237,7 +291,7 @@ export async function drawPage(
     scratch.width = width;
     scratch.height = height;
     task = proxy.render({ canvas: scratch, viewport });
-    const [, text] = await Promise.all([task.promise, textOf(proxy)]);
+    const [, text] = await answered(Promise.all([task.promise, textOf(proxy)]));
     const context = canvas.getContext('2d');
     if (stopped) return { kind: 'cancelled' };
     if (!context) return { kind: 'undrawn' };
@@ -246,8 +300,10 @@ export async function drawPage(
     context.drawImage(scratch, 0, 0);
     return { kind: 'drawn', text };
   } catch {
-    return stopped ? { kind: 'cancelled' } : { kind: 'undrawn' };
+    if (stopped) return { kind: 'cancelled' };
+    return unanswered ? { kind: 'undrawn', unanswered: true } : { kind: 'undrawn' };
   } finally {
+    unlimit();
     // PDF.js waits while a draw of the page still runs, on this canvas or another.
     proxy?.cleanup();
     if (scratch) {
