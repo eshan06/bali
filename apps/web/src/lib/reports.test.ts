@@ -2,6 +2,7 @@ import type {
   ClassDetail,
   FeedEvent,
   RosterResponse,
+  SessionReportQuestion,
   SessionReportResponse,
   SessionReportsPage,
   SessionReportSummary,
@@ -14,6 +15,7 @@ import { classFigures } from './recap';
 import {
   FIRST_READ,
   readSessionPage,
+  readSessionQuestions,
   readSessions,
   reportPath,
   type SessionList,
@@ -390,5 +392,62 @@ describe('a session’s own page (PV14)', () => {
     for (const other of ['..', '.', '', 'c1', `${SESSION}/..`, ` ${SESSION}`, `${SESSION}x`]) {
       expect(UUID.test(other), other).toBe(false);
     }
+  });
+});
+
+describe('a session’s questions, its report page’s Questions card (L7c)', () => {
+  const SESSION = '0199e3a1-0000-7000-8000-00000000000a';
+  const CLASS_ID = '0199e3a1-0000-7000-8000-00000000000c';
+  const QUESTIONS = `/v1/classes/${CLASS_ID}/reports/sessions/${SESSION}/questions`;
+  const asked = (id: string, counts: number[] | null): SessionReportQuestion => ({
+    id,
+    prompt: 'Which value of x solves x² − 5x + 6 = 0?',
+    options: ['x = 1', 'x = 2', 'x = 4', 'x = 6'],
+    correctOption: 1,
+    revealed: counts !== null,
+    open: false,
+    openedAt: MON.startedAt,
+    answered: counts === null ? 2 : 21,
+    eligible: 28,
+    counts,
+  });
+
+  it('reads them through L3c’s route, in the order the server gives, its totals as it counted them', async () => {
+    // The later first: the order asked is the server's, never sorted here.
+    const questions = [asked('q2', null), asked('q1', [3, 14, 1, 3])];
+    const api = fakeApi({ [QUESTIONS]: [{ questions }] });
+    expect(await readSessionQuestions(api, CLASS_ID, SESSION)).toEqual({
+      kind: 'ready',
+      questions,
+    });
+    expect(api.asked).toEqual([QUESTIONS]);
+  });
+
+  it('reads none asked as none, for no card', async () => {
+    const api = fakeApi({ [QUESTIONS]: [{ questions: [] }] });
+    expect(await readSessionQuestions(api, CLASS_ID, SESSION)).toEqual({
+      kind: 'ready',
+      questions: [],
+    });
+  });
+
+  it('says any failure as the card’s own, for its Try again', async () => {
+    for (const failure of [
+      new NetworkError(),
+      new ApiError(404, 'not_found', 'no such session', 'session_not_found'),
+      new ApiError(429, 'rate_limited', 'too many requests', undefined, 1),
+      new ApiError(500, 'internal', 'something broke'),
+    ]) {
+      const api = fakeApi({ [QUESTIONS]: [failure] });
+      expect(await readSessionQuestions(api, CLASS_ID, SESSION), failure.message).toEqual({
+        kind: 'error',
+      });
+    }
+  });
+
+  it('puts the class and the session in its path as one segment each', async () => {
+    const api = fakeApi({});
+    await readSessionQuestions(api, 'a/b', 'c/d');
+    expect(api.asked).toEqual(['/v1/classes/a%2Fb/reports/sessions/c%2Fd/questions']);
   });
 });

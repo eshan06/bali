@@ -37,6 +37,79 @@ export const BEHIND = "These totals may be behind. Bali can't reach the server a
 export const letterClass = (right: boolean) =>
   `grid size-7 shrink-0 place-items-center rounded-full text-data font-semibold ${right ? 'bg-letter-right text-text-brand' : 'bg-surface-sunken text-text-primary'}`;
 
+/*
+ * A question's results as its teacher sees them, the class page's card and a session's report alike
+ * (L7, L7c): v2.css's `.results`, the options beside "N of M answered", under them on a narrow card.
+ */
+export const RESULTS = 'flex flex-wrap items-start gap-x-10 gap-y-5';
+export const OPTIONS_COLUMN = 'min-w-0 flex-[999_1_440px]';
+export const ANSWERED_COLUMN =
+  'flex flex-[1_1_160px] flex-col gap-1 border-l border-border-default pl-6';
+
+/**
+ * A question's options (v2.css's `.opts`): each with its letter, the correct one marked, "Correct
+ * answer" once students were shown it; and from the server's breakdown (`counts`, null until 3 have
+ * answered: the guard is the server's, never the portal's) each one's count and its bar, out of
+ * those who answered. Only totals: never who picked what.
+ */
+export function Options({
+  question,
+  counts,
+  answered,
+  shown,
+}: {
+  question: Pick<TeacherQuestion, 'options' | 'correctOption'>;
+  counts: readonly number[] | null;
+  answered: number;
+  /** Students were shown the correct answer: its tag says so. */
+  shown: boolean;
+}) {
+  return (
+    // Under the question as the boards render it: `.app ul`'s margin 0 outranks `.opts`'s.
+    <ul className="flex flex-col gap-3.5">
+      {question.options.map((option, i) => {
+        const right = question.correctOption === i;
+        const n = counts?.[i];
+        return (
+          <li
+            key={i}
+            className="grid grid-cols-[28px_minmax(0,1fr)_3rem] items-center gap-x-3 gap-y-1.5"
+          >
+            <span aria-hidden="true" className={letterClass(right)}>
+              {letterOf(i)}
+            </span>
+            <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="min-w-0 wrap-break-word">{option}</span>
+              {right ? (
+                <span className="inline-flex items-center gap-1 text-section-label text-text-brand uppercase">
+                  <CircleCheck size={14} aria-hidden="true" />
+                  {shown ? 'Correct answer' : 'Correct'}
+                </span>
+              ) : null}
+            </span>
+            <span className="text-right text-data tabular-nums">{n ?? ''}</span>
+            {n === undefined ? null : (
+              <span
+                aria-hidden="true"
+                className={`col-start-2 h-2 rounded-full ${right ? 'bg-bar-right' : 'bg-bar'}`}
+                style={{ width: `${Math.round((n / answered) * 100)}%` }}
+              />
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** "21 of 28 answered" (v2.css's `.answered .line`): who answered, of everyone who could. */
+export const answeredLine = (answered: number, eligible: number) => (
+  <p className="flex items-baseline gap-2">
+    <span className="font-num text-data-lg tabular-nums">{answered}</span>
+    <span className="text-text-secondary">of {eligible} answered</span>
+  </p>
+);
+
 /** The class page's live question (L6's logic), held for one session. */
 export interface LiveQuestion {
   /** What the card shows: the open question, or a closed one until Done or the next; else none. */
@@ -431,46 +504,18 @@ export function QuestionCard({
           {BEHIND}
         </p>
       ) : null}
-      <div className="flex flex-wrap items-start gap-x-10 gap-y-5">
-        <div className="min-w-0 flex-[999_1_440px]">
+      <div className={RESULTS}>
+        <div className={OPTIONS_COLUMN}>
           {/* Focus comes here once it is asked, so a screen reader starts at the question. */}
           <h2 id={`${id}-q`} tabIndex={-1} className="text-h3 text-pretty wrap-break-word">
             {q.prompt}
           </h2>
-          {/* Under the question as the boards render it: `.app ul`'s margin 0 outranks `.opts`'s. */}
-          <ul className="flex flex-col gap-3.5">
-            {q.options.map((option, i) => {
-              const right = q.correctOption === i;
-              const n = counts?.[i];
-              return (
-                <li
-                  key={i}
-                  className="grid grid-cols-[28px_minmax(0,1fr)_3rem] items-center gap-x-3 gap-y-1.5"
-                >
-                  <span aria-hidden="true" className={letterClass(right)}>
-                    {letterOf(i)}
-                  </span>
-                  <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-                    <span className="min-w-0 wrap-break-word">{option}</span>
-                    {right ? (
-                      <span className="inline-flex items-center gap-1 text-section-label text-text-brand uppercase">
-                        <CircleCheck size={14} aria-hidden="true" />
-                        {!open && revealed ? 'Correct answer' : 'Correct'}
-                      </span>
-                    ) : null}
-                  </span>
-                  <span className="text-right text-data tabular-nums">{n ?? ''}</span>
-                  {n === undefined || !totals ? null : (
-                    <span
-                      aria-hidden="true"
-                      className={`col-start-2 h-2 rounded-full ${right ? 'bg-bar-right' : 'bg-bar'}`}
-                      style={{ width: `${Math.round((n / totals.answered) * 100)}%` }}
-                    />
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+          <Options
+            question={q}
+            counts={counts}
+            answered={totals?.answered ?? 0}
+            shown={!open && revealed}
+          />
           {open ? null : bell ? (
             <p className="mt-3.5 text-body">The bell closed this question.</p>
           ) : q.correctOption === null ? null : (
@@ -482,14 +527,8 @@ export function QuestionCard({
           )}
         </div>
         {totals ? (
-          <div
-            aria-live="polite"
-            className="flex flex-[1_1_160px] flex-col gap-1 border-l border-border-default pl-6"
-          >
-            <p className="flex items-baseline gap-2">
-              <span className="font-num text-data-lg tabular-nums">{totals.answered}</span>
-              <span className="text-text-secondary">of {totals.eligible} answered</span>
-            </p>
+          <div aria-live="polite" className={ANSWERED_COLUMN}>
+            {answeredLine(totals.answered, totals.eligible)}
             {r?.final ? <p className="text-caption text-text-tertiary">Final count</p> : null}
           </div>
         ) : null}
