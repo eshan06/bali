@@ -289,8 +289,8 @@ const RIGHT = 'border-2 border-bar-right bg-option-right px-3.75 py-2.75 text-te
 const MARK = 'inline-flex items-center gap-1 text-section-label uppercase';
 
 /** The card's line under the answers (StudentLesson, StudentNotIn, StudentClosed; StudentCardStates). */
-function caption(q: StudentQuestion, sending: boolean): string {
-  if (!q.open) {
+function caption(q: StudentQuestion, open: boolean, sending: boolean): string {
+  if (!open) {
     return q.correctOption === null
       ? 'Your teacher closed this question.'
       : 'Your teacher closed it and showed the answer.';
@@ -320,12 +320,15 @@ function QuestionCard({
   onPick: (option: number) => void;
 }) {
   const id = useId();
+  // Closed once a read says so, or once Bali said this question closed before the answer reached
+  // it: too late is said on the closed card (StudentCardStates), the read saying so due within 2 s.
+  const open = q.open && said !== 'too_late';
   const picked = sending ?? q.answer?.option ?? null;
   // A send that failed is no news once the question has closed: there's no picking it again.
   const alert =
     said === 'too_late'
       ? "This question closed before your answer reached Bali, so it wasn't counted."
-      : said === 'failed' && q.open
+      : said === 'failed' && open
         ? "Bali couldn't send your answer. Check your connection and pick it again."
         : null;
   return (
@@ -335,9 +338,9 @@ function QuestionCard({
     >
       <div>
         <p
-          className={`text-section-label uppercase ${q.open ? 'text-text-brand' : 'text-text-tertiary'}`}
+          className={`text-section-label uppercase ${open ? 'text-text-brand' : 'text-text-tertiary'}`}
         >
-          {q.open ? 'Question' : 'Question · closed'}
+          {open ? 'Question' : 'Question · closed'}
         </p>
         <h2 id={id} className="mt-2 text-h3 text-pretty wrap-break-word">
           {q.prompt}
@@ -345,14 +348,16 @@ function QuestionCard({
       </div>
       <div className="flex flex-col gap-2">
         {q.options.map((option, i) => {
-          if (q.open) {
+          if (open) {
             return (
               <button
                 key={i}
                 type="button"
                 aria-pressed={picked === i}
+                // The answer Bali holds sends nothing again; one still on its way can be sent
+                // again, as a send that hangs would never say it didn't send.
                 onClick={() => {
-                  if (picked !== i) onPick(i);
+                  if (picked !== i || sending !== null) onPick(i);
                 }}
                 className={OPTION}
               >
@@ -403,7 +408,7 @@ function QuestionCard({
         </p>
       ) : (
         <p aria-live="polite" className="text-caption text-text-tertiary">
-          {caption(q, sending !== null)}
+          {caption(q, open, sending !== null)}
         </p>
       )}
       <p className="flex items-start gap-2 border-t border-border-default pt-3 text-caption text-text-tertiary">

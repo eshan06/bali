@@ -192,6 +192,43 @@ describe('the question card, every state', () => {
     expect(next).not.toContain('role="alert"');
   });
 
+  it('closes the card as Bali says too late, before a read shows it closed, the answer it holds marked', () => {
+    const said: Said = { questionId: QUESTION, said: 'too_late' };
+    const html = render(live({ question: question({ answer: yours(3) }) }), null, said);
+    expect(buttons(html)).toEqual([]);
+    expect(words(html)).toEqual([
+      ...HEAD,
+      'Question · closed',
+      PROMPT,
+      ...ANSWERS.slice(0, 6),
+      'D',
+      'x = 6',
+      'Your answer',
+      "This question closed before your answer reached Bali, so it wasn't counted.",
+      PRIVACY,
+    ]);
+    // No answer marked correct until a read shows it.
+    expect(rows(html)[1]?.classes).toEqual(expect.arrayContaining(['text-text-secondary']));
+  });
+
+  it('closed without the answer shown, marks nothing for a student who didn’t answer (StudentCardStates)', () => {
+    const html = render(live({ question: question({ open: false }) }));
+    expect(words(html)).toEqual([
+      ...HEAD,
+      'Question · closed',
+      PROMPT,
+      ...ANSWERS,
+      'Your teacher closed this question.',
+      PRIVACY,
+    ]);
+    expect(rows(html).map((r) => r.classes.includes('text-text-secondary'))).toEqual([
+      true,
+      true,
+      true,
+      true,
+    ]);
+  });
+
   it('marks the correct answer once shown, and the student’s own, never red (StudentClosed)', () => {
     const html = render(
       live({ question: question({ open: false, correctOption: 1, answer: yours(3) }) }),
@@ -411,8 +448,8 @@ describe('its URL and its reads (from their sources)', () => {
     expect(component).toMatch(/const result = await followed\.answer\(questionId, option\);/);
     expect(component).toMatch(/if \(picks\.current !== mine\) return;/);
     expect(component).toMatch(/const words = answerSaid\(result\);/);
-    // A pick of the answer already picked sends nothing.
-    expect(component).toMatch(/if \(picked !== i\) onPick\(i\);/);
+    // A pick of the answer Bali holds sends nothing; one still on its way is sent again.
+    expect(component).toMatch(/if \(picked !== i \|\| sending !== null\) onPick\(i\);/);
   });
 
   it('sends anyone but a student home', () => {
