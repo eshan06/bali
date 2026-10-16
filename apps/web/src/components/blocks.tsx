@@ -1,6 +1,7 @@
 'use client';
 
 import type { BlockDetail, BlockListResponse } from '@bali/shared';
+import { Nfc } from 'lucide-react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 import { Button } from '@/components/button';
@@ -17,11 +18,12 @@ const registeredOn = (iso: string) =>
   new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 
 /**
- * The teacher's blocks on the classes home (P3; the approved Classes home design): a card of its
- * own, the ones registered to them as rows between hairlines, each ID in the code style, and a
- * field to register one by the ID written on it. The ID is checked as the phone reads a tag before
- * a try is spent on it; each refusal is said under the field, with the way on; an answer that
- * never came is sent again as it was by Try again, which is safe: one's own tag registers once.
+ * The teacher's blocks (P3; v2's card since PV16, as Classes and HomeStates draw it): its label
+ * with the tag's icon, the ones registered to them as rows between hairlines, each ID in the code
+ * face, and a field to register one by the ID written on it. The ID is checked as the phone reads a
+ * tag before a try is spent on it; each refusal is said right under the field's help, with the way
+ * on; an answer that never came is sent again as it was by Try again, which is safe: one's own tag
+ * registers once.
  */
 export function Blocks() {
   const api = useApi();
@@ -80,43 +82,47 @@ export function Blocks() {
 
   return (
     <section aria-labelledby={`${id}-title`} className={CARD_ALONE}>
-      <h2 id={`${id}-title`} className="text-h3">
+      <h2
+        id={`${id}-title`}
+        className="flex items-center gap-2 text-section-label text-text-tertiary uppercase"
+      >
+        <Nfc size={14} aria-hidden="true" className="shrink-0" />
         {blocks && blocks.length > 1 ? 'Your blocks' : 'Your block'}
       </h2>
-      <p className="mt-2 text-body text-text-secondary">
+      {/* 14 px under the label, as the boards render it: its margin outranks the line's. */}
+      <p className="mt-3.5 text-body text-text-secondary">
         Students tap your block with their phone to join your session.
       </p>
 
       {blocks === null ? (
         loadError !== null ? (
-          <div className="mt-6">
+          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-3">
             <p role="alert" className="text-body">
-              Couldn&apos;t load your blocks.{' '}
-              <span className="text-text-secondary">{loadError}</span>
+              Couldn&apos;t load your blocks.{loadError ? ` ${loadError}` : null}
             </p>
-            <Button variant="secondary" onClick={load} className="mt-4">
+            <Button variant="secondary" size="sm" onClick={load}>
               Try again
             </Button>
           </div>
         ) : (
-          <p role="status" className="mt-6 text-body text-text-secondary">
+          <p role="status" className="mt-4 text-body text-text-secondary">
             Loading…
           </p>
         )
       ) : (
         <>
           {blocks.length === 0 ? (
-            <p className="mt-6 border-y border-border-default py-3 text-body text-text-secondary">
+            <p className="mt-4 border-y border-border-default py-2.75 text-body text-text-secondary">
               No block registered yet.
             </p>
           ) : (
-            <ul className="mt-6 border-b border-border-default">
+            <ul className="mt-4 border-b border-border-default">
               {blocks.map((b) => (
                 <li
                   key={b.id}
-                  className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-border-default py-3"
+                  className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-border-default py-2.75"
                 >
-                  <span translate="no" className="font-mono text-code break-all">
+                  <span translate="no" className="font-mono font-medium text-body break-all">
                     {b.tagId}
                   </span>
                   <span className="text-caption text-text-tertiary">
@@ -127,7 +133,7 @@ export function Blocks() {
             </ul>
           )}
 
-          <form onSubmit={(e) => void onSubmit(e)} className="mt-6">
+          <form onSubmit={(e) => void onSubmit(e)} className="mt-4.5">
             <Field
               ref={field}
               id={`${id}-id`}
@@ -153,7 +159,7 @@ export function Blocks() {
               <p
                 id={`${id}-said`}
                 role={said.kind === 'done' ? 'status' : 'alert'}
-                className="mt-4 text-body break-words"
+                className="text-body break-words"
               >
                 {said.message}
               </p>
@@ -165,7 +171,7 @@ export function Blocks() {
               type="submit"
               aria-disabled={busy}
               aria-busy={busy}
-              className="mt-4"
+              className="mt-3.5"
             >
               {busy ? 'Registering…' : said?.kind === 'failed' ? 'Try again' : 'Register block'}
             </Button>

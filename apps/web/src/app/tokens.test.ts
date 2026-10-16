@@ -135,6 +135,8 @@ const V2_SIZES: Record<string, [string, string, number, string?]> = {
   'present-kicker': ['14px', '15px', 600, '0.05em'],
   'present-tag': ['14px', '20px', 600, '0.05em'],
   'present-line': ['20px', '28px', 400],
+  // Classes' (PV16a): a class's name on its card (`.classcard .name`).
+  'card-name': ['17px', '22px', 600],
 };
 /** The sizes §1 lists that the scale has, each its style: [style, size, line height]. */
 const ON_SCALE = [

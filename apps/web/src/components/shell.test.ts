@@ -294,21 +294,23 @@ describe('the avatar’s initials', () => {
 });
 
 describe('the side menu', () => {
-  it('links Bali, Home, Reports, Questions, Slides and Help, and no page that doesn’t exist yet, dead or disabled', () => {
+  it('links Bali, Home, Classes, Reports, Questions, Slides and Help, each page as it exists', () => {
     const html = menu();
     expect(html).toMatch(/^<nav aria-label="Main" /);
     expect(links(html).map(({ href, text }) => [href, text])).toEqual([
       ['/', 'Bali'],
       ['/', 'Home'],
+      ['/classes', 'Classes'],
       ['/reports', 'Reports'],
       ['/questions', 'Questions'],
       ['/slides', 'Slides'],
       ['/support', 'Help'],
     ]);
-    expect(html).not.toMatch(/Classes/);
-    // Reports with the boards' icon, the class page's Reports button's (PV13); Questions with
+    // Classes with the boards' icon, the grid of four (PV16a); Reports with the boards' icon, the
+    // class page's Reports button's (PV13); Questions with
     // theirs, the speech bubble with a question mark (L7b); Slides with theirs, the presentation
     // board (M5b).
+    expect(html).toMatch(/<a [^>]*href="\/classes"><svg[^>]*\blucide-layout-grid\b/);
     expect(html).toMatch(/<a [^>]*href="\/reports"><svg[^>]*\blucide-chart-bar\b/);
     expect(html).toMatch(
       /<a [^>]*href="\/questions"><svg[^>]*\blucide-message-circle-question-mark\b/,
@@ -328,12 +330,16 @@ describe('the side menu', () => {
         .filter((l) => l.current)
         .map((l) => l.text);
     expect(current('/')).toEqual(['Home']);
+    expect(current('/classes')).toEqual(['Classes']);
     expect(current('/reports')).toEqual(['Reports']);
     expect(current('/questions')).toEqual(['Questions']);
     expect(current('/slides')).toEqual(['Slides']);
-    expect(current('/classes/c1')).toEqual([]);
-    // A page under one it lists: a session's report under Reports (PV14, ReportOpened); none under
-    // Home's `/`, nor a page whose name only starts as another's does.
+    // A page under one it lists: a class's page and its reports' old address under Classes (PV16a),
+    // a session's report under Reports (PV14, ReportOpened); none under Home's `/`, nor a page whose
+    // name only starts as another's does.
+    expect(current('/classes/c1')).toEqual(['Classes']);
+    expect(current('/classes/c1/reports')).toEqual(['Classes']);
+    expect(current('/classesx')).toEqual([]);
     expect(current('/reports/c1/s1')).toEqual(['Reports']);
     expect(current('/reportsx')).toEqual([]);
     // By its aria-current, which a screen reader says too, never by colour alone.
@@ -352,7 +358,34 @@ describe('the side menu', () => {
   it('names the account at its foot: the initials beside the name, Sign out an icon named so', () => {
     const html = menu();
     expect(html).toMatch(
-      /<span aria-hidden="true" class="[^"]*\bbg-avatar-bg\b[^"]*">MR<\/span><span class="[^"]*\btext-menu-name\b[^"]*">Ms\. Rivera<\/span><button type="button" aria-label="Sign out" aria-disabled="false"[^>]*><svg[^>]*lucide-log-out/,
+      /<span aria-hidden="true" class="[^"]*\bbg-avatar-bg\b[^"]*">MR<\/span><span title="Ms\. Rivera" class="[^"]*\btext-menu-name\b[^"]*">Ms\. Rivera<\/span><button type="button" aria-label="Sign out" aria-disabled="false"[^>]*><svg[^>]*lucide-log-out/,
+    );
+  });
+
+  it('keeps a name too long for the foot on one line, cut with an ellipsis, whole on hover and to a screen reader (MenuNameStates)', () => {
+    // An account with no name of its own shows its sign-in, the demo teacher's an email: no longer
+    // broken mid-word over three lines (PV14's shots), its text whole in the page for a screen
+    // reader, and its title the whole of it on hover.
+    const email = 'bali-demo-teacher@bali.test';
+    const html = menu({ name: email });
+    expect(html).toContain(`<span title="${email}" class="`);
+    const name = classesOf(html, /<span title="[^"]*" class="[^"]*">/);
+    expect(name).toEqual(expect.arrayContaining(['min-w-0', 'truncate', 'text-menu-name']));
+    expect(name).not.toContain('wrap-anywhere');
+    expect(html).toContain(`>${email}</span>`);
+    // On a phone the foot keeps its place beside Bali on the bar's top row, growing into the room
+    // there and cutting the name to fit, the avatar, the name and Sign out together at its end.
+    const foot = classesOf(html, /<div class="[^"]*\bborder-t\b[^"]*">/);
+    expect(foot).toEqual(
+      expect.arrayContaining([
+        'max-sm:min-w-0',
+        'max-sm:flex-1',
+        'max-sm:basis-0',
+        'max-sm:justify-end',
+      ]),
+    );
+    expect(classesOf(html, /<button type="button" aria-label="Sign out"[^>]*>/)).toEqual(
+      expect.arrayContaining(['ml-auto', 'max-sm:ml-0', 'shrink-0']),
     );
   });
 
@@ -377,7 +410,7 @@ describe('the side menu', () => {
     expect(html).toMatch(/<a [^>]*href="\/"[^>]*><svg[^>]*\blucide-layout-grid\b/);
     // The same foot: the initials beside the name, Sign out an icon.
     expect(html).toMatch(
-      /<span aria-hidden="true" class="[^"]*\bbg-avatar-bg\b[^"]*">AR<\/span><span class="[^"]*\btext-menu-name\b[^"]*">Ana Rodríguez<\/span><button type="button" aria-label="Sign out"/,
+      /<span aria-hidden="true" class="[^"]*\bbg-avatar-bg\b[^"]*">AR<\/span><span title="Ana Rodríguez" class="[^"]*\btext-menu-name\b[^"]*">Ana Rodríguez<\/span><button type="button" aria-label="Sign out"/,
     );
     // On a page the student has no item for, nothing is marked.
     expect(links(menu({ role: 'student', path: '/invite' })).filter((l) => l.current)).toEqual([]);
