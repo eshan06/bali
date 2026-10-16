@@ -94,6 +94,13 @@ export interface LessonState {
   ended?: { after: number | null; by: number };
 }
 
+/**
+ * How long an answer's send waits for its whole answer before it says it didn't send (#407's
+ * review), about what a poll waits (`POLL_TIMEOUT_MS`, #334): a half-open connection never fails
+ * by itself, so the card said "Sending your answer…" until the browser gave up, minutes later.
+ */
+export const ANSWER_TIMEOUT_MS = 10_000;
+
 /** An answer's one request: the answer Bali holds now, this one or a later one, or why not. */
 export type AnswerResult = { kind: 'answered'; answer: StudentAnswer } | Failure;
 

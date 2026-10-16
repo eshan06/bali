@@ -368,6 +368,95 @@ describe('api-client', () => {
     });
   });
 
+  describe('a call given a time limit: an answer’s send (#407’s review)', () => {
+    const LIMIT = 10_000;
+    const PATH = '/v1/questions/q1/answers';
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.mocked(captureApiFailure).mockClear();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('fails as unreached once its limit is up, never a sign-out, leaving no timer', async () => {
+      const onUnauthorized = vi.fn();
+      const api = createApiClient({
+        baseUrl: 'http://api',
+        getToken: () => 'tok',
+        onUnauthorized,
+        fetchImpl: (_url, init) => swallowed(init),
+      });
+      const sent = api.post(PATH, { eventId: 'e1', option: 1 }, LIMIT);
+      const settled = vi.fn();
+      sent.then(settled, settled);
+      await vi.advanceTimersByTimeAsync(LIMIT - 1);
+      expect(settled).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(settled).toHaveBeenCalledOnce();
+      await expect(sent).rejects.toBeInstanceOf(NetworkError);
+      expect(onUnauthorized).not.toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+      expect(vi.mocked(captureApiFailure).mock.calls).toEqual([['POST', PATH, 'network']]);
+    });
+
+    it('fails a body that stops on its way the same way: the limit is on the whole answer', async () => {
+      const api = createApiClient({
+        baseUrl: 'http://api',
+        getToken: () => 'tok',
+        fetchImpl: (_url, init) => {
+          const body = new ReadableStream<Uint8Array>({
+            start(stream) {
+              stream.enqueue(new TextEncoder().encode('{"outcome":'));
+              init?.signal?.addEventListener('abort', () =>
+                stream.error(new DOMException('aborted', 'AbortError')),
+              );
+            },
+          });
+          return Promise.resolve(new Response(body, { status: 200 }));
+        },
+      });
+      const sent = api.post(PATH, { eventId: 'e1', option: 1 }, LIMIT);
+      const settled = vi.fn();
+      sent.then(settled, settled);
+      await vi.advanceTimersByTimeAsync(LIMIT - 1);
+      expect(settled).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(settled).toHaveBeenCalledOnce();
+      await expect(sent).rejects.toBeInstanceOf(NetworkError);
+      expect(vi.getTimerCount()).toBe(0);
+      expect(vi.mocked(captureApiFailure).mock.calls).toEqual([['POST', PATH, 'network']]);
+    });
+
+    it('clears its timer once answered: a body, a refusal, a 401, no network, not JSON', async () => {
+      const replies: (() => Promise<Response>)[] = [
+        () => Promise.resolve(jsonResponse({ outcome: 'answered' })),
+        () => Promise.resolve(jsonResponse({ error: { code: 'conflict', message: 'no' } }, 409)),
+        () => Promise.resolve(new Response('', { status: 401 })),
+        () => Promise.reject(new TypeError('Failed to fetch')),
+        // A proxy's page: a body that came whole, so its own error, never the limit's no answer.
+        () => Promise.resolve(new Response('<html>', { status: 200 })),
+      ];
+      const api = createApiClient({
+        baseUrl: 'http://api',
+        getToken: () => 'tok',
+        fetchImpl: () => replies.shift()!(),
+      });
+      const answers: unknown[] = [];
+      for (let i = 0; i < 5; i += 1) {
+        answers.push(await api.post(PATH, { eventId: 'e1' }, LIMIT).catch((e: unknown) => e));
+        expect(vi.getTimerCount(), `after answer ${i + 1}`).toBe(0);
+      }
+      expect(answers[0]).toEqual({ outcome: 'answered' });
+      expect(answers.slice(1).map((e) => (e as Error).name)).toEqual([
+        'ApiError',
+        'UnauthorizedError',
+        'NetworkError',
+        'SyntaxError',
+      ]);
+    });
+  });
+
   it('surfaces a clean ApiError (not a TypeError) on a non-conforming error body', async () => {
     // A valid-JSON body lacking our `{ error: { code, message } }` shape — e.g. an
     // ALB/API-Gateway `{ message }` — must still throw ApiError with the fallback

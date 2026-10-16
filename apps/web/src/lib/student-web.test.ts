@@ -19,6 +19,7 @@ import {
 import { newEventId } from './event-id';
 import { type PageVisibility, POLL_EVERY_MS } from './live-question';
 import {
+  ANSWER_TIMEOUT_MS,
   answerSaid,
   type AnswerResult,
   CLOCK_SKEW_MS,
@@ -483,6 +484,37 @@ describe('followLesson', () => {
       AT + 60_002,
     ]);
     expect(shownAnswer()).toEqual({ option: 3, eventId: second?.eventId });
+    followed.stop();
+  });
+
+  it('says an answer whose send never answers didn’t send once ANSWER_TIMEOUT_MS is up, and a pick again sends anew (#407’s review)', async () => {
+    const answered = (init?: RequestInit) => {
+      const { eventId, option } = JSON.parse(init?.body as string) as AnswerRequest;
+      return json(200, { outcome: 'answered', answer: { option, eventId } })();
+    };
+    const sends = [swallowed, answered];
+    const { api, asked } = client({
+      [`/v1/sessions/${SESSION}/presentation`]: json(200, lesson({ question: question() })),
+      [`/v1/questions/${QUESTION}/answers`]: (init) => (sends.shift() ?? swallowed)(init),
+    });
+    const followed = followLesson(api, SESSION, onChange, page().doc);
+    await after(0);
+    const sent = followed.answer(QUESTION, 1);
+    const settled = vi.fn();
+    void sent.then(settled);
+    await after(ANSWER_TIMEOUT_MS - 1);
+    expect(settled).not.toHaveBeenCalled();
+    await after(1);
+    expect(settled).toHaveBeenCalledOnce();
+    const result = await sent;
+    expect(result).toEqual({ kind: 'failed', status: undefined, retryAfter: undefined });
+    // The card's drawn "didn't send", with its retry: a pick again.
+    expect(answerSaid(result)).toBe('failed');
+    expect(shownAnswer()).toBeNull();
+    const again = await followed.answer(QUESTION, 1);
+    expect(again).toMatchObject({ kind: 'answered', answer: { option: 1 } });
+    expect(shownAnswer()).toMatchObject({ option: 1 });
+    expect(asked.filter((path) => path.endsWith('/answers'))).toHaveLength(2);
     followed.stop();
   });
 
