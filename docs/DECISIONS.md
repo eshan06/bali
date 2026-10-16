@@ -58,7 +58,15 @@ a real decision? Add a dated entry at the top: what was decided and why.
   PDF.js and the CSP, beside every board (`.claude/shots/W5/`), at 1440, 1024, 720 and 390 px, full
   screen at 1440 × 900, 1920 × 1080 and on a phone, the tampered copy refused by the browser's own
   check. Full screen's closes measured there: Esc, Exit full screen, a turn (stays), a question
-  asked, the slides stopped and the class over. About 416 changed lines without tests.
+  asked, the slides stopped and the class over. About 425 changed lines without tests. **Santa's
+  review** (both reviewers, round 1): no blockers. Taken from the WARNs both raised: a full-screen
+  slide closed while the browser was still going full screen (Esc, a second Enter on Exit full
+  screen, a question arriving that moment) left the page in the browser's full screen with no slide;
+  the request now takes the page out again once it lands (`enterFullscreen` keeps whether the page
+  still wants it), its test failing first; and closing into a view with no class's name (the lesson
+  refused, or the class no longer the student's) put focus nowhere, so it goes to that view's Try
+  again or Your classes. *Left:* Exit full screen, then Full screen again within the frame the
+  browser takes to leave, closes the new view at once; pressing it again opens it.
 
 - **2026-10-16** — **M6's part 2d: Present's slide in the live grid's place, a question first (#418);
   its frame as the board renders it, the page's width and as tall as the screen leaves; #416's two

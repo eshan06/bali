@@ -431,16 +431,26 @@ export function fullEnds(
 
 type FullscreenDoc = Pick<Document, 'documentElement' | 'fullscreenElement' | 'exitFullscreen'>;
 
+/** Whether each page wants full screen now: the full-screen slide open. */
+const wanted = new WeakMap<FullscreenDoc, boolean>();
+
 /**
  * The whole page full screen for the full-screen slide (W5), where the browser allows it: only on a
  * press, and never on an iPhone. The slide covers the window either way, so a refusal changes
- * nothing the student sees and says nothing.
+ * nothing the student sees and says nothing. The browser gets there a frame or more later: a slide
+ * closed meanwhile takes the page out again once it lands (santa's review).
  */
 export function enterFullscreen(doc: FullscreenDoc = document): void {
+  wanted.set(doc, true);
   const root = doc.documentElement;
   if (doc.fullscreenElement || typeof root.requestFullscreen !== 'function') return;
   try {
-    void root.requestFullscreen().catch(() => undefined);
+    void root
+      .requestFullscreen()
+      .catch(() => undefined)
+      .then(() => {
+        if (!wanted.get(doc)) leaveFullscreen(doc);
+      });
   } catch {
     // An older browser's refusal: the slide still covers the window.
   }
@@ -448,6 +458,7 @@ export function enterFullscreen(doc: FullscreenDoc = document): void {
 
 /** The page out of full screen, if it is in it: the full-screen slide closed. */
 export function leaveFullscreen(doc: FullscreenDoc = document): void {
+  wanted.set(doc, false);
   if (!doc.fullscreenElement || typeof doc.exitFullscreen !== 'function') return;
   try {
     void doc.exitFullscreen().catch(() => undefined);

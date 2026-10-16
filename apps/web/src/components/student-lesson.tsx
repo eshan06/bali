@@ -178,12 +178,16 @@ export function StudentLesson({
     () => setFull((cur) => (cur.open === null ? cur : { open: null, back: 'left' })),
     [],
   );
-  // Closed: the page out of full screen, and focus where the student is now.
+  // Closed: the page out of full screen, and focus where the student is now; with no class's name
+  // on the page (the lesson refused, or no longer theirs), on what it offers to do (santa's review).
   useEffect(() => {
     if (full.open !== null || full.back === null) return;
     leaveFullscreen();
     const to = { left: 'full', question: 'question', gone: 'class' }[full.back];
-    document.getElementById(`${id}-${to}`)?.focus();
+    const target =
+      document.getElementById(`${id}-${to}`) ??
+      document.querySelector<HTMLElement>('main :is(button, a)');
+    target?.focus();
   }, [full, id]);
   // The page gone, full screen goes with it.
   useEffect(() => () => leaveFullscreen(), []);

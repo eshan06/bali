@@ -1330,4 +1330,49 @@ describe('enterFullscreen and leaveFullscreen: the page itself, where the browse
     expect(() => leaveFullscreen(as(iphone))).not.toThrow();
     expect(iphone.exitFullscreen).not.toHaveBeenCalled();
   });
+
+  it('leaves full screen once a request still on its way lands, the slide having closed meanwhile, but not one asked for again (santa’s review)', async () => {
+    /** A page whose browser goes full screen only once `land` is called, as it does a frame or more on. */
+    function slow() {
+      const doc = page();
+      let land = () => {};
+      doc.documentElement.requestFullscreen = vi.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            land = () => {
+              doc.fullscreenElement = doc.documentElement as unknown as Element;
+              resolve();
+            };
+          }),
+      );
+      return { doc, land: () => land() };
+    }
+    const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Closed (Esc, Exit full screen, a question asked) before the browser got there: out again.
+    const closed = slow();
+    enterFullscreen(as(closed.doc));
+    leaveFullscreen(as(closed.doc));
+    expect(closed.doc.exitFullscreen).not.toHaveBeenCalled();
+    closed.land();
+    await settle();
+    expect(closed.doc.exitFullscreen).toHaveBeenCalledOnce();
+    expect(closed.doc.fullscreenElement).toBeNull();
+
+    // Still open as it lands: kept.
+    const open = slow();
+    enterFullscreen(as(open.doc));
+    open.land();
+    await settle();
+    expect(open.doc.exitFullscreen).not.toHaveBeenCalled();
+
+    // Closed, then opened again before the first landed: kept for the slide open now.
+    const again = slow();
+    enterFullscreen(as(again.doc));
+    leaveFullscreen(as(again.doc));
+    enterFullscreen(as(again.doc));
+    again.land();
+    await settle();
+    expect(again.doc.exitFullscreen).not.toHaveBeenCalled();
+  });
 });

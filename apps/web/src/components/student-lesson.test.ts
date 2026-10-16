@@ -752,9 +752,18 @@ describe('its URL and its reads (from their sources)', () => {
       /setFull\(\(cur\) => \(cur\.open === null \? cur : \{ open: null, back: 'left' \}\)\)/,
     );
     // Closed: the page out of the browser's full screen, focus on Full screen, the question asked,
-    // or the class's name.
+    // or the class's name; with no class's name on the page (the lesson refused, or no longer the
+    // student's), on its Try again or its Your classes (santa's review).
     expect(component).toMatch(
-      /if \(full\.open !== null \|\| full\.back === null\) return;\s*leaveFullscreen\(\);\s*const to = \{ left: 'full', question: 'question', gone: 'class' \}\[full\.back\];\s*document\.getElementById\(`\$\{id\}-\$\{to\}`\)\?\.focus\(\);/,
+      /if \(full\.open !== null \|\| full\.back === null\) return;\s*leaveFullscreen\(\);\s*const to = \{ left: 'full', question: 'question', gone: 'class' \}\[full\.back\];\s*const target =\s*document\.getElementById\(`\$\{id\}-\$\{to\}`\) \?\?\s*document\.querySelector<HTMLElement>\('main :is\(button, a\)'\);\s*target\?\.focus\(\);/,
+    );
+    // Those views have no class's name, and their first control is that way on.
+    expect(render({ kind: 'failed' })).not.toMatch(/-class"/);
+    expect(render({ kind: 'failed' })).toMatch(
+      /^<main[^>]*><p role="alert"[^>]*>[^<]*<\/p><button /,
+    );
+    expect(render({ kind: 'not_in_class' })).toMatch(
+      /^<main[^>]*><p role="alert"[^>]*>[^<]*<\/p><a /,
     );
     expect(component).toMatch(/fullId=\{`\$\{id\}-full`\}/);
     expect(component).toMatch(/headingId=\{`\$\{id\}-question`\}/);
