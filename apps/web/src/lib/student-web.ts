@@ -234,6 +234,38 @@ export function answerSaid(result: AnswerResult): 'too_late' | 'failed' | null {
   return result.kind === 'refused' && result.reason === 'question_closed' ? 'too_late' : 'failed';
 }
 
+/** An answer on its way to Bali (W4): its question and the option picked. */
+export type Sending = { questionId: string; option: number } | null;
+/** What the last answer's request said (`answerSaid`), for its question. */
+export type Said = { questionId: string; said: 'too_late' | 'failed' } | null;
+/** The question card's picks as they go: the answer on its way, and what the last one said. */
+export interface Picks {
+  sending: Sending;
+  said: Said;
+}
+
+/**
+ * The question card's picks (W4): each sent through the lesson's one request (`Lesson.answer`),
+ * shown on its way until Bali answers, then what its request said (`answerSaid`), each change handed
+ * to `onChange`. Of picks whose answers cross, the last one's is the one said, an earlier one's
+ * never. With no lesson to send through, it didn't send.
+ */
+export function picker(
+  onChange: (picks: Picks) => void,
+): (lesson: Pick<Lesson, 'answer'> | null, questionId: string, option: number) => Promise<void> {
+  let last = 0;
+  return async (lesson, questionId, option) => {
+    const mine = (last += 1);
+    onChange({ sending: { questionId, option }, said: null });
+    const result: AnswerResult = lesson
+      ? await lesson.answer(questionId, option)
+      : { kind: 'failed', status: undefined, retryAfter: undefined };
+    if (last !== mine) return;
+    const said = answerSaid(result);
+    onChange({ sending: null, said: said === null ? null : { questionId, said } });
+  };
+}
+
 /** A session's start and bell, as `/v1/me` lists them (W3). */
 export type Bell = InSession['liveSession'];
 

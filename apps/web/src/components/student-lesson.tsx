@@ -4,12 +4,11 @@ import type { StudentQuestion } from '@bali/shared';
 import { Check, CircleCheck, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
 import { getAccessToken } from '@/lib/auth';
 import { bellTime } from '@/lib/session-controls';
 import {
-  answerSaid,
   type Bell,
   followLesson,
   keptBell,
@@ -17,6 +16,10 @@ import {
   type LessonState,
   lessonView,
   type LessonView,
+  picker,
+  type Picks,
+  type Said,
+  type Sending,
   type StudentClass,
 } from '@/lib/student-web';
 import { useApi } from '@/lib/use-api';
@@ -29,11 +32,6 @@ import { useMe } from './shell';
 
 /** The line under every question (StudentLesson), the board's own words. */
 export const PRIVACY = "Your teacher sees the class's totals, never which answer is yours.";
-
-/** An answer on its way to Bali: its question and the option picked. */
-export type Sending = { questionId: string; option: number } | null;
-/** What the last answer's request said (`answerSaid`), for its question. */
-export type Said = { questionId: string; said: 'too_late' | 'failed' } | null;
 
 const EMPTY: LessonState = { presentation: null, problem: null, asOf: null };
 
@@ -55,10 +53,8 @@ export function StudentLessonPage({ classId, sessionId }: { classId: string; ses
   const [lesson, setLesson] = useState<LessonState>(EMPTY);
   const [attempt, setAttempt] = useState(0);
   const following = useRef<Lesson | null>(null);
-  const [sending, setSending] = useState<Sending>(null);
-  const [said, setSaid] = useState<Said>(null);
-  // Each pick's number: the last one's answer is the one said.
-  const picks = useRef(0);
+  const [picks, setPicks] = useState<Picks>({ sending: null, said: null });
+  const [pick] = useState(() => picker(setPicks));
 
   useEffect(() => {
     if (!getAccessToken()) {
@@ -100,27 +96,14 @@ export function StudentLessonPage({ classId, sessionId }: { classId: string; ses
     return () => window.clearTimeout(timer);
   }, [endsAt, load]);
 
-  const pick = useCallback(async (questionId: string, option: number) => {
-    const followed = following.current;
-    if (followed === null) return;
-    const mine = (picks.current += 1);
-    setSending({ questionId, option });
-    setSaid(null);
-    const result = await followed.answer(questionId, option);
-    if (picks.current !== mine) return;
-    setSending(null);
-    const words = answerSaid(result);
-    if (words !== null) setSaid({ questionId, said: words });
-  }, []);
-
   if (home === null || home.kind !== 'student') return null;
   const account = me !== opened ? 'fresh' : asked.current && error !== null ? 'failed' : 'stale';
   return (
     <StudentLesson
       view={lessonView(klass, account, bell, lesson)}
-      sending={sending}
-      said={said}
-      onPick={(questionId, option) => void pick(questionId, option)}
+      sending={picks.sending}
+      said={picks.said}
+      onPick={(questionId, option) => void pick(following.current, questionId, option)}
       onRetry={() => {
         setLesson(EMPTY);
         setAttempt((n) => n + 1);
@@ -354,10 +337,11 @@ function QuestionCard({
                 key={i}
                 type="button"
                 aria-pressed={picked === i}
-                // The answer Bali holds sends nothing again; one still on its way can be sent
-                // again, as a send that hangs would never say it didn't send.
+                // The answer Bali holds sends nothing again, but while one is on its way (a send
+                // that hangs never says it didn't send) or after one didn't send (Bali may have
+                // taken it, its answer lost, and the line says to pick it again).
                 onClick={() => {
-                  if (picked !== i || sending !== null) onPick(i);
+                  if (picked !== i || sending !== null || said === 'failed') onPick(i);
                 }}
                 className={OPTION}
               >

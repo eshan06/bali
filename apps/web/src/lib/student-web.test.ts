@@ -32,6 +32,7 @@ import {
   lessonView,
   nextBell,
   phoneChip,
+  picker,
   type StudentClass,
 } from './student-web';
 
@@ -673,6 +674,107 @@ describe('answerSaid: what the card says of an answer’s request (W4)', () => {
     ] satisfies AnswerResult[]) {
       expect(answerSaid(result)).toBe('failed');
     }
+  });
+});
+
+describe('picker: the question card’s picks (W4)', () => {
+  /** A lesson whose answers come back when the test says, each pick's in turn. */
+  function sends() {
+    const pending: ((result: AnswerResult) => void)[] = [];
+    const answer = vi.fn<(questionId: string, option: number) => Promise<AnswerResult>>(
+      () => new Promise((resolve) => pending.push(resolve)),
+    );
+    return { lesson: { answer }, answer, settle: (i: number, r: AnswerResult) => pending[i](r) };
+  }
+  const answered = (option: number): AnswerResult => ({
+    kind: 'answered',
+    answer: { option, eventId: idAt(AT) },
+  });
+  const failed: AnswerResult = { kind: 'failed', status: undefined, retryAfter: undefined };
+  const closed: AnswerResult = { kind: 'refused', status: 409, reason: 'question_closed' };
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+
+  it('says the pick on its way, through the lesson’s one request, then nothing once Bali holds it', async () => {
+    const { lesson, answer, settle } = sends();
+    const onChange = vi.fn();
+    const pick = picker(onChange);
+    const done = pick(lesson, QUESTION, 1);
+    expect(answer).toHaveBeenCalledOnce();
+    expect(answer).toHaveBeenCalledWith(QUESTION, 1);
+    expect(onChange).toHaveBeenLastCalledWith({
+      sending: { questionId: QUESTION, option: 1 },
+      said: null,
+    });
+    settle(0, answered(1));
+    await done;
+    expect(onChange).toHaveBeenLastCalledWith({ sending: null, said: null });
+    expect(onChange).toHaveBeenCalledTimes(2);
+  });
+
+  it('says too late, or that it didn’t send, for the question picked', async () => {
+    for (const [result, said] of [
+      [closed, 'too_late'],
+      [failed, 'failed'],
+      [{ kind: 'refused', status: 403, reason: undefined }, 'failed'],
+    ] as const) {
+      const { lesson, settle } = sends();
+      const onChange = vi.fn();
+      const done = picker(onChange)(lesson, QUESTION, 2);
+      settle(0, result);
+      await done;
+      expect(onChange).toHaveBeenLastCalledWith({
+        sending: null,
+        said: { questionId: QUESTION, said },
+      });
+    }
+  });
+
+  it('a new pick clears what the last one said', async () => {
+    const { lesson, settle } = sends();
+    const onChange = vi.fn();
+    const pick = picker(onChange);
+    const first = pick(lesson, QUESTION, 2);
+    settle(0, failed);
+    await first;
+    void pick(lesson, QUESTION, 2);
+    expect(onChange).toHaveBeenLastCalledWith({
+      sending: { questionId: QUESTION, option: 2 },
+      said: null,
+    });
+  });
+
+  it('says only the last pick’s answer when two cross, whichever comes back first', async () => {
+    for (const order of [
+      [0, 1],
+      [1, 0],
+    ]) {
+      const { lesson, settle } = sends();
+      const onChange = vi.fn();
+      const pick = picker(onChange);
+      void pick(lesson, QUESTION, 1);
+      void pick(lesson, QUESTION, 3);
+      expect(onChange).toHaveBeenLastCalledWith({
+        sending: { questionId: QUESTION, option: 3 },
+        said: null,
+      });
+      // The first pick fails and the last lands: only the last one's answer is said.
+      const results = [failed, answered(3)];
+      for (const i of order) {
+        settle(i, results[i]);
+        await flush();
+      }
+      expect(onChange).toHaveBeenLastCalledWith({ sending: null, said: null });
+      expect(onChange).toHaveBeenCalledTimes(3);
+    }
+  });
+
+  it('with no lesson to send through, says it didn’t send', async () => {
+    const onChange = vi.fn();
+    await picker(onChange)(null, QUESTION, 0);
+    expect(onChange.mock.calls).toEqual([
+      [{ sending: { questionId: QUESTION, option: 0 }, said: null }],
+      [{ sending: null, said: { questionId: QUESTION, said: 'failed' } }],
+    ]);
   });
 });
 

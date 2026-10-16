@@ -7,14 +7,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { bellTime } from '../lib/session-controls';
-import type { LessonView, StudentClass } from '../lib/student-web';
-import {
-  PRIVACY,
-  type Said,
-  type Sending,
-  StudentLesson,
-  StudentLessonPage,
-} from './student-lesson';
+import type { LessonView, Said, Sending, StudentClass } from '../lib/student-web';
+import { PRIVACY, StudentLesson, StudentLessonPage } from './student-lesson';
 
 /*
  * A student's lesson (W4, parts 1a and 1b), rendered as it first draws, the boards' sample data in
@@ -452,12 +446,17 @@ describe('its URL and its reads (from their sources)', () => {
     );
   });
 
-  it('answers through followLesson’s one request, saying only the last pick’s answer', () => {
-    expect(component).toMatch(/const result = await followed\.answer\(questionId, option\);/);
-    expect(component).toMatch(/if \(picks\.current !== mine\) return;/);
-    expect(component).toMatch(/const words = answerSaid\(result\);/);
-    // A pick of the answer Bali holds sends nothing; one still on its way is sent again.
-    expect(component).toMatch(/if \(picked !== i \|\| sending !== null\) onPick\(i\);/);
+  it('answers through the lesson it follows, its picks as picker says them (tested in student-web.test.ts)', () => {
+    expect(component).toMatch(/const \[pick\] = useState\(\(\) => picker\(setPicks\)\);/);
+    expect(component).toMatch(
+      /onPick=\{\(questionId, option\) => void pick\(following\.current, questionId, option\)\}/,
+    );
+    expect(component).toMatch(/sending=\{picks\.sending\}\s*said=\{picks\.said\}/);
+    // A tap on the answer Bali holds sends nothing, but while one is on its way or after one
+    // didn't send: then it's sent again.
+    expect(component).toMatch(
+      /if \(picked !== i \|\| sending !== null \|\| said === 'failed'\) onPick\(i\);/,
+    );
   });
 
   it('sends anyone but a student home', () => {
