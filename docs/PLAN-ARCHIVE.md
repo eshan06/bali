@@ -10,6 +10,15 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-16 (Central) — M6's part 2b-2, the class page's slide card (#416;
+`docs/DECISIONS.md`, 2026-10-16): LessonSlide's card on 2b-1's hook, in the question card's place
+while no question shows (a question first, the slide back after its Done), never in Present: the
+deck's title, the page drawn at its frame's size and the screen's pixel ratio, "4 of 12", Previous,
+Next and the ← → keys, Ask a question and Stop showing, its intermediate states as LessonSlideStates
+draws them, the button of a change on its way busy. Checked on dev with a test deck, paged from the
+card and the keys, and sharp at pixel ratios from 1 to 2. Before it, 2b-1 (#415). Next: M6's 2c+2d,
+picking a deck in the side panel and Present's slide._
+
 _Last updated: 2026-10-16 (Central) — M6's part 2b-1, the slide's hook (#415; `docs/DECISIONS.md`,
 2026-10-16): `lib/use-slide.ts`, no screen: what a session shows, from the question card's own read
 of the session, the stream and the teacher's own changes; the deck's title from the teacher's decks;
