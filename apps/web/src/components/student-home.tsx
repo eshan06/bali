@@ -14,13 +14,14 @@ import {
   nextBell,
   phoneChip,
   type StudentClass,
+  unreached,
 } from '@/lib/student-web';
 import { useApi } from '@/lib/use-api';
 
 import { Button, buttonClass } from './button';
 import { Ring, shareLeft, timeLeft, useClock } from './live-header';
 import { TextLink } from './text-link';
-import { YourPhone } from './your-phone';
+import { CantReach, YourPhone } from './your-phone';
 
 const UNREAD: LessonState = { presentation: null, problem: null, asOf: null };
 
@@ -30,8 +31,10 @@ const UNREAD: LessonState = { presentation: null, problem: null, asOf: null };
  * this computer's clock to the server's bell, the bell under it; then Open the lesson, to its page
  * (W4), and the student's own phone, from the lesson's own read, as the lesson page reads it, never
  * a one-time `/v1/me` (decision 13: never greener than the teacher's grid), its states as
- * StudentChipStates draws them (drawn first). A read saying the session is over, or refusing it,
- * has the account read again (`onGone`), so the class leaves the card at once.
+ * StudentChipStates draws them (drawn first); while its reads fail before one answers, Checking…
+ * over the lesson page's can't-reach line (StudentChipUnreached, drawn first). A read saying the
+ * session is over, or refusing it, has the account read again (`onGone`), so the class leaves the
+ * card at once.
  */
 function LiveCard({ live, onGone }: { live: InSession; onGone: () => void }) {
   const api = useApi();
@@ -81,6 +84,7 @@ function LiveCard({ live, onGone }: { live: InSession; onGone: () => void }) {
         </Link>
         <YourPhone chip={phoneChip(lesson, new Date(now))} asOf={lesson.asOf} className="ml-auto" />
       </div>
+      {unreached(lesson) ? <CantReach /> : null}
     </section>
   );
 }

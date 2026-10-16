@@ -21,6 +21,7 @@ import {
   picker,
   type Picks,
   type Said,
+  saidNow,
   type Sending,
   type StudentClass,
 } from '@/lib/student-web';
@@ -31,7 +32,7 @@ import { CARD_ALONE } from './card';
 import { Countdown, Ring, shareLeft, useClock } from './live-header';
 import { letterClass, letterOf } from './question-card';
 import { useMe } from './shell';
-import { YourPhone } from './your-phone';
+import { CantReach, NOTICE, YourPhone } from './your-phone';
 
 /** The line under every question (StudentLesson), the board's own words. */
 export const PRIVACY = "Your teacher sees the class's totals, never which answer is yours.";
@@ -118,9 +119,6 @@ export function StudentLessonPage({ classId, sessionId }: { classId: string; ses
 
 /** A line said in the lesson's place, beside what to do (StudentStates' `.said`). */
 const SAID = 'flex flex-wrap items-center gap-x-4 gap-y-3';
-/** A line under the head, drawn as the grid's stale banner is (v2.css's `.notice`). */
-const NOTICE =
-  'rounded-sm border border-border-default bg-surface-sunken px-4 py-3 text-body text-text-primary';
 
 /**
  * The lesson page as its state draws it (W4): Loading… and the lesson that didn't load, with Try
@@ -213,19 +211,16 @@ export function StudentLesson({
     <main className="flex flex-col gap-5.5">
       <LessonHead klass={klass} bell={bell} phone={view} />
       <PhoneLine chip={phoneChip(view)} endsAt={bell.endsAt} />
-      {behind ? (
-        <p role="status" className={NOTICE}>
-          Can&apos;t reach Bali right now, so this page may be behind. It keeps trying.
-        </p>
-      ) : null}
+      {behind ? <CantReach /> : null}
       {q ? (
         // At its own width beside where a slide goes (StudentNoSlide); a column of its own under
-        // 1024 px, as StudentZoom draws it.
+        // 1024 px, as StudentZoom draws it. A pick that said it didn't send but a read since shows
+        // held is in (`saidNow`).
         <div className="lg:max-w-100">
           <QuestionCard
             question={q}
             sending={sending?.questionId === q.id ? sending.option : null}
-            said={said?.questionId === q.id ? said.said : null}
+            said={saidNow(said, q)}
             onPick={(option) => onPick(q.id, option)}
           />
         </div>
