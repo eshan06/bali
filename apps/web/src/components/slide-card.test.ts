@@ -273,6 +273,38 @@ describe('Present’s frame (PresentSlide, PresentSlideStates)', () => {
   });
 });
 
+describe('a student’s frame (W5; StudentLesson, StudentSlideFull, StudentSlideStates)', () => {
+  const draw = (deck: DeckState) =>
+    renderToStaticMarkup(
+      createElement(SlideFrame, { deck, slide: slide(), onReload: vi.fn(), look: 'student' }),
+    );
+
+  it('is v2.css’s `.slide`, 16:9 at the width it is given, never the card’s 420 px nor Present’s', () => {
+    const frame = /<figure class="([^"]*)">/.exec(draw(open))?.[1]?.split(' ');
+    expect(frame).toEqual(expect.arrayContaining(['aspect-video', 'w-full', 'rounded-frame']));
+    expect(frame).not.toContain('flex-[0_1_420px]');
+    expect(frame).not.toContain('flex-[1_1_0]');
+  });
+
+  it('says each line in a student’s words, at the page’s size, with Try again small', () => {
+    const lines: [DeckUnopened | 'undrawn', string][] = [
+      ['unloaded', "Bali couldn't load the slides."],
+      [
+        'mismatch',
+        "These slides don't match the PDF your teacher uploaded, so Bali won't show them.",
+      ],
+      ['unopened', "Bali couldn't open the slides. Try again, or reload this page."],
+      ['undrawn', "Bali couldn't draw this page."],
+    ];
+    for (const [why, words] of lines) {
+      const line = renderToStaticMarkup(UnshownLine({ why, onAgain: vi.fn(), look: 'student' }));
+      expect(text(line)).toBe(`${words} Try again`);
+      expect(line).toMatch(/<p role="alert" class="text-body">/);
+      expect(buttonTag(line, 'Try again')).toMatch(/\bh-8\.5\b/);
+    }
+  });
+});
+
 describe('turning pages', () => {
   it('turns with Previous and Next, and stops showing with Stop showing', () => {
     // Not stopped: no focus to move, in a test with no browser.

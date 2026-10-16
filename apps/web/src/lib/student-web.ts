@@ -412,6 +412,62 @@ export function lessonView(
 }
 
 /**
+ * Why the student's full-screen slide closes by itself (W5; PV1, the owner's approval of
+ * 2026-10-12): a question the teacher asked since it opened (`question`: the page then shows it), or
+ * the slides stopped, the class over or the lesson gone (`gone`); null while it stays, turning with
+ * the teacher's slide.
+ */
+export function fullEnds(
+  opened: { questionId: string | null },
+  view: LessonView,
+): 'question' | 'gone' | null {
+  if (view.kind === 'live') {
+    const q = view.presentation.question;
+    if (q !== null && q.id !== opened.questionId) return 'question';
+    if (view.presentation.slide !== null) return null;
+  }
+  return 'gone';
+}
+
+type FullscreenDoc = Pick<Document, 'documentElement' | 'fullscreenElement' | 'exitFullscreen'>;
+
+/** Whether each page wants full screen now: the full-screen slide open. */
+const wanted = new WeakMap<FullscreenDoc, boolean>();
+
+/**
+ * The whole page full screen for the full-screen slide (W5), where the browser allows it: only on a
+ * press, and never on an iPhone. The slide covers the window either way, so a refusal changes
+ * nothing the student sees and says nothing. The browser gets there a frame or more later: a slide
+ * closed meanwhile takes the page out again once it lands (santa's review).
+ */
+export function enterFullscreen(doc: FullscreenDoc = document): void {
+  wanted.set(doc, true);
+  const root = doc.documentElement;
+  if (doc.fullscreenElement || typeof root.requestFullscreen !== 'function') return;
+  try {
+    void root
+      .requestFullscreen()
+      .catch(() => undefined)
+      .then(() => {
+        if (!wanted.get(doc)) leaveFullscreen(doc);
+      });
+  } catch {
+    // An older browser's refusal: the slide still covers the window.
+  }
+}
+
+/** The page out of full screen, if it is in it: the full-screen slide closed. */
+export function leaveFullscreen(doc: FullscreenDoc = document): void {
+  wanted.set(doc, false);
+  if (!doc.fullscreenElement || typeof doc.exitFullscreen !== 'function') return;
+  try {
+    void doc.exitFullscreen().catch(() => undefined);
+  } catch {
+    // Already out of it.
+  }
+}
+
+/**
  * The chip beside the class's name (decision 13): the app's (DESIGN.md §2), Silent with the whole
  * minutes since Bali last heard from the phone (`since`), as the grid counts them. Any chip but
  * `focused` and `unknown` takes its line under the head; the words, the canvas's, are the lesson

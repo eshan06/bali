@@ -130,6 +130,46 @@ export function changeEnd(answer: SlideAnswer): { shown: Shown } | { said: Chang
   return { said: answer.kind === 'over' || answer.kind === 'gone' ? answer.kind : 'failed' };
 }
 
+/**
+ * The deck `slide` names, loaded (`loadShown`) for each deck shown and each Try again (`reload`),
+ * and closed once another deck, or none, is shown, or the page goes; one that opened as the page
+ * moved on is closed too. A page turn loads nothing. The class page's slide (`useSlide`) and the
+ * student's (W5) alike.
+ */
+export function useShownDeck(
+  api: Pick<ApiClient, 'get'>,
+  slide: Pick<Slide, 'deckId' | 'sha256'> | null,
+): { deck: DeckState; reload: () => void } {
+  const deckId = slide?.deckId ?? null;
+  const sha256 = slide?.sha256 ?? null;
+  const [tries, setTries] = useState(0);
+  const [loaded, setLoaded] = useState<{ key: string; state: DeckState } | null>(null);
+  const key = `${deckId}:${sha256}:${tries}`;
+  useEffect(() => {
+    if (deckId === null || sha256 === null) return;
+    const stop = new AbortController();
+    let gone = false;
+    let open: OpenDeck | null = null;
+    void loadShown(api, { deckId, sha256 }, stop).then((state) => {
+      // Opened as the page moved on: closed, never left with its worker running.
+      if (gone && state?.kind === 'open') void state.deck.close();
+      if (gone || state === null) return;
+      if (state.kind === 'open') open = state.deck;
+      setLoaded({ key, state });
+    });
+    return () => {
+      gone = true;
+      stop.abort();
+      void open?.close();
+      // Never handed back once closed, nor a failure said again: the same deck shown again, after
+      // another or none, loads afresh under the same key (santa's review).
+      setLoaded(null);
+    };
+  }, [api, deckId, sha256, key]);
+  const reload = useCallback(() => setTries((n) => n + 1), []);
+  return { deck: loaded?.key === key ? loaded.state : { kind: 'loading' }, reload };
+}
+
 type Held = { session: string | null; shown: Shown };
 
 /**
@@ -137,7 +177,7 @@ type Held = { session: string | null; shown: Shown };
  * question's own (`useLiveQuestion`'s `snapshot`), so a slide shown before a reload is found; from
  * the stream (`onEvent`), so one shown in another tab is, a change it can't name reading the
  * session again (`reread`); and from this tab's own changes' answers: only ever a later change, by
- * the server's order (`newer`). Its deck loaded (`loadShown`) for each deck shown and each Try
+ * the server's order (`newer`). Its deck loaded (`useShownDeck`) for each deck shown and each Try
  * again, closed once the session shows another, or none, or is gone; its title from the teacher's
  * decks, read while the deck shown isn't among them, again while Bali gives no answer
  * (`waitAfter`).
@@ -152,8 +192,6 @@ export function useSlide(
   const now = useRef<Held>(held);
   const [decks, setDecks] = useState<Deck[] | null>(null);
   const decksNow = useRef<Deck[]>([]);
-  const [tries, setTries] = useState(0);
-  const [loaded, setLoaded] = useState<{ key: string; state: DeckState } | null>(null);
   const unanswered = useRef<SlideAttempt | null>(null);
   const last = useRef<SlideChange | null>(null);
   const sending = useRef(false);
@@ -181,7 +219,6 @@ export function useSlide(
 
   const shown = held.session === sessionId ? held.shown : NOTHING_SHOWN;
   const deckId = shown.slide?.deckId ?? null;
-  const sha256 = shown.slide?.sha256 ?? null;
 
   const named = decks?.some((d) => d.id === deckId) ?? false;
   useEffect(() => {
@@ -214,28 +251,7 @@ export function useSlide(
     [put, reread],
   );
 
-  const key = `${deckId}:${sha256}:${tries}`;
-  useEffect(() => {
-    if (deckId === null || sha256 === null) return;
-    const stop = new AbortController();
-    let gone = false;
-    let open: OpenDeck | null = null;
-    void loadShown(api, { deckId, sha256 }, stop).then((state) => {
-      // Opened as the page moved on: closed, never left with its worker running.
-      if (gone && state?.kind === 'open') void state.deck.close();
-      if (gone || state === null) return;
-      if (state.kind === 'open') open = state.deck;
-      setLoaded({ key, state });
-    });
-    return () => {
-      gone = true;
-      stop.abort();
-      void open?.close();
-      // Never handed back once closed, nor a failure said again: the same deck shown again, after
-      // another or none, loads afresh under the same key (santa's review).
-      setLoaded(null);
-    };
-  }, [api, deckId, sha256, key]);
+  const { deck, reload } = useShownDeck(api, shown.slide);
 
   // One change at a time: one whose answer never came is resent under its id (2a).
   const change = useCallback(
@@ -291,7 +307,7 @@ export function useSlide(
   const slides: SlideLesson = {
     slide: shown.slide,
     title: decks?.find((d) => d.id === deckId)?.title ?? null,
-    deck: loaded?.key === key ? loaded.state : { kind: 'loading' },
+    deck,
     changing,
     said,
     turn,
@@ -300,7 +316,7 @@ export function useSlide(
     again: () => {
       if (last.current) void change(last.current);
     },
-    reload: () => setTries((n) => n + 1),
+    reload,
   };
   return { slides, onEvent };
 }

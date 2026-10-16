@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { bellTime } from '../lib/session-controls';
 import type { LessonView, Said, Sending, StudentClass } from '../lib/student-web';
+import type { DeckState } from '../lib/use-slide';
 import { PRIVACY, StudentLesson, StudentLessonPage } from './student-lesson';
 
 /*
@@ -71,11 +72,27 @@ const live = (over: Partial<Presentation> = {}, behind = false, klass = biology)
   asOf: behind ? AS_OF : null,
 });
 
+/** The slide's deck as the page first holds it (W5): loading, its Try again a stand-in. */
+const LOADING_DECK = { deck: { kind: 'loading' } as DeckState, onReloadDeck: () => {} };
+
 /** The page as it first draws `view`, at NOW, with an answer on its way or said. */
-function render(view: LessonView, sending: Sending = null, said: Said = null): string {
+function render(
+  view: LessonView,
+  sending: Sending = null,
+  said: Said = null,
+  deck: DeckState = LOADING_DECK.deck,
+): string {
   vi.useFakeTimers({ now: NOW });
   return renderToStaticMarkup(
-    createElement(StudentLesson, { view, sending, said, onPick: () => {}, onRetry: () => {} }),
+    createElement(StudentLesson, {
+      view,
+      deck,
+      onReloadDeck: () => {},
+      sending,
+      said,
+      onPick: () => {},
+      onRetry: () => {},
+    }),
   );
 }
 afterEach(() => vi.useRealTimers());
@@ -106,6 +123,8 @@ const HEAD = [
   'Focused',
 ];
 const ANSWERS = ['A', 'x = 1', 'B', 'x = 2', 'C', 'x = 4', 'D', 'x = 6'];
+/** The slide's head (StudentLesson): which slide, and Full screen. */
+const SLIDE = ['Slide 4 of 12', 'Full screen'];
 const ANSWERED = 'Your answer is in. You can change it until the question closes.';
 const NOTHING = 'Nothing shared yet. Slides and questions from your teacher show up here.';
 
@@ -151,9 +170,24 @@ describe('the lesson with a question (StudentLesson, StudentNoSlide)', () => {
     expect(words(card)).toEqual(['Question', PROMPT, ...ANSWERS, ANSWERED, PRIVACY]);
   });
 
-  it('shows the card beside a slide too, the slide W5’s', () => {
+  it('shows the card beside the slide, the card first in the page’s order at every width (StudentLesson, StudentZoom; W5)', () => {
     const both = render(live({ question: question({ answer: yours(1) }), slide }));
-    expect(words(both)).toEqual([...HEAD, 'Question', PROMPT, ...ANSWERS, ANSWERED, PRIVACY]);
+    expect(words(both)).toEqual([
+      ...HEAD,
+      'Question',
+      PROMPT,
+      ...ANSWERS,
+      ANSWERED,
+      PRIVACY,
+      ...SLIDE,
+      'Loading…',
+    ]);
+    // Beside the slide from 1024 px, its 25 rem column on the right; over it under 1024 px.
+    expect(both).toMatch(
+      /<div class="grid items-start gap-6 lg:grid-cols-\[minmax\(0,1fr\)_25rem\]"><div class="lg:col-start-2 lg:row-start-1"><section aria-labelledby="([^"]+)" class="flex flex-col gap-3\.5 rounded-live[^"]*">[^]*?<\/section><\/div><section aria-labelledby=/,
+    );
+    // Its question's heading, where focus comes once a question asked closes full screen.
+    expect(both).toMatch(/<h2 id="[^"]+-question" tabindex="-1" class="mt-2 text-h3 /);
   });
 });
 
@@ -335,7 +369,10 @@ describe('the lesson page while the class runs', () => {
     expect(html).toMatch(
       /^<main class="flex flex-col gap-5\.5"><header class="flex flex-wrap items-center gap-x-4\.5 gap-y-3\.5 max-sm:gap-x-3\.5">/,
     );
-    expect(html).toMatch(/<h1 class="text-page-title [^"]*">Biology, period 3<\/h1>/);
+    // Focusable from a script alone, for full screen's close (W5).
+    expect(html).toMatch(
+      /<h1 id="[^"]+-class" tabindex="-1" class="text-page-title [^"]*">Biology, period 3<\/h1>/,
+    );
     expect(html).toContain(
       '<p class="mt-0.5 text-meta text-text-secondary wrap-anywhere">with Ms. Rivera</p>',
     );
@@ -351,8 +388,14 @@ describe('the lesson page while the class runs', () => {
     expect(words(render(live()))).toEqual([...HEAD, NOTHING]);
   });
 
-  it('draws the head alone while a slide shows and no question, until W5 draws slides here (StudentCardStates)', () => {
-    expect(words(render(live({ slide })))).toEqual(HEAD);
+  it('draws the slide alone while no question shows, at the width it has beside one (StudentSlideAlone, drawn first)', () => {
+    const html = render(live({ slide }));
+    expect(words(html)).toEqual([...HEAD, ...SLIDE, 'Loading…']);
+    // The grid's first column, the second left for a question, as v2.css's `.s-lesson` lays it.
+    expect(html).toMatch(
+      /<div class="grid items-start gap-6 lg:grid-cols-\[minmax\(0,1fr\)_25rem\]"><section aria-labelledby=/,
+    );
+    expect(html).not.toContain(NOTHING);
   });
 
   it('says Bali can’t be reached under the head, the lesson as last read under it (StudentStates, StudentCardStates)', () => {
@@ -490,6 +533,7 @@ describe('the student’s own phone beside the class’s name (StudentPhoneState
     const html = renderToStaticMarkup(
       createElement(StudentLesson, {
         view: live({ phone: { state: 'silent', lastSeenAt: SINCE } }),
+        ...LOADING_DECK,
         sending: null,
         said: null,
         onPick: () => {},
@@ -536,6 +580,7 @@ describe('the student’s own phone beside the class’s name (StudentPhoneState
     const html = renderToStaticMarkup(
       createElement(StudentLesson, {
         view,
+        ...LOADING_DECK,
         sending: null,
         said: null,
         onPick: () => {},
@@ -675,6 +720,56 @@ describe('its URL and its reads (from their sources)', () => {
     expect(component).toMatch(
       /if \(picked !== i \|\| sending !== null \|\| said === 'failed'\) onPick\(i\);/,
     );
+  });
+
+  it('loads the slide’s deck only while the lesson shows it, closed once it stops, changes or the class is over (W5)', () => {
+    // Through the presenter's own hook (use-slide-hook.test.ts): loadDeck's check, `no-store`.
+    expect(component).toMatch(
+      /const view = lessonView\(klass, account, bell, lesson\);\s*const shown = view\.kind === 'live' \? view\.presentation\.slide : null;\s*const \{ deck, reload \} = useShownDeck\(api, shown\);/,
+    );
+    expect(component).toMatch(/view=\{view\}\s*deck=\{deck\}\s*onReloadDeck=\{reload\}/);
+  });
+
+  it('opens full screen on Full screen’s press, the page itself full screen where the browser allows it (W5)', () => {
+    // The browser's own full screen only on the press itself, before the view opens.
+    expect(component).toMatch(
+      /onFull=\{\(\) => \{[^}]*enterFullscreen\(\);\s*setFull\(\{ open: \{ questionId: q\?\.id \?\? null \}, back: null \}\);\s*\}\}/,
+    );
+    expect(component).toMatch(
+      /\{full\.open && slide \? \(\s*<SlideFull\s*slide=\{slide\}\s*deck=\{deck\}\s*behind=\{behind\}\s*onReload=\{onReloadDeck\}\s*onLeave=\{leave\}\s*\/>\s*\) : null\}/,
+    );
+    // Shut as the page first draws.
+    expect(render(live({ slide }))).not.toMatch(/<dialog/);
+  });
+
+  it('closes full screen by itself once a question is asked, the slides stop or the class is over, focus where the student is now (W5; PV1)', () => {
+    // When, as fullEnds says (tested in student-web.test.ts), checked at each draw.
+    expect(component).toMatch(
+      /const ends = full\.open === null \? null : fullEnds\(full\.open, view\);\s*if \(ends !== null\) setFull\(\{ open: null, back: ends \}\);/,
+    );
+    // Left by the student, once: Exit full screen, Esc, or the browser leaving full screen.
+    expect(component).toMatch(
+      /setFull\(\(cur\) => \(cur\.open === null \? cur : \{ open: null, back: 'left' \}\)\)/,
+    );
+    // Closed: the page out of the browser's full screen, focus on Full screen, the question asked,
+    // or the class's name; with no class's name on the page (the lesson refused, or no longer the
+    // student's), on its Try again or its Your classes (santa's review).
+    expect(component).toMatch(
+      /if \(full\.open !== null \|\| full\.back === null\) return;\s*leaveFullscreen\(\);\s*const to = \{ left: 'full', question: 'question', gone: 'class' \}\[full\.back\];\s*const target =\s*document\.getElementById\(`\$\{id\}-\$\{to\}`\) \?\?\s*document\.querySelector<HTMLElement>\('main :is\(button, a\)'\);\s*target\?\.focus\(\);/,
+    );
+    // Those views have no class's name, and their first control is that way on.
+    expect(render({ kind: 'failed' })).not.toMatch(/-class"/);
+    expect(render({ kind: 'failed' })).toMatch(
+      /^<main[^>]*><p role="alert"[^>]*>[^<]*<\/p><button /,
+    );
+    expect(render({ kind: 'not_in_class' })).toMatch(
+      /^<main[^>]*><p role="alert"[^>]*>[^<]*<\/p><a /,
+    );
+    expect(component).toMatch(/fullId=\{`\$\{id\}-full`\}/);
+    expect(component).toMatch(/headingId=\{`\$\{id\}-question`\}/);
+    expect(component).toMatch(/headingId=\{`\$\{id\}-class`\}/);
+    // The page gone (another page, the class's end): out of full screen with it.
+    expect(component).toMatch(/useEffect\(\(\) => \(\) => leaveFullscreen\(\), \[\]\);/);
   });
 
   it('sends anyone but a student home', () => {

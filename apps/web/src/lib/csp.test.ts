@@ -275,4 +275,12 @@ describe('next.config headers()', () => {
     expect(byKey['Strict-Transport-Security']).toMatch(/^max-age=\d{8,}/);
     expect(byKey['Permissions-Policy']).toContain('camera=()');
   });
+
+  it('leaves full screen to the portal’s own pages, for the student’s slide (W5)', () => {
+    // `fullscreen=()` would refuse the page's own full screen: the slide would cover the window
+    // alone, never the screen. Unnamed, it is the portal's own pages', and no frame's.
+    const policy = securityHeaders.find((h) => h.key === 'Permissions-Policy')?.value ?? '';
+    expect(policy).not.toMatch(/fullscreen/);
+    expect(parse(contentSecurityPolicy(BASE)).get('frame-ancestors')).toEqual(["'none'"]);
+  });
 });

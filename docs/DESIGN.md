@@ -227,14 +227,21 @@ The student's lesson page is v2's since W4's part 1a (2026-10-15): `/lessons/<cl
 Your classes marked in the menu, StudentLesson's head (its ring and the class page's countdown) over
 StudentWaiting's line, StudentEnded's card and StudentStates' lines, and its intermediate states as
 StudentCardStates draws them (drawn on the canvas first); its question card since part 1b
-(2026-10-15), StudentLesson's, StudentNotIn's and StudentClosed's, alone at its own width until W5
-draws the slide beside it (StudentNoSlide), its states as StudentCardStates draws them, too late
-closing it at once; and since part 2 (2026-10-15) "Your phone" at the head's end, the chip in the
-grid's tint, icon and edge and the app's words, its line under the head (StudentPhoneStates), kept
-"as of" the last read while Bali can't be reached, Silent's minutes stopped then, the phone's line
-over "Can't reach Bali", and the grid's Unknown for a state the page has no chip for, with no line
+(2026-10-15), StudentLesson's, StudentNotIn's and StudentClosed's, alone at its own width while no
+slide shows (StudentNoSlide), its states as StudentCardStates draws them, too late closing it at
+once; and since part 2 (2026-10-15) "Your phone" at the head's end, the chip in the grid's tint,
+icon and edge and the app's words, its line under the head (StudentPhoneStates), kept "as of" the
+last read while Bali can't be reached, Silent's minutes stopped then, the phone's line over "Can't
+reach Bali", and the grid's Unknown for a state the page has no chip for, with no line
 (StudentChipStates, drawn on the canvas first); on a phone the chip takes a line of its own; the
-home's Open the lesson leads to it.
+home's Open the lesson leads to it. The slide the teacher shows is StudentLesson's since W5
+(2026-10-16): "Slide 4 of 12" and Full screen over the page in v2.css's `.slide`, the question card
+first in the page's order, beside it from 1024 px and over it narrower (StudentZoom), the slide alone
+at the width it has beside a card (StudentSlideAlone); its lines in a student's words, and its
+states, a phone's width included, as StudentSlideStates and StudentSlidePhone draw them (drawn on the
+canvas first); never a page turned by the student. Full screen is PV1's StudentSlideFull: only the
+slide, turning with the teacher's, as large as fits over its row, Exit full screen or Esc leaving it,
+a question asked, the slides stopped or the class over closing it by itself.
 The class page's "Questions and slides" card is v2's since L7-1a (2026-10-15): between the counts
 and the grid, never in Present, a question's totals ("N of M answered", each option's count and bar
 from 3 answers), Close and Close and show answer, Done; and since L7-1b, at rest, Ask a question,

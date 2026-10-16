@@ -8,15 +8,15 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-16 (Central) — M6 done, its part 2d, Present's slide (#418;
-`docs/DECISIONS.md`, 2026-10-16): PresentSlide in the live grid's place, a question first and the
-slide back after its Done; the page in a white frame the page's width, as the board renders it, as
-tall as the screen leaves under the header (760 px at 1920 × 1080), "Factoring quadratics · 4 of
-12", Previous, Next, Stop showing and the ← → keys; its states as PresentSlideStates and
-PresentSlidePhone draw them. With it #416's two fixes: a page's draw given 20 s in view, and the keys
-left to a side panel. The conductor's two M6 calls are the owner's now ("your decisions are fine",
-2026-10-16). Checked on dev, and sharp beside every board. Before it, 2c (#417). Next: W5, slides on
-the student web._
+_Last updated: 2026-10-16 (Central) — W5 done, slides on the student web (#419;
+`docs/DECISIONS.md`, 2026-10-16): the lesson page shows the slide the teacher shows, the question card
+first, beside it from 1024 px; the deck through the student's own download, `no-store`, checked
+against its SHA-256 before PDF.js, drawn as the presenter's, the page's text its label for a screen
+reader, and dropped once the teacher stops; a student turns no page. Full screen (PV1's
+StudentSlideFull) turns with the teacher's slide, Exit full screen or Esc leaves it, and a question
+asked, the slides stopped or the class over closes it by itself. Its intermediate states drawn first
+(canvas version 63). Checked on dev as Ana, a tampered deck refused, and sharp beside every board.
+Before it, M6 (#413–#418). Next on the Windows PC: PV16, Classes; on the Mac, the phone's L8 and M8._
 
 ## Now
 
@@ -85,7 +85,7 @@ first class, production backups (L0b, the owner's console step; the owner, 2026-
 
 **Phase 7, Live lesson: building.** Every step with no screen is done, L3c the last (2026-10-15);
 M0 is done (deck storage on, 2026-10-12); the web screens come after the redesign's PV15 (✅ #388),
-W3 the first (✅ #392), M5 (✅ #400), L7 (✅ #402, #405), W4 (✅ #406, #407, #408, its follow-up #409), L7b (✅ #393, #394, #395, #411), L7c (✅ #412), M6 (✅ #413–#418), W5 next, then the phone's (L8, M8). L0b, production backups, is the owner's, before the Vanderbilt pilot's first
+W3 the first (✅ #392), M5 (✅ #400), L7 (✅ #402, #405), W4 (✅ #406, #407, #408, its follow-up #409), L7b (✅ #393, #394, #395, #411), L7c (✅ #412), M6 (✅ #413–#418), W5 (✅ #419), so every web screen of Phase 7 is built; next the phone's (L8, M8). L0b, production backups, is the owner's, before the Vanderbilt pilot's first
 class.
 
 ## Phases
@@ -209,7 +209,7 @@ Slice 3 — students on the web (added 2026-10-10; ARCHITECTURE, "Live lesson", 
 - **W3** 👀 The student's home to v2's canvas — ✅ (#392; DECISIONS 2026-10-15); left for the owner: the privacy policy names the student pages (C2's words, the lawyer's)
 - **W4** 👀 The lesson page to v2's canvas — ✅ as part 1a (#406), part 1b (#407) and part 2 (#408); DECISIONS 2026-10-15; left for the owner: the same check with a real iPhone once the app's card (L8) can answer (📱)
 - **W4 follow-up** 👀 The home's chip says Bali can't be reached before its lesson's first read answers, an answer that landed after 10 s is in once a read shows it, and the home reads the account every 30 s while in view with no class in session (the owner, 2026-10-16) — ✅ (#409; DECISIONS 2026-10-15, 2026-10-16)
-- **W5** 👀 Slides on the student web to v2's canvas (StudentLesson's slide, its full-screen view as PV1 draws it; after M3, M6 and W4): PDF.js as M6 configures it, the `sha256` check, the download's `no-store`, the text layer for screen readers, full screen — validation: CSP tests, a tampered deck refused, `/santa-loop`, screenshots
+- **W5** 👀 Slides on the student web to v2's canvas — ✅ (#419; DECISIONS 2026-10-16)
 - **W6** 📱 Exit check: a real class on prod follows a lesson on laptops and phones at once; each student's chip agrees with the teacher's grid
 
 **The open design questions are settled** (the owner, 2026-10-10, each as recommended;
