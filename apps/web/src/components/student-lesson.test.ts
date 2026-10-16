@@ -187,6 +187,30 @@ describe('the question card, every state', () => {
     expect(closed).not.toContain('role="alert"');
   });
 
+  it('says the answer is in once a read shows Bali holding an answer that said it didn’t send, or one after it (W4’s follow-up)', () => {
+    const sent = '01924b2c-0000-7000-8000-00000000000b';
+    const said: Said = { questionId: QUESTION, said: 'failed', eventId: sent };
+    const DIDNT = 'Bali couldn&#x27;t send your answer. Check your connection and pick it again.';
+    // Its reply lost, or later than 10 s: the read since shows it held under the id it went under.
+    const landed = render(
+      live({ question: question({ answer: { option: 2, eventId: sent } }) }),
+      null,
+      said,
+    );
+    expect(landed).not.toContain('role="alert"');
+    expect(words(landed)).toContain(ANSWERED);
+    expect(buttons(landed).map((b) => b.pressed)).toEqual([false, false, true, false]);
+    // A pick on the phone since, its id after this one's: that answer is in.
+    const later = { option: 3, eventId: '01924b2c-0000-7000-8000-00000000000c' };
+    expect(words(render(live({ question: question({ answer: later }) }), null, said))).toContain(
+      ANSWERED,
+    );
+    // Not yet: the read holds an older answer, or none.
+    for (const answer of [yours(1), null]) {
+      expect(render(live({ question: question({ answer }) }), null, said)).toContain(DIDNT);
+    }
+  });
+
   it('says a pick that reached Bali too late, on the closed card, until another question', () => {
     const said: Said = { questionId: QUESTION, said: 'too_late' };
     const closed = render(live({ question: question({ open: false }) }), null, said);

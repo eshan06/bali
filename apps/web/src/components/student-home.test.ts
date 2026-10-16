@@ -14,8 +14,9 @@ import { StudentHome } from './student-home';
  * sample data in it: StudentHome (Biology, period 3 in class now with Ms. Rivera, 23:04 left to a
  * 9:55 bell, Open the lesson and the phone's chip; Chemistry, period 5 with Mr. Okafor and AP
  * English, period 6 with Ms. Chen under Other classes), StudentHomeEmpty, StudentStates' "The
- * classes didn't load" and StudentChipStates' Checking…, drawn first. The chip's other states are
- * the lesson's read's, after the first draw: `your-phone.test.ts` and `student-web.test.ts`.
+ * classes didn't load" and StudentChipStates' Checking…, drawn first. The chip's other states, and
+ * StudentChipUnreached's line (drawn first), are the lesson's read's, after the first draw:
+ * `your-phone.test.ts`, `student-web.test.ts` and the card's wiring below.
  */
 vi.mock('next/navigation', () => ({ useRouter: vi.fn() }));
 const STARTED = '2026-10-12T14:05:00.000Z';
@@ -134,6 +135,8 @@ describe('a student’s home with a class in session (StudentHome)', () => {
     );
     // Never a chip from this one-time /v1/me (decision 13): only the lesson's read says it.
     expect(html).not.toMatch(/Focused|as of/);
+    // Nor that Bali can't be reached: no read has failed yet (StudentChipUnreached).
+    expect(html).not.toMatch(/Can.t reach/);
     // The one control on the card is its way into the lesson.
     expect(html.match(/<a\b|<button\b/g)).toHaveLength(1);
   });
@@ -257,6 +260,14 @@ describe('the home’s wiring (read from its source)', () => {
       '<YourPhone chip={phoneChip(lesson, new Date(now))} asOf={lesson.asOf} className="ml-auto" />',
     );
     expect(source).not.toMatch(/api\.get\b/);
+  });
+
+  it('says Bali can’t be reached under the card’s last row while its lesson’s reads fail before one answers (StudentChipUnreached)', () => {
+    // Checking… stays in the chip's place, the line under the row (tested in student-web.test.ts
+    // and your-phone.test.ts): the reads go on every 2 s, so there's nothing to press.
+    expect(source).toMatch(
+      /<YourPhone chip=\{phoneChip\(lesson, new Date\(now\)\)\} asOf=\{lesson\.asOf\} className="ml-auto" \/>\s*<\/div>\s*\{unreached\(lesson\) \? <CantReach \/> : null\}\s*<\/section>/,
+    );
   });
 
   it('reads the account again as its tab comes back into view, so a class that started shows with its way in', () => {
