@@ -10,6 +10,14 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-15 (Central) — W4's part 1a, the student's lesson page (#406;
+`docs/DECISIONS.md`, 2026-10-15): `/lessons/<class>/<session>`, its head with the ring and the
+countdown, nothing shared yet, class over, Loading…, the lesson that didn't load, not in this class
+and "Can't reach Bali", built to v2's canvas and two boards drawn first (version 49); no link leads to
+it until W4's part 2. Before it, L7's part 3, Close and Done on Present (#405). Next: W4's part 1b,
+the question card, built on branch `w4-1b-question-card`, then its part 2; M6, the presenter; L7c's
+Questions card goes on PV14's page._
+
 _Last updated: 2026-10-15 (Central) — L7's part 3, Close and Done on Present (#405;
 `docs/DECISIONS.md`, 2026-10-15), built to the boards the owner approved that day
 (PresentQuestionControls, PresentAnswerControls, PresentControlsStates): the class page's own Close
