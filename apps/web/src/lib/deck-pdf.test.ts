@@ -19,6 +19,8 @@ import {
   PDF_OPTIONS,
   PDFJS_WORKER,
   type Pdfjs,
+  STALL_MS,
+  watchStall,
 } from './deck-pdf';
 import { captureApiFailure } from './monitoring';
 
@@ -528,6 +530,117 @@ describe('loadDeck: stopped, and closed', () => {
     await vi.advanceTimersByTimeAsync(1);
     await closing;
     expect(FakeWorker.made[0]?.terminated).toBe(true);
+  });
+});
+
+describe('watchStall: a download the screen stops once nothing arrives for 20 s (M6, part 2b)', () => {
+  /**
+   * A bucket whose answer's body arrives a chunk at a time, as the test sends it, and errors once its
+   * GET is stopped, as a browser's does.
+   */
+  function trickling() {
+    let to: ReadableStreamDefaultController<Uint8Array> | undefined;
+    const fetchImpl = ((_url: string, init?: RequestInit) => {
+      const body = new ReadableStream<Uint8Array>({
+        start(c) {
+          to = c;
+          init?.signal?.addEventListener('abort', () => {
+            c.error(new DOMException('aborted', 'AbortError'));
+          });
+        },
+      });
+      return Promise.resolve(new Response(body));
+    }) as typeof fetch;
+    return { fetchImpl, send: (chunk: Uint8Array) => to?.enqueue(chunk), end: () => to?.close() };
+  }
+  /** The body's reader, of an answer that must have one. */
+  const readerOf = (res: Response) => {
+    if (!res.body) throw new Error('no body');
+    return res.body.getReader();
+  };
+
+  it('says a bucket that never answers stalled, at 20 s and not a moment before', async () => {
+    vi.useFakeTimers();
+    const onStall = vi.fn();
+    const silent = (() => new Promise<Response>(() => {})) as typeof fetch;
+    void watchStall(onStall, silent)(URL_GET);
+    await vi.advanceTimersByTimeAsync(STALL_MS - 1);
+    expect(onStall).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(onStall).toHaveBeenCalledOnce();
+  });
+
+  it('keeps a download that keeps arriving, however slowly: each chunk gives it 20 s more', async () => {
+    vi.useFakeTimers();
+    const onStall = vi.fn();
+    const { fetchImpl, send, end } = trickling();
+    const reader = readerOf(await watchStall(onStall, fetchImpl)(URL_GET));
+    for (const chunk of [PDF.slice(0, 10), PDF.slice(10, 20), PDF.slice(20)]) {
+      await vi.advanceTimersByTimeAsync(STALL_MS - 1);
+      send(chunk);
+      expect((await reader.read()).value).toEqual(chunk);
+    }
+    end();
+    expect((await reader.read()).done).toBe(true);
+    // Its last byte in, nothing is waited for any more.
+    await vi.advanceTimersByTimeAsync(STALL_MS * 3);
+    expect(onStall).not.toHaveBeenCalled();
+  });
+
+  it('says a download whose bytes stop arriving midway stalled, 20 s after the last', async () => {
+    vi.useFakeTimers();
+    const onStall = vi.fn();
+    const { fetchImpl, send } = trickling();
+    const reader = readerOf(await watchStall(onStall, fetchImpl)(URL_GET));
+    await vi.advanceTimersByTimeAsync(STALL_MS - 1);
+    send(PDF.slice(0, 10));
+    await reader.read();
+    await vi.advanceTimersByTimeAsync(STALL_MS - 1);
+    expect(onStall).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(onStall).toHaveBeenCalledOnce();
+  });
+
+  it('watches nothing past a refusal, an answer with no body, or a fetch that failed', async () => {
+    vi.useFakeTimers();
+    const onStall = vi.fn();
+    const refused = new Response('AccessDenied', { status: 403 });
+    expect(await watchStall(onStall, fakeBucket(() => refused).fetchImpl)(URL_GET)).toBe(refused);
+    const bodiless = new Response(null, { status: 200 });
+    expect(await watchStall(onStall, fakeBucket(() => bodiless).fetchImpl)(URL_GET)).toBe(bodiless);
+    const failing = (() => Promise.reject(new TypeError('Failed to fetch'))) as typeof fetch;
+    await expect(watchStall(onStall, failing)(URL_GET)).rejects.toThrow('Failed to fetch');
+    await vi.advanceTimersByTimeAsync(STALL_MS * 3);
+    expect(onStall).not.toHaveBeenCalled();
+  });
+
+  it('hands on the bucket’s answer as it came: its bytes, status and headers, the GET as asked', async () => {
+    const bucket = fakeBucket(
+      () => new Response(PDF, { headers: { 'content-length': String(PDF.byteLength) } }),
+    );
+    const init = { cache: 'no-store', credentials: 'omit' } as const;
+    const res = await watchStall(vi.fn(), bucket.fetchImpl)(URL_GET, init);
+    expect(bucket.asked).toEqual([{ url: URL_GET, init }]);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-length')).toBe(String(PDF.byteLength));
+    expect(new Uint8Array(await res.arrayBuffer())).toEqual(PDF);
+  });
+
+  it('lets the screen stop a stalled load through its signal: loadDeck says it was stopped', async () => {
+    vi.useFakeTimers();
+    const stop = new AbortController();
+    const { fetchImpl, send } = trickling();
+    const loading = loadDeck(
+      fakeApi().api,
+      SLIDE,
+      options({ signal: stop.signal, fetchImpl: watchStall(() => stop.abort(), fetchImpl) }),
+    );
+    await vi.advanceTimersByTimeAsync(STALL_MS - 1);
+    send(PDF.slice(0, 10));
+    await vi.advanceTimersByTimeAsync(STALL_MS);
+    expect(stop.signal.aborted).toBe(true);
+    expect(await loading).toEqual({ kind: 'cancelled' });
+    expect(captureApiFailure).not.toHaveBeenCalled();
   });
 });
 

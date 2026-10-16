@@ -10,6 +10,16 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-16 (Central) — M6's part 2a, the presenter's logic (#414; `docs/DECISIONS.md`,
+2026-10-16): `lib/presenter.ts`, no screen: what a session shows, from its snapshot, its stream and
+the teacher's own slide changes, always the latest change by the server's order; a slide change
+minted after the one held and resent under its id while its answer never came, its refusals typed;
+the ready decks; and a page drawn on a canvas at the screen's pixel ratio, a draw still running there
+cancelled, its text for the label. Part 2 is three PRs now (the worker's sizing), and the conductor
+made two calls for the screens, awaiting the owner: a question first while a question and a slide
+both show, and LessonDecks' panel line left out until W5 and M8. Before it, M6's part 1 (#413). Next:
+M6's 2b, the class page's slide card, then 2c+2d._
+
 _Last updated: 2026-10-16 (Central) — M6's part 1, PDF.js and the CSP (#413; `docs/DECISIONS.md`,
 2026-10-16): pdfjs-dist 6.4.299 pinned, its legacy build in a worker of its own served from the
 portal (`public/pdfjs/`, copied at each dev and build), eval and WebAssembly off; `loadDeck` checks a

@@ -147,6 +147,59 @@ async function fetchChecked(
   }
 }
 
+/**
+ * How long a deck's download may go with nothing arriving before the screen stops it (M6, part 2b):
+ * no answer from the bucket yet, or no byte of its answer since the last. A download that keeps
+ * arriving is never cut, however slow, since no one limit on the whole fits 25 MB on a slow link.
+ */
+export const STALL_MS = 20_000;
+
+/**
+ * The bucket's fetch for `loadDeck` (`fetchImpl`), calling `onStall` once `STALL_MS` pass with
+ * nothing arriving, until its answer's last byte. It stops nothing itself: the screen's `onStall`
+ * aborts the load's `signal`, as a stalled download is the screen's to stop.
+ */
+export function watchStall(
+  onStall: () => void,
+  fetchImpl: typeof fetch = fetch,
+  ms = STALL_MS,
+): typeof fetch {
+  return async (input, init) => {
+    let timer = setTimeout(onStall, ms);
+    const arrived = () => {
+      clearTimeout(timer);
+      timer = setTimeout(onStall, ms);
+    };
+    let res: Response;
+    try {
+      res = await fetchImpl(input, init);
+    } catch (e) {
+      clearTimeout(timer);
+      throw e;
+    }
+    // A refusal is read no further, nor an answer with no body: nothing more to wait for.
+    if (!res.ok || !res.body) {
+      clearTimeout(timer);
+      return res;
+    }
+    arrived();
+    const body = res.body.pipeThrough(
+      new TransformStream<Uint8Array, Uint8Array>({
+        transform(chunk, out) {
+          arrived();
+          out.enqueue(chunk);
+        },
+        flush: () => clearTimeout(timer),
+      }),
+    );
+    return new Response(body, {
+      status: res.status,
+      statusText: res.statusText,
+      headers: res.headers,
+    });
+  };
+}
+
 /** A URL's path, or none for one that doesn't parse. */
 function pathOf(url: string): string {
   try {

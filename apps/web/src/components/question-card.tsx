@@ -178,6 +178,9 @@ export function useLiveQuestion(sessionId: string | null) {
   // what the last ask asked (`Opening.from`), null for them.
   const asks = useRef(0);
   const askedFrom = useRef<string | null>(null);
+  // The session's last read, for the slide's hook, which takes what the session shows from it (M6,
+  // part 2b): one read of the session for both cards.
+  const [snapshot, setSnapshot] = useState<{ session: string; snap: SessionSnapshot } | null>(null);
 
   const put = useCallback((session: string | null, question: TeacherQuestion | null) => {
     const before = now.current.question;
@@ -203,6 +206,7 @@ export function useLiveQuestion(sessionId: string | null) {
       let failed = false;
       try {
         const snap = await api.get<SessionSnapshot>(`/v1/sessions/${session}`);
+        if (now.current.session === session) setSnapshot({ session, snap });
         const q = snap.question ?? null;
         if (q && q.id > newest.current) put(session, q);
       } catch (e) {
@@ -264,6 +268,13 @@ export function useLiveQuestion(sessionId: string | null) {
     poll.current = { id, poll: p };
     return () => p.stop();
   }, [api, id]);
+
+  // The session read again, for the slide's hook: a slide change its stream can't name, or a deck
+  // gone meanwhile (M6, part 2b). One read at a time, as ever.
+  const reread = useCallback(() => {
+    const session = now.current.session;
+    if (session !== null) void read(session);
+  }, [read]);
 
   const onEvent = useCallback(
     (e: FeedEvent) => {
@@ -348,7 +359,7 @@ export function useLiveQuestion(sessionId: string | null) {
       told.current?.tell({ sessionId: session, questionId: question.id });
     },
   };
-  return { lesson, onEvent, ask, opening, forgetAsk };
+  return { lesson, onEvent, ask, opening, forgetAsk, snapshot, reread };
 }
 
 /** v2.css's `.lesson` head: the title or the kicker, then its buttons. */
