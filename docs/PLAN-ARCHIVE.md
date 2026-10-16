@@ -10,6 +10,14 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-15 (Central) — L7's part 3, Close and Done on Present (#405;
+`docs/DECISIONS.md`, 2026-10-15), built to the boards the owner approved that day
+(PresentQuestionControls, PresentAnswerControls, PresentControlsStates): the class page's own Close
+and Close and show answer at the foot of Present's question, Done in their place once it is closed,
+Ask another question kept off Present; and Done, there or on the class page, puts the question away
+in every Bali window of the browser. Before it, #334, a time limit on the portal's polls (#403).
+Next: M6, the presenter; L7c's Questions card goes on PV14's page._
+
 _Last updated: 2026-10-15 (Central) — #334, a time limit on the portal's polls (#403;
 `docs/DECISIONS.md`, 2026-10-15), W4's prerequisite: a polled read (`getTagged`: the student's
 lesson and L6's results) with no whole answer in 10 s fails as no answer, so a read that hangs is
