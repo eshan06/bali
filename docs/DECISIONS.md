@@ -14,7 +14,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4): LessonAsk, and
   LessonAskStates, drawn first as intermediate states (versions 56 to 58): the list loading, didn't load and
   none saved; an Ask on its way, with no answer, after the session ended, too many tries and refused;
-  a question opened elsewhere meanwhile (#PRNUM). **The panel** (`PickPanel`, `components/ask-panel.tsx`):
+  a question opened elsewhere meanwhile (#411). **The panel** (`PickPanel`, `components/ask-panel.tsx`):
   Ask a question, and a closed question's Ask another question, open it on Written ahead, the
   teacher's questions oldest first (`readDrafts`, as Your questions lists them), each with its answers
   counted and the correct one named ("4 answers · B marked correct") and Ask, then Write a new question
