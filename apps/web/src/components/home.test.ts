@@ -1,15 +1,17 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import type { ActivityEvent, MeResponse } from '@bali/shared';
+import type { ActivityEvent, MeResponse, SessionReportResponse } from '@bali/shared';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ActivityRead } from '../lib/activity';
-import type { TaughtClass } from '../lib/classes';
+import type { LastSession, TaughtClass } from '../lib/classes';
 import { CANT_REACH } from '../lib/errors';
 import type { Student, Students } from '../lib/grid-state';
+import { sessionTimes } from '../lib/recap';
+import type { ReportRead } from '../lib/reports';
 import { DOT, type GridNow } from './live-grid';
 
 /*
@@ -17,7 +19,8 @@ import { DOT, type GridNow } from './live-grid';
  * HomeNoName; the evening and two classes live drawn first, HomeInterimStates), each class once with
  * Live and Open or Start… (Main, HomeIdle), a new teacher's first class card going to Classes' New
  * class (HomeNew to ClassesNew), the list's failure over the classes read before, and the block's
- * card beside them; Main's live card (PV17b), and the rail's Recent activity (PV17c).
+ * card beside them; Main's live card (PV17b), and the rail's Recent activity and Last session
+ * (PV17c).
  */
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: () => undefined, push: () => undefined }),
@@ -31,6 +34,7 @@ const {
   LiveCardView,
   presentHref,
   RecentActivityView,
+  LastSessionView,
   activityMoment,
 } = await import('./home');
 const source = readFileSync(fileURLToPath(new URL('./home.tsx', import.meta.url)), 'utf8');
@@ -292,33 +296,57 @@ describe('Home’s page (PV17a)', () => {
     expect(html).not.toContain('Last session');
   });
 
-  it('draws no Last session yet: PV17c’s second part (HomeIdle’s rail, as HomeNoName draws it)', () => {
+  it('sets the last session over the block’s card while none is live (HomeIdle), and neither before a class’s first ends', () => {
     const third = taught('Biology, period 3', { count: 28, lastStart: '2026-10-12T13:05:00.000Z' });
-    for (const classes of [[third, TODAY, NONE], [NONE], []]) {
-      const html = plain(view({ me: me(classes) }));
-      expect(html).not.toMatch(/Recent activity|Last session/);
-      expect(html).toContain('Your block');
+    const html = plain(view({ me: me([third, TODAY, NONE]) }));
+    expect(html).toMatch(
+      /<div class="flex min-w-0 grow basis-80 flex-col gap-5"><section aria-labelledby="([^"]+)" class="[^"]*"><h2 id="\1" class="[^"]*"><svg[^]*?<\/svg>Last session<\/h2><p id="[^"]+" class="mt-3\.5 text-body font-semibold wrap-anywhere">Biology, period 3<\/p>.*?Loading the last session…<\/p><\/section><section [^>]*>.*Your block<\/h2>/,
+    );
+    expect(html).not.toContain('Recent activity');
+    // No session over yet, or a new teacher: the block's card alone (HomeNew; PV1).
+    for (const classes of [[NONE], []]) {
+      const alone = plain(view({ me: me(classes) }));
+      expect(alone).not.toMatch(/Recent activity|Last session/);
+      expect(alone).toContain('Your block');
     }
-    // Past the bell by this computer's clock: no live class, so no Recent activity either.
-    expect(plain(view({ now: Date.parse(BELL) }))).not.toContain('Recent activity');
   });
 
-  it('reads Recent activity only on a page wide enough to show it, and again while in view (sources)', () => {
+  it('shows no last session past a bell until the classes are read again: never an older one meanwhile', () => {
+    // The bell has rung by this computer's clock, the read still counting the session running.
+    const html = plain(view({ now: Date.parse(BELL) }));
+    expect(html).not.toMatch(/Recent activity|Last session/);
+    // Read again: the session just ended is the last, over the morning's.
+    const ended = taught('Biology, period 3', { count: 28, lastStart: '2026-10-12T14:05:00.000Z' });
+    const after = plain(view({ me: me([ended, TODAY, NONE]), now: Date.parse(BELL) + 3000 }));
+    expect(after).toMatch(/Last session<\/h2><p id="[^"]+" [^>]*>Biology, period 3<\/p>/);
+  });
+
+  it('reads Recent activity only on a page wide enough to show it, and Last session’s report once a session (sources)', () => {
     // Hidden under 640 px (PV1, PhoneHome), so a phone never reads what it hides.
     expect(source).toContain("const WIDE = '(min-width: 40rem)';");
     expect(source).toMatch(
-      /\{live\.length > 0 && wide \? \(\s*<RecentActivity only=\{live\.length === 1 \? \(live\[0\]\?\.c\.id \?\? null\) : null\} \/>\s*\) : null\}\s*<Blocks \/>/,
+      /\{live\.length > 0 \? \(\s*wide \? \(\s*<RecentActivity only=\{live\.length === 1 \? \(live\[0\]\?\.c\.id \?\? null\) : null\} \/>\s*\) : null\s*\) : last !== null \? \(\s*<LastSessionCard key=\{last\.session\.id\} last=\{last\} \/>\s*\) : null\}\s*<Blocks \/>/,
     );
     // Read again while in view, stopped as it goes (pollActivity, tested in lib/activity).
     expect(source).toMatch(
       /useEffect\(\(\) => \{\s*const poll = pollActivity\(api, setRead\);\s*return \(\) => poll\.stop\(\);\s*\}, \[api, attempt\]\);/,
     );
+    // Last session's report: read as it shows, again only by Try again.
+    expect(source).toMatch(
+      /void readReport\(api, classId, sessionId\)\.then\(\(answer\) => \{\s*if \(live\) setRead\(answer\);\s*\}\);/,
+    );
+    expect(source).toMatch(/\}, \[api, classId, sessionId, attempt\]\);/);
+    // Past a bell the read still counts it running: no Last session until it is read again.
+    expect(source).toMatch(
+      /const running = me\.classes\.some\(\(c\) => \(c\.summary\?\.runningSession \?\? null\) !== null\);\s*const last = running \? null : lastOf\(me\.classes\);/,
+    );
   });
 });
 
 /*
- * The rail (PV17c): Recent activity while a class is live (Main); loading and failing as
- * HomeMoreStates draws them, and its other states as HomeRailStates draws them (drawn first).
+ * The rail (PV17c): Recent activity while a class is live (Main), Last session while none is
+ * (HomeIdle); loading and failing as HomeMoreStates draws them, and their other states as
+ * HomeRailStates draws them (drawn first).
  */
 describe('Recent activity (PV17c; Main, HomeMoreStates, HomeRailStates)', () => {
   const CLASS = { id: 'c1', name: 'Biology, period 3' };
@@ -442,6 +470,109 @@ describe('Recent activity (PV17c; Main, HomeMoreStates, HomeRailStates)', () => 
 
   it('draws nothing for a list that came back empty: never an empty state (PV1)', () => {
     expect(card({ kind: 'ready', events: [] })).toBe('');
+  });
+});
+
+describe('Last session (PV17c; HomeIdle, HomeMoreStates, HomeRailStates)', () => {
+  const LAST: LastSession = {
+    classId: 'c3',
+    name: 'Biology, period 3',
+    session: {
+      id: 's9',
+      startedAt: '2026-10-12T13:05:00.000Z',
+      endedAt: '2026-10-12T13:55:00.000Z',
+    },
+  };
+  const student = (n: number) => ({ id: `u${n}`, displayName: `Student ${n}` });
+  const unlockOf = (n: number) => ({
+    eventId: `e${n}`,
+    student: student(n),
+    occurredAt: '2026-10-12T13:30:00.000Z',
+    reason: null,
+    recordedAs: null,
+  });
+  // HomeIdle's: 25 joined, 43 minutes each on average, 5 unlocks.
+  const REPORT: SessionReportResponse = {
+    ended: true,
+    startedAt: LAST.session.startedAt,
+    endsAt: LAST.session.endedAt,
+    endedAt: LAST.session.endedAt,
+    joined: Array.from({ length: 25 }, (_, i) => student(i)),
+    focusMinutes: 1075,
+    averageFocusMinutes: 43,
+    silentMinutes: 2,
+    unlocks: [1, 2, 3, 4, 5].map(unlockOf),
+    protectionOffs: [],
+  };
+  const card = (read: ReportRead, onRetry = () => undefined) =>
+    plain(renderToStaticMarkup(createElement(LastSessionView, { last: LAST, read, onRetry })));
+  /** Each figure as read: its name and its value. */
+  const figures = (html: string) =>
+    [...html.matchAll(/<dt [^>]*>([^<]*)<\/dt><dd [^>]*>([^<]*)<\/dd>/g)].map((m) => [m[1], m[2]]);
+
+  it('names the class and when it ran, then who joined, the average per student and the unlocks (HomeIdle)', () => {
+    const html = card({ kind: 'ready', report: REPORT });
+    const [, id = '', name = ''] =
+      /^<section aria-labelledby="([^"]+)" class="rounded-md border border-border-default bg-surface-card p-5 shadow-1"><h2 id="\1" class="flex items-center gap-2 text-section-label text-text-tertiary uppercase"><svg(?=[^>]*\bwidth="14")[^>]*\blucide-clock\b[^>]*>[^]*?<\/svg>Last session<\/h2><p id="([^"]+)" class="mt-3\.5 text-body font-semibold wrap-anywhere">Biology, period 3<\/p>/.exec(
+        html,
+      ) ?? [];
+    expect(id).not.toBe('');
+    expect(html).toContain(
+      `<p class="text-caption text-text-tertiary">${sessionTimes({ ...LAST.session, endsAt: LAST.session.endedAt })}</p>`,
+    );
+    expect(figures(html)).toEqual([
+      ['Joined', '25'],
+      ['Average per student', '43 min'],
+      ['Unlocks', '5'],
+    ]);
+    // v2.css's `.stats`, 14 px under the times, 12 px between rows and 28 between figures.
+    expect(html).toContain('<dl class="flex flex-wrap mt-3.5 gap-x-7 gap-y-3">');
+    // Open the recap: the class page, where the recap shows after the bell (ClassEnded), in a line
+    // of the body's height 14 px under the figures, as the board sets it.
+    expect(html).toMatch(
+      new RegExp(
+        `<div class="mt-3\\.5 text-body"><a aria-describedby="${name}" class="rounded-xs text-caption font-semibold text-text-brand [^"]*" href="\\/classes\\/c3">Open the recap<\\/a><\\/div><\\/section>$`,
+      ),
+    );
+  });
+
+  it('reads a report the sweep hasn’t marked yet as any other: never as still running', () => {
+    // Within a minute of its bell R2 says `ended: false`; its figures already run to the bell.
+    const unswept = { ...REPORT, ended: false, endedAt: null };
+    expect(card({ kind: 'ready', report: unswept })).toBe(card({ kind: 'ready', report: REPORT }));
+  });
+
+  it('says nobody joined in place of the figures, the unlocks kept when there were any (HomeRailStates)', () => {
+    const nobody = {
+      ...REPORT,
+      joined: [],
+      averageFocusMinutes: null,
+      focusMinutes: 0,
+      unlocks: [],
+    };
+    const html = card({ kind: 'ready', report: nobody });
+    expect(html).toContain(
+      '<p class="mt-3.5 text-body text-text-secondary">Nobody joined this session.</p><div class="mt-3.5 text-body"><a ',
+    );
+    expect(figures(html)).toEqual([]);
+    const unlocked = card({ kind: 'ready', report: { ...nobody, unlocks: [unlockOf(1)] } });
+    expect(unlocked).toContain('Nobody joined this session.</p><dl ');
+    expect(figures(unlocked)).toEqual([['Unlocks', '1']]);
+  });
+
+  it('says Loading the last session… under when it ran, and a failure with Try again; no link to the recap until read (HomeMoreStates)', () => {
+    const loading = card({ kind: 'loading' });
+    expect(loading).toMatch(
+      /<p class="text-caption text-text-tertiary">[^<]*<\/p><p role="status" class="mt-3\.5 text-body text-text-secondary">Loading the last session…<\/p><\/section>$/,
+    );
+    const retry = vi.fn();
+    const failed = card({ kind: 'error', message: CANT_REACH }, retry);
+    expect(failed).toMatch(
+      new RegExp(
+        `<p class="text-caption text-text-tertiary">[^<]*<\\/p><div class="mt-3\\.5"><div role="alert" class="text-body"><p class="font-semibold">Couldn't load the last session\\.<\\/p><p class="text-text-secondary">${CANT_REACH.replaceAll('.', '\\.')}<\\/p><\\/div><button type="button" class="[^"]*\\bh-8\\.5\\b[^"]*\\bmt-3\\.5\\b[^"]*">Try again<\\/button><\\/div><\\/section>$`,
+      ),
+    );
+    for (const html of [loading, failed]) expect(html).not.toMatch(/Open the recap|<dl/);
   });
 });
 
@@ -696,8 +827,9 @@ describe('the live card (PV17b; Main, HomeMoreStates, HomeLiveStates)', () => {
     expect(source).toMatch(
       /<LiveGrid\s*sessionId=\{session\.id\}\s*onEnded=\{onEnded\}\s*onSession=\{onSession\}\s*card=\{\(grid\) => \(/,
     );
-    // No read of its own: the grid's snapshot and stream are the only ones. Recent activity's read
-    // (PV17c-1) is lib's (`pollActivity`), never written out here.
+    // No read of its own: the grid's snapshot and stream are the only ones. The rail's reads,
+    // Recent activity's (PV17c-1) and Last session's (PV17c-2), are lib's (`pollActivity`,
+    // `readReport`), never written out here.
     expect(source).not.toMatch(/api\.get|createSseClient|\/v1\//);
   });
 });

@@ -9,6 +9,7 @@ import {
 } from '@bali/shared';
 import {
   CircleCheck,
+  Clock,
   LockOpen,
   type LucideIcon,
   Presentation,
@@ -19,9 +20,10 @@ import Link from 'next/link';
 import { type Ref, useCallback, useEffect, useId, useState, useSyncExternalStore } from 'react';
 
 import { type ActivityRead, pollActivity } from '@/lib/activity';
-import { liveNow, type TaughtClass } from '@/lib/classes';
+import { type LastSession, lastOf, liveNow, type TaughtClass } from '@/lib/classes';
 import { gridDisplay, latestUnlock, staleWords } from '@/lib/grid-state';
-import { bareTime, nameOf, type RecapFormat } from '@/lib/recap';
+import { bareTime, classFigures, nameOf, type RecapFormat, sessionTimes } from '@/lib/recap';
+import { readReport, type ReportRead } from '@/lib/reports';
 import { bellTime, laterBell } from '@/lib/session-controls';
 import { useApi } from '@/lib/use-api';
 
@@ -31,6 +33,7 @@ import { CARD_ALONE } from './card';
 import { classLine, FirstClass, LiveChip } from './classes';
 import { DOT, type GridNow, LiveGrid, stateCounts } from './live-grid';
 import { joinedLine, LIVE_CARD, LiveCardHead, LiveCounts, useClock } from './live-header';
+import { Figures } from './recap-card';
 import { QUIET_LINK } from './text-link';
 import { Timeline, type TimelineMoment } from './timeline';
 import { reasonWords } from './unlock-popups';
@@ -376,6 +379,120 @@ function RecentActivity({ only }: { only: string | null }) {
   );
 }
 
+/**
+ * Last session (PV17c; HomeIdle): the last session over, its class and when it ran from the account
+ * (PV2's `lastSession`), its figures from its report (R2): who joined, the average per student and
+ * the unlocks; nobody joined, the recap's line in place of the first two (HomeRailStates, drawn
+ * first). Within a minute of its bell its report says `ended: false`, the sweep not there yet, its
+ * figures already counted to the bell: never read here, so the card never calls it running. Loading
+ * and a failure as HomeMoreStates draws them.
+ */
+export function LastSessionView({
+  last,
+  read,
+  onRetry,
+}: {
+  last: LastSession;
+  read: ReportRead;
+  onRetry: () => void;
+}) {
+  const id = useId();
+  const name = useId();
+  const { startedAt, endedAt } = last.session;
+  return (
+    <section aria-labelledby={id} className={CARD_ALONE}>
+      <h2 id={id} className={RAIL_LABEL}>
+        <Clock size={14} aria-hidden="true" className="shrink-0" />
+        Last session
+      </h2>
+      <p id={name} className="mt-3.5 text-body font-semibold wrap-anywhere">
+        {last.name}
+      </p>
+      <p className="text-caption text-text-tertiary">
+        {sessionTimes({ startedAt, endsAt: endedAt, endedAt })}
+      </p>
+      {read.kind === 'loading' ? (
+        <p role="status" className="mt-3.5 text-body text-text-secondary">
+          Loading the last session…
+        </p>
+      ) : read.kind === 'error' ? (
+        <div className="mt-3.5">
+          <div role="alert" className="text-body">
+            <p className="font-semibold">Couldn&apos;t load the last session.</p>
+            <p className="text-text-secondary">{read.message}</p>
+          </div>
+          <Button variant="secondary" size="sm" onClick={onRetry} className="mt-3.5">
+            Try again
+          </Button>
+        </div>
+      ) : (
+        <LastFigures report={read.report} />
+      )}
+      {/* In a line of the body's height, as the board sets it: 14 px under the figures. */}
+      {read.kind === 'ready' ? (
+        <div className="mt-3.5 text-body">
+          <Link href={`/classes/${last.classId}`} aria-describedby={name} className={QUIET_LINK}>
+            Open the recap
+          </Link>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+/** HomeIdle's three figures; nobody joined, the recap's line, and the unlocks only if any. */
+function LastFigures({ report }: { report: Extract<ReportRead, { kind: 'ready' }>['report'] }) {
+  const joined = report.joined.length;
+  const unlocks = new Intl.NumberFormat().format(report.unlocks.length);
+  const { joined: who, average } = classFigures(joined, report);
+  const figures =
+    joined > 0
+      ? ([
+          ['Joined', who],
+          ['Average per student', `${average} min`],
+          ['Unlocks', unlocks],
+        ] as const)
+      : report.unlocks.length > 0
+        ? ([['Unlocks', unlocks]] as const)
+        : [];
+  return (
+    <>
+      {joined === 0 ? (
+        <p className="mt-3.5 text-body text-text-secondary">Nobody joined this session.</p>
+      ) : null}
+      {figures.length > 0 ? <Figures figures={figures} className="mt-3.5 gap-x-7 gap-y-3" /> : null}
+    </>
+  );
+}
+
+/** Last session, its report read as Home shows it and by Try again (`readReport`). */
+function LastSessionCard({ last }: { last: LastSession }) {
+  const api = useApi();
+  const [read, setRead] = useState<ReportRead>({ kind: 'loading' });
+  const [attempt, setAttempt] = useState(0);
+  const { classId } = last;
+  const sessionId = last.session.id;
+  useEffect(() => {
+    let live = true;
+    void readReport(api, classId, sessionId).then((answer) => {
+      if (live) setRead(answer);
+    });
+    return () => {
+      live = false;
+    };
+  }, [api, classId, sessionId, attempt]);
+  return (
+    <LastSessionView
+      last={last}
+      read={read}
+      onRetry={() => {
+        setRead({ kind: 'loading' });
+        setAttempt((n) => n + 1);
+      }}
+    />
+  );
+}
+
 /** v2.css's phone width, Tailwind's `sm`: under it Recent activity is hidden (PV1; PhoneHome). */
 const WIDE = '(min-width: 40rem)';
 
@@ -398,9 +515,10 @@ function useWide(): boolean {
  * computer's clock to the server's bell on its live card (PV17b), then each class once, or for a new
  * teacher the first class's card, its Create a class to Classes' New class; beside them, under them
  * on anything narrower, the rail (PV17c): while a class is live Recent activity, never on a phone;
- * then the block's card. A session the server ends while Home is open loses its card at once, and
- * the classes are read again (HomeLiveStates, drawn first). `ref` is the greeting's, for focus after
- * a redeem.
+ * once the last read has none running, the last session over, if any has ended; then the block's
+ * card. A session the server ends while Home is open loses its card at once, and the classes are
+ * read again (HomeLiveStates, drawn first), Last session showing once the read says none runs, so
+ * it never shows an older session meanwhile. `ref` is the greeting's, for focus after a redeem.
  */
 export function TeacherHome({
   ref,
@@ -432,6 +550,10 @@ export function TeacherHome({
     return session && !ended.has(session.id) ? [{ c, session }] : [];
   });
   const wide = useWide();
+  // Past a bell, or past an End elsewhere, the read still counts the session running until it is
+  // read again; until then there is no Last session to show, never an older one.
+  const running = me.classes.some((c) => (c.summary?.runningSession ?? null) !== null);
+  const last = running ? null : lastOf(me.classes);
   return (
     <main className="flex flex-col gap-5.5">
       <div>
@@ -471,8 +593,12 @@ export function TeacherHome({
           )}
         </div>
         <div className="flex min-w-0 grow basis-80 flex-col gap-5">
-          {live.length > 0 && wide ? (
-            <RecentActivity only={live.length === 1 ? (live[0]?.c.id ?? null) : null} />
+          {live.length > 0 ? (
+            wide ? (
+              <RecentActivity only={live.length === 1 ? (live[0]?.c.id ?? null) : null} />
+            ) : null
+          ) : last !== null ? (
+            <LastSessionCard key={last.session.id} last={last} />
           ) : null}
           <Blocks />
         </div>

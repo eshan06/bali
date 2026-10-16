@@ -156,6 +156,32 @@ export async function readSessionPage(
   }
 }
 
+/** A session's report as Home's Last session reads it (PV17c): being read, read, or why not. */
+export type ReportRead =
+  | { kind: 'loading' }
+  | { kind: 'ready'; report: SessionReportResponse }
+  | { kind: 'error'; message: string };
+
+/**
+ * Read a session's report (R2) alone, for Home's Last session: its figures. Within a minute of its
+ * bell it says `ended: false` (the sweep hasn't marked it yet), its figures already counted to the
+ * bell; the card never reads that flag. Never thrown: a failure is said with Try again.
+ */
+export async function readReport(
+  api: Pick<ApiClient, 'get'>,
+  classId: string,
+  sessionId: string,
+): Promise<Exclude<ReportRead, { kind: 'loading' }>> {
+  try {
+    const report = await api.get<SessionReportResponse>(
+      `/v1/classes/${encodeURIComponent(classId)}/reports/sessions/${encodeURIComponent(sessionId)}`,
+    );
+    return { kind: 'ready', report };
+  } catch (e) {
+    return { kind: 'error', message: errText(e) };
+  }
+}
+
 /** A session's Questions card as it reads (L7c): loading, read, or not read. */
 export type SessionQuestions =
   | { kind: 'loading' }

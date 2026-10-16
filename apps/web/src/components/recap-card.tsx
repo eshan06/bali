@@ -183,6 +183,29 @@ export function RecapShown({
 }
 
 /**
+ * v2.css's `.stats`: each name over its figure, the unit beside the number. The recap's, and Home's
+ * Last session (PV17c), each spaced as its board draws it.
+ */
+export function Figures({
+  figures,
+  className,
+}: {
+  figures: readonly (readonly [label: string, value: string])[];
+  className: string;
+}) {
+  return (
+    <dl className={`flex flex-wrap ${className}`}>
+      {figures.map(([label, value]) => (
+        <div key={label} className="flex flex-col gap-0.5">
+          <dt className="text-tile-line font-normal text-text-tertiary">{label}</dt>
+          <dd className="font-num text-h2">{value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/**
  * A session's recap as ClassEnded and ReportOpened draw it, in the class page's card and on the
  * session's own page (PV14): the class's figures and the note on silence, then the three groups.
  * Nobody joined: that line alone, but for someone who never joined with an unlock or protection
@@ -210,22 +233,15 @@ export function RecapBody({
         <p className="text-body text-text-secondary">Nobody joined this session.</p>
       ) : (
         <>
-          {/* v2.css's `.stats`: each name over its figure, the unit beside the number. */}
-          <dl className="flex flex-wrap gap-x-10 gap-y-4">
-            {(
-              [
-                ['Joined', figures.joined],
-                ['Class focus time', `${figures.focus} min`],
-                ['Average per student', `${figures.average} min`],
-                ['Silent', `${figures.silent} min`],
-              ] as const
-            ).map(([label, value]) => (
-              <div key={label} className="flex flex-col gap-0.5">
-                <dt className="text-tile-line font-normal text-text-tertiary">{label}</dt>
-                <dd className="font-num text-h2">{value}</dd>
-              </div>
-            ))}
-          </dl>
+          <Figures
+            figures={[
+              ['Joined', figures.joined],
+              ['Class focus time', `${figures.focus} min`],
+              ['Average per student', `${figures.average} min`],
+              ['Silent', `${figures.silent} min`],
+            ]}
+            className="gap-x-10 gap-y-4"
+          />
           <p className="text-caption text-text-tertiary">
             A phone is silent when it stops checking in. Silent time doesn&apos;t count as focus.
           </p>
