@@ -10,37 +10,38 @@ a real decision? Add a dated entry at the top: what was decided and why.
 
 - **2026-10-15** — **W4's part 1b: the student's question card; too late closes it at once.** Built
   to [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4): StudentLesson's,
-  StudentNotIn's and StudentClosed's card, alone at its own width (StudentNoSlide) and a column of its
-  own under 1024 px (StudentZoom), and StudentCardStates' card states, two of them drawn first as
-  intermediate states (version 53): too late after an answer Bali held, and closed with the answer
-  not shown and none given (nothing marked, the closed line). **The card:** a tap sends the answer
-  through `followLesson`'s one request (W2) and a tap on another changes it until the close, no
-  Submit; the pick shows picked, "Sending your answer…", until Bali answers, and only the last pick's
-  answer is said (`answerSaid`: too late for `question_closed`, else that it didn't send); didn't send
-  takes the line's place, the answer Bali holds left picked, and goes once the question closes, when
-  there is no picking it again; too late stays on the closed card until the next question. **Too late
-  closes the card at once:** Bali's `409 question_closed` is newer than the page's last read, so the
-  card shows closed as it comes, the answer Bali holds marked Your answer, and the read that shows the
-  close (with the correct answer, if shown) follows within 2 s. *Weighed:* the line on the card as
-  last read (an open card, its answers still pickable, saying the question closed: undrawn) and the
-  line held back until that read (2 s of "Your answer is in" over a pick that wasn't counted). **A tap
-  on the answer Bali holds sends nothing, but while one is on its way or after one didn't send:**
-  an answer's `POST` has no time limit (#334 gave one to the polls alone), so a send that hangs would
-  leave a dead control; and a send whose reply was lost after Bali took it shows that answer held
-  under the didn't-send line, which says to pick it again (santa's review). The picks' sequence is
-  `picker` (`lib/student-web.ts`), so it runs in tests. **The closed kicker** is 11.5/15 like the
-  open one, as L7-1a and L7's part 2 built theirs (the board's `.kicker.quiet` takes v2.css's link
-  class `.quiet`'s 13/18), so nothing moves 3 px as the question closes. **Privacy:** the card shows the student's own answer and, once shown,
-  the correct one; the presentation read carries no count and no one else's answer, so there is no
-  count to guard here (the teacher's side keeps #389's). **Checked on dev:** the demo teacher asked
-  five questions in a 30-minute session of the demo class while Ana followed it through the page's own
-  logic: she answered from the web (B), then from the phone, through the API as the demo does with an
-  id minted after the held one (D), which the web showed 2 s later; the web's next pick after the
+  StudentNotIn's and StudentClosed's card, alone at its own width (StudentNoSlide) and a column of
+  its own under 1024 px (StudentZoom), and StudentCardStates' card states, two of them drawn first
+  as intermediate states (version 53): too late after an answer Bali held, and closed with the
+  answer not shown and none given (nothing marked, the closed line). **The card:** a tap sends the
+  answer through `followLesson`'s one request (W2) and a tap on another changes it until the close,
+  no Submit; the pick shows picked, "Sending your answer…", until Bali answers, and only the last
+  pick's answer is said (`answerSaid`: too late for `question_closed`, else that it didn't send);
+  didn't send takes the line's place, the answer Bali holds left picked, and goes once the question
+  closes, when there is no picking it again; too late stays on the closed card until the next
+  question. **Too late closes the card at once:** Bali's `409 question_closed` is newer than the
+  page's last read, so the card shows closed as it comes, the answer Bali holds marked Your answer,
+  and the read that shows the close (with the correct answer, if shown) follows within 2 s.
+  *Weighed:* the line on the card as last read (an open card, its answers still pickable, saying the
+  question closed: undrawn) and the line held back until that read (2 s of "Your answer is in" over
+  a pick that wasn't counted). **A tap on the answer Bali holds sends nothing, but while one is on
+  its way or after one didn't send:** an answer's `POST` has no time limit (#334 gave one to the
+  polls alone), so a send that hangs would leave a dead control; and a send whose reply was lost
+  after Bali took it shows that answer held under the didn't-send line, which says to pick it again
+  (santa's review). The picks' sequence is `picker` (`lib/student-web.ts`), so it runs in tests.
+  **The closed kicker** is 11.5/15 like the open one, as L7-1a and L7's part 2 built theirs (the
+  board's `.kicker.quiet` takes v2.css's link class `.quiet`'s 13/18), so nothing moves 3 px as the
+  question closes. **Privacy:** the card shows the student's own answer and, once shown, the correct
+  one; the presentation read carries no count and no one else's answer, so there is no count to
+  guard here (the teacher's side keeps #389's). **Checked on dev:** the demo teacher asked five
+  questions in a 30-minute session of the demo class while Ana followed it through the page's own
+  logic: she answered from the web (B), then from the phone, through the API as the demo does with
+  an id minted after the held one (D), which the web showed 2 s later; the web's next pick after the
   phone's counted; a pick after a close said too late, once before the web's read showed the close.
   Every question closed and the session ended. A real iPhone's half waits for the app's card (L8).
-  **The screenshots:** the real components with those reads in a throwaway page in the preview alone,
-  deleted after, the browser's clock held 20 s into the session (it had ended by then), beside the
-  boards at 1440 px and StudentZoom at 720, the card box for box.
+  **The screenshots:** the real components with those reads in a throwaway page in the preview
+  alone, deleted after, the browser's clock held 20 s into the session (it had ended by then),
+  beside the boards at 1440 px and StudentZoom at 720, the card box for box.
 
 - **2026-10-15** — **W4's part 1a: the student's lesson page at `/lessons/<class>/<session>`, its
   head and its states; the question card split off as part 1b.** Built to
