@@ -8,6 +8,65 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-16** — **M6's part 2a: the presenter's logic, no screen (#414); part 2 in three PRs; and
+  the conductor's two calls for its screens, awaiting the owner.** **The split:** part 2 whole came to
+  about 1,000 changed lines without tests (the worker's sizing), so the conductor split it in three:
+  2a, this logic; 2b, the class page's slide card (LessonSlide); 2c+2d, one PR, picking a deck in the
+  side panel (LessonClass's Show slides, LessonDecks) and Present's slide (PresentSlide). As L6 went
+  before L7 and W2 before W3, **2a is `lib/presenter.ts`, tested and holding no words.** *What a
+  session shows* is the slide and the id of the slide change that set it (`Shown`), and the page only
+  ever takes a later one (`newer`): the server applies a change only when its id sorts after the one
+  held (M3a), so the client orders by the same key, the UUIDv7's hex lower-cased (#319), and a
+  snapshot read or an answer that lands after a later change never puts back an older page. It comes
+  from the snapshot (`shownIn`, M3b's `presentation`: none before the first change, once over, from an
+  older server), from the stream (`slideAfter`: `slide_shown` carries the deck's id and the page alone,
+  M3a's payload, so the SHA-256 and the page count come from the deck held or the teacher's ready
+  decks, and a deck neither names is `'unknown'`, the snapshot read again, as `questionAfter` does for
+  a question), and from the teacher's own changes. *A change* (`slideAttemptFor`) whose answer never
+  came may have landed, so the same change is resent under its id, while no later change is held:
+  under one (another window's, Present's, heard since) its resend could only replay that one, and the
+  press would change nothing (santa's review). Any other is minted after both the change held and
+  that unanswered one (`eventIdAfter`, as a saved question's save is, #318), so the teacher's last
+  press is the one shown however far behind this computer's clock stands. It waits 10 s for its
+  answer (`SLIDE_TIMEOUT_MS`, as a student's answer does since #407's review): a half-open connection
+  fails as no answer, for Try again, never after minutes. Its answer (`showSlide`) is typed for the
+  screens: `shown`, what the session shows now (this change, its replay, or a later one from another
+  tab that this one changed nothing under); `over`, the session ended first (`session_not_running`);
+  `gone`, the deck is no ready deck of the teacher's (`deck_not_found`, removed meanwhile;
+  `deck_not_ready`, `deck_rejected`); else a failure, resent under its id (`keepUnanswered`), or a
+  refusal, never resent. `readyDecks` and `turned` (Previous and Next, none past either end) are the
+  screens' too. *A page drawn* (`drawPage`): as large as fits the box it is given, its shape kept, at
+  the screen's pixel ratio (the canvas's own window's), so it is sharp on a laptop and a projector
+  alike; drawn on a canvas of its own, then copied whole; a draw still running on the same canvas
+  cancelled (PDF.js's own `RenderTask`), and `signal` stops one too; its text back for the slide's
+  label (decision 8: a page with none says which slide it is), empty when PDF.js reads none. What a
+  draw held is let go once it ends, as PDF.js's own viewer lets go of pages it no longer shows: its
+  own canvas emptied (Safari caps a tab's canvases), and the page's drawing instructions and decoded
+  images (`cleanup`, which PDF.js holds back while a draw of the page runs), so paging through a deck
+  of 200 photos never holds them all until the deck closes (santa's review); a page drawn again reads
+  them again. A page whose size is no number (a crafted file's, which PDF.js reads as Infinity), or a
+  box that isn't one, draws nothing, the canvas kept as it was (santa's review). *Weighed:* drawing
+  straight onto the slide's canvas, as PDF.js's viewer does, which blanks the slide for each draw's
+  length, on the projector too; cancelling only by `signal`, which leaves an older draw that finishes
+  later free to cover a newer page whenever a caller forgets to stop it; keeping the last few pages
+  drawn, as PDF.js's viewer does (faster back and forth, but a cache to bound and to empty on a deck
+  change, for pages that draw in a fraction of a second). **Checked:** vitest with PDF.js stubbed
+  (dropping the cancel, the order, the pixel ratio, the checks after a stop, the resend's rule, the
+  time limit, the letting go or the finite check each fails tests); and once, uncommitted, with the
+  PDF.js the portal ships, in Node on its own canvas (`@napi-rs/canvas`): a two-page deck drawn (840 ×
+  473 at a ratio of 2 in the class page's 420 px slide, and again after its cleanup; a letter-sized
+  page 587 × 760 in Present's frame), its text read, a second draw cancelling the first, and a stop
+  as PDF.js began drawing cancelling its task and leaving the canvas as it was. **The conductor's two calls (2026-10-16, for the owner's morning
+  look; both reversible), which 2b and 2c+2d follow:** (1) **a question and a slide at once: the
+  question first**, ARCHITECTURE decision 11's order on the phone, and the approved boards' own way
+  (LessonSlide's Ask a question leads on to LessonWaiting). While a question shows, open or closed
+  until Done, the class page's card and Present show it as approved, the slide card coming back after
+  Done; phones and the student web keep their slide meanwhile. Composed of approved pieces alone, it
+  is drawn as an intermediate state and built, not parked. (2) **LessonDecks' panel line "Every phone
+  in this class shows the page you're on, and so does Present." is left out** until W5 and M8 make it
+  true (no phone and no student page shows a slide before them), as PLAN leaves out the presenter
+  card's sentence; it is added back with M8.
+
 - **2026-10-16** — **M6's part 1: PDF.js 6.4.299's legacy build, in a worker of its own from the
   portal's origin, eval and WebAssembly off; a deck's bytes checked against its SHA-256 before PDF.js
   sees them; the CSP's `worker-src 'self'`, and the worker's own CSP. No screen: the presenter is
