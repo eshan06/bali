@@ -151,9 +151,21 @@ export interface Me {
   error: string | null;
   /** Read it again: after a change, for Try again, or `fresh` after a redeem, forgetting it first. */
   load: (fresh?: boolean) => void;
+  /**
+   * Read it again unless a read is on its way, keeping what the page shows, its failure too, until
+   * the answer: the student home's read every 30 s (W4's follow-up). Settles once that answer has
+   * landed, or at once when no read began.
+   */
+  refresh: () => Promise<void>;
 }
 
-const MeContext = createContext<Me>({ home: null, me: null, error: null, load: () => undefined });
+const MeContext = createContext<Me>({
+  home: null,
+  me: null,
+  error: null,
+  load: () => undefined,
+  refresh: () => Promise.resolve(),
+});
 const PresentingContext = createContext<(on: boolean) => void>(() => undefined);
 
 export const useMe = (): Me => useContext(MeContext);
@@ -378,6 +390,21 @@ export function Shell({ children }: { children: ReactNode }) {
     [api],
   );
 
+  // The student home's read every 30 s: never over a read on its way, and its failure, if one was
+  // said, kept until an answer, so it isn't said afresh every 30 s while Bali can't be reached.
+  const refresh = useCallback(async () => {
+    if (reading.current) return;
+    reading.current = true;
+    const said = await readAccount(api, reads);
+    // A newer read is under way: its answer is the one that counts.
+    if (said === null) return;
+    reading.current = false;
+    if ('home' in said) {
+      setHome(said.home);
+      setError(null);
+    } else setError(said.error);
+  }, [api]);
+
   // On every page, and again as an answer lands (one landing after a Sign out is forgotten too).
   useEffect(() => {
     const newPage = seen.current !== path;
@@ -415,7 +442,10 @@ export function Shell({ children }: { children: ReactNode }) {
 
   const frame = frameFor(path, home, error, presenting);
   const me = home === null || home.kind === 'invite' ? null : home.me;
-  const value = useMemo(() => ({ home, me, error, load }), [home, me, error, load]);
+  const value = useMemo(
+    () => ({ home, me, error, load, refresh }),
+    [home, me, error, load, refresh],
+  );
   return (
     <MeContext value={value}>
       <PresentingContext value={setPresenting}>

@@ -36,6 +36,7 @@ function drawnFor(home: Home | null, Page: () => ReactNode = HomePage): string {
     me: home === null || home.kind === 'invite' ? null : home.me,
     error: null,
     load: () => undefined,
+    refresh: () => Promise.resolve(),
   };
   shell.me = me;
   return renderToStaticMarkup(createElement(Page));

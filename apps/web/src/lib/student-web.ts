@@ -72,6 +72,56 @@ export function nextBell(me: MeResponse, now: number): number | null {
   return bells.length > 0 ? Math.min(...bells) : null;
 }
 
+/**
+ * How long the home waits after the account's last answer to read it again while it's in view with
+ * no class in session (the owner, 2026-10-16): a class that starts shows within about 30 s.
+ */
+export const ACCOUNT_EVERY_MS = 30_000;
+
+/**
+ * Read the account again `ACCOUNT_EVERY_MS` after each answer while the page is in view (W4's
+ * follow-up; the owner, 2026-10-16), one read at a time: `read` settles once its answer has landed.
+ * Hidden, it reads nothing, and back in view it counts 30 s afresh, the home having read at once as
+ * its tab came back. The home stops it while a class is in session: the bell and the lesson's reads
+ * take over.
+ */
+export function rereadEvery(
+  read: () => Promise<void>,
+  doc: PageVisibility = document,
+): { stop(): void } {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let reading = false;
+  let stopped = false;
+
+  const schedule = () => {
+    if (stopped || reading || timer !== undefined || doc.visibilityState === 'hidden') return;
+    timer = setTimeout(() => {
+      timer = undefined;
+      reading = true;
+      const settled = () => {
+        reading = false;
+        schedule();
+      };
+      void read().then(settled, settled);
+    }, ACCOUNT_EVERY_MS);
+  };
+  const onVisibility = () => {
+    if (doc.visibilityState !== 'hidden') return schedule();
+    clearTimeout(timer);
+    timer = undefined;
+  };
+
+  doc.addEventListener('visibilitychange', onVisibility);
+  schedule();
+  return {
+    stop() {
+      stopped = true;
+      clearTimeout(timer);
+      doc.removeEventListener('visibilitychange', onVisibility);
+    },
+  };
+}
+
 /** What the lesson page knows of a running session's lesson. */
 export interface LessonState {
   /**

@@ -238,6 +238,16 @@ describe('the shell’s wiring of the rulings (read from its source)', () => {
     );
   });
 
+  it('reads again for the student home’s 30 s only when no read is on its way, its failure kept until an answer, so it isn’t said afresh each time (the owner, 2026-10-16)', () => {
+    expect(shell).toMatch(
+      /const refresh = useCallback\(async \(\) => \{\s*if \(reading\.current\) return;\s*reading\.current = true;\s*const said = await readAccount\(api, reads\);\s*\/\/ A newer read is under way: its answer is the one that counts\.\s*if \(said === null\) return;\s*reading\.current = false;\s*if \('home' in said\) \{\s*setHome\(said\.home\);\s*setError\(null\);\s*\} else setError\(said\.error\);\s*\}, \[api\]\);/,
+    );
+    // Every read sets `reading` as it starts, the shell's own (`load`) too.
+    expect(shell).toMatch(
+      /setError\(null\);\s*reading\.current = true;\s*void readAccount\(api, reads\)/,
+    );
+  });
+
   it('applies only the newest read’s answer, so a past failure never shows over fresh data (#352’s review)', () => {
     expect(shell).toMatch(
       /void readAccount\(api, reads\)\.then\(\(said\) => \{\s*\/\/ A newer read is under way: its answer is the one that counts\.\s*if \(said === null\) return;\s*reading\.current = false;\s*if \('home' in said\) setHome\(said\.home\);\s*else setError\(said\.error\);\s*\}\);/,
@@ -249,7 +259,7 @@ describe('the shell’s wiring of the rulings (read from its source)', () => {
     expect(shell).not.toMatch(/['"]\/v1\/me['"?]/);
     // The menu names the account `/v1/me` read, none for one the check never let it read.
     expect(shell).toMatch(
-      /const me = home === null \|\| home\.kind === 'invite' \? null : home\.me;\s*const value = useMemo\(\(\) => \(\{ home, me, error, load \}\), \[home, me, error, load\]\);/,
+      /const me = home === null \|\| home\.kind === 'invite' \? null : home\.me;\s*const value = useMemo\(\s*\(\) => \(\{ home, me, error, load, refresh \}\),\s*\[home, me, error, load, refresh\],\s*\);/,
     );
     expect(shell).toMatch(/name=\{me\?\.user\.displayName\?\.trim\(\) \|\| null\}/);
     // A student's menu once the account reads as one, a teacher's otherwise (W3).
@@ -486,7 +496,7 @@ describe('the shell', () => {
 
   it('holds the one read of the account that Home shows and the menu names', () => {
     const home = read('../app/page.tsx');
-    expect(home).toContain('const { home, error, load } = useMe();');
+    expect(home).toContain('const { home, error, load, refresh } = useMe();');
     expect(home).not.toContain("'/v1/me'");
     // A redeem forgets the account and reads it again, so the menu comes with the classes; until
     // it answers, the shell says Loading… in Home's place, as it does for every page.

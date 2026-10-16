@@ -43,11 +43,14 @@ const me = (...classes: Class[]): MeResponse => ({
   armed: false,
 });
 
+const onRead = () => {};
+const onRefresh = () => Promise.resolve();
+
 /** The home as it first draws for `account` at NOW, its last read failed or not. */
 function home(account: MeResponse, failed = false): string {
   vi.useFakeTimers({ now: NOW });
   return renderToStaticMarkup(
-    createElement(StudentHome, { me: account, failed, onRead: () => {} }),
+    createElement(StudentHome, { me: account, failed, onRead, onRefresh }),
   );
 }
 afterEach(() => vi.useRealTimers());
@@ -171,7 +174,7 @@ describe('a student’s home in other states', () => {
   it('shows a class past its bell by this computer’s clock with the rest, though the read said in session', () => {
     vi.useFakeTimers({ now: Date.parse(BELL) });
     const html = renderToStaticMarkup(
-      createElement(StudentHome, { me: me(BIOLOGY, CHEMISTRY), failed: false, onRead: () => {} }),
+      createElement(StudentHome, { me: me(BIOLOGY, CHEMISTRY), failed: false, onRead, onRefresh }),
     );
     expect(html).not.toContain('in class now');
     expect(html).not.toContain('Other classes');
@@ -276,8 +279,18 @@ describe('the home’s wiring (read from its source)', () => {
     );
   });
 
+  it('reads it again every 30 s while no class is in session, and stops once one is: the bell and the lesson’s reads take over (the owner, 2026-10-16)', () => {
+    // Its timing, its pause in a hidden tab and one read at a time: rereadEvery, tested in
+    // student-web.test.ts; the shell's refresh never reads over a read on its way.
+    expect(source).toMatch(
+      /const idle = classes\.inSession\.length === 0;\s*useEffect\(\(\) => \{\s*if \(!idle\) return;\s*const reread = rereadEvery\(onRefresh\);\s*return \(\) => reread\.stop\(\);\s*\}, \[idle, onRefresh\]\);/,
+    );
+  });
+
   it('gives the home its own read: Home passes the shell’s, never one of its own', () => {
     const page = readFileSync(fileURLToPath(new URL('../app/page.tsx', import.meta.url)), 'utf8');
-    expect(page).toContain('<StudentHome me={home.me} failed={error !== null} onRead={load} />');
+    expect(page).toContain(
+      '<StudentHome me={home.me} failed={error !== null} onRead={load} onRefresh={refresh} />',
+    );
   });
 });

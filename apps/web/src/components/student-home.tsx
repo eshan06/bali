@@ -13,6 +13,7 @@ import {
   type LessonState,
   nextBell,
   phoneChip,
+  rereadEvery,
   type StudentClass,
   unreached,
 } from '@/lib/student-web';
@@ -121,16 +122,20 @@ function ClassRows({ classes }: { classes: StudentClass[] }) {
  * StudentStates draws it, Try again reading it again (`onRead`). At its bell by this computer's
  * clock a class leaves its card and the page reads the account again: added minutes bring it back.
  * It reads it again too as its tab comes back into view, so a class that started while it was away
- * shows with its way into the lesson (W4), and as a live card's lesson says it is over.
+ * shows with its way into the lesson (W4), and as a live card's lesson says it is over; and while
+ * no class is in session, every 30 s it is in view (`onRefresh`, one read at a time; the owner,
+ * 2026-10-16), so one that starts shows with Open the lesson within about 30 s.
  */
 export function StudentHome({
   me,
   failed,
   onRead,
+  onRefresh,
 }: {
   me: MeResponse;
   failed: boolean;
   onRead: () => void;
+  onRefresh: () => Promise<void>;
 }) {
   const [now, setNow] = useState(() => Date.now());
   const others = useId();
@@ -154,6 +159,14 @@ export function StudentHome({
     document.addEventListener('visibilitychange', back);
     return () => document.removeEventListener('visibilitychange', back);
   }, [onRead]);
+
+  // In class, the bell and the lesson's reads take over from the 30 s read.
+  const idle = classes.inSession.length === 0;
+  useEffect(() => {
+    if (!idle) return;
+    const reread = rereadEvery(onRefresh);
+    return () => reread.stop();
+  }, [idle, onRefresh]);
 
   return (
     <main className="flex flex-col gap-5.5">

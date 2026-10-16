@@ -20,6 +20,7 @@ import {
 import { newEventId } from './event-id';
 import { type PageVisibility, POLL_EVERY_MS } from './live-question';
 import {
+  ACCOUNT_EVERY_MS,
   ANSWER_TIMEOUT_MS,
   answerSaid,
   type AnswerResult,
@@ -37,6 +38,7 @@ import {
   phoneChip,
   picker,
   type Picks,
+  rereadEvery,
   type Said,
   saidNow,
   type StudentClass,
@@ -220,6 +222,131 @@ describe('the student’s home: who is in class now, and when to look again (W3)
     const after = me(klass('a', [-26, 19]));
     expect(ids(homeClasses(after, bell ?? 0).inSession)).toEqual(['a']);
     expect(nextBell(after, bell ?? 0)).toBe(AT + 19 * 60_000);
+  });
+});
+
+describe('rereadEvery: the home’s account, read again every 30 s while in view (the owner, 2026-10-16)', () => {
+  /** A page whose visibility a test turns, as a browser does on a tab switch. */
+  function page(visibilityState: DocumentVisibilityState = 'visible') {
+    const doc = Object.assign(new EventTarget(), { visibilityState });
+    const turn = (to: DocumentVisibilityState) => {
+      doc.visibilityState = to;
+      doc.dispatchEvent(new Event('visibilitychange'));
+    };
+    return { doc: doc as unknown as PageVisibility, turn };
+  }
+  /** Reads whose answers land when the test says, each read's in turn. */
+  function reads() {
+    const pending: { resolve: () => void; reject: (e: Error) => void }[] = [];
+    const read = vi.fn(
+      () => new Promise<void>((resolve, reject) => pending.push({ resolve, reject })),
+    );
+    return {
+      read,
+      answer: (i: number) => pending[i]?.resolve(),
+      fail: (i: number) => pending[i]?.reject(new Error('offline')),
+    };
+  }
+  const after = (ms: number) => vi.advanceTimersByTimeAsync(ms);
+
+  beforeEach(() => {
+    vi.useFakeTimers({ now: AT });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('reads 30 s after the page shows, then 30 s after each answer', async () => {
+    // The owner's 30 s: a class that starts shows with Open the lesson within about that.
+    expect(ACCOUNT_EVERY_MS).toBe(30_000);
+    const { read, answer } = reads();
+    const reread = rereadEvery(read, page().doc);
+    await after(ACCOUNT_EVERY_MS - 1);
+    expect(read).not.toHaveBeenCalled();
+    await after(1);
+    expect(read).toHaveBeenCalledOnce();
+    answer(0);
+    await after(ACCOUNT_EVERY_MS - 1);
+    expect(read).toHaveBeenCalledOnce();
+    await after(1);
+    expect(read).toHaveBeenCalledTimes(2);
+    reread.stop();
+  });
+
+  it('never reads twice at once: a read on its way holds the next until 30 s after its answer', async () => {
+    const { read, answer } = reads();
+    const reread = rereadEvery(read, page().doc);
+    await after(ACCOUNT_EVERY_MS);
+    expect(read).toHaveBeenCalledOnce();
+    // The read hangs for minutes: nothing stacks on it.
+    await after(10 * ACCOUNT_EVERY_MS);
+    expect(read).toHaveBeenCalledOnce();
+    answer(0);
+    await after(ACCOUNT_EVERY_MS - 1);
+    expect(read).toHaveBeenCalledOnce();
+    await after(1);
+    expect(read).toHaveBeenCalledTimes(2);
+    reread.stop();
+  });
+
+  it('reads again 30 s after a read that failed, the home saying the failure as ever meanwhile', async () => {
+    const { read, fail } = reads();
+    const reread = rereadEvery(read, page().doc);
+    await after(ACCOUNT_EVERY_MS);
+    fail(0);
+    await after(ACCOUNT_EVERY_MS);
+    expect(read).toHaveBeenCalledTimes(2);
+    reread.stop();
+  });
+
+  it('reads nothing while the tab is hidden, and counts 30 s afresh back in view', async () => {
+    const { read, answer } = reads();
+    const { doc, turn } = page();
+    const reread = rereadEvery(read, doc);
+    await after(ACCOUNT_EVERY_MS - 5_000);
+    turn('hidden');
+    await after(10 * ACCOUNT_EVERY_MS);
+    expect(read).not.toHaveBeenCalled();
+    // Back in view (the home reads at once then itself): 30 s from now, not from before.
+    turn('visible');
+    await after(ACCOUNT_EVERY_MS - 1);
+    expect(read).not.toHaveBeenCalled();
+    await after(1);
+    expect(read).toHaveBeenCalledOnce();
+    // Hidden with a read on its way: it answers, and nothing more until back in view.
+    turn('hidden');
+    answer(0);
+    await after(10 * ACCOUNT_EVERY_MS);
+    expect(read).toHaveBeenCalledOnce();
+    turn('visible');
+    await after(ACCOUNT_EVERY_MS);
+    expect(read).toHaveBeenCalledTimes(2);
+    reread.stop();
+  });
+
+  it('starts nothing in a hidden tab until it comes into view', async () => {
+    const { read } = reads();
+    const { doc, turn } = page('hidden');
+    const reread = rereadEvery(read, doc);
+    await after(10 * ACCOUNT_EVERY_MS);
+    expect(read).not.toHaveBeenCalled();
+    turn('visible');
+    await after(ACCOUNT_EVERY_MS);
+    expect(read).toHaveBeenCalledOnce();
+    reread.stop();
+  });
+
+  it('reads nothing once stopped, as a class comes into session: not after an answer on its way, nor back in view', async () => {
+    const { read, answer } = reads();
+    const { doc, turn } = page();
+    const reread = rereadEvery(read, doc);
+    await after(ACCOUNT_EVERY_MS);
+    reread.stop();
+    answer(0);
+    turn('hidden');
+    turn('visible');
+    await after(10 * ACCOUNT_EVERY_MS);
+    expect(read).toHaveBeenCalledOnce();
   });
 });
 
