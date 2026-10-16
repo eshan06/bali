@@ -577,7 +577,7 @@ describe('on the class page', () => {
   it('asks through the live question either way; asked, the panel goes and focus goes to it', () => {
     expect(page.match(/onAsk=\{ask\}/g)).toHaveLength(2);
     expect(page).toMatch(
-      /const asked = \(\) => \{\s*setSide\(null\);\s*window\.requestAnimationFrame\(\(\) => document\.getElementById\(`\$\{id\}-q`\)\?\.focus\(\)\);\s*\};/,
+      /const asked = \(\) => \{\s*setSide\(\(cur\) => \(cur === 'ask' \? null : cur\)\);\s*window\.requestAnimationFrame\(\(\) => document\.getElementById\(`\$\{id\}-q`\)\?\.focus\(\)\);\s*\};/,
     );
     // What was written goes once it is asked; a question picked leaves it as it was.
     expect(page).toMatch(

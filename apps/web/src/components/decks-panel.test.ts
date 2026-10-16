@@ -195,6 +195,8 @@ describe('its states (LessonStates, LessonDecksStates)', () => {
     );
     press(DecksView(p), 'Try again');
     expect(p.onShow).toHaveBeenCalledWith(B);
+    // Named by its deck, as each Show is (santa's review).
+    expect(buttons(DecksView(p), 'Try again')[0]?.props['aria-describedby']).toBe(`P-${B.id}`);
     // Held while another change is on its way.
     const held = DecksView(props(DECKS, showOf(A), { why: 'failed', change: showOf(B) }));
     expect(buttons(held, 'Try again')[0]?.props['aria-disabled']).toBe(true);

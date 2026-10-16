@@ -167,10 +167,13 @@ export function useSlide(
     setHeld(now.current);
   }, []);
 
-  // A new session starts with nothing shown, then takes what its read says.
+  // A new session starts with nothing shown and nothing said, then takes what its read says: a
+  // Show the last one refused is no line of this one's, though no change was ever heard in either
+  // (santa's review).
   useEffect(() => {
     now.current = { session: sessionId, shown: NOTHING_SHOWN };
     setHeld(now.current);
+    setSaid(null);
   }, [sessionId]);
   useEffect(() => {
     if (snapshot !== null) put(snapshot.session, shownIn(snapshot.snap));

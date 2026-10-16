@@ -411,6 +411,25 @@ describe('useSlide: its changes', () => {
     expect(h.slides.changing).toBeNull();
   });
 
+  it('starts the next session with nothing said, even with nothing ever shown (santa’s review)', async () => {
+    // A Show refused past the bell, before the sweep ended the session: nothing was ever shown, so
+    // no slide change heard since would let the line go.
+    io.post.mockRejectedValueOnce(
+      new ApiError(409, 'conflict', 'not running', 'session_not_running'),
+    );
+    const h = mount(SESSION, null, vi.fn());
+    await h.settle();
+    expect(await h.slides.show(X.id)).toBe(false);
+    await h.settle();
+    expect(h.slides.said).toEqual({ why: 'over', change: { deckId: X.id, page: 1 } });
+    // The session over on this page, then the next one started on it, nothing shown in either.
+    h.render(null, null, vi.fn());
+    await h.settle();
+    h.render('0199e0a0-0000-7000-8000-00000000000b', null, vi.fn());
+    await h.settle();
+    expect(h.slides.said).toBeNull();
+  });
+
   it('says a Show that didn’t go through with its deck, and sends it again under its id', async () => {
     io.post.mockRejectedValue(new NetworkError());
     const h = mount(SESSION, read(null, id(1)), vi.fn());

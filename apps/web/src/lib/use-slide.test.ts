@@ -196,9 +196,9 @@ describe('useSlide: what a session shows, held for one session (read from its so
     expect(hook).toMatch(
       /const put = useCallback\(\(session: string, next: Shown\) => \{\s*const shown = newer\(now\.current\.shown, next\);\s*if \(now\.current\.session !== session \|\| shown === now\.current\.shown\) return;/,
     );
-    // A new session starts with nothing shown.
+    // A new session starts with nothing shown, and nothing said (santa's review).
     expect(hook).toMatch(
-      /useEffect\(\(\) => \{\s*now\.current = \{ session: sessionId, shown: NOTHING_SHOWN \};\s*setHeld\(now\.current\);\s*\}, \[sessionId\]\);/,
+      /useEffect\(\(\) => \{\s*now\.current = \{ session: sessionId, shown: NOTHING_SHOWN \};\s*setHeld\(now\.current\);\s*setSaid\(null\);\s*\}, \[sessionId\]\);/,
     );
     expect(hook).toMatch(
       /const shown = held\.session === sessionId \? held\.shown : NOTHING_SHOWN;/,

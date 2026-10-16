@@ -94,6 +94,7 @@ export function DecksView({
                       why={said.why}
                       held={changing !== null}
                       onAgain={() => onShow(deck)}
+                      describedBy={name}
                       className="col-span-full mt-1.5"
                     />
                   ) : null}

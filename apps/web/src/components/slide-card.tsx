@@ -160,17 +160,20 @@ const SAID: Record<ChangeSaid, string> = {
 
 /**
  * What a slide change left to say, where it was made (the card, a deck in the side panel); one
- * that didn't go through with Try again, held while another is on its way.
+ * that didn't go through with Try again, held while another is on its way, and named by what it
+ * is about (`describedBy`: a deck in the panel's list).
  */
 export function SaidLine({
   why,
   held,
   onAgain,
+  describedBy,
   className = '',
 }: {
   why: ChangeSaid;
   held: boolean;
   onAgain: () => void;
+  describedBy?: string;
   className?: string;
 }) {
   return why === 'failed' ? (
@@ -178,7 +181,13 @@ export function SaidLine({
       <p role="alert" className="text-body">
         {SAID.failed}
       </p>
-      <Button variant="secondary" size="sm" onClick={onAgain} aria-disabled={held}>
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={onAgain}
+        aria-disabled={held}
+        aria-describedby={describedBy}
+      >
         Try again
       </Button>
     </div>

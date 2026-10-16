@@ -199,9 +199,10 @@ export default function ClassDetailPage() {
       document.getElementById(`${id}-q`)
     )?.focus();
   };
-  // Asked: the panel goes, and focus to the question in the card.
+  // Asked: the panel goes, and focus to the question in the card; the decks' panel, opened while the
+  // ask was on its way, stays (santa's review).
   const asked = () => {
-    setSide(null);
+    setSide((cur) => (cur === 'ask' ? null : cur));
     window.requestAnimationFrame(() => document.getElementById(`${id}-q`)?.focus());
   };
   // Shown: the panel goes, and focus to the slide card's title; to the question, when one shows
