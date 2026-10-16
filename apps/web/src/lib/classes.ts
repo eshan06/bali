@@ -1,9 +1,49 @@
-import type { ClassDetail } from '@bali/shared';
+import type { ClassDetail, MeClassWithTeacher } from '@bali/shared';
 
 import { type ApiClient, ApiError, NetworkError } from './api-client';
 import { CANT_CREATE, CANT_REACH, errText } from './errors';
 
-/* The classes home's create form (D2e), tested: the name's limit, and the create's answer. */
+/*
+ * A teacher's classes (D2e; Classes since PV16), tested: the name's limit, the create's answer, and
+ * what the Classes page counts from each class's summary (PV2).
+ */
+
+/** A teacher's own class as `/v1/me` lists it, its summary (PV2) with it. */
+export type TaughtClass = MeClassWithTeacher;
+
+/**
+ * The class's session running at `now` (ms) by this computer's clock: the last read's (running by
+ * the server's clock then) until its bell, so its Live chip goes at the bell, as the home's live
+ * card does (W3).
+ */
+export function liveNow(c: TaughtClass, now: number): { id: string; endsAt: string } | null {
+  const running = c.summary?.runningSession ?? null;
+  return running !== null && Date.parse(running.endsAt) > now ? running : null;
+}
+
+/** The first bell still to ring among the classes live at `now`, or null: when to read them again. */
+export function nextBell(classes: TaughtClass[], now: number): number | null {
+  const bells = classes.flatMap((c) => {
+    const live = liveNow(c, now);
+    return live ? [Date.parse(live.endsAt)] : [];
+  });
+  return bells.length > 0 ? Math.min(...bells) : null;
+}
+
+/** How many calendar days `at` is before `now`, in `timeZone` (the viewer's own unless given). */
+export function daysBefore(at: Date, now: Date, timeZone?: string): number {
+  const day = new Intl.DateTimeFormat('en-US', {
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    timeZone,
+  });
+  const index = (d: Date) => {
+    const part = (type: string) => Number(day.formatToParts(d).find((p) => p.type === type)?.value);
+    return Date.UTC(part('year'), part('month') - 1, part('day')) / 86_400_000;
+  };
+  return index(now) - index(at);
+}
 
 /**
  * The longest name `POST /v1/classes` takes once trimmed (its `CreateBody`, pinned by the test):
