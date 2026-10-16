@@ -8,6 +8,38 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-16** — **PV16b: New class's dialog and "<name> is ready" (#421); PV16 is done.** Built
+  to [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4): ClassesNew,
+  ClassesCreated, ClassesStates' and HomeStates' New class states, CopyStates' new class, and New
+  class at the head of Classes, ClassesEmpty and ClassesPhone; two boards drawn first as
+  intermediate states (version 68), ClassesNewPhone and ClassesCreatedPhone, the dialog in a phone's
+  browser, 24 px in from each side and 120 px from the top, as the class page's New code's dialog
+  already sits there. **The dialog** (`components/new-class.tsx`): New code's own native modal
+  (`DIALOG`, now shared from `join-code.tsx`: 460 px, 120 px from the top, over the warm backdrop,
+  the page behind it inert), opened by the head's New class and by the first class's card's Create a
+  class, focus on the name. Create class is held until a name is typed (`aria-disabled`, so it keeps
+  focus whatever it comes to say); Creating… holds the name, Cancel and Escape until Bali answers; a
+  failure is said right under the help, the field described by it: a 5xx or a timeout as
+  `CANT_CREATE`, no connection and the budget's wait in `errText`'s words, each with Try again, and
+  an account deleted on its way (`account_deleted`) with Create class, since no resend changes it.
+  Typing again clears it. **Every answer reads the list again**, as Home's create row does:
+  `POST /v1/classes` takes no `eventId` (2026-09-20), so a class made before its answer was lost
+  shows on the list. **A class made** turns the dialog into ClassesCreated's: its 40 px check at the
+  board's 1.5 stroke (by a class, as PV4b says) in green-600, the colour `ready` (pinned in
+  `tokens.test.ts`, over 3:1 on white), "<name> is ready" taking focus so a screen reader says it
+  and then its line, the join code on the class page's chip (`CODE`), Copy code and Done its whole
+  width. **Copy** is the class page's (CopyStates): Copied for 2 s, said to a screen reader by a
+  status of its own, or "Bali couldn't copy the code. Select it and copy it yourself." under it; its
+  state and timer are one hook now, `useCopy`, which the class page's join code and the dialog share.
+  **Done**, or Escape, closes it and puts focus on the class's card once the list holds it (its id,
+  `cardId`), else back on what opened the dialog; the next New class starts afresh. **The boards'
+  tight lines**, as PV6 built them: `v2.css`'s `.app p { margin: 0 }` outranks `.refusal`'s 8 px, so
+  a failure sits right under the help. **ClassesInterim** is gone from the page, and relabelled on
+  the canvas as no longer built (replaced by ClassesNew in PV16b). Home keeps its create row until
+  PV17a, its own step. **Seen:** on dev as the demo teacher, one test class made ("PV16 test", which
+  stays: no route removes a class), its code copied and Done; and sharp beside every board, each
+  state of the dialog driven through the real component.
+
 - **2026-10-16** — **PV16a: Classes, the page (#420); the menu's foot for a long name; PV16 in
   two.** Built to [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4):
   Classes, ClassesEmpty, HomeStates' lines for the list and the block, and four boards drawn first as

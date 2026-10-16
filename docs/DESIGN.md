@@ -26,7 +26,7 @@ said as `errors.ts`'s `CANT_REACH`, its own message a log line, D2c-2);
 `recap.ts` (the session's "9:05 AM to 9:30 AM"; PB5's timeline took its reasons
 and "No reason given" with it in PV14). `blocks.ts`, `classes.ts`, `reports.ts`, `invite.ts` and `decks.ts` hold
 none: their words are in `blocks.tsx`, the classes home (`app/page.tsx`), Classes'
-cards (`classes.tsx`, PV16a), the reports page, `invite-code.tsx`, `slides.tsx` and `errors.ts`. In
+cards (`classes.tsx`, PV16a) and New class's dialog (`new-class.tsx`, PV16b), the reports page, `invite-code.tsx`, `slides.tsx` and `errors.ts`. In
 `ios/Bali/` outside `UI/`: the NFC sheet's words in `BlockReader.swift`
 ("Hold the top of your iPhone to your teacher's Bali block.", "This isn't a
 Bali block.", "Bali block read.", "A scan is under way."); the `problem` a
@@ -277,10 +277,13 @@ six, else its date) or "no sessions yet", and while it runs the Live chip and th
 both gone at its bell by this computer's clock, when the list is read again; ClassesEmpty's card;
 the list's failure over the classes read before; the block's card beside them in v2's look, on Home
 too; its intermediate states as ClassesStates and ClassesPhone draw them (drawn on the canvas first).
-Until PV16b brings New class's dialog, its head has no New class and the first class's card no
-Create a class (ClassesInterim, drawn first): Home's create row makes classes until then. The menu's
-foot keeps a name too long for it on one line, cut with an ellipsis, whole on hover and to a screen
-reader (MenuNameStates, drawn first).
+Since PV16b (2026-10-16) its head's New class and the first class's card's Create a class open
+ClassesNew's dialog, the class page's New code's own, its states as ClassesStates draws them; a class
+made turns it into ClassesCreated's "<name> is ready", its join code with Copy code (CopyStates) and
+Done, which puts focus on the class's card; on a phone as ClassesNewPhone and ClassesCreatedPhone
+draw it (drawn on the canvas first). Home keeps its create row until PV17a. The menu's foot keeps a
+name too long for it on one line, cut with an ellipsis, whole on hover and to a screen reader
+(MenuNameStates, drawn first).
 Every
 portal source file is held to the tokens' utilities by `tokens.test.ts`, and
 since D2g the theme holds none of Tailwind's own colours, type sizes,
@@ -482,8 +485,9 @@ a live question's results' three colours, `bar` (stone-500, an option's bar), `b
 part 2, Present's question, three sizes, `present-kicker` (14/15, semibold, uppercase: its
 "Question"), `present-tag` (14/20, semibold, uppercase: "Correct answer") and `present-line` (20/28,
 regular: its count's words, its foot and the guard's line), and the colour `option-right` (green-50,
-the correct answer's fill once shown, v2.css's `.p-opt.right`); and PV16a Classes' `card-name`
-(17/22, semibold: a class's name on its card, v2.css's `.classcard .name`).
+the correct answer's fill once shown, v2.css's `.p-opt.right`); PV16a Classes' `card-name`
+(17/22, semibold: a class's name on its card, v2.css's `.classcard .name`); and PV16b the colour
+`ready` (green-600, the "is ready" dialog's check, as ClassesCreated draws it).
 
 Density: the teacher's live grid is dense (many students at a glance); the
 student app is airy and simple. Theme: **light, everywhere.** The app and the
