@@ -29,23 +29,25 @@ a real decision? Add a dated entry at the top: what was decided and why.
   protection off, which the next Home shows. **Only once the account's last read counts no session
   running:** from a bell by this computer's clock, or an End elsewhere, until that read answers (3 s
   after the bell, PV17a), the rail holds the block's card alone, never the session before it (drawn
-  first); with this computer's clock more than 3 s ahead of Bali's, until Home next reads the account
-  (PV17a's one read per bell). *Weighed:* the session just ended taken from the running one by this
-  computer's clock, whose report, read before Bali's bell, would count it to now and whose End time
-  the account alone knows. **On a phone too** (HomeIdlePhone), under your classes and over your block:
-  it reads nothing again, unlike Recent activity. **HomeNoName** draws the same rail as HomeIdle, Last
-  session included, so PV1's ruling stands, hidden only until a class's first session ends; PV17c-1's
-  entry (below) read that board's rail as the block's card alone. **Seen:** on dev as the demo teacher
-  in a browser of its own signed in by the demo world (its profile deleted): a 2-minute session with
-  4 joined and two unlocks, the rail the block's card alone at the bell, Last session 3.4 s after it
-  and its figures 3.7 s after it while the report still said `ended: false`, the sweep 54 s after the
-  bell, the same card after it; at 390 px under your classes and over your blocks; a session nobody
-  joined in which Ana unlocked without tapping in (`no_live_participation`), ended with End with
-  Home open, "Nobody joined this session." and Unlocks 1 within a second; one nobody joined, the line
-  alone; the rest through the real component, each card the height of its board to the pixel.
-  *Found:* Open the recap in that minute before the sweep opens the class page, which still shows the
-  session at 0:00 with its grid until the sweep's end comes down its live feed, then the recap (seen:
-  54 s); the class page's own wait for the server's mark (PV7, PV12b), left as it is.
+  first); with this computer's clock more than 3 s ahead of Bali's, until Home is opened again or
+  reloaded, since that read still counts the session running and PV17a reads once per bell (santa's
+  review: left, the safe side, nothing wrong shown). *Weighed:* the session just ended taken from the
+  running one by this computer's clock, whose report, read before Bali's bell, would count it to now
+  and whose End time the account alone knows. **On a phone too** (HomeIdlePhone), under your classes
+  and over your block: it reads nothing again, unlike Recent activity. **HomeNoName** draws the same
+  rail as HomeIdle, Last session included, so PV1's ruling stands, hidden only until a class's first
+  session ends; PV17c-1's entry (below) read that board's rail as the block's card alone. **Seen:** on
+  dev as the demo teacher in a browser of its own signed in by the demo world (its profile deleted):
+  a 2-minute session with 4 joined and two unlocks, the rail the block's card alone at the bell, Last
+  session 3.4 s after it and its figures 3.7 s after it while the report still said `ended: false`,
+  the sweep 54 s after the bell, the same card after it; at 390 px under your classes and over your
+  blocks; a session nobody joined in which Ana unlocked without tapping in (`no_live_participation`),
+  ended with End with Home open, "Nobody joined this session." and Unlocks 1 within a second; one
+  nobody joined, the line alone; the rest through the real component, each card the height of its
+  board to the pixel. *Found:* Open the recap in that minute before the sweep opens the class page,
+  which still shows the session at 0:00 with its grid until the sweep's end comes down its live feed,
+  then the recap (seen: 54 s); the class page's own wait for the server's mark (PV7, PV12b), left as
+  it is.
 
 - **2026-10-16** — **PV17c-1: Home's Recent activity (#424), read again every 15 s while Home is in
   view, its read narrowed to its kinds; PV17c in two.** Built to [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4):
