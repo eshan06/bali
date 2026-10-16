@@ -434,19 +434,36 @@ describe('showSlide', () => {
 
 // ---- drawing a page ----
 
-/** A canvas as `drawPage` uses one, and its window's pixel ratio; what was copied onto it, kept. */
-function fakeScreen(ratio = 1) {
+/**
+ * A canvas as `drawPage` uses one, and its window's pixel ratio; what was copied onto it, kept. Its
+ * page in view or hidden (a background tab), `show` and `hide` turning it, as the browser does.
+ */
+function fakeScreen(ratio = 1, visibility: DocumentVisibilityState = 'visible') {
   const scratches: { width: number; height: number }[] = [];
   const copies: { image: unknown; x: number; y: number; width: number; height: number }[] = [];
   let context = true;
+  const listeners = new Set<() => void>();
   const doc = {
     defaultView: { devicePixelRatio: ratio },
+    visibilityState: visibility,
+    addEventListener: (type: string, listener: () => void) => {
+      expect(type).toBe('visibilitychange');
+      listeners.add(listener);
+    },
+    removeEventListener: (type: string, listener: () => void) => {
+      expect(type).toBe('visibilitychange');
+      listeners.delete(listener);
+    },
     createElement: (tag: string) => {
       expect(tag).toBe('canvas');
       const scratch = { width: 300, height: 150 };
       scratches.push(scratch);
       return scratch;
     },
+  };
+  const turn = (to: DocumentVisibilityState) => {
+    doc.visibilityState = to;
+    for (const listener of [...listeners]) listener();
   };
   const canvas = {
     width: 300,
@@ -469,6 +486,10 @@ function fakeScreen(ratio = 1) {
     noContext: () => {
       context = false;
     },
+    show: () => turn('visible'),
+    hide: () => turn('hidden'),
+    /** How many listen for the page's visibility now. */
+    listening: () => listeners.size,
   };
 }
 
@@ -822,6 +843,50 @@ describe('drawPage', () => {
     expect(drawing.renders[0]?.cancelled).toBe(true);
     expect(drawing.counts.cleaned).toBe(1);
     expect(reading.counts.cleaned).toBe(1);
+  });
+
+  it('counts its 20 s only while the page is in view, since PDF.js draws on animation frames, which a hidden page never runs', async () => {
+    // Santa's review: a page turned from Present's tab while the class page's tab was hidden, or a
+    // deck that opened in a hidden tab, waited there for a frame; at 20 s it was said not drawn, and
+    // its Try again downloaded the whole deck again.
+    vi.useFakeTimers();
+    const box = { width: 420, height: 236 };
+    const drawing = fakeDeck({ draws: 'waits' });
+    const screen = fakeScreen(1, 'hidden');
+    let end: unknown;
+    void drawPage(drawing.pdf, 4, screen.canvas, box).then((e) => (end = e));
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    expect(end).toBeUndefined();
+    expect(drawing.renders[0]?.cancelled).toBe(false);
+    // In view: its 20 s start; hidden again midway, the time hidden doesn't count either.
+    screen.show();
+    await vi.advanceTimersByTimeAsync(12_000);
+    screen.hide();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(end).toBeUndefined();
+    screen.show();
+    await vi.advanceTimersByTimeAsync(8_000 - 1);
+    expect(end).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(end).toEqual({ kind: 'undrawn', unanswered: true });
+    expect(drawing.renders[0]?.cancelled).toBe(true);
+    expect(screen.listening()).toBe(0);
+  });
+
+  it('draws a page that waited in a hidden page once its frames come, and keeps no clock or listener after', async () => {
+    vi.useFakeTimers();
+    const box = { width: 420, height: 236 };
+    const drawing = fakeDeck({ draws: 'waits' });
+    const screen = fakeScreen(1, 'hidden');
+    const drawn = drawPage(drawing.pdf, 4, screen.canvas, box);
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    screen.show();
+    await vi.advanceTimersByTimeAsync(3_000);
+    drawing.renders[0]?.finish();
+    expect(await drawn).toEqual({ kind: 'drawn', text: '' });
+    expect(screen.copies).toHaveLength(1);
+    expect(vi.getTimerCount()).toBe(0);
+    expect(screen.listening()).toBe(0);
   });
 
   it('keeps no clock for a draw that ended, however it ended', async () => {

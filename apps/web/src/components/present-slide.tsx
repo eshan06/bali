@@ -43,12 +43,12 @@ export function presentSlide({ id, lesson, slide }: Props) {
     <section aria-labelledby={`${id}-ps`} className="@container flex flex-1 flex-col gap-5.5">
       <SlideFrame look="present" deck={deck} slide={slide} onReload={lesson.reload} />
       <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-3">
-        {/* Said as it changes, so a turn is heard before its page is drawn. */}
+        {/* Said as it changes, so a turn is heard before its page is drawn; a long title wraps. */}
         <p
           id={`${id}-ps`}
           aria-live="polite"
           aria-atomic="true"
-          className="text-h3 font-normal text-text-secondary tabular-nums max-sm:basis-full max-sm:text-center"
+          className="min-w-0 text-h3 font-normal wrap-break-word text-text-secondary tabular-nums max-sm:basis-full max-sm:text-center"
         >
           <span className={title === null ? 'text-text-tertiary' : undefined}>{title ?? '…'}</span>
           {` · ${slide.page} of ${slide.pageCount}`}

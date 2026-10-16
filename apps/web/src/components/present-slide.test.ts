@@ -99,8 +99,9 @@ describe('Present’s slide (PresentSlide)', () => {
   });
 
   it('says its title and page at 18/24 as PresentSlide draws them, as each changes, on their own line on a phone', () => {
+    // A title of one long word (a file's name) wraps rather than run off a phone's screen.
     expect(html).toMatch(
-      /<p id="L-ps" aria-live="polite" aria-atomic="true" class="text-h3 font-normal text-text-secondary tabular-nums max-sm:basis-full max-sm:text-center"><span>Factoring quadratics<\/span> · 4 of 12<\/p>/,
+      /<p id="L-ps" aria-live="polite" aria-atomic="true" class="min-w-0 text-h3 font-normal wrap-break-word text-text-secondary tabular-nums max-sm:basis-full max-sm:text-center"><span>Factoring quadratics<\/span> · 4 of 12<\/p>/,
     );
     // Under the slide, in the middle, as the board draws them.
     expect(html).toMatch(
