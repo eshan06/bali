@@ -35,12 +35,23 @@ a real decision? Add a dated entry at the top: what was decided and why.
   screen, 800 × 1280 (16:9, 704 × 396) and 390 × 844 and 667 (358 × 201). *Weighed:* measuring the
   header in a script (a resize observer more, for what layout gives). **#416's two fixes**, each with
   its test failing first (in the branch's one commit, so this PR's history doesn't show the red run):
-  `drawPage` gives PDF.js 20 s (`DRAW_LIMIT_MS`), every wait on it raced against the limit and a stop,
-  so a worker that stops answering after the deck opened ends in "Bali couldn't draw this page." with
-  Try again, which then opens the deck again (`unanswered`: drawing again would ask the same worker);
-  and the ← → keys never turn the slide from inside an open side panel (`keyTurn`: focus in an
-  `aside`, the ask, write, decks and student panels), nor in a field or with a key held, the card's
-  and Present's alike. LessonSlideStates' undrawn label and its line on the keys say so (version 62).
+  `drawPage` gives PDF.js 20 s with the page in view (`DRAW_LIMIT_MS`), every wait on it raced against
+  the limit and a stop, so a worker that stops answering after the deck opened ends in "Bali couldn't
+  draw this page." with Try again, which then opens the deck again (`unanswered`: drawing again would
+  ask the same worker); and the ← → keys never turn the slide from inside an open side panel
+  (`keyTurn`: focus in an `aside`, the ask, write, decks and student panels), nor in a field or with
+  a key held, the card's and Present's alike. LessonSlideStates' undrawn label and its line on the
+  keys say so (version 62). **Santa's review** (both reviewers, round 1): the same blocker, fixed with
+  its tests failing first: the 20 s ran on a plain timer, but PDF.js 6.4.299 draws each part of a page
+  on an animation frame, which a hidden page never runs, so a page turned from Present's tab, or a deck
+  opened, while the class page's tab was hidden waited there, was said not drawn at 20 s, and its Try
+  again downloaded the deck again; the limit now counts only while the page is in view (`inViewFor`,
+  `visibilitychange`), the time hidden never counted. Round 2, the fix alone: no blockers. Taken from
+  the design check: a deck's title of one long word wraps on Present's row. *Left:* while a slide shows,
+  Present hides the grid's tiles and counts for as long as it shows, as the board draws it (decision
+  11; the class page's own grid and its unlock pop-up are unchanged); and a page that keeps drawing but
+  takes more than 20 s in view would never show, each Try again meeting the same limit: doubtful (no
+  page of a ready deck is known to come near it), kept as the conductor asked, for the owner to weigh.
   **Checked on dev**, the demo teacher's 12-page test deck uploaded and checked, and a session of the
   demo class started, through the API: in the owner's signed-in tab Show slides and Show; Present on,
   the slide in the grid's place (1 of 12, Previous held), Next to 2, → twice to 4, ← to 3 and → to 4;

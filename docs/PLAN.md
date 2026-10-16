@@ -10,11 +10,11 @@ is in `docs/DECISIONS.md`, and finished history is word for word in
 
 _Last updated: 2026-10-16 (Central) — M6 done, its part 2d, Present's slide (#418;
 `docs/DECISIONS.md`, 2026-10-16): PresentSlide in the live grid's place, a question first and the
-slide back after its Done; the page in a white frame the page's width, as PresentSlide renders, as
+slide back after its Done; the page in a white frame the page's width, as the board renders it, as
 tall as the screen leaves under the header (760 px at 1920 × 1080), "Factoring quadratics · 4 of
 12", Previous, Next, Stop showing and the ← → keys; its states as PresentSlideStates and
-PresentSlidePhone draw them. With it #416's two fixes: a page's draw given 20 s, and the keys left to
-a side panel. The conductor's two M6 calls are the owner's now ("your decisions are fine",
+PresentSlidePhone draw them. With it #416's two fixes: a page's draw given 20 s in view, and the keys
+left to a side panel. The conductor's two M6 calls are the owner's now ("your decisions are fine",
 2026-10-16). Checked on dev, and sharp beside every board. Before it, 2c (#417). Next: W5, slides on
 the student web._
 

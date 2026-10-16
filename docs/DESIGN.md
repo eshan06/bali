@@ -249,11 +249,11 @@ call, the owner's approval of 2026-10-16), never in Present: "Slides · showing"
 title, Ask a question and Stop showing, the page drawn at its frame's size and the screen's pixel
 ratio beside "4 of 12", Previous, Next and the ← → keys (never in a field nor, since 2d, in a side
 panel), and its intermediate states as LessonSlideStates draws them (drawn on the canvas first; a
-page PDF.js gave no answer for in 20 s said as one not drawn since 2d, its Try again opening the
-slides again). Since M6's part 2c (2026-10-16) the card at rest also holds Show slides, LessonClass's,
-which opens LessonDecks' panel where Ask a question's shows, one at a time, never in Present: "Pick a
-deck." (its second sentence waits for W5 and M8: the conductor's call, the owner's approval of
-2026-10-16), the teacher's ready decks
+page PDF.js gave no answer for in 20 s in view said as one not drawn since 2d, its Try again
+opening the slides again). Since M6's part 2c (2026-10-16) the card at rest also holds Show slides,
+LessonClass's, which opens LessonDecks' panel where Ask a question's shows, one at a time, never in
+Present: "Pick a deck." (its second sentence waits for W5 and M8: the conductor's call, the owner's
+approval of 2026-10-16), the teacher's ready decks
 newest first, each with its pages, its day and Show, a Show's line under its deck, and once shown
 the slide card in the card's place, focus on its title; its intermediate states as LessonDecksStates
 draws them (drawn on the canvas first).
