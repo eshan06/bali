@@ -300,7 +300,7 @@ describe('useSlide: its changes', () => {
     await h.settle();
     h.slides.turn(1);
     await h.settle();
-    expect(h.slides.changing).toBe(true);
+    expect(h.slides.changing).toEqual({ deckId: X.id, page: 5 });
     const [path, body] = io.post.mock.calls[0] ?? [];
     expect(path).toBe(`/v1/sessions/${SESSION}/slide`);
     const sent = body as { eventId: string; deckId: string; page: number };
@@ -311,7 +311,7 @@ describe('useSlide: its changes', () => {
     expect(io.post).toHaveBeenCalledOnce();
     answer(shownAnswer(slideOf(5), sent.eventId));
     await h.settle();
-    expect(h.slides.changing).toBe(false);
+    expect(h.slides.changing).toBeNull();
     expect(h.slides.slide).toEqual(slideOf(5));
   });
 

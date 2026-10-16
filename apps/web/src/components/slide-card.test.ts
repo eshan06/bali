@@ -30,7 +30,7 @@ function lesson(over: Partial<SlideLesson> = {}): SlideLesson {
     slide: slide(),
     title: 'Factoring quadratics',
     deck: { kind: 'loading' },
-    changing: false,
+    changing: null,
     said: null,
     turn: vi.fn(),
     stop: vi.fn(() => Promise.resolve(true)),
@@ -201,12 +201,28 @@ describe('turning pages', () => {
     expect(l.stop).toHaveBeenCalledOnce();
   });
 
-  it('holds every slide control while a change is on its way, but Ask a question', () => {
-    const html = render(lesson({ changing: true }));
+  it('holds every slide control while a change is on its way, but Ask a question, its own button busy', () => {
+    const { deckId } = slide();
+    const busy = (changing: SlideLesson['changing']) => {
+      const html = render(lesson({ changing }));
+      for (const words of ['Previous', 'Next', 'Stop showing']) {
+        expect(buttonTag(html, words)).toMatch(/aria-disabled="true"/);
+      }
+      expect(buttonTag(html, 'Ask a question')).not.toMatch(/aria-disabled="|aria-busy="/);
+      return ['Previous', 'Next', 'Stop showing'].filter((w) =>
+        /aria-busy="true"/.test(buttonTag(html, w)),
+      );
+    };
+    expect(busy({ deckId, page: 5 })).toEqual(['Next']);
+    expect(busy({ deckId, page: 3 })).toEqual(['Previous']);
+    expect(busy({ deckId: null, page: null })).toEqual(['Stop showing']);
+    // Another page than the next or the one before (a slide shown in another tab meanwhile).
+    expect(busy({ deckId, page: 9 })).toEqual([]);
+    // At rest, none.
+    const html = render(lesson());
     for (const words of ['Previous', 'Next', 'Stop showing']) {
-      expect(buttonTag(html, words)).toMatch(/aria-disabled="true"/);
+      expect(buttonTag(html, words)).toMatch(/aria-busy="false"/);
     }
-    expect(buttonTag(html, 'Ask a question')).not.toMatch(/aria-disabled="/);
   });
 
   it('holds Previous on the first page and Next on the last, both on a deck of one page', () => {

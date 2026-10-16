@@ -234,6 +234,12 @@ which opens in the side panel where a student's panel shows, one at a time: sinc
 intermediate states as LessonAskStates draws them (drawn on the canvas first), and Write a new
 question there LessonWrite's form, 460 px, saying what Bali refuses in Your questions' words; never
 in Present, since it names the correct answers.
+A slide the session shows takes that card's place since M6's part 2b-2 (2026-10-16), LessonSlide's
+card while no question shows, a question first and the slide back after its Done (the conductor's
+call), never in Present: "Slides · showing" over the deck's title, Ask a question and Stop showing,
+the page drawn at its frame's size and the screen's pixel ratio beside "4 of 12", Previous, Next and
+the ← → keys, and its intermediate states as LessonSlideStates draws them (drawn on the canvas
+first).
 Your questions is v2's since L7b part 1 (2026-10-15): Questions in the menu, the drafts oldest
 first as Questions draws them, each removed after its confirm across the card's foot, and Write a
 question and Edit opening QuestionsEdit's card over the list, its letters grey and its refusals

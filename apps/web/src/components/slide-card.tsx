@@ -7,7 +7,7 @@ import { Button } from '@/components/button';
 import { CARD_ALONE } from '@/components/card';
 import { askButton, HEAD, ROW } from '@/components/question-card';
 import type { OpenDeck } from '@/lib/deck-pdf';
-import { type Box, drawPage, turned } from '@/lib/presenter';
+import { type Box, drawPage, type SlideChange, turned } from '@/lib/presenter';
 import type { ChangeSaid, DeckState, DeckUnopened, SlideLesson } from '@/lib/use-slide';
 
 /** Why the slide's place says a line in its page's stead (LessonStates, LessonSlideStates). */
@@ -153,6 +153,9 @@ const SAID: Record<Exclude<ChangeSaid, 'failed'>, string> = {
   gone: "These slides aren't in Your slides anymore, so Bali can't show them.",
 };
 
+/** Stop showing's change: nothing shown. */
+const STOP: SlideChange = { deckId: null, page: null };
+
 interface CardProps {
   id: string;
   lesson: SlideLesson;
@@ -170,7 +173,8 @@ interface CardProps {
  * slide beside "4 of 12", Previous and Next, which the ← and → keys press too, but in a field. In
  * the question card's place while no question shows (the conductor's call, 2026-10-16: a question
  * first, this card back after Done), never in Present. A change on its way holds every slide
- * control; what didn't go through is said under the head. Its state is 2b-1's `useSlide`.
+ * control, its own button busy; what didn't go through is said under the head. Its state is 2b-1's
+ * `useSlide`.
  */
 export function SlideCard(props: CardProps) {
   const { turn } = props.lesson;
@@ -193,8 +197,13 @@ export function SlideCard(props: CardProps) {
 /** The card itself, its keys aside: a function of what it shows, so a test presses its buttons. */
 export function slideCard({ id, lesson, slide, asking, onAsk }: CardProps) {
   const { title, deck, changing, said, turn } = lesson;
-  const first = turned(slide, -1) === null;
-  const last = turned(slide, 1) === null;
+  const held = changing !== null;
+  // A slide control's change (none past either end): held while one is on its way, its own button
+  // busy (LessonSlideStates).
+  const hold = (to: SlideChange | null) => ({
+    'aria-disabled': held || to === null,
+    'aria-busy': to !== null && changing?.deckId === to.deckId && changing.page === to.page,
+  });
   // Stopped: the card at rest takes this one's place, focus on its Ask a question.
   const stopShowing = () =>
     void lesson.stop().then((stopped) => {
@@ -216,7 +225,7 @@ export function slideCard({ id, lesson, slide, asking, onAsk }: CardProps) {
         </div>
         <div className={ROW}>
           {askButton(id, 'Ask a question', 'secondary', asking, onAsk)}
-          <Button variant="secondary" onClick={stopShowing} aria-disabled={changing}>
+          <Button variant="secondary" onClick={stopShowing} {...hold(STOP)}>
             Stop showing
           </Button>
         </div>
@@ -226,7 +235,7 @@ export function slideCard({ id, lesson, slide, asking, onAsk }: CardProps) {
           <p role="alert" className="text-body">
             Bali couldn&apos;t change the slide.
           </p>
-          <Button variant="secondary" size="sm" onClick={lesson.again} aria-disabled={changing}>
+          <Button variant="secondary" size="sm" onClick={lesson.again} aria-disabled={held}>
             Try again
           </Button>
         </div>
@@ -243,10 +252,10 @@ export function slideCard({ id, lesson, slide, asking, onAsk }: CardProps) {
             <span className="text-text-secondary">of {slide.pageCount}</span>
           </p>
           <div className={ROW}>
-            <Button variant="secondary" onClick={() => turn(-1)} aria-disabled={changing || first}>
+            <Button variant="secondary" onClick={() => turn(-1)} {...hold(turned(slide, -1))}>
               Previous
             </Button>
-            <Button onClick={() => turn(1)} aria-disabled={changing || last}>
+            <Button onClick={() => turn(1)} {...hold(turned(slide, 1))}>
               Next
             </Button>
           </div>
