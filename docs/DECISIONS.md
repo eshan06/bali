@@ -23,15 +23,17 @@ a real decision? Add a dated entry at the top: what was decided and why.
   never shows another session. *Weighed:* the class alone, which would follow whatever session runs
   and say class is over before one starts. **Whose lesson:** the shell's one read of the account,
   read again as the page opens and at the bell (once, never a loop), so minutes the teacher added move
-  it; the page follows the session only once a read lists it as the class's (`liveSession`), keeping
-  its start and bell after a later read lists none; a class that a read since the page opened doesn't
+  it; the page follows the session only once a read lists it as the class's (`liveSession`), and only
+  while the account lists the class, keeping its start and bell after a later read lists none
+  (`keptBell`); a class that a read since the page opened doesn't
   list says "This lesson is for a class you're not in." with Your classes (removed from it, or someone
   else's link); a teacher, or an account never through the 13+ check, goes home. **Class over:** the
   presentation read says only that the session isn't running, so `followLesson` now notes between
   which reads it ended (`ended`), and the page says StudentEnded's time only when a read that saw it
-  run came within 30 s of the one that saw it over: the bell when that came first, else that read's
-  time (an End); a page opened after the end, or away when it came, says "This class has ended."
-  (`endedAt`). *Weighed:* the bell always (wrong after an End), the time this page learned it (wrong
+  run came within 30 s of the one that saw it over: the bell when it fell between the two, give or
+  take 10 s of clock skew, else that read's time (an End, or minutes the teacher added that the page
+  never heard of, santa's review); a page opened after the end, or away when it came, says "This
+  class has ended." (`endedAt`). *Weighed:* the bell always (wrong after an End), the time this page learned it (wrong
   after a hidden tab), and the end's time on the presentation read (an API change for one line).
   **Drawn first, then built:** "Can't reach Bali" under the head, padded as every built notice is
   (the boards' `<p class="notice">` loses its padding to `.app p`, as the class page's line found);
