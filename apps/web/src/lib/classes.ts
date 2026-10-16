@@ -21,6 +21,12 @@ export function liveNow(c: TaughtClass, now: number): { id: string; endsAt: stri
   return running !== null && Date.parse(running.endsAt) > now ? running : null;
 }
 
+/**
+ * How long after a bell Classes reads the account again: a computer's clock a little ahead of the
+ * server's would otherwise read it before the server's bell and still find the session running.
+ */
+export const AFTER_BELL_MS = 3000;
+
 /** The first bell still to ring among the classes live at `now`, or null: when to read them again. */
 export function nextBell(classes: TaughtClass[], now: number): number | null {
   const bells = classes.flatMap((c) => {

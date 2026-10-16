@@ -289,9 +289,18 @@ describe('the Classes page', () => {
     expect(source).toMatch(
       /if \(!getAccessToken\(\)\) \{\s*router\.replace\('\/login'\);\s*return;\s*\}\s*load\(\);/,
     );
+    // The chip goes at the bell by this computer's clock, each answer dated as it lands.
     expect(source).toMatch(/const bell = classes === null \? null : nextBell\(classes, now\);/);
     expect(source).toMatch(
-      /const timer = window\.setTimeout\(\(\) => \{\s*setNow\(Math\.max\(Date\.now\(\), bell\)\);\s*load\(\);\s*\}, bell - Date\.now\(\)\);\s*return \(\) => window\.clearTimeout\(timer\);/,
+      /const timer = window\.setTimeout\(\(\) => setNow\(Math\.max\(Date\.now\(\), bell\)\), bell - Date\.now\(\)\);\s*return \(\) => window\.clearTimeout\(timer\);\s*\}, \[bell\]\);/,
+    );
+    expect(source).toMatch(/useEffect\(\(\) => setNow\(Date\.now\(\)\), \[home\]\);/);
+    // The account read 3 s after the first bell the last read counts running, past ones too, so a
+    // clock a little ahead of the server's still finds the session over; once per bell, never a loop.
+    expect(source).toMatch(/const readAt = classes === null \? null : nextBell\(classes, 0\);/);
+    expect(read('../lib/classes.ts')).toMatch(/export const AFTER_BELL_MS = 3000;/);
+    expect(source).toMatch(
+      /const timer = window\.setTimeout\(load, readAt \+ AFTER_BELL_MS - Date\.now\(\)\);\s*return \(\) => window\.clearTimeout\(timer\);\s*\}, \[readAt, load\]\);/,
     );
   });
 });
