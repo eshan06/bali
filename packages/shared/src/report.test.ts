@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import type { EventType } from './index.js';
-import { sessionReport, type ReportEvent, type ReportWindow } from './report.js';
+import {
+  REPORT_LISTING_TYPES,
+  sessionReport,
+  type ReportEvent,
+  type ReportWindow,
+} from './report.js';
 
 /*
  * One test per counting rule of the go-live features' Reports row
@@ -375,6 +380,50 @@ describe('sessionReport', () => {
       ['ben', at(4), 'no_live_participation'],
       ['ana', at(9), null],
       ['ana', at(10), 'superseded'],
+    ]);
+  });
+
+  it('lists its unlocks and protection offs, each reason now, from REPORT_LISTING_TYPES alone (PV17c-1)', () => {
+    // Every kind the engine records in a session, with each kind of note: what Recent activity
+    // reads of a session (those kinds alone) lists what the report lists.
+    const events = recorded(
+      ['session_started', null, 0],
+      ['tap_in', 'ana', 1],
+      ['tap_in', 'ben', 2],
+      ['unlock', 'ana', 3, { reason: 'bathroom' }],
+      ['unlock_reason_changed', 'ana', 4, { unlock_event_id: 'event-4', reason: 'nurse' }],
+      ['refocus', 'ana', 5],
+      ['unlock', 'ana', 6, late],
+      ['went_silent', 'ben', 7],
+      ['came_back', 'ben', 8],
+      ['protection_off', 'ben', 9],
+      ['unlock', 'ben', 10, { recorded_as: 'protection_off', reason: 'other' }],
+      ['protection_on', 'ben', 11],
+      ['unlock', 'cal', 12, { recorded_as: 'no_live_participation' }],
+      ['unlock', 'dee', 13, { recorded_as: 'not_enrolled' }],
+      ['armed_tap_skipped', 'eve', 14],
+      ['session_extended', null, 15],
+      ['left_for_other_session', 'ana', 16],
+      ['enrollment_removed', 'ben', 17],
+      ['protection_off', 'cal', 26, { recorded_as: 'after_session_end' }],
+      ['session_expired', null, 25],
+    );
+    const listed = (rows: ReportEvent[]) => {
+      const { unlocks, protectionOffs } = sessionReport(lesson, rows, later);
+      return { unlocks, protectionOffs };
+    };
+    const kinds: readonly string[] = REPORT_LISTING_TYPES;
+    expect(listed(events.filter((e) => kinds.includes(e.type)))).toEqual(listed(events));
+    // And the listing is the one each note gives: none kept with no class.
+    expect(listed(events).unlocks.map((u) => [u.studentId, u.reason, u.recordedAs])).toEqual([
+      ['ana', 'nurse', null],
+      ['ana', null, 'superseded'],
+      ['ben', 'other', 'protection_off'],
+      ['cal', null, 'no_live_participation'],
+    ]);
+    expect(listed(events).protectionOffs.map((p) => [p.studentId, p.recordedAs])).toEqual([
+      ['ben', null],
+      ['cal', 'after_session_end'],
     ]);
   });
 });

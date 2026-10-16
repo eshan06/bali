@@ -23,16 +23,19 @@ a real decision? Add a dated entry at the top: what was decided and why.
   before the class, its time without AM or PM as the board draws it (`bareTime`, the recap axis's,
   now shared); Open the class at its foot while one class is live alone (with two, each live card
   has its own: drawn first); no card at all for a list that came back empty, which PV1 rules out but
-  for a session started before midnight. **Read again:** at once as Home shows it, then 15 s after
-  each answer while the page is in view, the class page's grid's own pace, and at once as the tab
-  comes back (`pollActivity`, `lib/activity.ts`, on the student home's `rereadEvery`, which now takes
-  its interval); a poll's 10 s limit (#334); only the newest read's answer is shown; a failure in the
+  for a session started before midnight. **Read again:** at once as Home shows it and as its tab
+  comes back, and between those every 15 s while the page is in view, the class page's grid's own
+  pace, each read 15 s after the one before answered (`pollActivity`, `lib/activity.ts`, on the
+  student home's `rereadEvery`, which now takes its interval; its first 15 s after Home shows the
+  card); a poll's 10 s limit (#334); only the newest read's answer is shown; a failure in the
   list's place until a read works, as HomeMoreStates draws it (drawn first). *Weighed:* read once as
   Home opens, which leaves the list standing still while the live card beside it moves on, one fact
   said two ways. **Narrowed first** (PV3's review): the route reads today's sessions' `unlock`,
   `protection_off`, `session_started` and `unlock_reason_changed` alone (`sessionEvents`' new
   `types`), all `sessionReport` needs to list a session's unlocks and protection offs and say each
-  reason now, so the answer is unchanged: the activity integration tests (happy path, the kinds, own
+  reason now; the kinds the listing reads are `REPORT_LISTING_TYPES`, beside `sessionReport` in
+  `@bali/shared` and pinned there by a test of every kind (santa's review: one place, so a listing
+  rule reading another kind can't leave Home behind). The answer is unchanged: the activity integration tests (happy path, the kinds, own
   classes only, today, order and limit, the report's listing late and after the bell, names, a
   student `403`, `401`) hold it to each session's report read whole, and a db test pins the narrowed
   read to the session's index and to the whole read's listing. No route, field or `403` changes.

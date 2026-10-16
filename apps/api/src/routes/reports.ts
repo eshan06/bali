@@ -13,6 +13,8 @@ import {
   ACTIVITY_LIMIT,
   type ActivityEventType,
   type ActivityResponse,
+  type EventType,
+  REPORT_LISTING_TYPES,
   type ReportEvent,
   type ReportStudent,
   type ReportWindow,
@@ -31,12 +33,12 @@ import { refusal } from './errors.js';
 import { teacherQuestion } from './questions.js';
 
 /**
- * What Recent activity reads of today's sessions: its three kinds, and the reasons' changes that
- * give an unlock its reason now (A20). All `sessionReport` needs to list a session's unlocks and
- * protection offs, whatever else happened (PV3's review: narrowed once Home reads it again every
- * 15 s, PV17c); the tests hold its answer to each session's report, read whole.
+ * What Recent activity reads of today's sessions: its three kinds, and every kind the report's
+ * listing reads (`REPORT_LISTING_TYPES`: its unlocks, protection offs and each reason now, A20).
+ * All it needs, whatever else happened (PV3's review: narrowed once Home reads it again every 15 s,
+ * PV17c-1); the tests hold its answer to each session's report, read whole.
  */
-const ACTIVITY_READ = [...ACTIVITY_EVENT_TYPES, 'unlock_reason_changed'] as const;
+const ACTIVITY_READ = [...new Set<EventType>([...ACTIVITY_EVENT_TYPES, ...REPORT_LISTING_TYPES])];
 
 const Params = z.object({ id: z.string().uuid(), sessionId: z.string().uuid() });
 const ClassParams = z.object({ id: z.string().uuid() });

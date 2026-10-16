@@ -1,4 +1,11 @@
-import { sessionReport, type ActionOrder, type ReportEvent } from '@bali/shared';
+import {
+  ACTIVITY_EVENT_TYPES,
+  type ActionOrder,
+  type EventType,
+  REPORT_LISTING_TYPES,
+  type ReportEvent,
+  sessionReport,
+} from '@bali/shared';
 import { and, eq, isNull, sql, type SQLWrapper } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -548,16 +555,14 @@ describe('the reports list’s reads', () => {
   });
 });
 
-/** Recent activity's read (the API's `ACTIVITY_READ`): its three kinds and the reasons' changes. */
-const ACTIVITY_KINDS = [
-  'unlock',
-  'protection_off',
-  'session_started',
-  'unlock_reason_changed',
-] as const;
+/**
+ * Recent activity's read, as the API composes it (`ACTIVITY_READ`): its three kinds, and the kinds
+ * the report's listing reads (`REPORT_LISTING_TYPES`), each once.
+ */
+const ACTIVITY_KINDS = [...new Set<EventType>([...ACTIVITY_EVENT_TYPES, ...REPORT_LISTING_TYPES])];
 
 /*
- * PV17c: Home reads Recent activity again every 15 s, so its read takes only the kinds the report
+ * PV17c-1: Home reads Recent activity again every 15 s, so its read takes only the kinds the report
  * needs to list a session's unlocks and protection offs (PV3's review). Behaviour is tested through
  * the endpoint (apps/api/test/activity.test.ts), held there to each session's report read whole.
  */

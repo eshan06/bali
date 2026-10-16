@@ -696,8 +696,8 @@ describe('the live card (PV17b; Main, HomeMoreStates, HomeLiveStates)', () => {
     expect(source).toMatch(
       /<LiveGrid\s*sessionId=\{session\.id\}\s*onEnded=\{onEnded\}\s*onSession=\{onSession\}\s*card=\{\(grid\) => \(/,
     );
-    // No read of its own: the grid's snapshot and stream are the only ones. The rail's two reads
-    // (PV17c) are lib's (`pollActivity`, `readReport`), never written out here.
+    // No read of its own: the grid's snapshot and stream are the only ones. Recent activity's read
+    // (PV17c-1) is lib's (`pollActivity`), never written out here.
     expect(source).not.toMatch(/api\.get|createSseClient|\/v1\//);
   });
 });

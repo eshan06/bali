@@ -48,8 +48,9 @@ export async function readActivity(
 }
 
 /**
- * Read Recent activity now, again `ACTIVITY_EVERY_MS` after each answer while the page is in view
- * (`rereadEvery`: one read at a time, none while hidden), and at once as it comes back into view,
+ * Read Recent activity now and at once as the page comes back into view, and between those every
+ * `ACTIVITY_EVERY_MS` while it is in view (`rereadEvery`: its first read that long after the poll
+ * starts, each next that long after the one before answered, one at a time, none while hidden),
  * telling `show` each answer. Only the newest read's answer is told, so one that lands late never
  * puts an older list back. Stopped as Home stops showing it.
  */

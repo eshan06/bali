@@ -110,7 +110,7 @@ describe('pollActivity: Recent activity read again while Home is in view', () =>
     vi.useRealTimers();
   });
 
-  it('reads at once, then 15 s after each answer, telling each answer', async () => {
+  it('reads at once, then every 15 s, each read 15 s after the one before answered, telling each answer', async () => {
     // The class page's grid reads its session as often.
     expect(ACTIVITY_EVERY_MS).toBe(15_000);
     const { api, get, answer } = reads();
