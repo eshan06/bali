@@ -443,7 +443,7 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     }
   });
 
-  it('beside them, only border-input, the side menu’s avatar (PV5), a dialog’s backdrop (PV6), the reconnect pill’s dot (PV7), the unlock pop-up’s edge (PV10) and Open student (PV11b), the recap’s marks (PV12b), a live card’s edge (W3), a question’s bars and correct letter (L7; the letter on Your questions too, L7b), and the correct answer’s fill on the projector (L7, part 2)', () => {
+  it('beside them, only border-input, the side menu’s avatar (PV5), a dialog’s backdrop (PV6), the reconnect pill’s dot (PV7), the unlock pop-up’s edge (PV10) and Open student (PV11b), the recap’s marks (PV12b), a live card’s edge (W3), a question’s bars and correct letter (L7; the letter on Your questions too, L7b), the correct answer’s fill on the projector (L7, part 2), and the "is ready" dialog’s check (PV16b)', () => {
     const named = [...inline.keys()].filter((k) => k.startsWith('--color-'));
     const semanticNames = semantic(tokens.color.tokens).map((t) =>
       t.name === 'focus-ring-color' ? '--color-focus-ring' : `--color-${t.name}`,
@@ -460,12 +460,19 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
       '--color-mark-off',
       '--color-option-right',
       '--color-pip',
+      '--color-ready',
       '--color-scrim',
       '--color-unlock-edge',
       '--color-unlock-link',
     ]);
     // A live card's edge: green-200, as v2.css's `.livecard` draws it.
     expect(inline.get('--color-live-edge')).toBe('var(--bali-green-200)');
+    // The "is ready" dialog's check (PV16b, ClassesCreated): green-600, as the board draws it, a
+    // graphic at 3:1 and more on the dialog's white (1.4.11).
+    expect(inline.get('--color-ready')).toBe('var(--bali-green-600)');
+    expect(contrast(hexOf('green-600', 'light'), hexOf('surface-card', 'light'))).toBeGreaterThan(
+      3,
+    );
     // A live question's results (L7), as v2.css draws them: an option's bar stone-500, the correct
     // one's green-600, its letter green-700 on green-100 as v2.css's `.right .letter` draws it (the
     // correct answer's letter on Your questions too, L7b), small text at 4.5:1 and more.

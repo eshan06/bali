@@ -2,7 +2,7 @@
 
 import type { ClassDetail } from '@bali/shared';
 import { Check, Copy } from 'lucide-react';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 import { Button } from '@/components/button';
 import { CANT_COPY, NEW_CODE_MADE } from '@/lib/errors';
@@ -19,15 +19,43 @@ const COPIED_FOR = 2000;
 export const CODE_CHIP =
   'inline-block border border-border-default bg-surface-sunken font-mono text-text-primary select-all';
 
-/** The code on its card (ClassBefore): 40/48 on its chip, centred for its tracking. */
-const CODE = `${CODE_CHIP} rounded-md py-4 pr-6.5 pl-[calc(26px+0.16em)] text-code-card`;
+/** The code on its card (ClassBefore, ClassesCreated): 40/48 on its chip, centred for its tracking. */
+export const CODE = `${CODE_CHIP} rounded-md py-4 pr-6.5 pl-[calc(26px+0.16em)] text-code-card`;
 
 /**
- * New code's dialog (ClassNewCode): 460 px, 120 px from the top, over the page's warm backdrop. A
- * native modal, so the page behind it is inert and Escape closes it; shown only while open.
+ * v2's dialog (ClassNewCode, ClassesNew): 460 px, 120 px from the top, over the page's warm
+ * backdrop. A native modal, so the page behind it is inert and Escape closes it; shown only while
+ * open.
  */
-const DIALOG =
+export const DIALOG =
   'm-auto mt-30 w-115 max-w-[calc(100%-48px)] flex-col gap-4.5 overscroll-contain rounded-md bg-surface-card p-6 text-text-primary shadow-3 backdrop:bg-scrim open:flex';
+
+/**
+ * A code's Copy (CopyStates): Copied for a few seconds, then Copy again; or, where the browser has
+ * no clipboard or refuses it, `failed`, for the page to say. `forget` drops a past answer, as a new
+ * code does; a Copied still showing when the page goes is forgotten with it.
+ */
+export function useCopy() {
+  const [copy, setCopy] = useState<'copied' | 'failed' | null>(null);
+  const copied = useRef<number | undefined>(undefined);
+
+  useEffect(() => () => window.clearTimeout(copied.current), []);
+
+  const forget = useCallback(() => {
+    window.clearTimeout(copied.current);
+    setCopy(null);
+  }, []);
+
+  const copyCode = useCallback(async (code: string) => {
+    window.clearTimeout(copied.current);
+    if (await copyText(code)) {
+      setCopy('copied');
+      copied.current = window.setTimeout(() => setCopy(null), COPIED_FOR);
+    } else setCopy('failed');
+  }, []);
+
+  return { copy, copyCode, forget };
+}
 
 /**
  * The class's join code on its own card, before a session (ClassBefore, CopyStates): the code on
@@ -58,11 +86,7 @@ export function JoinCode({
   const [busy, setBusy] = useState(false);
   const [said, setSaid] = useState<Said | null>(null);
   // Copy's answer: Copied for a few seconds, or the browser refused it.
-  const [copy, setCopy] = useState<'copied' | 'failed' | null>(null);
-  const copied = useRef<number | undefined>(undefined);
-
-  // A Copied still showing when the page goes is forgotten with it.
-  useEffect(() => () => window.clearTimeout(copied.current), []);
+  const { copy, copyCode, forget } = useCopy();
 
   function open() {
     if (sending.current) return;
@@ -88,8 +112,7 @@ export function JoinCode({
     }
     dialog.current?.close();
     // Copy's answer was about the old code.
-    window.clearTimeout(copied.current);
-    setCopy(null);
+    forget();
     setSaid({ kind: 'made', message: NEW_CODE_MADE });
     onClass(answer.klass);
   }
@@ -109,14 +132,6 @@ export function JoinCode({
     }
     setSaid((cur) => (cur?.kind === 'made' ? cur : null));
     toggle.current?.focus();
-  }
-
-  async function copyCode() {
-    window.clearTimeout(copied.current);
-    if (await copyText(code)) {
-      setCopy('copied');
-      copied.current = window.setTimeout(() => setCopy(null), COPIED_FOR);
-    } else setCopy('failed');
   }
 
   const newCode = (
@@ -182,7 +197,7 @@ export function JoinCode({
         Students type it in the Bali app to join this class.
       </p>
       <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
-        <Button variant="secondary" size="sm" onClick={() => void copyCode()}>
+        <Button variant="secondary" size="sm" onClick={() => void copyCode(code)}>
           {copy === 'copied' ? (
             <Check size={16} aria-hidden="true" />
           ) : (
