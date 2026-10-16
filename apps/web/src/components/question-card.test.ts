@@ -450,9 +450,11 @@ describe('its hook (L6’s logic, held for one session)', () => {
     );
     const grid = readFileSync(fileURLToPath(new URL('./live-grid.tsx', import.meta.url)), 'utf8');
     expect(page).toMatch(
-      /const \{ lesson, onEvent, ask, opening, forgetAsk \} = useLiveQuestion\(\s*live \? grid\.id : null,?\s*\);/,
+      /const \{ lesson, onEvent, ask, opening, forgetAsk, snapshot, reread \} = useLiveQuestion\(\s*live \? grid\.id : null,?\s*\);/,
     );
-    expect(page).toMatch(/onEvent=\{onEvent\}/);
+    // Beside the slide's (M6, part 2b-2), which hears its slide changes the same way.
+    expect(page).toMatch(/onEvent=\{onLessonEvent\}/);
+    expect(page).toMatch(/\(e: FeedEvent\) => \{\s*onEvent\(e\);\s*onSlideEvent\(e\);/);
     expect(grid).toMatch(
       /if \(endsSession\(e\)\) onEndedRef\.current\?\.\(sessionId\);\s*onEventRef\.current\?\.\(e\);/,
     );

@@ -363,7 +363,7 @@ export function useLiveQuestion(sessionId: string | null) {
 }
 
 /** v2.css's `.lesson` head: the title or the kicker, then its buttons. */
-const HEAD = 'flex flex-wrap items-center justify-between gap-x-6 gap-y-3';
+export const HEAD = 'flex flex-wrap items-center justify-between gap-x-6 gap-y-3';
 /** v2.css's `.row`: a card's buttons, 10 px apart. */
 export const ROW = 'flex flex-wrap items-center gap-2.5';
 
@@ -432,6 +432,30 @@ export const doneButton = ({ done }: LiveQuestion, then: string) => (
 );
 
 /**
+ * Ask a question, or Ask another question, which opens the side panel (L7-1b): the question card's
+ * and the slide card's (M6, part 2b-2) alike, `${id}-ask` on whichever card shows, so focus comes
+ * back to it. `asking`: the panel is open, which it controls.
+ */
+export const askButton = (
+  id: string,
+  words: string,
+  variant: 'primary' | 'secondary',
+  asking: boolean,
+  onAsk: () => void,
+) => (
+  <Button
+    id={`${id}-ask`}
+    variant={variant}
+    onClick={onAsk}
+    aria-expanded={asking}
+    aria-controls={asking ? `${id}-panel` : undefined}
+  >
+    <MessageCircleQuestionMark size={16} aria-hidden="true" />
+    {words}
+  </Button>
+);
+
+/**
  * The class page's "Questions and slides" card (L7; LessonClass, LessonWaiting, LessonLive,
  * LessonClosed, LessonStates' lines), between the counts and the grid, never in Present. At rest,
  * Ask a question (Show slides is M6's). A question open: Close, and Close and show answer when it
@@ -453,18 +477,8 @@ export function QuestionCard({
   onAsk: () => void;
 }) {
   const { question: q, results: r } = lesson;
-  const ask = (words: string, variant: 'primary' | 'secondary') => (
-    <Button
-      id={`${id}-ask`}
-      variant={variant}
-      onClick={onAsk}
-      aria-expanded={asking}
-      aria-controls={asking ? `${id}-panel` : undefined}
-    >
-      <MessageCircleQuestionMark size={16} aria-hidden="true" />
-      {words}
-    </Button>
-  );
+  const ask = (words: string, variant: 'primary' | 'secondary') =>
+    askButton(id, words, variant, asking, onAsk);
   if (q === null) {
     return (
       <section aria-labelledby={`${id}-lesson`} className={`flex flex-col gap-4 ${CARD_ALONE}`}>
