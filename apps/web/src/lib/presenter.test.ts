@@ -570,6 +570,10 @@ const run = (str: string, hasEOL = false) => ({ str, hasEOL, dir: 'ltr', transfo
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe('drawPage', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('draws the page as large as fits the box, at the screen’s pixel ratio, then copies it whole', async () => {
     const { pdf, renders, asked } = fakeDeck();
     const screen = fakeScreen(2);
@@ -790,6 +794,65 @@ describe('drawPage', () => {
     screen.noContext();
     expect(await drawPage(plain.pdf, 4, screen.canvas, box)).toEqual({ kind: 'undrawn' });
     expect(screen.canvas.width).toBe(300);
+  });
+
+  it('answers undrawn once PDF.js gives no answer for 20 s, never a moment before: its page, its draw or its text', async () => {
+    // A worker that stops answering after the deck opened (#416's review): its draw would
+    // otherwise never end, and the slide stay on Loading… or the page before it, unsaid.
+    vi.useFakeTimers();
+    const box = { width: 420, height: 236 };
+    const hung = {
+      getPage: () => new Promise(() => {}),
+    } as unknown as Pick<PDFDocumentProxy, 'getPage'>;
+    const drawing = fakeDeck({ draws: 'waits' });
+    const reading = fakeDeck({ text: 'waits' });
+    for (const pdf of [hung, drawing.pdf, reading.pdf]) {
+      const screen = fakeScreen();
+      let end: unknown;
+      void drawPage(pdf, 4, screen.canvas, box).then((e) => (end = e));
+      await vi.advanceTimersByTimeAsync(20_000 - 1);
+      expect(end).toBeUndefined();
+      await vi.advanceTimersByTimeAsync(1);
+      // Said apart from a page PDF.js failed to draw: Try again then opens the deck again.
+      expect(end).toEqual({ kind: 'undrawn', unanswered: true });
+      expect(screen.copies).toEqual([]);
+      expect(screen.canvas).toMatchObject({ width: 300, height: 150 });
+    }
+    // The draw PDF.js never finished is cancelled, and what it held let go.
+    expect(drawing.renders[0]?.cancelled).toBe(true);
+    expect(drawing.counts.cleaned).toBe(1);
+    expect(reading.counts.cleaned).toBe(1);
+  });
+
+  it('keeps no clock for a draw that ended, however it ended', async () => {
+    vi.useFakeTimers();
+    const box = { width: 420, height: 236 };
+    await drawPage(fakeDeck().pdf, 4, fakeScreen().canvas, box);
+    await drawPage(fakeDeck({ draws: 'fail' }).pdf, 4, fakeScreen().canvas, box);
+    const waiting = fakeDeck({ draws: 'waits' });
+    const screen = fakeScreen();
+    const first = drawPage(waiting.pdf, 4, screen.canvas, box);
+    await vi.advanceTimersByTimeAsync(0);
+    void drawPage(waiting.pdf, 5, screen.canvas, box);
+    expect(await first).toEqual({ kind: 'cancelled' });
+    // The second still runs, its own clock alone left.
+    expect(vi.getTimerCount()).toBe(1);
+  });
+
+  it('stops a draw still waiting for PDF.js at once: a later draw, or its signal', async () => {
+    vi.useFakeTimers();
+    const box = { width: 420, height: 236 };
+    const hung = {
+      getPage: () => new Promise(() => {}),
+    } as unknown as Pick<PDFDocumentProxy, 'getPage'>;
+    const screen = fakeScreen();
+    const going = new AbortController();
+    const first = drawPage(hung, 4, screen.canvas, box, going.signal);
+    going.abort();
+    expect(await first).toEqual({ kind: 'cancelled' });
+    const second = drawPage(hung, 4, screen.canvas, box);
+    void drawPage(hung, 5, screen.canvas, box);
+    expect(await second).toEqual({ kind: 'cancelled' });
   });
 });
 

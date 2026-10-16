@@ -38,14 +38,25 @@ const UNSHOWN: Record<Unshown, string> = {
   undrawn: "Bali couldn't draw this page.",
 };
 
-/** A line in the slide's place with its Try again, centred in the white frame. */
-export function UnshownLine({ why, onAgain }: { why: Unshown; onAgain: () => void }) {
+/**
+ * A line in the slide's place with its Try again, centred in the white frame; in Present one size
+ * up.
+ */
+export function UnshownLine({
+  why,
+  onAgain,
+  present = false,
+}: {
+  why: Unshown;
+  onAgain: () => void;
+  present?: boolean;
+}) {
   return (
     <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-3">
-      <p role="alert" className="text-body">
+      <p role="alert" className={present ? 'text-present-line' : 'text-body'}>
         {UNSHOWN[why]}
       </p>
-      <Button variant="secondary" size="sm" onClick={onAgain}>
+      <Button variant="secondary" size={present ? 'md' : 'sm'} onClick={onAgain}>
         Try again
       </Button>
     </div>
@@ -53,25 +64,44 @@ export function UnshownLine({ why, onAgain }: { why: Unshown; onAgain: () => voi
 }
 
 /**
- * The slide: v2.css's `.slide`, a white 16:9 frame 420 px wide at most, its page drawn on a canvas
- * as large as fits (2a's `drawPage`, given the frame's size as the browser lays it out), its shape
- * kept, the canvas filling the frame and its picture fitted in it. Its label is "Slide 4 of 12."
- * and the page's text (decision 8). A turn keeps the page before it until the next is drawn.
+ * The slide's frame: the class page's card's (v2.css's `.slide`), 420 px wide at most beside its
+ * controls; or Present's (`.p-slide`), as large as fits the screen with Present's header, its row
+ * and the page's own padding and gaps in sight (232 px at 1920 × 1080), 1351 × 760 at most, as
+ * PresentSlide draws it, and 16 rem wide at least where the page is wider.
  */
-function SlideFrame({
+const FRAME = {
+  card: 'w-full min-w-0 flex-[0_1_420px] rounded-frame',
+  present:
+    'mx-auto w-[min(100%,max(16rem,calc((100dvh_-_232px)*16/9)),1351px)] shrink-0 rounded-md',
+};
+
+/**
+ * The slide: a white 16:9 frame (`FRAME`), its page drawn on a canvas as large as fits (2a's
+ * `drawPage`, given the frame's size as the browser lays it out), its shape kept, the canvas
+ * filling the frame and its picture fitted in it. Its label is "Slide 4 of 12." and the page's text
+ * (decision 8). A turn keeps the page before it until the next is drawn. A page Bali couldn't draw
+ * is drawn again by Try again, or, PDF.js having given no answer, the deck is opened again.
+ */
+export function SlideFrame({
   deck,
   slide,
   onReload,
+  look = 'card',
 }: {
   deck: DeckState;
   slide: Slide;
   onReload: () => void;
+  look?: keyof typeof FRAME;
 }) {
   const frame = useRef<HTMLElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const [box, setBox] = useState<Box | null>(null);
   const [drawn, setDrawn] = useState<{ deck: OpenDeck; page: number; text: string } | null>(null);
-  const [undrawn, setUndrawn] = useState<{ deck: OpenDeck; page: number } | null>(null);
+  const [undrawn, setUndrawn] = useState<{
+    deck: OpenDeck;
+    page: number;
+    unanswered: boolean;
+  } | null>(null);
   const [redraws, setRedraws] = useState(0);
   const open = deck.kind === 'open' ? deck.deck : null;
 
@@ -95,21 +125,21 @@ function SlideFrame({
     void drawPage(open.pdf, page, target, box, stop.signal).then((end) => {
       if (stop.signal.aborted || end.kind === 'cancelled') return;
       if (end.kind === 'drawn') setDrawn({ deck: open, page, text: end.text });
-      setUndrawn(end.kind === 'undrawn' ? { deck: open, page } : null);
+      setUndrawn(
+        end.kind === 'undrawn' ? { deck: open, page, unanswered: end.unanswered === true } : null,
+      );
     });
     return () => stop.abort();
   }, [open, page, box, redraws]);
 
   const held = open !== null && drawn?.deck === open ? drawn : null;
-  const place = placeOf(
-    deck,
-    held !== null,
-    open !== null && undrawn?.deck === open && undrawn.page === page,
-  );
+  const failed = open !== null && undrawn?.deck === open && undrawn.page === page ? undrawn : null;
+  const place = placeOf(deck, held !== null, failed !== null);
+  const present = look === 'present';
   return (
     <figure
       ref={frame}
-      className="relative aspect-video w-full min-w-0 flex-[0_1_420px] overflow-hidden rounded-frame border border-border-default bg-surface-card shadow-1"
+      className={`relative aspect-video overflow-hidden border border-border-default bg-surface-card shadow-1 ${FRAME[look]}`}
     >
       <canvas
         ref={canvas}
@@ -125,13 +155,21 @@ function SlideFrame({
         // Scrolls where a narrow frame can't hold a line and its Try again (a phone under 390 px).
         <div className="absolute inset-0 grid place-items-center overflow-y-auto p-5 text-center">
           {place === 'loading' ? (
-            <p role="status" className="text-body text-text-secondary">
+            <p
+              role="status"
+              className={`${present ? 'text-present-line' : 'text-body'} text-text-secondary`}
+            >
               Loading…
             </p>
           ) : (
             <UnshownLine
               why={place}
-              onAgain={place === 'undrawn' ? () => setRedraws((n) => n + 1) : onReload}
+              present={present}
+              onAgain={
+                place === 'undrawn' && !failed?.unanswered
+                  ? () => setRedraws((n) => n + 1)
+                  : onReload
+              }
             />
           )}
         </div>
@@ -148,6 +186,47 @@ export const typesText = (target: EventTarget | null) => {
   );
 };
 
+/** A key pressed on the page, as `keyTurn` reads it. */
+export type Key = Pick<
+  KeyboardEvent,
+  'key' | 'target' | 'defaultPrevented' | 'altKey' | 'ctrlKey' | 'metaKey' | 'shiftKey'
+>;
+
+/**
+ * Whether focus is in an open side panel (an `aside`: a question being written or picked, a
+ * student's moments, a deck being picked), whose keys are its own.
+ */
+const inPanel = (target: EventTarget | null) =>
+  ((target as { closest?: (selector: string) => unknown } | null)?.closest?.('aside') ?? null) !==
+  null;
+
+/**
+ * The way a key turns the slide: ← back a page, → on one; none for any other key, one with a
+ * modifier held, one a control has taken, one that goes to what is being typed in, or one pressed
+ * in an open side panel (#416's review).
+ */
+export function keyTurn(e: Key): -1 | 1 | null {
+  const by = e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowRight' ? 1 : null;
+  if (by === null || e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) {
+    return null;
+  }
+  return typesText(e.target) || inPanel(e.target) ? null : by;
+}
+
+/** The ← and → keys turn the slide (`keyTurn`), the class page's card and Present's alike. */
+export function useSlideKeys(turn: (by: -1 | 1) => void) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const by = keyTurn(e);
+      if (by === null) return;
+      e.preventDefault();
+      turn(by);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [turn]);
+}
+
 /**
  * What a slide change left to say (LessonStates, LessonSlideStates): it didn't go through, the
  * session ended first, or its deck is gone.
@@ -159,31 +238,34 @@ const SAID: Record<ChangeSaid, string> = {
 };
 
 /**
- * What a slide change left to say, where it was made (the card, a deck in the side panel); one
- * that didn't go through with Try again, held while another is on its way, and named by what it
- * is about (`describedBy`: a deck in the panel's list).
+ * What a slide change left to say, where it was made (the card, Present one size up, a deck in the
+ * side panel); one that didn't go through with Try again, held while another is on its way, and
+ * named by what it is about (`describedBy`: a deck in the panel's list).
  */
 export function SaidLine({
   why,
   held,
   onAgain,
   describedBy,
+  present = false,
   className = '',
 }: {
   why: ChangeSaid;
   held: boolean;
   onAgain: () => void;
   describedBy?: string;
+  present?: boolean;
   className?: string;
 }) {
+  const type = present ? 'text-present-line' : 'text-body';
   return why === 'failed' ? (
     <div className={`flex flex-wrap items-center gap-x-4 gap-y-3 ${className}`}>
-      <p role="alert" className="text-body">
+      <p role="alert" className={type}>
         {SAID.failed}
       </p>
       <Button
         variant="secondary"
-        size="sm"
+        size={present ? 'md' : 'sm'}
         onClick={onAgain}
         aria-disabled={held}
         aria-describedby={describedBy}
@@ -192,14 +274,23 @@ export function SaidLine({
       </Button>
     </div>
   ) : (
-    <p role="alert" className={`text-body ${className}`}>
+    <p role="alert" className={`${type} ${className}`}>
       {SAID[why]}
     </p>
   );
 }
 
 /** Stop showing's change: nothing shown. */
-const STOP: SlideChange = { deckId: null, page: null };
+export const STOP: SlideChange = { deckId: null, page: null };
+
+/**
+ * A slide control's change (none past either end): held while one is on its way, its own button
+ * busy (LessonSlideStates, PresentSlideStates).
+ */
+export const holdFor = (changing: SlideChange | null) => (to: SlideChange | null) => ({
+  'aria-disabled': changing !== null || to === null,
+  'aria-busy': to !== null && changing?.deckId === to.deckId && changing.page === to.page,
+});
 
 interface CardProps {
   id: string;
@@ -222,33 +313,14 @@ interface CardProps {
  * `useSlide`.
  */
 export function SlideCard(props: CardProps) {
-  const { turn } = props.lesson;
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const by = e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowRight' ? 1 : 0;
-      if (by === 0 || e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) {
-        return;
-      }
-      if (typesText(e.target)) return;
-      e.preventDefault();
-      turn(by);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [turn]);
+  useSlideKeys(props.lesson.turn);
   return slideCard(props);
 }
 
 /** The card itself, its keys aside: a function of what it shows, so a test presses its buttons. */
 export function slideCard({ id, lesson, slide, asking, onAsk }: CardProps) {
   const { title, deck, changing, said, turn } = lesson;
-  const held = changing !== null;
-  // A slide control's change (none past either end): held while one is on its way, its own button
-  // busy (LessonSlideStates).
-  const hold = (to: SlideChange | null) => ({
-    'aria-disabled': held || to === null,
-    'aria-busy': to !== null && changing?.deckId === to.deckId && changing.page === to.page,
-  });
+  const hold = holdFor(changing);
   // Stopped: the card at rest takes this one's place, focus on its Ask a question.
   const stopShowing = () =>
     void lesson.stop().then((stopped) => {
@@ -277,7 +349,9 @@ export function slideCard({ id, lesson, slide, asking, onAsk }: CardProps) {
           </Button>
         </div>
       </div>
-      {said === null ? null : <SaidLine why={said.why} held={held} onAgain={lesson.again} />}
+      {said === null ? null : (
+        <SaidLine why={said.why} held={changing !== null} onAgain={lesson.again} />
+      )}
       <div className="flex flex-wrap items-start gap-x-7 gap-y-5">
         <SlideFrame deck={deck} slide={slide} onReload={lesson.reload} />
         <div className="flex min-w-0 flex-[1_1_260px] flex-col gap-3">
