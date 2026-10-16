@@ -12,8 +12,9 @@ import {
   type OpenDeck,
   STALL_MS,
 } from './deck-pdf';
+import { LONGEST_WAIT_MS, POLL_EVERY_MS } from './live-question';
 import { type SlideAnswer } from './presenter';
-import { changeEnd, loadShown, unopenedAs } from './use-slide';
+import { changeEnd, loadShown, unopenedAs, waitAfter } from './use-slide';
 
 /*
  * The class page's slide (M6, part 2b-1): the deck shown loaded and watched for a stall, a slide
@@ -150,6 +151,20 @@ describe('loadShown: the deck shown, loaded for the card', () => {
   });
 });
 
+describe('waitAfter: how long a read with no answer waits', () => {
+  const failed = (status: number | undefined, retryAfter?: number) =>
+    ({ kind: 'failed', status, retryAfter }) as const;
+
+  it('waits 2 s, or a 429’s Retry-After from 2 s to a minute, none the minute', () => {
+    expect(waitAfter(failed(undefined))).toBe(POLL_EVERY_MS);
+    expect(waitAfter(failed(503))).toBe(POLL_EVERY_MS);
+    expect(waitAfter(failed(429, 30))).toBe(30_000);
+    expect(waitAfter(failed(429, 0))).toBe(POLL_EVERY_MS);
+    expect(waitAfter(failed(429, 3600))).toBe(LONGEST_WAIT_MS);
+    expect(waitAfter(failed(429))).toBe(LONGEST_WAIT_MS);
+  });
+});
+
 describe('changeEnd: a slide change’s answer, for the card', () => {
   const slide: Slide = { deckId: DECK_ID, sha256: SLIDE.sha256, page: 5, pageCount: 12 };
   const ID = '0199e0b0-0000-7000-8000-000000000005';
@@ -207,7 +222,7 @@ describe('useSlide: what a session shows, held for one session (read from its so
     expect(hook).toMatch(/const named = decks\?\.some\(\(d\) => d\.id === deckId\) \?\? false;/);
     expect(hook).toMatch(/if \(deckId === null \|\| named\) return;/);
     expect(hook).toMatch(
-      /const answer = await readDecks\(api\);\s*if \(gone\) return;\s*if \(answer\.kind === 'read'\) \{\s*decksNow\.current = answer\.decks;\s*setDecks\(answer\.decks\);\s*\} else if \(answer\.kind === 'failed'\) timer = setTimeout\(\(\) => void read\(\), POLL_EVERY_MS\);/,
+      /const answer = await readDecks\(api\);\s*if \(gone\) return;\s*if \(answer\.kind === 'read'\) \{\s*decksNow\.current = answer\.decks;\s*setDecks\(answer\.decks\);\s*\} else if \(answer\.kind === 'failed'\) \{?\s*timer = setTimeout\(\(\) => void read\(\), waitAfter\(answer\)\);/,
     );
     expect(hook).toMatch(/title: decks\?\.find\(\(d\) => d\.id === deckId\)\?\.title \?\? null,/);
   });
@@ -217,8 +232,9 @@ describe('useSlide: what a session shows, held for one session (read from its so
     expect(hook).toMatch(
       /void loadShown\(api, \{ deckId, sha256 \}, stop\)\.then\(\(state\) => \{[^]*?if \(gone && state\?\.kind === 'open'\) void state\.deck\.close\(\);\s*if \(gone \|\| state === null\) return;\s*if \(state\.kind === 'open'\) open = state\.deck;\s*setLoaded\(\{ key, state \}\);/,
     );
+    // Cleared as it closes, so the same deck shown again loads afresh (use-slide-hook.test.ts).
     expect(hook).toMatch(
-      /return \(\) => \{\s*gone = true;\s*stop\.abort\(\);\s*void open\?\.close\(\);\s*\};\s*\}, \[api, deckId, sha256, key\]\);/,
+      /return \(\) => \{\s*gone = true;\s*stop\.abort\(\);\s*void open\?\.close\(\);[^]*?setLoaded\(null\);\s*\};\s*\}, \[api, deckId, sha256, key\]\);/,
     );
     // Not open() but close(), which ends the worker too (#413).
     expect(hook).not.toMatch(/\.destroy\(/);
@@ -235,7 +251,11 @@ describe('useSlide: what a session shows, held for one session (read from its so
       /if \(now\.current\.session !== session\) return false;\s*unanswered\.current = keepUnanswered\(attempt, answer\);\s*const end = changeEnd\(answer\);/,
     );
     expect(hook).toMatch(
-      /if \('shown' in end\) \{\s*put\(session, end\.shown\);\s*return true;\s*\}\s*setSaid\(end\.said\);[^]*?if \(end\.said === 'gone'\) reread\(\);/,
+      /if \('shown' in end\) \{\s*put\(session, end\.shown\);\s*return true;\s*\}[^]*?setSaid\(end\.said\);[^]*?if \(end\.said === 'gone'\) reread\(\);/,
+    );
+    // Its answer gave up after the stream showed it: nothing said (use-slide-hook.test.ts).
+    expect(hook).toMatch(
+      /const heard = newer\(now\.current\.shown, \{ slide: null, eventId: attempt\.eventId \}\);\s*if \(end\.said === 'failed' && heard === now\.current\.shown\) \{\s*unanswered\.current = null;\s*return false;\s*\}/,
     );
     // Try again: the last change again, through the same rule.
     expect(hook).toMatch(/again: \(\) => \{\s*if \(last\.current\) void change\(last\.current\);/);

@@ -44,9 +44,17 @@ a real decision? Add a dated entry at the top: what was decided and why.
   card at 390 px. Its four new lines went through `no-ai-slop`: "Bali couldn't open these slides. Try
   again, or reload this page.", "This session has ended, so Bali didn't change the slide.", "These
   slides aren't in Your slides anymore, so Bali can't show them." and "Bali couldn't draw this page."
-  **Checked:** vitest, `watchStall` and `loadShown` against stand-ins (dropping a chunk's 20 s more,
-  the stall's own failure, or the guard that keeps a late stall off a load that ended each fails
-  tests), and the hooks' wiring read from their source, as the question card's is.
+  **Santa's review** (both reviewers): the deck a load held outlived its close, so the same deck shown
+  again, after another or none, was handed back closed until its new load landed (every page then
+  "Bali couldn't draw this page."); the held deck is now cleared as it closes, and a failure is never
+  said again for a load that hasn't failed. And a change whose answer gave up after the stream had
+  shown it was said not to have gone through; it says nothing now. The decks' read waits a `429`'s
+  `Retry-After` (`waitAfter`, the polls' rule), and the stall's watch ends with its body cancelled
+  or failed, not only read to its end. **Checked:** vitest, `watchStall` and `loadShown` against
+  stand-ins (dropping a chunk's 20 s more, the stall's own failure, or the guard that keeps a late
+  stall off a load that ended each fails tests); the hook as it runs, under a stand-in for the four
+  React hooks it uses (no DOM here), each failing first for both review findings
+  (`use-slide-hook.test.ts`); and its wiring read from its source, as the question card's is.
 
 - **2026-10-16** — **M6's part 2a: the presenter's logic, no screen (#414); part 2 in three PRs; and
   the conductor's two calls for its screens, awaiting the owner.** **The split:** part 2 whole came to

@@ -156,8 +156,10 @@ export const STALL_MS = 20_000;
 
 /**
  * The bucket's fetch for `loadDeck` (`fetchImpl`), calling `onStall` once `STALL_MS` pass with
- * nothing arriving, until its answer's last byte. It stops nothing itself: the screen's `onStall`
- * aborts the load's `signal`, as a stalled download is the screen's to stop.
+ * nothing arriving, while its answer is awaited and its body read. The watch ends with the body: read
+ * to its end, cancelled (a deck past its limit, read no further) or failed (the GET stopped); a body
+ * left unread is its reader's to stop. It stops nothing itself: the screen's `onStall` aborts the
+ * load's `signal`, as a stalled download is the screen's to stop.
  */
 export function watchStall(
   onStall: () => void,
@@ -183,15 +185,29 @@ export function watchStall(
       return res;
     }
     arrived();
-    const body = res.body.pipeThrough(
-      new TransformStream<Uint8Array, Uint8Array>({
-        transform(chunk, out) {
+    const reader = res.body.getReader();
+    const body = new ReadableStream<Uint8Array>({
+      async pull(out) {
+        let next: ReadableStreamReadResult<Uint8Array>;
+        try {
+          next = await reader.read();
+        } catch (e) {
+          clearTimeout(timer);
+          throw e;
+        }
+        if (next.done) {
+          clearTimeout(timer);
+          out.close();
+        } else {
           arrived();
-          out.enqueue(chunk);
-        },
-        flush: () => clearTimeout(timer),
-      }),
-    );
+          out.enqueue(next.value);
+        }
+      },
+      cancel(reason) {
+        clearTimeout(timer);
+        return reader.cancel(reason);
+      },
+    });
     return new Response(body, {
       status: res.status,
       statusText: res.statusText,

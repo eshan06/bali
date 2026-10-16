@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ApiClient } from './api-client';
 import { type DeckFailure, loadDeck, type OpenDeck, watchStall } from './deck-pdf';
 import { readDecks } from './decks';
-import { POLL_EVERY_MS } from './live-question';
+import { type Failure, LONGEST_WAIT_MS, POLL_EVERY_MS } from './live-question';
 import {
   newer,
   NOTHING_SHOWN,
@@ -101,6 +101,15 @@ export async function loadShown(
 }
 
 /**
+ * How long a read that got no answer waits before the next: 2 s, or a `429`'s `Retry-After`, from
+ * 2 s to a minute, none or a date the minute (L5's rule, as the polls wait: `pollTagged`).
+ */
+export const waitAfter = ({ status, retryAfter }: Extract<Failure, { kind: 'failed' }>) =>
+  status === 429
+    ? Math.min(Math.max((retryAfter ?? Infinity) * 1000, POLL_EVERY_MS), LONGEST_WAIT_MS)
+    : POLL_EVERY_MS;
+
+/**
  * A slide change's answer: what the session shows now (this change, its replay, or a later one
  * from another tab), or what to say.
  */
@@ -118,7 +127,8 @@ type Held = { session: string | null; shown: Shown };
  * session again (`reread`); and from this tab's own changes' answers: only ever a later change, by
  * the server's order (`newer`). Its deck loaded (`loadShown`) for each deck shown and each Try
  * again, closed once the session shows another, or none, or is gone; its title from the teacher's
- * decks, read while the deck shown isn't among them, again every 2 s while Bali gives no answer.
+ * decks, read while the deck shown isn't among them, again while Bali gives no answer
+ * (`waitAfter`).
  */
 export function useSlide(
   sessionId: string | null,
@@ -169,7 +179,7 @@ export function useSlide(
       if (answer.kind === 'read') {
         decksNow.current = answer.decks;
         setDecks(answer.decks);
-      } else if (answer.kind === 'failed') timer = setTimeout(() => void read(), POLL_EVERY_MS);
+      } else if (answer.kind === 'failed') timer = setTimeout(() => void read(), waitAfter(answer));
     };
     void read();
     return () => {
@@ -206,6 +216,9 @@ export function useSlide(
       gone = true;
       stop.abort();
       void open?.close();
+      // Never handed back once closed, nor a failure said again: the same deck shown again, after
+      // another or none, loads afresh under the same key (santa's review).
+      setLoaded(null);
     };
   }, [api, deckId, sha256, key]);
 
@@ -228,6 +241,12 @@ export function useSlide(
       if ('shown' in end) {
         put(session, end.shown);
         return true;
+      }
+      // Its answer gave up after the stream showed it, or a later change: the truth is on screen.
+      const heard = newer(now.current.shown, { slide: null, eventId: attempt.eventId });
+      if (end.said === 'failed' && heard === now.current.shown) {
+        unanswered.current = null;
+        return false;
       }
       setSaid(end.said);
       // Gone: the session read again, for what it shows now.

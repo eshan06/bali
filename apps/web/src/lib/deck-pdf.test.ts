@@ -614,6 +614,22 @@ describe('watchStall: a download the screen stops once nothing arrives for 20 s 
     expect(onStall).not.toHaveBeenCalled();
   });
 
+  it('ends the watch with the body: cancelled at a deck’s limit, or failed as its GET stops', async () => {
+    vi.useFakeTimers();
+    const onStall = vi.fn();
+    const cancelled = readerOf(await watchStall(onStall, trickling().fetchImpl)(URL_GET));
+    await cancelled.cancel();
+    const stop = new AbortController();
+    const failing = readerOf(
+      await watchStall(onStall, trickling().fetchImpl)(URL_GET, { signal: stop.signal }),
+    );
+    const reading = failing.read();
+    stop.abort();
+    await expect(reading).rejects.toThrow('aborted');
+    await vi.advanceTimersByTimeAsync(STALL_MS * 3);
+    expect(onStall).not.toHaveBeenCalled();
+  });
+
   it('hands on the bucket’s answer as it came: its bytes, status and headers, the GET as asked', async () => {
     const bucket = fakeBucket(
       () => new Response(PDF, { headers: { 'content-length': String(PDF.byteLength) } }),
