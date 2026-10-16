@@ -11,7 +11,7 @@ is in `docs/DECISIONS.md`, and finished history is word for word in
 _Last updated: 2026-10-16 (Central) — L7b's part 2, and with it L7b (#PRNUM; `docs/DECISIONS.md`,
 2026-10-16): Ask a question opens on the teacher's questions, LessonAsk's panel, each asked with one
 click through the same ask as Ask the class, Write a new question and Your questions under them; its
-states drawn on the canvas first (LessonAskStates, version 56); never in Present; and the panel's
+states drawn on the canvas first (LessonAskStates, versions 56–57); never in Present; and the panel's
 write form checks and says what Bali refuses through Your questions' one copy (#390's review).
 Checked on dev with the demo teacher's four questions. Before it, W4's follow-up (#409). Next: M6, the
 presenter; L7c's Questions card goes on PV14's page._

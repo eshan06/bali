@@ -12,7 +12,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   click through Ask the class's own ask; its states drawn first; the panel's refusal checks are Your
   questions' one copy. L7b is done.** Built to
   [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4): LessonAsk, and
-  LessonAskStates, drawn first as intermediate states (version 56): the list loading, didn't load and
+  LessonAskStates, drawn first as intermediate states (versions 56, 57): the list loading, didn't load and
   none saved; an Ask on its way, with no answer, after the session ended, too many tries and refused;
   a question opened elsewhere meanwhile (#PRNUM). **The panel** (`PickPanel`, `components/ask-panel.tsx`):
   Ask a question, and a closed question's Ask another question, open it on Written ahead, the
@@ -27,8 +27,14 @@ a real decision? Add a dated entry at the top: what was decided and why.
   Ask held meanwhile, the same words resent under the same id while their answer never came (L6), the
   panel closing once Bali has asked it and focus going to the question on the card; the ask's `from`
   names the question asked, so a failure is said under it, with Try again where it can help, and never
-  over the words written, nor theirs under a question. A question's words are sent as saved: they
-  passed the same checks when they were saved (one schema, L3b2). **Never in Present** (the owner,
+  over the words written, nor theirs under a question. Write a new question holds with the Asks
+  (santa's review, both reviewers): left for the form while a question's ask was on its way, that
+  ask's failure had nowhere to be said, the form saying only an ask of what is written and its Cancel
+  forgetting a failure; LessonAskStates' on-its-way panel draws it held (version 57). A question's
+  words are sent as saved: they passed the same checks when they were saved (one schema, L3b2).
+  *Known limit:* a question's ask that fails while the panel is closed, the question then removed in
+  another tab, is said nowhere, its row gone when the panel opens again; the card shows no question,
+  which is true, and every other question asks as ever. **Never in Present** (the owner,
   2026-10-15): it names the correct answers, so both views draw only while `panel` holds, which
   Present never does, pinned by `present.test.ts`. **One copy of the refusal checks** (#390's review):
   the panel's write form checked and worded what Bali refuses in a copy of its own; it now checks with

@@ -52,9 +52,12 @@ export function askSaid(failure: Failure): { words: string; retry: boolean } {
 /** The panel's Close and an answer's Remove: v2.css's `.icon-btn`. */
 const ICON_BUTTON =
   'grid size-9 shrink-0 cursor-pointer place-items-center rounded-item text-text-tertiary hover:bg-surface-sunken hover:text-text-primary';
-/** v2.css's `.link-btn` at the body's 15/22: Add an answer, Write a new question. */
+/**
+ * v2.css's `.link-btn` at the body's 15/22: Add an answer, Write a new question; held as a button
+ * is (`aria-disabled`), dimmed to 55 %.
+ */
 const LINK_BUTTON =
-  'inline-flex h-9 cursor-pointer items-center gap-2 rounded-xs text-body font-semibold text-text-brand';
+  'inline-flex h-9 cursor-pointer items-center gap-2 rounded-xs text-body font-semibold text-text-brand aria-disabled:cursor-default aria-disabled:opacity-55';
 const CAPTION = 'text-caption text-text-tertiary';
 /** A line said with its retry beside it, wrapping under it where there's no room. */
 const SAID = 'flex flex-wrap items-center gap-x-4 gap-y-3';
@@ -422,7 +425,16 @@ export function PickView({
           )}
         </section>
         <div className="flex flex-wrap items-center justify-between gap-2.5">
-          <button type="button" onClick={onWrite} className={LINK_BUTTON}>
+          {/* Held with the Asks: an ask that fails is said under its question, which the form
+              can't show (LessonAskStates). */}
+          <button
+            type="button"
+            aria-disabled={busy}
+            onClick={() => {
+              if (!busy) onWrite();
+            }}
+            className={LINK_BUTTON}
+          >
             <Plus size={16} aria-hidden="true" />
             Write a new question
           </button>

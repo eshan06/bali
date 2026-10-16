@@ -184,7 +184,7 @@ describe('the panel, picking one of your questions (LessonAsk)', () => {
       /How sure are you about factoring now\? 3 answers Ask Write a new question Your questions$/,
     );
     expect(html).toMatch(
-      /<button type="button" class="inline-flex h-9 cursor-pointer items-center gap-2 rounded-xs text-body font-semibold text-text-brand"><svg[^>]*lucide-plus[^>]*>[^]*?<\/svg>Write a new question<\/button><a class="rounded-xs text-caption font-semibold text-text-brand underline-offset-2 hover:underline" href="\/questions">Your questions<\/a>/,
+      /<button type="button" aria-disabled="false" class="inline-flex h-9 cursor-pointer items-center gap-2 rounded-xs text-body font-semibold text-text-brand aria-disabled:cursor-default aria-disabled:opacity-55"><svg[^>]*lucide-plus[^>]*>[^]*?<\/svg>Write a new question<\/button><a class="rounded-xs text-caption font-semibold text-text-brand underline-offset-2 hover:underline" href="\/questions">Your questions<\/a>/,
     );
     const handlers = on();
     press(PickView(pickProps(BOARD, IDLE, false, handlers)), 'Write a new question');
@@ -246,6 +246,27 @@ describe('asking one (LessonAskStates)', () => {
     expect(handlers.onPick).not.toHaveBeenCalled();
     // Held, not disabled: focus stays where it is.
     expect(html).not.toMatch(/\sdisabled=""/);
+  });
+
+  it('holds Write a new question too, so an ask that fails is said under its question (santa’s review)', () => {
+    // Left for the form mid-ask, a failure of the question asked had nowhere to be said: the form
+    // says only an ask of what is written, and its Cancel forgets a failure (LessonAskStates).
+    const handlers = on();
+    const busy = pickProps(
+      BOARD,
+      { busy: true, failure: null, from: BOARD[0].id },
+      false,
+      handlers,
+    );
+    expect(pick(busy)).toMatch(
+      /<button type="button" aria-disabled="true" class="[^"]*\baria-disabled:opacity-55\b[^"]*"><svg[^>]*lucide-plus[^>]*>[^]*?<\/svg>Write a new question<\/button>/,
+    );
+    press(PickView(busy), 'Write a new question');
+    expect(handlers.onWrite).not.toHaveBeenCalled();
+    // Answered, it lets go.
+    expect(pick(pickProps(BOARD))).toMatch(
+      /<button type="button" aria-disabled="false" class="[^"]*">(?:(?!<\/button>)[^])*Write a new question<\/button>/,
+    );
   });
 
   it('says one with no answer under its question, with Try again, which asks it again', () => {
@@ -445,7 +466,11 @@ describe('what Bali refuses before it asks (LessonStates)', () => {
     // hyphen or a zero-width space from a web page, was sent, refused 400, and said as the
     // connection's fault, Try again failing for ever.
     expect(
-      said({ prompt: '1.\tWhich value of x?', options: ['x­= 1', 'x =​2'], correctOption: null }),
+      said({
+        prompt: '1.\tWhich value of x?',
+        options: ['x\u00ad= 1', 'x =\u200b2'],
+        correctOption: null,
+      }),
     ).toEqual({ prompt: UNSHOWABLE, options: [UNSHOWABLE, UNSHOWABLE] });
     // A question's line breaks are its own; words no one could see are no words.
     expect(
@@ -454,7 +479,7 @@ describe('what Bali refuses before it asks (LessonStates)', () => {
       prompt: null,
       options: [null, null],
     });
-    expect(said({ prompt: '​', options: ['⠀', 'B', 'C'], correctOption: null })).toEqual({
+    expect(said({ prompt: '\u200b', options: ['\u2800', 'B', 'C'], correctOption: null })).toEqual({
       prompt: 'Write the question first.',
       options: ['Fill in this answer or remove it.', null, null],
     });
