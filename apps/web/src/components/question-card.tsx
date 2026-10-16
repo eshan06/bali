@@ -65,8 +65,13 @@ type Held = { session: string | null; question: TeacherQuestion | null };
 export interface Opening {
   busy: boolean;
   failure: Failure | null;
+  /**
+   * What it asked: one of the teacher's questions, by its id (L7b, part 2), or null, the words
+   * written in the panel.
+   */
+  from: string | null;
 }
-const IDLE: Opening = { busy: false, failure: null };
+const IDLE: Opening = { busy: false, failure: null, from: null };
 
 /**
  * The live question of `sessionId` (null: none running). Its words come from the session's read,
@@ -197,12 +202,12 @@ export function useLiveQuestion(sessionId: string | null) {
   );
 
   const ask = useCallback(
-    async (draft: QuestionDraft): Promise<OpenAnswer | null> => {
+    async (draft: QuestionDraft, from: string | null = null): Promise<OpenAnswer | null> => {
       const session = now.current.session;
       if (session === null || askingNow.current) return null;
       askingNow.current = true;
       const mine = (asks.current += 1);
-      setOpening({ busy: true, failure: null });
+      setOpening({ busy: true, failure: null, from });
       const attempt = openAttemptFor(unansweredOpen.current, session, draft);
       const answer = await openQuestion(api, attempt);
       // A session gone meanwhile is the next one's no more: its own ask and attempt stand.
@@ -210,7 +215,11 @@ export function useLiveQuestion(sessionId: string | null) {
       unansweredOpen.current = keepUnanswered(attempt, answer);
       askingNow.current = false;
       const cancelled = asks.current !== mine;
-      setOpening({ busy: false, failure: answer.kind === 'opened' || cancelled ? null : answer });
+      setOpening({
+        busy: false,
+        failure: answer.kind === 'opened' || cancelled ? null : answer,
+        from,
+      });
       // Its replay too, closed since perhaps; never over a question asked after it.
       if (answer.kind === 'opened' && answer.question.id >= newest.current) {
         put(session, answer.question);
@@ -222,7 +231,7 @@ export function useLiveQuestion(sessionId: string | null) {
   );
   const forgetAsk = useCallback(() => {
     asks.current += 1;
-    setOpening((cur) => ({ busy: cur.busy, failure: null }));
+    setOpening((cur) => ({ ...cur, failure: null }));
   }, []);
 
   const close = useCallback(

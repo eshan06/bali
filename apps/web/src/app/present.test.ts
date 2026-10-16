@@ -41,7 +41,9 @@ describe('the class page in Present while a session runs (ClassPresent)', () => 
     );
     // And the side panel's asking only out of Present, as the student's panel (L7-1b).
     expect(page).toMatch(/const panel = asking && !present;/);
-    expect(live).toMatch(/\{panel \? \(\s*<AskPanel/);
+    expect(live).toMatch(
+      /\{panel && !writing \? \(\s*<PickPanel[^]*?\{panel && writing \? \(\s*<AskPanel/,
+    );
     const [grid] = tags('LiveGrid');
     expect(grid).toMatch(/\bpresent=\{present\}/);
     expect(grid).toMatch(/\blivePage\s/);
@@ -84,6 +86,29 @@ describe('the class page in Present while a session runs (ClassPresent)', () => 
     // Ask another question stays on the class page: its panel lists the saved questions with their
     // answers, which the room must never see.
     expect(page).toMatch(/const panel = asking && !present;/);
+  });
+
+  it('never shows the panel of your questions, which names their correct answers (the owner, 2026-10-15)', () => {
+    // L7b, part 2: the panel lists the teacher's questions with each one's correct answer, so
+    // it is drawn only while `panel` holds, which Present never does, both its views alike; and
+    // nothing Present draws in its place reads the teacher's questions.
+    expect(page).toMatch(/const panel = asking && !present;/);
+    for (const [name, when] of [
+      ['PickPanel', '{panel && !writing ? ('],
+      ['AskPanel', '{panel && writing ? ('],
+    ]) {
+      const at = [...page.matchAll(new RegExp(`<${name}\\b`, 'g'))].map((m) => m.index);
+      expect(at, name).toHaveLength(1);
+      // Drawn right inside its own `panel` branch, and nowhere else.
+      const before = page.slice(0, at[0]);
+      expect(before.slice(before.lastIndexOf('{panel')).trimEnd(), name).toBe(when);
+    }
+    expect(ended).not.toMatch(/AskPanel|PickPanel|saved-questions/);
+    for (const part of ['present-question', 'live-header', 'live-grid']) {
+      expect(read(`../components/${part}.tsx`), part).not.toMatch(
+        /ask-panel|saved-questions|PickPanel|PickView/,
+      );
+    }
   });
 
   it('draws nothing ClassPresent leaves off: no nav, no roster, no New code, no heading', () => {

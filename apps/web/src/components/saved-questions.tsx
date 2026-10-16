@@ -125,7 +125,13 @@ const CAPTION = 'text-caption text-text-tertiary';
 /** A tab or a hidden character pasted in: the server refuses what no one would see. */
 export const UNSHOWABLE = "This has a tab or a hidden character Bali can't show. Type it again.";
 
-/** What Bali refuses in a field (LessonStates), in its words; "or remove it" only if it can be. */
+/** The drafts didn't load (LessonStates), here and in the class page's panel, with Try again. */
+export const CANT_LOAD_QUESTIONS = "Bali couldn't load your questions.";
+
+/**
+ * What Bali refuses in a field (LessonStates), in its words; "or remove it" only if it can be. The
+ * portal's one copy: the class page's panel says a question it can't ask through it too (#390).
+ */
 export function refusalSaid(refusal: Refusal, field: 'prompt' | 'answer', removable = true) {
   if (refusal === 'unshowable') return UNSHOWABLE;
   if (refusal !== 'empty') {
@@ -211,7 +217,7 @@ export function QuestionsView({
       ) : drafts === 'failed' ? (
         <div className={SAID}>
           <p role="alert" className="text-body">
-            Bali couldn&apos;t load your questions.
+            {CANT_LOAD_QUESTIONS}
           </p>
           <Button variant="secondary" size="sm" onClick={on.read}>
             Try again
