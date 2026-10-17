@@ -76,7 +76,7 @@ const view = (over: Partial<Parameters<typeof ClassesView>[0]> = {}) =>
       classes: CLASSES,
       failed: null,
       now: NOW,
-      onRead: () => undefined,
+      onRetry: () => Promise.resolve(),
       onNew: () => undefined,
       ...over,
     }),
@@ -209,7 +209,7 @@ describe('Classes (Classes, ClassesEmpty)', () => {
           classes: CLASSES,
           failed: null,
           now: NOW,
-          onRead: () => undefined,
+          onRetry: () => Promise.resolve(),
           onNew: () => undefined,
         },
         createElement('dialog', { id: 'new' }),
@@ -221,11 +221,28 @@ describe('Classes (Classes, ClassesEmpty)', () => {
   it('says a list that didn’t load over the classes read before, with Try again (HomeStates)', () => {
     const html = plain(view({ failed: CANT_REACH }));
     expect(html).toContain(
-      `<div class="flex flex-wrap items-center gap-x-4 gap-y-3"><p role="alert" class="text-body">Couldn't load your classes. ${CANT_REACH}</p><button type="button" class="`,
+      `<div class="flex flex-wrap items-center gap-x-4 gap-y-3"><p role="alert" class="text-body">Couldn't load your classes. ${CANT_REACH}</p><button type="button" aria-disabled="false" aria-busy="false" class="`,
     );
-    expect(html).toMatch(/<button type="button" class="[^"]*\bh-8\.5\b[^"]*">Try again<\/button>/);
+    expect(html).toMatch(
+      /<button type="button" aria-disabled="false" aria-busy="false" class="[^"]*\bh-8\.5\b[^"]*">Try again<\/button>/,
+    );
     expect(cards(html)).toHaveLength(3);
     expect(view()).not.toContain('role="alert"');
+  });
+
+  it('holds its Try again until the account’s read again answers, focus then on Classes (ClassesRetryStates)', () => {
+    // The shell's `refresh` keeps the line until the answer, so Try again stays, held as Loading…
+    // (`TryAgain`); `load` cleared it first, which dropped focus to the page. Read, focus on the
+    // page's heading, Classes (`then` none: the page's own).
+    expect(read('./classes.tsx')).toMatch(
+      /<TryAgain onRetry=\{onRetry\} then=\{\[\]\}>\s*<p role="alert" className="text-body">\s*Couldn&apos;t load your classes\. \{failed\}/,
+    );
+    expect(view()).toMatch(
+      /^<main class="[^"]*"><div class="[^"]*"><h1 class="text-page-title">Classes<\/h1>/,
+    );
+    expect(read('../app/classes/page.tsx')).toMatch(
+      /const \{ home, error, load, refresh \} = useMe\(\);[^]*?onRetry=\{refresh\}/,
+    );
   });
 
   it('sets the block’s card beside the classes, v2’s columns: 520 px and 320 px, 20 px apart', () => {
@@ -267,8 +284,18 @@ describe('the block’s card in v2’s look (Classes, HomeStates; PV16a)', () =>
     );
     expect(source).toMatch(/aria-busy=\{busy\}\s*className="mt-3\.5"/);
     expect(source).toMatch(
-      /<div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-3">\s*<p role="alert" className="text-body">\s*Couldn&apos;t load your blocks\.\{loadError \? ` \$\{loadError\}` : null\}\s*<\/p>\s*<Button variant="secondary" size="sm" onClick=\{load\}>/,
+      /<div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-3">\s*<TryAgain onRetry=\{load\} then=\{\[`\$\{id\}-title`\]\}>\s*<p role="alert" className="text-body">\s*Couldn&apos;t load your blocks\.\{loadError \? ` \$\{loadError\}` : null\}\s*<\/p>\s*<\/TryAgain>/,
     );
+  });
+
+  it('holds its list’s Try again until the read answers, focus then on its label (HomeRetryStates)', () => {
+    // The read keeps the line until its answer (never cleared as it starts, which dropped focus),
+    // its promise holding Try again as Loading…; read, focus on Your block, the card's label.
+    expect(source).toMatch(
+      /const load = useCallback\(async \(\) => \{\s*try \{\s*setBlocks\(\(await api\.get<BlockListResponse>\('\/v1\/blocks'\)\)\.blocks\);\s*\} catch \(e\) \{\s*setLoadError\(loadProblem\(e\) \?\? ''\);\s*\}\s*\}, \[api\]\);/,
+    );
+    expect(source).not.toContain('setLoadError(null)');
+    expect(html).toMatch(/<h2 id="([^"]+)-title" [^>]*>[^]*?Your block<\/h2>/);
   });
 });
 

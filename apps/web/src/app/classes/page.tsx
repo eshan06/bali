@@ -22,7 +22,7 @@ import { AFTER_BELL_MS, nextBell } from '@/lib/classes';
 export default function ClassesPage() {
   const router = useRouter();
   const asked = useSearchParams().has('new');
-  const { home, error, load } = useMe();
+  const { home, error, load, refresh } = useMe();
   const newClass = useRef<NewClassHandle>(null);
   const newButton = useRef<HTMLButtonElement>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -76,7 +76,7 @@ export default function ClassesPage() {
       classes={classes}
       failed={error}
       now={now}
-      onRead={() => load()}
+      onRetry={refresh}
       onNew={() => newClass.current?.open()}
       newButton={newButton}
     >

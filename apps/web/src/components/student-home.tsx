@@ -18,9 +18,10 @@ import {
 } from '@/lib/student-web';
 import { useApi } from '@/lib/use-api';
 
-import { Button, buttonClass } from './button';
+import { buttonClass } from './button';
 import { LIVE_CARD, LiveCardHead, Ring, useClock } from './live-header';
 import { TextLink } from './text-link';
+import { TryAgain } from './try-again';
 import { CantReach, YourPhone } from './your-phone';
 
 const UNREAD: LessonState = { presentation: null, problem: null, asOf: null };
@@ -104,7 +105,7 @@ function ClassRows({ classes }: { classes: StudentClass[] }) {
  * A student's home (W3; StudentHome, StudentHomeEmpty): each class in session on a live card, then
  * the rest, under "Other classes" only beside a live card; with none yet, the empty card and a
  * teacher's way to the invite page (decision 13). `failed`: the account's last read failed, said as
- * StudentStates draws it, Try again reading it again (`onRead`). At its bell by this computer's
+ * StudentStates draws it, Try again reading it again (`onRefresh`). At its bell by this computer's
  * clock a class leaves its card and the page reads the account again: added minutes bring it back.
  * It reads it again too as its tab comes back into view, so a class that started while it was away
  * shows with its way into the lesson (W4), and as a live card's lesson says it is over; and while
@@ -164,12 +165,11 @@ export function StudentHome({
 
       {failed ? (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-          <p role="alert" className="text-body">
-            Bali couldn&apos;t load your classes.
-          </p>
-          <Button variant="secondary" size="sm" onClick={() => onRead()}>
-            Try again
-          </Button>
+          <TryAgain onRetry={onRefresh} then={[]}>
+            <p role="alert" className="text-body">
+              Bali couldn&apos;t load your classes.
+            </p>
+          </TryAgain>
         </div>
       ) : null}
 

@@ -7,6 +7,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Button } from '@/components/button';
 import { CARD_ALONE } from '@/components/card';
 import { Field } from '@/components/field';
+import { TryAgain } from '@/components/try-again';
 import { blockIdOf, loadProblem, type RegisterAnswer, registerBlock } from '@/lib/blocks';
 import { NOT_A_BLOCK_ID } from '@/lib/errors';
 import { useApi } from '@/lib/use-api';
@@ -23,7 +24,8 @@ const registeredOn = (iso: string) =>
  * face, and a field to register one by the ID written on it. The ID is checked as the phone reads a
  * tag before a try is spent on it; each refusal is said right under the field's help, with the way
  * on; an answer that never came is sent again as it was by Try again, which is safe: one's own tag
- * registers once.
+ * registers once. The list that didn't load is read again by its own Try again, its line said until
+ * the answer, focus then on the card's label (HomeRetryStates, drawn first).
  */
 export function Blocks() {
   const api = useApi();
@@ -39,15 +41,17 @@ export function Blocks() {
   const [said, setSaid] = useState<Said | null>(null);
   const refused = said?.kind === 'refused';
 
-  const load = useCallback(() => {
-    setLoadError(null);
-    api.get<BlockListResponse>('/v1/blocks').then(
-      (res) => setBlocks(res.blocks),
-      (e: unknown) => setLoadError(loadProblem(e) ?? ''),
-    );
+  const load = useCallback(async () => {
+    try {
+      setBlocks((await api.get<BlockListResponse>('/v1/blocks')).blocks);
+    } catch (e) {
+      setLoadError(loadProblem(e) ?? '');
+    }
   }, [api]);
 
-  useEffect(load, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -97,12 +101,11 @@ export function Blocks() {
       {blocks === null ? (
         loadError !== null ? (
           <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-3">
-            <p role="alert" className="text-body">
-              Couldn&apos;t load your blocks.{loadError ? ` ${loadError}` : null}
-            </p>
-            <Button variant="secondary" size="sm" onClick={load}>
-              Try again
-            </Button>
+            <TryAgain onRetry={load} then={[`${id}-title`]}>
+              <p role="alert" className="text-body">
+                Couldn&apos;t load your blocks.{loadError ? ` ${loadError}` : null}
+              </p>
+            </TryAgain>
           </div>
         ) : (
           <p role="status" className="mt-4 text-body text-text-secondary">

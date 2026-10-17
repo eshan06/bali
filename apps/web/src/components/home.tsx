@@ -28,7 +28,7 @@ import { bellTime, laterBell } from '@/lib/session-controls';
 import { useApi } from '@/lib/use-api';
 
 import { Blocks } from './blocks';
-import { Button, buttonClass } from './button';
+import { buttonClass } from './button';
 import { CARD_ALONE } from './card';
 import { classLine, FirstClass, LiveChip } from './classes';
 import { DOT, type GridNow, LiveGrid, stateCounts } from './live-grid';
@@ -36,6 +36,7 @@ import { joinedLine, LIVE_CARD, LiveCardHead, LiveCounts, useClock } from './liv
 import { Figures } from './recap-card';
 import { QUIET_LINK } from './text-link';
 import { Timeline, type TimelineMoment } from './timeline';
+import { TryAgain } from './try-again';
 import { reasonWords } from './unlock-popups';
 import { NOTICE } from './your-phone';
 
@@ -52,8 +53,9 @@ export const presentHref = (classId: string) => `/classes/${classId}?present`;
  * student and when (`latestUnlock`), none while no chip carries one; the live feed lost, the class
  * page's own line under the counts (HomeLiveStates, drawn first). Until the session is read, its
  * name and "Loading this session…"; its read failed, "Couldn't load this session." with Try again
- * (HomeMoreStates). Its links are described by the class's name, so a list of links tells two
- * cards apart.
+ * (HomeMoreStates), held until the grid's read again answers, focus then on its name
+ * (HomeRetryStates, drawn first). Its links are described by the class's name, so a list of links
+ * tells two cards apart.
  */
 export function LiveCardView({
   classId,
@@ -81,13 +83,12 @@ export function LiveCardView({
           </p>
         ) : (
           <div>
-            <div role="alert" className="text-body">
-              <p className="font-semibold">Couldn&apos;t load this session.</p>
-              <p className="text-text-secondary">{grid.error}</p>
-            </div>
-            <Button variant="secondary" size="sm" onClick={grid.retry} className="mt-3.5">
-              Try again
-            </Button>
+            <TryAgain onRetry={grid.retry} held={grid.retrying} then={[id]} className="mt-3.5">
+              <div role="alert" className="text-body">
+                <p className="font-semibold">Couldn&apos;t load this session.</p>
+                <p className="text-text-secondary">{grid.error}</p>
+              </div>
+            </TryAgain>
           </div>
         )}
       </section>
@@ -305,18 +306,22 @@ export function activityMoment(e: ActivityEvent, clock?: Intl.DateTimeFormat): T
  * Recent activity (PV17c; Main): today's unlocks with their reasons, protection offs and starts
  * across the teacher's classes, newest first, four at most, then Open the class while one class is
  * live (with more, each live card has its own: HomeRailStates, drawn first). Loading and a failure
- * as HomeMoreStates draws them, the failure in the list's place until a read works. None at all for
- * a list that came back empty: a live class's own start is always in it (PV1), but for one that
- * started before midnight.
+ * as HomeMoreStates draws them, the failure in the list's place until a read works, its Try again
+ * held until its read answers, focus then on the card's label (HomeRetryStates, drawn first). None
+ * at all for a list that came back empty: a live class's own start is always in it (PV1), but for
+ * one that started before midnight.
  */
 export function RecentActivityView({
   read,
   only,
+  retrying = false,
   onRetry,
 }: {
   read: ActivityRead;
   /** The class live, when there is one alone. */
   only: string | null;
+  /** Try again's read on its way. */
+  retrying?: boolean;
   onRetry: () => void;
 }) {
   const id = useId();
@@ -333,13 +338,12 @@ export function RecentActivityView({
         </p>
       ) : read.kind === 'error' ? (
         <div className="mt-3.5">
-          <div role="alert" className="text-body">
-            <p className="font-semibold">Couldn&apos;t load recent activity.</p>
-            <p className="text-text-secondary">{read.message}</p>
-          </div>
-          <Button variant="secondary" size="sm" onClick={onRetry} className="mt-3.5">
-            Try again
-          </Button>
+          <TryAgain onRetry={onRetry} held={retrying} then={[id]} className="mt-3.5">
+            <div role="alert" className="text-body">
+              <p className="font-semibold">Couldn&apos;t load recent activity.</p>
+              <p className="text-text-secondary">{read.message}</p>
+            </div>
+          </TryAgain>
         </div>
       ) : (
         <>
@@ -363,16 +367,21 @@ function RecentActivity({ only }: { only: string | null }) {
   const api = useApi();
   const [read, setRead] = useState<ActivityRead>({ kind: 'loading' });
   const [attempt, setAttempt] = useState(0);
+  const [retrying, setRetrying] = useState(false);
   useEffect(() => {
-    const poll = pollActivity(api, setRead);
+    const poll = pollActivity(api, (answer) => {
+      setRead(answer);
+      setRetrying(false);
+    });
     return () => poll.stop();
   }, [api, attempt]);
   return (
     <RecentActivityView
       read={read}
       only={only}
+      retrying={retrying}
       onRetry={() => {
-        setRead({ kind: 'loading' });
+        setRetrying(true);
         setAttempt((n) => n + 1);
       }}
     />
@@ -385,7 +394,8 @@ function RecentActivity({ only }: { only: string | null }) {
  * the unlocks; nobody joined, the recap's line in place of the first two (HomeRailStates, drawn
  * first). Within a minute of its bell its report says `ended: false`, the sweep not there yet, its
  * figures already counted to the bell: never read here, so the card never calls it running. Loading
- * and a failure as HomeMoreStates draws them.
+ * and a failure as HomeMoreStates draws them, its Try again held until its read answers, focus then
+ * on the card's label (HomeRetryStates, drawn first).
  */
 export function LastSessionView({
   last,
@@ -394,7 +404,8 @@ export function LastSessionView({
 }: {
   last: LastSession;
   read: ReportRead;
-  onRetry: () => void;
+  /** Read it again, the failure said until it answers. */
+  onRetry: () => Promise<void>;
 }) {
   const id = useId();
   const name = useId();
@@ -417,13 +428,12 @@ export function LastSessionView({
         </p>
       ) : read.kind === 'error' ? (
         <div className="mt-3.5">
-          <div role="alert" className="text-body">
-            <p className="font-semibold">Couldn&apos;t load the last session.</p>
-            <p className="text-text-secondary">{read.message}</p>
-          </div>
-          <Button variant="secondary" size="sm" onClick={onRetry} className="mt-3.5">
-            Try again
-          </Button>
+          <TryAgain onRetry={onRetry} then={[id]} className="mt-3.5">
+            <div role="alert" className="text-body">
+              <p className="font-semibold">Couldn&apos;t load the last session.</p>
+              <p className="text-text-secondary">{read.message}</p>
+            </div>
+          </TryAgain>
         </div>
       ) : (
         <LastFigures report={read.report} />
@@ -469,7 +479,6 @@ function LastFigures({ report }: { report: Extract<ReportRead, { kind: 'ready' }
 function LastSessionCard({ last }: { last: LastSession }) {
   const api = useApi();
   const [read, setRead] = useState<ReportRead>({ kind: 'loading' });
-  const [attempt, setAttempt] = useState(0);
   const { classId } = last;
   const sessionId = last.session.id;
   useEffect(() => {
@@ -480,15 +489,12 @@ function LastSessionCard({ last }: { last: LastSession }) {
     return () => {
       live = false;
     };
-  }, [api, classId, sessionId, attempt]);
+  }, [api, classId, sessionId]);
   return (
     <LastSessionView
       last={last}
       read={read}
-      onRetry={() => {
-        setRead({ kind: 'loading' });
-        setAttempt((n) => n + 1);
-      }}
+      onRetry={async () => setRead(await readReport(api, classId, sessionId))}
     />
   );
 }
@@ -519,7 +525,8 @@ function useWide(): boolean {
  * card. A session the server ends while Home is open loses its card at once, and the classes are
  * read again (HomeLiveStates, drawn first), Last session showing once the read says none runs, so
  * it never shows an older session meanwhile (HomeRailStates, drawn first). `ref` is the greeting's,
- * for focus after a redeem.
+ * for focus after a redeem. The list's Try again reads with `onRetry` (the shell's `refresh`), held
+ * until it answers, focus then on Your classes or, with none, the greeting (HomeRetryStates).
  */
 export function TeacherHome({
   ref,
@@ -527,6 +534,7 @@ export function TeacherHome({
   failed,
   now,
   onRead,
+  onRetry,
 }: {
   ref?: Ref<HTMLHeadingElement>;
   me: MeResponse;
@@ -534,6 +542,8 @@ export function TeacherHome({
   failed: string | null;
   now: number;
   onRead: () => void;
+  /** The list's Try again: the account read again, its failure kept until the answer. */
+  onRetry: () => Promise<void>;
 }) {
   const yours = useId();
   const name = me.user.displayName?.trim() || null;
@@ -565,12 +575,11 @@ export function TeacherHome({
       </div>
       {failed !== null ? (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-          <p role="alert" className="text-body">
-            Couldn&apos;t load your classes. {failed}
-          </p>
-          <Button variant="secondary" size="sm" onClick={onRead}>
-            Try again
-          </Button>
+          <TryAgain onRetry={onRetry} then={[yours]}>
+            <p role="alert" className="text-body">
+              Couldn&apos;t load your classes. {failed}
+            </p>
+          </TryAgain>
         </div>
       ) : null}
       <div className="flex flex-wrap items-start gap-5">

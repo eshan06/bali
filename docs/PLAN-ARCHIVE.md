@@ -10,6 +10,19 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-16 (Central) — PV17c-2, Home's Last session (#425; `docs/DECISIONS.md`,
+2026-10-16), the portal redesign's last step, so PV0–PV17 are done: while no class is live, the
+rail holds the last session over across the classes over the block's card, on a phone too, its class
+and times from the account, its figures from its report (who joined, the average per student, the
+unlocks, or "Nobody joined this session."), never read as running before the sweep marks it; none
+until a class's first session ends, and none from a bell until the account's read says no class
+runs, never the one before it (drawn first, canvas version 77: HomeRailStates). Checked on dev as
+the demo teacher in a browser of its own: a 2-minute session's card 3.7 s after its bell while its
+report still said `ended: false`, the same card after the sweep; nobody joined, with and without an
+unlock, after an End with Home open; a phone's width; every card the height of its board. Before
+it, PV17c-1 (#424). Next on the Windows PC: the four steps for sessions before the pilot's first
+class (Open owner items; after PV17c, the owner, 2026-10-14); on the Mac, the phone's L8 and M8._
+
 _Last updated: 2026-10-16 (Central) — PV17c-1, Home's Recent activity (#424; `docs/DECISIONS.md`,
 2026-10-16): while a class is live, Main's Recent activity over the block's card, today's unlocks
 with their reasons, protection offs and starts, newest first, four at most, then Open the class

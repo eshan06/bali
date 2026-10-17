@@ -226,7 +226,7 @@ describe('a student’s home in other states', () => {
     for (const account of [me(BIOLOGY, CHEMISTRY), me()]) {
       const html = home(account, true);
       expect(html).toMatch(
-        /<div class="flex flex-wrap items-center gap-x-4 gap-y-3"><p role="alert" class="text-body">Bali couldn(&#x27;|')t load your classes\.<\/p><button type="button" class="[^"]*\bh-8\.5\b[^"]*">Try again<\/button><\/div>/,
+        /<div class="flex flex-wrap items-center gap-x-4 gap-y-3"><p role="alert" class="text-body">Bali couldn(&#x27;|')t load your classes\.<\/p><button type="button" aria-disabled="false" aria-busy="false" class="[^"]*\bh-8\.5\b[^"]*">Try again<\/button><\/div>/,
       );
       expect(words(html).slice(0, 4)).toEqual([
         'Your classes',
@@ -249,8 +249,16 @@ describe('the home’s wiring (read from its source)', () => {
     expect(source).toMatch(
       /useEffect\(\(\) => \{\s*if \(bell === null\) return;\s*const timer = window\.setTimeout\(\(\) => \{\s*setNow\(Math\.max\(Date\.now\(\), bell\)\);\s*onRead\(\);\s*\}, bell - Date\.now\(\)\);\s*return \(\) => window\.clearTimeout\(timer\);\s*\}, \[bell, onRead\]\);/,
     );
-    // Try again reads it too, never with its click as `load`'s fresh flag (which would forget the page).
-    expect(source).toContain('onClick={() => onRead()}');
+  });
+
+  it('holds Try again until the account’s read again answers, focus then on the page’s heading (StudentRetryStates)', () => {
+    // `onRefresh`, the shell's `refresh`, keeps the line until the answer, so Try again stays, held
+    // as Loading… (`TryAgain`); `load` cleared it first, which dropped focus to the page. Read,
+    // focus on Your classes, the page's heading (`then` none: the page's own).
+    expect(source).toMatch(
+      /<TryAgain onRetry=\{onRefresh\} then=\{\[\]\}>\s*<p role="alert" className="text-body">\s*Bali couldn&apos;t load your classes\./,
+    );
+    expect(source).not.toMatch(/onClick=\{\(\) => onRead\(\)\}/);
   });
 
   it('gives each live card its phone from its lesson’s own read, never a one-time /v1/me (decision 13)', () => {

@@ -92,5 +92,14 @@ export default function HomePage() {
   }
   // Never through the 13+ check: the invite code, in place of the classes or a 403.
   if (home.kind === 'invite') return <InviteEntry forStudents onTeacher={onTeacher} />;
-  return <TeacherHome ref={heading} me={home.me} failed={error} now={now} onRead={() => load()} />;
+  return (
+    <TeacherHome
+      ref={heading}
+      me={home.me}
+      failed={error}
+      now={now}
+      onRead={() => load()}
+      onRetry={refresh}
+    />
+  );
 }

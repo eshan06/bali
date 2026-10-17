@@ -8,6 +8,43 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-16** — **Try again keeps keyboard focus (#426), part 1: one Try again for every read
+  that failed, `TryAgain`, on Home, Classes, the account's card, the live grid's line and a
+  student's home first.** The owner's follow-up (2026-10-16), from this week's reviews: Try again
+  went as its read started (its line gave way to Loading…, or `load` cleared it first), so keyboard
+  focus fell to the page's body; PV17a had held the account's card's alone. **The one Try again**
+  (`components/try-again.tsx`), that card's way made shared: one button after its failure's line,
+  held as Loading… while the read runs (`aria-disabled` and `aria-busy`, never `disabled`, which
+  drops focus), whether the promise its `onRetry` gives runs or the page says its own read is on its
+  way (`held`), a press while held sending nothing; each answer that leaves the failure standing
+  says its line again, a new element, however it is worded; one that takes the failure away lands
+  focus on the region's heading (`then`), else the page's own `h1`, else its first control, never
+  the body, nor over focus the page moved itself meanwhile (`handOff`, from a layout effect's
+  cleanup while the button is still in the page, a frame later). A heading takes focus as one moved
+  to does: given tabindex -1 there (`land`). **Each read keeps its failure said while Try again
+  reads it:** Home's, Classes' and a student's home's list read with the shell's `refresh`, which
+  keeps it, as the account's card has since PV17a, within a poll's 10 s as there, never `load`,
+  which cleared it first (and set no limit); Recent
+  activity's poll, Last session's report, your block's list and the live grid's snapshot keep
+  theirs until an answer, the grid's going too with another session, read afresh. **Focus lands**
+  on Your classes (with none, the greeting), the live card's class name, the Recent activity, Last
+  session and Your block labels, and Classes', a student's home's, the class page's and any page
+  under the account's card's own heading. Drawn first as intermediate states (canvas version 79):
+  HomeRetryStates, ClassesRetryStates, ClassRetryStates, StudentRetryStates. **Tested** in the
+  repo's way, its tests rendering no DOM (no jsdom or happy-dom: the brief's rule for that case):
+  rendered, from the source, and `handOff` and `land` in a page of their own; and a scan that fails
+  on a new Try again drawn by hand, the ones left listed in it. **Seen** in headless Chrome with the
+  keyboard, the real components in a throwaway page with Bali's answers held, given and failing
+  again: all eleven held with focus on them, then on the heading each names, or kept, the line said
+  again. **The rest** come in steps of their own (PLAN.md, In flight): all of it was about twice the
+  ~400 changed lines a step holds. *Weighed:* a DOM library for the tests, a dependency this fix
+  doesn't need; focus on the region's first control, where a heading tells a screen reader where it
+  is and a control can be pressed by mistake (+5 min on the class page). *Left* (santa's review): on
+  a student's home, Try again pressed while its 30 s read is on its way isn't held, and its line is
+  said again before any answer, since `refresh` answers at once then; focus stays on it, and that
+  read's answer clears the line or keeps it. Holding it means `refresh` handing back the read on
+  its way: the shell's read, outside this step.
+
 - **2026-10-16** — **PV17c-2: Home's Last session (#425), the portal redesign's last step; never read
   as running before the sweep, and none from a bell until the account's read.** Built to [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4):
   HomeIdle's Last session, HomeMoreStates' (loading, didn't load), HomeRailStates' Last session items
