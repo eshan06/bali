@@ -23,7 +23,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   cleanup while the button is still in the page, a frame later). A heading takes focus as one moved
   to does: given tabindex -1 there (`land`). **Each read keeps its failure said while Try again
   reads it:** Home's, Classes' and a student's home's list read with the shell's `refresh`, which
-  keeps it, as the account's card has since PV17a, never `load`, which cleared it first; Recent
+  keeps it, as the account's card has since PV17a, within a poll's 10 s as there, never `load`,
+  which cleared it first (and set no limit); Recent
   activity's poll, Last session's report, your block's list and the live grid's snapshot keep
   theirs until an answer, the grid's going too with another session, read afresh. **Focus lands**
   on Your classes (with none, the greeting), the live card's class name, the Recent activity, Last
@@ -38,7 +39,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   again. **The rest** come in steps of their own (PLAN.md, In flight): all of it was about twice the
   ~400 changed lines a step holds. *Weighed:* a DOM library for the tests, a dependency this fix
   doesn't need; focus on the region's first control, where a heading tells a screen reader where it
-  is and a control can be pressed by mistake (+5 min on the class page).
+  is and a control can be pressed by mistake (+5 min on the class page). *Left* (santa's review): on
+  a student's home, Try again pressed while its 30 s read is on its way isn't held, and its line is
+  said again before any answer, since `refresh` answers at once then; focus stays on it, and that
+  read's answer clears the line or keeps it. Holding it means `refresh` handing back the read on
+  its way: the shell's read, outside this step.
 
 - **2026-10-16** — **PV17c-2: Home's Last session (#425), the portal redesign's last step; never read
   as running before the sweep, and none from a bell until the account's read.** Built to [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4):
