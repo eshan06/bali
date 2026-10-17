@@ -18,8 +18,8 @@ import {
 } from 'lucide-react';
 import { Fragment, type ReactNode, useEffect, useId, useReducer, useRef, useState } from 'react';
 
-import { Button } from '@/components/button';
 import { CLOCK_OFF, StudentPanel } from '@/components/student-panel';
+import { TryAgain } from '@/components/try-again';
 import { NO_POPUPS, popupsAfter, unlockNews, UnlockPopups } from '@/components/unlock-popups';
 import { getAccessToken } from '@/lib/auth';
 import { config } from '@/lib/config';
@@ -365,9 +365,13 @@ export interface GridNow {
   students: Students | null;
   /** This tab's clock, read each second. */
   now: Date;
-  /** The snapshot didn't load, in `errText`'s words; `retry` reads it again. */
+  /**
+   * The snapshot didn't load, in `errText`'s words; `retry` reads it again, the failure kept while
+   * `retrying`, until the answer.
+   */
   error: string | null;
   retry: () => void;
+  retrying: boolean;
   /** Why the grid may be out of date, and how old it is (`staleness`); null while it is current. */
   stale: Staleness | null;
 }
@@ -449,6 +453,15 @@ export function LiveGrid({
   const [status, setStatus] = useState<SseStatus>('connecting');
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0); // a boot that failed, tried again (rule 5)
+  // That boot on its way: its failure stays said, Try again held, until it answers (TryAgain).
+  const [retrying, setRetrying] = useState(false);
+  // Another session's grid starts unread, no failure of this one's said over it.
+  const [booting, setBooting] = useState(sessionId);
+  if (booting !== sessionId) {
+    setBooting(sessionId);
+    setError(null);
+    setRetrying(false);
+  }
   // The unlocks that landed while the grid was open, by event id: their chips pulse (§7).
   const [liveUnlocks, setLiveUnlocks] = useState<ReadonlySet<string>>(() => new Set());
   // And each opens a pop-up (PV10), kept while Present is on and shown after it, until it is closed
@@ -479,13 +492,14 @@ export function LiveGrid({
 
   // Boot from the snapshot, then stream.
   useEffect(() => {
-    setError(null);
     let sse: SseClient | null = null;
     let cancelled = false;
     void (async () => {
       try {
         const snap = await api.get<SessionSnapshot>(`/v1/sessions/${sessionId}`);
         if (cancelled) return;
+        setError(null);
+        setRetrying(false);
         setStudents(fromSnapshot(snap));
         onSessionRef.current?.(snap.session);
         if (snap.ended) {
@@ -523,7 +537,9 @@ export function LiveGrid({
           onUnauthorized,
         });
       } catch (e) {
-        if (!cancelled) setError(errText(e));
+        if (cancelled) return;
+        setError(errText(e));
+        setRetrying(false);
       }
     })();
     return () => {
@@ -608,25 +624,23 @@ export function LiveGrid({
           now: now.getTime(),
           heartbeatMs: STREAM_HEARTBEAT_MS,
         });
+  // A boot that failed, read again, its failure said until the answer.
+  const retry = () => {
+    setRetrying(true);
+    setAttempt((n) => n + 1);
+  };
   // Home's live card draws the grid as it stands, every line in its own words (PV17b).
-  if (card) {
-    const retry = () => setAttempt((n) => n + 1);
-    return card({ students, now, error, retry, stale: over ? null : stale });
-  }
+  if (card) return card({ students, now, error, retry, retrying, stale: over ? null : stale });
 
+  // Read, focus on the class's name, the page's heading (ClassRetryStates, drawn first).
   if (error) {
     return (
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-        <p role="alert" className="text-body">
-          {error}
-        </p>
-        <Button
-          variant="secondary"
-          size={livePage ? 'sm' : 'md'}
-          onClick={() => setAttempt((n) => n + 1)}
-        >
-          Try again
-        </Button>
+        <TryAgain onRetry={retry} held={retrying} then={[]} size={livePage ? 'sm' : 'md'}>
+          <p role="alert" className="text-body">
+            {error}
+          </p>
+        </TryAgain>
       </div>
     );
   }

@@ -532,16 +532,13 @@ describe('the shell', () => {
 
   it('holds Try again while it reads, so focus stays on it, and says a failure again (PV5b’s review; PV17a)', () => {
     const source = read('./shell.tsx');
-    // One button throughout: Loading… and held (aria-disabled keeps its focus) until Bali answers.
+    // The portal's one Try again (`TryAgain`, tested on its own): one button throughout, Loading…
+    // and held (aria-disabled keeps its focus) while `refresh` reads, each answer the alert said
+    // again; read, focus on the page's own heading (`then` none), never left on the body.
     expect(source).toMatch(
-      /<Button\s*variant="secondary"\s*aria-disabled=\{held\}\s*aria-busy=\{held\}\s*onClick=\{\(\) => void again\(\)\}\s*className="mt-3\.5"\s*>\s*\{held \? 'Loading…' : 'Try again'\}\s*<\/Button>/,
+      /<TryAgain size="md" onRetry=\{onRetry\} then=\{\[\]\} className="mt-3\.5">\s*<div role="alert">\s*<h1 className="text-body font-semibold">Couldn&apos;t load your account\.<\/h1>/,
     );
-    // A press while it reads sends nothing; each answer remounts the alert, so even the same words
-    // are said again.
-    expect(source).toMatch(
-      /async function again\(\) \{\s*if \(held\) return;\s*setHeld\(true\);\s*await onRetry\(\);\s*setHeld\(false\);\s*setTries\(\(n\) => n \+ 1\);\s*\}/,
-    );
-    expect(source).toMatch(/<div key=\{tries\} role="alert">/);
+    expect(source).toMatch(/<AccountUnread error=\{error\} onRetry=\{refresh\} \/>/);
   });
 
   it('draws nothing around a page read without signing in, the page in the same place', () => {

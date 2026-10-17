@@ -130,7 +130,7 @@ describe('a teacher’s Home, as the page runs it (PV17a)', () => {
       /if \(!redeemed\.current \|\| home\?\.kind !== 'teacher'\) return;\s*redeemed\.current = false;\s*heading\.current\?\.focus\(\);/,
     );
     expect(page).toMatch(
-      /<TeacherHome ref=\{heading\} me=\{home\.me\} failed=\{error\} now=\{now\}/,
+      /<TeacherHome\s+ref=\{heading\}\s+me=\{home\.me\}\s+failed=\{error\}\s+now=\{now\}\s+onRead=\{\(\) => load\(\)\}\s+onRetry=\{refresh\}\s+\/>/,
     );
   });
 

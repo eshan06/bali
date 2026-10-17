@@ -484,13 +484,14 @@ describe('the grid handed to Home’s live card (PV17b)', () => {
   });
 
   it('runs every hook first, so the snapshot, the stream and the 15 s read are the class page’s own', () => {
-    const at = source.indexOf('if (card) {');
+    const at = source.indexOf('if (card) return card(');
     expect(at).toBeGreaterThan(-1);
     expect(at).toBeLessThan(source.indexOf('if (error) {'));
     expect(source.slice(at)).not.toMatch(/\buse[A-Z]\w*\(/);
-    // A boot that failed is read again by the grid's own Try again; once over, no health to say.
+    // A boot that failed is read again by the grid's own Try again, held while it reads; once
+    // over, no health to say.
     expect(source).toMatch(
-      /const retry = \(\) => setAttempt\(\(n\) => n \+ 1\);\s*return card\(\{ students, now, error, retry, stale: over \? null : stale \}\);/,
+      /if \(card\) return card\(\{ students, now, error, retry, retrying, stale: over \? null : stale \}\);/,
     );
   });
 });
@@ -601,7 +602,29 @@ describe('the grid’s lines on the class page while a session runs (PV7)', () =
 
   it('asks a grid that didn’t load to try again with a small button there, as ClassStates does', () => {
     expect(source).toMatch(
-      /size=\{livePage \? 'sm' : 'md'\}\s*onClick=\{\(\) => setAttempt\(\(n\) => n \+ 1\)\}/,
+      /<TryAgain onRetry=\{retry\} held=\{retrying\} then=\{\[\]\} size=\{livePage \? 'sm' : 'md'\}>\s*<p role="alert" className="text-body">\s*\{error\}\s*<\/p>\s*<\/TryAgain>/,
+    );
+  });
+
+  it('keeps its failure said while Try again reads it again, Try again held, focus then on the page’s heading (ClassRetryStates)', () => {
+    // Try again's boot: held until it answers, its failure never cleared as it starts, which
+    // dropped focus to the page; read, focus on the class's name, the page's heading (`then` none).
+    expect(source).toMatch(
+      /const retry = \(\) => \{\s*setRetrying\(true\);\s*setAttempt\(\(n\) => n \+ 1\);\s*\};/,
+    );
+    const boot = source.slice(source.indexOf('// Boot from the snapshot, then stream.'));
+    expect(boot).toMatch(
+      /^\/\/ Boot from the snapshot, then stream\.\s*useEffect\(\(\) => \{\s*let sse: SseClient \| null = null;/,
+    );
+    expect(boot).toMatch(
+      /if \(cancelled\) return;\s*setError\(null\);\s*setRetrying\(false\);\s*setStudents\(fromSnapshot\(snap\)\);/,
+    );
+    expect(boot).toMatch(
+      /\} catch \(e\) \{\s*if \(cancelled\) return;\s*setError\(errText\(e\)\);\s*setRetrying\(false\);\s*\}/,
+    );
+    // Another session's grid starts unread: no failure of the last one's over it.
+    expect(source).toMatch(
+      /if \(booting !== sessionId\) \{\s*setBooting\(sessionId\);\s*setError\(null\);\s*setRetrying\(false\);\s*\}/,
     );
   });
 

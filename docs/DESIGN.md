@@ -314,6 +314,11 @@ loading and its failure as HomeMoreStates draws them, its other states as HomeRa
 (drawn on the canvas first). Home's other intermediate states as HomeInterimStates and HomeNewPhone
 draw them (drawn on the canvas first), HomeInterim no longer built. The account not read is said as HomeStates draws it, its failure headed as the page (an
 `h1`), Try again held as Loading… until Bali answers so focus stays on it, a failure said again.
+That Try again is the portal's one for a read that failed since the owner's follow-up of 2026-10-16
+(`TryAgain`, `components/try-again.tsx`): on Home, Classes, the account's card, the live grid's
+line and a student's home so far, its line kept while it reads, then focus on the region's heading,
+never the page (HomeRetryStates, ClassesRetryStates, ClassRetryStates and StudentRetryStates, drawn
+on the canvas first).
 Every
 portal source file is held to the tokens' utilities by `tokens.test.ts`, and
 since D2g the theme holds none of Tailwind's own colours, type sizes,

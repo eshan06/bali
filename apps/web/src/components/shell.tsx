@@ -30,10 +30,10 @@ import { errText } from '@/lib/errors';
 import { type Home, homeFor } from '@/lib/student-web';
 import { useApi } from '@/lib/use-api';
 
-import { Button } from './button';
 import { CARD_ALONE } from './card';
 import { Mark } from './mark';
 import { PortalBar } from './portal-bar';
+import { TryAgain } from './try-again';
 
 /** The pages read without signing in (sign-in, its callback, Help, the policies), each with a bar. */
 export const SIGNED_OUT_PATHS = /^\/(login|auth|support|privacy|terms)(\/|$)/;
@@ -335,9 +335,10 @@ export function SideMenu({
  * (HomeStates' "Loading, before the account answers" and "The account didn't load"): Loading…
  * while it is read, or its failure, headed as the page, with Try again. Try again reads it again
  * keeping the card, its button held as Loading… until Bali answers, so focus stays on it, and a
- * failure is said again however it is worded (PV17a; HomeInterimStates, drawn first). The only
- * `<main>` while the page waits: Home draws nothing of its own until the account is read. In the
- * page's frame, with no menu: nothing of a teacher's shows before the account reads as one.
+ * failure is said again however it is worded (PV17a; HomeInterimStates, drawn first); read, focus
+ * lands on the page's own heading (`TryAgain`). The only `<main>` while the page waits: Home draws
+ * nothing of its own until the account is read. In the page's frame, with no menu: nothing of a
+ * teacher's shows before the account reads as one.
  */
 export function AccountUnread({
   error,
@@ -346,37 +347,16 @@ export function AccountUnread({
   error: string | null;
   onRetry: () => Promise<void>;
 }) {
-  // Try again under way.
-  const [held, setHeld] = useState(false);
-  // How many answers Try again has had: each failure's alert is a new one, so it is said again.
-  const [tries, setTries] = useState(0);
-
-  async function again() {
-    if (held) return;
-    setHeld(true);
-    await onRetry();
-    setHeld(false);
-    setTries((n) => n + 1);
-  }
-
   return (
     <main className={PAGE}>
       {error ? (
         <div className={`mx-auto max-w-md ${CARD_ALONE}`}>
-          <div key={tries} role="alert">
-            <h1 className="text-body font-semibold">Couldn&apos;t load your account.</h1>
-            <p className="text-body text-text-secondary">{error}</p>
-          </div>
-          {/* One button throughout, held while it reads, so focus stays on it. */}
-          <Button
-            variant="secondary"
-            aria-disabled={held}
-            aria-busy={held}
-            onClick={() => void again()}
-            className="mt-3.5"
-          >
-            {held ? 'Loading…' : 'Try again'}
-          </Button>
+          <TryAgain size="md" onRetry={onRetry} then={[]} className="mt-3.5">
+            <div role="alert">
+              <h1 className="text-body font-semibold">Couldn&apos;t load your account.</h1>
+              <p className="text-body text-text-secondary">{error}</p>
+            </div>
+          </TryAgain>
         </div>
       ) : (
         <p role="status" className="mx-auto max-w-md text-center text-body text-text-secondary">

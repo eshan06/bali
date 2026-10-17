@@ -89,9 +89,14 @@ const view = (over: Partial<Parameters<typeof TeacherHome>[0]> = {}) =>
       failed: null,
       now: NOW,
       onRead: () => undefined,
+      onRetry: () => Promise.resolve(),
       ...over,
     }),
   );
+
+/** Try again as `TryAgain` draws it: small, or full size; at rest, or held as Loading…. */
+const tryAgain = ({ held = false, size = 'h-8\\.5', margin = '' } = {}) =>
+  `<button type="button" aria-disabled="${held}" aria-busy="${held}" class="[^"]*\\b${size}\\b[^"]*${margin ? `\\b${margin}\\b[^"]*` : ''}">${held ? 'Loading…' : 'Try again'}<\\/button>`;
 
 /** Each row: its classes, its words, its links (where each goes, its words, what describes it). */
 const rows = (html: string) =>
@@ -266,15 +271,24 @@ describe('Home’s page (PV17a)', () => {
   });
 
   it('says a list that didn’t load over the classes read before, with a small Try again (HomeInterimStates)', () => {
-    const read = vi.fn();
-    const html = plain(view({ failed: CANT_REACH, onRead: read }));
+    const html = plain(view({ failed: CANT_REACH }));
     expect(html).toMatch(
       new RegExp(
-        `<\\/div><div class="flex flex-wrap items-center gap-x-4 gap-y-3"><p role="alert" class="text-body">Couldn't load your classes\\. ${CANT_REACH.replaceAll('.', '\\.')}<\\/p><button type="button" class="[^"]*\\bh-8\\.5\\b[^"]*">Try again<\\/button><\\/div><div class="flex flex-wrap items-start gap-5">`,
+        `<\\/div><div class="flex flex-wrap items-center gap-x-4 gap-y-3"><p role="alert" class="text-body">Couldn't load your classes\\. ${CANT_REACH.replaceAll('.', '\\.')}<\\/p>${tryAgain()}<\\/div><div class="flex flex-wrap items-start gap-5">`,
       ),
     );
     expect(rows(html)).toHaveLength(3);
     expect(view()).not.toContain('role="alert"');
+  });
+
+  it('holds the list’s Try again until the account’s read again answers, then lands focus on Your classes (HomeRetryStates)', () => {
+    // `onRetry`, the shell's `refresh`, keeps the line until the answer, so Try again stays, held
+    // as Loading… (`TryAgain`); `load` cleared it first, which dropped focus to the page. Read,
+    // focus on Your classes; for a new teacher, whose list has none, on the page's heading.
+    expect(source).toMatch(
+      /<TryAgain onRetry=\{onRetry\} then=\{\[yours\]\}>\s*<p role="alert" className="text-body">\s*Couldn&apos;t load your classes\. \{failed\}/,
+    );
+    expect(view()).toMatch(/<h2 id="([^"]+)" [^>]*>Your classes<\/h2>/);
   });
 
   it('sets the block’s card beside the classes, v2’s columns: 520 px and 320 px, 20 px apart', () => {
@@ -327,15 +341,24 @@ describe('Home’s page (PV17a)', () => {
     expect(source).toMatch(
       /\{live\.length > 0 \? \(\s*wide \? \(\s*<RecentActivity only=\{live\.length === 1 \? \(live\[0\]\?\.c\.id \?\? null\) : null\} \/>\s*\) : null\s*\) : last !== null \? \(\s*<LastSessionCard key=\{last\.session\.id\} last=\{last\} \/>\s*\) : null\}\s*<Blocks \/>/,
     );
-    // Read again while in view, stopped as it goes (pollActivity, tested in lib/activity).
+    // Read again while in view, stopped as it goes (pollActivity, tested in lib/activity); its
+    // Try again starts it afresh, held until its first answer.
     expect(source).toMatch(
-      /useEffect\(\(\) => \{\s*const poll = pollActivity\(api, setRead\);\s*return \(\) => poll\.stop\(\);\s*\}, \[api, attempt\]\);/,
+      /useEffect\(\(\) => \{\s*const poll = pollActivity\(api, \(answer\) => \{\s*setRead\(answer\);\s*setRetrying\(false\);\s*\}\);\s*return \(\) => poll\.stop\(\);\s*\}, \[api, attempt\]\);/,
     );
-    // Last session's report: read as it shows, again only by Try again.
+    expect(source).toMatch(
+      /retrying=\{retrying\}\s*onRetry=\{\(\) => \{\s*setRetrying\(true\);\s*setAttempt\(\(n\) => n \+ 1\);\s*\}\}/,
+    );
+    // Last session's report: read as it shows, again only by Try again, its line said meanwhile.
     expect(source).toMatch(
       /void readReport\(api, classId, sessionId\)\.then\(\(answer\) => \{\s*if \(live\) setRead\(answer\);\s*\}\);/,
     );
-    expect(source).toMatch(/\}, \[api, classId, sessionId, attempt\]\);/);
+    expect(source).toMatch(/\}, \[api, classId, sessionId\]\);/);
+    expect(source).toContain(
+      'onRetry={async () => setRead(await readReport(api, classId, sessionId))}',
+    );
+    // Never the loading line in a failure's place while Try again reads: that dropped its focus.
+    expect(source).not.toMatch(/setRead\(\{ kind: 'loading' \}\);/);
     // Past a bell the read still counts it running: no Last session until it is read again.
     expect(source).toMatch(
       /const running = me\.classes\.some\(\(c\) => \(c\.summary\?\.runningSession \?\? null\) !== null\);\s*const last = running \? null : lastOf\(me\.classes\);/,
@@ -382,8 +405,12 @@ describe('Recent activity (PV17c; Main, HomeMoreStates, HomeRailStates)', () => 
     minute: '2-digit',
     timeZone: 'UTC',
   });
-  const card = (read: ActivityRead, only: string | null = 'c1', onRetry = () => undefined) =>
-    plain(renderToStaticMarkup(createElement(RecentActivityView, { read, only, onRetry })));
+  const card = (read: ActivityRead, only: string | null = 'c1', retrying = false) =>
+    plain(
+      renderToStaticMarkup(
+        createElement(RecentActivityView, { read, only, retrying, onRetry: () => undefined }),
+      ),
+    );
   /** Each moment as read: its icon, its words, the line under them, its time. */
   const moments = (html: string) =>
     [...html.matchAll(/<li class="relative[^"]*">([^]*?)<\/li>/g)].map(([, inner = '']) => ({
@@ -457,15 +484,27 @@ describe('Recent activity (PV17c; Main, HomeMoreStates, HomeRailStates)', () => 
     expect(card({ kind: 'loading' })).toMatch(
       /Recent activity<\/h2><p role="status" class="mt-3\.5 text-body text-text-secondary">Loading…<\/p><\/section>$/,
     );
-    const retry = vi.fn();
-    const failed = card({ kind: 'error', message: CANT_REACH }, 'c1', retry);
+    const failed = card({ kind: 'error', message: CANT_REACH });
     expect(failed).toMatch(
       new RegExp(
-        `Recent activity<\\/h2><div class="mt-3\\.5"><div role="alert" class="text-body"><p class="font-semibold">Couldn't load recent activity\\.<\\/p><p class="text-text-secondary">${CANT_REACH.replaceAll('.', '\\.')}<\\/p><\\/div><button type="button" class="[^"]*\\bh-8\\.5\\b[^"]*\\bmt-3\\.5\\b[^"]*">Try again<\\/button><\\/div><\\/section>$`,
+        `Recent activity<\\/h2><div class="mt-3\\.5"><div role="alert" class="text-body"><p class="font-semibold">Couldn't load recent activity\\.<\\/p><p class="text-text-secondary">${CANT_REACH.replaceAll('.', '\\.')}<\\/p><\\/div>${tryAgain({ margin: 'mt-3\\.5' })}<\\/div><\\/section>$`,
       ),
     );
     // Neither the list nor Open the class until a read works.
     expect(failed).not.toMatch(/<ol|Open the class/);
+  });
+
+  it('holds Try again as Loading… while its read runs, its line kept, focus then on its label (HomeRetryStates)', () => {
+    const held = card({ kind: 'error', message: CANT_REACH }, 'c1', true);
+    expect(held).toMatch(
+      new RegExp(
+        `<p class="text-text-secondary">${CANT_REACH.replaceAll('.', '\\.')}<\\/p><\\/div>${tryAgain({ held: true, margin: 'mt-3\\.5' })}<\\/div><\\/section>$`,
+      ),
+    );
+    // Read, its failure gone and Try again with it: focus on the card's label, never the page.
+    expect(source).toMatch(
+      /<h2 id=\{id\} className=\{RAIL_LABEL\}>\s*<ScrollText[^]*?<TryAgain onRetry=\{onRetry\} held=\{retrying\} then=\{\[id\]\} className="mt-3\.5">/,
+    );
   });
 
   it('draws nothing for a list that came back empty: never an empty state (PV1)', () => {
@@ -504,8 +543,12 @@ describe('Last session (PV17c; HomeIdle, HomeMoreStates, HomeRailStates)', () =>
     unlocks: [1, 2, 3, 4, 5].map(unlockOf),
     protectionOffs: [],
   };
-  const card = (read: ReportRead, onRetry = () => undefined) =>
-    plain(renderToStaticMarkup(createElement(LastSessionView, { last: LAST, read, onRetry })));
+  const card = (read: ReportRead) =>
+    plain(
+      renderToStaticMarkup(
+        createElement(LastSessionView, { last: LAST, read, onRetry: () => Promise.resolve() }),
+      ),
+    );
   /** Each figure as read: its name and its value. */
   const figures = (html: string) =>
     [...html.matchAll(/<dt [^>]*>([^<]*)<\/dt><dd [^>]*>([^<]*)<\/dd>/g)].map((m) => [m[1], m[2]]);
@@ -565,14 +608,21 @@ describe('Last session (PV17c; HomeIdle, HomeMoreStates, HomeRailStates)', () =>
     expect(loading).toMatch(
       /<p class="text-caption text-text-tertiary">[^<]*<\/p><p role="status" class="mt-3\.5 text-body text-text-secondary">Loading the last session…<\/p><\/section>$/,
     );
-    const retry = vi.fn();
-    const failed = card({ kind: 'error', message: CANT_REACH }, retry);
+    const failed = card({ kind: 'error', message: CANT_REACH });
     expect(failed).toMatch(
       new RegExp(
-        `<p class="text-caption text-text-tertiary">[^<]*<\\/p><div class="mt-3\\.5"><div role="alert" class="text-body"><p class="font-semibold">Couldn't load the last session\\.<\\/p><p class="text-text-secondary">${CANT_REACH.replaceAll('.', '\\.')}<\\/p><\\/div><button type="button" class="[^"]*\\bh-8\\.5\\b[^"]*\\bmt-3\\.5\\b[^"]*">Try again<\\/button><\\/div><\\/section>$`,
+        `<p class="text-caption text-text-tertiary">[^<]*<\\/p><div class="mt-3\\.5"><div role="alert" class="text-body"><p class="font-semibold">Couldn't load the last session\\.<\\/p><p class="text-text-secondary">${CANT_REACH.replaceAll('.', '\\.')}<\\/p><\\/div>${tryAgain({ margin: 'mt-3\\.5' })}<\\/div><\\/section>$`,
       ),
     );
     for (const html of [loading, failed]) expect(html).not.toMatch(/Open the recap|<dl/);
+  });
+
+  it('holds Try again until its read answers, focus then on its label (HomeRetryStates)', () => {
+    // Its read's promise holds it as Loading… (`TryAgain`), the line said meanwhile; read, its
+    // failure gone and Try again with it, focus on the card's label, never the page.
+    expect(source).toMatch(
+      /<h2 id=\{id\} className=\{RAIL_LABEL\}>\s*<Clock[^]*?<TryAgain onRetry=\{onRetry\} then=\{\[id\]\} className="mt-3\.5">\s*<div role="alert" className="text-body">\s*<p className="font-semibold">Couldn&apos;t load the last session\.<\/p>/,
+    );
   });
 });
 
@@ -632,6 +682,7 @@ describe('the live card (PV17b; Main, HomeMoreStates, HomeLiveStates)', () => {
     now: new Date(T),
     error: null,
     retry: () => undefined,
+    retrying: false,
     stale: null,
     ...over,
   });
@@ -785,13 +836,25 @@ describe('the live card (PV17b; Main, HomeMoreStates, HomeLiveStates)', () => {
     const html = card(grid({ students: null, error: CANT_REACH }));
     expect(html).toMatch(
       new RegExp(
-        `<\\/div><\\/div><div><div role="alert" class="text-body"><p class="font-semibold">Couldn't load this session\\.<\\/p><p class="text-text-secondary">${CANT_REACH.replaceAll('.', '\\.')}<\\/p><\\/div><button type="button" class="[^"]*\\bh-8\\.5\\b[^"]*\\bmt-3\\.5\\b[^"]*">Try again<\\/button><\\/div><\\/section>$`,
+        `<\\/div><\\/div><div><div role="alert" class="text-body"><p class="font-semibold">Couldn't load this session\\.<\\/p><p class="text-text-secondary">${CANT_REACH.replaceAll('.', '\\.')}<\\/p><\\/div>${tryAgain({ margin: 'mt-3\\.5' })}<\\/div><\\/section>$`,
       ),
     );
     expect(html).not.toMatch(/home-countdown|<a /);
     // Its failure stands even once a later read fills the grid, as the class page's does.
     expect(card(grid({ error: CANT_REACH }))).toContain("Couldn't load this session.");
-    expect(source).toMatch(/onClick=\{grid\.retry\}/);
+  });
+
+  it('holds the grid’s Try again as Loading… while it reads again, its line kept, focus then on its name (HomeRetryStates)', () => {
+    const held = card(grid({ students: null, error: CANT_REACH, retrying: true }));
+    expect(held).toMatch(
+      new RegExp(
+        `<p class="text-text-secondary">${CANT_REACH.replaceAll('.', '\\.')}<\\/p><\\/div>${tryAgain({ held: true, margin: 'mt-3\\.5' })}<\\/div><\\/section>$`,
+      ),
+    );
+    // Read, the card's counts in the failure's place: focus on the class's name, its heading.
+    expect(source).toMatch(
+      /<LiveCardHead id=\{id\} name=\{name\} now=\{now\} \/>[^]*?<TryAgain onRetry=\{grid\.retry\} held=\{grid\.retrying\} then=\{\[id\]\} className="mt-3\.5">/,
+    );
   });
 
   it('draws a card for each class live by this computer’s clock, in the account’s order, over Your classes', () => {

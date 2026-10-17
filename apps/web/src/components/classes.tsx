@@ -13,6 +13,7 @@ import { Button, buttonClass } from './button';
 import { Ring } from './live-header';
 import { CHIP, CHIP_PILL, DOT } from './live-grid';
 import { cardId } from './new-class';
+import { TryAgain } from './try-again';
 
 /** "1 student", "28 students". */
 export const students = (count: number) => `${count} ${count === 1 ? 'student' : 'students'}`;
@@ -115,15 +116,17 @@ export function FirstClass({ onNew, href }: { onNew?: () => void; href?: string 
 
 /**
  * Classes, in the menu (PV16; Classes, ClassesEmpty): its head with New class, the list's failure
- * with Try again over the classes read before (HomeStates; as the page opens too, ClassesStates), a
- * card per class or the first class's card, and beside them the block's card, under them on
- * anything narrower. `children` is the New class dialog, which New class and Create a class open.
+ * with Try again over the classes read before (HomeStates; as the page opens too, ClassesStates),
+ * held until the account's read again answers, focus then on the page's heading (ClassesRetryStates,
+ * drawn first), a card per class or the first class's card, and beside them the block's card, under
+ * them on anything narrower. `children` is the New class dialog, which New class and Create a class
+ * open.
  */
 export function ClassesView({
   classes,
   failed,
   now,
-  onRead,
+  onRetry,
   onNew,
   newButton,
   children,
@@ -132,7 +135,8 @@ export function ClassesView({
   /** The list's last read failed, in `errText`'s words; null once one works. */
   failed: string | null;
   now: number;
-  onRead: () => void;
+  /** The list's Try again: the account read again, its failure kept until the answer. */
+  onRetry: () => Promise<void>;
   onNew: () => void;
   /** The head's New class, which focus comes back to after a dialog Home asked for (`?new`). */
   newButton?: Ref<HTMLButtonElement>;
@@ -149,12 +153,11 @@ export function ClassesView({
       </div>
       {failed !== null ? (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-          <p role="alert" className="text-body">
-            Couldn&apos;t load your classes. {failed}
-          </p>
-          <Button variant="secondary" size="sm" onClick={onRead}>
-            Try again
-          </Button>
+          <TryAgain onRetry={onRetry} then={[]}>
+            <p role="alert" className="text-body">
+              Couldn&apos;t load your classes. {failed}
+            </p>
+          </TryAgain>
         </div>
       ) : null}
       <div className="flex flex-wrap items-start gap-5">

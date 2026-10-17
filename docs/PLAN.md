@@ -8,18 +8,16 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-16 (Central) — PV17c-2, Home's Last session (#425; `docs/DECISIONS.md`,
-2026-10-16), the portal redesign's last step, so PV0–PV17 are done: while no class is live, the
-rail holds the last session over across the classes over the block's card, on a phone too, its class
-and times from the account, its figures from its report (who joined, the average per student, the
-unlocks, or "Nobody joined this session."), never read as running before the sweep marks it; none
-until a class's first session ends, and none from a bell until the account's read says no class
-runs, never the one before it (drawn first, canvas version 77: HomeRailStates). Checked on dev as
-the demo teacher in a browser of its own: a 2-minute session's card 3.7 s after its bell while its
-report still said `ended: false`, the same card after the sweep; nobody joined, with and without an
-unlock, after an End with Home open; a phone's width; every card the height of its board. Before
-it, PV17c-1 (#424). Next on the Windows PC: the four steps for sessions before the pilot's first
-class (Open owner items; after PV17c, the owner, 2026-10-14); on the Mac, the phone's L8 and M8._
+_Last updated: 2026-10-16 (Central) — The owner's follow-up, Try again keeps keyboard focus, part 1
+(#426; `docs/DECISIONS.md`, 2026-10-16): the portal's one Try again for a read that failed
+(`TryAgain`), its line kept and its button held as Loading… while it reads, focus kept on it, a
+failure said again, and once read, focus on the region's heading, never the page; on Home, Classes,
+the account's card, the live grid's line and a student's home (drawn first, canvas version 79:
+HomeRetryStates, ClassesRetryStates, ClassRetryStates, StudentRetryStates). Checked in headless
+Chrome with the keyboard on the real components, Bali's answers held, given and failing again.
+Before it, PV17c-2 (#425). Next on the Windows PC: the owner's other follow-up fixes, Try again's
+remaining steps among them (In flight), then the four steps for sessions before the pilot's first
+class; on the Mac, the phone's L8 and M8._
 
 ## Now
 
@@ -48,6 +46,13 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
   Phase 7 screens (L8, M8). C2's legal words (⚖️) go into the portal's pages, on the Windows PC.
 - **The portal redesign in v2's look (PV0–PV17, the owner, 2026-10-12)** ✅ (2026-10-16): every step
   done, with PV3b, PV4b, PV4c and PV5b; the last, PV17c-2, Home's Last session (#425).
+- **The owner's follow-up fixes (2026-10-16), one worker at a time.** Try again keeps keyboard
+  focus: part 1 ✅ (#426; DECISIONS 2026-10-16), `TryAgain` on Home, Classes, the account's card,
+  the live grid's line and a student's home. Left, each a step of its own, the scan in
+  `try-again.test.ts` listing them: the class page's own lines and the recap; Reports, a session's
+  report and its Questions; Your questions, Your slides and the two side panels; a student's lesson
+  page, the student panel and the slide's line; and the sends whose line goes as they send again (a
+  slide change, an ask, a close, an extend).
 - **The workflow review's last steps** ✅ (the owner, 2026-10-13; DECISIONS 2026-10-14): the
   migration guard (#369), docs-only PRs skipping the test jobs (#365), moved files (#368) and two
   tests (#364), each in full in `docs/PLAN-ARCHIVE.md`.
