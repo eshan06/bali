@@ -362,10 +362,7 @@ export function RecentActivityView({
   );
 }
 
-/**
- * Recent activity, read as Home shows it and again while it is in view (`pollActivity`); Try again
- * reads it afresh, its failure said meanwhile.
- */
+/** Recent activity, read as Home shows it and again while it is in view (`pollActivity`). */
 function RecentActivity({ only }: { only: string | null }) {
   const api = useApi();
   const [read, setRead] = useState<ActivityRead>({ kind: 'loading' });
@@ -478,10 +475,7 @@ function LastFigures({ report }: { report: Extract<ReportRead, { kind: 'ready' }
   );
 }
 
-/**
- * Last session, its report read as Home shows it and by Try again (`readReport`), its failure said
- * until Try again's read answers.
- */
+/** Last session, its report read as Home shows it and by Try again (`readReport`). */
 function LastSessionCard({ last }: { last: LastSession }) {
   const api = useApi();
   const [read, setRead] = useState<ReportRead>({ kind: 'loading' });

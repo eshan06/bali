@@ -105,10 +105,8 @@ function ClassRows({ classes }: { classes: StudentClass[] }) {
  * A student's home (W3; StudentHome, StudentHomeEmpty): each class in session on a live card, then
  * the rest, under "Other classes" only beside a live card; with none yet, the empty card and a
  * teacher's way to the invite page (decision 13). `failed`: the account's last read failed, said as
- * StudentStates draws it, Try again reading it again (`onRefresh`, which keeps the failure until the
- * answer), held meanwhile, focus then on the page's heading (StudentRetryStates, drawn first). At
- * its bell by this computer's clock a class leaves its card and the page reads the account again:
- * added minutes bring it back.
+ * StudentStates draws it, Try again reading it again (`onRefresh`). At its bell by this computer's
+ * clock a class leaves its card and the page reads the account again: added minutes bring it back.
  * It reads it again too as its tab comes back into view, so a class that started while it was away
  * shows with its way into the lesson (W4), and as a live card's lesson says it is over; and while
  * no class is in session, every 30 s it is in view (`onRefresh`, one read at a time; the owner,

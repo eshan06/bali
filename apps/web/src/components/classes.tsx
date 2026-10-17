@@ -116,11 +116,9 @@ export function FirstClass({ onNew, href }: { onNew?: () => void; href?: string 
 
 /**
  * Classes, in the menu (PV16; Classes, ClassesEmpty): its head with New class, the list's failure
- * with Try again over the classes read before (HomeStates; as the page opens too, ClassesStates),
- * held until the account's read again answers, focus then on the page's heading (ClassesRetryStates,
- * drawn first), a card per class or the first class's card, and beside them the block's card, under
- * them on anything narrower. `children` is the New class dialog, which New class and Create a class
- * open.
+ * with Try again over the classes read before (HomeStates; as the page opens too, ClassesStates), a
+ * card per class or the first class's card, and beside them the block's card, under them on
+ * anything narrower. `children` is the New class dialog, which New class and Create a class open.
  */
 export function ClassesView({
   classes,
@@ -135,7 +133,10 @@ export function ClassesView({
   /** The list's last read failed, in `errText`'s words; null once one works. */
   failed: string | null;
   now: number;
-  /** The list's Try again: the account read again, its failure kept until the answer. */
+  /**
+   * The list's Try again: the account read again, its failure kept until the answer; read, focus
+   * on the page's heading (ClassesRetryStates, drawn first).
+   */
   onRetry: () => Promise<void>;
   onNew: () => void;
   /** The head's New class, which focus comes back to after a dialog Home asked for (`?new`). */
