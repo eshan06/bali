@@ -244,7 +244,7 @@ describe('the shell’s wiring of the rulings (read from its source)', () => {
     // One set of reads for the page's own and for `refresh`, which waits for the one on its way
     // (the read on its way, handed to Try again, below); the answer says what the page shows.
     expect(shell).toMatch(
-      /const reads = useMemo\(\s*\(\) =>\s*accountReads\(api, \(said\) => \{\s*if \('home' in said\) \{\s*setHome\(said\.home\);\s*setError\(null\);\s*\} else setError\(said\.error\);\s*\}\),\s*\[api\],\s*\);/,
+      /const \[reads\] = useState\(\(\) =>\s*accountReads\(api, \(said\) => \{\s*if \('home' in said\) \{\s*setHome\(said\.home\);\s*setError\(null\);\s*\} else setError\(said\.error\);\s*\}\),\s*\);/,
     );
     expect(shell).toMatch(/const \{ refresh \} = reads;/);
     // The page's own read (`load`) says no failure while it reads; `refresh` keeps it until then.

@@ -417,17 +417,15 @@ export function Shell({ children }: { children: ReactNode }) {
   const [home, setHome] = useState<Home | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [presenting, setPresenting] = useState(false);
-  // The account's reads, each within a read's 10 s (#334): the frame asks only when none is on its
-  // way, and only the newest one's answer counts.
-  const reads = useMemo(
-    () =>
-      accountReads(api, (said) => {
-        if ('home' in said) {
-          setHome(said.home);
-          setError(null);
-        } else setError(said.error);
-      }),
-    [api],
+  // The account's reads, each within a read's 10 s (#334), kept for the tab's life with its one
+  // client: the frame asks only when none is on its way, and only the newest one's answer counts.
+  const [reads] = useState(() =>
+    accountReads(api, (said) => {
+      if ('home' in said) {
+        setHome(said.home);
+        setError(null);
+      } else setError(said.error);
+    }),
   );
   // The page the account was last looked at on: a failure is read again on the next one.
   const seen = useRef<string | null>(null);
