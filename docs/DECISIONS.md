@@ -45,7 +45,16 @@ a real decision? Add a dated entry at the top: what was decided and why.
   (source text) is untouched: no component or page code changed. **Found on the way:** on a fake
   clock, user-event's actions and Testing Library's `waitFor` hang (they wait on a timer only Jest's
   fake clock is advanced for), so such a test presses with `fireEvent` and waits in `act`
-  (`docs/WEB.md`, Testing the portal). **Checked:** CHECKED_PLACEHOLDER
+  (`docs/WEB.md`, Testing the portal). **Checked** in headless Chrome on dev, main beside this branch:
+  the upload's request to the bucket paused (its CORS check, so no byte sent), main still said
+  "Uploading · 0%" at 42 s; this branch stopped it 30.0 s after it was sent (30,008 to 30,017 ms over
+  three runs), said as SlidesStates draws it, focus on the row's Cancel; Try again, pressed with
+  Enter once the pause was lifted, sent the create again for a fresh URL, focus on Cancel, and the
+  deck was checked. A 0.4 MB PDF on an upload throttled to 5 KB/s never stopped: 87 s, its progress
+  never more than 3.8 s apart, the bucket's answer 1.8 s after the last byte. Chrome reports an
+  upload's progress in 16 KB steps, so only a link sending under 16 KB in 30 s (about 4.4 kbit/s)
+  would be taken for stuck; at that rate even a 1 MB PDF is past its 25 minutes. Each test deck
+  removed. 48 changed lines of source, all in `decks.ts`; the rest is tests and docs.
 
 - **2026-10-22** — **The portal's tests drive the page (#434): jsdom and Testing Library, dev only,
   opted into per file, and `try-again.test.tsx` converted as the pattern.** The owner's answer to the
