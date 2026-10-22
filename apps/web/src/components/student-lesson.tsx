@@ -16,6 +16,7 @@ import {
   keptBell,
   leaveFullscreen,
   type Lesson,
+  type LessonRetry,
   type LessonState,
   lessonView,
   type LessonView,
@@ -23,6 +24,7 @@ import {
   type PhoneChip,
   picker,
   type Picks,
+  retryHeld,
   type Said,
   saidNow,
   type Sending,
@@ -31,12 +33,13 @@ import {
 import { useApi } from '@/lib/use-api';
 import { type DeckState, useShownDeck } from '@/lib/use-slide';
 
-import { Button, buttonClass } from './button';
+import { buttonClass } from './button';
 import { CARD_ALONE } from './card';
 import { Countdown, Ring, shareLeft, useClock } from './live-header';
 import { letterClass, letterOf } from './question-card';
 import { useMe } from './shell';
 import { SlideFull, StudentSlide } from './student-slide';
+import { TryAgain } from './try-again';
 import { CantReach, NOTICE, YourPhone } from './your-phone';
 
 /** The line under every question (StudentLesson), the board's own words. */
@@ -52,12 +55,14 @@ const EMPTY: LessonState = { presentation: null, problem: null, asOf: null };
  * student's own phone beside its name. The account is the shell's one read, read again as the page
  * opens and at the bell, so minutes the teacher added move it; a class the account doesn't list
  * isn't the student's. The slide's deck is loaded only while the lesson shows it (`useShownDeck`),
- * and closed once the teacher stops, shows another, or the class is over.
+ * and closed once the teacher stops, shows another, or the class is over. Try again reads the lesson
+ * again and the account with it, the failure said, held, until the read it waits on answers: the
+ * lesson's, or while the class isn't known the account's, then the lesson's (StudentRetryStates).
  */
 export function StudentLessonPage({ classId, sessionId }: { classId: string; sessionId: string }) {
   const api = useApi();
   const router = useRouter();
-  const { home, me, error, load } = useMe();
+  const { home, me, error, load, refresh } = useMe();
   // The account as the page opened: only a read since says the class isn't the student's.
   const [opened] = useState(me);
   const asked = useRef(false);
@@ -66,6 +71,9 @@ export function StudentLessonPage({ classId, sessionId }: { classId: string; ses
   const following = useRef<Lesson | null>(null);
   const [picks, setPicks] = useState<Picks>({ sending: null, said: null });
   const [pick] = useState(() => picker(setPicks));
+  // Try again pressed: the lesson as it was, and how many of the account's reads had answered.
+  const [again, setAgain] = useState<LessonRetry | null>(null);
+  const [accountReads, setAccountReads] = useState(0);
 
   useEffect(() => {
     if (!getAccessToken()) {
@@ -111,20 +119,26 @@ export function StudentLessonPage({ classId, sessionId }: { classId: string; ses
   const view = lessonView(klass, account, bell, lesson);
   const shown = view.kind === 'live' ? view.presentation.slide : null;
   const { deck, reload } = useShownDeck(api, shown);
+  const held = retryHeld(again, view, klass !== undefined && bell !== null, {
+    lesson,
+    accountReads,
+  });
+  if (again !== null && !held) setAgain(null);
 
   if (home === null || home.kind !== 'student') return null;
   return (
     <StudentLesson
-      view={view}
+      view={held ? { kind: 'failed' } : view}
+      held={held}
       deck={deck}
       onReloadDeck={reload}
       sending={picks.sending}
       said={picks.said}
       onPick={(questionId, option) => void pick(following.current, questionId, option)}
       onRetry={() => {
-        setLesson(EMPTY);
+        setAgain({ lesson, accountReads });
         setAttempt((n) => n + 1);
-        load();
+        void refresh().then(() => setAccountReads((n) => n + 1));
       }}
     />
   );
@@ -149,10 +163,12 @@ interface Full {
  * (StudentSlideAlone), or "Nothing shared yet" (StudentWaiting). The slide's Full screen
  * (StudentSlideFull) closes by itself once a question is asked, the slides stop or the class is
  * over (PV1), focus then on the question, or on the class's name; left by the student, on Full
- * screen.
+ * screen. Try again holds while it reads (`held`), then focus lands on the class's name, or on Your
+ * classes (StudentRetryStates).
  */
 export function StudentLesson({
   view,
+  held = false,
   deck,
   onReloadDeck,
   sending,
@@ -161,6 +177,8 @@ export function StudentLesson({
   onRetry,
 }: {
   view: LessonView;
+  /** Try again's read on its way: the failure stays said, its Try again held. */
+  held?: boolean;
   /** The slide's deck, as `useShownDeck` holds it: loading, open, or why not. */
   deck: DeckState;
   onReloadDeck: () => void;
@@ -204,12 +222,11 @@ export function StudentLesson({
   if (view.kind === 'failed') {
     return (
       <main className={SAID}>
-        <p role="alert" className="text-body">
-          Bali couldn&apos;t load this lesson.
-        </p>
-        <Button variant="secondary" size="sm" onClick={onRetry}>
-          Try again
-        </Button>
+        <TryAgain onRetry={onRetry} held={held} then={[`${id}-class`]}>
+          <p role="alert" className="text-body">
+            Bali couldn&apos;t load this lesson.
+          </p>
+        </TryAgain>
       </main>
     );
   }

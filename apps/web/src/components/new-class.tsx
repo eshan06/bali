@@ -11,6 +11,7 @@ import { useApi } from '@/lib/use-api';
 import { Button } from './button';
 import { Field } from './field';
 import { CODE, DIALOG, useCopy } from './join-code';
+import { TryAgain } from './try-again';
 
 /** How the page opens the dialog. */
 export interface NewClassHandle {
@@ -24,7 +25,8 @@ export const cardId = (classId: string) => `class-${classId}`;
  * New class (ClassesNew), v2's dialog: the class's name and Create class, held until a name is
  * typed; Creating… holds the name, Cancel and Escape until Bali answers; a failure is said right
  * under the help, and Try again sends the name again, but after a final refusal, which no resend can
- * change (ClassesStates, drawn first). Every answer has the page read the list again (`onAnswer`):
+ * change (ClassesStates, drawn first): one button throughout (`TryAgain`'s `send`), so focus stays
+ * on it whatever it comes to say. Every answer has the page read the list again (`onAnswer`):
  * the route takes no `eventId`, so a class made before its answer was lost shows there. A class made
  * turns the dialog into ClassesCreated's, focus on its title: "<name> is ready", its join code, Copy
  * code (CopyStates) and Done. Closed after Done, focus goes to the class's card once the list holds
@@ -60,8 +62,9 @@ export function NewClass({ ref, onAnswer }: { ref?: Ref<NewClassHandle>; onAnswe
     if (made) title.current?.focus();
   }, [made]);
 
-  async function create(e: React.FormEvent) {
-    e.preventDefault();
+  // Create class's press, and Try again's; Enter in the field presses it, the form's submit
+  // sending nothing.
+  async function create() {
     const trimmed = name.trim();
     if (sending.current || !trimmed) return;
     sending.current = true;
@@ -141,7 +144,7 @@ export function NewClass({ ref, onAnswer }: { ref?: Ref<NewClassHandle>; onAnswe
           </Button>
         </>
       ) : (
-        <form onSubmit={(e) => void create(e)} className="flex flex-col gap-4.5">
+        <form onSubmit={(e) => e.preventDefault()} className="flex flex-col gap-4.5">
           <h2 id={`${id}-title`} className="text-dialog-title">
             New class
           </h2>
@@ -179,9 +182,20 @@ export function NewClass({ ref, onAnswer }: { ref?: Ref<NewClassHandle>; onAnswe
               Cancel
             </Button>
             {/* One button throughout, so focus stays on it whatever it comes to say. */}
-            <Button type="submit" aria-disabled={busy || !name.trim()} aria-busy={busy}>
-              {busy ? 'Creating…' : failed?.kind === 'failed' ? 'Try again' : 'Create class'}
-            </Button>
+            <TryAgain
+              type="submit"
+              variant="primary"
+              size="md"
+              onRetry={create}
+              held={busy}
+              blocked={!name.trim()}
+              then={[`${id}-title`]}
+              send={{
+                words: 'Create class',
+                sending: 'Creating…',
+                failed: failed?.kind === 'failed',
+              }}
+            />
           </div>
         </form>
       )}

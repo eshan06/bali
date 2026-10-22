@@ -648,7 +648,32 @@ describe('the lesson page in its other states', () => {
       '<main><p role="status" class="text-body text-text-secondary">Loading…</p></main>',
     );
     expect(render({ kind: 'failed' })).toMatch(
-      /^<main class="flex flex-wrap items-center gap-x-4 gap-y-3"><p role="alert" class="text-body">Bali couldn&#x27;t load this lesson\.<\/p><button type="button" class="[^"]*\bh-8\.5\b[^"]*">Try again<\/button><\/main>$/,
+      /^<main class="flex flex-wrap items-center gap-x-4 gap-y-3"><p role="alert" class="text-body">Bali couldn&#x27;t load this lesson\.<\/p><button type="button" aria-disabled="false" aria-busy="false" class="[^"]*\bh-8\.5\b[^"]*">Try again<\/button><\/main>$/,
+    );
+  });
+
+  it('keeps its failure said while Try again reads it again, held as Loading… (StudentRetryStates)', () => {
+    vi.useFakeTimers({ now: NOW });
+    const html = renderToStaticMarkup(
+      createElement(StudentLesson, {
+        view: { kind: 'failed' },
+        held: true,
+        deck: LOADING_DECK.deck,
+        onReloadDeck: () => {},
+        sending: null,
+        said: null,
+        onPick: () => {},
+        onRetry: () => {},
+      }),
+    );
+    expect(html).toMatch(
+      /^<main class="flex flex-wrap items-center gap-x-4 gap-y-3"><p role="alert" class="text-body">Bali couldn&#x27;t load this lesson\.<\/p><button type="button" aria-disabled="true" aria-busy="true" class="[^"]*">Loading…<\/button><\/main>$/,
+    );
+    expect(html).not.toMatch(/\sdisabled=""/);
+    // Read: focus on the class's name, the page's heading; with none (not the student's class), on
+    // the page's first control, Your classes (`TryAgain`'s `land`).
+    expect(source('./student-lesson.tsx')).toMatch(
+      /<TryAgain onRetry=\{onRetry\} held=\{held\} then=\{\[`\$\{id\}-class`\]\}>/,
     );
   });
 
@@ -700,8 +725,15 @@ describe('its URL and its reads (from their sources)', () => {
     expect(component).toMatch(
       /if \(!follows\) return;\s*const followed = followLesson\(api, sessionId, setLesson\);/,
     );
+    // Try again follows it afresh and reads the account again (`refresh`, which keeps a failure said
+    // until its answer), the lesson as it was kept, so its failure stays said meanwhile.
     expect(component).toMatch(
-      /onRetry=\{\(\) => \{\s*setLesson\(EMPTY\);\s*setAttempt\(\(n\) => n \+ 1\);\s*load\(\);\s*\}\}/,
+      /onRetry=\{\(\) => \{\s*setAgain\(\{ lesson, accountReads \}\);\s*setAttempt\(\(n\) => n \+ 1\);\s*void refresh\(\)\.then\(\(\) => setAccountReads\(\(n\) => n \+ 1\)\);\s*\}\}/,
+    );
+    // Held until the read it waits on answers (retryHeld, tested in student-web.test.ts): the
+    // lesson's while the class and its bell are known, else the account's.
+    expect(component).toMatch(
+      /const held = retryHeld\(again, view, klass !== undefined && bell !== null, \{\s*lesson,\s*accountReads,\s*\}\);\s*if \(again !== null && !held\) setAgain\(null\);/,
     );
     // The account's last read decides: one since the page opened answers for it.
     expect(component).toMatch(
@@ -727,7 +759,9 @@ describe('its URL and its reads (from their sources)', () => {
     expect(component).toMatch(
       /const view = lessonView\(klass, account, bell, lesson\);\s*const shown = view\.kind === 'live' \? view\.presentation\.slide : null;\s*const \{ deck, reload \} = useShownDeck\(api, shown\);/,
     );
-    expect(component).toMatch(/view=\{view\}\s*deck=\{deck\}\s*onReloadDeck=\{reload\}/);
+    expect(component).toMatch(
+      /view=\{held \? \{ kind: 'failed' \} : view\}\s*held=\{held\}\s*deck=\{deck\}\s*onReloadDeck=\{reload\}/,
+    );
   });
 
   it('opens full screen on Full screen’s press, the page itself full screen where the browser allows it (W5)', () => {

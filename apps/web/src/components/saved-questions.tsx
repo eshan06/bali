@@ -23,6 +23,7 @@ import {
 import { Button } from './button';
 import { CARD_ALONE } from './card';
 import { Input } from './field';
+import { TryAgain } from './try-again';
 
 /*
  * Your questions (L7b, part 1; the Questions and QuestionsEdit boards, LessonStates' lines for
@@ -92,7 +93,8 @@ export interface QuestionsActions {
   ask: (draftId: string) => void;
   remove: (draftId: string) => void;
   keep: (draftId: string) => void;
-  read: () => void;
+  /** The list read again, its failure said until it answers. */
+  read: () => Promise<void>;
 }
 
 /** The page's title: where focus goes when nothing nearer is left. */
@@ -178,7 +180,8 @@ export function removeSaid(failure: Failure): string {
 /**
  * The page (Questions; QuestionsEdit while a question is written): the head with Write a question,
  * the question being written, then the drafts, oldest first, each with Edit and Remove; the list
- * loading, failed with Try again, or none yet.
+ * loading, failed with Try again (its line kept, held, until Bali answers, then focus on the page's
+ * title; QuestionsSlidesRetryStates), or none yet.
  */
 export function QuestionsView({
   drafts,
@@ -216,12 +219,11 @@ export function QuestionsView({
         </p>
       ) : drafts === 'failed' ? (
         <div className={SAID}>
-          <p role="alert" className="text-body">
-            {CANT_LOAD_QUESTIONS}
-          </p>
-          <Button variant="secondary" size="sm" onClick={on.read}>
-            Try again
-          </Button>
+          <TryAgain onRetry={on.read} then={[TITLE]}>
+            <p role="alert" className="text-body">
+              {CANT_LOAD_QUESTIONS}
+            </p>
+          </TryAgain>
         </div>
       ) : drafts.length > 0 ? (
         <ul className="flex max-w-215 flex-col gap-2.5">
@@ -375,13 +377,21 @@ const ICON_BUTTON =
 /**
  * Writing a question (QuestionsEdit), new or a draft's edit: the question, 2 to 6 answers, one
  * marked correct if the teacher likes; what Bali refuses said under each field once Save is pressed;
- * a save that didn't go through above Save, with Try again, which sends it again.
+ * a save that didn't go through above Save, with Try again, which sends it again, its line kept and
+ * Try again held until Bali answers; refused for good, its line alone, focus on the form's heading
+ * (QuestionsSlidesRetryStates).
  */
 export function QuestionForm({ form, on }: { form: Form; on: QuestionsActions }) {
   const { words, busy } = form;
   const refused = form.tried ? refusalsOf(words) : null;
   const count = words.options.length;
   const said = form.problem ? saveSaid(form.problem) : null;
+  // A new element for each answer, so a screen reader says each one.
+  const line = said && (
+    <p key={form.tries} role="alert" className="text-body">
+      {said.words}
+    </p>
+  );
   return (
     <section aria-labelledby="q-h" className={`flex max-w-215 flex-col gap-4.5 ${CARD_ALONE}`}>
       <div className="flex flex-col gap-0.75">
@@ -499,18 +509,16 @@ export function QuestionForm({ form, on }: { form: Form; on: QuestionsActions })
             students see it.
           </p>
         </fieldset>
-        {/* Right above the button that sends it again (DESIGN.md §4), kept, held, while it does;
-            a new element for each answer, so a screen reader says each one. */}
+        {/* Right above the button that sends it again (DESIGN.md §4), kept, held, while it does. */}
         {said ? (
           <div className={SAID}>
-            <p key={form.tries} role="alert" className="text-body">
-              {said.words}
-            </p>
             {said.retry ? (
-              <Button variant="secondary" size="sm" type="submit" aria-disabled={busy}>
-                Try again
-              </Button>
-            ) : null}
+              <TryAgain onRetry={on.save} held={busy} then={['q-h']}>
+                {line}
+              </TryAgain>
+            ) : (
+              line
+            )}
           </div>
         ) : null}
         <div className="flex flex-wrap items-center gap-2.5 border-t border-border-default pt-4.5">

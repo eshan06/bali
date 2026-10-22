@@ -23,6 +23,7 @@ import {
   TITLE,
   UNSHOWABLE,
 } from './saved-questions';
+import { TryAgain } from './try-again';
 
 /*
  * Your questions (L7b, part 1; Questions, QuestionsEdit and LessonStates' lines), drawn in each
@@ -117,6 +118,13 @@ const text = (html: string) =>
 function hosts(node: ReactNode): ReactElement<Record<string, unknown>>[] {
   if (Array.isArray(node)) return node.flatMap(hosts);
   if (!isValidElement<Record<string, unknown>>(node)) return [];
+  // `TryAgain` keeps state of its own: its line, then its button, pressed through its `onRetry`,
+  // held as its props say.
+  if (node.type === TryAgain) {
+    const { onRetry, children, held = false } = node.props as Parameters<typeof TryAgain>[0];
+    const button = { onClick: onRetry, 'aria-disabled': held };
+    return [...hosts(children), createElement('button', button, 'Try again')];
+  }
   if (typeof node.type === 'function') {
     return hosts((node.type as (p: unknown) => ReactNode)(node.props));
   }
@@ -245,10 +253,29 @@ describe('the list’s other states (LessonStates)', () => {
     const on = actions();
     const props = view('failed', null, {}, on);
     expect(render(props)).toMatch(
-      /<p role="alert" class="text-body">Bali couldn&#x27;t load your questions\.<\/p><button type="button" class="[^"]*\bh-8\.5\b[^"]*">Try again<\/button>/,
+      /<p role="alert" class="text-body">Bali couldn&#x27;t load your questions\.<\/p><button type="button" aria-disabled="false" aria-busy="false" class="[^"]*\bh-8\.5\b[^"]*">Try again<\/button>/,
     );
     press(QuestionsView(props), 'Try again');
     expect(on.read).toHaveBeenCalledOnce();
+  });
+
+  it('keeps it said while Try again reads it again, held, then focus on Your questions (QuestionsSlidesRetryStates)', () => {
+    // `TryAgain`'s own (try-again.test.ts): held while the read's promise runs, its line said again
+    // at each failure, and once read, focus on the page's title, never the page.
+    const component = readFileSync(
+      fileURLToPath(new URL('./saved-questions.tsx', import.meta.url)),
+      'utf8',
+    );
+    expect(component).toMatch(
+      /<TryAgain onRetry=\{on\.read\} then=\{\[TITLE\]\}>\s*<p role="alert" className="text-body">\s*\{CANT_LOAD_QUESTIONS\}/,
+    );
+    // The page reads it again with no Loading… step, so the failure stays said until the answer,
+    // and only the newest read's answer is drawn (a read on leaving a save with no answer says
+    // Loading… first, as before).
+    expect(page).toMatch(
+      /const read = useCallback\(async \(\) => \{\s*const mine = \+\+reads\.current;\s*const answer = await readDrafts\(api\);\s*if \(reads\.current === mine\) setDrafts\(answer\.kind === 'read' \? answer\.drafts : 'failed'\);\s*\}, \[api\]\);/,
+    );
+    expect(page).toMatch(/read,\s*\}\}/);
   });
 });
 
@@ -470,7 +497,26 @@ describe('a save that didn’t go through', () => {
   it('says it right above Save, with Try again, which sends it again', () => {
     const html = failed({ kind: 'failed', status: undefined, retryAfter: undefined });
     expect(html).toMatch(
-      /<div class="flex flex-wrap items-center gap-x-4 gap-y-3"><p role="alert" class="text-body">Bali couldn&#x27;t save the question\. Check your connection and try again\.<\/p><button type="submit" aria-disabled="false" class="[^"]*\bh-8\.5\b[^"]*">Try again<\/button><\/div><div class="[^"]*\bborder-t\b[^"]*"><button type="submit"[^>]*>Save<\/button>/,
+      /<div class="flex flex-wrap items-center gap-x-4 gap-y-3"><p role="alert" class="text-body">Bali couldn&#x27;t save the question\. Check your connection and try again\.<\/p><button type="button" aria-disabled="false" aria-busy="false" class="[^"]*\bh-8\.5\b[^"]*">Try again<\/button><\/div><div class="[^"]*\bborder-t\b[^"]*"><button type="submit"[^>]*>Save<\/button>/,
+    );
+    const on = actions();
+    const tree = QuestionsView(
+      view(
+        [],
+        form(WRITTEN, { problem: { kind: 'failed', status: 503, retryAfter: undefined } }),
+        {},
+        on,
+      ),
+    );
+    press(tree, 'Try again');
+    expect(on.save).toHaveBeenCalledOnce();
+    // Refused for good: its line alone, focus then on the form's heading (QuestionsSlidesRetryStates).
+    const component = readFileSync(
+      fileURLToPath(new URL('./saved-questions.tsx', import.meta.url)),
+      'utf8',
+    );
+    expect(component).toMatch(
+      /\{said\.retry \? \(\s*<TryAgain onRetry=\{on\.save\} held=\{busy\} then=\{\['q-h'\]\}>\s*\{line\}\s*<\/TryAgain>\s*\) : \(\s*line\s*\)\}/,
     );
   });
 
@@ -576,7 +622,7 @@ describe('the page’s wiring (app/questions/page.tsx)', () => {
     // Leaving a save whose answer never came (Cancel, Edit, Write) reads the list again: it may
     // have landed, and the cards then show the drafts as they are, or that they couldn't load.
     expect(page).toMatch(
-      /opened\.current \+= 1;[^]*?if \(unsaved\.current\) void read\(\);\s*unsaved\.current = null;/,
+      /opened\.current \+= 1;[^]*?if \(unsaved\.current\) \{\s*setDrafts\('loading'\);\s*void read\(\);\s*\}\s*unsaved\.current = null;/,
     );
   });
 });
@@ -632,7 +678,11 @@ describe('the form once a save is answered', () => {
   it('keeps a failure and its Try again, held, while it sends again, Cancel held too', () => {
     const lost = { kind: 'failed', status: undefined, retryAfter: undefined } as const;
     const html = render(view([], form(WRITTEN, { problem: lost, busy: true })));
-    expect(html).toMatch(/<button type="submit" aria-disabled="true" class="[^"]*">Try again</);
+    // Held as Loading… (QuestionsSlidesRetryStates), never disabled: focus stays on it.
+    expect(html).toMatch(
+      /Check your connection and try again\.<\/p><button type="button" aria-disabled="true" aria-busy="true" class="[^"]*">Loading…</,
+    );
+    expect(html).not.toMatch(/\sdisabled=""/);
     expect(html).toMatch(/<button type="button" aria-disabled="true" class="[^"]*">Cancel</);
     // Each answer's toggle is described by its answer, for a screen reader.
     expect(html).toMatch(/aria-pressed="true" aria-describedby="q-a0"/);

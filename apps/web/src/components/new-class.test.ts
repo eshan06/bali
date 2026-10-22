@@ -70,12 +70,13 @@ describe('New class, the dialog (ClassesNew)', () => {
     expect(create).toMatch(
       /if \(dialog\.current && !dialog\.current\.open\) dialog\.current\.showModal\(\);\s*if \(answer\.kind === 'created'\) setMade\(answer\.klass\);\s*else setFailed\(answer\);/,
     );
-    expect(source).toContain(
-      "{busy ? 'Creating…' : failed?.kind === 'failed' ? 'Try again' : 'Create class'}",
-    );
+    // One button throughout, `TryAgain`'s (try-again.test.ts), so focus stays on it whatever it
+    // comes to say: Creating… while it sends, Try again once one got no answer, held until a name
+    // is typed. The form's submit sends nothing: Enter in the field presses it.
     expect(source).toMatch(
-      /<Button type="submit" aria-disabled=\{busy \|\| !name\.trim\(\)\} aria-busy=\{busy\}>/,
+      /<TryAgain\s*type="submit"\s*variant="primary"\s*size="md"\s*onRetry=\{create\}\s*held=\{busy\}\s*blocked=\{!name\.trim\(\)\}\s*then=\{\[`\$\{id\}-title`\]\}\s*send=\{\{\s*words: 'Create class',\s*sending: 'Creating…',\s*failed: failed\?\.kind === 'failed',\s*\}\}\s*\/>/,
     );
+    expect(source).toMatch(/<form onSubmit=\{\(e\) => e\.preventDefault\(\)\}/);
     // Its failure right under the help, as HomeStates and ClassesStates draw it, the field
     // described by it; typing again clears it.
     expect(source).toMatch(

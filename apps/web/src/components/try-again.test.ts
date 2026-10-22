@@ -51,6 +51,18 @@ describe('Try again, as drawn', () => {
       /<button type="button" aria-disabled="false" aria-busy="false" aria-describedby="deck-name" class="[^"]*">Try again<\/button>$/,
     );
   });
+
+  it('holds at rest in its own words while another control’s send is on its way (a stopped upload’s Cancel)', () => {
+    const blocked = render({ blocked: true });
+    expect(blocked).toMatch(
+      /<button type="button" aria-disabled="true" aria-busy="false" class="[^"]*\baria-disabled:opacity-55\b[^"]*">Try again<\/button>$/,
+    );
+    expect(blocked).not.toMatch(/\sdisabled=""/);
+    // Its own read on its way says so, whatever else holds it.
+    expect(render({ blocked: true, held: true })).toMatch(
+      /<button type="button" aria-disabled="true" aria-busy="true" [^>]*>Loading…<\/button>$/,
+    );
+  });
 });
 
 describe('Try again as a send’s own button (Register block, Make new code)', () => {
@@ -93,15 +105,33 @@ describe('Try again as a send’s own button (Register block, Make new code)', (
       /^<button type="submit" aria-disabled="false" aria-busy="false" class="[^"]*\bh-10\b[^"]*\bbg-action-primary-bg\b[^"]*">Register block<\/button>$/,
     );
   });
+
+  it('holds in its own words with nothing to send yet (Create class before a name is typed)', () => {
+    const create = (blocked: boolean, failed = false) =>
+      render({
+        type: 'submit',
+        variant: 'primary',
+        size: 'md',
+        blocked,
+        children: undefined,
+        send: { words: 'Create class', sending: 'Creating…', failed },
+      });
+    expect(create(true)).toMatch(
+      /^<button type="submit" aria-disabled="true" aria-busy="false" class="[^"]*">Create class<\/button>$/,
+    );
+    expect(create(true, true)).toMatch(/aria-busy="false" [^>]*>Try again<\/button>$/);
+    expect(create(false)).toMatch(/aria-disabled="false" aria-busy="false" [^>]*>Create class</);
+  });
 });
 
 describe('Try again, pressed', () => {
   it('reads again once, holding while the read’s promise runs, and never twice at once', () => {
-    // A press while held sends nothing: its read is on its way.
+    // A press while held sends nothing: its read is on its way, or (`blocked`) another's send.
     expect(source).toMatch(
-      /function press\(\) \{\s*if \(busy\) return;\s*const answer = onRetry\(\);\s*if \(!\(answer instanceof Promise\)\) return;\s*setWaiting\(true\);\s*const done = \(\) => setWaiting\(false\);\s*answer\.then\(done, done\);\s*\}/,
+      /function press\(\) \{\s*if \(busy \|\| blocked\) return;\s*const answer = onRetry\(\);\s*if \(!\(answer instanceof Promise\)\) return;\s*setWaiting\(true\);\s*const done = \(\) => setWaiting\(false\);\s*answer\.then\(done, done\);\s*\}/,
     );
     expect(source).toMatch(/const busy = held \|\| waiting;/);
+    expect(source).toMatch(/aria-disabled=\{busy \|\| blocked\}\s*aria-busy=\{busy\}/);
     expect(source).toMatch(
       /\{busy \? \(send\?\.sending \?\? 'Loading…'\) : !send \|\| send\.failed \? 'Try again' : send\.words\}/,
     );
@@ -316,7 +346,7 @@ describe('every read’s Try again in the portal is this one', () => {
     expect(readFileSync(join(src, 'components/shell.tsx'), 'utf8')).not.toMatch(SAID);
   });
 
-  it('adds none of its own anywhere: each left is its own step’s', () => {
+  it('adds none of its own anywhere: none is left', () => {
     const left = sources(src)
       .filter((file) => !file.endsWith(`${sep}try-again.tsx`))
       .filter((file) => {
@@ -335,38 +365,38 @@ describe('every read’s Try again in the portal is this one', () => {
  * Present's), and the student's home; then the class page's own lines (its class and roster, an
  * extend's), the recap, the student panel, New code's Make new code, Reports, a session's report
  * and its Questions; then a close (the class page's and Present's) and the slides (the slide's line,
- * the card's, Present's and a student's, and a slide change's, Show slides' too).
+ * the card's, Present's and a student's, and a slide change's, Show slides' too); then the rest:
+ * the side panel's two lists and an ask (one of your questions, or one written), Your questions (its
+ * list and a save) and Your slides (its list and a stopped upload), New class's Create class, the
+ * invite code's own button, and a student's lesson.
  */
 const MOVED = [
   'app/classes/[id]/page.tsx',
+  'components/ask-panel.tsx',
   'components/blocks.tsx',
   'components/classes.tsx',
+  'components/decks-panel.tsx',
   'components/home.tsx',
+  'components/invite-code.tsx',
   'components/join-code.tsx',
   'components/live-grid.tsx',
+  'components/new-class.tsx',
   'components/question-card.tsx',
   'components/recap-card.tsx',
   'components/report-questions.tsx',
   'components/reports-list.tsx',
+  'components/saved-questions.tsx',
   'components/session-report.tsx',
   'components/shell.tsx',
   'components/slide-card.tsx',
+  'components/slides.tsx',
   'components/student-home.tsx',
+  'components/student-lesson.tsx',
   'components/student-panel.tsx',
 ];
 
 /**
- * The Try agains `TryAgain` doesn't draw yet, each settled in a step of its own: a read's failure
- * elsewhere, and a send's (the one button that sends saying it, as Create class and the invite
- * code do; or under its line, as an upload's, an ask's and a save's do). A new one fails the test
- * above.
+ * The Try agains `TryAgain` doesn't draw: none since the owner's follow-up's part 3 (2026-10-22), so
+ * a Try again drawn by hand anywhere in the portal fails the test above.
  */
-const LEFT = [
-  'components/ask-panel.tsx',
-  'components/decks-panel.tsx',
-  'components/invite-code.tsx',
-  'components/new-class.tsx',
-  'components/saved-questions.tsx',
-  'components/slides.tsx',
-  'components/student-lesson.tsx',
-];
+const LEFT: readonly string[] = [];

@@ -56,12 +56,14 @@ export function handOff(
  * so focus stays on it. An answer that leaves the failure standing says its line again, a new
  * element, however it is worded. One that takes the failure away, Try again with it, lands focus
  * where `then` says (`handOff`), never on the body. A send's resend holds the same way, its line
- * kept until Bali answers. A send's own button (`send`: Register block, Make new code) says its
- * words, and Try again only once a send of it failed.
+ * kept until Bali answers. A send's own button (`send`: Register block, Make new code, Create
+ * class, the invite code) says its words, and Try again only once a send of it failed. Held at rest
+ * (`blocked`), nothing of its own on its way, it keeps its words.
  */
 export function TryAgain({
   onRetry,
   held = false,
+  blocked = false,
   then,
   size = 'sm',
   variant = 'secondary',
@@ -73,6 +75,12 @@ export function TryAgain({
 }: {
   onRetry: () => unknown;
   held?: boolean;
+  /**
+   * Held, nothing of its own on its way: another control's send (a stopped upload's Cancel), or
+   * nothing to send yet (Create class before a name is typed). `aria-disabled` alone, its words as
+   * they are, a press sending nothing.
+   */
+  blocked?: boolean;
   /** The ids focus lands on once the read is in, the first the page has (`land`). */
   then: readonly string[];
   size?: 'sm' | 'md';
@@ -108,7 +116,7 @@ export function TryAgain({
   }, []);
 
   function press() {
-    if (busy) return;
+    if (busy || blocked) return;
     const answer = onRetry();
     if (!(answer instanceof Promise)) return;
     setWaiting(true);
@@ -124,7 +132,7 @@ export function TryAgain({
         type={type}
         variant={variant}
         size={size}
-        aria-disabled={busy}
+        aria-disabled={busy || blocked}
         aria-busy={busy}
         aria-describedby={describedBy}
         onClick={press}

@@ -15,6 +15,7 @@ import { Input } from '@/components/field';
 import { letterClass, letterOf, type Opening } from '@/components/question-card';
 import { CANT_LOAD_QUESTIONS, type Drafts, refusalSaid } from '@/components/saved-questions';
 import { QUIET_LINK } from '@/components/text-link';
+import { TryAgain } from '@/components/try-again';
 import { TOO_MANY_TRIES } from '@/lib/errors';
 import type { Failure, OpenAnswer, QuestionDraft } from '@/lib/live-question';
 import { readDrafts, refusalsOf, trimmed, withoutAnswer } from '@/lib/saved-questions';
@@ -61,15 +62,23 @@ const LINK_BUTTON =
 const CAPTION = 'text-caption text-text-tertiary';
 /** A line said with its retry beside it, wrapping under it where there's no room. */
 const SAID = 'flex flex-wrap items-center gap-x-4 gap-y-3';
+/** What went wrong, said where it happened. */
+const saidLine = (words: string) => (
+  <p role="alert" className="text-body">
+    {words}
+  </p>
+);
 
 /**
  * Write a new question in the side panel (L7; LessonWrite, LessonStates' lines), 460 px wide. The
  * question and 2 to 6 answers, one marked correct if the teacher likes; what Bali refuses said
  * under each, in Your questions' words through its checks (`refusalsOf`, `refusalSaid`: the
  * portal's one copy), the first focused; a failed ask above Ask the class, Try again sending it
- * again under its id (L6). The ask itself, on its way or failed, is the live question's
- * (`opening`), so a panel opened again shows it. Cancel drops what was written; Close and Escape
- * keep it for later.
+ * again under its id (L6), its line kept and Try again held until Bali answers; asked, the page
+ * moves focus to the question; the session ended first, its line alone, focus on the panel's title
+ * (LessonRetryStates). The ask itself, on its way or failed, is the live question's (`opening`),
+ * so a panel opened again shows it. Cancel drops what was written; Close and Escape keep it for
+ * later.
  */
 export function AskPanel({
   id,
@@ -111,8 +120,8 @@ export function AskPanel({
     added.current = false;
   }, [id, count]);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
+  // Ask the class's press, and Try again's.
+  async function send() {
     if (busy) return;
     const found = refusalsOf(draft);
     const first = found.prompt ? 'prompt' : found.options.findIndex((r) => r !== null);
@@ -136,7 +145,10 @@ export function AskPanel({
     >
       {/* noValidate: what Bali refuses is said in its words under each field. */}
       <form
-        onSubmit={(e) => void submit(e)}
+        onSubmit={(e) => {
+          e.preventDefault();
+          void send();
+        }}
         noValidate
         className="flex flex-col gap-5 px-5 pt-4.5 pb-6"
       >
@@ -247,14 +259,13 @@ export function AskPanel({
         {/* Right above the button that sends it again (DESIGN.md §4). */}
         {failed ? (
           <div className={SAID}>
-            <p role="alert" className="text-body">
-              {failed.words}
-            </p>
             {failed.retry ? (
-              <Button variant="secondary" size="sm" type="submit" aria-disabled={busy}>
-                Try again
-              </Button>
-            ) : null}
+              <TryAgain onRetry={send} held={busy} then={[`${id}-h`]}>
+                {saidLine(failed.words)}
+              </TryAgain>
+            ) : (
+              saidLine(failed.words)
+            )}
           </div>
         ) : null}
         <div className="flex flex-wrap items-center gap-2.5 border-t border-border-default pt-4.5">
@@ -331,7 +342,9 @@ export const pickLine = ({ options, correctOption }: QuestionDraft) =>
  * Written ahead, oldest first, each with its answers counted, the correct one named, and Ask; the
  * list loading, failed with Try again, or none yet; then Write a new question and Your questions.
  * Each Ask holds while any ask is on its way, and an ask that didn't go through is said under its
- * question with Try again. It names the correct answers, so the page never draws it in Present.
+ * question with Try again. Each Try again keeps its line, held, until Bali answers: read, focus on
+ * Written ahead; the session ended first, on the question's words (LessonRetryStates). It names
+ * the correct answers, so the page never draws it in Present.
  */
 export function PickView({
   id,
@@ -349,7 +362,8 @@ export function PickView({
   openNow: boolean;
   /** The ask on its way, or the last one's failure, and what it asked (`useLiveQuestion`). */
   opening: Opening;
-  onRead: () => void;
+  /** The list read again, its failure said until it answers. */
+  onRead: () => Promise<void>;
   onPick: (draft: SavedQuestion) => void;
   onWrite: () => void;
   onClose: () => void;
@@ -378,12 +392,9 @@ export function PickView({
             </p>
           ) : drafts === 'failed' ? (
             <div className={SAID}>
-              <p role="alert" className="text-body">
-                {CANT_LOAD_QUESTIONS}
-              </p>
-              <Button variant="secondary" size="sm" onClick={onRead}>
-                Try again
-              </Button>
+              <TryAgain onRetry={onRead} then={[`${id}-ahead`]}>
+                {saidLine(CANT_LOAD_QUESTIONS)}
+              </TryAgain>
             </div>
           ) : drafts.length === 0 ? (
             <p className="text-body">No saved questions yet.</p>
@@ -416,20 +427,13 @@ export function PickView({
                     {/* Under its question, where it happened (LessonAskStates). */}
                     {said ? (
                       <div className={`col-span-full mt-1.5 ${SAID}`}>
-                        <p role="alert" className="text-body">
-                          {said.words}
-                        </p>
                         {said.retry ? (
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            aria-describedby={q}
-                            aria-disabled={busy}
-                            onClick={pick(draft)}
-                          >
-                            Try again
-                          </Button>
-                        ) : null}
+                          <TryAgain onRetry={pick(draft)} held={busy} then={[q]} describedBy={q}>
+                            {saidLine(said.words)}
+                          </TryAgain>
+                        ) : (
+                          saidLine(said.words)
+                        )}
                       </div>
                     ) : null}
                   </li>
@@ -464,9 +468,10 @@ export function PickView({
 
 /**
  * The panel as Ask a question opens it (LessonAsk): the teacher's questions read from Bali each time
- * it opens, and again by Try again, focus coming to its title. An Ask sends the question's words
- * through the live question's own ask, as Ask the class sends what is written (#390): one at a time,
- * the same words again under the same id while their answer never came (L6).
+ * it opens, focus coming to its title, and again by Try again, its failure said until the answer.
+ * An Ask sends the question's words through the live question's own ask, as Ask the class sends
+ * what is written (#390): one at a time, the same words again under the same id while their answer
+ * never came (L6).
  */
 export function PickPanel({
   id,
@@ -488,7 +493,6 @@ export function PickPanel({
   const api = useApi();
   const [drafts, setDrafts] = useState<Drafts>('loading');
   const read = useCallback(async () => {
-    setDrafts('loading');
     const answer = await readDrafts(api);
     setDrafts(answer.kind === 'read' ? answer.drafts : 'failed');
   }, [api]);
@@ -509,7 +513,7 @@ export function PickPanel({
       drafts={drafts}
       openNow={openNow}
       opening={opening}
-      onRead={() => void read()}
+      onRead={read}
       onPick={(draft) => void pick(draft)}
       onWrite={onWrite}
       onClose={onClose}

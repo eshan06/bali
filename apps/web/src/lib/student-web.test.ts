@@ -43,6 +43,7 @@ import {
   picker,
   type Picks,
   rereadEvery,
+  retryHeld,
   type Said,
   saidNow,
   type StudentClass,
@@ -1247,6 +1248,40 @@ describe('lessonView: what the lesson page shows (W4)', () => {
     expect(lessonView(biology, 'fresh', SOON, { ...over, ended: { after: null, by: AT } })).toEqual(
       { kind: 'over', klass: biology, at: null },
     );
+  });
+});
+
+describe('retryHeld: the lesson page’s Try again held until the read it waits on answers (StudentRetryStates)', () => {
+  const failed = { kind: 'failed', status: undefined, retryAfter: undefined } as const;
+  const lost: LessonState = { presentation: null, problem: failed, asOf: null };
+  const FAILED: LessonView = { kind: 'failed' };
+  /** Pressed with the lesson `lost` and one of the account's reads answered. */
+  const pressed = { lesson: lost, accountReads: 1 };
+
+  it('holds nothing before it is pressed', () => {
+    expect(retryHeld(null, FAILED, true, pressed)).toBe(false);
+    expect(retryHeld(null, { kind: 'loading' }, false, pressed)).toBe(false);
+  });
+
+  it('holds while the lesson is read again, the class known, until its answer, a failure too', () => {
+    expect(retryHeld(pressed, FAILED, true, pressed)).toBe(true);
+    // The account answered meanwhile: still the lesson's read it waits on.
+    expect(retryHeld(pressed, FAILED, true, { lesson: lost, accountReads: 2 })).toBe(true);
+    // The lesson read again failed: a new state, so its line is said again.
+    expect(retryHeld(pressed, FAILED, true, { lesson: { ...lost }, accountReads: 1 })).toBe(false);
+  });
+
+  it('holds while the account is read again, the class not known, until its answer', () => {
+    expect(retryHeld(pressed, FAILED, false, pressed)).toBe(true);
+    expect(retryHeld(pressed, FAILED, false, { lesson: lost, accountReads: 2 })).toBe(false);
+  });
+
+  it('holds while what comes after is still loading, and lets go once it shows', () => {
+    // The account read: the class known, its lesson now on its way.
+    expect(retryHeld(pressed, { kind: 'loading' }, true, { lesson: lost, accountReads: 2 })).toBe(
+      true,
+    );
+    expect(retryHeld(pressed, { kind: 'not_in_class' }, false, pressed)).toBe(false);
   });
 });
 
