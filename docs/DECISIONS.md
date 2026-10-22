@@ -33,16 +33,21 @@ a real decision? Add a dated entry at the top: what was decided and why.
   commit: the create's on the unique index, the edit's and the removal's on the draft's row).
   **The same comparison elsewhere, left for the owner's pre-pilot step** (a repeated-`event_id` check
   on every data-changing route, waiting for the owner's word; *the conductor's call, awaiting the
-  owner*: saved questions only here): `DELETE /v1/decks/{id}` (`removeDeck`, M2a) compares
-  `deck.eventId === input.eventId`, so a removal resent in upper case is `404 deck_not_found`; and a
-  tap with the Emergency Unlock sent under it (`POST /v1/taps`, `POST /v1/taps/{eventId}/unlock`,
-  decision 11) match the tap's id as text, as sent: the kept unlock's `claimed_tap_event_id`, read by
-  `unlocksAwaitingTap` as the tap lands, and `lockTap`'s advisory lock over the id's text. So an
-  unlock that lands first, naming its tap in another case than the tap's own, stays recorded, kept
-  `unknown_tap`, and is never filed in the session the tap then lands in, nor do the two wait for each
-  other (one landing after its tap finds it in Postgres and is filed there). Only the portal calls
-  the first, and only the phone the second, whose outbox sends a record's id in one case. Every other
-  write route matches its ids in Postgres.
+  owner*: saved questions only here), three found. `DELETE /v1/decks/{id}` (`removeDeck`, M2a)
+  compares `deck.eventId === input.eventId`, so a removal resent in upper case is
+  `404 deck_not_found`. A tap with the Emergency Unlock sent under it (`POST /v1/taps`,
+  `POST /v1/taps/{eventId}/unlock`, decision 11) match the tap's id as text, as sent: the kept
+  unlock's `claimed_tap_event_id`, read by `unlocksAwaitingTap` as the tap lands, and `lockTap`'s
+  advisory lock over the id's text. So an unlock that lands first, naming its tap in another case
+  than the tap's own, stays recorded, kept `unknown_tap`, and is never filed in the session the tap
+  then lands in, nor do the two wait for each other (one landing after its tap finds it in Postgres
+  and is filed there). And an unlock's replay (`POST /v1/sessions/{id}/unlock`, or one filed under
+  its tap) answers its reason (`recordedReason`) by reading the student's change of it (A20) under
+  the id as sent, as text (`reasonChanges`, `payload->>'unlock_event_id'`), where a change stores it
+  lower-case: an unlock resent in upper case after its reason changed is answered with the reason
+  first recorded. The record and the teacher's view stay right; only that answer is stale (santa's
+  Reviewer A). Only the portal calls the first, and only the phone the others, whose outbox sends a
+  record's id in one case. The other write routes this survey read match their ids in Postgres.
 
 - **2026-10-22** — **A slide upload that sends nothing for 30 s stops; 25 minutes stay the outer
   limit (#436), the owner's decision** ("ok fine the 30 s and 25 min outer limit is good"). Your

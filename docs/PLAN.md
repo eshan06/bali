@@ -11,9 +11,9 @@ is in `docs/DECISIONS.md`, and finished history is word for word in
 _Last updated: 2026-10-22 (Central) — A saved question's write resent with its `eventId` in upper
 case is its replay (#437, closing #319; `docs/DECISIONS.md`, 2026-10-22): a resent edit was `409
 event_id_conflict` and a resent removal `404`, though the first had landed. The engine now compares
-the id as Postgres does (the conductor's call, awaiting the owner). The same comparison in a deck's
-removal, and in a tap with the unlock sent under it, waits for the owner's pre-pilot step, the
-repeated-`event_id` check. Nothing anyone sees changes. Before it, a stuck slide upload stops (#436).
+the id as Postgres does (the conductor's call, awaiting the owner). Three other places that compare
+an id as text wait for the owner's pre-pilot step, the repeated-`event_id` check (Open owner items).
+Nothing anyone sees changes. Before it, a stuck slide upload stops (#436).
 Next on the Windows PC: the four steps for sessions before the pilot's first class, which wait for
 the owner's word; on the Mac, the phone's L8 and M8._
 
@@ -330,7 +330,7 @@ Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect acc
 - 🔧 Before the pilot's first class: the owner's prod block gets a fresh code (its first reached the repo's history in #228), and a session builds an owner command that retires a block, to retire the old code (`docs/PILOT.md`, setup step 6). The portal's three class-page controls are built (P10, P11).
 - **Before the pilot's first class, four steps for sessions** (the owner's workflow review, 2026-10-13; one PR each; after the redesign's PV17c, the owner, 2026-10-14); not started, they wait for the owner's word:
   - a column-level privacy test: every column classified personal or not, each personal one placed by the privacy paths that handle it (the account deletion, the disposal, the retention run, the export), so a new column fails until it is placed; FERPA covers university students too;
-  - a repeated-`event_id` check on every data-changing route, driven from the authorization matrix's route list (#319's survey found two that still compare an id as text, so a retry in upper case misses: a deck's removal, and a tap with the unlock sent under it; DECISIONS 2026-10-22);
+  - a repeated-`event_id` check on every data-changing route, driven from the authorization matrix's route list (#319's survey found three that still compare an id as text, so a retry in upper case misses: a deck's removal, a tap with the unlock sent under it, and an unlock's replay after its reason changed; DECISIONS 2026-10-22);
   - pilot deploy rules: no deploys during class hours, and a documented one-command rollback in `docs/RUNBOOKS.md`;
   - Dependabot PRs can't pass Claude Review (the action rejects bot actors: add `allowed_bots` for dependabot in `claude-review.yml`, bundled with the next edit to that protected file); until then such a PR waits, as #427 (`vite` 8.3.4, dev only) does. #309 (`next` 15.5.27) is superseded by 15.5.28 (#435), and Dependabot closes it itself once main has it.
 - 🔧 The Cognito sign-in deleter: runbook 9 (`docs/RUNBOOKS.md`) — per environment an IAM policy
