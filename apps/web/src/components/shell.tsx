@@ -126,6 +126,34 @@ export async function readAccount(
   return mine === reads.current ? said : null;
 }
 
+/** Today's reads, extracted unchanged: the regression tests' first run (to be replaced). */
+export function accountReads(
+  api: Pick<ApiClient, 'get'>,
+  apply: (said: { home: Home } | { error: string | null }) => void,
+) {
+  const reads = { current: 0 };
+  let reading = false;
+  return {
+    reading: () => reading,
+    start() {
+      reading = true;
+      void readAccount(api, reads).then((said) => {
+        if (said === null) return;
+        reading = false;
+        apply(said);
+      });
+    },
+    async refresh() {
+      if (reading) return;
+      reading = true;
+      const said = await readAccount(api, reads);
+      if (said === null) return;
+      reading = false;
+      apply(said);
+    },
+  };
+}
+
 /**
  * A signed-in page the back button brings back whole (the browser's back-forward cache) is
  * reloaded, never shown as it was kept: its account may have signed out, expired, or given way to

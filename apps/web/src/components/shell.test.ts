@@ -5,14 +5,15 @@ import { fileURLToPath } from 'node:url';
 import type { MeResponse } from '@bali/shared';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import HomePage from '../app/page';
-import { createApiClient, NetworkError } from '../lib/api-client';
+import { createApiClient, NetworkError, POLL_TIMEOUT_MS } from '../lib/api-client';
 import { CANT_REACH } from '../lib/errors';
 import type { Home } from '../lib/student-web';
 import {
   AccountUnread,
+  accountReads,
   accountStep,
   frameFor,
   initials,
@@ -616,6 +617,127 @@ describe('the account’s reads (#352’s review)', () => {
     const read = readAccount(fake, { current: 0 });
     fake.settles[0]?.fail(new NetworkError());
     expect(await read).toEqual({ error: CANT_REACH });
+  });
+});
+
+describe('the read on its way, handed to Try again (#426’s Left; the owner, 2026-10-16)', () => {
+  const teacher = account('teacher');
+
+  /** An API whose reads answer in the order asked, each settled by hand. */
+  function api() {
+    const settles: { path: string; answer: (body: unknown) => void; fail: (e: unknown) => void }[] =
+      [];
+    return {
+      settles,
+      get: <T>(path: string) =>
+        new Promise<T>((resolve, reject) => {
+          settles.push({ path, answer: (body) => resolve(body as T), fail: reject });
+        }),
+    };
+  }
+  /** Every promise callback run so far, so a refresh that answers at once would have answered. */
+  const flush = () => new Promise<void>((done) => setTimeout(done, 0));
+
+  it('holds a Try again pressed while a read is on its way until that read answers, and reads nothing more', async () => {
+    // A student's home: its 30 s read on its way, or the page's own read as it opened.
+    const fake = api();
+    const said = vi.fn();
+    const reads = accountReads(fake, said);
+    reads.start();
+    expect(reads.reading()).toBe(true);
+    const held = vi.fn();
+    void reads.refresh().then(held);
+    await flush();
+    // Not at once, as it answered before: Try again stays Loading… with focus on it.
+    expect(held).not.toHaveBeenCalled();
+    expect(fake.settles.map((s) => s.path)).toEqual(['/v1/me/age-check']);
+    fake.settles[0]?.answer({ passed: true });
+    await vi.waitFor(() => expect(fake.settles).toHaveLength(2));
+    await flush();
+    expect(held).not.toHaveBeenCalled();
+    fake.settles[1]?.answer(teacher);
+    await vi.waitFor(() => expect(held).toHaveBeenCalledOnce());
+    // That read's answer, once, before Try again lets go.
+    expect(said.mock.calls).toEqual([[{ home: homeOf('teacher') }]]);
+    expect(reads.reading()).toBe(false);
+  });
+
+  it('reads when none is on its way, and settles once its answer has landed, its failure too', async () => {
+    const fake = api();
+    const said = vi.fn();
+    const reads = accountReads(fake, said);
+    expect(reads.reading()).toBe(false);
+    const held = vi.fn();
+    void reads.refresh().then(held);
+    expect(reads.reading()).toBe(true);
+    fake.settles[0]?.fail(new NetworkError());
+    await vi.waitFor(() => expect(held).toHaveBeenCalledOnce());
+    expect(said.mock.calls).toEqual([[{ error: CANT_REACH }]]);
+    expect(reads.reading()).toBe(false);
+  });
+
+  it('holds through a newer read begun meanwhile (a page’s own), until the newest answers; the older says nothing', async () => {
+    const fake = api();
+    const said = vi.fn();
+    const reads = accountReads(fake, said);
+    reads.start();
+    const held = vi.fn();
+    void reads.refresh().then(held);
+    // The page reads it again meanwhile (the bell, a tab back in view).
+    reads.start();
+    fake.settles[0]?.fail(new NetworkError());
+    await flush();
+    // The older read answered, a newer one is on its way: still held, and nothing said.
+    expect(held).not.toHaveBeenCalled();
+    expect(said).not.toHaveBeenCalled();
+    expect(reads.reading()).toBe(true);
+    fake.settles[1]?.answer({ passed: true });
+    await vi.waitFor(() => expect(fake.settles).toHaveLength(3));
+    fake.settles[2]?.answer(teacher);
+    await vi.waitFor(() => expect(held).toHaveBeenCalledOnce());
+    expect(said.mock.calls).toEqual([[{ home: homeOf('teacher') }]]);
+    expect(reads.reading()).toBe(false);
+  });
+
+  describe('a read the network swallows', () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    it('fails at its limit, so no read stays on its way and the next Try again reads again (#426’s review)', async () => {
+      // The page's own read had no limit: swallowed, it stayed on its way for minutes, and every
+      // Try again (`refresh`) answered at once with nothing read.
+      const asked: string[] = [];
+      const client = createApiClient({
+        baseUrl: 'http://api',
+        getToken: () => 'tok',
+        fetchImpl: (url, init) => {
+          asked.push((url as string).replace('http://api', ''));
+          return new Promise((_, reject) => {
+            init?.signal?.addEventListener('abort', () =>
+              reject(new DOMException('aborted', 'AbortError')),
+            );
+          });
+        },
+      });
+      const said = vi.fn();
+      const reads = accountReads(client, said);
+      reads.start();
+      await vi.advanceTimersByTimeAsync(POLL_TIMEOUT_MS - 1);
+      expect(reads.reading()).toBe(true);
+      await vi.advanceTimersByTimeAsync(1);
+      // No answer: said as one, never a sign-out, and no read left on its way.
+      expect(said.mock.calls).toEqual([[{ error: CANT_REACH }]]);
+      expect(reads.reading()).toBe(false);
+      expect(vi.getTimerCount()).toBe(0);
+      const held = vi.fn();
+      void reads.refresh().then(held);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(asked).toEqual(['/v1/me/age-check', '/v1/me/age-check']);
+      expect(held).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(POLL_TIMEOUT_MS);
+      expect(held).toHaveBeenCalledOnce();
+      expect(said).toHaveBeenCalledTimes(2);
+    });
   });
 });
 
