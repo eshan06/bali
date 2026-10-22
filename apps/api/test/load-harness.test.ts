@@ -6,8 +6,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { newUuidV7 } from '@bali/db';
-import { dropDatabase } from '@bali/db/testing';
+import { createDb, newUuidV7 } from '@bali/db';
+import { databaseUrl, dropDatabase } from '@bali/db/testing';
 import type {
   DeckDownload,
   MeResponse,
@@ -255,6 +255,51 @@ describe.runIf(REAL_PG)('the load harness', () => {
       token: student.token,
     });
     expect(download.url).toMatch(/^https:\/\/deck-storage\.invalid\//);
+  });
+
+  it("seeds the school LOAD_TEACHERS names for the bell's measurement (#336): 30 students to each teacher", async () => {
+    const small = `${database}_small`;
+    try {
+      const seeded = await seedSchool(server!, small, 2);
+      expect(seeded.teachers).toHaveLength(2);
+      expect(seeded.students).toHaveLength(60);
+      expect(seeded.teachers.map((t) => t.secondClassId !== null)).toEqual([false, true]);
+    } finally {
+      await dropDatabase(server!, small);
+    }
+  });
+
+  it("gives the API LOAD_DB_POOL's connections (#336): 20 reads at once open a pool of 2, no more", async () => {
+    // Its own name on each connection, so the suite's other API and this reader aren't counted.
+    const name = 'bali-load-pool';
+    const pooled = spawn(process.execPath, ['--import', 'tsx', 'scripts/load/serve.ts'], {
+      cwd: apiDir,
+      env: {
+        ...env,
+        LOAD_SCHOOL_FILE: join(dir!, 'school.json'),
+        HOST: '127.0.0.1',
+        PORT: '0',
+        LOG_LEVEL: 'info',
+        LOAD_DB_POOL: '2',
+        PGAPPNAME: name,
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const gone = once(pooled, 'close');
+    const reader = createDb(databaseUrl(server!, database), { max: 1 });
+    try {
+      const call = createCall(await listeningAt(pooled));
+      const reads = school.students.slice(0, 20).map((s) => ({ token: s.token }));
+      await Promise.all(reads.map((auth) => call<MeResponse>('GET', '/v1/me', auth)));
+      const [held] = await reader.$client<{ n: number }[]>`
+        select count(*)::int as n from pg_stat_activity where application_name = ${name}`;
+      // The driver's own 10 would open more than 2 for 20 reads at once.
+      expect(held!.n).toBe(2);
+    } finally {
+      pooled.kill('SIGTERM');
+      await gone;
+      await reader.$client.end();
+    }
   });
 
   it("serves the gate's flooder: an account of the school's, in no class", async () => {

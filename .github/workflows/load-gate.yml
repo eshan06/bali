@@ -150,6 +150,8 @@ jobs:
           k6-version: 2.3.0
       - name: Each run, a school seeded afresh, the API at its pool, and the bell (k6)
         working-directory: apps/api
+        # Named, so it runs with pipefail: k6's own exit code reaches `status` through its tee.
+        shell: bash
         env:
           # Through env, never inline: the input is typed by hand.
           RUNS: ${{ inputs.bell }}
@@ -218,3 +220,6 @@ jobs:
               exit "$status"
             fi
           done
+      - name: The API's warnings and errors
+        if: failure()
+        run: grep -hE '"level":(40|50|60)' "$RUNNER_TEMP"/api-*.log | tail -n 100 || true

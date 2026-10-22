@@ -49,10 +49,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   their laptops, which no push reaches, open within 30 s, as the student web reads every 30 s, and
   poll. `LOAD_DB_POOL` sizes the API's pool through `createDb`'s new `max` (unset, postgres.js's 10,
   as deployed), and `LOAD_TEACHERS` seeds a larger school (unset, the gate's 20 teachers of 30). Each
-  run's summary says the connections the API held (always the size asked) and, from the second
-  round, the busiest second of the API's main thread and of Postgres's container.
+  run's summary says the connections the API held (the size asked in every run but one with no
+  push, which needed 9 of its 10) and, from the second round, the busiest second of the API's main
+  thread and of Postgres's container.
   **The numbers** (CI's runner; the Starts' and the first reads' p95, then p99; runs 39857512764,
-  39858573122 and 39862758638, 31 in all). *The gate's school, 600 phones* (30 Starts, 20 of them
+  39858573122 and 39862758638, 32 in all). *The gate's school, 600 phones* (30 Starts, 20 of them
   joining 30): no push, the Starts 464 (470), 445 (455) and 331 (344) ms and the reads 8.7 (10.8),
   7.8 (10.3) and 7.3 (10.3) ms; every phone within 1 s, the Starts 520 (546), 901 (945), 1,060
   (1,080) and 1,080 (1,130) ms and the reads 54 (60), 273 (278), 352 (361) and 679 (687) ms; within
