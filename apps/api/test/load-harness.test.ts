@@ -20,7 +20,7 @@ import type {
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createCall } from '../scripts/demo/http.js';
-import { harnessServer, type SchoolFile, seedSchool } from '../scripts/load/school.js';
+import { harnessPool, harnessServer, type SchoolFile, seedSchool } from '../scripts/load/school.js';
 
 /*
  * The load harness (Phase 4, L2a), end to end: the school seeded into a database of its own on the
@@ -91,6 +91,25 @@ describe('harnessServer', () => {
       );
     }
     expect(() => harnessServer({ ...vouched })).toThrow(/TEST_DATABASE_URL/);
+  });
+});
+
+describe('harnessPool', () => {
+  it("names no pool when LOAD_DB_POOL is unset or empty, so the API keeps the one it deploys with: the gate's", () => {
+    expect(harnessPool({})).toBeUndefined();
+    expect(harnessPool({ LOAD_DB_POOL: '' })).toBeUndefined();
+  });
+
+  it("takes a whole number of connections from 1 to 50, the bell's measurement's (#336)", () => {
+    for (const size of [1, 10, 20, 50]) {
+      expect(harnessPool({ LOAD_DB_POOL: String(size) })).toBe(size);
+    }
+  });
+
+  it('refuses any other: postgres.js would open none for 0 and fail on a fraction or text', () => {
+    for (const size of ['0', '-1', '51', '100', '2.5', '1e1', '010', ' 20', 'twenty']) {
+      expect(() => harnessPool({ LOAD_DB_POOL: size })).toThrow(/LOAD_DB_POOL must be a whole/);
+    }
   });
 });
 

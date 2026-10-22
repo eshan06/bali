@@ -6,6 +6,15 @@ name: Load gate
 on:
   pull_request:
   workflow_dispatch:
+    inputs:
+      bell:
+        description: >-
+          Also measure the bell with the class-started push (#336), report-only: runs separated by
+          spaces, each window:pool:read, such as "1:10:me 1:20:me 30:10:me 1:10:light" (seconds a
+          rung phone takes to open Bali, the API's database connections, its first read). Empty,
+          the gate alone.
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -103,3 +112,84 @@ jobs:
       - name: The API's warnings and errors
         if: failure()
         run: grep -E '"level":(40|50|60)' "$RUNNER_TEMP/api.log" | tail -n 100 || true
+
+  # By hand only, and never a check on a PR (#336): the bell with the class-started push's arrival,
+  # apps/api/scripts/load/bell.js, whose thresholds cannot fail. Each run of the `bell` input seeds
+  # the school afresh, serves it at that many database connections and rings it; k6's numbers and
+  # the connections the API held go to the run's summary. The gate above runs beside it, unchanged.
+  bell:
+    name: The bell with the push (k6, by hand)
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.bell != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+      LOAD_LOCAL_POSTGRES: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - uses: grafana/setup-k6-action@43b9fc21641a76002687994433dd586f56e791b1 # v1.2.2
+        with:
+          k6-version: 2.3.0
+      - name: Each run, a school seeded afresh, the API at its pool, and the bell (k6)
+        working-directory: apps/api
+        env:
+          # Through env, never inline: the input is typed by hand.
+          RUNS: ${{ inputs.bell }}
+          POSTGRES: ${{ job.services.postgres.id }}
+        run: |
+          set -f # a run is text, never a file pattern
+          n=0
+          for run in $RUNS; do
+            n=$((n + 1))
+            if ! [[ "$run" =~ ^([0-9]{1,2}):([0-9]{1,2}):(me|light)$ ]]; then
+              echo "::error::each run is window:pool:read, such as 1:10:me, not $run"
+              exit 1
+            fi
+            window=${BASH_REMATCH[1]} pool=${BASH_REMATCH[2]} read=${BASH_REMATCH[3]}
+            npm run load:seed
+            log="$RUNNER_TEMP/api-$n.log"
+            LOAD_DB_POOL=$pool node --import tsx scripts/load/serve.ts > "$log" 2>&1 &
+            pid=$!
+            for _ in $(seq 30); do
+              curl -fsS http://127.0.0.1:3001/healthz > /dev/null && break
+              sleep 1
+            done
+            curl -fsS http://127.0.0.1:3001/healthz > /dev/null || { cat "$log"; exit 1; }
+            status=0
+            k6 run --quiet -e ARRIVAL_WINDOW="$window" -e FIRST_READ="$read" scripts/load/bell.js \
+              | tee "$RUNNER_TEMP/k6-$n.log" || status=$?
+            # postgres.js keeps each connection it opens: the most the API held at once.
+            held=$(docker exec "$POSTGRES" psql -U postgres -tAc \
+              "select count(*) from pg_stat_activity where datname = 'bali_load'")
+            kill -TERM "$pid"
+            timeout 20 tail --pid="$pid" -f /dev/null
+            {
+              echo "### Run $n: each rung phone within $window s, $pool connections, a first read of $read"
+              echo "k6 exited $status; the API held $held database connections;" \
+                "$(grep -cE '"level":(40|50|60)' "$log" || true) warnings or errors in its log."
+              echo '```'
+              sed -n '/TOTAL RESULTS/,$p' "$RUNNER_TEMP/k6-$n.log"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            if [ "$status" != 0 ]; then
+              grep -E '"level":(40|50|60)' "$log" | tail -n 50 || true
+              exit "$status"
+            fi
+          done

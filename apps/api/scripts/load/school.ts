@@ -85,6 +85,23 @@ export function harnessServer(env: NodeJS.ProcessEnv): string {
   return url;
 }
 
+/** The most connections a run may give the API: the harness's Postgres allows 100 in all. */
+const POOL_MAX = 50;
+
+/**
+ * The API's database pool for a run of the bell's measurement (#336), from LOAD_DB_POOL: unset or
+ * empty, none named, so the API keeps its own (postgres.js's 10, as deployed); else a whole number
+ * from 1 to 50, below the harness's Postgres's 100 connections.
+ */
+export function harnessPool(env: NodeJS.ProcessEnv): number | undefined {
+  const size = env.LOAD_DB_POOL;
+  if (size === undefined || size === '') return undefined;
+  if (!/^[1-9][0-9]?$/.test(size) || Number(size) > POOL_MAX) {
+    throw new Error(`LOAD_DB_POOL must be a whole number of connections from 1 to ${POOL_MAX}`);
+  }
+  return Number(size);
+}
+
 /**
  * A fresh `database` on `server` holding the school, and its file. Each teacher has a block and the
  * class they start at this bell; every other one teaches a second class too, which the room before
