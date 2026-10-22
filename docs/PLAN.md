@@ -8,14 +8,15 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-22 (Central) — A saved question's write resent with its `eventId` in upper
-case is its replay (#437, closing #319; `docs/DECISIONS.md`, 2026-10-22): a resent edit was `409
-event_id_conflict` and a resent removal `404`, though the first had landed. The engine now compares
-the id as Postgres does (the conductor's call, awaiting the owner). Three other places that compare
-an id as text wait for the owner's pre-pilot step, the repeated-`event_id` check (Open owner items).
-Nothing anyone sees changes. Before it, a stuck slide upload stops (#436).
-Next on the Windows PC: the four steps for sessions before the pilot's first class, which wait for
-the owner's word; on the Mac, the phone's L8 and M8._
+_Last updated: 2026-10-22 (Central) — The bell with the class-started push, measured at a school's
+scale (#336, #438; `docs/DECISIONS.md`, 2026-10-22), a k6 run by hand only (the Load gate's `bell`
+input); the gate on PRs is unchanged. Every rung phone opening at once about doubles the Starts'
+time (600 phones: 0.33–0.46 s to 0.52–1.08 s), with no request failing; what runs out is the API's
+one process, not its 10 connections. The fix waits for the owner (Open owner items): the conductor's
+pick, a random wait of up to 10 s before the phone's first read after a push, the Mac's, in the
+push's app half. Nothing anyone sees changes. Before it, a saved question's id case (#437). Next on
+the Windows PC: the four steps for sessions before the pilot's first class, which wait for the
+owner's word; on the Mac, the phone's L8 and M8._
 
 ## Now
 
@@ -88,7 +89,8 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
   whose waiting tap a Start converts; a doorbell, never the truth. N1 (the docs), N2 (CI) and N3 (the
   token endpoints; the app half's interface is on N3's line) ✅; **the backend half is done**
   (N4–N6 ✅, 2026-10-06). Left: the app half (the Mac session) and the owner's console steps
-  (`docs/RUNBOOKS.md`, runbook 7); until then push is off on both deploys. Not on
+  (`docs/RUNBOOKS.md`, runbook 7); until then push is off on both deploys. Before it reaches a
+  school, #336's fix, measured (#438; DECISIONS 2026-10-22) and the owner's to pick. Not on
   the pilot's critical path: it never delays C2 or the external TestFlight steps.
 
 - **Deleted accounts' Cognito sign-ins (C3-cognito, 2026-10-09):** the server queues and deletes
@@ -323,7 +325,7 @@ Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect acc
 - The parked PRs #61 and #49.
 - 🔧 Production, still open: check that the next push to `main` deploys `bali-portal` on its own now that `vercel.json` is deleted (runbook 3, step 6); Railway 2FA, threat protection, CloudTrail, the backups (L0b) and the restore drill are on Phase 6's owner list above.
 - 👀 After the next deploy of `bali` and `bali prod` (P8's follow-up): the deploy log shows the migrations, then `Server listening`; a later redeploy's log for the old deployment shows `shutting down` with `signal: SIGTERM`.
-- Phase 7: **to decide**, #313 (what a teacher's own deletion, and the retention run, do with their words), kept as today for now (the owner's ruling, 2026-10-12); **tracked fixes**, #319 ✅ (#437, saved questions' id case), #326 (a slow upload outliving its deck; M5 aborts it at 25 minutes, and a stuck one once nothing is sent for 30 s, #436), #334 ✅ (#403, a timeout on the portal's polls; #432, on every other read and save but a deck's check and a class's create), #336 (capacity at the bell, before the class-started push reaches a school); L0b is the owner's (Railway, above). The calls confirmed on 2026-10-12: this line in full in `docs/PLAN-ARCHIVE.md`.
+- Phase 7: **to decide**, #313 (what a teacher's own deletion, and the retention run, do with their words), kept as today for now (the owner's ruling, 2026-10-12); **tracked fixes**, #319 ✅ (#437, saved questions' id case), #326 (a slow upload outliving its deck; M5 aborts it at 25 minutes, and a stuck one once nothing is sent for 30 s, #436), #334 ✅ (#403, a timeout on the portal's polls; #432, on every other read and save but a deck's check and a class's create), #336 measured (#438; DECISIONS 2026-10-22), its fix the owner's to pick: the conductor's, a random wait of up to 10 s before the phone's first read after a push (the Mac's, in the push's app half), over more database connections (no better: the API's one process is what runs out) or a lighter first read (faster reads, not faster Starts); and a bell past the gate's 600 phones is over the Starts' 1 s with no push (1,200: 0.9–1.2 s), a later step's before a school that size; L0b is the owner's (Railway, above). The calls confirmed on 2026-10-12: this line in full in `docs/PLAN-ARCHIVE.md`.
 - #380: Present after the bell has no Start, so starting the next class from a projected tab shows the last recap's unlock reasons (the owner, 2026-10-14: tracked, not now); PresentEnded's line, "the session ended at 9:55 AM", waits with it (PV12b kept Present's "no session running")
 - Left for the owner on finished steps' lines (in full in `docs/PLAN-ARCHIVE.md`): P7's App Review path (decide its section 4, then fill the accounts and paste); P6's restore drill, its result recorded once a backup exists; S4's CSP check on the deployed portal after each Next upgrade (due now, for 15.5.28, #435); ⚖️ whether C7-server's yes rides Other Data Types; device rounds still marked pending (B5b's round 2, steps 7 and 9; B5c's round 3, steps 1 and 3; round 4, B6a and B6b); smaller calls on F (a refused tap's end-of-day drop or dismiss button; the waiting card's Tap in), B6c-2 (`.keep`/`.retry`), B5b (a rule for a replaced window, a code step to schedule) and D2 (Present's key per class).
 - ✅ **Answered** (the owner, 2026-10-14; DECISIONS 2026-10-14): PV5b's whole-page error kept; its review notes folded into PV15 and PV17a; PV4c's two test limits left.

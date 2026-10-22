@@ -85,6 +85,26 @@ export function harnessServer(env: NodeJS.ProcessEnv): string {
   return url;
 }
 
+/** A knob of the bell's measurement (#336): unset or empty, none; else a whole number, 1 to `max`. */
+function knob(env: NodeJS.ProcessEnv, name: string, max: number, what: string): number | undefined {
+  const value = env[name];
+  if (value === undefined || value === '') return undefined;
+  if (!/^[1-9][0-9]?$/.test(value) || Number(value) > max) {
+    throw new Error(`${name} must be a whole number of ${what} from 1 to ${max}`);
+  }
+  return Number(value);
+}
+
+/**
+ * The API's database pool for a run, from LOAD_DB_POOL: none named, the API keeps its own
+ * (postgres.js's 10, as deployed); at most 50, below the harness's Postgres's 100 connections.
+ */
+export const harnessPool = (env: NodeJS.ProcessEnv) => knob(env, 'LOAD_DB_POOL', 50, 'connections');
+
+/** How many teachers the seed's school has, from LOAD_TEACHERS: none named, the gate's 20. */
+export const harnessTeachers = (env: NodeJS.ProcessEnv) =>
+  knob(env, 'LOAD_TEACHERS', 60, 'teachers') ?? TEACHERS;
+
 /**
  * A fresh `database` on `server` holding the school, and its file. Each teacher has a block and the
  * class they start at this bell; every other one teaches a second class too, which the room before
@@ -92,10 +112,14 @@ export function harnessServer(env: NodeJS.ProcessEnv): string {
  * no event. Each teacher's deck goes through the engine's create and check, as the API's tests
  * make one, with no object behind it: no gate request reads its bytes.
  */
-export async function seedSchool(server: string, database = 'bali_load'): Promise<SchoolFile> {
+export async function seedSchool(
+  server: string,
+  database = 'bali_load',
+  teacherCount = TEACHERS,
+): Promise<SchoolFile> {
   const issuer = await makeTestIssuer();
   const schoolId = newUuidV7();
-  const teachers = Array.from({ length: TEACHERS }, (_, i) => ({
+  const teachers = Array.from({ length: teacherCount }, (_, i) => ({
     id: newUuidV7(),
     sub: `load-teacher-${i + 1}`,
     name: `Teacher ${i + 1}`,
@@ -104,7 +128,7 @@ export async function seedSchool(server: string, database = 'bali_load'): Promis
     blockId: newUuidV7(),
     tagId: `LOAD-TAG-${i + 1}`,
   }));
-  const students = Array.from({ length: TEACHERS * CLASS_SIZE }, (_, i) => {
+  const students = Array.from({ length: teacherCount * CLASS_SIZE }, (_, i) => {
     const room = Math.floor(i / CLASS_SIZE);
     const teacher = teachers[room]!;
     const elsewhere = teachers[room + 1]?.secondClassId ?? null;

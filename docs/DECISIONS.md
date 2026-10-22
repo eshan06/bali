@@ -8,6 +8,117 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-22** — **The bell with the class-started push, measured at a school's scale (#438, #336):
+  every rung phone opening at once about doubles the Starts' time, what runs out is the API's one
+  process and not its 10 connections, and of #336's three fixes only spreading the phones' first
+  reads brings the Starts back. The fix to make, *the conductor's call, awaiting the owner*: a
+  random wait of up to 10 s before the phone's first read after a push.** Measured, not fixed.
+  **The model** (ARCHITECTURE, "Push: a doorbell for students", in the load gate's world). *Who is
+  rung:* only the students whose waiting tap the Start converts. At the gate's bell that is all 600:
+  each taps in the minute before it, so each waits, and each teacher's Start joins their 30; the ten
+  second classes, which no one waits for, ring no one. The alert goes to each APNs token the student
+  registered, so to their phone (one each: phones are never shared), never to their laptop, since the
+  student web has no push. *When:* the Start route hands the students it converted to the sender
+  once its transaction commits; the sender reads their tokens (one query a Start) and sends each
+  alert at once, and Apple delivers in seconds, often under one, with no promise. With every teacher
+  starting within 2 s of the bell, a school's alerts land within about 3 s of it. *What a phone does
+  first:* nothing until the student opens Bali, since the alert is visible only and runs no code.
+  Opened, the app comes to the front (`setForeground`, `reread()`) and the engine's read loop wakes
+  at once with `GET /v1/me`, four queries, whose answer names the session, so the phone shields.
+  Nothing else goes: the tap left the outbox at its `armed` answer, and the 13+ ask runs only for a
+  sign-in not through it. A cold launch from the alert reads the same way. Then it checks in every
+  30 s while in front, its next wake 30 s after that read, so phones a push opened together check in
+  together, every 30 s, for the rest of the class; in a lesson class the phone's card (L8, not built)
+  polls the lesson every 2 s from that read. *How soon a student opens it:* not knowable here, so the
+  measurement brackets it with the window within which each rung phone opens after its Start's
+  answer: 1 s (every student at once, the worst case), 5 s and 10 s (a spread of reactions, or a
+  wait on the phone), and 30 s, which is no push: a waiting phone in front finds the Start at its
+  next 30 s read, the gate's own pattern, and one behind only when the student opens it. *Against
+  M9's 300:* M9's devices opened beside the Starts, within their 2 s, and read `/v1/me` every 2 s
+  until their session showed, so they met their own Starts; a push rings only after its Start
+  commits, so a class's reads follow its own Start and meet only the Starts still running. *Left
+  out:* the sender's own reads (one a Start, 20 at the bell beside the first reads' 2,400 queries;
+  the harness keeps push off) and the flooder (the rate limits' check, not capacity).
+  **The measurement** (`apps/api/scripts/load/bell.js`): by hand only, the Load gate workflow's
+  `bell` input on `workflow_dispatch`, a job of its own, each run `window:pool:read[:teachers]` on a
+  school seeded afresh, its thresholds unable to fail. The gate's job on `pull_request` is unchanged,
+  byte for byte: its scenarios, thresholds and time. The school taps as the gate's does (over 25 s,
+  the bell at 30 s, every device stopping 75 s after); each teacher's VU makes its Start, then
+  carries its class's 30 phones through `http.asyncRequest`, so no phone reads before its Start has
+  answered; the six lesson classes' teachers ask and show a slide, their phones poll and answer, and
+  their laptops, which no push reaches, open within 30 s, as the student web reads every 30 s, and
+  poll. `LOAD_DB_POOL` sizes the API's pool through `createDb`'s new `max` (unset, postgres.js's 10,
+  as deployed), and `LOAD_TEACHERS` seeds a larger school (unset, the gate's 20 teachers of 30). Each
+  run's summary says the connections the API held (the size asked in every run but one with no
+  push, which needed 9 of its 10) and, from the second round, the busiest second of the API's main
+  thread and of Postgres's container.
+  **The numbers** (CI's runner; the Starts' and the first reads' p95, then p99; runs 39857512764,
+  39858573122 and 39862758638, 32 in all, and 39869038433, two more, below). *The gate's school, 600 phones* (30 Starts, 20 of them
+  joining 30): no push, the Starts 464 (470), 445 (455) and 331 (344) ms and the reads 8.7 (10.8),
+  7.8 (10.3) and 7.3 (10.3) ms; every phone within 1 s, the Starts 520 (546), 901 (945), 1,060
+  (1,080) and 1,080 (1,130) ms and the reads 54 (60), 273 (278), 352 (361) and 679 (687) ms; within
+  1 s at 20 connections, the Starts 700 (734), 1,480 (1,600), 1,660 (1,780) and 1,100 (1,120) ms
+  and the reads 30 (37), 192 (198), 361 (371) and 160 (171) ms; within 5 s, the Starts 482 (488)
+  ms and the reads 15 (22) ms; within 10 s, the Starts 463 (474), 515 (528) and 520 (528) ms and the
+  reads 11 (14), 12 (18) and 10 (13) ms; within 1 s with a read of one query, the Starts 1,110
+  (1,130) and 872 (897) ms and the reads 112 (122) and 51 (65) ms. *1,200 phones* (40 teachers):
+  no push, the Starts 1,210 (1,330) and 909 (925) ms and the reads 106 (764) and 14 (427) ms;
+  within 1 s, the Starts 2,170 (2,380) and 2,060 (2,300) ms and the reads 2,170 (2,190) and 2,300
+  (2,330) ms; at 20 connections, the Starts 2,370 (2,400) and 2,130 (2,300) ms and the reads 1,710
+  (1,720) and 1,360 (1,380) ms; at 5 connections, the Starts 2,220 (2,280) ms and the reads 2,530
+  (2,550) ms; within 5 s, the Starts 1,340 (1,560) ms and the reads 788 (913) ms; within 10 s, the
+  Starts 1,120 (1,250) and 976 (1,110) ms and the reads 557 (713) and 379 (536) ms; a read of one
+  query, the Starts 1,670 (2,000) and 1,630 (2,010) ms and the reads 598 (654) and 586 (629) ms.
+  *1,800 phones* (60 teachers): no push, the Starts 1,890 (1,940) ms and the reads 60 (1,270) ms;
+  within 10 s, 1,950 (2,320) and 1,500 (1,860) ms; within 1 s, 3,250 (3,750) and 3,780 (3,810) ms.
+  The check-ins, in step after a push within 1 s: p95 12–21 ms at 600, 252–621 ms at 1,200, 1.34 s at
+  1,800; within 10 s, 9–11 ms, 9 ms and 140 ms. The CPU, in round two, at its busiest second: the
+  API's main thread used 93 to 96 hundredths of a core whenever every phone opened within 1 s, at
+  every size and pool; with no push, 71 at 600, 91 at 1,200 and 90 at 1,800; within 5 or 10 s, 75 and
+  77 at 600, 95 and 92 at 1,200, 92 at 1,800. Postgres's container used 67 to 124 hundredths, about
+  one of the runner's four cores. No request failed in any run (0 of 13,590 to 19,473 each), and no
+  check did. *A faster runner* (39869038433, the final script, at 600): within 1 s, the Starts 415
+  (488) ms and the reads 41 (46) ms, the main thread at 87; within 10 s, 161 (172) and 4.1 (5.5) ms,
+  at 54. Runners differ by about twice; on each, every phone at once at least doubles the Starts'
+  time against a 10 s spread.
+  **What they mean.** *The push at once doubles the bell's cost, in time, never in errors:* at the
+  gate's 600 the Starts' p95 goes from 0.33–0.46 s to 0.52–1.08 s (twice past their 1 s) and the
+  first reads from about 8 ms to 54–679 ms; at 1,200, from 0.9–1.2 s to 2.1–2.2 s; at 1,800, from
+  1.9 s to 3.3 s. Every request still answered. *What runs out is the API's one process, not its 10
+  connections* (#336's premise): in the burst its main thread, the event loop that every request and
+  every one of a Start's statements waits on, runs its whole core, while Postgres uses about one. So
+  the pool's size changes little: 5, 10 or 20 connections gave the same Starts at 1,200, and at 600,
+  20 were no better than 10. More connections only let more of the burst's reads into the one
+  process at once. *Spreading the first reads is what helps:* within 10 s of the Start, the Starts
+  are back to about their no-push numbers at every size, the reads at 10–12 ms at 600, and the
+  check-ins stay spread; within 5 s is enough at 600 (0.48 s) but not at 1,200 (1.34 s). *A lighter
+  first read helps the reads, not the Starts:* one query instead of four, the floor any rework could
+  reach, and the Starts stay at 0.87–1.11 s at 600 and 1.6–1.7 s at 1,200, since each request costs
+  the process its token's check, its route and its answer, whatever it asks of the database. *The
+  bell past the gate's school is over its 1 s with no push at all:* 1,200 phones' 60 Starts take
+  0.9–1.2 s and 1,800's 90 take 1.9 s, the main thread at 90 to 91; that is the bell's own limit, for
+  a later step before a school that size (each Start's 30 conversions, or more than one API
+  process), not the push's. *CI's runner is no Railway:* its four cores run k6, the API and Postgres
+  together, so a deploy's numbers will differ; the API is one Node process there too, which is the
+  part that carries over.
+  **More connections is not a deploy setting today.** postgres.js 3.4.9 reads `PGMAX` and a `?max=`
+  in `DATABASE_URL` as text, and a pool of "20" is one connection (`[...Array("20")]`), as is a `max`
+  passed undefined: setting either on Railway would shrink the API to one connection, with no error.
+  `createDb` now takes `max` as a number, never sent undefined, its test pinning both; a deploy that
+  wanted it would need the API to read a size and pass it.
+  **The recommendation** (*the conductor's call, awaiting the owner*): **when Bali opens from the
+  class-started alert, the phone waits a random time of up to 10 s before its first read** (#336's
+  "short jitter"). The only one of the three that brings the Starts back to about their no-push
+  numbers, at every size measured, and the check-ins with them; and the smallest: the push's app
+  half isn't built, so it ships with it (every phone a push reaches has it) and nothing on the
+  server changes. Its cost: a student who opens Bali from the alert at once waits up to 10 s more for
+  the lock, 5 on average, where today a phone waiting in front finds the Start within 30 s and one
+  behind only when the student looks. What the phone shows meanwhile is the Mac session's and the
+  owner's: Waiting as it is, or a state drawn for it. *Weighed:* more connections (no better on the
+  runner, its one process the limit, and a code change with the trap above); a lighter first read
+  (the most work, a narrower `/v1` read with BaliCore's half and its fixtures, and it helps the
+  reads, not the Starts); 5 s (enough for the gate's 600, not for 1,200).
+
 - **2026-10-22** — **A saved question's write resent with its `eventId` in upper case is its replay
   (#437, closing #319): the engine compares the id as Postgres does.** `writeSavedQuestion` (L3b1)
   checked the id a draft holds with a string `===`, but Postgres prints a `uuid` lower-case and the

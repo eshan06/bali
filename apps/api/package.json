@@ -14,6 +14,7 @@
     "load:seed": "NODE_ENV=development tsx scripts/load/seed.ts",
     "load:serve": "tsx scripts/load/serve.ts",
     "load:gate": "k6 run scripts/load/gate.js",
+    "load:bell": "k6 run scripts/load/bell.js",
     "load:sweep": "tsx scripts/load/sweep.ts",
     "fixtures": "UPDATE_FIXTURES=1 vitest run test/contract-fixtures.test.ts test/openapi.test.ts",
     "typecheck": "tsc --noEmit",

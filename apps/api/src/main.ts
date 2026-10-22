@@ -9,15 +9,19 @@ import { startSweeping } from './sweep.js';
 /**
  * The API as a process: Sentry, the app on DATABASE_URL, the minute sweep, the shutdown on a
  * signal, and the port. `deps` go to `buildApp` beside the database: a deploy passes none (server.ts),
- * the load harness its storage stand-in (M9).
+ * the load harness its storage stand-in (M9) and, for a measurement, its pool's size (#336), which
+ * unset is the driver's own 10.
  */
-export async function main(deps: Omit<AppDeps, 'db'> = {}): Promise<void> {
+export async function main({
+  databasePool,
+  ...deps
+}: Omit<AppDeps, 'db'> & { databasePool?: number } = {}): Promise<void> {
   // Before the app, so a failure to start is reported too (a bad env fails the
   // import above, before Sentry could start). A no-op without SENTRY_DSN.
   initMonitoring(env);
 
   // postgres.js connects lazily, so this makes no network call at boot.
-  const db = createDb(env.DATABASE_URL);
+  const db = createDb(env.DATABASE_URL, { max: databasePool });
   const app = buildApp(env, { ...deps, db });
 
   // The sweep every minute, run by this process itself (hosting decision 3):

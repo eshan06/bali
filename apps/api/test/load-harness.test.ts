@@ -6,8 +6,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { newUuidV7 } from '@bali/db';
-import { dropDatabase } from '@bali/db/testing';
+import { createDb, newUuidV7 } from '@bali/db';
+import { databaseUrl, dropDatabase } from '@bali/db/testing';
 import type {
   DeckDownload,
   MeResponse,
@@ -20,7 +20,13 @@ import type {
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createCall } from '../scripts/demo/http.js';
-import { harnessServer, type SchoolFile, seedSchool } from '../scripts/load/school.js';
+import {
+  harnessPool,
+  harnessServer,
+  harnessTeachers,
+  type SchoolFile,
+  seedSchool,
+} from '../scripts/load/school.js';
 
 /*
  * The load harness (Phase 4, L2a), end to end: the school seeded into a database of its own on the
@@ -91,6 +97,43 @@ describe('harnessServer', () => {
       );
     }
     expect(() => harnessServer({ ...vouched })).toThrow(/TEST_DATABASE_URL/);
+  });
+});
+
+describe('harnessPool', () => {
+  it("names no pool when LOAD_DB_POOL is unset or empty, so the API keeps the one it deploys with: the gate's", () => {
+    expect(harnessPool({})).toBeUndefined();
+    expect(harnessPool({ LOAD_DB_POOL: '' })).toBeUndefined();
+  });
+
+  it("takes a whole number of connections from 1 to 50, the bell's measurement's (#336)", () => {
+    for (const size of [1, 10, 20, 50]) {
+      expect(harnessPool({ LOAD_DB_POOL: String(size) })).toBe(size);
+    }
+  });
+
+  it('refuses any other: postgres.js would open no connection for 0 and fail on a fraction', () => {
+    for (const size of ['0', '-1', '51', '100', '2.5', '1e1', '010', ' 20', 'twenty']) {
+      expect(() => harnessPool({ LOAD_DB_POOL: size })).toThrow(/LOAD_DB_POOL must be a whole/);
+    }
+  });
+});
+
+describe('harnessTeachers', () => {
+  it("seeds the gate's 20 teachers when LOAD_TEACHERS is unset or empty", () => {
+    expect(harnessTeachers({})).toBe(20);
+    expect(harnessTeachers({ LOAD_TEACHERS: '' })).toBe(20);
+  });
+
+  it("takes a whole number of teachers from 1 to 60, for the bell's measurement's larger schools", () => {
+    for (const count of [1, 20, 40, 60]) {
+      expect(harnessTeachers({ LOAD_TEACHERS: String(count) })).toBe(count);
+    }
+    for (const count of ['0', '61', '2.5', 'forty']) {
+      expect(() => harnessTeachers({ LOAD_TEACHERS: count })).toThrow(
+        /LOAD_TEACHERS must be a whole/,
+      );
+    }
   });
 });
 
@@ -212,6 +255,52 @@ describe.runIf(REAL_PG)('the load harness', () => {
       token: student.token,
     });
     expect(download.url).toMatch(/^https:\/\/deck-storage\.invalid\//);
+  });
+
+  it("seeds the school LOAD_TEACHERS names for the bell's measurement (#336): 30 students to each teacher", async () => {
+    const small = `${database}_small`;
+    try {
+      const seeded = await seedSchool(server!, small, 2);
+      expect(seeded.teachers).toHaveLength(2);
+      expect(seeded.students).toHaveLength(60);
+      expect(seeded.teachers.map((t) => t.secondClassId !== null)).toEqual([false, true]);
+    } finally {
+      await dropDatabase(server!, small);
+    }
+  });
+
+  it("gives the API LOAD_DB_POOL's connections (#336): 20 reads at once open a pool of 2, no more", async () => {
+    // Its own name on each connection, so the suite's other API and this reader aren't counted.
+    const name = 'bali-load-pool';
+    const pooled = spawn(process.execPath, ['--import', 'tsx', 'scripts/load/serve.ts'], {
+      cwd: apiDir,
+      env: {
+        ...env,
+        LOAD_SCHOOL_FILE: join(dir!, 'school.json'),
+        HOST: '127.0.0.1',
+        PORT: '0',
+        LOG_LEVEL: 'info',
+        LOAD_DB_POOL: '2',
+        PGAPPNAME: name,
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const gone = once(pooled, 'close');
+    const reader = createDb(databaseUrl(server!, database), { max: 1 });
+    try {
+      const call = createCall(await listeningAt(pooled));
+      const reads = school.students.slice(0, 20).map((s) => ({ token: s.token }));
+      await Promise.all(reads.map((auth) => call<MeResponse>('GET', '/v1/me', auth)));
+      const [held] = await reader.$client<{ n: number }[]>`
+        select count(*)::int as n from pg_stat_activity
+        where application_name = ${name} and datname = current_database()`;
+      // The driver's own 10 would open more than 2 for 20 reads at once.
+      expect(held!.n).toBe(2);
+    } finally {
+      pooled.kill('SIGTERM');
+      await gone;
+      await reader.$client.end();
+    }
   });
 
   it("serves the gate's flooder: an account of the school's, in no class", async () => {
