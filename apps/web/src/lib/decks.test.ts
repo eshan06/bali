@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { type Deck, DECK_MAX_BYTES, DECK_TITLE_MAX_LENGTH } from '@bali/shared';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   type ApiClient,
@@ -16,6 +16,7 @@ import {
   inUseClasses,
   judgePick,
   newUpload,
+  type PutEnd,
   putPdf,
   type PutOptions,
   readDecks,
@@ -26,8 +27,10 @@ import {
   titleOf,
   type Upload,
   uploadAgain,
+  UPLOAD_ANSWER_MS,
   type UploadEnd,
   UPLOAD_LIMIT_MS,
+  UPLOAD_STALL_MS,
   type UploadStep,
   type XhrClass,
 } from './decks';
@@ -37,9 +40,10 @@ vi.mock('./monitoring', () => ({ captureApiFailure: vi.fn() }));
 
 /*
  * Your slides' logic (M5): the decks read, a picked file judged before anything is sent, the
- * upload (its SHA-256, the create, the PUT with its progress, Cancel and the 25-minute limit of
- * #326, then the check), Try again going on from where it stopped, and a removal, the in-use
- * refusal naming its classes (M5a), each against a fake API and a fake XMLHttpRequest.
+ * upload (its SHA-256, the create, the PUT with its progress, Cancel, its stop once nothing is sent
+ * for 30 s and the 25-minute limit of #326, then the check), Try again going on from where it
+ * stopped, and a removal, the in-use refusal naming its classes (M5a), each against a fake API and a
+ * fake XMLHttpRequest.
  */
 
 const ID = '0199b000-0000-7000-8000-0000000000d1';
@@ -91,7 +95,10 @@ class FakeXhr {
   timeout = 0;
   status = 0;
   aborted = false;
-  upload: { onprogress: ((e: Partial<ProgressEvent>) => void) | null } = { onprogress: null };
+  upload: {
+    onprogress: ((e: Partial<ProgressEvent>) => void) | null;
+    onload: (() => void) | null;
+  } = { onprogress: null, onload: null };
   onload: (() => void) | null = null;
   onerror: (() => void) | null = null;
   onabort: (() => void) | null = null;
@@ -120,6 +127,11 @@ class FakeXhr {
   progress(loaded: number, total: number, lengthComputable = true) {
     this.upload.onprogress?.({ loaded, total, lengthComputable });
   }
+  /** The whole file sent, as the browser says it: its last progress, then the upload's `load`. */
+  sentAll(total: number) {
+    this.progress(total, total);
+    this.upload.onload?.();
+  }
   answer(status: number) {
     clearTimeout(this.timer);
     this.status = status;
@@ -132,6 +144,24 @@ class FakeXhr {
 }
 const Xhr = FakeXhr as unknown as XhrClass;
 const lastXhr = () => FakeXhr.made.at(-1);
+
+/**
+ * A slow link on the fake clock: a byte more of `total` sent every `every` ms, never 30 s apart,
+ * until the clock reads `until`. Answers how many bytes it sent.
+ */
+async function trickle(
+  xhr: FakeXhr,
+  until: number,
+  every = UPLOAD_STALL_MS - 1_000,
+  total = 1_000_000,
+): Promise<number> {
+  let loaded = 0;
+  while (Date.now() < until) {
+    xhr.progress((loaded += 1), total);
+    await vi.advanceTimersByTimeAsync(Math.min(every, until - Date.now()));
+  }
+  return loaded;
+}
 
 afterEach(() => {
   FakeXhr.made = [];
@@ -318,6 +348,126 @@ describe('the PUT to the bucket (XMLHttpRequest, for its progress)', () => {
   });
 });
 
+describe('a PUT that sends nothing for 30 s stops; 25 minutes stay the outer limit (the owner, 2026-10-22)', () => {
+  /** The key as monitoring is told it: no query, so the URL's signature never leaves. */
+  const KEY = '/bucket/decks/0199b000-0000-7000-8000-0000000000d1.pdf';
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  /** A PUT on the fake clock, how it ended and how long after its start kept as it ends. */
+  function watched() {
+    const start = Date.now();
+    const controller = new AbortController();
+    const seen: { end?: PutEnd; after?: number } = {};
+    void putPdf(URL_PUT, new Blob([PDF]), {
+      deadline: start + UPLOAD_LIMIT_MS,
+      now: () => Date.now(),
+      onProgress: () => undefined,
+      signal: controller.signal,
+      Xhr,
+    }).then((end) => {
+      seen.end = end;
+      seen.after = Date.now() - start;
+    });
+    return { xhr: lastXhr()!, seen, controller, start };
+  }
+
+  it('waits the owner’s 30 s while bytes remain, 2 minutes for the answer once all is sent (the conductor’s call), and #326’s 25 minutes at most', () => {
+    expect([UPLOAD_STALL_MS, UPLOAD_ANSWER_MS, UPLOAD_LIMIT_MS]).toEqual([
+      30_000,
+      2 * 60_000,
+      25 * 60_000,
+    ]);
+  });
+
+  it('stops one that sends nothing for 30 s from its start: no connection, no first byte', async () => {
+    const { xhr, seen } = watched();
+    await vi.advanceTimersByTimeAsync(UPLOAD_STALL_MS - 1);
+    expect(seen.end).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(seen).toEqual({ end: { failed: undefined }, after: UPLOAD_STALL_MS });
+    // Stopped for good, and reported as the bucket's no answer is, by the key alone.
+    expect(xhr.aborted).toBe(true);
+    expect(vi.mocked(captureApiFailure).mock.calls).toEqual([['PUT', KEY, 'network']]);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('counts the 30 s again from each byte sent: stuck halfway, it stops 30 s after the last', async () => {
+    const { xhr, seen } = watched();
+    // The connection, TLS and the browser's CORS check, then the first bytes.
+    await vi.advanceTimersByTimeAsync(4_000);
+    xhr.progress(16_384, 1_000_000);
+    await vi.advanceTimersByTimeAsync(UPLOAD_STALL_MS - 1);
+    // A browser that sends the file again from its start (a connection it opened again) is sending.
+    xhr.progress(8_192, 1_000_000);
+    await vi.advanceTimersByTimeAsync(10_000);
+    // An event that says nothing more was sent is no progress.
+    xhr.progress(8_192, 1_000_000);
+    await vi.advanceTimersByTimeAsync(UPLOAD_STALL_MS - 10_000 - 1);
+    expect(seen.end).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(seen).toEqual({ end: { failed: undefined }, after: 4_000 + 2 * UPLOAD_STALL_MS - 1 });
+    expect(xhr.aborted).toBe(true);
+    expect(vi.mocked(captureApiFailure).mock.calls).toEqual([['PUT', KEY, 'network']]);
+  });
+
+  it('never stops a slow PUT that keeps sending: a little every 29 s for 24 minutes, then the bucket’s answer', async () => {
+    const { xhr, seen, start } = watched();
+    await trickle(xhr, start + 24 * 60_000);
+    expect(seen.end).toBeUndefined();
+    xhr.sentAll(1_000_000);
+    xhr.answer(200);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(seen).toEqual({ end: 'uploaded', after: 24 * 60_000 });
+    expect(captureApiFailure).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('gives the bucket UPLOAD_ANSWER_MS to answer once the whole file is sent, not the 30 s', async () => {
+    const { xhr, seen } = watched();
+    xhr.progress(500_000, 1_000_000);
+    await vi.advanceTimersByTimeAsync(10_000);
+    xhr.sentAll(1_000_000);
+    await vi.advanceTimersByTimeAsync(UPLOAD_ANSWER_MS - 1);
+    expect(seen.end).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(seen).toEqual({ end: { failed: undefined }, after: 10_000 + UPLOAD_ANSWER_MS });
+    expect(xhr.aborted).toBe(true);
+    expect(vi.mocked(captureApiFailure).mock.calls).toEqual([['PUT', KEY, 'network']]);
+  });
+
+  it('still ends one at its 25 minutes, `too_slow`, however steadily it sends', async () => {
+    const { xhr, seen, start } = watched();
+    await trickle(xhr, start + UPLOAD_LIMIT_MS - 1);
+    expect(seen.end).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(seen).toEqual({ end: 'too_slow', after: UPLOAD_LIMIT_MS });
+    // The browser's own stop, said in its own words: no stuck upload to report.
+    expect(captureApiFailure).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('watches nothing once it has ended: a Cancel, a refusal, the bucket’s answer', async () => {
+    const cancelled = watched();
+    const refused = watched();
+    const uploaded = watched();
+    cancelled.controller.abort();
+    refused.xhr.answer(403);
+    uploaded.xhr.sentAll(1_000_000);
+    uploaded.xhr.answer(200);
+    await vi.advanceTimersByTimeAsync(UPLOAD_LIMIT_MS);
+    expect([cancelled.seen.end, refused.seen.end, uploaded.seen.end]).toEqual([
+      'cancelled',
+      { failed: 403 },
+      'uploaded',
+    ]);
+    expect(captureApiFailure).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
 /** A fake API answering the create with a fresh URL each time, and the check with `verdict`. */
 function deckApi(
   verdict: () => unknown = () => ({
@@ -407,7 +557,7 @@ describe('an upload, from the file to the server’s verdict', () => {
     expect(await ended).toEqual({ kind: 'checked', deck: rejected });
   });
 
-  it('stops an upload still running 25 minutes after its create, on a fake clock', async () => {
+  it('stops an upload still running 25 minutes after its create, however steadily it sends, on a fake clock', async () => {
     vi.useFakeTimers();
     let createdAt = 0;
     const { api, calls } = fakeApi((_method, path) => {
@@ -419,16 +569,39 @@ describe('an upload, from the file to the server’s verdict', () => {
     const seen: { end?: UploadEnd } = {};
     void ended.then((end) => (seen.end = end));
     const xhr = await untilPut();
-    xhr.progress(1, 50);
-    await vi.advanceTimersByTimeAsync(createdAt + UPLOAD_LIMIT_MS - 1 - Date.now());
+    // A little more every 29 s: slow, never stuck (`UPLOAD_STALL_MS`).
+    const sent = await trickle(xhr, createdAt + UPLOAD_LIMIT_MS - 1);
     expect(seen.end).toBeUndefined();
-    expect(steps.at(-1)).toEqual({ step: 'uploading', fraction: 0.02 });
+    expect(steps.at(-1)).toEqual({ step: 'uploading', fraction: sent / 1_000_000 });
     await vi.advanceTimersByTimeAsync(1);
     expect(seen.end).toMatchObject({
       kind: 'too_slow',
       upload: { deck: deck(), uploaded: false },
     });
     // No check is asked for an upload that never arrived.
+    expect(calls.map(([, path]) => path)).toEqual(['/v1/decks']);
+  });
+
+  it('stops a stuck upload as one with no answer, for Try again to go on from (the owner, 2026-10-22)', async () => {
+    vi.useFakeTimers();
+    const { api, calls } = deckApi();
+    const { ended } = run(api, newUpload(file(), 'Unit 3 review'), () => Date.now());
+    const seen: { end?: UploadEnd } = {};
+    void ended.then((end) => (seen.end = end));
+    const xhr = await untilPut();
+    xhr.progress(1, 50);
+    await vi.advanceTimersByTimeAsync(UPLOAD_STALL_MS - 1);
+    expect(seen.end).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(seen.end).toMatchObject({
+      kind: 'stopped',
+      failure: { kind: 'failed', status: undefined },
+      upload: { deck: deck(), uploaded: false },
+    });
+    // Not refused: Try again goes on under the same ids, its create replayed for a fresh URL
+    // (M2b2); and no check is asked for a file that never arrived.
+    if (seen.end?.kind !== 'stopped') return;
+    expect(uploadAgain(seen.end)).toBe(seen.end.upload);
     expect(calls.map(([, path]) => path)).toEqual(['/v1/decks']);
   });
 
