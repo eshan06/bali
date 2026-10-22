@@ -791,7 +791,10 @@ describe('a teacher’s saved questions (L3b)', () => {
     const body = upper(asking());
 
     const created = await create(token, body);
-    expect(answered(await create(token, body))).toEqual({ ...answered(created), outcome: 'replay' });
+    expect(answered(await create(token, body))).toEqual({
+      ...answered(created),
+      outcome: 'replay',
+    });
     const draft = answered(created).savedQuestion;
     now = at(12);
     const edit = upper(asking({ prompt: 'Why?' }));

@@ -261,7 +261,10 @@ describe('a teacher’s drafts (decision 12)', () => {
     const draft = await written(write(teacher.id, 5, createId));
     expect(draft.eventId).toBe(createId.toLowerCase());
     for (const eventId of [createId, createId.toLowerCase()]) {
-      expect(await write(teacher.id, 6, eventId)).toEqual({ outcome: 'replay', savedQuestion: draft });
+      expect(await write(teacher.id, 6, eventId)).toEqual({
+        outcome: 'replay',
+        savedQuestion: draft,
+      });
     }
 
     const replace = {
