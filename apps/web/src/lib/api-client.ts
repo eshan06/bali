@@ -96,9 +96,9 @@ export const POLL_TIMEOUT_MS = 10_000;
 /**
  * How long a save waits for its whole answer, given at each save that takes it, never in `send`:
  * a save is one transaction in the engine, timed like a read at the server, and its resend goes
- * under the same `eventId` (or, with none, to a route that answers the same send the same), so a
- * save cut here that landed is answered by its replay with the truth now: a short limit costs a
- * press, never a second write. The answer's and the slide change's 10 s too (#407's review, M6).
+ * under the same `eventId`, or to a route a second send never doubles (a Start, an End, a block's
+ * tag, a new code), so a save cut here that landed is answered with the truth now: a short limit
+ * costs a press, never a second write. The answer's and the slide change's 10 s too (#407, M6).
  */
 export const SAVE_TIMEOUT_MS = 10_000;
 
