@@ -433,6 +433,47 @@ describe('useSlide: its changes', () => {
     expect(h.slides.slide).toEqual(slideOf(7));
   });
 
+  it('keeps the line while Try again sends the change again, says it anew if it fails again, and lets it go once shown (LessonRetryStates)', async () => {
+    let answer!: { shown: (res: SlideResponse) => void; failed: (e: unknown) => void };
+    io.post.mockImplementation(() => new Promise((shown, failed) => (answer = { shown, failed })));
+    const h = mount(SESSION, read(slideOf(4), id(1)), vi.fn());
+    await h.settle();
+    h.slides.turn(1);
+    await h.settle();
+    answer.failed(new NetworkError());
+    await h.settle();
+    const said = h.slides.said;
+    expect(said).toEqual({ why: 'failed', change: { deckId: X.id, page: 5 } });
+    // Sent again: its line kept while it goes, so its Try again holds in its place.
+    h.slides.again();
+    await h.settle();
+    expect(h.slides.changing).toEqual({ deckId: X.id, page: 5 });
+    expect(h.slides.said).toBe(said);
+    // Refused again: said anew, a line of its own, so it is said again.
+    answer.failed(new NetworkError());
+    await h.settle();
+    expect(h.slides.changing).toBeNull();
+    expect(h.slides.said).toEqual(said);
+    expect(h.slides.said).not.toBe(said);
+    // Sent again and shown: the line goes with its answer, never before.
+    h.slides.again();
+    await h.settle();
+    expect(h.slides.said).not.toBeNull();
+    const sent = io.post.mock.calls[2]?.[1] as { eventId: string };
+    answer.shown(shownAnswer(slideOf(5), sent.eventId));
+    await h.settle();
+    expect(h.slides.said).toBeNull();
+    expect(h.slides.slide).toEqual(slideOf(5));
+    // Any other change says nothing of the last one's while it goes.
+    io.post.mockRejectedValueOnce(new NetworkError());
+    h.slides.turn(1);
+    await h.settle();
+    expect(h.slides.said).toEqual({ why: 'failed', change: { deckId: X.id, page: 6 } });
+    h.slides.turn(1);
+    await h.settle();
+    expect(h.slides.said).toBeNull();
+  });
+
   it('says nothing failed of a change the stream already showed before its answer gave up', async () => {
     let fail!: (e: unknown) => void;
     io.post.mockImplementation(() => new Promise((_, reject) => (fail = reject)));

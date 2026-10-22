@@ -80,7 +80,7 @@ describe('the class page before its class is read', () => {
     );
     expect(before).toMatch(/\{klass \? cantLoad\(error \?\? rosterError\) : null\}/);
     expect(page).toMatch(
-      /const cantLoad = \(message: string \| null\) =>\s*message === null \? null : \(\s*<div className="flex flex-wrap items-center gap-x-4 gap-y-3">\s*<TryAgain onRetry=\{load\} then=\{\[\]\}>\s*<p role="alert" className="text-body">\s*Couldn&apos;t load this class\. \{message\}\s*<\/p>\s*<\/TryAgain>/,
+      /const cantLoad = \(message: string \| null\) =>\s*message === null \? null : \(\s*<div className="flex flex-wrap items-center gap-x-4 gap-y-3">\s*<TryAgain onRetry=\{load\} held=\{[^}]*\} then=\{\[\]\}>\s*<p role="alert" className="text-body">\s*Couldn&apos;t load this class\. \{message\}\s*<\/p>\s*<\/TryAgain>/,
     );
   });
 
@@ -89,10 +89,10 @@ describe('the class page before its class is read', () => {
     // each goes with its own read's answer, and Try again holds while `load`'s promise runs.
     const load = page.slice(page.indexOf('const load = useCallback('));
     expect(load).toMatch(
-      /^const load = useCallback\(async \(\) => \{\s*const mine = \+\+reads\.current\.klass;\s*const read = api\.get<ClassDetail>\(`\/v1\/classes\/\$\{classId\}`\)\.then\(\s*\(c\) => \{\s*if \(reads\.current\.klass !== mine\) return;\s*setError\(null\);\s*setKlass\(c\);/,
+      /^const load = useCallback\(async \(\) => \{\s*const mine = \+\+reads\.current\.klass;\s*setClassReading\(true\);\s*const read = api\.get<ClassDetail>\(`\/v1\/classes\/\$\{classId\}`\)\.then\(\s*\(c\) => \{\s*if \(reads\.current\.klass !== mine\) return;\s*setClassReading\(false\);\s*setError\(null\);\s*setKlass\(c\);/,
     );
     expect(load).toMatch(
-      /\(e: unknown\) => \{\s*if \(reads\.current\.klass === mine\) setError\(errText\(e\)\);\s*\},\s*\);\s*await Promise\.all\(\[read, readRoster\(\)\]\);\s*\}, \[api, classId, readRoster\]\);/,
+      /\(e: unknown\) => \{\s*if \(reads\.current\.klass !== mine\) return;\s*setClassReading\(false\);\s*setError\(errText\(e\)\);\s*\},\s*\);\s*await Promise\.all\(\[read, readRoster\(\)\]\);\s*\}, \[api, classId, readRoster\]\);/,
     );
     expect(page.match(/setError\(null\)/g)).toHaveLength(1);
     expect(page.match(/setRosterError\(null\)/g)).toHaveLength(2);
@@ -110,8 +110,35 @@ describe('the class page before its class is read', () => {
     expect(page).toMatch(
       /const readRoster = useCallback\(async \(\) => \{\s*const mine = \+\+reads\.current\.roster;/,
     );
-    expect(page.match(/reads\.current\.roster (!|=)== mine/g)).toHaveLength(2);
+    expect(page.match(/reads\.current\.roster (!|=)== mine/g)).toHaveLength(3);
     expect(page.match(/reads\.current\.klass (!|=)== mine/g)).toHaveLength(2);
+  });
+
+  it('holds a failure’s Try again while a read of it is on its way, whichever Try again sent it (ClassRetryStates)', () => {
+    // The class's Try again in the session's place reads its roster too. The class answering first,
+    // the roster's earlier failure was said under the header with a Try again not held until the
+    // roster's read answered (#429's review): each line holds while a read of what it says runs,
+    // the class's or else its roster's, and so does the recap's, the roster's other Try again.
+    expect(page).toMatch(
+      /<TryAgain onRetry=\{load\} held=\{error !== null \? classReading : rosterReading\} then=\{\[\]\}>/,
+    );
+    const [recap] = before.match(/<RecapCard\b[^]*?\/>/) ?? [];
+    expect(recap).toMatch(/rosterReading=\{rosterReading\}/);
+    // Each on its way from its start to its newest read's answer, never an older one's.
+    expect(page).toMatch(
+      /const readRoster = useCallback\(async \(\) => \{\s*const mine = \+\+reads\.current\.roster;\s*setRosterReading\(true\);\s*try \{[^]*?\} finally \{\s*if \(reads\.current\.roster === mine\) setRosterReading\(false\);\s*\}\s*\}, \[api, classId\]\);/,
+    );
+    const load = page.slice(page.indexOf('const load = useCallback('));
+    expect(load).toMatch(
+      /^const load = useCallback\(async \(\) => \{\s*const mine = \+\+reads\.current\.klass;\s*setClassReading\(true\);/,
+    );
+    expect(load).toMatch(
+      /\(c\) => \{\s*if \(reads\.current\.klass !== mine\) return;\s*setClassReading\(false\);/,
+    );
+    expect(load).toMatch(
+      /\(e: unknown\) => \{\s*if \(reads\.current\.klass !== mine\) return;\s*setClassReading\(false\);\s*setError\(errText\(e\)\);\s*\},/,
+    );
+    expect(page.match(/set(Class|Roster)Reading\(true\)/g)).toHaveLength(2);
   });
 });
 
@@ -148,7 +175,7 @@ describe('the class page while no session runs (ClassBefore)', () => {
     );
     // One read of the roster, the class's load's and this one's.
     expect(page).toMatch(
-      /const readRoster = useCallback\(async \(\) => \{\s*const mine = \+\+reads\.current\.roster;\s*try \{\s*const next = await api\.get<RosterResponse>/,
+      /const readRoster = useCallback\(async \(\) => \{\s*const mine = \+\+reads\.current\.roster;\s*setRosterReading\(true\);\s*try \{\s*const next = await api\.get<RosterResponse>/,
     );
     expect(page.match(/\/roster`\)/g)).toHaveLength(1);
   });

@@ -40,7 +40,8 @@ export function DecksView({
   decks: Decks;
   lesson: Pick<SlideLesson, 'changing' | 'said'>;
   onRead: () => void;
-  onShow: (deck: Deck) => void;
+  /** `again`: its line's Try again, the line kept until Bali answers. */
+  onShow: (deck: Deck, again?: boolean) => void;
   onClose: () => void;
 }) {
   const { changing, said } = lesson;
@@ -88,12 +89,14 @@ export function DecksView({
                   >
                     Show
                   </Button>
-                  {/* Under its deck, where it happened (LessonDecksStates). */}
+                  {/* Under its deck, where it happened (LessonDecksStates); a line said in its
+                      place, focus on the deck's name (LessonRetryStates). */}
                   {said !== null && showOf(deck, said.change) ? (
                     <SaidLine
                       why={said.why}
                       held={changing !== null}
-                      onAgain={() => onShow(deck)}
+                      onAgain={() => onShow(deck, true)}
+                      then={[name]}
                       describedBy={name}
                       className="col-span-full mt-1.5"
                     />
@@ -147,8 +150,8 @@ export function DecksPanel({
       open.current = false;
     };
   }, []);
-  const show = (deck: Deck) =>
-    void lesson.show(deck.id).then((shown) => {
+  const show = (deck: Deck, again = false) =>
+    void lesson.show(deck.id, again).then((shown) => {
       if (shown && open.current) onShown();
     });
   return (

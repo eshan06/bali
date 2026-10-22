@@ -162,6 +162,7 @@ type Over = {
   present?: boolean;
   roster?: RosterStudent[] | null;
   rosterError?: string | null;
+  rosterReading?: boolean;
 };
 const render = (state: Shown, over: Over = {}) =>
   plain(
@@ -422,10 +423,30 @@ describe('the card’s reads', () => {
     );
     // Read, the card's figures in the failure's place: focus on Last session, its heading.
     expect(source).toMatch(
-      /<h2 id=\{headingId\} className="text-section-label text-text-tertiary uppercase">\s*Last session\s*<\/h2>[^]*?<TryAgain size="md" onRetry=\{onRetry\} then=\{\[headingId\]\} className="mt-3\.5">/,
+      /<h2 id=\{headingId\} className="text-section-label text-text-tertiary uppercase">\s*Last session\s*<\/h2>[^]*?<TryAgain\s+size="md"\s+onRetry=\{onRetry\}\s+held=\{read\.kind === 'ready' && rosterReading\}\s+then=\{\[headingId\]\}\s+className="mt-3\.5"\s*>/,
     );
     // The page's roster read again too: a promise, so Try again holds until it answers.
     expect(source).toMatch(/onRetryRoster\?: \(\) => Promise<void>;/);
+  });
+
+  it('holds the roster’s Try again while the page reads the roster, sent from under its header too (ClassRetryStates)', () => {
+    // One failure, said under the page's header and here, each with its Try again, one read: a
+    // press on either, or the class's own Try again, which reads the roster too, holds both while
+    // it runs, the line kept (#429's review).
+    const failed = { roster: null, rosterError: "Couldn't reach Bali." };
+    const held = render(ready(board()), { ...failed, rosterReading: true });
+    expect(text(held)).toBe(
+      "|Last session|Couldn't load the last session.|Couldn't reach Bali.|Loading…|",
+    );
+    expect(held).toMatch(
+      /<p class="text-text-secondary">Couldn't reach Bali\.<\/p><\/div><button type="button" aria-disabled="true" aria-busy="true" class="[^"]*\bh-10\b[^"]*">Loading…<\/button>/,
+    );
+    // Answered and failed again: Try again, at rest, its line said again.
+    const atRest = /aria-busy="false" class="[^"]*">Try again<\/button><\/div><\/section>$/;
+    expect(render(ready(board()), { ...failed, rosterReading: false })).toMatch(atRest);
+    // Its own read's failure isn't the roster's: never held by the roster's read.
+    const own = { kind: 'error', message: "Couldn't reach Bali." } as const;
+    expect(render(own, { ...failed, rosterReading: true })).toMatch(atRest);
   });
 
   it('drops a read a later one, or another class, has overtaken', () => {

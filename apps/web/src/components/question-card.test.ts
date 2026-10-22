@@ -14,6 +14,7 @@ import {
   type LiveQuestion,
   QuestionCard,
 } from './question-card';
+import { TryAgain } from './try-again';
 
 /*
  * The class page's "Questions and slides" card with a question in it (L7-1a; LessonWaiting,
@@ -94,6 +95,10 @@ function buttons(node: ReactNode): Map<string, () => void> {
     if (!n || typeof n !== 'object' || !('props' in n)) return;
     const p = (n as ReactElement<{ onClick?: () => void; children?: ReactNode }>).props;
     if (p.onClick) found.set(words(p.children).trim(), p.onClick);
+    // `TryAgain` draws its own button: pressed, it calls its `onRetry`.
+    if ((n as ReactElement).type === TryAgain) {
+      found.set('Try again', (p as Parameters<typeof TryAgain>[0]).onRetry);
+    }
     walk(p.children);
   };
   walk(node);
@@ -216,10 +221,23 @@ describe('a question open (LessonWaiting, LessonLive)', () => {
   it('says a close that failed with Try again, which sends the same choice again', () => {
     const l = lesson({ closeFailed: { reveal: true } });
     expect(render(l)).toMatch(
-      /<p role="alert" class="text-body">Bali couldn&#x27;t close the question\.<\/p><button type="button" aria-disabled="false" class="[^"]*\bh-8\.5\b[^"]*">Try again<\/button>/,
+      /<p role="alert" class="text-body">Bali couldn&#x27;t close the question\.<\/p><button type="button" aria-disabled="false" aria-busy="false" class="[^"]*\bh-8\.5\b[^"]*">Try again<\/button>/,
     );
     press(l, 'Try again');
     expect(l.close).toHaveBeenCalledWith(true);
+  });
+
+  it('keeps its line while Try again closes it again, held as Loading… with both closes (LessonRetryStates)', () => {
+    const held = render(lesson({ closeFailed: { reveal: true }, closing: true }));
+    expect(held).toMatch(
+      /<p role="alert" class="text-body">Bali couldn&#x27;t close the question\.<\/p><button type="button" aria-disabled="true" aria-busy="true" class="[^"]*\bh-8\.5\b[^"]*">Loading…<\/button>/,
+    );
+    expect(held.match(/<button [^>]*aria-disabled="true"[^>]*>Close/g)).toHaveLength(2);
+    // Closed: the line goes with the question open, focus on the question (its heading, `L-q`).
+    expect(source).toMatch(/\{closeFailedLine\(lesson, `\$\{id\}-q`\)\}/);
+    expect(render(lesson({ closeFailed: { reveal: true } }))).toMatch(
+      /<h2 id="L-q" tabindex="-1" class="[^"]*">Which value/,
+    );
   });
 
   it('says results that can’t refresh, drawn as the stale banner, until its final count', () => {
@@ -331,13 +349,13 @@ describe('its buttons, the class page’s card and Present’s alike (L7, part 3
       '>\\s*Close and show answer\\s*<',
       '>\\s*Done\\s*<',
       'Bali couldn&apos;t close the question\\.',
-      '>\\s*Try again\\s*<',
+      '<TryAgain\\b',
     ]) {
       expect(source.match(new RegExp(words, 'g'))).toHaveLength(1);
     }
     expect(source).toMatch(/\{open \? \(\s*closeButtons\(lesson\)\s*\) : \(/);
     expect(source).toMatch(/\{doneButton\(lesson, `\$\{id\}-ask`\)\}/);
-    expect(source).toMatch(/\{closeFailedLine\(lesson\)\}/);
+    expect(source).toMatch(/\{closeFailedLine\(lesson, `\$\{id\}-q`\)\}/);
   });
 
   it('Close and Close and show answer close through the hook, held while a close is on its way', () => {
@@ -362,22 +380,28 @@ describe('its buttons, the class page’s card and Present’s alike (L7, part 3
   it('says a close that didn’t go through while the question is open, Present’s at its size', () => {
     const l = lesson({ closeFailed: { reveal: false } });
     // The class page's, under its head: the body's size, a small Try again.
-    expect(markup(closeFailedLine(l))).toMatch(
-      /^<div><div class="flex flex-wrap items-center gap-x-4 gap-y-3"><p role="alert" class="text-body">Bali couldn&#x27;t close the question\.<\/p><button type="button" aria-disabled="false" class="[^"]*\bh-8\.5\b[^"]*">Try again<\/button><\/div><\/div>$/,
+    expect(markup(closeFailedLine(l, 'L-q'))).toMatch(
+      /^<div><div class="flex flex-wrap items-center gap-x-4 gap-y-3"><p role="alert" class="text-body">Bali couldn&#x27;t close the question\.<\/p><button type="button" aria-disabled="false" aria-busy="false" class="[^"]*\bh-8\.5\b[^"]*">Try again<\/button><\/div><\/div>$/,
     );
     // Present's (PresentControlsStates): 20/28, at the right, a full-size Try again.
-    expect(markup(closeFailedLine(l, true))).toMatch(
-      /^<div><div class="flex flex-wrap items-center gap-x-4 gap-y-3 justify-end"><p role="alert" class="text-present-line">Bali couldn&#x27;t close the question\.<\/p><button type="button" aria-disabled="false" class="[^"]*\bh-10\b[^"]*">Try again<\/button><\/div><\/div>$/,
+    expect(markup(closeFailedLine(l, 'L-done', true))).toMatch(
+      /^<div><div class="flex flex-wrap items-center gap-x-4 gap-y-3 justify-end"><p role="alert" class="text-present-line">Bali couldn&#x27;t close the question\.<\/p><button type="button" aria-disabled="false" aria-busy="false" class="[^"]*\bh-10\b[^"]*">Try again<\/button><\/div><\/div>$/,
     );
-    buttons(closeFailedLine(l, true)).get('Try again')?.();
+    buttons(closeFailedLine(l, 'L-done', true)).get('Try again')?.();
     expect(l.close).toHaveBeenCalledWith(false);
+    // Held while a close is on its way, its line kept; closed, focus where `then` says.
+    expect(markup(closeFailedLine({ ...l, closing: true }, 'L-q'))).toMatch(
+      /<button type="button" aria-disabled="true" aria-busy="true" [^>]*>Loading…<\/button>/,
+    );
+    const line = closeFailedLine(l, 'L-done', true) as ReactElement<{ children: ReactElement }>;
+    expect((line.props.children.props as Parameters<typeof TryAgain>[0]).then).toEqual(['L-done']);
     // None once it is closed, or with nothing failed.
     const closedSince = lesson(
       { question: question({ open: false }), closeFailed: { reveal: true } },
       totals({ open: false }),
     );
-    expect(closeFailedLine(closedSince, true)).toBeNull();
-    expect(closeFailedLine(lesson(), true)).toBeNull();
+    expect(closeFailedLine(closedSince, 'L-done', true)).toBeNull();
+    expect(closeFailedLine(lesson(), 'L-done', true)).toBeNull();
   });
 
   it('Done puts the question away through the hook, focus going on to what takes its place', () => {
@@ -523,8 +547,18 @@ describe('its hook (L6’s logic, held for one session)', () => {
       /closeAttemptFor\(unansweredClose\.current, question\.id, reveal\);[^]*?unansweredClose\.current = keepUnanswered\(attempt, answer\);/,
     );
     expect(hook).toMatch(
-      /if \(answer\.kind === 'closed'\) put\(session, answer\.question\);\s*else setCloseFailed\(\{ id: question\.id, reveal \}\);/,
+      /setCloseFailed\(answer\.kind === 'closed' \? null : \{ id: question\.id, reveal \}\);\s*if \(answer\.kind === 'closed'\) put\(session, answer\.question\);/,
     );
+  });
+
+  it('keeps a close that didn’t go through said while its Try again sends it again (LessonRetryStates)', () => {
+    // Never cleared as a close starts, which took Try again, and focus with it, to the page: its
+    // answer clears it (closed) or says it again (a new object, so said again).
+    const close = hook.slice(hook.indexOf('const close = useCallback('));
+    expect(close).toMatch(
+      /sending\.current = true;\s*setClosing\(true\);\s*\/\/[^\n]*\n\s*const attempt = closeAttemptFor/,
+    );
+    expect(close.slice(0, close.indexOf('[api, put]'))).not.toMatch(/setCloseFailed\(null\)/);
   });
 
   it('tells its Done to every Bali window of this browser, and puts away what another’s Done names', () => {

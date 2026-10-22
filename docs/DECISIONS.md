@@ -8,6 +8,55 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-22** — **Try again keeps keyboard focus, part 2b (#430): a close and the slides on
+  `TryAgain`; and the class page's roster line held while its read is on its way, whichever Try
+  again sent it.** The owner's follow-up of 2026-10-16, finished on the class page (part 2a, #429,
+  below). **A close**, the class page's card's and Present's: its line kept while its Try again sends
+  the same choice again (`useLiveQuestion`'s `close` no longer clears `closeFailed` as it starts; its
+  answer clears it or says it again), Try again held with Close and Close and show answer; closed,
+  focus on the question (the card) or on Done in the buttons' place (Present). **A slide change**
+  (Previous, Next, Stop showing, a Show): Try again's `again` keeps what the last change said until
+  its answer (`useSlide`'s `change`), held with every slide control as while any change is on its
+  way; answered, focus on the slides' title (the card), on the slide's title and page (Present), or
+  from Show slides on the slide card's title, as after any Show, or on the deck's name for a line
+  said in its place (`TryAgain` gains `describedBy`, so its Try again is named by its deck as each
+  Show is); a Stop showing sent again, its slides gone, lands where its own press does, on Ask a
+  question or on Present (santa's review). **The slide's place**, the card's, Present's, a student's and full screen's: `SlideFrame`
+  keeps the line its Try again was pressed on (`Retried`) until it has its answer (`answered`:
+  another deck shown, or, past the loading between, the deck loaded afresh or the page drawn again),
+  held meanwhile; drawn, focus on the slides' title, the slide's title and page, or "Slide 4 of 12".
+  Built to LessonRetryStates and StudentRetryStates (drawn first) on the canvas as it stands (its
+  version id 1792645808-b59e): no new board. **The fix** (part 2a's *Found, left*, seen again on this
+  branch in headless Chrome): after the class's own Try again in the session's place, the class
+  answering before its roster, the header said the roster's earlier failure with a Try again not
+  held until the roster's read landed, and the recap's Try again for it was the same; the two never
+  held each other. The page now knows a read of each on its way until its newest answers
+  (`classReading`, `rosterReading`), and a failure's Try again holds while a read of what it says is
+  on its way, whichever Try again sent it: the class's failure by the class's read, the roster's by
+  the roster's, under the header, in the session's place, in Present after the bell and in the recap
+  (`rosterReading`), so a press on either of the roster's two Try agains holds both. As
+  ClassRetryStates draws it (the line under the header and the recap, Try again sent): no new board.
+  Its regression tests came first and failed (`class-page.test.ts` from the source,
+  `recap-card.test.ts` rendered). *The conductor's call, awaiting the owner:* the class's failure
+  said under the header while only its roster's read is on its way isn't held: its own read has
+  answered, and a press reads both again. *For the owner (the conductor asks):* whether a roster
+  failure keeps both its Try agains, under the header and in the recap; both kept, as asked, and a
+  failure said again there is now said twice at once, one line each. *Left* (santa's review): a
+  roster read the network swallows holds both its Try agains until the browser gives up, as it held
+  the one pressed before; the class page's reads have no time limit, and giving Try again's the
+  account card's 10 s (#334) is a step of its own (it reshapes both reads). **Tested** as parts 1
+  and 2a were: rendered markup, the source, `answered`, and the slide's line kept while its Try
+  again sends the change again on the running hook (`use-slide-hook.test.ts`). **Seen** in headless
+  Chrome on dev, the preview serving each build: main's first, its header's and recap's roster lines
+  at rest while the roster's read was held; then this branch's held as Loading… with focus on the
+  class's name, said again at rest once refused again, both held as the recap's was pressed, focus
+  then on Last session. As the demo teacher, a 20-minute session and a 12-page test deck, both gone
+  after: each close, slide change, Show and slides' read refused over CDP (a 503, or a download that
+  failed), Try again pressed with Enter, held with focus on it, let through, focus where each board
+  says, and a Stop showing's on Ask a question and on Present; the demo student Ana's lesson page
+  and its full screen, her 13+ check answered yes by a stand-in in that browser alone, nothing
+  written on dev. About 233 changed lines without tests.
+
 - **2026-10-22** — **Try again keeps keyboard focus, part 2a (#429): `TryAgain` on the class page's
   own lines, the recap, the student panel, Reports, a session's report and its Questions, and as a
   send's own button.** The owner's follow-up of 2026-10-16, continued (part 1, #426, below).

@@ -316,11 +316,15 @@ draw them (drawn on the canvas first), HomeInterim no longer built. The account 
 `h1`), Try again held as Loading… until Bali answers so focus stays on it, a failure said again.
 That Try again is the portal's one for a read that failed since the owner's follow-up of 2026-10-16
 (`TryAgain`, `components/try-again.tsx`): on Home, Classes, the account's card, the live grid's
-line and a student's home, and since part 2a (2026-10-22) the class page's own lines, an extend's
+line and a student's home, since part 2a (2026-10-22) the class page's own lines, an extend's
 failure sent again under its id among them, the recap, the student panel, Reports, a session's
-report and its Questions, its line kept while it reads or sends again, then focus on the region's
-heading, never the page (HomeRetryStates, ClassesRetryStates, ClassRetryStates, StudentRetryStates
-and ReportRetryStates, drawn on the canvas first); and as the one button of a send that says it,
+report and its Questions, and since part 2b (2026-10-22) a close, the class page's and Present's,
+and the slides: the slide's line, the card's, Present's and a student's, full screen too, and a
+slide change, the card's, Present's and Show slides'. Its line kept while it reads or sends again,
+and held too while a read of what it says is on its way from another Try again (the roster's,
+under the header and in the recap), then focus where its board says, never the page
+(HomeRetryStates, ClassesRetryStates, ClassRetryStates, StudentRetryStates, ReportRetryStates and
+LessonRetryStates, drawn on the canvas first); and as the one button of a send that says it,
 Register block and Make new code, their words its own until a send fails.
 Every
 portal source file is held to the tokens' utilities by `tokens.test.ts`, and

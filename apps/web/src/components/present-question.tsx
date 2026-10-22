@@ -153,10 +153,11 @@ export function PresentQuestion({ id, lesson }: { id: string; lesson: LiveQuesti
           </p>
           {/* Done gives way to the live grid: focus on to Present in the header. */}
           <div ref={foot} className={ROW}>
-            {open ? closeButtons(lesson) : doneButton(lesson, `${id}-present`)}
+            {open ? closeButtons(lesson) : doneButton(lesson, `${id}-present`, `${id}-done`)}
           </div>
         </div>
-        {closeFailedLine(lesson, true)}
+        {/* Closed by its Try again: focus on Done in the buttons' place, as after Close. */}
+        {closeFailedLine(lesson, `${id}-done`, true)}
       </div>
     </section>
   );

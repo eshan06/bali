@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { SlideLesson } from '../lib/use-slide';
 import { PresentSlide, presentSlide } from './present-slide';
 import { SlideFrame } from './slide-card';
+import { TryAgain } from './try-again';
 
 /*
  * Present's slide (M6, part 2d; PresentSlide, and the intermediate states PresentSlideStates and
@@ -58,6 +59,11 @@ const buttonTag = (html: string, words: string) =>
 function hosts(node: ReactNode): ReactElement<Record<string, unknown>>[] {
   if (Array.isArray(node)) return node.flatMap(hosts);
   if (!isValidElement<Record<string, unknown>>(node)) return [];
+  // `TryAgain` keeps state of its own: its line, then its button, pressed through its `onRetry`.
+  if (node.type === TryAgain) {
+    const { onRetry, children } = node.props as Parameters<typeof TryAgain>[0];
+    return [...hosts(children), createElement('button', { onClick: onRetry }, 'Try again')];
+  }
   if (typeof node.type === 'function' && node.type !== SlideFrame) {
     return hosts((node.type as (p: unknown) => ReactNode)(node.props));
   }
@@ -202,10 +208,20 @@ describe('what a change said, under the row (PresentSlideStates)', () => {
     const l = lesson({ said: { why: 'failed', change: turnTo } });
     const html = render(l);
     expect(html).toMatch(
-      /<div class="flex flex-wrap items-center gap-x-4 gap-y-3 justify-center text-center"><p role="alert" class="text-present-line">Bali couldn&#x27;t change the slide\.<\/p><button type="button" aria-disabled="false" class="[^"]*\bh-10\b[^"]*">Try again<\/button><\/div><\/section>$/,
+      /<div class="flex flex-wrap items-center gap-x-4 gap-y-3 justify-center text-center"><p role="alert" class="text-present-line">Bali couldn&#x27;t change the slide\.<\/p><button type="button" aria-disabled="false" aria-busy="false" class="[^"]*\bh-10\b[^"]*">Try again<\/button><\/div><\/section>$/,
     );
     press(presentSlide(props(l)), 'Try again');
     expect(l.again).toHaveBeenCalledOnce();
+    // Sent again: its line kept, Try again held as Loading…; answered, focus on the slide's title
+    // and page, under it (LessonRetryStates), its frame's lines landing there too; on Present once
+    // a Stop showing sent again gave the grid back, where a Stop showing's own puts it (santa's
+    // review).
+    expect(render(lesson({ said: { why: 'failed', change: turnTo }, changing: turnTo }))).toMatch(
+      /Bali couldn&#x27;t change the slide\.<\/p><button type="button" aria-disabled="true" aria-busy="true" class="[^"]*">Loading…<\/button>/,
+    );
+    expect(source.match(/then=\{\[`\$\{id\}-ps`\]\}/g)).toHaveLength(1);
+    expect(source.match(/then=\{\[`\$\{id\}-ps`, `\$\{id\}-present`\]\}/g)).toHaveLength(1);
+    expect(source).toMatch(/document\.getElementById\(`\$\{id\}-present`\)\?\.focus\(\)/);
   });
 
   it('says the session ended first, and the slides gone, with no Try again', () => {

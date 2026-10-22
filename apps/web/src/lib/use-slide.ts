@@ -67,14 +67,17 @@ export interface SlideLesson {
   said: Said | null;
   /** Previous (−1) and Next (+1); nothing past either end. */
   turn: (by: -1 | 1) => void;
-  /** Show a deck from its first page (the side panel's Show); true once it is on screen. */
-  show: (deckId: string) => Promise<boolean>;
+  /**
+   * Show a deck from its first page (the side panel's Show); true once it is on screen. `again`:
+   * its Try again, what it said kept until Bali answers.
+   */
+  show: (deckId: string, again?: boolean) => Promise<boolean>;
   /**
    * Stop showing; true once what the session shows now is on screen: Bali's answer, or the stream
    * showing it before an answer that gave up.
    */
   stop: () => Promise<boolean>;
-  /** Try again: the last change, under its id while its answer never came. */
+  /** Try again: the last change, under its id while its answer never came, its line kept meanwhile. */
   again: () => void;
   /** Try again: the deck, loaded afresh. */
   reload: () => void;
@@ -253,15 +256,16 @@ export function useSlide(
 
   const { deck, reload } = useShownDeck(api, shown.slide);
 
-  // One change at a time: one whose answer never came is resent under its id (2a).
+  // One change at a time: one whose answer never came is resent under its id (2a). Try again's
+  // (`again`) keeps what the last one said until its answer, so its button holds in its place.
   const change = useCallback(
-    async (to: SlideChange): Promise<boolean> => {
+    async (to: SlideChange, again = false): Promise<boolean> => {
       const { session, shown: at } = now.current;
       if (session === null || sending.current) return false;
       sending.current = true;
       last.current = to;
       setChanging(to);
-      setSaid(null);
+      if (!again) setSaid(null);
       const attempt = slideAttemptFor(unanswered.current, session, at.eventId, to);
       const answer = await showSlide(api, attempt);
       sending.current = false;
@@ -270,6 +274,7 @@ export function useSlide(
       unanswered.current = keepUnanswered(attempt, answer);
       const end = changeEnd(answer);
       if ('shown' in end) {
+        setSaid(null);
         put(session, end.shown);
         return true;
       }
@@ -278,6 +283,7 @@ export function useSlide(
       const heard = newer(now.current.shown, { slide: null, eventId: attempt.eventId });
       if (end.said === 'failed' && heard === now.current.shown) {
         unanswered.current = null;
+        setSaid(null);
         return true;
       }
       setSaid({ why: end.said, change: to });
@@ -311,10 +317,10 @@ export function useSlide(
     changing,
     said,
     turn,
-    show: (deck) => change({ deckId: deck, page: 1 }),
+    show: (deck, again) => change({ deckId: deck, page: 1 }, again),
     stop: () => change({ deckId: null, page: null }),
     again: () => {
-      if (last.current) void change(last.current);
+      if (last.current) void change(last.current, true);
     },
     reload,
   };

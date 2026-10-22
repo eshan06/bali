@@ -323,8 +323,14 @@ describe('its buttons (L7, part 3; PresentQuestionControls, PresentAnswerControl
     const failed = { ...lesson(), closeFailed: { reveal: true } };
     const html = render(failed);
     expect(foot(html)).toMatch(
-      /Close and show answer<\/button><\/div><\/div><div class="flex flex-wrap items-center gap-x-4 gap-y-3 justify-end"><p role="alert" class="text-present-line">Bali couldn&#x27;t close the question\.<\/p><button type="button" aria-disabled="false" class="[^"]*\bh-10\b[^"]*">Try again<\/button><\/div><\/div><\/section>$/,
+      /Close and show answer<\/button><\/div><\/div><div class="flex flex-wrap items-center gap-x-4 gap-y-3 justify-end"><p role="alert" class="text-present-line">Bali couldn&#x27;t close the question\.<\/p><button type="button" aria-disabled="false" aria-busy="false" class="[^"]*\bh-10\b[^"]*">Try again<\/button><\/div><\/div><\/section>$/,
     );
+    // Sent again: its line kept, Try again held as Loading… with both closes (LessonRetryStates).
+    const again = render({ ...failed, closing: true });
+    expect(foot(again)).toMatch(
+      /Bali couldn&#x27;t close the question\.<\/p><button type="button" aria-disabled="true" aria-busy="true" class="[^"]*\bh-10\b[^"]*">Loading…<\/button>/,
+    );
+    expect(foot(again).match(/<button type="button" aria-disabled="true"/g)).toHaveLength(3);
     expect(html).toContain('<p class="text-present-kicker uppercase text-text-brand">Question</p>');
     expect(text(html)).toContain('Answer in Bali on your phone.');
     // Closed since (another window, the stream, the bell): Done, and the line goes.
@@ -342,7 +348,7 @@ describe('its buttons (L7, part 3; PresentQuestionControls, PresentAnswerControl
     for (const l of [closed(false, {}, false), closed(true, {}, false), closed(true)]) {
       const html = render(l);
       expect(foot(html)).toMatch(
-        /^<div class="flex flex-col gap-4"><div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-3"><p class="text-present-line text-text-secondary">Bali shows only these totals, never who picked what\.<\/p><div class="flex flex-wrap items-center gap-2\.5"><button type="button" class="[^"]*\bh-10\b[^"]*">Done<\/button><\/div><\/div><\/div><\/section>$/,
+        /^<div class="flex flex-col gap-4"><div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-3"><p class="text-present-line text-text-secondary">Bali shows only these totals, never who picked what\.<\/p><div class="flex flex-wrap items-center gap-2\.5"><button type="button" id="L-done" class="[^"]*\bh-10\b[^"]*">Done<\/button><\/div><\/div><\/div><\/section>$/,
       );
     }
     // Its last count not in yet: Done at once, no count per answer.
@@ -384,9 +390,11 @@ describe('its buttons (L7, part 3; PresentQuestionControls, PresentAnswerControl
 
   it('says them through the class page’s own pieces: one close, one Done, one copy of the words', () => {
     expect(source).toMatch(
-      /\{open \? closeButtons\(lesson\) : doneButton\(lesson, `\$\{id\}-present`\)\}/,
+      /\{open \? closeButtons\(lesson\) : doneButton\(lesson, `\$\{id\}-present`, `\$\{id\}-done`\)\}/,
     );
-    expect(source).toMatch(/\{closeFailedLine\(lesson, true\)\}/);
+    // Closed by its Try again: focus on Done in the buttons' place, as after Close
+    // (LessonRetryStates), the effect below giving it the same.
+    expect(source).toMatch(/\{closeFailedLine\(lesson, `\$\{id\}-done`, true\)\}/);
     // No close or Done of its own, and none of the buttons' words.
     expect(source).not.toMatch(/\.close\(|\.done\(|closeQuestion|closeAttemptFor/);
     expect(source).not.toMatch(/>\s*(Close|Close and show answer|Done|Try again)\s*</);

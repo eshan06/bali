@@ -41,7 +41,13 @@ export function presentSlide({ id, lesson, slide }: Props) {
   return (
     // The rest of the page, its frame as tall as the screen leaves it (`SlideFrame`'s `present`).
     <section aria-labelledby={`${id}-ps`} className="@container flex flex-1 flex-col gap-5.5">
-      <SlideFrame look="present" deck={deck} slide={slide} onReload={lesson.reload} />
+      <SlideFrame
+        look="present"
+        deck={deck}
+        slide={slide}
+        onReload={lesson.reload}
+        then={[`${id}-ps`]}
+      />
       <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-3">
         {/* Said as it changes, so a turn is heard before its page is drawn; a long title wraps. */}
         <p
@@ -63,11 +69,14 @@ export function presentSlide({ id, lesson, slide }: Props) {
           Stop showing
         </Button>
       </div>
+      {/* Answered, focus on the slide's title and page; on Present once a Stop showing sent again
+          has given the grid back, as a Stop showing's own does. */}
       {said === null ? null : (
         <SaidLine
           why={said.why}
           held={changing !== null}
           onAgain={lesson.again}
+          then={[`${id}-ps`, `${id}-present`]}
           present
           className="justify-center text-center"
         />

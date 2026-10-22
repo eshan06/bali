@@ -9,16 +9,17 @@ is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
 _Last updated: 2026-10-22 (Central) — The owner's follow-up, Try again keeps keyboard focus, part
-2a (#429; `docs/DECISIONS.md`, 2026-10-22): `TryAgain` on the class page's own lines (its class, its
-roster, an extend's failure sent again under its id), the recap, the student panel, Reports, a
-session's report and its Questions, each line kept and its Try again held as Loading… until Bali
-answers, then focus on the heading each board names; and as Register block's and Make new code's own
-button. Built to ClassRetryStates and ReportRetryStates (drawn first; no new board). Checked in
-headless Chrome on dev as the demo teacher, each read refused, held and let through with the keyboard.
-Part 2 came to about 550 changed lines without tests, so it is two PRs: part 2b, the close and the
-slides, waits on the branch `fix/try-again-2b`. Before it, part 1 (#426). Next on the Windows PC:
-part 2b, then the rest of Try again (In flight), then the four steps for sessions before the pilot's
-first class; on the Mac, the phone's L8 and M8._
+2b (#430; `docs/DECISIONS.md`, 2026-10-22): `TryAgain` on a close (the class page's card's and
+Present's) and the slides (the slide's line in the card, in Present and on a student's page, full
+screen too; a slide change from the card, Present and Show slides), each line kept while it is sent
+or read again, its Try again held as Loading… with the card's own controls, then focus where each
+board says; and the class page's fix: a failure said while a read of it is on its way holds its Try
+again, whichever Try again sent it (the roster's under the header after the class's own, and the
+recap's). Built to LessonRetryStates, StudentRetryStates and ClassRetryStates (drawn first; no new
+board). Checked in headless Chrome on dev as the demo teacher and a demo student, each request
+refused, held and let through with the keyboard. Before it, part 2a (#429). Next on the Windows PC:
+the rest of Try again (In flight), then the four steps for sessions before the pilot's first class;
+on the Mac, the phone's L8 and M8._
 
 ## Now
 
@@ -51,12 +52,13 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
   focus: part 1 ✅ (#426; DECISIONS 2026-10-16), `TryAgain` on Home, Classes, the account's card,
   the live grid's line and a student's home; part 2a ✅ (#429; DECISIONS 2026-10-22), the class page's
   own lines with an extend's, the recap, the student panel, Reports, a session's report and its
-  Questions, Register block and Make new code. Left, each a step of its own, the scan in
-  `try-again.test.ts` listing them: part 2b, a close (the class page's and Present's) and the slides
-  (the slide's line, a slide change, Show slides' line, a student's slide), its code on the branch
-  `fix/try-again-2b`, stacked on part 2a; Your questions, Your slides and the two side panels' lists;
-  a student's lesson page; and the sends left (an ask, a save, an upload, Create class, the invite
-  code).
+  Questions, Register block and Make new code; part 2b ✅ (#430; DECISIONS 2026-10-22), a close (the
+  class page's and Present's) and the slides (the slide's line, a slide change, Show slides' line, a
+  student's slide), and the class page's roster line held while its read is on its way. Left, each a
+  step of its own, the scan in `try-again.test.ts` listing them: Your questions, Your slides and the
+  two side panels' lists; a student's lesson page; and the sends left (an ask, a save, an upload,
+  Create class, the invite code). For the owner: whether a roster failure keeps its two Try agains,
+  under the header and in the recap (both kept, each holding the other).
 - **The workflow review's last steps** ✅ (the owner, 2026-10-13; DECISIONS 2026-10-14): the
   migration guard (#369), docs-only PRs skipping the test jobs (#365), moved files (#368) and two
   tests (#364), each in full in `docs/PLAN-ARCHIVE.md`.

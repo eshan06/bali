@@ -78,9 +78,13 @@ describe('the slide on the lesson page (StudentLesson)', () => {
     expect(frame(html)).not.toContain('flex-[0_1_420px]');
     expect(html).toMatch(/<canvas role="img" class="[^"]*\binvisible\b/);
     // The label is the presenter's (slide-card.test.ts): which slide it is, then the page's text.
-    expect(source).toMatch(
-      /<SlideFrame look="student" deck=\{deck\} slide=\{slide\} onReload=\{onReload\} \/>/,
-    );
+    // Its lines' Try again lands focus, once the page is drawn, on "Slide 4 of 12" over it, or
+    // under it in full screen (StudentRetryStates).
+    expect(
+      source.match(
+        /<SlideFrame look="student" deck=\{deck\} slide=\{slide\} onReload=\{onReload\} then=\{\[id\]\} \/>/g,
+      ),
+    ).toHaveLength(2);
   });
 
   it('turns no page: a student never has Previous, Next or the arrow keys', () => {
