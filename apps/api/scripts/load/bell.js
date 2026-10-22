@@ -85,13 +85,8 @@ function params(kind, token, json, extra = {}) {
 
 /** A request in flight beside the others: a teacher's VU carries its class's devices. */
 function call(kind, method, path, token, body = null, extra = {}) {
-  const payload = body === null ? null : JSON.stringify(body);
-  return http.asyncRequest(
-    method,
-    `${API}${path}`,
-    payload,
-    params(kind, token, body !== null, extra),
-  );
+  const sent = params(kind, token, body !== null, extra);
+  return http.asyncRequest(method, `${API}${path}`, body && JSON.stringify(body), sent);
 }
 
 /** A UUIDv7, as the phone mints its event ids: the time in its first 48 bits. */
@@ -114,15 +109,9 @@ const joins = (n) => (r) =>
 export function tap() {
   const s = students[exec.scenario.iterationInTest];
   sleep(Math.random() * TAPS_BEFORE);
-  const body = { tagId: s.tagId, eventId: uuidv7(), deviceTime: deviceTime() };
-  const r = http.request(
-    'POST',
-    `${API}/v1/taps`,
-    JSON.stringify(body),
-    params('tap', s.token, true),
-  );
-  check(r, {
-    'a tap before the bell waits': (res) => res.status === 200 && res.json('outcome') === 'armed',
+  const body = JSON.stringify({ tagId: s.tagId, eventId: uuidv7(), deviceTime: deviceTime() });
+  check(http.request('POST', `${API}/v1/taps`, body, params('tap', s.token, true)), {
+    'a tap before the bell waits': (r) => r.status === 200 && r.json('outcome') === 'armed',
   });
 }
 
@@ -164,14 +153,10 @@ async function teach(t, session, lesson) {
     });
   }
   if (t.secondClassId) {
-    const second = await call(
-      'start',
-      'POST',
-      `/v1/classes/${t.secondClassId}/sessions`,
-      t.token,
-      LESSON,
-    );
-    check(second, { 'a class no one waits for starts': joins(0) });
+    const path = `/v1/classes/${t.secondClassId}/sessions`;
+    check(await call('start', 'POST', path, t.token, LESSON), {
+      'a class no one waits for starts': joins(0),
+    });
   }
 }
 
@@ -215,20 +200,14 @@ async function laptop(s, session, endAt) {
  * the download of the deck its slide names; a phone answers the question once it shows.
  */
 async function follow(s, session, endAt, isPhone) {
+  const presentation = `/v1/sessions/${session}/presentation`;
   let etag = null;
   let answered = !isPhone;
   let downloaded = false;
   for (let at = Date.now(); at < endAt; at += POLL * 1000) {
     await pause(at - Date.now());
-    const sent = etag === null ? {} : { 'If-None-Match': etag };
-    const r = await call(
-      'poll',
-      'GET',
-      `/v1/sessions/${session}/presentation`,
-      s.token,
-      null,
-      sent,
-    );
+    const held = etag === null ? {} : { 'If-None-Match': etag };
+    const r = await call('poll', 'GET', presentation, s.token, null, held);
     check(r, {
       'a poll shows the lesson under its ETag, or 304 while it is unchanged': (res) =>
         (res.status === 200 && res.json('running') === true && Boolean(res.headers.Etag)) ||
@@ -247,10 +226,8 @@ async function follow(s, session, endAt, isPhone) {
     const question = r.json('question');
     if (!answered && question !== null && question.open && question.answer === null) {
       answered = true;
-      const pick = {
-        eventId: uuidv7(),
-        option: Math.floor(Math.random() * question.options.length),
-      };
+      const option = Math.floor(Math.random() * question.options.length);
+      const pick = { eventId: uuidv7(), option };
       check(await call('answer', 'POST', `/v1/questions/${question.id}/answers`, s.token, pick), {
         'an answer counts': (res) => res.status === 200 && res.json('outcome') === 'answered',
       });

@@ -222,9 +222,10 @@ npm run load:sweep   # once load:serve has stopped: the sweep at that size, time
   every 30 s; six classes follow a lesson on their phones and laptops. `LOAD_DB_POOL` sizes the
   API's database pool for `load:serve` (unset: the deployed 10), and `LOAD_TEACHERS` the school
   `load:seed` makes (unset: the gate's 20 teachers of 30). No threshold can fail. CI runs it only
-  by hand: the Load gate workflow's `bell` input, runs such as `1:10:me 1:20:me 30:10:me
-  1:10:me:40` (window, pool, read, teachers), each on a school seeded afresh, the numbers in the
-  run's summary. The model and the numbers: `docs/DECISIONS.md` (2026-10-22, #336).
+  by hand: the Load gate workflow's `bell` input, runs such as
+  `1:10:me 1:20:me 30:10:me 1:10:me:40` (window, pool, read, teachers), each on a school seeded
+  afresh, the numbers in the run's summary. The model and the numbers: `docs/DECISIONS.md`
+  (2026-10-22, #336).
 - **Never dev's or prod's data:** both commands refuse a `TEST_DATABASE_URL` that isn't on this
   machine (`localhost`, `127.0.0.1`, `[::1]`), and one no one vouched for: `localhost` could be a
   tunnel to another machine, and nothing can tell, so `LOAD_LOCAL_POSTGRES=1` says it is not
