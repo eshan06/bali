@@ -8,18 +8,17 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-22 (Central) — The owner's follow-up, Try again keeps keyboard focus, part
-2b (#430; `docs/DECISIONS.md`, 2026-10-22): `TryAgain` on a close (the class page's card's and
-Present's) and the slides (the slide's line in the card, in Present and on a student's page, full
-screen too; a slide change from the card, Present and Show slides), each line kept while it is sent
-or read again, its Try again held as Loading… with the card's own controls, then focus where each
-board says; and the class page's fix: a failure said while a read of it is on its way holds its Try
-again, whichever Try again sent it (the roster's under the header after the class's own, and the
-recap's). Built to LessonRetryStates, StudentRetryStates and ClassRetryStates (drawn first; no new
-board). Checked in headless Chrome on dev as the demo teacher and a demo student, each request
-refused, held and let through with the keyboard. Before it, part 2a (#429). Next on the Windows PC:
-the rest of Try again (In flight), then the four steps for sessions before the pilot's first class;
-on the Mac, the phone's L8 and M8._
+_Last updated: 2026-10-22 (Central) — The owner's follow-up, Try again keeps keyboard focus, part 3
+(#431; `docs/DECISIONS.md`, 2026-10-22), its last: `TryAgain` everywhere else, so the scan's `LEFT`
+is empty and a Try again drawn by hand anywhere in the portal fails it: Your questions' and Your
+slides' lists, a save and a stopped upload, the side panel's two lists and an ask (one of the
+teacher's questions or one written, its failure now kept while the same one is asked again), a
+student's lesson, and Create class's and the invite code's own button. Built to LessonRetryStates,
+StudentRetryStates and QuestionsSlidesRetryStates (drawn first, canvas version 85). Checked in
+headless Chrome on dev as the demo teacher and a demo student, each request refused, held and let
+through with the keyboard. Before it, part 2b (#430). Next on the Windows PC: the class page's reads
+given a time limit (In flight), then the four steps for sessions before the pilot's first class; on
+the Mac, the phone's L8 and M8._
 
 ## Now
 
@@ -54,11 +53,13 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
   own lines with an extend's, the recap, the student panel, Reports, a session's report and its
   Questions, Register block and Make new code; part 2b ✅ (#430; DECISIONS 2026-10-22), a close (the
   class page's and Present's) and the slides (the slide's line, a slide change, Show slides' line, a
-  student's slide), and the class page's roster line held while its read is on its way. Left, each a
-  step of its own, the scan in `try-again.test.ts` listing them: Your questions, Your slides and the
-  two side panels' lists; a student's lesson page; and the sends left (an ask, a save, an upload,
-  Create class, the invite code). For the owner: whether a roster failure keeps its two Try agains,
-  under the header and in the recap (both kept, each holding the other).
+  student's slide), and the class page's roster line held while its read is on its way; part 3 ✅
+  (#431; DECISIONS 2026-10-22), the rest (Your questions, Your slides, the side panel's lists and an
+  ask, a student's lesson, Create class, the invite code), so the scan's `LEFT` is empty. Next: the
+  class page's reads given a time limit. For the owner: whether a roster failure keeps its two Try
+  agains, under the header and in the recap (both kept, each holding the other); and whether a send
+  whose own button sends it again keeps its line meanwhile (the conductor's call: it goes, as
+  Register block's).
 - **The workflow review's last steps** ✅ (the owner, 2026-10-13; DECISIONS 2026-10-14): the
   migration guard (#369), docs-only PRs skipping the test jobs (#365), moved files (#368) and two
   tests (#364), each in full in `docs/PLAN-ARCHIVE.md`.

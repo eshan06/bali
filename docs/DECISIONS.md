@@ -8,6 +8,53 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-22** — **Try again keeps keyboard focus, part 3 (#431): the rest on `TryAgain`, so the
+  scan's `LEFT` is empty; an ask that didn't go through stays said while it is asked again.** The
+  owner's follow-up of 2026-10-16, finished (parts 2a and 2b, #429 and #430, below). **The reads:**
+  Your questions' and Your slides' lists, the side panel's two (Ask a question's Written ahead, Show
+  slides') and a student's lesson draw `TryAgain`, each read again with no Loading… step, so its line
+  stays said and Try again holds as Loading… until the answer; read, focus on Your questions, Your
+  slides, Written ahead, the panel's title, or the class's name (Your classes for a lesson of a class
+  the student isn't in). Your questions' page draws only its newest read's answer, as the class page
+  has since #429. The lesson's Try again reads the lesson again and the account with it (the shell's
+  `refresh`, which keeps a failure said until its answer), held until the read it waits on answers:
+  the lesson's while the class and its bell are known, else the account's, then the lesson's
+  (`retryHeld`, `lib/student-web.ts`). **The sends:** an ask that didn't go through, of one of the
+  teacher's questions or of one written, stays said while the same one is asked again, by Try again
+  or by its own Ask or Ask the class, Try again held as Loading… with them; asking another lets it go
+  as it starts (`useLiveQuestion`'s `ask`; its regression test came first and failed, on the running
+  hook, `question-card-hook.test.ts`). Asked, the panel closes and focus goes to the question as after
+  any ask; the session ended first, its line alone, focus on the question's words or on the panel's
+  title. A save's Try again, which kept its line already, holds as Loading…; refused for good, focus on
+  Write a question, the form's heading. A stopped upload's Try again goes on as before, its row
+  uploading again, focus on its Cancel, or on the file's name while Bali checks it again with no
+  buttons (focus fell to the page there before), then on the row's button once checked. Create class
+  and the invite code's Redeem code draw their one button with `TryAgain`'s `send`, as Register block
+  and Make new code have since #429, their words and requests unchanged; the invite's redeem is
+  untouched, its press reaching the same `redeem`, Enter in the field pressing the button as Register
+  block's does. **`TryAgain` gains `blocked`:** held at rest in its own words, nothing of its own on
+  its way: a stopped upload's Try again while its Cancel is sent (SlidesStates), Create class before a
+  name is typed (ClassesStates). **The scan:** `LEFT` is empty, so a Try again drawn by hand anywhere
+  in the portal fails `try-again.test.ts`. **Drawn first** (canvas version 85, id 1792654334-1124):
+  LessonRetryStates gains the side panel's group (an ask of one of your questions, one written, Ask a
+  question's list, Show slides' list), StudentRetryStates the lesson, and QuestionsSlidesRetryStates,
+  new, in the row of Your questions and Your slides (the two lists, a save, a stopped upload).
+  *The conductor's call, awaiting the owner:* "any other send whose failure line still goes as it
+  sends again" read as a send whose Try again goes with its line, taking focus to the page: the asks
+  were the only ones. Every other send keeps focus on its own button throughout (Start, End, a
+  Remove, Register block, Make new code, Create class, the invite code) or says its progress where the
+  line was (an upload, a student's answer), so its line still goes as it sends again, as #429's call
+  has it for Register block and Make new code. **Tested** as parts 1 and 2 were: rendered markup, the
+  source, `retryHeld`, and the ask on its running hook. **Seen** in headless Chrome on dev, the preview
+  serving main and then this branch: on main every Try again here but the save's left focus on the
+  page's body. On this branch, as the demo teacher (a 20-minute session on "PV16 test", a question of
+  theirs saved and a 3-page test deck uploaded, each gone after), each read and send refused over
+  CDP, Try again pressed with Enter, held as Loading… with focus on it, refused again (said again,
+  focus kept) and let through, focus where each board says; a session ended first answered as a 409
+  over CDP; the demo student Ana's lesson the same way, her 13+ check answered yes by a stand-in in
+  that browser alone; New class's create and the invite's redeem failed or held in the browser, never
+  sent. About 383 changed lines without tests.
+
 - **2026-10-22** — **Try again keeps keyboard focus, part 2b (#430): a close and the slides on
   `TryAgain`; and the class page's roster line held while its read is on its way, whichever Try
   again sent it.** The owner's follow-up of 2026-10-16, finished on the class page (part 2a, #429,
