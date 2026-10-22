@@ -62,6 +62,11 @@ is the pattern.
   `act` (`await act(async () => { … })`), so React has drawn the answer before the next
   check. A frame (`requestAnimationFrame`) runs about 16 ms later: wait for the next one
   before checking what a frame does.
+- **On a fake clock** (`vi.useFakeTimers()`, for what takes seconds or minutes): press with
+  `fireEvent`, and wait inside `act` with `vi.advanceTimersByTimeAsync` or `vi.waitFor`.
+  user-event's actions and Testing Library's `waitFor` and `findBy…` wait on a timer that
+  only Jest's fake clock is advanced for, so under Vitest's they never return.
+  `app/slides/page.test.tsx` is the pattern.
 - **A guard that reads files (Try again's scan) finds them through `import.meta.dirname`:**
   in jsdom, Vite resolves `new URL('./x', import.meta.url)` against the page's address,
   `http://localhost:3000`, not the file's.
