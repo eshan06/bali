@@ -4,7 +4,6 @@ import type { SessionReportSummary } from '@bali/shared';
 import Link from 'next/link';
 import { useId } from 'react';
 
-import { Button } from '@/components/button';
 import { CARD_ALONE } from '@/components/card';
 import { TryAgain } from '@/components/try-again';
 import { sessionWhen } from '@/lib/recap';
@@ -59,8 +58,9 @@ export function focusBar(
  * session's average focus as a bar. Every state with its words: loading, couldn't load with Try
  * again, none yet, the place lost, and earlier sessions that didn't load. A failure stays said
  * while its Try again reads, Try again held, never Loading… in its place; read, focus on the
- * sessions' label, or Show earlier, as ReportRetryStates says. `classes` is null until the account
- * is read.
+ * sessions' label, or Show earlier, as ReportRetryStates says: Show earlier is its own Try again,
+ * one button throughout, so focus stays on it, and once it goes with the last page, on the
+ * sessions' label. `classes` is null until the account is read.
  */
 export function ReportsView({
   classes,
@@ -74,7 +74,8 @@ export function ReportsView({
   onRead: (at: ReadAt) => void;
 }) {
   const sessionsId = useId();
-  const earlierId = useId();
+  // Show earlier's read that failed, said before its button, which then says Try again.
+  const earlier = list.failure?.at === 'earlier' ? list.failure : null;
   const loading = classId !== null && list.reading === 'newest' && list.failure === null;
   const none =
     (classes !== null && classId === null) ||
@@ -150,32 +151,30 @@ export function ReportsView({
                 Sessions · {list.className}
               </h2>
               <SessionsTable classId={classId ?? ''} sessions={list.sessions} />
-              {list.nextBefore === null ? null : list.failure?.at === 'earlier' ? (
-                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-3">
+              {list.nextBefore === null ? null : (
+                // Show earlier, and its Try again once a read of it failed, the line before it: one
+                // button throughout, held as Loading… while it reads, so focus stays on it; gone
+                // with the last page, it lands focus on the sessions' label, as Try again does.
+                <div
+                  className={earlier ? 'mt-3 flex flex-wrap items-center gap-x-4 gap-y-3' : 'mt-3'}
+                >
                   <TryAgain
                     onRetry={() => onRead('earlier')}
                     held={list.reading === 'earlier'}
-                    then={[earlierId, sessionsId]}
-                  >
-                    <p role="alert" className="text-body">
-                      Couldn&apos;t load earlier sessions. {list.failure.message}
-                    </p>
-                  </TryAgain>
-                </div>
-              ) : (
-                <div className="mt-3">
-                  {/* Held, not disabled, while it reads: focus stays on it. */}
-                  <Button
-                    id={earlierId}
-                    variant="secondary"
-                    size="sm"
-                    aria-disabled={list.reading !== null}
-                    onClick={() => {
-                      if (list.reading === null) onRead('earlier');
+                    blocked={list.reading !== null}
+                    then={[sessionsId]}
+                    send={{
+                      words: 'Show earlier',
+                      sending: 'Loading…',
+                      failed: earlier !== null,
                     }}
                   >
-                    {list.reading === 'earlier' ? 'Loading…' : 'Show earlier'}
-                  </Button>
+                    {earlier ? (
+                      <p role="alert" className="text-body">
+                        Couldn&apos;t load earlier sessions. {earlier.message}
+                      </p>
+                    ) : null}
+                  </TryAgain>
                 </div>
               )}
             </section>
