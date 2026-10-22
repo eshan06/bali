@@ -354,9 +354,10 @@ describe('its URL and its reads (from their sources)', () => {
       /void readSessionPage\(api, classId, sessionId\)\.then\(\(next\) => \{\s*if \(live\) setPage\(next\);\s*\}\);/,
     );
     expect(component).toMatch(/\}, \[api, classId, sessionId, router\]\);/);
-    // Try again reads the page and its questions again, its failure said until both answer.
+    // Try again reads the page and its questions again, its failure said until both answer, the
+    // page drawn as soon as it is read, never waiting for its questions (santa's review).
     expect(component).toMatch(
-      /onRetry=\{async \(\) => \{\s*const \[next\] = await Promise\.all\(\[\s*readSessionPage\(api, classId, sessionId\),\s*readQuestions\(\),\s*\]\);\s*setPage\(next\);\s*\}\}/,
+      /onRetry=\{\(\) =>\s*Promise\.all\(\[readSessionPage\(api, classId, sessionId\)\.then\(setPage\), readQuestions\(\)\]\)\s*\}/,
     );
     expect(component).not.toMatch(/set(Page|Questions)\(\{ kind: 'loading' \}\)/);
     // The account the shell read once: no read of the class's own for its name.
@@ -368,13 +369,14 @@ describe('its URL and its reads (from their sources)', () => {
 
   it('reads its questions at once with the page, again by the page’s Try again and by the card’s own', () => {
     const component = source('./session-report.tsx');
-    // Signed in only (the page's read sends anyone else to sign in). A Try again reads only once
-    // these reads have answered, a failure shown, and holds while its own read runs.
+    // Signed in only (the page's read sends anyone else to sign in), and nothing from a read the
+    // page or the card has asked again since: the page's Try again shows once its own read fails,
+    // the first questions read perhaps still out, and only the newest read's answer is drawn.
     expect(component).toMatch(
-      /useEffect\(\(\) => \{\s*if \(!getAccessToken\(\)\) return;\s*let live = true;\s*void readSessionQuestions\(api, classId, sessionId\)\.then\(\(next\) => \{\s*if \(live\) setQuestions\(next\);\s*\}\);\s*return \(\) => \{\s*live = false;\s*\};\s*\}, \[api, classId, sessionId\]\);/,
+      /const asked = useRef\(0\);\s*const readQuestions = useCallback\(async \(\) => \{\s*const mine = \+\+asked\.current;\s*const next = await readSessionQuestions\(api, classId, sessionId\);\s*if \(asked\.current === mine\) setQuestions\(next\);\s*\}, \[api, classId, sessionId\]\);/,
     );
     expect(component).toMatch(
-      /const readQuestions = async \(\) =>\s*setQuestions\(await readSessionQuestions\(api, classId, sessionId\)\);/,
+      /useEffect\(\(\) => \{\s*if \(!getAccessToken\(\)\) return;\s*void readQuestions\(\);\s*return \(\) => \{\s*asked\.current \+= 1;\s*\};\s*\}, \[readQuestions\]\);/,
     );
     expect(component).toMatch(/onRetryQuestions=\{readQuestions\}/);
     // Drawn once the page is read, after the report's own parts.

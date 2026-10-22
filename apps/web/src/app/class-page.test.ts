@@ -76,7 +76,7 @@ describe('the class page before its class is read', () => {
     // failed while it is still on its way (santa's review).
     expect(page.match(/setError\(errText\(e\)\)/g)).toHaveLength(1);
     expect(page).toMatch(
-      /setRoster\(await api\.get<RosterResponse>\(`\/v1\/classes\/\$\{classId\}\/roster`\)\);\s*setRosterError\(null\);\s*\} catch \(e\) \{\s*setRosterError\(errText\(e\)\);/,
+      /const next = await api\.get<RosterResponse>\(`\/v1\/classes\/\$\{classId\}\/roster`\);\s*if \(reads\.current\.roster !== mine\) return;\s*setRoster\(next\);\s*setRosterError\(null\);\s*\} catch \(e\) \{\s*if \(reads\.current\.roster === mine\) setRosterError\(errText\(e\)\);/,
     );
     expect(before).toMatch(/\{klass \? cantLoad\(error \?\? rosterError\) : null\}/);
     expect(page).toMatch(
@@ -89,16 +89,29 @@ describe('the class page before its class is read', () => {
     // each goes with its own read's answer, and Try again holds while `load`'s promise runs.
     const load = page.slice(page.indexOf('const load = useCallback('));
     expect(load).toMatch(
-      /^const load = useCallback\(async \(\) => \{\s*const read = api\.get<ClassDetail>\(`\/v1\/classes\/\$\{classId\}`\)\.then\(\s*\(c\) => \{\s*setError\(null\);\s*setKlass\(c\);/,
+      /^const load = useCallback\(async \(\) => \{\s*const mine = \+\+reads\.current\.klass;\s*const read = api\.get<ClassDetail>\(`\/v1\/classes\/\$\{classId\}`\)\.then\(\s*\(c\) => \{\s*if \(reads\.current\.klass !== mine\) return;\s*setError\(null\);\s*setKlass\(c\);/,
     );
     expect(load).toMatch(
-      /await Promise\.all\(\[read, readRoster\(\)\]\);\s*\}, \[api, classId, readRoster\]\);/,
+      /\(e: unknown\) => \{\s*if \(reads\.current\.klass === mine\) setError\(errText\(e\)\);\s*\},\s*\);\s*await Promise\.all\(\[read, readRoster\(\)\]\);\s*\}, \[api, classId, readRoster\]\);/,
     );
     expect(page.match(/setError\(null\)/g)).toHaveLength(1);
     expect(page.match(/setRosterError\(null\)/g)).toHaveLength(2);
     // Read, focus on the page's own heading, the class's name, whichever page it then draws.
     expect(html.match(/<h1 /g)).toHaveLength(1);
     expect(live).toMatch(/<LiveHeader\s+name=\{klass\.name\}/);
+  });
+
+  it('draws only the newest read’s answer, so two Try agains for one failure never leave a stale one (santa’s review)', () => {
+    // The roster's failure is said under the header and in the recap, each with its Try again,
+    // and neither holds the other: pressed both, a slow read's failure could land after a later
+    // read's roster. Each read takes a turn; an answer not the newest's is dropped, the class's
+    // and the roster's alike, the read a session's end starts too.
+    expect(page).toMatch(/const reads = useRef\(\{ klass: 0, roster: 0 \}\);/);
+    expect(page).toMatch(
+      /const readRoster = useCallback\(async \(\) => \{\s*const mine = \+\+reads\.current\.roster;/,
+    );
+    expect(page.match(/reads\.current\.roster (!|=)== mine/g)).toHaveLength(2);
+    expect(page.match(/reads\.current\.klass (!|=)== mine/g)).toHaveLength(2);
   });
 });
 
@@ -135,7 +148,7 @@ describe('the class page while no session runs (ClassBefore)', () => {
     );
     // One read of the roster, the class's load's and this one's.
     expect(page).toMatch(
-      /const readRoster = useCallback\(async \(\) => \{\s*try \{\s*setRoster\(await api\.get<RosterResponse>/,
+      /const readRoster = useCallback\(async \(\) => \{\s*const mine = \+\+reads\.current\.roster;\s*try \{\s*const next = await api\.get<RosterResponse>/,
     );
     expect(page.match(/\/roster`\)/g)).toHaveLength(1);
   });

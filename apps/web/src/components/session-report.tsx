@@ -4,7 +4,7 @@ import { isUnlockReason, type SessionReportUnlock } from '@bali/shared';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 import { CARD_ALONE } from '@/components/card';
 import { RecapBody } from '@/components/recap-card';
@@ -52,33 +52,33 @@ export function SessionReportPage({ classId, sessionId }: { classId: string; ses
     };
   }, [api, classId, sessionId, router]);
 
-  // The Questions card's own read, at once with the page's: its failure is the card's alone.
+  // The Questions card's own read, at once with the page's, and again by either Try again: its
+  // failure is the card's alone, and only the newest read's answer is drawn, never a slow one's
+  // over a read since (santa's review).
+  const asked = useRef(0);
+  const readQuestions = useCallback(async () => {
+    const mine = ++asked.current;
+    const next = await readSessionQuestions(api, classId, sessionId);
+    if (asked.current === mine) setQuestions(next);
+  }, [api, classId, sessionId]);
   useEffect(() => {
     if (!getAccessToken()) return;
-    let live = true;
-    void readSessionQuestions(api, classId, sessionId).then((next) => {
-      if (live) setQuestions(next);
-    });
+    void readQuestions();
     return () => {
-      live = false;
+      asked.current += 1;
     };
-  }, [api, classId, sessionId]);
+  }, [readQuestions]);
 
-  const readQuestions = async () =>
-    setQuestions(await readSessionQuestions(api, classId, sessionId));
   return (
     <SessionReport
       classId={classId}
       className={me?.classes.find((c) => c.id === classId)?.name ?? null}
       page={page}
       questions={questions}
-      onRetry={async () => {
-        const [next] = await Promise.all([
-          readSessionPage(api, classId, sessionId),
-          readQuestions(),
-        ]);
-        setPage(next);
-      }}
+      // The page drawn as soon as it is read, its questions as theirs are.
+      onRetry={() =>
+        Promise.all([readSessionPage(api, classId, sessionId).then(setPage), readQuestions()])
+      }
       onRetryQuestions={readQuestions}
     />
   );

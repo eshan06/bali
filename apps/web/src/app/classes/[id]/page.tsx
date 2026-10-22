@@ -224,19 +224,29 @@ export default function ClassDetailPage() {
     );
   };
 
+  // Each read's turn, the class's and the roster's: only the newest one's answer is drawn, so a
+  // slow read never says its failure over one read since, two Try agains for one failure (under the
+  // header and in the recap) included (santa's review).
+  const reads = useRef({ klass: 0, roster: 0 });
+
   const readRoster = useCallback(async () => {
+    const mine = ++reads.current.roster;
     try {
-      setRoster(await api.get<RosterResponse>(`/v1/classes/${classId}/roster`));
+      const next = await api.get<RosterResponse>(`/v1/classes/${classId}/roster`);
+      if (reads.current.roster !== mine) return;
+      setRoster(next);
       setRosterError(null);
     } catch (e) {
-      setRosterError(errText(e));
+      if (reads.current.roster === mine) setRosterError(errText(e));
     }
   }, [api, classId]);
 
   // The class and its roster, read as the page opens and again by Try again.
   const load = useCallback(async () => {
+    const mine = ++reads.current.klass;
     const read = api.get<ClassDetail>(`/v1/classes/${classId}`).then(
       (c) => {
+        if (reads.current.klass !== mine) return;
         setError(null);
         setKlass(c);
         // Recover the live grid across a reload. `grid` is otherwise seeded
@@ -251,7 +261,9 @@ export default function ClassDetailPage() {
               : null),
         );
       },
-      (e: unknown) => setError(errText(e)),
+      (e: unknown) => {
+        if (reads.current.klass === mine) setError(errText(e));
+      },
     );
     await Promise.all([read, readRoster()]);
   }, [api, classId, readRoster]);
