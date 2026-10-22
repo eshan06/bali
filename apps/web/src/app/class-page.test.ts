@@ -316,3 +316,27 @@ describe('the class page while a session runs (ClassLive)', () => {
     expect(page).toMatch(/\{ id: c\.liveSessionId, over: false, startedAt: null, endsAt: null \}/);
   });
 });
+
+describe('the class page’s Start and End, each within a save’s limit (the owner, 2026-10-16)', () => {
+  it('sends a Start within SAVE_TIMEOUT_MS, its failure said under the lengths, Start sending the same again', () => {
+    // No `eventId` on the route: a Start sent again while one runs is answered with that session
+    // (`existing`, the API's own tests), so one cut here that landed is never two sessions.
+    expect(page).toMatch(
+      /const res = await api\.post<StartSessionResponse>\(\s*`\/v1\/classes\/\$\{classId\}\/sessions`,\s*\{ durationMinutes: minutes \},\s*SAVE_TIMEOUT_MS,\s*\);/,
+    );
+    // No answer to go by (a timeout, no connection, a 5xx): the class read again before anything
+    // is said, so a Start that landed shows its session, as a reload would, never a failure over a
+    // class in session (santa's review); a refusal, or no session running, says the failure.
+    expect(page).toMatch(
+      /\} catch \(err\) \{[^]*?const running =\s*failureOf\(err\)\.kind === 'failed' \? await sessionRunning\(api, classId\) : null;\s*if \(running === null\) return setStartSaid\(errText\(err\)\);\s*setSaid\(null\);\s*setGrid\(\(cur\) =>\s*cur\?\.id === running \? cur : \{ id: running, over: false, startedAt: null, endsAt: null \},\s*\);\s*\}/,
+    );
+  });
+
+  it('sends an End within SAVE_TIMEOUT_MS, its failure said beside the controls, End sending it again', () => {
+    // An End sent again after one landed is answered `already_ended`, and the recap shows.
+    expect(page).toMatch(
+      /await api\.post\(`\/v1\/sessions\/\$\{ending\}\/end`, undefined, SAVE_TIMEOUT_MS\);\s*onEnded\(ending\);/,
+    );
+    expect(page).toMatch(/setSaid\(\{ kind: 'refused', message: errText\(err\) \}\);/);
+  });
+});

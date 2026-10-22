@@ -8,17 +8,15 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-22 (Central) — The owner's follow-up, Try again keeps keyboard focus, part 3
-(#431; `docs/DECISIONS.md`, 2026-10-22), its last: `TryAgain` everywhere else, so the scan's `LEFT`
-is empty and a Try again drawn by hand anywhere in the portal fails it: Your questions' and Your
-slides' lists, a save and a stopped upload, the side panel's two lists and an ask (one of the
-teacher's questions or one written, its failure now kept while the same one is asked again), a
-student's lesson, and Create class's and the invite code's own button. Built to LessonRetryStates,
-StudentRetryStates and QuestionsSlidesRetryStates (drawn first, canvas version 85). Checked in
-headless Chrome on dev as the demo teacher and a demo student, each request refused, held and let
-through with the keyboard. Before it, part 2b (#430). Next on the Windows PC: the class page's reads
-given a time limit (In flight), then the four steps for sessions before the pilot's first class; on
-the Mac, the phone's L8 and M8._
+_Last updated: 2026-10-22 (Central) — The owner's follow-up, time limits on the portal's remaining
+reads and saves (#432; `docs/DECISIONS.md`, 2026-10-22): every read now fails as no answer after a
+poll's 10 s, and each save after its own (10 s; a deck's removal 40 s), sent again under the same
+`eventId` or to a route a second send never doubles; a deck's check and a class's create keep none.
+The shell's `refresh` hands back the read on its way, so a Try again pressed while the account's read
+is on its way holds until it answers (#426's *Left*). No new screen or state: a timeout lands in the
+failure lines and Try agains the canvas draws. Checked in headless Chrome on dev, reads and a save
+held past their limits. Before it, Try again's part 3 (#431). Next on the Windows PC: the four steps
+for sessions before the pilot's first class; on the Mac, the phone's L8 and M8._
 
 ## Now
 
@@ -55,11 +53,14 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
   class page's and Present's) and the slides (the slide's line, a slide change, Show slides' line, a
   student's slide), and the class page's roster line held while its read is on its way; part 3 ✅
   (#431; DECISIONS 2026-10-22), the rest (Your questions, Your slides, the side panel's lists and an
-  ask, a student's lesson, Create class, the invite code), so the scan's `LEFT` is empty. Next: the
-  class page's reads given a time limit. For the owner: whether a roster failure keeps its two Try
-  agains, under the header and in the recap (both kept, each holding the other); and whether a send
-  whose own button sends it again keeps its line meanwhile (the conductor's call: it goes, as
-  Register block's).
+  ask, a student's lesson, Create class, the invite code), so the scan's `LEFT` is empty. Time limits
+  on the remaining reads and saves ✅ (#432; DECISIONS 2026-10-22): every read 10 s, each save its own
+  (10 s, a deck's removal 40 s), and the shell's `refresh` holding Try again until the read on its way
+  answers. For the owner: whether a roster failure keeps its two Try agains, under the header and in
+  the recap (both kept, each holding the other); whether a send whose own button sends it again keeps
+  its line meanwhile (the conductor's call: it goes, as Register block's); the saves' 10 s, and a
+  class's create left with no limit since its route takes no `eventId` (the conductor's calls); and
+  the sign-in's token exchange, which has none (not touched).
 - **The workflow review's last steps** ✅ (the owner, 2026-10-13; DECISIONS 2026-10-14): the
   migration guard (#369), docs-only PRs skipping the test jobs (#365), moved files (#368) and two
   tests (#364), each in full in `docs/PLAN-ARCHIVE.md`.
@@ -303,7 +304,7 @@ Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect acc
 - The parked PRs #61 and #49.
 - 🔧 Production, still open: check that the next push to `main` deploys `bali-portal` on its own now that `vercel.json` is deleted (runbook 3, step 6); Railway 2FA, threat protection, CloudTrail, the backups (L0b) and the restore drill are on Phase 6's owner list above.
 - 👀 After the next deploy of `bali` and `bali prod` (P8's follow-up): the deploy log shows the migrations, then `Server listening`; a later redeploy's log for the old deployment shows `shutting down` with `signal: SIGTERM`.
-- Phase 7: **to decide**, #313 (what a teacher's own deletion, and the retention run, do with their words), kept as today for now (the owner's ruling, 2026-10-12); **tracked fixes**, #319 (saved questions' id case), #326 (a slow upload outliving its deck; M5 aborts it), #334 ✅ (#403, a timeout on the portal's polls), #336 (capacity at the bell, before the class-started push reaches a school); L0b is the owner's (Railway, above). The calls confirmed on 2026-10-12: this line in full in `docs/PLAN-ARCHIVE.md`.
+- Phase 7: **to decide**, #313 (what a teacher's own deletion, and the retention run, do with their words), kept as today for now (the owner's ruling, 2026-10-12); **tracked fixes**, #319 (saved questions' id case), #326 (a slow upload outliving its deck; M5 aborts it), #334 ✅ (#403, a timeout on the portal's polls; #432, on every other read and save but a deck's check and a class's create), #336 (capacity at the bell, before the class-started push reaches a school); L0b is the owner's (Railway, above). The calls confirmed on 2026-10-12: this line in full in `docs/PLAN-ARCHIVE.md`.
 - #380: Present after the bell has no Start, so starting the next class from a projected tab shows the last recap's unlock reasons (the owner, 2026-10-14: tracked, not now); PresentEnded's line, "the session ended at 9:55 AM", waits with it (PV12b kept Present's "no session running")
 - Left for the owner on finished steps' lines (in full in `docs/PLAN-ARCHIVE.md`): P7's App Review path (decide its section 4, then fill the accounts and paste); P6's restore drill, its result recorded once a backup exists; S4's CSP check on the deployed portal after each Next upgrade; ⚖️ whether C7-server's yes rides Other Data Types; device rounds still marked pending (B5b's round 2, steps 7 and 9; B5c's round 3, steps 1 and 3; round 4, B6a and B6b); smaller calls on F (a refused tap's end-of-day drop or dismiss button; the waiting card's Tap in), B6c-2 (`.keep`/`.retry`), B5b (a rule for a replaced window, a code step to schedule) and D2 (Present's key per class).
 - ✅ **Answered** (the owner, 2026-10-14; DECISIONS 2026-10-14): PV5b's whole-page error kept; its review notes folded into PV15 and PV17a; PV4c's two test limits left.

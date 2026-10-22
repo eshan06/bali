@@ -1,9 +1,17 @@
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import { type Deck, DECK_MAX_BYTES, DECK_TITLE_MAX_LENGTH } from '@bali/shared';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { type ApiClient, ApiError, NetworkError } from './api-client';
+import {
+  type ApiClient,
+  ApiError,
+  createApiClient,
+  NetworkError,
+  SAVE_TIMEOUT_MS,
+} from './api-client';
 import {
   inUseClasses,
   judgePick,
@@ -13,6 +21,7 @@ import {
   readDecks,
   removeAttemptFor,
   removeDeck,
+  REMOVE_TIMEOUT_MS,
   runUpload,
   titleOf,
   type Upload,
@@ -716,5 +725,121 @@ describe('a removal (Remove, and Cancel’s of its pending deck)', () => {
     expect(await removeDeck(offline.api, removeAttemptFor(undefined, ID))).toMatchObject({
       kind: 'failed',
     });
+  });
+});
+
+describe('each write’s time limit (the owner, 2026-10-16)', () => {
+  const file = () => new Blob([PDF]);
+  // Its SHA-256 already read, so a fake clock moves nothing the file's read waits on.
+  const hashed = () => ({ ...newUpload(file(), 'Unit 3 review'), sha256: SHA });
+
+  /**
+   * The API client over a fetch that swallows its first request (no answer until its limit gives up
+   * on it) and answers each after it from `answer`, each request's method, path and body kept.
+   */
+  function swallowsFirst(answer: (path: string) => Response) {
+    const sent: { method?: string; path: string; body: unknown }[] = [];
+    const client = createApiClient({
+      baseUrl: 'http://api',
+      getToken: () => 'tok',
+      fetchImpl: (url, init) => {
+        const path = (url as string).replace('http://api', '');
+        sent.push({
+          method: init?.method,
+          path,
+          body: JSON.parse(init?.body as string) as unknown,
+        });
+        if (sent.length > 1) return Promise.resolve(answer(path));
+        return new Promise((_, reject) => {
+          init?.signal?.addEventListener('abort', () =>
+            reject(new DOMException('aborted', 'AbortError')),
+          );
+        });
+      },
+    });
+    return { client, sent };
+  }
+
+  afterEach(() => vi.useRealTimers());
+
+  it('gives the create a save’s limit and the check none: a good upload’s check can take longer than any save waits', async () => {
+    const given: [string, number | undefined][] = [];
+    const api: Pick<ApiClient, 'post'> = {
+      // eslint-disable-next-line @typescript-eslint/require-await
+      post: async (path: string, _body?: unknown, limitMs?: number): Promise<never> => {
+        given.push([path, limitMs]);
+        return (
+          path === '/v1/decks'
+            ? { outcome: 'created', deck: deck(), uploadUrl: URL_PUT }
+            : { outcome: 'checked', deck: deck({ status: 'ready', pageCount: 12 }) }
+        ) as never;
+      },
+    };
+    const { ended } = run(api, hashed());
+    (await untilPut()).answer(200);
+    expect(await ended).toMatchObject({ kind: 'checked' });
+    expect(given).toEqual([
+      ['/v1/decks', SAVE_TIMEOUT_MS],
+      [`/v1/decks/${ID}/complete`, undefined],
+    ]);
+  });
+
+  it('stops an upload whose create the network swallows at SAVE_TIMEOUT_MS; its Try again sends the create again under its id', async () => {
+    vi.useFakeTimers();
+    const { client, sent } = swallowsFirst(() =>
+      Response.json({ error: { code: 'unavailable', message: 'down' } }, { status: 503 }),
+    );
+    const first = run(client, hashed()).ended;
+    const settled = vi.fn();
+    void first.then(settled);
+    await vi.advanceTimersByTimeAsync(SAVE_TIMEOUT_MS - 1);
+    expect(settled).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    const stopped = await first;
+    expect(stopped).toMatchObject({
+      kind: 'stopped',
+      failure: { kind: 'failed', status: undefined },
+      upload: { deck: null, uploaded: false },
+    });
+    if (stopped.kind !== 'stopped') return;
+    // No answer, so not refused: Try again goes on under the same ids, a replay if it landed.
+    const again = uploadAgain(stopped);
+    expect(again).toBe(stopped.upload);
+    await run(client, again).ended;
+    expect(sent.map((s) => [s.method, s.path, (s.body as { eventId: string }).eventId])).toEqual([
+      ['POST', '/v1/decks', again.createId],
+      ['POST', '/v1/decks', again.createId],
+    ]);
+  });
+
+  it('gives a removal a save’s 10 s past the API’s own delete of its object, its storage’s limit', () => {
+    const storage = readFileSync(
+      fileURLToPath(new URL('../../../api/src/deck-storage.ts', import.meta.url)),
+      'utf8',
+    );
+    const limit = /export const STORAGE_TIMEOUT_MS = ([\d_]+);/.exec(storage)?.[1];
+    expect(Number(limit?.replaceAll('_', ''))).toBe(30_000);
+    expect(REMOVE_TIMEOUT_MS).toBe(30_000 + SAVE_TIMEOUT_MS);
+  });
+
+  it('fails a removal the network swallows at REMOVE_TIMEOUT_MS, never sooner, and its Remove sends it again under its id', async () => {
+    vi.useFakeTimers();
+    const { client, sent } = swallowsFirst(() =>
+      Response.json({ outcome: 'replay', deck: deck() }),
+    );
+    const attempt = removeAttemptFor(undefined, ID);
+    const first = removeDeck(client, attempt);
+    const settled = vi.fn();
+    void first.then(settled);
+    await vi.advanceTimersByTimeAsync(REMOVE_TIMEOUT_MS - 1);
+    expect(settled).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await first).toEqual({ kind: 'failed', status: undefined, retryAfter: undefined });
+    const again = removeAttemptFor(attempt, ID);
+    expect(await removeDeck(client, again)).toEqual({ kind: 'removed' });
+    expect(sent.map((s) => [s.method, s.path, s.body])).toEqual([
+      ['DELETE', `/v1/decks/${ID}`, { eventId: attempt.eventId }],
+      ['DELETE', `/v1/decks/${ID}`, { eventId: attempt.eventId }],
+    ]);
   });
 });

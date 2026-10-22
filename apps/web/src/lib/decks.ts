@@ -8,7 +8,7 @@ import {
   type MeClass,
 } from '@bali/shared';
 
-import { type ApiClient, ApiError } from './api-client';
+import { type ApiClient, ApiError, SAVE_TIMEOUT_MS } from './api-client';
 import { newEventId } from './event-id';
 import { type Failure, failureOf } from './live-question';
 import { captureApiFailure } from './monitoring';
@@ -241,12 +241,16 @@ export async function runUpload(
     const sent = now();
     let made: CreateDeckResponse;
     try {
-      made = await api.post<CreateDeckResponse>(PATH, {
-        eventId: upload.createId,
-        title: upload.title,
-        bytes: upload.file.size,
-        sha256: upload.sha256,
-      });
+      made = await api.post<CreateDeckResponse>(
+        PATH,
+        {
+          eventId: upload.createId,
+          title: upload.title,
+          bytes: upload.file.size,
+          sha256: upload.sha256,
+        },
+        SAVE_TIMEOUT_MS,
+      );
     } catch (e) {
       return stopped(failureOf(e));
     }
@@ -269,6 +273,8 @@ export async function runUpload(
   if (signal.aborted) return { kind: 'cancelled', upload };
   onStep({ step: 'checking' });
   try {
+    // No time limit: the API reads up to 25 MB from the bucket and checks it in a worker, which can
+    // take longer than any save waits, so a limit could fail a good upload's check (#334).
     const checked = await api.post<DeckResponse>(`${PATH}/${deck.id}/complete`, {
       eventId: upload.completeId,
     });
@@ -314,13 +320,27 @@ export const removeAttemptFor = (
  */
 export type RemoveAnswer = { kind: 'removed' } | { kind: 'in_use'; classes: MeClass[] } | Failure;
 
-/** Remove it (`DELETE /v1/decks/{id}`): a Remove's, and a Cancel's of the pending deck it made. */
+/**
+ * How long a removal waits for its answer: the API deletes the deck's stored object before it
+ * answers, once no upload can write it (M2b2), within its storage's own 30 s; a save's 10 s more on
+ * top, so a removal that landed is never cut short by a slow bucket.
+ */
+export const REMOVE_TIMEOUT_MS = 30_000 + SAVE_TIMEOUT_MS;
+
+/**
+ * Remove it (`DELETE /v1/decks/{id}`): a Remove's, and a Cancel's of the pending deck it made,
+ * within `REMOVE_TIMEOUT_MS`.
+ */
 export async function removeDeck(
   api: Pick<ApiClient, 'del'>,
   attempt: RemoveAttempt,
 ): Promise<RemoveAnswer> {
   try {
-    await api.del<DeckResponse>(`${PATH}/${attempt.deckId}`, { eventId: attempt.eventId });
+    await api.del<DeckResponse>(
+      `${PATH}/${attempt.deckId}`,
+      { eventId: attempt.eventId },
+      REMOVE_TIMEOUT_MS,
+    );
     return { kind: 'removed' };
   } catch (e) {
     if (e instanceof ApiError && e.reason === 'deck_not_found') return { kind: 'removed' };

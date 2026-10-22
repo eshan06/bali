@@ -95,7 +95,8 @@ export type CreateAnswer =
  * Create a class named `name` (`POST /v1/classes`), its answer in words, never thrown, so the
  * form always comes back with something to say. The route takes no `eventId`: a resend after a
  * lost answer makes a second class, as a second press always has, so the page reads the list
- * again after every answer, and a class made either way is in it to see.
+ * again after every answer, and a class made either way is in it to see. So no time limit, unlike
+ * every other save: one that cut a slow create would make a second class out of its Try again.
  */
 export async function createClass(
   api: Pick<ApiClient, 'post'>,

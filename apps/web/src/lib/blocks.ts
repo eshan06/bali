@@ -1,6 +1,6 @@
 import type { BlockDetail } from '@bali/shared';
 
-import { type ApiClient, ApiError, NetworkError } from './api-client';
+import { type ApiClient, ApiError, NetworkError, SAVE_TIMEOUT_MS } from './api-client';
 import { BLOCK_TAKEN, CANT_REACH, CANT_REGISTER, errText, NOT_A_BLOCK_ID } from './errors';
 
 /* The block section's logic (P3), tested: the ID's check before sending, and the register. */
@@ -28,7 +28,8 @@ export type RegisterAnswer =
 /**
  * Register `tagId` (`POST /v1/blocks`). The route takes no `eventId`: it is idempotent on the tag
  * itself, as a resend of one's own tag hands back the same block, so any failure may be sent again
- * as it was. `owned` is what the section lists, to tell a block that was the teacher's already.
+ * as it was, one with no answer within a save's limit too. `owned` is what the section lists, to
+ * tell a block that was the teacher's already.
  */
 export async function registerBlock(
   api: Pick<ApiClient, 'post'>,
@@ -36,7 +37,7 @@ export async function registerBlock(
   owned: readonly BlockDetail[],
 ): Promise<RegisterAnswer> {
   try {
-    const block = await api.post<BlockDetail>('/v1/blocks', { tagId });
+    const block = await api.post<BlockDetail>('/v1/blocks', { tagId }, SAVE_TIMEOUT_MS);
     return { kind: 'registered', block, already: owned.some((b) => b.id === block.id) };
   } catch (e) {
     if (e instanceof NetworkError) return { kind: 'failed', message: CANT_REACH };

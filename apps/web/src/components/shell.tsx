@@ -24,7 +24,7 @@ import {
   useState,
 } from 'react';
 
-import { type ApiClient, POLL_TIMEOUT_MS, UnauthorizedError } from '@/lib/api-client';
+import { type ApiClient, UnauthorizedError } from '@/lib/api-client';
 import { endSession, getAccessToken } from '@/lib/auth';
 import { errText } from '@/lib/errors';
 import { type Home, homeFor } from '@/lib/student-web';
@@ -127,6 +127,40 @@ export async function readAccount(
 }
 
 /**
+ * The shell's reads of the account (`readAccount`), each within its limit (`get`'s), so one always
+ * answers. `start` reads it, the newest read's answer handed to `apply`; `reading` says one is on
+ * its way until then. `refresh` reads it unless one is on its way, and hands back the read on its
+ * way, settling once the newest has answered: a Try again pressed meanwhile holds until then, never
+ * let go before any answer (#426's Left).
+ */
+export function accountReads(
+  api: Pick<ApiClient, 'get'>,
+  apply: (said: { home: Home } | { error: string | null }) => void,
+): { start: () => void; reading: () => boolean; refresh: () => Promise<void> } {
+  const reads = { current: 0 };
+  let running: Promise<void> | null = null;
+  const onItsWay = () => running;
+  const start = () => {
+    const run = readAccount(api, reads).then((said) => {
+      // A newer read is under way: its answer is the one that counts.
+      if (said === null) return;
+      running = null;
+      apply(said);
+    });
+    running = run;
+  };
+  return {
+    start,
+    reading: () => running !== null,
+    refresh: async () => {
+      if (running === null) start();
+      // One begun meanwhile, the page's own, is waited for too.
+      for (let run = onItsWay(); run !== null; run = onItsWay()) await run;
+    },
+  };
+}
+
+/**
  * A signed-in page the back button brings back whole (the browser's back-forward cache) is
  * reloaded, never shown as it was kept: its account may have signed out, expired, or given way to
  * another sign-in in this tab since.
@@ -154,7 +188,8 @@ export interface Me {
   /**
    * Read it again unless a read is on its way, keeping what the page shows, its failure too, until
    * the answer: the student home's read every 30 s (W4's follow-up), and the account's Try again
-   * (`AccountUnread`, PV17a). Settles once that answer has landed, or at once when no read began.
+   * (`AccountUnread`, PV17a). Settles once the answer of the read it began, or of the one on its
+   * way, has landed (`accountReads`).
    */
   refresh: () => Promise<void>;
 }
@@ -382,10 +417,16 @@ export function Shell({ children }: { children: ReactNode }) {
   const [home, setHome] = useState<Home | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [presenting, setPresenting] = useState(false);
-  // A read under way: the frame asks only when none is.
-  const reading = useRef(false);
-  // The newest read's number (`readAccount`): only its answer counts.
-  const reads = useRef(0);
+  // The account's reads, each within a read's 10 s (#334), kept for the tab's life with its one
+  // client: the frame asks only when none is on its way, and only the newest one's answer counts.
+  const [reads] = useState(() =>
+    accountReads(api, (said) => {
+      if ('home' in said) {
+        setHome(said.home);
+        setError(null);
+      } else setError(said.error);
+    }),
+  );
   // The page the account was last looked at on: a failure is read again on the next one.
   const seen = useRef<string | null>(null);
   // A Sign out under way: a second press sends nothing.
@@ -395,48 +436,30 @@ export function Shell({ children }: { children: ReactNode }) {
     (fresh = false) => {
       if (fresh) setHome(null);
       setError(null);
-      reading.current = true;
-      void readAccount(api, reads).then((said) => {
-        // A newer read is under way: its answer is the one that counts.
-        if (said === null) return;
-        reading.current = false;
-        if ('home' in said) setHome(said.home);
-        else setError(said.error);
-      });
+      reads.start();
     },
-    [api],
+    [reads],
   );
 
-  // The student home's read every 30 s, and the account's Try again (PV17a): never over a read on
-  // its way, within a poll's 10 s (#334), and its failure, if one was said, kept until an answer, so
-  // it isn't said afresh every 30 s while Bali can't be reached, and Try again keeps its card.
-  const refresh = useCallback(async () => {
-    if (reading.current) return;
-    reading.current = true;
-    const limited = { get: <T,>(path: string) => api.get<T>(path, POLL_TIMEOUT_MS) };
-    const said = await readAccount(limited, reads);
-    // A newer read is under way: its answer is the one that counts.
-    if (said === null) return;
-    reading.current = false;
-    if ('home' in said) {
-      setHome(said.home);
-      setError(null);
-    } else setError(said.error);
-  }, [api]);
+  // The student home's read every 30 s, and the account's Try again (PV17a): never a second read
+  // beside one on its way, which it waits for instead, and its failure, if one was said, kept until
+  // an answer, so it isn't said afresh every 30 s while Bali can't be reached, and Try again keeps
+  // its card, held until the answer.
+  const { refresh } = reads;
 
   // On every page, and again as an answer lands (one landing after a Sign out is forgotten too).
   useEffect(() => {
     const newPage = seen.current !== path;
     seen.current = path;
     const signedIn = getAccessToken() !== null;
-    const step = accountStep(path, signedIn, home, error, reading.current, newPage);
+    const step = accountStep(path, signedIn, home, error, reads.reading(), newPage);
     if (step === 'read') load();
     if (step === 'sign in') router.replace('/login');
     if (step === 'forget') {
       setHome(null);
       setError(null);
     }
-  }, [path, home, error, load, router]);
+  }, [path, home, error, load, reads, router]);
 
   // Back here by the back button with the page kept whole: a signed-in page reloads, so it never
   // shows an account that has since left (`reloadOnRestore`), and its Sign out starts afresh.

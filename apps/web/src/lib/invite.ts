@@ -5,7 +5,7 @@ import {
   type RedeemTeacherInviteResponse,
 } from '@bali/shared';
 
-import { type ApiClient, ApiError } from './api-client';
+import { type ApiClient, ApiError, SAVE_TIMEOUT_MS } from './api-client';
 import { errText, NOT_AN_INVITE_CODE } from './errors';
 import { newEventId } from './event-id';
 
@@ -94,13 +94,20 @@ export function placeAnswer(said: SaidAnswer | null): {
   return { underField: null, aboveButton: said };
 }
 
-/** Redeem `attempt` (T1b's `POST /v1/teacher-invites/redeem`), its answer in words. */
+/**
+ * Redeem `attempt` (T1b's `POST /v1/teacher-invites/redeem`), its answer in words, within a save's
+ * limit: no answer by then is `failed`, its resend the same attempt (`attemptFor`), a replay.
+ */
 export async function redeemInvite(
   api: Pick<ApiClient, 'post'>,
   attempt: Attempt,
 ): Promise<RedeemAnswer> {
   try {
-    await api.post<RedeemTeacherInviteResponse>('/v1/teacher-invites/redeem', attempt);
+    await api.post<RedeemTeacherInviteResponse>(
+      '/v1/teacher-invites/redeem',
+      attempt,
+      SAVE_TIMEOUT_MS,
+    );
     return { kind: 'teacher' };
   } catch (e) {
     // 408 and 429 are the transport's, not a refusal, as the outbox's dispositions read them.

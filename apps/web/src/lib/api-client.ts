@@ -62,8 +62,9 @@ export interface ApiClientOptions {
 
 export interface ApiClient {
   /**
-   * `limitMs`, as `post`'s: the student home's 30 s read of the account takes a poll's
-   * (`POLL_TIMEOUT_MS`), so a read the network swallows never holds the next for minutes.
+   * A read, each one-shot: an answer not whole within `limitMs`, `POLL_TIMEOUT_MS` unless given
+   * another, fails as no answer, as a poll's does, so a read the network swallows never holds its
+   * page, or the next read, for minutes.
    */
   get<T>(path: string, limitMs?: number): Promise<T>;
   /**
@@ -74,23 +75,32 @@ export interface ApiClient {
    */
   getTagged<T>(path: string, etag: string | null): Promise<{ body: T; etag: string | null } | null>;
   /**
-   * `limitMs`: an answer not whole within it fails as no answer, as a poll's does (an answer's send,
-   * #407's review). No other write is given one: a deck's check (`POST /v1/decks/{id}/complete`) can
-   * take longer than a poll waits.
+   * A write, `limitMs` its own: an answer not whole within it fails as no answer, as a read's does
+   * (`SAVE_TIMEOUT_MS` for most). None given, none set: a deck's check (`POST
+   * /v1/decks/{id}/complete`) can take longer than any save waits.
    */
   post<T>(path: string, body?: unknown, limitMs?: number): Promise<T>;
-  put<T>(path: string, body?: unknown): Promise<T>;
-  patch<T>(path: string, body?: unknown): Promise<T>;
+  put<T>(path: string, body?: unknown, limitMs?: number): Promise<T>;
+  patch<T>(path: string, body?: unknown, limitMs?: number): Promise<T>;
   /** A removal may carry its `eventId` in its body (a saved question's, L3b2). */
-  del<T>(path: string, body?: unknown): Promise<T>;
+  del<T>(path: string, body?: unknown, limitMs?: number): Promise<T>;
 }
 
 /**
- * How long a polled read (`getTagged`) waits for its whole answer before it fails as unreached
+ * How long a read (`get`, `getTagged`) waits for its whole answer before it fails as unreached
  * (#334): a half-open connection never fails by itself, and the browser gives up only after
- * minutes. The polls alone: a deck's check (`POST /v1/decks/{id}/complete`) can take longer.
+ * minutes. The load gate measured a poll's p95 at 5–11 ms at the server (L4b, M9).
  */
 export const POLL_TIMEOUT_MS = 10_000;
+
+/**
+ * How long a save waits for its whole answer, given at each save that takes it, never in `send`:
+ * a save is one transaction in the engine, timed like a read at the server, and its resend goes
+ * under the same `eventId`, or to a route a second send never doubles (a Start, an End, a block's
+ * tag, a new code), so a save cut here that landed is answered with the truth now: a short limit
+ * costs a press, never a second write. The answer's and the slide change's 10 s too (#407, M6).
+ */
+export const SAVE_TIMEOUT_MS = 10_000;
 
 /** `Retry-After` as the API sends it, whole seconds; anything else (a date, none) is unknown. */
 function retryAfterSeconds(header: string | null): number | undefined {
@@ -188,23 +198,26 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
     return json<T>(res, method, path, signal);
   }
 
-  return {
-    get: (path, limitMs) =>
+  /** A write by `method`, within its `limitMs` when given one. */
+  const write =
+    (method: string) =>
+    <T>(path: string, body?: unknown, limitMs?: number): Promise<T> =>
       limitMs === undefined
-        ? request('GET', path)
-        : within(limitMs, (signal) => request('GET', path, undefined, signal)),
+        ? request(method, path, body)
+        : within(limitMs, (signal) => request(method, path, body, signal));
+
+  return {
+    get: (path, limitMs = POLL_TIMEOUT_MS) =>
+      within(limitMs, (signal) => request('GET', path, undefined, signal)),
     getTagged: <T>(path: string, etag: string | null) =>
       within(POLL_TIMEOUT_MS, async (signal) => {
         const res = await send('GET', path, undefined, etag, signal);
         if (res.status === 304) return null;
         return { body: await json<T>(res, 'GET', path, signal), etag: res.headers.get('etag') };
       }),
-    post: (path, body, limitMs) =>
-      limitMs === undefined
-        ? request('POST', path, body)
-        : within(limitMs, (signal) => request('POST', path, body, signal)),
-    put: (path, body) => request('PUT', path, body),
-    patch: (path, body) => request('PATCH', path, body),
-    del: (path, body) => request('DELETE', path, body),
+    post: write('POST'),
+    put: write('PUT'),
+    patch: write('PATCH'),
+    del: write('DELETE'),
   };
 }

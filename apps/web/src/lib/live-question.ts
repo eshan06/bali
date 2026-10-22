@@ -1,6 +1,6 @@
 import type { FeedEvent, QuestionResponse, QuestionResults, TeacherQuestion } from '@bali/shared';
 
-import { type ApiClient, ApiError } from './api-client';
+import { type ApiClient, ApiError, SAVE_TIMEOUT_MS } from './api-client';
 import { newEventId } from './event-id';
 
 /*
@@ -98,14 +98,21 @@ export function closeAttemptFor(
  */
 export type OpenAnswer = { kind: 'opened'; question: TeacherQuestion } | Failure;
 
-/** Ask `attempt` (`POST /v1/sessions/{id}/questions`), closing the one open there. */
+/**
+ * Ask `attempt` (`POST /v1/sessions/{id}/questions`), closing the one open there, within a save's
+ * limit: no answer by then is a failure, its resend the same attempt (`openAttemptFor`).
+ */
 export async function openQuestion(
   api: Pick<ApiClient, 'post'>,
   attempt: OpenAttempt,
 ): Promise<OpenAnswer> {
   const { sessionId, ...body } = attempt;
   try {
-    const res = await api.post<QuestionResponse>(`/v1/sessions/${sessionId}/questions`, body);
+    const res = await api.post<QuestionResponse>(
+      `/v1/sessions/${sessionId}/questions`,
+      body,
+      SAVE_TIMEOUT_MS,
+    );
     return { kind: 'opened', question: res.question };
   } catch (e) {
     return failureOf(e);
@@ -118,14 +125,21 @@ export async function openQuestion(
  */
 export type CloseAnswer = { kind: 'closed'; question: TeacherQuestion } | Failure;
 
-/** Close `attempt.questionId` (`POST /v1/questions/{id}/close`), revealing it when asked. */
+/**
+ * Close `attempt.questionId` (`POST /v1/questions/{id}/close`), revealing it when asked, within a
+ * save's limit: no answer by then is a failure, its resend the same attempt (`closeAttemptFor`).
+ */
 export async function closeQuestion(
   api: Pick<ApiClient, 'post'>,
   attempt: CloseAttempt,
 ): Promise<CloseAnswer> {
   const { questionId, ...body } = attempt;
   try {
-    const res = await api.post<QuestionResponse>(`/v1/questions/${questionId}/close`, body);
+    const res = await api.post<QuestionResponse>(
+      `/v1/questions/${questionId}/close`,
+      body,
+      SAVE_TIMEOUT_MS,
+    );
     return { kind: 'closed', question: res.question };
   } catch (e) {
     return failureOf(e);

@@ -8,6 +8,79 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-22** — **Time limits on the portal's remaining reads and saves (#432); the shell's
+  `refresh` hands back the read on its way.** The owner's follow-up of 2026-10-16, past #403's "the
+  polls alone" (#334, 2026-10-15) and #426's *Left*; #430's and #431's reviews saw it again. A read
+  or a save the network swallows (a half-open connection, Wi-Fi dropping packets) held its Try
+  again, or its buttons, on Loading… until the browser gave up, minutes later. **Every read** (`get`)
+  now fails as no answer once a poll's 10 s are up (`POLL_TIMEOUT_MS`) unless given another: the
+  decks, a session's snapshot (the grid's boot and 15 s read, the question card's), the class page's
+  class and roster, the account's two reads (the 13+ check, then `/v1/me`, the page's own and
+  `refresh`'s), Reports, a session's report and its questions, saved questions, your block, the
+  recap, the student panel, Last session, and a new code's read after its mint. Timed out, it fails
+  as a read with no answer does today: a `NetworkError`, reported to monitoring as no answer, never a
+  sign-out, said in its failure line with its Try again as the canvas draws them, so no new state.
+  *Weighed:* a limit at each read's call, two dozen of them, which a new read could forget. **Each
+  save** takes its own limit at its call, never in `send`: `SAVE_TIMEOUT_MS`, 10 s (*the conductor's
+  call, awaiting the owner*): a save is one transaction in the engine, timed like a read at the
+  server (the load gate's p95 of 5–11 ms, L4b, M9), and a resend of one cut short that landed is
+  answered with the truth now, so a short limit costs a press, never a second write; the answer's
+  and the slide change's 10 s already (#407, M6). Each limited save's resend is checked and tested:
+  under the same `eventId` for a saved question's save and removal, an ask, a close, an extend, a
+  deck's create and removal, and the invite's redeem (its replay checked before `already_teacher`);
+  and for the four routes with none, a resend that never doubles: a Start (answered `existing`, the
+  class's one running session), an End (`already_ended`), a block (its tag's own block back) and a
+  new code (minted once more, then the class read for the code Bali holds, #247's review). A deck's
+  removal waits `REMOVE_TIMEOUT_MS`, 40 s: the API deletes its stored object before it answers, within
+  its storage's 30 s (`STORAGE_TIMEOUT_MS`, pinned by the test), so a save's 10 s could cut a removal
+  that landed while the bucket was slow. **Never limited:** a deck's check (`POST
+  /v1/decks/{id}/complete`, about 40 s at the API), the live grid's stream, the upload's XHR (#326's 25
+  minutes), and a class's create (*the conductor's call, awaiting the owner*): `POST /v1/classes`
+  takes no `eventId` (2026-09-20), so a Try again after a limit could make a second class, which no
+  route removes; a create the network swallows still holds Creating… until the browser gives up. A
+  scan in `api-client.test.ts` fails any other write sent with no limit, through any client's `post`,
+  `put`, `patch` or `del` (santa's review). **A Start with no answer** reads the class again before
+  it says anything, and a session running shows as a reload shows it, so the page never says it
+  couldn't start over a class in session (santa's review; `sessionRunning`, as a new code's
+  `codeMoved`): a Start has no stream to say it landed, where an End, an extend, an ask and a close
+  each have the grid's. **Not touched, for the
+  owner:** the sign-in's token exchange (`completeLogin`'s `fetch` to Cognito) has no limit, so one
+  the network swallows says "Signing in…" until the browser gives up; sign-out is a redirect; the 13+
+  check's send is the phone's (the portal only reads it, now within 10 s). **`refresh`** (#426's
+  *Left*): the shell's reads are `accountReads` (`components/shell.tsx`), and `refresh` hands back the
+  read on its way, settling once the newest read has answered, so a Try again pressed while the
+  student home's 30 s read, or the page's own, is on its way holds as Loading… until it answers,
+  never let go before any; the lesson page's Try again with it (#431's review). Its regression tests
+  came first and failed (`shell.test.ts`: it settled at once; a read the network swallowed never
+  ended). **The Claude Review note on `reading`** (#426: "when `readAccount` returns null,
+  `reading.current` is never reset"): a read a newer one replaced leaves the flag to the newer, which
+  clears it as it answers, by design; but the page's own read (`load`) had no limit, so one the
+  network swallowed stayed on its way for minutes, and every `refresh` answered at once, its line
+  said again before any answer. Every read has its limit now, and `refresh` waits for the one on its
+  way: settled here. *Left, known:* a Start that landed with no answer, whose class read fails too,
+  then sent again, is answered `existing`, and the page says "A session was already running, so the
+  length you picked wasn't used." though the length was this Start's (rare; the bell shown is
+  right); a new question's save
+  with no answer, then other words saved, still makes a second draft if the first landed (part 1a's,
+  unchanged); the account's read is two reads, so up to 20 s. **Tested:** the client (every read at
+  10 s, a write at its own limit, none without one), `accountReads` on reads settled by hand and on a
+  swallowed one, and each limited save through the real client on a fake clock: failed at its limit,
+  then sent again under its id (or as it was) and answered. **Seen** in headless Chrome on dev, the
+  preview serving main and then this branch, each request held over CDP and never let through: on
+  main the class page's class read still said Loading… after 15.7 s, and the student home's Try
+  again pressed during its 30 s read let go at once. On this branch, as the demo teacher: the class
+  page's class, Home's account (the 13+ check) and Your questions' list each failed as no answer
+  10.6 s after the page opened, in the line ClassStates, HomeStates and LessonStates draw, Try again
+  held as Loading… with focus on it while held again, said again at its limit, then read with focus
+  on the class's name, the greeting and Your questions; a new question's save failed 10.1 s after
+  Save, its Try again held with Save and Cancel, its three sends one `eventId`, then saved with focus
+  on its Edit (the question removed after); a Start held before it was sent said "Couldn't reach
+  Bali…" 10.2 s after Start, and one that landed with its answer held showed the live page 10.3 s
+  after Start, no failure said (the session ended after). As the demo student Ana, her 13+ check
+  answered yes by a stand-in in that browser alone: a 30 s read refused, then Try again pressed
+  during the next, held as Loading… until that read failed at its limit, 10.0 s on, then read with
+  focus on Your classes. About 314 changed lines without tests, one PR.
+
 - **2026-10-22** — **Try again keeps keyboard focus, part 3 (#431): the rest on `TryAgain`, so the
   scan's `LEFT` is empty; an ask that didn't go through stays said while it is asked again.** The
   owner's follow-up of 2026-10-16, finished (parts 2a and 2b, #429 and #430, below). **The reads:**

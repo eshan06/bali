@@ -1,7 +1,7 @@
 import { MAX_SESSION_MINUTES } from '@bali/shared';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { createApiClient } from './api-client';
+import { createApiClient, POLL_TIMEOUT_MS, SAVE_TIMEOUT_MS } from './api-client';
 import { CANT_ADD_TIME, CANT_MAKE_CODE, CANT_REACH, TOO_MANY_TRIES } from './errors';
 import {
   bellTime,
@@ -21,6 +21,7 @@ import {
   rememberedPresent,
   rememberMinutes,
   rememberPresent,
+  sessionRunning,
 } from './session-controls';
 
 /** The API client over a fetch that answers `status` with `body`, every request recorded. */
@@ -412,6 +413,127 @@ describe('regenerateCode', () => {
     expect(await codeMoved(unreachable, CLASS, 'OLDCDE')).toBeNull();
     const down = api(503, { error: { code: 'unavailable', message: 'unavailable' } });
     expect(await codeMoved(down.client, CLASS, 'OLDCDE')).toBeNull();
+  });
+});
+
+describe('an extend or a new code the network swallows (the owner, 2026-10-16)', () => {
+  afterEach(() => vi.useRealTimers());
+
+  /**
+   * The API client over a fetch that swallows each request `swallow` names (no answer until its
+   * limit gives up on it) and answers the rest from `answer`, each request's method and body kept.
+   */
+  function swallowing(swallow: (n: number) => boolean, answer: (method?: string) => unknown) {
+    const sent: { method?: string; body: unknown }[] = [];
+    const client = createApiClient({
+      baseUrl: 'http://api',
+      getToken: () => 'tok',
+      fetchImpl: (_url, init) => {
+        sent.push({ method: init?.method, body: init?.body && JSON.parse(init.body as string) });
+        if (!swallow(sent.length)) return Promise.resolve(Response.json(answer(init?.method)));
+        return new Promise((_, reject) => {
+          init?.signal?.addEventListener('abort', () =>
+            reject(new DOMException('aborted', 'AbortError')),
+          );
+        });
+      },
+    });
+    return { client, sent };
+  }
+
+  it('fails an extend at SAVE_TIMEOUT_MS; Try again sends the same extend under its id, added once', async () => {
+    vi.useFakeTimers();
+    const session = { id: SESSION, classId: CLASS, endsAt: '2026-10-05T14:40:00.000Z' };
+    const { client, sent } = swallowing(
+      (n) => n === 1,
+      () => ({ outcome: 'extended', session }),
+    );
+    const attempt = extendAttemptFor(null, 5);
+    const first = extendSession(client, SESSION, attempt);
+    const settled = vi.fn();
+    void first.then(settled);
+    await vi.advanceTimersByTimeAsync(SAVE_TIMEOUT_MS - 1);
+    expect(settled).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    const failed = await first;
+    expect(failed).toEqual({ kind: 'failed', message: CANT_REACH });
+    const again = extendAttemptFor(keepUnanswered(attempt, failed), 5);
+    expect(again).toBe(attempt);
+    expect(await extendSession(client, SESSION, again)).toEqual({
+      kind: 'extended',
+      endsAt: session.endsAt,
+    });
+    expect(sent.map((s) => s.body)).toEqual([
+      { durationMinutes: 5, eventId: attempt.eventId },
+      { durationMinutes: 5, eventId: attempt.eventId },
+    ]);
+  });
+
+  it('fails a new code at SAVE_TIMEOUT_MS, then reads the class: the code Bali holds if the mint landed', async () => {
+    // The route takes no `eventId`: a mint sent again mints once more, never anything twice, and
+    // the read after one with no answer shows a code that landed (#247's review).
+    vi.useFakeTimers();
+    const klass = {
+      id: CLASS,
+      name: 'Period 1',
+      joinCode: 'NEWCDE',
+      createdAt: '2026-10-01T12:00:00.000Z',
+      liveSessionId: null,
+    };
+    const { client, sent } = swallowing(
+      (n) => n === 1,
+      () => klass,
+    );
+    const made = regenerateCode(client, CLASS, 'OLDCDE');
+    const settled = vi.fn();
+    void made.then(settled);
+    await vi.advanceTimersByTimeAsync(SAVE_TIMEOUT_MS - 1);
+    expect(settled).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await made).toEqual({ kind: 'made', klass });
+    expect(sent.map((s) => s.method)).toEqual(['PATCH', 'GET']);
+  });
+});
+
+describe('sessionRunning: the class read again after a Start with no answer (santa’s review)', () => {
+  const klass = (liveSessionId: string | null) => ({
+    id: CLASS,
+    name: 'Period 1',
+    joinCode: 'ABCDEF',
+    createdAt: '2026-10-01T12:00:00.000Z',
+    liveSessionId,
+  });
+
+  it('answers the session running, as a reload finds it, or none', async () => {
+    const live = api(200, klass(SESSION));
+    expect(await sessionRunning(live.client, CLASS)).toBe(SESSION);
+    expect(live.sent[0]?.url).toBe(`http://api/v1/classes/${CLASS}`);
+    expect(live.sent[0]?.init?.method).toBe('GET');
+    expect(await sessionRunning(api(200, klass(null)).client, CLASS)).toBeNull();
+  });
+
+  it('answers none, never thrown, when the read fails or gets no answer within its limit', async () => {
+    expect(await sessionRunning(unreachable, CLASS)).toBeNull();
+    const down = api(503, { error: { code: 'unavailable', message: 'unavailable' } });
+    expect(await sessionRunning(down.client, CLASS)).toBeNull();
+    vi.useFakeTimers();
+    try {
+      const swallowed = createApiClient({
+        baseUrl: 'http://api',
+        getToken: () => 'tok',
+        fetchImpl: (_url, init) =>
+          new Promise((_, reject) => {
+            init?.signal?.addEventListener('abort', () =>
+              reject(new DOMException('aborted', 'AbortError')),
+            );
+          }),
+      });
+      const read = sessionRunning(swallowed, CLASS);
+      await vi.advanceTimersByTimeAsync(POLL_TIMEOUT_MS);
+      expect(await read).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
