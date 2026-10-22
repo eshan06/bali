@@ -22,7 +22,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   floor raised from `^15.5.4` so no install resolves a vulnerable `next`; the lockfile moves `next`
   and its own `@next/*` packages from 15.5.25 to 15.5.28, and nothing else. 15.5.26 to 15.5.28 are
   security-only patch releases, and no portal code changes. The lockfile's sharp was 0.35.5 already,
-  the floor 15.5.28 now sets. Made by raising the range and resolving `next` afresh at the root:
+  the fixed one; 15.5.28's range for it (`^0.34.3 || ^0.35.5`) still admits 0.34, so what holds it
+  there is the lockfile and CI's audit, which refuses a sharp below 0.35.5 (sharp's own
+  GHSA-wq5f-xc86-pv6w, high). Made by raising the range and resolving `next` afresh at the root:
   `npm install next@15.5.28 -w @bali/web` nested a second copy under `apps/web` with postcss 8.4.31,
   past the root override (2026-09-20), which the audit refuses as high. **The portal used none of
   the vulnerable paths:** no `next/image` and no `images` config, so the built-in optimizer refuses
@@ -33,10 +35,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   affected. The fix lands anyway: the audit gates every PR, and a later change could reach them.
   **Supersedes** #309, which Dependabot closes itself once main has a newer `next`. **For the
   owner:** S4's CSP check on the deployed portal, due after this upgrade (PLAN's Open owner items).
-  *Left:* `npm audit` without `--omit=dev` still lists dev tools that never ship (vite 8.3.0, high,
-  Dependabot's #427; vitest 5.0.1's `@vitest/mocker`, moderate): outside this step, which installs
-  `next` alone. **Checked:** the audit clean, `npm audit signatures`, typecheck, lint, `npm test`,
-  the portal's build (every route ƒ) and CI's nonce check on the served `/login` (16 scripts).
+  *Left,* outside this step, which installs `next` alone: what `npm audit` still lists, below CI's
+  gate or outside it. The API's fastify 5.12.5, GHSA-389g-gv7q-r4x8 (low, published today after the
+  Next.js ones, fixed in 5.12.6, on main too); and dev tools that never ship (vite 8.3.0, high,
+  Dependabot's #427; vitest 5.0.1's `@vitest/mocker`, moderate). **Checked:** CI's audit gate
+  passing, `npm audit signatures`, typecheck, lint, `npm test`, the portal's build (every route ƒ)
+  and CI's nonce check on the served `/login` (16 scripts).
 
 - **2026-10-22** — **Four small fixes (#433): the Classes page's clock, one `<main>` on every page
   in every state, Show earlier's focus, and a Start's line.** The owner's follow-up of 2026-10-16,
