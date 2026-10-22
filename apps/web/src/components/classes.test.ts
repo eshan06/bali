@@ -410,4 +410,14 @@ describe('the Classes page', () => {
       /const timer = window\.setTimeout\(load, readAt \+ AFTER_BELL_MS - Date\.now\(\)\);\s*return \(\) => window\.clearTimeout\(timer\);\s*\}, \[readAt, load\]\);/,
     );
   });
+
+  it('reads the clock afresh as its tab comes back into view, as Home does, a timer having slept with the computer', () => {
+    // A tab hidden overnight still said "today" of yesterday's session, and a live class's chip
+    // stayed past its bell, until the next read (the owner, 2026-10-16). Each card's line and chip
+    // hang off `now`, the bell's timer too.
+    expect(source).toMatch(
+      /const back = \(\) => \{\s*if \(document\.visibilityState === 'visible'\) setNow\(Date\.now\(\)\);\s*\};\s*document\.addEventListener\('visibilitychange', back\);\s*return \(\) => document\.removeEventListener\('visibilitychange', back\);\s*\}, \[\]\);/,
+    );
+    expect(source).toMatch(/now=\{now\}/);
+  });
 });
