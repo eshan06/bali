@@ -2,7 +2,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -361,9 +361,9 @@ describe('focus, once the read is in and Try again goes with its failure', () =>
     const { read, answer } = bali();
     render(
       <main>
-        <h1>Home</h1>
+        <h1 id="greeting">Good morning</h1>
         <h2 id="block">Your block</h2>
-        <Failing read={read} then={['gone', 'block']}>
+        <Failing read={read} then={['gone', 'block', 'greeting']}>
           <p>No block registered yet.</p>
         </Failing>
       </main>,
@@ -372,6 +372,10 @@ describe('focus, once the read is in and Try again goes with its failure', () =>
     const heading = screen.getByRole('heading', { name: 'Your block' });
     expect(document.activeElement).toBe(heading);
     expect(heading.getAttribute('tabindex')).toBe('-1');
+    // The later one there, the page's own heading too, is left as it is.
+    expect(screen.getByRole('heading', { name: 'Good morning' }).hasAttribute('tabindex')).toBe(
+      false,
+    );
   });
 
   it('takes a control there as it is, no tabindex given', async () => {
@@ -447,7 +451,7 @@ describe('focus, once the read is in and Try again goes with its failure', () =>
     expect(document.activeElement).toBe(document.body);
   });
 
-  it('lands where `then` said last: the page’s latest word', async () => {
+  it('follows `then` as the page changes it: the page’s latest word', async () => {
     const { read, answer } = bali();
     const page = (then: readonly string[]) => (
       <main>
@@ -462,6 +466,28 @@ describe('focus, once the read is in and Try again goes with its failure', () =>
     rerender(page(['second']));
     await readIn(answer);
     expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Recent activity' }));
+  });
+
+  it('leaves the page as it is when focus wasn’t on Try again as it went: a click that didn’t focus it (Safari, Firefox on a Mac)', async () => {
+    const { read, answer } = bali();
+    render(
+      <main>
+        <h1>Home</h1>
+        <h2 id="block">Your block</h2>
+        <Failing read={read} then={['block']}>
+          <p>No block registered yet.</p>
+        </Failing>
+      </main>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(read).toHaveBeenCalledOnce();
+    expect(document.activeElement).toBe(document.body);
+    await answer(true);
+    await nextFrame();
+    expect(document.activeElement).toBe(document.body);
+    expect(screen.getByRole('heading', { name: 'Your block' }).hasAttribute('tabindex')).toBe(
+      false,
+    );
   });
 
   it('leaves focus be when it was elsewhere as Try again went: a keyboard user who moved on', async () => {
@@ -512,7 +538,7 @@ describe('focus, once the read is in and Try again goes with its failure', () =>
   });
 });
 
-describe('the hand-off, where a browser differs (`handOff`)', () => {
+describe('the hand-off itself (`handOff`)', () => {
   /** The page as a browser that names the gone button, or nothing, as focused tells it. */
   const naming = (focused: () => Element | null) => ({
     get activeElement() {
@@ -538,6 +564,23 @@ describe('the hand-off, where a browser differs (`handOff`)', () => {
       expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Your block' }));
       unmount();
     }
+  });
+
+  it('reads `then` as the frame comes, not as Try again goes', async () => {
+    render(
+      <>
+        <h2 id="first">Your classes</h2>
+        <h2 id="second">Recent activity</h2>
+      </>,
+    );
+    const button = document.body.appendChild(document.createElement('button'));
+    button.focus();
+    let then = ['first'];
+    handOff(button, () => then);
+    then = ['second'];
+    button.remove();
+    await nextFrame();
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Recent activity' }));
   });
 
   it('does nothing for a button never drawn', () => {
