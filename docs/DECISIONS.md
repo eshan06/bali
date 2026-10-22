@@ -66,7 +66,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   "Sessions · Device check" here. Its read refused: the body on main; here the same button, now Try
   again. A 50-minute Start on "PV16 test" let through, its answer and the class read after it refused,
   then Start pressed again: main said the line and this branch didn't, and both said it for a session
-  started first over the API, as another tab would. Five test sessions, each ended. About 264 changed
+  started first over the API, as another tab would. Five test sessions, each ended. About 269 changed
   lines without tests, one PR.
 
 - **2026-10-22** — **Time limits on the portal's remaining reads and saves (#432); the shell's
