@@ -81,23 +81,23 @@ touching infra, CI, git plumbing, or the dev environment.
 
 ## The Windows PC
 
-The conductor's machine since 2026-10-14 (`docs/DECISIONS.md`); the clone is `C:\dev\bali`.
+The conductor's machine since 2026-10-14 (`docs/DECISIONS.md`), replaced by a new PC on 2026-10-21;
+the clone is `C:\Users\Eshan Shah\Downloads\github\bali`. Its path has a space: always quote it.
 
-- **Node 22 runs only in Git Bash.** fnm installs it and `~/.bashrc` loads it; PowerShell and cmd
-  find the system's Node 24, which `npm ci` refuses (the repo's `engine-strict`). Run npm, git and
-  the repo's scripts in Git Bash, which is Claude Code's Bash tool.
+- **Node 22 runs only in Git Bash.** fnm (from winget) installs it and `~/.bashrc` loads it, without
+  `--use-on-cd`; PowerShell and cmd find the system's own Node, which lacks the `script-shell`
+  setting below (and a Node 24 there is refused by the repo's `engine-strict`). Run npm, git and the
+  repo's scripts in Git Bash, which is Claude Code's Bash tool.
 - **npm runs scripts in Git Bash by a setting outside the repo.** The scripts use `NODE_ENV=…`
   prefixes and quoted globs, which cmd can't run, so `script-shell` names Git Bash in Node 22's own
   global npmrc. fnm installing a newer 22.x starts without it: set it again there.
-- **`cd` in the Bash tool can fail.** fnm's `--use-on-cd` turns `cd` into its own function, which
-  in the Bash tool can stop with "We can't find the necessary environment variables to replace the
-  Node version" (seen entering a worktree). Use `git -C <path>`, absolute paths or `builtin cd`.
+- **`cd` in the Bash tool can fail if fnm's `--use-on-cd` is on.** It turns `cd` into its own
+  function, which can stop with "We can't find the necessary environment variables to replace the
+  Node version". Keep it out of `~/.bashrc`; otherwise use `git -C <path>`, absolute paths or `builtin cd`.
 - **Line endings.** Git for Windows checks files out with CRLF by default and the repo is LF, so
-  the clone sets `core.autocrlf=input` (its worktrees share it); a new clone sets it again.
-- **The clone's root holds the owner's v2 files**, untracked: `.idea/`, `android/`, `packages/api/`,
-  `packages/db/src/cleanup-students.ts` and a v2 `.env`, which v3's API reads from the root. Never
-  run the API or the tests from `C:\dev\bali` itself (workers use their own worktrees), and never
-  touch those files without the owner.
+  the clone sets `core.autocrlf=input` (its worktrees share it). A clone made before the setting
+  keeps CRLF files on disk though `git status` is clean: check `git ls-files --eol`, and re-checkout
+  (`git rm -rq --cached . && git reset --hard`) when it shows `w/crlf`.
 - **Headless Chrome lays a page out 500 px wide at least.** `--window-size=390,…` renders at 500 and
   crops the shot to 390, a layout no phone has, with no error. For a phone-width shot, emulate the
   width over DevTools: start it with `--remote-debugging-port`, then `Emulation.setDeviceMetricsOverride`
