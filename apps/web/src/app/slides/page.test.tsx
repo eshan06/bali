@@ -15,7 +15,8 @@ import SlidesPage from './page';
  * one that keeps sending never stops; one still going at 25 minutes stops, in its own words.
  *
  * Pressed with `fireEvent`, never user-event, and waited on inside `act`: on a fake clock, Testing
- * Library's own waits (user-event's actions, `waitFor`, `findBy…`) hang on a timer it never runs.
+ * Library's own waits (user-event's actions, even with its `advanceTimers`, `waitFor`, `findBy…`)
+ * hang on a timer it advances only on Jest's.
  */
 
 const bali = vi.hoisted(() => {
@@ -77,10 +78,7 @@ class Bucket {
   timeout = 0;
   status = 0;
   aborted = false;
-  upload: {
-    onprogress: ((e: Partial<ProgressEvent>) => void) | null;
-    onload: (() => void) | null;
-  } = { onprogress: null, onload: null };
+  upload: { onprogress: ((e: Partial<ProgressEvent>) => void) | null } = { onprogress: null };
   onload: (() => void) | null = null;
   onerror: (() => void) | null = null;
   onabort: (() => void) | null = null;
@@ -136,7 +134,6 @@ const pass = (ms: number) => act(() => vi.advanceTimersByTimeAsync(ms));
 const arrived = (xhr: Bucket) =>
   act(async () => {
     xhr.upload.onprogress?.({ loaded: SIZE, total: SIZE, lengthComputable: true });
-    xhr.upload.onload?.();
     xhr.status = 200;
     xhr.onload?.();
     await vi.advanceTimersByTimeAsync(0);

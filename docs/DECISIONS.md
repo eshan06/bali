@@ -25,26 +25,37 @@ a real decision? Add a dated entry at the top: what was decided and why.
   sent again under its id for a fresh URL, M2b2; QuestionsSlidesRetryStates). **No new words, so no
   board** (*the conductor's call, awaiting the owner*): that line says what happened and what to do.
   **After the last byte, 2 minutes** (`UPLOAD_ANSWER_MS`; *the conductor's call, awaiting the
-  owner*): once the browser says the whole file is sent (the upload's `load`), the bucket has 2
-  minutes to answer before the upload stops as one with no answer. What the browser counts as sent
+  owner*): once the browser's progress counts the whole file sent, the bucket has 2 minutes to
+  answer before the upload stops as one with no answer. Not from the upload's `load` event: Firefox
+  fires it only as the bucket's answer starts, which would have left Firefox on the 30 s (santa's
+  review, both reviewers). What the browser counts as sent
   can still be on its way, in a slow link's buffers or a school's proxy that holds a whole upload to
   check it before passing it on, and then the bucket stores it. Two minutes is 25 MB's time at the
   1.7 Mbit/s the owner's rule was set against; a dead connection at 100% now stops in 2 minutes, not
   25. *Weighed:* the same 30 s (a proxy that checks big files would stop every big upload, its Try
   again too, on that network for good); no limit there (the bar at 100% until the 25 minutes).
-  **Kept:** the 25 minutes, `too_slow` and its words; Cancel. **A hidden tab:** the watch is a page
+  **Kept:** the 25 minutes, `too_slow` and its words; Cancel. **A known limit** (santa's Reviewer A;
+  *the conductor's call, awaiting the owner*): a browser opens at most 6 connections to one host, and
+  the bucket is one host, so a 7th upload started while 6 are still sending waits for one of them,
+  and on a link slow enough that none ends in 30 s it is stopped as stuck though nothing is wrong. Try
+  again goes on once fewer run, and nothing is lost. Kept so: the owner's rule counts from the start,
+  and starting the watch at the first byte instead would leave an upload that never connects on its
+  frozen bar. **A hidden tab:** the watch is a page
   timer, and browsers slow a hidden tab's timers (Chrome some to once a minute after 5 minutes
   hidden), so a stall in a hidden tab may be stopped late; the 25 minutes are XHR's own timeout,
   which no tab slows. **Tests:** the watch on a fake clock (`decks.test.ts`): stopped at 30 s from
   the start and from the last byte, never 1 ms sooner; a slow PUT sending every 29 s for 24 minutes
-  never stopped; 2 minutes after the last byte; the 25 minutes still `too_slow`; nothing watched
-  once it ended. Your slides' first test that drives the page (`app/slides/page.test.tsx`, jsdom, on
-  a fake clock): stuck, the row says its line with Try again at 30 s, which goes on with a fresh
-  URL, focus on its Cancel; a slow upload never stops; 25 minutes stop it in their words. Thirteen
-  breakages of `putPdf`, tried one at a time, each failed the tests. `components/slides.test.ts`
+  never stopped; 2 minutes once the progress counts the whole file, in Firefox's order (no `load`
+  before the answer), and again after a file sent over; the 25 minutes still `too_slow`; nothing
+  watched once it ended. Your slides' first test that drives the page (`app/slides/page.test.tsx`,
+  jsdom, on a fake clock): stuck, the row says its line with Try again at 30 s, which goes on with a
+  fresh URL, focus on its Cancel; a slow upload never stops; 25 minutes stop it in their words.
+  Fifteen breakages of `putPdf`, tried one at a time, each failed the tests, the 2 minutes started
+  by the `load` event among them. `components/slides.test.ts`
   (source text) is untouched: no component or page code changed. **Found on the way:** on a fake
-  clock, user-event's actions and Testing Library's `waitFor` hang (they wait on a timer only Jest's
-  fake clock is advanced for), so such a test presses with `fireEvent` and waits in `act`
+  clock, user-event's actions, even with its `advanceTimers` option (tried: santa's Reviewer B
+  thought it ran), and Testing Library's `waitFor` hang: they wait on a timer Testing Library
+  advances only on Jest's fake clock. So such a test presses with `fireEvent` and waits in `act`
   (`docs/WEB.md`, Testing the portal). **Checked** in headless Chrome on dev, main beside this branch:
   the upload's request to the bucket paused (its CORS check, so no byte sent), main still said
   "Uploading · 0%" at 42 s; this branch stopped it 30.0 s after it was sent (30,008 to 30,017 ms over
@@ -54,7 +65,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   never more than 3.8 s apart, the bucket's answer 1.8 s after the last byte. Chrome reports an
   upload's progress in 16 KB steps, so only a link sending under 16 KB in 30 s (about 4.4 kbit/s)
   would be taken for stuck; at that rate even a 1 MB PDF is past its 25 minutes. Each test deck
-  removed. 48 changed lines of source, all in `decks.ts`; the rest is tests and docs.
+  removed. 49 changed lines of source, all in `decks.ts`; the rest is tests and docs.
 
 - **2026-10-22** — **The portal's tests drive the page (#434): jsdom and Testing Library, dev only,
   opted into per file, and `try-again.test.tsx` converted as the pattern.** The owner's answer to the

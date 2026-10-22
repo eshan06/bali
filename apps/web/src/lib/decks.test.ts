@@ -95,10 +95,7 @@ class FakeXhr {
   timeout = 0;
   status = 0;
   aborted = false;
-  upload: {
-    onprogress: ((e: Partial<ProgressEvent>) => void) | null;
-    onload: (() => void) | null;
-  } = { onprogress: null, onload: null };
+  upload: { onprogress: ((e: Partial<ProgressEvent>) => void) | null } = { onprogress: null };
   onload: (() => void) | null = null;
   onerror: (() => void) | null = null;
   onabort: (() => void) | null = null;
@@ -127,10 +124,12 @@ class FakeXhr {
   progress(loaded: number, total: number, lengthComputable = true) {
     this.upload.onprogress?.({ loaded, total, lengthComputable });
   }
-  /** The whole file sent, as the browser says it: its last progress, then the upload's `load`. */
+  /**
+   * The whole file sent, as every browser says it first: its progress at the whole file (Firefox
+   * fires the upload's `load` only as the answer starts).
+   */
   sentAll(total: number) {
     this.progress(total, total);
-    this.upload.onload?.();
   }
   answer(status: number) {
     clearTimeout(this.timer);
@@ -400,8 +399,9 @@ describe('a PUT that sends nothing for 30 s stops; 25 minutes stay the outer lim
     await vi.advanceTimersByTimeAsync(4_000);
     xhr.progress(16_384, 1_000_000);
     await vi.advanceTimersByTimeAsync(UPLOAD_STALL_MS - 1);
-    // A browser that sends the file again from its start (a connection it opened again) is sending.
-    xhr.progress(8_192, 1_000_000);
+    // A browser that sends the file again from its start (a connection it opened again) is sending,
+    // whether or not it says the length.
+    xhr.progress(8_192, 0, false);
     await vi.advanceTimersByTimeAsync(10_000);
     // An event that says nothing more was sent is no progress.
     xhr.progress(8_192, 1_000_000);
@@ -425,7 +425,7 @@ describe('a PUT that sends nothing for 30 s stops; 25 minutes stay the outer lim
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it('gives the bucket UPLOAD_ANSWER_MS to answer once the whole file is sent, not the 30 s', async () => {
+  it('gives the bucket UPLOAD_ANSWER_MS to answer once the progress counts the whole file, with no `load` before the answer (Firefox’s order)', async () => {
     const { xhr, seen } = watched();
     xhr.progress(500_000, 1_000_000);
     await vi.advanceTimersByTimeAsync(10_000);
@@ -436,6 +436,23 @@ describe('a PUT that sends nothing for 30 s stops; 25 minutes stay the outer lim
     expect(seen).toEqual({ end: { failed: undefined }, after: 10_000 + UPLOAD_ANSWER_MS });
     expect(xhr.aborted).toBe(true);
     expect(vi.mocked(captureApiFailure).mock.calls).toEqual([['PUT', KEY, 'network']]);
+  });
+
+  it('counts the 30 s again when the browser sends the whole file over, then the answer’s 2 minutes from its end', async () => {
+    const { xhr, seen } = watched();
+    xhr.sentAll(1_000_000);
+    await vi.advanceTimersByTimeAsync(60_000);
+    // A connection opened again: the file sent over from its start, bytes remaining again.
+    xhr.progress(16_384, 1_000_000);
+    await vi.advanceTimersByTimeAsync(UPLOAD_STALL_MS - 1);
+    xhr.sentAll(1_000_000);
+    await vi.advanceTimersByTimeAsync(UPLOAD_ANSWER_MS - 1);
+    expect(seen.end).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(seen).toEqual({
+      end: { failed: undefined },
+      after: 60_000 + UPLOAD_STALL_MS - 1 + UPLOAD_ANSWER_MS,
+    });
   });
 
   it('still ends one at its 25 minutes, `too_slow`, however steadily it sends', async () => {

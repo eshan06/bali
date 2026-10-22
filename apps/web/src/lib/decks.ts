@@ -151,7 +151,9 @@ export function putPdf(url: string, body: Blob, opts: PutOptions): Promise<PutEn
       watch = setTimeout(stuck, ms);
     };
     // Bytes sent as last told: a count that moves is progress, back to the start included (a
-    // connection opened again), and an event repeating it isn't.
+    // connection opened again), and an event repeating it isn't. Its count at the whole file starts
+    // the answer's wait: the upload's own `load` won't do, as Firefox fires it only once the bucket's
+    // answer starts (santa's review).
     let sent = 0;
     xhr.open('PUT', url);
     xhr.setRequestHeader('Content-Type', 'application/pdf');
@@ -159,11 +161,10 @@ export function putPdf(url: string, body: Blob, opts: PutOptions): Promise<PutEn
     xhr.upload.onprogress = (e) => {
       if (e.loaded !== sent) {
         sent = e.loaded;
-        wait(UPLOAD_STALL_MS);
+        wait(e.lengthComputable && e.loaded >= e.total ? UPLOAD_ANSWER_MS : UPLOAD_STALL_MS);
       }
       if (e.lengthComputable && e.total > 0) onProgress(e.loaded / e.total);
     };
-    xhr.upload.onload = () => wait(UPLOAD_ANSWER_MS);
     xhr.onload = () =>
       xhr.status >= 200 && xhr.status < 300 ? end('uploaded') : failed(xhr.status);
     xhr.onerror = () => failed(undefined);
