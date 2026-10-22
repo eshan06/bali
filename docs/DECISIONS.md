@@ -58,11 +58,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   advances only on Jest's fake clock. So such a test presses with `fireEvent` and waits in `act`
   (`docs/WEB.md`, Testing the portal). **Checked** in headless Chrome on dev, main beside this branch:
   the upload's request to the bucket paused (its CORS check, so no byte sent), main still said
-  "Uploading · 0%" at 42 s; this branch stopped it 30.0 s after it was sent (30,008 to 30,017 ms over
-  three runs), said as SlidesStates draws it, focus on the row's Cancel; Try again, pressed with
+  "Uploading · 0%" at 42 s; this branch stopped it 30.0 s after it was sent (30,006 to 30,017 ms over
+  four runs), said as SlidesStates draws it, focus on the row's Cancel; Try again, pressed with
   Enter once the pause was lifted, sent the create again for a fresh URL, focus on Cancel, and the
   deck was checked. A 0.4 MB PDF on an upload throttled to 5 KB/s never stopped: 87 s, its progress
-  never more than 3.8 s apart, the bucket's answer 1.8 s after the last byte. Chrome reports an
+  never more than 3.9 s apart, the bucket's answer 1.8 s after the last byte. Chrome reports an
   upload's progress in 16 KB steps, so only a link sending under 16 KB in 30 s (about 4.4 kbit/s)
   would be taken for stuck; at that rate even a 1 MB PDF is past its 25 minutes. Each test deck
   removed. 49 changed lines of source, all in `decks.ts`; the rest is tests and docs.
