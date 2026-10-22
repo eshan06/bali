@@ -53,7 +53,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   push, which needed 9 of its 10) and, from the second round, the busiest second of the API's main
   thread and of Postgres's container.
   **The numbers** (CI's runner; the Starts' and the first reads' p95, then p99; runs 39857512764,
-  39858573122 and 39862758638, 32 in all). *The gate's school, 600 phones* (30 Starts, 20 of them
+  39858573122 and 39862758638, 32 in all, and 39869038433, two more, below). *The gate's school, 600 phones* (30 Starts, 20 of them
   joining 30): no push, the Starts 464 (470), 445 (455) and 331 (344) ms and the reads 8.7 (10.8),
   7.8 (10.3) and 7.3 (10.3) ms; every phone within 1 s, the Starts 520 (546), 901 (945), 1,060
   (1,080) and 1,080 (1,130) ms and the reads 54 (60), 273 (278), 352 (361) and 679 (687) ms; within
@@ -77,7 +77,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   every size and pool; with no push, 71 at 600, 91 at 1,200 and 90 at 1,800; within 5 or 10 s, 75 and
   77 at 600, 95 and 92 at 1,200, 92 at 1,800. Postgres's container used 67 to 124 hundredths, about
   one of the runner's four cores. No request failed in any run (0 of 13,590 to 19,473 each), and no
-  check did.
+  check did. *A faster runner* (39869038433, the final script, at 600): within 1 s, the Starts 415
+  (488) ms and the reads 41 (46) ms, the main thread at 87; within 10 s, 161 (172) and 4.1 (5.5) ms,
+  at 54. Runners differ by about twice; on each, every phone at once at least doubles the Starts'
+  time against a 10 s spread.
   **What they mean.** *The push at once doubles the bell's cost, in time, never in errors:* at the
   gate's 600 the Starts' p95 goes from 0.33–0.46 s to 0.52–1.08 s (twice past their 1 s) and the
   first reads from about 8 ms to 54–679 ms; at 1,200, from 0.9–1.2 s to 2.1–2.2 s; at 1,800, from

@@ -220,6 +220,7 @@ jobs:
               exit "$status"
             fi
           done
+      # All but its trace, debug and info lines: a crash Node writes as plain text stays in.
       - name: The API's warnings and errors
         if: failure()
-        run: grep -hE '"level":(40|50|60)' "$RUNNER_TEMP"/api-*.log | tail -n 100 || true
+        run: grep -hvE '"level":(10|20|30)' "$RUNNER_TEMP"/api-*.log | tail -n 100 || true

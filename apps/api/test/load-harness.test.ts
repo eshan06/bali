@@ -292,7 +292,8 @@ describe.runIf(REAL_PG)('the load harness', () => {
       const reads = school.students.slice(0, 20).map((s) => ({ token: s.token }));
       await Promise.all(reads.map((auth) => call<MeResponse>('GET', '/v1/me', auth)));
       const [held] = await reader.$client<{ n: number }[]>`
-        select count(*)::int as n from pg_stat_activity where application_name = ${name}`;
+        select count(*)::int as n from pg_stat_activity
+        where application_name = ${name} and datname = current_database()`;
       // The driver's own 10 would open more than 2 for 20 reads at once.
       expect(held!.n).toBe(2);
     } finally {
