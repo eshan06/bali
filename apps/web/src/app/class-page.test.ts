@@ -80,7 +80,7 @@ describe('the class page before its class is read', () => {
     );
     expect(before).toMatch(/\{klass \? cantLoad\(error \?\? rosterError\) : null\}/);
     expect(page).toMatch(
-      /const cantLoad = \(message: string \| null\) =>\s*message === null \? null : \(\s*<div className="flex flex-wrap items-center gap-x-4 gap-y-3">\s*<TryAgain onRetry=\{load\} then=\{\[\]\}>\s*<p role="alert" className="text-body">\s*Couldn&apos;t load this class\. \{message\}\s*<\/p>\s*<\/TryAgain>/,
+      /const cantLoad = \(message: string \| null\) =>\s*message === null \? null : \(\s*<div className="flex flex-wrap items-center gap-x-4 gap-y-3">\s*<TryAgain onRetry=\{load\} held=\{[^}]*\} then=\{\[\]\}>\s*<p role="alert" className="text-body">\s*Couldn&apos;t load this class\. \{message\}\s*<\/p>\s*<\/TryAgain>/,
     );
   });
 
@@ -175,7 +175,7 @@ describe('the class page while no session runs (ClassBefore)', () => {
     );
     // One read of the roster, the class's load's and this one's.
     expect(page).toMatch(
-      /const readRoster = useCallback\(async \(\) => \{\s*const mine = \+\+reads\.current\.roster;\s*try \{\s*const next = await api\.get<RosterResponse>/,
+      /const readRoster = useCallback\(async \(\) => \{\s*const mine = \+\+reads\.current\.roster;\s*setRosterReading\(true\);\s*try \{\s*const next = await api\.get<RosterResponse>/,
     );
     expect(page.match(/\/roster`\)/g)).toHaveLength(1);
   });

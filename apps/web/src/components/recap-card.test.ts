@@ -442,15 +442,11 @@ describe('the card’s reads', () => {
       /<p class="text-text-secondary">Couldn't reach Bali\.<\/p><\/div><button type="button" aria-disabled="true" aria-busy="true" class="[^"]*\bh-10\b[^"]*">Loading…<\/button>/,
     );
     // Answered and failed again: Try again, at rest, its line said again.
-    expect(render(ready(board()), { ...failed, rosterReading: false })).toMatch(
-      /aria-busy="false" class="[^"]*">Try again<\/button><\/div><\/section>$/,
-    );
+    const atRest = /aria-busy="false" class="[^"]*">Try again<\/button><\/div><\/section>$/;
+    expect(render(ready(board()), { ...failed, rosterReading: false })).toMatch(atRest);
     // Its own read's failure isn't the roster's: never held by the roster's read.
-    const own = render({ kind: 'error', message: "Couldn't reach Bali." }, {
-      ...failed,
-      rosterReading: true,
-    });
-    expect(own).toMatch(/aria-busy="false" class="[^"]*">Try again<\/button><\/div><\/section>$/);
+    const own = { kind: 'error', message: "Couldn't reach Bali." } as const;
+    expect(render(own, { ...failed, rosterReading: true })).toMatch(atRest);
   });
 
   it('drops a read a later one, or another class, has overtaken', () => {

@@ -35,6 +35,8 @@ interface Props {
   rosterError?: string | null;
   /** The roster read again, its failure said until it answers. */
   onRetryRoster?: () => Promise<void>;
+  /** A read of the roster on its way, whichever Try again sent it: its failure's held meanwhile. */
+  rosterReading?: boolean;
   /** The session it found, for the page's line; null while none is. */
   onFound?: (session: Summary | null) => void;
 }
@@ -122,6 +124,7 @@ export function RecapShown({
   present = false,
   roster = null,
   rosterError = null,
+  rosterReading = false,
   state: read,
   onRetry,
 }: Props & {
@@ -169,8 +172,15 @@ export function RecapShown({
         </p>
       ) : state.kind === 'error' ? (
         <div>
-          {/* Held until its reads answer; read, focus on Last session (ClassRetryStates). */}
-          <TryAgain size="md" onRetry={onRetry} then={[headingId]} className="mt-3.5">
+          {/* Held until its reads answer, the roster's sent from under the page's header too;
+              read, focus on Last session (ClassRetryStates). */}
+          <TryAgain
+            size="md"
+            onRetry={onRetry}
+            held={read.kind === 'ready' && rosterReading}
+            then={[headingId]}
+            className="mt-3.5"
+          >
             <div role="alert" className="text-body">
               <p className="font-semibold">Couldn&apos;t load the last session.</p>
               <p className="text-text-secondary">{state.message}</p>

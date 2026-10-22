@@ -124,6 +124,10 @@ export default function ClassDetailPage() {
   // answers, so Try again holds in its place (ClassRetryStates).
   const [error, setError] = useState<string | null>(null);
   const [rosterError, setRosterError] = useState<string | null>(null);
+  // A read of each on its way, until its newest one answers: the failure it will answer holds its
+  // Try again as Loading…, whichever Try again sent it (ClassRetryStates).
+  const [classReading, setClassReading] = useState(false);
+  const [rosterReading, setRosterReading] = useState(false);
   // Which send is under way, if any: every control holds while one is, and only a Start's own
   // button says "Starting…" (an End's answer can come after the grid already says it ended).
   const [busy, setBusy] = useState<'start' | 'end' | 'extend' | null>(null);
@@ -231,6 +235,7 @@ export default function ClassDetailPage() {
 
   const readRoster = useCallback(async () => {
     const mine = ++reads.current.roster;
+    setRosterReading(true);
     try {
       const next = await api.get<RosterResponse>(`/v1/classes/${classId}/roster`);
       if (reads.current.roster !== mine) return;
@@ -238,15 +243,19 @@ export default function ClassDetailPage() {
       setRosterError(null);
     } catch (e) {
       if (reads.current.roster === mine) setRosterError(errText(e));
+    } finally {
+      if (reads.current.roster === mine) setRosterReading(false);
     }
   }, [api, classId]);
 
   // The class and its roster, read as the page opens and again by Try again.
   const load = useCallback(async () => {
     const mine = ++reads.current.klass;
+    setClassReading(true);
     const read = api.get<ClassDetail>(`/v1/classes/${classId}`).then(
       (c) => {
         if (reads.current.klass !== mine) return;
+        setClassReading(false);
         setError(null);
         setKlass(c);
         // Recover the live grid across a reload. `grid` is otherwise seeded
@@ -262,7 +271,9 @@ export default function ClassDetailPage() {
         );
       },
       (e: unknown) => {
-        if (reads.current.klass === mine) setError(errText(e));
+        if (reads.current.klass !== mine) return;
+        setClassReading(false);
+        setError(errText(e));
       },
     );
     await Promise.all([read, readRoster()]);
@@ -474,11 +485,14 @@ export default function ClassDetailPage() {
         ? `${students(roster.students.length)} · the session ended at ${endedAt}`
         : `The session ended at ${endedAt}`;
   // A read again of the class failed, or its roster didn't load: said under the header; or the
-  // class didn't load, in the session's place. Read, focus on the class's name (ClassRetryStates).
+  // class didn't load, in the session's place. Held while a read of what it says is on its way,
+  // the class's or else its roster's, whichever Try again sent it: the class's own answering
+  // first, its roster's failure is said here held, and the recap's Try again for it holds too.
+  // Read, focus on the class's name (ClassRetryStates).
   const cantLoad = (message: string | null) =>
     message === null ? null : (
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-        <TryAgain onRetry={load} then={[]}>
+        <TryAgain onRetry={load} held={error !== null ? classReading : rosterReading} then={[]}>
           <p role="alert" className="text-body">
             Couldn&apos;t load this class. {message}
           </p>
@@ -785,6 +799,7 @@ export default function ClassDetailPage() {
             roster={roster?.students ?? null}
             rosterError={rosterError}
             onRetryRoster={load}
+            rosterReading={rosterReading}
             onFound={setLast}
           />
           {/* The roster beside the join code's card; on a narrow page the card goes under it. */}
