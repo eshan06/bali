@@ -20,7 +20,13 @@ import type {
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createCall } from '../scripts/demo/http.js';
-import { harnessPool, harnessServer, type SchoolFile, seedSchool } from '../scripts/load/school.js';
+import {
+  harnessPool,
+  harnessServer,
+  harnessTeachers,
+  type SchoolFile,
+  seedSchool,
+} from '../scripts/load/school.js';
 
 /*
  * The load harness (Phase 4, L2a), end to end: the school seeded into a database of its own on the
@@ -106,9 +112,27 @@ describe('harnessPool', () => {
     }
   });
 
-  it('refuses any other: postgres.js would open none for 0 and fail on a fraction or text', () => {
+  it('refuses any other: postgres.js would open no connection for 0 and fail on a fraction', () => {
     for (const size of ['0', '-1', '51', '100', '2.5', '1e1', '010', ' 20', 'twenty']) {
       expect(() => harnessPool({ LOAD_DB_POOL: size })).toThrow(/LOAD_DB_POOL must be a whole/);
+    }
+  });
+});
+
+describe('harnessTeachers', () => {
+  it("seeds the gate's 20 teachers when LOAD_TEACHERS is unset or empty", () => {
+    expect(harnessTeachers({})).toBe(20);
+    expect(harnessTeachers({ LOAD_TEACHERS: '' })).toBe(20);
+  });
+
+  it("takes a whole number of teachers from 1 to 60, for the bell's measurement's larger schools", () => {
+    for (const count of [1, 20, 40, 60]) {
+      expect(harnessTeachers({ LOAD_TEACHERS: String(count) })).toBe(count);
+    }
+    for (const count of ['0', '61', '2.5', 'forty']) {
+      expect(() => harnessTeachers({ LOAD_TEACHERS: count })).toThrow(
+        /LOAD_TEACHERS must be a whole/,
+      );
     }
   });
 });

@@ -10,9 +10,10 @@ on:
       bell:
         description: >-
           Also measure the bell with the class-started push (#336), report-only: runs separated by
-          spaces, each window:pool:read, such as "1:10:me 1:20:me 30:10:me 1:10:light" (seconds a
-          rung phone takes to open Bali, the API's database connections, its first read). Empty,
-          the gate alone.
+          spaces, each window:pool:read or window:pool:read:teachers, such as "1:10:me 1:20:me
+          30:10:me 1:10:light 1:10:me:40" (the seconds a rung phone takes to open Bali, the API's
+          database connections, its first read, the school's teachers with 30 students each, 20
+          unless named). Empty, the gate alone.
         required: false
         default: ''
 
@@ -158,17 +159,17 @@ jobs:
           n=0
           for run in $RUNS; do
             n=$((n + 1))
-            if ! [[ "$run" =~ ^([0-9]{1,2}):([0-9]{1,2}):(me|light)$ ]]; then
-              echo "::error::each run is window:pool:read, such as 1:10:me, not $run"
+            if ! [[ "$run" =~ ^([0-9]{1,2}):([0-9]{1,2}):(me|light)(:([0-9]{1,2}))?$ ]]; then
+              echo "::error::each run is window:pool:read[:teachers], such as 1:10:me, not $run"
               exit 1
             fi
             window=${BASH_REMATCH[1]} pool=${BASH_REMATCH[2]} read=${BASH_REMATCH[3]}
-            npm run load:seed
+            LOAD_TEACHERS=${BASH_REMATCH[5]} npm run load:seed
             log="$RUNNER_TEMP/api-$n.log"
             LOAD_DB_POOL=$pool node --import tsx scripts/load/serve.ts > "$log" 2>&1 &
             pid=$!
             for _ in $(seq 30); do
-              curl -fsS http://127.0.0.1:3001/healthz > /dev/null && break
+              curl -fs http://127.0.0.1:3001/healthz > /dev/null && break
               sleep 1
             done
             curl -fsS http://127.0.0.1:3001/healthz > /dev/null || { cat "$log"; exit 1; }
@@ -181,13 +182,13 @@ jobs:
             kill -TERM "$pid"
             timeout 20 tail --pid="$pid" -f /dev/null
             {
-              echo "### Run $n: each rung phone within $window s, $pool connections, a first read of $read"
+              echo "### Run $n ($run): each rung phone within $window s, $pool connections, a first read of $read"
               echo "k6 exited $status; the API held $held database connections;" \
                 "$(grep -cE '"level":(40|50|60)' "$log" || true) warnings or errors in its log."
               echo '```'
               sed -n '/TOTAL RESULTS/,$p' "$RUNNER_TEMP/k6-$n.log"
               echo '```'
-            } >> "$GITHUB_STEP_SUMMARY"
+            } | tee -a "$GITHUB_STEP_SUMMARY"
             if [ "$status" != 0 ]; then
               grep -E '"level":(40|50|60)' "$log" | tail -n 50 || true
               exit "$status"

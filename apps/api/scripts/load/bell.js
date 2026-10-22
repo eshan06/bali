@@ -7,17 +7,18 @@ import http from 'k6/http';
 /*
  * The bell with the class-started push (#336): a measurement, run by hand and never on a PR
  * (load-gate.yml's `bell` input), where no threshold can fail and k6's summary shows each kind's
- * numbers. `load:serve`'s school, as the gate has it: the 600 tap before the bell, so each waits, and
- * each teacher's Start at it joins their 30. The push (ARCHITECTURE, "Push: a doorbell for students")
- * then rings those 30, once the Start has committed, and each phone opens Bali within ARRIVAL_WINDOW
- * seconds of its Start's answer: the engine's read on coming to the front, `GET /v1/me` (`kind:open`),
- * then a check-in every 30 s from there, in step with the phones that opened with it. A window of
- * 30 s is no push: a phone waiting in front finds the Start at its next 30 s read. FIRST_READ=light
- * makes that first read the age check's, one query, as low as a lighter first read could go. Six
- * classes follow a live lesson, as the gate's six do: their teacher asks and shows a slide after the
- * Start, each phone polls the lesson every 2 s once open, as the phone's card will (L8), and answers
- * once; each laptop, which no push reaches, opens it within 30 s, at the student web's 30 s read, and
- * polls too. The model and the numbers: docs/DECISIONS.md (2026-10-22, #336).
+ * numbers. `load:serve`'s school, the gate's 600 or a larger one (LOAD_TEACHERS): every student taps
+ * before the bell, so each waits, and each teacher's Start at it joins their 30. The push
+ * (ARCHITECTURE, "Push: a doorbell for students") then rings those 30, once the Start has committed,
+ * and each phone opens Bali within ARRIVAL_WINDOW seconds of its Start's answer: the engine's read on
+ * coming to the front, `GET /v1/me` (`kind:open`), then a check-in every 30 s from there, in step with
+ * the phones that opened with it. A window of 30 s is no push: a phone waiting in front finds the
+ * Start at its next 30 s read. FIRST_READ=light makes that first read the age check's, one query, as
+ * low as a lighter first read could go. Six classes follow a live lesson, as the gate's six do: their
+ * teacher asks and shows a slide after the Start, each phone polls the lesson every 2 s once open, as
+ * the phone's card will (L8), and answers once; each laptop, which no push reaches, opens it within
+ * 30 s, at the student web's 30 s read, and polls too. The model and the numbers: docs/DECISIONS.md
+ * (2026-10-22, #336).
  */
 
 const SCHOOL_FILE = __ENV.LOAD_SCHOOL_FILE || './school.json';
@@ -44,18 +45,7 @@ const students = school('students');
 const teachers = school('teachers');
 
 /** Each kind's numbers in k6's summary: a threshold names each, and none can fail. */
-const KINDS = [
-  'tap',
-  'start',
-  'open',
-  'checkin',
-  'me',
-  'poll',
-  'ask',
-  'slide',
-  'download',
-  'answer',
-];
+const KINDS = 'tap start open checkin me poll ask slide download answer'.split(' ');
 const thresholds = {
   'http_req_failed{who:school}': ['rate>=0'],
   'http_reqs{who:school,expected_response:false}': ['count>=0'],
