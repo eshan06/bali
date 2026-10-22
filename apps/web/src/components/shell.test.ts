@@ -236,23 +236,26 @@ describe('the shell’s wiring of the rulings (read from its source)', () => {
   it('reads, keeps or forgets the account, or signs the tab in, as accountStep says, on every page and every answer', () => {
     // A new page is one the effect hasn't seen yet: the same page's answers never read again.
     expect(shell).toMatch(
-      /const newPage = seen\.current !== path;\s*seen\.current = path;\s*const signedIn = getAccessToken\(\) !== null;\s*const step = accountStep\(path, signedIn, home, error, reading\.current, newPage\);\s*if \(step === 'read'\) load\(\);\s*if \(step === 'sign in'\) router\.replace\('\/login'\);\s*if \(step === 'forget'\) \{\s*setHome\(null\);\s*setError\(null\);\s*\}\s*\}, \[path, home, error, load, router\]\);/,
+      /const newPage = seen\.current !== path;\s*seen\.current = path;\s*const signedIn = getAccessToken\(\) !== null;\s*const step = accountStep\(path, signedIn, home, error, reads\.reading\(\), newPage\);\s*if \(step === 'read'\) load\(\);\s*if \(step === 'sign in'\) router\.replace\('\/login'\);\s*if \(step === 'forget'\) \{\s*setHome\(null\);\s*setError\(null\);\s*\}\s*\}, \[path, home, error, load, reads, router\]\);/,
     );
   });
 
-  it('reads again for the student home’s 30 s only when no read is on its way, its failure kept until an answer, so it isn’t said afresh each time (the owner, 2026-10-16)', () => {
+  it('reads again for the student home’s 30 s and Try again through `accountReads`, its failure kept until an answer, so it isn’t said afresh each time (the owner, 2026-10-16)', () => {
+    // One set of reads for the page's own and for `refresh`, which waits for the one on its way
+    // (the read on its way, handed to Try again, below); the answer says what the page shows.
     expect(shell).toMatch(
-      /const refresh = useCallback\(async \(\) => \{\s*if \(reading\.current\) return;\s*reading\.current = true;\s*const limited = \{ get: <T,>\(path: string\) => api\.get<T>\(path, POLL_TIMEOUT_MS\) \};\s*const said = await readAccount\(limited, reads\);\s*\/\/ A newer read is under way: its answer is the one that counts\.\s*if \(said === null\) return;\s*reading\.current = false;\s*if \('home' in said\) \{\s*setHome\(said\.home\);\s*setError\(null\);\s*\} else setError\(said\.error\);\s*\}, \[api\]\);/,
+      /const reads = useMemo\(\s*\(\) =>\s*accountReads\(api, \(said\) => \{\s*if \('home' in said\) \{\s*setHome\(said\.home\);\s*setError\(null\);\s*\} else setError\(said\.error\);\s*\}\),\s*\[api\],\s*\);/,
     );
-    // Every read sets `reading` as it starts, the shell's own (`load`) too.
+    expect(shell).toMatch(/const \{ refresh \} = reads;/);
+    // The page's own read (`load`) says no failure while it reads; `refresh` keeps it until then.
     expect(shell).toMatch(
-      /setError\(null\);\s*reading\.current = true;\s*void readAccount\(api, reads\)/,
+      /\(fresh = false\) => \{\s*if \(fresh\) setHome\(null\);\s*setError\(null\);\s*reads\.start\(\);\s*\}/,
     );
   });
 
   it('applies only the newest read’s answer, so a past failure never shows over fresh data (#352’s review)', () => {
     expect(shell).toMatch(
-      /void readAccount\(api, reads\)\.then\(\(said\) => \{\s*\/\/ A newer read is under way: its answer is the one that counts\.\s*if \(said === null\) return;\s*reading\.current = false;\s*if \('home' in said\) setHome\(said\.home\);\s*else setError\(said\.error\);\s*\}\);/,
+      /const run = readAccount\(api, reads\)\.then\(\(said\) => \{\s*\/\/ A newer read is under way: its answer is the one that counts\.\s*if \(said === null\) return;\s*running = null;\s*apply\(said\);\s*\}\);/,
     );
   });
 

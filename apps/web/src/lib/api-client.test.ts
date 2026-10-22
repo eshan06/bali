@@ -5,6 +5,7 @@ import {
   createApiClient,
   NetworkError,
   POLL_TIMEOUT_MS,
+  SAVE_TIMEOUT_MS,
   UnauthorizedError,
 } from './api-client';
 import { captureApiFailure } from './monitoring';
@@ -344,7 +345,7 @@ describe('api-client', () => {
       ]);
     });
 
-    it('puts no limit on any other call: a deck’s check can take longer than a poll waits', async () => {
+    it('puts no limit on a write given none: a deck’s check can take longer than any save waits', async () => {
       const api = createApiClient({
         baseUrl: 'http://api',
         getToken: () => 'tok',
@@ -357,7 +358,6 @@ describe('api-client', () => {
           ]),
       });
       const calls = [
-        api.get('/v1/decks'),
         api.post('/v1/decks/d1/complete', { eventId: 'e1' }),
         api.put('/v1/saved-questions/q1', { eventId: 'e2' }),
         api.patch('/v1/me', { eventId: 'e3' }),
@@ -365,6 +365,89 @@ describe('api-client', () => {
       ];
       await vi.advanceTimersByTimeAsync(4 * POLL_TIMEOUT_MS);
       expect(await Promise.all(calls)).toEqual(calls.map(() => ({ ok: 1 })));
+    });
+  });
+
+  describe('every other read, one-shot: a poll’s limit unless given its own (the owner, 2026-10-16)', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.mocked(captureApiFailure).mockClear();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('fails a read with no answer as unreached once POLL_TIMEOUT_MS is up, never a sign-out, leaving no timer', async () => {
+      const onUnauthorized = vi.fn();
+      const api = createApiClient({
+        baseUrl: 'http://api',
+        getToken: () => 'tok',
+        onUnauthorized,
+        fetchImpl: (_url, init) => swallowed(init),
+      });
+      // The decks, a session's snapshot, the class and its roster, the account: none given a limit.
+      const paths = ['/v1/decks', '/v1/sessions/s1', '/v1/classes/c1', '/v1/me/age-check'];
+      const reads = paths.map((path) => api.get(path));
+      const settled = vi.fn();
+      for (const read of reads) read.then(settled, settled);
+      await vi.advanceTimersByTimeAsync(POLL_TIMEOUT_MS - 1);
+      expect(settled).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      for (const read of reads) await expect(read).rejects.toBeInstanceOf(NetworkError);
+      expect(onUnauthorized).not.toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+      expect(vi.mocked(captureApiFailure).mock.calls).toEqual(
+        paths.map((path) => ['GET', path, 'network']),
+      );
+    });
+
+    it('fails a body that stops on its way the same way, and clears its timer once answered', async () => {
+      const replies: ((init?: RequestInit) => Promise<Response>)[] = [
+        (init) => {
+          const body = new ReadableStream<Uint8Array>({
+            start(stream) {
+              stream.enqueue(new TextEncoder().encode('{"decks":'));
+              init?.signal?.addEventListener('abort', () =>
+                stream.error(new DOMException('aborted', 'AbortError')),
+              );
+            },
+          });
+          return Promise.resolve(new Response(body, { status: 200 }));
+        },
+        () => Promise.resolve(jsonResponse({ decks: [] })),
+        () => Promise.resolve(jsonResponse({ error: { code: 'x', message: 'no' } }, 503)),
+      ];
+      const api = createApiClient({
+        baseUrl: 'http://api',
+        getToken: () => 'tok',
+        fetchImpl: (_url, init) => replies.shift()!(init),
+      });
+      const stopped = api.get('/v1/decks');
+      const settled = vi.fn();
+      stopped.then(settled, settled);
+      await vi.advanceTimersByTimeAsync(POLL_TIMEOUT_MS - 1);
+      expect(settled).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      await expect(stopped).rejects.toBeInstanceOf(NetworkError);
+      await expect(api.get('/v1/decks')).resolves.toEqual({ decks: [] });
+      expect(vi.getTimerCount()).toBe(0);
+      await expect(api.get('/v1/decks')).rejects.toMatchObject({ status: 503 });
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('takes a longer limit when given one', async () => {
+      const api = createApiClient({
+        baseUrl: 'http://api',
+        getToken: () => 'tok',
+        fetchImpl: (_url, init) => swallowed(init),
+      });
+      const read = api.get('/v1/me', 3 * POLL_TIMEOUT_MS);
+      const settled = vi.fn();
+      read.then(settled, settled);
+      await vi.advanceTimersByTimeAsync(3 * POLL_TIMEOUT_MS - 1);
+      expect(settled).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      await expect(read).rejects.toBeInstanceOf(NetworkError);
     });
   });
 
@@ -455,6 +538,34 @@ describe('api-client', () => {
       });
       await expect(answered.get('/v1/me', LIMIT)).resolves.toEqual({ ok: 1 });
       expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('fails a PUT, a PATCH and a DELETE given one the same way: a save’s (SAVE_TIMEOUT_MS)', async () => {
+      const onUnauthorized = vi.fn();
+      const api = createApiClient({
+        baseUrl: 'http://api',
+        getToken: () => 'tok',
+        onUnauthorized,
+        fetchImpl: (_url, init) => swallowed(init),
+      });
+      const sends = [
+        api.put('/v1/saved-questions/q1', { eventId: 'e1' }, SAVE_TIMEOUT_MS),
+        api.patch('/v1/classes/c1', { regenerateCode: true }, SAVE_TIMEOUT_MS),
+        api.del('/v1/saved-questions/q1', { eventId: 'e2' }, SAVE_TIMEOUT_MS),
+      ];
+      const settled = vi.fn();
+      for (const sent of sends) sent.then(settled, settled);
+      await vi.advanceTimersByTimeAsync(SAVE_TIMEOUT_MS - 1);
+      expect(settled).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      for (const sent of sends) await expect(sent).rejects.toBeInstanceOf(NetworkError);
+      expect(onUnauthorized).not.toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+      expect(vi.mocked(captureApiFailure).mock.calls).toEqual([
+        ['PUT', '/v1/saved-questions/q1', 'network'],
+        ['PATCH', '/v1/classes/c1', 'network'],
+        ['DELETE', '/v1/saved-questions/q1', 'network'],
+      ]);
     });
 
     it('clears its timer once answered: a body, a refusal, a 401, no network, not JSON', async () => {
