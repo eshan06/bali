@@ -3,7 +3,6 @@
 import type { SessionReportQuestion } from '@bali/shared';
 import { useId } from 'react';
 
-import { Button } from '@/components/button';
 import { CARD_ALONE } from '@/components/card';
 import {
   ANSWERED_COLUMN,
@@ -12,6 +11,7 @@ import {
   OPTIONS_COLUMN,
   RESULTS,
 } from '@/components/question-card';
+import { TryAgain } from '@/components/try-again';
 import type { SessionQuestions } from '@/lib/reports';
 import { bellTime } from '@/lib/session-controls';
 
@@ -25,14 +25,15 @@ const SAID = 'flex flex-wrap items-center gap-x-4 gap-y-3';
  * them, through the class page's card's own options and bars. The guard is the server's: a question
  * whose `counts` is null (under 3 answers) says so and shows no breakdown. Only totals: never who
  * answered, or what. None asked: no card. Its read is its own, loading and failing under its title,
- * the report above it standing either way.
+ * the report above it standing either way; its Try again held until Bali answers, its line said
+ * meanwhile, then focus on Questions (ReportRetryStates).
  */
 export function ReportQuestions({
   questions,
   onRetry,
 }: {
   questions: SessionQuestions;
-  onRetry: () => void;
+  onRetry: () => unknown;
 }) {
   const id = useId();
   if (questions.kind === 'ready' && questions.questions.length === 0) return null;
@@ -59,12 +60,11 @@ export function ReportQuestions({
         </p>
       ) : questions.kind === 'error' ? (
         <div className={SAID}>
-          <p role="alert" className="text-body">
-            Bali couldn&apos;t load this session&apos;s questions.
-          </p>
-          <Button variant="secondary" size="sm" onClick={onRetry}>
-            Try again
-          </Button>
+          <TryAgain onRetry={onRetry} then={[id]}>
+            <p role="alert" className="text-body">
+              Bali couldn&apos;t load this session&apos;s questions.
+            </p>
+          </TryAgain>
         </div>
       ) : (
         questions.questions.map((question, i) => (

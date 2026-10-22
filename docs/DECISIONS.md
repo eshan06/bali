@@ -8,6 +8,45 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-22** — **Try again keeps keyboard focus, part 2a (#PR): `TryAgain` on the class page's
+  own lines, the recap, the student panel, Reports, a session's report and its Questions, and as a
+  send's own button.** The owner's follow-up of 2026-10-16, continued (part 1, #426, below).
+  **Each failure said until its read answers:** the class page reads its class and roster again as
+  one promise (`load`), each failure cleared only by its own read's answer, never as it starts, so
+  Try again, in the session's place or under the header (in Present after the bell too), holds as
+  Loading… in its place; the recap's read again skips its own Loading… step and reads the roster
+  too when that failed (`RecapState`'s loading always has its session now); the student panel reads
+  again with its failure said; Reports' `startRead` keeps a failure until its answer, and no
+  "Loading sessions…" shows over it; a session's report reads its page and questions again, and its
+  Questions card its own. **A send's resend:** an extend that got no answer is sent again under its
+  id with its line kept, Try again held as every control is while a send is under way; answered,
+  the time added or a refusal in the line's place. **Focus lands** on the class's name (the page's
+  heading) for the class, its roster and an extend; Last session; This session, the panel's section
+  heading (given an id); the sessions' label, or Show earlier while earlier sessions are left, or
+  Reports with none; the session's day; and Questions. Built to ClassRetryStates (canvas version 79)
+  and ReportRetryStates (drawn since as intermediate states), on the canvas as it stands (its version
+  id 1792645808-b59e): no new board. **`TryAgain` extended, never copied:** `send` (a send's own
+  words, at rest and while it sends, Try again only once one failed), `type`, `variant`, and its
+  line optional, for the one button that sends saying it: Register block (the form's submit, so Enter
+  in the field presses it) and Make new code. *The conductor's call, awaiting the owner:* their line
+  still goes as they send again and is said anew at the answer, as HomeStates and ClassStates draw
+  them (Registering…, Making…): their one button keeps focus throughout, so keeping the line would be
+  an undrawn state for no focus gained. **In two:** part 2 came to about 550 changed lines without
+  tests, new code, so it splits by the owner's rule: part 2a here (about 370), part 2b on the branch
+  `fix/try-again-2b`, stacked on it: a close (the class page's and Present's, its line kept while it
+  sends again, focus then on the question or on Done), the slide's line (the card's, Present's and a
+  student's, kept while the deck loads again or the page is drawn again), and a slide change (the
+  card's, Present's and Show slides', sent again with its line kept), drawn first as LessonRetryStates
+  and StudentRetryStates. **Tested** as part 1 was: rendered markup, the source, `startRead` and
+  `readSessions`; the scan's `LEFT` eight files shorter. **Seen** in headless Chrome on dev as the
+  demo teacher, each read refused over CDP, Try again pressed with Enter, its read held (Loading…,
+  focus on it), failed again (said again, focus kept) and let through: focus on each heading above; a
+  10-minute session started, +5 min refused by a 503 and sent again, every control held, the time
+  added, focus on the class's name, then ended. *Found, left:* the roster's failure is said twice on
+  the class page, under the header and in the recap's card, each with its own Try again, as before;
+  and Show earlier's own button goes as it reads the last page, so focus falls to the page there,
+  no Try again's: a step of its own if the owner wants it.
+
 - **2026-10-16** — **Try again keeps keyboard focus (#426), part 1: one Try again for every read
   that failed, `TryAgain`, on Home, Classes, the account's card, the live grid's line and a
   student's home first.** The owner's follow-up (2026-10-16), from this week's reviews: Try again

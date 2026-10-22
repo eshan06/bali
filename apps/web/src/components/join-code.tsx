@@ -5,6 +5,7 @@ import { Check, Copy } from 'lucide-react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 import { Button } from '@/components/button';
+import { TryAgain } from '@/components/try-again';
 import { CANT_COPY, NEW_CODE_MADE } from '@/lib/errors';
 import { codeMoved, copyText, regenerateCode } from '@/lib/session-controls';
 import { useApi } from '@/lib/use-api';
@@ -178,9 +179,14 @@ export function JoinCode({
         >
           Cancel
         </Button>
-        <Button onClick={() => void make()} aria-disabled={busy} aria-busy={busy}>
-          {busy ? 'Making…' : said?.kind === 'failed' ? 'Try again' : 'Make new code'}
-        </Button>
+        <TryAgain
+          variant="primary"
+          size="md"
+          onRetry={make}
+          held={busy}
+          then={[]}
+          send={{ words: 'Make new code', sending: 'Making…', failed: said?.kind === 'failed' }}
+        />
       </div>
     </dialog>
   );

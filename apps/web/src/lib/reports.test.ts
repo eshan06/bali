@@ -224,7 +224,8 @@ describe('readSessions', () => {
 });
 
 describe('startRead', () => {
-  it('starts a read, and what the last one said goes with it', () => {
+  it('starts a read, its failure said until the answer, the place lost gone with it', () => {
+    // Try again reads with its line kept, so its button holds in place (ReportRetryStates).
     const said: SessionList = {
       ...FIRST_READ,
       loaded: true,
@@ -235,9 +236,30 @@ describe('startRead', () => {
     expect(startRead(said, 'earlier')).toEqual({
       ...said,
       reading: 'earlier',
-      failure: null,
       restarted: false,
     });
+  });
+
+  it('lets the answer settle the failure: gone once read, said again if not', async () => {
+    const failed: SessionList = {
+      ...FIRST_READ,
+      reading: null,
+      failure: { at: 'newest', message: 'nope' },
+    };
+    const read = await readSessions(
+      fakeApi({ [CLASS]: [KLASS], [NEWEST]: [page(null, MON)] }),
+      'c1',
+      startRead(failed, 'newest'),
+      'newest',
+    );
+    expect(read).toMatchObject({ reading: null, failure: null, sessions: [MON] });
+    const again = await readSessions(
+      fakeApi({ [CLASS]: [new NetworkError()], [NEWEST]: [page(null, MON)] }),
+      'c1',
+      startRead(failed, 'newest'),
+      'newest',
+    );
+    expect(again).toMatchObject({ reading: null, failure: { at: 'newest' } });
   });
 });
 

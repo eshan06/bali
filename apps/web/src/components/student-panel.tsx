@@ -4,8 +4,8 @@ import type { FeedEvent } from '@bali/shared';
 import { CircleCheck, X } from 'lucide-react';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 
-import { Button } from '@/components/button';
 import { MOMENT, Timeline } from '@/components/timeline';
+import { TryAgain } from '@/components/try-again';
 import { reasonWords } from '@/components/unlock-popups';
 import type { Student } from '@/lib/grid-state';
 import { bellTime } from '@/lib/session-controls';
@@ -48,7 +48,8 @@ export interface PanelProps {
   read: StudentRead;
   now: Date;
   onClose: () => void;
-  onRetry: () => void;
+  /** Read them again, the failure said until the answer. */
+  onRetry: () => unknown;
 }
 
 /**
@@ -56,7 +57,8 @@ export interface PanelProps {
  * and Close; this session's moments, oldest first, with their times and each unlock's reason (so
  * never in Present, #265), going silent and coming back among them as the recap marks them (the
  * owner, 2026-10-14); Clock off, the last check-in and who sees it. While the events are read, the
- * name and state alone; a read that failed, with Try again. Escape closes it from inside.
+ * name and state alone; a read that failed, with Try again, held until Bali answers, focus then on
+ * This session (ClassRetryStates). Escape closes it from inside.
  */
 export function PanelView({ id, student, chip, read, now, onClose, onRetry }: PanelProps) {
   const name = student.displayName ?? student.studentId.slice(0, 8);
@@ -91,23 +93,20 @@ export function PanelView({ id, student, chip, read, now, onClose, onRetry }: Pa
       </div>
       <div className="flex flex-col gap-5.5 px-5 pt-4.5 pb-6">
         <section>
-          <h3 className="mb-3 text-label text-text-tertiary uppercase">This session</h3>
+          <h3 id={`${id}-session`} className="mb-3 text-label text-text-tertiary uppercase">
+            This session
+          </h3>
           {read.kind === 'loading' ? (
             <p role="status" className="text-body text-text-secondary">
               Loading this session…
             </p>
           ) : read.kind === 'error' ? (
-            <>
+            <TryAgain onRetry={onRetry} then={[`${id}-session`]} className="mt-3.5">
               <div role="alert">
                 <p className="text-body font-semibold">Couldn&apos;t load this session.</p>
                 <p className="text-body text-text-secondary">{read.message}</p>
               </div>
-              <div className="mt-3.5">
-                <Button variant="secondary" size="sm" onClick={onRetry}>
-                  Try again
-                </Button>
-              </div>
-            </>
+            </TryAgain>
           ) : moments.length === 0 ? (
             <p className="text-body text-text-secondary">
               {name} hasn&apos;t tapped in this session.
@@ -151,7 +150,6 @@ export function StudentPanel({
 }: Omit<PanelProps, 'read' | 'onRetry'> & { sessionId: string; streamed: readonly FeedEvent[] }) {
   const api = useApi();
   const [answer, setAnswer] = useState<StudentRead>({ kind: 'loading' });
-  const [attempt, setAttempt] = useState(0);
   const studentId = view.student.studentId;
   useEffect(() => {
     let cancelled = false;
@@ -161,7 +159,7 @@ export function StudentPanel({
     return () => {
       cancelled = true;
     };
-  }, [api, sessionId, studentId, attempt]);
+  }, [api, sessionId, studentId]);
   const read = useMemo<StudentRead>(
     () =>
       answer.kind === 'ready'
@@ -173,12 +171,7 @@ export function StudentPanel({
     <PanelView
       {...view}
       read={read}
-      onRetry={() => {
-        setAnswer({ kind: 'loading' });
-        setAttempt((n) => n + 1);
-        // Try again goes as the read starts: focus back to the name, never lost.
-        document.getElementById(`${view.id}-name`)?.focus();
-      }}
+      onRetry={async () => setAnswer(await readStudentEvents(api, noEvents(sessionId, studentId)))}
     />
   );
 }

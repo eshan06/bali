@@ -167,8 +167,9 @@ describe('the block’s card', () => {
       fileURLToPath(new URL('../components/blocks.tsx', import.meta.url)),
       'utf8',
     );
-    expect(blocks).toContain(
-      "{busy ? 'Registering…' : said?.kind === 'failed' ? 'Try again' : 'Register block'}",
+    // `TryAgain` as the send's own button: Try again only once a send of it failed.
+    expect(blocks).toMatch(
+      /send=\{\{\s*words: 'Register block',\s*sending: 'Registering…',\s*failed: said\?\.kind === 'failed',\s*\}\}/,
     );
   });
 });

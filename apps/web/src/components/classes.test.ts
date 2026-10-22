@@ -11,6 +11,7 @@ import { CANT_REACH } from '../lib/errors';
 import type { Home } from '../lib/student-web';
 import { DOT } from './live-grid';
 import type { Me } from './shell';
+import { TryAgain } from './try-again';
 
 /*
  * Classes, in the menu (PV16): its head with New class (PV16b), a card per class with its students,
@@ -282,9 +283,35 @@ describe('the block’s card in v2’s look (Classes, HomeStates; PV16a)', () =>
     expect(source).toMatch(
       /role=\{said\.kind === 'done' \? 'status' : 'alert'\}\s*className="text-body break-words"/,
     );
-    expect(source).toMatch(/aria-busy=\{busy\}\s*className="mt-3\.5"/);
+    expect(source).toMatch(/failed: said\?\.kind === 'failed',\s*\}\}\s*className="mt-3\.5"/);
     expect(source).toMatch(
       /<div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-3">\s*<TryAgain onRetry=\{load\} then=\{\[`\$\{id\}-title`\]\}>\s*<p role="alert" className="text-body">\s*Couldn&apos;t load your blocks\.\{loadError \? ` \$\{loadError\}` : null\}\s*<\/p>\s*<\/TryAgain>/,
+    );
+  });
+
+  it('registers by its own button, `TryAgain` as the send’s, one button throughout (HomeStates)', () => {
+    // Register block, Registering… while it sends, and Try again once one never got its answer:
+    // the form's submit, so Enter in the field presses it, and the form's own submit sends nothing.
+    expect(source).toMatch(
+      /<TryAgain\s+type="submit"\s+size="md"\s+onRetry=\{register\}\s+held=\{busy\}\s+then=\{\[\]\}\s+send=\{\{\s*words: 'Register block',\s*sending: 'Registering…',\s*failed: said\?\.kind === 'failed',\s*\}\}/,
+    );
+    expect(source).toContain('<form onSubmit={(e) => e.preventDefault()} className="mt-4.5">');
+    expect(source).toMatch(
+      /async function register\(\) \{\s*if \(sending\.current \|\| blocks === null\) return;/,
+    );
+    // In its card's look, a secondary button at its full size.
+    const card = renderToStaticMarkup(
+      createElement(TryAgain, {
+        type: 'submit',
+        size: 'md',
+        onRetry: () => undefined,
+        then: [],
+        send: { words: 'Register block', sending: 'Registering…', failed: false },
+        className: 'mt-3.5',
+      }),
+    );
+    expect(card).toMatch(
+      /^<button type="submit" aria-disabled="false" aria-busy="false" class="[^"]*\bh-10\b[^"]*\bborder-border-strong\b[^"]*\bmt-3\.5\b[^"]*">Register block<\/button>$/,
     );
   });
 

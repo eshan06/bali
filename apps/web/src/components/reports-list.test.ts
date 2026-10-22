@@ -249,9 +249,25 @@ describe('the Reports page in each state (ReportStates)', () => {
     };
     const html = view({ list: failed });
     expect(html).toMatch(
-      /<div class="[^"]*\bshadow-1\b[^"]*"><p role="alert" class="text-body"><span class="block font-semibold">Couldn(&#x27;|')t load the sessions\.<\/span><span class="text-text-secondary">x<\/span><\/p><button type="button" class="[^"]*\bmt-3\.5\b[^"]*">Try again<\/button><\/div>/,
+      /<div class="[^"]*\bshadow-1\b[^"]*"><p role="alert" class="text-body"><span class="block font-semibold">Couldn(&#x27;|')t load the sessions\.<\/span><span class="text-text-secondary">x<\/span><\/p><button type="button" aria-disabled="false" aria-busy="false" class="[^"]*\bh-10\b[^"]*\bmt-3\.5\b[^"]*">Try again<\/button><\/div>/,
     );
     expect(html).not.toMatch(/No reports yet|Loading sessions/);
+  });
+
+  it('keeps the sessions’ failure said while Try again reads them, Try again held, no loading line (ReportRetryStates)', () => {
+    // Its line kept and Try again held as Loading… until Bali answers, so focus stays on it; never
+    // "Loading sessions…" in its place, which dropped Try again, and focus with it.
+    const held = view({
+      list: { ...FIRST_READ, reading: 'newest', failure: { at: 'newest', message: 'x' } },
+    });
+    expect(held).toMatch(
+      /<span class="text-text-secondary">x<\/span><\/p><button type="button" aria-disabled="true" aria-busy="true" class="[^"]*">Loading…<\/button><\/div>/,
+    );
+    expect(held).not.toMatch(/Loading sessions/);
+    // Read: focus on the sessions' label, or on Reports, the page's heading, while it has none.
+    expect(source('./reports-list.tsx')).toMatch(
+      /<TryAgain\s+size="md"\s+onRetry=\{\(\) => onRead\('newest'\)\}\s+held=\{list\.reading === 'newest'\}\s+then=\{\[sessionsId\]\}\s+className="mt-3\.5"\s*>/,
+    );
   });
 
   it('says there are none yet over when one will show, for a class or an account with none', () => {
@@ -277,7 +293,7 @@ describe('the Reports page in each state (ReportStates)', () => {
 
   it('offers Show earlier, small, held while it reads, gone at the end', () => {
     expect(view()).toMatch(
-      /<div class="mt-3"><button type="button" aria-disabled="false" class="[^"]*\bh-8\.5\b[^"]*">Show earlier<\/button><\/div>/,
+      /<div class="mt-3"><button type="button" id="[^"]+" aria-disabled="false" class="[^"]*\bh-8\.5\b[^"]*">Show earlier<\/button><\/div>/,
     );
     expect(view({ list: { ...LOADED, reading: 'earlier' } })).toMatch(
       /aria-disabled="true"[^>]*>Loading…<\/button>/,
@@ -288,9 +304,29 @@ describe('the Reports page in each state (ReportStates)', () => {
   it('says earlier sessions didn’t load in one line, a small Try again beside it', () => {
     const failed = { ...LOADED, failure: { at: 'earlier' as const, message: 'x' } };
     expect(view({ list: failed })).toMatch(
-      /<div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-3"><p role="alert" class="text-body">Couldn(&#x27;|')t load earlier sessions\. x<\/p><button type="button" class="[^"]*\bh-8\.5\b[^"]*">Try again<\/button><\/div>/,
+      /<div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-3"><p role="alert" class="text-body">Couldn(&#x27;|')t load earlier sessions\. x<\/p><button type="button" aria-disabled="false" aria-busy="false" class="[^"]*\bh-8\.5\b[^"]*">Try again<\/button><\/div>/,
     );
     expect(view({ list: failed })).not.toMatch(/Show earlier/);
+  });
+
+  it('keeps earlier sessions’ failure said while Try again reads them, focus then on Show earlier (ReportRetryStates)', () => {
+    const held = view({
+      list: { ...LOADED, reading: 'earlier', failure: { at: 'earlier', message: 'x' } },
+    });
+    expect(held).toMatch(
+      /t load earlier sessions\. x<\/p><button type="button" aria-disabled="true" aria-busy="true" class="[^"]*\bh-8\.5\b[^"]*">Loading…<\/button><\/div>/,
+    );
+    expect(held).not.toMatch(/Show earlier/);
+    // Read: on Show earlier, as after its own read; on the sessions' label once none are left.
+    const src = source('./reports-list.tsx');
+    expect(src).toMatch(
+      /<TryAgain\s+onRetry=\{\(\) => onRead\('earlier'\)\}\s+held=\{list\.reading === 'earlier'\}\s+then=\{\[earlierId, sessionsId\]\}\s*>/,
+    );
+    expect(src).toMatch(/<Button\s+id=\{earlierId\}\s+variant="secondary"\s+size="sm"/);
+    // The sessions' loading line only for a first read, never over a failure being read again.
+    expect(src).toMatch(
+      /const loading = classId !== null && list\.reading === 'newest' && list\.failure === null;/,
+    );
   });
 
   it('says the place was lost in v2’s grey notice, over the sessions it read again', () => {

@@ -203,9 +203,19 @@ describe('a session’s page in each state', () => {
   it('says why it couldn’t load in a card, Try again reading it again (ReportStates)', () => {
     const html = render({ kind: 'error', message: "Couldn't reach Bali." });
     expect(html).toMatch(
-      /<div class="[^"]*\bshadow-1\b[^"]*"><p role="alert" class="text-body"><span class="block font-semibold">Couldn't load this session\.<\/span><span class="text-text-secondary">Couldn't reach Bali\.<\/span><\/p><button type="button" class="[^"]*\bmt-3\.5\b[^"]*">Try again<\/button><\/div>/,
+      /<div class="[^"]*\bshadow-1\b[^"]*"><p role="alert" class="text-body"><span class="block font-semibold">Couldn't load this session\.<\/span><span class="text-text-secondary">Couldn't reach Bali\.<\/span><\/p><button type="button" aria-disabled="false" aria-busy="false" class="[^"]*\bh-10\b[^"]*\bmt-3\.5\b[^"]*">Try again<\/button><\/div>/,
     );
     expect(html).not.toMatch(/<h1|Loading/);
+  });
+
+  it('holds Try again while it reads it all again, its line kept, focus then on its day (ReportRetryStates)', () => {
+    // `TryAgain`, held while the reads' promise runs: never "Loading this session…" in the
+    // failure's place, which dropped Try again, and focus with it. Read, focus on the page's
+    // heading, the session's day (`then` none), which the failure's page has none of.
+    expect(source('./session-report.tsx')).toMatch(
+      /<TryAgain size="md" onRetry=\{onRetry\} then=\{\[\]\} className="mt-3\.5">\s*<p role="alert" className="text-body">\s*<span className="block font-semibold">Couldn&apos;t load this session\.<\/span>/,
+    );
+    expect(render(ready(board()))).toMatch(/<h1 class="text-page-title">/);
   });
 
   it('heads the session with its day over its times, then its card and its unlocks (ReportOpened)', () => {
@@ -343,10 +353,12 @@ describe('its URL and its reads (from their sources)', () => {
     expect(component).toMatch(
       /void readSessionPage\(api, classId, sessionId\)\.then\(\(next\) => \{\s*if \(live\) setPage\(next\);\s*\}\);/,
     );
-    expect(component).toMatch(/\}, \[api, classId, sessionId, attempt, router\]\);/);
+    expect(component).toMatch(/\}, \[api, classId, sessionId, router\]\);/);
+    // Try again reads the page and its questions again, its failure said until both answer.
     expect(component).toMatch(
-      /onRetry=\{\(\) => \{\s*setPage\(\{ kind: 'loading' \}\);\s*setQuestions\(\{ kind: 'loading' \}\);\s*setAttempt\(\(n\) => n \+ 1\);\s*\}\}/,
+      /onRetry=\{async \(\) => \{\s*const \[next\] = await Promise\.all\(\[\s*readSessionPage\(api, classId, sessionId\),\s*readQuestions\(\),\s*\]\);\s*setPage\(next\);\s*\}\}/,
     );
+    expect(component).not.toMatch(/set(Page|Questions)\(\{ kind: 'loading' \}\)/);
     // The account the shell read once: no read of the class's own for its name.
     expect(component).toMatch(
       /className=\{me\?\.classes\.find\(\(c\) => c\.id === classId\)\?\.name \?\? null\}/,
@@ -356,14 +368,15 @@ describe('its URL and its reads (from their sources)', () => {
 
   it('reads its questions at once with the page, again by the page’s Try again and by the card’s own', () => {
     const component = source('./session-report.tsx');
-    // Signed in only (the page's read sends anyone else to sign in), and nothing from a read the
-    // page or the card has asked again since.
+    // Signed in only (the page's read sends anyone else to sign in). A Try again reads only once
+    // these reads have answered, a failure shown, and holds while its own read runs.
     expect(component).toMatch(
-      /useEffect\(\(\) => \{\s*if \(!getAccessToken\(\)\) return;\s*let live = true;\s*void readSessionQuestions\(api, classId, sessionId\)\.then\(\(next\) => \{\s*if \(live\) setQuestions\(next\);\s*\}\);\s*return \(\) => \{\s*live = false;\s*\};\s*\}, \[api, classId, sessionId, attempt, asked\]\);/,
+      /useEffect\(\(\) => \{\s*if \(!getAccessToken\(\)\) return;\s*let live = true;\s*void readSessionQuestions\(api, classId, sessionId\)\.then\(\(next\) => \{\s*if \(live\) setQuestions\(next\);\s*\}\);\s*return \(\) => \{\s*live = false;\s*\};\s*\}, \[api, classId, sessionId\]\);/,
     );
     expect(component).toMatch(
-      /onRetryQuestions=\{\(\) => \{\s*setQuestions\(\{ kind: 'loading' \}\);\s*setAsked\(\(n\) => n \+ 1\);\s*\}\}/,
+      /const readQuestions = async \(\) =>\s*setQuestions\(await readSessionQuestions\(api, classId, sessionId\)\);/,
     );
+    expect(component).toMatch(/onRetryQuestions=\{readQuestions\}/);
     // Drawn once the page is read, after the report's own parts.
     expect(component).toMatch(
       /<Report page=\{page\} \/>\s*<ReportQuestions questions=\{questions\} onRetry=\{onRetryQuestions\} \/>/,

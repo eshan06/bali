@@ -28,6 +28,7 @@ import { isOpen, QuestionCard, useLiveQuestion } from '@/components/question-car
 import { endedToday, RecapCard } from '@/components/recap-card';
 import { usePresenting } from '@/components/shell';
 import { SlideCard } from '@/components/slide-card';
+import { TryAgain } from '@/components/try-again';
 import { getAccessToken } from '@/lib/auth';
 import { errText, NOT_A_SESSION_LENGTH, SESSION_ALREADY_RUNNING } from '@/lib/errors';
 import type { QuestionDraft } from '@/lib/live-question';
@@ -119,7 +120,8 @@ export default function ClassDetailPage() {
   // server marked it, never this computer's clock.
   const [last, setLast] = useState<SessionReportSummary | null>(null);
   // The class didn't load: said in the session's place, with Try again. Its roster didn't, or a
-  // read again of the class failed: said under the header, with Try again.
+  // read again of the class failed: said under the header, with Try again. Each said until its read
+  // answers, so Try again holds in its place (ClassRetryStates).
   const [error, setError] = useState<string | null>(null);
   const [rosterError, setRosterError] = useState<string | null>(null);
   // Which send is under way, if any: every control holds while one is, and only a Start's own
@@ -222,17 +224,20 @@ export default function ClassDetailPage() {
     );
   };
 
-  const readRoster = useCallback(() => {
-    api
-      .get<RosterResponse>(`/v1/classes/${classId}/roster`)
-      .then(setRoster, (e: unknown) => setRosterError(errText(e)));
+  const readRoster = useCallback(async () => {
+    try {
+      setRoster(await api.get<RosterResponse>(`/v1/classes/${classId}/roster`));
+      setRosterError(null);
+    } catch (e) {
+      setRosterError(errText(e));
+    }
   }, [api, classId]);
 
-  const load = useCallback(() => {
-    setError(null);
-    setRosterError(null);
-    api.get<ClassDetail>(`/v1/classes/${classId}`).then(
+  // The class and its roster, read as the page opens and again by Try again.
+  const load = useCallback(async () => {
+    const read = api.get<ClassDetail>(`/v1/classes/${classId}`).then(
       (c) => {
+        setError(null);
         setKlass(c);
         // Recover the live grid across a reload. `grid` is otherwise seeded
         // only by the Start response, so refreshing mid-lesson dropped the grid
@@ -248,7 +253,7 @@ export default function ClassDetailPage() {
       },
       (e: unknown) => setError(errText(e)),
     );
-    readRoster();
+    await Promise.all([read, readRoster()]);
   }, [api, classId, readRoster]);
 
   useEffect(() => {
@@ -256,7 +261,7 @@ export default function ClassDetailPage() {
       router.replace('/login');
       return;
     }
-    load();
+    void load();
   }, [load, router]);
 
   // A session over here: the roster read again, so the recap's Didn't join counts who joined the
@@ -266,7 +271,7 @@ export default function ClassDetailPage() {
     if (!over) return;
     setRoster(null);
     setRosterError(null);
-    readRoster();
+    void readRoster();
   }, [over, readRoster]);
 
   // The class's last pick on this computer, and Present as this tab left it, read once the page is
@@ -380,15 +385,18 @@ export default function ClassDetailPage() {
     });
   }
 
-  function addTime(attempt: ExtendAttempt) {
+  /** Add time; `again`, Try again's resend, keeps its failure said until Bali answers. */
+  function addTime(attempt: ExtendAttempt, again = false) {
     if (!grid) return;
     const session = grid.id;
     void once('extend', async () => {
-      setSaid(null);
+      if (!again) setSaid(null);
       const answer = await extendSession(api, session, attempt);
       unanswered.current = keepUnanswered(attempt, answer);
-      if (answer.kind === 'extended') onSession({ id: session, classId, endsAt: answer.endsAt });
-      else setSaid(answer);
+      if (answer.kind === 'extended') {
+        setSaid(null);
+        onSession({ id: session, classId, endsAt: answer.endsAt });
+      } else setSaid(answer);
     });
   }
 
@@ -453,18 +461,25 @@ export default function ClassDetailPage() {
       : roster
         ? `${students(roster.students.length)} · the session ended at ${endedAt}`
         : `The session ended at ${endedAt}`;
-  // A read again of the class failed, or its roster didn't load: said under the header.
+  // A read again of the class failed, or its roster didn't load: said under the header; or the
+  // class didn't load, in the session's place. Read, focus on the class's name (ClassRetryStates).
   const cantLoad = (message: string | null) =>
     message === null ? null : (
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-        <p role="alert" className="text-body">
-          Couldn&apos;t load this class. {message}
-        </p>
-        <Button variant="secondary" size="sm" onClick={load}>
-          Try again
-        </Button>
+        <TryAgain onRetry={load} then={[]}>
+          <p role="alert" className="text-body">
+            Couldn&apos;t load this class. {message}
+          </p>
+        </TryAgain>
       </div>
     );
+  // What is said under the controls: a failed extend with Try again, sending the same one again,
+  // held as every control is until Bali answers; then focus on the class's name (ClassRetryStates).
+  const saidLine = said && (
+    <p role={said.kind === 'note' ? 'status' : 'alert'} className="text-body">
+      {said.message}
+    </p>
+  );
 
   // While a session runs (PV7; in Present, PV9): one tree in both views, each part in its place
   // whether Present is on or off, so the grid never restarts or reconnects as it turns on.
@@ -491,22 +506,20 @@ export default function ClassDetailPage() {
       {/* Said right under the controls, where they are. */}
       {said ? (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-          <p role={said.kind === 'note' ? 'status' : 'alert'} className="text-body">
-            {said.message}
-          </p>
           {said.kind === 'failed' ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => {
+            <TryAgain
+              onRetry={() => {
                 const again = unanswered.current;
-                if (again) addTime(again);
+                if (again) addTime(again, true);
               }}
-              aria-disabled={busy !== null}
+              held={busy !== null}
+              then={[]}
             >
-              Try again
-            </Button>
-          ) : null}
+              {saidLine}
+            </TryAgain>
+          ) : (
+            saidLine
+          )}
         </div>
       ) : null}
       {/* The rest of the page, so Present's slide fills what the screen leaves under the header. */}
@@ -659,16 +672,7 @@ export default function ClassDetailPage() {
       {klass === null ? (
         // Until the class is read, the session's place holds no Start: one may already be live.
         error ? (
-          <section className={CARD_ALONE}>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-              <p role="alert" className="text-body">
-                Couldn&apos;t load this class. {error}
-              </p>
-              <Button variant="secondary" size="sm" onClick={load}>
-                Try again
-              </Button>
-            </div>
-          </section>
+          <section className={CARD_ALONE}>{cantLoad(error)}</section>
         ) : (
           // As tall as the Start card it holds the place of (118 px), so nothing jumps.
           <section aria-label="Session" className={`flex min-h-29.5 items-center ${CARD_ALONE}`}>

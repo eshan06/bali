@@ -6,13 +6,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useId, useState } from 'react';
 
-import { Button } from '@/components/button';
 import { CARD_ALONE } from '@/components/card';
 import { RecapBody } from '@/components/recap-card';
 import { ReportQuestions } from '@/components/report-questions';
 import { CELL, FIGURE, HEAD, LABEL, TABLE_BOX } from '@/components/reports-list';
 import { useMe } from '@/components/shell';
 import { NAV_LINK } from '@/components/text-link';
+import { TryAgain } from '@/components/try-again';
 import { reasonWords } from '@/components/unlock-popups';
 import { getAccessToken } from '@/lib/auth';
 import { nameOf, sessionWhen } from '@/lib/recap';
@@ -28,16 +28,15 @@ import { useApi } from '@/lib/use-api';
 /**
  * A session's report on its own page (PV14): read as it opens, and again by Try again, its class
  * named as the shell's one read of the account names it (none when the class isn't the teacher's).
- * Its questions (L7c) are read beside it, and again by the page's Try again or the card's own.
+ * Its questions (L7c) are read beside it, and again by the page's Try again or the card's own, each
+ * failure said until its read again answers (ReportRetryStates).
  */
 export function SessionReportPage({ classId, sessionId }: { classId: string; sessionId: string }) {
   const api = useApi();
   const router = useRouter();
   const { me } = useMe();
   const [page, setPage] = useState<SessionPage>({ kind: 'loading' });
-  const [attempt, setAttempt] = useState(0);
   const [questions, setQuestions] = useState<SessionQuestions>({ kind: 'loading' });
-  const [asked, setAsked] = useState(0);
 
   useEffect(() => {
     if (!getAccessToken()) {
@@ -51,7 +50,7 @@ export function SessionReportPage({ classId, sessionId }: { classId: string; ses
     return () => {
       live = false;
     };
-  }, [api, classId, sessionId, attempt, router]);
+  }, [api, classId, sessionId, router]);
 
   // The Questions card's own read, at once with the page's: its failure is the card's alone.
   useEffect(() => {
@@ -63,23 +62,24 @@ export function SessionReportPage({ classId, sessionId }: { classId: string; ses
     return () => {
       live = false;
     };
-  }, [api, classId, sessionId, attempt, asked]);
+  }, [api, classId, sessionId]);
 
+  const readQuestions = async () =>
+    setQuestions(await readSessionQuestions(api, classId, sessionId));
   return (
     <SessionReport
       classId={classId}
       className={me?.classes.find((c) => c.id === classId)?.name ?? null}
       page={page}
       questions={questions}
-      onRetry={() => {
-        setPage({ kind: 'loading' });
-        setQuestions({ kind: 'loading' });
-        setAttempt((n) => n + 1);
+      onRetry={async () => {
+        const [next] = await Promise.all([
+          readSessionPage(api, classId, sessionId),
+          readQuestions(),
+        ]);
+        setPage(next);
       }}
-      onRetryQuestions={() => {
-        setQuestions({ kind: 'loading' });
-        setAsked((n) => n + 1);
-      }}
+      onRetryQuestions={readQuestions}
     />
   );
 }
@@ -105,8 +105,9 @@ export function SessionReport({
   page: SessionPage;
   /** The questions it asked, read on their own: shown once the page is read. */
   questions: SessionQuestions;
-  onRetry: () => void;
-  onRetryQuestions: () => void;
+  /** Read it all again, its failure said until the answer; read, focus on its day. */
+  onRetry: () => unknown;
+  onRetryQuestions: () => unknown;
 }) {
   return (
     <main className="flex flex-col gap-5.5">
@@ -124,13 +125,12 @@ export function SessionReport({
         </p>
       ) : page.kind === 'error' ? (
         <div className={CARD_ALONE}>
-          <p role="alert" className="text-body">
-            <span className="block font-semibold">Couldn&apos;t load this session.</span>
-            <span className="text-text-secondary">{page.message}</span>
-          </p>
-          <Button variant="secondary" onClick={onRetry} className="mt-3.5">
-            Try again
-          </Button>
+          <TryAgain size="md" onRetry={onRetry} then={[]} className="mt-3.5">
+            <p role="alert" className="text-body">
+              <span className="block font-semibold">Couldn&apos;t load this session.</span>
+              <span className="text-text-secondary">{page.message}</span>
+            </p>
+          </TryAgain>
         </div>
       ) : (
         <>

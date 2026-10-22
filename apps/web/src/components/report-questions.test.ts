@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { SessionQuestions } from '../lib/reports';
 import { ReportQuestions } from './report-questions';
+import { TryAgain } from './try-again';
 
 /*
  * A session's Questions card on its report page (L7c), as ReportOpened draws it, LessonStates' lines
@@ -98,23 +99,15 @@ function tree(questions: SessionQuestions, onRetry: () => void): ReactNode {
   renderToStaticMarkup(createElement(Probe));
   return drawn;
 }
-/** A button of the tree's, by its words. */
-function button(node: ReactNode, words: string): (() => void) | undefined {
-  const said = (n: ReactNode): string =>
-    Array.isArray(n)
-      ? n.map(said).join('')
-      : typeof n === 'string'
-        ? n
-        : n && typeof n === 'object' && 'props' in n
-          ? said((n as ReactElement<{ children?: ReactNode }>).props.children)
-          : '';
+type Again = Parameters<typeof TryAgain>[0];
+/** The tree's Try again (`TryAgain`), whose press reads again: what it reads and where focus goes. */
+function tryAgainOf(node: ReactNode): Again | undefined {
   if (Array.isArray(node)) {
-    return (node as readonly ReactNode[]).map((n) => button(n, words)).find(Boolean);
+    return (node as readonly ReactNode[]).map(tryAgainOf).find(Boolean);
   }
   if (!node || typeof node !== 'object' || !('props' in node)) return undefined;
-  const p = (node as ReactElement<{ onClick?: () => void; children?: ReactNode }>).props;
-  if (p.onClick && said(p.children).trim() === words) return p.onClick;
-  return button(p.children, words);
+  const element = node as ReactElement<Again>;
+  return element.type === TryAgain ? element.props : tryAgainOf(element.props.children);
 }
 
 describe('the card (ReportOpened)', () => {
@@ -264,11 +257,15 @@ describe('its own read’s states (ReportQuestionsStates; LessonStates)', () => 
     const html = render({ kind: 'error' });
     expect(text(html)).toBe("|Questions|Bali couldn't load this session's questions.|Try again|");
     expect(html).toMatch(
-      /<\/h2><\/div><div class="flex flex-wrap items-center gap-x-4 gap-y-3"><p role="alert" class="text-body">Bali couldn't load this session's questions\.<\/p><button type="button" class="[^"]*\bh-8\.5\b[^"]*">Try again<\/button><\/div><\/section>$/,
+      /<\/h2><\/div><div class="flex flex-wrap items-center gap-x-4 gap-y-3"><p role="alert" class="text-body">Bali couldn't load this session's questions\.<\/p><button type="button" aria-disabled="false" aria-busy="false" class="[^"]*\bh-8\.5\b[^"]*">Try again<\/button><\/div><\/section>$/,
     );
+    // `TryAgain` reads them again, held until Bali answers, its line said meanwhile; read, focus
+    // on Questions, the card's title (ReportRetryStates).
     const onRetry = vi.fn();
-    button(tree({ kind: 'error' }, onRetry), 'Try again')?.();
+    const again = tryAgainOf(tree({ kind: 'error' }, onRetry));
+    again?.onRetry();
     expect(onRetry).toHaveBeenCalledOnce();
+    expect(again?.then).toEqual([/<h2 id="([^"]+)"/.exec(html)?.[1]]);
   });
 
   it('none asked: no card at all', () => {
