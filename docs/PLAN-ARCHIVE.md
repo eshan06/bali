@@ -10,6 +10,18 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-22 (Central) — The owner's follow-up, Try again keeps keyboard focus, part 3
+(#431; `docs/DECISIONS.md`, 2026-10-22), its last: `TryAgain` everywhere else, so the scan's `LEFT`
+is empty and a Try again drawn by hand anywhere in the portal fails it: Your questions' and Your
+slides' lists, a save and a stopped upload, the side panel's two lists and an ask (one of the
+teacher's questions or one written, its failure now kept while the same one is asked again), a
+student's lesson, and Create class's and the invite code's own button. Built to LessonRetryStates,
+StudentRetryStates and QuestionsSlidesRetryStates (drawn first, canvas version 85). Checked in
+headless Chrome on dev as the demo teacher and a demo student, each request refused, held and let
+through with the keyboard. Before it, part 2b (#430). Next on the Windows PC: the class page's reads
+given a time limit (In flight), then the four steps for sessions before the pilot's first class; on
+the Mac, the phone's L8 and M8._
+
 _Last updated: 2026-10-22 (Central) — The owner's follow-up, Try again keeps keyboard focus, part
 2b (#430; `docs/DECISIONS.md`, 2026-10-22): `TryAgain` on a close (the class page's card's and
 Present's) and the slides (the slide's line in the card, in Present and on a student's page, full
