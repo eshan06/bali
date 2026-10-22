@@ -2,9 +2,15 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import type { SavedQuestion } from '@bali/shared';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { type ApiClient, ApiError, NetworkError } from './api-client';
+import {
+  type ApiClient,
+  ApiError,
+  createApiClient,
+  NetworkError,
+  SAVE_TIMEOUT_MS,
+} from './api-client';
 import { newEventId } from './event-id';
 import {
   oldestFirst,
@@ -388,5 +394,94 @@ describe('a removal', () => {
       status: 403,
       reason: undefined,
     });
+  });
+});
+
+describe('a save or a removal the network swallows (the owner, 2026-10-16)', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  /**
+   * The API client over a fetch that swallows its first request (no answer until its limit gives up
+   * on it) and answers each after it with `body`, each request's method, path and body kept.
+   */
+  function swallowsFirst(body: unknown) {
+    const sent: { method?: string; path: string; body: unknown }[] = [];
+    const client = createApiClient({
+      baseUrl: 'http://api',
+      getToken: () => 'tok',
+      fetchImpl: (url, init) => {
+        sent.push({
+          method: init?.method,
+          path: (url as string).replace('http://api', ''),
+          body: JSON.parse(init?.body as string) as unknown,
+        });
+        if (sent.length > 1) return Promise.resolve(Response.json(body));
+        return new Promise((_, reject) => {
+          init?.signal?.addEventListener('abort', () =>
+            reject(new DOMException('aborted', 'AbortError')),
+          );
+        });
+      },
+    });
+    return { client, sent };
+  }
+  /** `run`'s answer once `ms` has passed, and whether it had come before then. */
+  async function after<A>(ms: number, run: Promise<A>): Promise<{ early: boolean; answer: A }> {
+    let early = false;
+    void run.then(() => (early = true));
+    await vi.advanceTimersByTimeAsync(ms - 1);
+    const before = early;
+    await vi.advanceTimersByTimeAsync(1);
+    return { early: before, answer: await run };
+  }
+
+  it('fails a new question’s save at SAVE_TIMEOUT_MS; Try again sends it again under its id, never a second draft', async () => {
+    const typed = words('Q', ['a', 'b'], 0);
+    const attempt = saveAttemptFor(null, null, typed, T);
+    const made = draft({ eventId: attempt.eventId, prompt: 'Q', options: ['a', 'b'] });
+    const { client, sent } = swallowsFirst({ outcome: 'replay', savedQuestion: made });
+    const first = await after(SAVE_TIMEOUT_MS, saveDraft(client, attempt));
+    expect(first).toEqual({
+      early: false,
+      answer: { kind: 'failed', status: undefined, retryAfter: undefined },
+    });
+    // The same words: the same attempt, whose replay answers the draft the first one made.
+    const again = saveAttemptFor(attempt, null, typed, T + SAVE_TIMEOUT_MS);
+    expect(again).toBe(attempt);
+    expect(await saveDraft(client, again)).toEqual({ kind: 'saved', draft: made });
+    expect(sent.map((s) => [s.method, s.path, (s.body as { eventId: string }).eventId])).toEqual([
+      ['POST', '/v1/saved-questions', attempt.eventId],
+      ['POST', '/v1/saved-questions', attempt.eventId],
+    ]);
+  });
+
+  it('fails an edit’s save the same way, sent again under its id', async () => {
+    const held = draft();
+    const attempt = saveAttemptFor(null, held, words('Q2', ['a', 'b']), T + 10);
+    const now = { ...held, prompt: 'Q2', options: ['a', 'b'], eventId: attempt.eventId };
+    const { client, sent } = swallowsFirst({ outcome: 'replay', savedQuestion: now });
+    const first = await after(SAVE_TIMEOUT_MS, saveDraft(client, attempt));
+    expect(first).toMatchObject({ early: false, answer: { kind: 'failed', status: undefined } });
+    const again = saveAttemptFor(attempt, held, words('Q2', ['a', 'b']), T + 20);
+    expect(again).toBe(attempt);
+    expect(await saveDraft(client, again)).toEqual({ kind: 'saved', draft: now });
+    expect(sent.map((s) => [s.method, (s.body as { eventId: string }).eventId])).toEqual([
+      ['PUT', attempt.eventId],
+      ['PUT', attempt.eventId],
+    ]);
+  });
+
+  it('fails a removal the same way, sent again under its id by its Remove', async () => {
+    const attempt = removeAttemptFor(undefined, 'q1', () => 'e1');
+    const { client, sent } = swallowsFirst({ outcome: 'replay', savedQuestion: draft() });
+    const first = await after(SAVE_TIMEOUT_MS, removeDraft(client, attempt));
+    expect(first).toMatchObject({ early: false, answer: { kind: 'failed', status: undefined } });
+    const again = removeAttemptFor(attempt, 'q1', () => 'e2');
+    expect(await removeDraft(client, again)).toEqual({ kind: 'removed' });
+    expect(sent.map((s) => [s.method, s.path, s.body])).toEqual([
+      ['DELETE', '/v1/saved-questions/q1', { eventId: 'e1' }],
+      ['DELETE', '/v1/saved-questions/q1', { eventId: 'e1' }],
+    ]);
   });
 });

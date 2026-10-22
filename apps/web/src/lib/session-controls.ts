@@ -1,6 +1,6 @@
 import { type ClassDetail, type ExtendSessionResponse, MAX_SESSION_MINUTES } from '@bali/shared';
 
-import { type ApiClient, ApiError, NetworkError } from './api-client';
+import { type ApiClient, ApiError, NetworkError, SAVE_TIMEOUT_MS } from './api-client';
 import { CANT_ADD_TIME, CANT_MAKE_CODE, CANT_REACH, errText } from './errors';
 import { newEventId } from './event-id';
 import type { RecapFormat } from './recap';
@@ -152,17 +152,21 @@ export function keepUnanswered<A, K extends { kind: string }>(
   return answer.kind === 'failed' ? attempt : null;
 }
 
-/** Add `attempt.minutes` to the session (`POST /v1/sessions/{id}/extend`), its answer in words. */
+/**
+ * Add `attempt.minutes` to the session (`POST /v1/sessions/{id}/extend`), its answer in words,
+ * within a save's limit: no answer by then is `failed`, its resend the same attempt.
+ */
 export async function extendSession(
   api: Pick<ApiClient, 'post'>,
   sessionId: string,
   attempt: ExtendAttempt,
 ): Promise<ExtendAnswer> {
   try {
-    const res = await api.post<ExtendSessionResponse>(`/v1/sessions/${sessionId}/extend`, {
-      durationMinutes: attempt.minutes,
-      eventId: attempt.eventId,
-    });
+    const res = await api.post<ExtendSessionResponse>(
+      `/v1/sessions/${sessionId}/extend`,
+      { durationMinutes: attempt.minutes, eventId: attempt.eventId },
+      SAVE_TIMEOUT_MS,
+    );
     return { kind: 'extended', endsAt: res.session.endsAt };
   } catch (e) {
     if (e instanceof NetworkError) return { kind: 'failed', message: CANT_REACH };
@@ -190,6 +194,7 @@ export type NewCodeAnswer =
  * lost: the class is read again then (#247's review, `codeMoved`), and a code other than `shown` is
  * the one Bali holds now, answered as made. A read that fails too, or reaches the server before the
  * mint commits, leaves the failure said; the control reads once more if the teacher cancels then.
+ * Within a save's limit, so a mint the network swallows is one of those.
  */
 export async function regenerateCode(
   api: Pick<ApiClient, 'patch' | 'get'>,
@@ -198,7 +203,11 @@ export async function regenerateCode(
 ): Promise<NewCodeAnswer> {
   let message: string;
   try {
-    const klass = await api.patch<ClassDetail>(`/v1/classes/${classId}`, { regenerateCode: true });
+    const klass = await api.patch<ClassDetail>(
+      `/v1/classes/${classId}`,
+      { regenerateCode: true },
+      SAVE_TIMEOUT_MS,
+    );
     return { kind: 'made', klass };
   } catch (e) {
     // Refused (a 4xx, the budget's 429 included): nothing was minted, so nothing to read again.

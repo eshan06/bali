@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { ApiError, createApiClient } from './api-client';
+import { ApiError, createApiClient, SAVE_TIMEOUT_MS } from './api-client';
 import {
   CANT_REACH,
   errText,
@@ -249,5 +249,39 @@ describe('redeemInvite', () => {
     // A proxy's timeout is the transport's, as the outbox reads it (#198's review): resend it.
     const slow = api(408, { message: 'request timeout' });
     expect((await redeemInvite(slow.client, attempt)).kind).toBe('failed');
+  });
+
+  it('fails a redeem the network swallows at SAVE_TIMEOUT_MS; Try again sends the same redeem, its replay a teacher (the owner, 2026-10-16)', async () => {
+    vi.useFakeTimers();
+    try {
+      const sent: unknown[] = [];
+      const client = createApiClient({
+        baseUrl: 'http://api',
+        getToken: () => 'tok',
+        fetchImpl: (_url, init) => {
+          sent.push(JSON.parse(init?.body as string));
+          if (sent.length > 1) return Promise.resolve(Response.json({ outcome: 'replay', user }));
+          return new Promise((_, reject) => {
+            init?.signal?.addEventListener('abort', () =>
+              reject(new DOMException('aborted', 'AbortError')),
+            );
+          });
+        },
+      });
+      const first = redeemInvite(client, attempt);
+      const settled = vi.fn();
+      void first.then(settled);
+      await vi.advanceTimersByTimeAsync(SAVE_TIMEOUT_MS - 1);
+      expect(settled).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await first).toEqual({ kind: 'failed', message: CANT_REACH });
+      // The same code: the same attempt, under its id, so one that landed is its replay.
+      const again = attemptFor(attempt, CODE);
+      expect(again).toBe(attempt);
+      expect(await redeemInvite(client, again)).toEqual({ kind: 'teacher' });
+      expect(sent).toEqual([attempt, attempt]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

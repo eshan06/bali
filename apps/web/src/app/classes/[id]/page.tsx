@@ -29,6 +29,7 @@ import { endedToday, RecapCard } from '@/components/recap-card';
 import { usePresenting } from '@/components/shell';
 import { SlideCard } from '@/components/slide-card';
 import { TryAgain } from '@/components/try-again';
+import { SAVE_TIMEOUT_MS } from '@/lib/api-client';
 import { getAccessToken } from '@/lib/auth';
 import { errText, NOT_A_SESSION_LENGTH, SESSION_ALREADY_RUNNING } from '@/lib/errors';
 import type { QuestionDraft } from '@/lib/live-question';
@@ -373,9 +374,13 @@ export default function ClassDetailPage() {
       rememberMinutes(classId, minutes);
       setStartSaid(null);
       try {
-        const res = await api.post<StartSessionResponse>(`/v1/classes/${classId}/sessions`, {
-          durationMinutes: minutes,
-        });
+        // Within a save's limit: the route takes no `eventId`, and a Start sent again while one
+        // runs answers that session (`existing`), so a Start cut here that landed is never two.
+        const res = await api.post<StartSessionResponse>(
+          `/v1/classes/${classId}/sessions`,
+          { durationMinutes: minutes },
+          SAVE_TIMEOUT_MS,
+        );
         setGrid({
           id: res.session.id,
           over: false,
@@ -399,7 +404,8 @@ export default function ClassDetailPage() {
     void once('end', async () => {
       setSaid(null);
       try {
-        await api.post(`/v1/sessions/${ending}/end`);
+        // Within a save's limit: an End sent again after one landed answers `already_ended`.
+        await api.post(`/v1/sessions/${ending}/end`, undefined, SAVE_TIMEOUT_MS);
         onEnded(ending);
       } catch (err) {
         // Said beside the controls; End itself sends it again.

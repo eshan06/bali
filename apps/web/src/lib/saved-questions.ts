@@ -5,7 +5,7 @@ import {
   type SavedQuestionsResponse,
 } from '@bali/shared';
 
-import { type ApiClient, ApiError } from './api-client';
+import { type ApiClient, ApiError, SAVE_TIMEOUT_MS } from './api-client';
 import { eventIdAfter, newEventId } from './event-id';
 import { type Failure, failureOf, type QuestionDraft } from './live-question';
 
@@ -141,7 +141,10 @@ export type SaveAnswer =
 
 const gone = (e: unknown) => e instanceof ApiError && e.reason === 'saved_question_not_found';
 
-/** Save `attempt`: a new draft (`POST`), or one replaced whole (`PUT`). */
+/**
+ * Save `attempt`: a new draft (`POST`), or one replaced whole (`PUT`), within a save's limit: no
+ * answer by then is a failure, its Try again the same attempt (`saveAttemptFor`).
+ */
 export async function saveDraft(
   api: Pick<ApiClient, 'post' | 'put'>,
   attempt: SaveAttempt,
@@ -150,8 +153,8 @@ export async function saveDraft(
   try {
     const { savedQuestion: draft } =
       draftId === null
-        ? await api.post<SavedQuestionResponse>(PATH, body)
-        : await api.put<SavedQuestionResponse>(`${PATH}/${draftId}`, body);
+        ? await api.post<SavedQuestionResponse>(PATH, body, SAVE_TIMEOUT_MS)
+        : await api.put<SavedQuestionResponse>(`${PATH}/${draftId}`, body, SAVE_TIMEOUT_MS);
     const mine = draft.eventId.toLowerCase() === body.eventId.toLowerCase();
     return { kind: mine ? 'saved' : 'not_saved', draft };
   } catch (e) {
@@ -178,9 +181,11 @@ export async function removeDraft(
   attempt: RemoveAttempt,
 ): Promise<{ kind: 'removed' } | Failure> {
   try {
-    await api.del<SavedQuestionResponse>(`${PATH}/${attempt.draftId}`, {
-      eventId: attempt.eventId,
-    });
+    await api.del<SavedQuestionResponse>(
+      `${PATH}/${attempt.draftId}`,
+      { eventId: attempt.eventId },
+      SAVE_TIMEOUT_MS,
+    );
     return { kind: 'removed' };
   } catch (e) {
     return gone(e) ? { kind: 'removed' } : failureOf(e);

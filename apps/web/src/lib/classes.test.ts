@@ -2,9 +2,9 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import type { ClassDetail } from '@bali/shared';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { createApiClient } from './api-client';
+import { createApiClient, SAVE_TIMEOUT_MS } from './api-client';
 import {
   CLASS_NAME_MAX,
   createClass,
@@ -143,6 +143,39 @@ describe('createClass', () => {
       "Bali couldn't finish creating the class. If it isn't in your list above, try again.",
     );
     expect(CANT_CREATE).not.toMatch(/[—–!]/);
+  });
+
+  it('waits for the create’s answer however long it takes, unlike every other save: it takes no eventId, so a Try again after a limit would make a second class (the owner, 2026-10-16)', async () => {
+    vi.useFakeTimers();
+    try {
+      const klass: ClassDetail = {
+        id: 'c1',
+        name: 'Period 4 Biology',
+        joinCode: 'ABCDEF',
+        createdAt: '2026-10-01T12:00:00.000Z',
+        liveSessionId: null,
+      };
+      const client = createApiClient({
+        baseUrl: 'http://api',
+        getToken: () => 'tok',
+        fetchImpl: (_url, init) =>
+          new Promise((answer, reject) => {
+            init?.signal?.addEventListener('abort', () =>
+              reject(new DOMException('aborted', 'AbortError')),
+            );
+            setTimeout(() => answer(Response.json(klass)), 6 * SAVE_TIMEOUT_MS);
+          }),
+      });
+      const created = createClass(client, 'Period 4 Biology');
+      const settled = vi.fn();
+      void created.then(settled);
+      await vi.advanceTimersByTimeAsync(6 * SAVE_TIMEOUT_MS - 1);
+      expect(settled).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await created).toEqual({ kind: 'created', klass });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

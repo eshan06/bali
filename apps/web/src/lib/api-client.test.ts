@@ -1,3 +1,7 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, relative, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -595,6 +599,45 @@ describe('api-client', () => {
         'SyntaxError',
       ]);
     });
+  });
+
+  it('gives every write in the portal a time limit of its own, but a deck’s check and a class’s create (the owner, 2026-10-16)', () => {
+    // A write the network swallows held its buttons until the browser gave up. Each is limited at
+    // its call, never in `send`: the check (`/complete`) can take about 40 s, and the create takes
+    // no `eventId`, so a Try again after a limit could make a second class.
+    const src = fileURLToPath(new URL('../', import.meta.url));
+    const files = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+        const path = join(dir, entry.name);
+        if (entry.isDirectory()) return files(path);
+        return /\.tsx?$/.test(entry.name) && !entry.name.includes('.test.') ? [path] : [];
+      });
+    const unlimited: string[] = [];
+    let writes = 0;
+    for (const file of files(src)) {
+      const text = readFileSync(file, 'utf8');
+      for (const call of text.matchAll(/\bapi\.(post|put|patch|del)\b(<[^>(]*>)?\(/g)) {
+        // The call's arguments, to the parenthesis that closes it, and where its path ends.
+        let depth = 1;
+        let path = -1;
+        let end = call.index + call[0].length;
+        while (depth > 0 && end < text.length) {
+          if (text[end] === '(') depth += 1;
+          if (text[end] === ')') depth -= 1;
+          if (text[end] === ',' && depth === 1 && path < 0) path = end;
+          end += 1;
+        }
+        writes += 1;
+        if (/\b[A-Z_]+_TIMEOUT_MS\b/.test(text.slice(call.index, end))) continue;
+        const where = relative(src, file).split(sep).join('/');
+        unlimited.push(`${where}: ${text.slice(call.index + call[0].length, path).trim()}`);
+      }
+    }
+    expect(writes).toBeGreaterThan(10);
+    expect(unlimited).toEqual([
+      "lib/classes.ts: '/v1/classes'",
+      'lib/decks.ts: `${PATH}/${deck.id}/complete`',
+    ]);
   });
 
   it('surfaces a clean ApiError (not a TypeError) on a non-conforming error body', async () => {

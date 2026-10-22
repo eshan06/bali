@@ -7,6 +7,7 @@ import {
   createApiClient,
   NetworkError,
   POLL_TIMEOUT_MS,
+  SAVE_TIMEOUT_MS,
 } from './api-client';
 import {
   closeAttemptFor,
@@ -215,6 +216,73 @@ describe('closeQuestion', () => {
       kind: 'failed',
       status: 502,
     });
+  });
+});
+
+describe('an ask or a close the network swallows (the owner, 2026-10-16)', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  /**
+   * The API client over a fetch that swallows its first request (no answer until its limit gives up
+   * on it) and answers each after it with `body`, each request's path and body kept.
+   */
+  function swallowsFirst(body: unknown) {
+    const sent: { path: string; body: unknown }[] = [];
+    const client = createApiClient({
+      baseUrl: 'http://api',
+      getToken: () => 'tok',
+      fetchImpl: (url, init) => {
+        const path = (url as string).replace('http://api', '');
+        sent.push({ path, body: JSON.parse(init?.body as string) as unknown });
+        if (sent.length > 1) return Promise.resolve(Response.json(body));
+        return new Promise((_, reject) => {
+          init?.signal?.addEventListener('abort', () =>
+            reject(new DOMException('aborted', 'AbortError')),
+          );
+        });
+      },
+    });
+    return { client, sent };
+  }
+  /** `run`'s answer once SAVE_TIMEOUT_MS has passed, and whether it had come a moment before. */
+  async function atLimit<A>(run: Promise<A>): Promise<{ early: boolean; answer: A }> {
+    let early = false;
+    void run.then(() => (early = true));
+    await vi.advanceTimersByTimeAsync(SAVE_TIMEOUT_MS - 1);
+    const before = early;
+    await vi.advanceTimersByTimeAsync(1);
+    return { early: before, answer: await run };
+  }
+  const noAnswer = { kind: 'failed', status: undefined, retryAfter: undefined };
+
+  it('fails an ask at SAVE_TIMEOUT_MS; asked again, the same ask under its id, its replay the question it opened', async () => {
+    const { client, sent } = swallowsFirst({ outcome: 'replay', question: question() });
+    const attempt = openAttemptFor(null, SESSION, draft);
+    const first = await atLimit(openQuestion(client, attempt));
+    expect(first).toEqual({ early: false, answer: noAnswer });
+    const again = openAttemptFor(keepUnanswered(attempt, first.answer), SESSION, draft);
+    expect(again).toBe(attempt);
+    expect(await openQuestion(client, again)).toEqual({ kind: 'opened', question: question() });
+    expect(sent.map((s) => [s.path, (s.body as { eventId: string }).eventId])).toEqual([
+      [`/v1/sessions/${SESSION}/questions`, attempt.eventId],
+      [`/v1/sessions/${SESSION}/questions`, attempt.eventId],
+    ]);
+  });
+
+  it('fails a close the same way; closed again, the same close under its id', async () => {
+    const closed = question({ open: false, revealed: true });
+    const { client, sent } = swallowsFirst({ outcome: 'replay', question: closed });
+    const attempt = closeAttemptFor(null, QUESTION, true);
+    const first = await atLimit(closeQuestion(client, attempt));
+    expect(first).toEqual({ early: false, answer: noAnswer });
+    const again = closeAttemptFor(keepUnanswered(attempt, first.answer), QUESTION, true);
+    expect(again).toBe(attempt);
+    expect(await closeQuestion(client, again)).toEqual({ kind: 'closed', question: closed });
+    expect(sent.map((s) => s.body)).toEqual([
+      { reveal: true, eventId: attempt.eventId },
+      { reveal: true, eventId: attempt.eventId },
+    ]);
   });
 });
 

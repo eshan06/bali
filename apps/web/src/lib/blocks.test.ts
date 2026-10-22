@@ -1,7 +1,7 @@
 import type { BlockDetail } from '@bali/shared';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { ApiError, createApiClient, NetworkError } from './api-client';
+import { ApiError, createApiClient, NetworkError, SAVE_TIMEOUT_MS } from './api-client';
 import { blockIdOf, loadProblem, registerBlock } from './blocks';
 import {
   ACCOUNT_DELETED,
@@ -161,6 +161,42 @@ describe('registerBlock', () => {
       kind: 'failed',
       message: CANT_REGISTER,
     });
+  });
+
+  it('fails a register the network swallows at SAVE_TIMEOUT_MS; Try again sends the same tag, the same block back (the owner, 2026-10-16)', async () => {
+    // The route takes no `eventId`: it is idempotent on the tag, so a resend is never a second block.
+    vi.useFakeTimers();
+    try {
+      const sent: unknown[] = [];
+      const client = createApiClient({
+        baseUrl: 'http://api',
+        getToken: () => 'tok',
+        fetchImpl: (_url, init) => {
+          sent.push(JSON.parse(init?.body as string));
+          if (sent.length > 1) return Promise.resolve(Response.json(block));
+          return new Promise((_, reject) => {
+            init?.signal?.addEventListener('abort', () =>
+              reject(new DOMException('aborted', 'AbortError')),
+            );
+          });
+        },
+      });
+      const first = registerBlock(client, 'T7XK2M9QPF', []);
+      const settled = vi.fn();
+      void first.then(settled);
+      await vi.advanceTimersByTimeAsync(SAVE_TIMEOUT_MS - 1);
+      expect(settled).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await first).toEqual({ kind: 'failed', message: CANT_REACH });
+      expect(await registerBlock(client, 'T7XK2M9QPF', [])).toEqual({
+        kind: 'registered',
+        block,
+        already: false,
+      });
+      expect(sent).toEqual([{ tagId: 'T7XK2M9QPF' }, { tagId: 'T7XK2M9QPF' }]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
