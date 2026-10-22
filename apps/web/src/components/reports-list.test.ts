@@ -202,7 +202,7 @@ describe('the Reports page in each state (ReportStates)', () => {
   it('heads it Reports over its framing line, in the italic face alone (PV4)', () => {
     const html = view();
     expect(html).toMatch(
-      /^<main class="flex flex-col gap-5\.5"><header><h1 class="text-page-title">Reports<\/h1><p class="[^"]*">Patterns are conversation starters, not verdicts\.<\/p><\/header>/,
+      /^<div class="flex flex-col gap-5\.5"><header><h1 class="text-page-title">Reports<\/h1><p class="[^"]*">Patterns are conversation starters, not verdicts\.<\/p><\/header>/,
     );
     const framing = classesOf(html, /<p class="[^"]*\bitalic\b[^"]*">/);
     expect(framing).toEqual(expect.arrayContaining(['italic', 'text-body', 'text-text-secondary']));
@@ -237,7 +237,7 @@ describe('the Reports page in each state (ReportStates)', () => {
   it('says it is loading the sessions under the pills, and nothing else', () => {
     const html = view({ list: FIRST_READ });
     expect(html).toMatch(
-      /<\/nav><div><div role="status"><p class="text-body text-text-secondary">Loading sessions…<\/p><\/div><\/div><\/main>$/,
+      /<\/nav><div><div role="status"><p class="text-body text-text-secondary">Loading sessions…<\/p><\/div><\/div><\/div>$/,
     );
   });
 

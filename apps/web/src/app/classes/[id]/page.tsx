@@ -529,7 +529,7 @@ export default function ClassDetailPage() {
   // While a session runs (PV7; in Present, PV9): one tree in both views, each part in its place
   // whether Present is on or off, so the grid never restarts or reconnects as it turns on.
   return klass !== null && grid !== null && !grid.over ? (
-    <main className={present ? PRESENT_PAGE : 'relative flex flex-col gap-5.5'}>
+    <div className={present ? PRESENT_PAGE : 'relative flex flex-col gap-5.5'}>
       {/* ClassLive's header, End set apart from adding time, and no New code, which it doesn't
           draw; ClassPresent's in Present, +5, +10 and End kept there beside Present. */}
       <LiveHeader
@@ -657,11 +657,11 @@ export default function ClassDetailPage() {
           onClose={closePanel}
         />
       ) : null}
-    </main>
+    </div>
   ) : klass !== null && present ? (
     // After the bell in Present (PresentEnded, as PV1 approved): the header, its ring whole, and
     // "Class is over" alone, the figures left to the recap, where the class can't misread them.
-    <main className={PRESENT_PAGE}>
+    <div className={PRESENT_PAGE}>
       <LiveHeader
         name={klass.name}
         joinCode={klass.joinCode}
@@ -682,10 +682,10 @@ export default function ClassDetailPage() {
           Class is over
         </h2>
       </section>
-    </main>
+    </div>
   ) : (
     // No session running (PV6), or the class not read yet: v2's look, its parts 22 px apart.
-    <main className={present ? PRESENT_PAGE : 'flex flex-col gap-5.5'}>
+    <div className={present ? PRESENT_PAGE : 'flex flex-col gap-5.5'}>
       {/* The name over its line, Reports at the end; on a phone the name at the card titles' size and
           Reports on a line of its own. */}
       <header className="flex flex-wrap items-center gap-x-4.5 gap-y-3.5 max-sm:gap-x-3.5">
@@ -869,6 +869,6 @@ export default function ClassDetailPage() {
           </div>
         </>
       )}
-    </main>
+    </div>
   );
 }

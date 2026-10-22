@@ -224,7 +224,7 @@ export function SlidesView({
   children?: ReactNode;
 }) {
   return (
-    <main className="flex flex-col gap-5.5">
+    <div className="flex flex-col gap-5.5">
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
         <div>
           <h1 id={TITLE} tabIndex={-1} className="text-page-title">
@@ -276,7 +276,7 @@ export function SlidesView({
           ))}
         </ul>
       ) : null}
-    </main>
+    </div>
   );
 }
 

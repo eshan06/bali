@@ -110,7 +110,7 @@ export function SessionReport({
   onRetryQuestions: () => unknown;
 }) {
   return (
-    <main className="flex flex-col gap-5.5">
+    <div className="flex flex-col gap-5.5">
       {/* A class's name of one long word breaks rather than pushing past a phone's width. */}
       <Link
         href={`/reports?class=${encodeURIComponent(classId)}`}
@@ -138,7 +138,7 @@ export function SessionReport({
           <ReportQuestions questions={questions} onRetry={onRetryQuestions} />
         </>
       )}
-    </main>
+    </div>
   );
 }
 

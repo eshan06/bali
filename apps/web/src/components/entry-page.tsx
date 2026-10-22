@@ -10,7 +10,8 @@ import { Mark } from './mark';
  * the bar and no more, or an empty page would scroll: where SignIn draws the stage as the board's
  * root, v2.css adds its 120 px of padding to the window's height, which a page would scroll by. The
  * window is the one that shows (`dvh`, as the layout's body is): `vh` on iPhone Safari is the
- * window behind its toolbars, taller than what shows.
+ * window behind its toolbars, taller than what shows. Signed out, it is the page's `<main>`; signed
+ * in, it sits in the shell's (`PagePlace`), the page's one.
  */
 export function EntryPage({
   signedIn = false,
@@ -19,8 +20,9 @@ export function EntryPage({
   signedIn?: boolean;
   children: ReactNode;
 }) {
+  const Root = signedIn ? 'div' : 'main';
   return (
-    <main
+    <Root
       className={`flex flex-col items-center justify-center px-6 pt-12 pb-18 ${signedIn ? 'min-h-[calc(100dvh-60px)]' : 'min-h-dvh'}`}
     >
       <div className="flex w-full max-w-100 flex-col items-center gap-1.5">
@@ -37,7 +39,7 @@ export function EntryPage({
         )}
         {children}
       </div>
-    </main>
+    </Root>
   );
 }
 

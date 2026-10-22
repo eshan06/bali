@@ -81,7 +81,7 @@ export function ReportsView({
     (classes !== null && classId === null) ||
     (list.loaded && list.sessions.length === 0 && list.nextBefore === null);
   return (
-    <main className="flex flex-col gap-5.5">
+    <div className="flex flex-col gap-5.5">
       <header>
         <h1 className="text-page-title">Reports</h1>
         {/* The italic class alone: `font-sans` would set the upright face, slanted (PV4). */}
@@ -182,7 +182,7 @@ export function ReportsView({
           </div>
         ) : null}
       </div>
-    </main>
+    </div>
   );
 }
 

@@ -352,7 +352,7 @@ export function healthOf(status: SseStatus, connectingMs: number): 'open' | 'rec
  * `shadow-2` and a stone dot. It sits on a layer over the whole page, 14 px from its top as drawn,
  * taking no room and nobody's clicks, and stays in view as the page scrolls, so a grid scrolled to
  * its last row still says it may be out of date. The layer is placed against the nearest
- * positioned ancestor, the class page's `<main>` (its frame is 30 px in, 22 on a phone; in Present
+ * positioned ancestor, the class page's own root (its frame is 30 px in, 22 on a phone; in Present
  * it has no frame, and the pill, sticky, still rests 14 px from the screen's top).
  */
 const PILL_LAYER = 'pointer-events-none absolute inset-x-0 -top-4 bottom-0 z-10 max-sm:-top-2';

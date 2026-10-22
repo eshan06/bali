@@ -204,7 +204,7 @@ describe('Your slides, as the Slides board draws it', () => {
   it('draws the head as v2.css’s page head, Upload a PDF its primary button with the upload icon', () => {
     expect(html).toMatch(
       new RegExp(
-        `^<main class="flex flex-col gap-5\\.5"><div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-3"><div><h1 id="${TITLE}" tabindex="-1" class="text-page-title">Your slides</h1><p class="mt-0\\.5 text-meta text-text-secondary">`,
+        `^<div class="flex flex-col gap-5\\.5"><div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-3"><div><h1 id="${TITLE}" tabindex="-1" class="text-page-title">Your slides</h1><p class="mt-0\\.5 text-meta text-text-secondary">`,
       ),
     );
     expect(html).toMatch(

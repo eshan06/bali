@@ -130,7 +130,7 @@ describe('Classes (Classes, ClassesEmpty)', () => {
   it('is headed by Classes and New class, a secondary button with its plus that opens a dialog', () => {
     const html = view();
     expect(html).toMatch(
-      /^<main class="flex flex-col gap-5\.5"><div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-3"><h1 class="text-page-title">Classes<\/h1><button type="button" aria-haspopup="dialog" class="[^"]*\bborder-border-strong\b[^"]*"><svg(?=[^>]*\bwidth="16")[^>]*\blucide-plus\b[^]*?<\/svg>New class<\/button><\/div>/,
+      /^<div class="flex flex-col gap-5\.5"><div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-3"><h1 class="text-page-title">Classes<\/h1><button type="button" aria-haspopup="dialog" class="[^"]*\bborder-border-strong\b[^"]*"><svg(?=[^>]*\bwidth="16")[^>]*\blucide-plus\b[^]*?<\/svg>New class<\/button><\/div>/,
     );
     // ClassesInterim's head, the title alone, went with PV16b.
     expect(html).not.toContain('Create a class');
@@ -216,7 +216,7 @@ describe('Classes (Classes, ClassesEmpty)', () => {
         createElement('dialog', { id: 'new' }),
       ),
     );
-    expect(html).toMatch(/<\/div><\/div><dialog id="new"><\/dialog><\/main>$/);
+    expect(html).toMatch(/<\/div><\/div><dialog id="new"><\/dialog><\/div>$/);
   });
 
   it('says a list that didn’t load over the classes read before, with Try again (HomeStates)', () => {
@@ -239,7 +239,7 @@ describe('Classes (Classes, ClassesEmpty)', () => {
       /<TryAgain onRetry=\{onRetry\} then=\{\[\]\}>\s*<p role="alert" className="text-body">\s*Couldn&apos;t load your classes\. \{failed\}/,
     );
     expect(view()).toMatch(
-      /^<main class="[^"]*"><div class="[^"]*"><h1 class="text-page-title">Classes<\/h1>/,
+      /^<div class="[^"]*"><div class="[^"]*"><h1 class="text-page-title">Classes<\/h1>/,
     );
     expect(read('../app/classes/page.tsx')).toMatch(
       /const \{ home, error, load, refresh \} = useMe\(\);[^]*?onRetry=\{refresh\}/,
@@ -348,7 +348,7 @@ describe('the Classes page', () => {
 
   it('draws a teacher’s classes from the shell’s read, its failure over them', () => {
     const html = drawnFor({ kind: 'teacher', me: account('teacher') });
-    expect(html).toMatch(/^<main [^>]*><div [^>]*><h1 class="text-page-title">Classes<\/h1>/);
+    expect(html).toMatch(/^<div [^>]*><div [^>]*><h1 class="text-page-title">Classes<\/h1>/);
     expect(cards(html)).toHaveLength(3);
     expect(drawnFor({ kind: 'teacher', me: account('teacher') }, CANT_REACH)).toContain(
       'role="alert"',
