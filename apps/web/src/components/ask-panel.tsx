@@ -120,8 +120,9 @@ export function AskPanel({
     added.current = false;
   }, [id, count]);
 
-  // Ask the class's press, and Try again's.
-  async function send() {
+  // Ask the class's press, and Try again's: what Bali refuses said first, and nothing sent, so only
+  // an ask on its way holds Try again (santa's review).
+  function send() {
     if (busy) return;
     const found = refusalsOf(draft);
     const first = found.prompt ? 'prompt' : found.options.findIndex((r) => r !== null);
@@ -130,11 +131,15 @@ export function AskPanel({
       document.getElementById(`${id}-${first === 'prompt' ? 'prompt' : `a${first}`}`)?.focus();
       return;
     }
-    const answer = await onAsk(trimmed(draft));
-    if (answer?.kind === 'opened') onAsked();
+    return onAsk(trimmed(draft)).then((answer) => {
+      if (answer?.kind === 'opened') onAsked();
+    });
   }
 
-  const failed = failure ? askSaid(failure) : null;
+  // A line with no Try again goes while it is asked again, and is said anew with its answer: only a
+  // Try again keeps its place (santa's review).
+  const said = failure ? askSaid(failure) : null;
+  const failed = said && (said.retry || !busy) ? said : null;
   return (
     <Panel
       id={id}
@@ -402,7 +407,9 @@ export function PickView({
             <ul>
               {drafts.map((draft) => {
                 const q = `${id}-${draft.id}`;
-                const said = failure && from === draft.id ? askSaid(failure) : null;
+                const asked = failure && from === draft.id ? askSaid(failure) : null;
+                // A line with no Try again goes while it is asked again, said anew with its answer.
+                const said = asked && (asked.retry || !busy) ? asked : null;
                 return (
                   <li
                     key={draft.id}
