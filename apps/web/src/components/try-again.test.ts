@@ -45,6 +45,12 @@ describe('Try again, as drawn', () => {
       /<button type="button" aria-disabled="false" aria-busy="false" class="[^"]*\bh-10\b[^"]*\bmt-3\.5\b[^"]*">Try again<\/button>$/,
     );
   });
+
+  it('is described by what it is about where its line doesn’t say it (a deck in Show slides)', () => {
+    expect(render({ describedBy: 'deck-name' })).toMatch(
+      /<button type="button" aria-disabled="false" aria-busy="false" aria-describedby="deck-name" class="[^"]*">Try again<\/button>$/,
+    );
+  });
 });
 
 describe('Try again as a send’s own button (Register block, Make new code)', () => {
@@ -328,7 +334,8 @@ describe('every read’s Try again in the portal is this one', () => {
  * session, your block and Register block), the live grid's own line (the class page's and
  * Present's), and the student's home; then the class page's own lines (its class and roster, an
  * extend's), the recap, the student panel, New code's Make new code, Reports, a session's report
- * and its Questions.
+ * and its Questions; then a close (the class page's and Present's) and the slides (the slide's line,
+ * the card's, Present's and a student's, and a slide change's, Show slides' too).
  */
 const MOVED = [
   'app/classes/[id]/page.tsx',
@@ -337,11 +344,13 @@ const MOVED = [
   'components/home.tsx',
   'components/join-code.tsx',
   'components/live-grid.tsx',
+  'components/question-card.tsx',
   'components/recap-card.tsx',
   'components/report-questions.tsx',
   'components/reports-list.tsx',
   'components/session-report.tsx',
   'components/shell.tsx',
+  'components/slide-card.tsx',
   'components/student-home.tsx',
   'components/student-panel.tsx',
 ];
@@ -349,17 +358,15 @@ const MOVED = [
 /**
  * The Try agains `TryAgain` doesn't draw yet, each settled in a step of its own: a read's failure
  * elsewhere, and a send's (the one button that sends saying it, as Create class and the invite
- * code do; or under its line, as an upload's, a slide change's, an ask's, a close's and a save's
- * do). A new one fails the test above.
+ * code do; or under its line, as an upload's, an ask's and a save's do). A new one fails the test
+ * above.
  */
 const LEFT = [
   'components/ask-panel.tsx',
   'components/decks-panel.tsx',
   'components/invite-code.tsx',
   'components/new-class.tsx',
-  'components/question-card.tsx',
   'components/saved-questions.tsx',
-  'components/slide-card.tsx',
   'components/slides.tsx',
   'components/student-lesson.tsx',
 ];

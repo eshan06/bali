@@ -30,6 +30,25 @@ export function placeOf(
   return drawn ? 'page' : 'loading';
 }
 
+/** What the slide's place showed as its Try again was pressed: the line, its deck and its draw. */
+export interface Retried {
+  why: Unshown;
+  deckId: string;
+  deck: DeckState;
+  failed: unknown;
+}
+
+/**
+ * Whether Try again has its answer: another deck shown, or, past the loading between, the page
+ * drawn or a line from a newer answer, the deck loaded afresh or the page drawn again.
+ */
+export const answered = (
+  retried: Retried,
+  now: Omit<Retried, 'why'> & { place: ReturnType<typeof placeOf> },
+) =>
+  retried.deckId !== now.deckId ||
+  (now.place !== 'loading' && (retried.deck !== now.deck || retried.failed !== now.failed));
+
 /** Each line in the slide's place, LessonStates' and LessonSlideStates' words. */
 const UNSHOWN: Record<Unshown, string> = {
   unloaded: "Bali couldn't load these slides.",
@@ -162,20 +181,11 @@ export function SlideFrame({
   const held = open !== null && drawn?.deck === open ? drawn : null;
   const failed = open !== null && undrawn?.deck === open && undrawn.page === page ? undrawn : null;
   const place = placeOf(deck, held !== null, failed !== null);
-  // Try again on its way: the line it was pressed on, until a newer answer shows the page or a line;
-  // dropped for another deck.
-  const [again, setAgain] = useState<{
-    why: Unshown;
-    deck: DeckState;
-    failed: typeof failed;
-    deckId: string;
-  } | null>(null);
-  const answered =
-    again !== null &&
-    (again.deckId !== slide.deckId ||
-      (place !== 'loading' && (again.deck !== deck || again.failed !== failed)));
-  if (answered) setAgain(null);
-  const shown = again === null || answered ? place : again.why;
+  // Try again on its way: the line it was pressed on, said until its answer (`answered`).
+  const [again, setAgain] = useState<Retried | null>(null);
+  const done = again !== null && answered(again, { place, deck, failed, deckId: slide.deckId });
+  if (done) setAgain(null);
+  const shown = again === null || done ? place : again.why;
   const present = look === 'present';
   return (
     <figure

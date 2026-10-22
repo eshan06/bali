@@ -124,7 +124,7 @@ describe('the class page in Present while a session runs (ClassPresent)', () => 
       /^const presentToggle = \(beside = false, className = ''\) => \(\s*<Button\s+ref=\{toggle\}\s+id=\{`\$\{id\}-present`\}/,
     );
     expect(read('../components/present-question.tsx')).toMatch(
-      /doneButton\(lesson, `\$\{id\}-present`\)/,
+      /doneButton\(lesson, `\$\{id\}-present`, `\$\{id\}-done`\)/,
     );
     // Ask another question stays on the class page: its panel lists the saved questions with their
     // answers, which the room must never see.

@@ -262,18 +262,25 @@ describe('useSlide: what a session shows, held for one session (read from its so
       /if \(now\.current\.session !== session\) return false;\s*unanswered\.current = keepUnanswered\(attempt, answer\);\s*const end = changeEnd\(answer\);/,
     );
     expect(hook).toMatch(
-      /if \('shown' in end\) \{\s*put\(session, end\.shown\);\s*return true;\s*\}[^]*?setSaid\(\{ why: end\.said, change: to \}\);[^]*?if \(end\.said === 'gone'\) reread\(\);/,
+      /if \('shown' in end\) \{\s*setSaid\(null\);\s*put\(session, end\.shown\);\s*return true;\s*\}[^]*?setSaid\(\{ why: end\.said, change: to \}\);[^]*?if \(end\.said === 'gone'\) reread\(\);/,
     );
     // Its answer gave up after the stream showed it: nothing said, and done, as its answer would
     // have said (use-slide-hook.test.ts).
     expect(hook).toMatch(
-      /const heard = newer\(now\.current\.shown, \{ slide: null, eventId: attempt\.eventId \}\);\s*if \(end\.said === 'failed' && heard === now\.current\.shown\) \{\s*unanswered\.current = null;\s*return true;\s*\}/,
+      /const heard = newer\(now\.current\.shown, \{ slide: null, eventId: attempt\.eventId \}\);\s*if \(end\.said === 'failed' && heard === now\.current\.shown\) \{\s*unanswered\.current = null;\s*setSaid\(null\);\s*return true;\s*\}/,
     );
-    // Try again: the last change again, through the same rule.
-    expect(hook).toMatch(/again: \(\) => \{\s*if \(last\.current\) void change\(last\.current\);/);
+    // Try again: the last change again, through the same rule, what it said kept until its
+    // answer so its button holds in place (LessonRetryStates); any other change clears it first.
+    expect(hook).toMatch(
+      /again: \(\) => \{\s*if \(last\.current\) void change\(last\.current, true\);/,
+    );
+    expect(hook).toMatch(
+      /async \(to: SlideChange, again = false\): Promise<boolean> => \{[^]*?setChanging\(to\);\s*if \(!again\) setSaid\(null\);/,
+    );
     expect(hook).toMatch(/stop: \(\) => change\(\{ deckId: null, page: null \}\),/);
-    // The side panel's Show (M6, part 2c): the deck's first page, through the same rule.
-    expect(hook).toMatch(/show: \(deck\) => change\(\{ deckId: deck, page: 1 \}\),/);
+    // The side panel's Show (M6, part 2c): the deck's first page, through the same rule, its own
+    // line's Try again keeping that line.
+    expect(hook).toMatch(/show: \(deck, again\) => change\(\{ deckId: deck, page: 1 \}, again\),/);
   });
 
   it('settles what a change said once a later one is heard, and turns pages within the deck', () => {

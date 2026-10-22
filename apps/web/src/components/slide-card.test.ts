@@ -10,9 +10,11 @@ import type { OpenDeck } from '@/lib/deck-pdf';
 import type { DeckState, DeckUnopened, SlideLesson } from '@/lib/use-slide';
 
 import {
+  answered,
   type Key,
   keyTurn,
   placeOf,
+  type Retried,
   SaidLine,
   SlideCard,
   slideCard,
@@ -20,6 +22,7 @@ import {
   typesText,
   UnshownLine,
 } from './slide-card';
+import { TryAgain } from './try-again';
 
 /*
  * The class page's slide card (M6, part 2b-2; LessonSlide, LessonStates' slide lines and the
@@ -86,6 +89,10 @@ function buttons(node: ReactNode): Map<string, () => void> {
     if (!n || typeof n !== 'object' || !('props' in n)) return;
     const p = (n as ReactElement<{ onClick?: () => void; children?: ReactNode }>).props;
     if (p.onClick) found.set(words(p.children).trim(), p.onClick);
+    // `TryAgain` draws its own button: pressed, it calls its `onRetry`.
+    if ((n as ReactElement).type === TryAgain) {
+      found.set('Try again', (p as Parameters<typeof TryAgain>[0]).onRetry as () => void);
+    }
     walk(p.children);
   };
   walk(node);
@@ -204,6 +211,52 @@ describe('its slide’s place (LessonSlideStates)', () => {
     expect(again).toHaveBeenCalledOnce();
   });
 
+  it('keeps its line while Try again loads or draws it again, until a newer answer (LessonRetryStates)', () => {
+    const failed: DeckState = { kind: 'failed', why: 'unloaded' };
+    const deckId = slide().deckId;
+    const loaded: Retried = { why: 'unloaded', deckId, deck: failed, failed: null };
+    // The deck loading afresh, opened and not drawn yet: no answer, the line said meanwhile.
+    for (const deck of [{ kind: 'loading' } as const, open]) {
+      expect(answered(loaded, { place: 'loading', deck, failed: null, deckId })).toBe(false);
+    }
+    // Drawn, or a line from the new answer, however worded: answered.
+    expect(answered(loaded, { place: 'page', deck: open, failed: null, deckId })).toBe(true);
+    const again: DeckState = { kind: 'failed', why: 'unloaded' };
+    expect(answered(loaded, { place: 'unloaded', deck: again, failed: null, deckId })).toBe(true);
+    // A page drawn again: the same line until the draw answers, a new one then.
+    const undrawn = { page: 4 };
+    const drawing: Retried = { why: 'undrawn', deckId, deck: open, failed: undrawn };
+    expect(answered(drawing, { place: 'undrawn', deck: open, failed: undrawn, deckId })).toBe(
+      false,
+    );
+    expect(answered(drawing, { place: 'undrawn', deck: open, failed: { page: 4 }, deckId })).toBe(
+      true,
+    );
+    expect(answered(drawing, { place: 'page', deck: open, failed: null, deckId })).toBe(true);
+    // Another deck shown meanwhile: its own loading, never this line.
+    expect(
+      answered(loaded, { place: 'loading', deck: { kind: 'loading' }, failed: null, deckId: 'x' }),
+    ).toBe(true);
+    // The frame says the kept line, Try again held, while it has no answer.
+    expect(source).toMatch(
+      /const done = again !== null && answered\(again, \{ place, deck, failed, deckId: slide\.deckId \}\);\s*if \(done\) setAgain\(null\);\s*const shown = again === null \|\| done \? place : again\.why;/,
+    );
+    expect(source).toMatch(/held=\{again !== null\}\s*then=\{then\}/);
+  });
+
+  it('holds its Try again as Loading… with its line, focus once drawn on the slide’s title', () => {
+    const held = renderToStaticMarkup(
+      UnshownLine({ why: 'unloaded', onAgain: vi.fn(), held: true, then: ['L-slides'] }),
+    );
+    expect(held).toMatch(
+      /<p role="alert" class="text-body">Bali couldn&#x27;t load these slides\.<\/p><button type="button" aria-disabled="true" aria-busy="true" class="[^"]*\bh-8\.5\b[^"]*">Loading…<\/button>/,
+    );
+    // The card's, Present's and a student's frame each name where focus lands once it is drawn.
+    expect(source).toMatch(
+      /<SlideFrame deck=\{deck\} slide=\{slide\} onReload=\{lesson\.reload\} then=\{\[`\$\{id\}-slides`\]\} \/>/,
+    );
+  });
+
   it('shows the page once drawn, Loading… before, a line in its stead, never the page before it', () => {
     expect(placeOf({ kind: 'loading' }, false, false)).toBe('loading');
     expect(placeOf(open, false, false)).toBe('loading');
@@ -225,9 +278,9 @@ describe('its slide’s place (LessonSlideStates)', () => {
       /`Slide \$\{held\.page\} of \$\{slide\.pageCount\}\.\$\{held\.text \? ` \$\{held\.text\}` : ''\}`/,
     );
     // Try again: a deck loaded afresh (2b-1), a page drawn again, but one PDF.js gave no answer
-    // for, whose deck is opened again (its worker most likely gone).
+    // for, whose deck is opened again (its worker most likely gone); its line kept meanwhile.
     expect(source).toMatch(
-      /onAgain=\{\s*place === 'undrawn' && !failed\?\.unanswered\s*\? \(\) => setRedraws\(\(n\) => n \+ 1\)\s*: onReload\s*\}/,
+      /onAgain=\{\(\) => \{\s*setAgain\(\{ why: shown, deck, failed, deckId: slide\.deckId \}\);\s*if \(shown === 'undrawn' && !failed\?\.unanswered\) setRedraws\(\(n\) => n \+ 1\);\s*else onReload\(\);\s*\}\}/,
     );
     expect(source).toMatch(
       /setUndrawn\(\s*end\.kind === 'undrawn' \? \{ deck: open, page, unanswered: end\.unanswered === true \} : null,\s*\);/,
@@ -427,22 +480,23 @@ describe('what a change said, under the card’s head (LessonStates, LessonSlide
     const l = lesson({ said: { why: 'failed', change: turnTo } });
     const html = render(l);
     expect(html).toMatch(
-      /<p role="alert" class="text-body">Bali couldn&#x27;t change the slide\.<\/p><button type="button" aria-disabled="false" class="[^"]*\bh-8\.5\b[^"]*">Try again<\/button>/,
+      /<p role="alert" class="text-body">Bali couldn&#x27;t change the slide\.<\/p><button type="button" aria-disabled="false" aria-busy="false" class="[^"]*\bh-8\.5\b[^"]*">Try again<\/button>/,
     );
-    // The line's Try again is the hook's own: the last change again.
+    // The line's Try again is the hook's own: the last change again; answered, focus on the
+    // slides' title (LessonRetryStates).
     expect(source).toMatch(
-      /<SaidLine why=\{said\.why\} held=\{changing !== null\} onAgain=\{lesson\.again\} \/>/,
+      /<SaidLine\s+why=\{said\.why\}\s+held=\{changing !== null\}\s+onAgain=\{lesson\.again\}\s+then=\{\[`\$\{id\}-slides`\]\}\s*\/>/,
     );
     const again = vi.fn();
-    press(SaidLine({ why: 'failed', held: false, onAgain: again }), 'Try again');
+    press(SaidLine({ why: 'failed', held: false, onAgain: again, then: [] }), 'Try again');
     expect(again).toHaveBeenCalledOnce();
-    // Held while another change is on its way.
+    // Held as Loading… while it, or another change, is on its way, its line kept.
     expect(
       buttonTag(
         render(lesson({ said: { why: 'failed', change: turnTo }, changing: turnTo })),
-        'Try again',
+        'Loading…',
       ),
-    ).toMatch(/aria-disabled="true"/);
+    ).toMatch(/aria-disabled="true" aria-busy="true"/);
   });
 
   it('says the session ended first, and the slides gone, with no Try again', () => {
@@ -458,13 +512,25 @@ describe('what a change said, under the card’s head (LessonStates, LessonSlide
 
   it('says each one Present’s size there, Try again full size', () => {
     const failed = renderToStaticMarkup(
-      SaidLine({ why: 'failed', held: false, onAgain: vi.fn(), present: true }),
+      SaidLine({ why: 'failed', held: false, onAgain: vi.fn(), then: [], present: true }),
     );
     expect(failed).toMatch(/<p role="alert" class="text-present-line">Bali couldn&#x27;t change/);
     expect(buttonTag(failed, 'Try again')).toMatch(/\bh-10\b/);
     expect(
-      renderToStaticMarkup(SaidLine({ why: 'over', held: false, onAgain: vi.fn(), present: true })),
+      renderToStaticMarkup(
+        SaidLine({ why: 'over', held: false, onAgain: vi.fn(), then: [], present: true }),
+      ),
     ).toMatch(/^<p role="alert" class="text-present-line ">This session has ended/);
+  });
+
+  it('names a deck’s line by its deck in Show slides’ list, where the line doesn’t say which', () => {
+    expect(
+      renderToStaticMarkup(
+        SaidLine({ why: 'failed', held: false, onAgain: vi.fn(), then: [], describedBy: 'd1' }),
+      ),
+    ).toMatch(
+      /<button type="button" aria-disabled="false" aria-busy="false" aria-describedby="d1"/,
+    );
   });
 });
 

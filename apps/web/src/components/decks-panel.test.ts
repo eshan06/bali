@@ -11,6 +11,7 @@ import type { SlideChange } from '../lib/presenter';
 import type { Said } from '../lib/use-slide';
 import { DecksView } from './decks-panel';
 import type { Decks } from './slides';
+import { TryAgain } from './try-again';
 
 /*
  * Show slides in the side panel (M6, part 2c; LessonDecks, LessonStates' lines and the
@@ -67,6 +68,18 @@ const view = (p: ReturnType<typeof props>) => renderToStaticMarkup(createElement
 function hosts(node: ReactNode): ReactElement<Record<string, unknown>>[] {
   if (Array.isArray(node)) return node.flatMap(hosts);
   if (!isValidElement<Record<string, unknown>>(node)) return [];
+  // `TryAgain` keeps state of its own: its line, then its button, pressed through its `onRetry`,
+  // held and described as its props say.
+  if (node.type === TryAgain) {
+    const {
+      onRetry,
+      children,
+      describedBy,
+      held = false,
+    } = node.props as Parameters<typeof TryAgain>[0];
+    const button = { onClick: onRetry, 'aria-describedby': describedBy, 'aria-disabled': held };
+    return [...hosts(children), createElement('button', button, 'Try again')];
+  }
   // Next's link holds hooks of its own: read as the `<a>` it draws.
   if (typeof node.type === 'function' && node.type !== Link) {
     return hosts((node.type as (p: unknown) => ReactNode)(node.props));
@@ -193,13 +206,17 @@ describe('its states (LessonStates, LessonDecksStates)', () => {
     expect(html).toMatch(
       /<div class="flex flex-wrap items-center gap-x-4 gap-y-3 col-span-full mt-1\.5"><p role="alert" class="text-body">Bali couldn&#x27;t change the slide\.<\/p>/,
     );
+    // Shown again with its line kept while it goes (`again`), so its Try again holds in place
+    // (LessonRetryStates).
     press(DecksView(p), 'Try again');
-    expect(p.onShow).toHaveBeenCalledWith(B);
+    expect(p.onShow).toHaveBeenCalledWith(B, true);
     // Named by its deck, as each Show is (santa's review).
     expect(buttons(DecksView(p), 'Try again')[0]?.props['aria-describedby']).toBe(`P-${B.id}`);
     // Held while another change is on its way.
     const held = DecksView(props(DECKS, showOf(A), { why: 'failed', change: showOf(B) }));
     expect(buttons(held, 'Try again')[0]?.props['aria-disabled']).toBe(true);
+    // A line said in its place (the session over, the deck gone): focus on the deck's name.
+    expect(source).toMatch(/onAgain=\{\(\) => onShow\(deck, true\)\}\s*then=\{\[name\]\}/);
   });
 
   it('says the session ended first, and the slides gone, under their deck with no Try again', () => {
@@ -233,7 +250,7 @@ describe('the panel as Show slides opens it', () => {
 
   it('shows through the slide’s own change, and closes once shown, only while it is open', () => {
     expect(source).toMatch(
-      /void lesson\.show\(deck\.id\)\.then\(\(shown\) => \{\s*if \(shown && open\.current\) onShown\(\);\s*\}\);/,
+      /const show = \(deck: Deck, again = false\) =>\s*void lesson\.show\(deck\.id, again\)\.then\(\(shown\) => \{\s*if \(shown && open\.current\) onShown\(\);\s*\}\);/,
     );
     expect(source).toMatch(
       /useEffect\(\(\) => \{\s*open\.current = true;\s*return \(\) => \{\s*open\.current = false;\s*\};\s*\}, \[\]\);/,
