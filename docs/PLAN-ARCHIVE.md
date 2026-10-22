@@ -10,6 +10,16 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-22 (Central) — The owner's follow-up, time limits on the portal's remaining
+reads and saves (#432; `docs/DECISIONS.md`, 2026-10-22): every read now fails as no answer after a
+poll's 10 s, and each save after its own (10 s; a deck's removal 40 s), sent again under the same
+`eventId` or to a route a second send never doubles; a deck's check and a class's create keep none.
+The shell's `refresh` hands back the read on its way, so a Try again pressed while the account's read
+is on its way holds until it answers (#426's *Left*). No new screen or state: a timeout lands in the
+failure lines and Try agains the canvas draws. Checked in headless Chrome on dev, reads and a save
+held past their limits. Before it, Try again's part 3 (#431). Next on the Windows PC: the four steps
+for sessions before the pilot's first class; on the Mac, the phone's L8 and M8._
+
 _Last updated: 2026-10-22 (Central) — The owner's follow-up, Try again keeps keyboard focus, part 3
 (#431; `docs/DECISIONS.md`, 2026-10-22), its last: `TryAgain` everywhere else, so the scan's `LEFT`
 is empty and a Try again drawn by hand anywhere in the portal fails it: Your questions' and Your

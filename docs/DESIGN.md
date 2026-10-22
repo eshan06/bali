@@ -330,7 +330,8 @@ says, never the page (HomeRetryStates, ClassesRetryStates, ClassRetryStates, Stu
 ReportRetryStates, LessonRetryStates and QuestionsSlidesRetryStates, drawn on the canvas first);
 and as the one button of a send that says it, Register block, Make new code, Create class and the
 invite code's Redeem code, their words its own until a send fails, held in them while it has
-nothing to send.
+nothing to send; and since 2026-10-22 of a read, Reports' Show earlier, its words its own until its
+read fails, focus on the sessions' label once it goes with the last page (ReportRetryStates).
 Every
 portal source file is held to the tokens' utilities by `tokens.test.ts`, and
 since D2g the theme holds none of Tailwind's own colours, type sizes,
