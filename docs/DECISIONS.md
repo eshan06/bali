@@ -8,7 +8,7 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
-- **2026-10-22** — **The portal's tests drive the page (#NNN): jsdom and Testing Library, dev only,
+- **2026-10-22** — **The portal's tests drive the page (#434): jsdom and Testing Library, dev only,
   opted into per file, and `try-again.test.tsx` converted as the pattern.** The owner's answer to the
   conductor's question this morning: "Yes, go gradually. One setup PR adds a DOM test environment and
   Testing Library (dev only) and converts try-again.test.ts as the pattern; after that, each UI step
@@ -65,8 +65,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the owner*). **Found on the way:** in jsdom,
   Vite resolves `new URL('../', import.meta.url)` against the page's address, so a test there reads
   files through `import.meta.dirname` (`docs/WEB.md`, Testing the portal). **Time:** on this PC the
-  portal's suite went from 8.1 s to 8.7 s, the new file 3.9 s alone (jsdom about 1 s to start); in
-  CI, TIME-CI. Nothing anyone sees changes: no screenshots, no canvas.
+  portal's suite went from 8.1 s to 8.7 s, the new file 3.9 s alone (jsdom about 1 s to start). In
+  CI's Unit tests (PGlite), against #433's run: the install 15 s, not 11 s, and the portal's suite
+  9.8 s, as before (the new file's 1.0 s runs beside the others), so about 5 s on a 4-minute job; the
+  static job's install gains the same few seconds. Nothing anyone sees changes: no screenshots, no
+  canvas.
 
 - **2026-10-22** — **`next` 15.5.28, for today's critical Next.js advisories (#435); *the
   conductor's call, awaiting the owner*.** From today `npm audit --omit=dev --audit-level=high`, the

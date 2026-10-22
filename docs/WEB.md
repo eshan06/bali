@@ -62,9 +62,9 @@ is the pattern.
   `act` (`await act(async () => { … })`), so React has drawn the answer before the next
   check. A frame (`requestAnimationFrame`) runs about 16 ms later: wait for the next one
   before checking what a frame does.
-- **Read a file through `import.meta.dirname`:** in jsdom, Vite resolves
-  `new URL('./x', import.meta.url)` against the page's address, `http://localhost:3000`,
-  not the file's.
+- **A guard that reads files (Try again's scan) finds them through `import.meta.dirname`:**
+  in jsdom, Vite resolves `new URL('./x', import.meta.url)` against the page's address,
+  `http://localhost:3000`, not the file's.
 - **No new test reads source text:** `src/source-text-tests.test.ts` fails on a page or
   component test that reads a file's text unless it is listed, and its list only shrinks:
   a UI step converts the tests it touches. It sees files, not checks: a new source-text

@@ -8,7 +8,7 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-22 (Central) — The portal's tests drive the page (#NNN; `docs/DECISIONS.md`,
+_Last updated: 2026-10-22 (Central) — The portal's tests drive the page (#434; `docs/DECISIONS.md`,
 2026-10-22), the owner's answer to the conductor's question: jsdom and Testing Library in `apps/web`,
 dev only, opted into per file, and `try-again.test.tsx` converted as the pattern, its regexes over
 `TryAgain`'s source gone. From now on a UI step converts the source-text tests it touches and adds
@@ -46,7 +46,7 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
 - **The portal redesign in v2's look (PV0–PV17, the owner, 2026-10-12)** ✅ (2026-10-16): every step
   done, with PV3b, PV4b, PV4c and PV5b; the last, PV17c-2, Home's Last session (#425).
 - **The portal's tests drive the page (the owner, 2026-10-22: "Yes, go gradually")**: the setup ✅
-  (#NNN; DECISIONS 2026-10-22), jsdom and Testing Library, dev only, opted into per file
+  (#434; DECISIONS 2026-10-22), jsdom and Testing Library, dev only, opted into per file
   (`docs/WEB.md`, Testing the portal), `try-again.test.tsx` the pattern. Each UI step from now on
   converts the source-text tests it touches and adds none; `src/source-text-tests.test.ts` lists the
   33 left, a list that only shrinks.
