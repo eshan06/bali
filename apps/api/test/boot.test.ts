@@ -1,4 +1,5 @@
 import { type ChildProcess, spawn } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -151,7 +152,40 @@ describe('boot contracts', () => {
       // The process entry starts the minute sweep (A15) — the one line that
       // fixes sessions ending late; sweep.test.ts pins what the ticker does.
       expect(result.output).toContain('"msg":"sweeping every minute"');
+      // A deploy names no pool size: postgres.js's own 10 (DECISIONS 2026-10-22).
+      expect(result.output).toContain('"msg":"database pool: 10 connections"');
     },
     30_000,
   );
+
+  it('ignores PGMAX and a max in DATABASE_URL, keeping its own 10 connections, and says so without the URL', async () => {
+    // Read as text, either would make a deploy's pool one connection (DECISIONS 2026-10-22). The
+    // URL's parts are made afresh, so none is in this file's text.
+    const part = randomBytes(8).toString('hex');
+    const url = `postgresql://user_${part}:pw_${part}@db-${part}.example.invalid:5432/railway?max=20`;
+    const { child, exited, waitForOutput } = bootServer({
+      PORT: '0',
+      HOST: '127.0.0.1',
+      PGMAX: '20',
+      DATABASE_URL: url,
+    });
+    await waitForOutput('Server listening');
+    child.kill('SIGKILL');
+    const { output } = await exited;
+
+    const said = output
+      .split('\n')
+      .filter((line) => line.startsWith('{'))
+      .map((line) => JSON.parse(line) as { level: number; msg: string; connections?: number })
+      .filter((line) => line.connections !== undefined);
+    // One line says the pool, once: a warning naming both, the pool still 10.
+    expect(said).toEqual([
+      expect.objectContaining({
+        level: 40,
+        connections: 10,
+        msg: 'PGMAX and the max parameter in DATABASE_URL are ignored: the API sizes its own database pool, 10 connections (docs/DECISIONS.md, 2026-10-22)',
+      }),
+    ]);
+    expect(output).not.toContain(part);
+  }, 30_000);
 });

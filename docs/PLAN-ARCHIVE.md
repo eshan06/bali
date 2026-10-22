@@ -10,6 +10,16 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-22 (Central) — The bell with the class-started push, measured at a school's
+scale (#336, #438; `docs/DECISIONS.md`, 2026-10-22), a k6 run by hand only (the Load gate's `bell`
+input); the gate on PRs is unchanged. Every rung phone opening at once about doubles the Starts'
+time (600 phones: 0.33–0.46 s to 0.52–1.08 s), with no request failing; what runs out is the API's
+one process, not its 10 connections. The fix waits for the owner (Open owner items): the conductor's
+pick, a random wait of up to 10 s before the phone's first read after a push, the Mac's, in the
+push's app half. Nothing anyone sees changes. Before it, a saved question's id case (#437). Next on
+the Windows PC: the four steps for sessions before the pilot's first class, which wait for the
+owner's word; on the Mac, the phone's L8 and M8._
+
 _Last updated: 2026-10-22 (Central) — A saved question's write resent with its `eventId` in upper
 case is its replay (#437, closing #319; `docs/DECISIONS.md`, 2026-10-22): a resent edit was `409
 event_id_conflict` and a resent removal `404`, though the first had landed. The engine now compares

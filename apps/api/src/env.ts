@@ -214,3 +214,11 @@ function load(): Env {
 }
 
 export const env = load();
+
+/**
+ * PGMAX, read only for the boot to say it is ignored (database-pool.ts; DECISIONS 2026-10-22): the
+ * API passes its pool's size itself, so postgres.js never reads it. Not a setting, so outside the
+ * schema, whose every variable `.railway/railway.ts` keeps (infra/railway/iac.test.mjs): its apply
+ * deletes this one.
+ */
+export const PGMAX = process.env.PGMAX;

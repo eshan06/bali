@@ -63,6 +63,8 @@ with notes. The ones a deploy must set:
 
 `PORT`/`HOST` are provided by the platform; `NODE_ENV` defaults to `production`.
 
+`PGMAX`, and a `max` in `DATABASE_URL`, are ignored: the API sizes its own database pool, 10 connections, and with either set its boot log and Sentry say so by name (`docs/DECISIONS.md`, 2026-10-22).
+
 ## First-time setup checklist (needs the Railway dashboard + AWS)
 
 These steps need credentials this repo doesn't hold — do them once per

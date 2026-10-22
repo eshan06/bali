@@ -8,15 +8,13 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-22 (Central) — The bell with the class-started push, measured at a school's
-scale (#336, #438; `docs/DECISIONS.md`, 2026-10-22), a k6 run by hand only (the Load gate's `bell`
-input); the gate on PRs is unchanged. Every rung phone opening at once about doubles the Starts'
-time (600 phones: 0.33–0.46 s to 0.52–1.08 s), with no request failing; what runs out is the API's
-one process, not its 10 connections. The fix waits for the owner (Open owner items): the conductor's
-pick, a random wait of up to 10 s before the phone's first read after a push, the Mac's, in the
-push's app half. Nothing anyone sees changes. Before it, a saved question's id case (#437). Next on
-the Windows PC: the four steps for sessions before the pilot's first class, which wait for the
-owner's word; on the Mac, the phone's L8 and M8._
+_Last updated: 2026-10-22 (Central) — The API's database pool can never silently shrink to one
+connection (#439; `docs/DECISIONS.md`, 2026-10-22), a guard from #336's finding (the conductor's
+call, awaiting the owner): the API always hands postgres.js its own size, 10, so `PGMAX` or a `max`
+in `DATABASE_URL`, which postgres.js read as text and made one connection, is ignored, and the boot
+says so by name in its log and to Sentry, never with the URL. No new setting; nothing changes today.
+Before it, #336 measured (#438). Next on the Windows PC: the four steps for sessions before the
+pilot's first class, which wait for the owner's word; on the Mac, the phone's L8 and M8._
 
 ## Now
 
@@ -81,6 +79,10 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
   advisories, which failed CI's audit on every PR, fixed while the owner is away (the conductor's
   call, awaiting the owner); the portal used none of their paths. Dependabot's #309 is superseded.
   Left for the owner: S4's CSP check on the deployed portal (Open owner items).
+- **The database pool's guard (2026-10-22)** ✅ (#439; DECISIONS 2026-10-22), from #336's finding,
+  the conductor's call, awaiting the owner: `createDb` always passes postgres.js a number, 10 unless
+  the load harness names one, so `PGMAX` or a `max` in `DATABASE_URL` is ignored, and the boot says so
+  by name, never with the URL (`docs/DEPLOY.md`). More connections stays not a deploy setting.
 - **The workflow review's last steps** ✅ (the owner, 2026-10-13; DECISIONS 2026-10-14): the
   migration guard (#369), docs-only PRs skipping the test jobs (#365), moved files (#368) and two
   tests (#364), each in full in `docs/PLAN-ARCHIVE.md`.

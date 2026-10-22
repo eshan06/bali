@@ -8,6 +8,41 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-22** — **The API's database pool can never silently shrink to one connection (#439, a
+  guard from #336's finding, #438): the API always hands postgres.js its own size, so `PGMAX` and a
+  `max` in `DATABASE_URL` are ignored, and the boot says so by name. *The conductor's call, awaiting
+  the owner*: no new setting, and nothing changes today.** Passed no size, postgres.js 3.4.9 sizes
+  its pool by a `max` in the URL's query or `PGMAX`, read as text, and a pool of "20" is one
+  connection (`[...Array("20")]`); a deploy calls `main()` with no `databasePool`, so `createDb`
+  passed none, and either one set on Railway would have shrunk the API to one connection, with no
+  error. **The guard:** `createDb` (`packages/db/src/client.ts`) always passes `max`, a number: its
+  caller's, or 10, postgres.js's own default. So a deploy's pool stays 10, and the load harness's
+  `databasePool` (#336, `LOAD_DB_POOL`) sizes it as before. Passed one, postgres.js reads neither
+  `PGMAX` nor the URL's, and sends the URL's `max` nowhere, never to the server as a startup
+  parameter (which Postgres would refuse), so the URL goes over as it is, nothing taken out. Every
+  caller of `createDb` has it, the owner's `school` commands and the load scripts too (*the
+  conductor's call*: one place, beside postgres.js). **Said at boot** (`apps/api/src/database-pool.ts`):
+  `database pool: 10 connections` at info; with either set, instead a warning, in the log and to
+  Sentry (a message at warning level, tagged `boot`: `captureWarning`), "PGMAX and the max parameter
+  in DATABASE_URL are ignored: the API sizes its own database pool, 10 connections
+  (docs/DECISIONS.md, 2026-10-22)", naming one or both, never a value, and never the URL, which
+  holds the database's password. A blank `PGMAX` is unset, as postgres.js read it. `PGMAX` is read
+  beside env.ts's schema, not in it (*the conductor's call*): not a setting, so `.railway/railway.ts`
+  doesn't keep it, and its next apply deletes it. The URL's `max` is found as postgres.js reads the
+  query, after the first `?` and before any `#`, by a read that never throws, so it can't stop a
+  boot. **More connections stays not a deploy setting:** #336 measured 5, 10 and 20 connections
+  giving the same Starts, the API's one process the limit (the entry below); a deploy that wanted
+  another size would need the API to read one and pass it, a decision of its own. **Tests:**
+  `createDb`'s (the control, postgres.js reading both as text when passed no size; then
+  `createDb`'s 10, or its number, with both set; and no `max` sent to the server), the warning's (in
+  the log and to Sentry, no part of the URL in either; the URL's parts made afresh each run, since
+  Sentry sends source lines beside a stack's frames and a test's own text would show there), the
+  boot contract's (the real entry with both set and a password in the URL: one warning naming both,
+  the pool 10, no part of the URL in its output; with neither, the info line, on CI), and the
+  real-Postgres lane's (20 reads at once on a deploy's pool, both set, hold more than one
+  connection; `LOAD_DB_POOL`'s 2 holds 2 with `PGMAX` set). On the old `createDb`, its own and the
+  boot contract's fail: the pool was "20", one connection.
+
 - **2026-10-22** — **The bell with the class-started push, measured at a school's scale (#438, #336):
   every rung phone opening at once about doubles the Starts' time, what runs out is the API's one
   process and not its 10 connections, and of #336's three fixes only spreading the phones' first

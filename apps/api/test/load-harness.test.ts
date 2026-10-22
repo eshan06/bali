@@ -269,9 +269,10 @@ describe.runIf(REAL_PG)('the load harness', () => {
     }
   });
 
-  it("gives the API LOAD_DB_POOL's connections (#336): 20 reads at once open a pool of 2, no more", async () => {
-    // Its own name on each connection, so the suite's other API and this reader aren't counted.
-    const name = 'bali-load-pool';
+  /** The connections the harness's API holds once 20 reads have run at once, with `vars` set. */
+  async function connectionsAfterReads(vars: Record<string, string>): Promise<number> {
+    // Its own name on each connection, so the suite's other APIs and this reader aren't counted.
+    const name = `bali-load-pool-${randomUUID().slice(0, 8)}`;
     const pooled = spawn(process.execPath, ['--import', 'tsx', 'scripts/load/serve.ts'], {
       cwd: apiDir,
       env: {
@@ -280,8 +281,8 @@ describe.runIf(REAL_PG)('the load harness', () => {
         HOST: '127.0.0.1',
         PORT: '0',
         LOG_LEVEL: 'info',
-        LOAD_DB_POOL: '2',
         PGAPPNAME: name,
+        ...vars,
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -294,13 +295,31 @@ describe.runIf(REAL_PG)('the load harness', () => {
       const [held] = await reader.$client<{ n: number }[]>`
         select count(*)::int as n from pg_stat_activity
         where application_name = ${name} and datname = current_database()`;
-      // The driver's own 10 would open more than 2 for 20 reads at once.
-      expect(held!.n).toBe(2);
+      return held!.n;
     } finally {
       pooled.kill('SIGTERM');
       await gone;
       await reader.$client.end();
     }
+  }
+
+  it("gives the API LOAD_DB_POOL's connections (#336): 20 reads at once open a pool of 2, no more, PGMAX or not", async () => {
+    // The driver's own 10 would open more than 2 for 20 reads at once.
+    expect(await connectionsAfterReads({ LOAD_DB_POOL: '2', PGMAX: '20' })).toBe(2);
+  });
+
+  it("keeps a deploy's own pool past PGMAX and a max in DATABASE_URL, never one connection (DECISIONS 2026-10-22)", async () => {
+    // No LOAD_DB_POOL, as a deploy names no size. Read as text, PGMAX's "20" or the URL's made
+    // the pool one connection, which 20 reads at once would share.
+    const url = new URL(server!);
+    url.searchParams.set('max', '20');
+    const held = await connectionsAfterReads({
+      LOAD_DB_POOL: '',
+      PGMAX: '20',
+      TEST_DATABASE_URL: url.toString(),
+    });
+    expect(held).toBeGreaterThan(1);
+    expect(held).toBeLessThanOrEqual(10);
   });
 
   it("serves the gate's flooder: an account of the school's, in no class", async () => {

@@ -8,11 +8,11 @@ import { scrubText } from './redact.js';
  * Error monitoring (Phase 5, P1). Off unless SENTRY_DSN is set — tests and dev
  * never set it, so `captureFailure` is a no-op there. When on, only real
  * failures leave (a 500 from the error handler, an uncaught exception or
- * rejection), never an expected 4xx refusal, and nothing about a student goes
- * with them: the scrubber below keeps the error's type, its stack, the route
- * template and the release, and drops everything else that could carry
- * personal data. Messages are scrubbed by the same rule as the logs
- * (`redact.ts`, Phase 6 S2).
+ * rejection) and the boot's warnings (`captureWarning`), never an expected 4xx
+ * refusal, and nothing about a student goes with them: the scrubber below keeps
+ * the error's type, its stack, the route template and the release, and drops
+ * everything else that could carry personal data. Messages are scrubbed by the
+ * same rule as the logs (`redact.ts`, Phase 6 S2).
  */
 
 /**
@@ -106,6 +106,18 @@ export function captureFailure(error: unknown, where: string): void {
   Sentry.withScope((scope) => {
     scope.setTag('route', where);
     Sentry.captureException(error);
+  });
+}
+
+/**
+ * Report something wrong that fails nothing, at warning level: a pool size the
+ * boot ignores (database-pool.ts). The message, tagged where it was found, is
+ * scrubbed as any event is. A no-op when monitoring is off.
+ */
+export function captureWarning(message: string, where: string): void {
+  Sentry.withScope((scope) => {
+    scope.setTag('route', where);
+    Sentry.captureMessage(message, 'warning');
   });
 }
 
