@@ -16,27 +16,27 @@ a real decision? Add a dated entry at the top: what was decided and why.
   Optimization API with SVG files, from a memory bug in the image library it calls (sharp before
   0.35.5) on glibc Linux; GHSA-p3m5-59mp-jv5r (high, today), a denial of service through Server
   Actions in the App Router; and GHSA-4jqv-mc3x-m676 and GHSA-mcj8-r9mp-w47p (moderate, 2026-10-07,
-  the two Dependabot's #309 fixed with 15.5.27), cache poisoning of SSG and ISR pages. **Why now,
-  without the owner:** CLAUDE.md's standing order (a security hole is fixed now, and the owner told
-  after) and CI blocked for every PR. **The bump:** `apps/web`'s range is `^15.5.28`, its floor
-  raised from `^15.5.4` so no install resolves a vulnerable `next`; the lockfile moves `next` and its
-  own `@next/*` packages from 15.5.25 to 15.5.28, and nothing else. 15.5.26 to 15.5.28 are
+  the two that Dependabot's #309, `next` 15.5.27, fixes), cache poisoning of SSG and ISR pages.
+  **Why now, without the owner:** CLAUDE.md's standing order (a security hole is fixed now, and the
+  owner told after) and CI blocked for every PR. **The bump:** `apps/web`'s range is `^15.5.28`, its
+  floor raised from `^15.5.4` so no install resolves a vulnerable `next`; the lockfile moves `next`
+  and its own `@next/*` packages from 15.5.25 to 15.5.28, and nothing else. 15.5.26 to 15.5.28 are
   security-only patch releases, and no portal code changes. The lockfile's sharp was 0.35.5 already,
-  the floor 15.5.28 now sets. Made by raising the range and resolving `next` afresh at the root: `npm
-  install next@15.5.28 -w @bali/web` nested a second copy under `apps/web` with postcss 8.4.31, past
-  the root override (2026-09-20), which the audit refuses as high. **The portal used none of the
-  vulnerable paths:** no `next/image` and no `images` config, so the built-in optimizer refuses SVG
-  and remote URLs (served locally, both answer `400`) and takes only the portal's own two PNG icons;
-  no Server Action (no `'use server'` anywhere: the API is the one brain); no SSG or ISR (every route
-  renders per request, held by `rendering.test.ts` and CI's route check) and no catch-all route; and
-  it runs on Vercel, which the first cache poisoning spares. The fix lands anyway: the audit gates
-  every PR, and a later change could reach them. **Supersedes** #309, which Dependabot closes itself
-  once main has a newer `next`. **For the owner:** S4's CSP check on the deployed portal, due after
-  this upgrade (PLAN's Open owner items). *Left:* `npm audit` without `--omit=dev` still lists dev
-  tools that never ship (vite 8.3.0, high, Dependabot's #427; vitest 5.0.1's `@vitest/mocker`,
-  moderate): outside this step, which installs `next` alone. **Checked:** the audit clean, `npm
-  audit signatures`, typecheck, lint, `npm test`, the portal's build (every route ƒ) and CI's nonce
-  check on the served `/login` (16 scripts).
+  the floor 15.5.28 now sets. Made by raising the range and resolving `next` afresh at the root:
+  `npm install next@15.5.28 -w @bali/web` nested a second copy under `apps/web` with postcss 8.4.31,
+  past the root override (2026-09-20), which the audit refuses as high. **The portal used none of
+  the vulnerable paths:** no `next/image` and no `images` config, so the built-in optimizer refuses
+  SVG and remote URLs (served locally, both answer `400`) and takes only the portal's own two PNG
+  icons; no Server Action (no `'use server'` anywhere: the API is the one brain); no SSG or ISR
+  (every route renders per request, held by `rendering.test.ts` and CI's route check) and no
+  catch-all route; and it runs on Vercel, which the first cache-poisoning advisory says is not
+  affected. The fix lands anyway: the audit gates every PR, and a later change could reach them.
+  **Supersedes** #309, which Dependabot closes itself once main has a newer `next`. **For the
+  owner:** S4's CSP check on the deployed portal, due after this upgrade (PLAN's Open owner items).
+  *Left:* `npm audit` without `--omit=dev` still lists dev tools that never ship (vite 8.3.0, high,
+  Dependabot's #427; vitest 5.0.1's `@vitest/mocker`, moderate): outside this step, which installs
+  `next` alone. **Checked:** the audit clean, `npm audit signatures`, typecheck, lint, `npm test`,
+  the portal's build (every route ƒ) and CI's nonce check on the served `/login` (16 scripts).
 
 - **2026-10-22** — **Four small fixes (#433): the Classes page's clock, one `<main>` on every page
   in every state, Show earlier's focus, and a Start's line.** The owner's follow-up of 2026-10-16,
