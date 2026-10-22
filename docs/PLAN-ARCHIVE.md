@@ -10,6 +10,15 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-22 (Central) — The owner's follow-up fixes are done with four small ones (#433;
+`docs/DECISIONS.md`, 2026-10-22), but for one question the conductor asks the owner. The Classes page
+reads its clock afresh as its tab comes back; every page has one `<main>` in every state, the shell's;
+Show earlier keeps focus, and lands it on the sessions' label once it goes with the last page; and a
+Start sent again after one whose answer was lost no longer says its length wasn't used. No new screen
+or state. Checked in headless Chrome on dev, main beside this branch. Before it, time limits on the
+remaining reads and saves (#432). Next on the Windows PC: the four steps for sessions before the
+pilot's first class, which wait for the owner's word; on the Mac, the phone's L8 and M8._
+
 _Last updated: 2026-10-22 (Central) — The owner's follow-up, time limits on the portal's remaining
 reads and saves (#432; `docs/DECISIONS.md`, 2026-10-22): every read now fails as no answer after a
 poll's 10 s, and each save after its own (10 s; a deck's removal 40 s), sent again under the same
