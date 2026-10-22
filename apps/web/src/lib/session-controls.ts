@@ -1,4 +1,9 @@
-import { type ClassDetail, type ExtendSessionResponse, MAX_SESSION_MINUTES } from '@bali/shared';
+import {
+  type ClassDetail,
+  type ExtendSessionResponse,
+  MAX_SESSION_MINUTES,
+  type StartSessionResponse,
+} from '@bali/shared';
 
 import { type ApiClient, ApiError, NetworkError, SAVE_TIMEOUT_MS } from './api-client';
 import { CANT_ADD_TIME, CANT_MAKE_CODE, CANT_REACH, errText } from './errors';
@@ -254,16 +259,20 @@ export async function sessionRunning(
 }
 
 /**
- * A Start answered `existing` (P10): whether the session running is another length than the one
- * picked, so the page says the pick wasn't used (`SESSION_ALREADY_RUNNING`). A session of the
- * length picked says nothing: this Start's own among them, landed with no answer and sent again
- * (#432's Left). Its length as the Start route made it, its start to its bell.
+ * Whether a Start's answer says a session was already running (`SESSION_ALREADY_RUNNING`, P10):
+ * answered `existing`, its pick set nothing and the bell shown is that session's (another tab's,
+ * a phone's). Never of this page's own last Start that got no answer (`lost`, its minutes), sent
+ * again: a session of its length, picked again, is the one it made, its length used (#432's Left).
+ * The length as the Start route makes it, from the start to the bell.
  */
-export function lengthNotUsed(
-  session: { startedAt: string; endsAt: string },
+export function saysAlreadyRunning(
+  res: Pick<StartSessionResponse, 'outcome' | 'session'>,
   minutes: number,
+  lost: number | null,
 ): boolean {
-  return Date.parse(session.endsAt) - Date.parse(session.startedAt) !== minutes * 60_000;
+  if (res.outcome !== 'existing') return false;
+  const length = Date.parse(res.session.endsAt) - Date.parse(res.session.startedAt);
+  return lost !== minutes || length !== minutes * 60_000;
 }
 
 /**

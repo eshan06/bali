@@ -57,8 +57,9 @@ export function handOff(
  * element, however it is worded. One that takes the failure away, Try again with it, lands focus
  * where `then` says (`handOff`), never on the body. A send's resend holds the same way, its line
  * kept until Bali answers. A send's own button (`send`: Register block, Make new code, Create
- * class, the invite code) says its words, and Try again only once a send of it failed. Held at rest
- * (`blocked`), nothing of its own on its way, it keeps its words.
+ * class, the invite code), or a read's (Reports' Show earlier), says its words, and Try again only
+ * once one of it failed. Held at rest (`blocked`), nothing of its own on its way, it keeps its
+ * words.
  */
 export function TryAgain({
   onRetry,

@@ -42,13 +42,13 @@ import {
   keepUnanswered,
   laterBell,
   LENGTH_PRESETS,
-  lengthNotUsed,
   parseMinutes,
   pickFor,
   rememberedMinutes,
   rememberedPresent,
   rememberMinutes,
   rememberPresent,
+  saysAlreadyRunning,
   sessionRunning,
 } from '@/lib/session-controls';
 import { useApi } from '@/lib/use-api';
@@ -143,6 +143,10 @@ export default function ClassDetailPage() {
   const otherField = useRef<HTMLInputElement>(null);
   // A Start that failed, said under its button; the button sends it again.
   const [startSaid, setStartSaid] = useState<string | null>(null);
+  // The minutes of this page's last Start that got no answer, no session found after it, until a
+  // Start is answered: it may have landed, so its resend answered `existing` with a session of
+  // those minutes is its own (`saysAlreadyRunning`; #432's Left).
+  const lostStart = useRef<number | null>(null);
   // The projector view (DESIGN.md §5), toggled in the grid's header and kept for this tab, so a
   // reload or a return from Reports comes back in it; a new tab or window opens without it.
   const [present, setPresent] = useState(false);
@@ -383,6 +387,8 @@ export default function ClassDetailPage() {
           { durationMinutes: minutes },
           SAVE_TIMEOUT_MS,
         );
+        const lost = lostStart.current;
+        lostStart.current = null;
         setGrid({
           id: res.session.id,
           over: false,
@@ -390,19 +396,23 @@ export default function ClassDetailPage() {
           endsAt: res.session.endsAt,
         });
         // `existing`: a session was running already (another tab's, a phone's), so the length
-        // picked here set nothing; said, since the bell shown is that session's. Not of one the
-        // length picked: this Start's own, landed with no answer and sent again, among them.
+        // picked here set nothing; said, since the bell shown is that session's. Never of this
+        // page's own Start that got no answer, sent again: its session, its length used.
         setSaid(
-          res.outcome === 'existing' && lengthNotUsed(res.session, minutes)
+          saysAlreadyRunning(res, minutes, lost)
             ? { kind: 'note', message: SESSION_ALREADY_RUNNING }
             : null,
         );
       } catch (err) {
         // No answer to go by: the Start may have landed, so the class is read again first, and a
         // session running shows as a reload shows it, never a failure over a class in session.
-        const running =
-          failureOf(err).kind === 'failed' ? await sessionRunning(api, classId) : null;
-        if (running === null) return setStartSaid(errText(err));
+        const noAnswer = failureOf(err).kind === 'failed';
+        const running = noAnswer ? await sessionRunning(api, classId) : null;
+        if (running === null) {
+          // Start sends it again: one with no answer may have landed all the same.
+          if (noAnswer) lostStart.current = minutes;
+          return setStartSaid(errText(err));
+        }
         setSaid(null);
         setGrid((cur) =>
           cur?.id === running ? cur : { id: running, over: false, startedAt: null, endsAt: null },

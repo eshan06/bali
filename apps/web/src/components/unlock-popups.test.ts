@@ -351,7 +351,7 @@ describe('the pop-ups on the class page', () => {
     const grids = page.match(/<LiveGrid\b[^]*?\/>/g) ?? [];
     expect(grids).toHaveLength(1);
     expect(grids[0]).toMatch(/\blivePage\b/);
-    // Placed against the live page's `<main>`, as the reconnect pill is.
+    // Placed against the live page's own root, as the reconnect pill is.
     expect(page).toMatch(/: 'relative flex flex-col gap-5\.5'\}>/);
   });
 });
