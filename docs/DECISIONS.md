@@ -65,7 +65,21 @@ a real decision? Add a dated entry at the top: what was decided and why.
   unchanged); the account's read is two reads, so up to 20 s. **Tested:** the client (every read at
   10 s, a write at its own limit, none without one), `accountReads` on reads settled by hand and on a
   swallowed one, and each limited save through the real client on a fake clock: failed at its limit,
-  then sent again under its id (or as it was) and answered.
+  then sent again under its id (or as it was) and answered. **Seen** in headless Chrome on dev, the
+  preview serving main and then this branch, each request held over CDP and never let through: on
+  main the class page's class read still said Loading… after 15.7 s, and the student home's Try
+  again pressed during its 30 s read let go at once. On this branch, as the demo teacher: the class
+  page's class, Home's account (the 13+ check) and Your questions' list each failed as no answer
+  10.6 s after the page opened, in the line ClassStates, HomeStates and LessonStates draw, Try again
+  held as Loading… with focus on it while held again, said again at its limit, then read with focus
+  on the class's name, the greeting and Your questions; a new question's save failed 10.1 s after
+  Save, its Try again held with Save and Cancel, its three sends one `eventId`, then saved with focus
+  on its Edit (the question removed after); a Start held before it was sent said "Couldn't reach
+  Bali…" 10.2 s after Start, and one that landed with its answer held showed the live page 10.3 s
+  after Start, no failure said (the session ended after). As the demo student Ana, her 13+ check
+  answered yes by a stand-in in that browser alone: a 30 s read refused, then Try again pressed
+  during the next, held as Loading… until that read failed at its limit, 10.0 s on, then read with
+  focus on Your classes. About 314 changed lines without tests, one PR.
 
 - **2026-10-22** — **Try again keeps keyboard focus, part 3 (#431): the rest on `TryAgain`, so the
   scan's `LEFT` is empty; an ask that didn't go through stays said while it is asked again.** The
