@@ -8,7 +8,7 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
-- **2026-10-22** — **The bell with the class-started push, measured at a school's scale (#336):
+- **2026-10-22** — **The bell with the class-started push, measured at a school's scale (#438, #336):
   every rung phone opening at once about doubles the Starts' time, what runs out is the API's one
   process and not its 10 connections, and of #336's three fixes only spreading the phones' first
   reads brings the Starts back. The fix to make, *the conductor's call, awaiting the owner*: a
