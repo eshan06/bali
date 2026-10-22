@@ -483,10 +483,12 @@ describe('what a change said, under the card’s head (LessonStates, LessonSlide
       /<p role="alert" class="text-body">Bali couldn&#x27;t change the slide\.<\/p><button type="button" aria-disabled="false" aria-busy="false" class="[^"]*\bh-8\.5\b[^"]*">Try again<\/button>/,
     );
     // The line's Try again is the hook's own: the last change again; answered, focus on the
-    // slides' title (LessonRetryStates).
+    // slides' title (LessonRetryStates), or on Ask a question once a Stop showing sent again took
+    // the card away, where a Stop showing's own puts it (santa's review).
     expect(source).toMatch(
-      /<SaidLine\s+why=\{said\.why\}\s+held=\{changing !== null\}\s+onAgain=\{lesson\.again\}\s+then=\{\[`\$\{id\}-slides`\]\}\s*\/>/,
+      /<SaidLine\s+why=\{said\.why\}\s+held=\{changing !== null\}\s+onAgain=\{lesson\.again\}\s+then=\{\[`\$\{id\}-slides`, `\$\{id\}-ask`\]\}\s*\/>/,
     );
+    expect(source).toMatch(/document\.getElementById\(`\$\{id\}-ask`\)\?\.focus\(\)/);
     const again = vi.fn();
     press(SaidLine({ why: 'failed', held: false, onAgain: again, then: [] }), 'Try again');
     expect(again).toHaveBeenCalledOnce();

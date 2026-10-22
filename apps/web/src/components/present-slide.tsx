@@ -69,12 +69,14 @@ export function presentSlide({ id, lesson, slide }: Props) {
           Stop showing
         </Button>
       </div>
+      {/* Answered, focus on the slide's title and page; on Present once a Stop showing sent again
+          has given the grid back, as a Stop showing's own does. */}
       {said === null ? null : (
         <SaidLine
           why={said.why}
           held={changing !== null}
           onAgain={lesson.again}
-          then={[`${id}-ps`]}
+          then={[`${id}-ps`, `${id}-present`]}
           present
           className="justify-center text-center"
         />

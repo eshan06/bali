@@ -407,12 +407,14 @@ export function slideCard({ id, lesson, slide, asking, onAsk }: CardProps) {
           </Button>
         </div>
       </div>
+      {/* Answered, focus on the slides' title; on Ask a question once a Stop showing sent again
+          has taken the card away, as a Stop showing's own does. */}
       {said === null ? null : (
         <SaidLine
           why={said.why}
           held={changing !== null}
           onAgain={lesson.again}
-          then={[`${id}-slides`]}
+          then={[`${id}-slides`, `${id}-ask`]}
         />
       )}
       <div className="flex flex-wrap items-start gap-x-7 gap-y-5">

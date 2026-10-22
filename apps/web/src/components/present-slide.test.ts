@@ -213,11 +213,15 @@ describe('what a change said, under the row (PresentSlideStates)', () => {
     press(presentSlide(props(l)), 'Try again');
     expect(l.again).toHaveBeenCalledOnce();
     // Sent again: its line kept, Try again held as Loading…; answered, focus on the slide's title
-    // and page, under it (LessonRetryStates), its frame's lines landing there too.
+    // and page, under it (LessonRetryStates), its frame's lines landing there too; on Present once
+    // a Stop showing sent again gave the grid back, where a Stop showing's own puts it (santa's
+    // review).
     expect(render(lesson({ said: { why: 'failed', change: turnTo }, changing: turnTo }))).toMatch(
       /Bali couldn&#x27;t change the slide\.<\/p><button type="button" aria-disabled="true" aria-busy="true" class="[^"]*">Loading…<\/button>/,
     );
-    expect(source.match(/then=\{\[`\$\{id\}-ps`\]\}/g)).toHaveLength(2);
+    expect(source.match(/then=\{\[`\$\{id\}-ps`\]\}/g)).toHaveLength(1);
+    expect(source.match(/then=\{\[`\$\{id\}-ps`, `\$\{id\}-present`\]\}/g)).toHaveLength(1);
+    expect(source).toMatch(/document\.getElementById\(`\$\{id\}-present`\)\?\.focus\(\)/);
   });
 
   it('says the session ended first, and the slides gone, with no Try again', () => {
