@@ -10,6 +10,15 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-22 (Central) — A saved question's write resent with its `eventId` in upper
+case is its replay (#437, closing #319; `docs/DECISIONS.md`, 2026-10-22): a resent edit was `409
+event_id_conflict` and a resent removal `404`, though the first had landed. The engine now compares
+the id as Postgres does (the conductor's call, awaiting the owner). Three other places that compare
+an id as text wait for the owner's pre-pilot step, the repeated-`event_id` check (Open owner items).
+Nothing anyone sees changes. Before it, a stuck slide upload stops (#436).
+Next on the Windows PC: the four steps for sessions before the pilot's first class, which wait for
+the owner's word; on the Mac, the phone's L8 and M8._
+
 _Last updated: 2026-10-22 (Central) — A slide upload that sends nothing for 30 s stops (#436;
 `docs/DECISIONS.md`, 2026-10-22), the owner's decision: one stuck on a half-open connection or Wi-Fi
 dropping packets sat on a frozen bar until its 25 minutes. Its row now says "The upload stopped.

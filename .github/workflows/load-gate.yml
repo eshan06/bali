@@ -156,6 +156,11 @@ jobs:
           POSTGRES: ${{ job.services.postgres.id }}
         run: |
           set -f # a run is text, never a file pattern
+          # Postgres's CPU, read from its container's cgroup (systemd's driver, else cgroupfs's).
+          cgroup=/sys/fs/cgroup/system.slice/docker-$POSTGRES.scope/cpu.stat
+          [ -r "$cgroup" ] || cgroup=/sys/fs/cgroup/docker/$POSTGRES/cpu.stat
+          # A run's busiest second, by its column of the sampler's log (below).
+          busiest() { sort -n -k"$1" "$cpu" | tail -n 1 | cut -d' ' -f"$1"; }
           n=0
           for run in $RUNS; do
             n=$((n + 1))
@@ -173,18 +178,37 @@ jobs:
               sleep 1
             done
             curl -fsS http://127.0.0.1:3001/healthz > /dev/null || { cat "$log"; exit 1; }
+            # Each second, the CPU the API's main thread (its event loop) and Postgres used, in
+            # hundredths of a core: 100 is one core the whole second.
+            cpu="$RUNNER_TEMP/cpu-$n.log"
+            (
+              api='' db=''
+              while read -r -a stat < "/proc/$pid/task/$pid/stat"; do
+                ticks=$((stat[13] + stat[14]))
+                usec=$(awk '/^usage_usec/ { print int($2 / 10000) }' "$cgroup" 2> /dev/null || true)
+                [ -n "$api" ] && echo "$((ticks - api)) $((${usec:-0} - ${db:-0}))"
+                api=$ticks db=${usec:-0}
+                sleep 1
+              done
+            ) > "$cpu" 2> /dev/null &
+            sampler=$!
             status=0
             k6 run --quiet -e ARRIVAL_WINDOW="$window" -e FIRST_READ="$read" scripts/load/bell.js \
               | tee "$RUNNER_TEMP/k6-$n.log" || status=$?
             # postgres.js keeps each connection it opens: the most the API held at once.
             held=$(docker exec "$POSTGRES" psql -U postgres -tAc \
               "select count(*) from pg_stat_activity where datname = 'bali_load'")
+            kill "$sampler" 2> /dev/null || true
             kill -TERM "$pid"
             timeout 20 tail --pid="$pid" -f /dev/null
+            pg=unread
+            [ -r "$cgroup" ] && pg=$(busiest 2)
             {
               echo "### Run $n ($run): each rung phone within $window s, $pool connections, a first read of $read"
-              echo "k6 exited $status; the API held $held database connections;" \
-                "$(grep -cE '"level":(40|50|60)' "$log" || true) warnings or errors in its log."
+              echo "k6 exited $status; the API held $held database connections; at their busiest" \
+                "second, the API's main thread used $(busiest 1) and Postgres $pg hundredths of a core."
+              echo "The API's warnings and errors:"
+              grep -E '"level":(40|50|60)' "$log" | grep -o '"msg":"[^"]*"' | sort | uniq -c || true
               echo '```'
               sed -n '/TOTAL RESULTS/,$p' "$RUNNER_TEMP/k6-$n.log"
               echo '```'
