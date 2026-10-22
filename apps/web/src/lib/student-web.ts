@@ -412,6 +412,29 @@ export function lessonView(
   return { kind: 'live', klass, bell, presentation, behind: problem !== null, asOf };
 }
 
+/** The lesson page's Try again, pressed: the lesson as it was, and the account's reads answered. */
+export interface LessonRetry {
+  lesson: LessonState;
+  accountReads: number;
+}
+
+/**
+ * Whether the lesson page's Try again holds (StudentRetryStates), its failure said meanwhile: once
+ * pressed (`again`), until the read it waits on answers, the lesson's while the class and its bell
+ * are known (`known`), else the account's; and while what comes after is still loading, so no
+ * Loading… takes its place.
+ */
+export function retryHeld(
+  again: LessonRetry | null,
+  view: LessonView,
+  known: boolean,
+  now: LessonRetry,
+): boolean {
+  if (again === null || view.kind === 'loading') return again !== null;
+  if (view.kind !== 'failed') return false;
+  return known ? now.lesson === again.lesson : now.accountReads === again.accountReads;
+}
+
 /**
  * Why the student's full-screen slide closes by itself (W5; PV1, the owner's approval of
  * 2026-10-12): a question the teacher asked since it opened (`question`: the page then shows it), or

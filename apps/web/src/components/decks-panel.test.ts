@@ -161,9 +161,16 @@ describe('its states (LessonStates, LessonDecksStates)', () => {
   it('says your slides didn’t load, Try again reading them again', () => {
     const p = props('failed');
     expect(text(view(p))).toContain("Bali couldn't load your slides. Try again");
-    expect(view(p)).toMatch(/<p role="alert">Bali couldn&#x27;t load your slides\.<\/p>/);
+    expect(view(p)).toMatch(
+      /<p role="alert">Bali couldn&#x27;t load your slides\.<\/p><button type="button" aria-disabled="false" aria-busy="false" class="[^"]*\bh-8\.5\b[^"]*">Try again<\/button>/,
+    );
     press(DecksView(p), 'Try again');
     expect(p.onRead).toHaveBeenCalledOnce();
+    // `TryAgain`'s own: held while the read runs, its line said again at each failure, and once
+    // read, focus on the panel's title (LessonRetryStates).
+    expect(source).toMatch(
+      /<TryAgain onRetry=\{onRead\} then=\{\[`\$\{id\}-h`\]\}>\s*<p role="alert">\{CANT_LOAD_SLIDES\}<\/p>\s*<\/TryAgain>/,
+    );
   });
 
   it('says none are ready yet, none uploaded or none checked', () => {
@@ -239,9 +246,12 @@ describe('its states (LessonStates, LessonDecksStates)', () => {
 
 describe('the panel as Show slides opens it', () => {
   it('reads your slides each time it opens, again by Try again, focus to its title', () => {
+    // Read again with no Loading… step: a failure stays said until the answer, Try again held.
     expect(source).toMatch(
-      /const read = useCallback\(async \(\) => \{\s*setDecks\('loading'\);\s*const answer = await readDecks\(api\);\s*setDecks\(answer\.kind === 'read' \? answer\.decks : 'failed'\);\s*\}, \[api\]\);/,
+      /const read = useCallback\(async \(\) => \{\s*const answer = await readDecks\(api\);\s*setDecks\(answer\.kind === 'read' \? answer\.decks : 'failed'\);\s*\}, \[api\]\);/,
     );
+    expect(source).toMatch(/useState<Decks>\('loading'\)/);
+    expect(source).toMatch(/onRead=\{read\}/);
     expect(source).toMatch(/useEffect\(\(\) => \{\s*void read\(\);\s*\}, \[read\]\);/);
     expect(source).toMatch(
       /useEffect\(\(\) => document\.getElementById\(`\$\{id\}-h`\)\?\.focus\(\), \[id\]\);/,

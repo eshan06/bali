@@ -70,10 +70,13 @@ export default function QuestionsPage() {
       ?.focus();
   }, [focus]);
 
+  // The list read, its failure said until the answer, so Try again holds in its place; only the
+  // newest read's answer is drawn, so a slow one never says its failure over one read since.
+  const reads = useRef(0);
   const read = useCallback(async () => {
-    setDrafts('loading');
+    const mine = ++reads.current;
     const answer = await readDrafts(api);
-    setDrafts(answer.kind === 'read' ? answer.drafts : 'failed');
+    if (reads.current === mine) setDrafts(answer.kind === 'read' ? answer.drafts : 'failed');
   }, [api]);
 
   useEffect(() => {
@@ -94,7 +97,10 @@ export default function QuestionsPage() {
   function show(draft: SavedQuestion | null | undefined, to: string[]) {
     opened.current += 1;
     // A save whose answer never came may have landed: the list reads the drafts as they are.
-    if (unsaved.current) void read();
+    if (unsaved.current) {
+      setDrafts('loading');
+      void read();
+    }
     unsaved.current = null;
     const start = draft ? trimmed(draft) : NEW;
     setForm(
@@ -195,7 +201,7 @@ export default function QuestionsPage() {
           removal(draftId, null);
           setFocus([`q-${draftId}-remove`]);
         },
-        read: () => void read(),
+        read,
       }}
     />
   );

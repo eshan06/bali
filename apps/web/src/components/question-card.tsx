@@ -296,7 +296,9 @@ export function useLiveQuestion(sessionId: string | null) {
       askingNow.current = true;
       const mine = (asks.current += 1);
       askedFrom.current = from;
-      setOpening({ busy: true, failure: null, from });
+      // The same one asked again (Try again, or its Ask): its failure stays said until this ask's
+      // answer, Try again held; another one's goes as it starts (LessonRetryStates).
+      setOpening((cur) => ({ busy: true, failure: cur.from === from ? cur.failure : null, from }));
       const attempt = openAttemptFor(unansweredOpen.current, session, draft);
       const answer = await openQuestion(api, attempt);
       // A session gone meanwhile is the next one's no more: its own ask and attempt stand.

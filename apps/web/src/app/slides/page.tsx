@@ -72,8 +72,8 @@ export default function SlidesPage() {
       ?.focus();
   }, [focus]);
 
+  // The list read, its failure said until the answer, so Try again holds in its place.
   const read = useCallback(async () => {
-    setDecks('loading');
     const answer = await readDecks(api);
     if (open.current) setDecks(answer.kind === 'read' ? answer.decks : 'failed');
   }, [api]);
@@ -143,8 +143,12 @@ export default function SlidesPage() {
     const at = held.current.get(key);
     if (end.kind === 'cancelled') return void cancelled(key, end.upload, at?.near ?? []);
     // The check took the row's buttons away: focus it lost comes back to the row's button now, or
-    // to the page's title once the row has gone with its deck.
-    if (document.activeElement === document.body) setFocus([`${idOf(key)}-act`, TITLE]);
+    // to the page's title once the row has gone with its deck; and so does focus Try again left on
+    // the row's name while the check ran (QuestionsSlidesRetryStates).
+    const lost = document.activeElement;
+    if (lost === document.body || lost?.id === `${idOf(key)}-name`) {
+      setFocus([`${idOf(key)}-act`, TITLE]);
+    }
     if (end.kind === 'checked' || end.kind === 'gone') {
       held.current.delete(key);
       // The verdict: the row turns into its deck, the same element, so its line is said.
@@ -240,7 +244,7 @@ export default function SlidesPage() {
       inUse={inUse}
       on={{
         pick: () => picker.current?.click(),
-        read: () => void read(),
+        read,
         cancel: (key) => {
           const at = held.current.get(key);
           if (!at) return;

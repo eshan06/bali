@@ -520,7 +520,11 @@ describe('its hook (L6’s logic, held for one session)', () => {
       /const ask = useCallback\(\s*async \(draft: QuestionDraft, from: string \| null = null\): Promise<OpenAnswer \| null> => \{/,
     );
     expect(hook).toMatch(/if \(session === null \|\| askingNow\.current\) return null;/);
-    expect(hook).toMatch(/setOpening\(\{ busy: true, failure: null, from \}\);/);
+    // The same one asked again keeps its failure said while it goes, so its Try again holds in its
+    // place; another one's goes as it starts (question-card-hook.test.ts runs it).
+    const keeps =
+      /setOpening\(\(cur\) => \(\{ busy: true, failure: cur\.from === from \? cur\.failure : null, from \}\)\);/;
+    expect(hook).toMatch(keeps);
     // Answered, it lets go: the guard and the busy look, its failure said unless Cancel forgot it
     // meanwhile; an ask of a session gone touches the next one's nothing; one cancelled on its way
     // closes no panel opened since. A new session starts with none.
@@ -534,7 +538,7 @@ describe('its hook (L6’s logic, held for one session)', () => {
     // way; never an ask of one of the teacher's questions, whose failure waits under it in their list
     // however the panel was left meanwhile (santa's review, round 2).
     expect(hook).toMatch(
-      /askedFrom\.current = from;\s*setOpening\(\{ busy: true, failure: null, from \}\);/,
+      new RegExp(`askedFrom\\.current = from;\\s*(?://[^\\n]*\\n\\s*)*${keeps.source}`),
     );
     expect(hook).toMatch(
       /const forgetAsk = useCallback\(\(\) => \{\s*if \(askedFrom\.current !== null\) return;\s*asks\.current \+= 1;\s*setOpening\(\(cur\) => \(\{ \.\.\.cur, failure: null \}\)\);\s*\}, \[\]\);/,

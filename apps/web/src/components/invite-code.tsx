@@ -2,10 +2,10 @@
 
 import { useId, useLayoutEffect, useRef, useState } from 'react';
 
-import { Button } from '@/components/button';
 import { CARD_ENTRY } from '@/components/card';
 import { EntryPage, STAGE_FOOT } from '@/components/entry-page';
 import { Field } from '@/components/field';
+import { TryAgain } from '@/components/try-again';
 import {
   type Attempt,
   attemptFor,
@@ -86,10 +86,9 @@ export function InviteCode({ onTeacher }: { onTeacher: () => void }) {
     }
   }
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  // Redeem code's press, and Try again's; Enter in the field presses it.
+  async function redeem() {
     if (sending.current) return;
-    if (teaches) return onTeacher();
     const problem = codeProblem(code);
     if (problem) {
       setSaid({ kind: 'refused', message: problem, reason: 'invite_code_invalid' });
@@ -120,7 +119,14 @@ export function InviteCode({ onTeacher }: { onTeacher: () => void }) {
         You need it once, to set up this account for teaching.
       </p>
 
-      <form onSubmit={(e) => void onSubmit(e)} className="flex flex-col gap-4.5">
+      {/* Its button sends; Enter in the field presses it, or goes on once the account teaches. */}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (teaches && !sending.current) onTeacher();
+        }}
+        className="flex flex-col gap-4.5"
+      >
         <Field
           ref={field}
           id={`${id}-code`}
@@ -145,21 +151,22 @@ export function InviteCode({ onTeacher }: { onTeacher: () => void }) {
           </p>
         ) : null}
 
-        {/* One button throughout, so focus stays on it whatever it comes to say. */}
-        <Button
+        {/* One button throughout, so focus stays on it whatever it comes to say: Try again only
+            for an answer that never came, never after a refusal (PB5's review). */}
+        <TryAgain
           type={teaches ? 'button' : 'submit'}
-          onClick={teaches ? onTeacher : undefined}
-          aria-disabled={busy}
+          variant="primary"
+          size="md"
+          onRetry={teaches ? onTeacher : redeem}
+          held={busy}
+          then={[]}
+          send={{
+            words: teaches ? 'Go to your classes' : 'Redeem code',
+            sending: 'Redeeming…',
+            failed: said?.kind === 'failed',
+          }}
           className="w-full"
-        >
-          {busy
-            ? 'Redeeming…'
-            : teaches
-              ? 'Go to your classes'
-              : said?.kind === 'failed'
-                ? 'Try again'
-                : 'Redeem code'}
-        </Button>
+        />
       </form>
     </section>
   );

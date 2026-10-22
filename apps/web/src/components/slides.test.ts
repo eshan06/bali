@@ -28,6 +28,7 @@ import {
   stoppedLine,
   TITLE,
 } from './slides';
+import { TryAgain } from './try-again';
 
 /*
  * Your slides (M5b) as the canvas draws it: the Slides board's rows, LessonStates' lines for it,
@@ -140,6 +141,18 @@ const text = (html: string) =>
 function hosts(node: ReactNode): ReactElement<Record<string, unknown>>[] {
   if (Array.isArray(node)) return node.flatMap(hosts);
   if (!isValidElement<Record<string, unknown>>(node)) return [];
+  // `TryAgain` keeps state of its own: its line, then its button, pressed as its own press is, a
+  // press while held sending nothing.
+  if (node.type === TryAgain) {
+    const {
+      onRetry,
+      children,
+      held = false,
+      blocked = false,
+    } = node.props as Parameters<typeof TryAgain>[0];
+    const onClick = () => (held || blocked ? undefined : onRetry());
+    return [...hosts(children), createElement('button', { onClick }, 'Try again')];
+  }
   if (typeof node.type === 'function') {
     return hosts((node.type as (p: unknown) => ReactNode)(node.props));
   }
@@ -310,10 +323,24 @@ describe('the list’s other states (LessonStates, SlidesStates)', () => {
     const on = actions();
     const props = view('failed', [], { on });
     expect(render(props)).toMatch(
-      /<div class="flex flex-wrap items-center gap-x-4 gap-y-3"><p role="alert" class="text-body">Bali couldn&#x27;t load your slides\.<\/p><button type="button" class="[^"]*\bh-8\.5\b[^"]*">Try again<\/button><\/div>/,
+      /<div class="flex flex-wrap items-center gap-x-4 gap-y-3"><p role="alert" class="text-body">Bali couldn&#x27;t load your slides\.<\/p><button type="button" aria-disabled="false" aria-busy="false" class="[^"]*\bh-8\.5\b[^"]*">Try again<\/button><\/div>/,
     );
     press(SlidesView(props), 'Try again');
     expect(on.read).toHaveBeenCalledOnce();
+  });
+
+  it('keeps it said while Try again reads it again, held, then focus on Your slides (QuestionsSlidesRetryStates)', () => {
+    // `TryAgain`'s own (try-again.test.ts): held while the read's promise runs, its line said again
+    // at each failure, and once read, focus on the page's title, never the page.
+    const component = readFileSync(fileURLToPath(new URL('./slides.tsx', import.meta.url)), 'utf8');
+    expect(component).toMatch(
+      /<TryAgain onRetry=\{on\.read\} then=\{\[TITLE\]\}>\s*<p role="alert" className="text-body">\s*\{CANT_LOAD_SLIDES\}/,
+    );
+    // The page reads it again with no Loading… step: the failure stays said until the answer.
+    expect(page).toMatch(
+      /const read = useCallback\(async \(\) => \{\s*const answer = await readDecks\(api\);\s*if \(open\.current\) setDecks\(answer\.kind === 'read' \? answer\.decks : 'failed'\);\s*\}, \[api\]\);/,
+    );
+    expect(page).toMatch(/read,\s*cancel:/);
   });
 
   it('keeps an upload in sight while the list loads or failed, under its line', () => {
@@ -370,7 +397,7 @@ describe('an upload that stopped (LessonStates, SlidesStates)', () => {
       'Unit 3 review Cancel The upload stopped. Check your connection and try again. Try again',
     );
     expect(html).toMatch(
-      /<div class="col-\[2\/-1\] flex flex-wrap items-center gap-x-4 gap-y-3"><p role="alert">The upload stopped\. Check your connection and try again\.<\/p><button type="button" aria-describedby="deck-upload-3-name" aria-disabled="false" class="[^"]*\bh-8\.5\b/,
+      /<div class="col-\[2\/-1\] flex flex-wrap items-center gap-x-4 gap-y-3"><p role="alert">The upload stopped\. Check your connection and try again\.<\/p><button type="button" aria-disabled="false" aria-busy="false" aria-describedby="deck-upload-3-name" class="[^"]*\bh-8\.5\b/,
     );
     // No line under the name and no bar: the foot says it.
     expect(html).not.toContain('aria-live');
@@ -380,6 +407,19 @@ describe('an upload that stopped (LessonStates, SlidesStates)', () => {
     press(tree, 'Cancel');
     expect(on.retry).toHaveBeenCalledWith('upload-3');
     expect(on.cancel).toHaveBeenCalledWith('upload-3');
+  });
+
+  it('goes on as Try again is pressed, focus on its Cancel, or on its name while it is checked (QuestionsSlidesRetryStates)', () => {
+    // `TryAgain`'s, so focus never falls to the page as its row turns: on the row's Cancel, or with
+    // none while the check runs, on its name; and the page, once the check answers, takes it from
+    // there to the row's button, as it does from the page.
+    const component = readFileSync(fileURLToPath(new URL('./slides.tsx', import.meta.url)), 'utf8');
+    expect(component).toMatch(
+      /<TryAgain\s*onRetry=\{\(\) => on\.retry\(key\)\}\s*blocked=\{cancelling\}\s*then=\{\[`\$\{id\}-act`, name\]\}\s*describedBy=\{name\}\s*>/,
+    );
+    expect(page).toMatch(
+      /const lost = document\.activeElement;\s*if \(lost === document\.body \|\| lost\?\.id === `\$\{idOf\(key\)\}-name`\) \{\s*setFocus\(\[`\$\{idOf\(key\)\}-act`, TITLE\]\);\s*\}/,
+    );
   });
 
   it('says the 25 minutes, and too many tries, each in its words', () => {
@@ -411,6 +451,10 @@ describe('an upload that stopped (LessonStates, SlidesStates)', () => {
       /<button type="button" id="deck-upload-4-act" aria-describedby="deck-upload-4-name" aria-disabled="true"/,
     );
     const held = { key: 'upload-3', sending: stopped(failed, { cancelling: true }) };
+    // Try again held in its own words while the Cancel is sent: not its own send (SlidesStates).
+    expect(row(held)).toMatch(
+      /<button type="button" aria-disabled="true" aria-busy="false" aria-describedby="deck-upload-3-name" class="[^"]*">Try again<\/button>/,
+    );
     const tree = DeckRow({ row: held, removal: undefined, inUse: undefined, on });
     press(tree, 'Cancel');
     press(tree, 'Try again');
@@ -582,7 +626,7 @@ describe('the page’s wiring (app/slides/page.tsx)', () => {
     // Its buttons went with the check: focus lost to the page comes back to the row's button at
     // every end of a run but a Cancel's (a verdict, a stop), else to the title (santa's review).
     expect(page).toMatch(
-      /if \(end\.kind === 'cancelled'\) return void cancelled\(key, end\.upload, at\?\.near \?\? \[\]\);\s*(?:\/\/[^\n]*\n\s*)*if \(document\.activeElement === document\.body\) setFocus\(\[`\$\{idOf\(key\)\}-act`, TITLE\]\);\s*if \(end\.kind === 'checked' \|\| end\.kind === 'gone'\)/,
+      /if \(end\.kind === 'cancelled'\) return void cancelled\(key, end\.upload, at\?\.near \?\? \[\]\);\s*(?:\/\/[^\n]*\n\s*)*const lost = document\.activeElement;\s*if \(lost === document\.body \|\| lost\?\.id === `\$\{idOf\(key\)\}-name`\) \{\s*setFocus\(\[`\$\{idOf\(key\)\}-act`, TITLE\]\);\s*\}\s*if \(end\.kind === 'checked' \|\| end\.kind === 'gone'\)/,
     );
   });
 

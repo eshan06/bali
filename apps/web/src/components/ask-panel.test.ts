@@ -13,6 +13,7 @@ import { refusalsOf } from '../lib/saved-questions';
 import { askSaid, AskPanel, NEW_DRAFT, pickLine, PickView } from './ask-panel';
 import type { Opening } from './question-card';
 import { CANT_LOAD_QUESTIONS, type Drafts, refusalSaid, UNSHOWABLE } from './saved-questions';
+import { TryAgain } from './try-again';
 
 /*
  * Asking a question in the side panel: picked from the teacher's questions (L7b, part 2; LessonAsk,
@@ -88,6 +89,18 @@ const pick = (props: ReturnType<typeof pickProps>) =>
 function hosts(node: ReactNode): ReactElement<Record<string, unknown>>[] {
   if (Array.isArray(node)) return node.flatMap(hosts);
   if (!isValidElement<Record<string, unknown>>(node)) return [];
+  // `TryAgain` keeps state of its own: its line, then its button, pressed through its `onRetry`,
+  // held and described as its props say.
+  if (node.type === TryAgain) {
+    const {
+      onRetry,
+      children,
+      describedBy,
+      held = false,
+    } = node.props as Parameters<typeof TryAgain>[0];
+    const button = { onClick: onRetry, 'aria-describedby': describedBy, 'aria-disabled': held };
+    return [...hosts(children), createElement('button', button, 'Try again')];
+  }
   // Next's link holds hooks of its own: read as the `<a>` it draws.
   if (typeof node.type === 'function' && node.type !== Link) {
     return hosts((node.type as (p: unknown) => ReactNode)(node.props));
@@ -212,11 +225,23 @@ describe('the list’s other states (LessonAskStates)', () => {
     const handlers = on();
     const props = pickProps('failed', IDLE, false, handlers);
     expect(pick(props)).toMatch(
-      /Written ahead<\/h3><div class="flex flex-wrap items-center gap-x-4 gap-y-3"><p role="alert" class="text-body">Bali couldn&#x27;t load your questions\.<\/p><button type="button" class="[^"]*\bh-8\.5\b[^"]*">Try again<\/button><\/div>/,
+      /Written ahead<\/h3><div class="flex flex-wrap items-center gap-x-4 gap-y-3"><p role="alert" class="text-body">Bali couldn&#x27;t load your questions\.<\/p><button type="button" aria-disabled="false" aria-busy="false" class="[^"]*\bh-8\.5\b[^"]*">Try again<\/button><\/div>/,
     );
     expect(CANT_LOAD_QUESTIONS).toBe("Bali couldn't load your questions.");
     press(PickView(props), 'Try again');
     expect(handlers.onRead).toHaveBeenCalledOnce();
+  });
+
+  it('keeps it said while Try again reads them again, held, then focus on Written ahead (LessonRetryStates)', () => {
+    // `TryAgain`'s own (try-again.test.ts): held while the read's promise runs, its line said again
+    // at each failure, and once read, focus on Written ahead, never the page.
+    const view = source.slice(source.indexOf('export function PickView'));
+    expect(view).toMatch(
+      /<TryAgain onRetry=\{onRead\} then=\{\[`\$\{id\}-ahead`\]\}>\s*\{saidLine\(CANT_LOAD_QUESTIONS\)\}\s*<\/TryAgain>/,
+    );
+    // Read again with no Loading… step: the failure stays said until the answer.
+    const panel = source.slice(source.indexOf('export function PickPanel'));
+    expect(panel).not.toContain("setDrafts('loading')");
   });
 
   it('says none saved yet in LessonStates’ line, in the primary ink, Write a new question under it', () => {
@@ -283,7 +308,7 @@ describe('asking one (LessonAskStates)', () => {
       "Where does the graph of y = (x − 3)(x − 4) cross the x-axis? 3 answers · A marked correct Ask Bali couldn't ask the question. Check your connection and try again. Try again",
     );
     expect(row[2]).toMatch(
-      /<\/button><div class="col-span-full mt-1\.5 flex flex-wrap items-center gap-x-4 gap-y-3"><p role="alert" class="text-body">Bali couldn&#x27;t ask the question\. Check your connection and try again\.<\/p><button type="button" aria-describedby="P-[^"]+" aria-disabled="false" class="[^"]*\bh-8\.5\b[^"]*">Try again<\/button><\/div>$/,
+      /<\/button><div class="col-span-full mt-1\.5 flex flex-wrap items-center gap-x-4 gap-y-3"><p role="alert" class="text-body">Bali couldn&#x27;t ask the question\. Check your connection and try again\.<\/p><button type="button" aria-disabled="false" aria-busy="false" aria-describedby="P-[^"]+" class="[^"]*\bh-8\.5\b[^"]*">Try again<\/button><\/div>$/,
     );
     // Said under that question alone.
     expect(html.match(/role="alert"/g)).toHaveLength(1);
@@ -291,12 +316,43 @@ describe('asking one (LessonAskStates)', () => {
     expect(handlers.onPick).toHaveBeenCalledWith(BOARD[2]);
   });
 
+  it('keeps it said while Try again or its Ask asks it again, held with every Ask (LessonRetryStates)', () => {
+    // The live question keeps the failure of the one asked again (question-card-hook.test.ts).
+    const handlers = on();
+    const props = pickProps(
+      BOARD,
+      { busy: true, failure: NO_ANSWER, from: BOARD[2].id },
+      false,
+      handlers,
+    );
+    const html = pick(props);
+    const row = [...html.matchAll(/<li class="[^"]*">([^]*?)<\/li>/g)].map((r) => r[1]);
+    expect(text(row[2] ?? '')).toBe(
+      "Where does the graph of y = (x − 3)(x − 4) cross the x-axis? 3 answers · A marked correct Ask Bali couldn't ask the question. Check your connection and try again. Loading…",
+    );
+    expect(row[2]).toMatch(
+      /<button type="button" aria-disabled="true" aria-busy="true" aria-describedby="P-[^"]+" class="[^"]*">Loading…<\/button><\/div>$/,
+    );
+    expect(html).not.toMatch(/\sdisabled=""/);
+    press(PickView(props), 'Try again');
+    expect(handlers.onPick).not.toHaveBeenCalled();
+    // Asked, the panel closes and the page moves focus to the question; the session ended first,
+    // its line alone, focus on the question's words.
+    expect(source).toMatch(
+      /<TryAgain\s*onRetry=\{pick\(draft\)\}\s*held=\{busy\}\s*then=\{\[q\]\}\s*describedBy=\{q\}\s*>/,
+    );
+  });
+
   it('says the session ended first, with no Try again; too many tries and a refusal in theirs', () => {
-    const said = (failure: Failure) =>
-      text(pick(pickProps(BOARD, { busy: false, failure, from: BOARD[0].id })));
+    const said = (failure: Failure, busy = false) =>
+      text(pick(pickProps(BOARD, { busy, failure, from: BOARD[0].id })));
     expect(said(ENDED)).toContain(
       "Ask This session has ended, so Bali didn't ask the question. Which pair",
     );
+    // With no Try again to keep in its place, it goes while its Ask asks again, and is said anew
+    // with its answer, a new element (santa's review); one with a Try again is kept.
+    expect(said(ENDED, true)).not.toContain('This session has ended');
+    expect(said(NO_ANSWER, true)).toContain("Bali couldn't ask the question.");
     expect(said({ kind: 'failed', status: 429, retryAfter: 2 })).toContain(
       `Ask ${TOO_MANY_TRIES} Try again Which pair`,
     );
@@ -315,12 +371,14 @@ describe('asking one (LessonAskStates)', () => {
     expect(panel).toMatch(
       /const answer = await onAsk\(trimmed\(draft\), draft\.id\);\s*if \(answer\?\.kind === 'opened'\) onAsked\(\);/,
     );
-    // Its words read from Bali each time it opens, and again by Try again, oldest first.
+    // Its words read from Bali each time it opens, and again by Try again, oldest first, a failure
+    // said until the answer.
     expect(panel).toMatch(
-      /const read = useCallback\(async \(\) => \{\s*setDrafts\('loading'\);\s*const answer = await readDrafts\(api\);\s*setDrafts\(answer\.kind === 'read' \? answer\.drafts : 'failed'\);/,
+      /const read = useCallback\(async \(\) => \{\s*const answer = await readDrafts\(api\);\s*setDrafts\(answer\.kind === 'read' \? answer\.drafts : 'failed'\);/,
     );
+    expect(panel).toMatch(/useState<Drafts>\('loading'\)/);
     expect(panel).toMatch(/useEffect\(\(\) => \{\s*void read\(\);\s*\}, \[read\]\);/);
-    expect(panel).toMatch(/onRead=\{\(\) => void read\(\)\}/);
+    expect(panel).toMatch(/onRead=\{read\}/);
     // Focus comes to its title as it opens.
     expect(panel).toMatch(
       /useEffect\(\(\) => document\.getElementById\(`\$\{id\}-h`\)\?\.focus\(\), \[id\]\);/,
@@ -502,9 +560,14 @@ describe('a failed ask (LessonStates)', () => {
     });
     expect(askSaid({ kind: 'failed', status: 503, retryAfter: undefined }).retry).toBe(true);
     expect(askSaid({ kind: 'refused', status: 409, reason: 'event_id_conflict' }).retry).toBe(true);
-    // Try again submits the form again: the same words are the same attempt (L6).
+    // Try again sends the form's words again, as Ask the class does: the same words are the same
+    // attempt (L6). Held while any ask is on its way; asked, the page moves focus to the question;
+    // the session ended first, its line alone, focus on the panel's title (LessonRetryStates).
     expect(source).toMatch(
-      /\{failed\.retry \? \(\s*<Button variant="secondary" size="sm" type="submit" aria-disabled=\{busy\}>\s*Try again/,
+      /\{failed\.retry \? \(\s*<TryAgain onRetry=\{send\} held=\{busy\} then=\{\[`\$\{id\}-h`\]\}>\s*\{saidLine\(failed\.words\)\}\s*<\/TryAgain>\s*\) : \(\s*saidLine\(failed\.words\)\s*\)\}/,
+    );
+    expect(source).toMatch(
+      /<form\s*onSubmit=\{\(e\) => \{\s*e\.preventDefault\(\);\s*void send\(\);\s*\}\}/,
     );
   });
 
@@ -534,17 +597,33 @@ describe('a failed ask (LessonStates)', () => {
     const written = { prompt: 'Q', options: ['A', 'B'], correctOption: null };
     const html = render(written, false, { busy: false, failure: NO_ANSWER, from: null });
     expect(html).toMatch(
-      /<p role="alert" class="text-body">Bali couldn&#x27;t ask the question\. Check your connection and try again\.<\/p><button type="submit" aria-disabled="false" class="[^"]*\bh-8\.5\b[^"]*">Try again<\/button><\/div><div class="[^"]*border-t[^"]*"><button type="submit"/,
+      /<p role="alert" class="text-body">Bali couldn&#x27;t ask the question\. Check your connection and try again\.<\/p><button type="button" aria-disabled="false" aria-busy="false" class="[^"]*\bh-8\.5\b[^"]*">Try again<\/button><\/div><div class="[^"]*border-t[^"]*"><button type="submit"/,
+    );
+    // Sent again, by Try again or Ask the class: the line kept, Try again held as Loading… with
+    // Ask the class (LessonRetryStates).
+    const again = render(written, false, { busy: true, failure: NO_ANSWER, from: null });
+    expect(again).toMatch(
+      /<p role="alert" class="text-body">Bali couldn&#x27;t ask the question\. Check your connection and try again\.<\/p><button type="button" aria-disabled="true" aria-busy="true" class="[^"]*">Loading…<\/button><\/div><div class="[^"]*border-t[^"]*"><button type="submit" aria-disabled="true" aria-busy="true"/,
     );
     const ended = render(written, false, { busy: false, failure: ENDED, from: null });
     expect(text(ended)).toContain("This session has ended, so Bali didn't ask the question.");
     expect(ended).not.toContain('Try again');
+    // With no Try again to keep in its place, it goes while Ask the class asks again, and is said
+    // anew with its answer, a new element (santa's review).
+    expect(render(written, false, { busy: true, failure: ENDED, from: null })).not.toContain(
+      'role="alert"',
+    );
     // An ask of one of the teacher's questions is said in their list, never over what is written.
     expect(
       render(written, false, { busy: false, failure: NO_ANSWER, from: BOARD[0].id }),
     ).not.toContain('role="alert"');
     expect(source).toMatch(
-      /const answer = await onAsk\(trimmed\(draft\)\);\s*if \(answer\?\.kind === 'opened'\) onAsked\(\);/,
+      /return onAsk\(trimmed\(draft\)\)\.then\(\(answer\) => \{\s*if \(answer\?\.kind === 'opened'\) onAsked\(\);\s*\}\);/,
+    );
+    // What Bali refuses is said first and nothing sent: no promise, so Try again doesn't hold, nor
+    // say its line again beside the field's refusal (santa's review).
+    expect(source).toMatch(
+      /function send\(\) \{\s*if \(busy\) return;[^]*?if \(first !== -1\) \{[^]*?\.focus\(\);\s*return;\s*\}\s*return onAsk/,
     );
   });
 

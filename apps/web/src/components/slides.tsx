@@ -8,6 +8,7 @@ import { TOO_MANY_TRIES } from '@/lib/errors';
 import type { Failure } from '@/lib/live-question';
 
 import { Button } from './button';
+import { TryAgain } from './try-again';
 
 /*
  * Your slides (M5b; the Slides board, LessonStates' lines for it, and SlidesStates' states in
@@ -54,8 +55,8 @@ export type Refusal =
 export interface SlidesActions {
   /** Upload a PDF: the file picker. */
   pick: () => void;
-  /** The list's Try again. */
-  read: () => void;
+  /** The list's Try again: read again, its failure said until it answers. */
+  read: () => Promise<void>;
   cancel: (key: string) => void;
   retry: (key: string) => void;
   /** A deck's Remove, which asks first. */
@@ -201,7 +202,8 @@ const CAPTION = 'text-caption text-text-tertiary';
 
 /**
  * Your slides (the Slides board): its head with Upload a PDF, a refused pick under it, then the
- * list: loading, failed with Try again, none yet, or each row.
+ * list: loading, failed with Try again (its line kept, held, until Bali answers, then focus on the
+ * page's title; QuestionsSlidesRetryStates), none yet, or each row.
  */
 export function SlidesView({
   decks,
@@ -250,12 +252,11 @@ export function SlidesView({
         </p>
       ) : decks === 'failed' ? (
         <div className={SAID}>
-          <p role="alert" className="text-body">
-            {CANT_LOAD_SLIDES}
-          </p>
-          <Button variant="secondary" size="sm" onClick={on.read}>
-            Try again
-          </Button>
+          <TryAgain onRetry={on.read} then={[TITLE]}>
+            <p role="alert" className="text-body">
+              {CANT_LOAD_SLIDES}
+            </p>
+          </TryAgain>
         </div>
       ) : rows.length === 0 ? (
         <p className="text-body text-text-secondary">
@@ -281,9 +282,11 @@ export function SlidesView({
 
 /**
  * One row (`.deck-row`): an upload with its percentage and Cancel, its check, or where it stopped
- * with Try again; or a deck, ready with its pages, size and day, or refused with why, Remove beside
- * it, which asks across the row's foot, or says it is in use. Its line is said as it changes (the
- * percentage aside, which the bar gives), so the check and its verdict reach a screen reader.
+ * with Try again, which goes on with it, focus on its Cancel, or on its name while it is checked
+ * (QuestionsSlidesRetryStates); or a deck, ready with its pages, size and day, or refused with why,
+ * Remove beside it, which asks across the row's foot, or says it is in use. Its line is said as it
+ * changes (the percentage aside, which the bar gives), so the check and its verdict reach a screen
+ * reader.
  */
 export function DeckRow({
   row,
@@ -334,21 +337,18 @@ export function DeckRow({
     if (state.step === 'stopped') {
       foot = (
         <div className={ACROSS}>
-          {/* A new element for each stop, so a screen reader says each one. */}
-          <p key={stoppedLine(state.why)} role="alert">
-            {stoppedLine(state.why)}
-          </p>
-          <Button
-            variant="secondary"
-            size="sm"
-            aria-describedby={name}
-            aria-disabled={cancelling}
-            onClick={() => {
-              if (!cancelling) on.retry(key);
-            }}
+          {/* Held in its own words while its Cancel is sent (SlidesStates). */}
+          <TryAgain
+            onRetry={() => on.retry(key)}
+            blocked={cancelling}
+            then={[`${id}-act`, name]}
+            describedBy={name}
           >
-            Try again
-          </Button>
+            {/* A new element for each stop, so a screen reader says each one. */}
+            <p key={stoppedLine(state.why)} role="alert">
+              {stoppedLine(state.why)}
+            </p>
+          </TryAgain>
         </div>
       );
     }

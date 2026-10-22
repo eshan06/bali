@@ -9,6 +9,7 @@ import { Button } from '@/components/button';
 import { SaidLine } from '@/components/slide-card';
 import { CANT_LOAD_SLIDES, type Decks, showLine } from '@/components/slides';
 import { QUIET_LINK } from '@/components/text-link';
+import { TryAgain } from '@/components/try-again';
 import { readDecks } from '@/lib/decks';
 import { readyDecks, type SlideChange } from '@/lib/presenter';
 import { useApi } from '@/lib/use-api';
@@ -26,7 +27,8 @@ const showOf = (deck: Deck, change: SlideChange | null | undefined) =>
  * this class shows the page you're on, and so does Present." until W5 and M8 make it true (the
  * conductor's call, 2026-10-16). A Show is the slide's own change (`useSlide`'s `show`), one at a
  * time: every Show held meanwhile, its own busy, and what it left to say under its deck, Try again
- * showing it again. Never in Present.
+ * showing it again. The list's Try again keeps its line, held, until Bali answers, then focus on
+ * the panel's title (LessonRetryStates). Never in Present.
  */
 export function DecksView({
   id,
@@ -39,7 +41,8 @@ export function DecksView({
   id: string;
   decks: Decks;
   lesson: Pick<SlideLesson, 'changing' | 'said'>;
-  onRead: () => void;
+  /** The list read again, its failure said until it answers. */
+  onRead: () => Promise<void>;
   /** `again`: its line's Try again, the line kept until Bali answers. */
   onShow: (deck: Deck, again?: boolean) => void;
   onClose: () => void;
@@ -56,10 +59,9 @@ export function DecksView({
           </p>
         ) : decks === 'failed' ? (
           <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-            <p role="alert">{CANT_LOAD_SLIDES}</p>
-            <Button variant="secondary" size="sm" onClick={onRead}>
-              Try again
-            </Button>
+            <TryAgain onRetry={onRead} then={[`${id}-h`]}>
+              <p role="alert">{CANT_LOAD_SLIDES}</p>
+            </TryAgain>
           </div>
         ) : ready.length === 0 ? (
           <p>You have no slides ready yet.</p>
@@ -116,8 +118,9 @@ export function DecksView({
 
 /**
  * The panel as Show slides opens it (LessonDecks): the teacher's decks read from Bali each time it
- * opens, and again by Try again, focus coming to its title. A deck shown while the panel is still
- * open closes it, the slide card in the question card's place (`onShown`).
+ * opens, focus coming to its title, and again by Try again, its failure said until the answer. A
+ * deck shown while the panel is still open closes it, the slide card in the question card's place
+ * (`onShown`).
  */
 export function DecksPanel({
   id,
@@ -133,7 +136,6 @@ export function DecksPanel({
   const api = useApi();
   const [decks, setDecks] = useState<Decks>('loading');
   const read = useCallback(async () => {
-    setDecks('loading');
     const answer = await readDecks(api);
     setDecks(answer.kind === 'read' ? answer.decks : 'failed');
   }, [api]);
@@ -159,7 +161,7 @@ export function DecksPanel({
       id={id}
       decks={decks}
       lesson={lesson}
-      onRead={() => void read()}
+      onRead={read}
       onShow={show}
       onClose={onClose}
     />

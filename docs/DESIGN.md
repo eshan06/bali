@@ -320,12 +320,17 @@ line and a student's home, since part 2a (2026-10-22) the class page's own lines
 failure sent again under its id among them, the recap, the student panel, Reports, a session's
 report and its Questions, and since part 2b (2026-10-22) a close, the class page's and Present's,
 and the slides: the slide's line, the card's, Present's and a student's, full screen too, and a
-slide change, the card's, Present's and Show slides'. Its line kept while it reads or sends again,
-and held too while a read of what it says is on its way from another Try again (the roster's,
-under the header and in the recap), then focus where its board says, never the page
-(HomeRetryStates, ClassesRetryStates, ClassRetryStates, StudentRetryStates, ReportRetryStates and
-LessonRetryStates, drawn on the canvas first); and as the one button of a send that says it,
-Register block and Make new code, their words its own until a send fails.
+slide change, the card's, Present's and Show slides'; since part 3 (2026-10-22) everywhere else, so
+none is drawn by hand: Your questions' and Your slides' lists, a save, a stopped upload (its row
+going on, focus on its Cancel, or on its name while the file is checked again), the side panel's
+two lists, an ask, one of the teacher's questions or one written, and a student's lesson. Its line
+kept while it reads or sends again, and held too while a read of what it says is on its way from
+another Try again (the roster's, under the header and in the recap), then focus where its board
+says, never the page (HomeRetryStates, ClassesRetryStates, ClassRetryStates, StudentRetryStates,
+ReportRetryStates, LessonRetryStates and QuestionsSlidesRetryStates, drawn on the canvas first);
+and as the one button of a send that says it, Register block, Make new code, Create class and the
+invite code's Redeem code, their words its own until a send fails, held in them while it has
+nothing to send.
 Every
 portal source file is held to the tokens' utilities by `tokens.test.ts`, and
 since D2g the theme holds none of Tailwind's own colours, type sizes,

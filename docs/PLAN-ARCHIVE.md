@@ -11,6 +11,19 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 ## The status line's past entries (newest first)
 
 _Last updated: 2026-10-22 (Central) — The owner's follow-up, Try again keeps keyboard focus, part
+2b (#430; `docs/DECISIONS.md`, 2026-10-22): `TryAgain` on a close (the class page's card's and
+Present's) and the slides (the slide's line in the card, in Present and on a student's page, full
+screen too; a slide change from the card, Present and Show slides), each line kept while it is sent
+or read again, its Try again held as Loading… with the card's own controls, then focus where each
+board says; and the class page's fix: a failure said while a read of it is on its way holds its Try
+again, whichever Try again sent it (the roster's under the header after the class's own, and the
+recap's). Built to LessonRetryStates, StudentRetryStates and ClassRetryStates (drawn first; no new
+board). Checked in headless Chrome on dev as the demo teacher and a demo student, each request
+refused, held and let through with the keyboard. Before it, part 2a (#429). Next on the Windows PC:
+the rest of Try again (In flight), then the four steps for sessions before the pilot's first class;
+on the Mac, the phone's L8 and M8._
+
+_Last updated: 2026-10-22 (Central) — The owner's follow-up, Try again keeps keyboard focus, part
 2a (#429; `docs/DECISIONS.md`, 2026-10-22): `TryAgain` on the class page's own lines (its class, its
 roster, an extend's failure sent again under its id), the recap, the student panel, Reports, a
 session's report and its Questions, each line kept and its Try again held as Loading… until Bali
