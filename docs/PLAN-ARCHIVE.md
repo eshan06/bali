@@ -10,6 +10,16 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-22 (Central) — A slide upload that sends nothing for 30 s stops (#436;
+`docs/DECISIONS.md`, 2026-10-22), the owner's decision: one stuck on a half-open connection or Wi-Fi
+dropping packets sat on a frozen bar until its 25 minutes. Its row now says "The upload stopped.
+Check your connection and try again." with Try again, as SlidesStates draws a stop with no answer;
+once the whole file is sent the bucket has 2 minutes to answer (the conductor's call, awaiting the
+owner); a slow upload that keeps sending never stops, and the 25 minutes stay the outer limit. No new
+words or board. Before it, the portal's tests drive the page (#434). Next on the Windows PC: the four
+steps for sessions before the pilot's first class, which wait for the owner's word; on the Mac, the
+phone's L8 and M8._
+
 _Last updated: 2026-10-22 (Central) — The portal's tests drive the page (#434; `docs/DECISIONS.md`,
 2026-10-22), the owner's answer to the conductor's question: jsdom and Testing Library in `apps/web`,
 dev only, opted into per file, and `try-again.test.tsx` converted as the pattern, its regexes over

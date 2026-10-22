@@ -8,6 +8,47 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-22** — **A saved question's write resent with its `eventId` in upper case is its replay
+  (#437, closing #319): the engine compares the id as Postgres does.** `writeSavedQuestion` (L3b1)
+  checked the id a draft holds with a string `===`, but Postgres prints a `uuid` lower-case and the
+  routes' `z.uuidv7()` lets an upper-case one through. So a client minting upper-case ids (Foundation's
+  `uuidString` writes them so) that resent an edit got `409 event_id_conflict`, and a resent removal
+  `404 saved_question_not_found`, though the first write had landed. A false error, nothing lost:
+  only the portal calls these routes, and it mints lower-case ids, as the phone's outbox does.
+  **The fix, in the engine** (*the conductor's call, awaiting the owner*): the sent id lower-cased
+  against the one the draft holds, the one string comparison on these paths. Every other match of the
+  id there was already Postgres's, as a `uuid`, in any case: the create's look-up (so a create's
+  retry was its replay already), `idHeldBy`, the unique index and decision 4's order. Right for every
+  caller of the engine, as `changeUnlockReason` reads "the id as stored, never as sent" (A20), and the
+  routes' schemas and the OpenAPI snapshot stay as they are. Lower-casing is the `uuid`'s own
+  comparison for every id the routes take: zod's `uuidv7` takes only the hyphenated form Postgres
+  prints. *Weighed:* lower-casing at the boundary, the saved questions' bodies made lower-case as
+  `JoinCode` upper-cases a code and a push token is stored lower-case: right too, but the body is a
+  question's open's, shared with its route, and the engine's comparison would stay wrong for any other
+  caller. **The answers name the id as stored, lower-case:** a client compares its own with it
+  ignoring case, as the portal's `saveDraft` already does (L7b). **Tests:** the route's (a create, an
+  edit and a removal, each sent and resent in upper case: replays; before the fix the edit's `409` and
+  the removal's `404`), the engine's (either case one id, and another write's use of it still
+  `event_id_conflict`), and the real-Postgres lane's (each retry parked behind its first delivery's
+  commit: the create's on the unique index, the edit's and the removal's on the draft's row).
+  **The same comparison elsewhere, left for the owner's pre-pilot step** (a repeated-`event_id` check
+  on every data-changing route, waiting for the owner's word; *the conductor's call, awaiting the
+  owner*: saved questions only here), three found. `DELETE /v1/decks/{id}` (`removeDeck`, M2a)
+  compares `deck.eventId === input.eventId`, so a removal resent in upper case is
+  `404 deck_not_found`. A tap with the Emergency Unlock sent under it (`POST /v1/taps`,
+  `POST /v1/taps/{eventId}/unlock`, decision 11) match the tap's id as text, as sent: the kept
+  unlock's `claimed_tap_event_id`, read by `unlocksAwaitingTap` as the tap lands, and `lockTap`'s
+  advisory lock over the id's text. So an unlock that lands first, naming its tap in another case
+  than the tap's own, stays recorded, kept `unknown_tap`, and is never filed in the session the tap
+  then lands in, nor do the two wait for each other (one landing after its tap finds it in Postgres
+  and is filed there). And an unlock's replay (`POST /v1/sessions/{id}/unlock`, or one filed under
+  its tap) answers its reason (`recordedReason`) by reading the student's change of it (A20) under
+  the id as sent, as text (`reasonChanges`, `payload->>'unlock_event_id'`), where a change stores it
+  lower-case: an unlock resent in upper case after its reason changed is answered with the reason
+  first recorded. The record and the teacher's view stay right; only that answer is stale (santa's
+  Reviewer A). Only the portal calls the first, and only the phone the others, whose outbox sends a
+  record's id in one case. The other write routes this survey read match their ids in Postgres.
+
 - **2026-10-22** — **A slide upload that sends nothing for 30 s stops; 25 minutes stay the outer
   limit (#436), the owner's decision** ("ok fine the 30 s and 25 min outer limit is good"). Your
   slides' PUT to the bucket (`putPdf`, `lib/decks.ts`; M5, #326) stopped only at its 25 minutes

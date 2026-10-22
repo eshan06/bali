@@ -8,15 +8,14 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-22 (Central) — A slide upload that sends nothing for 30 s stops (#436;
-`docs/DECISIONS.md`, 2026-10-22), the owner's decision: one stuck on a half-open connection or Wi-Fi
-dropping packets sat on a frozen bar until its 25 minutes. Its row now says "The upload stopped.
-Check your connection and try again." with Try again, as SlidesStates draws a stop with no answer;
-once the whole file is sent the bucket has 2 minutes to answer (the conductor's call, awaiting the
-owner); a slow upload that keeps sending never stops, and the 25 minutes stay the outer limit. No new
-words or board. Before it, the portal's tests drive the page (#434). Next on the Windows PC: the four
-steps for sessions before the pilot's first class, which wait for the owner's word; on the Mac, the
-phone's L8 and M8._
+_Last updated: 2026-10-22 (Central) — A saved question's write resent with its `eventId` in upper
+case is its replay (#437, closing #319; `docs/DECISIONS.md`, 2026-10-22): a resent edit was `409
+event_id_conflict` and a resent removal `404`, though the first had landed. The engine now compares
+the id as Postgres does (the conductor's call, awaiting the owner). Three other places that compare
+an id as text wait for the owner's pre-pilot step, the repeated-`event_id` check (Open owner items).
+Nothing anyone sees changes. Before it, a stuck slide upload stops (#436).
+Next on the Windows PC: the four steps for sessions before the pilot's first class, which wait for
+the owner's word; on the Mac, the phone's L8 and M8._
 
 ## Now
 
@@ -324,14 +323,14 @@ Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect acc
 - The parked PRs #61 and #49.
 - 🔧 Production, still open: check that the next push to `main` deploys `bali-portal` on its own now that `vercel.json` is deleted (runbook 3, step 6); Railway 2FA, threat protection, CloudTrail, the backups (L0b) and the restore drill are on Phase 6's owner list above.
 - 👀 After the next deploy of `bali` and `bali prod` (P8's follow-up): the deploy log shows the migrations, then `Server listening`; a later redeploy's log for the old deployment shows `shutting down` with `signal: SIGTERM`.
-- Phase 7: **to decide**, #313 (what a teacher's own deletion, and the retention run, do with their words), kept as today for now (the owner's ruling, 2026-10-12); **tracked fixes**, #319 (saved questions' id case), #326 (a slow upload outliving its deck; M5 aborts it at 25 minutes, and a stuck one once nothing is sent for 30 s, #436), #334 ✅ (#403, a timeout on the portal's polls; #432, on every other read and save but a deck's check and a class's create), #336 (capacity at the bell, before the class-started push reaches a school); L0b is the owner's (Railway, above). The calls confirmed on 2026-10-12: this line in full in `docs/PLAN-ARCHIVE.md`.
+- Phase 7: **to decide**, #313 (what a teacher's own deletion, and the retention run, do with their words), kept as today for now (the owner's ruling, 2026-10-12); **tracked fixes**, #319 ✅ (#437, saved questions' id case), #326 (a slow upload outliving its deck; M5 aborts it at 25 minutes, and a stuck one once nothing is sent for 30 s, #436), #334 ✅ (#403, a timeout on the portal's polls; #432, on every other read and save but a deck's check and a class's create), #336 (capacity at the bell, before the class-started push reaches a school); L0b is the owner's (Railway, above). The calls confirmed on 2026-10-12: this line in full in `docs/PLAN-ARCHIVE.md`.
 - #380: Present after the bell has no Start, so starting the next class from a projected tab shows the last recap's unlock reasons (the owner, 2026-10-14: tracked, not now); PresentEnded's line, "the session ended at 9:55 AM", waits with it (PV12b kept Present's "no session running")
 - Left for the owner on finished steps' lines (in full in `docs/PLAN-ARCHIVE.md`): P7's App Review path (decide its section 4, then fill the accounts and paste); P6's restore drill, its result recorded once a backup exists; S4's CSP check on the deployed portal after each Next upgrade (due now, for 15.5.28, #435); ⚖️ whether C7-server's yes rides Other Data Types; device rounds still marked pending (B5b's round 2, steps 7 and 9; B5c's round 3, steps 1 and 3; round 4, B6a and B6b); smaller calls on F (a refused tap's end-of-day drop or dismiss button; the waiting card's Tap in), B6c-2 (`.keep`/`.retry`), B5b (a rule for a replaced window, a code step to schedule) and D2 (Present's key per class).
 - ✅ **Answered** (the owner, 2026-10-14; DECISIONS 2026-10-14): PV5b's whole-page error kept; its review notes folded into PV15 and PV17a; PV4c's two test limits left.
 - 🔧 Before the pilot's first class: the owner's prod block gets a fresh code (its first reached the repo's history in #228), and a session builds an owner command that retires a block, to retire the old code (`docs/PILOT.md`, setup step 6). The portal's three class-page controls are built (P10, P11).
 - **Before the pilot's first class, four steps for sessions** (the owner's workflow review, 2026-10-13; one PR each; after the redesign's PV17c, the owner, 2026-10-14); not started, they wait for the owner's word:
   - a column-level privacy test: every column classified personal or not, each personal one placed by the privacy paths that handle it (the account deletion, the disposal, the retention run, the export), so a new column fails until it is placed; FERPA covers university students too;
-  - a repeated-`event_id` check on every data-changing route, driven from the authorization matrix's route list;
+  - a repeated-`event_id` check on every data-changing route, driven from the authorization matrix's route list (#319's survey found three that still compare an id as text, so a retry in upper case misses: a deck's removal, a tap with the unlock sent under it, and an unlock's replay after its reason changed; DECISIONS 2026-10-22);
   - pilot deploy rules: no deploys during class hours, and a documented one-command rollback in `docs/RUNBOOKS.md`;
   - Dependabot PRs can't pass Claude Review (the action rejects bot actors: add `allowed_bots` for dependabot in `claude-review.yml`, bundled with the next edit to that protected file); until then such a PR waits, as #427 (`vite` 8.3.4, dev only) does. #309 (`next` 15.5.27) is superseded by 15.5.28 (#435), and Dependabot closes it itself once main has it.
 - 🔧 The Cognito sign-in deleter: runbook 9 (`docs/RUNBOOKS.md`) — per environment an IAM policy

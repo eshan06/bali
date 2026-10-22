@@ -780,6 +780,49 @@ describe('a teacher’s saved questions (L3b)', () => {
     expect(await draftsOf(teacher.id)).toMatchObject([{ removedAt: at(12) }]);
   });
 
+  it('answers a write’s retry sent in upper case as its replay, never 409 or 404 (#319)', async () => {
+    // A client minting its ids in upper case, as Foundation's `uuidString` writes them, resends each
+    // write whose answer never came. Postgres keeps a uuid lower-case, and the answers name it so.
+    const { teacher, token } = await lesson('draft-id-case');
+    const upper = <T extends { eventId: string }>(body: T) => ({
+      ...body,
+      eventId: body.eventId.toUpperCase(),
+    });
+    const body = upper(asking());
+
+    const created = await create(token, body);
+    expect(answered(await create(token, body))).toEqual({
+      ...answered(created),
+      outcome: 'replay',
+    });
+    const draft = answered(created).savedQuestion;
+    now = at(12);
+    const edit = upper(asking({ prompt: 'Why?' }));
+    const edited = await replace(token, draft.id, edit);
+    expect(answered(await replace(token, draft.id, edit))).toEqual({
+      ...answered(edited),
+      outcome: 'replay',
+    });
+    now = at(14);
+    const removal = upper({ eventId: newUuidV7() });
+    const removed = await remove(token, draft.id, removal);
+    expect(answered(await remove(token, draft.id, removal))).toEqual({
+      ...answered(removed),
+      outcome: 'replay',
+    });
+
+    expect(answered(created).savedQuestion.eventId).toBe(body.eventId.toLowerCase());
+    expect(answered(edited)).toMatchObject({
+      outcome: 'replaced',
+      savedQuestion: { prompt: 'Why?', eventId: edit.eventId.toLowerCase() },
+    });
+    expect(answered(removed)).toMatchObject({
+      outcome: 'removed',
+      savedQuestion: { prompt: 'Why?', eventId: removal.eventId.toLowerCase() },
+    });
+    expect(await draftsOf(teacher.id)).toMatchObject([{ id: draft.id, removedAt: at(14) }]);
+  });
+
   it('writes a create’s retry anew once its draft was removed: the removal holds the draft’s id', async () => {
     // Never a 404: a draft keeps only its last write's id (L3b1). After a deletion, a disposal or
     // a retention run, which keep it, the caller is no teacher: 403.
