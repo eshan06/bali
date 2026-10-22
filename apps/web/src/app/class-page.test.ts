@@ -324,7 +324,12 @@ describe('the class page’s Start and End, each within a save’s limit (the ow
     expect(page).toMatch(
       /const res = await api\.post<StartSessionResponse>\(\s*`\/v1\/classes\/\$\{classId\}\/sessions`,\s*\{ durationMinutes: minutes \},\s*SAVE_TIMEOUT_MS,\s*\);/,
     );
-    expect(page).toMatch(/\} catch \(err\) \{\s*setStartSaid\(errText\(err\)\);\s*\}/);
+    // No answer to go by (a timeout, no connection, a 5xx): the class read again before anything
+    // is said, so a Start that landed shows its session, as a reload would, never a failure over a
+    // class in session (santa's review); a refusal, or no session running, says the failure.
+    expect(page).toMatch(
+      /\} catch \(err\) \{[^]*?const running =\s*failureOf\(err\)\.kind === 'failed' \? await sessionRunning\(api, classId\) : null;\s*if \(running === null\) return setStartSaid\(errText\(err\)\);\s*setSaid\(null\);\s*setGrid\(\(cur\) =>\s*cur\?\.id === running \? cur : \{ id: running, over: false, startedAt: null, endsAt: null \},\s*\);\s*\}/,
+    );
   });
 
   it('sends an End within SAVE_TIMEOUT_MS, its failure said beside the controls, End sending it again', () => {

@@ -1,7 +1,7 @@
 import { MAX_SESSION_MINUTES } from '@bali/shared';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { createApiClient, SAVE_TIMEOUT_MS } from './api-client';
+import { createApiClient, POLL_TIMEOUT_MS, SAVE_TIMEOUT_MS } from './api-client';
 import { CANT_ADD_TIME, CANT_MAKE_CODE, CANT_REACH, TOO_MANY_TRIES } from './errors';
 import {
   bellTime,
@@ -21,6 +21,7 @@ import {
   rememberedPresent,
   rememberMinutes,
   rememberPresent,
+  sessionRunning,
 } from './session-controls';
 
 /** The API client over a fetch that answers `status` with `body`, every request recorded. */
@@ -491,6 +492,48 @@ describe('an extend or a new code the network swallows (the owner, 2026-10-16)',
     await vi.advanceTimersByTimeAsync(1);
     expect(await made).toEqual({ kind: 'made', klass });
     expect(sent.map((s) => s.method)).toEqual(['PATCH', 'GET']);
+  });
+});
+
+describe('sessionRunning: the class read again after a Start with no answer (santa’s review)', () => {
+  const klass = (liveSessionId: string | null) => ({
+    id: CLASS,
+    name: 'Period 1',
+    joinCode: 'ABCDEF',
+    createdAt: '2026-10-01T12:00:00.000Z',
+    liveSessionId,
+  });
+
+  it('answers the session running, as a reload finds it, or none', async () => {
+    const live = api(200, klass(SESSION));
+    expect(await sessionRunning(live.client, CLASS)).toBe(SESSION);
+    expect(live.sent[0]?.url).toBe(`http://api/v1/classes/${CLASS}`);
+    expect(live.sent[0]?.init?.method).toBe('GET');
+    expect(await sessionRunning(api(200, klass(null)).client, CLASS)).toBeNull();
+  });
+
+  it('answers none, never thrown, when the read fails or gets no answer within its limit', async () => {
+    expect(await sessionRunning(unreachable, CLASS)).toBeNull();
+    const down = api(503, { error: { code: 'unavailable', message: 'unavailable' } });
+    expect(await sessionRunning(down.client, CLASS)).toBeNull();
+    vi.useFakeTimers();
+    try {
+      const swallowed = createApiClient({
+        baseUrl: 'http://api',
+        getToken: () => 'tok',
+        fetchImpl: (_url, init) =>
+          new Promise((_, reject) => {
+            init?.signal?.addEventListener('abort', () =>
+              reject(new DOMException('aborted', 'AbortError')),
+            );
+          }),
+      });
+      const read = sessionRunning(swallowed, CLASS);
+      await vi.advanceTimersByTimeAsync(POLL_TIMEOUT_MS);
+      expect(await read).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

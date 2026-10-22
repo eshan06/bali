@@ -32,7 +32,7 @@ import { TryAgain } from '@/components/try-again';
 import { SAVE_TIMEOUT_MS } from '@/lib/api-client';
 import { getAccessToken } from '@/lib/auth';
 import { errText, NOT_A_SESSION_LENGTH, SESSION_ALREADY_RUNNING } from '@/lib/errors';
-import type { QuestionDraft } from '@/lib/live-question';
+import { failureOf, type QuestionDraft } from '@/lib/live-question';
 import {
   DEFAULT_MINUTES,
   EXTEND_PRESETS,
@@ -48,6 +48,7 @@ import {
   rememberedPresent,
   rememberMinutes,
   rememberPresent,
+  sessionRunning,
 } from '@/lib/session-controls';
 import { useApi } from '@/lib/use-api';
 import { useSlide } from '@/lib/use-slide';
@@ -393,7 +394,15 @@ export default function ClassDetailPage() {
           res.outcome === 'existing' ? { kind: 'note', message: SESSION_ALREADY_RUNNING } : null,
         );
       } catch (err) {
-        setStartSaid(errText(err));
+        // No answer to go by: the Start may have landed, so the class is read again first, and a
+        // session running shows as a reload shows it, never a failure over a class in session.
+        const running =
+          failureOf(err).kind === 'failed' ? await sessionRunning(api, classId) : null;
+        if (running === null) return setStartSaid(errText(err));
+        setSaid(null);
+        setGrid((cur) =>
+          cur?.id === running ? cur : { id: running, over: false, startedAt: null, endsAt: null },
+        );
       }
     });
   }

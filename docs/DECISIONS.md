@@ -38,7 +38,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   minutes), and a class's create (*the conductor's call, awaiting the owner*): `POST /v1/classes`
   takes no `eventId` (2026-09-20), so a Try again after a limit could make a second class, which no
   route removes; a create the network swallows still holds Creating… until the browser gives up. A
-  scan in `api-client.test.ts` fails any other write sent with no limit. **Not touched, for the
+  scan in `api-client.test.ts` fails any other write sent with no limit, through any client's `post`,
+  `put`, `patch` or `del` (santa's review). **A Start with no answer** reads the class again before
+  it says anything, and a session running shows as a reload shows it, so the page never says it
+  couldn't start over a class in session (santa's review; `sessionRunning`, as a new code's
+  `codeMoved`): a Start has no stream to say it landed, where an End, an extend, an ask and a close
+  each have the grid's. **Not touched, for the
   owner:** the sign-in's token exchange (`completeLogin`'s `fetch` to Cognito) has no limit, so one
   the network swallows says "Signing in…" until the browser gives up; sign-out is a redirect; the 13+
   check's send is the phone's (the portal only reads it, now within 10 s). **`refresh`** (#426's
@@ -52,9 +57,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   clears it as it answers, by design; but the page's own read (`load`) had no limit, so one the
   network swallowed stayed on its way for minutes, and every `refresh` answered at once, its line
   said again before any answer. Every read has its limit now, and `refresh` waits for the one on its
-  way: settled here. *Left, known:* a Start that timed out but landed, sent again, is answered
-  `existing`, and the page says "A session was already running, so the length you picked wasn't
-  used." though the length was this Start's (rare; the bell shown is right); a new question's save
+  way: settled here. *Left, known:* a Start that landed with no answer, whose class read fails too,
+  then sent again, is answered `existing`, and the page says "A session was already running, so the
+  length you picked wasn't used." though the length was this Start's (rare; the bell shown is
+  right); a new question's save
   with no answer, then other words saved, still makes a second draft if the first landed (part 1a's,
   unchanged); the account's read is two reads, so up to 20 s. **Tested:** the client (every read at
   10 s, a write at its own limit, none without one), `accountReads` on reads settled by hand and on a

@@ -238,6 +238,22 @@ export async function codeMoved(
 }
 
 /**
+ * The class's running session as a reload finds it (`liveSessionId`), read once a Start got no
+ * answer: it may have landed, as a new code's mint may (`codeMoved`). Null while none runs, or when
+ * the read fails, which is never thrown.
+ */
+export async function sessionRunning(
+  api: Pick<ApiClient, 'get'>,
+  classId: string,
+): Promise<string | null> {
+  try {
+    return (await api.get<ClassDetail>(`/v1/classes/${classId}`)).liveSessionId;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Copy the join code to the clipboard (PV6): true once it is there; false, never thrown, where the
  * browser has no clipboard (a page not served securely) or refuses it, so the page can say so.
  */

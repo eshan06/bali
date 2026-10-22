@@ -616,7 +616,8 @@ describe('api-client', () => {
     let writes = 0;
     for (const file of files(src)) {
       const text = readFileSync(file, 'utf8');
-      for (const call of text.matchAll(/\bapi\.(post|put|patch|del)\b(<[^>(]*>)?\(/g)) {
+      // A write through any client's method, whatever the client is called (santa's review).
+      for (const call of text.matchAll(/\.(post|put|patch|del)\b(<[^>(]*>)?\(/g)) {
         // The call's arguments, to the parenthesis that closes it, and where its path ends.
         let depth = 1;
         let path = -1;
