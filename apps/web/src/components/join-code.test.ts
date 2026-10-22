@@ -126,8 +126,10 @@ describe('New code’s confirm, a dialog (ClassNewCode)', () => {
     expect(source).toMatch(
       /if \(answer\.kind === 'failed'\) \{\s*setSaid\(answer\);[^}]*if \(dialog\.current && !dialog\.current\.open\) dialog\.current\.showModal\(\);/,
     );
+    // `TryAgain` as the send's own button: Make new code, Making… while one is on its way, and
+    // Try again once one failed; the primary one, at its full size, beside Cancel.
     expect(source).toMatch(
-      /\{busy \? 'Making…' : said\?\.kind === 'failed' \? 'Try again' : 'Make new code'\}/,
+      /<TryAgain\s+variant="primary"\s+size="md"\s+onRetry=\{make\}\s+held=\{busy\}\s+then=\{\[\]\}\s+send=\{\{ words: 'Make new code', sending: 'Making…', failed: said\?\.kind === 'failed' \}\}\s*\/>/,
     );
   });
 

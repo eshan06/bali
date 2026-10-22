@@ -8,16 +8,17 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-16 (Central) — The owner's follow-up, Try again keeps keyboard focus, part 1
-(#426; `docs/DECISIONS.md`, 2026-10-16): the portal's one Try again for a read that failed
-(`TryAgain`), its line kept and its button held as Loading… while it reads, focus kept on it, a
-failure said again, and once read, focus on the region's heading, never the page; on Home, Classes,
-the account's card, the live grid's line and a student's home (drawn first, canvas version 79:
-HomeRetryStates, ClassesRetryStates, ClassRetryStates, StudentRetryStates). Checked in headless
-Chrome with the keyboard on the real components, Bali's answers held, given and failing again.
-Before it, PV17c-2 (#425). Next on the Windows PC: the owner's other follow-up fixes, Try again's
-remaining steps among them (In flight), then the four steps for sessions before the pilot's first
-class; on the Mac, the phone's L8 and M8._
+_Last updated: 2026-10-22 (Central) — The owner's follow-up, Try again keeps keyboard focus, part
+2a (#429; `docs/DECISIONS.md`, 2026-10-22): `TryAgain` on the class page's own lines (its class, its
+roster, an extend's failure sent again under its id), the recap, the student panel, Reports, a
+session's report and its Questions, each line kept and its Try again held as Loading… until Bali
+answers, then focus on the heading each board names; and as Register block's and Make new code's own
+button. Built to ClassRetryStates and ReportRetryStates (drawn first; no new board). Checked in
+headless Chrome on dev as the demo teacher, each read refused, held and let through with the keyboard.
+Part 2 came to about 550 changed lines without tests, so it is two PRs: part 2b, the close and the
+slides, waits on the branch `fix/try-again-2b`. Before it, part 1 (#426). Next on the Windows PC:
+part 2b, then the rest of Try again (In flight), then the four steps for sessions before the pilot's
+first class; on the Mac, the phone's L8 and M8._
 
 ## Now
 
@@ -48,11 +49,14 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
   done, with PV3b, PV4b, PV4c and PV5b; the last, PV17c-2, Home's Last session (#425).
 - **The owner's follow-up fixes (2026-10-16), one worker at a time.** Try again keeps keyboard
   focus: part 1 ✅ (#426; DECISIONS 2026-10-16), `TryAgain` on Home, Classes, the account's card,
-  the live grid's line and a student's home. Left, each a step of its own, the scan in
-  `try-again.test.ts` listing them: the class page's own lines and the recap; Reports, a session's
-  report and its Questions; Your questions, Your slides and the two side panels; a student's lesson
-  page, the student panel and the slide's line; and the sends whose line goes as they send again (a
-  slide change, an ask, a close, an extend).
+  the live grid's line and a student's home; part 2a ✅ (#429; DECISIONS 2026-10-22), the class page's
+  own lines with an extend's, the recap, the student panel, Reports, a session's report and its
+  Questions, Register block and Make new code. Left, each a step of its own, the scan in
+  `try-again.test.ts` listing them: part 2b, a close (the class page's and Present's) and the slides
+  (the slide's line, a slide change, Show slides' line, a student's slide), its code on the branch
+  `fix/try-again-2b`, stacked on part 2a; Your questions, Your slides and the two side panels' lists;
+  a student's lesson page; and the sends left (an ask, a save, an upload, Create class, the invite
+  code).
 - **The workflow review's last steps** ✅ (the owner, 2026-10-13; DECISIONS 2026-10-14): the
   migration guard (#369), docs-only PRs skipping the test jobs (#365), moved files (#368) and two
   tests (#364), each in full in `docs/PLAN-ARCHIVE.md`.

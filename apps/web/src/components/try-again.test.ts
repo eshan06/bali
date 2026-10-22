@@ -47,6 +47,48 @@ describe('Try again, as drawn', () => {
   });
 });
 
+describe('Try again as a send’s own button (Register block, Make new code)', () => {
+  const send = (failed: boolean, held = false) =>
+    render({
+      held,
+      children: undefined,
+      send: { words: 'Make new code', sending: 'Making…', failed },
+    });
+
+  it('says its send’s words until one fails, and Try again once one did, its line drawn apart', () => {
+    expect(send(false)).toMatch(
+      /^<button type="button" aria-disabled="false" aria-busy="false" class="[^"]*">Make new code<\/button>$/,
+    );
+    expect(send(true)).toMatch(
+      /^<button type="button" aria-disabled="false" aria-busy="false" class="[^"]*">Try again<\/button>$/,
+    );
+  });
+
+  it('says its own sending word while one is on its way, a resend too, held and never disabled', () => {
+    for (const failed of [false, true]) {
+      const held = send(failed, true);
+      expect(held).toMatch(
+        /<button type="button" aria-disabled="true" aria-busy="true" [^>]*>Making…<\/button>$/,
+      );
+      expect(held).not.toMatch(/\sdisabled=""/);
+    }
+  });
+
+  it('is its form’s submit, in its form’s look: Enter in the field presses it', () => {
+    expect(
+      render({
+        type: 'submit',
+        variant: 'primary',
+        size: 'md',
+        children: undefined,
+        send: { words: 'Register block', sending: 'Registering…', failed: false },
+      }),
+    ).toMatch(
+      /^<button type="submit" aria-disabled="false" aria-busy="false" class="[^"]*\bh-10\b[^"]*\bbg-action-primary-bg\b[^"]*">Register block<\/button>$/,
+    );
+  });
+});
+
 describe('Try again, pressed', () => {
   it('reads again once, holding while the read’s promise runs, and never twice at once', () => {
     // A press while held sends nothing: its read is on its way.
@@ -54,7 +96,9 @@ describe('Try again, pressed', () => {
       /function press\(\) \{\s*if \(busy\) return;\s*const answer = onRetry\(\);\s*if \(!\(answer instanceof Promise\)\) return;\s*setWaiting\(true\);\s*const done = \(\) => setWaiting\(false\);\s*answer\.then\(done, done\);\s*\}/,
     );
     expect(source).toMatch(/const busy = held \|\| waiting;/);
-    expect(source).toMatch(/\{busy \? 'Loading…' : 'Try again'\}/);
+    expect(source).toMatch(
+      /\{busy \? \(send\?\.sending \?\? 'Loading…'\) : !send \|\| send\.failed \? 'Try again' : send\.words\}/,
+    );
   });
 
   it('says its line again at each answer that leaves the failure standing, a new element each time', () => {
@@ -281,40 +325,41 @@ describe('every read’s Try again in the portal is this one', () => {
 
 /**
  * Home and Classes whole (the account's card, your classes, the live card, Recent activity, Last
- * session, your block), the live grid's own line (the class page's and Present's), and the
- * student's home.
+ * session, your block and Register block), the live grid's own line (the class page's and
+ * Present's), and the student's home; then the class page's own lines (its class and roster, an
+ * extend's), the recap, the student panel, New code's Make new code, Reports, a session's report
+ * and its Questions.
  */
 const MOVED = [
+  'app/classes/[id]/page.tsx',
   'components/blocks.tsx',
   'components/classes.tsx',
   'components/home.tsx',
+  'components/join-code.tsx',
   'components/live-grid.tsx',
+  'components/recap-card.tsx',
+  'components/report-questions.tsx',
+  'components/reports-list.tsx',
+  'components/session-report.tsx',
   'components/shell.tsx',
   'components/student-home.tsx',
+  'components/student-panel.tsx',
 ];
 
 /**
  * The Try agains `TryAgain` doesn't draw yet, each settled in a step of its own: a read's failure
- * elsewhere, and a send's (the one button that sends saying it, as Register block, Create class,
- * Make new code and the invite code do; or under its line, as an upload's, a slide change's, an
- * ask's, a close's, a save's and an extend's do). A new one fails the test above.
+ * elsewhere, and a send's (the one button that sends saying it, as Create class and the invite
+ * code do; or under its line, as an upload's, a slide change's, an ask's, a close's and a save's
+ * do). A new one fails the test above.
  */
 const LEFT = [
-  'app/classes/[id]/page.tsx',
   'components/ask-panel.tsx',
-  'components/blocks.tsx',
   'components/decks-panel.tsx',
   'components/invite-code.tsx',
-  'components/join-code.tsx',
   'components/new-class.tsx',
   'components/question-card.tsx',
-  'components/recap-card.tsx',
-  'components/report-questions.tsx',
-  'components/reports-list.tsx',
   'components/saved-questions.tsx',
-  'components/session-report.tsx',
   'components/slide-card.tsx',
   'components/slides.tsx',
   'components/student-lesson.tsx',
-  'components/student-panel.tsx',
 ];

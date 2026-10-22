@@ -107,7 +107,10 @@ describe('the student panel’s states, as PanelStates draws them', () => {
     expect(head(html)).toBe('Ethan Park Focused');
     const [, alert = ''] = /<div role="alert">([^]*?)<\/div>/.exec(html) ?? [];
     expect(text(alert).replaceAll('&#x27;', "'")).toBe(`Couldn't load this session. ${CANT_REACH}`);
-    expect(html).toMatch(/<div class="mt-3\.5"><button type="button" class="[^"]*">Try again/);
+    // `TryAgain`'s small button, 14 px under the line, as PanelStates draws it.
+    expect(html).toMatch(
+      /<\/div><button type="button" aria-disabled="false" aria-busy="false" class="[^"]*\bh-8\.5\b[^"]*\bmt-3\.5\b[^"]*">Try again<\/button><\/section>/,
+    );
     expect(notes(html)).toEqual([PRIVATE]);
   });
 
@@ -257,7 +260,9 @@ describe('the panel, as ClassStudent draws it', () => {
   });
 
   it('marks each moment with a grey 26 px dot, its icon, and a hairline to the next', () => {
-    expect(html).toMatch(/<h3 class="mb-3 text-label text-text-tertiary uppercase">This session/);
+    expect(html).toMatch(
+      /<h3 id="[^"]+-session" class="mb-3 text-label text-text-tertiary uppercase">This session/,
+    );
     const dots = [...html.matchAll(/<span class="relative z-1 grid size-6\.5[^"]*">(<svg[^>]*>)/g)];
     expect(dots.map((d) => /lucide-([\w-]+)/.exec(d[1] ?? '')?.[1])).toEqual([
       'circle-check',
@@ -290,11 +295,18 @@ describe('the panel on the class page', () => {
     );
   });
 
-  it('reads again on Try again, saying it loads, with focus kept on the name', () => {
+  it('reads again on Try again, its failure said until the answer, focus then on This session (ClassRetryStates)', () => {
+    // Never Loading… in the failure's place, which dropped Try again, and focus with it: the
+    // read's promise holds Try again (`TryAgain`) until Bali answers.
     expect(panel).toMatch(
-      /onRetry=\{\(\) => \{\s*setAnswer\(\{ kind: 'loading' \}\);\s*setAttempt\(\(n\) => n \+ 1\);[^]*?document\.getElementById\(`\$\{view\.id\}-name`\)\?\.focus\(\);/,
+      /onRetry=\{async \(\) =>\s*setAnswer\(await readStudentEvents\(api, noEvents\(sessionId, studentId\)\)\)\s*\}/,
     );
-    expect(panel).toMatch(/\}, \[api, sessionId, studentId, attempt\]\);/);
+    expect(panel).not.toMatch(/setAnswer\(\{ kind: 'loading' \}\)/);
+    expect(panel).toMatch(/\}, \[api, sessionId, studentId\]\);/);
+    // Read, its moments in the failure's place: focus on This session, the section's heading.
+    expect(panel).toMatch(
+      /<h3 id=\{`\$\{id\}-session`\}[^>]*>\s*This session\s*<\/h3>[^]*?<TryAgain onRetry=\{onRetry\} then=\{\[`\$\{id\}-session`\]\} className="mt-3\.5">/,
+    );
   });
 
   it('never opens in Present, closes as it turns on, and opens on the live page alone', () => {

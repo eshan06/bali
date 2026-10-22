@@ -8,11 +8,12 @@ import type {
 } from '@bali/shared';
 import { ChartBar } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
-import { Button, buttonClass } from '@/components/button';
+import { buttonClass } from '@/components/button';
 import { CARD_ALONE } from '@/components/card';
 import { RecapLists } from '@/components/timeline';
+import { TryAgain } from '@/components/try-again';
 import {
   classFigures,
   loadRecap,
@@ -32,7 +33,8 @@ interface Props {
   /** The class page's roster (PV12b), who didn't join: null while it is read or when it failed. */
   roster?: readonly RosterStudent[] | null;
   rosterError?: string | null;
-  onRetryRoster?: () => void;
+  /** The roster read again, its failure said until it answers. */
+  onRetryRoster?: () => Promise<void>;
   /** The session it found, for the page's line; null while none is. */
   onFound?: (session: Summary | null) => void;
 }
@@ -51,25 +53,24 @@ export function RecapCard(props: Props) {
   const api = useApi();
   const { classId, rosterError, onRetryRoster, onFound } = props;
   const [state, setState] = useState<RecapState>({ kind: 'finding' });
-  const [attempt, setAttempt] = useState(0);
+  // The newest read: an answer counts only while no later read, or another class, has started.
+  const reads = useRef(0);
 
   useEffect(() => {
-    let live = true;
+    const mine = ++reads.current;
     void loadRecap(api, classId, (next) => {
-      if (live) setState(next);
+      if (reads.current === mine) setState(next);
     });
     return () => {
-      live = false;
+      reads.current += 1;
     };
-  }, [api, classId, attempt]);
+  }, [api, classId]);
 
   // The session found, for the page's line: none until one is, and none when its read failed.
   const found = state.kind === 'ready' || state.kind === 'loading' ? state.session : null;
   useEffect(() => {
-    // A retry's read, finding its session again, changes nothing meanwhile.
-    if (state.kind === 'loading' && found === null) return;
     onFound?.(found);
-  }, [found, state.kind, onFound]);
+  }, [found, onFound]);
   // Gone (a Start), none: the next session's end never paints with this one's.
   useEffect(() => () => onFound?.(null), [onFound]);
 
@@ -79,12 +80,18 @@ export function RecapCard(props: Props) {
     <RecapShown
       {...props}
       state={state}
-      onRetry={() => {
-        if (state.kind !== 'ready') {
-          setState({ kind: 'loading', session: null });
-          setAttempt((n) => n + 1);
-        }
-        if (rosterError) onRetryRoster?.();
+      onRetry={async () => {
+        // Its own read unless it is in, and the roster's if it failed, each failure said until
+        // its answer, never Loading… in its place (ClassRetryStates).
+        const mine = ++reads.current;
+        await Promise.all([
+          state.kind === 'ready'
+            ? null
+            : loadRecap(api, classId, (next) => {
+                if (reads.current === mine && next.kind !== 'loading') setState(next);
+              }),
+          rosterError ? onRetryRoster?.() : null,
+        ]);
       }}
     />
   );
@@ -119,7 +126,8 @@ export function RecapShown({
   onRetry,
 }: Props & {
   state: Exclude<RecapState, { kind: 'finding' | 'none' }>;
-  onRetry: () => void;
+  /** Read again what failed, its line said until the answer. */
+  onRetry: () => unknown;
 }) {
   const headingId = useId();
   // The card waits for the roster, and says its failure.
@@ -161,13 +169,13 @@ export function RecapShown({
         </p>
       ) : state.kind === 'error' ? (
         <div>
-          <div role="alert" className="text-body">
-            <p className="font-semibold">Couldn&apos;t load the last session.</p>
-            <p className="text-text-secondary">{state.message}</p>
-          </div>
-          <Button variant="secondary" onClick={onRetry} className="mt-3.5">
-            Try again
-          </Button>
+          {/* Held until its reads answer; read, focus on Last session (ClassRetryStates). */}
+          <TryAgain size="md" onRetry={onRetry} then={[headingId]} className="mt-3.5">
+            <div role="alert" className="text-body">
+              <p className="font-semibold">Couldn&apos;t load the last session.</p>
+              <p className="text-text-secondary">{state.message}</p>
+            </div>
+          </TryAgain>
         </div>
       ) : (
         <RecapBody

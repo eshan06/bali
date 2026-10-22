@@ -55,13 +55,18 @@ export function handOff(
  * while the page says its own read again is on its way (`held`): `aria-disabled`, never `disabled`,
  * so focus stays on it. An answer that leaves the failure standing says its line again, a new
  * element, however it is worded. One that takes the failure away, Try again with it, lands focus
- * where `then` says (`handOff`), never on the body.
+ * where `then` says (`handOff`), never on the body. A send's resend holds the same way, its line
+ * kept until Bali answers. A send's own button (`send`: Register block, Make new code) says its
+ * words, and Try again only once a send of it failed.
  */
 export function TryAgain({
   onRetry,
   held = false,
   then,
   size = 'sm',
+  variant = 'secondary',
+  type = 'button',
+  send,
   className = '',
   children,
 }: {
@@ -70,9 +75,13 @@ export function TryAgain({
   /** The ids focus lands on once the read is in, the first the page has (`land`). */
   then: readonly string[];
   size?: 'sm' | 'md';
+  variant?: 'primary' | 'secondary';
+  type?: 'button' | 'submit';
+  /** A send's own words: at rest, while it sends, and whether its last send failed. */
+  send?: { words: string; sending: string; failed: boolean };
   className?: string;
-  /** The failure's line, said again at each answer that leaves it standing. */
-  children: ReactNode;
+  /** The failure's line, said again at each answer that leaves it standing; none where it sits apart. */
+  children?: ReactNode;
 }) {
   const button = useRef<HTMLButtonElement>(null);
   // Its own read again on its way: the promise `onRetry` gave, not settled yet.
@@ -109,14 +118,15 @@ export function TryAgain({
       <Fragment key={said}>{children}</Fragment>
       <Button
         ref={button}
-        variant="secondary"
+        type={type}
+        variant={variant}
         size={size}
         aria-disabled={busy}
         aria-busy={busy}
         onClick={press}
         className={className}
       >
-        {busy ? 'Loading…' : 'Try again'}
+        {busy ? (send?.sending ?? 'Loading…') : !send || send.failed ? 'Try again' : send.words}
       </Button>
     </>
   );

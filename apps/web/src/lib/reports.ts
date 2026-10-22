@@ -43,7 +43,7 @@ export interface SessionList {
   nextBefore: string | null;
   loaded: boolean;
   reading: ReadAt | null;
-  /** Why the last read failed, said where it was asked, with its Try again. */
+  /** Why the last read failed, said where it was asked, with its Try again, until a read answers. */
   failure: { at: ReadAt; message: string } | null;
   /** Show earlier's cursor was one the class doesn't hold, so the newest page was read again. */
   restarted: boolean;
@@ -59,9 +59,12 @@ export const FIRST_READ: SessionList = {
   restarted: false,
 };
 
-/** A read starts, and what the last one said goes. */
+/**
+ * A read starts: a failure stays said until its answer, so its Try again holds in its place; the
+ * place lost goes.
+ */
 export function startRead(list: SessionList, at: ReadAt): SessionList {
-  return { ...list, reading: at, failure: null, restarted: false };
+  return { ...list, reading: at, restarted: false };
 }
 
 /**

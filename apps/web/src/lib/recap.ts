@@ -38,8 +38,8 @@ export type RecapState =
   /** Looking for the class's last session: the card shows nothing until there is one. */
   | { kind: 'finding' }
   | { kind: 'none' }
-  /** Its report on the way; the session is null on a retry, until it is found again. */
-  | { kind: 'loading'; session: SessionReportSummary | null }
+  /** Its report on the way, under the session found; never on a Try again, its failure kept. */
+  | { kind: 'loading'; session: SessionReportSummary }
   | {
       kind: 'ready';
       session: SessionReportSummary;

@@ -6,6 +6,7 @@ import { useId } from 'react';
 
 import { Button } from '@/components/button';
 import { CARD_ALONE } from '@/components/card';
+import { TryAgain } from '@/components/try-again';
 import { sessionWhen } from '@/lib/recap';
 import { type ReadAt, reportPath, type SessionList, sessionRow } from '@/lib/reports';
 
@@ -56,8 +57,10 @@ export function focusBar(
  * in italic, the class picked with pills, then that class's sessions, newest first, as a table in a
  * box that scrolls sideways, each a link to its own page (PV14), with Show earlier, beside each
  * session's average focus as a bar. Every state with its words: loading, couldn't load with Try
- * again, none yet, the place lost, and earlier sessions that didn't load. `classes` is null until
- * the account is read.
+ * again, none yet, the place lost, and earlier sessions that didn't load. A failure stays said
+ * while its Try again reads, Try again held, never Loading… in its place; read, focus on the
+ * sessions' label, or Show earlier, as ReportRetryStates says. `classes` is null until the account
+ * is read.
  */
 export function ReportsView({
   classes,
@@ -71,7 +74,8 @@ export function ReportsView({
   onRead: (at: ReadAt) => void;
 }) {
   const sessionsId = useId();
-  const loading = classId !== null && list.reading === 'newest';
+  const earlierId = useId();
+  const loading = classId !== null && list.reading === 'newest' && list.failure === null;
   const none =
     (classes !== null && classId === null) ||
     (list.loaded && list.sessions.length === 0 && list.nextBefore === null);
@@ -114,13 +118,18 @@ export function ReportsView({
 
         {list.failure?.at === 'newest' ? (
           <div className={CARD_ALONE}>
-            <p role="alert" className="text-body">
-              <span className="block font-semibold">Couldn&apos;t load the sessions.</span>
-              <span className="text-text-secondary">{list.failure.message}</span>
-            </p>
-            <Button variant="secondary" onClick={() => onRead('newest')} className="mt-3.5">
-              Try again
-            </Button>
+            <TryAgain
+              size="md"
+              onRetry={() => onRead('newest')}
+              held={list.reading === 'newest'}
+              then={[sessionsId]}
+              className="mt-3.5"
+            >
+              <p role="alert" className="text-body">
+                <span className="block font-semibold">Couldn&apos;t load the sessions.</span>
+                <span className="text-text-secondary">{list.failure.message}</span>
+              </p>
+            </TryAgain>
           </div>
         ) : null}
 
@@ -143,17 +152,21 @@ export function ReportsView({
               <SessionsTable classId={classId ?? ''} sessions={list.sessions} />
               {list.nextBefore === null ? null : list.failure?.at === 'earlier' ? (
                 <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-3">
-                  <p role="alert" className="text-body">
-                    Couldn&apos;t load earlier sessions. {list.failure.message}
-                  </p>
-                  <Button variant="secondary" size="sm" onClick={() => onRead('earlier')}>
-                    Try again
-                  </Button>
+                  <TryAgain
+                    onRetry={() => onRead('earlier')}
+                    held={list.reading === 'earlier'}
+                    then={[earlierId, sessionsId]}
+                  >
+                    <p role="alert" className="text-body">
+                      Couldn&apos;t load earlier sessions. {list.failure.message}
+                    </p>
+                  </TryAgain>
                 </div>
               ) : (
                 <div className="mt-3">
                   {/* Held, not disabled, while it reads: focus stays on it. */}
                   <Button
+                    id={earlierId}
                     variant="secondary"
                     size="sm"
                     aria-disabled={list.reading !== null}

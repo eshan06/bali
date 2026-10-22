@@ -10,6 +10,17 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-16 (Central) — The owner's follow-up, Try again keeps keyboard focus, part 1
+(#426; `docs/DECISIONS.md`, 2026-10-16): the portal's one Try again for a read that failed
+(`TryAgain`), its line kept and its button held as Loading… while it reads, focus kept on it, a
+failure said again, and once read, focus on the region's heading, never the page; on Home, Classes,
+the account's card, the live grid's line and a student's home (drawn first, canvas version 79:
+HomeRetryStates, ClassesRetryStates, ClassRetryStates, StudentRetryStates). Checked in headless
+Chrome with the keyboard on the real components, Bali's answers held, given and failing again.
+Before it, PV17c-2 (#425). Next on the Windows PC: the owner's other follow-up fixes, Try again's
+remaining steps among them (In flight), then the four steps for sessions before the pilot's first
+class; on the Mac, the phone's L8 and M8._
+
 _Last updated: 2026-10-16 (Central) — PV17c-2, Home's Last session (#425; `docs/DECISIONS.md`,
 2026-10-16), the portal redesign's last step, so PV0–PV17 are done: while no class is live, the
 rail holds the last session over across the classes over the block's card, on a phone too, its class

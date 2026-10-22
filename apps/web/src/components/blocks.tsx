@@ -4,7 +4,6 @@ import type { BlockDetail, BlockListResponse } from '@bali/shared';
 import { Nfc } from 'lucide-react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
-import { Button } from '@/components/button';
 import { CARD_ALONE } from '@/components/card';
 import { Field } from '@/components/field';
 import { TryAgain } from '@/components/try-again';
@@ -53,8 +52,8 @@ export function Blocks() {
     void load();
   }, [load]);
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  // Register block's own press; Enter in the field presses it too, the form's submit sending nothing.
+  async function register() {
     if (sending.current || blocks === null) return;
     const tagId = blockIdOf(typed);
     if (!tagId) {
@@ -136,7 +135,7 @@ export function Blocks() {
             </ul>
           )}
 
-          <form onSubmit={(e) => void onSubmit(e)} className="mt-4.5">
+          <form onSubmit={(e) => e.preventDefault()} className="mt-4.5">
             <Field
               ref={field}
               id={`${id}-id`}
@@ -169,15 +168,19 @@ export function Blocks() {
             ) : null}
 
             {/* One button throughout, so focus stays on it whatever it comes to say. */}
-            <Button
-              variant="secondary"
+            <TryAgain
               type="submit"
-              aria-disabled={busy}
-              aria-busy={busy}
+              size="md"
+              onRetry={register}
+              held={busy}
+              then={[]}
+              send={{
+                words: 'Register block',
+                sending: 'Registering…',
+                failed: said?.kind === 'failed',
+              }}
               className="mt-3.5"
-            >
-              {busy ? 'Registering…' : said?.kind === 'failed' ? 'Try again' : 'Register block'}
-            </Button>
+            />
           </form>
         </>
       )}

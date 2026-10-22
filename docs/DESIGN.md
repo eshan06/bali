@@ -316,9 +316,12 @@ draw them (drawn on the canvas first), HomeInterim no longer built. The account 
 `h1`), Try again held as Loading… until Bali answers so focus stays on it, a failure said again.
 That Try again is the portal's one for a read that failed since the owner's follow-up of 2026-10-16
 (`TryAgain`, `components/try-again.tsx`): on Home, Classes, the account's card, the live grid's
-line and a student's home so far, its line kept while it reads, then focus on the region's heading,
-never the page (HomeRetryStates, ClassesRetryStates, ClassRetryStates and StudentRetryStates, drawn
-on the canvas first).
+line and a student's home, and since part 2a (2026-10-22) the class page's own lines, an extend's
+failure sent again under its id among them, the recap, the student panel, Reports, a session's
+report and its Questions, its line kept while it reads or sends again, then focus on the region's
+heading, never the page (HomeRetryStates, ClassesRetryStates, ClassRetryStates, StudentRetryStates
+and ReportRetryStates, drawn on the canvas first); and as the one button of a send that says it,
+Register block and Make new code, their words its own until a send fails.
 Every
 portal source file is held to the tokens' utilities by `tokens.test.ts`, and
 since D2g the theme holds none of Tailwind's own colours, type sizes,

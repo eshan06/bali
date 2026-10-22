@@ -64,8 +64,9 @@ describe('the class page before its class is read', () => {
   it('says a class that didn’t load in that place, with Try again, and shows no roster', () => {
     const start = before.indexOf('{klass === null ? (');
     const unread = before.slice(start, before.indexOf('<form', start));
+    // The line under the header's own (`cantLoad`), in a card in the session's place.
     expect(unread).toMatch(
-      /error \? \([^]*role="alert"[^]*Couldn&apos;t load this class\. \{error\}[^]*size="sm" onClick=\{load\}[^]*Try again[^]*\) : \(/,
+      /error \? \(\s*<section className=\{CARD_ALONE\}>\{cantLoad\(error\)\}<\/section>\s*\) : \(/,
     );
     expect(unread).not.toMatch(/<form|startSession|JoinCode|roster/);
   });
@@ -74,11 +75,43 @@ describe('the class page before its class is read', () => {
     // Only the class's own read sets `error`, so a roster failing first never says the class
     // failed while it is still on its way (santa's review).
     expect(page.match(/setError\(errText\(e\)\)/g)).toHaveLength(1);
-    expect(page).toMatch(/\/roster`\)\s*\.then\(setRoster, \(e: unknown\) => setRosterError\(/);
+    expect(page).toMatch(
+      /const next = await api\.get<RosterResponse>\(`\/v1\/classes\/\$\{classId\}\/roster`\);\s*if \(reads\.current\.roster !== mine\) return;\s*setRoster\(next\);\s*setRosterError\(null\);\s*\} catch \(e\) \{\s*if \(reads\.current\.roster === mine\) setRosterError\(errText\(e\)\);/,
+    );
     expect(before).toMatch(/\{klass \? cantLoad\(error \?\? rosterError\) : null\}/);
     expect(page).toMatch(
-      /const cantLoad = \(message: string \| null\) =>\s*message === null \? null : \(\s*<div className="flex flex-wrap items-center gap-x-4 gap-y-3">\s*<p role="alert" className="text-body">\s*Couldn&apos;t load this class\. \{message\}\s*<\/p>\s*<Button variant="secondary" size="sm" onClick=\{load\}>/,
+      /const cantLoad = \(message: string \| null\) =>\s*message === null \? null : \(\s*<div className="flex flex-wrap items-center gap-x-4 gap-y-3">\s*<TryAgain onRetry=\{load\} then=\{\[\]\}>\s*<p role="alert" className="text-body">\s*Couldn&apos;t load this class\. \{message\}\s*<\/p>\s*<\/TryAgain>/,
     );
+  });
+
+  it('keeps each failure said while Try again reads the class again, focus then on its name (ClassRetryStates)', () => {
+    // Never cleared as the read starts, which dropped Try again, and focus with it, to the page:
+    // each goes with its own read's answer, and Try again holds while `load`'s promise runs.
+    const load = page.slice(page.indexOf('const load = useCallback('));
+    expect(load).toMatch(
+      /^const load = useCallback\(async \(\) => \{\s*const mine = \+\+reads\.current\.klass;\s*const read = api\.get<ClassDetail>\(`\/v1\/classes\/\$\{classId\}`\)\.then\(\s*\(c\) => \{\s*if \(reads\.current\.klass !== mine\) return;\s*setError\(null\);\s*setKlass\(c\);/,
+    );
+    expect(load).toMatch(
+      /\(e: unknown\) => \{\s*if \(reads\.current\.klass === mine\) setError\(errText\(e\)\);\s*\},\s*\);\s*await Promise\.all\(\[read, readRoster\(\)\]\);\s*\}, \[api, classId, readRoster\]\);/,
+    );
+    expect(page.match(/setError\(null\)/g)).toHaveLength(1);
+    expect(page.match(/setRosterError\(null\)/g)).toHaveLength(2);
+    // Read, focus on the page's own heading, the class's name, whichever page it then draws.
+    expect(html.match(/<h1 /g)).toHaveLength(1);
+    expect(live).toMatch(/<LiveHeader\s+name=\{klass\.name\}/);
+  });
+
+  it('draws only the newest read’s answer, so two Try agains for one failure never leave a stale one (santa’s review)', () => {
+    // The roster's failure is said under the header and in the recap, each with its Try again,
+    // and neither holds the other: pressed both, a slow read's failure could land after a later
+    // read's roster. Each read takes a turn; an answer not the newest's is dropped, the class's
+    // and the roster's alike, the read a session's end starts too.
+    expect(page).toMatch(/const reads = useRef\(\{ klass: 0, roster: 0 \}\);/);
+    expect(page).toMatch(
+      /const readRoster = useCallback\(async \(\) => \{\s*const mine = \+\+reads\.current\.roster;/,
+    );
+    expect(page.match(/reads\.current\.roster (!|=)== mine/g)).toHaveLength(2);
+    expect(page.match(/reads\.current\.klass (!|=)== mine/g)).toHaveLength(2);
   });
 });
 
@@ -111,11 +144,11 @@ describe('the class page while no session runs (ClassBefore)', () => {
     // didn't join; one removed meanwhile is not (santa's review). The roster the page opened with
     // knows neither, so the recap waits for a fresh one.
     expect(page).toMatch(
-      /const over = grid\?\.over \?\? false;\s*useEffect\(\(\) => \{\s*if \(!over\) return;\s*setRoster\(null\);\s*setRosterError\(null\);\s*readRoster\(\);\s*\}, \[over, readRoster\]\);/,
+      /const over = grid\?\.over \?\? false;\s*useEffect\(\(\) => \{\s*if \(!over\) return;\s*setRoster\(null\);\s*setRosterError\(null\);\s*void readRoster\(\);\s*\}, \[over, readRoster\]\);/,
     );
     // One read of the roster, the class's load's and this one's.
     expect(page).toMatch(
-      /const readRoster = useCallback\(\(\) => \{\s*api\s*\.get<RosterResponse>/,
+      /const readRoster = useCallback\(async \(\) => \{\s*const mine = \+\+reads\.current\.roster;\s*try \{\s*const next = await api\.get<RosterResponse>/,
     );
     expect(page.match(/\/roster`\)/g)).toHaveLength(1);
   });
@@ -221,11 +254,32 @@ describe('the class page while a session runs (ClassLive)', () => {
   });
 
   it('says its lines as ClassStates does: right under the header, Try again small', () => {
-    // A failed read again of the class (`cantLoad`), and an extend's failure, refusal or note.
+    // A failed read again of the class (`cantLoad`), and an extend's failure, refusal or note:
+    // `TryAgain`'s small button, the same size in Present.
     expect(live).toMatch(
-      /\{said \? \(\s*<div className="flex flex-wrap items-center gap-x-4 gap-y-3">[^]*?size="sm"[^]*?Try again/,
+      /\{said \? \(\s*<div className="flex flex-wrap items-center gap-x-4 gap-y-3">\s*\{said\.kind === 'failed' \? \(\s*<TryAgain\b[^]*?>\s*\{saidLine\}\s*<\/TryAgain>\s*\) : \(\s*saidLine\s*\)\}\s*<\/div>\s*\) : null\}/,
+    );
+    expect(page).toMatch(
+      /const saidLine = said && \(\s*<p role=\{said\.kind === 'note' \? 'status' : 'alert'\} className="text-body">\s*\{said\.message\}\s*<\/p>\s*\);/,
     );
     expect(live).not.toMatch(/size=\{present/);
+  });
+
+  it('keeps an extend’s failure said while its Try again sends it again, every control held (ClassRetryStates)', () => {
+    // The same one again, under its id; held, as every control is while any send is under way,
+    // so focus stays on it. Answered: the time added or a refusal in the line's place, focus on
+    // the class's name (the page's heading, `then` none); failed again, said again.
+    expect(live).toMatch(
+      /<TryAgain\s+onRetry=\{\(\) => \{\s*const again = unanswered\.current;\s*if \(again\) addTime\(again, true\);\s*\}\}\s+held=\{busy !== null\}\s+then=\{\[\]\}\s*>/,
+    );
+    const add = page.slice(page.indexOf('function addTime('));
+    expect(add).toMatch(
+      /^function addTime\(attempt: ExtendAttempt, again = false\) \{[^]*?void once\('extend', async \(\) => \{\s*if \(!again\) setSaid\(null\);\s*const answer = await extendSession\(api, session, attempt\);\s*unanswered\.current = keepUnanswered\(attempt, answer\);\s*if \(answer\.kind === 'extended'\) \{\s*setSaid\(null\);\s*onSession\(\{ id: session, classId, endsAt: answer\.endsAt \}\);\s*\} else setSaid\(answer\);/,
+    );
+    // +5 and +10 send afresh, their line going as they do: their own buttons keep focus.
+    expect(page).toMatch(
+      /onClick=\{\(\) => addTime\(extendAttemptFor\(unanswered\.current, add\)\)\}/,
+    );
   });
 
   it('keeps the session’s start for the ring, from the Start’s answer or the first snapshot', () => {

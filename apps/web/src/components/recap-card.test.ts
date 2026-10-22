@@ -407,14 +407,39 @@ describe('the card’s reads', () => {
 
   it('reads the roster again with Try again when it failed, and its own read unless it is in', () => {
     expect(source).toMatch(
-      /onRetry=\{\(\) => \{\s*if \(state\.kind !== 'ready'\) \{\s*setState\(\{ kind: 'loading', session: null \}\);\s*setAttempt\(\(n\) => n \+ 1\);\s*\}\s*if \(rosterError\) onRetryRoster\?\.\(\);/,
+      /onRetry=\{async \(\) => \{[^]*?const mine = \+\+reads\.current;\s*await Promise\.all\(\[\s*state\.kind === 'ready'\s*\? null\s*: loadRecap\(api, classId, \(next\) => \{\s*if \(reads\.current === mine && next\.kind !== 'loading'\) setState\(next\);\s*\}\),\s*rosterError \? onRetryRoster\?\.\(\) : null,\s*\]\);/,
+    );
+  });
+
+  it('keeps its failure said while Try again reads, Try again held, focus then on Last session (ClassRetryStates)', () => {
+    // Never Loading… in the failure's place, which dropped Try again, and focus with it, to the
+    // page: its read's own steps are skipped, and Try again holds while the reads' promise runs.
+    expect(source).not.toMatch(/setState\(\{ kind: 'loading'/);
+    // The board's full-size Try again under its line, `TryAgain`'s (held while its promise runs).
+    const failed = render({ kind: 'error', message: "Couldn't reach Bali." });
+    expect(failed).toMatch(
+      /<p class="text-text-secondary">Couldn't reach Bali\.<\/p><\/div><button type="button" aria-disabled="false" aria-busy="false" class="[^"]*\bh-10\b[^"]*\bmt-3\.5\b[^"]*">Try again<\/button><\/div><\/section>$/,
+    );
+    // Read, the card's figures in the failure's place: focus on Last session, its heading.
+    expect(source).toMatch(
+      /<h2 id=\{headingId\} className="text-section-label text-text-tertiary uppercase">\s*Last session\s*<\/h2>[^]*?<TryAgain size="md" onRetry=\{onRetry\} then=\{\[headingId\]\} className="mt-3\.5">/,
+    );
+    // The page's roster read again too: a promise, so Try again holds until it answers.
+    expect(source).toMatch(/onRetryRoster\?: \(\) => Promise<void>;/);
+  });
+
+  it('drops a read a later one, or another class, has overtaken', () => {
+    expect(source).toMatch(
+      /useEffect\(\(\) => \{\s*const mine = \+\+reads\.current;\s*void loadRecap\(api, classId, \(next\) => \{\s*if \(reads\.current === mine\) setState\(next\);\s*\}\);\s*return \(\) => \{\s*reads\.current \+= 1;\s*\};\s*\}, \[api, classId\]\);/,
     );
   });
 
   it('tells the page the session it found, none until it does, and keeps it through a retry', () => {
     expect(source).toMatch(
-      /const found = state\.kind === 'ready' \|\| state\.kind === 'loading' \? state\.session : null;\s*useEffect\(\(\) => \{[^]*?if \(state\.kind === 'loading' && found === null\) return;\s*onFound\?\.\(found\);/,
+      /const found = state\.kind === 'ready' \|\| state\.kind === 'loading' \? state\.session : null;\s*useEffect\(\(\) => \{\s*onFound\?\.\(found\);\s*\}, \[found, onFound\]\);/,
     );
+    // A retry's read is said only once it answers, so the session found stays meanwhile.
+    expect(source).toMatch(/next\.kind !== 'loading'\) setState\(next\)/);
     // And none once it is gone (a Start), so the next session's end never paints with this one's.
     expect(source).toMatch(/useEffect\(\(\) => \(\) => onFound\?\.\(null\), \[onFound\]\);/);
   });
