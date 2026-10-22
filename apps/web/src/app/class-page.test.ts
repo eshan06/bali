@@ -344,7 +344,7 @@ describe('the class page’s Start and End, each within a save’s limit (the ow
       /setSaid\(\s*saysAlreadyRunning\(res, minutes, lost\)\s*\? \{ kind: 'note', message: SESSION_ALREADY_RUNNING \}\s*: null,\s*\);/,
     );
     expect(page).toMatch(
-      /if \(running === null\) \{\s*(\/\/[^\n]*\s*)*if \(noAnswer\) lostStart\.current = minutes;\s*return setStartSaid\(errText\(err\)\);\s*\}/,
+      /if \(running === null\) \{[^}]*?if \(noAnswer\) lostStart\.current = minutes;\s*return setStartSaid\(errText\(err\)\);\s*\}/,
     );
     expect(page.match(/SESSION_ALREADY_RUNNING/g)).toHaveLength(2);
     // Settled once a session shows, by an answer or a read: its minutes never outlive it.
