@@ -46,9 +46,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   read after it fails too, and the teacher presses Start again. The second press is answered `existing`
   with the session the first one made, and the page said "A session was already running, so the length
   you picked wasn't used." though that length was used. The page now keeps the minutes of its last
-  Start that got no answer (`lostStart`) until a Start is answered. A resend answered `existing` with a
-  session of those minutes, picked again, says nothing (`saysAlreadyRunning`); any other `existing`
-  still says it. The conductor's brief asked for the line only when the session's length differs from
+  Start that got no answer (`lostStart`) until a Start is answered or a session shows. A resend
+  answered `existing` with a session of those minutes, picked again, says nothing
+  (`saysAlreadyRunning`); any other `existing` still says it. The conductor's brief asked for the line only when the session's length differs from
   the pick. Both of santa's reviewers found that this also hid it for a session another tab started at
   the same length, or another computer at the default 50: P10's own case (#245's review), where the
   countdown is shorter than the pick and nothing would say why. So the line now goes only for this

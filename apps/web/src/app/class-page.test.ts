@@ -347,7 +347,11 @@ describe('the class page’s Start and End, each within a save’s limit (the ow
       /if \(running === null\) \{\s*(\/\/[^\n]*\s*)*if \(noAnswer\) lostStart\.current = minutes;\s*return setStartSaid\(errText\(err\)\);\s*\}/,
     );
     expect(page.match(/SESSION_ALREADY_RUNNING/g)).toHaveLength(2);
-    expect(page.match(/lostStart\.current = /g)).toHaveLength(2);
+    // Settled once a session shows, by an answer or a read: its minutes never outlive it.
+    expect(page).toMatch(
+      /useEffect\(\(\) => \{\s*lostStart\.current = null;\s*\}, \[grid\?\.id\]\);/,
+    );
+    expect(page.match(/lostStart\.current = /g)).toHaveLength(3);
   });
 
   it('sends an End within SAVE_TIMEOUT_MS, its failure said beside the controls, End sending it again', () => {

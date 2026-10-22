@@ -144,8 +144,8 @@ export default function ClassDetailPage() {
   // A Start that failed, said under its button; the button sends it again.
   const [startSaid, setStartSaid] = useState<string | null>(null);
   // The minutes of this page's last Start that got no answer, no session found after it, until a
-  // Start is answered: it may have landed, so its resend answered `existing` with a session of
-  // those minutes is its own (`saysAlreadyRunning`; #432's Left).
+  // Start is answered or a session shows: it may have landed, so its resend answered `existing`
+  // with a session of those minutes is its own (`saysAlreadyRunning`; #432's Left).
   const lostStart = useRef<number | null>(null);
   // The projector view (DESIGN.md §5), toggled in the grid's header and kept for this tab, so a
   // reload or a return from Reports comes back in it; a new tab or window opens without it.
@@ -196,6 +196,11 @@ export default function ClassDetailPage() {
     setSide(null);
     setWriting(false);
     setDraft(NEW_DRAFT);
+  }, [grid?.id]);
+  // A session shown, by an answer or a read: a Start lost before it is settled, the session its
+  // own or another's.
+  useEffect(() => {
+    lostStart.current = null;
   }, [grid?.id]);
   // Never in Present: asking lists the teacher's questions with their correct answers (the owner,
   // 2026-10-15), and what is written in it; the decks are the teacher's to pick, not the room's.
