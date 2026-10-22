@@ -9,7 +9,7 @@ is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
 _Last updated: 2026-10-22 (Central) — The owner's follow-up, Try again keeps keyboard focus, part
-2a (#PR; `docs/DECISIONS.md`, 2026-10-22): `TryAgain` on the class page's own lines (its class, its
+2a (#429; `docs/DECISIONS.md`, 2026-10-22): `TryAgain` on the class page's own lines (its class, its
 roster, an extend's failure sent again under its id), the recap, the student panel, Reports, a
 session's report and its Questions, each line kept and its Try again held as Loading… until Bali
 answers, then focus on the heading each board names; and as Register block's and Make new code's own
@@ -49,7 +49,7 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
   done, with PV3b, PV4b, PV4c and PV5b; the last, PV17c-2, Home's Last session (#425).
 - **The owner's follow-up fixes (2026-10-16), one worker at a time.** Try again keeps keyboard
   focus: part 1 ✅ (#426; DECISIONS 2026-10-16), `TryAgain` on Home, Classes, the account's card,
-  the live grid's line and a student's home; part 2a ✅ (#PR; DECISIONS 2026-10-22), the class page's
+  the live grid's line and a student's home; part 2a ✅ (#429; DECISIONS 2026-10-22), the class page's
   own lines with an extend's, the recap, the student panel, Reports, a session's report and its
   Questions, Register block and Make new code. Left, each a step of its own, the scan in
   `try-again.test.ts` listing them: part 2b, a close (the class page's and Present's) and the slides

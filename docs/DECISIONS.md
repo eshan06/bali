@@ -8,7 +8,7 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
-- **2026-10-22** — **Try again keeps keyboard focus, part 2a (#PR): `TryAgain` on the class page's
+- **2026-10-22** — **Try again keeps keyboard focus, part 2a (#429): `TryAgain` on the class page's
   own lines, the recap, the student panel, Reports, a session's report and its Questions, and as a
   send's own button.** The owner's follow-up of 2026-10-16, continued (part 1, #426, below).
   **Each failure said until its read answers:** the class page reads its class and roster again as
@@ -17,8 +17,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   Loading… in its place; the recap's read again skips its own Loading… step and reads the roster
   too when that failed (`RecapState`'s loading always has its session now); the student panel reads
   again with its failure said; Reports' `startRead` keeps a failure until its answer, and no
-  "Loading sessions…" shows over it; a session's report reads its page and questions again, and its
-  Questions card its own. **A send's resend:** an extend that got no answer is sent again under its
+  "Loading sessions…" shows over it; a session's report reads its page and questions again, the page
+  drawn as soon as it is read, and its Questions card its own. Only the newest read's answer is drawn
+  on the class page (its class, its roster) and in the Questions card (santa's review), so a slow
+  read never says its failure over one read since, two Try agains for one roster failure included.
+  **A send's resend:** an extend that got no answer is sent again under its
   id with its line kept, Try again held as every control is while a send is under way; answered,
   the time added or a refusal in the line's place. **Focus lands** on the class's name (the page's
   heading) for the class, its roster and an extend; Last session; This session, the panel's section
@@ -43,9 +46,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   focus on it), failed again (said again, focus kept) and let through: focus on each heading above; a
   10-minute session started, +5 min refused by a 503 and sent again, every control held, the time
   added, focus on the class's name, then ended. *Found, left:* the roster's failure is said twice on
-  the class page, under the header and in the recap's card, each with its own Try again, as before;
-  and Show earlier's own button goes as it reads the last page, so focus falls to the page there,
-  no Try again's: a step of its own if the owner wants it.
+  the class page, under the header and in the recap's card, each with its own Try again that doesn't
+  hold the other, as before; after Try again in the session's place, a class read before its roster
+  shows the roster's earlier failure under the header, its Try again not held, until the roster's
+  read lands (santa's review); and Show earlier's own button goes as it reads the last page, so
+  focus falls to the page there, no Try again's: a step of its own if the owner wants it.
 
 - **2026-10-16** — **Try again keeps keyboard focus (#426), part 1: one Try again for every read
   that failed, `TryAgain`, on Home, Classes, the account's card, the live grid's line and a
