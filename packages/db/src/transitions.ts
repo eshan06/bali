@@ -3660,10 +3660,11 @@ export interface WriteSavedQuestionInput {
 
 /**
  * Write the draft `savedQuestionId` under `eventId`, holding its row alone, so two writes to it run
- * one at a time and a duplicate finds its own. The id the draft holds is this write's replay when
- * `replays` says the draft is as this write left it, else another write's: EVENT_ID_CONFLICT. A
- * draft removed, or none, is `saved_question_not_found`; an id another draft, an event or an answer
- * holds is EVENT_ID_CONFLICT. An `ordered` write older than the draft's last changes nothing.
+ * one at a time and a duplicate finds its own. The id the draft holds, sent in any case (#319), is
+ * this write's replay when `replays` says the draft is as this write left it, else another write's:
+ * EVENT_ID_CONFLICT. A draft removed, or none, is `saved_question_not_found`; an id another draft,
+ * an event or an answer holds is EVENT_ID_CONFLICT. An `ordered` write older than the draft's last
+ * changes nothing.
  */
 function writeSavedQuestion(
   db: Database,
@@ -3683,7 +3684,9 @@ function writeSavedQuestion(
         .from(savedQuestions)
         .where(eq(savedQuestions.id, input.savedQuestionId))
         .for('update');
-      if (draft?.eventId === input.eventId) {
+      // Postgres prints a uuid lower-case, and a client may send it in upper case: one id, so its
+      // retry is its replay (#319). Every other match of the id here is Postgres's, in any case.
+      if (draft?.eventId === input.eventId.toLowerCase()) {
         if (write.replays(draft)) return { outcome: 'replay', savedQuestion: draft };
         throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
       }
