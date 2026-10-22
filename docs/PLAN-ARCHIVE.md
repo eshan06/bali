@@ -10,6 +10,18 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-22 (Central) — The owner's follow-up, Try again keeps keyboard focus, part
+2a (#429; `docs/DECISIONS.md`, 2026-10-22): `TryAgain` on the class page's own lines (its class, its
+roster, an extend's failure sent again under its id), the recap, the student panel, Reports, a
+session's report and its Questions, each line kept and its Try again held as Loading… until Bali
+answers, then focus on the heading each board names; and as Register block's and Make new code's own
+button. Built to ClassRetryStates and ReportRetryStates (drawn first; no new board). Checked in
+headless Chrome on dev as the demo teacher, each read refused, held and let through with the keyboard.
+Part 2 came to about 550 changed lines without tests, so it is two PRs: part 2b, the close and the
+slides, waits on the branch `fix/try-again-2b`. Before it, part 1 (#426). Next on the Windows PC:
+part 2b, then the rest of Try again (In flight), then the four steps for sessions before the pilot's
+first class; on the Mac, the phone's L8 and M8._
+
 _Last updated: 2026-10-16 (Central) — The owner's follow-up, Try again keeps keyboard focus, part 1
 (#426; `docs/DECISIONS.md`, 2026-10-16): the portal's one Try again for a read that failed
 (`TryAgain`), its line kept and its button held as Loading… while it reads, focus kept on it, a
