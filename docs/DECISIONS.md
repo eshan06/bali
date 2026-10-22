@@ -25,7 +25,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   as it starts (`useLiveQuestion`'s `ask`; its regression test came first and failed, on the running
   hook, `question-card-hook.test.ts`). Asked, the panel closes and focus goes to the question as after
   any ask; the session ended first, its line alone, focus on the question's words or on the panel's
-  title. A save's Try again, which kept its line already, holds as Loading…; refused for good, focus on
+  title. A line with no Try again goes while the same is asked again and is said anew with its answer,
+  and a written ask refused before it is sent holds nothing (santa's review). A save's Try again,
+  which kept its line already, holds as Loading…; refused for good, focus on
   Write a question, the form's heading. A stopped upload's Try again goes on as before, its row
   uploading again, focus on its Cancel, or on the file's name while Bali checks it again with no
   buttons (focus fell to the page there before), then on the row's button once checked. Create class
@@ -53,7 +55,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   focus kept) and let through, focus where each board says; a session ended first answered as a 409
   over CDP; the demo student Ana's lesson the same way, her 13+ check answered yes by a stand-in in
   that browser alone; New class's create and the invite's redeem failed or held in the browser, never
-  sent. About 383 changed lines without tests.
+  sent. 398 changed lines without tests, one PR.
 
 - **2026-10-22** — **Try again keeps keyboard focus, part 2b (#430): a close and the slides on
   `TryAgain`; and the class page's roster line held while its read is on its way, whichever Try
