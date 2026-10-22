@@ -97,7 +97,7 @@ function buttons(node: ReactNode): Map<string, () => void> {
     if (p.onClick) found.set(words(p.children).trim(), p.onClick);
     // `TryAgain` draws its own button: pressed, it calls its `onRetry`.
     if ((n as ReactElement).type === TryAgain) {
-      found.set('Try again', (p as Parameters<typeof TryAgain>[0]).onRetry as () => void);
+      found.set('Try again', (p as Parameters<typeof TryAgain>[0]).onRetry);
     }
     walk(p.children);
   };
