@@ -8,15 +8,14 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-22 (Central) — The owner's follow-up, time limits on the portal's remaining
-reads and saves (#432; `docs/DECISIONS.md`, 2026-10-22): every read now fails as no answer after a
-poll's 10 s, and each save after its own (10 s; a deck's removal 40 s), sent again under the same
-`eventId` or to a route a second send never doubles; a deck's check and a class's create keep none.
-The shell's `refresh` hands back the read on its way, so a Try again pressed while the account's read
-is on its way holds until it answers (#426's *Left*). No new screen or state: a timeout lands in the
-failure lines and Try agains the canvas draws. Checked in headless Chrome on dev, reads and a save
-held past their limits. Before it, Try again's part 3 (#431). Next on the Windows PC: the four steps
-for sessions before the pilot's first class; on the Mac, the phone's L8 and M8._
+_Last updated: 2026-10-22 (Central) — The owner's follow-up fixes are done with four small ones (#433;
+`docs/DECISIONS.md`, 2026-10-22), but for one question the conductor asks the owner. The Classes page
+reads its clock afresh as its tab comes back; every page has one `<main>` in every state, the shell's;
+Show earlier keeps focus, and lands it on the sessions' label once it goes with the last page; and a
+Start sent again after one whose answer was lost no longer says its length wasn't used. No new screen
+or state. Checked in headless Chrome on dev, main beside this branch. Before it, time limits on the
+remaining reads and saves (#432). Next on the Windows PC: the four steps for sessions before the
+pilot's first class, which wait for the owner's word; on the Mac, the phone's L8 and M8._
 
 ## Now
 
@@ -45,8 +44,14 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
   Phase 7 screens (L8, M8). C2's legal words (⚖️) go into the portal's pages, on the Windows PC.
 - **The portal redesign in v2's look (PV0–PV17, the owner, 2026-10-12)** ✅ (2026-10-16): every step
   done, with PV3b, PV4b, PV4c and PV5b; the last, PV17c-2, Home's Last session (#425).
-- **The owner's follow-up fixes (2026-10-16), one worker at a time.** Try again keeps keyboard
-  focus: part 1 ✅ (#426; DECISIONS 2026-10-16), `TryAgain` on Home, Classes, the account's card,
+- **The owner's follow-up fixes (2026-10-16)** ✅, but for one question the conductor asks the owner.
+  Four small fixes ✅ (#433; DECISIONS 2026-10-22), the last: the Classes page's clock read afresh as
+  its tab comes back, one `<main>` on every page in every state (the shell's, `PagePlace`), Show
+  earlier's focus (one `TryAgain`, on the sessions' label once it goes with the last page; the
+  conductor's call), and a Start's line not said of its own resend after a lost answer (the
+  conductor's call, narrowed after santa's review so another tab's session still says it). Try
+  again keeps keyboard focus: part 1 ✅ (#426; DECISIONS 2026-10-16), `TryAgain` on Home, Classes,
+  the account's card,
   the live grid's line and a student's home; part 2a ✅ (#429; DECISIONS 2026-10-22), the class page's
   own lines with an extend's, the recap, the student panel, Reports, a session's report and its
   Questions, Register block and Make new code; part 2b ✅ (#430; DECISIONS 2026-10-22), a close (the
@@ -309,7 +314,7 @@ Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect acc
 - Left for the owner on finished steps' lines (in full in `docs/PLAN-ARCHIVE.md`): P7's App Review path (decide its section 4, then fill the accounts and paste); P6's restore drill, its result recorded once a backup exists; S4's CSP check on the deployed portal after each Next upgrade; ⚖️ whether C7-server's yes rides Other Data Types; device rounds still marked pending (B5b's round 2, steps 7 and 9; B5c's round 3, steps 1 and 3; round 4, B6a and B6b); smaller calls on F (a refused tap's end-of-day drop or dismiss button; the waiting card's Tap in), B6c-2 (`.keep`/`.retry`), B5b (a rule for a replaced window, a code step to schedule) and D2 (Present's key per class).
 - ✅ **Answered** (the owner, 2026-10-14; DECISIONS 2026-10-14): PV5b's whole-page error kept; its review notes folded into PV15 and PV17a; PV4c's two test limits left.
 - 🔧 Before the pilot's first class: the owner's prod block gets a fresh code (its first reached the repo's history in #228), and a session builds an owner command that retires a block, to retire the old code (`docs/PILOT.md`, setup step 6). The portal's three class-page controls are built (P10, P11).
-- **Before the pilot's first class, four steps for sessions** (the owner's workflow review, 2026-10-13; one PR each; after the redesign's PV17c, the owner, 2026-10-14):
+- **Before the pilot's first class, four steps for sessions** (the owner's workflow review, 2026-10-13; one PR each; after the redesign's PV17c, the owner, 2026-10-14); not started, they wait for the owner's word:
   - a column-level privacy test: every column classified personal or not, each personal one placed by the privacy paths that handle it (the account deletion, the disposal, the retention run, the export), so a new column fails until it is placed; FERPA covers university students too;
   - a repeated-`event_id` check on every data-changing route, driven from the authorization matrix's route list;
   - pilot deploy rules: no deploys during class hours, and a documented one-command rollback in `docs/RUNBOOKS.md`;

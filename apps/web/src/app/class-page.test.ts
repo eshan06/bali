@@ -328,8 +328,30 @@ describe('the class page’s Start and End, each within a save’s limit (the ow
     // is said, so a Start that landed shows its session, as a reload would, never a failure over a
     // class in session (santa's review); a refusal, or no session running, says the failure.
     expect(page).toMatch(
-      /\} catch \(err\) \{[^]*?const running =\s*failureOf\(err\)\.kind === 'failed' \? await sessionRunning\(api, classId\) : null;\s*if \(running === null\) return setStartSaid\(errText\(err\)\);\s*setSaid\(null\);\s*setGrid\(\(cur\) =>\s*cur\?\.id === running \? cur : \{ id: running, over: false, startedAt: null, endsAt: null \},\s*\);\s*\}/,
+      /\} catch \(err\) \{[^]*?const noAnswer = failureOf\(err\)\.kind === 'failed';\s*const running = noAnswer \? await sessionRunning\(api, classId\) : null;\s*if \(running === null\) \{[^}]*?return setStartSaid\(errText\(err\)\);\s*\}\s*setSaid\(null\);\s*setGrid\(\(cur\) =>\s*cur\?\.id === running \? cur : \{ id: running, over: false, startedAt: null, endsAt: null \},\s*\);\s*\}/,
     );
+  });
+
+  it('says a session was already running, but not of its own Start that got no answer, sent again (#432’s Left)', () => {
+    // A Start that landed with no answer, its class read failing too, then pressed again, is
+    // answered `existing` with the session it made: "the length you picked wasn't used" was
+    // false there. Its minutes are kept until a Start is answered (`lostStart`), and a session of
+    // those minutes, picked again, says nothing (`saysAlreadyRunning`); any other `existing`
+    // still says it, another tab's of the same length too (santa's review).
+    expect(page).toMatch(/const lostStart = useRef<number \| null>\(null\);/);
+    expect(page).toMatch(/const lost = lostStart\.current;\s*lostStart\.current = null;/);
+    expect(page).toMatch(
+      /setSaid\(\s*saysAlreadyRunning\(res, minutes, lost\)\s*\? \{ kind: 'note', message: SESSION_ALREADY_RUNNING \}\s*: null,\s*\);/,
+    );
+    expect(page).toMatch(
+      /if \(running === null\) \{[^}]*?if \(noAnswer\) lostStart\.current = minutes;\s*return setStartSaid\(errText\(err\)\);\s*\}/,
+    );
+    expect(page.match(/SESSION_ALREADY_RUNNING/g)).toHaveLength(2);
+    // Settled once a session shows, by an answer or a read: its minutes never outlive it.
+    expect(page).toMatch(
+      /useEffect\(\(\) => \{\s*lostStart\.current = null;\s*\}, \[grid\?\.id\]\);/,
+    );
+    expect(page.match(/lostStart\.current = /g)).toHaveLength(3);
   });
 
   it('sends an End within SAVE_TIMEOUT_MS, its failure said beside the controls, End sending it again', () => {

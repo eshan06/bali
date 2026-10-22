@@ -646,7 +646,7 @@ describe('a failed ask (LessonStates)', () => {
 describe('on the class page', () => {
   it('opens on your questions, and writes a new one from there', () => {
     expect(page).toMatch(
-      /\{panel === 'ask' && !writing \? \(\s*<PickPanel[^]*?\/>\s*\) : null\}\s*\{panel === 'ask' && writing \? \(\s*<AskPanel[^]*?\/>\s*\) : null\}\s*<\/main>/,
+      /\{panel === 'ask' && !writing \? \(\s*<PickPanel[^]*?\/>\s*\) : null\}\s*\{panel === 'ask' && writing \? \(\s*<AskPanel[^]*?\/>\s*\) : null\}\s*<\/div>/,
     );
     expect(page).toMatch(/onWrite=\{\(\) => setWriting\(true\)\}/);
     // Ask a question opens it, on whichever card shows (M6, part 2b-2).

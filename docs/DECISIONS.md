@@ -8,6 +8,67 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-22** — **Four small fixes (#433): the Classes page's clock, one `<main>` on every page
+  in every state, Show earlier's focus, and a Start's line.** The owner's follow-up of 2026-10-16,
+  its last: two of the owner's, and two the conductor added from #429's and #432's findings. Nothing
+  drawn changes, and no board was drawn: only the times are right now, and focus lands somewhere.
+  **The Classes page's clock** (the owner's): Classes reads the clock afresh as its tab comes back
+  into view (`visibilitychange`), as Home has since PV17a. Before, a tab left hidden, or a computer
+  left asleep, kept its old "now": a card said "today" of yesterday's session, and a live class's chip
+  stayed past its bell until the next read. **One `<main>`** (the owner's; PV5b's, left so by PV17a):
+  while the account was read or had failed, the pages that draw themselves before it (the class page,
+  Reports, a session's report, Your questions, Your slides) kept their own `<main>` hidden beside the
+  shell's, two on the page. Now the shell's `<main>` is the page's only one on every signed-in page, in
+  every state (`PagePlace`, `components/shell.tsx`). It holds the account not read (`AccountUnread`,
+  which no longer draws its own) with the page hidden after it; otherwise it holds the page in its
+  frame: beside the menu, under the bar, or in Present. Every page draws a `div` where it drew its own
+  `<main>`, Home, Classes, a student's home and lesson, and the invite page (`EntryPage` signed in)
+  included. The pages read without signing in (sign-in, its callback, Help, the policies) keep their
+  own `<main>`, under their own bar. The `<main>` takes the classes the page's place had, so nothing
+  moves (the loading and failed shots are the same byte for byte). The account's read, sign-in and
+  sign-out are untouched. Moving between a page read without signing in and a signed-in page swaps the
+  shell's `div` for its `<main>`, which mounts the new page afresh, as that navigation does anyway.
+  *Weighed:* not drawing the page until the account reads (a redeem's fresh read would remount Home
+  and lose the greeting's focus, and every page's reads would start one read later); swapping the
+  page's `<main>` for a `div` while it waits (that remounts the page's parts once the account lands,
+  the live grid's stream with them); moving the signed-out pages' bar into the shell (a bigger change
+  for nothing gained). A scan fails a `<main>` drawn anywhere else. **Show earlier's focus** (*the
+  conductor's call, awaiting the owner*; #429's *Found, left*): when the last page loaded, its button
+  went and dropped focus to the page's body. Show earlier is now `TryAgain`'s own button, as a send's
+  is (`send`): it says Show earlier, then Loading… while it reads (`held`; `blocked` while another read
+  is on its way), then Try again with its line once a read of it fails, one button throughout, so focus
+  stays on it. When it goes with the last page, it lands focus as Try again does: on the sessions'
+  label, where ReportRetryStates puts its Try again's focus "once there are no earlier ones" (the
+  boards don't mention the first row loaded). *Found on the way* (and fixed): when Show earlier's read
+  failed, focus fell to the body too, because the failure's Try again replaced its button; now it is
+  the same button. **A Start's line** (*the conductor's call on a doubtful edge, the owner away: the
+  recommended option*; #432's *Left*): here is the case. A Start lands, its answer is lost, the class
+  read after it fails too, and the teacher presses Start again. The second press is answered `existing`
+  with the session the first one made, and the page said "A session was already running, so the length
+  you picked wasn't used." though that length was used. The page now keeps the minutes of its last
+  Start that got no answer (`lostStart`) until a Start is answered or a session shows. A resend
+  answered `existing` with a session of those minutes, picked again, says nothing
+  (`saysAlreadyRunning`); any other `existing` still says it. The conductor's brief asked for the line only when the session's length differs from
+  the pick. Both of santa's reviewers found that this also hid it for a session another tab started at
+  the same length, or another computer at the default 50: P10's own case (#245's review), where the
+  countdown is shorter than the pick and nothing would say why. So the line now goes only for this
+  page's own lost Start (*the worker's refinement, awaiting the owner*). *Left:* a lost Start that never
+  landed, with another tab's session of its length started meanwhile, says nothing either (rare: both
+  at once). **Tested** first, each test failing before its fix: the Classes page's source (as Home's);
+  the shell rendered over every signed-in page while the account is read (five pages drew two
+  `<main>`s), and `PagePlace` in each frame; Reports' source for the one `TryAgain`; and
+  `saysAlreadyRunning`. **Seen** in headless Chrome on dev as the demo teacher, the preview serving main
+  and then this branch (`.claude/shots/small-fixes/notes.txt`). On main, the class page, Reports, a
+  session's report, Your questions and Your slides each had two `<main>`s while the account's read was
+  held and after it failed; on this branch every page had one in every state. A week passing while
+  Classes was hidden left its cards as they were on main; here they were re-dated ("Friday" became
+  "Oct 16"). Show earlier, pressed with Enter, loading the last page: focus on the body on main, on
+  "Sessions · Device check" here. Its read refused: the body on main; here the same button, now Try
+  again. A 50-minute Start on "PV16 test" let through, its answer and the class read after it refused,
+  then Start pressed again: main said the line and this branch didn't, and both said it for a session
+  started first over the API, as another tab would. Five test sessions, each ended. About 269 changed
+  lines without tests, one PR.
+
 - **2026-10-22** — **Time limits on the portal's remaining reads and saves (#432); the shell's
   `refresh` hands back the read on its way.** The owner's follow-up of 2026-10-16, past #403's "the
   polls alone" (#334, 2026-10-15) and #426's *Left*; #430's and #431's reviews saw it again. A read

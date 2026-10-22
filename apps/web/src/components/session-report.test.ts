@@ -196,7 +196,7 @@ describe('a session’s page in each state', () => {
     const html = render({ kind: 'loading' });
     expect(text(html)).toBe('|Reports · Biology, period 3|Loading this session…|');
     expect(html).toMatch(
-      /<\/a><p role="status" class="text-body text-text-secondary">Loading this session…<\/p><\/main>$/,
+      /<\/a><p role="status" class="text-body text-text-secondary">Loading this session…<\/p><\/div>$/,
     );
   });
 
@@ -221,7 +221,7 @@ describe('a session’s page in each state', () => {
   it('heads the session with its day over its times, then its card and its unlocks (ReportOpened)', () => {
     const html = render(ready(board()));
     expect(html).toMatch(
-      /^<main class="flex flex-col gap-5\.5"><a [^>]*>[^]*?<\/a><header><h1 class="text-page-title">([^<]*)<\/h1><p class="mt-0\.5 text-meta text-text-secondary">([^<]*)<\/p><\/header><section aria-labelledby="([^"]+)" class="@container flex flex-col gap-4\.5 [^"]*\bshadow-1\b[^"]*"><h2 id="\3" class="text-section-label text-text-tertiary uppercase">This session<\/h2>/,
+      /^<div class="flex flex-col gap-5\.5"><a [^>]*>[^]*?<\/a><header><h1 class="text-page-title">([^<]*)<\/h1><p class="mt-0\.5 text-meta text-text-secondary">([^<]*)<\/p><\/header><section aria-labelledby="([^"]+)" class="@container flex flex-col gap-4\.5 [^"]*\bshadow-1\b[^"]*"><h2 id="\3" class="text-section-label text-text-tertiary uppercase">This session<\/h2>/,
     );
     expect(text(html)).toContain(`|${plain(day)}|${plain(times)}|This session|Joined|3|`);
     // The class page's recap whole: the figures, the note on silence, then the groups.
@@ -290,14 +290,14 @@ describe('its Questions card (L7c; ReportOpened, ReportQuestionsStates)', () => 
     const html = render(ready(board()), 'Biology, period 3', asked);
     expect(sections(html)).toEqual(['This session', 'Unlocks · 2', 'Questions']);
     expect(text(html)).toContain(`|Questions|1 asked in this session|${clock(18)} · Answer shown|`);
-    expect(html).toMatch(/<\/section><\/main>$/);
+    expect(html).toMatch(/<\/section><\/div>$/);
     const calm = render(ready([event('tap_in', 'Ana Rodríguez', 5)]), 'Biology, period 3', asked);
     expect(sections(calm)).toEqual(['This session', 'Questions']);
   });
 
   it('none asked: the page ends at its Unlocks table, or at its card', () => {
     expect(sections(render(ready(board())))).toEqual(['This session', 'Unlocks · 2']);
-    expect(render(ready(board()))).toMatch(/<\/table><\/div><\/section><\/main>$/);
+    expect(render(ready(board()))).toMatch(/<\/table><\/div><\/section><\/div>$/);
     expect(sections(render(ready([event('tap_in', 'Ana Rodríguez', 5)])))).toEqual([
       'This session',
     ]);

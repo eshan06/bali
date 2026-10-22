@@ -144,7 +144,7 @@ export function ClassesView({
   children?: ReactNode;
 }) {
   return (
-    <main className="flex flex-col gap-5.5">
+    <div className="flex flex-col gap-5.5">
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
         <h1 className="text-page-title">Classes</h1>
         <Button ref={newButton} variant="secondary" aria-haspopup="dialog" onClick={onNew}>
@@ -180,6 +180,6 @@ export function ClassesView({
         </div>
       </div>
       {children}
-    </main>
+    </div>
   );
 }

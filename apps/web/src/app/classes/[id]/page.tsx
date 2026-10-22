@@ -48,6 +48,7 @@ import {
   rememberedPresent,
   rememberMinutes,
   rememberPresent,
+  saysAlreadyRunning,
   sessionRunning,
 } from '@/lib/session-controls';
 import { useApi } from '@/lib/use-api';
@@ -142,6 +143,10 @@ export default function ClassDetailPage() {
   const otherField = useRef<HTMLInputElement>(null);
   // A Start that failed, said under its button; the button sends it again.
   const [startSaid, setStartSaid] = useState<string | null>(null);
+  // The minutes of this page's last Start that got no answer, no session found after it, until a
+  // Start is answered or a session shows: it may have landed, so its resend answered `existing`
+  // with a session of those minutes is its own (`saysAlreadyRunning`; #432's Left).
+  const lostStart = useRef<number | null>(null);
   // The projector view (DESIGN.md §5), toggled in the grid's header and kept for this tab, so a
   // reload or a return from Reports comes back in it; a new tab or window opens without it.
   const [present, setPresent] = useState(false);
@@ -191,6 +196,11 @@ export default function ClassDetailPage() {
     setSide(null);
     setWriting(false);
     setDraft(NEW_DRAFT);
+  }, [grid?.id]);
+  // A session shown, by an answer or a read: a Start lost before it is settled, the session its
+  // own or another's.
+  useEffect(() => {
+    lostStart.current = null;
   }, [grid?.id]);
   // Never in Present: asking lists the teacher's questions with their correct answers (the owner,
   // 2026-10-15), and what is written in it; the decks are the teacher's to pick, not the room's.
@@ -382,6 +392,8 @@ export default function ClassDetailPage() {
           { durationMinutes: minutes },
           SAVE_TIMEOUT_MS,
         );
+        const lost = lostStart.current;
+        lostStart.current = null;
         setGrid({
           id: res.session.id,
           over: false,
@@ -389,16 +401,23 @@ export default function ClassDetailPage() {
           endsAt: res.session.endsAt,
         });
         // `existing`: a session was running already (another tab's, a phone's), so the length
-        // picked here set nothing; said, since the bell shown is that session's.
+        // picked here set nothing; said, since the bell shown is that session's. Never of this
+        // page's own Start that got no answer, sent again: its session, its length used.
         setSaid(
-          res.outcome === 'existing' ? { kind: 'note', message: SESSION_ALREADY_RUNNING } : null,
+          saysAlreadyRunning(res, minutes, lost)
+            ? { kind: 'note', message: SESSION_ALREADY_RUNNING }
+            : null,
         );
       } catch (err) {
         // No answer to go by: the Start may have landed, so the class is read again first, and a
         // session running shows as a reload shows it, never a failure over a class in session.
-        const running =
-          failureOf(err).kind === 'failed' ? await sessionRunning(api, classId) : null;
-        if (running === null) return setStartSaid(errText(err));
+        const noAnswer = failureOf(err).kind === 'failed';
+        const running = noAnswer ? await sessionRunning(api, classId) : null;
+        if (running === null) {
+          // Start sends it again: one with no answer may have landed all the same.
+          if (noAnswer) lostStart.current = minutes;
+          return setStartSaid(errText(err));
+        }
         setSaid(null);
         setGrid((cur) =>
           cur?.id === running ? cur : { id: running, over: false, startedAt: null, endsAt: null },
@@ -525,7 +544,7 @@ export default function ClassDetailPage() {
   // While a session runs (PV7; in Present, PV9): one tree in both views, each part in its place
   // whether Present is on or off, so the grid never restarts or reconnects as it turns on.
   return klass !== null && grid !== null && !grid.over ? (
-    <main className={present ? PRESENT_PAGE : 'relative flex flex-col gap-5.5'}>
+    <div className={present ? PRESENT_PAGE : 'relative flex flex-col gap-5.5'}>
       {/* ClassLive's header, End set apart from adding time, and no New code, which it doesn't
           draw; ClassPresent's in Present, +5, +10 and End kept there beside Present. */}
       <LiveHeader
@@ -653,11 +672,11 @@ export default function ClassDetailPage() {
           onClose={closePanel}
         />
       ) : null}
-    </main>
+    </div>
   ) : klass !== null && present ? (
     // After the bell in Present (PresentEnded, as PV1 approved): the header, its ring whole, and
     // "Class is over" alone, the figures left to the recap, where the class can't misread them.
-    <main className={PRESENT_PAGE}>
+    <div className={PRESENT_PAGE}>
       <LiveHeader
         name={klass.name}
         joinCode={klass.joinCode}
@@ -678,10 +697,10 @@ export default function ClassDetailPage() {
           Class is over
         </h2>
       </section>
-    </main>
+    </div>
   ) : (
     // No session running (PV6), or the class not read yet: v2's look, its parts 22 px apart.
-    <main className={present ? PRESENT_PAGE : 'flex flex-col gap-5.5'}>
+    <div className={present ? PRESENT_PAGE : 'flex flex-col gap-5.5'}>
       {/* The name over its line, Reports at the end; on a phone the name at the card titles' size and
           Reports on a line of its own. */}
       <header className="flex flex-wrap items-center gap-x-4.5 gap-y-3.5 max-sm:gap-x-3.5">
@@ -865,6 +884,6 @@ export default function ClassDetailPage() {
           </div>
         </>
       )}
-    </main>
+    </div>
   );
 }

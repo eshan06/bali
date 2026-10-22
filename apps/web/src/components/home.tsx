@@ -566,7 +566,7 @@ export function TeacherHome({
   const running = me.classes.some((c) => (c.summary?.runningSession ?? null) !== null);
   const last = running ? null : lastOf(me.classes);
   return (
-    <main className="flex flex-col gap-5.5">
+    <div className="flex flex-col gap-5.5">
       <div>
         <h1 ref={ref} tabIndex={-1} className="text-greeting text-balance wrap-anywhere">
           {greeting(now, name)}
@@ -613,6 +613,6 @@ export function TeacherHome({
           <Blocks />
         </div>
       </div>
-    </main>
+    </div>
   );
 }

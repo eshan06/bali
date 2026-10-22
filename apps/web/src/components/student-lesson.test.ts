@@ -367,7 +367,7 @@ describe('the lesson page while the class runs', () => {
     const arc = (((23 * 60 + 14) / 3000) * around).toFixed(1);
     expect(ring).toContain(`stroke-dasharray="${arc} ${around.toFixed(1)}"`);
     expect(html).toMatch(
-      /^<main class="flex flex-col gap-5\.5"><header class="flex flex-wrap items-center gap-x-4\.5 gap-y-3\.5 max-sm:gap-x-3\.5">/,
+      /^<div class="flex flex-col gap-5\.5"><header class="flex flex-wrap items-center gap-x-4\.5 gap-y-3\.5 max-sm:gap-x-3\.5">/,
     );
     // Focusable from a script alone, for full screen's close (W5).
     expect(html).toMatch(
@@ -645,10 +645,10 @@ describe('the lesson page in its other states', () => {
 
   it('says Loading… until the first read, and a read that failed with Try again (StudentStates)', () => {
     expect(render({ kind: 'loading' })).toBe(
-      '<main><p role="status" class="text-body text-text-secondary">Loading…</p></main>',
+      '<div><p role="status" class="text-body text-text-secondary">Loading…</p></div>',
     );
     expect(render({ kind: 'failed' })).toMatch(
-      /^<main class="flex flex-wrap items-center gap-x-4 gap-y-3"><p role="alert" class="text-body">Bali couldn&#x27;t load this lesson\.<\/p><button type="button" aria-disabled="false" aria-busy="false" class="[^"]*\bh-8\.5\b[^"]*">Try again<\/button><\/main>$/,
+      /^<div class="flex flex-wrap items-center gap-x-4 gap-y-3"><p role="alert" class="text-body">Bali couldn&#x27;t load this lesson\.<\/p><button type="button" aria-disabled="false" aria-busy="false" class="[^"]*\bh-8\.5\b[^"]*">Try again<\/button><\/div>$/,
     );
   });
 
@@ -667,7 +667,7 @@ describe('the lesson page in its other states', () => {
       }),
     );
     expect(html).toMatch(
-      /^<main class="flex flex-wrap items-center gap-x-4 gap-y-3"><p role="alert" class="text-body">Bali couldn&#x27;t load this lesson\.<\/p><button type="button" aria-disabled="true" aria-busy="true" class="[^"]*">Loading…<\/button><\/main>$/,
+      /^<div class="flex flex-wrap items-center gap-x-4 gap-y-3"><p role="alert" class="text-body">Bali couldn&#x27;t load this lesson\.<\/p><button type="button" aria-disabled="true" aria-busy="true" class="[^"]*">Loading…<\/button><\/div>$/,
     );
     expect(html).not.toMatch(/\sdisabled=""/);
     // Read: focus on the class's name, the page's heading; with none (not the student's class), on
@@ -679,7 +679,7 @@ describe('the lesson page in its other states', () => {
 
   it('says a class the account doesn’t list isn’t the student’s, and leads to Your classes (StudentCardStates)', () => {
     expect(render({ kind: 'not_in_class' })).toMatch(
-      /^<main class="flex flex-wrap items-center gap-x-4 gap-y-3"><p role="alert" class="text-body">This lesson is for a class you&#x27;re not in\.<\/p><a class="[^"]*\bh-8\.5\b[^"]*" href="\/">Your classes<\/a><\/main>$/,
+      /^<div class="flex flex-wrap items-center gap-x-4 gap-y-3"><p role="alert" class="text-body">This lesson is for a class you&#x27;re not in\.<\/p><a class="[^"]*\bh-8\.5\b[^"]*" href="\/">Your classes<\/a><\/div>$/,
     );
   });
 });
@@ -794,10 +794,10 @@ describe('its URL and its reads (from their sources)', () => {
     // Those views have no class's name, and their first control is that way on.
     expect(render({ kind: 'failed' })).not.toMatch(/-class"/);
     expect(render({ kind: 'failed' })).toMatch(
-      /^<main[^>]*><p role="alert"[^>]*>[^<]*<\/p><button /,
+      /^<div[^>]*><p role="alert"[^>]*>[^<]*<\/p><button /,
     );
     expect(render({ kind: 'not_in_class' })).toMatch(
-      /^<main[^>]*><p role="alert"[^>]*>[^<]*<\/p><a /,
+      /^<div[^>]*><p role="alert"[^>]*>[^<]*<\/p><a /,
     );
     expect(component).toMatch(/fullId=\{`\$\{id\}-full`\}/);
     expect(component).toMatch(/headingId=\{`\$\{id\}-question`\}/);

@@ -195,7 +195,7 @@ export function QuestionsView({
   on: QuestionsActions;
 }) {
   return (
-    <main className="flex flex-col gap-5.5">
+    <div className="flex flex-col gap-5.5">
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
         <div>
           <h1 id={TITLE} tabIndex={-1} className="text-page-title">
@@ -242,7 +242,7 @@ export function QuestionsView({
           No questions yet. Write one now, then ask it in class with a click.
         </p>
       )}
-    </main>
+    </div>
   );
 }
 

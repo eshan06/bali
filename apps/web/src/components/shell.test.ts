@@ -7,10 +7,17 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import ClassDetailPage from '../app/classes/[id]/page';
+import ClassesPage from '../app/classes/page';
+import InviteRoute from '../app/invite/page';
 import HomePage from '../app/page';
+import QuestionsPage from '../app/questions/page';
+import ReportsPage from '../app/reports/page';
+import SlidesPage from '../app/slides/page';
 import { createApiClient, NetworkError, POLL_TIMEOUT_MS } from '../lib/api-client';
 import { CANT_REACH } from '../lib/errors';
 import type { Home } from '../lib/student-web';
+import { SessionReportPage } from './session-report';
 import {
   AccountUnread,
   accountReads,
@@ -18,11 +25,14 @@ import {
   frameFor,
   initials,
   PAGE,
+  PagePlace,
   readAccount,
   reloadOnRestore,
   Shell,
   SideMenu,
+  SIGNED_OUT_PATHS,
 } from './shell';
+import { StudentLessonPage } from './student-lesson';
 
 /*
  * The shell (PV5): v2's side menu on a teacher's signed-in pages, built to the canvas's teacher
@@ -37,10 +47,17 @@ import {
  * account, and a tab with no sign-in sent to /login (PV15). And a student's menu, Your classes and
  * Help, for an account that said 13+ in the app, the invite page at /invite under the bar (W3).
  */
-const nav = vi.hoisted(() => ({ path: '/' }));
+const nav = vi.hoisted(() => ({
+  path: '/',
+  classId: '01924b2c-0000-7000-8000-000000000002',
+  sessionId: '01924b2c-0000-7000-8000-000000000001',
+}));
 vi.mock('next/navigation', () => ({
   usePathname: () => nav.path,
   useRouter: () => ({ replace: () => undefined, push: () => undefined }),
+  // A class's page and Classes, drawn in the shell below (one `<main>`).
+  useParams: () => ({ id: nav.classId }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 const read = (path: string) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
@@ -273,9 +290,13 @@ describe('the shell’s wiring of the rulings (read from its source)', () => {
 
   it('says the account unread in the page’s place, Try again reading it again (#352’s review)', () => {
     // Read as the student home's 30 s read is (`refresh`): its failure kept until the answer, so
-    // the card and its Try again stay while it reads (PV17a).
+    // the card and its Try again stay while it reads (PV17a). In the page's one `<main>`, the page
+    // waiting hidden after it.
     expect(shell).toMatch(
-      /\{frame\.hidden \? <AccountUnread error=\{error\} onRetry=\{refresh\} \/> : null\}\s*<div hidden=\{frame\.hidden\}/,
+      /<PagePlace\s+signedOut=\{SIGNED_OUT_PATHS\.test\(path\)\}\s+frame=\{frame\}\s+error=\{error\}\s+onRetry=\{refresh\}\s*>\s*\{children\}\s*<\/PagePlace>/,
+    );
+    expect(shell).toMatch(
+      /\{frame\.hidden \? <AccountUnread error=\{error\} onRetry=\{onRetry\} \/> : null\}\s*<div hidden=\{frame\.hidden\}>\{children\}<\/div>/,
     );
   });
 
@@ -479,7 +500,9 @@ describe('the side menu', () => {
 });
 
 describe('the shell', () => {
-  const page = createElement('main', null, 'page');
+  // A signed-in page draws its parts in the shell's `<main>`; one read without signing in, its own.
+  const page = createElement('div', null, 'page');
+  const own = createElement('main', null, 'page');
 
   it('sets the page beside the menu left-aligned, 1260 px at most, in v2’s gutters', () => {
     expect(PAGE.split(' ')).toEqual(
@@ -503,7 +526,7 @@ describe('the shell', () => {
     for (const path of ['/', '/classes/c1', '/no-such-page']) {
       nav.path = path;
       expect(renderToStaticMarkup(createElement(Shell, null, page)), path).toMatch(
-        /^<div><main class="[^"]*"><p role="status" class="[^"]*">Loading…<\/p><\/main><div hidden=""><main>page<\/main><\/div><\/div>$/,
+        /^<div><main class="[^"]*"><p role="status" class="[^"]*">Loading…<\/p><div hidden=""><div>page<\/div><\/div><\/main><\/div>$/,
       );
     }
   });
@@ -513,24 +536,29 @@ describe('the shell', () => {
 
   it('says the account unread as Home says it (HomeStates): Loading…, or its failure with Try again', () => {
     expect(unread(null)).toMatch(
-      /^<main class="[^"]*"><p role="status" class="[^"]*\btext-text-secondary\b[^"]*">Loading…<\/p><\/main>$/,
+      /^<p role="status" class="[^"]*\btext-text-secondary\b[^"]*">Loading…<\/p>$/,
     );
     // HomeStates' card: its title semibold over its words, Try again 14 px under them.
     expect(unread(CANT_REACH)).toMatch(
       /<div role="alert"><h1 class="text-body font-semibold">Couldn(’|'|&#x27;)t load your account\.<\/h1><p class="text-body text-text-secondary">Couldn(’|'|&#x27;)t reach Bali\. Check your connection, then try again\.<\/p><\/div><button type="button" aria-disabled="false" aria-busy="false" class="[^"]*\bmt-3\.5\b[^"]*">Try again<\/button>/,
     );
-    // In the page's frame, beside no menu: v2's gutters, as the page would have them.
-    expect(classesOf(unread(null), /<main\b[^>]*>/)).toEqual(PAGE.split(' '));
+    // In the page's frame, beside no menu: v2's gutters on the shell's `<main>`, as the page would
+    // have them (`PagePlace`, below).
+    nav.path = '/reports';
+    expect(
+      classesOf(renderToStaticMarkup(createElement(Shell, null, page)), /<main\b[^>]*>/),
+    ).toEqual(PAGE.split(' '));
   });
 
-  it('heads its failure as the page, and is the one <main> while Home waits (PV5b’s review; PV17a)', () => {
+  it('heads its failure as the page, said in the page’s one <main> while Home waits (PV5b’s review; PV17a)', () => {
     // A real heading: the page's only one while it waits, Home drawing nothing of its own.
     expect(unread(CANT_REACH).match(/<h1\b/g)).toHaveLength(1);
-    for (const error of [null, CANT_REACH]) expect(unread(error).match(/<main\b/g)).toHaveLength(1);
+    // The shell's `<main>` holds it: none of its own.
+    for (const error of [null, CANT_REACH]) expect(unread(error)).not.toMatch(/<main\b/);
     nav.path = '/';
     const waiting = renderToStaticMarkup(createElement(Shell, null, createElement(HomePage)));
     expect(waiting).toMatch(
-      /^<div><main class="[^"]*"><p role="status" class="[^"]*">Loading…<\/p><\/main><div hidden=""><\/div><\/div>$/,
+      /^<div><main class="[^"]*"><p role="status" class="[^"]*">Loading…<\/p><div hidden=""><\/div><\/main><\/div>$/,
     );
   });
 
@@ -542,12 +570,13 @@ describe('the shell', () => {
     expect(source).toMatch(
       /<TryAgain size="md" onRetry=\{onRetry\} then=\{\[\]\} className="mt-3\.5">\s*<div role="alert">\s*<h1 className="text-body font-semibold">Couldn&apos;t load your account\.<\/h1>/,
     );
-    expect(source).toMatch(/<AccountUnread error=\{error\} onRetry=\{refresh\} \/>/);
+    expect(source).toMatch(/<AccountUnread error=\{error\} onRetry=\{onRetry\} \/>/);
+    expect(source).toMatch(/error=\{error\}\s+onRetry=\{refresh\}/);
   });
 
   it('draws nothing around a page read without signing in, the page in the same place', () => {
     nav.path = '/login';
-    expect(renderToStaticMarkup(createElement(Shell, null, page))).toBe(
+    expect(renderToStaticMarkup(createElement(Shell, null, own))).toBe(
       '<div><div><main>page</main></div></div>',
     );
   });
@@ -569,6 +598,113 @@ describe('the shell', () => {
     // Home draws nothing of its own for an account not read: the shell's words are the only ones.
     expect(home).toMatch(/if \(home === null\) return null;/);
     expect(home).not.toMatch(/>\s*Loading…\s*<|Couldn&apos;t load your account/);
+  });
+});
+
+describe('one `<main>` on a page, in every state (the owner’s follow-up, 2026-10-16)', () => {
+  // A page drawn before the account is read (a class's, Reports, a session's report, Your
+  // questions, Your slides, a student's lesson) kept its own `<main>` hidden beside the shell's
+  // Loading… (PV5b; PV17a left it so): two in the page while the account loaded. The shell's is
+  // the page's one now, whatever the page waits for, and no page draws its own.
+  const { classId, sessionId } = nav;
+  const signedIn: [string, ReturnType<typeof createElement>][] = [
+    ['/', createElement(HomePage)],
+    ['/invite', createElement(InviteRoute)],
+    ['/classes', createElement(ClassesPage)],
+    [`/classes/${classId}`, createElement(ClassDetailPage)],
+    ['/reports', createElement(ReportsPage)],
+    [`/reports/${classId}/${sessionId}`, createElement(SessionReportPage, { classId, sessionId })],
+    ['/questions', createElement(QuestionsPage)],
+    ['/slides', createElement(SlidesPage)],
+    [`/lessons/${classId}/${sessionId}`, createElement(StudentLessonPage, { classId, sessionId })],
+  ];
+
+  it('has one while the account is read: the shell’s, its Loading… in it, each signed-in page waiting hidden in it', () => {
+    const drawn = signedIn.map(([path, page]) => {
+      nav.path = path;
+      return [path, renderToStaticMarkup(createElement(Shell, null, page))] as const;
+    });
+    expect(drawn.map(([path, html]) => [path, html.match(/<main\b/g)?.length ?? 0])).toEqual(
+      signedIn.map(([path]) => [path, 1]),
+    );
+    for (const [path, html] of drawn) {
+      expect(html, path).toMatch(
+        /^<div><main class="[^"]*"><p role="status" class="[^"]*">Loading…<\/p><div hidden="">/,
+      );
+    }
+  });
+
+  it('has one in every frame: beside the menu, under the bar, in Present, the account’s failure said, and a page read without signing in its own', () => {
+    const place = (
+      path: string,
+      home: Home | null,
+      error: string | null,
+      presenting: boolean,
+      page = createElement('div', null, 'page'),
+    ) =>
+      renderToStaticMarkup(
+        createElement(PagePlace, {
+          signedOut: SIGNED_OUT_PATHS.test(path),
+          frame: frameFor(path, home, error, presenting),
+          error,
+          onRetry: () => Promise.resolve(),
+          children: page,
+        }),
+      );
+    const frames = {
+      teacher: place(`/classes/${classId}`, homeOf('teacher'), null, false),
+      student: place('/', homeOf('student'), null, false),
+      invite: place('/invite', homeOf('invite'), null, false),
+      bar: place(`/classes/${classId}`, homeOf('invite'), null, false),
+      present: place(`/classes/${classId}`, homeOf('teacher'), null, true),
+      presentUnread: place(`/classes/${classId}`, null, null, true),
+      reading: place('/reports', null, null, false),
+      failed: place('/reports', null, CANT_REACH, false),
+      failedAgain: place('/', homeOf('teacher'), CANT_REACH, false),
+      signedOut: place('/support', null, null, false, createElement('main', null, 'page')),
+    };
+    for (const [state, html] of Object.entries(frames)) {
+      expect(html.match(/<main\b/g), state).toHaveLength(1);
+    }
+    // v2's width and gutters on the shell's `<main>` beside the menu and while the account is
+    // said, as on the page's place before; none in Present or on the invite page, which frame
+    // themselves; the page in it, as it was, its frame never remounting it.
+    expect(classesOf(frames.teacher, /^<main\b[^>]*>/)).toEqual(PAGE.split(' '));
+    expect(classesOf(frames.reading, /^<main\b[^>]*>/)).toEqual(PAGE.split(' '));
+    expect(frames.present).toBe('<main><div><div>page</div></div></main>');
+    expect(frames.invite).toBe(frames.present);
+    // The account that didn't load, headed as the page, the page hidden after it.
+    expect(frames.failed).toMatch(
+      /^<main class="[^"]*"><div class="[^"]*"><div role="alert"><h1 class="text-body font-semibold">[^]*<\/button><\/div><div hidden=""><div>page<\/div><\/div><\/main>$/,
+    );
+    expect(frames.signedOut).toBe('<div><main>page</main></div>');
+  });
+
+  it('draws no `<main>` of its own on any page but those read without signing in, each under its own bar', () => {
+    const src = fileURLToPath(new URL('../', import.meta.url));
+    const files = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+        const path = join(dir, entry.name);
+        if (entry.isDirectory()) return files(path);
+        return /\.tsx$/.test(entry.name) && !entry.name.includes('.test.') ? [path] : [];
+      });
+    // Its code, its comments set aside.
+    const code = (file: string) =>
+      readFileSync(file, 'utf8')
+        .replace(/\/\*[^]*?\*\//g, '')
+        .replace(/^\s*\/\/.*$/gm, '');
+    // Drawn as a tag, or named for one (`EntryPage`'s root).
+    const drawers = files(src)
+      .filter((file) => /<main\b|'main'/.test(code(file)))
+      .map((file) => relative(src, file).split(sep).join('/'))
+      .sort();
+    // The shell's, and Help's, a policy's and sign-in's own (`EntryPage` signed out).
+    expect(drawers).toEqual([
+      'app/support/page.tsx',
+      'components/entry-page.tsx',
+      'components/policy-draft.tsx',
+      'components/shell.tsx',
+    ]);
   });
 });
 

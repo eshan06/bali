@@ -27,7 +27,7 @@ const classesOf = (html: string, tag: RegExp) =>
 describe('the entry page', () => {
   it('centres one column, 400 px at most, its parts 6 px apart, 48/24/72 in', () => {
     for (const html of [render(false), render(true)]) {
-      expect(classesOf(html, /<main\b[^>]*>/)).toEqual(
+      expect(classesOf(html, /^<(main|div)\b[^>]*>/)).toEqual(
         expect.arrayContaining([
           'flex',
           'flex-col',
@@ -38,11 +38,18 @@ describe('the entry page', () => {
           'pb-18',
         ]),
       );
-      expect(classesOf(html, /<div\b[^>]*>/)).toEqual(
+      // The column inside it.
+      expect(/^<[^>]+><div class="([^"]*)">/.exec(html)?.[1]?.split(' ')).toEqual(
         expect.arrayContaining(['w-full', 'max-w-100', 'flex-col', 'items-center', 'gap-1.5']),
       );
-      expect(html).toMatch(/<p>card<\/p><\/div><\/main>$/);
+      expect(html).toMatch(/<p>card<\/p><\/div><\/(main|div)>$/);
     }
+  });
+
+  it('is the page’s `<main>` signed out; signed in, it sits in the shell’s, the page’s one (the owner’s follow-up, 2026-10-16)', () => {
+    expect(render(false)).toMatch(/^<main\b/);
+    expect(render(true)).toMatch(/^<div\b/);
+    expect(render(true)).not.toMatch(/<main\b/);
   });
 
   it('signed out, opens with the brand, no bar: the mark at 40 px, Bali, and its line, 28 px over the card', () => {
@@ -59,7 +66,7 @@ describe('the entry page', () => {
     const html = render(true);
     expect(html).not.toContain('<header');
     expect(html).not.toContain('Focus sessions for your classroom');
-    expect(classesOf(html, /<main\b[^>]*>/)).toContain('min-h-[calc(100dvh-60px)]');
+    expect(classesOf(html, /^<div\b[^>]*>/)).toContain('min-h-[calc(100dvh-60px)]');
     // The bar above it: v2's, 60 px tall with its hairline inside.
     expect(TOP_BAR.split(' ')).toEqual(
       expect.arrayContaining(['h-15', 'border-b', 'bg-surface-card', 'px-8', 'max-sm:px-4']),

@@ -371,9 +371,8 @@ export function SideMenu({
  * while it is read, or its failure, headed as the page, with Try again. Try again reads it again
  * keeping the card, its button held as Loading… until Bali answers, so focus stays on it, and a
  * failure is said again however it is worded (PV17a; HomeInterimStates, drawn first); read, focus
- * lands on the page's own heading (`TryAgain`). The only `<main>` while the page waits: Home draws
- * nothing of its own until the account is read. In the page's frame, with no menu: nothing of a
- * teacher's shows before the account reads as one.
+ * lands on the page's own heading (`TryAgain`). Said in the page's one `<main>` (`PagePlace`), in
+ * the page's frame with no menu: nothing of a teacher's shows before the account reads as one.
  */
 export function AccountUnread({
   error,
@@ -382,22 +381,49 @@ export function AccountUnread({
   error: string | null;
   onRetry: () => Promise<void>;
 }) {
-  return (
-    <main className={PAGE}>
-      {error ? (
-        <div className={`mx-auto max-w-md ${CARD_ALONE}`}>
-          <TryAgain size="md" onRetry={onRetry} then={[]} className="mt-3.5">
-            <div role="alert">
-              <h1 className="text-body font-semibold">Couldn&apos;t load your account.</h1>
-              <p className="text-body text-text-secondary">{error}</p>
-            </div>
-          </TryAgain>
+  return error ? (
+    <div className={`mx-auto max-w-md ${CARD_ALONE}`}>
+      <TryAgain size="md" onRetry={onRetry} then={[]} className="mt-3.5">
+        <div role="alert">
+          <h1 className="text-body font-semibold">Couldn&apos;t load your account.</h1>
+          <p className="text-body text-text-secondary">{error}</p>
         </div>
-      ) : (
-        <p role="status" className="mx-auto max-w-md text-center text-body text-text-secondary">
-          Loading…
-        </p>
-      )}
+      </TryAgain>
+    </div>
+  ) : (
+    <p role="status" className="mx-auto max-w-md text-center text-body text-text-secondary">
+      Loading…
+    </p>
+  );
+}
+
+/**
+ * The page's place, and its one `<main>` in every state (the owner's follow-up of 2026-10-16): on
+ * a signed-in page the shell's own, holding the account not read (`AccountUnread`) with the page
+ * waiting hidden after it (PV5b), else the page, in v2's frame beside the menu or under the bar, or
+ * alone in Present. A page draws its parts in it, never a `<main>` of its own, so none waits hidden
+ * beside the shell's. One element throughout, so the page is never remounted as its frame changes.
+ * A page read without signing in draws its own bar and its own `<main>`: going there from a
+ * signed-in page, or back, opens another page, mounted afresh either way.
+ */
+export function PagePlace({
+  signedOut,
+  frame,
+  error,
+  onRetry,
+  children,
+}: {
+  signedOut: boolean;
+  frame: Frame;
+  error: string | null;
+  onRetry: () => Promise<void>;
+  children: ReactNode;
+}) {
+  if (signedOut) return <div>{children}</div>;
+  return (
+    <main className={frame.framed || frame.hidden ? PAGE : undefined}>
+      {frame.hidden ? <AccountUnread error={error} onRetry={onRetry} /> : null}
+      <div hidden={frame.hidden}>{children}</div>
     </main>
   );
 }
@@ -407,8 +433,9 @@ export function AccountUnread({
  * (`readAccount`, the 13+ check before `/v1/me`) as a signed-in page first opens (Home reads it
  * again as it opens), kept as pages change and forgotten once the sign-in is gone; a failed one read
  * again by Try again and on the next page opened; a tab with no sign-in sent to /login. `frameFor`
- * says what to draw. One tree throughout, so the page under it is never remounted as its frame
- * changes (a redeem's turn from the bar to the menu, Present).
+ * says what to draw, and the page's one `<main>` is the shell's (`PagePlace`). One tree throughout,
+ * so the page under it is never remounted as its frame changes (a redeem's turn from the bar to the
+ * menu, Present).
  */
 export function Shell({ children }: { children: ReactNode }) {
   const api = useApi();
@@ -503,10 +530,14 @@ export function Shell({ children }: { children: ReactNode }) {
           ) : frame.chrome === 'bar' ? (
             <PortalBar leaving={leaving} onSignOut={onSignOut} />
           ) : null}
-          {frame.hidden ? <AccountUnread error={error} onRetry={refresh} /> : null}
-          <div hidden={frame.hidden} className={frame.framed ? PAGE : undefined}>
+          <PagePlace
+            signedOut={SIGNED_OUT_PATHS.test(path)}
+            frame={frame}
+            error={error}
+            onRetry={refresh}
+          >
             {children}
-          </div>
+          </PagePlace>
         </div>
       </PresentingContext>
     </MeContext>

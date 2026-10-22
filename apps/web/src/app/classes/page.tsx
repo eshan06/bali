@@ -14,7 +14,8 @@ import { AFTER_BELL_MS, nextBell } from '@/lib/classes';
  * of the account (`useMe`), read again as the page opens, so each card's students and sessions are
  * this moment's, and dated by this computer's clock as each read lands; after every create too, from
  * New class's dialog (PV16b). At a live class's bell by that clock its Live chip goes, and the
- * account is read again just after it, so its last session shows. Anyone but a teacher goes to
+ * account is read again just after it, so its last session shows; the clock is read afresh as the
+ * tab comes back into view, as Home reads it. Anyone but a teacher goes to
  * their own home. Until the account is read, the shell says Loading… or its failure in the page's
  * place (PV5b). Opened from Home's Create a class (`?new`, HomeNew), New class opens as the page
  * shows, as ClassesNew draws it.
@@ -62,6 +63,16 @@ export default function ClassesPage() {
     const timer = window.setTimeout(() => setNow(Math.max(Date.now(), bell)), bell - Date.now());
     return () => window.clearTimeout(timer);
   }, [bell]);
+
+  // Back in view, the clock read afresh, as Home reads it: a timer can sleep with the computer (a
+  // tab left overnight), and each card's day and Live chip hang off it.
+  useEffect(() => {
+    const back = () => {
+      if (document.visibilityState === 'visible') setNow(Date.now());
+    };
+    document.addEventListener('visibilitychange', back);
+    return () => document.removeEventListener('visibilitychange', back);
+  }, []);
 
   // Once per bell: an answer still counting it running (a clock well ahead) waits for a later read.
   useEffect(() => {

@@ -155,7 +155,7 @@ export function StudentHome({
   }, [idle, onRefresh]);
 
   return (
-    <main className="flex flex-col gap-5.5">
+    <div className="flex flex-col gap-5.5">
       <div>
         <h1 className="text-page-title">Your classes</h1>
         <p className="mt-0.5 text-meta text-text-secondary">
@@ -211,6 +211,6 @@ export function StudentHome({
           </p>
         </div>
       )}
-    </main>
+    </div>
   );
 }

@@ -55,18 +55,18 @@ describe('the home sends each account where it belongs (PV15; decision 13)', () 
   it('a teacher: v2’s Home, the greeting heading it, no invite card (PV17a)', () => {
     const html = drawnFor({ kind: 'teacher', me: account('teacher') });
     expect(html).toMatch(
-      /^<main class="flex flex-col gap-5\.5"><div><h1 tabindex="-1" class="text-greeting text-balance wrap-anywhere">Good (morning|afternoon|evening), Ana Rodríguez<\/h1>/,
+      /^<div class="flex flex-col gap-5\.5"><div><h1 tabindex="-1" class="text-greeting text-balance wrap-anywhere">Good (morning|afternoon|evening), Ana Rodríguez<\/h1>/,
     );
-    // One page heading and one main: the shell's own main is gone once the account is read.
+    // One page heading, and no `<main>` of its own: the shell's is the page's one (shell.test.ts).
     expect(html.match(/<h1\b/g)).toHaveLength(1);
-    expect(html.match(/<main\b/g)).toHaveLength(1);
+    expect(html).not.toMatch(/<main\b/);
     expect(html).not.toContain('Enter your invite code');
   });
 
   it('an account the 13+ check never passed: the invite card under the bar, the line for students under it', () => {
     const html = drawnFor({ kind: 'invite' });
     expect(html).toMatch(
-      /^<main class="[^"]*\bmin-h-\[calc\(100dvh-60px\)\][^"]*"><div class="[^"]*"><section aria-labelledby="[^"]*" class="[^"]*">.*<h1 [^>]*>Enter your invite code<\/h1>.*<\/section><p class="[^"]*">([^<]*)<\/p><\/div><\/main>$/,
+      /^<div class="[^"]*\bmin-h-\[calc\(100dvh-60px\)\][^"]*"><div class="[^"]*"><section aria-labelledby="[^"]*" class="[^"]*">.*<h1 [^>]*>Enter your invite code<\/h1>.*<\/section><p class="[^"]*">([^<]*)<\/p><\/div><\/div>$/,
     );
     expect(html).toContain(`>${STUDENTS_LINE}</p>`);
     // Neither a teacher's Home nor a student's.
@@ -77,7 +77,7 @@ describe('the home sends each account where it belongs (PV15; decision 13)', () 
   it('a student who said 13+ in the app: their own home, their classes, never the invite card (W3)', () => {
     const html = drawnFor({ kind: 'student', me: account('student') });
     expect(html).toMatch(
-      /^<main class="flex flex-col gap-5\.5"><div><h1 class="text-page-title">Your classes<\/h1>/,
+      /^<div class="flex flex-col gap-5\.5"><div><h1 class="text-page-title">Your classes<\/h1>/,
     );
     // In no class yet, as this account is: the empty card, and a teacher's way to the invite page.
     expect(html).toContain('You&#x27;re not in a class yet');
@@ -91,7 +91,7 @@ describe('the invite page at /invite, where a student’s home sends a teacher w
   it('a student who said 13+ in the app: the invite card, never told to set up the app again', () => {
     const html = drawnFor({ kind: 'student', me: account('student') }, InviteRoute);
     expect(html).toMatch(
-      /^<main class="[^"]*\bmin-h-\[calc\(100dvh-60px\)\][^"]*"><div class="[^"]*"><section aria-labelledby="[^"]*" class="[^"]*">.*<h1 [^>]*>Enter your invite code<\/h1>.*<\/section><\/div><\/main>$/,
+      /^<div class="[^"]*\bmin-h-\[calc\(100dvh-60px\)\][^"]*"><div class="[^"]*"><section aria-labelledby="[^"]*" class="[^"]*">.*<h1 [^>]*>Enter your invite code<\/h1>.*<\/section><\/div><\/div>$/,
     );
     expect(html).not.toContain('Here as a student');
   });

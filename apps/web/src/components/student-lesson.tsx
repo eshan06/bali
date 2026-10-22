@@ -212,40 +212,40 @@ export function StudentLesson({
 
   if (view.kind === 'loading') {
     return (
-      <main>
+      <div>
         <p role="status" className="text-body text-text-secondary">
           Loading…
         </p>
-      </main>
+      </div>
     );
   }
   if (view.kind === 'failed') {
     return (
-      <main className={SAID}>
+      <div className={SAID}>
         <TryAgain onRetry={onRetry} held={held} then={[`${id}-class`]}>
           <p role="alert" className="text-body">
             Bali couldn&apos;t load this lesson.
           </p>
         </TryAgain>
-      </main>
+      </div>
     );
   }
   if (view.kind === 'not_in_class') {
     return (
-      <main className={SAID}>
+      <div className={SAID}>
         <p role="alert" className="text-body">
           This lesson is for a class you&apos;re not in.
         </p>
         <Link href="/" className={buttonClass('secondary', '', 'sm')}>
           Your classes
         </Link>
-      </main>
+      </div>
     );
   }
   if (view.kind === 'over') {
     const at = view.at === null ? null : new Date(view.at).toISOString();
     return (
-      <main className="flex flex-col gap-5.5">
+      <div className="flex flex-col gap-5.5">
         <LessonHead klass={view.klass} bell={null} headingId={`${id}-class`} />
         <section
           aria-labelledby={over}
@@ -268,7 +268,7 @@ export function StudentLesson({
             Your classes
           </Link>
         </section>
-      </main>
+      </div>
     );
   }
   const { klass, bell, presentation, behind } = view;
@@ -285,7 +285,7 @@ export function StudentLesson({
     />
   ) : null;
   return (
-    <main className="flex flex-col gap-5.5">
+    <div className="flex flex-col gap-5.5">
       <LessonHead klass={klass} bell={bell} phone={view} headingId={`${id}-class`} />
       <PhoneLine chip={phoneChip(view)} endsAt={bell.endsAt} />
       {behind ? <CantReach /> : null}
@@ -326,7 +326,7 @@ export function StudentLesson({
           onLeave={leave}
         />
       ) : null}
-    </main>
+    </div>
   );
 }
 

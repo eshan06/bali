@@ -90,7 +90,7 @@ const DOT = '\u00a0· ';
 
 /**
  * The stack's layer, over the page's whole frame (the shell's 30/36 px in, 22/16 on a phone), placed
- * against the class page's `<main>`: it takes no room and nobody's clicks but the pop-ups' own, over
+ * against the class page's own root: it takes no room and nobody's clicks but the pop-ups' own, over
  * the reconnect pill's layer (z-10) should the two meet on a phone.
  */
 const LAYER =

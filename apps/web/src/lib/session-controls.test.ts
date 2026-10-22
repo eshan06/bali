@@ -21,6 +21,7 @@ import {
   rememberedPresent,
   rememberMinutes,
   rememberPresent,
+  saysAlreadyRunning,
   sessionRunning,
 } from './session-controls';
 
@@ -534,6 +535,52 @@ describe('sessionRunning: the class read again after a Start with no answer (san
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('saysAlreadyRunning: a Start’s answer, whether it says a session was already running (P10)', () => {
+  const START = '2026-10-22T14:05:00.000Z';
+  /** A Start's answer: `outcome`, with a session running from START, `minutes` long. */
+  const answer = (outcome: 'created' | 'existing', minutes: number) => ({
+    outcome,
+    session: {
+      id: SESSION,
+      classId: CLASS,
+      startedAt: START,
+      endsAt: new Date(Date.parse(START) + minutes * 60_000).toISOString(),
+    },
+  });
+
+  it('says nothing of a session this Start made', () => {
+    expect(saysAlreadyRunning(answer('created', 50), 50, null)).toBe(false);
+    expect(saysAlreadyRunning(answer('created', 50), 50, 50)).toBe(false);
+  });
+
+  it('says it of a session another tab or a phone started, of any length (#245’s review)', () => {
+    // Another length: the pick set nothing.
+    expect(saysAlreadyRunning(answer('existing', 25), 50, null)).toBe(true);
+    // The same length, started earlier: the bell is that session's, sooner than this pick's.
+    expect(saysAlreadyRunning(answer('existing', 50), 50, null)).toBe(true);
+    // Time added to it since.
+    expect(saysAlreadyRunning(answer('existing', 55), 50, null)).toBe(true);
+  });
+
+  it('says nothing of this page’s own Start that got no answer, sent again with its length (#432’s Left)', () => {
+    // Its answer lost, the class read after it failed too, Start pressed again with the same
+    // length: answered `existing` with the session the first press made, its length used.
+    expect(saysAlreadyRunning(answer('existing', 50), 50, 50)).toBe(false);
+    expect(saysAlreadyRunning(answer('existing', 1), 1, 1)).toBe(false);
+    const max = MAX_SESSION_MINUTES;
+    expect(saysAlreadyRunning(answer('existing', max), max, max)).toBe(false);
+  });
+
+  it('says it once the pick or the session’s length isn’t that lost Start’s', () => {
+    // The pick changed since: the lost Start's session, of its length, isn't this pick's.
+    expect(saysAlreadyRunning(answer('existing', 25), 50, 25)).toBe(true);
+    // The lost Start never landed, another tab's session runs: of another length, or one the
+    // pick changed to.
+    expect(saysAlreadyRunning(answer('existing', 75), 50, 50)).toBe(true);
+    expect(saysAlreadyRunning(answer('existing', 50), 50, 25)).toBe(true);
   });
 });
 

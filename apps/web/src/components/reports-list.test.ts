@@ -202,7 +202,7 @@ describe('the Reports page in each state (ReportStates)', () => {
   it('heads it Reports over its framing line, in the italic face alone (PV4)', () => {
     const html = view();
     expect(html).toMatch(
-      /^<main class="flex flex-col gap-5\.5"><header><h1 class="text-page-title">Reports<\/h1><p class="[^"]*">Patterns are conversation starters, not verdicts\.<\/p><\/header>/,
+      /^<div class="flex flex-col gap-5\.5"><header><h1 class="text-page-title">Reports<\/h1><p class="[^"]*">Patterns are conversation starters, not verdicts\.<\/p><\/header>/,
     );
     const framing = classesOf(html, /<p class="[^"]*\bitalic\b[^"]*">/);
     expect(framing).toEqual(expect.arrayContaining(['italic', 'text-body', 'text-text-secondary']));
@@ -237,7 +237,7 @@ describe('the Reports page in each state (ReportStates)', () => {
   it('says it is loading the sessions under the pills, and nothing else', () => {
     const html = view({ list: FIRST_READ });
     expect(html).toMatch(
-      /<\/nav><div><div role="status"><p class="text-body text-text-secondary">Loading sessions…<\/p><\/div><\/div><\/main>$/,
+      /<\/nav><div><div role="status"><p class="text-body text-text-secondary">Loading sessions…<\/p><\/div><\/div><\/div>$/,
     );
   });
 
@@ -293,10 +293,17 @@ describe('the Reports page in each state (ReportStates)', () => {
 
   it('offers Show earlier, small, held while it reads, gone at the end', () => {
     expect(view()).toMatch(
-      /<div class="mt-3"><button type="button" id="[^"]+" aria-disabled="false" class="[^"]*\bh-8\.5\b[^"]*">Show earlier<\/button><\/div>/,
+      /<div class="mt-3"><button type="button" aria-disabled="false" aria-busy="false" class="[^"]*\bh-8\.5\b[^"]*\bborder-border-strong\b[^"]*">Show earlier<\/button><\/div>/,
     );
     expect(view({ list: { ...LOADED, reading: 'earlier' } })).toMatch(
-      /aria-disabled="true"[^>]*>Loading…<\/button>/,
+      /<div class="mt-3"><button type="button" aria-disabled="true" aria-busy="true" [^>]*>Loading…<\/button><\/div>/,
+    );
+    // Held in its own words while another read is on its way (the newest page's Try again), as
+    // before: a press then sends nothing.
+    expect(
+      view({ list: { ...LOADED, reading: 'newest', failure: { at: 'newest', message: 'x' } } }),
+    ).toMatch(
+      /<div class="mt-3"><button type="button" aria-disabled="true" aria-busy="false" [^>]*>Show earlier<\/button><\/div>/,
     );
     expect(view({ list: { ...LOADED, nextBefore: null } })).not.toMatch(/Show earlier/);
   });
@@ -317,16 +324,34 @@ describe('the Reports page in each state (ReportStates)', () => {
       /t load earlier sessions\. x<\/p><button type="button" aria-disabled="true" aria-busy="true" class="[^"]*\bh-8\.5\b[^"]*">Loading…<\/button><\/div>/,
     );
     expect(held).not.toMatch(/Show earlier/);
-    // Read: on Show earlier, as after its own read; on the sessions' label once none are left.
+    // Read: on Show earlier, as after its own read, the same button saying it again; on the
+    // sessions' label once none are left (the hand-off, above).
     const src = source('./reports-list.tsx');
     expect(src).toMatch(
-      /<TryAgain\s+onRetry=\{\(\) => onRead\('earlier'\)\}\s+held=\{list\.reading === 'earlier'\}\s+then=\{\[earlierId, sessionsId\]\}\s*>/,
+      /<TryAgain\s+onRetry=\{\(\) => onRead\('earlier'\)\}\s+held=\{list\.reading === 'earlier'\}\s+blocked=\{list\.reading !== null\}\s+then=\{\[sessionsId\]\}/,
     );
-    expect(src).toMatch(/<Button\s+id=\{earlierId\}\s+variant="secondary"\s+size="sm"/);
+    expect(src).toMatch(
+      /const earlier = list\.failure\?\.at === 'earlier' \? list\.failure : null;/,
+    );
     // The sessions' loading line only for a first read, never over a failure being read again.
     expect(src).toMatch(
       /const loading = classId !== null && list\.reading === 'newest' && list\.failure === null;/,
     );
+  });
+
+  it('hands focus on as Try again does once Show earlier goes with the last page: to the sessions’ label (ReportRetryStates)', () => {
+    // Its own button went as the last page landed, and focus fell to the page's body (#429's
+    // worker found it). Show earlier is `TryAgain`'s own button now, as a send's is: held as
+    // Loading… while it reads and Try again once a read of it failed, one button throughout, so
+    // focus stays on it; gone with the last page, it lands focus on the sessions' label, as its Try
+    // again's does "once there are no earlier ones".
+    const src = source('./reports-list.tsx');
+    expect(src).toMatch(
+      /<TryAgain\s+onRetry=\{\(\) => onRead\('earlier'\)\}\s+held=\{list\.reading === 'earlier'\}\s+blocked=\{list\.reading !== null\}\s+then=\{\[sessionsId\]\}\s+send=\{\{\s*words: 'Show earlier',\s*sending: 'Loading…',\s*failed: earlier !== null,\s*\}\}\s*>/,
+    );
+    // No button of its own beside it, which went with no hand-off; one read of earlier sessions.
+    expect(src).not.toMatch(/<Button\b/);
+    expect(src.match(/onRead\('earlier'\)/g)).toHaveLength(1);
   });
 
   it('says the place was lost in v2’s grey notice, over the sessions it read again', () => {
