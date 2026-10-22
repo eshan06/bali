@@ -74,7 +74,26 @@ export async function judgePick(file: File): Promise<Picked> {
  */
 export const UPLOAD_LIMIT_MS = 25 * 60_000;
 
-/** How an upload's PUT ended: in the bucket, cancelled, stopped at its limit, or failed. */
+/**
+ * How long an upload may send nothing before it stops (the owner, 2026-10-22): from its start, time
+ * enough for the connection, TLS and the browser's CORS check before its first byte, and again from
+ * each byte sent. A slow upload that keeps sending is never cut; a stuck one (a half-open
+ * connection, Wi-Fi dropping packets) stops here, not on a frozen bar until its 25 minutes.
+ */
+export const UPLOAD_STALL_MS = 30_000;
+
+/**
+ * How long the bucket's answer may take once the browser has sent the whole file (the conductor's
+ * call): what it counts as sent can still be on its way, in a slow link's buffers or a school's
+ * proxy that holds a file to check it before passing it on, and then the bucket stores it. Two
+ * minutes: 25 MB's time at the 1.7 Mbit/s the owner's rule was set against.
+ */
+export const UPLOAD_ANSWER_MS = 2 * 60_000;
+
+/**
+ * How an upload's PUT ended: in the bucket, cancelled, stopped at its limit, or failed: the
+ * bucket's status, or none for no answer (no connection, or nothing moving in time).
+ */
 export type PutEnd = 'uploaded' | 'cancelled' | 'too_slow' | { failed: number | undefined };
 
 /** The browser's XMLHttpRequest, or a test's stand-in. */
@@ -94,8 +113,10 @@ export interface PutOptions {
 /**
  * The PDF to the bucket by its presigned PUT, as it was signed: `Content-Type: application/pdf`
  * and the file's exact length, which the browser sets from the body. By XMLHttpRequest, whose
- * upload reports its progress (`fetch` reports none). Stopped by `signal`, and at `deadline` by the
- * browser itself (XHR's own timeout, not a page timer a hidden tab may throttle). The bucket's 5xx,
+ * upload reports its progress (`fetch` reports none). Stopped by `signal`; once nothing is sent for
+ * `UPLOAD_STALL_MS`, or the bucket hasn't answered `UPLOAD_ANSWER_MS` after the whole file was
+ * sent, as no answer (a page timer, so a hidden tab's throttling can stop it late); and at
+ * `deadline` by the browser itself (XHR's own timeout, which no tab throttles). The bucket's 5xx,
  * or no answer, is reported as an API call's is (`captureApiFailure`, never a 4xx), by the key's
  * template: the URL carries its signature, so it never leaves.
  */
@@ -107,7 +128,9 @@ export function putPdf(url: string, body: Blob, opts: PutOptions): Promise<PutEn
   return new Promise((resolve) => {
     const xhr = new Xhr();
     const cancel = () => xhr.abort();
+    let watch: ReturnType<typeof setTimeout> | undefined;
     const end = (how: PutEnd) => {
+      clearTimeout(watch);
       signal.removeEventListener('abort', cancel);
       resolve(how);
     };
@@ -117,10 +140,29 @@ export function putPdf(url: string, body: Blob, opts: PutOptions): Promise<PutEn
       }
       end({ failed: status });
     };
+    // Nothing moved in time: ended as no answer first, so the abort's own end, a Cancel's, comes
+    // too late to count (a promise settles once).
+    const stuck = () => {
+      failed(undefined);
+      xhr.abort();
+    };
+    const wait = (ms: number) => {
+      clearTimeout(watch);
+      watch = setTimeout(stuck, ms);
+    };
+    // Bytes sent as last told: a count that moves is progress, back to the start included (a
+    // connection opened again), and an event repeating it isn't. Its count at the whole file starts
+    // the answer's wait: the upload's own `load` won't do, as Firefox fires it only once the bucket's
+    // answer starts (santa's review).
+    let sent = 0;
     xhr.open('PUT', url);
     xhr.setRequestHeader('Content-Type', 'application/pdf');
     xhr.timeout = left;
     xhr.upload.onprogress = (e) => {
+      if (e.loaded !== sent) {
+        sent = e.loaded;
+        wait(e.lengthComputable && e.loaded >= e.total ? UPLOAD_ANSWER_MS : UPLOAD_STALL_MS);
+      }
       if (e.lengthComputable && e.total > 0) onProgress(e.loaded / e.total);
     };
     xhr.onload = () =>
@@ -129,6 +171,7 @@ export function putPdf(url: string, body: Blob, opts: PutOptions): Promise<PutEn
     xhr.onabort = () => end('cancelled');
     xhr.ontimeout = () => end('too_slow');
     signal.addEventListener('abort', cancel);
+    wait(UPLOAD_STALL_MS);
     xhr.send(body);
   });
 }

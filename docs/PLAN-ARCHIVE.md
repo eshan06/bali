@@ -10,6 +10,16 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-22 (Central) — The portal's tests drive the page (#434; `docs/DECISIONS.md`,
+2026-10-22), the owner's answer to the conductor's question: jsdom and Testing Library in `apps/web`,
+dev only, opted into per file, and `try-again.test.tsx` converted as the pattern, its regexes over
+`TryAgain`'s source gone. From now on a UI step converts the source-text tests it touches and adds
+none (CLAUDE.md; `src/source-text-tests.test.ts` lists the 33 left). Nothing anyone sees changes.
+Before it, `next` 15.5.28 (#435), a security fix while the owner is away (the conductor's call,
+awaiting the owner); for the owner, S4's CSP check on the deployed portal (Open owner items). Next
+on the Windows PC: the four steps for sessions before the pilot's first class, which wait for the
+owner's word; on the Mac, the phone's L8 and M8._
+
 _Last updated: 2026-10-22 (Central) — `next` 15.5.28 (#435; `docs/DECISIONS.md`, 2026-10-22), a
 security fix while the owner is away (the conductor's call, awaiting the owner): today's critical
 Next.js advisories failed CI's audit on every PR. The portal used none of their paths (no `next/image`,
