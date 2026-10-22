@@ -8,6 +8,40 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-22** — **`next` 15.5.28, for today's critical Next.js advisories (#435); *the
+  conductor's call, awaiting the owner*.** From today `npm audit --omit=dev --audit-level=high`, the
+  first step of CI's "Typecheck · lint · build" (S5), failed on `next` 10.0.0–15.5.27, so every PR
+  failed CI (#434 parked on it), and main's next push would have too. Four advisories, all fixed in
+  15.5.28: GHSA-2464-fhr4-w9xw (critical, published today), remote code execution through the Image
+  Optimization API with SVG files, from a memory bug in the image library it calls (sharp before
+  0.35.5) on glibc Linux; GHSA-p3m5-59mp-jv5r (high, today), a denial of service through Server
+  Actions in the App Router; and GHSA-4jqv-mc3x-m676 and GHSA-mcj8-r9mp-w47p (moderate, 2026-10-07,
+  the two that Dependabot's #309, `next` 15.5.27, fixes), cache poisoning of SSG and ISR pages.
+  **Why now, without the owner:** CLAUDE.md's standing order (a security hole is fixed now, and the
+  owner told after) and CI blocked for every PR. **The bump:** `apps/web`'s range is `^15.5.28`, its
+  floor raised from `^15.5.4` so no install resolves a vulnerable `next`; the lockfile moves `next`
+  and its own `@next/*` packages from 15.5.25 to 15.5.28, and nothing else. 15.5.26 to 15.5.28 are
+  security-only patch releases, and no portal code changes. The lockfile's sharp was 0.35.5 already,
+  the fixed one; 15.5.28's range for it (`^0.34.3 || ^0.35.5`) still admits 0.34, so what holds it
+  there is the lockfile and CI's audit, which refuses a sharp below 0.35.5 (sharp's own
+  GHSA-wq5f-xc86-pv6w, high). Made by raising the range and resolving `next` afresh at the root:
+  `npm install next@15.5.28 -w @bali/web` nested a second copy under `apps/web` with postcss 8.4.31,
+  past the root override (2026-09-20), which the audit refuses as high. **The portal used none of
+  the vulnerable paths:** no `next/image` and no `images` config, so the built-in optimizer refuses
+  SVG and remote URLs (served locally, both answer `400`) and takes only the portal's own two PNG
+  icons; no Server Action (no `'use server'` anywhere: the API is the one brain); no SSG or ISR
+  (every route renders per request, held by `rendering.test.ts` and CI's route check) and no
+  catch-all route; and it runs on Vercel, which the first cache-poisoning advisory says is not
+  affected. The fix lands anyway: the audit gates every PR, and a later change could reach them.
+  **Supersedes** #309, which Dependabot closes itself once main has a newer `next`. **For the
+  owner:** S4's CSP check on the deployed portal, due after this upgrade (PLAN's Open owner items).
+  *Left,* outside this step, which installs `next` alone: what `npm audit` still lists, below CI's
+  gate or outside it. The API's fastify 5.12.5, GHSA-389g-gv7q-r4x8 (low, published today after the
+  Next.js ones, fixed in 5.12.6, on main too); and dev tools that never ship (vite 8.3.0, high,
+  Dependabot's #427; vitest 5.0.1's `@vitest/mocker`, moderate). **Checked:** CI's audit gate
+  passing, `npm audit signatures`, typecheck, lint, `npm test`, the portal's build (every route ƒ)
+  and CI's nonce check on the served `/login` (16 scripts).
+
 - **2026-10-22** — **Four small fixes (#433): the Classes page's clock, one `<main>` on every page
   in every state, Show earlier's focus, and a Start's line.** The owner's follow-up of 2026-10-16,
   its last: two of the owner's, and two the conductor added from #429's and #432's findings. Nothing
