@@ -37,6 +37,39 @@ The defaults in `src/lib/config.ts` already point at a local setup
 (`http://localhost:3001` API, `http://localhost:3000/auth/callback` redirect), so
 only the Cognito domain and client id must be supplied to sign in.
 
+## Testing the portal
+
+`npm test -w @bali/web` runs the portal's tests (Vitest; the root's `npm test` runs them
+with the rest). Most run in Node, with no page. A test of what a page or a component does
+drives it in one instead (the owner, 2026-10-22; CLAUDE.md, Working rules): it renders the
+component in jsdom with Testing Library, uses it as a person would, with the keyboard or the
+mouse, and checks what they and a screen reader get. `src/components/try-again.test.tsx`
+is the pattern.
+
+- **Opt in on the file's first line:** `// @vitest-environment jsdom`, in a `.test.tsx` file
+  for JSX. Every other test stays in Node, as fast as before. Vitest takes those words from
+  anywhere in a test file, a comment included, so a Node test never writes them.
+- **Clean up after each test:** `afterEach(cleanup)`, from `@testing-library/react`. The
+  portal's Vitest runs without globals, so Testing Library can't register it itself. Where
+  a test leaves mounted something that moves focus as it goes (`TryAgain`), blur first.
+- **Use it as a person would:** `const user = userEvent.setup()`
+  (`@testing-library/user-event`), then `await user.tab()`, `await user.keyboard('{Enter}')`,
+  `await user.type(field, 'BALI7Q2M4X{Enter}')` or `await user.click(button)`.
+- **Find what a person finds:** `screen.getByRole('button', { name: 'Try again' })`, with
+  `description` for what `aria-describedby` says. `document.activeElement` is where focus
+  is; `getAttribute('aria-busy')` and the like are what a screen reader is told.
+- **Hold Bali's answers:** a stand-in read returns a promise the test settles inside
+  `act` (`await act(async () => { … })`), so React has drawn the answer before the next
+  check. A frame (`requestAnimationFrame`) runs about 16 ms later: wait for the next one
+  before checking what a frame does.
+- **A guard that reads files (Try again's scan) finds them through `import.meta.dirname`:**
+  in jsdom, Vite resolves `new URL('./x', import.meta.url)` against the page's address,
+  `http://localhost:3000`, not the file's.
+- **No new test reads source text:** `src/source-text-tests.test.ts` fails on a page or
+  component test that reads a file's text unless it is listed, and its list only shrinks:
+  a UI step converts the tests it touches. It sees files, not checks: a new source-text
+  check in a file still listed gets past it, so a step adds none there either.
+
 ## Cognito app client — author action (needs the AWS console)
 
 The portal is a browser SPA, so it uses the **authorization-code + PKCE** grant with

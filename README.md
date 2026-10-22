@@ -27,6 +27,9 @@ npm run typecheck && npm run lint && npm test
 npm run dev:api        # then: curl localhost:3001/healthz
 ```
 
+The portal's tests of what a page does drive it in jsdom with Testing Library;
+[docs/WEB.md](docs/WEB.md), "Testing the portal", says how to write one.
+
 Configuration comes from a single `.env` at the repo root (`.env.example` lists every
 variable with notes). Every variable the API reads is declared and validated in
 `apps/api/src/env.ts`; a missing or malformed value fails the boot with a readable list

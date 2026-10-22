@@ -90,6 +90,11 @@ lint && npm test`, plus `npm run demo` when API behavior changed), then run
   integration tests (happy path, authz, validation, idempotent replay). Bug
   fix → the failing regression test comes first. Engine change → PGlite tests
   plus real-Postgres race coverage where concurrency is involved.
+- **Portal UI behavior is tested by driving the page** (the owner,
+  2026-10-22): Testing Library on jsdom, opted into per file (`docs/WEB.md`,
+  Testing the portal). A UI step converts the source-text tests it touches
+  and adds none: `apps/web/src/source-text-tests.test.ts` lists those left,
+  and its list only shrinks.
 - **Ponytail (the account-wide minimalism/YAGNI plugin) governs
   implementation, never the gates.** Its minimalism shapes the code you
   write; the testing rules above, every CI check, validation at trust

@@ -8,6 +8,69 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-22** — **The portal's tests drive the page (#434): jsdom and Testing Library, dev only,
+  opted into per file, and `try-again.test.tsx` converted as the pattern.** The owner's answer to the
+  conductor's question this morning: "Yes, go gradually. One setup PR adds a DOM test environment and
+  Testing Library (dev only) and converts try-again.test.ts as the pattern; after that, each UI step
+  converts the tests it touches." 34 of the portal's 40 page and component test files checked their
+  component's source text with regexes, about 314 checks, which Claude Review kept saying pin the
+  code's shape, not what it does (its WARN on #429); and they can't see focus move, so each focus fix
+  of #429–#433 was proven by hand in headless Chrome. It reverses #426's *Weighed* (2026-10-16, below)
+  for the portal's tests. **The setup**, in `apps/web` alone, as devDependencies at caret ranges like
+  the rest: `jsdom` ^30.1.3 (its focus and keyboard handling are what these tests need, so not
+  happy-dom), `@testing-library/react` ^16.3.3, `@testing-library/dom` ^10.4.2 (the React package's
+  peer since its 16) and `@testing-library/user-event` ^14.6.8: each the current stable, fitting React
+  19.3, Next 15.5 and Vitest 5. The lockfile gains their 47 packages, all dev, none with an install
+  script, each signed by the registry (`npm audit signatures`), the four with provenance; nothing else
+  in it moves. **jsdom 30, not 29** (*the conductor's call, awaiting the owner*): 30.1 fixed focus
+  after a focused element or an ancestor of it is removed, which is Try again going, and the focus
+  events around it; but it needs Node 22.22.2 or later (a security release of 2026-03-24). CI's
+  runners and this PC run 22.23; the API's image installs before `.npmrc` is copied in, so its
+  `engine-strict` doesn't apply there. Anywhere else on an older Node 22, the install fails with
+  `EBADENGINE` until Node is updated: the owner's Mac if it is behind, and Vercel's `bali-portal`,
+  whose 22.x patch can't be read from here (its next build log's `node -v` says). **No
+  `@testing-library/jest-dom`** (*the conductor's call,
+  awaiting the owner*): plain `expect` on the page says what its matchers would
+  (`document.activeElement`, `getAttribute`, `classList`), and they need a setup file every test would
+  load. **Opt-in per file** (*the conductor's call, awaiting the owner*): a test's first line,
+  `// @vitest-environment jsdom`; every other test runs in Node as before. *Weighed:* a file-name
+  convention, which Vitest 5 (no `environmentMatchGlobs`) gives only as two Vitest projects for the
+  package; the line says on the file itself where it runs. Vitest takes those words from anywhere in a
+  test file, a comment too, so a Node test never writes them. Such a file cleans up after each test
+  itself (`afterEach`): the portal's Vitest runs without globals, so Testing Library can't. **The
+  pattern**, `components/try-again.test.tsx` (`.tsx` now, for JSX): `TryAgain` rendered in a page,
+  pressed with Tab, Enter, Space and the mouse, Bali's answers held until each test gives them, and
+  checked by what a person and a screen reader get. What it proves that the regexes couldn't: focus
+  stays on the same button while it holds and after a failure; a second press sends nothing; a failure
+  that stands says its line as a new element, the old one gone from the page; once the failure goes,
+  a frame later, focus lands on the first of `then` the page has (a heading given tabindex -1, a
+  control as it is), else `main h1`, else the page's first control, never the body, and never over
+  focus the page or the person moved meanwhile; Enter in a form's field presses its submit;
+  `describedBy` is the button's accessible description. Fifteen breakages of `try-again.tsx`, tried
+  one at a time, each failed it (the hand-off moved to a passive effect, when the button is already
+  gone, failed six tests). Santa's reviewers each found two of them passing at first, both caught by
+  the old stand-in page: a `land` taking the last of `then` (a stopped upload's Try again lands on its
+  Cancel, before the deck's name), and a hand-off with focus not on Try again as it went (a click in
+  Safari, or Firefox on a Mac, focuses no button); a test each now. Gone: its regexes over
+  `try-again.tsx`'s source and its stand-in page for `land` and `handOff`, each covered (the PR maps
+  them); what no page shows through Try again keeps a test of `handOff` itself, the page's lookups
+  real: a browser naming the gone button, or nothing, as focused, and `then` read as the frame comes.
+  Kept as it was: the repo-wide scan (`MOVED`, `LEFT`), which guards other files. **Making it
+  stick:** a rule in CLAUDE.md's Working rules, and `src/source-text-tests.test.ts`, which lists the
+  page and component tests still reading source text (33) and fails on one added, or on one listed
+  that no longer reads; try-again's scan is its one guard (`GUARDS`). A test reads source text when it
+  names `readFile` or `readFileSync` (its import too, so an alias counts) or imports a file `?raw`. It
+  sees files, not checks: a new check in a listed file gets past it, and the rule says none is added
+  there either. `src/lib`'s tests, the portal's logic, are left out (*the conductor's call, awaiting
+  the owner*). **Found on the way:** in jsdom,
+  Vite resolves `new URL('../', import.meta.url)` against the page's address, so a test there reads
+  files through `import.meta.dirname` (`docs/WEB.md`, Testing the portal). **Time:** on this PC the
+  portal's suite went from 8.1 s to 8.7 s, the new file 3.9 s alone (jsdom about 1 s to start). In
+  CI's Unit tests (PGlite), against #433's run: the install 15 s, not 11 s, and the portal's suite
+  9.8 s, as before (the new file's 1.0 s runs beside the others), so about 5 s on a 4-minute job; the
+  static job's install gains the same few seconds. Nothing anyone sees changes: no screenshots, no
+  canvas.
+
 - **2026-10-22** — **`next` 15.5.28, for today's critical Next.js advisories (#435); *the
   conductor's call, awaiting the owner*.** From today `npm audit --omit=dev --audit-level=high`, the
   first step of CI's "Typecheck · lint · build" (S5), failed on `next` 10.0.0–15.5.27, so every PR
