@@ -254,6 +254,19 @@ export async function sessionRunning(
 }
 
 /**
+ * A Start answered `existing` (P10): whether the session running is another length than the one
+ * picked, so the page says the pick wasn't used (`SESSION_ALREADY_RUNNING`). A session of the
+ * length picked says nothing: this Start's own among them, landed with no answer and sent again
+ * (#432's Left). Its length as the Start route made it, its start to its bell.
+ */
+export function lengthNotUsed(
+  session: { startedAt: string; endsAt: string },
+  minutes: number,
+): boolean {
+  return Date.parse(session.endsAt) - Date.parse(session.startedAt) !== minutes * 60_000;
+}
+
+/**
  * Copy the join code to the clipboard (PV6): true once it is there; false, never thrown, where the
  * browser has no clipboard (a page not served securely) or refuses it, so the page can say so.
  */

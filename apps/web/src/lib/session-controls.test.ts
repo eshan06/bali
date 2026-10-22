@@ -14,6 +14,7 @@ import {
   keepUnanswered,
   laterBell,
   LENGTH_PRESETS,
+  lengthNotUsed,
   parseMinutes,
   pickFor,
   regenerateCode,
@@ -534,6 +535,31 @@ describe('sessionRunning: the class read again after a Start with no answer (san
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('lengthNotUsed: a Start answered `existing` (P10)', () => {
+  const START = '2026-10-22T14:05:00.000Z';
+  /** A session running from START, `minutes` long as the Start route makes it. */
+  const running = (minutes: number) => ({
+    startedAt: START,
+    endsAt: new Date(Date.parse(START) + minutes * 60_000).toISOString(),
+  });
+
+  it('says the length picked wasn’t used when the session running is another length', () => {
+    // Another tab's or a phone's Start of another length: this one's pick set nothing.
+    expect(lengthNotUsed(running(25), 50)).toBe(true);
+    expect(lengthNotUsed(running(75), 50)).toBe(true);
+    // Time added since: its length is no longer the one picked.
+    expect(lengthNotUsed(running(55), 50)).toBe(true);
+  });
+
+  it('says nothing of a session the length picked, this Start’s own that landed with no answer and was sent again (#432’s Left)', () => {
+    // Its answer lost, the class read after it failed too, Start pressed again: answered
+    // `existing`, with the session the first press made, of the length it picked.
+    expect(lengthNotUsed(running(50), 50)).toBe(false);
+    expect(lengthNotUsed(running(1), 1)).toBe(false);
+    expect(lengthNotUsed(running(MAX_SESSION_MINUTES), MAX_SESSION_MINUTES)).toBe(false);
   });
 });
 

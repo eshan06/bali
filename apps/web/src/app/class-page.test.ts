@@ -332,6 +332,16 @@ describe('the class page’s Start and End, each within a save’s limit (the ow
     );
   });
 
+  it('says a session was already running only when its length isn’t the one picked (#432’s Left)', () => {
+    // A Start that landed with no answer, its class read failing too, then pressed again, is
+    // answered `existing` with the session it made: "the length you picked wasn't used" was
+    // false there. Said only when the session running is another length (`lengthNotUsed`).
+    expect(page).toMatch(
+      /setSaid\(\s*res\.outcome === 'existing' && lengthNotUsed\(res\.session, minutes\)\s*\? \{ kind: 'note', message: SESSION_ALREADY_RUNNING \}\s*: null,\s*\);/,
+    );
+    expect(page.match(/SESSION_ALREADY_RUNNING/g)).toHaveLength(2);
+  });
+
   it('sends an End within SAVE_TIMEOUT_MS, its failure said beside the controls, End sending it again', () => {
     // An End sent again after one landed is answered `already_ended`, and the recap shows.
     expect(page).toMatch(

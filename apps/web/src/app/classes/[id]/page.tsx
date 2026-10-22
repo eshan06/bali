@@ -42,6 +42,7 @@ import {
   keepUnanswered,
   laterBell,
   LENGTH_PRESETS,
+  lengthNotUsed,
   parseMinutes,
   pickFor,
   rememberedMinutes,
@@ -389,9 +390,12 @@ export default function ClassDetailPage() {
           endsAt: res.session.endsAt,
         });
         // `existing`: a session was running already (another tab's, a phone's), so the length
-        // picked here set nothing; said, since the bell shown is that session's.
+        // picked here set nothing; said, since the bell shown is that session's. Not of one the
+        // length picked: this Start's own, landed with no answer and sent again, among them.
         setSaid(
-          res.outcome === 'existing' ? { kind: 'note', message: SESSION_ALREADY_RUNNING } : null,
+          res.outcome === 'existing' && lengthNotUsed(res.session, minutes)
+            ? { kind: 'note', message: SESSION_ALREADY_RUNNING }
+            : null,
         );
       } catch (err) {
         // No answer to go by: the Start may have landed, so the class is read again first, and a
