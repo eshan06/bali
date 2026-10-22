@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Button } from '@/components/button';
 import { CARD_ALONE } from '@/components/card';
+import { TryAgain } from '@/components/try-again';
 import {
   closeAttemptFor,
   type CloseAttempt,
@@ -331,15 +332,15 @@ export function useLiveQuestion(sessionId: string | null) {
       if (sending.current || question === null) return;
       sending.current = true;
       setClosing(true);
-      setCloseFailed(null);
+      // A close that didn't go through stays said until this one's answer, Try again held.
       const attempt = closeAttemptFor(unansweredClose.current, question.id, reveal);
       const answer = await closeQuestion(api, attempt);
       unansweredClose.current = keepUnanswered(attempt, answer);
       sending.current = false;
       setClosing(false);
       if (now.current.question?.id !== question.id) return;
+      setCloseFailed(answer.kind === 'closed' ? null : { id: question.id, reveal });
       if (answer.kind === 'closed') put(session, answer.question);
-      else setCloseFailed({ id: question.id, reveal });
     },
     [api, put],
   );
@@ -393,34 +394,36 @@ export const closeButtons = ({ question, closing, close }: LiveQuestion) => (
 /**
  * A close that didn't go through, said while the question is still open, Try again sending the same
  * choice again: on the class page under the card's head; in Present at its size, under the buttons
- * and at their right, Try again a full-size button (PresentControlsStates).
+ * and at their right, Try again a full-size button (PresentControlsStates). Held, its line kept,
+ * until Bali answers; closed, focus on `then` (LessonRetryStates).
  */
-export function closeFailedLine(lesson: LiveQuestion, present = false) {
+export function closeFailedLine(lesson: LiveQuestion, then: string, present = false) {
   const { closeFailed: failed, closing, close } = lesson;
   if (failed === null || !isOpen(lesson)) return null;
   return (
     <div className={`flex flex-wrap items-center gap-x-4 gap-y-3${present ? ' justify-end' : ''}`}>
-      <p role="alert" className={present ? 'text-present-line' : 'text-body'}>
-        Bali couldn&apos;t close the question.
-      </p>
-      <Button
-        variant="secondary"
+      <TryAgain
+        onRetry={() => close(failed.reveal)}
+        held={closing}
+        then={[then]}
         size={present ? 'md' : 'sm'}
-        onClick={() => close(failed.reveal)}
-        aria-disabled={closing}
       >
-        Try again
-      </Button>
+        <p role="alert" className={present ? 'text-present-line' : 'text-body'}>
+          Bali couldn&apos;t close the question.
+        </p>
+      </TryAgain>
     </div>
   );
 }
 
 /**
  * Once it is closed: Done, which puts it away here and in every Bali window of this browser (the
- * hook's `done`), focus going on to `then`, what is left in its place.
+ * hook's `done`), focus going on to `then`, what is left in its place. `id`: its own, where focus
+ * comes to it once a close lands.
  */
-export const doneButton = ({ done }: LiveQuestion, then: string) => (
+export const doneButton = ({ done }: LiveQuestion, then: string, id?: string) => (
   <Button
+    id={id}
     variant="secondary"
     onClick={() => {
       done();
@@ -537,7 +540,7 @@ export function QuestionCard({
           )}
         </div>
       </div>
-      {closeFailedLine(lesson)}
+      {closeFailedLine(lesson, `${id}-q`)}
       {r?.problem && !r.final ? (
         <p
           role="status"

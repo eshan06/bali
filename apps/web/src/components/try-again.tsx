@@ -67,6 +67,7 @@ export function TryAgain({
   variant = 'secondary',
   type = 'button',
   send,
+  describedBy,
   className = '',
   children,
 }: {
@@ -79,6 +80,8 @@ export function TryAgain({
   type?: 'button' | 'submit';
   /** A send's own words: at rest, while it sends, and whether its last send failed. */
   send?: { words: string; sending: string; failed: boolean };
+  /** What it is about, where its line doesn't say (a deck in the side panel's list). */
+  describedBy?: string;
   className?: string;
   /** The failure's line, said again at each answer that leaves it standing; none where it sits apart. */
   children?: ReactNode;
@@ -123,6 +126,7 @@ export function TryAgain({
         size={size}
         aria-disabled={busy}
         aria-busy={busy}
+        aria-describedby={describedBy}
         onClick={press}
         className={className}
       >

@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/button';
 import { CARD_ALONE } from '@/components/card';
 import { askButton, HEAD, ROW } from '@/components/question-card';
+import { TryAgain } from '@/components/try-again';
 import type { OpenDeck } from '@/lib/deck-pdf';
 import { type Box, drawPage, type SlideChange, turned } from '@/lib/presenter';
 import type { ChangeSaid, DeckState, DeckUnopened, SlideLesson } from '@/lib/use-slide';
@@ -51,26 +52,30 @@ const STUDENT_UNSHOWN: Record<Unshown, string> = {
 
 /**
  * A line in the slide's place with its Try again, centred in the white frame; in Present one size
- * up; on a student's page in their words.
+ * up; on a student's page in their words. Held, its line kept, until the page is drawn or a line is
+ * said again; drawn, focus on `then` (LessonRetryStates, StudentRetryStates).
  */
 export function UnshownLine({
   why,
   onAgain,
+  held = false,
+  then = [],
   look = 'card',
 }: {
   why: Unshown;
   onAgain: () => void;
+  held?: boolean;
+  then?: readonly string[];
   look?: Look;
 }) {
   const present = look === 'present';
   return (
     <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-3">
-      <p role="alert" className={present ? 'text-present-line' : 'text-body'}>
-        {(look === 'student' ? STUDENT_UNSHOWN : UNSHOWN)[why]}
-      </p>
-      <Button variant="secondary" size={present ? 'md' : 'sm'} onClick={onAgain}>
-        Try again
-      </Button>
+      <TryAgain onRetry={onAgain} held={held} then={then} size={present ? 'md' : 'sm'}>
+        <p role="alert" className={present ? 'text-present-line' : 'text-body'}>
+          {(look === 'student' ? STUDENT_UNSHOWN : UNSHOWN)[why]}
+        </p>
+      </TryAgain>
     </div>
   );
 }
@@ -98,17 +103,21 @@ type Look = keyof typeof FRAME;
  * `drawPage`, given the frame's size as the browser lays it out), its shape kept, the canvas
  * filling the frame and its picture fitted in it. Its label is "Slide 4 of 12." and the page's text
  * (decision 8). A turn keeps the page before it until the next is drawn. A page Bali couldn't draw
- * is drawn again by Try again, or, PDF.js having given no answer, the deck is opened again.
+ * is drawn again by Try again, or, PDF.js having given no answer, the deck is opened again; a deck
+ * that didn't load or open is loaded again. Its line kept meanwhile, Try again held, until the page
+ * is drawn or a line is said again; drawn, focus on `then`, the slide's title (LessonRetryStates).
  */
 export function SlideFrame({
   deck,
   slide,
   onReload,
+  then = [],
   look = 'card',
 }: {
   deck: DeckState;
   slide: Slide;
   onReload: () => void;
+  then?: readonly string[];
   look?: Look;
 }) {
   const frame = useRef<HTMLElement>(null);
@@ -153,6 +162,20 @@ export function SlideFrame({
   const held = open !== null && drawn?.deck === open ? drawn : null;
   const failed = open !== null && undrawn?.deck === open && undrawn.page === page ? undrawn : null;
   const place = placeOf(deck, held !== null, failed !== null);
+  // Try again on its way: the line it was pressed on, until a newer answer shows the page or a line;
+  // dropped for another deck.
+  const [again, setAgain] = useState<{
+    why: Unshown;
+    deck: DeckState;
+    failed: typeof failed;
+    deckId: string;
+  } | null>(null);
+  const answered =
+    again !== null &&
+    (again.deckId !== slide.deckId ||
+      (place !== 'loading' && (again.deck !== deck || again.failed !== failed)));
+  if (answered) setAgain(null);
+  const shown = again === null || answered ? place : again.why;
   const present = look === 'present';
   return (
     <figure
@@ -169,13 +192,13 @@ export function SlideFrame({
         }
         className={`absolute inset-0 size-full object-contain ${place === 'page' ? '' : 'invisible'}`}
       />
-      {place === 'page' ? null : (
+      {shown === 'page' ? null : (
         // Scrolls where a narrow frame can't hold a line and its Try again (a phone under 390 px);
         // 24 px in on Present, as PresentSlideStates draws it.
         <div
           className={`absolute inset-0 grid place-items-center overflow-y-auto ${present ? 'p-6' : 'p-5'} text-center`}
         >
-          {place === 'loading' ? (
+          {shown === 'loading' ? (
             <p
               role="status"
               className={`${present ? 'text-present-line' : 'text-body'} text-text-secondary`}
@@ -184,13 +207,15 @@ export function SlideFrame({
             </p>
           ) : (
             <UnshownLine
-              why={place}
+              why={shown}
               look={look}
-              onAgain={
-                place === 'undrawn' && !failed?.unanswered
-                  ? () => setRedraws((n) => n + 1)
-                  : onReload
-              }
+              held={again !== null}
+              then={then}
+              onAgain={() => {
+                setAgain({ why: shown, deck, failed, deckId: slide.deckId });
+                if (shown === 'undrawn' && !failed?.unanswered) setRedraws((n) => n + 1);
+                else onReload();
+              }}
             />
           )}
         </div>
@@ -260,13 +285,15 @@ const SAID: Record<ChangeSaid, string> = {
 
 /**
  * What a slide change left to say, where it was made (the card, Present one size up, a deck in the
- * side panel); one that didn't go through with Try again, held while another is on its way, and
- * named by what it is about (`describedBy`: a deck in the panel's list).
+ * side panel); one that didn't go through with Try again, held while another is on its way, its
+ * line kept while it sends the same change again, and named by what it is about (`describedBy`: a
+ * deck in the panel's list). Answered, focus on `then` (LessonRetryStates).
  */
 export function SaidLine({
   why,
   held,
   onAgain,
+  then,
   describedBy,
   present = false,
   className = '',
@@ -274,6 +301,7 @@ export function SaidLine({
   why: ChangeSaid;
   held: boolean;
   onAgain: () => void;
+  then: readonly string[];
   describedBy?: string;
   present?: boolean;
   className?: string;
@@ -281,18 +309,17 @@ export function SaidLine({
   const type = present ? 'text-present-line' : 'text-body';
   return why === 'failed' ? (
     <div className={`flex flex-wrap items-center gap-x-4 gap-y-3 ${className}`}>
-      <p role="alert" className={type}>
-        {SAID.failed}
-      </p>
-      <Button
-        variant="secondary"
+      <TryAgain
+        onRetry={onAgain}
+        held={held}
+        then={then}
         size={present ? 'md' : 'sm'}
-        onClick={onAgain}
-        aria-disabled={held}
-        aria-describedby={describedBy}
+        describedBy={describedBy}
       >
-        Try again
-      </Button>
+        <p role="alert" className={type}>
+          {SAID.failed}
+        </p>
+      </TryAgain>
     </div>
   ) : (
     <p role="alert" className={`${type} ${className}`}>
@@ -371,10 +398,15 @@ export function slideCard({ id, lesson, slide, asking, onAsk }: CardProps) {
         </div>
       </div>
       {said === null ? null : (
-        <SaidLine why={said.why} held={changing !== null} onAgain={lesson.again} />
+        <SaidLine
+          why={said.why}
+          held={changing !== null}
+          onAgain={lesson.again}
+          then={[`${id}-slides`]}
+        />
       )}
       <div className="flex flex-wrap items-start gap-x-7 gap-y-5">
-        <SlideFrame deck={deck} slide={slide} onReload={lesson.reload} />
+        <SlideFrame deck={deck} slide={slide} onReload={lesson.reload} then={[`${id}-slides`]} />
         <div className="flex min-w-0 flex-[1_1_260px] flex-col gap-3">
           {/* Said as it changes, so a turn is heard before its page is drawn. */}
           <p aria-live="polite" aria-atomic="true" className="flex items-baseline gap-2">

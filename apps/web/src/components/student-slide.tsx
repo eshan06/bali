@@ -47,7 +47,7 @@ export function StudentSlide({
           Full screen
         </Button>
       </div>
-      <SlideFrame look="student" deck={deck} slide={slide} onReload={onReload} />
+      <SlideFrame look="student" deck={deck} slide={slide} onReload={onReload} then={[id]} />
     </section>
   );
 }
@@ -115,7 +115,7 @@ export function SlideFull({
       {/* The slide and its row as large as fit, 16:9, over the row's 34 px and the gap's 18. */}
       <div className="min-h-0 flex-1 [container-type:size]">
         <div className="mx-auto flex w-[min(100cqw,calc((100cqh-52px)*16/9))] flex-col gap-4.5">
-          <SlideFrame look="student" deck={deck} slide={slide} onReload={onReload} />
+          <SlideFrame look="student" deck={deck} slide={slide} onReload={onReload} then={[id]} />
           <div className="flex flex-wrap items-center justify-between gap-2.5">
             {/* Said as the teacher turns: the page behind, inert, says nothing meanwhile. */}
             <p id={id} aria-live="polite" aria-atomic="true" className={KICKER}>
