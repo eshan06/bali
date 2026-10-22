@@ -4865,6 +4865,49 @@ describe.runIf(REAL_PG)('live lesson questions under contention (real Postgres, 
     }
   }, 20_000);
 
+  it('a write’s retry in upper case behind its first delivery is the replay, never a 409 or a 404 (#319)', async () => {
+    // A client minting upper-case ids resends while its first delivery is still on its way: a
+    // create's retry parks on `event_id`'s unique index, a save's or a removal's on the draft's row,
+    // and each then finds the id as Postgres keeps it, lower-case.
+    const { teacherId } = await seed('race-draft-id-case');
+    const draft = drafting(teacherId, newUuidV7().toUpperCase());
+    let draftId = '';
+    const created = await behindCommit(
+      async (tx) => {
+        const first = await createSavedQuestion(tx, draft);
+        if (first.outcome !== 'created') throw new Error(first.outcome);
+        draftId = first.savedQuestion.id;
+      },
+      () => createSavedQuestion(db, draft),
+    );
+    if (created.status === 'rejected') throw created.reason as Error;
+    expect(created.value).toMatchObject({ outcome: 'replay', savedQuestion: { id: draftId } });
+
+    const save = {
+      savedQuestionId: draftId,
+      eventId: newUuidV7().toUpperCase(),
+      prompt: 'Why?',
+      options: ['x', 'y'],
+    };
+    const saved = await behindCommit(
+      (tx) => replaceSavedQuestion(tx, save),
+      () => replaceSavedQuestion(db, save),
+    );
+    if (saved.status === 'rejected') throw saved.reason as Error;
+    expect(saved.value).toMatchObject({ outcome: 'replay', savedQuestion: { prompt: 'Why?' } });
+
+    const removal = { savedQuestionId: draftId, eventId: newUuidV7().toUpperCase() };
+    const removed = await behindCommit(
+      (tx) => removeSavedQuestion(tx, removal),
+      () => removeSavedQuestion(db, removal),
+    );
+    if (removed.status === 'rejected') throw removed.reason as Error;
+    expect(removed.value).toMatchObject({ outcome: 'replay' });
+    expect(await draftsOf(teacherId)).toMatchObject([
+      { id: draftId, prompt: 'Why?', eventId: removal.eventId.toLowerCase() },
+    ]);
+  }, 20_000);
+
   it('a draft behind a teacher’s deletion is refused and writes nothing; one ahead of it goes with the account (L3b)', async () => {
     /** A teacher whose class is archived, so the account may go (C3). */
     async function leaving(tag: string) {

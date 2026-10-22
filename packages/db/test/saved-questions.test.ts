@@ -252,6 +252,62 @@ describe('a teacher’s drafts (decision 12)', () => {
     expect(await draftsOf(teacher.id)).toEqual([removed]);
   });
 
+  it('reads an eventId in any case as one id: a write’s retry is its replay, another write’s use still taken (#319)', async () => {
+    // Postgres keeps a uuid lower-case and matches one sent in any case. A client minting its ids in
+    // upper case, as Foundation's `uuidString` writes them, resends a write whose answer never came.
+    const { teacher } = await lesson('d-id-case');
+    const upper = () => newUuidV7().toUpperCase();
+    const createId = upper();
+    const draft = await written(write(teacher.id, 5, createId));
+    expect(draft.eventId).toBe(createId.toLowerCase());
+    for (const eventId of [createId, createId.toLowerCase()]) {
+      expect(await write(teacher.id, 6, eventId)).toEqual({ outcome: 'replay', savedQuestion: draft });
+    }
+
+    const replace = {
+      savedQuestionId: draft.id,
+      eventId: upper(),
+      prompt: 'Why?',
+      options: ['a', 'b'],
+      now: at(7),
+    };
+    const replaced = await written(replaceSavedQuestion(db, replace));
+    for (const eventId of [replace.eventId, replace.eventId.toLowerCase()]) {
+      expect(await replaceSavedQuestion(db, { ...replace, eventId, now: at(8) })).toEqual({
+        outcome: 'replay',
+        savedQuestion: replaced,
+      });
+    }
+    // Another write under the id the draft holds, in either case: never that write's replay.
+    await expect(
+      removeSavedQuestion(db, { savedQuestionId: draft.id, eventId: replace.eventId }),
+    ).rejects.toMatchObject(conflict);
+    await expect(replaceSavedQuestion(db, { ...replace, prompt: 'Who?' })).rejects.toMatchObject(
+      conflict,
+    );
+
+    const remove = { savedQuestionId: draft.id, eventId: upper(), now: at(9) };
+    const removed = await written(removeSavedQuestion(db, remove));
+    for (const eventId of [remove.eventId, remove.eventId.toLowerCase()]) {
+      expect(await removeSavedQuestion(db, { ...remove, eventId, now: at(10) })).toEqual({
+        outcome: 'replay',
+        savedQuestion: removed,
+      });
+    }
+    await expect(
+      replaceSavedQuestion(db, { ...replace, eventId: remove.eventId }),
+    ).rejects.toMatchObject(conflict);
+
+    expect(replaced.eventId).toBe(replace.eventId.toLowerCase());
+    expect(removed).toEqual({
+      ...replaced,
+      eventId: remove.eventId.toLowerCase(),
+      updatedAt: at(9),
+      removedAt: at(9),
+    });
+    expect(await draftsOf(teacher.id)).toEqual([removed]);
+  });
+
   it('refuses the id the draft holds from another write: never that write’s replay', async () => {
     const { teacher } = await lesson('d-other-write');
     const draft = await written(write(teacher.id, 5));
