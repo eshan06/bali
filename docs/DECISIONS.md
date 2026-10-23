@@ -8,6 +8,63 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-23** — **The pre-pilot event-id step, part 2 of 3 (#447; the owner's go, 2026-10-23):
+  Create class carries an event id, so a resend is its replay, never a second class, and the create
+  gets the saves' 10 s.** `POST /v1/classes` takes an optional `eventId`, a UUIDv7 (`z.uuidv7()`,
+  as the Phase 7 routes check theirs; a malformed one is a `400`). Additive: a portal from before it
+  sends none and makes a class at every call, as today. The class keeps it in `classes.event_id`, a
+  nullable uuid under a unique constraint (migration 0028, which only adds, so the migration guard
+  passes). Resent under it by the same teacher, in either letter case, the create answers the class
+  that id made, as it is now (its name, its join code and its running session, read as `GET
+  /v1/classes/{id}` reads them), never a second; the same id from another teacher is `409
+  event_id_conflict`, nothing made, as every route refuses an id another account holds. **How:**
+  `createClass` (management.ts) inserts with ON CONFLICT DO NOTHING on any unique key, where it named
+  the live join code's alone, and on no row reads the class holding the id: the caller's is the
+  replay, another teacher's the conflict, and none means the code was taken, so it tries the next.
+  The unique index arbitrates: a create racing its own resend waits at it for the first to commit,
+  then reads that class. Postgres compares the uuid, and nothing compares the id as text, so no letter
+  case misses (#437's trap). **The engine rule, checked:** making a class writes no event and no
+  participation, so it stays beside the engine, as a block's registration does; and, a writer beside
+  it, it reads only `classes` for the id (the owner's ruling on #317, 2026-10-12), which
+  ARCHITECTURE's "Settled" now names with the other three. The answer keeps its shape, `ClassDetail`,
+  no `outcome` (part 1's scenario took the first answer as the replay); a create now reads the class's
+  running session to answer, none for a class just made. **The portal:** one `eventId` per create,
+  minted at its first press (`newEventId`) and sent again by every press while no answer has come (none
+  within the limit, a 5xx, a 429), so Try again is the replay; let go once Bali answers with the class
+  or a refusal, or the dialog closes, so the next New class mints another. Create class takes
+  `SAVE_TIMEOUT_MS`, 10 s, as #432 gave every other save, and the API client's scan lists only a
+  deck's check now; no answer by then is said as ClassesStates draws "No answer at all", with Try
+  again. *The conductor's call, awaiting the owner:* a name changed after a create got no answer still
+  goes under that create's id, so one that landed is answered with its class under the name it was
+  made with, which its page can rename; a fresh id would make a second class, which no route
+  removes. *Weighed:* a fresh id for a changed name, as the invite's code and an ask's words take one,
+  which can leave a class made twice (#432's *Left* names that risk for a saved question's draft,
+  which can be removed). **Drawn first,** an intermediate state on the canvas's ClassesStates: an id
+  another teacher's class holds, which an id minted fresh never is, said in the words every route's
+  spent id gets ("That didn't go through, so nothing changed. Try again."), nothing made, Create class
+  sending it under a new id. **Tests:** the route's (the happy path, authz, a malformed id, the replay
+  twice and in upper case, the class as it is after a rename, a new code and a Start, another
+  teacher's id in either case, and none); `createClass`'s on PGlite; three on real Postgres (a create
+  and its resend at once, one in upper case: one class, both answered with it; a resend meeting its
+  create uncommitted waits, then is answered with it; two teachers sending one id: one class, one
+  conflict); #442's check, Create class off its list, its scenario now renaming the class, giving it a
+  new code and starting it between the sends, so a replay that only echoed fails; and New class's test
+  drives the page (jsdom, Testing Library), so `source-text-tests.test.ts` lists 32, pinning what the
+  old one did, as santa's round 1 asked (a dialog the browser closes mid-create keeping its name and
+  id, a Copy's answer going with its class, the form's own submit going nowhere). The shared
+  `CreateClassRequest` names the optional `eventId`. **Checked:** with the id dropped from the insert,
+  #442's check fails ("wrote classes +1" in both cases); minting an id at every press, keeping one past
+  a close, or losing any of those three, fails the dialog's tests. **Seen** in headless Chrome on dev
+  as the demo teacher, the preview serving this branch, every create held, failed or answered by a
+  stand-in over CDP and never let through (the teacher's 5 classes before and after): Create class held
+  as Creating…, the name read-only; no answer, said 10.0 s after the press, "Couldn't reach Bali…" with
+  Try again, as ClassesStates draws it; Try again pressed and held again, under the first press's id;
+  answered, "Period 4 Biology is ready", focus on its title; Done, focus back on New class; the next
+  create under a new id, refused as another teacher's in the drawn words with Create class, whose next
+  press went under another (`.claude/shots/create-class-id/`). **Left:** part 3, the three places #437
+  found comparing an id as text; the demo and `dev:teacher` still create with no id, an old client's
+  way, which works as before.
+
 - **2026-10-23** — **S10 closed with no code, and the push's wait screen picked (#446; the owner's
   rulings, in chat, each as recommended).** *S10* ("a Release build never ships dev's API or user
   pool", Phase 6): every prod TestFlight run already checks that its API, its pool's hosted-UI domain

@@ -175,6 +175,7 @@ const classesColumns = {
   schoolId: classes.schoolId,
   name: classes.name,
   joinCode: classes.joinCode,
+  eventId: classes.eventId,
   createdAt: classes.createdAt,
   removedAt: classes.removedAt,
 };

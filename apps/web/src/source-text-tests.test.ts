@@ -61,7 +61,6 @@ const STILL_READING = [
   'components/invite-code.test.ts',
   'components/join-code.test.ts',
   'components/live-grid.test.ts',
-  'components/new-class.test.ts',
   'components/present-question.test.ts',
   'components/present-slide.test.ts',
   'components/question-card.test.ts',

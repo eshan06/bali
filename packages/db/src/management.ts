@@ -49,15 +49,12 @@ export function generateJoinCode(): string {
   return code;
 }
 
-/** Only live classes reserve their join code, so ON CONFLICT arbitrates on the partial index. */
-const activeClass = sql`${classes.removedAt} is null`;
-
 /**
  * A 23505 out of the regenerate UPDATE is always a join-code collision.
- * Besides the primary key on `id` (which that UPDATE never sets), the active
- * join-code index is the only unique constraint on `classes`, so the loop can
- * safely read one as "try a fresh code". (INSERT uses ON CONFLICT DO NOTHING
- * instead and never throws here.)
+ * Besides the primary key on `id` and the unique `event_id` (which that UPDATE
+ * never sets), the active join-code index is the only unique constraint on
+ * `classes`, so the loop can safely read one as "try a fresh code". (INSERT
+ * uses ON CONFLICT DO NOTHING instead and never throws here.)
  *
  * The cause-chain walk this used to carry is in `sql-errors.ts` now, because
  * the engine had grown its own copy of the same loop for 40P01 and the trap it
@@ -88,15 +85,24 @@ async function holdLiveTeacher(tx: Database, teacherId: string): Promise<void> {
 
 /**
  * Create a class for a teacher with a unique, server-generated join code. The
- * insert uses ON CONFLICT DO NOTHING on the active join-code index: a code
- * collision returns no row and we try a fresh code — so two concurrent creates
+ * insert uses ON CONFLICT DO NOTHING: a code collision on the active join-code
+ * index returns no row and we try a fresh code — so two concurrent creates
  * that happen to mint the same code can never both win (the index arbitrates,
  * not a read-then-write). Exhausting the bounded attempts is effectively
  * impossible and surfaces as a 500 rather than a silent bad state.
+ *
+ * Idempotent on `eventId` when the request carries one (rule 4; 2026-10-23):
+ * the class that id made, the caller's own, is the replay, returned as it is
+ * now and never made twice; another teacher's is `EVENT_ID_CONFLICT`. Its
+ * unique index arbitrates here too, so the same create racing itself waits for
+ * the first to commit and then reads its class. Postgres compares the uuid, so
+ * an id resent in another letter case is the same id. Only `classes` is read
+ * for it: a writer beside the engine checks its own table (the owner's ruling
+ * on #317, 2026-10-12). Without one, every call makes a class, as before.
  */
 export async function createClass(
   db: Database,
-  input: { teacherId: string; schoolId: string; name: string },
+  input: { teacherId: string; schoolId: string; name: string; eventId?: string },
   // Injection point for deterministic tests (force a collision); defaults to the
   // real generator, so every production caller behaves identically.
   gen: () => string = generateJoinCode,
@@ -120,10 +126,24 @@ export async function createClass(
           schoolId: input.schoolId,
           name: input.name,
           joinCode: gen(),
+          eventId: input.eventId,
         })
-        .onConflictDoNothing({ target: classes.joinCode, where: activeClass })
+        // No target: either unique key may meet a row, the live join code or the eventId.
+        .onConflictDoNothing()
         .returning();
       if (row) return row;
+      if (input.eventId === undefined) continue;
+      // Nothing written: the code was taken, or this eventId's class is made already. Read whether
+      // or not it was removed since: unreachable today, as only a disposal removes a class, and it
+      // de-identifies its teacher with it, so a resend is refused before this read (the route's
+      // 403 for a sign-in that is no teacher now, or ACCOUNT_DELETED above for one already under
+      // way). A route that removes a class while its teacher stays must settle what a resend of
+      // its create answers.
+      const [made] = await tx.select().from(classes).where(eq(classes.eventId, input.eventId));
+      if (made?.teacherId === input.teacherId) return made;
+      if (made) {
+        throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another class');
+      }
     }
     throw new Error('createClass: could not allocate a unique join code');
   });

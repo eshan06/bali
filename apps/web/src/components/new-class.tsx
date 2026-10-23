@@ -6,6 +6,7 @@ import { type Ref, useEffect, useId, useImperativeHandle, useRef, useState } fro
 
 import { CLASS_NAME_MAX, type CreateAnswer, createClass } from '@/lib/classes';
 import { CANT_COPY } from '@/lib/errors';
+import { newEventId } from '@/lib/event-id';
 import { useApi } from '@/lib/use-api';
 
 import { Button } from './button';
@@ -26,8 +27,11 @@ export const cardId = (classId: string) => `class-${classId}`;
  * typed; Creating… holds the name, Cancel and Escape until Bali answers; a failure is said right
  * under the help, and Try again sends the name again, but after a final refusal, which no resend can
  * change (ClassesStates, drawn first): one button throughout (`TryAgain`'s `send`), so focus stays
- * on it whatever it comes to say. Every answer has the page read the list again (`onAnswer`):
- * the route takes no `eventId`, so a class made before its answer was lost shows there. A class made
+ * on it whatever it comes to say. One create, one `eventId` (2026-10-23): minted at its first press
+ * and sent again by every press while no answer has come, Try again's and one after the name was
+ * changed alike, so a create that landed unanswered is answered with its class, never a second; a
+ * class made, a refusal or the dialog closed lets it go. Every answer has the page read the list
+ * again (`onAnswer`), so a class made shows there whatever the dialog came to say. A class made
  * turns the dialog into ClassesCreated's, focus on its title: "<name> is ready", its join code, Copy
  * code (CopyStates) and Done. Closed after Done, focus goes to the class's card once the list holds
  * it, else back to what opened the dialog.
@@ -40,6 +44,8 @@ export function NewClass({ ref, onAnswer }: { ref?: Ref<NewClassHandle>; onAnswe
   const title = useRef<HTMLHeadingElement>(null);
   // A create under way: a second press before the page redraws sends nothing.
   const sending = useRef(false);
+  // This create's eventId, while no answer to it has come: what the next press sends again.
+  const unanswered = useRef<string | null>(null);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<Exclude<CreateAnswer, { kind: 'created' }> | null>(null);
@@ -70,7 +76,10 @@ export function NewClass({ ref, onAnswer }: { ref?: Ref<NewClassHandle>; onAnswe
     sending.current = true;
     setBusy(true);
     setFailed(null);
-    const answer = await createClass(api, trimmed);
+    unanswered.current ??= newEventId();
+    const answer = await createClass(api, { name: trimmed, eventId: unanswered.current });
+    // Kept while the create may have landed with no answer to say so: Try again resends it.
+    if (answer.kind !== 'failed') unanswered.current = null;
     sending.current = false;
     setBusy(false);
     onAnswer();
@@ -80,13 +89,14 @@ export function NewClass({ ref, onAnswer }: { ref?: Ref<NewClassHandle>; onAnswe
     else setFailed(answer);
   }
 
-  /** Closed: by Cancel, Escape or Done. The next New class starts afresh. */
+  /** Closed: by Cancel, Escape or Done. The next New class starts afresh, under a new eventId. */
   function closed() {
     if (sending.current) return;
     if (made) document.getElementById(cardId(made.id))?.focus();
     setName('');
     setFailed(null);
     setMade(null);
+    unanswered.current = null;
     forget();
   }
 

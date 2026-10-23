@@ -126,6 +126,66 @@ describe('createClass', () => {
   });
 });
 
+describe('createClass with an eventId (2026-10-23)', () => {
+  const classesOf = (teacherId: string) =>
+    db.select().from(classes).where(eq(classes.teacherId, teacherId));
+
+  it('keeps the id, and a resend of it, in either letter case, is the class it made, never a second', async () => {
+    const { teacherId, schoolId } = await makeTeacher('cc-id-replay');
+    const eventId = newUuidV7();
+    const made = await createClass(db, { teacherId, schoolId, name: 'Algebra', eventId });
+    expect(made.eventId).toBe(eventId);
+    const again = await createClass(db, { teacherId, schoolId, name: 'Algebra', eventId });
+    const upper = eventId.toUpperCase();
+    const shouted = await createClass(db, { teacherId, schoolId, name: 'Algebra', eventId: upper });
+    expect(again).toEqual(made);
+    expect(shouted).toEqual(made);
+    expect(await classesOf(teacherId)).toEqual([made]);
+  });
+
+  it('answers a resend with the class as it is now, whatever name the resend carries', async () => {
+    const { teacherId, schoolId } = await makeTeacher('cc-id-now');
+    const eventId = newUuidV7();
+    const made = await createClass(db, { teacherId, schoolId, name: 'Old', eventId });
+    const now = await updateClass(db, { classId: made.id, name: 'New', regenerateCode: true });
+    const again = await createClass(db, { teacherId, schoolId, name: 'Typed again', eventId });
+    expect(again).toEqual(now);
+    expect(again.name).toBe('New');
+    expect(await classesOf(teacherId)).toHaveLength(1);
+  });
+
+  it('refuses another teacher’s id as EVENT_ID_CONFLICT, making nothing', async () => {
+    const owner = await makeTeacher('cc-id-owner');
+    const other = await makeTeacher('cc-id-other');
+    const eventId = newUuidV7();
+    await createClass(db, { ...owner, name: 'Mine', eventId });
+    for (const id of [eventId, eventId.toUpperCase()]) {
+      await expect(
+        createClass(db, { ...other, name: 'Theirs', eventId: id }),
+      ).rejects.toMatchObject({ code: 'EVENT_ID_CONFLICT' });
+    }
+    expect(await classesOf(other.teacherId)).toEqual([]);
+  });
+
+  it('still takes a fresh join code past a taken one, the id kept', async () => {
+    const { teacherId, schoolId } = await makeTeacher('cc-id-code');
+    await createClass(db, { teacherId, schoolId, name: 'holder' }, () => 'XXXX22');
+    const eventId = newUuidV7();
+    const input = { teacherId, schoolId, name: 'newcomer', eventId };
+    const klass = await createClass(db, input, sequence('XXXX22', 'XXXX33'));
+    expect(klass).toMatchObject({ joinCode: 'XXXX33', eventId });
+  });
+
+  it('without one, makes a class at every call, as before', async () => {
+    const { teacherId, schoolId } = await makeTeacher('cc-no-id');
+    const first = await createClass(db, { teacherId, schoolId, name: 'Same' });
+    const second = await createClass(db, { teacherId, schoolId, name: 'Same' });
+    expect(first.eventId).toBeNull();
+    expect(second.id).not.toBe(first.id);
+    expect(await classesOf(teacherId)).toHaveLength(2);
+  });
+});
+
 describe('updateClass', () => {
   it('renames without touching the join code', async () => {
     const { teacherId, schoolId } = await makeTeacher('uc-rename');
