@@ -34,8 +34,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   shows once a read of `GET /v1/me` names the student's classes (the phone keeps no `me` across a
   launch): after the update, Home for that first read, then the screen, by a cut, as every screen
   off the onboarding path (DESIGN.md §7). **Known limits:** a reinstall or a new phone shows it once
-  more to a student in a class (the record is the phone's); and a join made while `GET /v1/me` had no
-  answer records nothing, so that student sees it once after the join. **The board over
+  more to a student in a class (the record is the phone's); a join made while `GET /v1/me` had no
+  answer records nothing, so that student sees it once after the join; and a student whose first
+  launch after the update is mid-class sees the two lines only after the bell, which matters once
+  L8b puts the answer card on a session's screens: L8b, or the owner, decides whether the card waits
+  for the list (santa's round 1). **The board over
   ARCHITECTURE's words:** decision 11 says "the two new lines and Continue"; the approved board also
   draws See the whole list, built as drawn. **The portal's help page** says the list word for word
   (`apps/web/src/app/support/support.test.ts` reads `ConsentCard`'s lists from `JoinView.swift`, and
