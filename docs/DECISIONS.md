@@ -8,6 +8,61 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-23** — **The live lesson followed and the answer card's words, no screen yet (L8b-1,
+  #448, the first of L8b's two PRs: L8b came to about 506 lines and the conductor split it); the
+  card waits for the consent list, and Delete account takes the phone's two notes with the account
+  (the owner's rulings, 2026-10-23).** **Which lesson** (`SyncState.lessonSession`, BaliOutbox's
+  `Lesson.swift`): the running session the phone stands in, else the first class `GET /v1/me` lists
+  in session, as Home's in-session card picks it, tapped in or not (decision 2); each only while its
+  bell is ahead by the phone's clock, as Focus's countdown and Home's card read it, and never one a
+  read said is over. **One `LiveLesson` per session** (L5): `Phone` runs its poll only while the app
+  is in front and cancels it as the app goes behind (the owner's ruling, #330), and drops the lesson
+  at a sign-out, its poll and the card's own with it (#331), and once a read says the session is
+  over, following another class in session if one runs. **The card waits for the list (the owner's
+  ruling, "Wait for the list"):** asked whether a student whose first open after the update is
+  mid-class, on Focus, where L8a's one-time screen waits for the bell, may answer before seeing the
+  list's two new lines, the owner picked no card until this phone has shown them the list as it
+  stands: "Keeps 'never grows without asking you again' to the letter; no new screen to draw. Cost:
+  such a student can't answer in that one class." So a lesson is followed only for a student this
+  phone holds L8a's record for (`listSeenBy`: the one-time screen's Continue, Join's preview, or Me's
+  What your teacher sees), from the moment the record is written, mid-class included. *The worker's
+  call, as the conductor suggested:* nothing is followed until then, so nothing polls for a card
+  that can't show. **Delete account takes the notes (the owner's ruling, "Clear both at delete"):**
+  the two notes the phone keeps under the student's id, `inClass` (#143) and `listSeenBy` (L8a), go
+  from its defaults with the account, and a sign-out keeps them as before, so the same student isn't
+  asked again (from #443's Claude Review privacy WARN). *The worker's reading of "a finished Delete
+  account":* once Bali's server has deleted the account, its Cognito sign-in deleted or still to go
+  (`deleted`, `signInNotDeleted`), so a student who leaves the pending screen without its Try again
+  leaves no note either; the gap's fallback's deletion, the same call, too. One case keeps them:
+  the app closed after the phone heard the server's deletion but before Cognito's DeleteUser
+  answered, which a relaunch finds pending; the pending screen's Try again then clears them (left
+  as is, its reachability doubtful; reported to the conductor). The engine's `me` is
+  forgotten with them, as at another student's sign-in: a state it sent before, still listing her
+  classes, would otherwise keep her in a class again (santa's round 1). A rider in this PR.
+  **The answer** (decision 5): a tap sends it in one request through `LiveLesson.answer`, never the
+  outbox, and another changes it until the close; the answer Bali holds sends nothing again, unless
+  the last pick didn't send; of picks whose answers cross only the last one's is said, and one for a
+  question no longer shown is dropped. Hide is this phone's alone, in memory, until another question
+  shows. **The words** (`AnswerCard`): each answer's look and the line under them as the app canvas
+  draws them, word for word (Main, FocusAnswered, FocusRevealed, CardSending, CardFailed,
+  CardTooLate, CardClosed, CardRight, CardNoAnswer, CardOffline). **States no board draws** (*the
+  worker's call, awaiting the owner*): any failed poll, no answer, a `429` or a refusal, says
+  CardOffline's line while the question is open, as L5's entry planned ("the poll's no answer is its
+  Offline card"), a pick's own line said before it; any failed answer but too late says CardFailed's,
+  as the student web's `answerSaid` does; and that line goes once Bali holds an answer other than
+  the one it held when the pick was made: the pick landed, its reply lost, or another device's
+  stands. **Known limits:** an earlier pick still on its way that lands after a later one failed
+  clears that line too, so the card says the earlier answer is in, which is true, and not that the
+  later tap didn't go; the student web keeps its line there, comparing with the failed send's own id,
+  which BaliCore's `AnswerResult` doesn't carry (left as is, its reachability doubtful; reported to
+  the conductor). Two of a student's classes in session at once follow the first listed. A Hide
+  doesn't outlive the app's run. `LessonState` gains a public init, for the app's fixtures and tests.
+  Tests: `LessonTests` (BaliOutbox: which lesson, each state's looks and line),
+  `AppTests.lessonFollowed` (the wait for the list, the poll only in front, the sign-out, the
+  bell), `AppTests.lessonAnswers`, `AppTests.deleteAccountWiring` (the notes gone with the account,
+  and not back from a late state) and `AppTests.deleteFromMeUnchecked` (kept when nothing is
+  deleted).
+
 - **2026-10-23** — **The pre-pilot event-id step, part 2 of 3 (#447; the owner's go, 2026-10-23):
   Create class carries an event id, so a resend is its replay, never a second class, and the create
   gets the saves' 10 s.** `POST /v1/classes` takes an optional `eventId`, a UUIDv7 (`z.uuidv7()`,

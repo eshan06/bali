@@ -1405,7 +1405,10 @@ which replaced the look of the
 - **The consent list** gains two lines: "Your answers to questions, counted only in the
   class's totals" under Sees, and "Which answer is yours, or whether you answered" under Never
   sees. The list promises it "never grows without asking you again", so a student who saw the
-  old list sees a one-time screen after the update with the two new lines and Continue.
+  old list sees a one-time screen after the update with the two new lines and Continue. The phone
+  shows a student no answer card until it has shown them the list as it stands (the owner's
+  ruling, 2026-10-23), so one whose first open after the update is mid-class on Focus, where that
+  screen waits for the bell, answers from their next class on.
 - **The portal.** One "Questions and slides" card between the session card and the live grid.
   While a question or a slide shows, Present shows it in place of the live grid; **while a
   question is open the projector shows only "N of M answered", and the counts per option only

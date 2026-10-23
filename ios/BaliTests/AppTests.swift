@@ -850,17 +850,31 @@ struct AppTests {
     }
 
     @Test(
-        "Delete account through the phone's own sign-in and engine (C4b): confirmed, the deletion's screen shows and nothing else until the answer; Cognito's DeleteUser answering nothing leaves the account deleted and the sign-in waiting, said with Try again alone — and a relaunch over the same Keychain lands on that screen at once, before any press; Try again finishes it, the sign-in gone, the done screen holding over Sign in until OK",
+        "Delete account through the phone's own sign-in and engine (C4b): confirmed, the deletion's screen shows and nothing else until the answer; Cognito's DeleteUser answering nothing leaves the account deleted and the sign-in waiting, said with Try again alone — and a relaunch over the same Keychain lands on that screen at once, before any press; Try again finishes it, the sign-in gone, the done screen holding over Sign in until OK. The account deleted on Bali's server, the phone's notes under the student, `inClass` and `listSeenBy`, go from its defaults (the owner's ruling, 2026-10-23)",
         .timeLimit(.minutes(3)))
     func deleteAccountWiring() async throws {
+        let defaults = UserDefaults.standard
+        let notes = [Phone.inClassKey, Phone.listSeenByKey]
+        let before = notes.map { ($0, defaults.object(forKey: $0)) }
+        defer { for (key, value) in before { defaults.set(value, forKey: key) } }
+        for key in notes { defaults.set("ana", forKey: key) }
         // Me's (the gap's fallback is `ageAfterSignInWiring`'s).
         let server = Deleter(deleteUser: [nil, 200], holdsDeletion: true)
         let keychain = Keychain(account: "ana", scoped: true)
         let (phone, engine) = try standIn(server, keychain: keychain)
+        #expect(phone.inClass == "ana" && phone.listSeenBy == "ana")
         let signIn = try #require(phone.signIn)
         let following = Task { await phone.follow(signIn) }
         defer { following.cancel() }
         try await until { phone.signedIn == true }
+        // The engine's truth lists her in Period 3.
+        var listed = SyncState()
+        listed.me = try BaliJSON.makeDecoder().decode(
+            MeResponse.self,
+            from: Data(
+                #"{"user":{"id":"ana","role":"student","displayName":"Ana"},"classes":[{"id":"p3","name":"Period 3","enrollmentId":"e3"}],"session":null}"#
+                    .utf8))
+        phone.synced(listed)
         // A phone of the test's own runs no enforcer: the router shows Starting, so only the
         // deletion's screen is asked after here, never Me.
         #expect(phone.deleting == .none && phone.shown.screen != .deleting)
@@ -875,6 +889,12 @@ struct AppTests {
         await deleting.value
         #expect(phone.deleting == .pending && phone.shown == (.deleting, false))
         #expect(await signIn.deletionPending() && !keychain.empty)
+        #expect(phone.inClass == nil && phone.listSeenBy == nil)
+        #expect(notes.allSatisfy { defaults.object(forKey: $0) == nil })
+        // A state the engine sent before it forgot her, still listing her in Period 3, landing
+        // late: she isn't kept in a class again.
+        phone.synced(listed)
+        #expect(phone.inClass == nil && defaults.object(forKey: Phone.inClassKey) == nil)
         let sent = (deletions: await server.deletions, deleteUsers: await server.deleteUsers)
         #expect(sent.deletions == 1 && sent.deleteUsers == 1)
         // A relaunch: a fresh phone over the same Keychain finds the sign-in waiting to be deleted.
@@ -2331,6 +2351,9 @@ struct AppTests {
     func ageAfterSignInWiring() async throws {
         let defaults = UserDefaults.standard
         let noted = { AgeCheck.notes.contains { defaults.object(forKey: $0) != nil } }
+        // Its deletion takes the phone's notes under the student from the defaults: put back after.
+        let before = [Phone.inClassKey, Phone.listSeenByKey].map { ($0, defaults.object(forKey: $0)) }
+        defer { for (key, value) in before { defaults.set(value, forKey: key) } }
         /// Signed in, an account Bali holds no yes for, the engine running: the phone, its engine
         /// and the stand-in, once the question shows and the engine has found no token to send.
         func signedInAround() async throws
@@ -2390,9 +2413,13 @@ struct AppTests {
     }
 
     @Test(
-        "Me's Delete account for a sign-in not through the 13+ check — Bali's server holding no yes for its account, Me reached through a session's Home or the home a standing not read keeps — is C4's own, said as Me's, never the fallback's (santa's round 1): the outbox goes first, under the deletion's own token, and an Emergency Unlock the server has not recorded holds the deletion back in C4b's words, with Back; DELETE /v1/me is never sent",
+        "Me's Delete account for a sign-in not through the 13+ check — Bali's server holding no yes for its account, Me reached through a session's Home or the home a standing not read keeps — is C4's own, said as Me's, never the fallback's (santa's round 1): the outbox goes first, under the deletion's own token, and an Emergency Unlock the server has not recorded holds the deletion back in C4b's words, with Back; DELETE /v1/me is never sent, and the phone's notes under the student stay",
         .timeLimit(.minutes(3)))
     func deleteFromMeUnchecked() async throws {
+        let defaults = UserDefaults.standard
+        let before = defaults.object(forKey: Phone.listSeenByKey)
+        defer { defaults.set(before, forKey: Phone.listSeenByKey) }
+        defaults.set("ana", forKey: Phone.listSeenByKey)
         let server = Recorder()
         let (phone, engine) = try await gatedStandIn(
             server, keychain: Keychain(account: "ana", scoped: true))
@@ -2411,6 +2438,8 @@ struct AppTests {
             phone.deleting.said?.body.hasPrefix("Your Emergency Unlock hasn't reached your teacher")
                 == true)
         #expect(await server.asked == ["GET /v1/me/age-check", "POST /v1/sessions/t/unlock"])
+        // Nothing deleted: the phone's notes stay.
+        #expect(phone.listSeenBy == "ana" && defaults.string(forKey: Phone.listSeenByKey) == "ana")
     }
 
     @Test(
@@ -3248,6 +3277,104 @@ struct AppTests {
         #expect(String(reflecting: type(of: history.body)).contains("LazyVStack"))
     }
 
+    @Test(
+        "The live lesson (L8) is followed for the class in session, tapped in or not, once this phone has shown the student the consent list as it stands (the owner's ruling, 2026-10-23): before, nothing polls and no card shows, and the list shown — the one-time screen's Continue, in front mid-class — follows it at once. Its poll runs only while the app is in front: none behind, once it goes or from the start, and run again as it comes back (the owner's ruling, #330); a sign-out drops it, its poll with it (#331), and keeps the list's record, so the same student signing back in follows it again; and a read saying the session is over drops it for good"
+    )
+    func lessonFollowed() async throws {
+        let defaults = UserDefaults.standard
+        let before = [Phone.inClassKey, Phone.listSeenByKey].map { ($0, defaults.object(forKey: $0)) }
+        defer { for (key, value) in before { defaults.set(value, forKey: key) } }
+        defaults.removeObject(forKey: Phone.listSeenByKey)
+        let server = LessonServer()
+        let (phone, _) = try standIn(server)
+        phone.signed(in: true, as: "ana", checked: true)
+        phone.synced(try classInSession())
+        phone.setForeground(true)
+        try await Task.sleep(for: .seconds(0.5))
+        #expect(await server.polls == 0 && phone.lesson == nil, "followed before the list was shown")
+        phone.sawList()
+        try await until { phone.card?.question.id == "q" }
+        phone.setForeground(false)
+        let polled = await server.polls
+        try await Task.sleep(for: .seconds(2.5))
+        #expect(await server.polls == polled, "polled behind the app")
+        phone.setForeground(true)
+        try await until { await server.polls > polled }
+        phone.signed(in: false)
+        #expect(phone.lesson == nil && phone.card == nil)
+        let out = await server.polls
+        try await Task.sleep(for: .seconds(2.5))
+        #expect(await server.polls == out, "polled after the sign-out")
+        // Back in, behind: followed, its poll waiting for the front.
+        phone.setForeground(false)
+        phone.signed(in: true, as: "ana", checked: true)
+        try await Task.sleep(for: .seconds(0.5))
+        #expect(await server.polls == out, "polled behind the app from the start")
+        phone.setForeground(true)
+        try await until { phone.card?.question.id == "q" }
+        // The bell: a read saying the session is over drops the lesson, its poll stopped, and a read
+        // of `GET /v1/me` still listing the session follows it no more.
+        await server.end()
+        try await until { phone.lesson == nil }
+        let ended = await server.polls
+        phone.synced(try classInSession())
+        try await Task.sleep(for: .seconds(2.5))
+        #expect(await server.polls == ended && phone.card == nil, "followed past the bell")
+    }
+
+    @Test(
+        "A tap on an answer (L8) sends it at once, in one request of the lesson's and never through the outbox, and another tap changes it, under an id after the last (decision 4); the card shows the answer Bali holds, and a tap on it sends nothing again; one with no answer says it didn't send; of picks whose answers cross only the last one's is said; one too late closes the card at once and says so"
+    )
+    func lessonAnswers() async throws {
+        let defaults = UserDefaults.standard
+        let before = [Phone.inClassKey, Phone.listSeenByKey].map { ($0, defaults.object(forKey: $0)) }
+        defer { for (key, value) in before { defaults.set(value, forKey: key) } }
+        let server = LessonServer()
+        let (phone, engine) = try standIn(server)
+        phone.signed(in: true, as: "ana", checked: true)
+        phone.synced(try classInSession())
+        phone.sawList()
+        phone.setForeground(true)
+        try await until { phone.card != nil }
+        phone.setForeground(false)
+        let inLine = "Your answer is in. You can change it until the question closes."
+        await phone.answer(1)
+        try await until { phone.card?.looks[1] == .open(picked: true) && phone.card?.line == inLine }
+        await phone.answer(2)
+        try await until { phone.card?.looks[2] == .open(picked: true) && phone.card?.line == inLine }
+        let sent = await server.answers
+        #expect(sent.map(\.option) == [1, 2] && sent[0].eventId < sent[1].eventId)
+        #expect(await engine.state.queued.isEmpty)
+        await phone.answer(2)
+        #expect(await server.answers.count == 2)
+        await server.refuse(nil)
+        await phone.answer(0)
+        #expect(phone.card?.line == "Bali couldn't send your answer. Check your connection and tap it again.")
+        #expect(phone.card?.looks[2] == .open(picked: true))
+        // The first pick's no answer, held until the next is taken: never said over it.
+        await server.refuse(nil, held: true)
+        let first = Task { await phone.answer(0) }
+        try await until { await server.holding }
+        await phone.answer(1)
+        await server.letGo()
+        await first.value
+        try await until { phone.card?.looks[1] == .open(picked: true) }
+        #expect(phone.card?.line == inLine)
+        await server.refuse(409, #"{"error":{"code":"conflict","reason":"question_closed","message":"closed"}}"#)
+        await phone.answer(3)
+        #expect(phone.card?.open == false && phone.card?.looks[1] == .closed(right: false, mine: true))
+        #expect(phone.card?.line == "This question closed before your answer reached Bali, so it wasn't counted.")
+        // Hide: kept however often the question is read again, until another opens, whose card
+        // carries nothing of the last one's.
+        phone.hideQuestion()
+        #expect(phone.card == nil)
+        phone.lessonRead(try #require(phone.lesson), of: "s")
+        #expect(phone.card == nil)
+        phone.lessonRead(try lessonRead(question: "next"), of: "s")
+        #expect(phone.card?.question.id == "next" && phone.card?.open == true)
+        #expect(phone.card?.line == "Tap an answer. You can change it until the question closes.")
+    }
+
     /// `image` drawn at 1× and read as sRGB bytes — red, green, blue, alpha — at a point counted
     /// from the top left.
     private func pixels(of image: UIImage) throws -> (Int, Int) -> [Int] {
@@ -3803,6 +3930,94 @@ private actor Names: HTTPTransport {
             }
         case ("POST", "/oauth2/token"):
             body = #"{"access_token":"\#(token(naming: "ana"))","refresh_token":"r1"}"#
+        default: throw URLError(.notConnectedToInternet)
+        }
+        guard
+            let response = HTTPURLResponse(
+                url: url, statusCode: status, httpVersion: nil, headerFields: nil)
+        else { throw URLError(.badURL) }
+        return (Data(body.utf8), response)
+    }
+}
+
+/// The engine's truth out of any session, `GET /v1/me` listing Ana's Period 3 in session `s` (C3c):
+/// the lesson L8 follows, tapped in or not.
+@MainActor
+private func classInSession() throws -> SyncState {
+    var state = SyncState()
+    let bell = (Date() + 600).formatted(Date.ISO8601FormatStyle(includingFractionalSeconds: true))
+    state.me = try BaliJSON.makeDecoder().decode(
+        MeResponse.self,
+        from: Data(
+            #"{"user":{"id":"ana","role":"student","displayName":"Ana"},"classes":[{"id":"p3","name":"Period 3","liveSession":{"id":"s","endsAt":"\#(bell)"}}],"session":null}"#
+                .utf8))
+    return state
+}
+
+/// A read of a lesson whose question `question` is open, four answers, none given.
+private func lessonRead(question: String) throws -> LessonState {
+    LessonState(
+        presentation: try BaliJSON.makeDecoder().decode(
+            Presentation.self,
+            from: Data(
+                #"{"running":true,"question":{"id":"\#(question)","prompt":"Which?","options":["A","B","C","D"],"open":true,"correctOption":null,"answer":null},"slide":null,"phone":null}"#
+                    .utf8)))
+}
+
+/// The API as a stand-in answers a live lesson (L8): session `s`'s presentation, polls counted —
+/// question `q`, open, with the answer it holds — and each answer to it, kept where its id sorts
+/// after the one held, as the API keeps one (decision 4), each taken one listed. An answer given a
+/// refusal (`refuse`) gets it instead — no answer at all for a nil status — held first where said,
+/// until the test lets it go. Once the test ends the session (`end`), the presentation says it is
+/// over. Anything else gets no answer.
+private actor LessonServer: HTTPTransport {
+    private(set) var polls = 0
+    private(set) var answers: [(option: Int, eventId: String)] = []
+    private var held: (option: Int, eventId: String)?
+    private var refusals: [(status: Int?, body: String, held: Bool)] = []
+    private var waiting: CheckedContinuation<Void, Never>?
+    private var over = false
+
+    var holding: Bool { waiting != nil }
+
+    func end() { over = true }
+
+    func refuse(_ status: Int?, _ body: String = "", held: Bool = false) {
+        refusals.append((status, body, held))
+    }
+
+    func letGo() {
+        waiting?.resume()
+        waiting = nil
+    }
+
+    func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        struct Pick: Decodable {
+            let eventId: String
+            let option: Int
+        }
+        guard let url = request.url else { throw URLError(.badURL) }
+        var (status, body) = (200, "")
+        switch "\(request.httpMethod ?? "") \(url.path())" {
+        case "GET /v1/sessions/s/presentation" where over:
+            polls += 1
+            body = #"{"running":false,"question":null,"slide":null,"phone":null}"#
+        case "GET /v1/sessions/s/presentation":
+            polls += 1
+            let answer = held.map { #"{"option":\#($0.option),"eventId":"\#($0.eventId)"}"# } ?? "null"
+            body =
+                #"{"running":true,"question":{"id":"q","prompt":"Which?","options":["A","B","C","D"],"open":true,"correctOption":null,"answer":\#(answer)},"slide":null,"phone":null}"#
+        case "POST /v1/questions/q/answers" where !refusals.isEmpty:
+            let refusal = refusals.removeFirst()
+            if refusal.held { await withCheckedContinuation { waiting = $0 } }
+            guard let refused = refusal.status else { throw URLError(.notConnectedToInternet) }
+            (status, body) = (refused, refusal.body)
+        case "POST /v1/questions/q/answers":
+            let pick = try JSONDecoder().decode(Pick.self, from: request.httpBody ?? Data())
+            answers.append((pick.option, pick.eventId))
+            if pick.eventId > held?.eventId ?? "" { held = (pick.option, pick.eventId) }
+            let now = held ?? (pick.option, pick.eventId)
+            body = #"{"outcome":"answered","answer":{"option":\#(now.option),"eventId":"\#(now.eventId)"}}"#
         default: throw URLError(.notConnectedToInternet)
         }
         guard
