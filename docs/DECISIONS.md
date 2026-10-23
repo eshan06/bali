@@ -9,7 +9,7 @@ touching before changing how something works. A pointer of the form
 a real decision? Add a dated entry at the top: what was decided and why.
 
 - **2026-10-23** — **The live lesson followed and the answer card's words, no screen yet (L8b-1,
-  #PRNUM, the first of L8b's two PRs: L8b came to about 506 lines and the conductor split it); the
+  #448, the first of L8b's two PRs: L8b came to about 506 lines and the conductor split it); the
   card waits for the consent list, and Delete account takes the phone's two notes with the account
   (the owner's rulings, 2026-10-23).** **Which lesson** (`SyncState.lessonSession`, BaliOutbox's
   `Lesson.swift`): the running session the phone stands in, else the first class `GET /v1/me` lists

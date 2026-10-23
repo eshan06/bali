@@ -9,7 +9,7 @@ is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
 _Last updated: 2026-10-23 (Central) — The live lesson followed and the answer card's words, no
-screen yet (L8b-1, #PRNUM; `docs/DECISIONS.md`, 2026-10-23), the first of L8b's two PRs on the Mac:
+screen yet (L8b-1, #448; `docs/DECISIONS.md`, 2026-10-23), the first of L8b's two PRs on the Mac:
 the phone follows the lesson of its class in session, tapped in or not, polling only in front, for
 a student this phone has shown the consent list as it stands (the owner's ruling, 2026-10-23: the
 card waits for the list), and Delete account takes the phone's two notes under the student with
@@ -48,7 +48,7 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
   keeps D1's look until the owner approves a new one (its redesign rolled back, 2026-10-06). Left:
   the push's app half (not started), TestFlight build 9 for C7's phone test (📱), and the phone's
   Phase 7 screens (L8: its consent list ✅ as L8a, #443, and the lesson followed with the card's
-  words ✅ as L8b-1, #PRNUM; next L8b-2, the card on Focus; M8). C2's legal words (⚖️) go into the
+  words ✅ as L8b-1, #448; next L8b-2, the card on Focus; M8). C2's legal words (⚖️) go into the
   portal's pages, on the Windows PC.
 - **The portal redesign in v2's look (PV0–PV17, the owner, 2026-10-12)** ✅ (2026-10-16): every step
   done, with PV3b, PV4b, PV4c and PV5b; the last, PV17c-2, Home's Last session (#425).
@@ -235,7 +235,7 @@ Slice 1 — live questions:
 - **L7** 👀 Portal UI to v2's canvas: the class page's question and Present's — ✅ as L7-1a (#389), L7-1b (#390), L7-2 (#402) and L7-3, Close and Done on Present, Done in every window of the browser (#405); DECISIONS 2026-10-15
 - **L7b** 👀 Portal saved questions to v2's canvas — ✅ as part 1a (#393), part 1b (#394), part 1c (#395) and part 2, the panel's drafts (#411); DECISIONS 2026-10-15, 2026-10-16
 - **L7c** 👀 A session's Questions to v2's canvas — ✅ (#412; DECISIONS 2026-10-16)
-- **L8** 👀📱 iOS answer card to the app canvas: while a question or a slide shows, the Focus screen's ring as a strip and Emergency Unlock pinned at the bottom; a tap answers and changes it until the close; the revealed answer marked, never red; a closed question's Hide; the same card on Unlocked, Screen Time off and Home; the consent list's two new lines and the one-time screen for a student who saw the old list (`no-ai-slop`); M0 ✅ (the canvas approved 2026-10-10; L0b, before the first actual pilot since 2026-10-12, holds back no screen). **No build that can answer ships (TestFlight included) before L2's documents and this wording have landed** — validation: XCTest, then the device check on the owner's iPhone: a shielded phone answers, the battery cost of the 2 s poll over a lesson, VoiceOver. **L8a**, the consent list's two new lines and the one-time screen — ✅ (#443; DECISIONS 2026-10-23). **L8b-1**, the live lesson followed and the answer card's words, no screen, the card waiting for the list and Delete account taking the phone's notes (the owner's rulings) — ✅ (#PRNUM; DECISIONS 2026-10-23); next **L8b-2**, the card on Focus (the ring as the strip, Emergency Unlock pinned)
+- **L8** 👀📱 iOS answer card to the app canvas: while a question or a slide shows, the Focus screen's ring as a strip and Emergency Unlock pinned at the bottom; a tap answers and changes it until the close; the revealed answer marked, never red; a closed question's Hide; the same card on Unlocked, Screen Time off and Home; the consent list's two new lines and the one-time screen for a student who saw the old list (`no-ai-slop`); M0 ✅ (the canvas approved 2026-10-10; L0b, before the first actual pilot since 2026-10-12, holds back no screen). **No build that can answer ships (TestFlight included) before L2's documents and this wording have landed** — validation: XCTest, then the device check on the owner's iPhone: a shielded phone answers, the battery cost of the 2 s poll over a lesson, VoiceOver. **L8a**, the consent list's two new lines and the one-time screen — ✅ (#443; DECISIONS 2026-10-23). **L8b-1**, the live lesson followed and the answer card's words, no screen, the card waiting for the list and Delete account taking the phone's notes (the owner's rulings) — ✅ (#448; DECISIONS 2026-10-23); next **L8b-2**, the card on Focus (the ring as the strip, Emergency Unlock pinned)
 - **L9** 📱 Exit check: a real class on prod asks and answers, the recap and the stream show the lifecycle, no screen names an answer
 
 Slice 2 — slides:
