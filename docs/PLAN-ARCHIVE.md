@@ -10,6 +10,15 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-23 (Central) — S10 closed with no code, and the push's wait screen picked
+(the owner's rulings; `docs/DECISIONS.md`, 2026-10-23): every prod TestFlight run already checks that
+its API, sign-in domain and phone client are production's (P5's release guard), and dev builds go to
+internal testers only; the push's wait is option B on the app canvas, for a fresh alert only, built
+with the push's app half. Before it, L8a (#443): the consent list's two new lines and the one-time
+screen after the update. Next on the Mac: L8's answer card (L8b, in two PRs), then M8; on the
+Windows PC, the pre-pilot event-id step's part 2, Create class's event id, then part 3, the three
+places; the other three pre-pilot steps wait for the owner's word._
+
 _Last updated: 2026-10-23 (Central) — The consent list's two new lines and the one-time screen after
 the update (L8a, #443; `docs/DECISIONS.md`, 2026-10-23), L8's first PR on the Mac: Join's
 preview, the intro's second page and Me's What your teacher sees list the answers lines, as does
