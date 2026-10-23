@@ -850,13 +850,19 @@ struct AppTests {
     }
 
     @Test(
-        "Delete account through the phone's own sign-in and engine (C4b): confirmed, the deletion's screen shows and nothing else until the answer; Cognito's DeleteUser answering nothing leaves the account deleted and the sign-in waiting, said with Try again alone — and a relaunch over the same Keychain lands on that screen at once, before any press; Try again finishes it, the sign-in gone, the done screen holding over Sign in until OK",
+        "Delete account through the phone's own sign-in and engine (C4b): confirmed, the deletion's screen shows and nothing else until the answer; Cognito's DeleteUser answering nothing leaves the account deleted and the sign-in waiting, said with Try again alone — and a relaunch over the same Keychain lands on that screen at once, before any press; Try again finishes it, the sign-in gone, the done screen holding over Sign in until OK. The account deleted on Bali's server, the phone's notes under the student, `inClass` and `listSeenBy`, go from its defaults (the owner's ruling, 2026-10-23)",
         .timeLimit(.minutes(3)))
     func deleteAccountWiring() async throws {
+        let defaults = UserDefaults.standard
+        let notes = [Phone.inClassKey, Phone.listSeenByKey]
+        let before = notes.map { ($0, defaults.object(forKey: $0)) }
+        defer { for (key, value) in before { defaults.set(value, forKey: key) } }
+        for key in notes { defaults.set("ana", forKey: key) }
         // Me's (the gap's fallback is `ageAfterSignInWiring`'s).
         let server = Deleter(deleteUser: [nil, 200], holdsDeletion: true)
         let keychain = Keychain(account: "ana", scoped: true)
         let (phone, engine) = try standIn(server, keychain: keychain)
+        #expect(phone.inClass == "ana" && phone.listSeenBy == "ana")
         let signIn = try #require(phone.signIn)
         let following = Task { await phone.follow(signIn) }
         defer { following.cancel() }
@@ -875,6 +881,8 @@ struct AppTests {
         await deleting.value
         #expect(phone.deleting == .pending && phone.shown == (.deleting, false))
         #expect(await signIn.deletionPending() && !keychain.empty)
+        #expect(phone.inClass == nil && phone.listSeenBy == nil)
+        #expect(notes.allSatisfy { defaults.object(forKey: $0) == nil })
         let sent = (deletions: await server.deletions, deleteUsers: await server.deleteUsers)
         #expect(sent.deletions == 1 && sent.deleteUsers == 1)
         // A relaunch: a fresh phone over the same Keychain finds the sign-in waiting to be deleted.
@@ -2331,6 +2339,9 @@ struct AppTests {
     func ageAfterSignInWiring() async throws {
         let defaults = UserDefaults.standard
         let noted = { AgeCheck.notes.contains { defaults.object(forKey: $0) != nil } }
+        // Its deletion takes the phone's notes under the student from the defaults: put back after.
+        let before = [Phone.inClassKey, Phone.listSeenByKey].map { ($0, defaults.object(forKey: $0)) }
+        defer { for (key, value) in before { defaults.set(value, forKey: key) } }
         /// Signed in, an account Bali holds no yes for, the engine running: the phone, its engine
         /// and the stand-in, once the question shows and the engine has found no token to send.
         func signedInAround() async throws
@@ -2390,9 +2401,13 @@ struct AppTests {
     }
 
     @Test(
-        "Me's Delete account for a sign-in not through the 13+ check — Bali's server holding no yes for its account, Me reached through a session's Home or the home a standing not read keeps — is C4's own, said as Me's, never the fallback's (santa's round 1): the outbox goes first, under the deletion's own token, and an Emergency Unlock the server has not recorded holds the deletion back in C4b's words, with Back; DELETE /v1/me is never sent",
+        "Me's Delete account for a sign-in not through the 13+ check — Bali's server holding no yes for its account, Me reached through a session's Home or the home a standing not read keeps — is C4's own, said as Me's, never the fallback's (santa's round 1): the outbox goes first, under the deletion's own token, and an Emergency Unlock the server has not recorded holds the deletion back in C4b's words, with Back; DELETE /v1/me is never sent, and the phone's notes under the student stay",
         .timeLimit(.minutes(3)))
     func deleteFromMeUnchecked() async throws {
+        let defaults = UserDefaults.standard
+        let before = defaults.object(forKey: Phone.listSeenByKey)
+        defer { defaults.set(before, forKey: Phone.listSeenByKey) }
+        defaults.set("ana", forKey: Phone.listSeenByKey)
         let server = Recorder()
         let (phone, engine) = try await gatedStandIn(
             server, keychain: Keychain(account: "ana", scoped: true))
@@ -2411,6 +2426,8 @@ struct AppTests {
             phone.deleting.said?.body.hasPrefix("Your Emergency Unlock hasn't reached your teacher")
                 == true)
         #expect(await server.asked == ["GET /v1/me/age-check", "POST /v1/sessions/t/unlock"])
+        // Nothing deleted: the phone's notes stay.
+        #expect(phone.listSeenBy == "ana" && defaults.string(forKey: Phone.listSeenByKey) == "ana")
     }
 
     @Test(
@@ -3249,19 +3266,21 @@ struct AppTests {
     }
 
     @Test(
-        "The live lesson (L8) is followed for the class in session, tapped in or not, its poll run only while the app is in front: none behind, from the start or once it goes, and run again as it comes back (the owner's ruling, #330); a sign-out drops it, its poll with it (#331)"
+        "The live lesson (L8) is followed for the class in session, tapped in or not, once this phone has shown the student the consent list as it stands (the owner's ruling, 2026-10-23): before, nothing polls and no card shows, and the list shown — the one-time screen's Continue, in front mid-class — follows it at once. Its poll runs only while the app is in front: none behind, once it goes or from the start, and run again as it comes back (the owner's ruling, #330); a sign-out drops it, its poll with it (#331), and keeps the list's record, so the same student signing back in follows it again"
     )
     func lessonFollowed() async throws {
         let defaults = UserDefaults.standard
-        let before = defaults.object(forKey: Phone.inClassKey)
-        defer { defaults.set(before, forKey: Phone.inClassKey) }
+        let before = [Phone.inClassKey, Phone.listSeenByKey].map { ($0, defaults.object(forKey: $0)) }
+        defer { for (key, value) in before { defaults.set(value, forKey: key) } }
+        defaults.removeObject(forKey: Phone.listSeenByKey)
         let server = LessonServer()
         let (phone, _) = try standIn(server)
         phone.signed(in: true, as: "ana", checked: true)
         phone.synced(try classInSession())
-        try await Task.sleep(for: .seconds(0.5))
-        #expect(await server.polls == 0 && phone.lesson == nil)
         phone.setForeground(true)
+        try await Task.sleep(for: .seconds(0.5))
+        #expect(await server.polls == 0 && phone.lesson == nil, "followed before the list was shown")
+        phone.sawList()
         try await until { phone.card?.question.id == "q" }
         phone.setForeground(false)
         let polled = await server.polls
@@ -3274,6 +3293,13 @@ struct AppTests {
         let out = await server.polls
         try await Task.sleep(for: .seconds(2.5))
         #expect(await server.polls == out, "polled after the sign-out")
+        // Back in, behind: followed, its poll waiting for the front.
+        phone.setForeground(false)
+        phone.signed(in: true, as: "ana", checked: true)
+        try await Task.sleep(for: .seconds(0.5))
+        #expect(await server.polls == out, "polled behind the app from the start")
+        phone.setForeground(true)
+        try await until { phone.card?.question.id == "q" }
     }
 
     @Test(
@@ -3281,12 +3307,13 @@ struct AppTests {
     )
     func lessonAnswers() async throws {
         let defaults = UserDefaults.standard
-        let before = defaults.object(forKey: Phone.inClassKey)
-        defer { defaults.set(before, forKey: Phone.inClassKey) }
+        let before = [Phone.inClassKey, Phone.listSeenByKey].map { ($0, defaults.object(forKey: $0)) }
+        defer { for (key, value) in before { defaults.set(value, forKey: key) } }
         let server = LessonServer()
         let (phone, engine) = try standIn(server)
         phone.signed(in: true, as: "ana", checked: true)
         phone.synced(try classInSession())
+        phone.sawList()
         phone.setForeground(true)
         try await until { phone.card != nil }
         phone.setForeground(false)

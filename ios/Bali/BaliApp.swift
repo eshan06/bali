@@ -534,7 +534,9 @@ final class Phone {
     /// (`Deleting.answered`). Nothing where no try can help, nor while one runs. A phone whose
     /// engine has not started — a frozen one too — says so (rule 5). After an answer under 13 this
     /// run, signed in, it is the gap's fallback's, which that answer started: the same steps, said
-    /// as the approved canvas draws them (`Deleting.saidUnderThirteen`).
+    /// as the approved canvas draws them (`Deleting.saidUnderThirteen`). The account deleted on
+    /// Bali's server, its sign-in deleted or still to go, the phone's notes under it go too
+    /// (`forgetNotes`).
     func deleteAccount() async {
         guard deleting.start() else { return }
         let young = underThirteen
@@ -542,7 +544,12 @@ final class Phone {
             return deleting = .stopped(
                 title: Deleting.notDeleted, why: Joining.notStarted, retries: true)
         }
-        deleting.answered(await engine.deleteAccount(signIn), underThirteen: young)
+        let answer = await engine.deleteAccount(signIn)
+        switch answer {
+        case .deleted, .signInNotDeleted: forgetNotes()
+        default: break
+        }
+        deleting.answered(answer, underThirteen: young)
     }
 
     /// The bell of the session the phone stands in, where the router chooses again (C5a).
@@ -819,6 +826,19 @@ final class Phone {
         guard let id = sync?.me?.user.id, id != listSeenBy else { return }
         listSeenBy = id
         if !frozen { UserDefaults.standard.set(id, forKey: Phone.listSeenByKey) }
+        // The answer card may show now: a class in session has its lesson followed from here.
+        follow()
+    }
+
+    /// The account deleted on Bali's server (Delete account, the gap's fallback's too): the phone's
+    /// two notes under the student's id, `inClass` and `listSeenBy`, go from its defaults (the
+    /// owner's ruling, 2026-10-23). A sign-out keeps them, so the same student is never asked again.
+    private func forgetNotes() {
+        (inClass, listSeenBy) = (nil, nil)
+        for key in [Phone.inClassKey, Phone.listSeenByKey] {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+        follow()
     }
 
     /// Keeps `everApproved` as a pass read the permission: set at approved, cleared once the check
@@ -891,11 +911,15 @@ final class Phone {
         return AnswerCard(question, problem: lesson?.problem, sending: answering, said: answerSaid)
     }
 
-    /// Follows the lesson `sync` names now (`lessonSession`), signed in: a new session's takes the
-    /// last one's place, its poll cancelled and let go. A fixture's lesson stays as made.
+    /// Follows the lesson `sync` names now (`lessonSession`), signed in, for a student this phone has
+    /// shown the consent list as it stands (`listSeenBy`; the owner's ruling, 2026-10-23: no card
+    /// before its lines on answers, so none on Focus before the one-time screen after the bell): a
+    /// new session's takes the last one's place, its poll cancelled and let go. A fixture's lesson
+    /// stays as made.
     private func follow() {
         guard !frozen else { return }
-        let session = signedIn == true ? sync?.lessonSession(at: Date(), over: lessonsOver) : nil
+        let seen = signedIn == true && sync?.me.map { $0.user.id == listSeenBy } == true
+        let session = seen ? sync?.lessonSession(at: Date(), over: lessonsOver) : nil
         guard session != following?.lesson.session else { return }
         dropLesson()
         guard let session, let engine else { return }
