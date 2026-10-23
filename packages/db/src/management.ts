@@ -135,8 +135,10 @@ export async function createClass(
       if (input.eventId === undefined) continue;
       // Nothing written: the code was taken, or this eventId's class is made already. Read whether
       // or not it was removed since: unreachable today, as only a disposal removes a class, and it
-      // removes its teacher with it, so a resend stops at ACCOUNT_DELETED above. A route that
-      // removes a class while its teacher stays must settle what a resend of its create answers.
+      // de-identifies its teacher with it, so a resend is refused before this read (the route's
+      // 403 for a sign-in that is no teacher now, or ACCOUNT_DELETED above for one already under
+      // way). A route that removes a class while its teacher stays must settle what a resend of
+      // its create answers.
       const [made] = await tx.select().from(classes).where(eq(classes.eventId, input.eventId));
       if (made?.teacherId === input.teacherId) return made;
       if (made) {
