@@ -399,6 +399,27 @@ struct AppTests {
         let busyStays = Phone(fixture: try #require(PreviewFixtures.all["deleting"]))
         busyStays.signed(in: true, as: "ana", pending: true)
         #expect(busyStays.deleting == .busy)
+        // A question on Focus (L8): each fixture's card as its board draws it, open or closed, and
+        // its line; a frozen phone's tap says it didn't send, never nothing.
+        let cards: [(String, Bool, String)] = [
+            ("focusQuestion", true, "Tap an answer."), ("focusAnswered", true, "Your answer is in."),
+            ("focusSending", true, "Sending your answer…"), ("focusFailed", true, "Bali couldn't send"),
+            ("focusTooLate", false, "This question closed before your answer reached Bali"),
+            ("focusClosed", false, "Your teacher closed this question."),
+            ("focusRevealed", false, "Your teacher closed it and showed the answer."),
+            ("focusRight", false, "Your teacher closed it and showed the answer."),
+            ("focusNoAnswer", false, "Your teacher closed it and showed the answer."),
+            ("focusQuestionOffline", true, "No connection right now"),
+            ("focusLong", true, "Tap an answer."),
+        ]
+        for (name, open, line) in cards {
+            let card = Phone(fixture: try #require(PreviewFixtures.all[name])).card
+            #expect(card?.open == open && card?.line.hasPrefix(line) == true, "\(name)")
+        }
+        #expect(Phone(fixture: try #require(PreviewFixtures.all["focusLong"])).card?.looks.count == 6)
+        let frozenLesson = Phone(fixture: try #require(PreviewFixtures.all["focusQuestion"]))
+        await frozenLesson.answer(1)
+        #expect(frozenLesson.card?.line.hasPrefix("Bali couldn't send your answer.") == true)
     }
 
     @Test(
@@ -1727,7 +1748,7 @@ struct AppTests {
             ("action-primary-bg", Theme.brand), ("action-primary-bg-hover", Theme.brandPressed),
             ("action-destructive-bg", Theme.destructive), ("red-700", Theme.destructivePressed),
             ("arc-fill", Theme.arc), ("arc-final2", Theme.arcFinal), ("arc-track", Theme.arcTrack),
-            ("green-200", Theme.markTrack),
+            ("green-200", Theme.markTrack), ("green-50", Theme.optionRight),
             ("state-focused-bg", Chip.Kind.focused.look.fill),
             ("state-focused-fg", Chip.Kind.focused.look.ink),
             ("state-emergency-bg", Chip.Kind.unlocked.look.fill),
@@ -3166,6 +3187,109 @@ struct AppTests {
         phone.lessonRead(try lessonRead(question: "next"), of: "s")
         #expect(phone.card?.question.id == "next" && phone.card?.open == true)
         #expect(phone.card?.line == "Tap an answer. You can change it until the question closes.")
+    }
+
+    @Test(
+        "Hide, on a closed question (L8): the card goes and the ring comes back, kept on this phone however often the question is read again, until another opens, whose card shows — and an open card has no Hide"
+    )
+    func lessonHide() async throws {
+        let phone = Phone(fixture: try #require(PreviewFixtures.all["focusClosed"]))
+        let closed = try #require(phone.lesson)
+        let prompt = try #require(phone.card?.question.prompt)
+        let labels = try await elements(of: RootView(phone: phone), once: prompt).map(\.label)
+        #expect(labels.contains("Hide this question"), "\(labels)")
+        phone.hideQuestion()
+        #expect(phone.card == nil && phone.shown.screen == .focus)
+        let ring = try await elements(of: RootView(phone: phone), once: "Period 3 — Algebra II").map(\.label)
+        #expect(!ring.contains(prompt) && !ring.contains("Hide this question"), "\(ring)")
+        phone.lessonRead(closed, of: "session")
+        #expect(phone.card == nil)
+        phone.lessonRead(try lessonRead(question: "next"), of: "session")
+        #expect(phone.card?.question.id == "next" && phone.card?.open == true)
+        let open = try await elements(of: RootView(phone: phone), once: "Which?").map(\.label)
+        #expect(!open.contains("Hide this question"), "\(open)")
+    }
+
+    @Test(
+        "A question on Focus (L8) fits the smallest iPhone and the owner's at the default text size, the strip, the card and Emergency Unlock on one screen; past it — a larger text size, or six long answers — the page scrolls over Emergency Unlock, pinned at the bottom and whole at every text size"
+    )
+    func questionFits() async throws {
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let cases: [(String, DynamicTypeSize)] = [
+            ("focusQuestion", .large), ("focusAnswered", .large), ("focusRevealed", .large),
+            ("focusLong", .large), ("focusQuestion", .xxxLarge), ("focusRevealed", .accessibility1),
+            ("focusLong", .accessibility1), ("focusRight", .accessibility2), ("focusLong", .accessibility5),
+        ]
+        // The iPhone 17e's and the owner's iPhone 15 Pro's, as `waitingFits` has them, and the
+        // iPhone 17 Pro's, 402 × 874 less 62 and 34.
+        let phones = [
+            CGSize(width: 390, height: 844 - 47 - 34), CGSize(width: 393, height: 852 - 59 - 34),
+            CGSize(width: 402, height: 874 - 62 - 34),
+        ]
+        for (name, size) in cases {
+            for frame in phones {
+                let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))
+                let hosting = UIHostingController(
+                    rootView: RootView(phone: phone).environment(\.dynamicTypeSize, size))
+                hosting.safeAreaRegions = []
+                let window = UIWindow(windowScene: scene)
+                window.frame = CGRect(origin: .zero, size: frame)
+                window.rootViewController = hosting
+                window.isHidden = false
+                defer { window.isHidden = true }
+                window.layoutIfNeeded()
+                let scroll = try #require(scrollViews(in: window).first, "\(name)")
+                let (content, shown) = (scroll.contentSize.height, scroll.bounds.height)
+                let fits = size == .large && name != "focusLong"
+                #expect((content <= shown + 0.5) == fits, "\(name), \(size), \(frame): \(content) in \(shown)")
+                // Never a pixel wider than the screen: an answer's disc in whole points.
+                #expect(scroll.bounds.width == frame.width, "\(name), \(size): \(scroll.bounds.width)")
+                var unlock: NSObject?
+                try await until {
+                    unlock = try? voiceOver(in: window).first {
+                        $0.accessibilityLabel == "Emergency Unlock. Your teacher will see it."
+                    }
+                    return unlock != nil
+                }
+                let pinned = try #require(unlock?.accessibilityFrame, "\(name)")
+                let above = scroll.convert(scroll.bounds, to: window).maxY
+                #expect(pinned.minY >= above - 0.5 && pinned.maxY <= frame.height + 0.5, "\(name), \(size): \(pinned)")
+            }
+        }
+    }
+
+    @Test(
+        "VoiceOver on a question (L8): the strip's time read as the ring's, and its chip; each answer a button read with its letter and words, the student's own read as Your answer and selected; closed, each answer with its marks, the correct one's and theirs; Emergency Unlock's label unchanged"
+    )
+    func questionVoiceOver() async throws {
+        /// What VoiceOver reads on `fixture`'s screen: each element's label, value and traits.
+        func read(_ fixture: String) async throws -> [(label: String, value: String, traits: UIAccessibilityTraits)] {
+            let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+            let window = UIWindow(windowScene: scene)
+            window.frame = CGRect(x: 0, y: 0, width: scene.screen.bounds.width, height: 3000)
+            let phone = Phone(fixture: try #require(PreviewFixtures.all[fixture]))
+            window.rootViewController = UIHostingController(rootView: RootView(phone: phone))
+            window.isHidden = false
+            defer { window.isHidden = true }
+            window.layoutIfNeeded()
+            var found: [NSObject] = []
+            try await until {
+                found = (try? voiceOver(in: window)) ?? []
+                return found.contains { $0.accessibilityLabel == "Emergency Unlock. Your teacher will see it." }
+            }
+            return found.map { ($0.accessibilityLabel ?? "", $0.accessibilityValue ?? "", $0.accessibilityTraits) }
+        }
+        let answered = try await read("focusAnswered")
+        #expect(answered.contains { $0.label.contains(" left, until ") }, "\(answered)")
+        #expect(answered.contains { $0.label == "Focused" }, "\(answered)")
+        let options = answered.filter { $0.traits.contains(.button) && $0.label.contains("x = ") }
+        #expect(options.map(\.label) == ["A, x = 1", "B, x = 2", "C, x = 4", "D, x = 6"], "\(answered)")
+        #expect(options.map(\.value) == ["", "Your answer", "", ""])
+        #expect(options.map { $0.traits.contains(.selected) } == [false, true, false, false])
+        let revealed = try await read("focusRevealed")
+        let marks = revealed.filter { $0.label.contains("x = ") }.map(\.label)
+        #expect(marks == ["A, x = 1", "B, x = 2, Correct answer", "C, x = 4", "D, x = 6, Your answer"], "\(revealed)")
+        #expect(!revealed.contains { $0.traits.contains(.button) && $0.label.contains("x = ") })
     }
 
     /// `image` drawn at 1× and read as sRGB bytes — red, green, blue, alpha — at a point counted

@@ -222,6 +222,7 @@ final class Phone {
             (naming, signOutFailed, email) = (fixture.naming, fixture.signOutFailed, fixture.email)
             (leaving, picking, pickFailed) = (fixture.leaving, fixture.picking, fixture.pickFailed)
             deleting = fixture.deleting
+            (lesson, answering, answerSaid) = (fixture.lesson, fixture.answering, fixture.answerSaid)
         }
 
         /// A phone over a sign-in and an engine a test made, never started (BaliTests): the calls

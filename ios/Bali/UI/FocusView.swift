@@ -9,12 +9,21 @@ import UIKit
 struct FocusView: View {
     let phone: Phone
     @Environment(\.openURL) private var openURL
+    /// Whether the page over the pinned Emergency Unlock scrolls: a hairline then marks its edge.
+    @State private var scrolls = false
 
     var body: some View {
         let (sync, protection, signedIn) = (phone.sync, phone.protection, phone.signedIn)
         TimelineView(.periodic(from: .now, by: 1)) { context in
             if let sync {
-                page(FocusWords(sync, protection, now: context.date, signedIn: signedIn))
+                let focus = FocusWords(sync, protection, now: context.date, signedIn: signedIn)
+                // The card shows where the strip can: its time, as the ring's, only over verified
+                // shields (rule 3).
+                if let card = phone.card, focus.claim == .paused {
+                    lesson(focus, card)
+                } else {
+                    page(focus)
+                }
             }
         }
     }
@@ -26,11 +35,7 @@ struct FocusView: View {
         ScreenScaffold {
             PageScroll {
                 VStack(spacing: 0) {
-                    VStack(spacing: 2) {
-                        Text(focus.title).textStyle(.h3)
-                        Text(focus.subtitle).textStyle(.caption).foregroundStyle(Theme.textTertiary)
-                    }
-                    .fixedSize(horizontal: false, vertical: true)
+                    heading(focus)
                     Spacer(minLength: 24)
                     middle(focus).fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 24)
@@ -39,6 +44,42 @@ struct FocusView: View {
                 .multilineTextAlignment(.center)
             }
         }
+    }
+
+    /// Focus while a question shows (L8; the app canvas's Main, FocusAnswered, FocusRevealed and
+    /// FocusLargeText): the class, the ring become the strip, the card, then what else Focus says,
+    /// scrolling over Emergency Unlock, pinned at the bottom at every text size.
+    private func lesson(_ focus: FocusWords, _ card: AnswerCard) -> some View {
+        ScreenScaffold {
+            ScrollView {
+                VStack(spacing: 20) {
+                    heading(focus).multilineTextAlignment(.center)
+                    Strip(focus: focus) { chips(focus) }
+                    AnswerCardView(card: card, phone: phone)
+                    notes(focus).multilineTextAlignment(.center)
+                }
+                .onGeometryChange(for: Bool.self) { geometry in
+                    geometry.size.height > (geometry.bounds(of: .scrollView)?.height ?? .infinity) + 0.5
+                } action: { scrolls = $0 }
+            }
+            .scrollBounceBehavior(.basedOnSize).screenWide()
+            EmergencyUnlock(phone: phone, caption: focus.caption, paused: true)
+                .multilineTextAlignment(.center).padding(.top, 16).frame(maxWidth: .infinity)
+                .overlay(alignment: .top) {
+                    if scrolls {
+                        Rectangle().fill(Theme.border).frame(height: 1).padding(.horizontal, -Theme.gutter)
+                    }
+                }
+        }
+    }
+
+    /// The class, and under it its teacher and bell.
+    private func heading(_ focus: FocusWords) -> some View {
+        VStack(spacing: 2) {
+            Text(focus.title).textStyle(.h3)
+            Text(focus.subtitle).textStyle(.caption).foregroundStyle(Theme.textTertiary)
+        }
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     /// The state as chips — the claim's, never the standing's; side by side, or one above the
@@ -76,9 +117,17 @@ struct FocusView: View {
         if focus.offline != nil { Chip(kind: .notIn, icon: "wifi.slash", text: "No connection") }
     }
 
-    /// Why an unlock gave way (C5a); why nothing reaches the teacher; offline, D1's card; a wake
-    /// iOS refused; then Emergency Unlock and its line.
+    /// What Focus says beside the countdown, then Emergency Unlock and its line.
     private func lower(_ focus: FocusWords) -> some View {
+        VStack(spacing: 24) {
+            notes(focus)
+            EmergencyUnlock(phone: phone, caption: focus.caption, paused: focus.claim == .paused)
+        }
+    }
+
+    /// Why an unlock gave way (C5a); why nothing reaches the teacher; offline, D1's card; a wake
+    /// iOS refused.
+    private func notes(_ focus: FocusWords) -> some View {
         VStack(spacing: 24) {
             ForEach([focus.superseded, focus.stalled].compactMap { $0 }, id: \.self) { words in
                 Card { Text(words).textStyle(.body).frame(maxWidth: .infinity, alignment: .leading) }
@@ -98,8 +147,61 @@ struct FocusView: View {
             if let note = focus.unscheduled {
                 Text(note).textStyle(.caption).foregroundStyle(Theme.textSecondary)
             }
-            EmergencyUnlock(phone: phone, caption: focus.caption, paused: focus.claim == .paused)
         }
+    }
+}
+
+/// The ring become a strip while a question shows (L8; the app canvas's Main): the time left as
+/// the ring draws it, small, beside its digits and until when, then the state's chips — under them
+/// once the row outgrows the screen (FocusLargeText). VoiceOver reads the time as the ring's.
+private struct Strip<Chips: View>: View {
+    let focus: FocusWords
+    @ViewBuilder let chips: () -> Chips
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) { time.frame(maxWidth: .infinity, alignment: .leading); chips() }
+            VStack(alignment: .leading, spacing: 12) {
+                time
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 8) { chips() }
+                    VStack(alignment: .leading, spacing: 8) { chips() }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var time: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle().stroke(Theme.markTrack, lineWidth: 6)
+                Circle().trim(from: 0, to: focus.fraction)
+                    .stroke(
+                        focus.final ? Theme.arcFinal : Theme.arc,
+                        style: StrokeStyle(lineWidth: focus.final ? 8 : 6, lineCap: .round)
+                    )
+                    .rotationEffect(.degrees(-90))
+            }
+            .padding(4).frame(width: 44, height: 44)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(focus.countdown).textStyle(.dataLg)
+                Text(focus.until).textStyle(.caption).foregroundStyle(Theme.textTertiary)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(focus.timeLeft)
+        .accessibilityAddTraits(.updatesFrequently)
+    }
+}
+
+extension FocusWords {
+    /// The time left as VoiceOver says it: "1 minute, 52 seconds left, until 10:45 AM", a length of
+    /// time, never a clock's "one fifty-two".
+    fileprivate var timeLeft: String {
+        Duration.seconds(secondsLeft).formatted(.units(allowed: [.hours, .minutes, .seconds], width: .wide))
+            + " left, \(until)"
     }
 }
 
@@ -158,11 +260,7 @@ private struct Ring: View {
         }
         .padding(12).frame(width: 240, height: 240)
         .accessibilityElement(children: .ignore)
-        // Spoken as a length of time — "1 minute, 52 seconds" — never as a clock's "one fifty-two".
-        .accessibilityLabel(
-            Duration.seconds(focus.secondsLeft)
-                .formatted(.units(allowed: [.hours, .minutes, .seconds], width: .wide))
-                + " left, \(focus.until)")
+        .accessibilityLabel(focus.timeLeft)
         .accessibilityAddTraits(.updatesFrequently)
         .onAppear {
             withAnimation(reduceMotion ? nil : .timingCurve(0.2, 0, 0, 1, duration: 0.6)) {
