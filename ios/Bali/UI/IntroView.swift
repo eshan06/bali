@@ -44,7 +44,10 @@ struct IntroView: View {
             // gutters its scroll view reaches past (`screenWide`).
             TabView(selection: $page) {
                 PageScroll { first }.padding(.horizontal, Theme.gutter).tag(0)
-                PageScroll { Self.consent }.padding(.horizontal, Theme.gutter).tag(1)
+                // Scrolled to its end — the list outgrows the screen since its answers lines
+                // (L8a) — 24 between its last line and the dots, as the Consent board draws it.
+                PageScroll { Self.consent.padding(.bottom, 24) }
+                    .padding(.horizontal, Theme.gutter).tag(1)
                 PageScroll { third }.padding(.horizontal, Theme.gutter).tag(2)
             }
             .tabViewStyle(.page(indexDisplayMode: .never)).padding(.horizontal, -Theme.gutter)

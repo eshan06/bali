@@ -8,8 +8,9 @@ import Testing
 /// last run unless `signedInThisRun` says — the permission
 /// approved and checked (never read approved before, `everApproved`), the engine standing
 /// `standing` with `queued` and its newest tap
-/// `lastTap`, `GET /v1/me` not answered unless `me` says, nor failed unless `meFailed` says, and
-/// Home's tab chosen, unless said otherwise — nil for a sign-in, an enforcer or an
+/// `lastTap`, `GET /v1/me` not answered unless `me` says, nor failed unless `meFailed` says, the
+/// consent list as it stands seen by `me`'s student, `u` (L8a), and Home's tab chosen, unless
+/// said otherwise — nil for a sign-in, an enforcer or an
 /// engine that has not spoken. The permission is judged off as the enforcer judges it: denied at
 /// once, not determined only where `permissionOff` says it has lasted past B5a-2's grace.
 private func screen(
@@ -19,8 +20,8 @@ private func screen(
     permissionOff: Bool? = nil, checked: Bool = true, shielded: Bool = false,
     everApproved: Bool = false, standing: Standing? = .out,
     queued: [OutboxRecord] = [], lastTap: String? = nil, me: MeResponse? = nil,
-    meFailed: SendResult? = nil, sessionOverClosed: SessionView? = nil, opened: [Screen] = [],
-    tab: Screen = .home, now: Date = t0
+    meFailed: SendResult? = nil, listSeenBy: String? = "u", sessionOverClosed: SessionView? = nil,
+    opened: [Screen] = [], tab: Screen = .home, now: Date = t0
 ) -> Screen {
     var protection: Protection?
     if let permission {
@@ -42,7 +43,8 @@ private func screen(
     return Screen.choose(
         problem: problem, deleting: deleting, age: age, intro: intro, signedIn: signedIn,
         signedInThisRun: signedInThisRun, protection: protection, everApproved: everApproved,
-        sync: sync, sessionOverClosed: sessionOverClosed, opened: opened, tab: tab, now: now
+        sync: sync, listSeenBy: listSeenBy, sessionOverClosed: sessionOverClosed, opened: opened,
+        tab: tab, now: now
     ).screen
 }
 
@@ -58,7 +60,7 @@ private func tabbed(
     return Screen.choose(
         problem: nil, deleting: false, age: .passed, intro: false, signedIn: true,
         signedInThisRun: false, protection: protection, everApproved: false, sync: sync,
-        sessionOverClosed: closed, opened: opened, tab: .history, now: now
+        listSeenBy: "u", sessionOverClosed: closed, opened: opened, tab: .history, now: now
     ).tabbed
 }
 
@@ -151,7 +153,7 @@ struct ScreenTests {
                     problem: nil, deleting: false, age: age, intro: intro, signedIn: false,
                     signedInThisRun: false,
                     protection: protection, everApproved: false, sync: out,
-                    sessionOverClosed: nil, opened: [], tab: .history, now: t0)
+                    listSeenBy: "u", sessionOverClosed: nil, opened: [], tab: .history, now: t0)
                 #expect(shown.screen == screen && !shown.tabbed, "\(age)")
             }
         }
@@ -203,7 +205,7 @@ struct ScreenTests {
                 problem: nil, deleting: false, age: age, intro: false, signedIn: true,
                 signedInThisRun: false,
                 protection: protection, everApproved: false, sync: out,
-                sessionOverClosed: nil, opened: [], tab: .history, now: t0)
+                listSeenBy: "u", sessionOverClosed: nil, opened: [], tab: .history, now: t0)
             #expect(shown.screen == asked && !shown.tabbed, "\(age)")
         }
         #expect(screen(age: .passed) == .home)
@@ -264,7 +266,7 @@ struct ScreenTests {
             problem: nil, deleting: false, age: .passed, intro: false, signedIn: true,
             signedInThisRun: true,
             protection: protection, everApproved: false, sync: out,
-            sessionOverClosed: nil, opened: [], tab: .history, now: t0)
+            listSeenBy: "u", sessionOverClosed: nil, opened: [], tab: .history, now: t0)
         #expect(shown.screen == .name && !shown.tabbed)
     }
 
@@ -329,13 +331,89 @@ struct ScreenTests {
                 problem: nil, deleting: false, age: .passed, intro: false, signedIn: true,
                 signedInThisRun: true,
                 protection: protection, everApproved: false, sync: out,
-                sessionOverClosed: nil, opened: [], tab: .history, now: t0)
+                listSeenBy: "u", sessionOverClosed: nil, opened: [], tab: .history, now: t0)
         }
         #expect(shown().screen == .starting && !shown().tabbed)
         // The phone's storage failing, no read can be tried: a failed read too, never a mark held
         // with nothing said.
         out.link = .storageFailed
         #expect(shown().screen == .history && shown().tabbed)
+    }
+
+    @Test(
+        "The consent list's two new lines, once (L8a; ARCHITECTURE, \"Live lesson\", decision 11): signed in, a student `GET /v1/me` lists in a class who has not seen the list as it stands on this phone gets the one-time screen — in Home's place, Screen Time's and Waiting's, over a Join or a tab opened, after the bell once Session over is closed — with no tab bar; seen by that student, never again, while another student seen before gets it; never in no class (a join shows the list as it stands), for a teacher's account or a role this build does not know, nor before a read names who is signed in. After the 13+ question and Your name, and never over a session's screens: the shields' Focus, Unlocked, Protection off, Session over not closed, nor the home a standing not read keeps; Delete account's screen, a start that failed and Sign in come first"
+    )
+    func listChanged() throws {
+        let (outbox, _) = try makeOutbox()
+        try record(outbox, .tap(tagId: "tag"))
+        let held = try outbox.records()
+        /// `GET /v1/me`'s answer: account `u` of `role`, named `name` or nothing, in `classes`.
+        func user(
+            _ name: String? = "Ana", role: String = "student",
+            classes: [String] = [Answer.inClass("c")]
+        ) throws -> MeResponse {
+            let named = name.map { #""\#($0)""# } ?? "null"
+            let listed = classes.joined(separator: ",")
+            return try me(
+                #"{"user":{"id":"u","role":"\#(role)","displayName":\#(named)},"classes":[\#(listed)],"session":null}"#
+            )
+        }
+        let inClass = try user()
+        let (rung, ended) = (Standing.inSession(session(), .focused), at(3000))
+        // Not seen by this student here: none seen it, or another student.
+        #expect(screen(me: inClass, listSeenBy: nil) == .listChanged)
+        #expect(screen(me: inClass, listSeenBy: "bea") == .listChanged)
+        #expect(screen(permission: .notDetermined, me: inClass, listSeenBy: nil) == .listChanged)
+        #expect(screen(permission: .denied, me: inClass, listSeenBy: nil) == .listChanged)
+        #expect(screen(standing: .waiting, me: inClass, listSeenBy: nil) == .listChanged)
+        #expect(screen(me: inClass, listSeenBy: nil, opened: [.join], tab: .me) == .listChanged)
+        #expect(
+            screen(
+                standing: rung, me: inClass, listSeenBy: nil, sessionOverClosed: session(),
+                now: ended) == .listChanged)
+        // Seen by this student: the screens as before.
+        #expect(screen(me: inClass) == .home)
+        #expect(screen(permission: .notDetermined, me: inClass) == .screenTime)
+        #expect(screen(standing: .waiting, me: inClass) == .waiting)
+        // In no class, a teacher's account, a role not known, or nothing read yet: never.
+        for other in [try user(classes: []), try user(role: "teacher"), try user(role: "admin")] {
+            #expect(screen(me: other, listSeenBy: nil) == .home)
+        }
+        #expect(screen(listSeenBy: nil) == .home)
+        // A sign-in made this run: the starting screen until its read answers, then the list.
+        #expect(screen(signedInThisRun: true, listSeenBy: nil) == .starting)
+        #expect(screen(signedInThisRun: true, me: inClass, listSeenBy: nil) == .listChanged)
+        // The 13+ question first, then Your name.
+        #expect(screen(age: .unanswered, me: inClass, listSeenBy: nil) == .age)
+        #expect(screen(age: .checking, me: inClass, listSeenBy: nil) == .starting)
+        #expect(screen(me: try user(nil), listSeenBy: nil) == .name)
+        // Never over a session's screens, the shields' or the last run's: Emergency Unlock's.
+        #expect(screen(standing: rung, me: inClass, listSeenBy: nil) == .focus)
+        #expect(screen(queued: held, me: inClass, listSeenBy: nil) == .focus)
+        #expect(screen(shielded: true, standing: .unread, me: inClass, listSeenBy: nil) == .home)
+        #expect(screen(standing: .unread, me: inClass, listSeenBy: nil) == .home)
+        let unlocked = Standing.inSession(session(), .unlocked)
+        #expect(screen(standing: unlocked, me: inClass, listSeenBy: nil) == .unlocked)
+        #expect(
+            screen(standing: unlocked, me: inClass, listSeenBy: nil, opened: [.home], tab: .me)
+                == .me)
+        let off = Standing.inSession(session(), .protectionOff)
+        #expect(
+            screen(permission: .denied, standing: off, me: inClass, listSeenBy: nil)
+                == .protectionOff)
+        #expect(screen(standing: rung, me: inClass, listSeenBy: nil, now: ended) == .sessionOver)
+        #expect(screen(deleting: true, me: inClass, listSeenBy: nil) == .deleting)
+        #expect(screen(problem: "why", me: inClass, listSeenBy: nil) == .storage("why"))
+        #expect(screen(signedIn: false, me: inClass, listSeenBy: nil) == .signIn)
+        #expect(screen(signedIn: nil, me: inClass, listSeenBy: nil) == .starting)
+        var (protection, out) = (Protection(), SyncState())
+        (protection.checked, protection.permission) = (true, .approved)
+        (out.standing, out.me) = (.out, inClass)
+        let shown = Screen.choose(
+            problem: nil, deleting: false, age: .passed, intro: false, signedIn: true,
+            signedInThisRun: false, protection: protection, everApproved: false, sync: out,
+            listSeenBy: nil, sessionOverClosed: nil, opened: [], tab: .history, now: t0)
+        #expect(shown.screen == .listChanged && !shown.tabbed)
     }
 
     @Test("The app could not start: storage, with why, over everything else")
@@ -366,7 +444,7 @@ struct ScreenTests {
             problem: nil, deleting: true, age: .passed, intro: false, signedIn: true,
             signedInThisRun: false, protection: protection,
             everApproved: false, sync: sync,
-            sessionOverClosed: nil, opened: [], tab: .me, now: t0)
+            listSeenBy: "u", sessionOverClosed: nil, opened: [], tab: .me, now: t0)
         #expect(shown.screen == .deleting && !shown.tabbed)
         #expect(screen(problem: "why", deleting: true) == .storage("why"))
     }
@@ -1199,6 +1277,7 @@ struct MoveTests {
             (.focus, false), (.unlocked, false), (.protectionOff, false), (.sessionOver, false),
             (.waiting, false), (.home, false), (.deleting, false), (.storage("why"), false),
             (.history, true), (.me, true), (.join, false), (.tooYoung, false),
+            (.listChanged, false),
         ]
         for (screen, tabbed) in path {
             for (other, otherTabbed) in held where (screen, other) != (.age, .deleting)
@@ -1325,15 +1404,16 @@ struct TapInTests {
 }
 
 /// The screen for `state` at `now`, and whether its tab bar shows, with `opened` — the router's
-/// answer for a phone signed in, its permission approved and checked, Home's tab chosen.
+/// answer for a phone signed in, its permission approved and checked, the consent list as it
+/// stands seen by `GET /v1/me`'s student, `u` (L8a), Home's tab chosen.
 private func shown(_ state: SyncState, opened: [Screen], now: Date = t0) -> (Screen, Bool) {
     var protection = Protection()
     (protection.checked, protection.permission) = (true, .approved)
     let shown = Screen.choose(
         problem: nil, deleting: false, age: .passed, intro: false, signedIn: true,
         signedInThisRun: false, protection: protection,
-        everApproved: false, sync: state, sessionOverClosed: nil, opened: opened, tab: .home,
-        now: now)
+        everApproved: false, sync: state, listSeenBy: "u", sessionOverClosed: nil, opened: opened,
+        tab: .home, now: now)
     return (shown.screen, shown.tabbed)
 }
 
