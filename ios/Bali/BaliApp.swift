@@ -175,6 +175,21 @@ final class Phone {
     /// Counts the unlocks Unlocked's card has been about: a pick on its way for one the card has
     /// left says and sends nothing more (#140, santa's round 1).
     private var cards = 0
+    /// The live lesson followed (L8; ARCHITECTURE, "Live lesson"): what its last read showed and
+    /// why the last poll brought nothing; nil while none is followed.
+    private(set) var lesson: LessonState?
+    /// The answer card's own, on this phone alone: the pick on its way, what the last one's request
+    /// said, and whether the closed question is hidden — all let go once another question shows.
+    private(set) var answering: Int?
+    private(set) var answerSaid: AnswerCard.Said?
+    private(set) var questionHidden = false
+    /// The lesson followed and its tasks: the watch of its reads, and its poll, run only while the
+    /// app is in front (the owner's ruling, #330).
+    @ObservationIgnored private var following: (lesson: LiveLesson, watch: Task<Void, Never>, poll: Task<Void, Never>?)?
+    /// The sessions a read said are over, never followed again; and the picks counted, so a pick's
+    /// answer is said only while it is the latest on the same question.
+    @ObservationIgnored private var lessonsOver: Set<String> = []
+    @ObservationIgnored private var picks = 0
 
     /// Whether the student `GET /v1/me` names has been listed in a class on this phone (#143):
     /// which words Home's empty state says.
@@ -382,6 +397,8 @@ final class Phone {
             (naming, signOutFailed, leaving) = (Naming(), nil, Leaving())
             (joining, signIns) = (Joining(), signIns + 1)
             deleting.signInChanged()
+            // The lesson goes with whoever was signed in, its poll and its answers (#331).
+            dropLesson()
         }
         if pending, deleting == .none { deleting = .pending }
         if signedIn == true { signingIn = false }
@@ -398,6 +415,7 @@ final class Phone {
         }
         if changed { historyDue = signedIn == true && !frozen }
         readDueHistory()
+        follow()
     }
 
     /// Bali's server asked whether the account signed in has its 13+ yes (C7-server): the one call
@@ -604,6 +622,7 @@ final class Phone {
         }
         sync = state
         readDueHistory()
+        follow()
         // "Unsent" is said where the file holds an unlock the engine's queue does not show
         // (`signOut`). A hold the queue showed ending is that unlock gone: the words go at once,
         // never a moment late under an enabled Sign out. Where none showed, its reads failing
@@ -847,6 +866,71 @@ final class Phone {
         return await engine.backToFocus()
     }
 
+    /// The answer card to show (L8): the lesson's question — the open one, or the last closed one
+    /// until another opens — unless this phone hid it; nil when there is none.
+    var card: AnswerCard? {
+        guard let question = lesson?.presentation?.question, !questionHidden else { return nil }
+        return AnswerCard(question, problem: lesson?.problem, sending: answering, said: answerSaid)
+    }
+
+    /// Follows the lesson `sync` names now (`lessonSession`), signed in: a new session's takes the
+    /// last one's place, its poll cancelled and let go. A fixture's lesson stays as made.
+    private func follow() {
+        guard !frozen else { return }
+        let session = signedIn == true ? sync?.lessonSession(at: Date(), over: lessonsOver) : nil
+        guard session != following?.lesson.session else { return }
+        dropLesson()
+        guard let session, let engine else { return }
+        let live = LiveLesson(session: session, client: engine.client)
+        let reads = live.updates
+        let watch = Task { [weak self] in
+            for await state in reads { self?.lessonRead(state, of: session) }
+        }
+        following = (live, watch, foreground ? Task { await live.run() } : nil)
+    }
+
+    /// No lesson followed: its watch and poll cancelled, and the card's own let go with it.
+    private func dropLesson() {
+        following?.watch.cancel()
+        following?.poll?.cancel()
+        (following, lesson) = (nil, nil)
+        letCardGo()
+    }
+
+    private func letCardGo() { (answering, answerSaid, questionHidden, picks) = (nil, nil, false, picks + 1) }
+
+    /// A read of the lesson of `session`, while it is the one followed (or a fixture's): shown, the
+    /// card's own let go once another question shows, and the lesson dropped once a read says the
+    /// session is over — another session's followed, if one runs.
+    func lessonRead(_ state: LessonState, of session: String) {
+        guard frozen || session == following?.lesson.session else { return }
+        if state.presentation?.question?.id != lesson?.presentation?.question?.id { letCardGo() }
+        lesson = state
+        guard state.presentation?.running == false, !frozen else { return }
+        lessonsOver.insert(session)
+        follow()
+    }
+
+    /// A tap on an answer (L8): sent at once in one request of the lesson's, never through the
+    /// outbox (decision 5), shown on its way, then what it said — of picks whose answers cross, the
+    /// last one's. The answer Bali holds sends nothing again, unless the last pick didn't send. With
+    /// no lesson to send through (a fixture's), it didn't send (rule 5).
+    func answer(_ option: Int) async {
+        guard let card, card.open else { return }
+        let question = card.question
+        guard option != question.answer?.option || answering != nil || answerSaid != nil else { return }
+        picks += 1
+        let (pick, held) = (picks, question.answer?.eventId)
+        (answering, answerSaid) = (option, nil)
+        let result =
+            await following?.lesson.answer(question: question.id, option: option) ?? .unreachable(.unreachable)
+        guard pick == picks else { return }
+        (answering, answerSaid) = (nil, AnswerCard.Said(result, held: held))
+    }
+
+    /// Hide, on a closed question: kept by this phone alone, until another question shows.
+    func hideQuestion() { questionHidden = true }
+
     /// Starts the sign-in, the engine and the enforcer, unless they run already: a start that
     /// failed can be tried again.
     func start() async {
@@ -933,6 +1017,12 @@ final class Phone {
             if shown.screen == .history { Task { await refreshHistory() } }
         }
         self.foreground = foreground
+        // The lesson's poll runs only in front (#330): cancelled as the app goes behind, run again
+        // as it comes back.
+        if let live = following?.lesson {
+            following?.poll?.cancel()
+            following?.poll = foreground ? Task { await live.run() } : nil
+        }
         guard let onPhase else { return }
         Task { await onPhase.engine(self.foreground) }
         if foreground { Task { if self.foreground { await onPhase.check() } } }

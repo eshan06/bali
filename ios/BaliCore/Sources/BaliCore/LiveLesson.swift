@@ -24,6 +24,11 @@ public struct LessonState: Sendable, Hashable {
     /// Why the last poll brought nothing, said beside what is kept (rule 5) while the poll tries
     /// again by itself; nil once one is answered, and once the session is over.
     public internal(set) var problem: PollProblem?
+
+    /// A state of the app's own making: its Debug fixtures' and its tests' (L8).
+    public init(presentation: Presentation? = nil, problem: PollProblem? = nil) {
+        (self.presentation, self.problem) = (presentation, problem)
+    }
 }
 
 /// Why a poll brought nothing.
