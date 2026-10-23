@@ -9,8 +9,8 @@ touching before changing how something works. A pointer of the form
 a real decision? Add a dated entry at the top: what was decided and why.
 
 - **2026-10-23** — **The consent list's two new lines, and who sees the one-time screen after the
-  update (L8a, L8's first PR). *The worker's call, as the conductor's brief suggested, awaiting the
-  owner.*** The list (`ConsentCard`, the one view behind the intro's second page, Me's What your
+  update (L8a, #443, L8's first PR). *The worker's call, as the conductor's brief suggested, awaiting
+  the owner.*** The list (`ConsentCard`, the one view behind the intro's second page, Me's What your
   teacher sees and Join's preview) gains "Your answers to questions, counted only in the class's
   totals" last under what a teacher sees and "Which answer is yours, or whether you answered" last
   under what a teacher never sees, as the app canvas's Consent board draws them. **Who sees the
