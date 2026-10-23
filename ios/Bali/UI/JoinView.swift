@@ -140,24 +140,23 @@ struct ConsentCard: View {
     @ScaledMetric(relativeTo: .body) private var iconWidth: CGFloat = 24
 
     /// The whole of it — the grid's silence and last-seen time too (owner, 2026-09-27) — its
-    /// answers lines last (L8a).
-    static let sees =
-        [
-            "Your focus status: focused, unlocked, or Screen Time off",
-            "If Bali stops hearing from your phone during class, and when it last did",
-            "When you tap in, and when class ends for you",
-            "When you unlock, and the reason if you share one",
-            "If you leave this class",
-        ] + added.sees
-    static let neverSees =
-        ["Your screen, your apps, or what's in them", "Your messages or where you are"]
-        + added.neverSees
-    /// The lines a live lesson's questions added (L8a; ARCHITECTURE, "Live lesson", decision 11):
-    /// all the one-time screen lists.
-    static let added = (
-        sees: ["Your answers to questions, counted only in the class's totals"],
-        neverSees: ["Which answer is yours, or whether you answered"]
-    )
+    /// answers lines last (L8a). The portal's help page says the same, word for word
+    /// (`apps/web/src/app/support/support.test.ts` reads these from this file).
+    static let sees = [
+        "Your focus status: focused, unlocked, or Screen Time off",
+        "If Bali stops hearing from your phone during class, and when it last did",
+        "When you tap in, and when class ends for you",
+        "When you unlock, and the reason if you share one",
+        "If you leave this class",
+        "Your answers to questions, counted only in the class's totals",
+    ]
+    static let neverSees = [
+        "Your screen, your apps, or what's in them", "Your messages or where you are",
+        "Which answer is yours, or whether you answered",
+    ]
+    /// The lines a live lesson's questions added (L8a; ARCHITECTURE, "Live lesson", decision 11),
+    /// the last of each list: all the one-time screen lists.
+    static let added = (sees: Array(sees.suffix(1)), neverSees: Array(neverSees.suffix(1)))
 
     var body: some View {
         Card {

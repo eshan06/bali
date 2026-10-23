@@ -37,7 +37,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   more to a student in a class (the record is the phone's); and a join made while `GET /v1/me` had no
   answer records nothing, so that student sees it once after the join. **The board over
   ARCHITECTURE's words:** decision 11 says "the two new lines and Continue"; the approved board also
-  draws See the whole list, built as drawn. **Rode along:** the intro's second page, which now
+  draws See the whole list, built as drawn. **The portal's help page** says the list word for word
+  (`apps/web/src/app/support/support.test.ts` reads `ConsentCard`'s lists from `JoinView.swift`, and
+  pins what a teacher sees at 5 lines), so it gains the same two lines in the same change; that is
+  the Windows PC's lane (the owner, 2026-10-23), so the Mac pushed this branch for it and stopped.
+  **Rode along:** the intro's second page, which now
   outgrows the screen, keeps the board's 24 pt between its last line and the dots when scrolled to its
   end. **Weighed:** a phone-wide flag (a second student would inherit it, for no less code than a key
   on the student, as `inClass`); a record on the server (an API change, outside the Mac's lane, and
