@@ -25,6 +25,7 @@ import {
   tapIn,
   unlock,
   unlockUnderTap,
+  updateClass,
 } from '@bali/db';
 import type { UnlockReason } from '@bali/shared';
 import { eq, type SQL, sql } from 'drizzle-orm';
@@ -182,10 +183,11 @@ async function deck(w: World, ready = false): Promise<string> {
 }
 
 /**
- * Every data-changing route that takes an event id, and the one gap that should (LEFT): its
- * scenario. Where a later write of the same caller's changes what a replay must answer, the
- * scenario makes it between the sends, so a replay that only echoed its first answer fails; and a
- * replay a route answers otherwise than `outcome: 'replay'` says so, after its docs.
+ * Every data-changing route that takes an event id, and any that should and takes none (none since
+ * Create class took one, 2026-10-23; one would be on LEFT): its scenario. Where a later write of
+ * the same caller's changes what a replay must answer, the scenario makes it between the sends, so
+ * a replay that only echoed its first answer fails; and a replay a route answers otherwise than
+ * `outcome: 'replay'` says so, after its docs.
  */
 const REPEATS: Record<string, Repeat> = {
   // Renamed again since: a replay applies nothing and answers the name now (A8).
@@ -321,15 +323,32 @@ const REPEATS: Record<string, Repeat> = {
       return { url: '/v1/teacher-invites/redeem', body: { code, eventId: newUuidV7() } };
     },
   },
-  // Takes no event id yet (LEFT): sent one, as every mutation carries one, its replay is the class
-  // the first send made.
+  // Renamed with a new code, and started, since: a replay answers the class the first send made,
+  // as it is now (2026-10-23).
   'POST /v1/classes': {
     as: 'owner',
-    sent: () => ({
-      url: '/v1/classes',
-      body: { name: 'Period 2', eventId: newUuidV7() },
-      replay: (f) => f,
-    }),
+    sent() {
+      let now: Json = {};
+      return {
+        url: '/v1/classes',
+        body: { name: 'Period 2', eventId: newUuidV7() },
+        async between(first) {
+          const classId = String(first.id);
+          const renamed = await updateClass(db, {
+            classId,
+            name: 'Period 2B',
+            regenerateCode: true,
+          });
+          const { session } = await startSession(db, {
+            classId,
+            startedAt: new Date(),
+            endsAt: new Date(Date.now() + 25 * 60_000),
+          });
+          now = { name: 'Period 2B', joinCode: renamed?.joinCode, liveSessionId: session.id };
+        },
+        replay: (first) => ({ ...first, ...now }),
+      };
+    },
   },
   // Time added again since: a replay adds none and answers the bell now, `extended` as always.
   'POST /v1/sessions/:id/extend': {
@@ -582,14 +601,11 @@ const NO_EVENT_ID: Record<string, { why: string; repeat?: Repeat }> = {
 
 /**
  * What fails today, each with its one-line reason and exactly what the check finds. Only ever
- * shrinks: the step that fixes one takes its entry off (part 2 of the pre-pilot step, Create class;
- * part 3, the other four, where an id is compared as text: docs/DECISIONS.md, 2026-10-22, #437).
+ * shrinks: the step that fixes one takes its entry off (part 2 of the pre-pilot step took Create
+ * class's, 2026-10-23; part 3, the other four, where an id is compared as text: docs/DECISIONS.md,
+ * 2026-10-22, #437).
  */
 const LEFT: Record<string, { why: string; fails: string[] }> = {
-  'POST /v1/classes': {
-    why: 'takes no eventId (2026-09-20), so every resend makes another class, which no route removes (#432)',
-    fails: ['resent in lower case: wrote classes +1', 'resent in upper case: wrote classes +1'],
-  },
   'DELETE /v1/decks/:id': {
     why: '`removeDeck` compares the id the deck holds as text, so a removal resent in another case is `404 deck_not_found`',
     fails: ['resent in upper case: 404 deck_not_found'],

@@ -1,6 +1,6 @@
-import type { ClassDetail, MeClassWithTeacher } from '@bali/shared';
+import type { ClassDetail, CreateClassRequest, MeClassWithTeacher } from '@bali/shared';
 
-import { type ApiClient, ApiError, NetworkError } from './api-client';
+import { type ApiClient, ApiError, NetworkError, SAVE_TIMEOUT_MS } from './api-client';
 import { CANT_CREATE, CANT_REACH, errText } from './errors';
 
 /*
@@ -84,30 +84,37 @@ export const CLASS_NAME_MAX = 120;
 
 /** The create's answer, as the form acts on it. */
 export type CreateAnswer =
-  /** The class, as the server made it. */
+  /** The class, as the server made it, or as it is now for a resend of a create that landed. */
   | { kind: 'created'; klass: ClassDetail }
-  /** No class made that the page knows of (no answer, a refusal, over the budget): Try again. */
+  /**
+   * No class made that the page knows of (no answer, a refusal, over the budget): Try again, under
+   * the same `eventId`, since it may have landed.
+   */
   | { kind: 'failed'; message: string }
   /** No class made, and a resend can't change that (a deleted account, C3): said, no Try again. */
   | { kind: 'final'; message: string };
 
+/** One create: the class's name, and the `eventId` it is sent under. */
+export type CreateAttempt = Required<CreateClassRequest>;
+
 /**
- * Create a class named `name` (`POST /v1/classes`), its answer in words, never thrown, so the
- * form always comes back with something to say. The route takes no `eventId`: a resend after a
- * lost answer makes a second class, as a second press always has, so the page reads the list
- * again after every answer, and a class made either way is in it to see. So no time limit, unlike
- * every other save: one that cut a slow create would make a second class out of its Try again.
+ * Create a class (`POST /v1/classes`) under the attempt's `eventId`, within a save's limit, its
+ * answer in words, never thrown, so the form always comes back with something to say. No answer
+ * by then is `failed`, and its resend under the same `eventId` is answered with the class it made,
+ * if it did, never a second (2026-10-23).
  */
 export async function createClass(
   api: Pick<ApiClient, 'post'>,
-  name: string,
+  attempt: CreateAttempt,
 ): Promise<CreateAnswer> {
   try {
-    return { kind: 'created', klass: await api.post<ClassDetail>('/v1/classes', { name }) };
+    const klass = await api.post<ClassDetail>('/v1/classes', attempt, SAVE_TIMEOUT_MS);
+    return { kind: 'created', klass };
   } catch (e) {
     if (e instanceof NetworkError) return { kind: 'failed', message: CANT_REACH };
     // A refusal that carries something to go by, said as errText says it: the budget's wait, or a
-    // `reason` (the route's `account_deleted`), which is final.
+    // `reason`, which is final: the route's `account_deleted`, or `event_id_conflict`, an id
+    // another teacher's class holds, which no id minted fresh meets.
     if (e instanceof ApiError && e.status === 429) return { kind: 'failed', message: errText(e) };
     if (e instanceof ApiError && e.status < 500 && e.reason !== undefined) {
       return { kind: 'final', message: errText(e) };

@@ -1,5 +1,6 @@
-import { type Database, users } from '@bali/db';
+import { classes, type Database, newUuidV7, users } from '@bali/db';
 import type { ApiErrorBody, ClassDetail, EnrollmentJoinResponse } from '@bali/shared';
+import { eq } from 'drizzle-orm';
 import type { InjectOptions } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -119,6 +120,120 @@ describe('POST /v1/classes', () => {
       payload: { name: 'X' },
     });
     expect(res.statusCode).toBe(401);
+  });
+});
+
+describe('POST /v1/classes with an eventId (2026-10-23)', () => {
+  /** The rows `classes` holds for `teacherId`. */
+  const classesOf = (teacherId: string) =>
+    db.select().from(classes).where(eq(classes.teacherId, teacherId));
+
+  it('makes the class under it: a real one, its code joinable', async () => {
+    const { teacher } = await seedClassroom(db, 'id-create');
+    const eventId = newUuidV7();
+    const res = await post(await ctx.tokenFor(teacher.cognitoId), '/v1/classes', {
+      name: 'Period 1',
+      eventId,
+    });
+    expect(res.statusCode).toBe(200);
+    const made = res.json<ClassDetail>();
+    expect(made).toMatchObject({ name: 'Period 1', liveSessionId: null });
+    expect(made.joinCode).toMatch(JOIN_CODE);
+    const [row] = await db.select().from(classes).where(eq(classes.id, made.id));
+    expect(row?.eventId).toBe(eventId);
+    expect((await join(await ctx.tokenFor('id-joiner'), made.joinCode)).statusCode).toBe(200);
+  });
+
+  it('answers a resend of it, in either letter case, with the class it made: one class', async () => {
+    const { teacher } = await seedClassroom(db, 'id-replay');
+    const token = await ctx.tokenFor(teacher.cognitoId);
+    const eventId = newUuidV7();
+    const first = await post(token, '/v1/classes', { name: 'Period 2', eventId });
+    const again = await post(token, '/v1/classes', { name: 'Period 2', eventId });
+    const upper = await post(token, '/v1/classes', {
+      name: 'Period 2',
+      eventId: eventId.toUpperCase(),
+    });
+    expect([first.statusCode, again.statusCode, upper.statusCode]).toEqual([200, 200, 200]);
+    expect(again.json()).toEqual(first.json());
+    expect(upper.json()).toEqual(first.json());
+    // The seeded class and this one: no second.
+    expect(await classesOf(teacher.id)).toHaveLength(2);
+  });
+
+  it('answers a resend with the class as it is now: renamed, a new code, a session running', async () => {
+    const { teacher } = await seedClassroom(db, 'id-now');
+    const token = await ctx.tokenFor(teacher.cognitoId);
+    const eventId = newUuidV7();
+    const made = (await post(token, '/v1/classes', { name: 'Old', eventId })).json<ClassDetail>();
+    const renamed = await patch(token, `/v1/classes/${made.id}`, {
+      name: 'New',
+      regenerateCode: true,
+    });
+    const started = await post(token, `/v1/classes/${made.id}/sessions`, { durationMinutes: 25 });
+    const sessionId = started.json<{ session: { id: string } }>().session.id;
+
+    // The resend carries the name the teacher typed again; the class is the one its id made.
+    const again = await post(token, '/v1/classes', { name: 'Typed again', eventId });
+    expect(again.statusCode).toBe(200);
+    expect(again.json<ClassDetail>()).toEqual({
+      ...made,
+      name: 'New',
+      joinCode: renamed.json<ClassDetail>().joinCode,
+      liveSessionId: sessionId,
+    });
+    expect(await classesOf(teacher.id)).toHaveLength(2);
+  });
+
+  it('refuses another teacher’s id, in either case, as 409 event_id_conflict, making nothing', async () => {
+    const owner = await seedClassroom(db, 'id-owner');
+    const other = await seedClassroom(db, 'id-other');
+    const eventId = newUuidV7();
+    const made = await post(await ctx.tokenFor(owner.teacher.cognitoId), '/v1/classes', {
+      name: 'Mine',
+      eventId,
+    });
+    expect(made.statusCode).toBe(200);
+    const token = await ctx.tokenFor(other.teacher.cognitoId);
+    for (const id of [eventId, eventId.toUpperCase()]) {
+      const res = await post(token, '/v1/classes', { name: 'Theirs', eventId: id });
+      expect(res.statusCode, id).toBe(409);
+      expect(res.json<ApiErrorBody>().error).toMatchObject({
+        code: 'conflict',
+        reason: 'event_id_conflict',
+      });
+    }
+    expect(await classesOf(other.teacher.id)).toHaveLength(1);
+  });
+
+  it('refuses an id that is no UUIDv7 (400), making nothing', async () => {
+    const { teacher } = await seedClassroom(db, 'id-bad');
+    const token = await ctx.tokenFor(teacher.cognitoId);
+    for (const eventId of ['not-an-id', randomUUID(), 42, null, '']) {
+      const res = await post(token, '/v1/classes', { name: 'X', eventId });
+      expect(res.statusCode, String(eventId)).toBe(400);
+    }
+    expect(await classesOf(teacher.id)).toHaveLength(1);
+  });
+
+  it('a student is refused (403) and a caller with no token (401), under an id too', async () => {
+    const { student } = await seedClassroom(db, 'id-authz');
+    const body = { name: 'X', eventId: newUuidV7() };
+    const studentRes = await post(await ctx.tokenFor(student.cognitoId), '/v1/classes', body);
+    expect(studentRes.statusCode).toBe(403);
+    const anonymous = await ctx.app.inject({ method: 'POST', url: '/v1/classes', payload: body });
+    expect(anonymous.statusCode).toBe(401);
+    expect(await db.select().from(classes).where(eq(classes.eventId, body.eventId))).toEqual([]);
+  });
+
+  it('without one, makes a class at every call, as today', async () => {
+    const { teacher } = await seedClassroom(db, 'id-none');
+    const token = await ctx.tokenFor(teacher.cognitoId);
+    const a = await post(token, '/v1/classes', { name: 'Same' });
+    const b = await post(token, '/v1/classes', { name: 'Same' });
+    expect([a.statusCode, b.statusCode]).toEqual([200, 200]);
+    expect(a.json<ClassDetail>().id).not.toBe(b.json<ClassDetail>().id);
+    expect(await classesOf(teacher.id)).toHaveLength(3);
   });
 });
 

@@ -610,7 +610,9 @@ Teacher app and web portal:
 - `POST` / `GET` / `PATCH` `/v1/classes…` — create and manage classes. A class named by its id is
   the caller's own: an unknown one is `404 class_not_found` on every route under
   `/v1/classes/{id}` (added 2026-10-04, R3, additive: one condition, one shape), another
-  teacher's `403`.
+  teacher's `403`. A create may carry an `eventId` (added 2026-10-23, additive): resent under it,
+  in either letter case, it answers the class that id made, as it is now, never a second; another
+  teacher's id is `409 event_id_conflict`; with none, every create makes a class, as before.
 - `GET /v1/classes/{id}/roster` — the roster; `DELETE /v1/enrollments/{id}` — remove a
   student (the one-transaction removal).
 - `POST /v1/classes/{id}/sessions` — start a session; if one is already open for this
@@ -1514,9 +1516,10 @@ and keeps everything that enforces focus.
 **Settled** (the owner, 2026-10-10, each as recommended; PLAN's step for each in parentheses):
 - `event_id` uniqueness in both directions: every writer in the transition engine refuses an
   `eventId` that any `responses` or `saved_questions` row holds, as the answers route already
-  checks `events` (L1, L3b). The three writers beside the engine, `PUT /v1/me/age-check`, `PUT`
-  and `DELETE /v1/me/push-token` and `POST /v1/teacher-invites/redeem`, check only their own
-  table: a UUIDv7 minted fresh never collides (narrowed 2026-10-12, the owner's ruling on #317).
+  checks `events` (L1, L3b). The writers beside the engine, `PUT /v1/me/age-check`, `PUT` and
+  `DELETE /v1/me/push-token`, `POST /v1/teacher-invites/redeem` and, since 2026-10-23, `POST
+  /v1/classes`, check only their own table: a UUIDv7 minted fresh never collides (narrowed
+  2026-10-12, the owner's ruling on #317).
 - The guard wherever counts are read: one guarded count that the results route, the recap and
   any report read (L3, L3c, L7c).
 - The portal checks a deck's `sha256` as the phone does, refusing a mismatch, for the presenter

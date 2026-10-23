@@ -14,7 +14,11 @@ import { ApiError, parseRequest } from '../errors.js';
 import { mapTransitionError } from './errors.js';
 
 const Params = z.object({ id: z.string().uuid() });
-const CreateBody = z.object({ name: z.string().trim().min(1).max(120) });
+const CreateBody = z.object({
+  name: z.string().trim().min(1).max(120),
+  // Optional and additive (2026-10-23): a client that sends none makes a class at every call.
+  eventId: z.uuidv7().optional(),
+});
 const UpdateBody = z
   .object({
     name: z.string().trim().min(1).max(120).optional(),
@@ -54,6 +58,10 @@ function toClassDetail(
  * A class named by id is the caller's own (`requireOwnClass`): an unknown one is
  * `404 class_not_found` on every class route, another teacher's `403`.
  *
+ * A create may carry an `eventId` (2026-10-23): resent under it, in either
+ * letter case, it answers the class that id made, as it is now, never a second;
+ * another teacher's id is `409 event_id_conflict`.
+ *
  * These writes never touch participations/events, so they call the `@bali/db`
  * management helpers directly rather than the engine. Creates return 200 with
  * the resource, matching the house style (start-session, enrollment-join).
@@ -71,10 +79,12 @@ export function registerClassesRoutes(app: FastifyInstance, db: Database): void 
       }
       // A teacher deleted while this was on its way (C3) is `409 account_deleted`.
       const schoolId = teacher.schoolId;
+      const { name, eventId } = body;
       const klass = await mapTransitionError(() =>
-        createClass(db, { teacherId: teacher.id, schoolId, name: body.name }),
+        createClass(db, { teacherId: teacher.id, schoolId, name, eventId }),
       );
-      return toClassDetail(klass, null);
+      // A resend's class may have a session running by now: answered as a read of it would be.
+      return toClassDetail(klass, (await findLiveSessionForClass(db, klass.id))?.id ?? null);
     },
   );
 
