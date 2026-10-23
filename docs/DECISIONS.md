@@ -8,6 +8,55 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-23** — **The pre-pilot event-id step, part 3 of 3 (#449; the owner's go, 2026-10-23):
+  an event id sent in upper case is the same id at the last three places the engine compared one as
+  text, so #442's check passes on every route and its list is empty.** None could happen today: the
+  portal and the phone mint lower-case ids. This closes the gap before any other client exists
+  (Foundation's `uuidString` writes upper case). **How, in the engine, by #437's pattern:** one rule,
+  `asStored` (an id as Postgres prints a `uuid`, lower-case), wherever the engine compares or keeps an
+  id as text; Postgres's own matches of a `uuid` column were right in any case and stay as they are,
+  and #437's comparison now goes through the rule too. *A deck's removal* (`removeDeck`, M2a): the id
+  the deck holds is compared with the one sent as stored, so a removal resent in upper case is its
+  replay, never `404 deck_not_found`; its create's id in upper case is still refused as the create's.
+  *A tap and the Emergency Unlock sent under it* (decision 11): `lockTap` hashes the tap's id as
+  stored, so a tap, an unlock naming it and the tap's arm (A17) wait for each other in whatever cases
+  they come; `unlockUnderTap` keeps its claim (`claimed_tap_event_id`) and its filing's note
+  (`tap_event_id`) as stored; and a landing tap's look for unlocks kept under it
+  (`unlocksAwaitingTap`) and its filing's note (`fileKeptUnlocks`) match and name the tap so. So an
+  unlock that arrived before its tap, naming it in another case than the tap's own, is filed in the
+  tap's session as the tap lands, exactly as in one case, and every record names the tap one way. The
+  look is still one probe of `events_unattached_tap_idx` (its EXPLAIN test unchanged): only the value
+  it probes for changed. *An unlock's replay* (`recordedReason`, on `POST /v1/sessions/{id}/unlock`
+  and `POST /v1/taps/{eventId}/unlock` alike): the reason's latest change (A20), which names the
+  unlock as stored, is read under the unlock's id as stored, so a retry in upper case after the reason
+  changed answers the reason now, never the one first recorded. **The unlock contract, checked**
+  (`packages/shared/src/unlock-contract.ts`): every write on these paths is where it was and records
+  what it did, so no unlock goes unrecorded and every answer is still `applied`, `recorded` or
+  `replay`. An answer changes only where it was wrong: a replay's reason is the one the teacher sees,
+  and a tap that files an unlock kept under it in another case answers `unlocked` with its session,
+  as in one case. **Not rewritten, *the conductor's call, awaiting the owner*:** a claim kept before
+  this in upper case would still not be filed by its tap's landing (recorded, in no class). None
+  exists: both clients have always sent lower case, and only the phone calls that route; rewriting
+  stored claims would be a migration that rewrites data, which waits for the owner's label, for no
+  row. **Tests:** the engine's on PGlite (a removal sent and resent in either case, its create's id
+  in upper case still refused; each pair of cases in both arrival orders of a tap and its unlock,
+  filed alike, each retry in the other case answered where it was recorded, nothing filed twice; an
+  unlock's retry in either case after its reason changed, on both routes); the routes' (the same
+  three through the API); and real Postgres (an unlock naming its tap in another case, parked on its
+  own id after its look while the tap arrives: the tap waits on the tap's lock and files it, in both
+  pairs of cases; the two racing freely, twelve rounds in both orders; an unlock's retry in upper
+  case parked behind a change of its reason, on both routes, answering the change's reason; a deck's
+  removal resent in upper case parked behind its first delivery, its replay; an arm in another case
+  than its landing tap, waiting it out, A17's staging run in both cases). #442's check passes on
+  every route, its `LEFT` kept empty as the guard, as `try-again.test.tsx`'s is. **Checked:** every
+  new test failed first, on PGlite and on the real-Postgres lane's run of the tests alone (#449's
+  first commit), each race as predicted: the tap committed focused over the kept unlock, staged and
+  racing freely; the retry behind the reason's change answered the reason first recorded; the arm
+  behind its landing armed; the removal behind its first delivery was `deck_not_found`; A17's race in
+  one case stayed green. With each piece of the fix reverted alone on PGlite, a test goes red for
+  each: the removal's comparison, the reason's read, the look's probe, the kept claim and either
+  filing's note. `lockTap`'s lock only the real-Postgres races can show (PGlite runs one connection).
+
 - **2026-10-23** — **The live lesson followed and the answer card's words, no screen yet (L8b-1,
   #448, the first of L8b's two PRs: L8b came to about 506 lines and the conductor split it); the
   card waits for the consent list, and Delete account takes the phone's two notes with the account
