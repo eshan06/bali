@@ -8,7 +8,7 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
-- **2026-10-23** — **The pre-pilot event-id step, part 2 of 3 (#PRNUM; the owner's go, 2026-10-23):
+- **2026-10-23** — **The pre-pilot event-id step, part 2 of 3 (#447; the owner's go, 2026-10-23):
   Create class carries an event id, so a resend is its replay, never a second class, and the create
   gets the saves' 10 s.** `POST /v1/classes` takes an optional `eventId`, a UUIDv7 (`z.uuidv7()`,
   as the Phase 7 routes check theirs; a malformed one is a `400`). Additive: a portal from before it
