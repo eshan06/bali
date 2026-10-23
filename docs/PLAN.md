@@ -8,15 +8,14 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-23 (Central) — The consent list's two new lines and the one-time screen after
-the update (L8a, #443; `docs/DECISIONS.md`, 2026-10-23), L8's first PR on the Mac: Join's
-preview, the intro's second page and Me's What your teacher sees list the answers lines, as does
-the portal's help page (the one portal edit the owner allowed across the lanes), and a student in
-a class who has not seen the list as it stands on this phone sees the two lines once, never over a
-session's screens (the worker's call on who, awaiting the owner). Before it, the pre-pilot event-id
-step's part 1 (#442). Next on the Mac: L8's answer card, then M8; on the Windows PC, that step's
-part 2, Create class's event id, then part 3, the three places; the other three pre-pilot steps
-wait for the owner's word._
+_Last updated: 2026-10-23 (Central) — S10 closed with no code, and the push's wait screen picked
+(the owner's rulings; `docs/DECISIONS.md`, 2026-10-23): every prod TestFlight run already checks that
+its API, sign-in domain and phone client are production's (P5's release guard), and dev builds go to
+internal testers only; the push's wait is option B on the app canvas, for a fresh alert only, built
+with the push's app half. Before it, L8a (#443): the consent list's two new lines and the one-time
+screen after the update. Next on the Mac: L8's answer card (L8b, in two PRs), then M8; on the
+Windows PC, the pre-pilot event-id step's part 2, Create class's event id, then part 3, the three
+places; the other three pre-pilot steps wait for the owner's word._
 
 ## Now
 
@@ -149,7 +148,7 @@ One line each. Phases 3–6's step lists, the push's (N1–N6) and this table in
 | 3 | iOS student app: BaliCore, outbox + sync, enforcement, sign-in, screens, device test gate | ✅ **complete** (2026-10-03) |
 | 4 | Reports + recap, rate limits, the one-address load gate, the OpenAPI check, the authorization matrix | ✅ **complete** (2026-10-05); the sweep's per-row retry left unbounded at this size: bound it if the sweep grows (L3) |
 | 5 | Pilot readiness: prod, Sentry, TestFlight, App Store, runbooks | ✅ cloud steps done; **prod live 2026-10-05**; open: the owner's items |
-| 6 | Security and compliance; gates Phase 5's student-facing steps | ✅ cloud steps done; open: C2 (⚖️ the lawyer's words), C7's phone check 📱, S8 (the owner's decision), S10 📱 |
+| 6 | Security and compliance; gates Phase 5's student-facing steps | ✅ cloud steps done; open: C2 (⚖️ the lawyer's words), C7's phone check 📱, S8 (the owner's decision) |
 | 7 | Live lesson: questions and PDF slides in a running session, followed on the phone and the web | building (Phase 7 steps) |
 
 ### Portal redesign (v2's look) steps (PV; one PR each; 👀 = the owner looks at screenshots)
@@ -272,9 +271,8 @@ One line each; each step's full notes are on its line in `docs/PLAN-ARCHIVE.md`.
 - **C2** 👀 ⚖️ The privacy policy and terms (Phase 6, **gate**): the portal's pages and the app's links are built with placeholder text, which the lawyer's words replace in place
 - **C7** 📱 The 13+ screen (Phase 6, **gate**): built, C7-server with it; left, the owner's first-launch check on the next TestFlight build
 - **S8** 🔧 Least-privilege database roles (Phase 6): the owner's decision (Open owner items, 1)
-- **S10** 📱 A release guard: a Release build never ships dev's API or user pool (Phase 6)
 - **D2k** ⏸ The shield's new look (Phase 3): waits for a design the owner approves in Claude Design
-- **The push's app half** (N1–N6's backend is done): the Mac session's, its interface on N3's line and its notes on N2's, N4's and N6's; then runbook 7, the owner's
+- **The push's app half** (N1–N6's backend is done): the Mac session's, its interface on N3's line and its notes on N2's, N4's and N6's; its wait screen the owner's pick, option B on the app canvas, for a fresh alert only (2026-10-23); then runbook 7, the owner's
 
 ### Phase 3: known edges, carried forward
 

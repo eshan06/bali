@@ -8,6 +8,29 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-23** — **S10 closed with no code, and the push's wait screen picked (#446; the owner's
+  rulings, in chat, each as recommended).** *S10* ("a Release build never ships dev's API or user
+  pool", Phase 6): every prod TestFlight run already checks that its API, its pool's hosted-UI domain
+  and the phone's client are production's before anything is uploaded (P5's release guard,
+  `.github/workflows/testflight.yml`, "Release guard: the archived app"), and the owner's phone test
+  on prod (2026-10-12) used such a build. A Release build made without naming prod, Xcode's own
+  Archive on a Mac or the workflow's `dev` option, carries dev's values from `ios/project.yml`, by
+  design: dev builds go to the owner's internal testers only (`docs/DEPLOY.md`, "Keep the pilot's
+  testers on prod builds only"). Weighed: Release defaulting to prod's values in `project.yml`, Debug
+  keeping dev's; declined, since no build reaches a tester but through the workflow, which names its
+  environment. *The push's wait screen* (the random wait of up to 10 s before the phone's first read
+  after the class-started alert, the entry of 2026-10-22 below): option B of the app canvas's row
+  "Opened from the class-started alert" (boards `PushWaitB` and `PushWaitBHome`). While the wait
+  runs, Waiting says "Checking in with your class" and "Your apps lock in a few seconds. No need to
+  tap again.", its card "Keep Bali open until your apps lock.", and Home's waiting card "You're tapped
+  in. Your apps lock in a few seconds, as long as Bali is open."; a read that fails brings back
+  Waiting's words with Try again. The wait is only for an alert opened within about a minute of its
+  arrival: the rush it spreads is in the first seconds after the bell, and an alert opened later,
+  when its class may be over, reads the truth at once. Weighed: A, Waiting as it is (it says
+  "waiting for your teacher" for up to 10 s after the alert said class started); C, a ring filling
+  over the wait (past DESIGN.md's 300 ms motion limit, its green reading as focused); and B waiting on
+  every open. Built with the push's app half, the Mac session's.
+
 - **2026-10-23** — **The consent list's two new lines, and who sees the one-time screen after the
   update (L8a, #443, L8's first PR). *The worker's call, as the conductor's brief suggested, awaiting
   the owner.*** The list (`ConsentCard`, the one view behind the intro's second page, Me's What your
