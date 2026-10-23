@@ -115,6 +115,12 @@ final class Phone {
     /// own, never the phone's defaults.
     private(set) var inClass = UserDefaults.standard.string(forKey: Phone.inClassKey)
     static let inClassKey = "inClass"
+    /// The student who has seen the consent list as it stands — its answers lines, a live lesson's
+    /// (L8a) — on this phone, by their id, kept as `inClass` is (`sawList`): the router shows the
+    /// one-time screen to a student `GET /v1/me` lists in a class who is not this one, and a list
+    /// that grows again keeps its own key. A fixture's is its own, never the phone's defaults.
+    private(set) var listSeenBy = UserDefaults.standard.string(forKey: Phone.listSeenByKey)
+    static let listSeenByKey = "listSeenBy"
     /// The last ask for the Screen Time permission that did not finish (C1b), said on its screen
     /// until the next ask (rule 5).
     private(set) var askFailed: ScreenTimeAskError?
@@ -218,6 +224,7 @@ final class Phone {
             (protection, sync, frozen) = (fixture.protection, fixture.sync, true)
             (everApproved, askFailed, joining) = (false, fixture.askFailed, fixture.joining)
             inClass = fixture.everInClass ? fixture.sync?.me?.user.id : nil
+            listSeenBy = fixture.listSeenBy
             (opened, tab, history) = (fixture.opened, fixture.tab, fixture.history)
             (naming, signOutFailed, email) = (fixture.naming, fixture.signOutFailed, fixture.email)
             (leaving, picking, pickFailed) = (fixture.leaving, fixture.picking, fixture.pickFailed)
@@ -249,8 +256,8 @@ final class Phone {
         Screen.choose(
             problem: problem, deleting: deleting.shows, age: ageNow, intro: introShows,
             signedIn: signedIn, signedInThisRun: signedInThisRun, protection: protection,
-            everApproved: everApproved, sync: sync, sessionOverClosed: sessionOverClosed,
-            opened: opened, tab: tab, now: Date())
+            everApproved: everApproved, sync: sync, listSeenBy: listSeenBy,
+            sessionOverClosed: sessionOverClosed, opened: opened, tab: tab, now: Date())
     }
 
     /// The 13+ check as the router reads it (C7): signed in, the sign-in's — through it, passed;
@@ -801,6 +808,17 @@ final class Phone {
     private func keepInClass(_ id: String) {
         inClass = id
         if !frozen { UserDefaults.standard.set(id, forKey: Phone.inClassKey) }
+    }
+
+    /// The consent list as it stands seen by the student `GET /v1/me` names (L8a): Join's preview
+    /// or Me's What your teacher sees showing it, or the one-time screen's Continue. Kept as
+    /// `listSeenBy`, in the phone's own defaults — a frozen fixture's in itself only — so the
+    /// router never shows them that screen again. Nothing while no read has named them; never from
+    /// the intro, which shows before Sign up's page, the last student's `me` perhaps still kept.
+    func sawList() {
+        guard let id = sync?.me?.user.id, id != listSeenBy else { return }
+        listSeenBy = id
+        if !frozen { UserDefaults.standard.set(id, forKey: Phone.listSeenByKey) }
     }
 
     /// Keeps `everApproved` as a pass read the permission: set at approved, cleared once the check

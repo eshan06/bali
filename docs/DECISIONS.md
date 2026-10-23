@@ -8,6 +8,162 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-23** — **The consent list's two new lines, and who sees the one-time screen after the
+  update (L8a, #443, L8's first PR). *The worker's call, as the conductor's brief suggested, awaiting
+  the owner.*** The list (`ConsentCard`, the one view behind the intro's second page, Me's What your
+  teacher sees and Join's preview) gains "Your answers to questions, counted only in the class's
+  totals" last under what a teacher sees and "Which answer is yours, or whether you answered" last
+  under what a teacher never sees, as the app canvas's Consent board draws them. **Who sees the
+  screen** (the ListChanged board, "Once, after the update"): a signed-in student whom `GET /v1/me`
+  lists in a class, on a phone with no record that this student has seen the list as it stands. A
+  class is joined through Join's preview, which shows the list, so a student in a class may have
+  seen it before its new lines; one in no class has nothing a teacher sees yet. A teacher's account
+  never gets it. **The record:** the student's id in the phone's own defaults (`Phone.listSeenBy`,
+  kept as `inClass` is: keyed on the student, kept across a sign-out, one student at a time, since
+  two accounts on one phone are ruled out for the pilot), written by the screen's Continue, by
+  Join's preview as it shows, and by Me's What your teacher sees as it opens. So a student who joins
+  a class after the update never sees the screen, and one who opened the list from Me during a class
+  (Home over Unlocked) is not asked after the bell. The intro's second page writes nothing: it shows
+  before Sign up's page, with no account yet, and the last student's `me` can still be kept then; a
+  new account is in no class until Join's preview records it. See the whole list opens the list (Me's
+  sheet) and records nothing, so the screen never leaves from under its own sheet. **Where it shows:**
+  exactly where Your name may, after it (`Screen.choose`): after the 13+ check; in Home's, Screen
+  Time's and Waiting's place and over a Join or a tab opened, with no tab bar; never over Focus,
+  Unlocked, Protection off, Session over not closed, nor the home a standing not read keeps, so never
+  between a student and Emergency Unlock. As Your name does for a sign-in kept from the last run, it
+  shows once a read of `GET /v1/me` names the student's classes (the phone keeps no `me` across a
+  launch): after the update, Home for that first read, then the screen, by a cut, as every screen
+  off the onboarding path (DESIGN.md §7). **Known limits:** a reinstall or a new phone shows it once
+  more to a student in a class (the record is the phone's); a join made while `GET /v1/me` had no
+  answer records nothing, so that student sees it once after the join; and a student whose first
+  launch after the update is mid-class sees the two lines only after the bell, which matters once
+  L8b puts the answer card on a session's screens: L8b, or the owner, decides whether the card waits
+  for the list (santa's round 1). **The board over
+  ARCHITECTURE's words:** decision 11 says "the two new lines and Continue"; the approved board also
+  draws See the whole list, built as drawn. **The portal's help page** says the list word for word
+  (`apps/web/src/app/support/support.test.ts` reads `ConsentCard`'s lists from `JoinView.swift`, and
+  pins what a teacher sees at 5 lines, now 6), so it gains the same two lines in this PR: the one
+  portal edit the owner allowed across the lanes (2026-10-23: "add the two lines to the Help page
+  and its test's count in L8a's PR. Only that, nothing else in the portal").
+  **Rode along:** the intro's second page, which now
+  outgrows the screen, keeps the board's 24 pt between its last line and the dots when scrolled to its
+  end. **Weighed:** a phone-wide flag (a second student would inherit it, for no less code than a key
+  on the student, as `inClass`); a record on the server (an API change, outside the Mac's lane, and
+  the promise is about what this phone showed); the screen for every student, in a class or not (one
+  in no class has no teacher seeing anything, and Join's preview shows the list as it stands before
+  any join). Tests: `ScreenTests.listChanged` and `ScreenTests.cuts` (BaliOutbox), `AppTests.consentList`,
+  `AppTests.listOnce` and `AppTests.waitingFits`.
+
+- **2026-10-23** — **The pre-pilot event-id step, part 1 of 3 (#442; the owner's go, 2026-10-23): a
+  check resends every data-changing route's request under its event id, in either case, and the five
+  routes that fail today are its list, which only shrinks.** Tests only; no product code changed.
+  `apps/api/test/event-id-repeat.test.ts` walks the route table the authorization matrix walks
+  (`routeTable()`, which the matrix's guard holds to its MATRIX row for row), so no export was
+  needed: every route but a GET or its HEAD changes data, and each one has a scenario there or is
+  listed as taking no event id by design, with why. A new route fails its guard until it is one or
+  the other, and a route listed as taking none that starts taking one fails it too. **What it sends
+  and asserts.** Each scenario runs in a world of its own (a class, its teacher and student, its
+  session running): the request with a fresh event id, every id in it lower case; then the same
+  again; then the same with every id in its path and body in upper case. Each resend must be
+  answered 2xx, never `409` for its own id, with the replay, the truth now: the first answer with
+  `outcome: 'replay'`, unless the route's docs say its replay otherwise (`already_deleted`,
+  `not_registered`, `already_enrolled`, `already_removed`, `{ passed: true }`, an extend's
+  `extended`, a deck create's fresh upload URL). And it must add or remove no row: every table in
+  the schema is counted around each send, so a new table is counted too, and a guard holds the count
+  to every table the schema defines and to the rows a world adds. A resend that only rewrote a row
+  in place shows where its answer does, an outcome that is no replay. Where a later write of the
+  same caller's changes what a replay must answer, the scenario makes it between the sends, so a
+  replay that only echoed its first answer fails: the unlock's reason changed (A20) on both unlock
+  routes, and a reason change changed again; the name renamed (A8); the push token registered again;
+  the bell moved by another extend; the state moved by an unlock, or protection on or off (#167);
+  the question closed; the answer, the draft and the slide changed again (decisions 4 and 12, M3a).
+  *The conductor's call, awaiting the owner:* each scenario also runs with its request sent first in
+  upper case, then again so, then in lower case, everything else in its world as the server prints
+  ids, in lower case, and the two worlds must write the same rows. A client may mint either case
+  (Foundation's `uuidString` writes upper), and one of #437's three spots shows only so: an unlock
+  that landed first, naming its tap in another case than the tap's own. The three sends alone never
+  reach it: the tap lands at its first send, in the case of the unlock kept before it, and its
+  resend in upper case is a replay, which files nothing. **No event id by design**, each found so in
+  the code and sent again by the check as the others are, its answers unread, its resends adding no
+  row: Start (one running session a class, its partial unique index: a second Start is answered
+  `existing`, that session), End (a second is `already_ended`, nothing recorded), a block's
+  registration (one live block a tag: the tag again is answered its block), a rename or a new join
+  code (`PATCH /v1/classes/{id}`: the class's one row rewritten, nothing recorded; a second new code
+  replaces the first, and the answer names the one the class holds), and the check-in (it moves
+  `last_seen_at` alone, data-model decision 7, and a silence's `came_back` once, by its marker). And
+  the sweep and its Phase 1 alias (`POST /internal/sweep`, `/internal/sessions/expire`): idempotent
+  by design (hosting decision 3), listed but not sent here, since it sweeps every world of the file
+  at once; `internal.test.ts` sends it twice. #432's four, and three more. **The list (`LEFT`)**,
+  each entry with its one-line reason and exactly what the check finds: Create class (`POST
+  /v1/classes`), no event id, so every resend makes another class (part 2); and part 3's three
+  spots, on four routes (DECISIONS 2026-10-22, #437): a deck's removal resent in upper case is `404
+  deck_not_found` (`removeDeck` compares the id as text); a tap sent in upper case never files the
+  unlock kept under it in lower case, one event fewer than the same tap in lower case
+  (`unlocksAwaitingTap`, and `lockTap`'s lock, match the id as text); and an unlock resent in upper
+  case after its reason changed answers the reason first recorded, on `POST
+  /v1/sessions/{id}/unlock` and `POST /v1/taps/{eventId}/unlock` alike (`recordedReason`). No
+  surprise: the other 22 routes with an event id pass both ways, and the five sent again double
+  nothing. A route on the list that passes, or fails otherwise, fails the check until its entry says
+  so. **Checked**: with the three compares made case-blind in a scratch copy of the engine, exactly
+  their four entries fail as fixed; with the extend route made to drop its id, the check fails it
+  (`wrote events +1`, in both cases). About 5 s on PGlite.
+
+- **2026-10-23** — **`zod` 4.6.6, for today's high advisory (#444); *the conductor's call, awaiting
+  the owner*.** From today `npm audit --omit=dev --audit-level=high`, the first step of CI's
+  "Typecheck · lint · build" (S5), failed on `zod` below 4.6.6, so every PR failed CI (#442 waited on
+  that alone), and main's next push would have too. GHSA-mrhx-c7xc-m3w5 (high; CVE-2023-54404,
+  reviewed by GitHub today), "Zod can exhaust memory while validating oversized constrained
+  collections": through 4.6.5 the size bound of an array, a set or a map (`.max()`, `.length()`,
+  `.size()`) ran only after every element was parsed, each failing element adding an issue, so it
+  bounded nothing; 4.6.6 refuses an oversized one before parsing any element (zod's #6652), but only
+  while its size checks come before every other check. A collection with no bound still parses
+  every element (zod's `abortEarly`, #6475, closed unmerged).
+  **Why now, without the owner:** CLAUDE.md's standing order (a security hole is fixed now, the owner
+  told after), and CI blocked for every PR. **Bali was exposed, to a signed-in teacher:** one bounded
+  collection reaches a request body, a question's `options` (`z.array(Text(200)).min(2).max(6)`,
+  `OpenBody` in `apps/api/src/routes/questions.ts`), on `POST /v1/sessions/{id}/questions`, `POST
+  /v1/saved-questions` and `PUT /v1/saved-questions/{id}`, each parsed after its teacher check, so no
+  student and no stranger reached it. Fastify's body limit, its default 1 MiB (the API sets none),
+  held a request to about 524,000 elements, and the API's 400 lists every issue in `details`.
+  Measured on this PC through the route: on 4.6.5 a 1 MiB body of `options: [0, 0, …]` took
+  0.54–0.66 s of the API's one process and was answered with 524,249 details, 45 MB (`["", "", …]`:
+  349,499 details, 16 MB, in about 0.4 s), and the same schema's parse, measured alone, held about
+  208 MB of heap in its issues and their details (107 MB); on 4.6.6 each is one `too_big` detail, 143
+  bytes, in 7–10 ms, about the time it takes to read the body. With the account budget's burst of
+  120, one teacher could have kept the API's one process busy for over a minute and had it send
+  gigabytes (#438: the process, not the database, is what runs out). No other request schema has an
+  array, a set, a map or a record; the list in `env.ts` is `AUTH_AUDIENCE`'s, read at boot from the
+  deploy's settings. **The bump:** `apps/api`'s range is `^4.6.6`, its floor raised from `^4.6.5`, so
+  no install resolves a vulnerable `zod`; the lockfile moves its one `zod`, at the root, from 4.6.5 to
+  4.6.6, and nothing else. Resolved at the root, never with `-w` (#435's trap, below); even there,
+  npm resolving the raised range in place nested the new copy under `apps/api`, so the lockfile's
+  `zod` entry was taken out and resolved afresh at the root as of the day 4.6.6 was the newest (`npm
+  install --before=2026-10-12`); a plain `npm install` keeps it. 4.6.7 (2026-10-12), whose release
+  notes list only its version's commit, is left to a later install, which the range allows. **What
+  else 4.6.6 changes:** `z.record`'s types (zod's #6645; the API has no record), and the rest is docs
+  and zod's release workflow. A request with too many options is refused as before, with the same one
+  detail ("Too big: expected array to have <=6 items"); what zod listed beside it is gone: each
+  option's issue, and the body's own check that `correctOption` names an option, which no longer
+  runs once the count fails (seven options and `correctOption: 9`: two details on 4.6.5, one now).
+  The other fields are still checked. **A test holds it** (santa's Reviewer B's blocker, by
+  CLAUDE.md's regression-test rule, where the conductor's brief asked for the version alone: *the
+  conductor's call, awaiting the owner*): the abuse suite (`abuse.test.ts`) sends 10,000 options to
+  each of the three routes and expects one detail, on `options`, and nothing written. It failed on
+  4.6.5 (10,001 details), and fails on 4.6.6 too with a check put before the count, which a comment
+  at `OpenBody` says; no other test changed.
+  **Its supply chain:** signed by the registry, with provenance (published by zod's GitHub release
+  workflow, approved by its maintainer), built from a commit whose tree is `9c219833`'s in zod's
+  history; zod's release notes say six malicious commits pushed to its `main` on 2026-09-21 with a
+  compromised credential were reverted that day and removed from its history, none ever published.
+  **Left,** outside this step: a list with no bound, which zod still parses whole, every issue listed
+  in the 400 with no cap; no request body has one (the snapshot's request arrays are the three
+  `options`, `maxItems` 6), and nothing yet stops a new route adding one (santa's Reviewer B: a check
+  over `contracts/openapi.json` that every request array has a bound would). Fastify 5.12.5's
+  GHSA-389g-gv7q-r4x8 (low, below CI's gate), which doesn't apply (the API defines no Fastify header
+  schemas), the owner's or Dependabot's; and the dev tools that never ship (vite, vitest), as #435
+  left them. **Checked:** CI's audit gate passing (fastify's low left), `npm audit signatures`,
+  typecheck, lint, `npm test` and the in-memory demo.
+
 - **2026-10-22** — **The API's database pool can never silently shrink to one connection (#439, a
   guard from #336's finding, #438): the API always hands postgres.js its own size, so `PGMAX` and a
   `max` in `DATABASE_URL` are ignored, and the boot says so by name. *The conductor's call, awaiting

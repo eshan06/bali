@@ -8,13 +8,15 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-22 (Central) — The API's database pool can never silently shrink to one
-connection (#439; `docs/DECISIONS.md`, 2026-10-22), a guard from #336's finding (the conductor's
-call, awaiting the owner): the API always hands postgres.js its own size, 10, so `PGMAX` or a `max`
-in `DATABASE_URL`, which postgres.js read as text and made one connection, is ignored, and the boot
-says so by name in its log and to Sentry, never with the URL. No new setting; nothing changes today.
-Before it, #336 measured (#438). Next on the Windows PC: the four steps for sessions before the
-pilot's first class, which wait for the owner's word; on the Mac, the phone's L8 and M8._
+_Last updated: 2026-10-23 (Central) — The consent list's two new lines and the one-time screen after
+the update (L8a, #443; `docs/DECISIONS.md`, 2026-10-23), L8's first PR on the Mac: Join's
+preview, the intro's second page and Me's What your teacher sees list the answers lines, as does
+the portal's help page (the one portal edit the owner allowed across the lanes), and a student in
+a class who has not seen the list as it stands on this phone sees the two lines once, never over a
+session's screens (the worker's call on who, awaiting the owner). Before it, the pre-pilot event-id
+step's part 1 (#442). Next on the Mac: L8's answer card, then M8; on the Windows PC, that step's
+part 2, Create class's event id, then part 3, the three places; the other three pre-pilot steps
+wait for the owner's word._
 
 ## Now
 
@@ -40,7 +42,8 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
 - **The owner's Mac session (Xcode and the iPhone):** the app's Sign in & sign up is built; the app
   keeps D1's look until the owner approves a new one (its redesign rolled back, 2026-10-06). Left:
   the push's app half (not started), TestFlight build 9 for C7's phone test (📱), and the phone's
-  Phase 7 screens (L8, M8). C2's legal words (⚖️) go into the portal's pages, on the Windows PC.
+  Phase 7 screens (L8, its consent list ✅ as L8a, #443; M8). C2's legal words (⚖️) go into the
+  portal's pages, on the Windows PC.
 - **The portal redesign in v2's look (PV0–PV17, the owner, 2026-10-12)** ✅ (2026-10-16): every step
   done, with PV3b, PV4b, PV4c and PV5b; the last, PV17c-2, Home's Last session (#425).
 - **The portal's tests drive the page (the owner, 2026-10-22: "Yes, go gradually")**: the setup ✅
@@ -79,6 +82,12 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
   advisories, which failed CI's audit on every PR, fixed while the owner is away (the conductor's
   call, awaiting the owner); the portal used none of their paths. Dependabot's #309 is superseded.
   Left for the owner: S4's CSP check on the deployed portal (Open owner items).
+- **`zod` 4.6.6 (2026-10-23)** ✅ (#444; DECISIONS 2026-10-23): today's high advisory
+  (GHSA-mrhx-c7xc-m3w5), which failed CI's audit on every PR, fixed (the conductor's call, awaiting
+  the owner). A signed-in teacher could reach it: a question's `options`, at most 6, on three
+  teacher routes, were each parsed before their count, so a 1 MiB body held about 200 MB of the
+  API's memory and was answered with 45 MB; now one line, at once, held by a test in the abuse
+  suite. Left: fastify's low advisory, which doesn't apply.
 - **The database pool's guard (2026-10-22)** ✅ (#439; DECISIONS 2026-10-22), from #336's finding,
   the conductor's call, awaiting the owner: `createDb` always passes postgres.js a number, 10 unless
   the load harness names one, so `PGMAX` or a `max` in `DATABASE_URL` is ignored, and the boot says so
@@ -220,7 +229,7 @@ Slice 1 — live questions:
 - **L7** 👀 Portal UI to v2's canvas: the class page's question and Present's — ✅ as L7-1a (#389), L7-1b (#390), L7-2 (#402) and L7-3, Close and Done on Present, Done in every window of the browser (#405); DECISIONS 2026-10-15
 - **L7b** 👀 Portal saved questions to v2's canvas — ✅ as part 1a (#393), part 1b (#394), part 1c (#395) and part 2, the panel's drafts (#411); DECISIONS 2026-10-15, 2026-10-16
 - **L7c** 👀 A session's Questions to v2's canvas — ✅ (#412; DECISIONS 2026-10-16)
-- **L8** 👀📱 iOS answer card to the app canvas: while a question or a slide shows, the Focus screen's ring as a strip and Emergency Unlock pinned at the bottom; a tap answers and changes it until the close; the revealed answer marked, never red; a closed question's Hide; the same card on Unlocked, Screen Time off and Home; the consent list's two new lines and the one-time screen for a student who saw the old list (`no-ai-slop`); M0 ✅ (the canvas approved 2026-10-10; L0b, before the first actual pilot since 2026-10-12, holds back no screen). **No build that can answer ships (TestFlight included) before L2's documents and this wording have landed** — validation: XCTest, then the device check on the owner's iPhone: a shielded phone answers, the battery cost of the 2 s poll over a lesson, VoiceOver
+- **L8** 👀📱 iOS answer card to the app canvas: while a question or a slide shows, the Focus screen's ring as a strip and Emergency Unlock pinned at the bottom; a tap answers and changes it until the close; the revealed answer marked, never red; a closed question's Hide; the same card on Unlocked, Screen Time off and Home; the consent list's two new lines and the one-time screen for a student who saw the old list (`no-ai-slop`); M0 ✅ (the canvas approved 2026-10-10; L0b, before the first actual pilot since 2026-10-12, holds back no screen). **No build that can answer ships (TestFlight included) before L2's documents and this wording have landed** — validation: XCTest, then the device check on the owner's iPhone: a shielded phone answers, the battery cost of the 2 s poll over a lesson, VoiceOver. **L8a**, the consent list's two new lines and the one-time screen — ✅ (#443; DECISIONS 2026-10-23)
 - **L9** 📱 Exit check: a real class on prod asks and answers, the recap and the stream show the lifecycle, no screen names an answer
 
 Slice 2 — slides:
@@ -332,9 +341,9 @@ Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect acc
 - Left for the owner on finished steps' lines (in full in `docs/PLAN-ARCHIVE.md`): P7's App Review path (decide its section 4, then fill the accounts and paste); P6's restore drill, its result recorded once a backup exists; S4's CSP check on the deployed portal after each Next upgrade (due now, for 15.5.28, #435); ⚖️ whether C7-server's yes rides Other Data Types; device rounds still marked pending (B5b's round 2, steps 7 and 9; B5c's round 3, steps 1 and 3; round 4, B6a and B6b); smaller calls on F (a refused tap's end-of-day drop or dismiss button; the waiting card's Tap in), B6c-2 (`.keep`/`.retry`), B5b (a rule for a replaced window, a code step to schedule) and D2 (Present's key per class).
 - ✅ **Answered** (the owner, 2026-10-14; DECISIONS 2026-10-14): PV5b's whole-page error kept; its review notes folded into PV15 and PV17a; PV4c's two test limits left.
 - 🔧 Before the pilot's first class: the owner's prod block gets a fresh code (its first reached the repo's history in #228), and a session builds an owner command that retires a block, to retire the old code (`docs/PILOT.md`, setup step 6). The portal's three class-page controls are built (P10, P11).
-- **Before the pilot's first class, four steps for sessions** (the owner's workflow review, 2026-10-13; one PR each; after the redesign's PV17c, the owner, 2026-10-14); not started, they wait for the owner's word:
+- **Before the pilot's first class, four steps for sessions** (the owner's workflow review, 2026-10-13; one PR each; after the redesign's PV17c, the owner, 2026-10-14); the event-id check under way (the owner's go, 2026-10-23), the other three wait for the owner's word:
   - a column-level privacy test: every column classified personal or not, each personal one placed by the privacy paths that handle it (the account deletion, the disposal, the retention run, the export), so a new column fails until it is placed; FERPA covers university students too;
-  - a repeated-`event_id` check on every data-changing route, driven from the authorization matrix's route list (#319's survey found three that still compare an id as text, so a retry in upper case misses: a deck's removal, a tap with the unlock sent under it, and an unlock's replay after its reason changed; DECISIONS 2026-10-22);
+  - a repeated-`event_id` check on every data-changing route, driven from the authorization matrix's route list, in three parts: part 1, the check ✅ (#442; DECISIONS 2026-10-23), its list the five routes that fail today; next part 2, Create class's event id (it takes none, so a resend makes a second class: #432), then part 3, the three places #319's survey found comparing an id as text, so a retry in upper case misses (a deck's removal, a tap with the unlock sent under it, and an unlock's replay after its reason changed; DECISIONS 2026-10-22), each part taking its entries off the list;
   - pilot deploy rules: no deploys during class hours, and a documented one-command rollback in `docs/RUNBOOKS.md`;
   - Dependabot PRs can't pass Claude Review (the action rejects bot actors: add `allowed_bots` for dependabot in `claude-review.yml`, bundled with the next edit to that protected file); until then such a PR waits, as #427 (`vite` 8.3.4, dev only) does. #309 (`next` 15.5.27) is superseded by 15.5.28 (#435), and Dependabot closes it itself once main has it.
 - 🔧 The Cognito sign-in deleter: runbook 9 (`docs/RUNBOOKS.md`) — per environment an IAM policy

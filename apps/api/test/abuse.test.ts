@@ -1,11 +1,15 @@
 import {
+  createSavedQuestion,
   createSchool,
   type Database,
   events,
   formatInviteCode,
   mintTeacherInvite,
+  newUuidV7,
   participations,
+  questions,
   recordAgreement,
+  savedQuestions,
   startSession,
   tapIn,
   teacherInvites,
@@ -555,6 +559,44 @@ describe('an oversized or malformed body', () => {
     ]) {
       refused(res);
     }
+  });
+
+  it('a question’s options far past their 6: one detail, for their count, never one per option', async () => {
+    // Before zod 4.6.6 every option was parsed before the count was checked (GHSA-mrhx-c7xc-m3w5),
+    // and the 400 lists each issue: a teacher's 1 MiB body was answered with 524,249 details, 45 MB
+    // (docs/DECISIONS.md, 2026-10-23). It holds only while `OpenBody`'s count comes first.
+    const app = appWith({ account: ROOMY });
+    const { teacher, session } = await running('abuse-options');
+    const draft = await createSavedQuestion(db, {
+      teacherId: teacher.id,
+      eventId: newUuidV7(),
+      prompt: 'Which?',
+      options: ['a', 'b'],
+    });
+    if (draft.outcome !== 'created') throw new Error(draft.outcome);
+    const options = Array<number>(10_000).fill(0);
+    for (const [method, url] of [
+      ['POST', `/v1/sessions/${session.id}/questions`],
+      ['POST', '/v1/saved-questions'],
+      ['PUT', `/v1/saved-questions/${draft.savedQuestion.id}`],
+    ] as const) {
+      const payload = { eventId: newUuidV7(), prompt: 'Which?', options };
+      const res = await send(app, { method, url, sub: teacher.cognitoId, payload });
+      expect(res.status).toBe(400);
+      refused(res);
+      const details = res.body.error?.details as { path: string }[];
+      expect(details).toHaveLength(1);
+      expect(details[0]?.path).toBe('options');
+    }
+    const asked = await db.select().from(questions).where(eq(questions.sessionId, session.id));
+    expect(asked).toEqual([]);
+    const drafts = await db
+      .select()
+      .from(savedQuestions)
+      .where(eq(savedQuestions.teacherId, teacher.id));
+    expect(drafts).toMatchObject([
+      { id: draft.savedQuestion.id, prompt: 'Which?', options: ['a', 'b'] },
+    ]);
   });
 });
 
