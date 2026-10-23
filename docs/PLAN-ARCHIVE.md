@@ -10,6 +10,16 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-23 (Central) — The consent list's two new lines and the one-time screen after
+the update (L8a, #443; `docs/DECISIONS.md`, 2026-10-23), L8's first PR on the Mac: Join's
+preview, the intro's second page and Me's What your teacher sees list the answers lines, as does
+the portal's help page (the one portal edit the owner allowed across the lanes), and a student in
+a class who has not seen the list as it stands on this phone sees the two lines once, never over a
+session's screens (the worker's call on who, awaiting the owner). Before it, the pre-pilot event-id
+step's part 1 (#442). Next on the Mac: L8's answer card, then M8; on the Windows PC, that step's
+part 2, Create class's event id, then part 3, the three places; the other three pre-pilot steps
+wait for the owner's word._
+
 _Last updated: 2026-10-23 (Central) — The pre-pilot event-id step, part 1 of 3 (#442;
 `docs/DECISIONS.md`, 2026-10-23), the owner's go: a check resends every data-changing route's request
 under its event id, in lower and upper case, and fails a second row, a `409`, or an answer that isn't
@@ -1207,7 +1217,7 @@ Security:
 - **S7** Abuse tests, in process: join-code guessing, a flood of orphan unlocks, another student's `event_id`, malformed tokens (`alg: none`, HS256 signed with the public key, an unknown key id) answered `401`, never `500`, and oversized bodies; and an HTTP test that a `429` from join-code tries gives back the held miss — after L1 — ✅ `apps/api/test/abuse.test.ts`, real tokens from the test issuer: join-code guessing at production's budgets (20 tries an account, then the address's 100 misses across fresh accounts; the preview and the join), and a tries `429` giving back its held miss; 150 orphan unlocks from one account record its 120, the rest `429`, then 2 a second; another student's `event_id` on a tap, an unlock, a refocus and an invite redeem `409 event_id_conflict` with no row written; 26 tokens (`alg: none` three ways, HS256/HS512 keyed with the public key, an unknown, missing or numeric key id, another key, an embedded `jwk`, an unknown `crit`, expired, not yet valid, wrong issuer, client or audience, no subject, a swapped payload, malformed shapes) each `401`; a body over 1 MiB `413`, a capped field `400`, deep or broken JSON a `4xx`, all in the one shape; every UUID path parameter `400` (and the router's own refusals, below). Found: a parameter past 100 characters (`414`) or badly percent-encoded (`400`) left in Fastify's shape, echoing the path; fixed by `frameworkErrors` (`routerRefusal`, `apps/api/src/errors.ts`). The ID-token check is `it.todo` until S3 (#209). Why and what's left: `docs/DECISIONS.md` (S7)
 - **S8** 🔧 Least-privilege database roles: the API's runtime role cannot change the schema or update, delete or truncate `events`; migrations run as their own role
 - **S9** Clock skew surfaced, as ARCHITECTURE's iOS rules already promise: a note on the record when a device's time is far from the server's, and a badge on the grid — ✅ `insertEvent` adds `clock_ahead_s` (whole seconds) to the payload of a tap, refocus, Screen Time on or off, or unlock (orphans included) whose claimed time runs more than `CLOCK_AHEAD_THRESHOLD_MS` (2 min, `@bali/shared`) ahead of when the server heard it; never for a claim behind (an offline catch-up looks the same); advisory, the clamp and A10–A14 untouched. `getSessionRoster` and the snapshot carry `clockOff` (additive); the grid's chip shows "Clock off" beside the name in its own ink (`live-grid.tsx`, `grid-state.ts`). PGlite tests `packages/db/test/clock-skew.test.ts`. Not covered: pre-bell taps converted at Start, and check-ins (no history). Why: `docs/DECISIONS.md` (S9)
-- **S10** 📱 A release guard: a Release build never ships dev's API or user pool
+- **S10** 📱 A release guard: a Release build never ships dev's API or user pool — ✅ closed with no code by the owner's ruling (2026-10-23, #446; DECISIONS 2026-10-23): every prod TestFlight run checks that its API, sign-in domain and phone client are production's before upload (P5's release guard, `testflight.yml`'s "Release guard: the archived app"), and dev builds go to the owner's internal testers only (`docs/DEPLOY.md`, "Keep the pilot's testers on prod builds only"); a Release build made without naming prod, Xcode's own Archive or the workflow's `dev` option, carries dev's values by design
 - **S11** 🔧 Self sign-up gated to the school's email domains (owner ruling, 2026-10-04) — ✅ `infra/cognito/pre-signup.mjs`, a dependency-free Cognito Pre sign-up Lambda (Node 22, pasted in by the owner, `docs/RUNBOOKS.md` runbook 2 step 4): refuses an email whose domain isn't exactly one of `ALLOWED_EMAIL_DOMAINS` (comma-separated, any case; subdomains listed one by one; unset or empty refuses all), for sign-ups and first external-provider sign-ins; console-made accounts pass. `node --test` tests, run by the root `npm test`
 
 Compliance:
