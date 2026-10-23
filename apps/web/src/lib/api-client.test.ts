@@ -601,10 +601,10 @@ describe('api-client', () => {
     });
   });
 
-  it('gives every write in the portal a time limit of its own, but a deck’s check and a class’s create (the owner, 2026-10-16)', () => {
+  it('gives every write in the portal a time limit of its own, but a deck’s check (the owner, 2026-10-16)', () => {
     // A write the network swallows held its buttons until the browser gave up. Each is limited at
-    // its call, never in `send`: the check (`/complete`) can take about 40 s, and the create takes
-    // no `eventId`, so a Try again after a limit could make a second class.
+    // its call, never in `send`: the check (`/complete`) can take about 40 s. A class's create has
+    // its limit since it carries an `eventId` (2026-10-23): a Try again after it is a replay.
     const src = fileURLToPath(new URL('../', import.meta.url));
     const files = (dir: string): string[] =>
       readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -635,10 +635,7 @@ describe('api-client', () => {
       }
     }
     expect(writes).toBeGreaterThan(10);
-    expect(unlimited).toEqual([
-      "lib/classes.ts: '/v1/classes'",
-      'lib/decks.ts: `${PATH}/${deck.id}/complete`',
-    ]);
+    expect(unlimited).toEqual(['lib/decks.ts: `${PATH}/${deck.id}/complete`']);
   });
 
   it('surfaces a clean ApiError (not a TypeError) on a non-conforming error body', async () => {

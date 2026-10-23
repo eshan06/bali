@@ -43,9 +43,9 @@ export const CANT_REGISTER = "Bali couldn't register the block just now. Try aga
 
 /**
  * A create with no words of its own to say (D2e): a 5xx, a timeout, or a refusal with no reason,
- * whose message is written for a log. The class may have been made before the answer was lost (the
- * route takes no `eventId`), and the page reads the list again, so the words send the teacher
- * there before a second press makes a second class.
+ * whose message is written for a log. The class may have been made before the answer was lost, and
+ * the page reads the list again, so the words send the teacher there; a Try again goes under the
+ * create's own `eventId` (2026-10-23), so it is answered with that class and never makes a second.
  */
 export const CANT_CREATE =
   "Bali couldn't finish creating the class. If it isn't in your list above, try again.";

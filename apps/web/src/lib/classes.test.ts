@@ -50,13 +50,17 @@ const klass: ClassDetail = {
   liveSessionId: null,
 };
 
+/** A create of `name`, under one eventId. */
+const attempt = (name: string) => ({ name, eventId: '019a0000-0000-7000-8000-000000000001' });
+
 describe('createClass', () => {
-  it('sends the name and answers with the class the server made', async () => {
+  it('sends the name under its eventId and answers with the class the server made', async () => {
     const { client, sent } = api(200, klass);
-    expect(await createClass(client, 'Period 4 Biology')).toEqual({ kind: 'created', klass });
+    const sentAs = attempt('Period 4 Biology');
+    expect(await createClass(client, sentAs)).toEqual({ kind: 'created', klass });
     expect(sent[0]?.url).toBe('http://api/v1/classes');
     expect(sent[0]?.init?.method).toBe('POST');
-    expect(JSON.parse(sent[0]?.init?.body as string)).toEqual({ name: 'Period 4 Biology' });
+    expect(JSON.parse(sent[0]?.init?.body as string)).toEqual(sentAs);
   });
 
   it('answers every failure in words, never the API’s log line for a 5xx or a timeout', async () => {
@@ -65,12 +69,12 @@ describe('createClass', () => {
       getToken: () => 'tok',
       fetchImpl: () => Promise.reject(new TypeError('Failed to fetch')),
     });
-    expect(await createClass(unreachable, 'Period 4')).toEqual({
+    expect(await createClass(unreachable, attempt('Period 4'))).toEqual({
       kind: 'failed',
       message: CANT_REACH,
     });
     const busy = api(429, { error: { code: 'rate_limited', message: 'too many requests' } });
-    expect(await createClass(busy.client, 'Period 4')).toEqual({
+    expect(await createClass(busy.client, attempt('Period 4'))).toEqual({
       kind: 'failed',
       message: TOO_MANY_TRIES,
     });
@@ -79,20 +83,20 @@ describe('createClass', () => {
       { error: { code: 'rate_limited', message: 'too many requests' } },
       { 'retry-after': '30' },
     );
-    expect(await createClass(waiting.client, 'Period 4')).toEqual({
+    expect(await createClass(waiting.client, attempt('Period 4'))).toEqual({
       kind: 'failed',
       message: TOO_MANY_TRIES_MINUTE,
     });
     for (const status of [500, 502, 408]) {
       const broken = api(status, { error: { code: 'internal', message: 'internal error' } });
-      expect(await createClass(broken.client, 'Period 4'), String(status)).toEqual({
+      expect(await createClass(broken.client, attempt('Period 4')), String(status)).toEqual({
         kind: 'failed',
         message: CANT_CREATE,
       });
     }
     // An answer that isn't JSON (a proxy's page): no class to show, so the same words.
     const garbled = api(200, '<html>');
-    expect(await createClass(garbled.client, 'Period 4')).toEqual({
+    expect(await createClass(garbled.client, attempt('Period 4'))).toEqual({
       kind: 'failed',
       message: CANT_CREATE,
     });
@@ -106,7 +110,7 @@ describe('createClass', () => {
       [403, 'forbidden', 'teacher access required'],
     ] as const) {
       const refused = api(status, { error: { code, message } });
-      expect(await createClass(refused.client, 'Period 4'), String(status)).toEqual({
+      expect(await createClass(refused.client, attempt('Period 4')), String(status)).toEqual({
         kind: 'failed',
         message: CANT_CREATE,
       });
@@ -118,7 +122,7 @@ describe('createClass', () => {
     const gone = api(409, {
       error: { code: 'conflict', reason: 'account_deleted', message: 'this account was deleted' },
     });
-    expect(await createClass(gone.client, 'Period 4')).toEqual({
+    expect(await createClass(gone.client, attempt('Period 4'))).toEqual({
       kind: 'final',
       message: ACCOUNT_DELETED,
     });
@@ -126,6 +130,15 @@ describe('createClass', () => {
       'This account was deleted, so nothing changed. Sign out, then sign in again.',
     );
     expect(ACCOUNT_DELETED).not.toMatch(/[—–!]/);
+    // An eventId another teacher's class holds (2026-10-23), which no id minted fresh meets: final
+    // for that id, said in the words every route's spent id gets.
+    const spent = api(409, {
+      error: { code: 'conflict', reason: 'event_id_conflict', message: 'event_id already used' },
+    });
+    expect(await createClass(spent.client, attempt('Period 4'))).toEqual({
+      kind: 'final',
+      message: "That didn't go through, so nothing changed. Try again.",
+    });
   });
 
   it('holds a name to the API’s own limit, so its 400 for a longer one is never met', () => {
@@ -133,8 +146,10 @@ describe('createClass', () => {
       fileURLToPath(new URL('../../../api/src/routes/classes.ts', import.meta.url)),
       'utf8',
     );
-    expect(route).toContain(
-      `const CreateBody = z.object({ name: z.string().trim().min(1).max(${CLASS_NAME_MAX}) });`,
+    expect(route).toMatch(
+      new RegExp(
+        String.raw`const CreateBody = z\.object\(\{\s*name: z\.string\(\)\.trim\(\)\.min\(1\)\.max\(${CLASS_NAME_MAX}\),`,
+      ),
     );
   });
 
@@ -145,34 +160,34 @@ describe('createClass', () => {
     expect(CANT_CREATE).not.toMatch(/[—–!]/);
   });
 
-  it('waits for the create’s answer however long it takes, unlike every other save: it takes no eventId, so a Try again after a limit would make a second class (the owner, 2026-10-16)', async () => {
+  it('gives up at a save’s limit as no answer, and its resend under the same eventId is answered with the class (2026-10-23)', async () => {
     vi.useFakeTimers();
     try {
-      const klass: ClassDetail = {
-        id: 'c1',
-        name: 'Period 4 Biology',
-        joinCode: 'ABCDEF',
-        createdAt: '2026-10-01T12:00:00.000Z',
-        liveSessionId: null,
-      };
+      const bodies: unknown[] = [];
+      // The first create lands, but its answer never comes; the resend's comes at once.
       const client = createApiClient({
         baseUrl: 'http://api',
         getToken: () => 'tok',
-        fetchImpl: (_url, init) =>
-          new Promise((answer, reject) => {
+        fetchImpl: (_url, init) => {
+          bodies.push(JSON.parse(init?.body as string));
+          if (bodies.length > 1) return Promise.resolve(Response.json(klass));
+          return new Promise((_answer, reject) => {
             init?.signal?.addEventListener('abort', () =>
               reject(new DOMException('aborted', 'AbortError')),
             );
-            setTimeout(() => answer(Response.json(klass)), 6 * SAVE_TIMEOUT_MS);
-          }),
+          });
+        },
       });
-      const created = createClass(client, 'Period 4 Biology');
+      const sentAs = attempt('Period 4 Biology');
+      const created = createClass(client, sentAs);
       const settled = vi.fn();
       void created.then(settled);
-      await vi.advanceTimersByTimeAsync(6 * SAVE_TIMEOUT_MS - 1);
+      await vi.advanceTimersByTimeAsync(SAVE_TIMEOUT_MS - 1);
       expect(settled).not.toHaveBeenCalled();
       await vi.advanceTimersByTimeAsync(1);
-      expect(await created).toEqual({ kind: 'created', klass });
+      expect(await created).toEqual({ kind: 'failed', message: CANT_REACH });
+      expect(await createClass(client, sentAs)).toEqual({ kind: 'created', klass });
+      expect(bodies).toEqual([sentAs, sentAs]);
     } finally {
       vi.useRealTimers();
     }
