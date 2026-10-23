@@ -10,6 +10,14 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-22 (Central) — The API's database pool can never silently shrink to one
+connection (#439; `docs/DECISIONS.md`, 2026-10-22), a guard from #336's finding (the conductor's
+call, awaiting the owner): the API always hands postgres.js its own size, 10, so `PGMAX` or a `max`
+in `DATABASE_URL`, which postgres.js read as text and made one connection, is ignored, and the boot
+says so by name in its log and to Sentry, never with the URL. No new setting; nothing changes today.
+Before it, #336 measured (#438). Next on the Windows PC: the four steps for sessions before the
+pilot's first class, which wait for the owner's word; on the Mac, the phone's L8 and M8._
+
 _Last updated: 2026-10-22 (Central) — The bell with the class-started push, measured at a school's
 scale (#336, #438; `docs/DECISIONS.md`, 2026-10-22), a k6 run by hand only (the Load gate's `bell`
 input); the gate on PRs is unchanged. Every rung phone opening at once about doubles the Starts'
