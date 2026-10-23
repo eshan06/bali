@@ -8,13 +8,13 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-22 (Central) — The API's database pool can never silently shrink to one
-connection (#439; `docs/DECISIONS.md`, 2026-10-22), a guard from #336's finding (the conductor's
-call, awaiting the owner): the API always hands postgres.js its own size, 10, so `PGMAX` or a `max`
-in `DATABASE_URL`, which postgres.js read as text and made one connection, is ignored, and the boot
-says so by name in its log and to Sentry, never with the URL. No new setting; nothing changes today.
-Before it, #336 measured (#438). Next on the Windows PC: the four steps for sessions before the
-pilot's first class, which wait for the owner's word; on the Mac, the phone's L8 and M8._
+_Last updated: 2026-10-23 (Central) — The consent list's two new lines and the one-time screen after
+the update (L8a, #L8A-PR; `docs/DECISIONS.md`, 2026-10-23), L8's first PR on the Mac: Join's
+preview, the intro's second page and Me's What your teacher sees list the answers lines, and a
+student in a class who has not seen the list as it stands on this phone sees the two lines once,
+never over a session's screens (the worker's call on who, awaiting the owner). Before it, the
+database pool's guard (#439). Next on the Mac: L8's answer card, then M8; on the Windows PC, the
+four steps for sessions before the pilot's first class, which wait for the owner's word._
 
 ## Now
 
@@ -40,7 +40,8 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
 - **The owner's Mac session (Xcode and the iPhone):** the app's Sign in & sign up is built; the app
   keeps D1's look until the owner approves a new one (its redesign rolled back, 2026-10-06). Left:
   the push's app half (not started), TestFlight build 9 for C7's phone test (📱), and the phone's
-  Phase 7 screens (L8, M8). C2's legal words (⚖️) go into the portal's pages, on the Windows PC.
+  Phase 7 screens (L8, its consent list ✅ as L8a, #L8A-PR; M8). C2's legal words (⚖️) go into the
+  portal's pages, on the Windows PC.
 - **The portal redesign in v2's look (PV0–PV17, the owner, 2026-10-12)** ✅ (2026-10-16): every step
   done, with PV3b, PV4b, PV4c and PV5b; the last, PV17c-2, Home's Last session (#425).
 - **The portal's tests drive the page (the owner, 2026-10-22: "Yes, go gradually")**: the setup ✅
@@ -220,7 +221,7 @@ Slice 1 — live questions:
 - **L7** 👀 Portal UI to v2's canvas: the class page's question and Present's — ✅ as L7-1a (#389), L7-1b (#390), L7-2 (#402) and L7-3, Close and Done on Present, Done in every window of the browser (#405); DECISIONS 2026-10-15
 - **L7b** 👀 Portal saved questions to v2's canvas — ✅ as part 1a (#393), part 1b (#394), part 1c (#395) and part 2, the panel's drafts (#411); DECISIONS 2026-10-15, 2026-10-16
 - **L7c** 👀 A session's Questions to v2's canvas — ✅ (#412; DECISIONS 2026-10-16)
-- **L8** 👀📱 iOS answer card to the app canvas: while a question or a slide shows, the Focus screen's ring as a strip and Emergency Unlock pinned at the bottom; a tap answers and changes it until the close; the revealed answer marked, never red; a closed question's Hide; the same card on Unlocked, Screen Time off and Home; the consent list's two new lines and the one-time screen for a student who saw the old list (`no-ai-slop`); M0 ✅ (the canvas approved 2026-10-10; L0b, before the first actual pilot since 2026-10-12, holds back no screen). **No build that can answer ships (TestFlight included) before L2's documents and this wording have landed** — validation: XCTest, then the device check on the owner's iPhone: a shielded phone answers, the battery cost of the 2 s poll over a lesson, VoiceOver
+- **L8** 👀📱 iOS answer card to the app canvas: while a question or a slide shows, the Focus screen's ring as a strip and Emergency Unlock pinned at the bottom; a tap answers and changes it until the close; the revealed answer marked, never red; a closed question's Hide; the same card on Unlocked, Screen Time off and Home; the consent list's two new lines and the one-time screen for a student who saw the old list (`no-ai-slop`); M0 ✅ (the canvas approved 2026-10-10; L0b, before the first actual pilot since 2026-10-12, holds back no screen). **No build that can answer ships (TestFlight included) before L2's documents and this wording have landed** — validation: XCTest, then the device check on the owner's iPhone: a shielded phone answers, the battery cost of the 2 s poll over a lesson, VoiceOver. **L8a**, the consent list's two new lines and the one-time screen — ✅ (#L8A-PR; DECISIONS 2026-10-23)
 - **L9** 📱 Exit check: a real class on prod asks and answers, the recap and the stream show the lifecycle, no screen names an answer
 
 Slice 2 — slides:

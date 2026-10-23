@@ -8,6 +8,44 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-23** — **The consent list's two new lines, and who sees the one-time screen after the
+  update (L8a, L8's first PR). *The worker's call, as the conductor's brief suggested, awaiting the
+  owner.*** The list (`ConsentCard`, the one view behind the intro's second page, Me's What your
+  teacher sees and Join's preview) gains "Your answers to questions, counted only in the class's
+  totals" last under what a teacher sees and "Which answer is yours, or whether you answered" last
+  under what a teacher never sees, as the app canvas's Consent board draws them. **Who sees the
+  screen** (the ListChanged board, "Once, after the update"): a signed-in student whom `GET /v1/me`
+  lists in a class, on a phone with no record that this student has seen the list as it stands. A
+  class is joined through Join's preview, which shows the list, so a student in a class may have
+  seen it before its new lines; one in no class has nothing a teacher sees yet. A teacher's account
+  never gets it. **The record:** the student's id in the phone's own defaults (`Phone.listSeenBy`,
+  kept as `inClass` is: keyed on the student, kept across a sign-out, one student at a time, since
+  two accounts on one phone are ruled out for the pilot), written by the screen's Continue, by
+  Join's preview as it shows, and by Me's What your teacher sees as it opens. So a student who joins
+  a class after the update never sees the screen, and one who opened the list from Me during a class
+  (Home over Unlocked) is not asked after the bell. The intro's second page writes nothing: it shows
+  before Sign up's page, with no account yet, and the last student's `me` can still be kept then; a
+  new account is in no class until Join's preview records it. See the whole list opens the list (Me's
+  sheet) and records nothing, so the screen never leaves from under its own sheet. **Where it shows:**
+  exactly where Your name may, after it (`Screen.choose`): after the 13+ check; in Home's, Screen
+  Time's and Waiting's place and over a Join or a tab opened, with no tab bar; never over Focus,
+  Unlocked, Protection off, Session over not closed, nor the home a standing not read keeps, so never
+  between a student and Emergency Unlock. As Your name does for a sign-in kept from the last run, it
+  shows once a read of `GET /v1/me` names the student's classes (the phone keeps no `me` across a
+  launch): after the update, Home for that first read, then the screen, by a cut, as every screen
+  off the onboarding path (DESIGN.md §7). **Known limits:** a reinstall or a new phone shows it once
+  more to a student in a class (the record is the phone's); and a join made while `GET /v1/me` had no
+  answer records nothing, so that student sees it once after the join. **The board over
+  ARCHITECTURE's words:** decision 11 says "the two new lines and Continue"; the approved board also
+  draws See the whole list, built as drawn. **Rode along:** the intro's second page, which now
+  outgrows the screen, keeps the board's 24 pt between its last line and the dots when scrolled to its
+  end. **Weighed:** a phone-wide flag (a second student would inherit it, for no less code than a key
+  on the student, as `inClass`); a record on the server (an API change, outside the Mac's lane, and
+  the promise is about what this phone showed); the screen for every student, in a class or not (one
+  in no class has no teacher seeing anything, and Join's preview shows the list as it stands before
+  any join). Tests: `ScreenTests.listChanged` and `ScreenTests.cuts` (BaliOutbox), `AppTests.consentList`,
+  `AppTests.listOnce` and `AppTests.waitingFits`.
+
 - **2026-10-22** — **The API's database pool can never silently shrink to one connection (#439, a
   guard from #336's finding, #438): the API always hands postgres.js its own size, so `PGMAX` and a
   `max` in `DATABASE_URL` are ignored, and the boot says so by name. *The conductor's call, awaiting

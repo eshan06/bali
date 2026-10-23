@@ -155,7 +155,11 @@ struct MeView: View {
                     if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
                 }
                 Rectangle().fill(Theme.border).frame(height: 1)
-                row("What your teacher sees") { consent = true }
+                // The list as it stands, seen: the one-time screen never shows them it (L8a).
+                row("What your teacher sees") {
+                    consent = true
+                    phone.sawList()
+                }
             }
         }
     }
@@ -300,7 +304,8 @@ struct LeaveQuestion: View {
     }
 }
 
-/// What a teacher sees, from Me's row: the intro's own page, in a sheet with Done.
+/// What a teacher sees, from Me's row and the one-time screen's See the whole list (L8a): the
+/// intro's own page, in a sheet with Done.
 struct ConsentSheet: View {
     @Environment(\.dismiss) private var dismiss
 
