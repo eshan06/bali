@@ -11,12 +11,13 @@ export type Db = ReturnType<typeof createDb>;
  * The caller owns the URL (the API's env module validates it); this module
  * never reads process.env itself.
  *
- * `max` sizes the pool (the load harness's runs, #336); unset, postgres.js's
- * own 10. Only ever a number here: postgres.js 3.4.9 reads `?max=` in the URL
- * and PGMAX as text, and a pool of "20" is one connection, as is a `max` key
- * passed undefined.
+ * `max` sizes the pool (the load harness's runs, #336); unset, 10, postgres.js's
+ * own default. Always passed, and always a number (DECISIONS 2026-10-22): passed
+ * none, postgres.js 3.4.9 sizes the pool by PGMAX or a `max` in the URL, read
+ * as text, and a pool of "20" is one connection, as is a `max` key passed
+ * undefined. Passed one, it reads neither.
  */
-export function createDb(databaseUrl: string, { max }: { max?: number } = {}) {
-  const sql = postgres(databaseUrl, max === undefined ? {} : { max });
+export function createDb(databaseUrl: string, { max = 10 }: { max?: number } = {}) {
+  const sql = postgres(databaseUrl, { max });
   return drizzle(sql, { schema });
 }
