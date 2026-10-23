@@ -10,9 +10,10 @@ is in `docs/DECISIONS.md`, and finished history is word for word in
 
 _Last updated: 2026-10-23 (Central) — The consent list's two new lines and the one-time screen after
 the update (L8a, #L8A-PR; `docs/DECISIONS.md`, 2026-10-23), L8's first PR on the Mac: Join's
-preview, the intro's second page and Me's What your teacher sees list the answers lines, and a
-student in a class who has not seen the list as it stands on this phone sees the two lines once,
-never over a session's screens (the worker's call on who, awaiting the owner). Before it, the
+preview, the intro's second page and Me's What your teacher sees list the answers lines, as does
+the portal's help page (the one portal edit the owner allowed across the lanes), and a student in
+a class who has not seen the list as it stands on this phone sees the two lines once, never over a
+session's screens (the worker's call on who, awaiting the owner). Before it, the
 database pool's guard (#439). Next on the Mac: L8's answer card, then M8; on the Windows PC, the
 four steps for sessions before the pilot's first class, which wait for the owner's word._
 

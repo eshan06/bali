@@ -28,11 +28,13 @@ const TEACHER_SEES = [
   'When you tap in, and when class ends for you',
   'When you unlock, and the reason if you share one',
   'If you leave this class',
+  "Your answers to questions, counted only in the class's totals",
 ];
 
 const TEACHER_NEVER_SEES = [
   "Your screen, your apps, or what's in them",
   'Your messages or where you are',
+  'Which answer is yours, or whether you answered',
 ];
 
 /** A list of what a teacher sees, in a calm grey box (SupportPage), two side by side. */

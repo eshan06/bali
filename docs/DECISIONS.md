@@ -39,8 +39,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   ARCHITECTURE's words:** decision 11 says "the two new lines and Continue"; the approved board also
   draws See the whole list, built as drawn. **The portal's help page** says the list word for word
   (`apps/web/src/app/support/support.test.ts` reads `ConsentCard`'s lists from `JoinView.swift`, and
-  pins what a teacher sees at 5 lines), so it gains the same two lines in the same change; that is
-  the Windows PC's lane (the owner, 2026-10-23), so the Mac pushed this branch for it and stopped.
+  pins what a teacher sees at 5 lines, now 6), so it gains the same two lines in this PR: the one
+  portal edit the owner allowed across the lanes (2026-10-23: "add the two lines to the Help page
+  and its test's count in L8a's PR. Only that, nothing else in the portal").
   **Rode along:** the intro's second page, which now
   outgrows the screen, keeps the board's 24 pt between its last line and the dots when scrolled to its
   end. **Weighed:** a phone-wide flag (a second student would inherit it, for no less code than a key
