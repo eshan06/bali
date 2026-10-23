@@ -600,29 +600,11 @@ const NO_EVENT_ID: Record<string, { why: string; repeat?: Repeat }> = {
 };
 
 /**
- * What fails today, each with its one-line reason and exactly what the check finds. Only ever
- * shrinks: the step that fixes one takes its entry off (part 2 of the pre-pilot step took Create
- * class's, 2026-10-23; part 3, the other four, where an id is compared as text: docs/DECISIONS.md,
- * 2026-10-22, #437).
+ * What fails today, each with its one-line reason and exactly what the check finds: none since the
+ * pre-pilot step's part 3 (2026-10-23), which took off the last four, where the engine compared an
+ * id as text (docs/DECISIONS.md, 2026-10-22, #437), so a route that fails the check fails here.
  */
-const LEFT: Record<string, { why: string; fails: string[] }> = {
-  'DELETE /v1/decks/:id': {
-    why: '`removeDeck` compares the id the deck holds as text, so a removal resent in another case is `404 deck_not_found`',
-    fails: ['resent in upper case: 404 deck_not_found'],
-  },
-  'POST /v1/taps': {
-    why: '`unlocksAwaitingTap` and `lockTap` match the tap’s id as text, so an unlock kept under it in another case is never filed',
-    fails: ['sent first in upper case: wrote events +1, where first in lower case +2'],
-  },
-  'POST /v1/taps/:eventId/unlock': {
-    why: '`recordedReason` reads the reason’s change under the id as sent, as text, so a replay in another case answers the reason first recorded',
-    fails: ['resent in upper case: answered otherwise (reason)'],
-  },
-  'POST /v1/sessions/:id/unlock': {
-    why: '`recordedReason` reads the reason’s change under the id as sent, as text, so a replay in another case answers the reason first recorded',
-    fails: ['resent in upper case: answered otherwise (reason)'],
-  },
-};
+const LEFT: Record<string, { why: string; fails: string[] }> = {};
 
 let db: Database;
 let closeDb: () => Promise<void>;

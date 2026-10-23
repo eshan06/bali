@@ -109,6 +109,50 @@ describe('PATCH /v1/unlocks/:eventId', () => {
     expect(await changesIn(session.id)).toHaveLength(2);
   });
 
+  it('the unlock’s own retry, in either letter case, answers the reason now on both its routes (#442, part 3)', async () => {
+    // A client may mint its ids in upper case (Foundation's `uuidString`); the change names the
+    // unlock as Postgres keeps it, lower-case, and the replay reads it so.
+    const { session, unlockId, token, act } = await unlocked('reason-wire-unlock-replay');
+    const send = (url: string, eventId: string) =>
+      authedInject(ctx.app, token, {
+        method: 'POST',
+        url,
+        payload: { eventId, deviceTime: new Date().toISOString(), reason: 'other' },
+      });
+    await patch(token, unlockId, { reason: 'nurse', eventId: randomUUID() });
+    for (const [sessionId, id] of [
+      [session.id.toUpperCase(), unlockId.toUpperCase()],
+      [session.id, unlockId],
+    ] as const) {
+      const res = await send(`/v1/sessions/${sessionId}/unlock`, id);
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toMatchObject({ outcome: 'replay', state: 'unlocked', reason: 'nurse' });
+    }
+
+    // One sent under its tap and filed there (decision 11): the same.
+    const tapId = randomUUID();
+    await tapIn(db, { ...act(), eventId: tapId });
+    const underId = randomUUID();
+    expect((await send(`/v1/taps/${tapId}/unlock`, underId)).json()).toMatchObject({
+      outcome: 'applied',
+      reason: 'other',
+    });
+    await patch(token, underId, { reason: 'bathroom', eventId: randomUUID() });
+    for (const [tap, id] of [
+      [tapId.toUpperCase(), underId.toUpperCase()],
+      [tapId, underId],
+    ] as const) {
+      const res = await send(`/v1/taps/${tap}/unlock`, id);
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toMatchObject({
+        outcome: 'replay',
+        state: 'unlocked',
+        reason: 'bathroom',
+      });
+    }
+    expect(await changesIn(session.id)).toHaveLength(2);
+  });
+
   it('names only the caller’s own unlock: anyone else’s is not found, and no token is a 401', async () => {
     const { teacher, session, unlockId } = await unlocked('reason-wire-authz');
     const stranger = await unlocked('reason-wire-authz-other');
