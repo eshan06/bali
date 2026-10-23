@@ -49,10 +49,21 @@ a real decision? Add a dated entry at the top: what was decided and why.
   create uncommitted waits, then is answered with it; two teachers sending one id: one class, one
   conflict); #442's check, Create class off its list, its scenario now renaming the class, giving it a
   new code and starting it between the sends, so a replay that only echoed fails; and New class's test
-  drives the page (jsdom, Testing Library), so `source-text-tests.test.ts` lists 32. **Checked:** with
-  the id dropped from the insert, #442's check fails ("wrote classes +1" in both cases); minting an id
-  at every press, or keeping one past a close, fails the dialog's tests. **Seen:** SEEN. **Left:**
-  part 3, the three places #437 found comparing an id as text.
+  drives the page (jsdom, Testing Library), so `source-text-tests.test.ts` lists 32, pinning what the
+  old one did, as santa's round 1 asked (a dialog the browser closes mid-create keeping its name and
+  id, a Copy's answer going with its class, the form's own submit going nowhere). The shared
+  `CreateClassRequest` names the optional `eventId`. **Checked:** with the id dropped from the insert,
+  #442's check fails ("wrote classes +1" in both cases); minting an id at every press, keeping one past
+  a close, or losing any of those three, fails the dialog's tests. **Seen** in headless Chrome on dev
+  as the demo teacher, the preview serving this branch, every create held, failed or answered by a
+  stand-in over CDP and never let through (the teacher's 5 classes before and after): Create class held
+  as Creating…, the name read-only; no answer, said 10.0 s after the press, "Couldn't reach Bali…" with
+  Try again, as ClassesStates draws it; Try again pressed and held again, under the first press's id;
+  answered, "Period 4 Biology is ready", focus on its title; Done, focus back on New class; the next
+  create under a new id, refused as another teacher's in the drawn words with Create class, whose next
+  press went under another (`.claude/shots/create-class-id/`). **Left:** part 3, the three places #437
+  found comparing an id as text; the demo and `dev:teacher` still create with no id, an old client's
+  way, which works as before.
 
 - **2026-10-23** — **S10 closed with no code, and the push's wait screen picked (#446; the owner's
   rulings, in chat, each as recommended).** *S10* ("a Release build never ships dev's API or user
