@@ -642,6 +642,13 @@ export interface RosterResponse {
 // POST /v1/classes — a teacher creates a class (the join code is server-generated).
 export interface CreateClassRequest {
   name: string;
+  /**
+   * Client idempotency key, a UUIDv7 (rule 4; added 2026-10-23, so optional: `/v1` is
+   * additive-only, and a create with none makes a class at every call, as before). Resent under it,
+   * the create answers the class it made, as it is now; another teacher's is `409
+   * event_id_conflict`.
+   */
+  eventId?: string;
 }
 
 /** A class as its owning teacher manages it — the POST/GET/PATCH /v1/classes/{id} body. */

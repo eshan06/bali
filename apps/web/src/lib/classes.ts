@@ -1,4 +1,4 @@
-import type { ClassDetail, MeClassWithTeacher } from '@bali/shared';
+import type { ClassDetail, CreateClassRequest, MeClassWithTeacher } from '@bali/shared';
 
 import { type ApiClient, ApiError, NetworkError, SAVE_TIMEOUT_MS } from './api-client';
 import { CANT_CREATE, CANT_REACH, errText } from './errors';
@@ -95,10 +95,7 @@ export type CreateAnswer =
   | { kind: 'final'; message: string };
 
 /** One create: the class's name, and the `eventId` it is sent under. */
-export interface CreateAttempt {
-  name: string;
-  eventId: string;
-}
+export type CreateAttempt = Required<CreateClassRequest>;
 
 /**
  * Create a class (`POST /v1/classes`) under the attempt's `eventId`, within a save's limit, its
