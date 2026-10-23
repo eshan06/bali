@@ -867,6 +867,14 @@ struct AppTests {
         let following = Task { await phone.follow(signIn) }
         defer { following.cancel() }
         try await until { phone.signedIn == true }
+        // The engine's truth lists her in Period 3.
+        var listed = SyncState()
+        listed.me = try BaliJSON.makeDecoder().decode(
+            MeResponse.self,
+            from: Data(
+                #"{"user":{"id":"ana","role":"student","displayName":"Ana"},"classes":[{"id":"p3","name":"Period 3","enrollmentId":"e3"}],"session":null}"#
+                    .utf8))
+        phone.synced(listed)
         // A phone of the test's own runs no enforcer: the router shows Starting, so only the
         // deletion's screen is asked after here, never Me.
         #expect(phone.deleting == .none && phone.shown.screen != .deleting)
@@ -883,6 +891,10 @@ struct AppTests {
         #expect(await signIn.deletionPending() && !keychain.empty)
         #expect(phone.inClass == nil && phone.listSeenBy == nil)
         #expect(notes.allSatisfy { defaults.object(forKey: $0) == nil })
+        // A state the engine sent before it forgot her, still listing her in Period 3, landing
+        // late: she isn't kept in a class again.
+        phone.synced(listed)
+        #expect(phone.inClass == nil && defaults.object(forKey: Phone.inClassKey) == nil)
         let sent = (deletions: await server.deletions, deleteUsers: await server.deleteUsers)
         #expect(sent.deletions == 1 && sent.deleteUsers == 1)
         // A relaunch: a fresh phone over the same Keychain finds the sign-in waiting to be deleted.
@@ -3266,7 +3278,7 @@ struct AppTests {
     }
 
     @Test(
-        "The live lesson (L8) is followed for the class in session, tapped in or not, once this phone has shown the student the consent list as it stands (the owner's ruling, 2026-10-23): before, nothing polls and no card shows, and the list shown — the one-time screen's Continue, in front mid-class — follows it at once. Its poll runs only while the app is in front: none behind, once it goes or from the start, and run again as it comes back (the owner's ruling, #330); a sign-out drops it, its poll with it (#331), and keeps the list's record, so the same student signing back in follows it again"
+        "The live lesson (L8) is followed for the class in session, tapped in or not, once this phone has shown the student the consent list as it stands (the owner's ruling, 2026-10-23): before, nothing polls and no card shows, and the list shown — the one-time screen's Continue, in front mid-class — follows it at once. Its poll runs only while the app is in front: none behind, once it goes or from the start, and run again as it comes back (the owner's ruling, #330); a sign-out drops it, its poll with it (#331), and keeps the list's record, so the same student signing back in follows it again; and a read saying the session is over drops it for good"
     )
     func lessonFollowed() async throws {
         let defaults = UserDefaults.standard
@@ -3300,6 +3312,14 @@ struct AppTests {
         #expect(await server.polls == out, "polled behind the app from the start")
         phone.setForeground(true)
         try await until { phone.card?.question.id == "q" }
+        // The bell: a read saying the session is over drops the lesson, its poll stopped, and a read
+        // of `GET /v1/me` still listing the session follows it no more.
+        await server.end()
+        try await until { phone.lesson == nil }
+        let ended = await server.polls
+        phone.synced(try classInSession())
+        try await Task.sleep(for: .seconds(2.5))
+        #expect(await server.polls == ended && phone.card == nil, "followed past the bell")
     }
 
     @Test(
@@ -3948,15 +3968,19 @@ private func lessonRead(question: String) throws -> LessonState {
 /// question `q`, open, with the answer it holds — and each answer to it, kept where its id sorts
 /// after the one held, as the API keeps one (decision 4), each taken one listed. An answer given a
 /// refusal (`refuse`) gets it instead — no answer at all for a nil status — held first where said,
-/// until the test lets it go. Anything else gets no answer.
+/// until the test lets it go. Once the test ends the session (`end`), the presentation says it is
+/// over. Anything else gets no answer.
 private actor LessonServer: HTTPTransport {
     private(set) var polls = 0
     private(set) var answers: [(option: Int, eventId: String)] = []
     private var held: (option: Int, eventId: String)?
     private var refusals: [(status: Int?, body: String, held: Bool)] = []
     private var waiting: CheckedContinuation<Void, Never>?
+    private var over = false
 
     var holding: Bool { waiting != nil }
+
+    func end() { over = true }
 
     func refuse(_ status: Int?, _ body: String = "", held: Bool = false) {
         refusals.append((status, body, held))
@@ -3975,6 +3999,9 @@ private actor LessonServer: HTTPTransport {
         guard let url = request.url else { throw URLError(.badURL) }
         var (status, body) = (200, "")
         switch "\(request.httpMethod ?? "") \(url.path())" {
+        case "GET /v1/sessions/s/presentation" where over:
+            polls += 1
+            body = #"{"running":false,"question":null,"slide":null,"phone":null}"#
         case "GET /v1/sessions/s/presentation":
             polls += 1
             let answer = held.map { #"{"option":\#($0.option),"eventId":"\#($0.eventId)"}"# } ?? "null"

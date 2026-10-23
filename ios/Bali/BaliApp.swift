@@ -832,12 +832,15 @@ final class Phone {
 
     /// The account deleted on Bali's server (Delete account, the gap's fallback's too): the phone's
     /// two notes under the student's id, `inClass` and `listSeenBy`, go from its defaults (the
-    /// owner's ruling, 2026-10-23). A sign-out keeps them, so the same student is never asked again.
+    /// owner's ruling, 2026-10-23), and so does the engine's `me`, whose classes a state it sent
+    /// before would otherwise keep her in again (`synced`). A sign-out keeps them, so the same
+    /// student is never asked again.
     private func forgetNotes() {
         (inClass, listSeenBy) = (nil, nil)
         for key in [Phone.inClassKey, Phone.listSeenByKey] {
             UserDefaults.standard.removeObject(forKey: key)
         }
+        forgetMe()
         follow()
     }
 

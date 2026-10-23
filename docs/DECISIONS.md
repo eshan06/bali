@@ -32,8 +32,13 @@ a real decision? Add a dated entry at the top: what was decided and why.
   from its defaults with the account, and a sign-out keeps them as before, so the same student isn't
   asked again (from #443's Claude Review privacy WARN). *The worker's reading of "a finished Delete
   account":* once Bali's server has deleted the account, its Cognito sign-in deleted or still to go
-  (`deleted`, `signInNotDeleted`), so a student who never presses the pending screen's Try again
-  leaves no note either; the gap's fallback's deletion, the same call, too. A rider in this PR.
+  (`deleted`, `signInNotDeleted`), so a student who leaves the pending screen without its Try again
+  leaves no note either; the gap's fallback's deletion, the same call, too. One case keeps them:
+  the app closed after the server's deletion but before its answer reached the phone, which a
+  relaunch finds pending; the pending screen's Try again then clears them (left as is, its
+  reachability doubtful; reported to the conductor). The engine's `me` is
+  forgotten with them, as at another student's sign-in: a state it sent before, still listing her
+  classes, would otherwise keep her in a class again (santa's round 1). A rider in this PR.
   **The answer** (decision 5): a tap sends it in one request through `LiveLesson.answer`, never the
   outbox, and another changes it until the close; the answer Bali holds sends nothing again, unless
   the last pick didn't send; of picks whose answers cross only the last one's is said, and one for a
@@ -53,9 +58,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the conductor). Two of a student's classes in session at once follow the first listed. A Hide
   doesn't outlive the app's run. `LessonState` gains a public init, for the app's fixtures and tests.
   Tests: `LessonTests` (BaliOutbox: which lesson, each state's looks and line),
-  `AppTests.lessonFollowed` (the wait for the list, the poll only in front, the sign-out),
-  `AppTests.lessonAnswers`, `AppTests.deleteAccountWiring` (the notes gone with the account) and
-  `AppTests.deleteFromMeUnchecked` (kept when nothing is deleted).
+  `AppTests.lessonFollowed` (the wait for the list, the poll only in front, the sign-out, the
+  bell), `AppTests.lessonAnswers`, `AppTests.deleteAccountWiring` (the notes gone with the account,
+  and not back from a late state) and `AppTests.deleteFromMeUnchecked` (kept when nothing is
+  deleted).
 
 - **2026-10-23** — **S10 closed with no code, and the push's wait screen picked (#446; the owner's
   rulings, in chat, each as recommended).** *S10* ("a Release build never ships dev's API or user
