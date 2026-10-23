@@ -54,6 +54,60 @@ a real decision? Add a dated entry at the top: what was decided and why.
   any join). Tests: `ScreenTests.listChanged` and `ScreenTests.cuts` (BaliOutbox), `AppTests.consentList`,
   `AppTests.listOnce` and `AppTests.waitingFits`.
 
+- **2026-10-23** — **The pre-pilot event-id step, part 1 of 3 (#442; the owner's go, 2026-10-23): a
+  check resends every data-changing route's request under its event id, in either case, and the five
+  routes that fail today are its list, which only shrinks.** Tests only; no product code changed.
+  `apps/api/test/event-id-repeat.test.ts` walks the route table the authorization matrix walks
+  (`routeTable()`, which the matrix's guard holds to its MATRIX row for row), so no export was
+  needed: every route but a GET or its HEAD changes data, and each one has a scenario there or is
+  listed as taking no event id by design, with why. A new route fails its guard until it is one or
+  the other, and a route listed as taking none that starts taking one fails it too. **What it sends
+  and asserts.** Each scenario runs in a world of its own (a class, its teacher and student, its
+  session running): the request with a fresh event id, every id in it lower case; then the same
+  again; then the same with every id in its path and body in upper case. Each resend must be
+  answered 2xx, never `409` for its own id, with the replay, the truth now: the first answer with
+  `outcome: 'replay'`, unless the route's docs say its replay otherwise (`already_deleted`,
+  `not_registered`, `already_enrolled`, `already_removed`, `{ passed: true }`, an extend's
+  `extended`, a deck create's fresh upload URL). And it must add or remove no row: every table in
+  the schema is counted around each send, so a new table is counted too, and a guard holds the count
+  to every table the schema defines and to the rows a world adds. A resend that only rewrote a row
+  in place shows where its answer does, an outcome that is no replay. Where a later write of the
+  same caller's changes what a replay must answer, the scenario makes it between the sends, so a
+  replay that only echoed its first answer fails: the unlock's reason changed (A20) on both unlock
+  routes, and a reason change changed again; the name renamed (A8); the push token registered again;
+  the bell moved by another extend; the state moved by an unlock, or protection on or off (#167);
+  the question closed; the answer, the draft and the slide changed again (decisions 4 and 12, M3a).
+  *The conductor's call, awaiting the owner:* each scenario also runs with its request sent first in
+  upper case, then again so, then in lower case, everything else in its world as the server prints
+  ids, in lower case, and the two worlds must write the same rows. A client may mint either case
+  (Foundation's `uuidString` writes upper), and one of #437's three spots shows only so: an unlock
+  that landed first, naming its tap in another case than the tap's own. The three sends alone never
+  reach it: the tap lands at its first send, in the case of the unlock kept before it, and its
+  resend in upper case is a replay, which files nothing. **No event id by design**, each found so in
+  the code and sent again by the check as the others are, its answers unread, its resends adding no
+  row: Start (one running session a class, its partial unique index: a second Start is answered
+  `existing`, that session), End (a second is `already_ended`, nothing recorded), a block's
+  registration (one live block a tag: the tag again is answered its block), a rename or a new join
+  code (`PATCH /v1/classes/{id}`: the class's one row rewritten, nothing recorded; a second new code
+  replaces the first, and the answer names the one the class holds), and the check-in (it moves
+  `last_seen_at` alone, data-model decision 7, and a silence's `came_back` once, by its marker). And
+  the sweep and its Phase 1 alias (`POST /internal/sweep`, `/internal/sessions/expire`): idempotent
+  by design (hosting decision 3), listed but not sent here, since it sweeps every world of the file
+  at once; `internal.test.ts` sends it twice. #432's four, and three more. **The list (`LEFT`)**,
+  each entry with its one-line reason and exactly what the check finds: Create class (`POST
+  /v1/classes`), no event id, so every resend makes another class (part 2); and part 3's three
+  spots, on four routes (DECISIONS 2026-10-22, #437): a deck's removal resent in upper case is `404
+  deck_not_found` (`removeDeck` compares the id as text); a tap sent in upper case never files the
+  unlock kept under it in lower case, one event fewer than the same tap in lower case
+  (`unlocksAwaitingTap`, and `lockTap`'s lock, match the id as text); and an unlock resent in upper
+  case after its reason changed answers the reason first recorded, on `POST
+  /v1/sessions/{id}/unlock` and `POST /v1/taps/{eventId}/unlock` alike (`recordedReason`). No
+  surprise: the other 22 routes with an event id pass both ways, and the five sent again double
+  nothing. A route on the list that passes, or fails otherwise, fails the check until its entry says
+  so. **Checked**: with the three compares made case-blind in a scratch copy of the engine, exactly
+  their four entries fail as fixed; with the extend route made to drop its id, the check fails it
+  (`wrote events +1`, in both cases). About 5 s on PGlite.
+
 - **2026-10-23** — **`zod` 4.6.6, for today's high advisory (#444); *the conductor's call, awaiting
   the owner*.** From today `npm audit --omit=dev --audit-level=high`, the first step of CI's
   "Typecheck · lint · build" (S5), failed on `zod` below 4.6.6, so every PR failed CI (#442 waited on

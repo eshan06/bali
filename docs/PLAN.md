@@ -13,9 +13,10 @@ the update (L8a, #443; `docs/DECISIONS.md`, 2026-10-23), L8's first PR on the Ma
 preview, the intro's second page and Me's What your teacher sees list the answers lines, as does
 the portal's help page (the one portal edit the owner allowed across the lanes), and a student in
 a class who has not seen the list as it stands on this phone sees the two lines once, never over a
-session's screens (the worker's call on who, awaiting the owner). Before it, `zod` 4.6.6 (#444).
-Next on the Mac: L8's answer card, then M8; on the Windows PC, the pre-pilot event-id check's part
-1 (#442, the owner's go); the other three pre-pilot steps wait for the owner's word._
+session's screens (the worker's call on who, awaiting the owner). Before it, the pre-pilot event-id
+step's part 1 (#442). Next on the Mac: L8's answer card, then M8; on the Windows PC, that step's
+part 2, Create class's event id, then part 3, the three places; the other three pre-pilot steps
+wait for the owner's word._
 
 ## Now
 
@@ -340,9 +341,9 @@ Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect acc
 - Left for the owner on finished steps' lines (in full in `docs/PLAN-ARCHIVE.md`): P7's App Review path (decide its section 4, then fill the accounts and paste); P6's restore drill, its result recorded once a backup exists; S4's CSP check on the deployed portal after each Next upgrade (due now, for 15.5.28, #435); ⚖️ whether C7-server's yes rides Other Data Types; device rounds still marked pending (B5b's round 2, steps 7 and 9; B5c's round 3, steps 1 and 3; round 4, B6a and B6b); smaller calls on F (a refused tap's end-of-day drop or dismiss button; the waiting card's Tap in), B6c-2 (`.keep`/`.retry`), B5b (a rule for a replaced window, a code step to schedule) and D2 (Present's key per class).
 - ✅ **Answered** (the owner, 2026-10-14; DECISIONS 2026-10-14): PV5b's whole-page error kept; its review notes folded into PV15 and PV17a; PV4c's two test limits left.
 - 🔧 Before the pilot's first class: the owner's prod block gets a fresh code (its first reached the repo's history in #228), and a session builds an owner command that retires a block, to retire the old code (`docs/PILOT.md`, setup step 6). The portal's three class-page controls are built (P10, P11).
-- **Before the pilot's first class, four steps for sessions** (the owner's workflow review, 2026-10-13; one PR each; after the redesign's PV17c, the owner, 2026-10-14); not started, they wait for the owner's word:
+- **Before the pilot's first class, four steps for sessions** (the owner's workflow review, 2026-10-13; one PR each; after the redesign's PV17c, the owner, 2026-10-14); the event-id check under way (the owner's go, 2026-10-23), the other three wait for the owner's word:
   - a column-level privacy test: every column classified personal or not, each personal one placed by the privacy paths that handle it (the account deletion, the disposal, the retention run, the export), so a new column fails until it is placed; FERPA covers university students too;
-  - a repeated-`event_id` check on every data-changing route, driven from the authorization matrix's route list (#319's survey found three that still compare an id as text, so a retry in upper case misses: a deck's removal, a tap with the unlock sent under it, and an unlock's replay after its reason changed; DECISIONS 2026-10-22);
+  - a repeated-`event_id` check on every data-changing route, driven from the authorization matrix's route list, in three parts: part 1, the check ✅ (#442; DECISIONS 2026-10-23), its list the five routes that fail today; next part 2, Create class's event id (it takes none, so a resend makes a second class: #432), then part 3, the three places #319's survey found comparing an id as text, so a retry in upper case misses (a deck's removal, a tap with the unlock sent under it, and an unlock's replay after its reason changed; DECISIONS 2026-10-22), each part taking its entries off the list;
   - pilot deploy rules: no deploys during class hours, and a documented one-command rollback in `docs/RUNBOOKS.md`;
   - Dependabot PRs can't pass Claude Review (the action rejects bot actors: add `allowed_bots` for dependabot in `claude-review.yml`, bundled with the next edit to that protected file); until then such a PR waits, as #427 (`vite` 8.3.4, dev only) does. #309 (`next` 15.5.27) is superseded by 15.5.28 (#435), and Dependabot closes it itself once main has it.
 - 🔧 The Cognito sign-in deleter: runbook 9 (`docs/RUNBOOKS.md`) — per environment an IAM policy

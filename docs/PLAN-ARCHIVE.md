@@ -10,6 +10,15 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-23 (Central) — The pre-pilot event-id step, part 1 of 3 (#442;
+`docs/DECISIONS.md`, 2026-10-23), the owner's go: a check resends every data-changing route's request
+under its event id, in lower and upper case, and fails a second row, a `409`, or an answer that isn't
+the truth now. Five routes fail today and are its list, which only shrinks: Create class, which takes
+no event id, and the three places #437 found comparing an id as text, on four routes. Tests only;
+nothing anyone sees changes. Before it, `zod` 4.6.6, for today's high advisory (#444). Next on the
+Windows PC: part 2, Create class's event id, then part 3, the three places; the other three
+pre-pilot steps wait for the owner's word. On the Mac, the phone's L8 and M8._
+
 _Last updated: 2026-10-23 (Central) — `zod` 4.6.6 (#444; `docs/DECISIONS.md`, 2026-10-23), for
 today's high advisory, which failed CI's audit on every PR (the conductor's call, awaiting the
 owner). It reached the API: a question's options, at most 6, were each checked before their count,
