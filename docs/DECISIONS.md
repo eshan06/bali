@@ -54,6 +54,62 @@ a real decision? Add a dated entry at the top: what was decided and why.
   any join). Tests: `ScreenTests.listChanged` and `ScreenTests.cuts` (BaliOutbox), `AppTests.consentList`,
   `AppTests.listOnce` and `AppTests.waitingFits`.
 
+- **2026-10-23** — **`zod` 4.6.6, for today's high advisory (#444); *the conductor's call, awaiting
+  the owner*.** From today `npm audit --omit=dev --audit-level=high`, the first step of CI's
+  "Typecheck · lint · build" (S5), failed on `zod` below 4.6.6, so every PR failed CI (#442 waited on
+  that alone), and main's next push would have too. GHSA-mrhx-c7xc-m3w5 (high; CVE-2023-54404,
+  reviewed by GitHub today), "Zod can exhaust memory while validating oversized constrained
+  collections": through 4.6.5 the size bound of an array, a set or a map (`.max()`, `.length()`,
+  `.size()`) ran only after every element was parsed, each failing element adding an issue, so it
+  bounded nothing; 4.6.6 refuses an oversized one before parsing any element (zod's #6652), but only
+  while its size checks come before every other check. A collection with no bound still parses
+  every element (zod's `abortEarly`, #6475, closed unmerged).
+  **Why now, without the owner:** CLAUDE.md's standing order (a security hole is fixed now, the owner
+  told after), and CI blocked for every PR. **Bali was exposed, to a signed-in teacher:** one bounded
+  collection reaches a request body, a question's `options` (`z.array(Text(200)).min(2).max(6)`,
+  `OpenBody` in `apps/api/src/routes/questions.ts`), on `POST /v1/sessions/{id}/questions`, `POST
+  /v1/saved-questions` and `PUT /v1/saved-questions/{id}`, each parsed after its teacher check, so no
+  student and no stranger reached it. Fastify's body limit, its default 1 MiB (the API sets none),
+  held a request to about 524,000 elements, and the API's 400 lists every issue in `details`.
+  Measured on this PC through the route: on 4.6.5 a 1 MiB body of `options: [0, 0, …]` took
+  0.54–0.66 s of the API's one process and was answered with 524,249 details, 45 MB (`["", "", …]`:
+  349,499 details, 16 MB, in about 0.4 s), and the same schema's parse, measured alone, held about
+  208 MB of heap in its issues and their details (107 MB); on 4.6.6 each is one `too_big` detail, 143
+  bytes, in 7–10 ms, about the time it takes to read the body. With the account budget's burst of
+  120, one teacher could have kept the API's one process busy for over a minute and had it send
+  gigabytes (#438: the process, not the database, is what runs out). No other request schema has an
+  array, a set, a map or a record; the list in `env.ts` is `AUTH_AUDIENCE`'s, read at boot from the
+  deploy's settings. **The bump:** `apps/api`'s range is `^4.6.6`, its floor raised from `^4.6.5`, so
+  no install resolves a vulnerable `zod`; the lockfile moves its one `zod`, at the root, from 4.6.5 to
+  4.6.6, and nothing else. Resolved at the root, never with `-w` (#435's trap, below); even there,
+  npm resolving the raised range in place nested the new copy under `apps/api`, so the lockfile's
+  `zod` entry was taken out and resolved afresh at the root as of the day 4.6.6 was the newest (`npm
+  install --before=2026-10-12`); a plain `npm install` keeps it. 4.6.7 (2026-10-12), whose release
+  notes list only its version's commit, is left to a later install, which the range allows. **What
+  else 4.6.6 changes:** `z.record`'s types (zod's #6645; the API has no record), and the rest is docs
+  and zod's release workflow. A request with too many options is refused as before, with the same one
+  detail ("Too big: expected array to have <=6 items"); what zod listed beside it is gone: each
+  option's issue, and the body's own check that `correctOption` names an option, which no longer
+  runs once the count fails (seven options and `correctOption: 9`: two details on 4.6.5, one now).
+  The other fields are still checked. **A test holds it** (santa's Reviewer B's blocker, by
+  CLAUDE.md's regression-test rule, where the conductor's brief asked for the version alone: *the
+  conductor's call, awaiting the owner*): the abuse suite (`abuse.test.ts`) sends 10,000 options to
+  each of the three routes and expects one detail, on `options`, and nothing written. It failed on
+  4.6.5 (10,001 details), and fails on 4.6.6 too with a check put before the count, which a comment
+  at `OpenBody` says; no other test changed.
+  **Its supply chain:** signed by the registry, with provenance (published by zod's GitHub release
+  workflow, approved by its maintainer), built from a commit whose tree is `9c219833`'s in zod's
+  history; zod's release notes say six malicious commits pushed to its `main` on 2026-09-21 with a
+  compromised credential were reverted that day and removed from its history, none ever published.
+  **Left,** outside this step: a list with no bound, which zod still parses whole, every issue listed
+  in the 400 with no cap; no request body has one (the snapshot's request arrays are the three
+  `options`, `maxItems` 6), and nothing yet stops a new route adding one (santa's Reviewer B: a check
+  over `contracts/openapi.json` that every request array has a bound would). Fastify 5.12.5's
+  GHSA-389g-gv7q-r4x8 (low, below CI's gate), which doesn't apply (the API defines no Fastify header
+  schemas), the owner's or Dependabot's; and the dev tools that never ship (vite, vitest), as #435
+  left them. **Checked:** CI's audit gate passing (fastify's low left), `npm audit signatures`,
+  typecheck, lint, `npm test` and the in-memory demo.
+
 - **2026-10-22** — **The API's database pool can never silently shrink to one connection (#439, a
   guard from #336's finding, #438): the API always hands postgres.js its own size, so `PGMAX` and a
   `max` in `DATABASE_URL` are ignored, and the boot says so by name. *The conductor's call, awaiting

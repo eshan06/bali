@@ -13,9 +13,9 @@ the update (L8a, #443; `docs/DECISIONS.md`, 2026-10-23), L8's first PR on the Ma
 preview, the intro's second page and Me's What your teacher sees list the answers lines, as does
 the portal's help page (the one portal edit the owner allowed across the lanes), and a student in
 a class who has not seen the list as it stands on this phone sees the two lines once, never over a
-session's screens (the worker's call on who, awaiting the owner). Before it, the
-database pool's guard (#439). Next on the Mac: L8's answer card, then M8; on the Windows PC, the
-four steps for sessions before the pilot's first class, which wait for the owner's word._
+session's screens (the worker's call on who, awaiting the owner). Before it, `zod` 4.6.6 (#444).
+Next on the Mac: L8's answer card, then M8; on the Windows PC, the pre-pilot event-id check's part
+1 (#442, the owner's go); the other three pre-pilot steps wait for the owner's word._
 
 ## Now
 
@@ -81,6 +81,12 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
   advisories, which failed CI's audit on every PR, fixed while the owner is away (the conductor's
   call, awaiting the owner); the portal used none of their paths. Dependabot's #309 is superseded.
   Left for the owner: S4's CSP check on the deployed portal (Open owner items).
+- **`zod` 4.6.6 (2026-10-23)** ✅ (#444; DECISIONS 2026-10-23): today's high advisory
+  (GHSA-mrhx-c7xc-m3w5), which failed CI's audit on every PR, fixed (the conductor's call, awaiting
+  the owner). A signed-in teacher could reach it: a question's `options`, at most 6, on three
+  teacher routes, were each parsed before their count, so a 1 MiB body held about 200 MB of the
+  API's memory and was answered with 45 MB; now one line, at once, held by a test in the abuse
+  suite. Left: fastify's low advisory, which doesn't apply.
 - **The database pool's guard (2026-10-22)** ✅ (#439; DECISIONS 2026-10-22), from #336's finding,
   the conductor's call, awaiting the owner: `createDb` always passes postgres.js a number, 10 unless
   the load harness names one, so `PGMAX` or a `max` in `DATABASE_URL` is ignored, and the boot says so

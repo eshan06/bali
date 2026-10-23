@@ -76,6 +76,9 @@ const OpenBody = z
   .object({
     eventId: z.uuidv7(),
     prompt: Text(QUESTION_PROMPT_MAX_LENGTH, true),
+    // The count's checks come first, so zod refuses a list past them before it parses any option
+    // (zod 4.6.6, GHSA-mrhx-c7xc-m3w5). Any other check put before either of them parses every
+    // option again, one issue each in the 400's details; abuse.test.ts holds the order.
     options: z
       .array(Text(QUESTION_OPTION_MAX_LENGTH))
       .min(QUESTION_OPTIONS_MIN)
