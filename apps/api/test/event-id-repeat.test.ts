@@ -19,6 +19,7 @@ import {
   registerPushToken,
   renameStudent,
   replaceSavedQuestion,
+  schema,
   showSlide,
   startSession,
   tapIn,
@@ -27,6 +28,7 @@ import {
 } from '@bali/db';
 import type { UnlockReason } from '@bali/shared';
 import { eq, type SQL, sql } from 'drizzle-orm';
+import { getTableConfig, PgTable } from 'drizzle-orm/pg-core';
 import type { FastifyInstance, InjectOptions, RouteOptions } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
@@ -58,9 +60,10 @@ import { makeTestIssuer, type TestIssuer } from './helpers/test-issuer.js';
  * case, resent so, then in lower case. Everything else in the world, the scenario's own setup and
  * what happens between the sends, is sent as the server prints ids, in lower case. Each resend must
  * be answered 2xx with the replay, the truth now (the first answer, `outcome: 'replay'`, unless the
- * scenario says what its route's replay is), and write no row: every table in the schema is
- * counted around it, so a new table is counted too. And the two worlds must write alike: a request
- * whose ids come in upper case lands as the same one in lower case does.
+ * scenario says what its route's replay is), and add or remove no row: every table in the schema is
+ * counted around it, so a new table is counted too. A resend that only rewrote a row in place is
+ * seen where its answer shows it, as an outcome that is no replay. And the two worlds must write
+ * alike: a request whose ids come in upper case lands as the same one in lower case does.
  *
  * What fails today is LEFT, each entry with its one-line reason and exactly what the check finds;
  * the list only shrinks. A route on it that passes, or fails otherwise, fails here until its entry
@@ -823,6 +826,19 @@ describe('the guard', () => {
     expect({ twice, stale }).toEqual({ twice: [], stale: [] });
   });
 
+  // Every route's "adds no row" rests on the count: one that missed a table, or saw none, would pass
+  // every resend.
+  it('counts every table the schema defines, and sees the rows a world adds', async () => {
+    const defined = Object.values(schema)
+      .filter((table) => table instanceof PgTable)
+      .map((table) => getTableConfig(table).name);
+    expect(tables).toEqual(expect.arrayContaining(defined));
+    const before = await rows();
+    await world();
+    const added = { schools: 1, users: 2, classes: 1, enrollments: 1, blocks: 1, sessions: 1 };
+    expect(moved(before, await rows())).toEqual({ ...added, events: 1 });
+  });
+
   it('fails a data-changing route added with neither, and only that', () => {
     const added = (method: string): RouteOptions => ({
       method,
@@ -855,7 +871,7 @@ describe.each(changing(routes).filter((route) => repeatOf(route) !== undefined))
     const read = key in REPEATS;
     const left = LEFT[key];
     const does = read
-      ? 'resent under its event id, in either case, is its replay and writes nothing'
+      ? 'resent under its event id, in either case, is its replay and adds no row'
       : 'sent again, it doubles nothing';
 
     it(left ? `${does}: not yet, as LEFT says` : does, async () => {
