@@ -328,6 +328,103 @@ ten letters and digits, `BALIDEVCHK` say.
 Emergency Unlock over a standing the phone cannot read back (B6b) has no step here: a phone cannot
 be made to lose its standing by hand, so the tests cover it.
 
+## Phase 7's phone sitting, on prod: C7, L8, M8 and M8b, then L9, M10 and W6
+
+One sitting on TestFlight build 10 (prod, from `1d4496b6`), the owner's iPhone and the prod portal. It covers
+C7's first-launch check, L8's, M8's and M8b's device checks, and the three exit checks. Everything happens
+on prod: the answers you give are real records there, so use your own accounts and your own class.
+
+**Before you start, once:**
+
+- Install build 10 from the TestFlight app once Apple has processed it.
+- On a laptop, keep two windows open on `https://bali-portal.vercel.app`: your prod teacher account in
+  one, and your prod student account in a second browser profile for W6.
+- Upload a real lesson deck on the portal's **Your slides**: a PDF exported with photos, 10–25 MB and
+  200 pages at most. Prod's deck bucket is already in the portal's security header, so the browser
+  accepts the upload.
+- Have your prod block, the sticker, at hand.
+
+### Part 1 — C7: the first launch
+
+**Starting state:** no class running. Bali is deleted from the phone, then build 10 is installed fresh from
+TestFlight. Airplane Mode is off. You won't need the sticker.
+
+1. Open Bali: **Sign up or sign in**. Tap **Sign up**: **When were you born?**, both menus on
+   **Choose**. Pick a month and year 13 or more years ago, then **Continue**. The intro's pages follow,
+   and its last button opens prod's sign-up page. Close that page without signing up: you're back on
+   Sign in, and nothing was kept.
+2. Tap **Sign in** and sign in with your prod student account. There's no birth question, because Bali's
+   server already holds your yes. If you're in a class, **Your teacher can ask questions now** shows
+   once: tap **Continue**. Then the Screen Time ask (allow it) and Home, which lists your class.
+
+**Check:** the birth question comes only with Sign up; Sign in goes straight through; the one-time screen
+shows once and never again after a relaunch.
+
+### Part 2 — L8: a locked phone answers
+
+**Starting state:** your class is running on prod (tap the block, or press Start on the portal). You're
+tapped in and Focused, with your apps locked. Bali is open on Focus. Airplane Mode is off. The sticker is
+your prod block.
+
+1. On the portal's class page, under **Questions and slides**, write a question with 4 options, mark one
+   correct, and **Ask**. Within about 2 seconds the phone's big ring becomes a strip (the time left and
+   **Focused**), the question card appears under it, and **Emergency Unlock** stays pinned at the
+   bottom.
+2. Tap **B**: "Your answer is in." Tap **C**: your answer moves to C. The portal says 1 answered, and
+   shows no breakdown under 3 answers.
+3. On the portal, close the question with the answer shown. The phone marks the correct option with a
+   check and C as **Your answer**. Nothing is red, and there's no X. Tap **Hide**: the card goes and
+   the ring comes back.
+4. Ask a second question. While it's open, hold **Emergency Unlock** for 1 second: you're unlocked at
+   once, and Unlocked shows the card above **Want to say why?**. Answer from there, then **Lock my apps
+   again**.
+5. Turn on VoiceOver and swipe through the card. Each option reads its letter and its text, yours reads
+   **Your answer**, and the strip reads the time left. Turn VoiceOver off.
+6. **Battery:** set Auto-Lock to Never and note the battery level. Keep Bali open on Focus with a question
+   showing for 30 minutes, then note the level again. Bali checks for questions every 2 seconds only
+   while it's on screen.
+
+**Check:** no phone screen shows a count or who answered; an answer changes until the close; nothing is
+ever red.
+
+### Part 3 — M8 and M8b: slides
+
+**Starting state:** your class is running, you're tapped in and Focused, Bali is open on Focus, and
+Airplane Mode is off.
+
+1. On the class page, tap **Show slides**, pick your deck, page 1. The phone shows **Slide loading**,
+   then the page. Pinch to zoom. Page forward and back on the portal: the phone follows within about 2
+   seconds.
+2. On a photo-heavy page, watch for any stutter while it draws. Hold **Emergency Unlock** just as a new
+   page arrives: the hold still takes 1 second, no longer. Then **Lock my apps again**.
+3. With VoiceOver on, the slide reads its page's words. A page with no words says which slide it is.
+4. Ask a question while a slide shows: the question comes first, the slide under it. Tap a link inside
+   the PDF, if it has one: nothing opens.
+5. Unlock (hold for 1 second). Unlocked shows the card, then the slide. **Lock my apps again**.
+6. Show a different big deck and lock the phone at once; unlock it 10 seconds later. The slide is
+   there, or "Bali couldn't load the slides." with **Try again**, which loads it.
+7. Switch between two big decks 3 or 4 times: no crash and no slowdown.
+8. Sign out and sign in again: the slide loads again, because the deck was dropped at sign-out.
+
+**If a second iPhone is around:** run step 1 on both phones at once, on the same Wi-Fi. That checks a big
+deck against the 30-second limit on one access point.
+
+### Part 4 — the exit checks: L9, M10, W6
+
+**Starting state:** your class is running on prod, with your phone tapped in and Focused. On the laptop,
+the teacher's class page is in one window. Your student is in the other, on the lesson page (the student
+home's **Open the lesson**). Airplane Mode is off.
+
+1. **L9:** ask a question, answer it on the phone, close it with the answer shown, then **End** the
+   class. Check: the class page and Present never name who answered, and the session's report page shows
+   the question's totals only. Under 3 answers, that's "N answered" with no breakdown.
+2. **M10:** show a deck and page through it. The phone and the student web both follow.
+3. **W6:** at each change, your chip on the student web matches your tile on the teacher's grid.
+   Focused; unlock on the phone, and both say Unlocked; lock again, and both say Focused.
+
+With one student, you, these checks prove the parts work end to end. A class with several students, the
+pilot's own, is the full exit check.
+
 ## CI
 
 The **iOS** workflow (`.github/workflows/ios.yml`) runs on every PR that touches `ios/`: it
