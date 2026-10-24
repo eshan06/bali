@@ -10,6 +10,17 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-24 (Central) — santa's reviewers run at `xhigh` on screen steps (the owner's
+ruling; `docs/DECISIONS.md`, 2026-10-24): a step building approved boards, the portal's or the app's,
+and nothing else (not the engine, ARCHITECTURE.md, sign-in, sign-out, the account's read, the 13+
+check, account deletion, Emergency Unlock, the store's privacy answers, or the policy's or terms'
+words); every other step's
+reviewers, and every worker's effort, as before. Before it, L8c (#451): the
+answer card on Unlocked, Screen Time off and Home, so L8's screens are done. Next on the Mac: M8 (#452), L8's 📱
+device check (the owner's), then M8b, the four boards the owner approved on 2026-10-24 (the slide on Unlocked, Screen Time off
+and Home, the card on the Screen Time ask); on the Windows PC, the other three pre-pilot steps wait
+for the owner's word._
+
 _Last updated: 2026-10-23 (Central) — The same answer card off the Focus screen (L8c, #451;
 `docs/DECISIONS.md`, 2026-10-23), L8's last PR on the Mac, so L8's screens are done: while a question
 shows, Unlocked has the card over its reason card, Screen Time off over its steps and Home, for a
