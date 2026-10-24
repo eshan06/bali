@@ -610,7 +610,9 @@ Teacher app and web portal:
 - `POST` / `GET` / `PATCH` `/v1/classes…` — create and manage classes. A class named by its id is
   the caller's own: an unknown one is `404 class_not_found` on every route under
   `/v1/classes/{id}` (added 2026-10-04, R3, additive: one condition, one shape), another
-  teacher's `403`.
+  teacher's `403`. A create may carry an `eventId` (added 2026-10-23, additive): resent under it,
+  in either letter case, it answers the class that id made, as it is now, never a second; another
+  teacher's id is `409 event_id_conflict`; with none, every create makes a class, as before.
 - `GET /v1/classes/{id}/roster` — the roster; `DELETE /v1/enrollments/{id}` — remove a
   student (the one-transaction removal).
 - `POST /v1/classes/{id}/sessions` — start a session; if one is already open for this
@@ -1403,7 +1405,10 @@ which replaced the look of the
 - **The consent list** gains two lines: "Your answers to questions, counted only in the
   class's totals" under Sees, and "Which answer is yours, or whether you answered" under Never
   sees. The list promises it "never grows without asking you again", so a student who saw the
-  old list sees a one-time screen after the update with the two new lines and Continue.
+  old list sees a one-time screen after the update with the two new lines and Continue. The phone
+  shows a student no answer card until it has shown them the list as it stands (the owner's
+  ruling, 2026-10-23), so one whose first open after the update is mid-class on Focus, where that
+  screen waits for the bell, answers from their next class on.
 - **The portal.** One "Questions and slides" card between the session card and the live grid.
   While a question or a slide shows, Present shows it in place of the live grid; **while a
   question is open the projector shows only "N of M answered", and the counts per option only
@@ -1511,9 +1516,10 @@ and keeps everything that enforces focus.
 **Settled** (the owner, 2026-10-10, each as recommended; PLAN's step for each in parentheses):
 - `event_id` uniqueness in both directions: every writer in the transition engine refuses an
   `eventId` that any `responses` or `saved_questions` row holds, as the answers route already
-  checks `events` (L1, L3b). The three writers beside the engine, `PUT /v1/me/age-check`, `PUT`
-  and `DELETE /v1/me/push-token` and `POST /v1/teacher-invites/redeem`, check only their own
-  table: a UUIDv7 minted fresh never collides (narrowed 2026-10-12, the owner's ruling on #317).
+  checks `events` (L1, L3b). The writers beside the engine, `PUT /v1/me/age-check`, `PUT` and
+  `DELETE /v1/me/push-token`, `POST /v1/teacher-invites/redeem` and, since 2026-10-23, `POST
+  /v1/classes`, check only their own table: a UUIDv7 minted fresh never collides (narrowed
+  2026-10-12, the owner's ruling on #317).
 - The guard wherever counts are read: one guarded count that the results route, the recap and
   any report read (L3, L3c, L7c).
 - The portal checks a deck's `sha256` as the phone does, refusing a mismatch, for the presenter

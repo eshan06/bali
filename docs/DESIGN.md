@@ -17,7 +17,8 @@ grep, 2026-10-05; a new one joins this list). In
 `ProtectionOff.swift`; History's row labels and refusals in `History.swift`;
 Me's name, leave and `SignOutWords` sentences in `Me.swift`; Delete account's
 question, its screen's titles and lines in `Deleting` (`Deletion.swift`), the gap's fallback's
-included; the 13+ stop screen's title and line in `AgeCheck` (`Age.swift`); and the two
+included; the 13+ stop screen's title and line in `AgeCheck` (`Age.swift`); the answer card's
+line under its answers, state by state, in `AnswerCard` (`Lesson.swift`); and the two
 refusals `SyncEngine.swift` hands a screen ("Bali couldn't save your reason.
 Try again.", "Bali couldn't lock your apps. Try again."). In
 `apps/web/src/lib`: `errors.ts`; `grid-state.ts` (the grid's notes and

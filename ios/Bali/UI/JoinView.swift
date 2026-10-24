@@ -89,7 +89,8 @@ struct JoinView: View {
                     Text(preview.class.name).textStyle(.h2)
                     Text("with \(teacher)").textStyle(.body).foregroundStyle(Theme.textSecondary)
                 }
-                ConsentCard(title: "What \(teacher) sees")
+                // The list as it stands, seen: the one-time screen never shows them it (L8a).
+                ConsentCard(title: "What \(teacher) sees").onAppear { phone.sawList() }
                 Text("This list never grows without asking you again.")
                     .textStyle(.caption).foregroundStyle(Theme.textTertiary)
             }
@@ -127,37 +128,47 @@ struct JoinView: View {
     private func run(_ call: @escaping @MainActor () async -> Void) { Task { await call() } }
 }
 
-/// What a teacher sees of a student in their class, and never sees — the intro's second page (C1b)
-/// and the preview before joining (C2b): one list, so the two never say different things, drawn
-/// as D1's ConsentPreview draws it. `title` heads what they see: "Sees", or "What Ms. Rivera sees".
+/// What a teacher sees of a student in their class, and never sees — the intro's second page (C1b),
+/// Me's What your teacher sees and the preview before joining (C2b): one list, so they never say
+/// different things, drawn as D1's ConsentPreview draws it — and the one-time screen's two lines
+/// it gained (L8a), `lines` its `added`. `title` heads what they see: "Sees", or "What Ms. Rivera
+/// sees".
 struct ConsentCard: View {
     let title: String
+    var lines = (sees: ConsentCard.sees, neverSees: ConsentCard.neverSees)
     /// One column for both lists' icons, so every line starts where the others do.
     @ScaledMetric(relativeTo: .body) private var iconWidth: CGFloat = 24
 
-    /// The whole of it — the grid's silence and last-seen time too (owner, 2026-09-27).
+    /// The whole of it — the grid's silence and last-seen time too (owner, 2026-09-27) — its
+    /// answers lines last (L8a). The portal's help page says the same, word for word
+    /// (`apps/web/src/app/support/support.test.ts` reads these from this file).
     static let sees = [
         "Your focus status: focused, unlocked, or Screen Time off",
         "If Bali stops hearing from your phone during class, and when it last did",
         "When you tap in, and when class ends for you",
         "When you unlock, and the reason if you share one",
         "If you leave this class",
+        "Your answers to questions, counted only in the class's totals",
     ]
     static let neverSees = [
         "Your screen, your apps, or what's in them", "Your messages or where you are",
+        "Which answer is yours, or whether you answered",
     ]
+    /// The lines a live lesson's questions added (L8a; ARCHITECTURE, "Live lesson", decision 11),
+    /// the last of each list: all the one-time screen lists.
+    static let added = (sees: Array(sees.suffix(1)), neverSees: Array(neverSees.suffix(1)))
 
     var body: some View {
         Card {
             VStack(alignment: .leading, spacing: 12) {
                 Text(title).textStyle(.label).textCase(.uppercase).foregroundStyle(Theme.brand)
-                ForEach(Self.sees, id: \.self) {
+                ForEach(lines.sees, id: \.self) {
                     row("checkmark.circle", Theme.brand, $0, Theme.text)
                 }
                 Rectangle().fill(Theme.border).frame(height: 1).padding(.vertical, 4)
                 Text("Never sees").textStyle(.label).textCase(.uppercase)
                     .foregroundStyle(Theme.textTertiary)
-                ForEach(Self.neverSees, id: \.self) {
+                ForEach(lines.neverSees, id: \.self) {
                     row("eye.slash", Theme.textTertiary, $0, Theme.textSecondary)
                 }
             }

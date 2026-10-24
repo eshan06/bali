@@ -15,8 +15,8 @@
         /// any session and in two classes, no ask for the permission failed, nothing typed to join,
         /// no screen opened over another, Home's tab chosen and no history read, no name being
         /// edited, no sign-out failed, no class being left, no account being deleted, no reason
-        /// picked, no email named (#147) and no class listed for the student on this phone before
-        /// (#143), unless said otherwise.
+        /// picked, no email named (#147), no class listed for the student on this phone before
+        /// (#143), and the consent list as it stands seen by Ana here (L8a), unless said otherwise.
         struct State {
             var problem: String?
             var age = AgeCheck.Answer.passed
@@ -42,6 +42,7 @@
             var pickFailed: String?
             var email: String?
             var everInClass = false
+            var listSeenBy: String? = "ana"
             /// A live lesson's last read (L8), and the answer card's own: a pick on its way, and
             /// what the last one said.
             var lesson: LessonState?
@@ -104,6 +105,9 @@
             "nameCantSave": State(
                 sync: standing(.out, me: nameless),
                 naming: naming(anaTyped, failure: Naming.words(.networkError, nil))),
+            // Once, after the update (L8a; the app canvas's ListChanged board): Ana, in Period 3 and
+            // Period 5, has not seen the consent list as it stands on this phone.
+            "listChanged": State(listSeenBy: nil),
             "screenTime": State(protection: permission(.notDetermined)),
             "screenTimeDenied": State(protection: permission(.denied)),
             "screenTimeError": State(

@@ -28,7 +28,7 @@ function pageList(name: string): string[] {
 describe('the help page says what the app says', () => {
   it('what a teacher sees, word for word', () => {
     expect(pageList('TEACHER_SEES')).toEqual(swiftList('sees'));
-    expect(pageList('TEACHER_SEES')).toHaveLength(5);
+    expect(pageList('TEACHER_SEES')).toHaveLength(6);
   });
 
   it('what a teacher never sees, word for word', () => {

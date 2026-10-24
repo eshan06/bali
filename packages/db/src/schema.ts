@@ -103,6 +103,12 @@ export const classes = pgTable(
     name: text('name').notNull(),
     /** Students join by typing this (auth decision 3). */
     joinCode: text('join_code').notNull(),
+    /**
+     * The `eventId` of the create that made it, when its request carried one (2026-10-23): a
+     * resend finds its class here. Null for a class made without one: before then, or by a client
+     * that sends none.
+     */
+    eventId: uuid('event_id').unique(),
     createdAt: createdAt(),
     removedAt: removedAt(),
   },

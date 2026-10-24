@@ -8,6 +8,297 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-23** — **The live lesson followed and the answer card's words, no screen yet (L8b-1,
+  #448, the first of L8b's two PRs: L8b came to about 506 lines and the conductor split it); the
+  card waits for the consent list, and Delete account takes the phone's two notes with the account
+  (the owner's rulings, 2026-10-23).** **Which lesson** (`SyncState.lessonSession`, BaliOutbox's
+  `Lesson.swift`): the running session the phone stands in, else the first class `GET /v1/me` lists
+  in session, as Home's in-session card picks it, tapped in or not (decision 2); each only while its
+  bell is ahead by the phone's clock, as Focus's countdown and Home's card read it, and never one a
+  read said is over. **One `LiveLesson` per session** (L5): `Phone` runs its poll only while the app
+  is in front and cancels it as the app goes behind (the owner's ruling, #330), and drops the lesson
+  at a sign-out, its poll and the card's own with it (#331), and once a read says the session is
+  over, following another class in session if one runs. **The card waits for the list (the owner's
+  ruling, "Wait for the list"):** asked whether a student whose first open after the update is
+  mid-class, on Focus, where L8a's one-time screen waits for the bell, may answer before seeing the
+  list's two new lines, the owner picked no card until this phone has shown them the list as it
+  stands: "Keeps 'never grows without asking you again' to the letter; no new screen to draw. Cost:
+  such a student can't answer in that one class." So a lesson is followed only for a student this
+  phone holds L8a's record for (`listSeenBy`: the one-time screen's Continue, Join's preview, or Me's
+  What your teacher sees), from the moment the record is written, mid-class included. *The worker's
+  call, as the conductor suggested:* nothing is followed until then, so nothing polls for a card
+  that can't show. **Delete account takes the notes (the owner's ruling, "Clear both at delete"):**
+  the two notes the phone keeps under the student's id, `inClass` (#143) and `listSeenBy` (L8a), go
+  from its defaults with the account, and a sign-out keeps them as before, so the same student isn't
+  asked again (from #443's Claude Review privacy WARN). *The worker's reading of "a finished Delete
+  account":* once Bali's server has deleted the account, its Cognito sign-in deleted or still to go
+  (`deleted`, `signInNotDeleted`), so a student who leaves the pending screen without its Try again
+  leaves no note either; the gap's fallback's deletion, the same call, too. One case keeps them:
+  the app closed after the phone heard the server's deletion but before Cognito's DeleteUser
+  answered, which a relaunch finds pending; the pending screen's Try again then clears them (left
+  as is, its reachability doubtful; reported to the conductor). The engine's `me` is
+  forgotten with them, as at another student's sign-in: a state it sent before, still listing her
+  classes, would otherwise keep her in a class again (santa's round 1). A rider in this PR.
+  **The answer** (decision 5): a tap sends it in one request through `LiveLesson.answer`, never the
+  outbox, and another changes it until the close; the answer Bali holds sends nothing again, unless
+  the last pick didn't send; of picks whose answers cross only the last one's is said, and one for a
+  question no longer shown is dropped. Hide is this phone's alone, in memory, until another question
+  shows. **The words** (`AnswerCard`): each answer's look and the line under them as the app canvas
+  draws them, word for word (Main, FocusAnswered, FocusRevealed, CardSending, CardFailed,
+  CardTooLate, CardClosed, CardRight, CardNoAnswer, CardOffline). **States no board draws** (*the
+  worker's call, awaiting the owner*): any failed poll, no answer, a `429` or a refusal, says
+  CardOffline's line while the question is open, as L5's entry planned ("the poll's no answer is its
+  Offline card"), a pick's own line said before it; any failed answer but too late says CardFailed's,
+  as the student web's `answerSaid` does; and that line goes once Bali holds an answer other than
+  the one it held when the pick was made: the pick landed, its reply lost, or another device's
+  stands. **Known limits:** an earlier pick still on its way that lands after a later one failed
+  clears that line too, so the card says the earlier answer is in, which is true, and not that the
+  later tap didn't go; the student web keeps its line there, comparing with the failed send's own id,
+  which BaliCore's `AnswerResult` doesn't carry (left as is, its reachability doubtful; reported to
+  the conductor). Two of a student's classes in session at once follow the first listed. A Hide
+  doesn't outlive the app's run. `LessonState` gains a public init, for the app's fixtures and tests.
+  Tests: `LessonTests` (BaliOutbox: which lesson, each state's looks and line),
+  `AppTests.lessonFollowed` (the wait for the list, the poll only in front, the sign-out, the
+  bell), `AppTests.lessonAnswers`, `AppTests.deleteAccountWiring` (the notes gone with the account,
+  and not back from a late state) and `AppTests.deleteFromMeUnchecked` (kept when nothing is
+  deleted).
+
+- **2026-10-23** — **The pre-pilot event-id step, part 2 of 3 (#447; the owner's go, 2026-10-23):
+  Create class carries an event id, so a resend is its replay, never a second class, and the create
+  gets the saves' 10 s.** `POST /v1/classes` takes an optional `eventId`, a UUIDv7 (`z.uuidv7()`,
+  as the Phase 7 routes check theirs; a malformed one is a `400`). Additive: a portal from before it
+  sends none and makes a class at every call, as today. The class keeps it in `classes.event_id`, a
+  nullable uuid under a unique constraint (migration 0028, which only adds, so the migration guard
+  passes). Resent under it by the same teacher, in either letter case, the create answers the class
+  that id made, as it is now (its name, its join code and its running session, read as `GET
+  /v1/classes/{id}` reads them), never a second; the same id from another teacher is `409
+  event_id_conflict`, nothing made, as every route refuses an id another account holds. **How:**
+  `createClass` (management.ts) inserts with ON CONFLICT DO NOTHING on any unique key, where it named
+  the live join code's alone, and on no row reads the class holding the id: the caller's is the
+  replay, another teacher's the conflict, and none means the code was taken, so it tries the next.
+  The unique index arbitrates: a create racing its own resend waits at it for the first to commit,
+  then reads that class. Postgres compares the uuid, and nothing compares the id as text, so no letter
+  case misses (#437's trap). **The engine rule, checked:** making a class writes no event and no
+  participation, so it stays beside the engine, as a block's registration does; and, a writer beside
+  it, it reads only `classes` for the id (the owner's ruling on #317, 2026-10-12), which
+  ARCHITECTURE's "Settled" now names with the other three. The answer keeps its shape, `ClassDetail`,
+  no `outcome` (part 1's scenario took the first answer as the replay); a create now reads the class's
+  running session to answer, none for a class just made. **The portal:** one `eventId` per create,
+  minted at its first press (`newEventId`) and sent again by every press while no answer has come (none
+  within the limit, a 5xx, a 429), so Try again is the replay; let go once Bali answers with the class
+  or a refusal, or the dialog closes, so the next New class mints another. Create class takes
+  `SAVE_TIMEOUT_MS`, 10 s, as #432 gave every other save, and the API client's scan lists only a
+  deck's check now; no answer by then is said as ClassesStates draws "No answer at all", with Try
+  again. *The conductor's call, awaiting the owner:* a name changed after a create got no answer still
+  goes under that create's id, so one that landed is answered with its class under the name it was
+  made with, which its page can rename; a fresh id would make a second class, which no route
+  removes. *Weighed:* a fresh id for a changed name, as the invite's code and an ask's words take one,
+  which can leave a class made twice (#432's *Left* names that risk for a saved question's draft,
+  which can be removed). **Drawn first,** an intermediate state on the canvas's ClassesStates: an id
+  another teacher's class holds, which an id minted fresh never is, said in the words every route's
+  spent id gets ("That didn't go through, so nothing changed. Try again."), nothing made, Create class
+  sending it under a new id. **Tests:** the route's (the happy path, authz, a malformed id, the replay
+  twice and in upper case, the class as it is after a rename, a new code and a Start, another
+  teacher's id in either case, and none); `createClass`'s on PGlite; three on real Postgres (a create
+  and its resend at once, one in upper case: one class, both answered with it; a resend meeting its
+  create uncommitted waits, then is answered with it; two teachers sending one id: one class, one
+  conflict); #442's check, Create class off its list, its scenario now renaming the class, giving it a
+  new code and starting it between the sends, so a replay that only echoed fails; and New class's test
+  drives the page (jsdom, Testing Library), so `source-text-tests.test.ts` lists 32, pinning what the
+  old one did, as santa's round 1 asked (a dialog the browser closes mid-create keeping its name and
+  id, a Copy's answer going with its class, the form's own submit going nowhere). The shared
+  `CreateClassRequest` names the optional `eventId`. **Checked:** with the id dropped from the insert,
+  #442's check fails ("wrote classes +1" in both cases); minting an id at every press, keeping one past
+  a close, or losing any of those three, fails the dialog's tests. **Seen** in headless Chrome on dev
+  as the demo teacher, the preview serving this branch, every create held, failed or answered by a
+  stand-in over CDP and never let through (the teacher's 5 classes before and after): Create class held
+  as Creating…, the name read-only; no answer, said 10.0 s after the press, "Couldn't reach Bali…" with
+  Try again, as ClassesStates draws it; Try again pressed and held again, under the first press's id;
+  answered, "Period 4 Biology is ready", focus on its title; Done, focus back on New class; the next
+  create under a new id, refused as another teacher's in the drawn words with Create class, whose next
+  press went under another (`.claude/shots/create-class-id/`). **Left:** part 3, the three places #437
+  found comparing an id as text; the demo and `dev:teacher` still create with no id, an old client's
+  way, which works as before.
+
+- **2026-10-23** — **S10 closed with no code, and the push's wait screen picked (#446; the owner's
+  rulings, in chat, each as recommended).** *S10* ("a Release build never ships dev's API or user
+  pool", Phase 6): every prod TestFlight run already checks that its API, its pool's hosted-UI domain
+  and the phone's client are production's before anything is uploaded (P5's release guard,
+  `.github/workflows/testflight.yml`, "Release guard: the archived app"), and the owner's phone test
+  on prod (2026-10-12) used such a build. A Release build made without naming prod, Xcode's own
+  Archive on a Mac or the workflow's `dev` option, carries dev's values from `ios/project.yml`, by
+  design: dev builds go to the owner's internal testers only (`docs/DEPLOY.md`, "Keep the pilot's
+  testers on prod builds only"). Weighed: Release defaulting to prod's values in `project.yml`, Debug
+  keeping dev's; declined, since no build reaches a tester but through the workflow, which names its
+  environment. *The push's wait screen* (the random wait of up to 10 s before the phone's first read
+  after the class-started alert, the entry of 2026-10-22 below): option B of the app canvas's row
+  "Opened from the class-started alert" (boards `PushWaitB` and `PushWaitBHome`). While the wait
+  runs, Waiting says "Checking in with your class" and "Your apps lock in a few seconds. No need to
+  tap again.", its card "Keep Bali open until your apps lock.", and Home's waiting card "You're tapped
+  in. Your apps lock in a few seconds, as long as Bali is open."; a read that fails brings back
+  Waiting's words with Try again. The wait is only for an alert opened within about a minute of its
+  arrival: the rush it spreads is in the first seconds after the bell, and an alert opened later,
+  when its class may be over, reads the truth at once. Weighed: A, Waiting as it is (it says
+  "waiting for your teacher" for up to 10 s after the alert said class started); C, a ring filling
+  over the wait (past DESIGN.md's 300 ms motion limit, its green reading as focused); and B waiting on
+  every open. Built with the push's app half, the Mac session's.
+
+- **2026-10-23** — **The consent list's two new lines, and who sees the one-time screen after the
+  update (L8a, #443, L8's first PR). *The worker's call, as the conductor's brief suggested, awaiting
+  the owner.*** The list (`ConsentCard`, the one view behind the intro's second page, Me's What your
+  teacher sees and Join's preview) gains "Your answers to questions, counted only in the class's
+  totals" last under what a teacher sees and "Which answer is yours, or whether you answered" last
+  under what a teacher never sees, as the app canvas's Consent board draws them. **Who sees the
+  screen** (the ListChanged board, "Once, after the update"): a signed-in student whom `GET /v1/me`
+  lists in a class, on a phone with no record that this student has seen the list as it stands. A
+  class is joined through Join's preview, which shows the list, so a student in a class may have
+  seen it before its new lines; one in no class has nothing a teacher sees yet. A teacher's account
+  never gets it. **The record:** the student's id in the phone's own defaults (`Phone.listSeenBy`,
+  kept as `inClass` is: keyed on the student, kept across a sign-out, one student at a time, since
+  two accounts on one phone are ruled out for the pilot), written by the screen's Continue, by
+  Join's preview as it shows, and by Me's What your teacher sees as it opens. So a student who joins
+  a class after the update never sees the screen, and one who opened the list from Me during a class
+  (Home over Unlocked) is not asked after the bell. The intro's second page writes nothing: it shows
+  before Sign up's page, with no account yet, and the last student's `me` can still be kept then; a
+  new account is in no class until Join's preview records it. See the whole list opens the list (Me's
+  sheet) and records nothing, so the screen never leaves from under its own sheet. **Where it shows:**
+  exactly where Your name may, after it (`Screen.choose`): after the 13+ check; in Home's, Screen
+  Time's and Waiting's place and over a Join or a tab opened, with no tab bar; never over Focus,
+  Unlocked, Protection off, Session over not closed, nor the home a standing not read keeps, so never
+  between a student and Emergency Unlock. As Your name does for a sign-in kept from the last run, it
+  shows once a read of `GET /v1/me` names the student's classes (the phone keeps no `me` across a
+  launch): after the update, Home for that first read, then the screen, by a cut, as every screen
+  off the onboarding path (DESIGN.md §7). **Known limits:** a reinstall or a new phone shows it once
+  more to a student in a class (the record is the phone's); a join made while `GET /v1/me` had no
+  answer records nothing, so that student sees it once after the join; and a student whose first
+  launch after the update is mid-class sees the two lines only after the bell, which matters once
+  L8b puts the answer card on a session's screens: L8b, or the owner, decides whether the card waits
+  for the list (santa's round 1). **The board over
+  ARCHITECTURE's words:** decision 11 says "the two new lines and Continue"; the approved board also
+  draws See the whole list, built as drawn. **The portal's help page** says the list word for word
+  (`apps/web/src/app/support/support.test.ts` reads `ConsentCard`'s lists from `JoinView.swift`, and
+  pins what a teacher sees at 5 lines, now 6), so it gains the same two lines in this PR: the one
+  portal edit the owner allowed across the lanes (2026-10-23: "add the two lines to the Help page
+  and its test's count in L8a's PR. Only that, nothing else in the portal").
+  **Rode along:** the intro's second page, which now
+  outgrows the screen, keeps the board's 24 pt between its last line and the dots when scrolled to its
+  end. **Weighed:** a phone-wide flag (a second student would inherit it, for no less code than a key
+  on the student, as `inClass`); a record on the server (an API change, outside the Mac's lane, and
+  the promise is about what this phone showed); the screen for every student, in a class or not (one
+  in no class has no teacher seeing anything, and Join's preview shows the list as it stands before
+  any join). Tests: `ScreenTests.listChanged` and `ScreenTests.cuts` (BaliOutbox), `AppTests.consentList`,
+  `AppTests.listOnce` and `AppTests.waitingFits`.
+
+- **2026-10-23** — **The pre-pilot event-id step, part 1 of 3 (#442; the owner's go, 2026-10-23): a
+  check resends every data-changing route's request under its event id, in either case, and the five
+  routes that fail today are its list, which only shrinks.** Tests only; no product code changed.
+  `apps/api/test/event-id-repeat.test.ts` walks the route table the authorization matrix walks
+  (`routeTable()`, which the matrix's guard holds to its MATRIX row for row), so no export was
+  needed: every route but a GET or its HEAD changes data, and each one has a scenario there or is
+  listed as taking no event id by design, with why. A new route fails its guard until it is one or
+  the other, and a route listed as taking none that starts taking one fails it too. **What it sends
+  and asserts.** Each scenario runs in a world of its own (a class, its teacher and student, its
+  session running): the request with a fresh event id, every id in it lower case; then the same
+  again; then the same with every id in its path and body in upper case. Each resend must be
+  answered 2xx, never `409` for its own id, with the replay, the truth now: the first answer with
+  `outcome: 'replay'`, unless the route's docs say its replay otherwise (`already_deleted`,
+  `not_registered`, `already_enrolled`, `already_removed`, `{ passed: true }`, an extend's
+  `extended`, a deck create's fresh upload URL). And it must add or remove no row: every table in
+  the schema is counted around each send, so a new table is counted too, and a guard holds the count
+  to every table the schema defines and to the rows a world adds. A resend that only rewrote a row
+  in place shows where its answer does, an outcome that is no replay. Where a later write of the
+  same caller's changes what a replay must answer, the scenario makes it between the sends, so a
+  replay that only echoed its first answer fails: the unlock's reason changed (A20) on both unlock
+  routes, and a reason change changed again; the name renamed (A8); the push token registered again;
+  the bell moved by another extend; the state moved by an unlock, or protection on or off (#167);
+  the question closed; the answer, the draft and the slide changed again (decisions 4 and 12, M3a).
+  *The conductor's call, awaiting the owner:* each scenario also runs with its request sent first in
+  upper case, then again so, then in lower case, everything else in its world as the server prints
+  ids, in lower case, and the two worlds must write the same rows. A client may mint either case
+  (Foundation's `uuidString` writes upper), and one of #437's three spots shows only so: an unlock
+  that landed first, naming its tap in another case than the tap's own. The three sends alone never
+  reach it: the tap lands at its first send, in the case of the unlock kept before it, and its
+  resend in upper case is a replay, which files nothing. **No event id by design**, each found so in
+  the code and sent again by the check as the others are, its answers unread, its resends adding no
+  row: Start (one running session a class, its partial unique index: a second Start is answered
+  `existing`, that session), End (a second is `already_ended`, nothing recorded), a block's
+  registration (one live block a tag: the tag again is answered its block), a rename or a new join
+  code (`PATCH /v1/classes/{id}`: the class's one row rewritten, nothing recorded; a second new code
+  replaces the first, and the answer names the one the class holds), and the check-in (it moves
+  `last_seen_at` alone, data-model decision 7, and a silence's `came_back` once, by its marker). And
+  the sweep and its Phase 1 alias (`POST /internal/sweep`, `/internal/sessions/expire`): idempotent
+  by design (hosting decision 3), listed but not sent here, since it sweeps every world of the file
+  at once; `internal.test.ts` sends it twice. #432's four, and three more. **The list (`LEFT`)**,
+  each entry with its one-line reason and exactly what the check finds: Create class (`POST
+  /v1/classes`), no event id, so every resend makes another class (part 2); and part 3's three
+  spots, on four routes (DECISIONS 2026-10-22, #437): a deck's removal resent in upper case is `404
+  deck_not_found` (`removeDeck` compares the id as text); a tap sent in upper case never files the
+  unlock kept under it in lower case, one event fewer than the same tap in lower case
+  (`unlocksAwaitingTap`, and `lockTap`'s lock, match the id as text); and an unlock resent in upper
+  case after its reason changed answers the reason first recorded, on `POST
+  /v1/sessions/{id}/unlock` and `POST /v1/taps/{eventId}/unlock` alike (`recordedReason`). No
+  surprise: the other 22 routes with an event id pass both ways, and the five sent again double
+  nothing. A route on the list that passes, or fails otherwise, fails the check until its entry says
+  so. **Checked**: with the three compares made case-blind in a scratch copy of the engine, exactly
+  their four entries fail as fixed; with the extend route made to drop its id, the check fails it
+  (`wrote events +1`, in both cases). About 5 s on PGlite.
+
+- **2026-10-23** — **`zod` 4.6.6, for today's high advisory (#444); *the conductor's call, awaiting
+  the owner*.** From today `npm audit --omit=dev --audit-level=high`, the first step of CI's
+  "Typecheck · lint · build" (S5), failed on `zod` below 4.6.6, so every PR failed CI (#442 waited on
+  that alone), and main's next push would have too. GHSA-mrhx-c7xc-m3w5 (high; CVE-2023-54404,
+  reviewed by GitHub today), "Zod can exhaust memory while validating oversized constrained
+  collections": through 4.6.5 the size bound of an array, a set or a map (`.max()`, `.length()`,
+  `.size()`) ran only after every element was parsed, each failing element adding an issue, so it
+  bounded nothing; 4.6.6 refuses an oversized one before parsing any element (zod's #6652), but only
+  while its size checks come before every other check. A collection with no bound still parses
+  every element (zod's `abortEarly`, #6475, closed unmerged).
+  **Why now, without the owner:** CLAUDE.md's standing order (a security hole is fixed now, the owner
+  told after), and CI blocked for every PR. **Bali was exposed, to a signed-in teacher:** one bounded
+  collection reaches a request body, a question's `options` (`z.array(Text(200)).min(2).max(6)`,
+  `OpenBody` in `apps/api/src/routes/questions.ts`), on `POST /v1/sessions/{id}/questions`, `POST
+  /v1/saved-questions` and `PUT /v1/saved-questions/{id}`, each parsed after its teacher check, so no
+  student and no stranger reached it. Fastify's body limit, its default 1 MiB (the API sets none),
+  held a request to about 524,000 elements, and the API's 400 lists every issue in `details`.
+  Measured on this PC through the route: on 4.6.5 a 1 MiB body of `options: [0, 0, …]` took
+  0.54–0.66 s of the API's one process and was answered with 524,249 details, 45 MB (`["", "", …]`:
+  349,499 details, 16 MB, in about 0.4 s), and the same schema's parse, measured alone, held about
+  208 MB of heap in its issues and their details (107 MB); on 4.6.6 each is one `too_big` detail, 143
+  bytes, in 7–10 ms, about the time it takes to read the body. With the account budget's burst of
+  120, one teacher could have kept the API's one process busy for over a minute and had it send
+  gigabytes (#438: the process, not the database, is what runs out). No other request schema has an
+  array, a set, a map or a record; the list in `env.ts` is `AUTH_AUDIENCE`'s, read at boot from the
+  deploy's settings. **The bump:** `apps/api`'s range is `^4.6.6`, its floor raised from `^4.6.5`, so
+  no install resolves a vulnerable `zod`; the lockfile moves its one `zod`, at the root, from 4.6.5 to
+  4.6.6, and nothing else. Resolved at the root, never with `-w` (#435's trap, below); even there,
+  npm resolving the raised range in place nested the new copy under `apps/api`, so the lockfile's
+  `zod` entry was taken out and resolved afresh at the root as of the day 4.6.6 was the newest (`npm
+  install --before=2026-10-12`); a plain `npm install` keeps it. 4.6.7 (2026-10-12), whose release
+  notes list only its version's commit, is left to a later install, which the range allows. **What
+  else 4.6.6 changes:** `z.record`'s types (zod's #6645; the API has no record), and the rest is docs
+  and zod's release workflow. A request with too many options is refused as before, with the same one
+  detail ("Too big: expected array to have <=6 items"); what zod listed beside it is gone: each
+  option's issue, and the body's own check that `correctOption` names an option, which no longer
+  runs once the count fails (seven options and `correctOption: 9`: two details on 4.6.5, one now).
+  The other fields are still checked. **A test holds it** (santa's Reviewer B's blocker, by
+  CLAUDE.md's regression-test rule, where the conductor's brief asked for the version alone: *the
+  conductor's call, awaiting the owner*): the abuse suite (`abuse.test.ts`) sends 10,000 options to
+  each of the three routes and expects one detail, on `options`, and nothing written. It failed on
+  4.6.5 (10,001 details), and fails on 4.6.6 too with a check put before the count, which a comment
+  at `OpenBody` says; no other test changed.
+  **Its supply chain:** signed by the registry, with provenance (published by zod's GitHub release
+  workflow, approved by its maintainer), built from a commit whose tree is `9c219833`'s in zod's
+  history; zod's release notes say six malicious commits pushed to its `main` on 2026-09-21 with a
+  compromised credential were reverted that day and removed from its history, none ever published.
+  **Left,** outside this step: a list with no bound, which zod still parses whole, every issue listed
+  in the 400 with no cap; no request body has one (the snapshot's request arrays are the three
+  `options`, `maxItems` 6), and nothing yet stops a new route adding one (santa's Reviewer B: a check
+  over `contracts/openapi.json` that every request array has a bound would). Fastify 5.12.5's
+  GHSA-389g-gv7q-r4x8 (low, below CI's gate), which doesn't apply (the API defines no Fastify header
+  schemas), the owner's or Dependabot's; and the dev tools that never ship (vite, vitest), as #435
+  left them. **Checked:** CI's audit gate passing (fastify's low left), `npm audit signatures`,
+  typecheck, lint, `npm test` and the in-memory demo.
+
 - **2026-10-22** — **The API's database pool can never silently shrink to one connection (#439, a
   guard from #336's finding, #438): the API always hands postgres.js its own size, so `PGMAX` and a
   `max` in `DATABASE_URL` are ignored, and the boot says so by name. *The conductor's call, awaiting

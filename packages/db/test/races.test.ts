@@ -4102,6 +4102,111 @@ describe.runIf(REAL_PG)('teacher invites redeemed under contention (real Postgre
   }, 30_000);
 });
 
+describe.runIf(REAL_PG)(
+  'a class made under its eventId, under contention (real Postgres, 2026-10-23)',
+  () => {
+    // A cold second connection would serialise the pair (armed taps' note, above).
+    beforeAll(async () => {
+      await Promise.all(Array.from({ length: 5 }, () => db.execute(sql`select 1`)));
+    });
+
+    /** A teacher at a school of their own: what a create needs. */
+    async function teacherAt(tag: string) {
+      const school = one(
+        await db
+          .insert(schools)
+          .values({ name: `School ${tag}` })
+          .returning(),
+      );
+      const teacher = one(
+        await db
+          .insert(users)
+          .values({
+            cognitoId: `teacher-${tag}-${newUuidV7()}`,
+            role: 'teacher',
+            schoolId: school.id,
+          })
+          .returning(),
+      );
+      return { teacherId: teacher.id, schoolId: school.id };
+    }
+
+    const classesUnder = (eventId: string) =>
+      db.select().from(classes).where(eq(classes.eventId, eventId));
+
+    it('a create and its resend at once, in either letter case, make one class and both are answered with it', async () => {
+      for (let round = 0; round < 20; round += 1) {
+        const teacher = await teacherAt(`race-class-twice-${round}`);
+        const eventId = newUuidV7();
+        const both = await Promise.all([
+          createClass(db, { ...teacher, name: 'Period 2', eventId }),
+          createClass(db, { ...teacher, name: 'Period 2', eventId: eventId.toUpperCase() }),
+        ]);
+        const made = one(await classesUnder(eventId));
+        expect(both, `round ${round}`).toEqual([made, made]);
+      }
+    });
+
+    it('a resend that meets its create still uncommitted waits for it, then is answered with its class', async () => {
+      const teacher = await teacherAt('race-class-staged');
+      const eventId = newUuidV7();
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      let wrote!: (row: typeof classes.$inferSelect) => void;
+      const first = new Promise<typeof classes.$inferSelect>((resolve) => {
+        wrote = resolve;
+      });
+      const holder = db.transaction(async (tx) => {
+        wrote(await createClass(tx, { ...teacher, name: 'Period 2', eventId }));
+        await held;
+      });
+      const made = await first;
+      // Its insert meets the uncommitted row at the eventId's unique index, and parks there.
+      const resend = createClass(db, {
+        ...teacher,
+        name: 'Period 2',
+        eventId: eventId.toUpperCase(),
+      });
+      let unstaged: Error | null = null;
+      try {
+        await waitForBlockedBackend();
+      } catch (err) {
+        unstaged = err instanceof Error ? err : new Error(String(err));
+      } finally {
+        release();
+      }
+      await holder;
+      const [settled] = await Promise.allSettled([resend]);
+      if (unstaged !== null) throw unstaged;
+      if (settled.status === 'rejected') throw settled.reason as Error;
+      expect(settled.value).toEqual(made);
+      expect(await classesUnder(eventId)).toEqual([made]);
+    }, 20_000);
+
+    it('two teachers sending one eventId at once: one makes the class, the other is told it is taken', async () => {
+      for (let round = 0; round < 10; round += 1) {
+        const [a, b] = [
+          await teacherAt(`race-class-a-${round}`),
+          await teacherAt(`race-class-b-${round}`),
+        ];
+        const eventId = newUuidV7();
+        const settled = await Promise.allSettled(
+          [a, b].map((t) => createClass(db, { ...t, name: 'Period 2', eventId })),
+        );
+        const made = one(await classesUnder(eventId));
+        const answered = settled.filter((s) => s.status === 'fulfilled').map((s) => s.value);
+        const refused = settled
+          .filter((s) => s.status === 'rejected')
+          .map((s) => s.reason as unknown);
+        expect(answered, `round ${round}`).toEqual([made]);
+        expect(refused, `round ${round}`).toMatchObject([{ code: 'EVENT_ID_CONFLICT' }]);
+      }
+    });
+  },
+);
+
 describe.runIf(REAL_PG)('device tokens registered under contention (real Postgres, N3)', () => {
   const student = async (tag: string) =>
     one(
