@@ -411,16 +411,23 @@ struct AppTests {
             ("focusNoAnswer", false, "Your teacher closed it and showed the answer."),
             ("focusQuestionOffline", true, "No connection right now"),
             ("focusLong", true, "Tap an answer."),
-            // The same card off the Focus screen: Unlocked, Screen Time off, Home not tapped in, and
-            // Unlocked's Home.
+            // The same card off the Focus screen: Unlocked, Screen Time off and Home not tapped in,
+            // each also with no connection (intermediate states); and Unlocked's Home, which draws
+            // none.
             ("unlockedQuestion", true, "Tap an answer."), ("protectionOffQuestion", true, "Tap an answer."),
             ("homeQuestion", true, "Tap an answer."), ("homeFromUnlockedQuestion", true, "Tap an answer."),
+            ("unlockedQuestionUnsent", true, "No connection right now"),
+            ("protectionOffQuestionError", true, "No connection right now"),
+            ("homeQuestionError", true, "No connection right now"),
         ]
         for (name, open, line) in cards {
             let card = Phone(fixture: try #require(PreviewFixtures.all[name])).card
             #expect(card?.open == open && card?.line.hasPrefix(line) == true, "\(name)")
         }
         #expect(Phone(fixture: try #require(PreviewFixtures.all["focusLong"])).card?.looks.count == 6)
+        let unsent = try #require(PreviewFixtures.all["unlockedQuestionUnsent"]?.sync)
+        #expect(UnlockedWords(unsent)?.stuck == UnlockedWords.unsent)
+        #expect(UnlockedWords(unsent)?.picker == .waiting(nil))
         let frozenLesson = Phone(fixture: try #require(PreviewFixtures.all["focusQuestion"]))
         await frozenLesson.answer(1)
         #expect(frozenLesson.card?.line.hasPrefix("Bali couldn't send your answer.") == true)
@@ -435,7 +442,7 @@ struct AppTests {
                 "home", "homeLoading", "homeError", "homeUnread", "homeRefused", "homeFromUnlocked",
                 "homeFromUnlockedRetap", "homeInSession", "homeTapRefused", "homeTapRefusedThenTapped",
                 "homeWaiting", "homeNew", "homeNoClasses", "homeNoClassesTapStuck", "homeQuestion",
-                "homeFromUnlockedQuestion",
+                "homeFromUnlockedQuestion", "homeQuestionError",
             ],
             ["meEditing", "meNameError"]
         )
@@ -3674,6 +3681,11 @@ struct AppTests {
                 ["Turn on Screen Time"]
             ),
             ("homeQuestion", { _ in "Tap in" }, ["Tap in", "Join a class", "Home", "History", "Me"]),
+            // With no connection (intermediate states, drawn on the canvas first): what the screen
+            // says went wrong, with its Try again, then the card.
+            ("unlockedQuestionUnsent", { _ in "Try again" }, ["Try again", "Go to Home", "Lock my apps again"]),
+            ("protectionOffQuestionError", { _ in "Try again" }, ["Try again", "Turn on Screen Time"]),
+            ("homeQuestionError", { _ in "Try again" }, ["Tap in", "Try again", "Join a class", "Home"]),
         ]
         for (name, last, controls) in cases {
             let fixture = try #require(PreviewFixtures.all[name])
@@ -3744,7 +3756,10 @@ struct AppTests {
             CGSize(width: 390, height: 844 - 47 - 34), CGSize(width: 393, height: 852 - 59 - 34),
             CGSize(width: 402, height: 874 - 62 - 34),
         ]
-        for name in ["unlockedQuestion", "protectionOffQuestion", "homeQuestion"] {
+        for name in [
+            "unlockedQuestion", "protectionOffQuestion", "homeQuestion", "unlockedQuestionUnsent",
+            "protectionOffQuestionError", "homeQuestionError",
+        ] {
             for size in [DynamicTypeSize.large, .accessibility1, .accessibility5] {
                 for frame in phones {
                     let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))

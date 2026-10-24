@@ -12,7 +12,8 @@ _Last updated: 2026-10-23 (Central) — The same answer card off the Focus scree
 `docs/DECISIONS.md`, 2026-10-23), L8's last PR on the Mac, so L8's screens are done: while a question
 shows, Unlocked has the card over its reason card, Screen Time off over its steps and Home, for a
 student not tapped in, over its classes, as the boards draw them, every other word and button where
-it was. With it, the owner's three small fixes: a relaunch that finds the account deleted on Bali's
+it was, and a screen's own line about something gone wrong above the card, as three intermediate
+boards drawn first on the app canvas show. With it, the owner's three small fixes: a relaunch that finds the account deleted on Bali's
 server clears the phone's two notes, a student removed and added back mid-class gets the card again
 once Bali reads their classes, and the card ignores taps while Emergency Unlock is held. And two
 found on the way: the card goes at its class's bell by the phone's clock, signal or not, and a state
