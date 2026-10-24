@@ -10,6 +10,17 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-24 (Central) — The push's app half (#456; `docs/DECISIONS.md`, 2026-10-24):
+the entitlements; iOS's own prompt to send notifications, asked once as Home shows right after
+onboarding's Screen Time step (the owner's ruling, 2026-10-24); the device token registered at each launch and
+taken off Bali at Sign out; and the owner's approved wait, a random 0–10 s before the first read
+after a fresh alert, Waiting and Home saying option B's words meanwhile. **Before the next TestFlight
+build, Push Notifications on `com.bali.Bali`** (runbook 7, step 3), or its signing may fail; build 10
+went before this, from `1d4496b6`. **An install whose Screen Time step was done before this build
+is never asked:** the owner reinstalls Bali before runbook 7's step-6 check. Next on the Mac: the owner's sitting on build
+10 (`ios/README.md`), then runbook 7 and N6's check; on the Windows PC, M6's LessonDecks line back
+(M8 landed) and the other three pre-pilot steps, which wait for the owner's word._
+
 _Last updated: 2026-10-24 (Central) — Phase 7's phone sitting written for the owner (`ios/README.md`,
 "Phase 7's phone sitting, on prod"): C7's first launch, L8's, M8's and M8b's device checks, and the
 exit checks L9, M10 and W6, each part opening with its starting state, on TestFlight build 10 (prod,

@@ -8,16 +8,17 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-24 (Central) — The push's app half (#456; `docs/DECISIONS.md`, 2026-10-24):
-the entitlements; iOS's own prompt to send notifications, asked once as Home shows right after
-onboarding's Screen Time step (the owner's ruling, 2026-10-24); the device token registered at each launch and
-taken off Bali at Sign out; and the owner's approved wait, a random 0–10 s before the first read
-after a fresh alert, Waiting and Home saying option B's words meanwhile. **Before the next TestFlight
-build, Push Notifications on `com.bali.Bali`** (runbook 7, step 3), or its signing may fail; build 10
-went before this, from `1d4496b6`. **An install whose Screen Time step was done before this build
-is never asked:** the owner reinstalls Bali before runbook 7's step-6 check. Next on the Mac: the owner's sitting on build
-10 (`ios/README.md`), then runbook 7 and N6's check; on the Windows PC, M6's LessonDecks line back
-(M8 landed) and the other three pre-pilot steps, which wait for the owner's word._
+_Last updated: 2026-10-24 (Central) — M6's LessonDecks panel line back (#457; `docs/DECISIONS.md`,
+2026-10-24): Show slides' panel says "Pick a deck. Every phone in this class shows the page you're
+on, and so does Present." again, now that phones (M8, M8b) and the student web (W5) show the slide.
+LessonDecksStates and LessonRetryStates still draw the short line on the canvas: their redraw is
+ready, unpublished (the worker's publish was refused), for the conductor. Before it, the push's app
+half (#456): **before the next TestFlight build, Push Notifications on `com.bali.Bali`** (runbook 7,
+step 3), or its signing may fail; build 10 went before it, from `1d4496b6`. **An install whose
+Screen Time step was done before that build is never asked:** the owner reinstalls Bali before
+runbook 7's step-6 check. Next on the Mac: the owner's sitting on build 10 (`ios/README.md`), then
+runbook 7 and N6's check; on the Windows PC, the other three pre-pilot steps, which wait for the
+owner's word._
 
 ## Now
 
@@ -249,7 +250,7 @@ Slice 2 — slides:
 - **M3b** The poll's slide and a deck's download (for M6) — ✅ (#328; DECISIONS 2026-10-12)
 - **M4** Decks in the privacy paths — ✅ (#329; DECISIONS 2026-10-12)
 - **M5** 👀 The slides page and upload — ✅ as M5a (#396), M5b part 1 (#397) and M5b part 2 (#400); DECISIONS 2026-10-15
-- **M6** 👀 Portal presenter to v2's canvas — ✅ as part 1 (#413), 2a (#414), 2b-1 (#415), 2b-2 (#416), 2c (#417) and 2d (#418); DECISIONS 2026-10-16; LessonDecks' panel line comes back with M8 (the conductor's call, the owner's on 2026-10-16)
+- **M6** 👀 Portal presenter to v2's canvas — ✅ as part 1 (#413), 2a (#414), 2b-1 (#415), 2b-2 (#416), 2c (#417) and 2d (#418); DECISIONS 2026-10-16; the panel line back (#457; DECISIONS 2026-10-24)
 - **M7** BaliCore's deck download and cache (for M8) — ✅ (#331; DECISIONS 2026-10-12)
 - **M8** 👀📱 iOS slide view to the app canvas — ✅ (#452; DECISIONS 2026-10-24): the slide on Focus only, over shields the check verified; left, its 📱 device check on a shielded phone, the owner's (Part 3 of `ios/README.md`'s "Phase 7's phone sitting, on prod"); the slide off Focus is M8b's; its CI failure, `AppTests.ageAgainInClass`'s own wait, fixed in the same PR (DECISIONS 2026-10-24)
 - **M8b** 👀📱 The slide on Unlocked, Screen Time off and Home, and the question card on the Screen Time ask — ✅ (#454; DECISIONS 2026-10-24); left, its 📱 device check with M8's (Part 3 of `ios/README.md`'s "Phase 7's phone sitting, on prod")
