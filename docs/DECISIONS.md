@@ -8,6 +8,37 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-24** — **M6's LessonDecks panel line back (#PR): "Pick a deck. Every phone in this
+  class shows the page you're on, and so does Present."** M6 left the second sentence out until W5
+  and M8 made it true (the conductor's call of 2026-10-16, approved by the owner the same day; below).
+  They have: the student web (W5, #419) and the phone on Focus (M8, #452), Unlocked, Screen Time off
+  and Home (M8b, #454) show the page the teacher shows, and Present does (M6's part 2d). Built word
+  for word as LessonDecks draws it, in the panel's one head, so it shows over every state too
+  (loading, didn't load, none ready, a Show on its way or said). It holds for phones on TestFlight
+  build 10 or later, the first with M8 and M8b; no pilot student has an older one. **Nothing else
+  waited for W5 and M8:** the presenter card's "Every phone in this class shows this slide, and so
+  does Present." was removed by v2's canvas (DESIGN.md, "The words"), not held, and no other line on
+  LessonDecks, LessonSlide, LessonStates, PresentSlide or their states boards waits on them. *The
+  conductor's call, awaiting the owner:* LessonDecksStates and LessonRetryStates, drawn while the line
+  waited, still show "Pick a deck." alone in their panels, and LessonDecksStates' note says the line
+  waits for W5 and M8; the build says the whole line there too, as the approved head. Their redraw
+  (the whole line in each panel, the note saying it is back) is ready but not on the canvas: the
+  worker's publish was refused by its permissions, so the conductor publishes it. **Tests:** the test
+  this touched now drives the page (jsdom, Testing Library; `decks-panel.driven.test.tsx`): the
+  panel's place and title, its whole line while loading, after a failed read, with none ready and
+  over the decks, and its Close; four of them fail with the short line. The rest of
+  `decks-panel.test.ts` still reads source text, so `source-text-tests.test.ts` lists 32 still.
+  *Weighed:* converting that whole file, whose checks of the class page's wiring and of "names no
+  student" read other source, a step of its own. *A trap:* a `decks-panel.test.tsx` beside
+  `decks-panel.test.ts` is dropped by TypeScript (the `.ts` wins the name), so `tsc` skips it and
+  ESLint fails with "was not found by the project service"; hence the driven file's own name, until
+  the step that converts the rest merges the two. **Seen on dev** (`.claude/shots/decks-line/`): the
+  demo teacher's class page served by the preview with this branch, a 15-minute session started and
+  ended through the API, the read of your slides answered by a stand-in with the board's three
+  decks (nothing uploaded); the panel at 1440 × 1000 and at 390 px (DevTools emulation, 372 px wide,
+  the line on two lines, no sideways scroll), its line wrapping where the board's does; focus on its
+  title after a real click.
+
 - **2026-10-24** — **The push's app half (#456): the entitlements, iOS's prompt right after
   onboarding's Screen Time step (the owner's ruling), the device token registered and removed, and
   the owner's approved wait with option B's words.** *The
