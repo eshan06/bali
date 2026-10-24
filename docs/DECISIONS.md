@@ -8,6 +8,24 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-24** — **Santa's reviewers run at `xhigh` on screen steps, `max` on everything else
+  (#PRNUM; the owner's ruling, in chat: "screens can go to xhigh. only screens").** Amends 2026-10-14
+  (below), which kept santa's Claude reviewers at `max` in every round whatever the worker's effort.
+  **A screen step:** a 👀 step building approved boards, the portal's pages and components (the
+  2026-10-14 folders) or the app's screens (`ios/Bali/UI`, `ios/BaliShield`, with the view code and
+  words they need, their tests and fixtures), and `docs/`. **Still `max`:** a step that changes
+  sign-in, sign-out, the account's read, the 13+ check, account deletion, or the privacy policy's or
+  terms' words, wherever its code sits, and any step that is mostly logic, the API, `packages/`, the
+  database, CI or workflows, or the rules (this one included). The conductor names the reviewers'
+  effort in each brief (`.claude/commands/plan.md`'s template), `max` when in doubt;
+  `santa-loop.md`, Step 2, runs them at it. **The workers' own effort is unchanged:** a portal screen
+  step's worker at `xhigh` as before, an app screen step's at `max`. **Why:** a Mac step took 75 to
+  145 minutes, santa's two reviewers at `max` and their fix round about 30 to 45 of it, on steps
+  whose look an approved board fixes and whose tests pin it; Claude Review still checks the final
+  code at its own effort. **How it is judged:** as 2026-10-14's: blockers found later, by Claude
+  Review or after a merge, in screen steps reviewed at `xhigh`, against earlier ones at `max`; more
+  of them → back to `max`.
+
 - **2026-10-23** — **The same answer card off the Focus screen (L8c, #451, L8's last PR, so its
   screens are done), with the owner's three riders; the card goes at its class's bell by the
   phone's clock; a state chip reads its word alone to VoiceOver.** **The screens** (the app canvas's
