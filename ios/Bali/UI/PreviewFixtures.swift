@@ -4,7 +4,7 @@
     import CryptoKit
     import Foundation
     import PDFKit
-    import UIKit
+    import SwiftUI
 
     /// Named states of the app, from its real types, for every screen's `#Preview` and for the
     /// Simulator with no server: `xcrun simctl launch booted com.bali.Bali -bali-screen <name>`
@@ -437,13 +437,13 @@
             axes.move(to: CGPoint(x: 210, y: 24))
             axes.addLine(to: CGPoint(x: 210, y: 166))
             axes.lineWidth = 1.25
-            ink(0x8A847A).setStroke()
+            UIColor(Color(hex: 0x8A847A)).setStroke()
             axes.stroke()
             let curve = UIBezierPath()
             curve.move(to: CGPoint(x: 238.5, y: 46))
             curve.addQuadCurve(to: CGPoint(x: 314.5, y: 46), controlPoint: CGPoint(x: 276.5, y: 238))
             (curve.lineWidth, curve.lineCapStyle) = (2, .round)
-            ink(0x26241F).set()
+            UIColor(Color(hex: 0x26241F)).set()
             curve.stroke()
             for x in [267.0, 286.0] {
                 UIBezierPath(ovalIn: CGRect(x: x - 3.5, y: 132.5, width: 7, height: 7)).fill()
@@ -459,18 +459,11 @@
             width: CGFloat = 300
         ) {
             let attributes: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: size, weight: weight), .foregroundColor: ink(hex),
+                .font: UIFont.systemFont(ofSize: size, weight: weight), .foregroundColor: UIColor(Color(hex: hex)),
             ]
             (text as NSString).draw(
                 with: CGRect(x: x, y: y, width: width, height: 100), options: .usesLineFragmentOrigin,
                 attributes: attributes, context: nil)
-        }
-
-        /// An sRGB ink from its hex.
-        private static func ink(_ hex: UInt32) -> UIColor {
-            UIColor(
-                red: CGFloat(hex >> 16 & 0xFF) / 255, green: CGFloat(hex >> 8 & 0xFF) / 255,
-                blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
         }
 
         /// Period 3's lesson as `GET /v1/sessions/{id}/presentation` answers it: the canvas's

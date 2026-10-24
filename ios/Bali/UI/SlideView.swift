@@ -30,11 +30,9 @@ struct SlideShown: Equatable {
 }
 
 /// The slide (M8; the app canvas's FocusSlide, SlideLoading and SlideFailed, in D1's look): which
-/// slide of how many over the page, PDFKit's, in a 16:9 frame the width of the screen, the page as
-/// large as fits and pinched up from there — the slide's page alone, no link in it followed
-/// (ARCHITECTURE, "Live lesson", decision 8), read by VoiceOver as its text, or as which slide it is
-/// when it has none. Its deck asked for as it shows, once (`Phone.loadDeck`); before it is in,
-/// Loading the slides…; one that didn't come, Bali couldn't load the slides. with Try again (rule 5).
+/// slide of how many over the page, in a 16:9 frame the width of the screen (`PageView`), its deck
+/// asked for as it shows (`Phone.loadDeck`); before it is in, Loading the slides…, and one that
+/// didn't come, Bali couldn't load the slides. with Try again (rule 5).
 struct SlideView: View {
     let shown: SlideShown
     let phone: Phone
@@ -112,12 +110,11 @@ extension PDFPage {
     }
 }
 
-/// The slide's page in PDFKit's view, alone in a document of its own so no other page of the deck
-/// can be reached, its links taken off and its form fields read-only, and a touch on it given to a
-/// clear view laid over it (PDFKit's markup mode), never to PDFKit's own text selection, links or
-/// fields: no link is opened (decision 8), and nothing on the slide — a field's keyboard, Look Up's
-/// or Share's sheet from a word selected — comes up over Emergency Unlock (decision 1). As large as
-/// fits, pinched up to four times that. VoiceOver reads it as one element, `said`.
+/// The slide's page in PDFKit's view (ARCHITECTURE, "Live lesson", decision 8), alone in a document
+/// of its own, its links and fields taken out of reach and a touch on it given to a clear view over
+/// it (markup mode), never to PDFKit's links, fields or text selection, whose Look Up and Share
+/// sheets would cover Emergency Unlock (decision 1). As large as fits, pinched up to four times
+/// that; VoiceOver reads it as one element, `said`.
 private struct PageView: UIViewRepresentable {
     let page: PDFPage
     let said: String

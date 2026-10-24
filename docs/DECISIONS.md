@@ -8,6 +8,59 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-24** — **The phone's slide view (M8, #NNN, the last of Phase 7's screens): the slide on
+  Focus only, PDFKit's page alone with no link to open and nothing to select, the deck asked for once
+  per SHA-256 as the slide shows, one document at a time.** **The screen** (the app canvas's row
+  "Slides": FocusSlide, FocusSlideQuestion, SlideLoading and SlideFailed, in D1's look): while the
+  lesson followed (L8b-1's rules: in front, the consent list seen) shows a slide over shields the
+  check verified, Focus takes L8b-2's lesson layout, the ring become the strip and Emergency Unlock
+  pinned at the bottom, the same control and one-second hold, the slide under the question when one
+  shows too (decision 11): "Slide 4 of 12" and Pinch to zoom over the page, in a 16:9 frame the width
+  of the screen less its gutters, white with a hairline and shadow-1 at `radius-md` as drawn, the page
+  as large as fits, white either side of a page that isn't 16:9 as on the student web (W5); Loading
+  the slides… and Bali couldn't load the slides. with Try again in the sunken frame as drawn, which
+  grows past 16:9 once the phone's text size needs it, so no line is cut. The ring comes back once
+  neither a card nor a slide shows. A press on Emergency Unlock holds the card and the slide as they
+  were, as L8b-2 held the card, so a replaced deck's document can outlive its replacement by that
+  second. **On Focus only** (the brief: no board draws a slide on Unlocked, Screen Time off or Home,
+  and a separate agent draws proposals for the owner), and none over shields not verified, as
+  L8b-2's card. **The view** (decision 8): PDFKit's `PDFView`, never a web view; the slide's page
+  copied alone into a document of its own, so no other page of the deck can be reached; pinch zoom
+  from the page as large as fits to four times that; VoiceOver reads the page as one element, its
+  text (`PDFPage.string`), or which slide it is when it has none ("Slide 2 of 3"). **No link opened,
+  nothing selected** (*the worker's call*): the copied page's link annotations, and any annotation
+  carrying an action or a URL, are taken off, form fields made read-only, and a touch lands on a
+  clear view over the page (PDFKit's markup mode, iOS 16+), never on PDFKit's links, fields or text
+  selection; a link PDFKit still offers goes to a delegate that opens nothing. Found on the
+  Simulator: a long press selected a word with Copy, Select All, Look Up and more (Translate, Search
+  Web, Share), whose sheets come up over Emergency Unlock (decision 1), as a fillable worksheet's
+  field would bring up a keyboard. Cost: a student can't copy a slide's words. Pinch and the page's
+  scroll stay PDFKit's, and a swipe starting on the slide scrolls the screen. **The deck** (M7's
+  `LiveLesson.deck(for:)`): asked for as the slide view shows it (`Phone.loadDeck`), never as the
+  poll names it, so no screen fetches up to 25 MB for a slide it doesn't show (*the worker's call*);
+  once per SHA-256: no second ask while one is on its way (M7 left that guard to M8) nor for the deck
+  held, a page turned asks nothing, a deck shown again is answered from `LiveLesson`'s memory for the
+  session, and Try again asks once more; only the lesson's current slide is ever asked for, so a stale
+  Try again fetches nothing. One parsed `PDFDocument` at a time, in memory alone: let go once the
+  lesson shows another deck or none, and with the lesson at a sign-out or the session's end
+  (`dropLesson`); the slide goes at its class's bell by the phone's clock, as the card does
+  (`Phone.lessonCurrent`, L8c's rule, now the card's and the slide's). A deck PDFKit can't open, or
+  one without the slide's page, says the same couldn't-load line. **Known limits** (left as they are;
+  the device check decides): the fetch shares the transport's 30 s bound on a whole exchange (M7's
+  `ponytail:`); a fetch the phone's lock cuts short says couldn't load, with Try again, when the
+  student is back; the deck is parsed on the main actor as it arrives; `LiveLesson` keeps every deck
+  the session showed (M7's `ponytail:`). **The device check** (📱, the owner's, on a shielded phone):
+  a ~25 MB deck on several phones at once through one access point against the 30 s bound; memory
+  with several big decks shown in one class; a deck fetched once per SHA-256 (paging fetches nothing,
+  an earlier deck shown again fetches nothing); the lesson, its deck with it, dropped at sign-out;
+  pinch, a swipe from the slide, VoiceOver on a page with text and one without, Emergency Unlock's
+  hold with a slide showing, a link not opened, a long press selecting nothing; the phone locked
+  mid-download. **Tests:** `AppTests.slideOnFocus`, `slideAndQuestion`, `slideStates`,
+  `slideVoiceOver`, `slideLinks`, `slideOncePerDeck`, `slideAsksAsItShows`, `slideFits` and
+  `slideWaitsForTheHold`, each guard taken out in turn (13) failing its test; the PDFs drawn in code
+  (`UIGraphicsPDFRenderer`), none in the repo; `scrollEdges`' sweep skips PDFKit's own zoom view,
+  no screen's scroll. Screenshots beside each board.
+
 - **2026-10-23** — **The same answer card off the Focus screen (L8c, #451, L8's last PR, so its
   screens are done), with the owner's three riders; the card goes at its class's bell by the
   phone's clock; a state chip reads its word alone to VoiceOver.** **The screens** (the app canvas's

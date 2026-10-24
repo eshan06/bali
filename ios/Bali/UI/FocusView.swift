@@ -11,11 +11,10 @@ struct FocusView: View {
     @Environment(\.openURL) private var openURL
     /// Whether the page over the pinned Emergency Unlock scrolls: a hairline then marks its edge.
     @State private var scrolls = false
-    /// The card and the slide shown — with the strip and Emergency Unlock pinned — or neither, the
-    /// ring's layout. It holds still while a press on Emergency Unlock is under way over verified
-    /// shields, so a card or a slide coming, going or changing never rebuilds the control under the
-    /// finger (decision 1), and catches up once the press ends: the screen shows meanwhile what it
-    /// showed as the press began.
+    /// The card and slide shown — with the strip and Emergency Unlock pinned — or neither, the ring's
+    /// layout. It holds still while a press on Emergency Unlock is under way over verified shields,
+    /// so a card or slide coming, going or changing never rebuilds the control under the finger
+    /// (decision 1), and catches up once the press ends, showing meanwhile what it showed as it began.
     @State private var held = Lesson()
     /// Why the last press on Emergency Unlock didn't go through: the screen's, so a change of layout
     /// never takes it (rule 5).

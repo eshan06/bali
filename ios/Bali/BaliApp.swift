@@ -954,10 +954,9 @@ final class Phone {
         return SlideShown(slide: slide, phase: phase)
     }
 
-    /// Whether the session followed is still the one to follow by the phone's clock
-    /// (`lessonSession`), a fixture's always: at its bell what shows of its lesson goes as Home's
-    /// card for the class does, Bali reached or not, where a screen that stays past the bell (Home)
-    /// would have kept it until the next read.
+    /// Whether the session followed is still the one to follow by the phone's clock (`lessonSession`),
+    /// a fixture's always: at its bell its card and slide go as Home's card for the class does, Bali
+    /// reached or not, where Home, which stays past the bell, would keep them until the next read.
     private var lessonCurrent: Bool {
         frozen || sync?.lessonSession(at: Date(), over: notFollowed) == following?.lesson.session
     }
@@ -967,16 +966,12 @@ final class Phone {
     /// session from memory, so a deck shown again fetches nothing — and, `again`, once more after it
     /// came (Try again). A new deck lets the last one's document go. A fixture's deck stays as made.
     func loadDeck(for slide: Slide, again: Bool = false) {
-        guard !frozen, slide.sha256 == lesson?.presentation?.slide?.sha256 else { return }
+        guard let live = following?.lesson, slide.sha256 == lesson?.presentation?.slide?.sha256 else { return }
         if let deck, deck.sha256 == slide.sha256, !again || deck.phase == .loading { return }
         deckFetch?.cancel()
         deckAsks += 1
         let ask = deckAsks
         deck = SlideDeck(sha256: slide.sha256, phase: .loading)
-        guard let live = following?.lesson else {
-            deck?.phase = .failed
-            return
-        }
         deckFetch = Task { [weak self] in
             let result = await live.deck(for: slide)
             guard let self, ask == self.deckAsks else { return }
@@ -1010,8 +1005,7 @@ final class Phone {
         following = (live, watch, foreground ? Task { await live.run() } : nil)
     }
 
-    /// No lesson followed: its watch and poll cancelled, and the card's own and the deck let go with
-    /// it.
+    /// No lesson followed: its watch and poll cancelled, the card's own and the deck let go with it.
     private func dropLesson() {
         following?.watch.cancel()
         following?.poll?.cancel()

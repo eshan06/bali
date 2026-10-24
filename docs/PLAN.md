@@ -8,20 +8,17 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-23 (Central) — The same answer card off the Focus screen (L8c, #451;
-`docs/DECISIONS.md`, 2026-10-23), L8's last PR on the Mac, so L8's screens are done: while a question
-shows, Unlocked has the card over its reason card, Screen Time off over its steps and Home, for a
-student not tapped in, over its classes, as the boards draw them, every other word and button where
-it was, and a screen's own line about something gone wrong above the card, as three intermediate
-boards drawn first on the app canvas show. With it, the owner's three small fixes: a relaunch that finds the account deleted on Bali's
-server clears the phone's two notes, a student removed and added back mid-class gets the card again
-once Bali reads their classes, and the card ignores taps while Emergency Unlock is held. And two
-found on the way: the card goes at its class's bell by the phone's clock, signal or not, and a state
-chip is read to VoiceOver as its word alone, never its icon's name. No board draws the card on the
-Screen Time grant screen (a student not tapped in whose Screen Time access is off) or on the Home
-opened from Unlocked or Waiting, so none shows there: the owner's call. No TestFlight build was
-sent. Next on the Mac: L8's 📱 device check, the owner's, then M8; on the Windows PC, the other three
-pre-pilot steps wait for the owner's word._
+_Last updated: 2026-10-24 (Central) — The phone's slide view (M8, #NNN; `docs/DECISIONS.md`,
+2026-10-24), the last of Phase 7's screens: while the teacher shows a slide, Focus's ring becomes the
+strip and the page shows under it (under the question, when one shows too), drawn by PDFKit in a 16:9
+frame, pinch to zoom, read by VoiceOver as the page's words or, with none, as which slide it is;
+Emergency Unlock pinned at the bottom, its hold unchanged. Each deck is fetched once, as the slide
+shows, kept in memory alone, one at a time. No link in a deck opens, and a slide's words can't be
+selected, so no Look Up or Share sheet comes up over Emergency Unlock (the worker's call). The slide
+shows on Focus only for now: no board draws it on Unlocked, Screen Time off or Home. No TestFlight
+build was sent. Next: L8's and M8's 📱 device checks, the owner's; on the Windows PC, M6's panel line
+comes back now that phones show the slide (the conductor's), and the other three pre-pilot steps wait
+for the owner's word._
 
 ## Now
 
@@ -46,10 +43,10 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
   runs unchanged, and `npm test` passes whole on the PC.
 - **The owner's Mac session (Xcode and the iPhone):** the app's Sign in & sign up is built; the app
   keeps D1's look until the owner approves a new one (its redesign rolled back, 2026-10-06). Left:
-  the push's app half (not started), TestFlight build 9 for C7's phone test (📱), and the phone's
-  Phase 7 work (L8's screens ✅ as L8a, #443, L8b, #448 and #450, and L8c, #451; left, its 📱
-  device check, the owner's; then M8). C2's legal words (⚖️) go into the portal's pages, on the
-  Windows PC.
+  the push's app half (not started) and TestFlight build 9 for C7's phone test (📱). The phone's
+  Phase 7 screens are done (L8's as L8a, #443, L8b, #448 and #450, and L8c, #451; M8's slide view,
+  #NNN); left, their 📱 device checks, the owner's. C2's legal words (⚖️) go into the portal's
+  pages, on the Windows PC.
 - **The portal redesign in v2's look (PV0–PV17, the owner, 2026-10-12)** ✅ (2026-10-16): every step
   done, with PV3b, PV4b, PV4c and PV5b; the last, PV17c-2, Home's Last session (#425).
 - **The portal's tests drive the page (the owner, 2026-10-22: "Yes, go gradually")**: the setup ✅
@@ -133,13 +130,13 @@ first class, production backups (L0b, the owner's console step; the owner, 2026-
 - The Windows PC (since 2026-10-14): the conductor, whose workers build the steps one at a time,
   the portal's UI included (`apps/web/src/app`, `apps/web/src/components`, its user-facing strings).
 - The Mac session: Xcode and the iPhone (`ios/Bali/UI`, `ios/BaliShield`, the app's user-facing
-  strings): L8, M8, TestFlight build 9, the push's app half.
+  strings): TestFlight build 9, the push's app half.
 - The owner: the consoles (AWS, Railway, Vercel, Sentry, App Store Connect), Apple, the
   lawyer, the school, and every iPhone check.
 
 **Phase 7, Live lesson: building.** Every step with no screen is done, L3c the last (2026-10-15);
 M0 is done (deck storage on, 2026-10-12); the web screens come after the redesign's PV15 (✅ #388),
-W3 the first (✅ #392), M5 (✅ #400), L7 (✅ #402, #405), W4 (✅ #406, #407, #408, its follow-up #409), L7b (✅ #393, #394, #395, #411), L7c (✅ #412), M6 (✅ #413–#418), W5 (✅ #419), so every web screen of Phase 7 is built, and the phone's L8 screens too (✅ L8a–L8c, its 📱 device check left); next M8. L0b, production backups, is the owner's, before the Vanderbilt pilot's first
+W3 the first (✅ #392), M5 (✅ #400), L7 (✅ #402, #405), W4 (✅ #406, #407, #408, its follow-up #409), L7b (✅ #393, #394, #395, #411), L7c (✅ #412), M6 (✅ #413–#418), W5 (✅ #419), so every web screen of Phase 7 is built, and the phone's too (✅ L8a–L8c and M8, #NNN, their 📱 device checks left). L0b, production backups, is the owner's, before the Vanderbilt pilot's first
 class.
 
 ## Phases
@@ -253,7 +250,7 @@ Slice 2 — slides:
 - **M5** 👀 The slides page and upload — ✅ as M5a (#396), M5b part 1 (#397) and M5b part 2 (#400); DECISIONS 2026-10-15
 - **M6** 👀 Portal presenter to v2's canvas — ✅ as part 1 (#413), 2a (#414), 2b-1 (#415), 2b-2 (#416), 2c (#417) and 2d (#418); DECISIONS 2026-10-16; LessonDecks' panel line comes back with M8 (the conductor's call, the owner's on 2026-10-16)
 - **M7** BaliCore's deck download and cache (for M8) — ✅ (#331; DECISIONS 2026-10-12)
-- **M8** 👀📱 iOS slide view to the app canvas: PDFKit, pinch zoom, each page's text as its VoiceOver label, Emergency Unlock untouched — validation: XCTest, the device check on a shielded phone
+- **M8** 👀📱 iOS slide view to the app canvas — ✅ (#NNN; DECISIONS 2026-10-24): the slide on Focus; left, its 📱 device check on a shielded phone, the owner's
 - **M9** Load and demo with a deck — ✅ (#335; DECISIONS 2026-10-12)
 - **M10** 📱 Exit check: a real class on prod follows a deck
 
