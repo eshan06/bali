@@ -8,7 +8,7 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
-- **2026-10-24** — **M6's LessonDecks panel line back (#PR): "Pick a deck. Every phone in this
+- **2026-10-24** — **M6's LessonDecks panel line back (#457): "Pick a deck. Every phone in this
   class shows the page you're on, and so does Present."** M6 left the second sentence out until W5
   and M8 made it true (the conductor's call of 2026-10-16, approved by the owner the same day; below).
   They have: the student web (W5, #419) and the phone on Focus (M8, #452), Unlocked, Screen Time off

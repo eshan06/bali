@@ -8,7 +8,7 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-24 (Central) — M6's LessonDecks panel line back (#PR; `docs/DECISIONS.md`,
+_Last updated: 2026-10-24 (Central) — M6's LessonDecks panel line back (#457; `docs/DECISIONS.md`,
 2026-10-24): Show slides' panel says "Pick a deck. Every phone in this class shows the page you're
 on, and so does Present." again, now that phones (M8, M8b) and the student web (W5) show the slide.
 LessonDecksStates and LessonRetryStates still draw the short line on the canvas: their redraw is
@@ -250,7 +250,7 @@ Slice 2 — slides:
 - **M3b** The poll's slide and a deck's download (for M6) — ✅ (#328; DECISIONS 2026-10-12)
 - **M4** Decks in the privacy paths — ✅ (#329; DECISIONS 2026-10-12)
 - **M5** 👀 The slides page and upload — ✅ as M5a (#396), M5b part 1 (#397) and M5b part 2 (#400); DECISIONS 2026-10-15
-- **M6** 👀 Portal presenter to v2's canvas — ✅ as part 1 (#413), 2a (#414), 2b-1 (#415), 2b-2 (#416), 2c (#417) and 2d (#418); DECISIONS 2026-10-16; the panel line back (#PR; DECISIONS 2026-10-24)
+- **M6** 👀 Portal presenter to v2's canvas — ✅ as part 1 (#413), 2a (#414), 2b-1 (#415), 2b-2 (#416), 2c (#417) and 2d (#418); DECISIONS 2026-10-16; the panel line back (#457; DECISIONS 2026-10-24)
 - **M7** BaliCore's deck download and cache (for M8) — ✅ (#331; DECISIONS 2026-10-12)
 - **M8** 👀📱 iOS slide view to the app canvas — ✅ (#452; DECISIONS 2026-10-24): the slide on Focus only, over shields the check verified; left, its 📱 device check on a shielded phone, the owner's (Part 3 of `ios/README.md`'s "Phase 7's phone sitting, on prod"); the slide off Focus is M8b's; its CI failure, `AppTests.ageAgainInClass`'s own wait, fixed in the same PR (DECISIONS 2026-10-24)
 - **M8b** 👀📱 The slide on Unlocked, Screen Time off and Home, and the question card on the Screen Time ask — ✅ (#454; DECISIONS 2026-10-24); left, its 📱 device check with M8's (Part 3 of `ios/README.md`'s "Phase 7's phone sitting, on prod")
