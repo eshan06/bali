@@ -40,7 +40,7 @@ What blocks is defined in one place: the reviewer prompt in `.github/workflows/c
 
 ### Step 2: Dual independent review
 
-Launch both reviewers **in parallel** (one message, two tool uses). Every Claude reviewer this loop launches, Reviewer A and Reviewer B's Claude fallback in either round, runs at the Agent tool's `effort: "max"`, whatever effort the worker itself runs at, except on a screen step (`.claude/commands/plan.md`, "The worker's effort"), where it runs at `effort: "xhigh"`: the owner's explicit instructions (2026-10-14, and 2026-10-24 for screen steps; `docs/DECISIONS.md`). The brief names the step's reviewer effort; with none named, `max`. Each gets:
+Launch both reviewers **in parallel** (one message, two tool uses). Every Claude reviewer this loop launches, Reviewer A and Reviewer B's Claude fallback in either round, runs at the Agent tool's `effort: "max"`, whatever effort the worker itself runs at, except on a screen step (`.claude/commands/plan.md`, "The worker's effort"), where it runs at `effort: "xhigh"`: the owner's explicit instructions (2026-10-14, and 2026-10-24 for screen steps; `docs/DECISIONS.md`). The brief names the step's reviewer effort; with none named, `max`; and a diff that ends up changing anything plan.md keeps at `max` runs its reviewers at `max`, whatever the brief named. Each gets:
 
 - the rules from Step 1, verbatim
 - the diff (`git diff origin/main...HEAD`), not whole files — reviewers open files themselves when they need context
