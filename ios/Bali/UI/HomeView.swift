@@ -10,8 +10,9 @@ import SwiftUI
 /// it, its card takes the hero's place (C3c) — and so, waiting for their teacher's Start, does the
 /// wait's (#151), and, in no class, the way into one: not in one yet, or in none any more (#143;
 /// the approved Sign in & sign up design's Home boards). While a question shows, the answer card
-/// sits over the classes (L8; the app canvas's HomeQuestion): a student tapped in or not may answer
-/// (ARCHITECTURE, "Live lesson", decision 2).
+/// sits under the card for the class in session and over the classes, for a student not tapped in
+/// (L8; the app canvas's HomeQuestion; ARCHITECTURE, "Live lesson", decision 11). No board draws it
+/// on the Home opened from Unlocked or Waiting, so none shows there.
 struct HomeView: View {
     let phone: Phone
     /// The card's bell, rung: the card goes then, by the phone's clock (C3c).
@@ -94,7 +95,9 @@ struct HomeView: View {
                     if let refused = phone.sync?.refusedTapWords {
                         Retry(words: refused, phone: phone)
                     }
-                    if let question = phone.card { AnswerCardView(card: question, phone: phone) }
+                    if card?.unlocked == false, let question = phone.card {
+                        AnswerCardView(card: question, phone: phone)
+                    }
                     // In no class, the card is the classes' own empty state, its Join a class
                     // theirs: one way in, never two (#143).
                     if empty == nil { ClassesSection(phone: phone, title: "Your classes") }

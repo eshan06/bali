@@ -3638,7 +3638,7 @@ struct AppTests {
     }
 
     @Test(
-        "The same card off the Focus screen (L8; the app canvas's UnlockedQuestion, ScreenTimeOffQuestion and HomeQuestion): on Unlocked, Screen Time off, Home not tapped in and Unlocked's Home, the card sits where the boards draw it, after what the screen says of where the student stands and over its own controls, and nothing else changes: the screen reads every word and control it reads with no question, in their order, its controls still buttons; each answer a button VoiceOver reads with its letter and words; closed, its Hide takes the card away and leaves the screen as it was"
+        "The same card off the Focus screen (L8; the app canvas's UnlockedQuestion, ScreenTimeOffQuestion and HomeQuestion): on Unlocked, Screen Time off and Home for a student not tapped in, the card sits where the boards draw it, after what the screen says of where the student stands and over its own controls, and nothing else changes: the screen reads every word and control it reads with no question, in their order, its controls still buttons; each answer a button VoiceOver reads with its letter and words; closed, its Hide takes the card away and leaves the screen as it was. The Home opened from Unlocked or Waiting, which no board draws with the card, shows none"
     )
     func offFocusCard() async throws {
         /// What VoiceOver reads of `view`, laid out whole, once it reads `title`: each element's
@@ -3674,10 +3674,6 @@ struct AppTests {
                 ["Turn on Screen Time"]
             ),
             ("homeQuestion", { _ in "Tap in" }, ["Tap in", "Join a class", "Home", "History", "Me"]),
-            (
-                "homeFromUnlockedQuestion", { _ in "Lock my apps again" },
-                ["Back", "Lock my apps again", "Join a class", "Home", "History", "Me"]
-            ),
         ]
         for (name, last, controls) in cases {
             let fixture = try #require(PreviewFixtures.all[name])
@@ -3706,6 +3702,22 @@ struct AppTests {
             let hidden = try await read(RootView(phone: phone), once: anchor).map(\.label)
             #expect(hidden == without, "\(name): \(hidden)")
         }
+        // The Home opened from Unlocked or from Waiting, a question open all the same: no board
+        // draws the card there, so none shows (decision 11's Home is a student's not tapped in).
+        var waiting = try #require(PreviewFixtures.all["homeWaiting"])
+        waiting.lesson = PreviewFixtures.all["homeQuestion"]?.lesson
+        let opened = [
+            ("homeFromUnlockedQuestion", try #require(PreviewFixtures.all["homeFromUnlockedQuestion"])),
+            ("homeWaiting", waiting),
+        ]
+        for (name, state) in opened {
+            var plain = state
+            plain.lesson = nil
+            #expect(Phone(fixture: state).card != nil, "\(name)")
+            let shown = try await read(RootView(phone: Phone(fixture: state)), once: "Join a class").map(\.label)
+            let without = try await read(RootView(phone: Phone(fixture: plain)), once: "Join a class").map(\.label)
+            #expect(shown == without, "\(name): \(shown)")
+        }
     }
 
     @Test(
@@ -3732,7 +3744,7 @@ struct AppTests {
             CGSize(width: 390, height: 844 - 47 - 34), CGSize(width: 393, height: 852 - 59 - 34),
             CGSize(width: 402, height: 874 - 62 - 34),
         ]
-        for name in ["unlockedQuestion", "protectionOffQuestion", "homeQuestion", "homeFromUnlockedQuestion"] {
+        for name in ["unlockedQuestion", "protectionOffQuestion", "homeQuestion"] {
             for size in [DynamicTypeSize.large, .accessibility1, .accessibility5] {
                 for frame in phones {
                     let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))
@@ -3828,7 +3840,7 @@ struct AppTests {
         let server = LessonServer()
         let (phone, _) = try standIn(server, protection: approved)
         phone.signed(in: true, as: "ana", checked: true)
-        phone.synced(try classInSession(ringsIn: 8))
+        phone.synced(try classInSession())
         phone.sawList()
         phone.setForeground(true)
         let window = UIWindow(windowScene: scene)
@@ -3843,6 +3855,10 @@ struct AppTests {
         try await until { phone.shown.screen == .home && shows("Which?") }
         await server.goOffline()
         try await until { phone.card?.offline == true }
+        // The bell set two seconds off only now, the card saying no connection, so no slow
+        // simulator reaches it first; the same session, so the lesson followed stays.
+        phone.synced(try classInSession(ringsIn: 2))
+        #expect(shows("Which?"))
         try await until { !shows("Which?") }
         #expect(phone.card == nil && phone.shown.screen == .home)
         phone.signed(in: false)

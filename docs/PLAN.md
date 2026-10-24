@@ -10,18 +10,17 @@ is in `docs/DECISIONS.md`, and finished history is word for word in
 
 _Last updated: 2026-10-23 (Central) — The same answer card off the Focus screen (L8c, #PRNUM;
 `docs/DECISIONS.md`, 2026-10-23), L8's last PR on the Mac, so L8's screens are done: while a question
-shows, Unlocked has the card over its reason card, Screen Time off over its steps and Home over its
-classes, as the boards draw them, every other word and button where it was; Home shows it to a
-student tapped in or not, Unlocked's Home too (the worker's call, awaiting the owner). With it, the
-owner's three small fixes: a relaunch that finds the account deleted on Bali's server clears the
-phone's two notes, a student removed and added back mid-class gets the card again once Bali reads
-their classes, and the card ignores taps while Emergency Unlock is held. And two found on the way:
-the card goes at its class's bell by the phone's clock, signal or not, and a state chip is read to
-VoiceOver as its word alone, never its icon's name. One place still shows no card while a class
-runs: the Screen Time grant screen, for a student not tapped in whose Screen Time access is off; no
-board draws it, so it is the owner's call. No TestFlight build was sent. Next on the Mac: L8's 📱
-device check, the owner's, then M8; on the Windows PC, the other three pre-pilot steps wait for the
-owner's word._
+shows, Unlocked has the card over its reason card, Screen Time off over its steps and Home, for a
+student not tapped in, over its classes, as the boards draw them, every other word and button where
+it was. With it, the owner's three small fixes: a relaunch that finds the account deleted on Bali's
+server clears the phone's two notes, a student removed and added back mid-class gets the card again
+once Bali reads their classes, and the card ignores taps while Emergency Unlock is held. And two
+found on the way: the card goes at its class's bell by the phone's clock, signal or not, and a state
+chip is read to VoiceOver as its word alone, never its icon's name. No board draws the card on the
+Screen Time grant screen (a student not tapped in whose Screen Time access is off) or on the Home
+opened from Unlocked or Waiting, so none shows there: the owner's call. No TestFlight build was
+sent. Next on the Mac: L8's 📱 device check, the owner's, then M8; on the Windows PC, the other three
+pre-pilot steps wait for the owner's word._
 
 ## Now
 

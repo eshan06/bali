@@ -197,7 +197,7 @@
             // Protection off reported there: the card's way back is a re-tap, as Unlocked's.
             "homeFromUnlockedRetap": State(
                 sync: reported(standing(.inSession(period3, .unlocked))), opened: [.home]),
-            // A question there (L8): HomeQuestion's layout, over C3c's unlocked card.
+            // A question open there (L8): no board draws the card on this Home, so none shows.
             "homeFromUnlockedQuestion": State(
                 sync: recorded(standing(.inSession(period3, .unlocked)), nil), opened: [.home],
                 lesson: lesson()),
