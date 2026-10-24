@@ -665,9 +665,9 @@ describe('every page and piece uses the tokens’ utilities, never a Tailwind de
 
 describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
   // Cards sit straight on the page with their own hairline (DESIGN.md §4). Grey stays only where
-  // the approved designs keep it: the grid's stale banner, the policy draft's banner, and a
-  // control's hover, pressed or open state, the side menu's item on its own page (PV5) among them;
-  // a chip's fill is its state's own tint, the Placeholder chip's Not here's (PV15). A field is
+  // the approved designs keep it: the grid's stale banner, and a control's hover, pressed or open
+  // state, the side menu's item on its own page (PV5) among them; a chip's fill is its state's own
+  // tint. The policy pages' banner and Placeholder chips went with their outline (C2-text). A field is
   // white in v2's look (PV4); the grey v2 adds comes with the step that draws each: the length
   // picker's track and the join code's chip (PV6); the recap's name pills (PV12b); a table's head
   // and the bars' tracks (PV13); the help page's two lists of what a teacher sees (PV15).
@@ -700,7 +700,7 @@ describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
     const filled = Object.fromEntries(
       files.filter((file) => bare(file) > 0).map((file) => [relative(src, file), bare(file)]),
     );
-    // The stale banner, the policy draft's banner, and v2's on the class page: the length
+    // The stale banner, and v2's on the class page: the length
     // picker's track, the join code's chip, the timeline's dots (the student panel's moments, and
     // Home's Recent activity since PV17c) and the recap's name
     // pills; on Reports (PV13) its table's head, its bars' tracks and the place-lost notice, drawn
@@ -716,7 +716,6 @@ describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
       [join('app', 'support', 'page.tsx')]: 1,
       [join('components', 'join-code.tsx')]: 1,
       [join('components', 'live-grid.tsx')]: 1,
-      [join('components', 'policy-draft.tsx')]: 1,
       [join('components', 'present-question.tsx')]: 2,
       [join('components', 'question-card.tsx')]: 2,
       [join('components', 'reports-list.tsx')]: 3,

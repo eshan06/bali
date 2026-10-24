@@ -769,7 +769,16 @@ a real decision? Add a dated entry at the top: what was decided and why.
   published settings (Railway backups daily 6 days and weekly 27 days, Railway logs up to 90
   days, Vercel's Hobby 1 hour, Sentry up to 90 days). The pages change only their words, so no
   new board (the owner's call); the privacy draft's table becomes lists so nothing undrawn
-  appears. The lawyer's real review stays before the pilot's first class.
+  appears. The lawyer's real review stays before the pilot's first class. *Built the same day
+  (C2-text, #461; the planning session's calls):* the pages are the one copy of the words, so the
+  drafts can't drift from what readers see: `docs/legal/` keeps only the notes for the lawyer, who
+  reviews the live pages. The privacy policy's section 2 shows the app's own two lists of what a
+  teacher sees and never sees (`apps/web/src/components/teacher-sees.ts`, the help page's too,
+  held word for word to `JoinView.swift` by `support.test.ts`), so the app, Help and the policy
+  never say different things (#130); the draft's paragraph on answers went, as the lists' answers
+  lines say it. One PR for all of it, though its ~745 changed lines pass the ~400 step size: ~625
+  are the legal text itself, and a split would have left `/terms` on the outline and the help
+  page's line half true.
 
 - **2026-10-22** — **The API's database pool can never silently shrink to one connection (#439, a
   guard from #336's finding, #438): the API always hands postgres.js its own size, so `PGMAX` and a
