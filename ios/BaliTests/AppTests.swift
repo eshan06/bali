@@ -3437,6 +3437,49 @@ struct AppTests {
     }
 
     @Test(
+        "A card that comes or goes while Emergency Unlock is held never rebuilds the control mid-hold (L8; ARCHITECTURE, \"Live lesson\", decision 1; santa's round 1): Focus keeps the layout it had, the ring or the strip, the control the same one, until the press ends, then shows what changed"
+    )
+    func cardWaitsForTheHold() async throws {
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let phone = Phone(fixture: try #require(PreviewFixtures.all["focus"]))
+        let window = UIWindow(windowScene: scene)
+        window.frame = scene.screen.bounds
+        window.rootViewController = UIHostingController(rootView: RootView(phone: phone))
+        window.isHidden = false
+        defer { window.isHidden = true }
+        func read() -> [NSObject] {
+            window.layoutIfNeeded()
+            return (try? voiceOver(in: window)) ?? []
+        }
+        func unlock() -> NSObject? { read().first { $0.accessibilityLabel == "Emergency Unlock. Your teacher will see it." } }
+        func shows(_ label: String) -> Bool { read().contains { $0.accessibilityLabel == label } }
+        try await until { unlock() != nil }
+        // A question comes while the hold runs: the ring stays, and so does the control.
+        let ringed = try #require(unlock())
+        phone.unlockHeld = true
+        phone.lessonRead(try lessonRead(question: "next"), of: "session")
+        try await Task.sleep(for: .seconds(0.5))
+        #expect(!shows("Which?") && unlock() === ringed, "the card came mid-hold")
+        phone.unlockHeld = false
+        try await until { shows("Which?") }
+        // The question goes while the hold runs: the card goes, the strip's layout and the control stay.
+        let pinned = try #require(unlock())
+        phone.unlockHeld = true
+        phone.lessonRead(LessonState(), of: "session")
+        try await Task.sleep(for: .seconds(0.5))
+        #expect(!shows("Which?") && unlock() === pinned, "the ring came back mid-hold")
+        phone.unlockHeld = false
+        try await until { unlock() !== pinned }
+        // Why the last press didn't go through outlives a change of layout (rule 5): VoiceOver's
+        // one step on a phone not started, then a question coming.
+        try #require(unlock()).accessibilityActivate()
+        try await until { shows(Joining.notStarted) }
+        phone.lessonRead(try lessonRead(question: "again"), of: "session")
+        try await until { shows("Which?") }
+        #expect(shows(Joining.notStarted), "the failure line went with the layout")
+    }
+
+    @Test(
         "Hide, on a closed question (L8): the card goes and the ring comes back, kept on this phone however often the question is read again, until another opens, whose card shows — and an open card has no Hide"
     )
     func lessonHide() async throws {

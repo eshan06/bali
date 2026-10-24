@@ -16,6 +16,8 @@ struct HomeView: View {
     @State private var rung: Date?
     /// Why Lock my apps again did not go through (rule 5).
     @State private var notBack: String?
+    /// Why the last press on Emergency Unlock did not go through (rule 5).
+    @State private var unlockFailed: UnlockFailure?
 
     private var me: MeResponse? { phone.sync?.me }
 
@@ -51,7 +53,7 @@ struct HomeView: View {
                             EmergencyUnlock(
                                 phone: phone,
                                 caption: "Works without Wi-Fi. Letting go early does nothing.",
-                                paused: true)
+                                paused: true, failed: $unlockFailed)
                         }
                     }
                     // In every build, as Emergency Unlock is wherever the shields can be on:

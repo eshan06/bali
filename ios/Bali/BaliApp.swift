@@ -197,6 +197,10 @@ final class Phone {
     /// on the same question.
     @ObservationIgnored private var lessonsOver: Set<String> = []
     @ObservationIgnored private var picks = 0
+    /// Whether a press on Emergency Unlock is under way, its one-second hold running: Focus keeps its
+    /// layout meanwhile, so a card coming or going never rebuilds the control under the finger
+    /// (ARCHITECTURE, "Live lesson", decision 1: never delayed, its hold unchanged).
+    var unlockHeld = false
 
     /// Whether the student `GET /v1/me` names has been listed in a class on this phone (#143):
     /// which words Home's empty state says.

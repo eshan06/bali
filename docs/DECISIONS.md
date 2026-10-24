@@ -13,35 +13,41 @@ a real decision? Add a dated entry at the top: what was decided and why.
   says the app's list word for word.** **The screen** (the app canvas's Main, FocusAnswered,
   FocusRevealed and FocusLargeText, and the eight boards of "The answer card, state by state", in
   D1's look): while the phone has a card to show (`Phone.card`: a lesson followed, its question open
-  or the last closed one, not hidden) and the check verified the shields on, Focus's ring becomes the
-  strip under the class's name, its time drawn and read as the ring's, its chips beside it or under
-  it once the row outgrows the screen; the card under it (`AnswerCardView`, one view the other
+  or the last closed one, not hidden) and the check verified the shields on, Focus's ring becomes
+  the strip under the class's name, its time drawn and read as the ring's, its chips beside it or
+  under it once the row outgrows the screen; the card under it (`AnswerCardView`, one view the other
   screens can take), then Focus's own notes; the page scrolls over Emergency Unlock, pinned at the
   bottom at every text size, a hairline over it once the page scrolls (FocusLargeText's edge), the
   control and its one-second hold the same `UnlockControl` as before. The ring comes back once the
-  card is hidden or the lesson has none. The correct answer's fill is green-50 (`Theme.optionRight`,
-  pinned by `AppTests.tokens`); an answer's letter disc is sized in whole points, so the card is never
-  a pixel wider than the screen at the larger text sizes. Built from an earlier worker's commit
-  (096d8554, on L8b-1's first draft) merged with main's L8b-1 (#448), main's logic kept. **No card on
-  Focus over shields not verified** (*the worker's call*): Focus's Screen Time off and its "Checking
-  Screen Time…" moment keep the ring layout with no card, since the strip's time is the ring's and
-  only verified shields get one (rule 3), and no board draws Focus there with a card; the Screen Time
-  off screen's own card (ScreenTimeOffQuestion) is the rest of L8's, with Unlocked's and Home's.
-  **A poll refused 403 or 404** (*the conductor's call, under CLAUDE.md's honest-errors rule*): `403`,
-  the student no longer in the session's class (removed mid-class, say), or `404`, no such session,
-  is no connection problem, so never CardOffline's "No connection" line: the phone stops following
-  that session as it does one a read said is over (`lessonsOver`), the card goes at once, another
-  class in session is followed if one runs, and the next read of `GET /v1/me` says where the student
-  stands. The other undrawn mappings stay as L8b-1 made them. **Known limits** (each left as is, its
-  reachability doubtful; reported to the conductor): a student removed and added back while the same
-  session runs gets no card for the rest of it this run, the session kept in `lessonsOver`; and an
-  Emergency Unlock's failure line under the control goes if the card comes or goes while it shows,
-  the two layouts placing the control apart, the control itself unchanged. **The rider** (#443's
+  card is hidden or the lesson has none. **The control is never rebuilt mid-hold** (santa's round 1,
+  both reviewers): the two layouts place Emergency Unlock apart, so a card coming or going under a
+  press, a cold start's first read landing say, would have dropped the hold. The layout now holds
+  still while a press is under way (`Phone.unlockHeld`, told by the control) and catches up once it
+  ends; the strip's time shows only over verified shields even then (rule 3); and why the last press
+  didn't go through is the screen's state, so a change of layout never takes that line. The correct
+  answer's fill is green-50 (`Theme.optionRight`, pinned by `AppTests.tokens`); an answer's letter
+  disc is sized in whole points, so the card is never a pixel wider than the screen at the larger
+  text sizes. Built from an earlier worker's commit (096d8554, on L8b-1's first draft) merged with
+  main's L8b-1 (#448), main's logic kept. **No card on Focus over shields not verified** (*the
+  worker's call*): Focus's Screen Time off and its "Checking Screen Time…" moment keep the ring
+  layout with no card, since the strip's time is the ring's and only verified shields get one (rule
+  3), and no board draws Focus there with a card; the Screen Time off screen's own card
+  (ScreenTimeOffQuestion) is the rest of L8's, with Unlocked's and Home's. **A poll refused 403 or
+  404** (*the conductor's call, under CLAUDE.md's honest-errors rule*): `403`, the student no longer
+  in the session's class (removed mid-class, say), or `404`, no such session, is no connection
+  problem, so never CardOffline's "No connection" line: the phone stops following that session as it
+  does one a read said is over (`lessonsOver`), the card goes at once, another class in session is
+  followed if one runs, and the next read of `GET /v1/me` says where the student stands. The other
+  undrawn mappings stay as L8b-1 made them. **Known limit** (left as is, its reachability doubtful;
+  reported to the conductor): a student removed and added back while the same session runs gets no
+  card for the rest of it this run, the session kept in `lessonsOver`. **The rider** (#443's
   follow-up): `docs/APP-STORE.md`'s store listing says the app's list word for word, "If you leave
   this class" and the two lines on answers, and its review notes name answers among what a teacher
   sees. Tests: `AppTests.lessonRefused` (it failed before the fix: the card stayed, saying no
-  connection), `lessonHide`, `questionFits`, `questionVoiceOver` and the fixtures' words in
-  `AppTests.fixtures`; screenshots beside each board, FocusLargeText at an accessibility text size.
+  connection), `cardWaitsForTheHold` (it failed before its fix: the card came mid-hold, the control
+  was rebuilt as the card went, and a failure line went with a change of layout), `lessonHide`,
+  `questionFits`, `questionVoiceOver` and the fixtures' words in `AppTests.fixtures`; screenshots
+  beside each board, FocusLargeText at an accessibility text size.
 
 - **2026-10-23** — **The live lesson followed and the answer card's words, no screen yet (L8b-1,
   #448, the first of L8b's two PRs: L8b came to about 506 lines and the conductor split it); the

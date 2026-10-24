@@ -11,6 +11,13 @@ struct FocusView: View {
     @Environment(\.openURL) private var openURL
     /// Whether the page over the pinned Emergency Unlock scrolls: a hairline then marks its edge.
     @State private var scrolls = false
+    /// Whether the layout is the card's — the strip, the card, Emergency Unlock pinned — or the
+    /// ring's. It holds still while a press on Emergency Unlock is under way, so a card coming or going
+    /// never rebuilds the control under the finger (decision 1), and catches up once the press ends.
+    @State private var withCard = false
+    /// Why the last press on Emergency Unlock didn't go through: the screen's, so a change of layout
+    /// never takes it (rule 5).
+    @State private var unlockFailed: UnlockFailure?
 
     var body: some View {
         let (sync, protection, signedIn) = (phone.sync, phone.protection, phone.signedIn)
@@ -19,11 +26,12 @@ struct FocusView: View {
                 let focus = FocusWords(sync, protection, now: context.date, signedIn: signedIn)
                 // The card shows where the strip can: its time, as the ring's, only over verified
                 // shields (rule 3).
-                if let card = phone.card, focus.claim == .paused {
-                    lesson(focus, card)
-                } else {
-                    page(focus)
+                let card = focus.claim == .paused ? phone.card : nil
+                let shows = phone.unlockHeld ? withCard : card != nil
+                Group {
+                    if shows { lesson(focus, card) } else { page(focus) }
                 }
+                .onChange(of: shows, initial: true) { withCard = $1 }
             }
         }
     }
@@ -48,14 +56,15 @@ struct FocusView: View {
 
     /// Focus while a question shows (L8; the app canvas's Main, FocusAnswered, FocusRevealed and
     /// FocusLargeText): the class, the ring become the strip, the card, then what else Focus says,
-    /// scrolling over Emergency Unlock, pinned at the bottom at every text size.
-    private func lesson(_ focus: FocusWords, _ card: AnswerCard) -> some View {
+    /// scrolling over Emergency Unlock, pinned at the bottom at every text size. No card: it went
+    /// while a press on Emergency Unlock was under way, the layout held until the press ends.
+    private func lesson(_ focus: FocusWords, _ card: AnswerCard?) -> some View {
         ScreenScaffold {
             ScrollView {
                 VStack(spacing: 20) {
                     heading(focus).multilineTextAlignment(.center)
                     Strip(focus: focus) { chips(focus) }
-                    AnswerCardView(card: card, phone: phone)
+                    if let card { AnswerCardView(card: card, phone: phone) }
                     notes(focus).multilineTextAlignment(.center)
                 }
                 .onGeometryChange(for: Bool.self) { geometry in
@@ -63,13 +72,15 @@ struct FocusView: View {
                 } action: { scrolls = $0 }
             }
             .scrollBounceBehavior(.basedOnSize).screenWide()
-            EmergencyUnlock(phone: phone, caption: focus.caption, paused: true)
-                .multilineTextAlignment(.center).padding(.top, 16).frame(maxWidth: .infinity)
-                .overlay(alignment: .top) {
-                    if scrolls {
-                        Rectangle().fill(Theme.border).frame(height: 1).padding(.horizontal, -Theme.gutter)
-                    }
+            EmergencyUnlock(
+                phone: phone, caption: focus.caption, paused: focus.claim == .paused, failed: $unlockFailed
+            )
+            .multilineTextAlignment(.center).padding(.top, 16).frame(maxWidth: .infinity)
+            .overlay(alignment: .top) {
+                if scrolls {
+                    Rectangle().fill(Theme.border).frame(height: 1).padding(.horizontal, -Theme.gutter)
                 }
+            }
         }
     }
 
@@ -121,7 +132,8 @@ struct FocusView: View {
     private func lower(_ focus: FocusWords) -> some View {
         VStack(spacing: 24) {
             notes(focus)
-            EmergencyUnlock(phone: phone, caption: focus.caption, paused: focus.claim == .paused)
+            EmergencyUnlock(
+                phone: phone, caption: focus.caption, paused: focus.claim == .paused, failed: $unlockFailed)
         }
     }
 
@@ -172,27 +184,31 @@ private struct Strip<Chips: View>: View {
         }
     }
 
-    private var time: some View {
-        HStack(spacing: 12) {
-            ZStack {
-                Circle().stroke(Theme.markTrack, lineWidth: 6)
-                Circle().trim(from: 0, to: focus.fraction)
-                    .stroke(
-                        focus.final ? Theme.arcFinal : Theme.arc,
-                        style: StrokeStyle(lineWidth: focus.final ? 8 : 6, lineCap: .round)
-                    )
-                    .rotationEffect(.degrees(-90))
+    /// The time left, only over shields the check verified, as the ring (rule 3): a layout held for a
+    /// press on Emergency Unlock can outlast them.
+    @ViewBuilder private var time: some View {
+        if focus.claim == .paused {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle().stroke(Theme.markTrack, lineWidth: 6)
+                    Circle().trim(from: 0, to: focus.fraction)
+                        .stroke(
+                            focus.final ? Theme.arcFinal : Theme.arc,
+                            style: StrokeStyle(lineWidth: focus.final ? 8 : 6, lineCap: .round)
+                        )
+                        .rotationEffect(.degrees(-90))
+                }
+                .padding(4).frame(width: 44, height: 44)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(focus.countdown).textStyle(.dataLg)
+                    Text(focus.until).textStyle(.caption).foregroundStyle(Theme.textTertiary)
+                }
+                .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(4).frame(width: 44, height: 44)
-            VStack(alignment: .leading, spacing: 0) {
-                Text(focus.countdown).textStyle(.dataLg)
-                Text(focus.until).textStyle(.caption).foregroundStyle(Theme.textTertiary)
-            }
-            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(focus.timeLeft)
+            .accessibilityAddTraits(.updatesFrequently)
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(focus.timeLeft)
-        .accessibilityAddTraits(.updatesFrequently)
     }
 }
 
@@ -213,11 +229,12 @@ struct EmergencyUnlock: View {
     let phone: Phone
     let caption: String
     let paused: Bool
-    @State private var failed: UnlockFailure?
+    /// The screen's own, so it outlives a change of the screen's layout.
+    @Binding var failed: UnlockFailure?
 
     var body: some View {
         VStack(spacing: 12) {
-            UnlockControl {
+            UnlockControl(pressing: { phone.unlockHeld = $0 }) {
                 Task {
                     let failure = await phone.emergencyUnlock()
                     failed = failure
@@ -229,6 +246,8 @@ struct EmergencyUnlock: View {
             Text(failed?.words(paused: paused) ?? caption).textStyle(.caption)
                 .foregroundStyle(failed == nil ? Theme.textTertiary : Theme.text)
         }
+        // A press the screen ended mid-hold says nothing more, so a layout never stays held for it.
+        .onDisappear { phone.unlockHeld = false }
     }
 }
 
@@ -276,6 +295,8 @@ private struct Ring: View {
 /// Motion a still pressed look instead, never a ring that looks done a second early. VoiceOver's
 /// own action unlocks in one step, and Voice Control knows it by the words on it too.
 struct UnlockControl: View {
+    /// Told as a press starts and ends (`Phone.unlockHeld`).
+    var pressing: (Bool) -> Void = { _ in }
     let unlock: () -> Void
     @State private var holding = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -296,10 +317,11 @@ struct UnlockControl: View {
         .padding(10).frame(minHeight: 64)
         .background(look.fill, in: .capsule)
         .opacity(holding && reduceMotion ? 0.7 : 1)
-        .onLongPressGesture(minimumDuration: 1, maximumDistance: 44, perform: unlock) { pressing in
+        .onLongPressGesture(minimumDuration: 1, maximumDistance: 44, perform: unlock) { pressed in
             let motion: Animation =
-                pressing ? .linear(duration: 1) : .timingCurve(0.34, 1.3, 0.64, 1, duration: 0.3)
-            withAnimation(reduceMotion ? nil : motion) { holding = pressing }
+                pressed ? .linear(duration: 1) : .timingCurve(0.34, 1.3, 0.64, 1, duration: 0.3)
+            withAnimation(reduceMotion ? nil : motion) { holding = pressed }
+            pressing(pressed)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Emergency Unlock. Your teacher will see it.")
