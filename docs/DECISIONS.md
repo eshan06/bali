@@ -38,7 +38,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   sign-in goes, the request carrying the student's token, and waits for it 3 s at most, then drops
   it and signs out whatever it answered: never a Sign out held up by the network, nor by a token
   renewal the removal waits on, which no cancelling ends (santa's round 1, both reviewers: Sign out
-  took 30 s, now a test). An Emergency Unlock recorded during that wait holds the sign-out back as
+  took 30 s, now a test). Dropped means cancelled, so a removal never lands late on a token
+  registered since (round 2). An Emergency Unlock recorded during that wait holds the sign-out back as
   any unsent one does, the token registered again (santa's round 1; *its reachability doubtful,
   fixed as the worker's call*, since the wait made the window). A removal that does
   not land is not retried, since a signed-out phone has no sign-in to send it under: the token stays
@@ -51,8 +52,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   counts) holds the engine's next `GET /v1/me` until a time drawn uniformly from 0 to 10 s
   (`PushWait`, `SyncEngine.holdRead`), then goes on as before; an older alert reads at once, as any
   return to the front. A hold found more than 10 s ahead, the phone's clock turned back since, is
-  over (santa's round 1; *doubtful reachability, guarded as the worker's call*: it would have held
-  the read, and the lock, as long as the clock went back). Nothing else waits: the outbox, and rule
+  over, so a turn of the clock adds 10 s to the wait at most (santa's round 1; *doubtful
+  reachability, guarded as the worker's call*: it would have held the read, and the lock, as long as
+  the clock went back). Nothing else waits: the outbox, and rule
   3's check, go as ever. The student's
   own action ends the wait at once: anything the phone records (a tap, Emergency Unlock, Back to
   focus; rule 3's own reports too), Try again, and any screen they open (Back to home, Join a class),

@@ -1115,7 +1115,7 @@ public actor SyncEngine {
 
     /// Until when the read of the truth still waits for the class-started alert (`holdRead`): nil
     /// once the hold is past — or more than `PushWait.longest` ahead, the phone's clock turned back
-    /// since, which never stretches the wait (santa's round 1).
+    /// since, so a turn of the clock adds `PushWait.longest` to the wait at most (santa's round 1).
     private var holdingUntil: Date? {
         guard rereading, let readHold, readHold > clock.now(),
             readHold <= clock.now() + PushWait.longest

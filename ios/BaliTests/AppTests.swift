@@ -4636,6 +4636,17 @@ struct AppTests {
         try await Task.sleep(for: .milliseconds(300))
         #expect(asked.asks == 1 && asked.registers == 1)
         phone.signed(in: false)
+        // A Waiting gone while iOS was asked how the student answered asks nothing (santa's round
+        // 1): its task cancelled before that answer came.
+        let slow = Slow()
+        let left = Phone()
+        left.notifications = slow.notifications
+        let asking = Task { await left.askToNotify() }
+        try await until { slow.answering != nil }
+        asking.cancel()
+        slow.answer(.notDetermined)
+        await asking.value
+        #expect(slow.asks == 0)
     }
 
     @Test(
@@ -4696,6 +4707,26 @@ struct AppTests {
         await stuck.signOut()
         #expect(ContinuousClock.now - again < .seconds(5))
         #expect(renewing.empty && stuck.signOutFailed == nil)
+        // An Emergency Unlock recorded while the removal is on its way holds the sign-out back, as
+        // any unsent one does, and the token, taken off Bali, is registered again (santa's rounds 1
+        // and 2).
+        let kept = Keychain(account: "ana")
+        let keptServer = PushServer(keychain: kept, answersRemoval: false)
+        let (holding, holdingEngine) = try standIn(keptServer, keychain: kept)
+        let keptAsked = Asked()
+        keptAsked.status = .authorized
+        holding.notifications = keptAsked.notifications
+        holding.signed(in: true, as: "ana", checked: true)
+        try await until { keptAsked.registers == 1 }
+        holding.pushRemoval = 1
+        holding.registered(token: token)
+        let signingOut = Task { await holding.signOut() }
+        try await until { await keptServer.removed != nil }
+        try await holdingEngine.record(.unlock(session: "s", reason: nil))
+        await signingOut.value
+        #expect(holding.signOutFailed == SignOutWords.unsent && !kept.empty)
+        try await until { keptAsked.registers == 2 }
+        holding.signed(in: false)
     }
 
     @Test(
@@ -5612,6 +5643,29 @@ private final class Asked {
                 return true
             },
             register: { self.registers += 1 })
+    }
+}
+
+/// iOS's notifications as a stand-in answers the phone slowly: how the student answered its prompt
+/// held until the test gives it (`answer`), and the prompts counted.
+@MainActor
+private final class Slow {
+    private(set) var answering: CheckedContinuation<UNAuthorizationStatus, Never>?
+    private(set) var asks = 0
+
+    func answer(_ status: UNAuthorizationStatus) {
+        answering?.resume(returning: status)
+        answering = nil
+    }
+
+    var notifications: Notifications {
+        Notifications(
+            status: { await withCheckedContinuation { self.answering = $0 } },
+            ask: {
+                self.asks += 1
+                return true
+            },
+            register: {})
     }
 }
 

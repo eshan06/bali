@@ -80,7 +80,7 @@ struct PushTests {
     }
 
     @Test(
-        "The phone's clock turned back during the hold never stretches it: a wake that finds the hold more than 10 s ahead reads at once (santa's round 1)"
+        "The phone's clock turned back during the hold stretches it by 10 s at most: a wake that finds the hold more than 10 s ahead reads at once (santa's round 1)"
     )
     func clockTurnedBack() async throws {
         let rig = try Rig()

@@ -610,14 +610,17 @@ final class Phone {
         if let held = await Self.unsent(engine) { return signOutFailed = held }
         // The class-started alert's token off Bali first (N3): the request carries the student's
         // own token, so it goes before the sign-in does — waited for `pushRemoval` at most, never
-        // past it, a token renewal under way included (santa's round 1), and the sign-out goes on
-        // whatever it answered (DECISIONS 2026-10-24). An Emergency Unlock recorded meanwhile holds
-        // it back as any does, the token registered again for the sign-in kept.
+        // past it, a token renewal under way included (santa's round 1), then dropped, so it never
+        // lands late on a token registered since (round 2); and the sign-out goes on whatever it
+        // answered (DECISIONS 2026-10-24). An Emergency Unlock recorded meanwhile holds it back as
+        // any does, the token registered again for the sign-in kept.
         if let pushToken {
             let (limit, (ends, end)) = (pushRemoval, AsyncStream.makeStream(of: Void.self))
-            Task { await engine.removePushToken(pushToken); end.yield() }
-            Task { try? await Task.sleep(for: .seconds(limit)); end.yield() }
+            let removal = Task { await engine.removePushToken(pushToken); end.yield() }
+            let timer = Task { try? await Task.sleep(for: .seconds(limit)); end.yield() }
             for await _ in ends { break }
+            removal.cancel()
+            timer.cancel()
             if let held = await Self.unsent(engine) {
                 registerForPush()
                 return signOutFailed = held
