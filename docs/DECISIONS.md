@@ -29,7 +29,13 @@ a real decision? Add a dated entry at the top: what was decided and why.
   round 1, both reviewers, a WARN fixed as L8c fixed the same on Home): nothing drew the ask again at
   the bell, `Phone.bell` naming no session for a student not tapped in, so offline at the bell its
   card, slide and class line stayed, saying no connection, for a class that was over; now the ask
-  wakes at the in-session class's bell, as Home's card does. **Drawn first** (*the worker's call*, under
+  wakes at the in-session class's bell, as Home's card does. *Left as is, its reachability doubtful
+  (Claude Review's WARN; the worker's call while the owner sleeps):* that bell is the first class in
+  session's, as Home's is, where the lesson shown skips a class a read said is over or refused, so
+  they differ only for one student with two classes in session at once, the first listed ended early
+  or left, until the next read of `GET /v1/me` drops it; the second's card and slide then stay past
+  their own bell only if the phone is offline as it rings. The fix, the lesson's own bell on both
+  screens, is a later step's if wanted. **Drawn first** (*the worker's call*, under
   the brief's rule for a state no board draws: composed of drawn parts, drawn on the canvas first,
   labelled, then built): a row of six beside a sticky note, "Intermediate states for the boards of
   2026-10-24, drawn before they're built", each from the approved boards' own markup:
