@@ -8,18 +8,15 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-24 (Central) — The slide off Focus and the card on the Screen Time ask (M8b,
-#454; `docs/DECISIONS.md`, 2026-10-24), the four boards the owner approved on 2026-10-24, in D1's
-look: a slide the teacher shows now shows on Unlocked, Screen Time off and Home (for a student not
-tapped in) too, under the question when one shows and in its place when none does; and the Screen
-Time ask, which a student not tapped in whose Screen Time access is off sees in Home's place, shows
-the class's name over the question and the slide. Six in-between states (the slide alone, both at
-once, the ask once access was turned off in Settings) were drawn first on the app canvas, beside the
-approved row. Measured on the Simulator: parsing a 26 MB, 200-page deck holds the main thread under
-0.1 ms, and drawing its first page up to 46 ms (a page with a big photo), so nothing changed; the
-device check times it on a phone. No TestFlight build was sent. Next on the Mac: L8's, M8's and
-M8b's 📱 device checks, the owner's; on the Windows PC, M6's panel line comes back now that phones
-show the slide (the conductor's), and the other three pre-pilot steps wait for the owner's word._
+_Last updated: 2026-10-24 (Central) — Phase 7's phone sitting written for the owner (`ios/README.md`,
+"Phase 7's phone sitting, on prod"): C7's first launch, L8's, M8's and M8b's device checks, and the
+exit checks L9, M10 and W6, each part opening with its starting state, on TestFlight build 10 (prod,
+from `1d4496b6`, dispatched 2026-10-24). Before it, M8b (#454): the slide on Unlocked, Screen Time
+off and Home, and the card on the Screen Time ask, so every phone screen of Phase 7 is built. Next on
+the Mac: the push's app half (option B's wait, for a fresh alert only), parked for the owner's word
+on when the app asks to send notifications; then the owner's sitting, runbook 7 and N6's check; on
+the Windows PC, M6's LessonDecks line back (M8 landed) and the other three pre-pilot steps, which
+wait for the owner's word._
 
 ## Now
 
@@ -233,7 +230,7 @@ Slice 1 — live questions:
 - **L7** 👀 Portal UI to v2's canvas: the class page's question and Present's — ✅ as L7-1a (#389), L7-1b (#390), L7-2 (#402) and L7-3, Close and Done on Present, Done in every window of the browser (#405); DECISIONS 2026-10-15
 - **L7b** 👀 Portal saved questions to v2's canvas — ✅ as part 1a (#393), part 1b (#394), part 1c (#395) and part 2, the panel's drafts (#411); DECISIONS 2026-10-15, 2026-10-16
 - **L7c** 👀 A session's Questions to v2's canvas — ✅ (#412; DECISIONS 2026-10-16)
-- **L8** 👀📱 iOS answer card to the app canvas: while a question or a slide shows, the Focus screen's ring as a strip and Emergency Unlock pinned at the bottom; a tap answers and changes it until the close; the revealed answer marked, never red; a closed question's Hide; the same card on Unlocked, Screen Time off and Home; the consent list's two new lines and the one-time screen for a student who saw the old list (`no-ai-slop`); M0 ✅ (the canvas approved 2026-10-10; L0b, before the first actual pilot since 2026-10-12, holds back no screen). **No build that can answer ships (TestFlight included) before L2's documents and this wording have landed** — validation: XCTest, then the device check on the owner's iPhone: a shielded phone answers, the battery cost of the 2 s poll over a lesson, VoiceOver. **L8a**, the consent list's two new lines and the one-time screen — ✅ (#443; DECISIONS 2026-10-23). **L8b**, the lesson followed and the card on Focus — ✅ as L8b-1, the lesson followed and the card's words, the card waiting for the list and Delete account taking the phone's notes (the owner's rulings; #448), and L8b-2, the card on Focus, the ring as the strip and Emergency Unlock pinned, a poll refused 403 or 404 ending the lesson (#450); DECISIONS 2026-10-23. **L8c**, the same card on Unlocked, Screen Time off and Home, with the owner's three riders — ✅ (#451; DECISIONS 2026-10-23). L8's screens are done; left, its 📱 device check on the owner's iPhone
+- **L8** 👀📱 iOS answer card to the app canvas: while a question or a slide shows, the Focus screen's ring as a strip and Emergency Unlock pinned at the bottom; a tap answers and changes it until the close; the revealed answer marked, never red; a closed question's Hide; the same card on Unlocked, Screen Time off and Home; the consent list's two new lines and the one-time screen for a student who saw the old list (`no-ai-slop`); M0 ✅ (the canvas approved 2026-10-10; L0b, before the first actual pilot since 2026-10-12, holds back no screen). **No build that can answer ships (TestFlight included) before L2's documents and this wording have landed** — validation: XCTest, then the device check on the owner's iPhone: a shielded phone answers, the battery cost of the 2 s poll over a lesson, VoiceOver (written as Part 2 of `ios/README.md`'s "Phase 7's phone sitting, on prod", 2026-10-24). **L8a**, the consent list's two new lines and the one-time screen — ✅ (#443; DECISIONS 2026-10-23). **L8b**, the lesson followed and the card on Focus — ✅ as L8b-1, the lesson followed and the card's words, the card waiting for the list and Delete account taking the phone's notes (the owner's rulings; #448), and L8b-2, the card on Focus, the ring as the strip and Emergency Unlock pinned, a poll refused 403 or 404 ending the lesson (#450); DECISIONS 2026-10-23. **L8c**, the same card on Unlocked, Screen Time off and Home, with the owner's three riders — ✅ (#451; DECISIONS 2026-10-23). L8's screens are done; left, its 📱 device check on the owner's iPhone
 - **L9** 📱 Exit check: a real class on prod asks and answers, the recap and the stream show the lifecycle, no screen names an answer
 
 Slice 2 — slides:
@@ -251,8 +248,8 @@ Slice 2 — slides:
 - **M5** 👀 The slides page and upload — ✅ as M5a (#396), M5b part 1 (#397) and M5b part 2 (#400); DECISIONS 2026-10-15
 - **M6** 👀 Portal presenter to v2's canvas — ✅ as part 1 (#413), 2a (#414), 2b-1 (#415), 2b-2 (#416), 2c (#417) and 2d (#418); DECISIONS 2026-10-16; LessonDecks' panel line comes back with M8 (the conductor's call, the owner's on 2026-10-16)
 - **M7** BaliCore's deck download and cache (for M8) — ✅ (#331; DECISIONS 2026-10-12)
-- **M8** 👀📱 iOS slide view to the app canvas — ✅ (#452; DECISIONS 2026-10-24): the slide on Focus only, over shields the check verified; left, its 📱 device check on a shielded phone, the owner's; the slide off Focus is M8b's; its CI failure, `AppTests.ageAgainInClass`'s own wait, fixed in the same PR (DECISIONS 2026-10-24)
-- **M8b** 👀📱 The slide on Unlocked, Screen Time off and Home, and the question card on the Screen Time ask — ✅ (#454; DECISIONS 2026-10-24); left, its 📱 device check with M8's
+- **M8** 👀📱 iOS slide view to the app canvas — ✅ (#452; DECISIONS 2026-10-24): the slide on Focus only, over shields the check verified; left, its 📱 device check on a shielded phone, the owner's (Part 3 of `ios/README.md`'s "Phase 7's phone sitting, on prod"); the slide off Focus is M8b's; its CI failure, `AppTests.ageAgainInClass`'s own wait, fixed in the same PR (DECISIONS 2026-10-24)
+- **M8b** 👀📱 The slide on Unlocked, Screen Time off and Home, and the question card on the Screen Time ask — ✅ (#454; DECISIONS 2026-10-24); left, its 📱 device check with M8's (Part 3 of `ios/README.md`'s "Phase 7's phone sitting, on prod")
 - **M9** Load and demo with a deck — ✅ (#335; DECISIONS 2026-10-12)
 - **M10** 📱 Exit check: a real class on prod follows a deck
 
@@ -360,7 +357,7 @@ Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect acc
 - 🔧 Dev's Cognito pool (`us-east-1_YTloqilwT`): turn on email as the attribute to verify, so a sign-up on its hosted page can be confirmed; today it ends on Cognito's error page with the account unconfirmed (found 2026-10-12; `docs/GOTCHAS.md`). The demo accounts sign in as they are.
 - 🔧 Delete dev's unused phone client `bali-ios-dev` (`33qr62dl4ee4inigneidmfe2s9`) in the dev pool; keep `bali-ios`, the demo's (2026-10-14).
 - 🔧 S4a's Sign out: check dev's web app client lists `http://localhost:3000/login` under Allowed sign-out URLs, and add it if not (`docs/WEB.md`).
-- 🔧 Vercel `bali-portal`: `NEXT_PUBLIC_DECK_BUCKET_URL`, prod's deck bucket (runbook 10, step 8), then Redeploy, before Your slides (M5b) is used on prod: without it the browser refuses every upload.
+- 🔧 Vercel `bali-portal`: `NEXT_PUBLIC_DECK_BUCKET_URL`, prod's deck bucket (runbook 10, step 8), then Redeploy (looks done: prod's portal lists `bali-decks-prod-eshshah` in its CSP's `connect-src`, seen 2026-10-24; the owner to confirm), before Your slides (M5b) is used on prod: without it the browser refuses every upload.
 
 ## Go-live features
 

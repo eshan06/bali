@@ -10,6 +10,19 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-24 (Central) — The slide off Focus and the card on the Screen Time ask (M8b,
+#454; `docs/DECISIONS.md`, 2026-10-24), the four boards the owner approved on 2026-10-24, in D1's
+look: a slide the teacher shows now shows on Unlocked, Screen Time off and Home (for a student not
+tapped in) too, under the question when one shows and in its place when none does; and the Screen
+Time ask, which a student not tapped in whose Screen Time access is off sees in Home's place, shows
+the class's name over the question and the slide. Six in-between states (the slide alone, both at
+once, the ask once access was turned off in Settings) were drawn first on the app canvas, beside the
+approved row. Measured on the Simulator: parsing a 26 MB, 200-page deck holds the main thread under
+0.1 ms, and drawing its first page up to 46 ms (a page with a big photo), so nothing changed; the
+device check times it on a phone. No TestFlight build was sent. Next on the Mac: L8's, M8's and
+M8b's 📱 device checks, the owner's; on the Windows PC, M6's panel line comes back now that phones
+show the slide (the conductor's), and the other three pre-pilot steps wait for the owner's word._
+
 _Last updated: 2026-10-24 (Central) — The phone's slide view (M8, #452; `docs/DECISIONS.md`,
 2026-10-24): while the teacher shows a slide, Focus's ring becomes the strip and the page shows under
 it (under the question, when one shows too), drawn by PDFKit in a 16:9 frame, pinch to zoom, read by
