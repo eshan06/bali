@@ -224,6 +224,34 @@ describe('a teacher’s decks (decision 4)', () => {
     expect(await decksOf(teacher.id)).toEqual([deck]);
   });
 
+  it('reads a removal’s eventId in any case as one id: its retry is its replay, never deck_not_found (#442, part 3)', async () => {
+    // Postgres keeps a uuid lower-case and matches one sent in any case. A client minting its ids in
+    // upper case, as Foundation's `uuidString` writes them, resends a removal whose answer never came.
+    const { teacher } = await school('k-remove-case');
+    for (const loud of [true, false]) {
+      const deck = await written(add(teacher, 5));
+      // Its create's id, in upper case, is still the create's: never this removal's replay.
+      await expect(
+        removeDeck(db, { deckId: deck.id, eventId: deck.eventId.toUpperCase() }),
+      ).rejects.toMatchObject(conflict);
+      const id = newUuidV7();
+      const removal = { deckId: deck.id, eventId: loud ? id.toUpperCase() : id, now: at(8) };
+
+      const removed = await written(removeDeck(db, removal));
+
+      expect(removed).toEqual({ ...deck, eventId: id, removedAt: at(8) });
+      for (const eventId of [id.toUpperCase(), id]) {
+        expect(await removeDeck(db, { ...removal, eventId, now: at(9) })).toEqual({
+          outcome: 'replay',
+          deck: removed,
+        });
+      }
+      const later = { ...removal, eventId: newUuidV7().toUpperCase() };
+      expect(await removeDeck(db, later)).toEqual(notFound);
+    }
+    expect(await decksOf(teacher.id)).toHaveLength(2);
+  });
+
   it('stamps its object deleted once: a later stamp keeps the first time (decision 5)', async () => {
     const { teacher } = await school('k-stamp');
     const deck = await written(add(teacher, 5));

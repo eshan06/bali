@@ -767,6 +767,34 @@ describe('POST /v1/taps/:eventId/unlock', () => {
     expect(await unlocksIn(session.id)).toHaveLength(1);
   });
 
+  it('files it there too when the unlock named its tap in another letter case than the tap’s own (#442, part 3)', async () => {
+    // Postgres keeps a uuid lower-case; a client may send one in upper case (Foundation's
+    // `uuidString`). Either pair of cases ends as one case does.
+    for (const unlockLoud of [true, false]) {
+      const tag = `tap-unlock-api-case-${unlockLoud}`;
+      const { student, block, session } = await seedRunning(tag);
+      const token = await ctx.tokenFor(student.cognitoId);
+      const tapId = randomUUID();
+      const [named, sent] = unlockLoud
+        ? [tapId.toUpperCase(), tapId]
+        : [tapId, tapId.toUpperCase()];
+      const unlockId = randomUUID();
+      const kept = await underTap(token, named, { eventId: unlockId, reason: 'nurse' });
+      expect(kept.json<UnlockResponse>().recordedAs).toBe('unknown_tap');
+
+      const tapped = await tapBlock(token, block.tagId, sent);
+
+      expect(tapped.json<TapResponse>()).toMatchObject({
+        outcome: 'joined',
+        state: 'unlocked',
+        session: { id: session.id },
+      });
+      expect((await unlocksIn(session.id)).map((e) => e.payload)).toEqual([
+        { tap_event_id: tapId, unattached_event_id: unlockId, reason: 'nurse' },
+      ]);
+    }
+  });
+
   it('files nothing under a tap that is not the caller’s: a stranger’s or a teacher’s is kept unattached', async () => {
     const { teacher, student, block, session } = await seedRunning('tap-unlock-api-theirs');
     const tapId = randomUUID();

@@ -14,6 +14,7 @@ import {
   startSession,
   tapIn,
   unlock,
+  unlockUnderTap,
 } from '../src/transitions.js';
 import type { Database } from '../src/types.js';
 
@@ -176,6 +177,45 @@ describe('changing an unlock’s reason (A20)', () => {
     // The unlock's own retry answers the reason now, not the one it carried (rule 4).
     const retried = await unlock(db, { ...act(5), eventId: unlockId, reason: 'bathroom' });
     expect(retried).toMatchObject({ outcome: 'replay', reason: 'other' });
+  });
+
+  it('answers the unlock’s own retry in either letter case with the reason now, on both its routes (#442, part 3)', async () => {
+    // A change names its unlock as stored, lower-case (above); a client may resend the unlock with
+    // its ids in upper case (Foundation's `uuidString`), and its replay reads that change all the same.
+    const { session, student, unlockId, act } = await unlocked('reason-replay-case', 'bathroom');
+    await change(unlockId, student.id, 'nurse');
+    for (const loud of [true, false]) {
+      const cased = (id: string) => (loud ? id.toUpperCase() : id);
+      const retried = await unlock(db, {
+        ...act(5),
+        sessionId: cased(session.id),
+        eventId: cased(unlockId),
+        reason: 'other',
+      });
+      expect(retried).toMatchObject({ outcome: 'replay', state: 'unlocked', reason: 'nurse' });
+    }
+
+    // One sent under its tap and filed there (decision 11): the same.
+    const tapId = newUuidV7();
+    await tapIn(db, { ...act(6), eventId: tapId });
+    const underId = newUuidV7();
+    const under = { tapEventId: tapId, studentId: student.id, eventId: underId, deviceTime: at(7) };
+    expect(await unlockUnderTap(db, { ...under, reason: 'bathroom' })).toMatchObject({
+      outcome: 'applied',
+      reason: 'bathroom',
+    });
+    await change(underId, student.id, 'other');
+    for (const loud of [true, false]) {
+      const cased = (id: string) => (loud ? id.toUpperCase() : id);
+      const retried = await unlockUnderTap(db, {
+        ...under,
+        tapEventId: cased(tapId),
+        eventId: cased(underId),
+        reason: 'nurse',
+      });
+      expect(retried).toMatchObject({ outcome: 'replay', state: 'unlocked', reason: 'other' });
+    }
+    expect(await changesOf(session.id)).toHaveLength(2);
   });
 
   it('is refused once a return to focus, a re-tap or another unlock came since', async () => {
