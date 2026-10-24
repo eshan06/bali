@@ -421,11 +421,26 @@ struct AppTests {
             ("unlockedQuestionUnsent", true, "No connection right now"),
             ("protectionOffQuestionError", true, "No connection right now"),
             ("homeQuestionError", true, "No connection right now"),
+            // With a slide too, and on the Screen Time ask (M8b).
+            ("unlockedSlide", true, "Tap an answer."), ("protectionOffSlideQuestion", true, "Tap an answer."),
+            ("homeSlideQuestion", true, "Tap an answer."), ("screenTimeQuestion", true, "Tap an answer."),
+            ("screenTimeQuestionSlide", true, "Tap an answer."), ("screenTimeDeniedQuestion", true, "Tap an answer."),
         ]
         for (name, open, line) in cards {
             let card = Phone(fixture: try #require(PreviewFixtures.all[name])).card
             #expect(card?.open == open && card?.line.hasPrefix(line) == true, "\(name)")
         }
+        // The slide off the Focus screen (M8b): page 4 of the fixture deck, in, on each board's
+        // screen; none on the ask's board, which draws the question alone.
+        for name in [
+            "unlockedSlide", "unlockedSlideAlone", "protectionOffSlide", "protectionOffSlideQuestion", "homeSlide",
+            "homeSlideQuestion", "screenTimeQuestionSlide", "screenTimeSlide",
+        ] {
+            let shown = Phone(fixture: try #require(PreviewFixtures.all[name])).slideShown
+            #expect(shown?.slide.page == 4 && shown?.slide.pageCount == 12, "\(name)")
+            if case .ready? = shown?.phase {} else { Issue.record("\(name): \(String(describing: shown?.phase))") }
+        }
+        #expect(Phone(fixture: try #require(PreviewFixtures.all["screenTimeQuestion"])).slideShown == nil)
         #expect(Phone(fixture: try #require(PreviewFixtures.all["focusLong"])).card?.looks.count == 6)
         let unsent = try #require(PreviewFixtures.all["unlockedQuestionUnsent"]?.sync)
         #expect(UnlockedWords(unsent)?.stuck == UnlockedWords.unsent)
@@ -4201,6 +4216,296 @@ struct AppTests {
         try await until { !shows("Slide 4 of 12") && unlock() !== pinned }
     }
 
+    @Test(
+        "The slide off the Focus screen and the card on the Screen Time ask (M8b; the app canvas's UnlockedSlide, ScreenTimeOffSlide, HomeSlide and ScreenTimeAskQuestion, and the intermediate states drawn beside them): on Unlocked, Screen Time off, Home for a student not tapped in and the ask in Home's place, the lesson sits where the boards draw it, after what the screen says of where the student stands and over its own controls — the question first, the slide under it or in its place, on the ask under the class's name, its teacher and bell — and nothing else changes: the screen reads every word and control it reads with no lesson, in their order, its controls still buttons. The slide reads which slide of how many, Pinch to zoom and its page's words, one element, its page alone in PDFKit's view, a 16:9 frame the screen's width less its gutters; Hide takes the card away and leaves the slide. The Home opened from Unlocked or Waiting, which no board draws with a lesson, shows none"
+    )
+    func offFocusSlide() async throws {
+        let text = try #require(PDFDocument(data: PreviewFixtures.deckPDF)?.page(at: 3)?.said)
+        let slide = ["Slide 4 of 12", "Pinch to zoom", text]
+        let unlocked: (Phone) -> String? = { $0.sync.flatMap { UnlockedWords($0) }?.body }
+        let off: (Phone) -> String? = { phone in phone.sync.flatMap { ProtectionOffWords($0, phone.protection) }?.body }
+        let ask: (Phone) -> String? = { ($0.protection?.permission ?? .notDetermined).screenTimeWords.body }
+        let reasons = ["Bathroom", "Nurse", "Other", "Go to Home", "Lock my apps again"]
+        // Each fixture; what its screen reads last before the lesson, as its board draws it; the
+        // screen's own controls; and, with a question, the fixture with the slide alone, which Hide
+        // leaves.
+        let cases: [(String, (Phone) -> String?, [String], String?)] = [
+            ("unlockedSlide", unlocked, reasons, "unlockedSlideAlone"), ("unlockedSlideAlone", unlocked, reasons, nil),
+            ("protectionOffSlide", off, ["Turn on Screen Time"], nil),
+            ("protectionOffSlideQuestion", off, ["Turn on Screen Time"], "protectionOffSlide"),
+            ("homeSlide", { _ in "Tap in" }, ["Tap in", "Join a class", "Home", "History", "Me"], nil),
+            ("homeSlideQuestion", { _ in "Tap in" }, ["Tap in", "Join a class", "Home"], "homeSlide"),
+            ("screenTimeQuestion", ask, ["Ask me"], nil),
+            ("screenTimeQuestionSlide", ask, ["Ask me"], "screenTimeSlide"),
+            ("screenTimeSlide", ask, ["Ask me"], nil),
+            ("screenTimeDeniedQuestion", ask, ["Open Settings", "Ask again"], nil),
+        ]
+        for (name, last, controls, alone) in cases {
+            let fixture = try #require(PreviewFixtures.all[name])
+            let phone = Phone(fixture: fixture)
+            let anchor = try #require(last(phone), "\(name)")
+            var plain = fixture
+            (plain.lesson, plain.deck) = (nil, nil)
+            let (bare, without) = try await laidOut(RootView(phone: Phone(fixture: plain))) { $0.contains(anchor) }
+            bare.isHidden = true
+            // The lesson as its parts read alone: on the ask the class first, then the card, then
+            // the slide.
+            var lesson: [String] = []
+            if name.hasPrefix("screenTime") {
+                let heading = try #require(phone.lessonHeading, "\(name)")
+                lesson += [heading.title, heading.subtitle]
+            }
+            if let card = phone.card {
+                let (cardWindow, read) = try await laidOut(AnswerCardView(card: card, phone: phone)) {
+                    $0.contains(card.question.prompt)
+                }
+                cardWindow.isHidden = true
+                lesson += read.map(\.label)
+            }
+            if phone.slideShown != nil { lesson += slide }
+            let (window, shown) = try await laidOut(RootView(phone: phone)) { $0.contains(lesson.last ?? "") }
+            defer { window.isHidden = true }
+            let labels = without.map(\.label)
+            let at = try #require(labels.firstIndex(of: anchor), "\(name): \(labels)") + 1
+            #expect(
+                shown.map(\.label) == Array(labels[..<at]) + lesson + Array(labels[at...]),
+                "\(name): \(shown.map(\.label))")
+            for control in controls {
+                #expect(shown.contains { $0.label == control && $0.traits.contains(.button) }, "\(name): \(control)")
+            }
+            if phone.slideShown != nil {
+                let views = pdfViews(in: window)
+                let view = try #require(views.first, "\(name)")
+                #expect(views.count == 1 && view.document?.pageCount == 1, "\(name): \(views)")
+                #expect(view.isAccessibilityElement && view.accessibilityLabel == text, "\(name)")
+                let width = window.bounds.width - 2 * Theme.gutter
+                #expect(abs(view.bounds.width - width) < 0.5, "\(name): \(view.bounds)")
+                #expect(abs(view.bounds.height - width * 9 / 16) < 0.5, "\(name): \(view.bounds)")
+            }
+            // Closed, its Hide (L8c's card, tested there): the card goes and the slide stays, the
+            // phone then as the slide alone's fixture, whose screen this loop reads as its own case.
+            // No screen drawn for it: PDFKit analyses every page a PDF view shows with Vision, each
+            // still at it seconds later on the Simulator, and a burst of them starves the test host.
+            guard let alone else { continue }
+            phone.lessonRead(try closedWithSlide(), of: "session")
+            #expect(phone.card?.open == false, "\(name)")
+            phone.hideQuestion()
+            let slideAlone = Phone(fixture: try #require(PreviewFixtures.all[alone]))
+            #expect(phone.card == nil && slideAlone.card == nil, "\(name)")
+            #expect(phone.slideShown?.slide == slideAlone.slideShown?.slide, "\(name)")
+            if case .ready? = phone.slideShown?.phase {} else { Issue.record("\(name): the slide's deck went") }
+        }
+        // The Home opened from Unlocked or from Waiting, a question and a slide showing all the same:
+        // no board draws a lesson there, so none shows (decision 11's Home is a student's not tapped
+        // in).
+        let slid = try #require(PreviewFixtures.all["homeSlideQuestion"])
+        var fromUnlocked = try #require(PreviewFixtures.all["homeFromUnlockedQuestion"])
+        var waiting = try #require(PreviewFixtures.all["homeWaiting"])
+        (fromUnlocked.lesson, fromUnlocked.deck) = (slid.lesson, slid.deck)
+        (waiting.lesson, waiting.deck) = (slid.lesson, slid.deck)
+        for (name, state) in [("homeFromUnlockedQuestion", fromUnlocked), ("homeWaiting", waiting)] {
+            var plain = state
+            (plain.lesson, plain.deck) = (nil, nil)
+            #expect(Phone(fixture: state).slideShown != nil, "\(name)")
+            let (shownWindow, shown) = try await laidOut(RootView(phone: Phone(fixture: state))) { $0.contains("Join a class") }
+            shownWindow.isHidden = true
+            let (bareWindow, without) = try await laidOut(RootView(phone: Phone(fixture: plain))) { $0.contains("Join a class") }
+            bareWindow.isHidden = true
+            #expect(shown.map(\.label) == without.map(\.label), "\(name): \(shown.map(\.label))")
+        }
+    }
+
+    @Test(
+        "The slide off the Focus screen and the card on the Screen Time ask (M8b) at the default text size and the accessibility ones, on the smallest iPhone, the owner's and the iPhone 17 Pro: each screen scrolls whole once it outgrows the phone, never a pixel wider than it, and nothing VoiceOver reads lies past its sides, the slide's own words and Try again included"
+    )
+    func offFocusSlideFits() async throws {
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        // The iPhone 17e's and the owner's iPhone 15 Pro's, as `questionFits` has them, and the
+        // iPhone 17 Pro's.
+        let phones = [
+            CGSize(width: 390, height: 844 - 47 - 34), CGSize(width: 393, height: 852 - 59 - 34),
+            CGSize(width: 402, height: 874 - 62 - 34),
+        ]
+        for name in [
+            "unlockedSlide", "unlockedSlideAlone", "protectionOffSlide", "protectionOffSlideQuestion", "homeSlide",
+            "homeSlideQuestion", "screenTimeQuestion", "screenTimeQuestionSlide", "screenTimeSlide",
+            "screenTimeDeniedQuestion",
+        ] {
+            for size in [DynamicTypeSize.large, .accessibility1, .accessibility5] {
+                for frame in phones {
+                    // The slide as SlideFailed draws it, its deck not come: its frame the page's,
+                    // taller once its words and Try again need it, and no PDF view. PDFKit analyses
+                    // every page a PDF view shows with Vision, each still at it seconds later on the
+                    // Simulator, and dozens at once starve the test host (`offFocusSlide` and M8's
+                    // `slideFits` draw the page itself).
+                    var state = try #require(PreviewFixtures.all[name])
+                    if state.deck != nil { state.deck = .failed }
+                    let phone = Phone(fixture: state)
+                    let hosting = UIHostingController(
+                        rootView: RootView(phone: phone).environment(\.dynamicTypeSize, size))
+                    hosting.safeAreaRegions = []
+                    let window = UIWindow(windowScene: scene)
+                    window.frame = CGRect(origin: .zero, size: frame)
+                    window.rootViewController = hosting
+                    window.isHidden = false
+                    defer { window.isHidden = true }
+                    window.layoutIfNeeded()
+                    let at = "\(name), \(size), \(frame)"
+                    #expect(pdfViews(in: window).isEmpty, "\(at)")
+                    let scroll = try #require(scrollViews(in: window).first, "\(at)")
+                    #expect(scroll.bounds.width == frame.width, "\(at): \(scroll.bounds)")
+                    #expect(scroll.contentSize.width <= frame.width + 0.5, "\(at): \(scroll.contentSize)")
+                    // Anything past the screen's height is in the scroll, never cut: at the
+                    // accessibility sizes every one of these screens outgrows the phone.
+                    if size != .large {
+                        #expect(scroll.contentSize.height > scroll.bounds.height + 0.5, "\(at): \(scroll.contentSize)")
+                    }
+                    let last = phone.slideShown != nil ? "Bali couldn't load the slides." : phone.card?.question.prompt
+                    var read: [NSObject] = []
+                    try await until {
+                        read = (try? voiceOver(in: window)) ?? []
+                        return read.contains { $0.accessibilityLabel == last }
+                    }
+                    let outside = read.filter {
+                        $0.accessibilityFrame.minX < -0.5 || $0.accessibilityFrame.maxX > frame.width + 0.5
+                    }
+                    #expect(outside.isEmpty, "\(at): \(outside.map { $0.accessibilityLabel ?? "" })")
+                    if phone.slideShown != nil {
+                        #expect(read.contains { $0.accessibilityLabel == "Try again" }, "\(at)")
+                    }
+                }
+            }
+        }
+    }
+
+    @Test(
+        "The slide off the Focus screen and the card on the Screen Time ask (M8b) show only while the lesson has them and this phone has shown the student the consent list as it stands (the owner's ruling, 2026-10-23): on Unlocked and Screen Time off, which the one-time screen never covers, no slide and no poll before, the question and the slide once the list is seen; on Home and on the ask in its place, the one-time screen until then, then the screen with them; each gone once a read shows neither, the screen staying. The ask never shows a lesson during onboarding, a student in no class following none, nor in Waiting's place, though one is followed"
+    )
+    func offFocusSlideWaits() async throws {
+        let defaults = UserDefaults.standard
+        let before = [Phone.inClassKey, Phone.listSeenByKey].map { ($0, defaults.object(forKey: $0)) }
+        defer { for (key, value) in before { defaults.set(value, forKey: key) } }
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        var (approved, off) = (Protection(), Protection())
+        (approved.checked, approved.permission) = (true, .approved)
+        (off.checked, off.permission, off.permissionOff) = (true, .denied, true)
+        let session = SessionView(id: "s", classId: "p3", endsAt: Date() + 600)
+        /// `phone` shown in a window as tall as its whole screen, and whether VoiceOver reads `label` there.
+        func shown(_ phone: Phone) -> (UIWindow, (String) -> Bool) {
+            let window = UIWindow(windowScene: scene)
+            window.frame = CGRect(x: 0, y: 0, width: scene.screen.bounds.width, height: 3000)
+            window.rootViewController = UIHostingController(rootView: RootView(phone: phone))
+            window.isHidden = false
+            return (window, { label in
+                window.layoutIfNeeded()
+                return ((try? voiceOver(in: window)) ?? []).contains { $0.accessibilityLabel == label }
+            })
+        }
+        let cases: [(Standing, Protection, Screen, Screen)] = [
+            (.inSession(session, .unlocked), approved, .unlocked, .unlocked),
+            (.inSession(session, .protectionOff), off, .protectionOff, .protectionOff),
+            (.out, approved, .listChanged, .home), (.out, off, .listChanged, .screenTime),
+        ]
+        for (standing, protection, first, then) in cases {
+            defaults.removeObject(forKey: Phone.listSeenByKey)
+            let server = LessonServer()
+            await server.show("deck", page: 2, of: pdfDeck())
+            // The deck refused, so no page is drawn: PDFKit's analysis of each one starves the test
+            // host in a burst (`offFocusSlideFits`), and the gate, not the page, is under test here.
+            await server.refuseDownloads(of: "deck")
+            let (phone, _) = try standIn(server, protection: protection)
+            phone.signed(in: true, as: "ana", checked: true)
+            var state = try classInSession()
+            state.standing = standing
+            phone.synced(state)
+            phone.setForeground(true)
+            let (window, shows) = shown(phone)
+            defer { window.isHidden = true }
+            try await Task.sleep(for: .seconds(0.5))
+            #expect(phone.shown.screen == first && !shows("Slide 2 of 3") && !shows("Which?"), "\(then)")
+            #expect(await server.polls == 0, "\(then): polled before the list was seen")
+            phone.sawList()
+            try await until { phone.shown.screen == then && shows("Which?") && shows("Slide 2 of 3") }
+            // The poll stopped behind, a read with neither: both go, the screen stays.
+            phone.setForeground(false)
+            try await until {
+                phone.lessonRead(LessonState(), of: "s")
+                return !shows("Slide 2 of 3") && !shows("Which?")
+            }
+            #expect(phone.shown.screen == then, "\(then)")
+            phone.signed(in: false)
+        }
+        // Onboarding: a student in no class, Screen Time access off, gets the ask with no lesson to
+        // follow, and nothing polls.
+        let server = LessonServer()
+        await server.show("deck", page: 2, of: pdfDeck())
+        let (newcomer, _) = try standIn(server, protection: off)
+        newcomer.signed(in: true, as: "ana", checked: true)
+        var none = SyncState()
+        none.me = try BaliJSON.makeDecoder().decode(
+            MeResponse.self,
+            from: Data(#"{"user":{"id":"ana","role":"student","displayName":"Ana"},"classes":[],"session":null}"#.utf8))
+        newcomer.synced(none)
+        newcomer.setForeground(true)
+        let (newWindow, newShows) = shown(newcomer)
+        defer { newWindow.isHidden = true }
+        // Access turned off: the ask's Open Settings in Ask me's place.
+        try await until { newShows("Open Settings") }
+        try await Task.sleep(for: .seconds(0.5))
+        #expect(newcomer.shown.screen == .screenTime && newcomer.card == nil && newcomer.lessonHeading == nil)
+        #expect(await server.polls == 0 && !newShows("Which?"))
+        newcomer.signed(in: false)
+        // In Waiting's place: the lesson of the class in session is followed, but no board draws
+        // it on the ask there, so none shows.
+        let (waiting, _) = try standIn(server, protection: off)
+        waiting.signed(in: true, as: "ana", checked: true)
+        var armed = try classInSession()
+        armed.standing = .waiting
+        waiting.synced(armed)
+        waiting.sawList()
+        waiting.setForeground(true)
+        let (waitWindow, waitShows) = shown(waiting)
+        defer { waitWindow.isHidden = true }
+        try await until { waiting.card != nil && waiting.slideShown != nil && waitShows("Open Settings") }
+        #expect(waiting.shown.screen == .screenTime && !waitShows("Which?") && !waitShows("Slide 2 of 3"))
+        waiting.signed(in: false)
+    }
+
+    @Test(
+        "The slide asks for its deck as it shows off the Focus screen too (M8b; Home, for a student not tapped in), once, with no call of its screen's own; a deck that didn't come is said with Try again, a button, and Try again asks again: the page shows once Bali has it"
+    )
+    func slideAsksOffFocus() async throws {
+        let defaults = UserDefaults.standard
+        let before = [Phone.inClassKey, Phone.listSeenByKey].map { ($0, defaults.object(forKey: $0)) }
+        defer { for (key, value) in before { defaults.set(value, forKey: key) } }
+        let server = LessonServer()
+        await server.show("deck", page: 2, of: pdfDeck())
+        await server.refuseDownloads(of: "deck")
+        var approved = Protection()
+        (approved.checked, approved.permission) = (true, .approved)
+        let (phone, _) = try standIn(server, protection: approved)
+        phone.signed(in: true, as: "ana", checked: true)
+        phone.synced(try classInSession())
+        phone.sawList()
+        phone.setForeground(true)
+        let (window, _) = try await laidOut(RootView(phone: phone)) { $0.contains("Bali couldn't load the slides.") }
+        defer { window.isHidden = true }
+        #expect(phone.shown.screen == .home)
+        #expect(await server.downloads == 1)
+        await server.acceptDownloads(of: "deck")
+        let again = try #require(
+            voiceOver(in: window).first {
+                $0.accessibilityLabel == "Try again" && $0.accessibilityTraits.contains(.button)
+            })
+        again.accessibilityActivate()
+        try await until {
+            window.layoutIfNeeded()
+            return ((try? voiceOver(in: window)) ?? []).contains { $0.accessibilityLabel == "Page 2 of the deck" }
+        }
+        #expect(await server.downloads == 2)
+        phone.signed(in: false)
+    }
+
     /// `image` drawn at 1× and read as sRGB bytes — red, green, blue, alpha — at a point counted
     /// from the top left.
     private func pixels(of image: UIImage) throws -> (Int, Int) -> [Int] {
@@ -4828,6 +5133,17 @@ private func slideRead(sha256: String = String(repeating: "a", count: 64)) throw
             Presentation.self,
             from: Data(
                 #"{"running":true,"question":null,"slide":{"deckId":"deck","sha256":"\#(sha256)","page":4,"pageCount":12},"phone":null}"#
+                    .utf8)))
+}
+
+/// A read of Period 3's lesson whose question is closed, its answer not shown, the fixture deck's
+/// page 4 still showing (M8b).
+private func closedWithSlide() throws -> LessonState {
+    LessonState(
+        presentation: try BaliJSON.makeDecoder().decode(
+            Presentation.self,
+            from: Data(
+                #"{"running":true,"question":{"id":"closed","prompt":"Which?","options":["A","B","C","D"],"open":false,"correctOption":null,"answer":null},"slide":{"deckId":"deck","sha256":"\#(PreviewFixtures.deckSHA256)","page":4,"pageCount":12},"phone":null}"#
                     .utf8)))
 }
 

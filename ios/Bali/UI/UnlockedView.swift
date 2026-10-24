@@ -7,8 +7,9 @@ import SwiftUI
 /// the reason the student may give and change — the check on the one on record, a light haptic as
 /// one is picked — and the ways on: Home first, the apps still open, then Lock my apps again, or
 /// where protection off was reported here, a re-tap. While a question shows, the answer card sits
-/// over the reason card (L8; the app canvas's UnlockedQuestion). In `UnlockedWords`' words
-/// (BaliOutbox, tested on Linux).
+/// over the reason card (L8; the app canvas's UnlockedQuestion), and a slide the teacher shows under
+/// it, or in its place with no question (M8b; UnlockedSlide, UnlockedSlideAlone). In
+/// `UnlockedWords`' words (BaliOutbox, tested on Linux).
 struct UnlockedView: View {
     let phone: Phone
     /// Why Lock my apps again did not go through (rule 5).
@@ -46,6 +47,7 @@ struct UnlockedView: View {
                     VStack(spacing: 24) {
                         if let stuck = words.stuck { Retry(words: stuck, phone: phone) }
                         if let card = phone.card { AnswerCardView(card: card, phone: phone) }
+                        if let slide = phone.slideShown { SlideView(shown: slide, phone: phone) }
                         if let picker = words.picker { reasons(picker) }
                         ways(words)
                     }

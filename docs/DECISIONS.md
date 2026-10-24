@@ -8,6 +8,67 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-24** — **The slide off Focus and the card on the Screen Time ask (M8b, #454): the four
+  boards the owner approved on 2026-10-24, six intermediate states drawn first on the app canvas; the
+  deck's parse measured on the Simulator, nothing changed.** **The screens** (the app canvas's row
+  "Approved by the owner, 2026-10-24": UnlockedSlide, ScreenTimeOffSlide, HomeSlide and
+  ScreenTimeAskQuestion, in D1's look): M8's `SlideView` shows on Unlocked under the answer card and
+  over the reason card, on Screen Time off under the card and over its steps, and on Home, for a
+  student not tapped in, under the card and over Your classes (Home's 20 pt apart, the others' 24),
+  the question first (decision 11) and the slide in the card's place with no question; each asks for
+  its deck as it shows, as on Focus (`Phone.loadDeck`, once per SHA-256). The Screen Time ask, which
+  the router shows in Home's place to a student not tapped in whose Screen Time access is off (its
+  rule unchanged), shows the lesson Home would: under its words the class's name with its teacher and
+  bell (Unlocked's top line, `SyncState.lessonHeading`, the words `heading` makes for Focus, Unlocked
+  and Screen Time off), 12 pt over the card, the slide 24 under the card; Ask me last, or Open
+  Settings and Ask again once access was turned off in Settings (the board's note). Only in Home's
+  place (`standing == .out`): never in Waiting's or Session over's, which no board draws with a
+  lesson, and never during onboarding, a student in no class following none. Every other word and
+  control of each screen reads and works as before, in its order. `SlideView`'s words start at the
+  left on the screens that centre theirs, as on Focus. **Drawn first** (*the worker's call*, under
+  the brief's rule for a state no board draws: composed of drawn parts, drawn on the canvas first,
+  labelled, then built): a row of six beside a sticky note, "Intermediate states for the boards of
+  2026-10-24, drawn before they're built", each from the approved boards' own markup:
+  UnlockedSlideAlone (the slide with no question), ScreenTimeOffSlideQuestion and HomeSlideQuestion
+  (the card, then the slide, as their notes say in words), ScreenTimeAskQuestionSlide (the slide 24
+  under the card: the ask's note says only "A slide would go under the card"), ScreenTimeAskSlide
+  (the class's name over the slide alone; the spare room shared around the groups, so Ask me stays at
+  the bottom, as today) and ScreenTimeAskDeniedQuestion. Published as the canvas's version 38, each
+  file read back byte for byte against the boards rendered and checked by eye (the live canvas needs
+  the owner's sign-in). A screen's line about something gone wrong keeps its place above the lesson,
+  as L8c's boards draw it for the card; the slide's loading and couldn't-load states are SlideLoading
+  and SlideFailed wherever it shows. **The measurement** (the brief: past ~50 ms on the main thread,
+  move the parse off the main actor): on the Simulator (an iPhone 17 Pro on the owner's Mac, an Apple
+  M5), a generated 26.3 MB deck of 200 16:9 pages, each an incompressible picture, a title and a
+  paragraph, one page a 1920 × 1080 JPEG. The parse (`SlideDeck.Phase` on the main actor:
+  `PDFDocument(data:)`, `isLocked`, `pageCount`) takes 0.06–0.09 ms, PDFKit reading the file lazily.
+  From the bucket's bytes to the page drawn, a thread pinging the main one every millisecond saw it
+  held at most 14–15 ms for a page of text and 40–46 ms for the page holding the photo, and 35 ms for
+  the first slide of a run (three runs each). The hold is PDFKit drawing the page as its view is given
+  it (`PDFView.document`: 2.5–5 ms for text, 22 ms for the photo, on the main thread as UIKit has it),
+  not the parse. Under 50 ms, so nothing changed, as the brief says: moving the parse off the main
+  actor would save a tenth of a millisecond. **For the device check:** a phone is slower than this
+  Mac, so a page with a large photo may hold the main thread past 50 ms there as it first draws, and
+  a press on Emergency Unlock begun in that instant would start that much late (one already under way
+  holds Focus's layout, so no slide is drawn mid-hold). Timing it on the owner's iPhone (Instruments'
+  Hangs) decides whether a later step draws the page off the main thread first. **Found on the way:**
+  PDFKit analyses every page a PDF view shows with Vision's document recognition, on a queue of its
+  own per document, with markup mode off too (so not M8's choice; no public switch turns it off). On
+  the Simulator each analysis was still running seconds later, holding a thread, so this step's first
+  test run, drawing 72 slides in about a second, starved the test host and hung it (93 threads
+  stuck). The tests now draw few pages: the fits test lays the slide out as SlideFailed draws it, the
+  waits test refuses the deck, and Hide is checked on the phone's state. On a phone it runs once per
+  page shown, one PDF view at a time; the device check's battery reading over a lesson covers it.
+  **Tests:**
+  `AppTests.offFocusSlide` (each board and intermediate state: the lesson where its board draws it,
+  every other word and control as without it, in order; the slide one element, its page alone, 16:9;
+  Hide leaving the slide; none on the Home opened from Unlocked or Waiting), `offFocusSlideFits` (the
+  default and accessibility sizes on three iPhones), `offFocusSlideWaits` (no lesson and no poll
+  before the list is seen, gone with a read showing none; none on the ask in onboarding or in
+  Waiting's place), `slideAsksOffFocus` (the deck asked for as it shows on Home, Try again), the
+  fixtures' cards and slides (`AppTests.fixtures`) and `LessonTests.lessonHeading` (BaliOutbox);
+  screenshots beside each board.
+
 - **2026-10-24** — **`AppTests.ageAgainInClass` failing on CI (#452, both runs; #443's first): the
   test's own wait, never M8's slide code: the test shows no lesson and no deck.** Its helper
   `signedIn` started the engine once the phone's 13+ answer read unanswered and the router had the

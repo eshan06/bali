@@ -13,6 +13,23 @@ extension SyncState {
         if case .inSession(let session, _) = standing { running.insert((session.id, session.endsAt), at: 0) }
         return running.first { $0.1 > now && !over.contains($0.0) }?.0
     }
+
+    /// The class of the lesson the phone follows at `now` (`lessonSession`), headed as a session's
+    /// screens head theirs: its name, and under it its teacher and bell — the line over the card and
+    /// the slide on the Screen Time ask (M8b; the app canvas's ScreenTimeAskQuestion, Unlocked's top
+    /// line). Nil with no lesson to follow, or a class `GET /v1/me` doesn't name.
+    public func lessonHeading(
+        at now: Date, over: Set<String>, time: Date.FormatStyle = .init(date: .omitted, time: .shortened)
+    ) -> (title: String, subtitle: String)? {
+        var sessions = (me?.classes ?? []).compactMap { row in
+            row.liveSession.map { SessionView(id: $0.id, classId: row.id, endsAt: $0.endsAt) }
+        }
+        if case .inSession(let session, _) = standing { sessions.insert(session, at: 0) }
+        let id = lessonSession(at: now, over: over)
+        guard let session = sessions.first(where: { $0.id == id }) else { return nil }
+        let heading = heading(session, time)
+        return heading.title.map { ($0, heading.subtitle) }
+    }
 }
 
 /// The answer card as the canvas draws it, state by state (L8): each answer's look and the line
