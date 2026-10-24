@@ -8,7 +8,7 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
-- **2026-10-23** — **The same answer card off the Focus screen (L8c, #PRNUM, L8's last PR, so its
+- **2026-10-23** — **The same answer card off the Focus screen (L8c, #451, L8's last PR, so its
   screens are done), with the owner's three riders; the card goes at its class's bell by the
   phone's clock; a state chip reads its word alone to VoiceOver.** **The screens** (the app canvas's
   row "The same card off the Focus screen": UnlockedQuestion, ScreenTimeOffQuestion and
