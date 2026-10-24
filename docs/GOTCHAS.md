@@ -102,6 +102,11 @@ the clone is `C:\Users\Eshan Shah\Downloads\github\bali`. Its path has a space: 
   crops the shot to 390, a layout no phone has, with no error. For a phone-width shot, emulate the
   width over DevTools: start it with `--remote-debugging-port`, then `Emulation.setDeviceMetricsOverride`
   and `Page.captureScreenshot` (Node 22's built-in `WebSocket` is enough).
+- **Publishing to a canvas from the scratchpad takes the folder's long path.** The session names its
+  scratchpad in Windows' short form (`C:\Users\ESHANS~1\…`), and a publish from that path fails as
+  "blocked by a Read permission rule"; the same folder as `C:\Users\Eshan Shah\…` publishes. A
+  publish refused with "you haven't viewed the latest version" wants a read of the artifact itself
+  (only its `url`), not only of its files, before it goes.
 
 ## Cloud sessions / dev environment
 

@@ -11,8 +11,8 @@ is in `docs/DECISIONS.md`, and finished history is word for word in
 _Last updated: 2026-10-24 (Central) — M6's LessonDecks panel line back (#457; `docs/DECISIONS.md`,
 2026-10-24): Show slides' panel says "Pick a deck. Every phone in this class shows the page you're
 on, and so does Present." again, now that phones (M8, M8b) and the student web (W5) show the slide.
-LessonDecksStates and LessonRetryStates still draw the short line on the canvas: their redraw is
-ready, unpublished (the worker's publish was refused), for the conductor. Before it, the push's app
+LessonDecksStates and LessonRetryStates show the whole line on the canvas too (canvas version 105,
+published by the conductor on the owner's go). Before it, the push's app
 half (#456): **before the next TestFlight build, Push Notifications on `com.bali.Bali`** (runbook 7,
 step 3), or its signing may fail; build 10 went before it, from `1d4496b6`. **An install whose
 Screen Time step was done before that build is never asked:** the owner reinstalls Bali before
