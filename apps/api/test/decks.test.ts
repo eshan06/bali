@@ -302,6 +302,28 @@ describe('DELETE /v1/decks/:id', () => {
     }
   });
 
+  it('answers its retry in either letter case as its replay, never 404 (#442, part 3)', async () => {
+    // A client minting its ids in upper case, as Foundation's `uuidString` writes them, resends a
+    // removal whose answer never came. Postgres keeps a uuid lower-case, and the answers name it so.
+    const { teacher, token } = await people('deck-remove-case');
+    for (const loud of [true, false]) {
+      const { deck } = await added(token);
+      const id = newUuidV7();
+      const cased = (s: string, upper: boolean) => (upper ? s.toUpperCase() : s);
+
+      const res = await remove(token, cased(deck.id, loud), { eventId: cased(id, loud) });
+
+      expect(res.json<DeckResponse>()).toEqual({ outcome: 'removed', deck });
+      for (const upper of [loud, !loud]) {
+        const retry = await remove(token, cased(deck.id, upper), { eventId: cased(id, upper) });
+        expect(retry.statusCode).toBe(200);
+        expect(retry.json<DeckResponse>()).toEqual({ outcome: 'replay', deck });
+      }
+      expect(await rowOf(deck.id)).toMatchObject({ eventId: id, removedAt: now });
+    }
+    expect(await decksOf(teacher.id)).toHaveLength(2);
+  });
+
   it('deletes its object at once, stamped so, once no upload can write it (decision 5)', async () => {
     const { teacher, token } = await people('deck-remove-ready');
     const deck = await uploaded(token, pdf(3));

@@ -899,6 +899,89 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
     expect(filed.payload).toEqual({ tap_event_id: tapId, unattached_event_id: unlockId });
   }, 20_000);
 
+  it('a tap and its unlock naming it in another letter case still wait for each other (decision 11; #442, part 3)', async () => {
+    // The staging above, the unlock naming its tap in another case than the tap is sent in: Postgres
+    // keeps the tap's id lower-case, and a client may send it in upper case (Foundation's
+    // `uuidString`). `lockTap` takes the id as stored, so the tap still parks behind the unlock and
+    // files it as it lands. Locked as sent, the two never meet: the tap commits focused, and the
+    // unlock is kept with no session, never filed.
+    const ago = (seconds: number) => new Date(Date.now() - seconds * 1000);
+    for (const tapLoud of [false, true]) {
+      const { classId, studentId } = await seed(`race-tap-unlock-case-${tapLoud}`);
+      const session = await openSession(classId);
+      const tapId = newUuidV7();
+      const unlockId = newUuidV7();
+      const loud = tapId.toUpperCase();
+
+      const [kept, tapped] = await behindHolder(
+        unlockId,
+        studentId,
+        () =>
+          unlockUnderTap(db, {
+            tapEventId: tapLoud ? tapId : loud,
+            studentId,
+            eventId: unlockId,
+            deviceTime: ago(10),
+          }),
+        () =>
+          tapIn(db, {
+            sessionId: session.id,
+            studentId,
+            eventId: tapLoud ? loud : tapId,
+            deviceTime: ago(20),
+          }),
+      );
+
+      expect(kept).toMatchObject({ outcome: 'recorded', recordedAs: 'unknown_tap' });
+      expect(tapped).toMatchObject({ outcome: 'joined', state: 'unlocked' });
+      expect(one(await liveParticipations(session.id)).state).toBe('unlocked');
+      const filed = one(await eventsOfType(session.id, 'unlock'));
+      expect(filed.payload).toEqual({ tap_event_id: tapId, unattached_event_id: unlockId });
+    }
+  }, 40_000);
+
+  it('an unlock naming its tap in another letter case, racing that tap, ends unlocked, filed once, whichever lands first (decision 11; #442, part 3)', async () => {
+    // The race two above, each pair of cases in each order: never a tap committed focused over the
+    // unlock, nor the unlock filed twice or not at all.
+    const ago = (seconds: number) => new Date(Date.now() - seconds * 1000);
+    for (let round = 0; round < 12; round += 1) {
+      const { classId, studentId } = await seed(`race-tap-unlock-cased-${round}`);
+      const session = await openSession(classId);
+      const tapId = newUuidV7();
+      // Odd rounds send the tap in upper case, even ones the unlock's name for it.
+      const loud = tapId.toUpperCase();
+      const [sent, named] = round % 2 === 1 ? [loud, tapId] : [tapId, loud];
+      const theTap = () =>
+        tapIn(db, { sessionId: session.id, studentId, eventId: sent, deviceTime: ago(20) });
+      const unlockId = newUuidV7();
+      const theUnlock = () =>
+        unlockUnderTap(db, {
+          tapEventId: named,
+          studentId,
+          eventId: unlockId,
+          deviceTime: ago(10),
+        });
+
+      // Rounds 0, 1, 4, 5, 8 and 9 give the unlock a head start, so each order meets each pair.
+      const [tapped, unlocked] = await Promise.allSettled([
+        round % 4 < 2 ? new Promise((resolve) => setTimeout(resolve, 10)).then(theTap) : theTap(),
+        theUnlock(),
+      ]);
+      if (tapped.status === 'rejected') throw tapped.reason;
+      if (unlocked.status === 'rejected') throw unlocked.reason;
+
+      expect(one(await liveParticipations(session.id)).state).toBe('unlocked');
+      const filed = one(await eventsOfType(session.id, 'unlock'));
+      if (unlocked.value.recordedAs === 'unknown_tap') {
+        expect(tapped.value.state).toBe('unlocked');
+        expect(filed.payload).toEqual({ tap_event_id: tapId, unattached_event_id: unlockId });
+      } else {
+        expect(unlocked.value).toMatchObject({ outcome: 'applied', state: 'unlocked' });
+        expect(filed).toMatchObject({ eventId: unlockId, payload: { tap_event_id: tapId } });
+      }
+    }
+  }, 120_000);
+
   it('a reason change racing a return, a re-tap or another unlock is never recorded after it (A20)', async () => {
     // A change is for the unlock the grid shows, and a return, a re-tap or a
     // new unlock ends that. All take the session FOR UPDATE, so either order
@@ -954,6 +1037,44 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
       }
     }
   }, 120_000);
+
+  it('an unlock resent in upper case behind a change of its reason answers the reason that change committed (A20; #442, part 3)', async () => {
+    // The change holds the session's row until it commits; the unlock's retry, its ids in upper case
+    // as Foundation's `uuidString` writes them, parks there, then reads the reason now. The change
+    // names the unlock as Postgres keeps it, lower-case. On both of the unlock's routes.
+    for (const route of ['session', 'tap'] as const) {
+      const { classId, studentId } = await seed(`race-reason-replay-case-${route}`);
+      const session = await openSession(classId);
+      const tapId = newUuidV7();
+      await tapIn(db, { sessionId: session.id, studentId, eventId: tapId, deviceTime: new Date() });
+      const unlockId = newUuidV7();
+      const sent = { studentId, deviceTime: new Date(), reason: 'bathroom' as const };
+      const send = (cased: (id: string) => string) =>
+        route === 'session'
+          ? unlock(db, { ...sent, sessionId: cased(session.id), eventId: cased(unlockId) })
+          : unlockUnderTap(db, { ...sent, tapEventId: cased(tapId), eventId: cased(unlockId) });
+      expect(await send((id) => id)).toMatchObject({ outcome: 'applied', reason: 'bathroom' });
+
+      const resent = await behindCommit(
+        (tx) =>
+          changeUnlockReason(tx, {
+            unlockEventId: unlockId,
+            studentId,
+            eventId: newUuidV7(),
+            reason: 'nurse',
+          }),
+        () => send((id) => id.toUpperCase()),
+      );
+
+      if (resent.status === 'rejected') throw resent.reason as Error;
+      expect(resent.value).toMatchObject({ outcome: 'replay', state: 'unlocked', reason: 'nurse' });
+      expect(await eventsOfType(session.id, 'unlock')).toHaveLength(1);
+      expect(one(await eventsOfType(session.id, 'unlock_reason_changed')).payload).toEqual({
+        unlock_event_id: unlockId,
+        reason: 'nurse',
+      });
+    }
+  }, 40_000);
 
   it('protection off racing the end of the session is recorded exactly once, whichever lands first', async () => {
     // Owner decision 10: a report that reaches a session already over is
@@ -2779,54 +2900,63 @@ describe.runIf(REAL_PG)('a Start past the bell (real Postgres, A18)', () => {
 });
 
 describe.runIf(REAL_PG)('a tap at the bell (real Postgres, A17)', () => {
-  it('an arm waits out the same tap still landing in a session, and answers as its replay', async () => {
-    /*
-     * A tap's retry reaching the server past the bell takes the arm path while
-     * the tap itself may still be landing in the session, its `tap_in` not yet
-     * committed — so `armTap`'s look for it finds nothing. Armed there, the id
-     * is spent a moment later by the landing, the next Start skips the row as
-     * spent, and a phone told "armed" waits for a Start that never joins it.
-     * `armTap` takes the tap's own lock, as the landing does, so it waits the
-     * landing out and answers as its replay. Staged: a holder parks the
-     * landing on the session's row while it holds the tap's lock.
-     */
-    const { classId, studentId, teacherId } = await seed('race-arm-landing');
-    const session = await openSession(classId);
-    const eventId = newUuidV7();
-    const release = await holdSession(session.id);
-    const landing = tapIn(db, {
-      sessionId: session.id,
-      studentId,
-      eventId,
-      deviceTime: new Date(),
-    });
-    let arming: ReturnType<typeof armTap> | undefined;
-    let settled = false;
-    try {
-      await waitForBlockedBackend();
-      arming = armTap(db, {
+  it.each([
+    ['', 'race-arm-landing', (id: string) => id],
+    // The retry in another letter case than the landing (#442, part 3): Postgres keeps the id
+    // lower-case, a client may send it in upper case, and `lockTap` takes the id as stored.
+    [' in another letter case', 'race-arm-landing-case', (id: string) => id.toUpperCase()],
+  ])(
+    'an arm waits out the same tap still landing in a session, and answers as its replay%s',
+    async (_, tag, cased) => {
+      /*
+       * A tap's retry reaching the server past the bell takes the arm path while
+       * the tap itself may still be landing in the session, its `tap_in` not yet
+       * committed — so `armTap`'s look for it finds nothing. Armed there, the id
+       * is spent a moment later by the landing, the next Start skips the row as
+       * spent, and a phone told "armed" waits for a Start that never joins it.
+       * `armTap` takes the tap's own lock, as the landing does, so it waits the
+       * landing out and answers as its replay. Staged: a holder parks the
+       * landing on the session's row while it holds the tap's lock.
+       */
+      const { classId, studentId, teacherId } = await seed(tag);
+      const session = await openSession(classId);
+      const eventId = newUuidV7();
+      const release = await holdSession(session.id);
+      const landing = tapIn(db, {
+        sessionId: session.id,
         studentId,
-        teacherId,
         eventId,
         deviceTime: new Date(),
-        expiresAt: new Date(Date.now() + 3_600_000),
       });
-      const done = () => {
-        settled = true;
-      };
-      void arming.then(done, done);
-      // Parked behind the landing on the tap's lock — or, without it, answered already.
-      const deadline = Date.now() + 5_000;
-      while (!settled && (await lockWaiters()) < 2 && Date.now() < deadline) {
-        await new Promise((r) => setTimeout(r, 10));
+      let arming: ReturnType<typeof armTap> | undefined;
+      let settled = false;
+      try {
+        await waitForBlockedBackend();
+        arming = armTap(db, {
+          studentId,
+          teacherId,
+          eventId: cased(eventId),
+          deviceTime: new Date(),
+          expiresAt: new Date(Date.now() + 3_600_000),
+        });
+        const done = () => {
+          settled = true;
+        };
+        void arming.then(done, done);
+        // Parked behind the landing on the tap's lock — or, without it, answered already.
+        const deadline = Date.now() + 5_000;
+        while (!settled && (await lockWaiters()) < 2 && Date.now() < deadline) {
+          await new Promise((r) => setTimeout(r, 10));
+        }
+      } finally {
+        await release();
       }
-    } finally {
-      await release();
-    }
-    expect((await landing).outcome).toBe('joined');
-    expect(await arming).toEqual({ outcome: 'replay' });
-    expect(await db.select().from(armedTaps).where(eq(armedTaps.eventId, eventId))).toEqual([]);
-  }, 20_000);
+      expect((await landing).outcome).toBe('joined');
+      expect(await arming).toEqual({ outcome: 'replay' });
+      expect(await db.select().from(armedTaps).where(eq(armedTaps.eventId, eventId))).toEqual([]);
+    },
+    20_000,
+  );
 });
 
 /**
@@ -3016,6 +3146,43 @@ async function behindHolder<P, R>(
   if (first.status === 'rejected') throw first.reason as Error;
   if (second.status === 'rejected') throw second.reason as Error;
   return [first.value, second.value as R];
+}
+
+/**
+ * What `call` answers behind a holder that writes with `write`, sits on it uncommitted until
+ * `call` parks on a lock, then commits: the interleaving staged, not hoped for.
+ */
+async function behindCommit<T>(
+  write: (tx: Database) => Promise<unknown>,
+  call: () => Promise<T>,
+): Promise<PromiseSettledResult<T>> {
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let wrote!: () => void;
+  const hasRow = new Promise<void>((resolve) => {
+    wrote = resolve;
+  });
+  const holder = db.transaction(async (tx) => {
+    await write(tx);
+    wrote();
+    await held;
+  });
+  await hasRow;
+  const calling = call();
+  let unstaged: Error | null = null;
+  try {
+    await waitForBlockedBackend();
+  } catch (err) {
+    unstaged = err instanceof Error ? err : new Error(String(err));
+  } finally {
+    release();
+  }
+  await holder;
+  const [settled] = await Promise.allSettled([calling]);
+  if (unstaged !== null) throw unstaged;
+  return settled;
 }
 
 /**
@@ -4415,43 +4582,6 @@ describe.runIf(REAL_PG)('live lesson questions under contention (real Postgres, 
   const answersTo = (questionId: string) =>
     db.select().from(responses).where(eq(responses.questionId, questionId));
 
-  /**
-   * What `call` answers behind a holder that writes with `write`, sits on it uncommitted until
-   * `call` parks on a lock, then commits: the interleaving staged, not hoped for.
-   */
-  async function behindCommit<T>(
-    write: (tx: Database) => Promise<unknown>,
-    call: () => Promise<T>,
-  ): Promise<PromiseSettledResult<T>> {
-    let release!: () => void;
-    const held = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    let wrote!: () => void;
-    const hasRow = new Promise<void>((resolve) => {
-      wrote = resolve;
-    });
-    const holder = db.transaction(async (tx) => {
-      await write(tx);
-      wrote();
-      await held;
-    });
-    await hasRow;
-    const calling = call();
-    let unstaged: Error | null = null;
-    try {
-      await waitForBlockedBackend();
-    } catch (err) {
-      unstaged = err instanceof Error ? err : new Error(String(err));
-    } finally {
-      release();
-    }
-    await holder;
-    const [settled] = await Promise.allSettled([calling]);
-    if (unstaged !== null) throw unstaged;
-    return settled;
-  }
-
   it('an answer racing the close either counts before it or sees it closed', async () => {
     for (let round = 0; round < 12; round += 1) {
       const { studentId, question } = await asking(`race-answer-close-${round}`);
@@ -5168,6 +5298,25 @@ describe.runIf(REAL_PG)('live lesson questions under contention (real Postgres, 
       );
     }
   });
+
+  it('a removal’s retry in upper case behind its first delivery is the replay, never a 404 (#442, part 3)', async () => {
+    // As a draft's (#319): a client minting upper-case ids resends while its first delivery is still
+    // on its way. The retry parks on the deck's row, then finds the id as Postgres keeps it.
+    const { teacherId } = await seed('race-deck-remove-case');
+    const { deck } = await createDeck(db, await decking(teacherId));
+    const removal = { deckId: deck.id, eventId: newUuidV7() };
+
+    const retried = await behindCommit(
+      (tx) => removeDeck(tx, removal),
+      () =>
+        removeDeck(db, { deckId: deck.id.toUpperCase(), eventId: removal.eventId.toUpperCase() }),
+    );
+
+    if (retried.status === 'rejected') throw retried.reason as Error;
+    expect(retried.value).toMatchObject({ outcome: 'replay', deck: { id: deck.id } });
+    expect(await decksOf(teacherId)).toMatchObject([{ eventId: removal.eventId }]);
+    expect((await decksOf(teacherId))[0]!.removedAt).not.toBeNull();
+  }, 20_000);
 
   it('two completes of one deck at once record one verdict: the other answers it (M2b)', async () => {
     for (let round = 0; round < 12; round += 1) {

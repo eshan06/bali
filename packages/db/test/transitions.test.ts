@@ -2362,6 +2362,82 @@ describe('an unlock sent under its tap (decision 11)', () => {
     }
   });
 
+  it('ends alike whatever letter case the tap and its unlock name the tap in, in both arrival orders (#442, part 3)', async () => {
+    // Postgres keeps a uuid lower-case; a client may send one in upper case (Foundation's
+    // `uuidString`). Every pair of cases ends as one case does: an unlock kept first is filed as its
+    // tap lands, and each record names the tap as stored. The two meeting at once: races.test.ts.
+    const cased = (id: string, loud: boolean) => (loud ? id.toUpperCase() : id);
+    for (const [tapLoud, namedLoud] of [
+      [true, false],
+      [false, true],
+      [true, true],
+    ] as const) {
+      for (const unlockFirst of [true, false]) {
+        const tag = `tap-unlock-case-${tapLoud}-${namedLoud}-${unlockFirst}`;
+        const { session, student } = await lesson(tag);
+        const tap = newUuidV7();
+        const sent = underTap(student.id, cased(tap, namedLoud), at(4), 'nurse');
+        const theTap = (loud = tapLoud) => tapped(session, student.id, cased(tap, loud), at(2));
+        if (unlockFirst) {
+          expect(await unlockUnderTap(db, sent)).toMatchObject({ recordedAs: 'unknown_tap' });
+          expect(one(await unlocksOf(student.id)).payload).toMatchObject({
+            claimed_tap_event_id: tap,
+          });
+          expect(await theTap()).toMatchObject({ outcome: 'joined', state: 'unlocked' });
+        } else {
+          expect(await theTap()).toMatchObject({ outcome: 'joined', state: 'focused' });
+          expect(await unlockUnderTap(db, sent)).toMatchObject({
+            outcome: 'applied',
+            state: 'unlocked',
+          });
+        }
+
+        expect(await stateOf(session.id, student.id)).toBe('unlocked');
+        const filed = one((await eventsFor(session.id)).filter((e) => e.type === 'unlock'));
+        expect(filed.payload).toEqual({
+          tap_event_id: tap,
+          ...(unlockFirst && { unattached_event_id: sent.eventId }),
+          reason: 'nurse',
+        });
+        // Each retry, in the other case, answers the truth now, and nothing is filed twice.
+        expect(await theTap(!tapLoud)).toMatchObject({ outcome: 'replay', state: 'unlocked' });
+        const again = { ...sent, tapEventId: cased(tap, !namedLoud) };
+        expect(await unlockUnderTap(db, again)).toMatchObject({
+          outcome: 'replay',
+          reason: 'nurse',
+          session: unlockFirst ? null : { id: session.id },
+        });
+        expect(await unlocksOf(student.id)).toHaveLength(unlockFirst ? 2 : 1);
+      }
+    }
+  });
+
+  it('still files a claim kept before #449 in its unlock’s own upper case, by a tap in that case, as it always did', async () => {
+    // Before #449 the claim was kept as the unlock sent it; its row, as that engine wrote it.
+    const { session, student } = await lesson('tap-unlock-case-kept-before');
+    const tap = newUuidV7();
+    const keptId = newUuidV7();
+    await db.insert(events).values({
+      eventId: keptId,
+      type: 'unlock',
+      userId: student.id,
+      occurredAt: at(5),
+      payload: {
+        recorded_as: 'unknown_tap',
+        claimed_tap_event_id: tap.toUpperCase(),
+        device_time: at(4).toISOString(),
+      },
+    });
+
+    expect(await tapped(session, student.id, tap.toUpperCase(), at(2))).toMatchObject({
+      outcome: 'joined',
+      state: 'unlocked',
+    });
+    const filed = one((await eventsFor(session.id)).filter((e) => e.type === 'unlock'));
+    expect(filed.payload).toEqual({ tap_event_id: tap, unattached_event_id: keptId });
+    expect(await stateOf(session.id, student.id)).toBe('unlocked');
+  });
+
   it('a late tap files its unlock by the session’s rules: late when a later return went ahead', async () => {
     const { session, student } = await lesson('tap-unlock-late-tap');
     const tap = newUuidV7();

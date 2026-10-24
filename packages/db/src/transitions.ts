@@ -168,6 +168,17 @@ function firstOrUndefined<T>(rows: T[]): T | undefined {
 }
 
 /**
+ * An id as Postgres prints a `uuid`: lower-case. The routes take one in either case, and a client
+ * may mint upper case (Foundation's `uuidString` writes it so). Postgres matches a `uuid` column in
+ * any case; where the engine compares an id as text it compares this form, and keeps this form in
+ * the payloads such a comparison reads (a kept unlock's claim on its tap), so one id, sent in any
+ * case, is one id (#319, #442).
+ */
+function asStored(id: string): string {
+  return id.toLowerCase();
+}
+
+/**
  * When the server last heard from a phone — always the server's own clock,
  * never the device's (even clamped).
  *
@@ -1737,11 +1748,12 @@ async function teacherOfClass(tx: Database, classId: string): Promise<string | u
  * other: the unlock kept unattached, the tap joined as focused over a phone its
  * student unlocked; or a retry armed under an id its landing then spends.
  * Taken first in each, before the session: one lock order. A transaction
- * advisory lock on a hash of the tap's id, released at commit — a collision
- * only makes two taps wait on each other.
+ * advisory lock on a hash of the tap's id as stored, so a tap and its unlock
+ * or arm sent in different letter cases still meet (#442), released at commit
+ * — a collision only makes two taps wait on each other.
  */
 async function lockTap(tx: Database, tapEventId: string): Promise<void> {
-  await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${tapEventId}, 0))`);
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${asStored(tapEventId)}, 0))`);
 }
 
 /**
@@ -2064,6 +2076,12 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
  * was unanswered, it is numbered after it, so the tap just recorded is never a
  * return after it — and was judged before it (A13), the kept unlock in no
  * session then.
+ *
+ * Its claim names the tap as stored (`unlockUnderTap`), whatever case either
+ * was sent in (#442); one kept before #449 names it as its unlock sent it,
+ * which a tap sent in that same case files, as it always did. So a tap sent in
+ * another case than lower looks for both, each one probe, oldest first across
+ * them.
  */
 async function fileKeptUnlocks(
   tx: Database,
@@ -2071,7 +2089,11 @@ async function fileKeptUnlocks(
   tap: TapInput,
   state: ParticipationState | null,
 ): Promise<ParticipationState | null> {
-  for (const kept of await unlocksAwaitingTap(tx, tap.studentId, tap.eventId)) {
+  const awaiting: Awaited<ReturnType<typeof unlocksAwaitingTap>> = [];
+  for (const claim of new Set([asStored(tap.eventId), tap.eventId])) {
+    awaiting.push(...(await unlocksAwaitingTap(tx, tap.studentId, claim)));
+  }
+  for (const kept of awaiting.sort((a, b) => a.seq - b.seq)) {
     const payload = (kept.payload ?? {}) as Record<string, unknown>;
     const claimed = new Date(String(payload.device_time));
     const filed = await unlockIn(
@@ -2087,7 +2109,7 @@ async function fileKeptUnlocks(
         reason: knownReason(payload.reason),
         order: knownOrder({ install: kept.orderInstall, seq: kept.orderSeq }),
       },
-      { tap_event_id: tap.eventId, unattached_event_id: kept.eventId },
+      { tap_event_id: asStored(tap.eventId), unattached_event_id: kept.eventId },
     );
     state = filed.state ?? state;
   }
@@ -2392,12 +2414,15 @@ async function storedPayload(
  * The reason on record for an unlock that already landed: its latest change's
  * (A20), else the one stored with it. A replay answers with the truth now (rule
  * 4), not with whatever the retry carries, so a phone that changed its answer
- * between retries learns which one the teacher sees.
+ * between retries learns which one the teacher sees. A change names its unlock
+ * as stored, so it is read under the id as stored, whatever case the retry
+ * sent it in (#442).
  */
 async function recordedReason(tx: Database, eventId: string): Promise<UnlockReason | null> {
-  const changed = (await changedReasons(tx, [eventId])).get(eventId);
+  const id = asStored(eventId);
+  const changed = (await changedReasons(tx, [id])).get(id);
   if (changed) return changed;
-  const stored = (await storedPayload(tx, eventId))?.reason;
+  const stored = (await storedPayload(tx, id))?.reason;
   return isUnlockReason(stored) ? stored : null;
 }
 
@@ -2827,12 +2852,13 @@ export interface TapUnlockInput {
 
 /**
  * The unlocks sent under a tap before it arrived — kept unattached, noted
- * `unknown_tap` — oldest first: what its landing files (decision 11). The
+ * `unknown_tap` — whose claim on it is `claim`, exactly as kept, oldest first:
+ * what its landing files (decision 11; `fileKeptUnlocks` says which forms). The
  * type and session are literals, so the read is one probe of
  * `events_unattached_tap_idx`, which holds only unlocks kept with no session.
  * Unexecuted, so a test can EXPLAIN it.
  */
-export function unlocksAwaitingTap(db: Database, studentId: string, tapEventId: string) {
+export function unlocksAwaitingTap(db: Database, studentId: string, claim: string) {
   return db
     .select({
       eventId: events.eventId,
@@ -2840,12 +2866,13 @@ export function unlocksAwaitingTap(db: Database, studentId: string, tapEventId: 
       occurredAt: events.occurredAt,
       orderInstall: events.orderInstall,
       orderSeq: events.orderSeq,
+      seq: events.seq,
     })
     .from(events)
     .where(
       and(
         sql`${events.type} = 'unlock' and ${events.sessionId} is null`,
-        sql`${events.payload}->>'claimed_tap_event_id' = ${tapEventId}`,
+        sql`${events.payload}->>'claimed_tap_event_id' = ${claim}`,
         sql`${events.payload}->>'recorded_as' = 'unknown_tap'`,
         eq(events.userId, studentId),
       ),
@@ -2860,8 +2887,9 @@ export function unlocksAwaitingTap(db: Database, studentId: string, tapEventId: 
  * one the tap switched it out of — so it sends the tap's id, and the unlock is
  * filed in whatever session that tap landed in, by `unlock`'s rules there: the
  * notes, A10's `superseded`, the clamp to that session's window (rule 1). Its
- * payload names the tap (`tap_event_id`). With no session to file it in, it is
- * kept unattached, as an unknown session's is, and noted:
+ * payload names the tap (`tap_event_id`) as stored, whatever case it was sent
+ * in (#442). With no session to file it in, it is kept unattached, as an
+ * unknown session's is, and noted:
  *   - `tap_armed`: the tap is on the arm path — waiting for its teacher's
  *     Start (decision 5), or late (A14): kept there consumed, so no Start ever
  *     converts it. The unlock came before any session did, so a Start does not
@@ -2884,10 +2912,13 @@ export function unlocksAwaitingTap(db: Database, studentId: string, tapEventId: 
  * other.
  */
 export async function unlockUnderTap(db: Database, input: TapUnlockInput): Promise<UnlockResult> {
+  // As stored, whatever case it was sent in: the claim a tap's landing matches as text
+  // (`unlocksAwaitingTap`), and the filing's note.
+  const tapEventId = asStored(input.tapEventId);
   // Retry on deadlock, as `unlock` does once it has the session.
   return withDeadlockRetry(() =>
     db.transaction(async (tx) => {
-      await lockTap(tx, input.tapEventId);
+      await lockTap(tx, tapEventId);
       // The caller's own only: an id another student's event holds is refused
       // all the same (`insertEvent`), without locking their session first.
       const recorded = firstOrUndefined(
@@ -2905,7 +2936,7 @@ export async function unlockUnderTap(db: Database, input: TapUnlockInput): Promi
             .from(events)
             .where(
               and(
-                eq(events.eventId, input.tapEventId),
+                eq(events.eventId, tapEventId),
                 eq(events.userId, input.studentId),
                 eq(events.type, 'tap_in'),
               ),
@@ -2916,7 +2947,7 @@ export async function unlockUnderTap(db: Database, input: TapUnlockInput): Promi
         ? await loadSession(tx, landed.sessionId, { forUpdate: true })
         : undefined;
       if (session) {
-        const filing = { tap_event_id: input.tapEventId };
+        const filing = { tap_event_id: tapEventId };
         return unlockIn(tx, session, { ...input, sessionId: session.id }, filing);
       }
 
@@ -2931,16 +2962,11 @@ export async function unlockUnderTap(db: Database, input: TapUnlockInput): Promi
           await tx
             .select({ id: armedTaps.id })
             .from(armedTaps)
-            .where(
-              and(
-                eq(armedTaps.eventId, input.tapEventId),
-                eq(armedTaps.studentId, input.studentId),
-              ),
-            )
+            .where(and(eq(armedTaps.eventId, tapEventId), eq(armedTaps.studentId, input.studentId)))
             .limit(1),
         ) !== undefined;
       return recordOrphanUnlock(tx, input, armed ? 'tap_armed' : 'unknown_tap', {
-        claimed_tap_event_id: input.tapEventId,
+        claimed_tap_event_id: tapEventId,
       });
     }),
   );
@@ -3686,7 +3712,7 @@ function writeSavedQuestion(
         .for('update');
       // Postgres prints a uuid lower-case, and a client may send it in upper case: one id, so its
       // retry is its replay (#319). Every other match of the id here is Postgres's, in any case.
-      if (draft?.eventId === input.eventId.toLowerCase()) {
+      if (draft?.eventId === asStored(input.eventId)) {
         if (write.replays(draft)) return { outcome: 'replay', savedQuestion: draft };
         throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
       }
@@ -3871,15 +3897,15 @@ export type RemoveDeckResult =
  * session shows the deck before it looks. So it reads the presentation rows here, unlocked, their
  * sessions' classes in the same statement: a running session showing the deck is `deck_in_use`,
  * naming each such class, nothing written, and a slide change's FOR SHARE on this row is where the
- * two meet, so they never deadlock. Its replay, the id it holds with the deck removed, answers the
- * deck now; the id it holds from another write, or one any other row holds, is EVENT_ID_CONFLICT. A
- * deck removed already, or none, is `deck_not_found`.
+ * two meet, so they never deadlock. Its replay, the id it holds with the deck removed, sent in any
+ * case (#442), answers the deck now; the id it holds from another write, or one any other row holds,
+ * is EVENT_ID_CONFLICT. A deck removed already, or none, is `deck_not_found`.
  */
 export function removeDeck(db: Database, input: RemoveDeckInput): Promise<RemoveDeckResult> {
   return onceMoreOnUnique(() =>
     db.transaction(async (tx): Promise<RemoveDeckResult> => {
       const [deck] = await tx.select().from(decks).where(eq(decks.id, input.deckId)).for('update');
-      if (deck?.eventId === input.eventId) {
+      if (deck?.eventId === asStored(input.eventId)) {
         if (deck.removedAt) return { outcome: 'replay', deck };
         throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
       }
