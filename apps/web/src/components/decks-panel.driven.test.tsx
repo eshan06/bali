@@ -80,12 +80,14 @@ afterEach(() => {
 describe('Show slides’ panel (LessonDecks)', () => {
   it('is v2’s side panel, 372 px from the right, titled Show slides over its whole line, then the decks', async () => {
     const { panel } = open();
+    expect(panel.id).toBe('P');
     const look = panel.className.split(' ');
     expect(look).toEqual(expect.arrayContaining(['fixed', 'right-0', 'w-93', 'max-w-full']));
     expect(look).not.toContain('w-115');
-    expect(within(panel).getByRole('heading', { level: 2, name: 'Show slides' }).className).toBe(
-      'text-h3',
-    );
+    const title = within(panel).getByRole('heading', { level: 2, name: 'Show slides' });
+    expect(title.className).toBe('text-h3');
+    // Focus comes to its title as it opens.
+    expect(document.activeElement).toBe(title);
     await answer([
       deck(1, 'Factoring quadratics'),
       deck(2, 'Graphing parabolas', { pageCount: 9, createdAt: '2026-10-02T15:00:00.000Z' }),
