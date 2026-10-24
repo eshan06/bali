@@ -2502,18 +2502,17 @@ describe('an unlock sent under its tap (decision 11)', () => {
   });
 
   it('every tap’s look for them is one probe of their index', async () => {
-    // A tap sent in upper case looks for its claim in two forms (#449): still the index.
-    for (const tap of [newUuidV7(), newUuidV7().toUpperCase()]) {
-      const plan = await db.transaction(async (tx) => {
-        await tx.execute(sql`set local enable_seqscan = off`);
-        const result = await tx.execute(sql`explain ${unlocksAwaitingTap(tx, newUuidV7(), tap)}`);
-        const rows = (
-          Array.isArray(result) ? result : (result as { rows: unknown[] }).rows
-        ) as Record<string, string>[];
-        return rows.map((row) => Object.values(row).join(' ')).join('\n');
-      });
-      expect(plan, plan).toContain('events_unattached_tap_idx');
-    }
+    const plan = await db.transaction(async (tx) => {
+      await tx.execute(sql`set local enable_seqscan = off`);
+      const result = await tx.execute(
+        sql`explain ${unlocksAwaitingTap(tx, newUuidV7(), newUuidV7())}`,
+      );
+      const rows = (
+        Array.isArray(result) ? result : (result as { rows: unknown[] }).rows
+      ) as Record<string, string>[];
+      return rows.map((row) => Object.values(row).join(' ')).join('\n');
+    });
+    expect(plan, plan).toContain('events_unattached_tap_idx');
   });
 });
 

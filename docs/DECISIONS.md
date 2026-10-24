@@ -29,11 +29,14 @@ a real decision? Add a dated entry at the top: what was decided and why.
   holds the id as its unlock sent it, and a tap in that same case files it, as it always did, so the
   fix files nothing less than before for any row (both santa reviewers' WARN: looking for the
   lower-case form alone, a claim kept in upper case would no longer have been filed even by a tap in
-  its own case). The look is still the index, one probe, or two for a tap sent in upper case (its
-  EXPLAIN test runs both). *An unlock's replay* (`recordedReason`, on `POST /v1/sessions/{id}/unlock`
-  and `POST /v1/taps/{eventId}/unlock` alike): the reason's latest change (A20), which names the
-  unlock as stored, is read under the unlock's id as stored, so a retry in upper case after the reason
-  changed answers the reason now, never the one first recorded. **The unlock contract, checked**
+  its own case). Each look is still one probe of `events_unattached_tap_idx` (its EXPLAIN test as it
+  was): a tap sent in lower case, as every client sends, looks once, as before; one sent otherwise
+  looks for each form in turn, oldest first across them. Not one look for both at once: the
+  real-Postgres lane planned that (`= ANY`) on the student's own events instead. *An unlock's replay*
+  (`recordedReason`, on `POST /v1/sessions/{id}/unlock` and `POST /v1/taps/{eventId}/unlock` alike):
+  the reason's latest change (A20), which names the unlock as stored, is read under the unlock's id as
+  stored, so a retry in upper case after the reason changed answers the reason now, never the one
+  first recorded. **The unlock contract, checked**
   (`packages/shared/src/unlock-contract.ts`): every write on these paths is where it was and records
   what it did, so no unlock goes unrecorded and every answer is still `applied`, `recorded` or
   `replay`. An answer changes only where it was wrong: a replay's reason is the one the teacher sees,

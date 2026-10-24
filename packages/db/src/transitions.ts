@@ -2076,6 +2076,12 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
  * was unanswered, it is numbered after it, so the tap just recorded is never a
  * return after it — and was judged before it (A13), the kept unlock in no
  * session then.
+ *
+ * Its claim names the tap as stored (`unlockUnderTap`), whatever case either
+ * was sent in (#442); one kept before #449 names it as its unlock sent it,
+ * which a tap sent in that same case files, as it always did. So a tap sent in
+ * another case than lower looks for both, each one probe, oldest first across
+ * them.
  */
 async function fileKeptUnlocks(
   tx: Database,
@@ -2083,7 +2089,11 @@ async function fileKeptUnlocks(
   tap: TapInput,
   state: ParticipationState | null,
 ): Promise<ParticipationState | null> {
-  for (const kept of await unlocksAwaitingTap(tx, tap.studentId, tap.eventId)) {
+  const awaiting: Awaited<ReturnType<typeof unlocksAwaitingTap>> = [];
+  for (const claim of new Set([asStored(tap.eventId), tap.eventId])) {
+    awaiting.push(...(await unlocksAwaitingTap(tx, tap.studentId, claim)));
+  }
+  for (const kept of awaiting.sort((a, b) => a.seq - b.seq)) {
     const payload = (kept.payload ?? {}) as Record<string, unknown>;
     const claimed = new Date(String(payload.device_time));
     const filed = await unlockIn(
@@ -2842,17 +2852,13 @@ export interface TapUnlockInput {
 
 /**
  * The unlocks sent under a tap before it arrived — kept unattached, noted
- * `unknown_tap` — oldest first: what its landing files (decision 11). The
- * type and session are literals, so the read probes
- * `events_unattached_tap_idx`, which holds only unlocks kept with no session:
- * once, or twice for a tap sent in upper case. The claim is text, kept with the
- * tap's id as stored (`unlockUnderTap`), so it is matched so, whatever case
- * either was sent in (#442); and as this tap is sent, since a claim kept before
- * #449 holds the id as its unlock sent it, which a tap in that same case files
- * as it always did. Unexecuted, so a test can EXPLAIN it.
+ * `unknown_tap` — whose claim on it is `claim`, exactly as kept, oldest first:
+ * what its landing files (decision 11; `fileKeptUnlocks` says which forms). The
+ * type and session are literals, so the read is one probe of
+ * `events_unattached_tap_idx`, which holds only unlocks kept with no session.
+ * Unexecuted, so a test can EXPLAIN it.
  */
-export function unlocksAwaitingTap(db: Database, studentId: string, tapEventId: string) {
-  const claims = [...new Set([asStored(tapEventId), tapEventId])];
+export function unlocksAwaitingTap(db: Database, studentId: string, claim: string) {
   return db
     .select({
       eventId: events.eventId,
@@ -2860,12 +2866,13 @@ export function unlocksAwaitingTap(db: Database, studentId: string, tapEventId: 
       occurredAt: events.occurredAt,
       orderInstall: events.orderInstall,
       orderSeq: events.orderSeq,
+      seq: events.seq,
     })
     .from(events)
     .where(
       and(
         sql`${events.type} = 'unlock' and ${events.sessionId} is null`,
-        inArray(sql`${events.payload}->>'claimed_tap_event_id'`, claims),
+        sql`${events.payload}->>'claimed_tap_event_id' = ${claim}`,
         sql`${events.payload}->>'recorded_as' = 'unknown_tap'`,
         eq(events.userId, studentId),
       ),
