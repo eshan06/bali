@@ -12,7 +12,8 @@ logo and CSS; D2d, `docs/PLAN-ARCHIVE.md`), a future demo site, and **user-facin
 strings wherever they live**. Several live outside those folders (found by
 grep, 2026-10-05; a new one joins this list). In
 `ios/BaliOutbox/Sources/BaliOutbox/`: `ShieldWords.swift`; the `words` in
-`Screen.swift` and `Join.swift`, sign-in's included; `FocusWords` in
+`Screen.swift` and `Join.swift`, sign-in's included, Home's waiting card with the class-started
+alert's check-in among them (`waitingCard`, since the push's app half, #456); `FocusWords` in
 `Focus.swift`; `UnlockedWords` in `Unlocked.swift`; `ProtectionOffWords` in
 `ProtectionOff.swift`; History's row labels and refusals in `History.swift`;
 Me's name, leave and `SignOutWords` sentences in `Me.swift`; Delete account's

@@ -8,6 +8,82 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-24** — **The push's app half (#456): the entitlements, iOS's prompt right after
+  onboarding's Screen Time step (the owner's ruling), the device token registered and removed, and
+  the owner's approved wait with option B's words.** *The
+  entitlements* (N2's notes): the one `ios/Bali/Bali.entitlements` gains `aps-environment` =
+  `development` and `com.apple.developer.usernotifications.time-sensitive`; TestFlight's export
+  re-signs the first to `production`, which testflight.yml's guard checks. A build signed after this
+  needs Push Notifications on the App ID `com.bali.Bali` first (runbook 7, step 3), or its signing
+  may fail: TestFlight build 10 was dispatched before it, from `1d4496b6`. *When the app asks* (the
+  owner's ruling, in chat on 2026-10-24: "Notifications: ask during onboarding, right after the
+  Screen Time step, not on Waiting."; the PR was a draft until it, with the conductor's
+  recommendation, the first Waiting, which this replaces): iOS's own prompt, alerts and sound, no
+  Bali screen before it, once onboarding's Screen Time step is done on this install, its grant
+  confirmed by any way in: its own ask, Settings after Don't Allow (santa's review of the change,
+  both reviewers: a student who went that way was never asked), or a reinstall where iOS kept the
+  grant and skipped the step. The step done outside a running session (`Phone.remember`:
+  `everApproved` set) makes it due, kept in the phone's own defaults so a run that ends before Home
+  keeps it; a grant through Protection off's Turn on Screen Time, in a session, makes nothing due.
+  Home asks it, the end of onboarding, signed in through the 13+ check and the phone out of any
+  session or wait (`HomeView`'s task, `askToNotify`; santa's round 2 of the change: the Home over
+  Waiting or Unlocked, and the one a standing not read keeps, ask nothing). So it comes up as the
+  step gives way to Home, never on Waiting, never over Focus, Emergency Unlock or a session's
+  screens: a due ask waits for that Home. A
+  student who never grants Screen Time never reaches Home and is never asked, since they can't tap
+  in and the alert can't help them. iOS prompts only while the student has never answered, so it
+  is asked once, and never again after a relaunch. An install whose step was done before this
+  build is not asked: only the owner's phone today, and build 10 has no push, so the owner
+  reinstalls Bali before runbook 7's step-6 check. *Registering* (N3, N4): while the sign-in is
+  through the 13+ check, at
+  a launch signed in or a sign-in this run, and as the student allows notifications, the phone asks
+  iOS for its device token, only once they are allowed (`.authorized`); the token goes to `PUT
+  /v1/me/push-token` as lower-case hex under a fresh lower-case UUIDv7 (`EventID`), `sandbox` from a
+  Debug build and `production` from a Release one, decided when it compiles (`Phone.pushEnvironment`).
+  The engine sends it after its read loop's next read, so the wait below holds it too and a school's
+  phones a push launched never register at once. It is kept in memory alone, never logged nor in any
+  words. *The worker's calls, recorded as the brief asked:* a register's answer changes nothing on
+  the phone, and one that does not land is sent again at the next launch or sign-in, never on a
+  timer, and is no screen of the student's. Sign out sends `DELETE /v1/me/push-token` before the
+  sign-in goes, the request carrying the student's token, and waits for it 3 s at most, then drops
+  it and signs out whatever it answered: never a Sign out held up by the network, nor by a token
+  renewal the removal waits on, which no cancelling ends (santa's round 1, both reviewers: Sign out
+  took 30 s, now a test). Dropped means cancelled, so a removal never lands late on a token
+  registered since (round 2). An Emergency Unlock recorded during that wait holds the sign-out back as
+  any unsent one does, the token registered again (santa's round 1; *its reachability doubtful,
+  fixed as the worker's call*, since the wait made the window). A removal that does
+  not land is not retried, since a signed-out phone has no sign-in to send it under: the token stays
+  on Bali under that account until a register moves it (this phone's next sign-in) or the account's
+  deletion or the retention run deletes it (N4), so at worst that account's Start rings a phone
+  signed out of it, which opens on Sign in. Delete account needs no removal: N4 deletes the tokens.
+  *The wait* (the owner's approved fix, the entry of 2026-10-22 below, and the pick of 2026-10-23):
+  opened from the alert (`UNUserNotificationCenterDelegate`'s response, the app's only push), one
+  delivered 60 s or less before the open (`notification.date`; one dated later, a clock set back,
+  counts) holds the engine's next `GET /v1/me` until a time drawn uniformly from 0 to 10 s
+  (`PushWait`, `SyncEngine.holdRead`), then goes on as before; an older alert reads at once, as any
+  return to the front. A hold found more than 10 s ahead, the phone's clock turned back since, is
+  over, so a turn of the clock adds 10 s to the wait at most (santa's round 1; *doubtful
+  reachability, guarded as the worker's call*: it would have held the read, and the lock, as long as
+  the clock went back). Nothing else waits: the outbox, and rule
+  3's check, go as ever. The student's
+  own action ends the wait at once: anything the phone records (a tap, Emergency Unlock, Back to
+  focus; rule 3's own reports too), Try again, and any screen they open (Back to home, Join a class),
+  as the brief listed; a tab chosen does not, since it sends nothing. Back to home ending it lets a
+  student skip the spread as a tap would (PushWaitA's note), bounded by those who press it in 10 s. A
+  cold launch from the alert keeps the hold until the engine is made; in front, the alert shows no
+  banner and changes nothing. The delegate hands the open over at once on the main thread, before the
+  scene comes to the front and its read goes; were iOS ever to answer after that read, that open is
+  not spread and one more read follows at the hold, harmless, which the phone test can confirm.
+  *The words* (option B, `PushWaitB` and `PushWaitBHome`, exactly): while the held read has not
+  answered (`SyncState.checkingIn`, from the hold to its read's answer or failure), Waiting says
+  "Checking in with your class", "Your apps lock in a few seconds. No need to tap again." and "Keep
+  Bali open until your apps lock.", and Home's waiting card "You're tapped in. Your apps lock in a
+  few seconds, as long as Bali is open."; a read that fails brings back Waiting's words with Try
+  again, and a failure from before the alert is not said while Bali checks in. Waiting's words, both
+  sets, stay in its view, where the portal's Help test reads its promise; Home's card is
+  `SyncState.waitingCard` (`Screen.swift`). Screenshots beside both boards. Left: runbook 7 and N6's
+  end-to-end check, the owner's, Bali reinstalled first.
+
 - **2026-10-24** — **The slide off Focus and the card on the Screen Time ask (M8b, #454): the four
   boards the owner approved on 2026-10-24, six intermediate states drawn first on the app canvas; the
   deck's parse measured on the Simulator, nothing changed.** **The screens** (the app canvas's row
@@ -689,8 +765,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
 - **2026-10-22** — **The bell with the class-started push, measured at a school's scale (#438, #336):
   every rung phone opening at once about doubles the Starts' time, what runs out is the API's one
   process and not its 10 connections, and of #336's three fixes only spreading the phones' first
-  reads brings the Starts back. The fix to make, *the conductor's call, awaiting the owner*: a
-  random wait of up to 10 s before the phone's first read after a push.** Measured, not fixed.
+  reads brings the Starts back. The fix to make, *the conductor's call, approved by the owner on
+  2026-10-23* ("The owner approves the fix"): a random wait of up to 10 s before the phone's first
+  read after a push.** Measured, not fixed; built with the push's app half (2026-10-24, #456).
   **The model** (ARCHITECTURE, "Push: a doorbell for students", in the load gate's world). *Who is
   rung:* only the students whose waiting tap the Start converts. At the gate's bell that is all 600:
   each taps in the minute before it, so each waits, and each teacher's Start joins their 30; the ten
@@ -784,8 +861,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   passed undefined: setting either on Railway would shrink the API to one connection, with no error.
   `createDb` now takes `max` as a number, never sent undefined, its test pinning both; a deploy that
   wanted it would need the API to read a size and pass it.
-  **The recommendation** (*the conductor's call, awaiting the owner*): **when Bali opens from the
-  class-started alert, the phone waits a random time of up to 10 s before its first read** (#336's
+  **The recommendation** (*the conductor's call, approved by the owner on 2026-10-23*): **when Bali
+  opens from the class-started alert, the phone waits a random time of up to 10 s before its first
+  read** (#336's
   "short jitter"). The only one of the three that brings the Starts back to about their no-push
   numbers, at every size measured, and the check-ins with them; and the smallest: the push's app
   half isn't built, so it ships with it (every phone a push reaches has it) and nothing on the

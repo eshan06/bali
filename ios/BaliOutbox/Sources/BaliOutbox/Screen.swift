@@ -380,10 +380,14 @@ extension SyncState {
     /// What Home's card says while the phone waits for its teacher's Start (#151; the owner's
     /// decision, 2026-10-01): Waiting's Back to home lands on the regular Home, which says the tap
     /// counted and when the phone locks, in the hero's place — as C3c's card does — never "Tap
-    /// your teacher's block" as if it had not. Nil otherwise.
+    /// your teacher's block" as if it had not; while Bali checks in after the class-started alert
+    /// (`checkingIn`), that the apps lock in a few seconds (the app canvas's PushWaitBHome). Nil
+    /// otherwise.
     public var waitingCard: String? {
-        standing == .waiting
-            ? "You're tapped in. Your phone locks when class starts, as long as Bali is open." : nil
+        guard standing == .waiting else { return nil }
+        return checkingIn
+            ? "You're tapped in. Your apps lock in a few seconds, as long as Bali is open."
+            : "You're tapped in. Your phone locks when class starts, as long as Bali is open."
     }
 
     /// Out of any session, `GET /v1/me` listing the student in no class: Home's empty state, Tap in

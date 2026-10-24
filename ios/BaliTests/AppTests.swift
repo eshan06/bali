@@ -8,6 +8,7 @@ import PDFKit
 import SwiftUI
 import Testing
 import UIKit
+import UserNotifications
 
 @testable import Bali
 
@@ -458,7 +459,8 @@ struct AppTests {
             [
                 "home", "homeLoading", "homeError", "homeUnread", "homeRefused", "homeFromUnlocked",
                 "homeFromUnlockedRetap", "homeInSession", "homeTapRefused", "homeTapRefusedThenTapped",
-                "homeWaiting", "homeNew", "homeNoClasses", "homeNoClassesTapStuck", "homeQuestion",
+                "homeWaiting", "homeWaitingChecking", "homeNew", "homeNoClasses",
+                "homeNoClassesTapStuck", "homeQuestion",
                 "homeFromUnlockedQuestion", "homeQuestionError", "homeSlide", "homeSlideQuestion",
             ],
             ["meEditing", "meNameError"]
@@ -4561,6 +4563,305 @@ struct AppTests {
         phone.signed(in: false)
     }
 
+    @Test(
+        "Opened from the class-started alert, as iOS hands `AppDelegate` the response: one delivered within a minute holds the engine's read, and the phone says it checks in; an older one reads at once, as an open with no alert does; before the engine is made — a cold launch — the hold waits for it, 0–10 s by the draw. In front, the alert shows no banner and holds nothing",
+        .timeLimit(.minutes(3)))
+    func alertOpened() async throws {
+        let delegate = AppDelegate()
+        let (phone, engine) = try standIn(StandIn())
+        delegate.phone = phone
+        let arriving = try alert(deliveredAt: Date())
+        let shown = await withCheckedContinuation { done in
+            delegate.userNotificationCenter(.current(), willPresent: arriving.notification) {
+                done.resume(returning: $0)
+            }
+        }
+        #expect(shown.isEmpty)
+        let fresh = try alert(deliveredAt: Date() - 5)
+        await withCheckedContinuation { done in
+            delegate.userNotificationCenter(.current(), didReceive: fresh.response) { done.resume() }
+        }
+        try await until { await engine.state.checkingIn }
+        let (later, laterEngine) = try standIn(StandIn())
+        delegate.phone = later
+        let old = try alert(deliveredAt: Date() - 61)
+        await withCheckedContinuation { done in
+            delegate.userNotificationCenter(.current(), didReceive: old.response) { done.resume() }
+        }
+        await Task {}.value
+        #expect(await laterEngine.state.checkingIn == false && later.heldUntil == nil)
+        // A cold launch: no engine yet, so the hold waits for the one `start` makes.
+        let cold = Phone()
+        let opened = Date()
+        cold.opened(alertDeliveredAt: opened - 5, draw: 1)
+        let held = try #require(cold.heldUntil).timeIntervalSince(opened)
+        #expect(held >= 10 && held < 11)
+        cold.opened(alertDeliveredAt: opened - 5, draw: 0)
+        #expect(try #require(cold.heldUntil).timeIntervalSince(opened) < 1)
+    }
+
+    @Test(
+        "iOS's prompt to send the class-started alert is asked once, as Home shows right after onboarding's Screen Time step (the owner's ruling, 2026-10-24) — its grant confirmed by its own ask, in Settings after Don't Allow, or kept by iOS through a reinstall, the step kept due through a relaunch until Home — and, allowed, the phone asks iOS for its device token. Never on Waiting, Focus or the Home over Waiting; never after Protection off's Turn on Screen Time, nor for a student who doesn't grant Screen Time, nor on an install whose step was done before, nor again after a relaunch; and a Home gone before iOS answered leaves it due",
+        .timeLimit(.minutes(3)))
+    func notifyAskedAfterScreenTime() async throws {
+        let defaults = UserDefaults.standard
+        let keys = [Phone.everApprovedKey, Phone.notifyDueKey]
+        let before = keys.map { ($0, defaults.object(forKey: $0)) }
+        defer { for (key, value) in before { defaults.set(value, forKey: key) } }
+        func freshInstall() { for key in keys { defaults.set(false, forKey: key) } }
+        freshInstall()
+        var (step, denied, granted) = (Protection(), Protection(), Protection())
+        (step.checked, step.permission) = (true, .notDetermined)
+        (denied.checked, denied.permission, denied.permissionOff) = (true, .denied, true)
+        (granted.checked, granted.permission) = (true, .approved)
+        let running = SessionView(id: "s", classId: "c", endsAt: Date() + 600)
+        /// `phone`'s screens in a window, as the app shows them, until the test ends.
+        var windows: [UIWindow] = []
+        defer { for window in windows { window.isHidden = true } }
+        func showing(_ phone: Phone, once label: String) async throws -> (String) async throws -> Void {
+            let (window, _) = try await laidOut(RootView(phone: phone)) { $0.contains(label) }
+            windows.append(window)
+            return { label in
+                try await until {
+                    window.layoutIfNeeded()
+                    return ((try? voiceOver(in: window)) ?? []).contains { $0.accessibilityLabel == label }
+                }
+            }
+        }
+        // The step's own ask granted: Waiting, the Home over it and Focus ask nothing; Home asks.
+        let asked = Asked()
+        let (phone, _) = try standIn(StandIn(), protection: step)
+        (asked.phone, phone.notifications) = (phone, asked.notifications)
+        phone.signed(in: true, as: "ana", checked: true)
+        // The sign-in's own ask of iOS for a token, not allowed yet: settled, so it never runs late.
+        try await Task.sleep(for: .milliseconds(300))
+        phone.synced(try student(.waiting))
+        let shows = try await showing(phone, once: "Ask me")
+        phone.protected(granted)
+        try await shows("Ready, waiting for your teacher")
+        phone.open(.home)
+        try await shows("Hi, Ana")
+        phone.synced(try student(.inSession(running, .focused)))
+        try await shows("Emergency Unlock. Your teacher will see it.")
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(asked.asks == 0 && phone.notifyDue)
+        phone.synced(try student(.out))
+        try await until { asked.asks == 1 }
+        #expect(asked.shownAtAsk == .home && !phone.notifyDue)
+        #expect(defaults.bool(forKey: Phone.notifyDueKey) == false)
+        try await until { asked.registers == 1 }
+        phone.signed(in: false)
+        // A relaunch, or an install whose step was done before this build, iOS never asked yet:
+        // Home asks nothing.
+        let before2 = Asked()
+        let (relaunched, _) = try standIn(StandIn(), protection: granted)
+        relaunched.notifications = before2.notifications
+        relaunched.signed(in: true, as: "ana", checked: true)
+        relaunched.synced(try student(.out))
+        relaunched.protected(granted)
+        _ = try await showing(relaunched, once: "Hi, Ana")
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(before2.asks == 0 && !relaunched.notifyDue)
+        relaunched.signed(in: false)
+        // Don't Allow, then Bali turned on in Settings: Home asks once it shows.
+        freshInstall()
+        let settings = Asked()
+        let (later, _) = try standIn(StandIn(), protection: step)
+        later.notifications = settings.notifications
+        later.signed(in: true, as: "ana", checked: true)
+        try await Task.sleep(for: .milliseconds(300))
+        later.synced(try student(.out))
+        later.protected(denied)
+        let laterShows = try await showing(later, once: "Open Settings")
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(settings.asks == 0 && !later.notifyDue)
+        later.protected(granted)
+        try await laterShows("Hi, Ana")
+        try await until { settings.asks == 1 }
+        later.signed(in: false)
+        // A reinstall where iOS kept Bali's grant: no step shows, the first run ends before the
+        // sign-in, and the next run's Home asks after it.
+        freshInstall()
+        let (firstRun, _) = try standIn(StandIn(), protection: granted)
+        firstRun.protected(granted)
+        #expect(firstRun.notifyDue && defaults.bool(forKey: Phone.notifyDueKey))
+        let kept = Asked()
+        let (nextRun, _) = try standIn(StandIn(), protection: granted)
+        nextRun.notifications = kept.notifications
+        #expect(nextRun.notifyDue)
+        nextRun.signed(in: true, as: "ana", checked: true)
+        try await Task.sleep(for: .milliseconds(300))
+        nextRun.synced(try student(.out))
+        _ = try await showing(nextRun, once: "Hi, Ana")
+        try await until { kept.asks == 1 }
+        nextRun.signed(in: false)
+        // Protection off's Turn on Screen Time, in a running session: the grant makes nothing due.
+        freshInstall()
+        let (inClass, _) = try standIn(StandIn(), protection: denied)
+        inClass.signed(in: true, as: "ana", checked: true)
+        inClass.synced(try student(.inSession(running, .protectionOff)))
+        inClass.protected(granted)
+        #expect(!inClass.notifyDue)
+        inClass.signed(in: false)
+        // A student who doesn't grant Screen Time: the step stays, and nothing is asked.
+        freshInstall()
+        let never = Asked()
+        let (refused, _) = try standIn(StandIn(), protection: step)
+        refused.notifications = never.notifications
+        refused.signed(in: true, as: "ana", checked: true)
+        refused.synced(try student(.out))
+        refused.protected(denied)
+        _ = try await showing(refused, once: "Open Settings")
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(never.asks == 0 && !refused.notifyDue)
+        refused.signed(in: false)
+        // A Home gone while iOS was saying how the student answered leaves it due (santa's round 1).
+        freshInstall()
+        let (left, _) = try standIn(StandIn(), protection: step)
+        left.signed(in: true, as: "ana", checked: true)
+        left.synced(try student(.out))
+        // The sign-in's own token ask, through iOS's own notifications: settled before Slow's.
+        try await Task.sleep(for: .milliseconds(300))
+        let slow = Slow()
+        left.notifications = slow.notifications
+        left.protected(granted)
+        let asking = Task { await left.askToNotify() }
+        try await until { slow.answering != nil }
+        asking.cancel()
+        slow.answer(.notDetermined)
+        await asking.value
+        #expect(slow.asks == 0 && left.notifyDue)
+        let again = Task { await left.askToNotify() }
+        try await until { slow.answering != nil }
+        slow.answer(.notDetermined)
+        await again.value
+        #expect(slow.asks == 1 && !left.notifyDue)
+        left.signed(in: false)
+    }
+
+    @Test(
+        "Signed in through the 13+ check, the phone asks iOS for its device token only if notifications are allowed, and registers the token iOS gives under this build's environment — sandbox, a Debug build's — as lower-case hex under a fresh lower-case UUIDv7; Sign out takes it off Bali before the sign-in goes, and a removal that gets no answer holds the sign-out back no longer than `pushRemoval`, saying nothing; the token in no log line all the while",
+        .timeLimit(.minutes(3)))
+    func pushToken() async throws {
+        let token = Data((0..<32).map { UInt8($0 * 8 + 7) })
+        let hex = token.map { String(format: "%02x", $0) }.joined()
+        let keychain = Keychain(account: "ana")
+        let server = PushServer(keychain: keychain)
+        let (phone, engine) = try standIn(server, keychain: keychain)
+        let asked = Asked()
+        asked.status = .denied
+        phone.notifications = asked.notifications
+        phone.signed(in: true, as: "ana", checked: true)
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(asked.registers == 0)
+        phone.signed(in: false)
+        asked.status = .authorized
+        phone.signed(in: true, as: "ana", checked: true)
+        try await until { asked.registers == 1 }
+        #expect(asked.asks == 0, "asked only as Home shows after the Screen Time step")
+        let running = Task { await engine.run() }
+        let logged = try await written {
+            phone.registered(token: token)
+            try await until { await server.registered != nil }
+            await phone.signOut()
+        }
+        running.cancel()
+        await running.value
+        let registered = try #require(await server.registered)
+        #expect(registered.token == hex && registered.environment == .sandbox)
+        #expect(
+            registered.eventId.wholeMatch(
+                of: /[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/) != nil,
+            "\(registered.eventId)")
+        let removed = try #require(await server.removed)
+        #expect(removed.token == hex && removed.signedIn)
+        #expect(keychain.empty && phone.signOutFailed == nil)
+        #expect(!logged.lowercased().contains(hex), "\(logged)")
+        // A removal that gets no answer: the sign-out goes on once `pushRemoval` is up.
+        let silent = Keychain(account: "ana")
+        let (quiet, _) = try standIn(PushServer(keychain: silent, answersRemoval: false), keychain: silent)
+        quiet.pushRemoval = 0.2
+        quiet.registered(token: token)
+        let pressed = ContinuousClock.now
+        await quiet.signOut()
+        #expect(ContinuousClock.now - pressed < .seconds(5))
+        #expect(silent.empty && quiet.signOutFailed == nil)
+        // Nor one stuck renewing the token first, a wait no cancelling ends (`SignIn.renew`'s;
+        // santa's round 1, both reviewers).
+        let renewing = Keychain(account: "ana")
+        let (stuck, _) = try standIn(
+            PushServer(keychain: renewing), keychain: renewing, tokens: Renewing())
+        stuck.pushRemoval = 0.2
+        stuck.registered(token: token)
+        let again = ContinuousClock.now
+        await stuck.signOut()
+        #expect(ContinuousClock.now - again < .seconds(5))
+        #expect(renewing.empty && stuck.signOutFailed == nil)
+        // An Emergency Unlock recorded while the removal is on its way holds the sign-out back, as
+        // any unsent one does, and the token, taken off Bali, is registered again (santa's rounds 1
+        // and 2).
+        let kept = Keychain(account: "ana")
+        let keptServer = PushServer(keychain: kept, answersRemoval: false)
+        let (holding, holdingEngine) = try standIn(keptServer, keychain: kept)
+        let keptAsked = Asked()
+        keptAsked.status = .authorized
+        holding.notifications = keptAsked.notifications
+        holding.signed(in: true, as: "ana", checked: true)
+        try await until { keptAsked.registers == 1 }
+        holding.pushRemoval = 1
+        holding.registered(token: token)
+        let signingOut = Task { await holding.signOut() }
+        try await until { await keptServer.removed != nil }
+        try await holdingEngine.record(.unlock(session: "s", reason: nil))
+        await signingOut.value
+        #expect(holding.signOutFailed == SignOutWords.unsent && !kept.empty)
+        try await until { keptAsked.registers == 2 }
+        holding.signed(in: false)
+    }
+
+    @Test(
+        "The student's own moves on the phone end the wait the class-started alert set: Back to home, as any screen opened, and Try again read the truth at once, never at the hold (santa's round 1)",
+        .timeLimit(.minutes(3)))
+    func movesEndTheWait() async throws {
+        let moves: [(String, @MainActor (Phone) async -> Void)] = [
+            ("Back to home", { $0.open(.home) }), ("Try again", { await $0.retry() }),
+        ]
+        for (move, make) in moves {
+            let server = PushServer(keychain: Keychain(account: "ana"))
+            let (phone, engine) = try standIn(server)
+            let running = Task { await engine.run() }
+            await engine.holdRead(until: Date() + 9)
+            try await Task.sleep(for: .milliseconds(200))
+            #expect(await server.reads == 0, "\(move)")
+            let made = ContinuousClock.now
+            await make(phone)
+            try await until { await server.reads == 1 }
+            #expect(ContinuousClock.now - made < .seconds(4), "\(move)")
+            running.cancel()
+            await running.value
+        }
+    }
+
+    @Test(
+        "Opened from the class-started alert, Waiting and Home's waiting card say Bali is checking in, the app canvas's option B, Back to home and Tap in kept; a read that failed brings back Waiting's own words, with Try again",
+        .timeLimit(.minutes(3)))
+    func checkingInWords() async throws {
+        func read(_ fixture: String, once title: String) async throws -> [String] {
+            let phone = Phone(fixture: try #require(PreviewFixtures.all[fixture]))
+            return try await elements(of: RootView(phone: phone), once: title).map { $0.label ?? "" }
+        }
+        let waiting = try await read("waitingChecking", once: "Checking in with your class")
+        #expect(waiting.contains("Your apps lock in a few seconds. No need to tap again."))
+        #expect(waiting.contains("Keep Bali open until your apps lock.") && waiting.contains("Back to home"))
+        #expect(!waiting.contains("Ready, waiting for your teacher") && !waiting.contains("Try again"))
+        let home = try await read(
+            "homeWaitingChecking",
+            once: "You're tapped in. Your apps lock in a few seconds, as long as Bali is open.")
+        #expect(home.contains("Tap in"))
+        let failed = try await read("waitingError", once: "Ready, waiting for your teacher")
+        #expect(failed.contains("Try again") && !failed.contains("Checking in with your class"))
+    }
+
     /// `image` drawn at 1× and read as sRGB bytes — red, green, blue, alpha — at a point counted
     /// from the top left.
     private func pixels(of image: UIImage) throws -> (Int, Int) -> [Int] {
@@ -4759,7 +5060,7 @@ private func signUp(_ phone: Phone, through pages: Pages) async {
 @MainActor
 private func standIn(
     _ server: any HTTPTransport, keychain: Keychain = Keychain(account: "ana"),
-    protection: Protection? = nil
+    protection: Protection? = nil, tokens: (any TokenProvider)? = nil
 ) throws -> (Phone, SyncEngine) {
     struct Signed: TokenProvider {
         func accessToken() async -> String? { "token" }
@@ -4767,7 +5068,8 @@ private func standIn(
     let url = FileManager.default.temporaryDirectory.appending(
         path: "phone-\(UUID().uuidString).sqlite")
     let client = APIClient(
-        baseURL: URL(string: "https://api.bali.test")!, tokens: Signed(), transport: server)
+        baseURL: URL(string: "https://api.bali.test")!, tokens: tokens ?? Signed(),
+        transport: server)
     let engine = SyncEngine(outbox: try Outbox(at: url), client: client)
     let cognito = Cognito(
         domain: URL(string: "https://bali.auth.test")!, clientId: "phone",
@@ -5412,6 +5714,167 @@ private final class Keychain: TokenStore, @unchecked Sendable {
     private func change(_ data: Data?) throws {
         try lock.withLock { if isLocked { throw Locked() } else { saved = data } }
     }
+}
+
+/// iOS's notifications as a stand-in answers the phone: the student's answer to its prompt,
+/// `status`, which the prompt sets to allowed, and the prompts and device-token asks counted — with
+/// the screen `phone` showed as the prompt was asked, where given.
+@MainActor
+private final class Asked {
+    var status = UNAuthorizationStatus.notDetermined
+    private(set) var asks = 0
+    private(set) var registers = 0
+    weak var phone: Phone?
+    private(set) var shownAtAsk: Screen?
+
+    var notifications: Notifications {
+        Notifications(
+            status: { self.status },
+            ask: {
+                self.asks += 1
+                self.shownAtAsk = self.phone?.shown.screen
+                self.status = .authorized
+                return true
+            },
+            register: { self.registers += 1 })
+    }
+}
+
+/// iOS's notifications as a stand-in answers the phone slowly: how the student answered its prompt
+/// held until the test gives it (`answer`), and the prompts counted.
+@MainActor
+private final class Slow {
+    private(set) var answering: CheckedContinuation<UNAuthorizationStatus, Never>?
+    private(set) var asks = 0
+
+    func answer(_ status: UNAuthorizationStatus) {
+        answering?.resume(returning: status)
+        answering = nil
+    }
+
+    var notifications: Notifications {
+        Notifications(
+            status: { await withCheckedContinuation { self.answering = $0 } },
+            ask: {
+                self.asks += 1
+                return true
+            },
+            register: {})
+    }
+}
+
+/// Bali's API as a stand-in answers the device token's register and removal: `GET /v1/me` with Ana
+/// in no class, the reads counted; `PUT /v1/me/push-token` registered, the request kept; `DELETE /v1/me/push-token`
+/// removed — unless not `answersRemoval`, a removal on its way for good — the request kept with
+/// whether the sign-in, on `keychain`, was still there as it came. Anything else gets no answer.
+private actor PushServer: HTTPTransport {
+    private let keychain: Keychain
+    private let answersRemoval: Bool
+    private(set) var registered: RegisterPushTokenRequest?
+    private(set) var removed: (token: String, signedIn: Bool)?
+    private(set) var reads = 0
+
+    init(keychain: Keychain, answersRemoval: Bool = true) {
+        (self.keychain, self.answersRemoval) = (keychain, answersRemoval)
+    }
+
+    func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        guard let url = request.url else { throw URLError(.badURL) }
+        let sent = request.httpBody ?? Data()
+        let body: String
+        switch "\(request.httpMethod ?? "") \(url.path())" {
+        case "GET /v1/me":
+            reads += 1
+            body = #"{"user":{"id":"ana","role":"student","displayName":"Ana"},"classes":[],"session":null}"#
+        case "PUT /v1/me/push-token":
+            registered = try JSONDecoder().decode(RegisterPushTokenRequest.self, from: sent)
+            body = #"{"outcome":"registered","environment":"sandbox"}"#
+        case "DELETE /v1/me/push-token":
+            let removal = try JSONDecoder().decode(RemovePushTokenRequest.self, from: sent)
+            removed = (removal.token, !keychain.empty)
+            if !answersRemoval { try await Task.sleep(for: .seconds(3600)) }
+            body = #"{"outcome":"removed"}"#
+        default: throw URLError(.notConnectedToInternet)
+        }
+        guard
+            let response = HTTPURLResponse(
+                url: url, statusCode: 200, httpVersion: nil, headerFields: nil)
+        else { throw URLError(.badURL) }
+        return (Data(body.utf8), response)
+    }
+}
+
+/// A sign-in whose token is being renewed, for 30 s: waited on as `SignIn.renew`'s shared renewal
+/// is, through an unstructured task's value, which no cancelling ends.
+private struct Renewing: TokenProvider {
+    func accessToken() async -> String? {
+        await Task.detached {
+            try? await Task.sleep(for: .seconds(30))
+            return "token"
+        }.value
+    }
+}
+
+/// The engine's truth standing `standing`, `GET /v1/me` naming Ana, a student in no class.
+@MainActor
+private func student(_ standing: Standing) throws -> SyncState {
+    var state = SyncState()
+    state.standing = standing
+    state.me = try BaliJSON.makeDecoder().decode(
+        MeResponse.self,
+        from: Data(
+            #"{"user":{"id":"ana","role":"student","displayName":"Ana"},"classes":[],"session":null}"#
+                .utf8))
+    return state
+}
+
+/// The class-started alert as iOS hands the app's delegate one, delivered at `date`, and its
+/// response, the student opening it. UserNotifications makes neither for an app, so each is decoded
+/// from an archive of the keys it reads — checked as read before anything is told of it.
+private func alert(deliveredAt date: Date) throws -> (
+    notification: UNNotification, response: UNNotificationResponse
+) {
+    func decoded<T: NSObject & NSCoding>(_ keys: [String: Any]) throws -> T {
+        let archiver = NSKeyedArchiver(requiringSecureCoding: false)
+        for (key, value) in keys { archiver.encode(value, forKey: key) }
+        archiver.finishEncoding()
+        let unarchiver = try NSKeyedUnarchiver(forReadingFrom: archiver.encodedData)
+        unarchiver.requiresSecureCoding = false
+        return try #require(T(coder: unarchiver))
+    }
+    let content = UNMutableNotificationContent()
+    (content.title, content.body) = ("Period 3 has started", "Open Bali to lock your apps.")
+    let request = UNNotificationRequest(identifier: "alert", content: content, trigger: nil)
+    let notification: UNNotification = try decoded(["date": date, "request": request])
+    #expect(notification.value(forKey: "date") as? Date == date)
+    let response: UNNotificationResponse = try decoded([
+        "notification": notification, "actionIdentifier": UNNotificationDefaultActionIdentifier,
+    ])
+    #expect(response.value(forKey: "notification") as? UNNotification == notification)
+    return (notification, response)
+}
+
+/// What `body` writes to standard output and standard error, read back once it is done.
+@MainActor
+private func written(during body: () async throws -> Void) async throws -> String {
+    let url = FileManager.default.temporaryDirectory.appending(path: "written-\(UUID().uuidString)")
+    #expect(FileManager.default.createFile(atPath: url.path(), contents: nil))
+    let file = try FileHandle(forWritingTo: url)
+    let (out, err) = (dup(STDOUT_FILENO), dup(STDERR_FILENO))
+    fflush(nil)
+    dup2(file.fileDescriptor, STDOUT_FILENO)
+    dup2(file.fileDescriptor, STDERR_FILENO)
+    defer {
+        fflush(nil)
+        dup2(out, STDOUT_FILENO)
+        dup2(err, STDERR_FILENO)
+        close(out)
+        close(err)
+        try? file.close()
+    }
+    try await body()
+    fflush(nil)
+    return try String(contentsOf: url, encoding: .utf8)
 }
 
 /// Waits, in real time, for `condition`; never true within a minute fails the test.

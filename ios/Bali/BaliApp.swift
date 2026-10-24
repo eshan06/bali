@@ -2,31 +2,79 @@ import AuthenticationServices
 import BaliCore
 import BaliOutbox
 import SwiftUI
+import UserNotifications
 
 // The student app (ARCHITECTURE, "iOS app structure"): its screens (C1–C6, `RootView`) over
 // `Phone`, which starts the app's one sync engine over the student's Cognito sign-in (B4) and the
 // shields' enforcer (B5).
 @main
 struct BaliApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @Environment(\.scenePhase) private var phase
-    @State private var phone = Phone.launched()
 
     var body: some Scene {
         WindowGroup {
-            RootView(phone: phone).task { await phone.start() }
+            RootView(phone: delegate.phone).task { await delegate.phone.start() }
         }
         // The outbox is in the app group, shared with the extensions: suspended holding a lock on
         // it, the app would be killed (0xdead10cc). So it takes none behind the app, and takes them
         // again in front — where the engine checks in.
         .onChange(of: phase, initial: true) { _, phase in
             if phase == .background { Outbox.suspend() } else { Outbox.resume() }
-            phone.setForeground(phase == .active, behind: phase == .background)
+            delegate.phone.setForeground(phase == .active, behind: phase == .background)
         }
     }
 
     static let version = ["CFBundleShortVersionString", "CFBundleVersion"]
         .map { Bundle.main.object(forInfoDictionaryKey: $0) as? String ?? "?" }
         .joined(separator: " · ")
+}
+
+/// The app's delegate, which holds the phone so iOS's push callbacks reach it from launch on
+/// (ARCHITECTURE, "Push: a doorbell for students"): the device token, and the class-started alert,
+/// the app's only push, opened or arriving in front. It is the notification center's delegate
+/// before launch finishes, so an alert that launched the app is not missed.
+final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+    /// The app's phone — a test's own in `BaliTests`.
+    var phone = Phone.launched()
+
+    func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions options: [UIApplication.LaunchOptionsKey: Any]? = nil
+    ) -> Bool {
+        UNUserNotificationCenter.current().delegate = self
+        return true
+    }
+
+    func application(
+        _ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken token: Data
+    ) {
+        phone.registered(token: token)
+    }
+
+    /// The alert arriving in front: no banner, and nothing changes — Bali open there finds the Start
+    /// at its 30 s read, as without push.
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter, willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler([])
+    }
+
+    /// The alert opened (`Phone.opened`), handed over at once where iOS calls on the main thread,
+    /// before the app comes to the front and its read goes, so the wait it sets comes first.
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        let delivered = response.notification.date
+        if Thread.isMainThread {
+            MainActor.assumeIsolated { phone.opened(alertDeliveredAt: delivered) }
+        } else {
+            Task { @MainActor in phone.opened(alertDeliveredAt: delivered) }
+        }
+        completionHandler()
+    }
 }
 
 /// The app's one sign-in, sync engine and enforcer, started once for the app's life, and what they
@@ -66,8 +114,12 @@ final class Phone {
     private(set) var age = AgeCheck(.unanswered)
     /// Whether the sign-in held now is through the 13+ check (C7-server; `SignIn.checked`), as
     /// `ageNow` reads it: nil while Bali's server is asked for its account's yes (`askAge`), false
-    /// once the question shows — no yes, or Bali not reached — and true once through.
-    private var cleared: Bool?
+    /// once the question shows — no yes, or Bali not reached — and true once through: at a launch
+    /// signed in, or a sign-in this run, when the phone asks iOS for its device token
+    /// (`registerForPush`).
+    private var cleared: Bool? {
+        didSet { if cleared == true, oldValue != true { registerForPush() } }
+    }
     /// Whether the last ask of Bali's server for that yes got no answer, so it is asked again at
     /// the engine's wakes while the question cannot show (`askAgeAgain`).
     private var unreached = false
@@ -213,6 +265,24 @@ final class Phone {
     /// ignores taps, so no second finger answers a question the screen no longer shows (the owner's
     /// ruling, 2026-10-23).
     var unlockHeld = false
+    /// iOS's notifications as the phone asks them, for the class-started alert — a test's own in
+    /// `BaliTests`.
+    @ObservationIgnored var notifications = Notifications.ios
+    /// The device token iOS last gave (`registered`): in memory alone, never logged, for Sign out to
+    /// take off Bali.
+    @ObservationIgnored private var pushToken: Data?
+    /// The read a class-started alert held before the engine was made — a cold launch — handed to
+    /// the engine as it starts (`opened`).
+    @ObservationIgnored private(set) var heldUntil: Date?
+    /// How long Sign out waits for its token's removal before it goes on regardless (`signOut`) — a
+    /// test's own in `BaliTests`.
+    @ObservationIgnored var pushRemoval: TimeInterval = 3
+    /// Whether iOS's prompt to send the class-started alert is due: the Screen Time step done on
+    /// this install (`remember`), asked once Home shows (`askToNotify`) — kept in the phone's own
+    /// defaults, as `everApproved` is, so a run that ends before Home keeps it (santa's review).
+    @ObservationIgnored private(set) var notifyDue = UserDefaults.standard.bool(
+        forKey: Phone.notifyDueKey)
+    static let notifyDueKey = "notifyDue"
 
     /// The sessions not to follow now: over, or refused with no read of `GET /v1/me` taken since.
     private var notFollowed: Set<String> {
@@ -543,16 +613,40 @@ final class Phone {
         signOutFailed = nil
         guard sync.flatMap(SignOutWords.held) == nil else { return }
         guard let signIn, let engine else { return signOutFailed = Joining.notStarted }
-        switch await engine.unlockUnsent() {
-        case false?: break
-        case true?: return signOutFailed = SignOutWords.unsent
-        case nil: return signOutFailed = SignOutWords.unread
+        if let held = await Self.unsent(engine) { return signOutFailed = held }
+        // The class-started alert's token off Bali first (N3): the request carries the student's
+        // own token, so it goes before the sign-in does — waited for `pushRemoval` at most, never
+        // past it, a token renewal under way included (santa's round 1), then dropped, so it never
+        // lands late on a token registered since (round 2); and the sign-out goes on whatever it
+        // answered (DECISIONS 2026-10-24). An Emergency Unlock recorded meanwhile holds it back as
+        // any does, the token registered again for the sign-in kept.
+        if let pushToken {
+            let (limit, (ends, end)) = (pushRemoval, AsyncStream.makeStream(of: Void.self))
+            let removal = Task { await engine.removePushToken(pushToken); end.yield() }
+            let timer = Task { try? await Task.sleep(for: .seconds(limit)); end.yield() }
+            for await _ in ends { break }
+            removal.cancel()
+            timer.cancel()
+            if let held = await Self.unsent(engine) {
+                registerForPush()
+                return signOutFailed = held
+            }
         }
         do {
             try await signIn.signOut()
             signOutFailed = nil
         } catch {
             signOutFailed = SignOutWords.failed
+        }
+    }
+
+    /// What Sign out says while the outbox file holds an Emergency Unlock unsent, or cannot say
+    /// whether it does (`SignOutWords`); nil once it holds none.
+    private static func unsent(_ engine: SyncEngine) async -> String? {
+        switch await engine.unlockUnsent() {
+        case false?: nil
+        case true?: SignOutWords.unsent
+        case nil: SignOutWords.unread
         }
     }
 
@@ -610,8 +704,12 @@ final class Phone {
     }
 
     /// Opens `screen` over what shows, fading in (#150): the student's own move, never the
-    /// router's, whose moves are `RootView`'s and never touch Focus at the Start.
-    func open(_ screen: Screen) { withAnimation(Motion.fade) { opened.append(screen) } }
+    /// router's, whose moves are `RootView`'s and never touch Focus at the Start — so it ends a wait
+    /// the class-started alert set, Waiting's Back to home among them (`SyncEngine.endWait`).
+    func open(_ screen: Screen) {
+        withAnimation(Motion.fade) { opened.append(screen) }
+        if let engine { Task { await engine.endWait() } }
+    }
 
     /// Whether the screen shown was opened over another, so it draws a way back to it (C3): only
     /// where Back leads to another screen — never from a Home its Unlocked became after the bell
@@ -705,8 +803,12 @@ final class Phone {
         tapFailed = await engine.tapIn(await BlockReader().read())
     }
 
-    /// The student's Try again (rule 5): everything queued goes now, and the truth is read again.
-    func retry() async { await engine?.retryNow() }
+    /// The student's Try again (rule 5): everything queued goes now, and the truth is read again —
+    /// a read the class-started alert held among it (`SyncEngine.endWait`).
+    func retry() async {
+        await engine?.endWait()
+        await engine?.retryNow()
+    }
 
     /// Looks the typed code up (`GET /v1/join-codes/{code}`), through the engine: what it opens, or
     /// why not — the last try's words gone meanwhile, the code kept as sent until the answer comes,
@@ -874,14 +976,32 @@ final class Phone {
         follow()
     }
 
+    /// What rule 3's check found, as the enforcer says it (`start`): the screens' to read, and
+    /// `everApproved` kept by it.
+    func protected(_ protection: Protection) {
+        self.protection = protection
+        remember(protection)
+    }
+
     /// Keeps `everApproved` as a pass read the permission: set at approved, cleared once the check
     /// judges it off, left at a read not determined for a moment — the read it is there to see
-    /// past.
+    /// past. Set outside a session, the Screen Time step is done on this install — its grant
+    /// confirmed by its own ask, in Settings, or kept by iOS through a reinstall — and iOS's prompt
+    /// to send the class-started alert is due (`notifyDue`; the owner's ruling, 2026-10-24): never
+    /// by Protection off's Turn on Screen Time, a session's screen.
     func remember(_ protection: Protection) {
         let approved = protection.permission == .approved
         guard approved || protection.permissionOff, everApproved != approved else { return }
         everApproved = approved
         UserDefaults.standard.set(approved, forKey: Phone.everApprovedKey)
+        if case .inSession(let session, _)? = sync?.standing, session.endsAt > Date() { return }
+        if approved { due(true) }
+    }
+
+    /// `notifyDue` set or let go, the phone's own defaults with it.
+    private func due(_ due: Bool) {
+        notifyDue = due
+        UserDefaults.standard.set(due, forKey: Phone.notifyDueKey)
     }
 
     /// Asks iOS for the Screen Time permission — its own prompt, through the enforcer — and keeps
@@ -892,6 +1012,67 @@ final class Phone {
         do { try await enforcer.requestPermission() } catch {
             askFailed = error as? ScreenTimeAskError ?? .failed("\(error)")
         }
+    }
+
+    /// Bali opened from the class-started alert, delivered at `delivered` (ARCHITECTURE, "Push: a
+    /// doorbell for students"; the owner's approved fix, DECISIONS 2026-10-22): one that came within
+    /// a minute holds the engine's next read a random 0–10 s (`PushWait`) — kept for the engine
+    /// while it is not made yet, a cold launch — and an older one reads at once, as any return to
+    /// the front does. `draw`, uniform in 0...1, is a test's own there.
+    func opened(alertDeliveredAt delivered: Date, draw: Double = .random(in: 0...1)) {
+        guard !frozen, let until = PushWait.until(delivered: delivered, now: Date(), draw: draw)
+        else { return }
+        guard let engine else { return heldUntil = until }
+        Task { await engine.holdRead(until: until) }
+    }
+
+    /// Home shows (`HomeView`'s task), signed in through the 13+ check, the phone out of any session
+    /// or wait, the Screen Time step done (`notifyDue`): onboarding's end, right after that step (the
+    /// owner's ruling, 2026-10-24) — iOS's own prompt to send notifications, alerts and sound, asked
+    /// only while the student has never answered it, so once, never again after a relaunch, and,
+    /// allowed, the device token asked for (`registerForPush`). Never on Waiting, nor over Focus,
+    /// Emergency Unlock or a session's screens, nor the Home over Waiting or Unlocked or the one a
+    /// standing not read keeps; never for a student who doesn't grant Screen Time, nor an install
+    /// whose step was done before this build. A Home gone before iOS said how the student answered
+    /// leaves it due (santa's round 1).
+    func askToNotify() async {
+        guard notifyDue, cleared == true, sync?.standing == .out, !frozen else { return }
+        let status = await notifications.status()
+        guard !Task.isCancelled else { return }
+        due(false)
+        if status == .notDetermined, await notifications.ask() { registerForPush() }
+    }
+
+    /// Signed in through the 13+ check (`cleared`), or notifications just allowed: the device token
+    /// asked of iOS — only if the student allowed notifications — which it gives through
+    /// `registered`.
+    private func registerForPush() {
+        guard !frozen else { return }
+        Task {
+            guard await notifications.status() == .authorized, cleared == true else { return }
+            notifications.register()
+        }
+    }
+
+    /// The device token iOS gave (`AppDelegate`): kept in memory alone for Sign out, and registered
+    /// on Bali through the engine under this build's APNs environment (`pushEnvironment`). Never
+    /// logged; one that does not land is registered again at the next launch, and is no screen of
+    /// the student's.
+    func registered(token: Data) {
+        pushToken = token
+        guard cleared == true, let engine else { return }
+        Task { await engine.registerPushToken(token, environment: Phone.pushEnvironment) }
+    }
+
+    /// The APNs environment this build's device tokens are issued for, by its configuration: Xcode's
+    /// Debug builds, signed with the development profile, are sandbox's; TestFlight's and the App
+    /// Store's, re-signed for distribution, production's.
+    static var pushEnvironment: PushEnvironment {
+        #if DEBUG
+            .sandbox
+        #else
+            .production
+        #endif
     }
 
     /// Emergency Unlock (C4), always allowed: recorded where decision 11 files it — the shields off
@@ -1104,15 +1285,17 @@ final class Phone {
         // last ran, kept in the app group — so a relaunch never takes them off (B5).
         let enforcer = Enforcer(engine: engine, screenTime: PhoneScreenTime())
         (self.signIn, self.engine, self.enforcer) = (signIn, engine, enforcer)
+        // A class-started alert that launched the app: its read waits, from the loops' first pass.
+        if let held = heldUntil {
+            heldUntil = nil
+            await engine.holdRead(until: held)
+        }
         onPhase = ({ await engine.setForeground($0) }, { await enforcer.check() })
         Task { await engine.run() }
         Task { await enforcer.run() }
         Task { for await state in await engine.updates() { self.synced(state) } }
         Task {
-            for await protection in await enforcer.updates() {
-                self.protection = protection
-                self.remember(protection)
-            }
+            for await protection in await enforcer.updates() { self.protected(protection) }
         }
         Task { await self.follow(signIn) }
         await engine.setForeground(foreground)
@@ -1162,6 +1345,23 @@ final class Phone {
         Task { await onPhase.engine(self.foreground) }
         if foreground { Task { if self.foreground { await onPhase.check() } } }
     }
+}
+
+/// iOS's notifications as the phone asks them, for the class-started alert: whether the student
+/// allowed them, iOS's own prompt — alerts and sound — and the ask for a device token, which iOS
+/// answers through `AppDelegate`.
+struct Notifications: Sendable {
+    var status: @MainActor @Sendable () async -> UNAuthorizationStatus
+    var ask: @MainActor @Sendable () async -> Bool
+    var register: @MainActor @Sendable () -> Void
+
+    static let ios = Notifications(
+        status: { await UNUserNotificationCenter.current().notificationSettings().authorizationStatus },
+        ask: {
+            (try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]))
+                ?? false
+        },
+        register: { UIApplication.shared.registerForRemoteNotifications() })
 }
 
 #if DEBUG

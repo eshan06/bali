@@ -10,6 +10,16 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-24 (Central) — Phase 7's phone sitting written for the owner (`ios/README.md`,
+"Phase 7's phone sitting, on prod"): C7's first launch, L8's, M8's and M8b's device checks, and the
+exit checks L9, M10 and W6, each part opening with its starting state, on TestFlight build 10 (prod,
+from `1d4496b6`, dispatched 2026-10-24). Before it, M8b (#454): the slide on Unlocked, Screen Time
+off and Home, and the card on the Screen Time ask, so every phone screen of Phase 7 is built. Next on
+the Mac: the push's app half (option B's wait, for a fresh alert only), parked for the owner's word
+on when the app asks to send notifications; then the owner's sitting, runbook 7 and N6's check; on
+the Windows PC, M6's LessonDecks line back (M8 landed) and the other three pre-pilot steps, which
+wait for the owner's word._
+
 _Last updated: 2026-10-24 (Central) — The slide off Focus and the card on the Screen Time ask (M8b,
 #454; `docs/DECISIONS.md`, 2026-10-24), the four boards the owner approved on 2026-10-24, in D1's
 look: a slide the teacher shows now shows on Unlocked, Screen Time off and Home (for a student not
@@ -1517,6 +1527,7 @@ words — is the Mac session's**, in parallel.
   until its next register restores it. **The backend half is done;** left: the app half (the
   Mac session's: registering the token, the entitlement, Time Sensitive, the words) and 🔧
   the owner's runbook 7
+- **The push's app half** (N1–N6's backend is done): the Mac session's, its interface on N3's line and its notes on N2's, N4's and N6's; its wait screen the owner's pick, option B on the app canvas, for a fresh alert only (2026-10-23); then runbook 7, the owner's — ✅ (#456) `aps-environment` = `development` and the Time Sensitive entitlement in `Bali/Bali.entitlements`; iOS's own prompt (alerts, sound) as Home shows once onboarding's Screen Time step is done on the install, by its own ask, Settings or a reinstall that kept the grant, never on Waiting nor over a session's screens (the owner's ruling, 2026-10-24; `Phone.remember`, `askToNotify`); the device token asked of iOS while the sign-in is through the 13+ check and notifications are allowed, registered by the engine after its read loop's next read (`SyncEngine.registerPushToken`: lower-case hex, `sandbox` from Debug and `production` from Release, a UUIDv7), and taken off Bali at Sign out before the sign-in goes (3 s at most, then cancelled; an Emergency Unlock recorded meanwhile holds the sign-out back); the alert opened within a minute of its delivery holding the engine's next `GET /v1/me` a random 0–10 s (`PushWait`, `SyncEngine.holdRead`), ended by the student's own action (anything recorded, Try again, a screen opened), a cold launch's hold kept for the engine, no banner in front; Waiting and Home's waiting card saying option B's words while that read is held (`SyncState.checkingIn`), Waiting's own after a failure. An install whose step was done before this build is never asked: the owner reinstalls Bali before runbook 7's step-6 check. Tests: BaliOutbox's `PushTests`; the app's `alertOpened`, `notifyAskedAfterScreenTime`, `pushToken`, `movesEndTheWait`, `checkingInWords`. Why: `docs/DECISIONS.md` (2026-10-24, the push's app half)
 
 ### Phase 3 steps (one PR each; 📱 = needs the owner's iPhone)
 

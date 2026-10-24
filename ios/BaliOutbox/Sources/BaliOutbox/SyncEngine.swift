@@ -171,6 +171,11 @@ public struct SyncState: Sendable, Hashable {
     /// file for a relaunch; nil when not known — a wait an earlier build kept, which only a read
     /// ends.
     public var waitEnds: Date?
+    /// Opened from a fresh class-started alert, the read it holds not answered yet (ARCHITECTURE,
+    /// "Push: a doorbell for students"; `SyncEngine.holdRead`): Waiting and Home's waiting card say
+    /// Bali is checking in, never that the apps are locked. That read's answer ends it, and so does
+    /// its failure, said then with Try again.
+    public var checkingIn = false
 
     /// Where a wait armed at `now` ends: the midnight after it in `calendar`'s zone — the phone's,
     /// the school's in class — as the server drops an armed tap at the end of its school day, in
@@ -244,6 +249,23 @@ public struct Superseded: Sendable, Hashable {
     public init(session: String, ordered: Bool) { (self.session, self.ordered) = (session, ordered) }
 }
 
+/// The wait before the first read after the class-started alert (ARCHITECTURE, "Push: a doorbell
+/// for students"; the owner's approved fix, DECISIONS 2026-10-22): opened from an alert that came
+/// `fresh` or less before, the phone waits a random time up to `longest`, so a school's phones
+/// opened together at the bell spread their reads (#336); an older alert, whose class may be over,
+/// reads at once (the owner's pick, 2026-10-23).
+public enum PushWait {
+    public static let fresh: TimeInterval = 60
+    public static let longest: TimeInterval = 10
+
+    /// When the read may go, the alert delivered at `delivered` opened at `now`, `draw` uniform in
+    /// 0...1 (the phone's random source; a test's own there); nil: at once.
+    public static func until(delivered: Date, now: Date, draw: Double) -> Date? {
+        guard now.timeIntervalSince(delivered) <= fresh else { return nil }
+        return now + longest * draw
+    }
+}
+
 /// The sync engine (ARCHITECTURE, "iOS app structure", decision 4): the one owner of the phone's
 /// server communication. It drains the outbox through the app's one `APIClient`, checks in every
 /// 30 seconds while the app is in the foreground, and applies the server's answers — the
@@ -295,6 +317,12 @@ public actor SyncEngine {
     private var changes = 0
     private var foreground = false
     private var rereading = false
+    /// Until when the read of the truth waits, the class-started alert having opened the app
+    /// (`holdRead`); nil: it waits for nothing.
+    private var readHold: Date?
+    /// The phone's device token, to register after the read loop's next read
+    /// (`registerPushToken`).
+    private var unregistered: (token: Data, environment: PushEnvironment)?
     /// The changes the phone has made to `me` — a join, a rename, a sign-in forgetting the last
     /// student's: a read of `GET /v1/me` sent before one never applies its `me`, older than it.
     private var meChanges = 0
@@ -430,6 +458,9 @@ public actor SyncEngine {
             // The file's newest tap now, written with it.
             if case .tap = change { $0.lastTap = record.eventId }
         }
+        // Whatever the phone records — the student's tap, Emergency Unlock or Back to focus, or
+        // what rule 3's check found — goes now, and ends a wait the class-started alert set.
+        endWait()
         ring(.drain)
         return record
     }
@@ -690,6 +721,50 @@ public actor SyncEngine {
     public func retryNow() {
         refreshed = false
         sendAndReadNow()
+    }
+
+    /// The class-started alert opened the app (ARCHITECTURE, "Push: a doorbell for students"; the
+    /// owner's approved fix, DECISIONS 2026-10-22): the read of the truth it calls for waits until
+    /// `deadline`, the random time the app drew (`PushWait`), so a school's phones opened together
+    /// at the bell spread their reads (#336); until that read answers or fails, the state says Bali
+    /// is checking in, and a failure from before is not said meanwhile. Nothing else waits: the
+    /// outbox goes as ever, and the student's own action ends the wait at once (`endWait`).
+    public func holdRead(until deadline: Date) {
+        readHold = deadline
+        update { ($0.checkingIn, $0.meFailed) = (true, nil) }
+        reread()
+    }
+
+    /// The student acted — anything the phone records (`record`), Try again, Back to home: a read
+    /// the class-started alert held goes now.
+    public func endWait() {
+        guard readHold != nil else { return }
+        readHold = nil
+        ring(.read)
+    }
+
+    /// The phone's APNs device token, registered for the class-started alert (`PUT
+    /// /v1/me/push-token`, N3) under the build's `environment`: sent by the read loop now, after a
+    /// read it makes — and after the read the alert held, so that wait holds it too — the last token
+    /// given, once. Its answer changes nothing here: one that does not land is sent again at the
+    /// next launch.
+    public func registerPushToken(_ deviceToken: Data, environment: PushEnvironment) {
+        unregistered = (deviceToken, environment)
+        ring(.read)
+    }
+
+    /// The phone's token taken off Bali (`DELETE /v1/me/push-token`, N3): Sign out's, before the
+    /// sign-in goes, whose token the request carries; its token renewed once on a 401. Its answer
+    /// changes nothing here either.
+    public func removePushToken(_ deviceToken: Data) async {
+        let request = RemovePushTokenRequest(
+            token: Self.hex(deviceToken), eventId: EventID.mint(at: clock.now()))
+        _ = await Joining.send(renewing: refresh) { await client.removePushToken(request) }
+    }
+
+    /// A device token as Bali's API takes it (N3): each byte as two lower-case hex digits.
+    static func hex(_ deviceToken: Data) -> String {
+        deviceToken.map { String(format: "%02x", $0) }.joined()
     }
 
     /// Runs `check` at each wake of the read loop in the foreground — before each check-in, and out
@@ -965,8 +1040,11 @@ public actor SyncEngine {
             if foreground, state.standing == .waiting || outInClass { rereading = true }
             // Never during an account deletion (C4): `GET /v1/me` would make a fresh account.
             if !deleting, let sent = stored(stamp) {
-                if rereading {
-                    rereading = false
+                if holdingUntil != nil {
+                    // Held by the class-started alert (`holdRead`): the pause below ends at the
+                    // hold, or at the student's own action (`endWait`).
+                } else if rereading {
+                    (rereading, readHold) = (false, nil)
                     let changesThen = meChanges
                     let response = await counted { await client.me() }
                     await heard(response.result, response.noAnswer)
@@ -975,11 +1053,11 @@ public actor SyncEngine {
                         let current = meChanges == changesThen
                         reconcile(sent, standing(me)) {
                             if current { ($0.me, $0.meReads) = (me, $0.meReads + 1) }
-                            $0.meFailed = nil
+                            ($0.meFailed, $0.checkingIn) = (nil, false)
                         }
                     } else {
                         rereading = true
-                        state.meFailed = response.result
+                        update { ($0.meFailed, $0.checkingIn) = (response.result, false) }
                     }
                 } else if foreground, case .inSession(let session, _) = state.standing {
                     let request = CheckInRequest(deviceTime: clock.now())
@@ -1002,6 +1080,17 @@ public actor SyncEngine {
             // at each wake. Never during an account deletion — landing after its `DELETE /v1/me`,
             // it would make a fresh account — and counted, so a deletion waits it out.
             if let yes = await signIn?.yes(), !deleting { await record(yes: yes) }
+            // The phone's device token, after the read: a read the class-started alert held holds
+            // it too, so a school's phones it opened never register at once. Counted, as the yes.
+            if let push = unregistered, readHold == nil, !deleting {
+                unregistered = nil
+                let request = RegisterPushTokenRequest(
+                    token: Self.hex(push.token), environment: push.environment,
+                    eventId: EventID.mint(at: clock.now()))
+                _ = await counted {
+                    await Joining.send(renewing: refresh) { await client.registerPushToken(request) }
+                }
+            }
             await pause(.read, until: nextRead)
         }
     }
@@ -1024,9 +1113,20 @@ public actor SyncEngine {
         }
     }
 
+    /// Until when the read of the truth still waits for the class-started alert (`holdRead`): nil
+    /// once the hold is past — or more than `PushWait.longest` ahead, the phone's clock turned back
+    /// since, so a turn of the clock adds `PushWait.longest` to the wait at most (santa's round 1).
+    private var holdingUntil: Date? {
+        guard rereading, let readHold, readHold > clock.now(),
+            readHold <= clock.now() + PushWait.longest
+        else { return nil }
+        return readHold
+    }
+
     /// When the read loop wakes on its own: for the check-in, in the foreground — and while where
     /// the phone stood is unread, within a minute, to read the file again.
     private var nextRead: Date? {
+        if let holdingUntil { return holdingUntil }
         if foreground { return clock.now() + Self.checkInInterval }
         return state.standing == .unread ? clock.now() + Outbox.backoffCap : nil
     }

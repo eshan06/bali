@@ -754,7 +754,10 @@ Holder or Admin role, and the Railway project.
    **Push Notifications** (no certificate: skip its **Configure**; token auth needs none)
    → **Save**, and confirm if it warns that the app's profiles change. Nothing to
    regenerate by hand: automatic signing makes a profile with push on the next build,
-   TestFlight's included. A build made before this step can't register for push.
+   TestFlight's included. A build made before this step can't register for push. **Do it before
+   the next TestFlight build:** since the app half (#456) the app's entitlements ask for push, so
+   a build signed without it may fail. If the list also shows **Time Sensitive Notifications**,
+   tick it too: the entitlements ask for that as well *(whether the list shows it, unsure)*.
    **Check:** the App ID's capability list shows Push Notifications ticked.
 4. **Railway, dev.** Railway → the project → environment `dev` *(as named there)* →
    service `bali` → **Variables** → add:
@@ -776,10 +779,17 @@ Holder or Admin role, and the Railway project.
 6. **End to end, once the app half ships** (the Mac session's: the phone registering its
    token, the `aps-environment` entitlement). A Debug build from Xcode, pointed at dev,
    registers as `sandbox`; a TestFlight build on prod registers as `production`. On each:
-   sign in as a student in a class, allow notifications, tap the block while the class is
-   off (the tap waits for the Start), lock the phone, then press **Start** on the portal.
+   **delete Bali and install it again first**, since only onboarding asks to send
+   notifications and an install already past it never asks. Sign in as a student in a class;
+   as Home shows, right after the Screen Time step (skipped if iOS kept Bali's grant), iOS asks
+   to send notifications: **Allow**. Never asked? Turn Bali off in Settings → Screen Time → Apps
+   with Screen Time Access, then allow it again at Bali's own Screen Time step: Home then asks.
+   Tap the block while the class is off (the tap waits for the Start), lock the phone, then
+   press **Start** on the portal.
    **Check:** within seconds the lock screen shows "{class name} has started" / "Open Bali
-   to lock your apps.", and the API's log shows no APNs refusal. A refusal is logged with
+   to lock your apps.", and the API's log shows no APNs refusal. Open Bali from the alert:
+   Waiting says "Checking in with your class" for up to 10 s, then Focus shows, the apps
+   locked. A refusal is logged with
    the student id and Apple's reason; `BadDeviceToken` there usually means the build
    registered under the other environment (it loses that token until its next register,
    PLAN's N6).
