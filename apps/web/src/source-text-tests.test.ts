@@ -48,10 +48,8 @@ const STILL_READING = [
   'app/class-page.test.ts',
   'app/home.test.ts',
   'app/icons.test.ts',
-  'app/policy-pages.test.ts',
   'app/present.test.ts',
   'app/rendering.test.ts',
-  'app/support/support.test.ts',
   'app/tokens.test.ts',
   'components/ask-panel.test.ts',
   'components/classes.test.ts',
@@ -81,6 +79,8 @@ const STILL_READING = [
 
 /**
  * Tests whose reads guard other files, never their own component's shape: try-again's scan, which
- * fails on a Try again drawn by hand anywhere in the portal.
+ * fails on a Try again drawn by hand anywhere in the portal; and the help page's, which renders its
+ * page and reads only the app's Swift sources, holding the teacher-sees lists and the Waiting
+ * screen's promise to the app's words (C2-text).
  */
-const GUARDS = ['components/try-again.test.tsx'];
+const GUARDS = ['app/support/support.test.ts', 'components/try-again.test.tsx'];
