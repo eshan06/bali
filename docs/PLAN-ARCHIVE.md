@@ -10,6 +10,18 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-24 (Central) — M6's LessonDecks panel line back (#457; `docs/DECISIONS.md`,
+2026-10-24): Show slides' panel says "Pick a deck. Every phone in this class shows the page you're
+on, and so does Present." again, now that phones (M8, M8b) and the student web (W5) show the slide.
+LessonDecksStates and LessonRetryStates still draw the short line on the canvas: their redraw is
+ready, unpublished (the worker's publish was refused), for the conductor. Before it, the push's app
+half (#456): **before the next TestFlight build, Push Notifications on `com.bali.Bali`** (runbook 7,
+step 3), or its signing may fail; build 10 went before it, from `1d4496b6`. **An install whose
+Screen Time step was done before that build is never asked:** the owner reinstalls Bali before
+runbook 7's step-6 check. Next on the Mac: the owner's sitting on build 10 (`ios/README.md`), then
+runbook 7 and N6's check; on the Windows PC, the other three pre-pilot steps, which wait for the
+owner's word._
+
 _Last updated: 2026-10-24 (Central) — The push's app half (#456; `docs/DECISIONS.md`, 2026-10-24):
 the entitlements; iOS's own prompt to send notifications, asked once as Home shows right after
 onboarding's Screen Time step (the owner's ruling, 2026-10-24); the device token registered at each launch and
