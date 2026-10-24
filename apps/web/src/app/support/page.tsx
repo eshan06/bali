@@ -4,13 +4,15 @@ import type { ReactNode } from 'react';
 
 import { CARD_ALONE } from '@/components/card';
 import { LockupBar } from '@/components/mark';
+import { TEACHER_NEVER_SEES, TEACHER_SEES } from '@/components/teacher-sees';
 import { QUIET_LINK, TEXT_LINK, TextLink } from '@/components/text-link';
 
 /*
  * The public help page (Phase 5, P4): read without signing in, so it calls no API and keeps no
  * state. It renders per request like every page (the root layout's `dynamic`), for the CSP nonce.
  * The teacher-sees lists are the student app's own (`ConsentCard`, ios/Bali/UI/JoinView.swift),
- * word for word; if the app's lists change, these change with them. Drawn as PV1 draws it in v2's
+ * word for word, kept in `teacher-sees.ts` with the privacy policy's; if the app's lists change,
+ * they change with them. Drawn as PV1 draws it in v2's
  * look (SupportPage; built in PV15), its words unchanged: under the white bar with Bali, one
  * column 860 px wide at most, each section a card.
  */
@@ -21,21 +23,6 @@ export const metadata: Metadata = {
 };
 
 const SUPPORT_EMAIL = 'eshan.shah@vanderbilt.edu';
-
-const TEACHER_SEES = [
-  'Your focus status: focused, unlocked, or Screen Time off',
-  'If Bali stops hearing from your phone during class, and when it last did',
-  'When you tap in, and when class ends for you',
-  'When you unlock, and the reason if you share one',
-  'If you leave this class',
-  "Your answers to questions, counted only in the class's totals",
-];
-
-const TEACHER_NEVER_SEES = [
-  "Your screen, your apps, or what's in them",
-  'Your messages or where you are',
-  'Which answer is yours, or whether you answered',
-];
 
 /** A list of what a teacher sees, in a calm grey box (SupportPage), two side by side. */
 const SEEN =

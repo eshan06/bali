@@ -10,11 +10,13 @@ is in `docs/DECISIONS.md`, and finished history is word for word in
 
 _Last updated: 2026-10-24 (Central) — C2-text (#461; `docs/DECISIONS.md`, 2026-10-24): the owner's
 drafted privacy policy and terms (#460) on `/privacy` and `/terms` in the outline's place, its
-notice and Placeholder chips gone, the notes for the lawyer left off; both pages stay out of search
-results until the lawyer's version replaces them in place. Before it, M6's LessonDecks panel line
-back (#457) and the push's app half (#456): **before the next TestFlight build, Push Notifications
-on `com.bali.Bali`** (runbook 7, step 3), or its signing may fail; build 10 went before it, from `1d4496b6`. **An install whose
-Screen Time step was done before that build is never asked:** the owner reinstalls Bali before
+notice and Placeholder chips gone, the notes for the lawyer left off. The pages are now the one copy
+of the words (`docs/legal/` keeps only the notes), and the policy's section 2 shows the app's own two
+lists, as the help page does (#130); both pages stay out of search results until the lawyer's
+version replaces them in place. Before it, M6's LessonDecks panel line back (#457) and the push's
+app half (#456): **before the next TestFlight build, Push Notifications on `com.bali.Bali`**
+(runbook 7, step 3), or its signing may fail; build 10 went before it, from `1d4496b6`. **An install
+whose Screen Time step was done before that build is never asked:** the owner reinstalls Bali before
 runbook 7's step-6 check. Next on the Mac: the owner's sitting on build 10 (`ios/README.md`), then
 runbook 7 and N6's check; on the Windows PC, the other three pre-pilot steps, which wait for the
 owner's word._
@@ -121,7 +123,7 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
 - **Worker and reviewer effort (the owner, 2026-10-14 and 2026-10-24):** a worker that only builds an approved portal screen runs at `xhigh`, every other worker at `max`; santa's reviewers run at `xhigh` on a screen step and at `max` on every other (`.claude/commands/plan.md`, `santa-loop.md`); the first 3–5 `xhigh` steps' blockers and times decide whether each stays (DECISIONS 2026-10-14, 2026-10-24).
 
 **The pilot's critical path.** The prod TestFlight build (✅ uploaded) → the owner's phone
-test on prod, a block tap included (✅ the tap, 2026-10-12) → the privacy page (C2, the lawyer's words) → the external
+test on prod, a block tap included (✅ the tap, 2026-10-12) → the privacy page (C2: the owner's drafts on the pages, C2-text, for the beta review; the lawyer's words before the pilot's first class) → the external
 TestFlight group `Vanderbilt pilot` and Beta App Review (`docs/APP-STORE.md`, section 5) →
 Apple's answer on §3.3.3(P) (ISSUES #3; asked 2026-10-13, case 102994872143, waiting); and before the
 first class, production backups (L0b, the owner's console step; the owner, 2026-10-12).
@@ -274,7 +276,7 @@ own worker (M2), and a load gate of several classes on phones and laptops (L4, M
 
 One line each; each step's full notes are on its line in `docs/PLAN-ARCHIVE.md`.
 
-- **C2** 👀 ⚖️ The privacy policy and terms (Phase 6, **gate**): the portal's pages and the app's links are built, the pages holding the owner's drafts (C2-text), which the lawyer's words replace in place
+- **C2** 👀 ⚖️ The privacy policy and terms (Phase 6, **gate**): the portal's pages and the app's links are built, the pages holding the owner's drafts (C2-text), the one copy of the words (`docs/legal/` keeps the notes for the lawyer), which the lawyer's words replace in place
   - **C2-drafts** The owner's drafts, for Apple's external beta review (the owner, 2026-10-24) — ✅ (#460): `docs/legal/privacy-policy.md` and `terms-of-use.md`, from General Legal's CC0 templates, every fact filled; the lawyer's questions at each file's end (DECISIONS 2026-10-24). The lawyer's review comes before the pilot's first class
   - **C2-text** The drafts' words on `/privacy` and `/terms` — ✅ (#461; DECISIONS 2026-10-24)
 - **C7** 📱 The 13+ screen (Phase 6, **gate**): built, C7-server with it; left, the owner's first-launch check on the next TestFlight build

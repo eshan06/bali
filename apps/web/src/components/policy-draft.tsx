@@ -4,9 +4,10 @@ import { LockupBar } from '@/components/mark';
 import { TEXT_LINK, TextLink } from '@/components/text-link';
 
 /*
- * A policy page, the privacy policy or the terms (Phase 6, C2): the owner's drafts of 2026-10-24
- * (`docs/legal/`), their words as written, until the lawyer's version replaces them in place
- * (C2-text). Its date under the title, what the policy covers, its sections, then where to ask.
+ * A policy page, the privacy policy or the terms (Phase 6, C2): the owner's drafted words of
+ * 2026-10-24, kept in each page and nowhere else (`docs/legal/` holds the notes for the lawyer),
+ * until the lawyer's version replaces them in place (C2-text). Its date under the title, what the
+ * policy covers, its sections, then where to ask.
  * Public like the help page (P4): no API call, no state, rendered per request like every page (the
  * root layout's `dynamic`), and no Sign out or side menu (the shell skips it). Drawn as PV1 draws it
  * in v2's look (PrivacyPage, TermsPage; built in PV15), with no new board (the owner, 2026-10-24):

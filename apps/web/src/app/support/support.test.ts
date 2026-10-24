@@ -3,9 +3,12 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { TEACHER_NEVER_SEES, TEACHER_SEES } from '@/components/teacher-sees';
+
 /*
  * The help page (P4) and the student app must say the same thing about what a teacher sees: the
- * page's lists are the app's `ConsentCard` lists, word for word.
+ * lists the help page and the privacy policy show (`teacher-sees.ts`) are the app's `ConsentCard`
+ * lists, word for word.
  */
 const page = readFileSync(fileURLToPath(new URL('./page.tsx', import.meta.url)), 'utf8');
 const swift = readFileSync(
@@ -19,20 +22,14 @@ function swiftList(name: string): string[] {
   return [...body.matchAll(/"((?:[^"\\]|\\.)*)"/g)].map((m) => m[1]);
 }
 
-function pageList(name: string): string[] {
-  const body = new RegExp(`const ${name} = \\[([\\s\\S]*?)\\];`).exec(page)?.[1];
-  if (!body) throw new Error(`${name} not found in the support page`);
-  return [...body.matchAll(/'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)"/g)].map((m) => m[1] ?? m[2]);
-}
-
 describe('the help page says what the app says', () => {
   it('what a teacher sees, word for word', () => {
-    expect(pageList('TEACHER_SEES')).toEqual(swiftList('sees'));
-    expect(pageList('TEACHER_SEES')).toHaveLength(6);
+    expect(TEACHER_SEES).toEqual(swiftList('sees'));
+    expect(TEACHER_SEES).toHaveLength(6);
   });
 
   it('what a teacher never sees, word for word', () => {
-    expect(pageList('TEACHER_NEVER_SEES')).toEqual(swiftList('neverSees'));
+    expect(TEACHER_NEVER_SEES).toEqual(swiftList('neverSees'));
   });
 
   it('a tap before class keeps the Waiting screen’s condition', () => {

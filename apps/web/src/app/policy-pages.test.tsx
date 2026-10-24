@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { accountStep, Shell } from '../components/shell';
+import { TEACHER_NEVER_SEES, TEACHER_SEES } from '../components/teacher-sees';
 import LoginPage from './login/page';
 import PrivacyPage, { metadata as privacyMetadata } from './privacy/page';
 import SupportPage from './support/page';
@@ -14,8 +15,9 @@ import TermsPage, { metadata as termsMetadata } from './terms/page';
  * The privacy policy and the terms (C2-text) as a reader meets them, signed out (the owner's
  * decision of 2026-10-22: the portal's tests drive the page): the owner's drafted words of
  * 2026-10-24 under each title and its date, every section in the draft's order, the sections the
- * owner named at the outline's ids, the privacy draft's table as a list, Contact's mailto and the
- * footer's links, and nothing of the drafts' notes for the lawyer. Reached from /login and from the
+ * owner named at the outline's ids, the privacy draft's table as a list, its section 2's lists the
+ * app's and the help page's own (#130), Contact's mailto and the footer's links, and nothing of the
+ * drafts' notes for the lawyer. Reached from /login and from the
  * help page; framed by the shell with no menu, no Sign out and no read; whole in the server's HTML,
  * so the words need no script. That every page renders per request is rendering.test.ts's.
  */
@@ -228,9 +230,41 @@ describe('the privacy policy’s table of what Bali collects, as a list', () => 
     const rows = within(students).getAllByRole('listitem');
     expect(rows.map((row) => row.firstElementChild?.tagName)).toEqual(Array(11).fill('STRONG'));
     expect(rows[0]?.textContent).toBe(
-      'The email you sign in with. To sign you in. It’s held by our sign-in provider (Amazon Cognito), not in Bali’s own database.',
+      "The email you sign in with. To sign you in. It's held by our sign-in provider (Amazon Cognito), not in Bali's own database.",
     );
     expect(rows.at(-1)?.textContent).toBe('What you write when you email us. To answer you.');
+  });
+});
+
+describe('the privacy policy’s section 2, what your teacher sees, says what the app says (#130)', () => {
+  it('lists what a teacher sees, then what they never see, as the app and the help page list them', () => {
+    render(<PrivacyPage />);
+    const sees = screen.getByRole('region', { name: '2. What your teacher sees' });
+    const lists = within(sees)
+      .getAllByRole('list')
+      .map((list) =>
+        within(list)
+          .getAllByRole('listitem')
+          .map((line) => line.textContent),
+      );
+    expect(lists).toEqual([TEACHER_SEES, TEACHER_NEVER_SEES]);
+    const never = within(sees).getAllByRole('list')[1]?.previousElementSibling;
+    expect(never?.textContent).toBe('Your teacher never sees:');
+    expect(never?.querySelector('strong')?.textContent).toBe('never');
+    // The draft's paragraph on answers is gone: the lists' answers lines say it.
+    expect(sees.textContent).not.toMatch(/answer totals/);
+  });
+
+  it('shows the help page the same two lists', () => {
+    render(<SupportPage />);
+    const help = within(screen.getByRole('region', { name: 'For students' }))
+      .getAllByRole('list')
+      .map((list) =>
+        within(list)
+          .getAllByRole('listitem')
+          .map((line) => line.textContent),
+      );
+    expect(help).toEqual([TEACHER_SEES, TEACHER_NEVER_SEES]);
   });
 });
 

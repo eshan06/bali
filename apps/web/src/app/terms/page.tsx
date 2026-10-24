@@ -4,10 +4,10 @@ import { PolicyDraft } from '@/components/policy-draft';
 import { TextLink } from '@/components/text-link';
 
 /*
- * The terms of use (Phase 6, C2-text): the owner's draft of 2026-10-24, `docs/legal/terms-of-use.md`,
- * its body as written: its date under the title, its link to the privacy policy this portal's own
- * `/privacy`, and the notes for the lawyer left off, never public. It stands until the lawyer's
- * version replaces it in place (C2).
+ * The terms of use (Phase 6, C2-text): the owner's drafted words of 2026-10-24, kept here and
+ * nowhere else (`docs/legal/terms-of-use.md` holds only the notes for the lawyer, who reviews this
+ * page): its date under the title, and its link to the privacy policy this portal's own `/privacy`.
+ * It stands until the lawyer's version replaces it in place (C2).
  */
 
 export const metadata: Metadata = {
@@ -27,9 +27,9 @@ export default function TermsPage() {
         <p>
           These terms are an agreement between you and Eshan Shah and Jonathan Bani, who run Bali
           (“Bali”, “we”, “us”), for using the Bali iPhone app and the Bali portal (together,
-          “Bali”). By creating an account or using Bali, you agree to them. If you don’t agree,
-          don’t use Bali. Our <TextLink href="/privacy">privacy policy</TextLink> is part of these
-          terms.
+          “Bali”). By creating an account or using Bali, you agree to them. If you don&apos;t agree,
+          don&apos;t use Bali. Our <TextLink href="/privacy">privacy policy</TextLink> is part of
+          these terms.
         </p>
       }
       sections={[
@@ -48,8 +48,8 @@ export default function TermsPage() {
                 </li>
                 <li>
                   <strong>During the Vanderbilt pilot</strong>, accounts are open only to
-                  @vanderbilt.edu addresses, and the app is a test version delivered through Apple’s
-                  TestFlight.
+                  @vanderbilt.edu addresses, and the app is a test version delivered through
+                  Apple&apos;s TestFlight.
                 </li>
               </ul>
               <p>
@@ -66,7 +66,7 @@ export default function TermsPage() {
             <ul>
               <li>Give your real name and keep it current. Your teacher sees it.</li>
               <li>
-                Keep your password to yourself. You’re responsible for what happens under your
+                Keep your password to yourself. You&apos;re responsible for what happens under your
                 account. Tell us right away if you think someone else got in.
               </li>
               <li>One account per person, on your own iPhone.</li>
@@ -80,8 +80,8 @@ export default function TermsPage() {
             <>
               <ul>
                 <li>
-                  <strong>Tapping in.</strong> When you hold your iPhone to your teacher’s Bali
-                  block, your apps go quiet until the bell, through Apple’s Screen Time. Calls,
+                  <strong>Tapping in.</strong> When you hold your iPhone to your teacher&apos;s Bali
+                  block, your apps go quiet until the bell, through Apple&apos;s Screen Time. Calls,
                   FaceTime, Messages and Emergency SOS keep working.
                 </li>
                 <li>
@@ -98,36 +98,38 @@ export default function TermsPage() {
                   time. Your teacher sees when you do during class.
                 </li>
                 <li>
-                  <strong>Your school’s rules come first.</strong> Bali is a tool your teacher
+                  <strong>Your school&apos;s rules come first.</strong> Bali is a tool your teacher
                   chooses. How a class handles unlocks or phones is up to your teacher and school,
                   not to us.
                 </li>
               </ul>
               <h3>Teachers also agree to</h3>
               <ul>
-                <li>Use Bali only for the classes they teach, under their school’s policies.</li>
+                <li>
+                  Use Bali only for the classes they teach, under their school&apos;s policies.
+                </li>
                 <li>Keep their block and its ID to themselves, and tell us if a block is lost.</li>
                 <li>
                   Upload only slides and questions they have the right to share, with nothing in
-                  them that breaks the law or their school’s rules.
+                  them that breaks the law or their school&apos;s rules.
                 </li>
                 <li>
-                  Treat what Bali shows about students as school records, under their school’s
+                  Treat what Bali shows about students as school records, under their school&apos;s
                   privacy rules.
                 </li>
               </ul>
               <h3>Nobody may</h3>
               <ul>
                 <li>
-                  Try to get around Bali’s records, for example by faking a tap, a block or a
+                  Try to get around Bali&apos;s records, for example by faking a tap, a block or a
                   check-in, or by changing the app.
                 </li>
                 <li>
-                  Try to see another person’s information, or get into an account or class that
-                  isn’t theirs.
+                  Try to see another person&apos;s information, or get into an account or class that
+                  isn&apos;t theirs.
                 </li>
                 <li>
-                  Overload, scan or attack Bali’s servers, or copy Bali to build a competing
+                  Overload, scan or attack Bali&apos;s servers, or copy Bali to build a competing
                   product.
                 </li>
                 <li>Use Bali to harass anyone, or to break the law.</li>
@@ -140,10 +142,10 @@ export default function TermsPage() {
           title: '4. Bali is not a safety device',
           body: (
             <p>
-              Bali never blocks emergency calls, and Emergency Unlock always works. Still, don’t
-              rely on Bali in an emergency. If your phone has no signal, is off or is broken, Bali
-              can’t help. Bali also can’t promise that every app will be quieted, since that depends
-              on Apple’s Screen Time.
+              Bali never blocks emergency calls, and Emergency Unlock always works. Still,
+              don&apos;t rely on Bali in an emergency. If your phone has no signal, is off or is
+              broken, Bali can&apos;t help. Bali also can&apos;t promise that every app will be
+              quieted, since that depends on Apple&apos;s Screen Time.
             </p>
           ),
         },
@@ -153,7 +155,7 @@ export default function TermsPage() {
           body: (
             <ul>
               <li>
-                <strong>Leave a class</strong> in the app any time a session isn’t running.
+                <strong>Leave a class</strong> in the app any time a session isn&apos;t running.
               </li>
               <li>
                 <strong>Delete your account</strong> in the app (Me → Delete account). Our privacy
@@ -162,12 +164,12 @@ export default function TermsPage() {
               </li>
               <li>
                 <strong>We may suspend or close an account</strong> that breaks these terms or puts
-                others at risk. If we do, we’ll say why unless the law stops us, and Emergency
+                others at risk. If we do, we&apos;ll say why unless the law stops us, and Emergency
                 Unlock keeps working on that phone until the bell.
               </li>
               <li>
-                <strong>If Bali shuts down</strong>, we’ll tell schools in advance and handle their
-                records as their agreements say.
+                <strong>If Bali shuts down</strong>, we&apos;ll tell schools in advance and handle
+                their records as their agreements say.
               </li>
             </ul>
           ),
@@ -177,9 +179,10 @@ export default function TermsPage() {
           title: '6. Changes to these terms',
           body: (
             <p>
-              If we change these terms, we’ll update the date at the top. If a change matters, we’ll
-              say so in the app and on the portal before it applies. If you keep using Bali after
-              that, you accept the new terms. If you don’t accept them, delete your account.
+              If we change these terms, we&apos;ll update the date at the top. If a change matters,
+              we&apos;ll say so in the app and on the portal before it applies. If you keep using
+              Bali after that, you accept the new terms. If you don&apos;t accept them, delete your
+              account.
             </p>
           ),
         },
@@ -189,7 +192,7 @@ export default function TermsPage() {
           body: (
             <p>
               Bali is new and still changing, and the pilot version may have bugs. We may change,
-              pause or stop features. We’ll avoid doing it during class hours when we can.
+              pause or stop features. We&apos;ll avoid doing it during class hours when we can.
             </p>
           ),
         },
@@ -198,9 +201,9 @@ export default function TermsPage() {
           title: '8. Ownership and feedback',
           body: (
             <p>
-              We own Bali’s software, name and design. Teachers keep their own slides and questions,
-              and give us permission to store and show them to their class only to run Bali. If you
-              send us ideas, we may use them freely, without owing you anything.
+              We own Bali&apos;s software, name and design. Teachers keep their own slides and
+              questions, and give us permission to store and show them to their class only to run
+              Bali. If you send us ideas, we may use them freely, without owing you anything.
             </p>
           ),
         },
@@ -211,7 +214,7 @@ export default function TermsPage() {
             <p>
               BALI IS PROVIDED “AS IS” AND “AS AVAILABLE”. AS FAR AS THE LAW ALLOWS, WE DISCLAIM ALL
               WARRANTIES, EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR
-              PURPOSE AND NON-INFRINGEMENT. WE DON’T PROMISE THAT BALI WILL ALWAYS WORK, BE
+              PURPOSE AND NON-INFRINGEMENT. WE DON&apos;T PROMISE THAT BALI WILL ALWAYS WORK, BE
               ERROR-FREE, OR QUIET EVERY APP.
             </p>
           ),
@@ -257,7 +260,7 @@ export default function TermsPage() {
               <li>
                 <strong>Other states.</strong> Residents of Colorado, Connecticut, Virginia, Nevada
                 and other states with privacy laws: the privacy policy, section 10, says how to see,
-                correct, delete or get a copy of your information. We don’t sell personal
+                correct, delete or get a copy of your information. We don&apos;t sell personal
                 information.
               </li>
             </ul>
@@ -279,13 +282,13 @@ export default function TermsPage() {
               </li>
               <li>
                 <strong>Whole agreement.</strong> These terms, the privacy policy and any school
-                agreement are the whole agreement about Bali. If part of these terms can’t be
-                enforced, the rest still applies. Not enforcing a term isn’t giving it up. You can’t
-                transfer these terms. We can transfer them only along with Bali itself, and only as
-                the school agreements allow.
+                agreement are the whole agreement about Bali. If part of these terms can&apos;t be
+                enforced, the rest still applies. Not enforcing a term isn&apos;t giving it up. You
+                can&apos;t transfer these terms. We can transfer them only along with Bali itself,
+                and only as the school agreements allow.
               </li>
               <li>
-                <strong>Export laws.</strong> Don’t use Bali in breach of U.S. export laws.
+                <strong>Export laws.</strong> Don&apos;t use Bali in breach of U.S. export laws.
               </li>
             </ul>
           ),
