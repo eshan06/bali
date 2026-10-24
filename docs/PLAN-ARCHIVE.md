@@ -10,6 +10,21 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-23 (Central) — The live lesson followed and the answer card's words, no
+screen yet (L8b-1, #448; `docs/DECISIONS.md`, 2026-10-23), the first of L8b's two PRs on the Mac:
+the phone follows the lesson of its class in session, tapped in or not, polling only in front, for
+a student this phone has shown the consent list as it stands (the owner's ruling, 2026-10-23: the
+card waits for the list), and Delete account takes the phone's two notes under the student with
+the account, a sign-out keeping them (the owner's ruling, 2026-10-23). Before it, the pre-pilot
+event-id step, part 2 of 3 (#447; `docs/DECISIONS.md`, 2026-10-23): Create class carries an event
+id, so a teacher's Try again after no answer gets back the class the first press made, never a
+second one, and the create now gives up after 10 s, as every other save does. The class keeps the id
+in a new column (a migration that only adds). A name changed before Try again still goes under the
+first press's id (the conductor's call, awaiting the owner). Before those, S10 closed with no code
+and the push's wait screen picked (#446). Next on the Mac: L8b-2, the card on Focus, then the rest
+of L8 and M8; on the Windows PC, part 3, the three places #437 found comparing an id as text; the
+other three pre-pilot steps wait for the owner's word._
+
 _Last updated: 2026-10-23 (Central) — S10 closed with no code, and the push's wait screen picked
 (the owner's rulings; `docs/DECISIONS.md`, 2026-10-23): every prod TestFlight run already checks that
 its API, sign-in domain and phone client are production's (P5's release guard), and dev builds go to
