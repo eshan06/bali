@@ -18,12 +18,14 @@ a real decision? Add a dated entry at the top: what was decided and why.
   build 10 or later, the first with M8 and M8b; no pilot student has an older one. **Nothing else
   waited for W5 and M8:** the presenter card's "Every phone in this class shows this slide, and so
   does Present." was removed by v2's canvas (DESIGN.md, "The words"), not held, and no other line on
-  LessonDecks, LessonSlide, LessonStates, PresentSlide or their states boards waits on them. *The
-  conductor's call, awaiting the owner:* LessonDecksStates and LessonRetryStates, drawn while the line
-  waited, still show "Pick a deck." alone in their panels, and LessonDecksStates' note says the line
-  waits for W5 and M8; the build says the whole line there too, as the approved head. Their redraw
-  (the whole line in each panel, the note saying it is back) is ready but not on the canvas: the
-  worker's publish was refused by its permissions, so the conductor publishes it. **Tests:** the test
+  LessonDecks, LessonSlide, LessonStates, PresentSlide or their states boards waits on them. **The
+  two states boards, redrawn on the canvas** (the owner's go, 2026-10-24; canvas version 105):
+  LessonDecksStates and LessonRetryStates, drawn while the line waited, showed "Pick a deck." alone
+  in their ten panels, and LessonDecksStates' note said the line waits for W5 and M8. Each panel now
+  shows the whole line, as the approved head and the build do, and the note says it is back; nothing
+  else on the canvas changed. The worker's publish was refused by its permissions; the conductor
+  published it, read both boards back byte for byte as sent, and rendered them: the whole line in all
+  ten panels, none short and none overflowing, the 390 px panel included. **Tests:** the test
   this touched now drives the page (jsdom, Testing Library; `decks-panel.driven.test.tsx`): the
   panel's place and title, its whole line while loading, after a failed read, with none ready and
   over the decks, and its Close; four of them fail with the short line. The rest of
