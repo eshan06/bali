@@ -1,8 +1,10 @@
 import AuthenticationServices
 import BaliCore
 import BaliOutbox
+import CryptoKit
 import FamilyControls
 import Foundation
+import PDFKit
 import SwiftUI
 import Testing
 import UIKit
@@ -2191,7 +2193,12 @@ struct AppTests {
                 Task { await phone.follow(signIn) },
                 Task { for await state in await engine.updates() { phone.synced(state) } },
             ]
-            try await until { phone.ageNow == .unanswered && phone.sync != nil }
+            // Signed in, too: until the sign-in is followed, `ageNow` is Sign up's own answer,
+            // unanswered, so a wait on it alone could start the engine, and the test reach Bali,
+            // before the sign-in's own ask (#452's CI).
+            try await until {
+                phone.signedIn == true && phone.ageNow == .unanswered && phone.sync != nil
+            }
             running.append(Task { await engine.run() })
             return (phone, engine)
         }
@@ -3879,6 +3886,321 @@ struct AppTests {
         phone.signed(in: false)
     }
 
+    @Test(
+        "A slide on Focus (M8; the app canvas's FocusSlide): the ring become the strip, then which slide of how many and Pinch to zoom over the slide's page alone — page 4 of the deck in PDFKit's view, a 16:9 frame the width of the screen less its gutters — read by VoiceOver as one element, its text; then Emergency Unlock, the same button"
+    )
+    func slideOnFocus() async throws {
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let window = UIWindow(windowScene: scene)
+        window.frame = scene.screen.bounds
+        let phone = Phone(fixture: try #require(PreviewFixtures.all["focusSlide"]))
+        window.rootViewController = UIHostingController(rootView: RootView(phone: phone))
+        window.isHidden = false
+        defer { window.isHidden = true }
+        let unlock = "Emergency Unlock. Your teacher will see it."
+        var read: [NSObject] = []
+        try await until {
+            window.layoutIfNeeded()
+            read = (try? voiceOver(in: window)) ?? []
+            return read.contains { $0.accessibilityLabel == unlock } && !pdfViews(in: window).isEmpty
+        }
+        let text = try #require(PDFDocument(data: PreviewFixtures.deckPDF)?.page(at: 3)?.said)
+        #expect(text.hasPrefix("Factoring quadratics"), "\(text)")
+        let views = pdfViews(in: window)
+        let view = try #require(views.first)
+        #expect(views.count == 1 && view.document?.pageCount == 1, "\(views)")
+        #expect(view.document?.page(at: 0)?.said == text)
+        let width = window.bounds.width - 2 * Theme.gutter
+        #expect(abs(view.bounds.width - width) < 0.5, "\(view.bounds)")
+        #expect(abs(view.bounds.height - width * 9 / 16) < 0.5, "\(view.bounds)")
+        // Pinch zoom, from the page as large as fits to four times that.
+        let fit = view.scaleFactorForSizeToFit
+        #expect(fit > 0 && abs(view.minScaleFactor - fit) < 0.001, "\(view.minScaleFactor), \(fit)")
+        #expect(abs(view.maxScaleFactor - fit * 4) < 0.001, "\(view.maxScaleFactor), \(fit)")
+        let labels = read.map { $0.accessibilityLabel ?? "" }
+        let at = try ["Slide 4 of 12", "Pinch to zoom", text, unlock].map { label in
+            try #require(labels.firstIndex(of: label), "\(label): \(labels)")
+        }
+        #expect(at == at.sorted(), "\(labels)")
+        // The strip, the ring's time drawn small, before the slide.
+        let time = try #require(read.firstIndex { $0.accessibilityLabel?.contains(" left, until ") == true })
+        #expect(read[time].accessibilityFrame.height < 100 && time < at[0], "\(read[time].accessibilityFrame)")
+        #expect(read[at[3]].accessibilityTraits.contains(.button))
+    }
+
+    @Test(
+        "With a question and a slide both showing (M8; the app canvas's FocusSlideQuestion; ARCHITECTURE, \"Live lesson\", decision 11), the question comes first: the card's words and answers, then the slide, then Emergency Unlock"
+    )
+    func slideAndQuestion() async throws {
+        let phone = Phone(fixture: try #require(PreviewFixtures.all["focusSlideQuestion"]))
+        let (window, read) = try await laidOut(RootView(phone: phone)) { $0.contains("Pinch to zoom") }
+        defer { window.isHidden = true }
+        let labels = read.map(\.label)
+        let shown = [
+            "Which value of x solves x² − 5x + 6 = 0?", "B, x = 2", "Slide 4 of 12", "Pinch to zoom",
+            "Emergency Unlock. Your teacher will see it.",
+        ]
+        let at = try shown.map { label in try #require(labels.firstIndex(of: label), "\(label): \(labels)") }
+        #expect(at == at.sorted(), "\(labels)")
+        #expect(pdfViews(in: window).count == 1)
+    }
+
+    @Test(
+        "Before its deck is in the slide says Loading the slides… (M8; the app canvas's SlideLoading), and a deck that didn't come says Bali couldn't load the slides. with Try again, a button (SlideFailed): each under which slide of how many, with no page and no Pinch to zoom"
+    )
+    func slideStates() async throws {
+        for (name, said, retry) in [
+            ("focusSlideLoading", "Loading the slides…", false), ("focusSlideFailed", "Bali couldn't load the slides.", true),
+        ] {
+            let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))
+            let (window, read) = try await laidOut(RootView(phone: phone)) { $0.contains(said) }
+            defer { window.isHidden = true }
+            let labels = read.map(\.label)
+            let at = try ["Slide 4 of 12", said, "Emergency Unlock. Your teacher will see it."].map { label in
+                try #require(labels.firstIndex(of: label), "\(name), \(label): \(labels)")
+            }
+            #expect(at == at.sorted(), "\(name): \(labels)")
+            #expect(read.contains { $0.label == "Try again" && $0.traits.contains(.button) } == retry, "\(name)")
+            #expect(!labels.contains("Pinch to zoom") && pdfViews(in: window).isEmpty, "\(name)")
+        }
+    }
+
+    @Test(
+        "Each page's text is what VoiceOver reads of it (M8; ARCHITECTURE, \"Live lesson\", decision 8), the page one element, nothing of PDFKit's read inside it; a page with no text says which slide it is"
+    )
+    func slideVoiceOver() async throws {
+        let bytes = pdfDeck(silent: [2])
+        let deck = try #require(PDFDocument(data: bytes))
+        let phone = Phone(fixture: try #require(PreviewFixtures.all["focusSlide"]))
+        for (page, said) in [(1, "Page 1 of the deck"), (2, "Slide 2 of 3")] {
+            let shown = SlideShown(slide: try slide(bytes, page: page), phase: .ready(deck))
+            let (window, read) = try await laidOut(SlideView(shown: shown, phone: phone).padding(24)) {
+                $0.count == 3
+            }
+            defer { window.isHidden = true }
+            #expect(read.map(\.label) == ["Slide \(page) of 3", "Pinch to zoom", said], "\(read)")
+            let view = try #require(pdfViews(in: window).first)
+            #expect(view.isAccessibilityElement && view.accessibilityLabel == said)
+        }
+    }
+
+    @Test(
+        "No link in a deck is opened (M8; decision 8): the page shown carries no link, nothing that acts and no field to type in; a touch on it lands on PDFKit's markup overlay, never its links nor its text selection, whose Look Up and Share sheets would cover Emergency Unlock (decision 1); and a link PDFKit still offers goes to a delegate that opens nothing"
+    )
+    func slideLinks() async throws {
+        let bytes = pdfDeck(linked: true)
+        let deck = try #require(PDFDocument(data: bytes))
+        // The deck's own page links its words: the test's premise.
+        let linked = try #require(deck.page(at: 0)).annotations
+        #expect(linked.contains { $0.url != nil || $0.action != nil }, "\(linked)")
+        let phone = Phone(fixture: try #require(PreviewFixtures.all["focusSlide"]))
+        let shown = SlideShown(slide: try slide(bytes, page: 1), phase: .ready(deck))
+        let (window, _) = try await laidOut(SlideView(shown: shown, phone: phone).padding(24)) {
+            $0.contains("Page 1 of the deck")
+        }
+        defer { window.isHidden = true }
+        let view = try #require(pdfViews(in: window).first)
+        let page = try #require(view.document?.page(at: 0))
+        #expect(
+            page.annotations.allSatisfy { $0.url == nil && $0.action == nil && $0.type != "Link" },
+            "\(page.annotations)")
+        #expect(view.isInMarkupMode && view.pageOverlayViewProvider != nil)
+        let delegate = try #require(view.delegate as? NSObject)
+        #expect(delegate.responds(to: #selector(PDFViewDelegate.pdfViewWillClick(onLink:with:))))
+    }
+
+    @Test(
+        "A slide's deck is asked for once per SHA-256 (M8): never again while it is on its way, nor once it is in — another page of it fetches nothing; another deck once, the last one's document let go; a deck shown again fetches nothing, `LiveLesson` keeping it for the session; one that didn't come is asked again only by Try again; and the slide goes at its class's bell by the phone's clock, the deck with the lesson at a sign-out"
+    )
+    func slideOncePerDeck() async throws {
+        let defaults = UserDefaults.standard
+        let before = [Phone.inClassKey, Phone.listSeenByKey].map { ($0, defaults.object(forKey: $0)) }
+        defer { for (key, value) in before { defaults.set(value, forKey: key) } }
+        let server = LessonServer()
+        let (first, second, third) = (pdfDeck(), pdfDeck(pages: 2), pdfDeck(pages: 1))
+        await server.show("first", page: 1, of: first)
+        let (phone, _) = try standIn(server)
+        phone.signed(in: true, as: "ana", checked: true)
+        phone.synced(try classInSession())
+        phone.sawList()
+        phone.setForeground(true)
+        try await until { phone.slideShown?.slide.sha256 == sha256(first) }
+        // On its way: asked again, nothing more fetched.
+        await server.holdBucket()
+        phone.loadDeck(for: try #require(phone.slideShown?.slide))
+        try await until { await server.bucketHolding }
+        phone.loadDeck(for: try #require(phone.slideShown?.slide))
+        #expect(await server.downloads == 1)
+        await server.letBucketGo()
+        try await until { shownDocument(phone)?.pageCount == 3 }
+        weak let firstDocument = shownDocument(phone)
+        // Another page of it: nothing fetched, the same document.
+        await server.show("first", page: 2, of: first)
+        try await until { phone.slideShown?.slide.page == 2 }
+        phone.loadDeck(for: try #require(phone.slideShown?.slide))
+        #expect(await server.downloads == 1)
+        #expect(firstDocument != nil && shownDocument(phone) === firstDocument)
+        // Another deck: fetched once, the last one's document let go.
+        await server.show("second", page: 1, of: second, pages: 2)
+        try await until { phone.slideShown?.slide.sha256 == sha256(second) }
+        try await until { firstDocument == nil }
+        phone.loadDeck(for: try #require(phone.slideShown?.slide))
+        try await until { shownDocument(phone)?.pageCount == 2 }
+        #expect(await server.downloads == 2)
+        // The first again: kept for the session, nothing fetched.
+        await server.show("first", page: 3, of: first)
+        try await until { phone.slideShown?.slide.sha256 == sha256(first) }
+        phone.loadDeck(for: try #require(phone.slideShown?.slide))
+        try await until { shownDocument(phone)?.pageCount == 3 }
+        #expect(await server.downloads == 2)
+        // One that didn't come: said, and asked again only by Try again.
+        await server.refuseDownloads(of: "third")
+        await server.show("third", page: 1, of: third, pages: 1)
+        try await until { phone.slideShown?.slide.sha256 == sha256(third) }
+        phone.loadDeck(for: try #require(phone.slideShown?.slide))
+        try await until { phone.slideShown?.phase == .failed }
+        phone.loadDeck(for: try #require(phone.slideShown?.slide))
+        #expect(await server.downloads == 3 && phone.slideShown?.phase == .failed)
+        await server.acceptDownloads(of: "third")
+        phone.loadDeck(for: try #require(phone.slideShown?.slide), again: true)
+        try await until { shownDocument(phone)?.pageCount == 1 }
+        #expect(await server.downloads == 4)
+        // The bell by the phone's clock, the same session: the slide goes, Bali reached or not.
+        phone.synced(try classInSession(ringsIn: 1))
+        #expect(phone.slideShown != nil)
+        try await until { phone.slideShown == nil }
+        phone.signed(in: false)
+        #expect(phone.deck == nil)
+    }
+
+    @Test(
+        "The slide asks for its deck as it shows on Focus (M8), once, with no call of its screen's own; a deck that didn't come is said with Try again, a button, and Try again asks again: the page shows once Bali has it"
+    )
+    func slideAsksAsItShows() async throws {
+        let defaults = UserDefaults.standard
+        let before = [Phone.inClassKey, Phone.listSeenByKey].map { ($0, defaults.object(forKey: $0)) }
+        defer { for (key, value) in before { defaults.set(value, forKey: key) } }
+        let server = LessonServer()
+        await server.show("deck", page: 2, of: pdfDeck())
+        await server.refuseDownloads(of: "deck")
+        var shielded = Protection()
+        (shielded.checked, shielded.permission, shielded.shielded) = (true, .approved, true)
+        let (phone, _) = try standIn(server, protection: shielded)
+        phone.signed(in: true, as: "ana", checked: true)
+        var state = try classInSession()
+        state.standing = .inSession(SessionView(id: "s", classId: "p3", endsAt: Date() + 600), .focused)
+        phone.synced(state)
+        phone.sawList()
+        phone.setForeground(true)
+        let (window, _) = try await laidOut(RootView(phone: phone)) { $0.contains("Bali couldn't load the slides.") }
+        defer { window.isHidden = true }
+        #expect(phone.shown.screen == .focus)
+        #expect(await server.downloads == 1)
+        await server.acceptDownloads(of: "deck")
+        let again = try #require(
+            voiceOver(in: window).first {
+                $0.accessibilityLabel == "Try again" && $0.accessibilityTraits.contains(.button)
+            })
+        again.accessibilityActivate()
+        try await until {
+            window.layoutIfNeeded()
+            return ((try? voiceOver(in: window)) ?? []).contains { $0.accessibilityLabel == "Page 2 of the deck" }
+        }
+        #expect(await server.downloads == 2)
+        phone.signed(in: false)
+    }
+
+    @Test(
+        "A slide on Focus (M8) fits the smallest iPhone, the owner's and the iPhone 17 Pro at the default text size — in, on its way or not come, the strip, the slide and Emergency Unlock on one screen — and with a question as well the page scrolls (FocusSlideQuestion, drawn scrolled down); at every size Emergency Unlock is pinned at the bottom and whole, under what scrolls, and nothing is wider than the phone"
+    )
+    func slideFits() async throws {
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let cases: [(String, DynamicTypeSize)] = [
+            ("focusSlide", .large), ("focusSlideLoading", .large), ("focusSlideFailed", .large),
+            ("focusSlideQuestion", .large), ("focusSlide", .accessibility1), ("focusSlideFailed", .accessibility3),
+            ("focusSlide", .accessibility5), ("focusSlideFailed", .accessibility5), ("focusSlideQuestion", .accessibility5),
+        ]
+        // As `questionFits` has them: the iPhone 17e's, the owner's iPhone 15 Pro's and the iPhone 17
+        // Pro's, less their status bars and home indicators.
+        let phones = [
+            CGSize(width: 390, height: 844 - 47 - 34), CGSize(width: 393, height: 852 - 59 - 34),
+            CGSize(width: 402, height: 874 - 62 - 34),
+        ]
+        for (name, size) in cases {
+            for frame in phones {
+                let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))
+                let hosting = UIHostingController(
+                    rootView: RootView(phone: phone).environment(\.dynamicTypeSize, size))
+                hosting.safeAreaRegions = []
+                let window = UIWindow(windowScene: scene)
+                window.frame = CGRect(origin: .zero, size: frame)
+                window.rootViewController = hosting
+                window.isHidden = false
+                defer { window.isHidden = true }
+                window.layoutIfNeeded()
+                let at = "\(name), \(size), \(frame)"
+                let scroll = try #require(scrollViews(in: window).first, "\(at)")
+                if size == .large {
+                    let fits = name != "focusSlideQuestion"
+                    let (content, shown) = (scroll.contentSize.height, scroll.bounds.height)
+                    #expect((content <= shown + 0.5) == fits, "\(at): \(content) in \(shown)")
+                }
+                #expect(scroll.bounds.width == frame.width, "\(at): \(scroll.bounds)")
+                #expect(scroll.contentSize.width <= frame.width + 0.5, "\(at): \(scroll.contentSize)")
+                var read: [NSObject] = []
+                try await until {
+                    read = (try? voiceOver(in: window)) ?? []
+                    return read.contains { $0.accessibilityLabel == "Emergency Unlock. Your teacher will see it." }
+                }
+                let unlock = try #require(
+                    read.first { $0.accessibilityLabel == "Emergency Unlock. Your teacher will see it." })
+                let pinned = unlock.accessibilityFrame
+                let above = scroll.convert(scroll.bounds, to: window).maxY
+                #expect(pinned.minY >= above - 0.5 && pinned.maxY <= frame.height + 0.5, "\(at): \(pinned)")
+                let outside = read.filter {
+                    $0.accessibilityFrame.minX < -0.5 || $0.accessibilityFrame.maxX > frame.width + 0.5
+                }
+                #expect(outside.isEmpty, "\(at): \(outside.map { $0.accessibilityLabel ?? "" })")
+            }
+        }
+    }
+
+    @Test(
+        "A slide that comes or goes while Emergency Unlock is held never rebuilds the control mid-hold (M8; ARCHITECTURE, \"Live lesson\", decision 1, as L8's card): Focus shows what it showed as the press began, the ring or the slide, the control the same one, until the press ends, then shows what changed"
+    )
+    func slideWaitsForTheHold() async throws {
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let phone = Phone(fixture: try #require(PreviewFixtures.all["focus"]))
+        let window = UIWindow(windowScene: scene)
+        window.frame = scene.screen.bounds
+        window.rootViewController = UIHostingController(rootView: RootView(phone: phone))
+        window.isHidden = false
+        defer { window.isHidden = true }
+        func read() -> [NSObject] {
+            window.layoutIfNeeded()
+            return (try? voiceOver(in: window)) ?? []
+        }
+        func unlock() -> NSObject? { read().first { $0.accessibilityLabel == "Emergency Unlock. Your teacher will see it." } }
+        func shows(_ label: String) -> Bool { read().contains { $0.accessibilityLabel == label } }
+        try await until { unlock() != nil }
+        // A slide comes while the hold runs: the ring stays, and so does the control.
+        let ringed = try #require(unlock())
+        phone.unlockHeld = true
+        phone.lessonRead(try slideRead(), of: "session")
+        try await Task.sleep(for: .seconds(0.5))
+        #expect(!shows("Slide 4 of 12") && unlock() === ringed, "the slide came mid-hold")
+        phone.unlockHeld = false
+        try await until { shows("Slide 4 of 12") }
+        // The slide goes while the hold runs: it stays as it was, and so does the control.
+        let pinned = try #require(unlock())
+        phone.unlockHeld = true
+        phone.lessonRead(LessonState(), of: "session")
+        try await Task.sleep(for: .seconds(0.5))
+        #expect(shows("Slide 4 of 12") && unlock() === pinned, "the slide went mid-hold")
+        phone.unlockHeld = false
+        try await until { !shows("Slide 4 of 12") && unlock() !== pinned }
+    }
+
     /// `image` drawn at 1× and read as sRGB bytes — red, green, blue, alpha — at a point counted
     /// from the top left.
     private func pixels(of image: UIImage) throws -> (Int, Int) -> [Int] {
@@ -3951,6 +4273,33 @@ private func elements(of screen: some View, once title: String) async throws -> 
     return read.map { ($0.accessibilityLabel, $0.accessibilityFrame, $0.accessibilityTraits) }
 }
 
+/// `view` laid out whole, in a window as wide as the phone and 3000 pt tall, once what VoiceOver
+/// reads there is `done`: the window, shown until the caller hides it, and each element's label and
+/// traits.
+@MainActor
+private func laidOut(_ view: some View, until done: ([String]) -> Bool) async throws -> (
+    window: UIWindow, read: [(label: String, traits: UIAccessibilityTraits)]
+) {
+    let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+    let window = UIWindow(windowScene: scene)
+    window.frame = CGRect(x: 0, y: 0, width: scene.screen.bounds.width, height: 3000)
+    window.rootViewController = UIHostingController(rootView: view)
+    window.isHidden = false
+    var read: [NSObject] = []
+    try await until {
+        window.layoutIfNeeded()
+        read = (try? voiceOver(in: window)) ?? []
+        return done(read.map { $0.accessibilityLabel ?? "" })
+    }
+    return (window, read.map { ($0.accessibilityLabel ?? "", $0.accessibilityTraits) })
+}
+
+/// The document of the deck `phone`'s slide shows, once it is in (M8).
+@MainActor
+private func shownDocument(_ phone: Phone) -> PDFDocument? {
+    if case .ready(let document) = phone.slideShown?.phase { document } else { nil }
+}
+
 /// Sign in shown in a window of its own, its page's sign-in about to land — Sign in's button busy,
 /// nothing read of `GET /v1/me` yet: the phone, what VoiceOver reads there now (the window laid out
 /// first, so whatever SwiftUI has to draw is drawn), and the window.
@@ -3972,9 +4321,11 @@ private func landing() throws -> (Phone, () throws -> [String], UIWindow) {
 }
 
 /// Every scroll view in `view`, itself among them, outermost first — of a pager's pages, only the
-/// one it shows: the others it lays out lie off screen.
+/// one it shows: the others it lays out lie off screen — but PDFKit's, which zooms a slide's page
+/// inside its frame (M8): no screen's scroll.
 @MainActor
 private func scrollViews(in view: UIView) -> [UIScrollView] {
+    guard !(view is PDFView) else { return [] }
     let scroll = view as? UIScrollView
     let shown = view.subviews.filter { subview in
         scroll.map { !$0.isPagingEnabled || subview.frame.minX == $0.contentOffset.x } ?? true
@@ -4470,14 +4821,66 @@ private func lessonRead(question: String) throws -> LessonState {
                     .utf8)))
 }
 
+/// A read of a lesson showing page 4 of a deck of 12, its SHA-256 `sha256`, and no question.
+private func slideRead(sha256: String = String(repeating: "a", count: 64)) throws -> LessonState {
+    LessonState(
+        presentation: try BaliJSON.makeDecoder().decode(
+            Presentation.self,
+            from: Data(
+                #"{"running":true,"question":null,"slide":{"deckId":"deck","sha256":"\#(sha256)","page":4,"pageCount":12},"phone":null}"#
+                    .utf8)))
+}
+
+/// Page `page` of `pages` of the deck `bytes` make, as the presentation read names it (M8).
+private func slide(_ bytes: Data, page: Int, of pages: Int = 3) throws -> Slide {
+    try BaliJSON.makeDecoder().decode(
+        Slide.self,
+        from: Data(
+            #"{"deckId":"deck","sha256":"\#(sha256(bytes))","page":\#(page),"pageCount":\#(pages)}"#.utf8))
+}
+
+/// A deck of `pages` 16:9 pages as `UIGraphicsPDFRenderer` draws one (M8): page n says "Page n of
+/// the deck" — but each page `silent`, a shape with no text — and, `linked`, page 1 links its words
+/// to a web page.
+private func pdfDeck(pages: Int = 3, silent: Set<Int> = [], linked: Bool = false) -> Data {
+    UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 960, height: 540)).pdfData { context in
+        for page in 1...pages {
+            context.beginPage()
+            if silent.contains(page) {
+                UIBezierPath(ovalIn: CGRect(x: 380, y: 170, width: 200, height: 200)).fill()
+            } else {
+                ("Page \(page) of the deck" as NSString).draw(
+                    at: CGPoint(x: 60, y: 60), withAttributes: [.font: UIFont.systemFont(ofSize: 48)])
+            }
+            if linked, page == 1, let url = URL(string: "https://example.com") {
+                context.setURL(url, for: CGRect(x: 60, y: 60, width: 520, height: 60))
+            }
+        }
+    }
+}
+
+/// `bytes`' SHA-256 in lowercase hex, as a slide names its deck's.
+private func sha256(_ bytes: Data) -> String {
+    SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+}
+
+/// Every PDFKit view in `view`, itself among them.
+@MainActor
+private func pdfViews(in view: UIView) -> [PDFView] {
+    [view as? PDFView].compactMap { $0 } + view.subviews.flatMap(pdfViews(in:))
+}
+
 /// The API as a stand-in answers a live lesson (L8): session `s`'s presentation, polls counted —
 /// question `q`, open, with the answer it holds — and each answer to it, kept where its id sorts
 /// after the one held, as the API keeps one (decision 4), each taken one listed. An answer given a
 /// refusal (`refuse`) gets it instead — no answer at all for a nil status — held first where said,
 /// until the test lets it go. Once the test ends the session (`end`), the presentation says it is
 /// over; once it refuses the polls (`refusePolls`), each poll gets that status until it takes them
-/// again (`acceptPolls`); once it goes offline (`goOffline`), no poll gets an answer. Anything else
-/// gets no answer.
+/// again (`acceptPolls`); once it goes offline (`goOffline`), no poll gets an answer. And the slide
+/// (M8): a page of a deck the test shows (`show`), whose download, counted, names the bucket's URL
+/// for its bytes — refused `404 deck_not_found` while the test says (`refuseDownloads`), and the
+/// bytes held on their way where it says (`holdBucket`), until it lets them go. Anything else gets
+/// no answer.
 private actor LessonServer: HTTPTransport {
     private(set) var polls = 0
     private(set) var answers: [(option: Int, eventId: String)] = []
@@ -4487,8 +4890,35 @@ private actor LessonServer: HTTPTransport {
     private var over = false
     private var pollsRefused: Int?
     private var offline = false
+    /// The presentation's slide, as JSON, and each deck shown by its id; its downloads counted.
+    private var slide = "null"
+    private var decks: [String: Data] = [:]
+    private var downloadsRefused: Set<String> = []
+    private(set) var downloads = 0
+    private var bucketHeld = false
+    private var bucketWaiting: CheckedContinuation<Void, Never>?
 
     var holding: Bool { waiting != nil }
+    var bucketHolding: Bool { bucketWaiting != nil }
+
+    /// Page `page` of the deck `id`, `bytes`, shown from the next poll — or, with no `id`, nothing.
+    func show(_ id: String?, page: Int = 1, of bytes: Data = Data(), pages: Int = 3) {
+        guard let id else { return slide = "null" }
+        decks[id] = bytes
+        slide = #"{"deckId":"\#(id)","sha256":"\#(sha256(bytes))","page":\#(page),"pageCount":\#(pages)}"#
+    }
+
+    func refuseDownloads(of id: String) { downloadsRefused.insert(id) }
+
+    func acceptDownloads(of id: String) { downloadsRefused.remove(id) }
+
+    func holdBucket() { bucketHeld = true }
+
+    func letBucketGo() {
+        bucketHeld = false
+        bucketWaiting?.resume()
+        bucketWaiting = nil
+    }
 
     func end() { over = true }
 
@@ -4514,7 +4944,23 @@ private actor LessonServer: HTTPTransport {
         }
         guard let url = request.url else { throw URLError(.badURL) }
         var (status, body) = (200, "")
-        switch "\(request.httpMethod ?? "") \(url.path())" {
+        let route = "\(request.httpMethod ?? "") \(url.path())"
+        // The slide's deck (M8): its download, then the bucket's bytes, sent with no token.
+        if route.hasPrefix("GET /v1/decks/"), route.hasSuffix("/download") {
+            let id = url.deletingLastPathComponent().lastPathComponent
+            downloads += 1
+            (status, body) =
+                downloadsRefused.contains(id)
+                ? (404, #"{"error":{"code":"not_found","reason":"deck_not_found","message":"gone"}}"#)
+                : (200, #"{"url":"https://bucket.bali.test/\#(id).pdf"}"#)
+        } else if url.host() == "bucket.bali.test", let bytes = decks[url.deletingPathExtension().lastPathComponent] {
+            if bucketHeld { await withCheckedContinuation { bucketWaiting = $0 } }
+            guard let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)
+            else { throw URLError(.badURL) }
+            return (bytes, response)
+        }
+        switch route {
+        case _ where route.hasPrefix("GET /v1/decks/"): break
         case "GET /v1/sessions/s/presentation" where offline:
             polls += 1
             throw URLError(.notConnectedToInternet)
@@ -4528,7 +4974,7 @@ private actor LessonServer: HTTPTransport {
             polls += 1
             let answer = held.map { #"{"option":\#($0.option),"eventId":"\#($0.eventId)"}"# } ?? "null"
             body =
-                #"{"running":true,"question":{"id":"q","prompt":"Which?","options":["A","B","C","D"],"open":true,"correctOption":null,"answer":\#(answer)},"slide":null,"phone":null}"#
+                #"{"running":true,"question":{"id":"q","prompt":"Which?","options":["A","B","C","D"],"open":true,"correctOption":null,"answer":\#(answer)},"slide":\#(slide),"phone":null}"#
         case "POST /v1/questions/q/answers" where !refusals.isEmpty:
             let refusal = refusals.removeFirst()
             if refusal.held { await withCheckedContinuation { waiting = $0 } }

@@ -189,6 +189,12 @@ final class Phone {
     private(set) var answering: Int?
     private(set) var answerSaid: AnswerCard.Said?
     private(set) var questionHidden = false
+    /// The deck of the slide the lesson shows (M8), as its slide view asks for it (`loadDeck`): one
+    /// at a time, in memory alone, let go once the lesson shows another deck or none, and with the
+    /// lesson; its fetch on its way, and the asks counted, so only the latest's answer is kept.
+    private(set) var deck: SlideDeck?
+    @ObservationIgnored private var deckFetch: Task<Void, Never>?
+    @ObservationIgnored private var deckAsks = 0
     /// The lesson followed and its tasks: the watch of its reads, and its poll, run only while the
     /// app is in front (the owner's ruling, #330).
     @ObservationIgnored private var following: (lesson: LiveLesson, watch: Task<Void, Never>, poll: Task<Void, Never>?)?
@@ -246,6 +252,7 @@ final class Phone {
             (leaving, picking, pickFailed) = (fixture.leaving, fixture.picking, fixture.pickFailed)
             deleting = fixture.deleting
             (lesson, answering, answerSaid) = (fixture.lesson, fixture.answering, fixture.answerSaid)
+            deck = fixture.deck.map(PreviewFixtures.slideDeck)
         }
 
         /// A phone over a sign-in and an engine a test made, never started (BaliTests): the calls
@@ -931,15 +938,51 @@ final class Phone {
     }
 
     /// The answer card to show (L8): the lesson's question — the open one, or the last closed one
-    /// until another opens — unless this phone hid it; nil when there is none, and once the session
-    /// followed is no longer the one to follow by the phone's clock (`lessonSession`): at its bell
-    /// the card goes as Home's card for the class does, Bali reached or not, where a screen that
-    /// stays past the bell (Home) would have kept it until the next read. A fixture's shows as made.
+    /// until another opens — unless this phone hid it; nil when there is none, and once the lesson
+    /// is no longer current (`lessonCurrent`). A fixture's shows as made.
     var card: AnswerCard? {
-        guard let question = lesson?.presentation?.question, !questionHidden,
-            frozen || sync?.lessonSession(at: Date(), over: notFollowed) == following?.lesson.session
-        else { return nil }
+        guard let question = lesson?.presentation?.question, !questionHidden, lessonCurrent else { return nil }
         return AnswerCard(question, problem: lesson?.problem, sending: answering, said: answerSaid)
+    }
+
+    /// The slide to show (M8): the page the lesson's last read names, with its deck as this phone
+    /// has it, on its way until asked for; nil when the teacher shows none, and once the lesson is
+    /// no longer current (`lessonCurrent`), as the card.
+    var slideShown: SlideShown? {
+        guard let slide = lesson?.presentation?.slide, lessonCurrent else { return nil }
+        let phase = deck.flatMap { $0.sha256 == slide.sha256 ? $0.phase : nil } ?? .loading
+        return SlideShown(slide: slide, phase: phase)
+    }
+
+    /// Whether the session followed is still the one to follow by the phone's clock (`lessonSession`),
+    /// a fixture's always: at its bell its card and slide go as Home's card for the class does, Bali
+    /// reached or not, where Home, which stays past the bell, would keep them until the next read.
+    private var lessonCurrent: Bool {
+        frozen || sync?.lessonSession(at: Date(), over: notFollowed) == following?.lesson.session
+    }
+
+    /// Asks for the deck `slide` names, while it is the lesson's slide (M8): once per SHA-256 — none
+    /// while one is on its way, nor for the one held, and `LiveLesson` answers a deck it fetched this
+    /// session from memory, so a deck shown again fetches nothing — and, `again`, once more after it
+    /// came (Try again). A new deck lets the last one's document go. A fixture's deck stays as made.
+    func loadDeck(for slide: Slide, again: Bool = false) {
+        guard let live = following?.lesson, slide.sha256 == lesson?.presentation?.slide?.sha256 else { return }
+        if let deck, deck.sha256 == slide.sha256, !again || deck.phase == .loading { return }
+        deckFetch?.cancel()
+        deckAsks += 1
+        let ask = deckAsks
+        deck = SlideDeck(sha256: slide.sha256, phase: .loading)
+        deckFetch = Task { [weak self] in
+            let result = await live.deck(for: slide)
+            guard let self, ask == self.deckAsks else { return }
+            self.deck?.phase = SlideDeck.Phase(result)
+        }
+    }
+
+    /// The deck let go, and its fetch on its way.
+    private func letDeckGo() {
+        deckFetch?.cancel()
+        (deckFetch, deck) = (nil, nil)
     }
 
     /// Follows the lesson `sync` names now (`lessonSession`), signed in, for a student this phone has
@@ -962,12 +1005,13 @@ final class Phone {
         following = (live, watch, foreground ? Task { await live.run() } : nil)
     }
 
-    /// No lesson followed: its watch and poll cancelled, and the card's own let go with it.
+    /// No lesson followed: its watch and poll cancelled, the card's own and the deck let go with it.
     private func dropLesson() {
         following?.watch.cancel()
         following?.poll?.cancel()
         (following, lesson) = (nil, nil)
         letCardGo()
+        letDeckGo()
     }
 
     private func letCardGo() { (answering, answerSaid, questionHidden, picks) = (nil, nil, false, picks + 1) }
@@ -982,6 +1026,8 @@ final class Phone {
     func lessonRead(_ state: LessonState, of session: String) {
         guard frozen || session == following?.lesson.session else { return }
         if state.presentation?.question?.id != lesson?.presentation?.question?.id { letCardGo() }
+        // One deck's document at a time (M8): a deck the lesson no longer shows is let go.
+        if deck?.sha256 != state.presentation?.slide?.sha256 { letDeckGo() }
         lesson = state
         let refused = if case .refused(status: 403...404, _)? = state.problem { true } else { false }
         guard state.presentation?.running == false || refused, !frozen else { return }
