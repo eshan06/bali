@@ -21,14 +21,13 @@ const showOf = (deck: Deck, change: SlideChange | null | undefined) =>
 
 /**
  * Show slides in the side panel (M6, part 2c; LessonDecks, and its intermediate states as
- * LessonDecksStates draws them, drawn on the canvas first): "Pick a deck." over the teacher's ready
- * decks, newest first, each with its pages, the day it was added and Show; the list loading, failed
- * with Try again, or none ready; then the way to Your slides. Its line leaves out "Every phone in
- * this class shows the page you're on, and so does Present." until W5 and M8 make it true (the
- * conductor's call, 2026-10-16). A Show is the slide's own change (`useSlide`'s `show`), one at a
- * time: every Show held meanwhile, its own busy, and what it left to say under its deck, Try again
- * showing it again. The list's Try again keeps its line, held, until Bali answers, then focus on
- * the panel's title (LessonRetryStates). Never in Present.
+ * LessonDecksStates draws them, drawn on the canvas first): LessonDecks' line, whole since phones
+ * (M8, M8b) and the student web (W5) show the slide, over the teacher's ready decks, newest first,
+ * each with its pages, the day it was added and Show; the list loading, failed with Try again, or
+ * none ready; then the way to Your slides. A Show is the slide's own change (`useSlide`'s `show`),
+ * one at a time: every Show held meanwhile, its own busy, and what it left to say under its deck,
+ * Try again showing it again. The list's Try again keeps its line, held, until Bali answers, then
+ * focus on the panel's title (LessonRetryStates). Never in Present.
  */
 export function DecksView({
   id,
@@ -50,7 +49,12 @@ export function DecksView({
   const { changing, said } = lesson;
   const ready = Array.isArray(decks) ? readyDecks(decks) : [];
   return (
-    <Panel id={id} title="Show slides" line="Pick a deck." onClose={onClose}>
+    <Panel
+      id={id}
+      title="Show slides"
+      line="Pick a deck. Every phone in this class shows the page you're on, and so does Present."
+      onClose={onClose}
+    >
       {/* `.panel-body`, its words at the body's 15/22 as `.app` sets them. */}
       <div className="flex flex-col gap-5.5 px-5 pt-4.5 pb-6 text-body">
         {decks === 'loading' ? (

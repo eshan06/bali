@@ -16,7 +16,8 @@ import { TryAgain } from './try-again';
 /*
  * Show slides in the side panel (M6, part 2c; LessonDecks, LessonStates' lines and the
  * intermediate states LessonDecksStates draws), rendered in each state, its buttons pressed through
- * its own element tree; its read and the page's wiring are read from their source.
+ * its own element tree; its read and the page's wiring are read from their source. Its title, its
+ * line and its Close are driven in jsdom (`decks-panel.test.tsx`).
  */
 const source = readFileSync(fileURLToPath(new URL('./decks-panel.tsx', import.meta.url)), 'utf8');
 const page = readFileSync(
@@ -106,18 +107,6 @@ const rows = (html: string) => [...html.matchAll(/<li class="grid[^"]*">([^]*?)<
 
 describe('the panel, picking a deck (LessonDecks)', () => {
   const html = view(props(DECKS));
-
-  it('is v2’s side panel, 372 px from the right, titled Show slides over “Pick a deck.”', () => {
-    expect(html).toMatch(/^<aside id="P" aria-labelledby="P-h" class="([^"]*)">/);
-    const look = /^<aside [^>]*class="([^"]*)"/.exec(html)?.[1]?.split(' ');
-    expect(look).toEqual(expect.arrayContaining(['fixed', 'right-0', 'w-93', 'max-w-full']));
-    expect(look).not.toContain('w-115');
-    expect(html).toContain('<h2 id="P-h" tabindex="-1" class="text-h3">Show slides</h2>');
-    expect(text(html)).toMatch(/^Show slides Pick a deck\. Factoring quadratics/);
-    // Its line's second sentence waits for W5 and M8 (the conductor's call, 2026-10-16).
-    expect(html).not.toMatch(/Every phone|so does Present/);
-    expect(html).toMatch(/<button type="button" aria-label="Close"/);
-  });
 
   it('lists the ready decks alone, newest first as Bali lists them, each with its pages, its day and Show', () => {
     expect(rows(html).map((m) => text(m[1] ?? ''))).toEqual([
