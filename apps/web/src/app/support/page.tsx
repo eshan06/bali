@@ -213,9 +213,8 @@ export default function SupportPage() {
           </Question>
           <Question title="Privacy policy and terms">
             <p>
-              The full privacy policy and terms are coming from Bali&apos;s lawyer. Until they
-              arrive, the <TextLink href="/privacy">privacy policy</TextLink> and{' '}
-              <TextLink href="/terms">terms</TextLink> pages show the sections each will have.
+              Read the full <TextLink href="/privacy">privacy policy</TextLink> and{' '}
+              <TextLink href="/terms">terms</TextLink>.
             </p>
           </Question>
         </Section>

@@ -48,7 +48,6 @@ const STILL_READING = [
   'app/class-page.test.ts',
   'app/home.test.ts',
   'app/icons.test.ts',
-  'app/policy-pages.test.ts',
   'app/present.test.ts',
   'app/rendering.test.ts',
   'app/support/support.test.ts',

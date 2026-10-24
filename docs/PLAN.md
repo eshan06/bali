@@ -8,13 +8,12 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-24 (Central) — M6's LessonDecks panel line back (#457; `docs/DECISIONS.md`,
-2026-10-24): Show slides' panel says "Pick a deck. Every phone in this class shows the page you're
-on, and so does Present." again, now that phones (M8, M8b) and the student web (W5) show the slide.
-LessonDecksStates and LessonRetryStates show the whole line on the canvas too (canvas version 105,
-published by the conductor on the owner's go). Before it, the push's app
-half (#456): **before the next TestFlight build, Push Notifications on `com.bali.Bali`** (runbook 7,
-step 3), or its signing may fail; build 10 went before it, from `1d4496b6`. **An install whose
+_Last updated: 2026-10-24 (Central) — C2-text (#461; `docs/DECISIONS.md`, 2026-10-24): the owner's
+drafted privacy policy and terms (#460) on `/privacy` and `/terms` in the outline's place, its
+notice and Placeholder chips gone, the notes for the lawyer left off; both pages stay out of search
+results until the lawyer's version replaces them in place. Before it, M6's LessonDecks panel line
+back (#457) and the push's app half (#456): **before the next TestFlight build, Push Notifications
+on `com.bali.Bali`** (runbook 7, step 3), or its signing may fail; build 10 went before it, from `1d4496b6`. **An install whose
 Screen Time step was done before that build is never asked:** the owner reinstalls Bali before
 runbook 7's step-6 check. Next on the Mac: the owner's sitting on build 10 (`ios/README.md`), then
 runbook 7 and N6's check; on the Windows PC, the other three pre-pilot steps, which wait for the
@@ -53,7 +52,7 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
   (#434; DECISIONS 2026-10-22), jsdom and Testing Library, dev only, opted into per file
   (`docs/WEB.md`, Testing the portal), `try-again.test.tsx` the pattern. Each UI step from now on
   converts the source-text tests it touches and adds none; `src/source-text-tests.test.ts` lists the
-  32 left (New class's converted, 2026-10-23), a list that only shrinks.
+  31 left (New class's converted, 2026-10-23, the policy pages', C2-text), a list that only shrinks.
 - **A stuck slide upload stops (the owner, 2026-10-22: "ok fine the 30 s and 25 min outer limit is
   good")** ✅ (#436; DECISIONS 2026-10-22): nothing sent for 30 s stops it as one with no answer, in
   the boards' line with Try again; 2 minutes for the bucket's answer once the whole file is sent (the
@@ -275,9 +274,9 @@ own worker (M2), and a load gate of several classes on phones and laptops (L4, M
 
 One line each; each step's full notes are on its line in `docs/PLAN-ARCHIVE.md`.
 
-- **C2** 👀 ⚖️ The privacy policy and terms (Phase 6, **gate**): the portal's pages and the app's links are built with placeholder text, which the lawyer's words replace in place
+- **C2** 👀 ⚖️ The privacy policy and terms (Phase 6, **gate**): the portal's pages and the app's links are built, the pages holding the owner's drafts (C2-text), which the lawyer's words replace in place
   - **C2-drafts** The owner's drafts, for Apple's external beta review (the owner, 2026-10-24) — ✅ (#460): `docs/legal/privacy-policy.md` and `terms-of-use.md`, from General Legal's CC0 templates, every fact filled; the lawyer's questions at each file's end (DECISIONS 2026-10-24). The lawyer's review comes before the pilot's first class
-  - **C2-text** The drafts' words on `/privacy` and `/terms` in place of the outline: text only, the notice and Placeholder chips gone, the privacy draft's table as lists, the lawyer's notes left off; no new board (the owner, 2026-10-24); `policy-pages.test.ts` converted — validation: the page tests, a screenshot of each page
+  - **C2-text** The drafts' words on `/privacy` and `/terms` — ✅ (#461; DECISIONS 2026-10-24)
 - **C7** 📱 The 13+ screen (Phase 6, **gate**): built, C7-server with it; left, the owner's first-launch check on the next TestFlight build
 - **S8** 🔧 Least-privilege database roles (Phase 6): the owner's decision (Open owner items, 1)
 - **D2k** ⏸ The shield's new look (Phase 3): waits for a design the owner approves in Claude Design

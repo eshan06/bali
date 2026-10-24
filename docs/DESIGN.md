@@ -217,7 +217,9 @@ The entry pages are v2's since PV15 (2026-10-15): sign-in and its callback on v2
 (the mark at 40 px, Bali and "Focus sessions for your classroom" over the card, no bar),
 the invite card under v2's white bar with Sign out, and Help and the policy pages under
 that bar in one column 860 px wide, Help's sections cards, the policy outline one card
-with a Placeholder chip per section, their words unchanged.
+with a Placeholder chip per section, their words unchanged. Since C2-text (2026-10-24; no new
+board, the owner's call) the policy pages hold the owner's drafted words in that card, in
+paragraphs and lists, the date under the title, the notice and the Placeholder chips gone.
 The student's home is v2's since W3 (2026-10-15): the side menu with Your classes and Help,
 each class in session on StudentHome's live card (its ring, its teacher, the time left and the
 bell) and the rest under it, none yet StudentHomeEmpty's card with its way to the invite page,
@@ -734,9 +736,9 @@ where they differ (Present's included: §5); the input size stands.
   card or a group of cards, and no other grey frame in its place (the owner's
   ruling, 2026-10-06;
   `components/card.ts`). Grey stays only where the approved designs keep it: a
-  text field's well, the state chips' fills, the grid's stale banner, a
-  button's hover and pressed states, and the policy draft's banner (its
-  Placeholder badge a chip in Not here's tint since PV15).
+  text field's well, the state chips' fills, the grid's stale banner, and a
+  button's hover and pressed states (the policy draft's banner went with its
+  outline in C2-text).
   Cards in a list (the grid's cells, the classes, the reports) are
   `radius-md` with `space-4` padding, `space-2` apart; a card standing alone
   (sign-in, the invite code, the block's card, the recap, a sheet) is
