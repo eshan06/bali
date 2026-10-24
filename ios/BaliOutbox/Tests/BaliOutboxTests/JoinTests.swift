@@ -228,22 +228,23 @@ private let (joinRoute, lookUpRoute) = ("POST /v1/enrollments", "GET /v1/join-co
 @Suite("Joining through the engine: the class at once (C3)", .timeLimit(.minutes(3)))
 struct JoinEngineTests {
     @Test(
-        "A join answered in is the engine's at once — the class in `me`, so `hasClasses` is true and the router moves on — and the truth is read again, which names its teacher; a join into a class already there adds it no second time"
+        "A join answered in is the engine's at once — the class in `me`, so `hasClasses` is true and the router moves on — and the truth is read again, which names its teacher; a join into a class already there adds it no second time. Only the reads count as reads (`meReads`, L8c), never the join"
     )
     func joined() async throws {
         let rig = try Rig()
         try await rig.foreground(Answer.me(nil))
         #expect(await rig.engine.state.hasClasses == false)
+        #expect(await rig.engine.state.meReads == 1)
         async let answer = rig.engine.join(request)
         try await rig.server.next(joinRoute).reply(200, Answer.joinedClass("c"))
         #expect(await answer.answer?.class.id == "c")
         var state = await rig.engine.state
         #expect(state.hasClasses == true && state.me?.classes.map(\.id) == ["c"])
-        #expect(state.me?.classes.first?.teacher == nil)
+        #expect(state.me?.classes.first?.teacher == nil && state.meReads == 1)
         try await rig.server.next(meRoute)
             .reply(200, Answer.me(nil, classes: [Answer.inClass("c")]))
         state = await rig.until { $0.me?.classes.first?.teacher != nil }
-        #expect(state.me?.classes.map(\.id) == ["c"])
+        #expect(state.me?.classes.map(\.id) == ["c"] && state.meReads == 2)
         async let again = rig.engine.join(request)
         try await rig.server.next(joinRoute)
             .reply(200, Answer.joinedClass("c", outcome: "already_enrolled"))
@@ -255,7 +256,7 @@ struct JoinEngineTests {
     }
 
     @Test(
-        "A read of the truth sent before the join and answered after it never takes the class away — its classes are older than the join; the read the join asks for then applies"
+        "A read of the truth sent before the join and answered after it never takes the class away — its classes are older than the join, and it counts as no read (`meReads`, L8c); the read the join asks for then applies"
     )
     func staleRead() async throws {
         let rig = try Rig()
@@ -269,9 +270,10 @@ struct JoinEngineTests {
         // Sent once the stale answer is in: it has taken nothing away.
         let after = try await rig.server.next(meRoute)
         #expect(await rig.engine.state.me?.classes.map(\.id) == ["c"])
+        #expect(await rig.engine.state.meReads == 1)
         after.reply(200, Answer.me(nil, classes: [Answer.inClass("c"), Answer.inClass("d")]))
         let state = await rig.until { $0.me?.classes.count == 2 }
-        #expect(state.hasClasses == true)
+        #expect(state.hasClasses == true && state.meReads == 2)
         await rig.stop()
     }
 

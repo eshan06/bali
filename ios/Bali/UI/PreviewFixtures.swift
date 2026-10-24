@@ -188,13 +188,31 @@
             "unlockedPickError": State(
                 sync: recorded(standing(.inSession(period3, .unlocked)), .bathroom),
                 pickFailed: UnlockedWords.offline),
+            // The same card off the Focus screen (L8; the app canvas's UnlockedQuestion): a question
+            // open, the unlock recorded with no reason picked yet; and, with no connection, the
+            // unlock not sent yet (UnlockedQuestionUnsent, an intermediate state).
+            "unlockedQuestion": State(
+                sync: recorded(standing(.inSession(period3, .unlocked)), nil), lesson: lesson()),
+            "unlockedQuestionUnsent": State(
+                sync: unsentUnlock(standing(.inSession(period3, .unlocked))),
+                lesson: lesson(problem: .unreachable(.unreachable))),
             // Unlocked's Home (C5c): its tab bar, the apps still open, and Back to Unlocked.
             "homeFromUnlocked": State(sync: standing(.inSession(period3, .unlocked)), opened: [.home]),
             // Protection off reported there: the card's way back is a re-tap, as Unlocked's.
             "homeFromUnlockedRetap": State(
                 sync: reported(standing(.inSession(period3, .unlocked))), opened: [.home]),
-            // Period 3 in session, the student not in it (C3c): its card in the hero's place.
+            // A question open there (L8): no board draws the card on this Home, so none shows.
+            "homeFromUnlockedQuestion": State(
+                sync: recorded(standing(.inSession(period3, .unlocked)), nil), opened: [.home],
+                lesson: lesson()),
+            // Period 3 in session, the student not in it (C3c): its card in the hero's place; and a
+            // question open (L8; the app canvas's HomeQuestion), and with no connection
+            // (HomeQuestionError, an intermediate state).
             "homeInSession": State(sync: standing(.out, me: ana(inSession: true))),
+            "homeQuestion": State(sync: standing(.out, me: ana(inSession: true)), lesson: lesson()),
+            "homeQuestionError": State(
+                sync: standing(.out, me: ana(inSession: true), failed: .networkError),
+                lesson: lesson(problem: .unreachable(.unreachable))),
             // In no class, Home with its card in the hero's place (the approved Sign in & sign up
             // design): Ana new, never in a class here, not in one yet; and removed from her last
             // class (#143), in a class on this phone before, in none any more.
@@ -308,6 +326,15 @@
             "protectionOffError": State(
                 protection: screenTimeOff(),
                 sync: standing(.inSession(period3, .protectionOff), me: nil, failed: .networkError)),
+            // A question open there (L8; the app canvas's ScreenTimeOffQuestion), and with no
+            // connection (ScreenTimeOffQuestionError, an intermediate state).
+            "protectionOffQuestion": State(
+                protection: screenTimeOff(), sync: standing(.inSession(period3, .protectionOff)),
+                lesson: lesson()),
+            "protectionOffQuestionError": State(
+                protection: screenTimeOff(),
+                sync: standing(.inSession(period3, .protectionOff), failed: .networkError),
+                lesson: lesson(problem: .unreachable(.unreachable))),
             "homeRefused": State(sync: refused(standing(.inSession(period3, nil)), .eventIdConflict)),
             // A scan of a block no teacher set up (#146): said with Try again while it is the
             // phone's newest tap; a tap since counted, it is kept and retried, and said no more.
@@ -596,6 +623,40 @@
                         }
                         try outbox.settle(sent, now: Date())
                         state.lastTap = tap?.eventId
+                    }
+                    state.queued = try outbox.records()
+                } catch {
+                    fatalError("A fixture's outbox failed: \(error)")
+                }
+                made.state = state
+                done.signal()
+            }
+            guard done.wait(timeout: .now() + 30) == .success else {
+                fatalError("A fixture's outbox did not answer within 30 s")
+            }
+            return made.state ?? state
+        }
+
+        /// `state` with this phone's Emergency Unlock in Period 3 sent and answered with a server error
+        /// `Outbox.bound` times, so stuck, kept and still retried (rule 5): in an outbox of the
+        /// fixture's own, each answer settled as the engine settles it, on a task of its own and
+        /// waited for at most 30 s, as `refusedTap` makes its taps.
+        private static func unsentUnlock(_ state: SyncState) -> SyncState {
+            final class Made: @unchecked Sendable { var state: SyncState? }
+            let (made, done) = (Made(), DispatchSemaphore(value: 0))
+            Task.detached { [state] in
+                var state = state
+                do {
+                    let outbox = try Outbox(
+                        at: FileManager.default.temporaryDirectory.appending(
+                            path: "fixture-\(UUID().uuidString).sqlite"))
+                    let unlock = try outbox.record(.unlock(session: "session", reason: nil), now: Date())
+                    let failing = Answering(status: 503, body: "{}")
+                    for _ in 0..<Outbox.bound {
+                        guard let sent = await unlock?.send(through: failing.client) else {
+                            throw URLError(.unknown)
+                        }
+                        try outbox.settle(sent, now: Date())
                     }
                     state.queued = try outbox.records()
                 } catch {

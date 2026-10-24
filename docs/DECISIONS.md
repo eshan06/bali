@@ -8,6 +8,68 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-23** — **The same answer card off the Focus screen (L8c, #451, L8's last PR, so its
+  screens are done), with the owner's three riders; the card goes at its class's bell by the
+  phone's clock; a state chip reads its word alone to VoiceOver.** **The screens** (the app canvas's
+  row "The same card off the Focus screen": UnlockedQuestion, ScreenTimeOffQuestion and
+  HomeQuestion, in D1's look): while the phone has a card to show (`Phone.card`, L8b's), Unlocked
+  shows `AnswerCardView` under what it says of the unlock and over the reason card, Screen Time off
+  under what it says and over its steps, and Home, for a student not tapped in (decision 11's
+  words), under its card for the class in session and over Your classes, 24 pt (Home 20) from its
+  neighbours as drawn. Every other word and control of each screen reads as before, in its order,
+  and works as before; nothing new is pinned (Home's tab bar stays pinned), and Hide takes the card
+  away, leaving the screen as it is with no question. **What a screen says went wrong** (Unlocked's
+  unlock not sent yet, Screen Time off's problems, Home's classes not read or a refused tap) keeps
+  its place above the card, next to what it is about (*the worker's call*: Focus puts its notes
+  under the card); intermediate states, so drawn on the app canvas first, labelled as such, and
+  built from those boards (CLAUDE.md, Working rules; santa's round 2 rejected the first draft's
+  dismissal that L8b-2's notes on Focus, #450, made them composition enough): UnlockedQuestionUnsent,
+  ScreenTimeOffQuestionError and HomeQuestionError, each with no connection, the card saying so too.
+  **Where a student in a running class sees no card** (no board draws it there, so nothing is built
+  and it is the owner's call): the Home opened from Unlocked (Go to Home; its Back returns to
+  Unlocked's card) or from Waiting, which an earlier draft of this PR gave the card in
+  HomeQuestion's layout, until santa's round 1 (a blocker: an undrawn state is drawn first or waits
+  for the owner, CLAUDE.md); Home in a state this build doesn't know, and Home kept while where the
+  phone stands can't be read (B6b); the Screen Time grant screen, which the router shows in Home's
+  place to a student not tapped in whose Screen Time access is off (never given on this phone, a new
+  phone or a reinstall where they declined, or turned off between classes) for as long as it stays
+  off, though decision 1 says the lesson works for such a student; they can answer on the web
+  meanwhile. Focus over shields not verified (L8b's call): a moment, unless the check can't save its
+  report or a tap waits unanswered. Waiting: only a student waiting for another teacher's Start
+  while their own class runs. And the screens a student opens (History, Me, Join), a tab or Back
+  away from the card. **The card goes at its class's bell** (found here, a proven bug on Home, the
+  one screen of the card's that outlives the bell): the lesson was dropped only when a read said it
+  was over, so offline at the bell Home
+  kept the question with its "No connection" line for a class that had ended; now `Phone.card` shows
+  only while the session followed is still the one to follow by the phone's clock (`lessonSession`,
+  L8b-1's rule), so the card goes with Home's card for the class. Its ceiling: the poll itself keeps
+  trying past the bell until Bali answers, the app goes behind or the engine's state changes, the
+  card hidden meanwhile. **The owner's three riders** (the owner's rulings, 2026-10-23, in chat:
+  "Yes: fix all three small edge cases in L8c"): *a relaunch that finds the account deleted on
+  Bali's server*, its Cognito sign-in still to go (the app closed between the two), clears the
+  phone's two notes, `inClass` and `listSeenBy`, at once, as a finished Delete account does (#448),
+  never left for the pending screen's Try again (a frozen fixture's from itself only); *a student
+  removed mid-class and added back* follows the lesson again once a read of `GET /v1/me` lists the
+  session: a poll refused 403 or 404 no longer drops the session for the run, only until the next
+  read the server answers (`SyncState.meReads`, counted in the engine's read loop, never for a join
+  or a read the phone's own change outdated), so a state with no read since follows nothing, and a
+  refusal that recurs costs one poll a read; *while Emergency Unlock is held the card ignores taps*,
+  an answer and Hide alike (`Phone.answer`, `hideQuestion`), so no second finger answers or hides a
+  question the screen no longer shows. **The chip** (found here, a proven bug): a state chip's icon
+  was read by VoiceOver as its symbol ("Selected" before Focused, "Unlock" before Unlocked,
+  "shield.slash" before Screen Time off, "Wi-Fi off" before No connection); hidden now, so a chip
+  reads its word alone, on every screen. Tests: `AppTests.offFocusCard` (on each screen and each of
+  its intermediate states, the card where its board draws it and every other word and control as
+  without a question, in order, its answers buttons read with their letters, Hide; none on the Home
+  opened from Unlocked or Waiting),
+  `offFocusFits` (each screen scrolls whole, never wider than the phone, nothing VoiceOver reads
+  past its sides, at the default and accessibility sizes on three iPhones), `offFocusCardWaits` (no
+  card and no poll before the list is seen, the one-time screen in Home's place, the card gone with
+  the question), `cardGoesAtTheBell`, `cardIgnoresTapsMidHold`, `chipWords`,
+  `deleteAccountWiring`'s relaunch and `lessonRefused`'s re-add, each of the last five failing
+  before its fix and the first three with the card taken out, misplaced or too wide; `JoinTests`'
+  and `ReconcileTests`' reads counted (BaliOutbox); screenshots beside each board.
+
 - **2026-10-23** — **The answer card on Focus (L8b-2, #450, the second of L8b's two PRs, so L8b is
   done); a poll refused 403 or 404 ends the following (the conductor's call), and the store listing
   says the app's list word for word.** **The screen** (the app canvas's Main, FocusAnswered,

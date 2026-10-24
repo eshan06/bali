@@ -10,6 +10,19 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-23 (Central) — The answer card on Focus (L8b-2, #450; `docs/DECISIONS.md`,
+2026-10-23), the second of L8b's two PRs on the Mac, so L8b is done: while a question shows over
+shields the check verified, Focus's ring becomes the strip under the class's name, the card under it,
+the page scrolling over Emergency Unlock, pinned at the bottom at every text size, its one-second
+hold unchanged; a tap answers and another changes it until the close, the revealed answer marked and
+never red, and a closed question's Hide kept by this phone alone. A poll refused 403 or 404 drops the
+lesson as one that is over, never the card's "No connection" line (the conductor's call), and the
+store listing's lists say the app's list word for word. Main can answer from the card now; no
+TestFlight build was sent. Before it, on the Windows PC, the pre-pilot event-id step's part 3 (#449),
+so that step is done: an event id in upper case is the same id at the last three places the engine
+compared one as text. Next on the Mac: the rest of L8, the same card on Unlocked, Screen Time off and
+Home, then M8; on the Windows PC, the other three pre-pilot steps wait for the owner's word._
+
 _Last updated: 2026-10-23 (Central) — The pre-pilot event-id step, part 3 of 3 (#449;
 `docs/DECISIONS.md`, 2026-10-23), so that step is done: an event id sent in upper case is now the
 same id at the last three places the engine compared one as text. A deck's removal sent again so is

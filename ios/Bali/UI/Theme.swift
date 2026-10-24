@@ -193,7 +193,8 @@ struct Card<Content: View>: View {
 
 /// A state chip, as every surface shows a student's state: its colour, an icon and a label,
 /// never the colour alone. D1's fill and ink per kind; 6 × 12 padding, radius 14, the label style
-/// in uppercase.
+/// in uppercase. VoiceOver reads the label alone: the icon read out was its symbol's name, the
+/// Focused chip's "Selected".
 struct Chip: View {
     enum Kind {
         case focused, unlocked, protectionOff, protectionOn, ended, notIn, waiting
@@ -224,7 +225,7 @@ struct Chip: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: icon ?? kind.look.icon)
+            Image(systemName: icon ?? kind.look.icon).accessibilityHidden(true)
             Text(text)
         }
         .textStyle(.label).textCase(.uppercase).foregroundStyle(kind.look.ink)

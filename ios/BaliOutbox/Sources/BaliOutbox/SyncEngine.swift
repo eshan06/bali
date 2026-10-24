@@ -162,6 +162,10 @@ public struct SyncState: Sendable, Hashable {
     /// (`SyncEngine.forgetMe`): a state counting fewer forgets than the app asked for was sent
     /// before the last one, so its `me` is the last student's (#160's review).
     public var forgets = 0
+    /// How many reads of `GET /v1/me` have given `me`: a later count is a read the server answered
+    /// since, never a class the phone joined (L8c: a lesson refused is followed again once a later
+    /// read lists its session).
+    public var meReads = 0
     /// When the wait for the teacher's Start ends by the phone's own clock, offline too (#166): the
     /// end of the day its tap was last answered armed (`waitEnds(armedAt:)`), kept in the outbox
     /// file for a relaunch; nil when not known — a wait an earlier build kept, which only a read
@@ -970,7 +974,7 @@ public actor SyncEngine {
                         // Its `me`, unless the phone changed that since it was sent.
                         let current = meChanges == changesThen
                         reconcile(sent, standing(me)) {
-                            if current { $0.me = me }
+                            if current { ($0.me, $0.meReads) = (me, $0.meReads + 1) }
                             $0.meFailed = nil
                         }
                     } else {

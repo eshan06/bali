@@ -2,10 +2,10 @@ import BaliOutbox
 import SwiftUI
 
 /// The answer card (L8; the app canvas's "The answer card, state by state"), one view for every
-/// screen a question shows on: Focus here; Unlocked, Screen Time off and Home in L8c. A tap on an
-/// answer sends it and another changes it until the close, with no Submit; closed, Hide, and the
-/// correct answer marked once shown and the student's own as Your answer, never red; never a
-/// count. Its looks and its line are `AnswerCard`'s.
+/// screen a question shows on: Focus, Unlocked, Screen Time off and Home. A tap on an answer sends
+/// it and another changes it until the close, with no Submit; closed, Hide, and the correct answer
+/// marked once shown and the student's own as Your answer, never red; never a count. Its looks and
+/// its line are `AnswerCard`'s.
 struct AnswerCardView: View {
     let card: AnswerCard
     let phone: Phone
