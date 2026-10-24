@@ -760,6 +760,17 @@ a real decision? Add a dated entry at the top: what was decided and why.
   left them. **Checked:** CI's audit gate passing (fastify's low left), `npm audit signatures`,
   typecheck, lint, `npm test` and the in-memory demo.
 
+- **2026-10-24** — **The privacy policy and terms go up as the owner's drafts before the lawyer's
+  review (C2-drafts, C2-text).** Apple's external TestFlight review needs a privacy policy URL, and
+  `/privacy` said "This isn't the privacy policy yet." The owner drafted both from General Legal's
+  CC0 templates (`docs/legal/`), filled from what Bali does: operators Eshan Shah and Jonathan
+  Bani, effective 2026-10-24, Tennessee law, contact `eshan.shah@vanderbilt.edu`, no mailing
+  address, no arbitration and no student indemnity. Retention figures are the providers'
+  published settings (Railway backups daily 6 days and weekly 27 days, Railway logs up to 90
+  days, Vercel's Hobby 1 hour, Sentry up to 90 days). The pages change only their words, so no
+  new board (the owner's call); the privacy draft's table becomes lists so nothing undrawn
+  appears. The lawyer's real review stays before the pilot's first class.
+
 - **2026-10-22** — **The API's database pool can never silently shrink to one connection (#439, a
   guard from #336's finding, #438): the API always hands postgres.js its own size, so `PGMAX` and a
   `max` in `DATABASE_URL` are ignored, and the boot says so by name. *The conductor's call, awaiting
