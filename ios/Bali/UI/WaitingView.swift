@@ -6,9 +6,11 @@ import SwiftUI
 /// 30 s (decision 6, the owner's ruling) and shields the moment it finds the Start; a read that
 /// gave no answer is said, with Try again (rule 5). Back to home opens the regular Home over it,
 /// its card saying the wait (#151). An armed tap's answer names no teacher, so neither does the
-/// screen. Opened from the class-started alert, it says Bali is checking in until the read the
-/// alert held answers (the app canvas's PushWaitB; `SyncState.waitingWords`). As it shows, iOS's
-/// prompt to send that alert is asked, once (`Phone.askToNotify`).
+/// screen. Opened from the class-started alert, it says Bali is checking in — that the apps lock in
+/// a few seconds, never that they are locked — until the read the alert held answers or fails
+/// (`SyncState.checkingIn`; the app canvas's PushWaitB, the owner's pick, 2026-10-23), its own words
+/// back after a failure, with Try again. As it shows, iOS's prompt to send that alert is asked,
+/// once (`Phone.askToNotify`).
 struct WaitingView: View {
     let phone: Phone
 
@@ -16,7 +18,7 @@ struct WaitingView: View {
     /// apart, each at its own height: only the spacers give, the one above the ring first, so a
     /// card more still fits the smallest iPhone, Back to home included (#149; C4's layout).
     var body: some View {
-        let words = (phone.sync ?? SyncState()).waitingWords
+        let checking = phone.sync?.checkingIn == true
         ScreenScaffold {
             PageScroll {
                 VStack(spacing: 0) {
@@ -28,9 +30,17 @@ struct WaitingView: View {
                             }
                             .frame(width: 176, height: 176).accessibilityHidden(true)
                         VStack(spacing: 12) {
-                            Text(words.heading).textStyle(.h1)
-                            Text(words.line)
-                                .textStyle(.bodyLg).foregroundStyle(Theme.textSecondary)
+                            Text(
+                                checking
+                                    ? "Checking in with your class" : "Ready, waiting for your teacher"
+                            )
+                            .textStyle(.h1)
+                            Text(
+                                checking
+                                    ? "Your apps lock in a few seconds. No need to tap again."
+                                    : "You tapped your teacher's block before class started. Your phone locks when class starts, as long as Bali is open. No need to tap again."
+                            )
+                            .textStyle(.bodyLg).foregroundStyle(Theme.textSecondary)
                         }
                         .multilineTextAlignment(.center)
                     }
@@ -42,7 +52,12 @@ struct WaitingView: View {
                                 Image(systemName: "info.circle").font(.system(size: 20))
                                     .foregroundStyle(Theme.brand).frame(width: 40, height: 40)
                                     .background(Theme.sunken, in: .circle).accessibilityHidden(true)
-                                Text(words.card).textStyle(.body)
+                                Text(
+                                    checking
+                                        ? "Keep Bali open until your apps lock."
+                                        : "Keep Bali open so it can start right away."
+                                )
+                                .textStyle(.body)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }

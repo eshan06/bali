@@ -57,10 +57,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   "Checking in with your class", "Your apps lock in a few seconds. No need to tap again." and "Keep
   Bali open until your apps lock.", and Home's waiting card "You're tapped in. Your apps lock in a
   few seconds, as long as Bali is open."; a read that fails brings back Waiting's words with Try
-  again, and a failure from before the alert is not said while Bali checks in. Waiting's words moved
-  from its view into `SyncState.waitingWords`, beside Home's card (`Screen.swift`), so they are tested
-  in the package; the source test of Waiting's promise reads them there. Screenshots beside both
-  boards. Left: the owner's word on the prompt's timing, then runbook 7 and N6's end-to-end check.
+  again, and a failure from before the alert is not said while Bali checks in. Waiting's words, both
+  sets, stay in its view, where the portal's Help test reads its promise; Home's card is
+  `SyncState.waitingCard` (`Screen.swift`). Screenshots beside both boards. Left: the owner's word on
+  the prompt's timing, then runbook 7 and N6's end-to-end check.
 
 - **2026-10-24** — **The slide off Focus and the card on the Screen Time ask (M8b, #454): the four
   boards the owner approved on 2026-10-24, six intermediate states drawn first on the app canvas; the

@@ -13,8 +13,9 @@ let deviceToken = Data([0x0a, 0xbc, 0xde, 0xf0] + Array(repeating: 0xff, count: 
 let deviceTokenHex = "0abcdef0" + String(repeating: "ff", count: 27) + "01"
 
 /// The class-started alert's app half (ARCHITECTURE, "Push: a doorbell for students"): the wait
-/// before the read after the alert (the owner's approved fix, DECISIONS 2026-10-22), what Waiting
-/// and Home say meanwhile (the app canvas's option B), and the device token's register and removal.
+/// before the read after the alert (the owner's approved fix, DECISIONS 2026-10-22), Home's waiting
+/// card meanwhile (the app canvas's option B; Waiting's words are the app's tests'), and the device
+/// token's register and removal.
 @Suite("The class-started alert", .timeLimit(.minutes(3)))
 struct PushTests {
     @Test(
@@ -42,7 +43,9 @@ struct PushTests {
         await rig.engine.holdRead(until: at(7))
         await rig.engine.setForeground(true)
         let checking = await rig.until { $0.checkingIn }
-        #expect(checking.waitingWords.heading == "Checking in with your class")
+        #expect(
+            checking.waitingCard
+                == "You're tapped in. Your apps lock in a few seconds, as long as Bali is open.")
         try await rig.sleeping([at(7)])
         rig.clock.advance(by: 6.9)
         try await rig.sleeping([at(7)])
@@ -59,7 +62,7 @@ struct PushTests {
     }
 
     @Test(
-        "A held read that fails ends the check: Waiting's own words come back, beside the failure and its Try again; a failure from before the alert is not said while Bali checks in"
+        "A held read that fails ends the check, the failure said with its Try again — Waiting's own words back; a failure from before the alert is not said while Bali checks in"
     )
     func heldReadFails() async throws {
         let rig = try Rig()
@@ -73,7 +76,6 @@ struct PushTests {
         try await rig.server.next(meRoute).reply(nil)
         let failed = await rig.until { !$0.checkingIn }
         #expect(failed.meFailed == .networkError && failed.meWords != nil)
-        #expect(failed.waitingWords.heading == "Ready, waiting for your teacher")
         await rig.stop()
     }
 
@@ -188,29 +190,15 @@ struct PushTests {
     }
 
     @Test(
-        "Waiting's words and Home's waiting card while Bali checks in after the alert are the app canvas's option B, exactly — never that the apps are locked — and Waiting's own otherwise; Home's card only while waiting"
+        "Home's waiting card while Bali checks in after the alert is the app canvas's option B, exactly — never that the apps are locked — and its own otherwise; only while waiting"
     )
     func words() {
         var state = SyncState()
         state.standing = .waiting
         #expect(
-            state.waitingWords
-                == (
-                    "Ready, waiting for your teacher",
-                    "You tapped your teacher's block before class started. Your phone locks when class starts, as long as Bali is open. No need to tap again.",
-                    "Keep Bali open so it can start right away."
-                ))
-        #expect(
             state.waitingCard
                 == "You're tapped in. Your phone locks when class starts, as long as Bali is open.")
         state.checkingIn = true
-        #expect(
-            state.waitingWords
-                == (
-                    "Checking in with your class",
-                    "Your apps lock in a few seconds. No need to tap again.",
-                    "Keep Bali open until your apps lock."
-                ))
         #expect(
             state.waitingCard
                 == "You're tapped in. Your apps lock in a few seconds, as long as Bali is open.")

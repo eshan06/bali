@@ -390,24 +390,6 @@ extension SyncState {
             : "You're tapped in. Your phone locks when class starts, as long as Bali is open."
     }
 
-    /// What Waiting says (D1's Waiting artboard): its heading, its line and its card's — while Bali
-    /// checks in after the class-started alert (`checkingIn`), that the apps lock in a few seconds,
-    /// never that they are locked (the app canvas's PushWaitB, the owner's pick, 2026-10-23); its
-    /// own words again once that read answers or fails, a failure beside Try again.
-    public var waitingWords: (heading: String, line: String, card: String) {
-        checkingIn
-            ? (
-                "Checking in with your class",
-                "Your apps lock in a few seconds. No need to tap again.",
-                "Keep Bali open until your apps lock."
-            )
-            : (
-                "Ready, waiting for your teacher",
-                "You tapped your teacher's block before class started. Your phone locks when class starts, as long as Bali is open. No need to tap again.",
-                "Keep Bali open so it can start right away."
-            )
-    }
-
     /// Out of any session, `GET /v1/me` listing the student in no class: Home's empty state, Tap in
     /// no way in for them, since a tap joins only a class the student is in (#143).
     var inNoClass: Bool { standing == .out && hasClasses == false }
