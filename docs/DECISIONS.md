@@ -8,7 +8,7 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
-- **2026-10-24** — **The phone's slide view (M8, #NNN, the last of Phase 7's screens): the slide on
+- **2026-10-24** — **The phone's slide view (M8, #452, the last of Phase 7's screens): the slide on
   Focus only, PDFKit's page alone with no link to open and nothing to select, the deck asked for once
   per SHA-256 as the slide shows, one document at a time.** **The screen** (the app canvas's row
   "Slides": FocusSlide, FocusSlideQuestion, SlideLoading and SlideFailed, in D1's look): while the

@@ -8,7 +8,7 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-24 (Central) — The phone's slide view (M8, #NNN; `docs/DECISIONS.md`,
+_Last updated: 2026-10-24 (Central) — The phone's slide view (M8, #452; `docs/DECISIONS.md`,
 2026-10-24), the last of Phase 7's screens: while the teacher shows a slide, Focus's ring becomes the
 strip and the page shows under it (under the question, when one shows too), drawn by PDFKit in a 16:9
 frame, pinch to zoom, read by VoiceOver as the page's words or, with none, as which slide it is;
@@ -45,7 +45,7 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
   keeps D1's look until the owner approves a new one (its redesign rolled back, 2026-10-06). Left:
   the push's app half (not started) and TestFlight build 9 for C7's phone test (📱). The phone's
   Phase 7 screens are done (L8's as L8a, #443, L8b, #448 and #450, and L8c, #451; M8's slide view,
-  #NNN); left, their 📱 device checks, the owner's. C2's legal words (⚖️) go into the portal's
+  #452); left, their 📱 device checks, the owner's. C2's legal words (⚖️) go into the portal's
   pages, on the Windows PC.
 - **The portal redesign in v2's look (PV0–PV17, the owner, 2026-10-12)** ✅ (2026-10-16): every step
   done, with PV3b, PV4b, PV4c and PV5b; the last, PV17c-2, Home's Last session (#425).
@@ -136,7 +136,7 @@ first class, production backups (L0b, the owner's console step; the owner, 2026-
 
 **Phase 7, Live lesson: building.** Every step with no screen is done, L3c the last (2026-10-15);
 M0 is done (deck storage on, 2026-10-12); the web screens come after the redesign's PV15 (✅ #388),
-W3 the first (✅ #392), M5 (✅ #400), L7 (✅ #402, #405), W4 (✅ #406, #407, #408, its follow-up #409), L7b (✅ #393, #394, #395, #411), L7c (✅ #412), M6 (✅ #413–#418), W5 (✅ #419), so every web screen of Phase 7 is built, and the phone's too (✅ L8a–L8c and M8, #NNN, their 📱 device checks left). L0b, production backups, is the owner's, before the Vanderbilt pilot's first
+W3 the first (✅ #392), M5 (✅ #400), L7 (✅ #402, #405), W4 (✅ #406, #407, #408, its follow-up #409), L7b (✅ #393, #394, #395, #411), L7c (✅ #412), M6 (✅ #413–#418), W5 (✅ #419), so every web screen of Phase 7 is built, and the phone's too (✅ L8a–L8c and M8, #452, their 📱 device checks left). L0b, production backups, is the owner's, before the Vanderbilt pilot's first
 class.
 
 ## Phases
@@ -250,7 +250,7 @@ Slice 2 — slides:
 - **M5** 👀 The slides page and upload — ✅ as M5a (#396), M5b part 1 (#397) and M5b part 2 (#400); DECISIONS 2026-10-15
 - **M6** 👀 Portal presenter to v2's canvas — ✅ as part 1 (#413), 2a (#414), 2b-1 (#415), 2b-2 (#416), 2c (#417) and 2d (#418); DECISIONS 2026-10-16; LessonDecks' panel line comes back with M8 (the conductor's call, the owner's on 2026-10-16)
 - **M7** BaliCore's deck download and cache (for M8) — ✅ (#331; DECISIONS 2026-10-12)
-- **M8** 👀📱 iOS slide view to the app canvas — ✅ (#NNN; DECISIONS 2026-10-24): the slide on Focus only, over shields the check verified; left, its 📱 device check on a shielded phone, the owner's, and a slide on Unlocked, Screen Time off and Home, which decision 1 asks for and no board draws yet (proposals for the owner are being drawn)
+- **M8** 👀📱 iOS slide view to the app canvas — ✅ (#452; DECISIONS 2026-10-24): the slide on Focus only, over shields the check verified; left, its 📱 device check on a shielded phone, the owner's, and a slide on Unlocked, Screen Time off and Home, which decision 1 asks for and no board draws yet (proposals for the owner are being drawn)
 - **M9** Load and demo with a deck — ✅ (#335; DECISIONS 2026-10-12)
 - **M10** 📱 Exit check: a real class on prod follows a deck
 
