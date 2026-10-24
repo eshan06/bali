@@ -192,7 +192,7 @@ struct FocusTests {
     }
 
     @Test(
-        "Emergency Unlock is a one-second hold (the owner's ruling, 2026-09-29; DESIGN.md §4): the control unlocks only through its long press's own action, once held a second — its ring filling in that second — so letting go early, or a tap, does nothing; and VoiceOver's action unlocks in one step (#118's review). The control's own source is read: no SwiftUI press can be made from a test"
+        "Emergency Unlock is a one-second hold (the owner's ruling, 2026-09-29; DESIGN.md §4): the control unlocks only through its long press's own action, once held a second — its ring filling in that second — so letting go early, or a tap, does nothing; and VoiceOver's action unlocks in one step (#118's review). Each press is told to the phone as it starts and ends, and a press its screen took away ends there, so Focus holds its layout for a press under way (L8; `AppTests.cardWaitsForTheHold`). The control's own source is read: no SwiftUI press can be made from a test"
     )
     func unlockHold() throws {
         let source = try sourceCode("Bali/UI/FocusView.swift")
@@ -201,6 +201,9 @@ struct FocusTests {
             control.contains(
                 ".onLongPressGesture(minimumDuration: 1, maximumDistance: 44, perform: unlock)"))
         #expect(control.contains("pressing ? .linear(duration: 1)"))
+        #expect(control.contains("held(pressing)"))
+        #expect(source.contains("UnlockControl(held: { phone.unlockHeld = $0 })"))
+        #expect(source.contains(".onDisappear { phone.unlockHeld = false }"))
         #expect(control.contains(".accessibilityAction { unlock() }"))
         // Those two are its only ways in: no tap, no button, no other call.
         #expect(control.components(separatedBy: "perform: unlock").count == 2)

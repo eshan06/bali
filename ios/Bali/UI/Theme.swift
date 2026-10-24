@@ -24,6 +24,8 @@ enum Theme {
     static let arcFinal = Color(hex: 0x62A483)
     static let arcTrack = border
     static let markTrack = Color(hex: 0xBCDCCA)
+    /// green-50, the answer card's correct answer once shown (L8; the app canvas's FocusRevealed).
+    static let optionRight = Color(hex: 0xF0F7F3)
     /// action-destructive-bg, red-600, for the one destructive action: Me's Delete account (C4b;
     /// DESIGN.md §2, red reserved). Pressed, red-700: the tokens name no pressed shade for it, so
     /// the next red primitive stands in (`docs/DECISIONS.md`, C4b).

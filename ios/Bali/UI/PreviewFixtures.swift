@@ -43,6 +43,11 @@
             var email: String?
             var everInClass = false
             var listSeenBy: String? = "ana"
+            /// A live lesson's last read (L8), and the answer card's own: a pick on its way, and
+            /// what the last one said.
+            var lesson: LessonState?
+            var answering: Int?
+            var answerSaid: AnswerCard.Said?
         }
 
         /// Each named for the screen it shows, then a state of it (`AppTests.fixtures` pins that).
@@ -146,6 +151,20 @@
             "focusSignedOut": State(
                 signedIn: false, protection: shielded(),
                 sync: waitingOnSignIn(standing(.inSession(period3, .focused)))),
+            // A question on Focus (L8; the app canvas): open, answered, its answer shown; then the
+            // card state by state — sending, didn't send, too late, closed, yours right, not
+            // answered, no connection, and six long answers.
+            "focusQuestion": asking(lesson()),
+            "focusAnswered": asking(lesson(answer: 1)),
+            "focusRevealed": asking(lesson(open: false, answer: 3, shown: true)),
+            "focusSending": asking(lesson(), answering: 1),
+            "focusFailed": asking(lesson(), said: .failed(held: nil)),
+            "focusTooLate": asking(lesson(), said: .tooLate),
+            "focusClosed": asking(lesson(open: false, answer: 3)),
+            "focusRight": asking(lesson(open: false, answer: 1, shown: true)),
+            "focusNoAnswer": asking(lesson(open: false, shown: true)),
+            "focusQuestionOffline": asking(lesson(problem: .unreachable(.unreachable))),
+            "focusLong": asking(lesson(long: true)),
             "unlocked": State(
                 sync: queued(
                     standing(.inSession(period3, .unlocked)), .unlock(session: "session", reason: nil),
@@ -325,6 +344,45 @@
             id: "session", classId: "p3", endsAt: Date() + 112)
         private static let periodOver = SessionView(
             id: "session", classId: "p3", endsAt: Date() - 60)
+
+        /// Focused in Period 3, the shields verified on, its lesson read as `lesson`, with the card's
+        /// own pick `answering` and what the last one `said`.
+        private static func asking(
+            _ lesson: LessonState?, answering: Int? = nil, said: AnswerCard.Said? = nil
+        ) -> State {
+            State(
+                protection: shielded(), sync: standing(.inSession(period3, .focused)), lesson: lesson,
+                answering: answering, answerSaid: said)
+        }
+
+        /// Period 3's lesson as `GET /v1/sessions/{id}/presentation` answers it: the canvas's
+        /// question — or, `long`, its six long answers (CardLong) — `open` or closed, its answer B
+        /// `shown` once revealed, the student's `answer`, if any; and the last poll's `problem`.
+        private static func lesson(
+            open: Bool = true, answer: Int? = nil, shown: Bool = false, problem: PollProblem? = nil,
+            long: Bool = false
+        ) -> LessonState {
+            let (prompt, options) =
+                long
+                ? (
+                    "A ball is thrown up from a 6-meter platform. Its height after t seconds is h = −t² + 5t + 6, and it lands when h = 0. Factor the expression, then pick the value of t that makes sense for when the ball lands.",
+                    [
+                        "t = −1, because both roots count", "t = 6, because time can't be negative", "t = 1",
+                        "t = 5, the number in front of t",
+                        "Both t = −1 and t = 6, since a quadratic always gives two answers that make sense here",
+                        "There isn't enough information to tell",
+                    ]
+                ) : ("Which value of x solves x² − 5x + 6 = 0?", ["x = 1", "x = 2", "x = 4", "x = 6"])
+            let held: Any = answer.map { ["option": $0, "eventId": "019a1b2c-0000-7000-8000-000000000001"] } ?? NSNull()
+            let question: [String: Any] = [
+                "id": "question", "prompt": prompt, "options": options, "open": open,
+                "correctOption": shown ? 1 : NSNull(), "answer": held,
+            ]
+            let body: [String: Any] = ["running": true, "question": question, "slide": NSNull(), "phone": NSNull()]
+            let presentation = try? BaliJSON.makeDecoder().decode(
+                Presentation.self, from: JSONSerialization.data(withJSONObject: body))
+            return LessonState(presentation: presentation, problem: problem)
+        }
 
         /// What `KWX49Q` opens, as `GET /v1/join-codes/{code}` answers: Period 3, with Ms. Rivera.
         private static let period3Preview = try? BaliJSON.makeDecoder().decode(

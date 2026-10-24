@@ -10,6 +10,17 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-23 (Central) — The pre-pilot event-id step, part 3 of 3 (#449;
+`docs/DECISIONS.md`, 2026-10-23), so that step is done: an event id sent in upper case is now the
+same id at the last three places the engine compared one as text. A deck's removal sent again so is
+its replay, never a 404; an Emergency Unlock that named its tap in another case than the tap's own is
+filed in the tap's session as the tap lands, exactly as in one case; and an unlock sent again after
+its reason changed answers the reason now. #442's check passes on every route, its list empty. None
+of it could happen today (the portal and the phone send lower case), and nothing anyone sees changes.
+Before it, on the Mac, the live lesson followed and the answer card's words, no screen yet (L8b-1,
+#448). Next on the Mac: L8b-2, the card on Focus, then the rest of L8 and M8; on the Windows PC, the
+other three pre-pilot steps wait for the owner's word._
+
 _Last updated: 2026-10-23 (Central) — The live lesson followed and the answer card's words, no
 screen yet (L8b-1, #448; `docs/DECISIONS.md`, 2026-10-23), the first of L8b's two PRs on the Mac:
 the phone follows the lesson of its class in session, tapped in or not, polling only in front, for

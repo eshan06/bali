@@ -399,6 +399,27 @@ struct AppTests {
         let busyStays = Phone(fixture: try #require(PreviewFixtures.all["deleting"]))
         busyStays.signed(in: true, as: "ana", pending: true)
         #expect(busyStays.deleting == .busy)
+        // A question on Focus (L8): each fixture's card as its board draws it, open or closed, and
+        // its line; a frozen phone's tap says it didn't send, never nothing.
+        let cards: [(String, Bool, String)] = [
+            ("focusQuestion", true, "Tap an answer."), ("focusAnswered", true, "Your answer is in."),
+            ("focusSending", true, "Sending your answer…"), ("focusFailed", true, "Bali couldn't send"),
+            ("focusTooLate", false, "This question closed before your answer reached Bali"),
+            ("focusClosed", false, "Your teacher closed this question."),
+            ("focusRevealed", false, "Your teacher closed it and showed the answer."),
+            ("focusRight", false, "Your teacher closed it and showed the answer."),
+            ("focusNoAnswer", false, "Your teacher closed it and showed the answer."),
+            ("focusQuestionOffline", true, "No connection right now"),
+            ("focusLong", true, "Tap an answer."),
+        ]
+        for (name, open, line) in cards {
+            let card = Phone(fixture: try #require(PreviewFixtures.all[name])).card
+            #expect(card?.open == open && card?.line.hasPrefix(line) == true, "\(name)")
+        }
+        #expect(Phone(fixture: try #require(PreviewFixtures.all["focusLong"])).card?.looks.count == 6)
+        let frozenLesson = Phone(fixture: try #require(PreviewFixtures.all["focusQuestion"]))
+        await frozenLesson.answer(1)
+        #expect(frozenLesson.card?.line.hasPrefix("Bali couldn't send your answer.") == true)
     }
 
     @Test(
@@ -1747,7 +1768,7 @@ struct AppTests {
             ("action-primary-bg", Theme.brand), ("action-primary-bg-hover", Theme.brandPressed),
             ("action-destructive-bg", Theme.destructive), ("red-700", Theme.destructivePressed),
             ("arc-fill", Theme.arc), ("arc-final2", Theme.arcFinal), ("arc-track", Theme.arcTrack),
-            ("green-200", Theme.markTrack),
+            ("green-200", Theme.markTrack), ("green-50", Theme.optionRight),
             ("state-focused-bg", Chip.Kind.focused.look.fill),
             ("state-focused-fg", Chip.Kind.focused.look.ink),
             ("state-emergency-bg", Chip.Kind.unlocked.look.fill),
@@ -3375,6 +3396,197 @@ struct AppTests {
         #expect(phone.card?.line == "Tap an answer. You can change it until the question closes.")
     }
 
+    @Test(
+        "A poll refused 403 (the student no longer in the session's class, removed mid-class) or 404 (no such session) is no connection problem (L8; the conductor's call): the lesson is dropped as one a read said is over, the card gone at once, never with the card's No connection line, its poll stopped, and a read of `GET /v1/me` still listing the session follows it no more; a 429 still says that line, the lesson kept"
+    )
+    func lessonRefused() async throws {
+        let defaults = UserDefaults.standard
+        let before = [Phone.inClassKey, Phone.listSeenByKey].map { ($0, defaults.object(forKey: $0)) }
+        defer { for (key, value) in before { defaults.set(value, forKey: key) } }
+        let offline = "No connection right now, so Bali can't send your answer. It keeps trying."
+        for status in [403, 404] {
+            let server = LessonServer()
+            let (phone, _) = try standIn(server)
+            phone.signed(in: true, as: "ana", checked: true)
+            phone.synced(try classInSession())
+            phone.sawList()
+            phone.setForeground(true)
+            try await until { phone.card?.question.id == "q" }
+            let shown = phone.lesson?.presentation
+            phone.lessonRead(LessonState(presentation: shown, problem: .rateLimited), of: "s")
+            #expect(phone.card?.line == offline && phone.lesson != nil, "\(status)")
+            phone.lessonRead(LessonState(presentation: shown, problem: .refused(status: status, reason: nil)), of: "s")
+            #expect(phone.card == nil && phone.lesson == nil, "\(status)")
+            // The poll's own refusal, on a phone following the lesson again: dropped the same way.
+            let (again, _) = try standIn(server)
+            again.signed(in: true, as: "ana", checked: true)
+            again.synced(try classInSession())
+            again.sawList()
+            again.setForeground(true)
+            try await until { again.card?.question.id == "q" }
+            await server.refusePolls(status)
+            try await until { again.lesson == nil }
+            #expect(again.card == nil, "\(status)")
+            let stopped = await server.polls
+            again.synced(try classInSession())
+            try await Task.sleep(for: .seconds(2.5))
+            #expect(await server.polls == stopped && again.lesson == nil, "\(status): followed again")
+            again.signed(in: false)
+            phone.signed(in: false)
+        }
+    }
+
+    @Test(
+        "A card that comes or goes while Emergency Unlock is held never rebuilds the control mid-hold (L8; ARCHITECTURE, \"Live lesson\", decision 1; santa's rounds 1 and 2): Focus shows what it showed as the press began, the ring or the card, the control the same one, until the press ends, then shows what changed; and why the last press didn't go through outlives a change of layout"
+    )
+    func cardWaitsForTheHold() async throws {
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let phone = Phone(fixture: try #require(PreviewFixtures.all["focus"]))
+        let window = UIWindow(windowScene: scene)
+        window.frame = scene.screen.bounds
+        window.rootViewController = UIHostingController(rootView: RootView(phone: phone))
+        window.isHidden = false
+        defer { window.isHidden = true }
+        func read() -> [NSObject] {
+            window.layoutIfNeeded()
+            return (try? voiceOver(in: window)) ?? []
+        }
+        func unlock() -> NSObject? { read().first { $0.accessibilityLabel == "Emergency Unlock. Your teacher will see it." } }
+        func shows(_ label: String) -> Bool { read().contains { $0.accessibilityLabel == label } }
+        try await until { unlock() != nil }
+        // A question comes while the hold runs: the ring stays, and so does the control.
+        let ringed = try #require(unlock())
+        phone.unlockHeld = true
+        phone.lessonRead(try lessonRead(question: "next"), of: "session")
+        try await Task.sleep(for: .seconds(0.5))
+        #expect(!shows("Which?") && unlock() === ringed, "the card came mid-hold")
+        phone.unlockHeld = false
+        try await until { shows("Which?") }
+        // The question goes while the hold runs: the card stays as it was, and so does the control.
+        let pinned = try #require(unlock())
+        phone.unlockHeld = true
+        phone.lessonRead(LessonState(), of: "session")
+        try await Task.sleep(for: .seconds(0.5))
+        #expect(shows("Which?") && unlock() === pinned, "the card went mid-hold")
+        phone.unlockHeld = false
+        try await until { !shows("Which?") && unlock() !== pinned }
+        // Why the last press didn't go through outlives a change of layout (rule 5): VoiceOver's
+        // one step on a phone not started, then a question coming.
+        try #require(unlock()).accessibilityActivate()
+        try await until { shows(Joining.notStarted) }
+        phone.lessonRead(try lessonRead(question: "again"), of: "session")
+        try await until { shows("Which?") }
+        #expect(shows(Joining.notStarted), "the failure line went with the layout")
+    }
+
+    @Test(
+        "Hide, on a closed question (L8): the card goes and the ring comes back, kept on this phone however often the question is read again, until another opens, whose card shows — and an open card has no Hide"
+    )
+    func lessonHide() async throws {
+        let phone = Phone(fixture: try #require(PreviewFixtures.all["focusClosed"]))
+        let closed = try #require(phone.lesson)
+        let prompt = try #require(phone.card?.question.prompt)
+        let labels = try await elements(of: RootView(phone: phone), once: prompt).map(\.label)
+        #expect(labels.contains("Hide this question"), "\(labels)")
+        phone.hideQuestion()
+        #expect(phone.card == nil && phone.shown.screen == .focus)
+        let ring = try await elements(of: RootView(phone: phone), once: "Period 3 — Algebra II").map(\.label)
+        #expect(!ring.contains(prompt) && !ring.contains("Hide this question"), "\(ring)")
+        phone.lessonRead(closed, of: "session")
+        #expect(phone.card == nil)
+        phone.lessonRead(try lessonRead(question: "next"), of: "session")
+        #expect(phone.card?.question.id == "next" && phone.card?.open == true)
+        let open = try await elements(of: RootView(phone: phone), once: "Which?").map(\.label)
+        #expect(!open.contains("Hide this question"), "\(open)")
+    }
+
+    @Test(
+        "A question on Focus (L8) fits the smallest iPhone and the owner's at the default text size, the strip, the card and Emergency Unlock on one screen; past it — a larger text size, or six long answers — the page scrolls over Emergency Unlock, pinned at the bottom and whole at every text size"
+    )
+    func questionFits() async throws {
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let cases: [(String, DynamicTypeSize)] = [
+            ("focusQuestion", .large), ("focusAnswered", .large), ("focusRevealed", .large),
+            ("focusLong", .large), ("focusQuestion", .xxxLarge), ("focusRevealed", .accessibility1),
+            ("focusLong", .accessibility1), ("focusRight", .accessibility2), ("focusLong", .accessibility5),
+        ]
+        // The iPhone 17e's and the owner's iPhone 15 Pro's, as `waitingFits` has them, and the
+        // iPhone 17 Pro's, 402 × 874 less 62 and 34.
+        let phones = [
+            CGSize(width: 390, height: 844 - 47 - 34), CGSize(width: 393, height: 852 - 59 - 34),
+            CGSize(width: 402, height: 874 - 62 - 34),
+        ]
+        for (name, size) in cases {
+            for frame in phones {
+                let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))
+                let hosting = UIHostingController(
+                    rootView: RootView(phone: phone).environment(\.dynamicTypeSize, size))
+                hosting.safeAreaRegions = []
+                let window = UIWindow(windowScene: scene)
+                window.frame = CGRect(origin: .zero, size: frame)
+                window.rootViewController = hosting
+                window.isHidden = false
+                defer { window.isHidden = true }
+                window.layoutIfNeeded()
+                let scroll = try #require(scrollViews(in: window).first, "\(name)")
+                let (content, shown) = (scroll.contentSize.height, scroll.bounds.height)
+                let fits = size == .large && name != "focusLong"
+                #expect((content <= shown + 0.5) == fits, "\(name), \(size), \(frame): \(content) in \(shown)")
+                // Never a pixel wider than the screen: an answer's disc in whole points.
+                #expect(scroll.bounds.width == frame.width, "\(name), \(size): \(scroll.bounds.width)")
+                var unlock: NSObject?
+                try await until {
+                    unlock = try? voiceOver(in: window).first {
+                        $0.accessibilityLabel == "Emergency Unlock. Your teacher will see it."
+                    }
+                    return unlock != nil
+                }
+                let pinned = try #require(unlock?.accessibilityFrame, "\(name)")
+                let above = scroll.convert(scroll.bounds, to: window).maxY
+                #expect(pinned.minY >= above - 0.5 && pinned.maxY <= frame.height + 0.5, "\(name), \(size): \(pinned)")
+            }
+        }
+    }
+
+    @Test(
+        "VoiceOver on a question (L8): the strip's time read as the ring's, and its chip; each answer a button read with its letter and words, the student's own read as Your answer and selected; closed, each answer with its marks, the correct one's and theirs, and Hide read as Hide this question; Emergency Unlock the same button, its label unchanged"
+    )
+    func questionVoiceOver() async throws {
+        /// What VoiceOver reads on `fixture`'s screen: each element's label, value and traits.
+        func read(_ fixture: String) async throws -> [(label: String, value: String, traits: UIAccessibilityTraits)] {
+            let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+            let window = UIWindow(windowScene: scene)
+            window.frame = CGRect(x: 0, y: 0, width: scene.screen.bounds.width, height: 3000)
+            let phone = Phone(fixture: try #require(PreviewFixtures.all[fixture]))
+            window.rootViewController = UIHostingController(rootView: RootView(phone: phone))
+            window.isHidden = false
+            defer { window.isHidden = true }
+            window.layoutIfNeeded()
+            var found: [NSObject] = []
+            try await until {
+                found = (try? voiceOver(in: window)) ?? []
+                return found.contains { $0.accessibilityLabel == "Emergency Unlock. Your teacher will see it." }
+            }
+            return found.map { ($0.accessibilityLabel ?? "", $0.accessibilityValue ?? "", $0.accessibilityTraits) }
+        }
+        let answered = try await read("focusAnswered")
+        #expect(answered.contains { $0.label.contains(" left, until ") }, "\(answered)")
+        #expect(answered.contains { $0.label == "Focused" }, "\(answered)")
+        let options = answered.filter { $0.traits.contains(.button) && $0.label.contains("x = ") }
+        #expect(options.map(\.label) == ["A, x = 1", "B, x = 2", "C, x = 4", "D, x = 6"], "\(answered)")
+        #expect(options.map(\.value) == ["", "Your answer", "", ""])
+        #expect(options.map { $0.traits.contains(.selected) } == [false, true, false, false])
+        let revealed = try await read("focusRevealed")
+        let marks = revealed.filter { $0.label.contains("x = ") }.map(\.label)
+        #expect(marks == ["A, x = 1", "B, x = 2, Correct answer", "C, x = 4", "D, x = 6, Your answer"], "\(revealed)")
+        #expect(!revealed.contains { $0.traits.contains(.button) && $0.label.contains("x = ") })
+        #expect(revealed.contains { $0.label == "Hide this question" && $0.traits.contains(.button) }, "\(revealed)")
+        let unlock = "Emergency Unlock. Your teacher will see it."
+        for read in [answered, revealed] {
+            #expect(read.contains { $0.label == unlock && $0.traits.contains(.button) }, "\(read)")
+        }
+    }
+
     /// `image` drawn at 1× and read as sRGB bytes — red, green, blue, alpha — at a point counted
     /// from the top left.
     private func pixels(of image: UIImage) throws -> (Int, Int) -> [Int] {
@@ -3969,7 +4181,8 @@ private func lessonRead(question: String) throws -> LessonState {
 /// after the one held, as the API keeps one (decision 4), each taken one listed. An answer given a
 /// refusal (`refuse`) gets it instead — no answer at all for a nil status — held first where said,
 /// until the test lets it go. Once the test ends the session (`end`), the presentation says it is
-/// over. Anything else gets no answer.
+/// over; once it refuses the polls (`refusePolls`), each poll gets that status. Anything else gets
+/// no answer.
 private actor LessonServer: HTTPTransport {
     private(set) var polls = 0
     private(set) var answers: [(option: Int, eventId: String)] = []
@@ -3977,10 +4190,13 @@ private actor LessonServer: HTTPTransport {
     private var refusals: [(status: Int?, body: String, held: Bool)] = []
     private var waiting: CheckedContinuation<Void, Never>?
     private var over = false
+    private var pollsRefused: Int?
 
     var holding: Bool { waiting != nil }
 
     func end() { over = true }
+
+    func refusePolls(_ status: Int) { pollsRefused = status }
 
     func refuse(_ status: Int?, _ body: String = "", held: Bool = false) {
         refusals.append((status, body, held))
@@ -3999,6 +4215,9 @@ private actor LessonServer: HTTPTransport {
         guard let url = request.url else { throw URLError(.badURL) }
         var (status, body) = (200, "")
         switch "\(request.httpMethod ?? "") \(url.path())" {
+        case "GET /v1/sessions/s/presentation" where pollsRefused != nil:
+            polls += 1
+            (status, body) = (pollsRefused ?? 0, #"{"error":{"code":"forbidden","message":"refused"}}"#)
         case "GET /v1/sessions/s/presentation" where over:
             polls += 1
             body = #"{"running":false,"question":null,"slide":null,"phone":null}"#
