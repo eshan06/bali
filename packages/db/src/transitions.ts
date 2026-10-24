@@ -170,8 +170,9 @@ function firstOrUndefined<T>(rows: T[]): T | undefined {
 /**
  * An id as Postgres prints a `uuid`: lower-case. The routes take one in either case, and a client
  * may mint upper case (Foundation's `uuidString` writes it so). Postgres matches a `uuid` column in
- * any case, so wherever the engine compares or keeps an id as text it uses this form: one id, sent
- * in any case, is one id (#319, #442).
+ * any case; where the engine compares an id as text it compares this form, and keeps this form in
+ * the payloads such a comparison reads (a kept unlock's claim on its tap), so one id, sent in any
+ * case, is one id (#319, #442).
  */
 function asStored(id: string): string {
   return id.toLowerCase();
@@ -2842,13 +2843,16 @@ export interface TapUnlockInput {
 /**
  * The unlocks sent under a tap before it arrived — kept unattached, noted
  * `unknown_tap` — oldest first: what its landing files (decision 11). The
- * type and session are literals, so the read is one probe of
- * `events_unattached_tap_idx`, which holds only unlocks kept with no session.
- * The claim is text, kept with the tap's id as stored (`unlockUnderTap`), so
- * it is matched so, whatever case either was sent in (#442). Unexecuted, so a
- * test can EXPLAIN it.
+ * type and session are literals, so the read probes
+ * `events_unattached_tap_idx`, which holds only unlocks kept with no session:
+ * once, or twice for a tap sent in upper case. The claim is text, kept with the
+ * tap's id as stored (`unlockUnderTap`), so it is matched so, whatever case
+ * either was sent in (#442); and as this tap is sent, since a claim kept before
+ * #449 holds the id as its unlock sent it, which a tap in that same case files
+ * as it always did. Unexecuted, so a test can EXPLAIN it.
  */
 export function unlocksAwaitingTap(db: Database, studentId: string, tapEventId: string) {
+  const claims = [...new Set([asStored(tapEventId), tapEventId])];
   return db
     .select({
       eventId: events.eventId,
@@ -2861,7 +2865,7 @@ export function unlocksAwaitingTap(db: Database, studentId: string, tapEventId: 
     .where(
       and(
         sql`${events.type} = 'unlock' and ${events.sessionId} is null`,
-        sql`${events.payload}->>'claimed_tap_event_id' = ${asStored(tapEventId)}`,
+        inArray(sql`${events.payload}->>'claimed_tap_event_id'`, claims),
         sql`${events.payload}->>'recorded_as' = 'unknown_tap'`,
         eq(events.userId, studentId),
       ),
