@@ -3397,6 +3397,46 @@ struct AppTests {
     }
 
     @Test(
+        "A poll refused 403 (the student no longer in the session's class, removed mid-class) or 404 (no such session) is no connection problem (L8; the conductor's call): the lesson is dropped as one a read said is over, the card gone at once, never with the card's No connection line, its poll stopped, and a read of `GET /v1/me` still listing the session follows it no more; a 429 still says that line, the lesson kept"
+    )
+    func lessonRefused() async throws {
+        let defaults = UserDefaults.standard
+        let before = [Phone.inClassKey, Phone.listSeenByKey].map { ($0, defaults.object(forKey: $0)) }
+        defer { for (key, value) in before { defaults.set(value, forKey: key) } }
+        let offline = "No connection right now, so Bali can't send your answer. It keeps trying."
+        for status in [403, 404] {
+            let server = LessonServer()
+            let (phone, _) = try standIn(server)
+            phone.signed(in: true, as: "ana", checked: true)
+            phone.synced(try classInSession())
+            phone.sawList()
+            phone.setForeground(true)
+            try await until { phone.card?.question.id == "q" }
+            let shown = phone.lesson?.presentation
+            phone.lessonRead(LessonState(presentation: shown, problem: .rateLimited), of: "s")
+            #expect(phone.card?.line == offline && phone.lesson != nil, "\(status)")
+            phone.lessonRead(LessonState(presentation: shown, problem: .refused(status: status, reason: nil)), of: "s")
+            #expect(phone.card == nil && phone.lesson == nil, "\(status)")
+            // The poll's own refusal, on a phone following the lesson again: dropped the same way.
+            let (again, _) = try standIn(server)
+            again.signed(in: true, as: "ana", checked: true)
+            again.synced(try classInSession())
+            again.sawList()
+            again.setForeground(true)
+            try await until { again.card?.question.id == "q" }
+            await server.refusePolls(status)
+            try await until { again.lesson == nil }
+            #expect(again.card == nil, "\(status)")
+            let stopped = await server.polls
+            again.synced(try classInSession())
+            try await Task.sleep(for: .seconds(2.5))
+            #expect(await server.polls == stopped && again.lesson == nil, "\(status): followed again")
+            again.signed(in: false)
+            phone.signed(in: false)
+        }
+    }
+
+    @Test(
         "Hide, on a closed question (L8): the card goes and the ring comes back, kept on this phone however often the question is read again, until another opens, whose card shows — and an open card has no Hide"
     )
     func lessonHide() async throws {
@@ -3466,7 +3506,7 @@ struct AppTests {
     }
 
     @Test(
-        "VoiceOver on a question (L8): the strip's time read as the ring's, and its chip; each answer a button read with its letter and words, the student's own read as Your answer and selected; closed, each answer with its marks, the correct one's and theirs; Emergency Unlock's label unchanged"
+        "VoiceOver on a question (L8): the strip's time read as the ring's, and its chip; each answer a button read with its letter and words, the student's own read as Your answer and selected; closed, each answer with its marks, the correct one's and theirs, and Hide read as Hide this question; Emergency Unlock the same button, its label unchanged"
     )
     func questionVoiceOver() async throws {
         /// What VoiceOver reads on `fixture`'s screen: each element's label, value and traits.
@@ -3497,6 +3537,11 @@ struct AppTests {
         let marks = revealed.filter { $0.label.contains("x = ") }.map(\.label)
         #expect(marks == ["A, x = 1", "B, x = 2, Correct answer", "C, x = 4", "D, x = 6, Your answer"], "\(revealed)")
         #expect(!revealed.contains { $0.traits.contains(.button) && $0.label.contains("x = ") })
+        #expect(revealed.contains { $0.label == "Hide this question" && $0.traits.contains(.button) }, "\(revealed)")
+        let unlock = "Emergency Unlock. Your teacher will see it."
+        for read in [answered, revealed] {
+            #expect(read.contains { $0.label == unlock && $0.traits.contains(.button) }, "\(read)")
+        }
     }
 
     /// `image` drawn at 1× and read as sRGB bytes — red, green, blue, alpha — at a point counted
@@ -4093,7 +4138,8 @@ private func lessonRead(question: String) throws -> LessonState {
 /// after the one held, as the API keeps one (decision 4), each taken one listed. An answer given a
 /// refusal (`refuse`) gets it instead — no answer at all for a nil status — held first where said,
 /// until the test lets it go. Once the test ends the session (`end`), the presentation says it is
-/// over. Anything else gets no answer.
+/// over; once it refuses the polls (`refusePolls`), each poll gets that status. Anything else gets
+/// no answer.
 private actor LessonServer: HTTPTransport {
     private(set) var polls = 0
     private(set) var answers: [(option: Int, eventId: String)] = []
@@ -4101,10 +4147,13 @@ private actor LessonServer: HTTPTransport {
     private var refusals: [(status: Int?, body: String, held: Bool)] = []
     private var waiting: CheckedContinuation<Void, Never>?
     private var over = false
+    private var pollsRefused: Int?
 
     var holding: Bool { waiting != nil }
 
     func end() { over = true }
+
+    func refusePolls(_ status: Int) { pollsRefused = status }
 
     func refuse(_ status: Int?, _ body: String = "", held: Bool = false) {
         refusals.append((status, body, held))
@@ -4123,6 +4172,9 @@ private actor LessonServer: HTTPTransport {
         guard let url = request.url else { throw URLError(.badURL) }
         var (status, body) = (200, "")
         switch "\(request.httpMethod ?? "") \(url.path())" {
+        case "GET /v1/sessions/s/presentation" where pollsRefused != nil:
+            polls += 1
+            (status, body) = (pollsRefused ?? 0, #"{"error":{"code":"forbidden","message":"refused"}}"#)
         case "GET /v1/sessions/s/presentation" where over:
             polls += 1
             body = #"{"running":false,"question":null,"slide":null,"phone":null}"#

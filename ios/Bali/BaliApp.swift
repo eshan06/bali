@@ -192,8 +192,9 @@ final class Phone {
     /// The lesson followed and its tasks: the watch of its reads, and its poll, run only while the
     /// app is in front (the owner's ruling, #330).
     @ObservationIgnored private var following: (lesson: LiveLesson, watch: Task<Void, Never>, poll: Task<Void, Never>?)?
-    /// The sessions a read said are over, never followed again; and the picks counted, so a pick's
-    /// answer is said only while it is the latest on the same question.
+    /// The sessions a read said are over, or a poll was refused for (`403`, `404`), never followed
+    /// again this run; and the picks counted, so a pick's answer is said only while it is the latest
+    /// on the same question.
     @ObservationIgnored private var lessonsOver: Set<String> = []
     @ObservationIgnored private var picks = 0
 
@@ -947,12 +948,16 @@ final class Phone {
 
     /// A read of the lesson of `session`, while it is the one followed (or a fixture's): shown, the
     /// card's own let go once another question shows, and the lesson dropped once a read says the
-    /// session is over — another session's followed, if one runs.
+    /// session is over — another session's followed, if one runs. So is a poll refused `403` or
+    /// `404`: the student no longer in the session's class (removed mid-class, say), or no such
+    /// session — no connection problem, so never the card's "No connection" line: the card goes,
+    /// and the next read of `GET /v1/me` says where the student stands (the conductor's call).
     func lessonRead(_ state: LessonState, of session: String) {
         guard frozen || session == following?.lesson.session else { return }
         if state.presentation?.question?.id != lesson?.presentation?.question?.id { letCardGo() }
         lesson = state
-        guard state.presentation?.running == false, !frozen else { return }
+        let refused = if case .refused(status: 403...404, _)? = state.problem { true } else { false }
+        guard state.presentation?.running == false || refused, !frozen else { return }
         lessonsOver.insert(session)
         follow()
     }
