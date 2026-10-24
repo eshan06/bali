@@ -22,10 +22,14 @@ a real decision? Add a dated entry at the top: what was decided and why.
   Bali screen before it, once onboarding's Screen Time step is done on this install, its grant
   confirmed by any way in: its own ask, Settings after Don't Allow (santa's review of the change,
   both reviewers: a student who went that way was never asked), or a reinstall where iOS kept the
-  grant and skipped the step. The step done (`Phone.remember`: `everApproved` set) makes it due;
-  Home asks it, the end of onboarding, signed in through the 13+ check (`HomeView`'s task,
-  `askToNotify`). So it comes up as the step gives way to Home, never on Waiting, never over Focus,
-  Emergency Unlock or a session's screens, which come in Home's place: a due ask waits for Home. A
+  grant and skipped the step. The step done outside a running session (`Phone.remember`:
+  `everApproved` set) makes it due, kept in the phone's own defaults so a run that ends before Home
+  keeps it; a grant through Protection off's Turn on Screen Time, in a session, makes nothing due.
+  Home asks it, the end of onboarding, signed in through the 13+ check and the phone out of any
+  session or wait (`HomeView`'s task, `askToNotify`; santa's round 2 of the change: the Home over
+  Waiting or Unlocked, and the one a standing not read keeps, ask nothing). So it comes up as the
+  step gives way to Home, never on Waiting, never over Focus, Emergency Unlock or a session's
+  screens: a due ask waits for that Home. A
   student who never grants Screen Time never reaches Home and is never asked, since they can't tap
   in and the alert can't help them. iOS prompts only while the student has never answered, so it
   is asked once, and never again after a relaunch. An install whose step was done before this

@@ -277,9 +277,12 @@ final class Phone {
     /// How long Sign out waits for its token's removal before it goes on regardless (`signOut`) — a
     /// test's own in `BaliTests`.
     @ObservationIgnored var pushRemoval: TimeInterval = 3
-    /// Whether iOS's prompt to send the class-started alert is due: the Screen Time step done this
-    /// run (`remember`), asked once Home shows (`askToNotify`).
-    @ObservationIgnored private(set) var notifyDue = false
+    /// Whether iOS's prompt to send the class-started alert is due: the Screen Time step done on
+    /// this install (`remember`), asked once Home shows (`askToNotify`) — kept in the phone's own
+    /// defaults, as `everApproved` is, so a run that ends before Home keeps it (santa's review).
+    @ObservationIgnored private(set) var notifyDue = UserDefaults.standard.bool(
+        forKey: Phone.notifyDueKey)
+    static let notifyDueKey = "notifyDue"
 
     /// The sessions not to follow now: over, or refused with no read of `GET /v1/me` taken since.
     private var notFollowed: Set<String> {
@@ -982,15 +985,23 @@ final class Phone {
 
     /// Keeps `everApproved` as a pass read the permission: set at approved, cleared once the check
     /// judges it off, left at a read not determined for a moment — the read it is there to see
-    /// past. Set, the Screen Time step is done on this install — its grant confirmed by its own ask,
-    /// in Settings, or kept by iOS through a reinstall — and iOS's prompt to send the class-started
-    /// alert is due (`notifyDue`; the owner's ruling, 2026-10-24).
+    /// past. Set outside a session, the Screen Time step is done on this install — its grant
+    /// confirmed by its own ask, in Settings, or kept by iOS through a reinstall — and iOS's prompt
+    /// to send the class-started alert is due (`notifyDue`; the owner's ruling, 2026-10-24): never
+    /// by Protection off's Turn on Screen Time, a session's screen.
     func remember(_ protection: Protection) {
         let approved = protection.permission == .approved
         guard approved || protection.permissionOff, everApproved != approved else { return }
         everApproved = approved
         UserDefaults.standard.set(approved, forKey: Phone.everApprovedKey)
-        if approved { notifyDue = true }
+        if case .inSession(let session, _)? = sync?.standing, session.endsAt > Date() { return }
+        if approved { due(true) }
+    }
+
+    /// `notifyDue` set or let go, the phone's own defaults with it.
+    private func due(_ due: Bool) {
+        notifyDue = due
+        UserDefaults.standard.set(due, forKey: Phone.notifyDueKey)
     }
 
     /// Asks iOS for the Screen Time permission — its own prompt, through the enforcer — and keeps
@@ -1015,19 +1026,20 @@ final class Phone {
         Task { await engine.holdRead(until: until) }
     }
 
-    /// Home shows (`HomeView`'s task), signed in through the 13+ check, the Screen Time step done
-    /// this run (`notifyDue`): onboarding's end, right after that step (the owner's ruling,
-    /// 2026-10-24) — iOS's own prompt to send notifications, alerts and sound, asked only while the
-    /// student has never answered it, so once, never again after a relaunch, and, allowed, the device
-    /// token asked for (`registerForPush`). Never on Waiting, nor over Focus, Emergency Unlock or a
-    /// session's screens, which come in Home's place; never for a student who doesn't grant Screen
-    /// Time, nor an install whose step was done before this build. A Home gone before iOS said how
-    /// the student answered leaves it due (santa's round 1).
+    /// Home shows (`HomeView`'s task), signed in through the 13+ check, the phone out of any session
+    /// or wait, the Screen Time step done (`notifyDue`): onboarding's end, right after that step (the
+    /// owner's ruling, 2026-10-24) — iOS's own prompt to send notifications, alerts and sound, asked
+    /// only while the student has never answered it, so once, never again after a relaunch, and,
+    /// allowed, the device token asked for (`registerForPush`). Never on Waiting, nor over Focus,
+    /// Emergency Unlock or a session's screens, nor the Home over Waiting or Unlocked or the one a
+    /// standing not read keeps; never for a student who doesn't grant Screen Time, nor an install
+    /// whose step was done before this build. A Home gone before iOS said how the student answered
+    /// leaves it due (santa's round 1).
     func askToNotify() async {
-        guard notifyDue, cleared == true, !frozen else { return }
+        guard notifyDue, cleared == true, sync?.standing == .out, !frozen else { return }
         let status = await notifications.status()
         guard !Task.isCancelled else { return }
-        notifyDue = false
+        due(false)
         if status == .notDetermined, await notifications.ask() { registerForPush() }
     }
 

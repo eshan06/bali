@@ -4601,13 +4601,15 @@ struct AppTests {
     }
 
     @Test(
-        "iOS's prompt to send the class-started alert is asked once, as Home shows right after onboarding's Screen Time step (the owner's ruling, 2026-10-24) — its grant confirmed by its own ask, in Settings after Don't Allow, or kept by iOS through a reinstall — and, allowed, the phone asks iOS for its device token. Never on Waiting or Focus, which come in Home's place; never for a student who doesn't grant Screen Time, nor on an install whose step was done before, nor again after a relaunch; and a Home gone before iOS answered leaves it due",
+        "iOS's prompt to send the class-started alert is asked once, as Home shows right after onboarding's Screen Time step (the owner's ruling, 2026-10-24) — its grant confirmed by its own ask, in Settings after Don't Allow, or kept by iOS through a reinstall, the step kept due through a relaunch until Home — and, allowed, the phone asks iOS for its device token. Never on Waiting, Focus or the Home over Waiting; never after Protection off's Turn on Screen Time, nor for a student who doesn't grant Screen Time, nor on an install whose step was done before, nor again after a relaunch; and a Home gone before iOS answered leaves it due",
         .timeLimit(.minutes(3)))
     func notifyAskedAfterScreenTime() async throws {
         let defaults = UserDefaults.standard
-        let before = defaults.object(forKey: Phone.everApprovedKey)
-        defer { defaults.set(before, forKey: Phone.everApprovedKey) }
-        defaults.set(false, forKey: Phone.everApprovedKey)
+        let keys = [Phone.everApprovedKey, Phone.notifyDueKey]
+        let before = keys.map { ($0, defaults.object(forKey: $0)) }
+        defer { for (key, value) in before { defaults.set(value, forKey: key) } }
+        func freshInstall() { for key in keys { defaults.set(false, forKey: key) } }
+        freshInstall()
         var (step, denied, granted) = (Protection(), Protection(), Protection())
         (step.checked, step.permission) = (true, .notDetermined)
         (denied.checked, denied.permission, denied.permissionOff) = (true, .denied, true)
@@ -4626,7 +4628,7 @@ struct AppTests {
                 }
             }
         }
-        // The step's own ask granted: Waiting and Focus, in Home's place, ask nothing; Home then asks.
+        // The step's own ask granted: Waiting, the Home over it and Focus ask nothing; Home asks.
         let asked = Asked()
         let (phone, _) = try standIn(StandIn(), protection: step)
         (asked.phone, phone.notifications) = (phone, asked.notifications)
@@ -4637,6 +4639,8 @@ struct AppTests {
         let shows = try await showing(phone, once: "Ask me")
         phone.protected(granted)
         try await shows("Ready, waiting for your teacher")
+        phone.open(.home)
+        try await shows("Hi, Ana")
         phone.synced(try student(.inSession(running, .focused)))
         try await shows("Emergency Unlock. Your teacher will see it.")
         try await Task.sleep(for: .milliseconds(300))
@@ -4644,20 +4648,23 @@ struct AppTests {
         phone.synced(try student(.out))
         try await until { asked.asks == 1 }
         #expect(asked.shownAtAsk == .home && !phone.notifyDue)
+        #expect(defaults.bool(forKey: Phone.notifyDueKey) == false)
         try await until { asked.registers == 1 }
         phone.signed(in: false)
-        // A relaunch, or an install whose step was done before this build: Home asks nothing.
+        // A relaunch, or an install whose step was done before this build, iOS never asked yet:
+        // Home asks nothing.
+        let before2 = Asked()
         let (relaunched, _) = try standIn(StandIn(), protection: granted)
-        relaunched.notifications = asked.notifications
+        relaunched.notifications = before2.notifications
         relaunched.signed(in: true, as: "ana", checked: true)
         relaunched.synced(try student(.out))
         relaunched.protected(granted)
         _ = try await showing(relaunched, once: "Hi, Ana")
         try await Task.sleep(for: .milliseconds(300))
-        #expect(asked.asks == 1 && !relaunched.notifyDue)
+        #expect(before2.asks == 0 && !relaunched.notifyDue)
         relaunched.signed(in: false)
         // Don't Allow, then Bali turned on in Settings: Home asks once it shows.
-        defaults.set(false, forKey: Phone.everApprovedKey)
+        freshInstall()
         let settings = Asked()
         let (later, _) = try standIn(StandIn(), protection: step)
         later.notifications = settings.notifications
@@ -4672,20 +4679,32 @@ struct AppTests {
         try await laterShows("Hi, Ana")
         try await until { settings.asks == 1 }
         later.signed(in: false)
-        // A reinstall where iOS kept Bali's grant: no step shows, and Home asks after the sign-in.
-        defaults.set(false, forKey: Phone.everApprovedKey)
+        // A reinstall where iOS kept Bali's grant: no step shows, the first run ends before the
+        // sign-in, and the next run's Home asks after it.
+        freshInstall()
+        let (firstRun, _) = try standIn(StandIn(), protection: granted)
+        firstRun.protected(granted)
+        #expect(firstRun.notifyDue && defaults.bool(forKey: Phone.notifyDueKey))
         let kept = Asked()
-        let (reinstalled, _) = try standIn(StandIn(), protection: granted)
-        reinstalled.notifications = kept.notifications
-        reinstalled.protected(granted)
-        reinstalled.signed(in: true, as: "ana", checked: true)
+        let (nextRun, _) = try standIn(StandIn(), protection: granted)
+        nextRun.notifications = kept.notifications
+        #expect(nextRun.notifyDue)
+        nextRun.signed(in: true, as: "ana", checked: true)
         try await Task.sleep(for: .milliseconds(300))
-        reinstalled.synced(try student(.out))
-        _ = try await showing(reinstalled, once: "Hi, Ana")
+        nextRun.synced(try student(.out))
+        _ = try await showing(nextRun, once: "Hi, Ana")
         try await until { kept.asks == 1 }
-        reinstalled.signed(in: false)
+        nextRun.signed(in: false)
+        // Protection off's Turn on Screen Time, in a running session: the grant makes nothing due.
+        freshInstall()
+        let (inClass, _) = try standIn(StandIn(), protection: denied)
+        inClass.signed(in: true, as: "ana", checked: true)
+        inClass.synced(try student(.inSession(running, .protectionOff)))
+        inClass.protected(granted)
+        #expect(!inClass.notifyDue)
+        inClass.signed(in: false)
         // A student who doesn't grant Screen Time: the step stays, and nothing is asked.
-        defaults.set(false, forKey: Phone.everApprovedKey)
+        freshInstall()
         let never = Asked()
         let (refused, _) = try standIn(StandIn(), protection: step)
         refused.notifications = never.notifications
@@ -4697,11 +4716,14 @@ struct AppTests {
         #expect(never.asks == 0 && !refused.notifyDue)
         refused.signed(in: false)
         // A Home gone while iOS was saying how the student answered leaves it due (santa's round 1).
-        defaults.set(false, forKey: Phone.everApprovedKey)
-        let slow = Slow()
+        freshInstall()
         let (left, _) = try standIn(StandIn(), protection: step)
-        left.notifications = slow.notifications
         left.signed(in: true, as: "ana", checked: true)
+        left.synced(try student(.out))
+        // The sign-in's own token ask, through iOS's own notifications: settled before Slow's.
+        try await Task.sleep(for: .milliseconds(300))
+        let slow = Slow()
+        left.notifications = slow.notifications
         left.protected(granted)
         let asking = Task { await left.askToNotify() }
         try await until { slow.answering != nil }
