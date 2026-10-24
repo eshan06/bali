@@ -9,8 +9,7 @@ import SwiftUI
 /// screen. Opened from the class-started alert, it says Bali is checking in — that the apps lock in
 /// a few seconds, never that they are locked — until the read the alert held answers or fails
 /// (`SyncState.checkingIn`; the app canvas's PushWaitB, the owner's pick, 2026-10-23), its own words
-/// back after a failure, with Try again. As it shows, iOS's prompt to send that alert is asked,
-/// once (`Phone.askToNotify`).
+/// back after a failure, with Try again.
 struct WaitingView: View {
     let phone: Phone
 
@@ -71,7 +70,6 @@ struct WaitingView: View {
                 }
             }
         }
-        .task { await phone.askToNotify() }
     }
 }
 

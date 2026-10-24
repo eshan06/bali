@@ -8,16 +8,16 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-24 (Central) — The push's app half (#456; `docs/DECISIONS.md`, 2026-10-24),
-a draft parked for the owner's word on when the app asks to send notifications (iOS's own prompt,
-the first time a student lands on Waiting: the conductor's recommendation): the entitlements, the
-device token registered at each launch and taken off Bali at Sign out, and the owner's approved
-wait, a random 0–10 s before the first read after a fresh alert, Waiting and Home saying option B's
-words meanwhile. **Before the next TestFlight build, Push Notifications on `com.bali.Bali`** (runbook
-7, step 3), or its signing may fail; build 10 went before this, from `1d4496b6`. Next on the Mac: the
-owner's sitting on build 10 (`ios/README.md`), then, once #456 lands, runbook 7 and N6's check; on
-the Windows PC, M6's LessonDecks line back (M8 landed) and the other three pre-pilot steps, which
-wait for the owner's word._
+_Last updated: 2026-10-24 (Central) — The push's app half (#456; `docs/DECISIONS.md`, 2026-10-24):
+the entitlements; iOS's own prompt to send notifications, asked once right after onboarding's
+Screen Time step (the owner's ruling, 2026-10-24); the device token registered at each launch and
+taken off Bali at Sign out; and the owner's approved wait, a random 0–10 s before the first read
+after a fresh alert, Waiting and Home saying option B's words meanwhile. **Before the next TestFlight
+build, Push Notifications on `com.bali.Bali`** (runbook 7, step 3), or its signing may fail; build 10
+went before this, from `1d4496b6`. **An install past the Screen Time step is never asked:** the
+owner reinstalls Bali before runbook 7's step-6 check. Next on the Mac: the owner's sitting on build
+10 (`ios/README.md`), then runbook 7 and N6's check; on the Windows PC, M6's LessonDecks line back
+(M8 landed) and the other three pre-pilot steps, which wait for the owner's word._
 
 ## Now
 
@@ -42,8 +42,7 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
   runs unchanged, and `npm test` passes whole on the PC.
 - **The owner's Mac session (Xcode and the iPhone):** the app's Sign in & sign up is built; the app
   keeps D1's look until the owner approves a new one (its redesign rolled back, 2026-10-06). Left:
-  the push's app half, built and parked as a draft (#456) for the owner's word on when the app asks
-  to send notifications, and TestFlight build 9 for C7's phone test (📱). The phone's
+  TestFlight build 9 for C7's phone test (📱); the push's app half is done (#456). The phone's
   Phase 7 screens are done: L8 (L8a, #443, L8b, #448 and #450, and L8c, #451), M8's slide view on
   Focus (#452) and M8b's slide off Focus and card on the Screen Time ask (#454); left, their 📱
   device checks, the owner's. C2's legal words (⚖️) go into the portal's pages, on the Windows PC.
@@ -102,10 +101,10 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
 - **The "class started" push (N1–N6, decided 2026-10-06):** a visible alert to the students
   whose waiting tap a Start converts; a doorbell, never the truth. N1 (the docs), N2 (CI) and N3 (the
   token endpoints; the app half's interface is on N3's line) ✅; **the backend half is done**
-  (N4–N6 ✅, 2026-10-06). The app half is built (#456; DECISIONS 2026-10-24), #336's fix in it (the
-  random wait, approved 2026-10-23), a draft waiting on the owner's word on when the app asks to send
-  notifications. Left: that word, then the owner's console steps (`docs/RUNBOOKS.md`, runbook 7:
-  Push Notifications on the App ID before the next TestFlight build) and N6's end-to-end check;
+  (N4–N6 ✅, 2026-10-06). The app half ✅ (#456; DECISIONS 2026-10-24), #336's fix in it (the random
+  wait, approved 2026-10-23), the prompt right after onboarding's Screen Time step (the owner,
+  2026-10-24). Left: the owner's console steps (`docs/RUNBOOKS.md`, runbook 7: Push Notifications on
+  the App ID before the next TestFlight build) and N6's end-to-end check, Bali reinstalled first;
   until then push is off on both deploys. Not on the pilot's critical path: it never delays C2 or
   the external TestFlight steps.
 
@@ -132,7 +131,7 @@ first class, production backups (L0b, the owner's console step; the owner, 2026-
 - The Windows PC (since 2026-10-14): the conductor, whose workers build the steps one at a time,
   the portal's UI included (`apps/web/src/app`, `apps/web/src/components`, its user-facing strings).
 - The Mac session: Xcode and the iPhone (`ios/Bali/UI`, `ios/BaliShield`, the app's user-facing
-  strings): TestFlight build 9, the push's app half (#456, parked).
+  strings): TestFlight build 9.
 - The owner: the consoles (AWS, Railway, Vercel, Sentry, App Store Connect), Apple, the
   lawyer, the school, and every iPhone check.
 
@@ -279,7 +278,7 @@ One line each; each step's full notes are on its line in `docs/PLAN-ARCHIVE.md`.
 - **C7** 📱 The 13+ screen (Phase 6, **gate**): built, C7-server with it; left, the owner's first-launch check on the next TestFlight build
 - **S8** 🔧 Least-privilege database roles (Phase 6): the owner's decision (Open owner items, 1)
 - **D2k** ⏸ The shield's new look (Phase 3): waits for a design the owner approves in Claude Design
-- **The push's app half** (N1–N6's backend is done) — built (#456; DECISIONS 2026-10-24), its wait option B for a fresh alert only (the owner, 2026-10-23); a draft parked for the owner's OK on when the app asks to send notifications (iOS's own prompt, the first time a student lands on Waiting); then runbook 7 (Push Notifications on `com.bali.Bali` before the next TestFlight build) and N6's end-to-end check, the owner's
+- **The push's app half** — ✅ (#456; DECISIONS 2026-10-24); left, runbook 7 (Push Notifications on `com.bali.Bali` before the next TestFlight build) and N6's end-to-end check, the owner's, Bali reinstalled first (an install past the Screen Time step is never asked)
 
 ### Phase 3: known edges, carried forward
 

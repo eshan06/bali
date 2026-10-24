@@ -779,9 +779,13 @@ Holder or Admin role, and the Railway project.
 6. **End to end, once the app half ships** (the Mac session's: the phone registering its
    token, the `aps-environment` entitlement). A Debug build from Xcode, pointed at dev,
    registers as `sandbox`; a TestFlight build on prod registers as `production`. On each:
-   sign in as a student in a class and tap the block while the class is off (the tap waits for
-   the Start); Waiting brings iOS's own prompt to send notifications: **Allow**. Lock the phone,
-   then press **Start** on the portal.
+   **delete Bali and install it again first**, since only onboarding asks to send
+   notifications and an install already past it never asks. Sign in as a student in a class;
+   right after the Screen Time step, iOS asks to send notifications: **Allow**. A phone that
+   granted Bali Screen Time before may keep that grant and skip the step: then turn Bali off in
+   Settings → Screen Time → Apps with Screen Time Access, and Bali shows the step again. Tap the
+   block while the class is off (the tap waits for the Start), lock the phone, then press
+   **Start** on the portal.
    **Check:** within seconds the lock screen shows "{class name} has started" / "Open Bali
    to lock your apps.", and the API's log shows no APNs refusal. Open Bali from the alert:
    Waiting says "Checking in with your class" for up to 10 s, then Focus shows, the apps

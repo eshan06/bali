@@ -322,9 +322,14 @@ final class Phone {
         /// A phone over a sign-in and an engine a test made, never started (BaliTests): the calls
         /// `start` wires between them and the screens, tested over stand-ins for the Keychain and
         /// the server (C6a-2's and C6b-1's reviews) — and, given, what rule 3's check found, so the
-        /// router routes as over a running enforcer.
-        init(signIn: SignIn, engine: SyncEngine, protection: Protection? = nil) {
+        /// router routes as over a running enforcer, and an enforcer over a stand-in for Screen
+        /// Time, for the permission's ask.
+        init(
+            signIn: SignIn, engine: SyncEngine, protection: Protection? = nil,
+            enforcer: Enforcer? = nil
+        ) {
             (self.signIn, self.engine, self.protection) = (signIn, engine, protection)
+            self.enforcer = enforcer
         }
     #endif
 
@@ -981,13 +986,18 @@ final class Phone {
     }
 
     /// Asks iOS for the Screen Time permission — its own prompt, through the enforcer — and keeps
-    /// why it did not finish. Nothing on a frozen phone.
+    /// why it did not finish. Asked on onboarding's Screen Time step (the router's `screenTime`,
+    /// never Protection off's Turn on Screen Time, a session's screen), a grant iOS confirmed is
+    /// followed at once by iOS's prompt to send the class-started alert (`askToNotify`; the owner's
+    /// ruling, 2026-10-24). Nothing on a frozen phone.
     func askScreenTime() async {
         guard let enforcer else { return }
         askFailed = nil
+        let onboarding = shown.screen == .screenTime
         do { try await enforcer.requestPermission() } catch {
-            askFailed = error as? ScreenTimeAskError ?? .failed("\(error)")
+            return askFailed = error as? ScreenTimeAskError ?? .failed("\(error)")
         }
+        if onboarding { await askToNotify() }
     }
 
     /// Bali opened from the class-started alert, delivered at `delivered` (ARCHITECTURE, "Push: a
@@ -1002,11 +1012,13 @@ final class Phone {
         Task { await engine.holdRead(until: until) }
     }
 
-    /// Waiting shows (the conductor's recommendation, awaiting the owner): iOS's own prompt to send
-    /// notifications, alerts and sound, asked only while the student has never answered it — so
-    /// once — and, allowed, the device token asked for (`registerForPush`). Never during
-    /// onboarding, nor over Focus or Emergency Unlock: Waiting is a tap's, before the Start, and a
-    /// Waiting gone while iOS was asked how the student answered asks nothing (santa's round 1).
+    /// Right after onboarding's Screen Time step, its grant confirmed (`askScreenTime`; the owner's
+    /// ruling, 2026-10-24): iOS's own prompt to send notifications, alerts and sound, asked only
+    /// while the student has never answered it — so once, never again after a relaunch — and,
+    /// allowed, the device token asked for (`registerForPush`). Never on Waiting, nor over Focus,
+    /// Emergency Unlock or a session's screens: that step shows outside a running session. A
+    /// student who never grants Screen Time is never asked, and an ask cancelled while iOS says how
+    /// the student answered asks nothing (santa's round 1).
     func askToNotify() async {
         guard !frozen, await notifications.status() == .notDetermined, !Task.isCancelled
         else { return }

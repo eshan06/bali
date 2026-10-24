@@ -8,24 +8,27 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
-- **2026-10-24** — **The push's app half (#456, parked as a draft for the owner's word on when the
-  app asks to send notifications): the entitlements, iOS's prompt on the first Waiting, the device
-  token registered and removed, and the owner's approved wait with option B's words.** *The
+- **2026-10-24** — **The push's app half (#456): the entitlements, iOS's prompt right after
+  onboarding's Screen Time step (the owner's ruling), the device token registered and removed, and
+  the owner's approved wait with option B's words.** *The
   entitlements* (N2's notes): the one `ios/Bali/Bali.entitlements` gains `aps-environment` =
   `development` and `com.apple.developer.usernotifications.time-sensitive`; TestFlight's export
   re-signs the first to `production`, which testflight.yml's guard checks. A build signed after this
   needs Push Notifications on the App ID `com.bali.Bali` first (runbook 7, step 3), or its signing
-  may fail: TestFlight build 10 was dispatched before it, from `1d4496b6`. *When the app asks*
-  (*the conductor's recommendation, awaiting the owner*; no board draws it, so the PR waits as a
-  draft): iOS's own prompt, alerts and sound, no Bali screen before it, the first time the student
-  lands on Waiting, an armed tap waiting for the Start, the one moment the alert helps; never
-  during onboarding, never over Focus or Emergency Unlock. iOS prompts only while the student has
-  never answered, so it is asked once (`Phone.askToNotify`, from Waiting's `task`). Its cost, for the
-  owner's word (santa's round 1): while iOS's prompt is up the app is inactive, so Waiting's 30 s
-  read pauses until the student answers, and a phone left on the prompt finds the Start only then;
-  for the same reason no read brings Focus under the prompt. Weighed: during
-  onboarding after Screen Time (asked before the student knows why), and a Bali screen before iOS's
-  prompt (it needs a board). *Registering* (N3, N4): while the sign-in is through the 13+ check, at
+  may fail: TestFlight build 10 was dispatched before it, from `1d4496b6`. *When the app asks* (the
+  owner's ruling, in chat on 2026-10-24: "Notifications: ask during onboarding, right after the
+  Screen Time step, not on Waiting."; the PR was a draft until it, with the conductor's
+  recommendation, the first Waiting, which this replaces): iOS's own prompt, alerts and sound, no
+  Bali screen before it, once onboarding's Screen Time step has its grant confirmed, before Home
+  (`Phone.askScreenTime`, then `askToNotify`). Only on that step, the router's `screenTime`, which
+  never shows in a running session: never on Waiting, never over Focus, Emergency Unlock or a
+  session's screens, so never after Protection off's Turn on Screen Time, which shares the step's
+  button. A student who never grants Screen Time is never asked, since they can't tap in and the
+  alert can't help them. iOS prompts only while the student has never answered, so it is asked
+  once, and never again after a relaunch. The prompt is asked as the grant lands, so it can come up
+  over the Home the step leads to. An install already past that step is not asked: only the
+  owner's phone today, and build 10 has no push, so the owner reinstalls Bali before runbook 7's
+  step-6 check. *Registering* (N3, N4): while the sign-in is through the 13+ check, at
   a launch signed in or a sign-in this run, and as the student allows notifications, the phone asks
   iOS for its device token, only once they are allowed (`.authorized`); the token goes to `PUT
   /v1/me/push-token` as lower-case hex under a fresh lower-case UUIDv7 (`EventID`), `sandbox` from a
@@ -71,8 +74,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   few seconds, as long as Bali is open."; a read that fails brings back Waiting's words with Try
   again, and a failure from before the alert is not said while Bali checks in. Waiting's words, both
   sets, stay in its view, where the portal's Help test reads its promise; Home's card is
-  `SyncState.waitingCard` (`Screen.swift`). Screenshots beside both boards. Left: the owner's word on
-  the prompt's timing, then runbook 7 and N6's end-to-end check.
+  `SyncState.waitingCard` (`Screen.swift`). Screenshots beside both boards. Left: runbook 7 and N6's
+  end-to-end check, the owner's, Bali reinstalled first.
 
 - **2026-10-24** — **The slide off Focus and the card on the Screen Time ask (M8b, #454): the four
   boards the owner approved on 2026-10-24, six intermediate states drawn first on the app canvas; the

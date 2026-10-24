@@ -799,7 +799,9 @@ waits for the Start learns of it only at the phone's next 30 s read or return to
   and the App Store), idempotent on a client-minted UUIDv7 `eventId`. A new table keyed by
   the token; students only for now. Tokens are personal data: deleted by `deleteAccount`
   (C3), a school's disposal (C6a) and the retention run (C6b); placed by C5's export and the
-  schema tests that place every foreign key to `users`; never logged.
+  schema tests that place every foreign key to `users`; never logged. The app asks to send the
+  alert with iOS's own prompt, once, right after onboarding's Screen Time step, never on Waiting
+  nor over a session's screens (the owner, 2026-10-24).
 - **Not on the pilot's critical path.** It never delays C2 or the external TestFlight steps.
   The app's half (registering, the `aps-environment` entitlement, the Time Sensitive
   capability, the words) is the Mac session's.
@@ -1592,8 +1594,8 @@ Each exists because v2 broke it and shipped a real bug
   the live lesson (Phase 7, 2026-10-05: questions and slides within a running session,
   totals only, phones polling; 2026-10-10: students on the web too, Slice 3), planned, its build
   under way since 2026-10-10; the Start's push to waiting
-  students (2026-10-06, a visible doorbell, never the truth), its backend built and its app half
-  built (#456), waiting on the owner's word on when the app asks to send notifications.
+  students (2026-10-06, a visible doorbell, never the truth), its backend and its app half built
+  (#456), the app asking to send it right after onboarding's Screen Time step (the owner, 2026-10-24).
 - **Open:** one design question, Phase 6: ISSUES #3's fallback, should Apple's answer
   call for one (the issue ranks the fallback designs, best fit first). Next: the build plan (what gets coded
   first). Items deliberately parked live in each section's "decided later" list.
