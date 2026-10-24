@@ -954,6 +954,12 @@ final class Phone {
         return SlideShown(slide: slide, phase: phase)
     }
 
+    /// The class the card and the slide come from, headed as Unlocked heads its own: the Screen Time
+    /// ask's line over them (M8b), the ask naming no class of its own.
+    var lessonHeading: (title: String, subtitle: String)? {
+        sync?.lessonHeading(at: Date(), over: notFollowed)
+    }
+
     /// Whether the session followed is still the one to follow by the phone's clock (`lessonSession`),
     /// a fixture's always: at its bell its card and slide go as Home's card for the class does, Bali
     /// reached or not, where Home, which stays past the bell, would keep them until the next read.

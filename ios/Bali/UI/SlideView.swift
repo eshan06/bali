@@ -32,7 +32,8 @@ struct SlideShown: Equatable {
 /// The slide (M8; the app canvas's FocusSlide, SlideLoading and SlideFailed, in D1's look): which
 /// slide of how many over the page, in a 16:9 frame the width of the screen (`PageView`), its deck
 /// asked for as it shows (`Phone.loadDeck`); before it is in, Loading the slides…, and one that
-/// didn't come, Bali couldn't load the slides. with Try again (rule 5).
+/// didn't come, Bali couldn't load the slides. with Try again (rule 5). On Focus, and since M8b on
+/// Unlocked, Screen Time off, Home and the Screen Time ask.
 struct SlideView: View {
     let shown: SlideShown
     let phone: Phone
@@ -66,6 +67,9 @@ struct SlideView: View {
                 waiting(failed: shown.phase != .loading, slide)
             }
         }
+        // Its words as Focus has them on the screens that centre theirs (M8b): a label the text size
+        // wraps starts at the left, as the card's do.
+        .multilineTextAlignment(.leading)
         // Asked at each change of what shows: `loadDeck` fetches a deck once, whatever it is asked.
         .task(id: shown) { phone.loadDeck(for: slide) }
     }

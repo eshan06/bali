@@ -122,6 +122,22 @@
             "screenTimeError": State(
                 protection: permission(.notDetermined),
                 askFailed: .failed("FamilyControlsError.networkError")),
+            // In Home's place for Ana not tapped in while Period 3 is in session (M8b): its question
+            // under the words, the class's name over it (the app canvas's ScreenTimeAskQuestion); with
+            // the slide as well, the slide alone, and access turned off in Settings (intermediate
+            // states, drawn beside it).
+            "screenTimeQuestion": State(
+                protection: permission(.notDetermined), sync: standing(.out, me: ana(inSession: true)),
+                lesson: lesson()),
+            "screenTimeQuestionSlide": State(
+                protection: permission(.notDetermined), sync: standing(.out, me: ana(inSession: true)),
+                lesson: lesson(slide: true), deck: .ready),
+            "screenTimeSlide": State(
+                protection: permission(.notDetermined), sync: standing(.out, me: ana(inSession: true)),
+                lesson: lesson(question: false, slide: true), deck: .ready),
+            "screenTimeDeniedQuestion": State(
+                protection: permission(.denied), sync: standing(.out, me: ana(inSession: true)),
+                lesson: lesson()),
             // Join, only ever opened over Home or Me (the owner's ruling, 2026-10-07): a new
             // student's from Home's empty state, nothing typed yet (the design's Join board); the
             // code looked up; refused; and from the Home of one in classes, a code typed.
@@ -211,6 +227,14 @@
             "unlockedQuestionUnsent": State(
                 sync: unsentUnlock(standing(.inSession(period3, .unlocked))),
                 lesson: lesson(problem: .unreachable(.unreachable))),
+            // And a slide (M8b; UnlockedSlide): the question, then the slide; and the slide alone
+            // (UnlockedSlideAlone, an intermediate state).
+            "unlockedSlide": State(
+                sync: recorded(standing(.inSession(period3, .unlocked)), nil), lesson: lesson(slide: true),
+                deck: .ready),
+            "unlockedSlideAlone": State(
+                sync: recorded(standing(.inSession(period3, .unlocked)), nil),
+                lesson: lesson(question: false, slide: true), deck: .ready),
             // Unlocked's Home (C5c): its tab bar, the apps still open, and Back to Unlocked.
             "homeFromUnlocked": State(sync: standing(.inSession(period3, .unlocked)), opened: [.home]),
             // Protection off reported there: the card's way back is a re-tap, as Unlocked's.
@@ -228,6 +252,13 @@
             "homeQuestionError": State(
                 sync: standing(.out, me: ana(inSession: true), failed: .networkError),
                 lesson: lesson(problem: .unreachable(.unreachable))),
+            // And a slide (M8b; HomeSlide), with the question as well (HomeSlideQuestion, an
+            // intermediate state).
+            "homeSlide": State(
+                sync: standing(.out, me: ana(inSession: true)),
+                lesson: lesson(question: false, slide: true), deck: .ready),
+            "homeSlideQuestion": State(
+                sync: standing(.out, me: ana(inSession: true)), lesson: lesson(slide: true), deck: .ready),
             // In no class, Home with its card in the hero's place (the approved Sign in & sign up
             // design): Ana new, never in a class here, not in one yet; and removed from her last
             // class (#143), in a class on this phone before, in none any more.
@@ -350,6 +381,14 @@
                 protection: screenTimeOff(),
                 sync: standing(.inSession(period3, .protectionOff), failed: .networkError),
                 lesson: lesson(problem: .unreachable(.unreachable))),
+            // A slide there (M8b; ScreenTimeOffSlide), and with the question as well
+            // (ScreenTimeOffSlideQuestion, an intermediate state).
+            "protectionOffSlide": State(
+                protection: screenTimeOff(), sync: standing(.inSession(period3, .protectionOff)),
+                lesson: lesson(question: false, slide: true), deck: .ready),
+            "protectionOffSlideQuestion": State(
+                protection: screenTimeOff(), sync: standing(.inSession(period3, .protectionOff)),
+                lesson: lesson(slide: true), deck: .ready),
             "homeRefused": State(sync: refused(standing(.inSession(period3, nil)), .eventIdConflict)),
             // A scan of a block no teacher set up (#146): said with Try again while it is the
             // phone's newest tap; a tap since counted, it is kept and retried, and said no more.

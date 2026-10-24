@@ -66,6 +66,21 @@ struct LessonTests {
     }
 
     @Test(
+        "The lesson's class headed as a session's screens head theirs, the Screen Time ask's line over its card and slide (M8b): its name as `GET /v1/me` gives it, then its teacher and its bell — the class in session, tapped in or not, the one the phone stands in first — and none with no lesson to follow, or a class the read doesn't name"
+    )
+    func lessonHeading() throws {
+        let out = try #require(try listing(.out).lessonHeading(at: t0, over: [], time: newYork))
+        #expect(out.title == "Period 3" && plain(out.subtitle) == "ends 11:03 AM")
+        let tapped = try #require(
+            try synced(.inSession(bell1042, .unlocked)).lessonHeading(at: t0, over: [], time: newYork))
+        #expect(tapped.title == "Period 3 — Algebra II")
+        #expect(plain(tapped.subtitle) == "with Ms. Rivera · ends 10:42 AM")
+        #expect(try listing(.out).lessonHeading(at: t0, over: ["live"]) == nil)
+        #expect(try synced(.inSession(bell1042, .unlocked), me: false).lessonHeading(at: t0, over: []) == nil)
+        #expect(SyncState().lessonHeading(at: t0, over: []) == nil)
+    }
+
+    @Test(
         "An open question, as the canvas draws it: nothing picked and Tap an answer; a tap on its way picked and Sending; the answer Bali holds picked and Your answer is in — never a mark of the correct answer, which the API sends only once shown"
     )
     func open() throws {

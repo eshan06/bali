@@ -7,19 +7,34 @@ import UIKit
 /// place (rule 5) — the permission denied, at the prompt or in Settings, with the way back:
 /// **Open Settings** first, the ask second, since iOS may not prompt again (#105's review); an ask
 /// iOS could not make, with the way on. The reference onboarding sheet's last page, in D1's light
-/// tokens; the words are `Permission.screenTimeWords` and `ScreenTimeAskError.words`.
+/// tokens; the words are `Permission.screenTimeWords` and `ScreenTimeAskError.words`. In Home's place
+/// for a student not tapped in while a class of theirs is in session, its lesson shows under the
+/// words, as Home would show it: the class's name over the answer card and the slide (M8b; the app
+/// canvas's ScreenTimeAskQuestion and the intermediate states drawn beside it).
 struct ScreenTimeView: View {
     let phone: Phone
     @Environment(\.openURL) private var openURL
+    /// The bell of the class in session, rung: the lesson goes then, by the phone's clock, Bali
+    /// reached or not, as Home's card for the class does (L8c's rule), the ask drawn again for it.
+    @State private var rung: Date?
 
     private var permission: Permission { phone.protection?.permission ?? .notDetermined }
 
     var body: some View {
+        let _ = rung
         let words = permission.screenTimeWords
+        // Home's lesson, for a student not tapped in: never in Waiting's place or Session over's.
+        // Out of any session the lesson is a class `GET /v1/me` lists, so its heading always has a
+        // name to show.
+        let out = phone.sync?.standing == .out
+        let (card, slide) = out ? (phone.card, phone.slideShown) : (nil, nil)
+        let heading = card != nil || slide != nil ? phone.lessonHeading : nil
+        let bell = heading == nil ? nil : phone.sync?.inSessionCard(at: Date())?.bell
         ScreenScaffold {
             PageScroll {
                 VStack(spacing: 0) {
-                    Spacer()
+                    // With a lesson the groups sit the board's 24 apart at the least, none above them.
+                    Spacer(minLength: heading == nil ? nil : 0)
                     VStack(spacing: 24) {
                         Image(systemName: "checkmark.shield")
                             .font(.system(size: 56, weight: .light)).foregroundStyle(Theme.brand)
@@ -31,7 +46,11 @@ struct ScreenTimeView: View {
                         }
                     }
                     .frame(maxWidth: .infinity).multilineTextAlignment(.center)
-                    Spacer()
+                    Spacer(minLength: heading == nil ? nil : 24)
+                    if let heading {
+                        lesson(heading, card, slide)
+                        Spacer(minLength: 24)
+                    }
                     VStack(spacing: 12) {
                         if let settings = words.settings {
                             Button(settings) {
@@ -55,6 +74,30 @@ struct ScreenTimeView: View {
                             .frame(maxWidth: .infinity).multilineTextAlignment(.center)
                     }
                 }
+            }
+        }
+        .task(id: bell) {
+            guard let bell else { return }
+            await Screen.bell(bell, change: UIApplication.significantTimeChangeNotification)
+            if !Task.isCancelled { rung = bell }
+        }
+    }
+
+    /// The lesson as the ask shows it: the class's name, its teacher and bell under it, as Unlocked's
+    /// top line, since nothing else here says which class is asking; 12 under it the card, then the
+    /// slide 24 under that, the question first (decision 11).
+    private func lesson(
+        _ heading: (title: String, subtitle: String), _ card: AnswerCard?, _ slide: SlideShown?
+    ) -> some View {
+        VStack(spacing: 12) {
+            VStack(spacing: 2) {
+                Text(heading.title).textStyle(.h3)
+                Text(heading.subtitle).textStyle(.caption).foregroundStyle(Theme.textTertiary)
+            }
+            .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+            VStack(spacing: 24) {
+                if let card { AnswerCardView(card: card, phone: phone) }
+                if let slide { SlideView(shown: slide, phone: phone) }
             }
         }
     }

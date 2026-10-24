@@ -7,8 +7,9 @@ import UIKit
 /// way back — Screen Time on again, in Settings or at iOS's prompt, which puts the phone back where
 /// it stood by itself (#167), or the block tapped again where that could not be done. A refocus out
 /// of protection off is refused (A2), so there is no Back to focus. While a question shows, the
-/// answer card sits over the steps (L8; the app canvas's ScreenTimeOffQuestion). In
-/// `ProtectionOffWords`' words (BaliOutbox, tested on Linux).
+/// answer card sits over the steps (L8; the app canvas's ScreenTimeOffQuestion), and a slide the
+/// teacher shows under it, or in its place with no question (M8b; ScreenTimeOffSlide,
+/// ScreenTimeOffSlideQuestion). In `ProtectionOffWords`' words (BaliOutbox, tested on Linux).
 struct ProtectionOffView: View {
     let phone: Phone
     @Environment(\.openURL) private var openURL
@@ -46,6 +47,7 @@ struct ProtectionOffView: View {
                                 .multilineTextAlignment(.leading)
                         }
                         if let card = phone.card { AnswerCardView(card: card, phone: phone) }
+                        if let slide = phone.slideShown { SlideView(shown: slide, phone: phone) }
                         steps(words.steps, backOn: words.way == .retap)
                         action(words.way)
                     }
