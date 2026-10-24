@@ -3437,7 +3437,7 @@ struct AppTests {
     }
 
     @Test(
-        "A card that comes or goes while Emergency Unlock is held never rebuilds the control mid-hold (L8; ARCHITECTURE, \"Live lesson\", decision 1; santa's round 1): Focus keeps the layout it had, the ring or the strip, the control the same one, until the press ends, then shows what changed"
+        "A card that comes or goes while Emergency Unlock is held never rebuilds the control mid-hold (L8; ARCHITECTURE, \"Live lesson\", decision 1; santa's rounds 1 and 2): Focus shows what it showed as the press began, the ring or the card, the control the same one, until the press ends, then shows what changed; and why the last press didn't go through outlives a change of layout"
     )
     func cardWaitsForTheHold() async throws {
         let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
@@ -3462,14 +3462,14 @@ struct AppTests {
         #expect(!shows("Which?") && unlock() === ringed, "the card came mid-hold")
         phone.unlockHeld = false
         try await until { shows("Which?") }
-        // The question goes while the hold runs: the card goes, the strip's layout and the control stay.
+        // The question goes while the hold runs: the card stays as it was, and so does the control.
         let pinned = try #require(unlock())
         phone.unlockHeld = true
         phone.lessonRead(LessonState(), of: "session")
         try await Task.sleep(for: .seconds(0.5))
-        #expect(!shows("Which?") && unlock() === pinned, "the ring came back mid-hold")
+        #expect(shows("Which?") && unlock() === pinned, "the card went mid-hold")
         phone.unlockHeld = false
-        try await until { unlock() !== pinned }
+        try await until { !shows("Which?") && unlock() !== pinned }
         // Why the last press didn't go through outlives a change of layout (rule 5): VoiceOver's
         // one step on a phone not started, then a question coming.
         try #require(unlock()).accessibilityActivate()

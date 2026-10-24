@@ -78,7 +78,8 @@ struct AnswerCardView: View {
             .accessibilityValue(picked ? "Your answer" : "")
             .accessibilityAddTraits(picked ? .isSelected : [])
         case .closed(let right, let mine):
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
+            // Its letter centred on the words and their marks, as the closed boards draw it.
+            HStack(spacing: 12) {
                 disc(
                     letter, right ? Chip.Kind.focused.look.fill : mine ? Theme.card : Theme.sunken,
                     right ? Theme.brand : mine ? Theme.text : Theme.textSecondary)
