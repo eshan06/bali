@@ -3908,6 +3908,10 @@ struct AppTests {
         let width = window.bounds.width - 2 * Theme.gutter
         #expect(abs(view.bounds.width - width) < 0.5, "\(view.bounds)")
         #expect(abs(view.bounds.height - width * 9 / 16) < 0.5, "\(view.bounds)")
+        // Pinch zoom, from the page as large as fits to four times that.
+        let fit = view.scaleFactorForSizeToFit
+        #expect(fit > 0 && abs(view.minScaleFactor - fit) < 0.001, "\(view.minScaleFactor), \(fit)")
+        #expect(abs(view.maxScaleFactor - fit * 4) < 0.001, "\(view.maxScaleFactor), \(fit)")
         let labels = read.map { $0.accessibilityLabel ?? "" }
         let at = try ["Slide 4 of 12", "Pinch to zoom", text, unlock].map { label in
             try #require(labels.firstIndex(of: label), "\(label): \(labels)")

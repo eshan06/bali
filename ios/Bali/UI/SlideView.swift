@@ -66,7 +66,8 @@ struct SlideView: View {
                 waiting(failed: shown.phase != .loading, slide)
             }
         }
-        .task(id: slide.sha256) { phone.loadDeck(for: slide) }
+        // Asked at each change of what shows: `loadDeck` fetches a deck once, whatever it is asked.
+        .task(id: shown) { phone.loadDeck(for: slide) }
     }
 
     /// Which slide of how many.
