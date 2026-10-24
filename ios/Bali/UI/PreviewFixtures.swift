@@ -1,7 +1,10 @@
 #if DEBUG
     import BaliCore
     import BaliOutbox
+    import CryptoKit
     import Foundation
+    import PDFKit
+    import UIKit
 
     /// Named states of the app, from its real types, for every screen's `#Preview` and for the
     /// Simulator with no server: `xcrun simctl launch booted com.bali.Bali -bali-screen <name>`
@@ -48,7 +51,13 @@
             var lesson: LessonState?
             var answering: Int?
             var answerSaid: AnswerCard.Said?
+            /// The deck of the lesson's slide (M8), the fixture deck (`deckPDF`): on its way, not
+            /// come, or in.
+            var deck: Deck?
         }
+
+        /// Where the fixture deck stands on the phone (M8).
+        enum Deck { case loading, failed, ready }
 
         /// Each named for the screen it shows, then a state of it (`AppTests.fixtures` pins that).
         static let all: [String: State] = [
@@ -165,6 +174,12 @@
             "focusNoAnswer": asking(lesson(open: false, shown: true)),
             "focusQuestionOffline": asking(lesson(problem: .unreachable(.unreachable))),
             "focusLong": asking(lesson(long: true)),
+            // A slide on Focus (M8; the app canvas's Slides row): page 4 of the deck, in; with the
+            // question, answered (FocusSlideQuestion); and the deck on its way, then not come.
+            "focusSlide": asking(lesson(question: false, slide: true), deck: .ready),
+            "focusSlideQuestion": asking(lesson(answer: 1, slide: true), deck: .ready),
+            "focusSlideLoading": asking(lesson(question: false, slide: true), deck: .loading),
+            "focusSlideFailed": asking(lesson(question: false, slide: true), deck: .failed),
             "unlocked": State(
                 sync: queued(
                     standing(.inSession(period3, .unlocked)), .unlock(session: "session", reason: nil),
@@ -373,21 +388,98 @@
             id: "session", classId: "p3", endsAt: Date() - 60)
 
         /// Focused in Period 3, the shields verified on, its lesson read as `lesson`, with the card's
-        /// own pick `answering` and what the last one `said`.
+        /// own pick `answering` and what the last one `said`, and its slide's `deck`.
         private static func asking(
-            _ lesson: LessonState?, answering: Int? = nil, said: AnswerCard.Said? = nil
+            _ lesson: LessonState?, answering: Int? = nil, said: AnswerCard.Said? = nil, deck: Deck? = nil
         ) -> State {
             State(
                 protection: shielded(), sync: standing(.inSession(period3, .focused)), lesson: lesson,
-                answering: answering, answerSaid: said)
+                answering: answering, answerSaid: said, deck: deck)
+        }
+
+        /// The fixture deck (M8): twelve 16:9 pages drawn in code, the fourth the app canvas's slide —
+        /// factoring a quadratic, its curve crossing the x-axis at 3 and 4 — the rest naming their
+        /// number; and its SHA-256, as a slide names it.
+        static let deckPDF = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 960, height: 540))
+            .pdfData { context in
+                for page in 1...12 {
+                    context.beginPage()
+                    // Drawn in the canvas's own units, its frame 342 wide.
+                    context.cgContext.scaleBy(x: 960 / 342, y: 960 / 342)
+                    if page == 4 { factoring() } else { write("Slide \(page)", 15, .semibold, 0x26241F, at: 18, 16) }
+                }
+            }
+        static let deckSHA256 = SHA256.hash(data: deckPDF).map { String(format: "%02x", $0) }.joined()
+
+        /// The fixture deck as `deck` has it on the phone, its document made from its bytes.
+        static func slideDeck(_ deck: Deck) -> SlideDeck {
+            let phase: SlideDeck.Phase =
+                switch deck {
+                case .loading: .loading
+                case .failed: .failed
+                case .ready: PDFDocument(data: deckPDF).map { .ready($0) } ?? .failed
+                }
+            return SlideDeck(sha256: deckSHA256, phase: phase)
+        }
+
+        /// The app canvas's slide (FocusSlide), at its place in its 342 × 192 frame: the working on
+        /// the left, the curve on the right.
+        private static func factoring() {
+            write("Factoring quadratics", 15, .semibold, 0x26241F, at: 18, 16)
+            write("x² − 7x + 12 = 0", 12, .regular, 0x3A3733, at: 18, 42)
+            write("(x − 3)(x − 4) = 0", 12, .regular, 0x3A3733, at: 18, 66)
+            write("x = 3 or x = 4", 12, .semibold, 0x26241F, at: 18, 90)
+            write("The roots are where the curve crosses the x-axis.", 10, .regular, 0x6B665D, at: 18, 150, width: 172)
+            // The curve's box, 132 × 160, 198 across and 16 down.
+            let axes = UIBezierPath()
+            axes.move(to: CGPoint(x: 204, y: 136))
+            axes.addLine(to: CGPoint(x: 326, y: 136))
+            axes.move(to: CGPoint(x: 210, y: 24))
+            axes.addLine(to: CGPoint(x: 210, y: 166))
+            axes.lineWidth = 1.25
+            ink(0x8A847A).setStroke()
+            axes.stroke()
+            let curve = UIBezierPath()
+            curve.move(to: CGPoint(x: 238.5, y: 46))
+            curve.addQuadCurve(to: CGPoint(x: 314.5, y: 46), controlPoint: CGPoint(x: 276.5, y: 238))
+            (curve.lineWidth, curve.lineCapStyle) = (2, .round)
+            ink(0x26241F).set()
+            curve.stroke()
+            for x in [267.0, 286.0] {
+                UIBezierPath(ovalIn: CGRect(x: x - 3.5, y: 132.5, width: 7, height: 7)).fill()
+            }
+            write("3", 10, .regular, 0x5B564E, at: 264, 146)
+            write("4", 10, .regular, 0x5B564E, at: 283, 146)
+        }
+
+        /// `text` at `size` and `weight` in `hex`'s ink, its line's top left at `x`, `y`, wrapping at
+        /// `width`: real text in the PDF, which PDFKit reads back.
+        private static func write(
+            _ text: String, _ size: CGFloat, _ weight: UIFont.Weight, _ hex: UInt32, at x: CGFloat, _ y: CGFloat,
+            width: CGFloat = 300
+        ) {
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: size, weight: weight), .foregroundColor: ink(hex),
+            ]
+            (text as NSString).draw(
+                with: CGRect(x: x, y: y, width: width, height: 100), options: .usesLineFragmentOrigin,
+                attributes: attributes, context: nil)
+        }
+
+        /// An sRGB ink from its hex.
+        private static func ink(_ hex: UInt32) -> UIColor {
+            UIColor(
+                red: CGFloat(hex >> 16 & 0xFF) / 255, green: CGFloat(hex >> 8 & 0xFF) / 255,
+                blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
         }
 
         /// Period 3's lesson as `GET /v1/sessions/{id}/presentation` answers it: the canvas's
         /// question — or, `long`, its six long answers (CardLong) — `open` or closed, its answer B
-        /// `shown` once revealed, the student's `answer`, if any; and the last poll's `problem`.
+        /// `shown` once revealed, the student's `answer`, if any — or no `question` at all — the
+        /// fixture deck's page 4 as its `slide`, if shown; and the last poll's `problem`.
         private static func lesson(
             open: Bool = true, answer: Int? = nil, shown: Bool = false, problem: PollProblem? = nil,
-            long: Bool = false
+            long: Bool = false, question asked: Bool = true, slide: Bool = false
         ) -> LessonState {
             let (prompt, options) =
                 long
@@ -405,7 +497,11 @@
                 "id": "question", "prompt": prompt, "options": options, "open": open,
                 "correctOption": shown ? 1 : NSNull(), "answer": held,
             ]
-            let body: [String: Any] = ["running": true, "question": question, "slide": NSNull(), "phone": NSNull()]
+            let page: Any =
+                slide ? ["deckId": "deck", "sha256": deckSHA256, "page": 4, "pageCount": 12] : NSNull()
+            let body: [String: Any] = [
+                "running": true, "question": asked ? question : NSNull(), "slide": page, "phone": NSNull(),
+            ]
             let presentation = try? BaliJSON.makeDecoder().decode(
                 Presentation.self, from: JSONSerialization.data(withJSONObject: body))
             return LessonState(presentation: presentation, problem: problem)

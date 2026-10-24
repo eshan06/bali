@@ -11,11 +11,12 @@ struct FocusView: View {
     @Environment(\.openURL) private var openURL
     /// Whether the page over the pinned Emergency Unlock scrolls: a hairline then marks its edge.
     @State private var scrolls = false
-    /// The card shown — with the strip and Emergency Unlock pinned — or none, the ring's layout. It
-    /// holds still while a press on Emergency Unlock is under way over verified shields, so a card
-    /// coming, going or changing never rebuilds the control under the finger (decision 1), and
-    /// catches up once the press ends: the screen shows meanwhile what it showed as the press began.
-    @State private var heldCard: AnswerCard?
+    /// The card and the slide shown — with the strip and Emergency Unlock pinned — or neither, the
+    /// ring's layout. It holds still while a press on Emergency Unlock is under way over verified
+    /// shields, so a card or a slide coming, going or changing never rebuilds the control under the
+    /// finger (decision 1), and catches up once the press ends: the screen shows meanwhile what it
+    /// showed as the press began.
+    @State private var held = Lesson()
     /// Why the last press on Emergency Unlock didn't go through: the screen's, so a change of layout
     /// never takes it (rule 5).
     @State private var unlockFailed: UnlockFailure?
@@ -25,14 +26,14 @@ struct FocusView: View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             if let sync {
                 let focus = FocusWords(sync, protection, now: context.date, signedIn: signedIn)
-                // The card shows where the strip can: its time, as the ring's, only over verified
-                // shields (rule 3).
-                let card = focus.claim == .paused ? phone.card : nil
-                let shown = phone.unlockHeld && focus.claim == .paused ? heldCard : card
+                // The card and the slide show where the strip can: its time, as the ring's, only
+                // over verified shields (rule 3).
+                let live = focus.claim == .paused ? Lesson(card: phone.card, slide: phone.slideShown) : Lesson()
+                let shown = phone.unlockHeld && focus.claim == .paused ? held : live
                 Group {
-                    if let shown { lesson(focus, shown) } else { page(focus) }
+                    if shown.card == nil, shown.slide == nil { page(focus) } else { lesson(focus, shown) }
                 }
-                .onChange(of: shown, initial: true) { heldCard = $1 }
+                .onChange(of: shown, initial: true) { held = $1 }
             }
         }
     }
@@ -55,16 +56,18 @@ struct FocusView: View {
         }
     }
 
-    /// Focus while a question shows (L8; the app canvas's Main, FocusAnswered, FocusRevealed and
-    /// FocusLargeText): the class, the ring become the strip, the card, then what else Focus says,
-    /// scrolling over Emergency Unlock, pinned at the bottom at every text size.
-    private func lesson(_ focus: FocusWords, _ card: AnswerCard) -> some View {
+    /// Focus while a question or a slide shows (L8, M8; the app canvas's Main, FocusAnswered,
+    /// FocusRevealed, FocusLargeText, FocusSlide and FocusSlideQuestion): the class, the ring become
+    /// the strip, the card, the slide under it, then what else Focus says, scrolling over Emergency
+    /// Unlock, pinned at the bottom at every text size.
+    private func lesson(_ focus: FocusWords, _ shown: Lesson) -> some View {
         ScreenScaffold {
             ScrollView {
                 VStack(spacing: 20) {
                     heading(focus).multilineTextAlignment(.center)
                     Strip(focus: focus) { chips(focus) }
-                    AnswerCardView(card: card, phone: phone)
+                    if let card = shown.card { AnswerCardView(card: card, phone: phone) }
+                    if let slide = shown.slide { SlideView(shown: slide, phone: phone) }
                     notes(focus).multilineTextAlignment(.center)
                 }
                 .onGeometryChange(for: Bool.self) { geometry in
@@ -159,6 +162,13 @@ struct FocusView: View {
             }
         }
     }
+}
+
+/// What of a live lesson Focus shows: its card, its slide, both — the question first (decision 11)
+/// — or neither, the ring's layout.
+private struct Lesson: Equatable {
+    var card: AnswerCard?
+    var slide: SlideShown?
 }
 
 /// The ring become a strip while a question shows (L8; the app canvas's Main): the time left as
