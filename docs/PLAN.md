@@ -8,17 +8,16 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-24 (Central) — M6's LessonDecks panel line back (#457; `docs/DECISIONS.md`,
-2026-10-24): Show slides' panel says "Pick a deck. Every phone in this class shows the page you're
-on, and so does Present." again, now that phones (M8, M8b) and the student web (W5) show the slide.
-LessonDecksStates and LessonRetryStates still draw the short line on the canvas: their redraw is
-ready, unpublished (the worker's publish was refused), for the conductor. Before it, the push's app
-half (#456): **before the next TestFlight build, Push Notifications on `com.bali.Bali`** (runbook 7,
-step 3), or its signing may fail; build 10 went before it, from `1d4496b6`. **An install whose
-Screen Time step was done before that build is never asked:** the owner reinstalls Bali before
-runbook 7's step-6 check. Next on the Mac: the owner's sitting on build 10 (`ios/README.md`), then
-runbook 7 and N6's check; on the Windows PC, the other three pre-pilot steps, which wait for the
-owner's word._
+_Last updated: 2026-10-24 (Central) — Phase 7 is built on both machines: every step merged, M6's
+LessonDecks line the last (#457), and TestFlight build 11 (prod, from `d1277445`, the push's app
+half included) uploaded, its guard confirming production push. Runbook 7 is done on prod by the
+owner (the APNs key, Push Notifications on `com.bali.Bali`, `bali prod`'s three variables; dev's
+step 4 left). The sitting moved to build 11 and grew (`ios/README.md`): Part 1 gains the notification
+ask, Part 5 is the class-started alert end to end (N6), Part 6 every other student flow. Left, the
+owner's: that sitting (the device checks and the exit checks L9, M10, W6), then the end-of-phase
+review (CLAUDE.md) and Phase 7 marked complete; L0b before the pilot's first class. On the Windows
+PC: LessonDecksStates' and LessonRetryStates' canvas redraw (#457's note), and the other three
+pre-pilot steps, which wait for the owner's word._
 
 ## Now
 
@@ -43,7 +42,8 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
   runs unchanged, and `npm test` passes whole on the PC.
 - **The owner's Mac session (Xcode and the iPhone):** the app's Sign in & sign up is built; the app
   keeps D1's look until the owner approves a new one (its redesign rolled back, 2026-10-06). Left:
-  TestFlight build 9 for C7's phone test (📱); the push's app half is done (#456). The phone's
+  the owner's phone sitting on TestFlight build 11 (prod, from `d1277445`, 2026-10-24; `ios/README.md`,
+  Parts 1–6), the push's app half (#456) in it. The phone's
   Phase 7 screens are done: L8 (L8a, #443, L8b, #448 and #450, and L8c, #451), M8's slide view on
   Focus (#452) and M8b's slide off Focus and card on the Screen Time ask (#454); left, their 📱
   device checks, the owner's. C2's legal words (⚖️) go into the portal's pages, on the Windows PC.
@@ -104,9 +104,9 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
   token endpoints; the app half's interface is on N3's line) ✅; **the backend half is done**
   (N4–N6 ✅, 2026-10-06). The app half ✅ (#456; DECISIONS 2026-10-24), #336's fix in it (the random
   wait, approved 2026-10-23), the prompt right after onboarding's Screen Time step (the owner,
-  2026-10-24). Left: the owner's console steps (`docs/RUNBOOKS.md`, runbook 7: Push Notifications on
-  the App ID before the next TestFlight build) and N6's end-to-end check, Bali reinstalled first;
-  until then push is off on both deploys. Not on the pilot's critical path: it never delays C2 or
+  2026-10-24). Runbook 7 done on prod by the owner (2026-10-24: the key, Push Notifications on the App ID,
+  `bali prod`'s three variables; dev's step 4 left), so build 11 went out with push. Left: N6's
+  end-to-end check on build 11, Bali reinstalled first (the sitting's Part 5); push is off on dev. Not on the pilot's critical path: it never delays C2 or
   the external TestFlight steps.
 
 - **Deleted accounts' Cognito sign-ins (C3-cognito, 2026-10-09):** the server queues and deletes
@@ -136,7 +136,7 @@ first class, production backups (L0b, the owner's console step; the owner, 2026-
 - The owner: the consoles (AWS, Railway, Vercel, Sentry, App Store Connect), Apple, the
   lawyer, the school, and every iPhone check.
 
-**Phase 7, Live lesson: building.** Every step with no screen is done, L3c the last (2026-10-15);
+**Phase 7, Live lesson: built** (2026-10-24; left, the owner's phone sitting and exit checks, and L0b). Every step with no screen is done, L3c the last (2026-10-15);
 M0 is done (deck storage on, 2026-10-12); the web screens come after the redesign's PV15 (✅ #388),
 W3 the first (✅ #392), M5 (✅ #400), L7 (✅ #402, #405), W4 (✅ #406, #407, #408, its follow-up #409), L7b (✅ #393, #394, #395, #411), L7c (✅ #412), M6 (✅ #413–#418), W5 (✅ #419), so every web screen of Phase 7 is built, and the phone's L8, M8 and M8b (✅ L8a–L8c, M8, #452, and M8b, #454, their 📱 device checks left). L0b, production backups, is the owner's, before the Vanderbilt pilot's first
 class.
@@ -155,7 +155,7 @@ One line each. Phases 3–6's step lists, the push's (N1–N6) and this table in
 | 4 | Reports + recap, rate limits, the one-address load gate, the OpenAPI check, the authorization matrix | ✅ **complete** (2026-10-05); the sweep's per-row retry left unbounded at this size: bound it if the sweep grows (L3) |
 | 5 | Pilot readiness: prod, Sentry, TestFlight, App Store, runbooks | ✅ cloud steps done; **prod live 2026-10-05**; open: the owner's items |
 | 6 | Security and compliance; gates Phase 5's student-facing steps | ✅ cloud steps done; open: C2 (⚖️ the lawyer's words), C7's phone check 📱, S8 (the owner's decision) |
-| 7 | Live lesson: questions and PDF slides in a running session, followed on the phone and the web | building (Phase 7 steps) |
+| 7 | Live lesson: questions and PDF slides in a running session, followed on the phone and the web | built: every step merged (M6's last line, #457, 2026-10-24); left, the owner's: the phone sitting's device checks and the exit checks L9, M10, W6 (`ios/README.md`), and L0b before the pilot's first class |
 
 ### Portal redesign (v2's look) steps (PV; one PR each; 👀 = the owner looks at screenshots)
 
@@ -355,9 +355,9 @@ Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect acc
   allowing only `AdminGetUser` and `AdminDeleteUser` on its own pool, a user and its access key,
   the two `COGNITO_DELETER_*` variables on dev's `bali` and prod's `bali prod`; the end-to-end
   check on dev (C3-cognito).
-- 🔧 Push: runbook 7 (`docs/RUNBOOKS.md`) — the APNs key, Push Notifications on the App ID (before
-  the next TestFlight build: the app half asks for `aps-environment`, #456), the three `APNS_*`
-  variables on dev and prod; its end-to-end check once the app half lands (N6).
+- 🔧 Push: runbook 7 (`docs/RUNBOOKS.md`) — ✅ on prod (the owner, 2026-10-24: the APNs key, Push
+  Notifications on the App ID, `bali prod`'s three `APNS_*` variables); left: dev's (step 4) and the
+  end-to-end check on build 11 (step 6, N6; the sitting's Part 5).
 - 🔧 Dev's Cognito pool (`us-east-1_YTloqilwT`): turn on email as the attribute to verify, so a sign-up on its hosted page can be confirmed; today it ends on Cognito's error page with the account unconfirmed (found 2026-10-12; `docs/GOTCHAS.md`). The demo accounts sign in as they are.
 - 🔧 Delete dev's unused phone client `bali-ios-dev` (`33qr62dl4ee4inigneidmfe2s9`) in the dev pool; keep `bali-ios`, the demo's (2026-10-14).
 - 🔧 S4a's Sign out: check dev's web app client lists `http://localhost:3000/login` under Allowed sign-out URLs, and add it if not (`docs/WEB.md`).
