@@ -11,7 +11,11 @@ import { DecksPanel } from './decks-panel';
  * tests drive the page), opened from Show slides on a class page (LessonDecks): titled Show slides
  * over LessonDecks' whole line, back now that phones (M8, M8b) and the student web (W5) show the
  * slide, in every state LessonDecksStates draws. Bali's answer to the read of your slides is a
- * stand-in's, held until the test gives it. The panel's other tests are in `decks-panel.test.ts`.
+ * stand-in's, held until the test gives it.
+ *
+ * The panel's other tests, not converted yet, are in `decks-panel.test.ts`; this file can't share
+ * its name, since TypeScript drops a `.tsx` whose name a `.ts` beside it has (ESLint then says the
+ * project service can't find it). The step that converts them merges the two.
  */
 
 const LINE =
@@ -57,11 +61,14 @@ function open() {
   return { panel, onClose };
 }
 
-/** Bali answers the read on its way. */
-const answer = (decks: Deck[]) =>
+/** Bali answers the read on its way, or it fails; drawn before the next check. */
+const settle = (how: (read: (typeof bali.reads)[number]) => void) =>
   act(async () => {
-    bali.reads.shift()?.answer({ decks });
+    const read = bali.reads.shift();
+    if (read) how(read);
+    await new Promise((resolve) => setTimeout(resolve, 0));
   });
+const answer = (decks: Deck[]) => settle((read) => read.answer({ decks }));
 
 afterEach(() => {
   // Focus off first, so no Try again unmounted here hands focus on in the next test's page.
@@ -96,9 +103,7 @@ describe('Show slides’ panel (LessonDecks)', () => {
 
   it('says its whole line when your slides didn’t load', async () => {
     const { panel } = open();
-    await act(async () => {
-      bali.reads.shift()?.fail(new Error('offline'));
-    });
+    await settle((read) => read.fail(new Error('offline')));
     expect(within(panel).getByRole('alert').textContent).toBe("Bali couldn't load your slides.");
     expect(within(panel).getByText(LINE)).toBeTruthy();
   });

@@ -17,7 +17,7 @@ import { TryAgain } from './try-again';
  * Show slides in the side panel (M6, part 2c; LessonDecks, LessonStates' lines and the
  * intermediate states LessonDecksStates draws), rendered in each state, its buttons pressed through
  * its own element tree; its read and the page's wiring are read from their source. Its title, its
- * line and its Close are driven in jsdom (`decks-panel.test.tsx`).
+ * line and its Close are driven in jsdom (`decks-panel.driven.test.tsx`).
  */
 const source = readFileSync(fileURLToPath(new URL('./decks-panel.tsx', import.meta.url)), 'utf8');
 const page = readFileSync(
