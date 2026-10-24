@@ -185,6 +185,7 @@ describe.each(POLICIES)('$path, the owner’s drafted words', (policy) => {
 
   it('is titled without "(draft)" and still kept out of search results until the lawyer’s version', () => {
     expect(JSON.stringify(policy.metadata)).not.toMatch(/draft|lawyer|placeholder/i);
+    expect(JSON.stringify(policy.metadata)).not.toMatch(/[—–]/);
     expect(policy.metadata.title).toBe(`Bali ${policy.title.toLowerCase()}`);
     expect(policy.metadata.robots).toEqual({ index: false });
   });

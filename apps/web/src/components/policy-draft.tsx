@@ -27,10 +27,11 @@ export interface PolicySection {
 /**
  * The policy's words, its intro's and each section's: 10 px between paragraphs and lists, a list's
  * items 6 px apart (a list in an item too), a part's heading semibold in the body's size and 8 px
- * further from what is over it, and bold in the same weight, both in the primary ink.
+ * further from what is over it, and bold in the same weight, both in the primary ink; a long address
+ * (the portal's URL) breaks rather than run past a phone's edge.
  */
 const WORDS =
-  'flex flex-col gap-2.5 text-text-secondary [&_h3]:mt-2 [&_h3]:font-semibold [&_h3]:text-text-primary [&_li+li]:mt-1.5 [&_li>ul]:mt-1.5 [&_strong]:font-semibold [&_strong]:text-text-primary [&_ul]:list-disc [&_ul]:pl-5';
+  'flex flex-col gap-2.5 text-text-secondary wrap-anywhere [&_h3]:mt-2 [&_h3]:font-semibold [&_h3]:text-text-primary [&_li+li]:mt-1.5 [&_li>ul]:mt-1.5 [&_strong]:font-semibold [&_strong]:text-text-primary [&_ul]:list-disc [&_ul]:pl-5';
 
 export function PolicyDraft({
   title,

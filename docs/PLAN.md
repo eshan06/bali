@@ -54,7 +54,7 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
   (#434; DECISIONS 2026-10-22), jsdom and Testing Library, dev only, opted into per file
   (`docs/WEB.md`, Testing the portal), `try-again.test.tsx` the pattern. Each UI step from now on
   converts the source-text tests it touches and adds none; `src/source-text-tests.test.ts` lists the
-  31 left (New class's converted, 2026-10-23, the policy pages', C2-text), a list that only shrinks.
+  30 left (New class's converted, 2026-10-23; the policy pages', and the help page's moved to its guards, C2-text), a list that only shrinks.
 - **A stuck slide upload stops (the owner, 2026-10-22: "ok fine the 30 s and 25 min outer limit is
   good")** ✅ (#436; DECISIONS 2026-10-22): nothing sent for 30 s stops it as one with no answer, in
   the boards' line with Try again; 2 minutes for the bucket's answer once the whole file is sent (the
