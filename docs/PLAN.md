@@ -8,18 +8,20 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-23 (Central) — The answer card on Focus (L8b-2, #450; `docs/DECISIONS.md`,
-2026-10-23), the second of L8b's two PRs on the Mac, so L8b is done: while a question shows over
-shields the check verified, Focus's ring becomes the strip under the class's name, the card under it,
-the page scrolling over Emergency Unlock, pinned at the bottom at every text size, its one-second
-hold unchanged; a tap answers and another changes it until the close, the revealed answer marked and
-never red, and a closed question's Hide kept by this phone alone. A poll refused 403 or 404 drops the
-lesson as one that is over, never the card's "No connection" line (the conductor's call), and the
-store listing's lists say the app's list word for word. Main can answer from the card now; no
-TestFlight build was sent. Before it, on the Windows PC, the pre-pilot event-id step's part 3 (#449),
-so that step is done: an event id in upper case is the same id at the last three places the engine
-compared one as text. Next on the Mac: the rest of L8, the same card on Unlocked, Screen Time off and
-Home, then M8; on the Windows PC, the other three pre-pilot steps wait for the owner's word._
+_Last updated: 2026-10-23 (Central) — The same answer card off the Focus screen (L8c, #PRNUM;
+`docs/DECISIONS.md`, 2026-10-23), L8's last PR on the Mac, so L8's screens are done: while a question
+shows, Unlocked has the card over its reason card, Screen Time off over its steps and Home over its
+classes, as the boards draw them, every other word and button where it was; Home shows it to a
+student tapped in or not, Unlocked's Home too (the worker's call, awaiting the owner). With it, the
+owner's three small fixes: a relaunch that finds the account deleted on Bali's server clears the
+phone's two notes, a student removed and added back mid-class gets the card again once Bali reads
+their classes, and the card ignores taps while Emergency Unlock is held. And two found on the way:
+the card goes at its class's bell by the phone's clock, signal or not, and a state chip is read to
+VoiceOver as its word alone, never its icon's name. One place still shows no card while a class
+runs: the Screen Time grant screen, for a student not tapped in whose Screen Time access is off; no
+board draws it, so it is the owner's call. No TestFlight build was sent. Next on the Mac: L8's 📱
+device check, the owner's, then M8; on the Windows PC, the other three pre-pilot steps wait for the
+owner's word._
 
 ## Now
 
@@ -45,9 +47,9 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
 - **The owner's Mac session (Xcode and the iPhone):** the app's Sign in & sign up is built; the app
   keeps D1's look until the owner approves a new one (its redesign rolled back, 2026-10-06). Left:
   the push's app half (not started), TestFlight build 9 for C7's phone test (📱), and the phone's
-  Phase 7 screens (L8: its consent list ✅ as L8a, #443, and the card on Focus ✅ as L8b, #448 and
-  #450; next the same card on Unlocked, Screen Time off and Home; M8). C2's legal words (⚖️) go into the
-  portal's pages, on the Windows PC.
+  Phase 7 work (L8's screens ✅ as L8a, #443, L8b, #448 and #450, and L8c, #PRNUM; left, its 📱
+  device check, the owner's; then M8). C2's legal words (⚖️) go into the portal's pages, on the
+  Windows PC.
 - **The portal redesign in v2's look (PV0–PV17, the owner, 2026-10-12)** ✅ (2026-10-16): every step
   done, with PV3b, PV4b, PV4c and PV5b; the last, PV17c-2, Home's Last session (#425).
 - **The portal's tests drive the page (the owner, 2026-10-22: "Yes, go gradually")**: the setup ✅
@@ -137,7 +139,7 @@ first class, production backups (L0b, the owner's console step; the owner, 2026-
 
 **Phase 7, Live lesson: building.** Every step with no screen is done, L3c the last (2026-10-15);
 M0 is done (deck storage on, 2026-10-12); the web screens come after the redesign's PV15 (✅ #388),
-W3 the first (✅ #392), M5 (✅ #400), L7 (✅ #402, #405), W4 (✅ #406, #407, #408, its follow-up #409), L7b (✅ #393, #394, #395, #411), L7c (✅ #412), M6 (✅ #413–#418), W5 (✅ #419), so every web screen of Phase 7 is built; next the phone's (L8, M8). L0b, production backups, is the owner's, before the Vanderbilt pilot's first
+W3 the first (✅ #392), M5 (✅ #400), L7 (✅ #402, #405), W4 (✅ #406, #407, #408, its follow-up #409), L7b (✅ #393, #394, #395, #411), L7c (✅ #412), M6 (✅ #413–#418), W5 (✅ #419), so every web screen of Phase 7 is built, and the phone's L8 screens too (✅ L8a–L8c, its 📱 device check left); next M8. L0b, production backups, is the owner's, before the Vanderbilt pilot's first
 class.
 
 ## Phases
@@ -233,7 +235,7 @@ Slice 1 — live questions:
 - **L7** 👀 Portal UI to v2's canvas: the class page's question and Present's — ✅ as L7-1a (#389), L7-1b (#390), L7-2 (#402) and L7-3, Close and Done on Present, Done in every window of the browser (#405); DECISIONS 2026-10-15
 - **L7b** 👀 Portal saved questions to v2's canvas — ✅ as part 1a (#393), part 1b (#394), part 1c (#395) and part 2, the panel's drafts (#411); DECISIONS 2026-10-15, 2026-10-16
 - **L7c** 👀 A session's Questions to v2's canvas — ✅ (#412; DECISIONS 2026-10-16)
-- **L8** 👀📱 iOS answer card to the app canvas: while a question or a slide shows, the Focus screen's ring as a strip and Emergency Unlock pinned at the bottom; a tap answers and changes it until the close; the revealed answer marked, never red; a closed question's Hide; the same card on Unlocked, Screen Time off and Home; the consent list's two new lines and the one-time screen for a student who saw the old list (`no-ai-slop`); M0 ✅ (the canvas approved 2026-10-10; L0b, before the first actual pilot since 2026-10-12, holds back no screen). **No build that can answer ships (TestFlight included) before L2's documents and this wording have landed** — validation: XCTest, then the device check on the owner's iPhone: a shielded phone answers, the battery cost of the 2 s poll over a lesson, VoiceOver. **L8a**, the consent list's two new lines and the one-time screen — ✅ (#443; DECISIONS 2026-10-23). **L8b**, the lesson followed and the card on Focus — ✅ as L8b-1, the lesson followed and the card's words, the card waiting for the list and Delete account taking the phone's notes (the owner's rulings; #448), and L8b-2, the card on Focus, the ring as the strip and Emergency Unlock pinned, a poll refused 403 or 404 ending the lesson (#450); DECISIONS 2026-10-23; next, the same card on Unlocked, Screen Time off and Home
+- **L8** 👀📱 iOS answer card to the app canvas: while a question or a slide shows, the Focus screen's ring as a strip and Emergency Unlock pinned at the bottom; a tap answers and changes it until the close; the revealed answer marked, never red; a closed question's Hide; the same card on Unlocked, Screen Time off and Home; the consent list's two new lines and the one-time screen for a student who saw the old list (`no-ai-slop`); M0 ✅ (the canvas approved 2026-10-10; L0b, before the first actual pilot since 2026-10-12, holds back no screen). **No build that can answer ships (TestFlight included) before L2's documents and this wording have landed** — validation: XCTest, then the device check on the owner's iPhone: a shielded phone answers, the battery cost of the 2 s poll over a lesson, VoiceOver. **L8a**, the consent list's two new lines and the one-time screen — ✅ (#443; DECISIONS 2026-10-23). **L8b**, the lesson followed and the card on Focus — ✅ as L8b-1, the lesson followed and the card's words, the card waiting for the list and Delete account taking the phone's notes (the owner's rulings; #448), and L8b-2, the card on Focus, the ring as the strip and Emergency Unlock pinned, a poll refused 403 or 404 ending the lesson (#450); DECISIONS 2026-10-23. **L8c**, the same card on Unlocked, Screen Time off and Home, with the owner's three riders — ✅ (#PRNUM; DECISIONS 2026-10-23). L8's screens are done; left, its 📱 device check on the owner's iPhone
 - **L9** 📱 Exit check: a real class on prod asks and answers, the recap and the stream show the lifecycle, no screen names an answer
 
 Slice 2 — slides:

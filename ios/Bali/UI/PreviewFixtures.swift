@@ -188,13 +188,23 @@
             "unlockedPickError": State(
                 sync: recorded(standing(.inSession(period3, .unlocked)), .bathroom),
                 pickFailed: UnlockedWords.offline),
+            // The same card off the Focus screen (L8; the app canvas's UnlockedQuestion): a question
+            // open, the unlock recorded with no reason picked yet.
+            "unlockedQuestion": State(
+                sync: recorded(standing(.inSession(period3, .unlocked)), nil), lesson: lesson()),
             // Unlocked's Home (C5c): its tab bar, the apps still open, and Back to Unlocked.
             "homeFromUnlocked": State(sync: standing(.inSession(period3, .unlocked)), opened: [.home]),
             // Protection off reported there: the card's way back is a re-tap, as Unlocked's.
             "homeFromUnlockedRetap": State(
                 sync: reported(standing(.inSession(period3, .unlocked))), opened: [.home]),
-            // Period 3 in session, the student not in it (C3c): its card in the hero's place.
+            // A question there (L8): HomeQuestion's layout, over C3c's unlocked card.
+            "homeFromUnlockedQuestion": State(
+                sync: recorded(standing(.inSession(period3, .unlocked)), nil), opened: [.home],
+                lesson: lesson()),
+            // Period 3 in session, the student not in it (C3c): its card in the hero's place; and a
+            // question open (L8; the app canvas's HomeQuestion).
             "homeInSession": State(sync: standing(.out, me: ana(inSession: true))),
+            "homeQuestion": State(sync: standing(.out, me: ana(inSession: true)), lesson: lesson()),
             // In no class, Home with its card in the hero's place (the approved Sign in & sign up
             // design): Ana new, never in a class here, not in one yet; and removed from her last
             // class (#143), in a class on this phone before, in none any more.
@@ -308,6 +318,10 @@
             "protectionOffError": State(
                 protection: screenTimeOff(),
                 sync: standing(.inSession(period3, .protectionOff), me: nil, failed: .networkError)),
+            // A question open there (L8; the app canvas's ScreenTimeOffQuestion).
+            "protectionOffQuestion": State(
+                protection: screenTimeOff(), sync: standing(.inSession(period3, .protectionOff)),
+                lesson: lesson()),
             "homeRefused": State(sync: refused(standing(.inSession(period3, nil)), .eventIdConflict)),
             // A scan of a block no teacher set up (#146): said with Try again while it is the
             // phone's newest tap; a tap since counted, it is kept and retried, and said no more.

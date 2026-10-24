@@ -9,7 +9,9 @@ import SwiftUI
 /// router's to show (C6a, `RootView`). A class of theirs in session, the student not focused in
 /// it, its card takes the hero's place (C3c) — and so, waiting for their teacher's Start, does the
 /// wait's (#151), and, in no class, the way into one: not in one yet, or in none any more (#143;
-/// the approved Sign in & sign up design's Home boards).
+/// the approved Sign in & sign up design's Home boards). While a question shows, the answer card
+/// sits over the classes (L8; the app canvas's HomeQuestion): a student tapped in or not may answer
+/// (ARCHITECTURE, "Live lesson", decision 2).
 struct HomeView: View {
     let phone: Phone
     /// The card's bell, rung: the card goes then, by the phone's clock (C3c).
@@ -92,6 +94,7 @@ struct HomeView: View {
                     if let refused = phone.sync?.refusedTapWords {
                         Retry(words: refused, phone: phone)
                     }
+                    if let question = phone.card { AnswerCardView(card: question, phone: phone) }
                     // In no class, the card is the classes' own empty state, its Join a class
                     // theirs: one way in, never two (#143).
                     if empty == nil { ClassesSection(phone: phone, title: "Your classes") }
@@ -310,5 +313,8 @@ struct Retry: View {
     }
     #Preview("Home — in no class") {
         RootView(phone: Phone(fixture: PreviewFixtures.all["homeNoClasses"]!))
+    }
+    #Preview("Home — a question, not tapped in") {
+        RootView(phone: Phone(fixture: PreviewFixtures.all["homeQuestion"]!))
     }
 #endif

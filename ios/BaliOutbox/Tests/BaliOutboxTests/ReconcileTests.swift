@@ -495,12 +495,14 @@ struct ClassesTests {
         try await rig.sleeping([at(60)])
         rig.clock.advance(by: 30)
         try await rig.server.next(meRoute).reply(200, "{}")
-        await rig.until { $0.meFailed == .status(200) }
+        state = await rig.until { $0.meFailed == .status(200) }
+        // None of them a read that gave `me` (L8c's `meReads`).
+        #expect(state.meReads == 0)
         try await rig.sleeping([at(90)])
         rig.clock.advance(by: 30)
         try await rig.server.next(meRoute).reply(200, Answer.me(nil))
         state = await rig.until { $0.meFailed == nil }
-        #expect(state.hasClasses == false)
+        #expect(state.hasClasses == false && state.meReads == 1)
         await rig.engine.setForeground(true)
         try await rig.server.next(meRoute).reply(nil)
         state = await rig.until { $0.meFailed != nil }

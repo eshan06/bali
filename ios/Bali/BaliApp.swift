@@ -192,15 +192,26 @@ final class Phone {
     /// The lesson followed and its tasks: the watch of its reads, and its poll, run only while the
     /// app is in front (the owner's ruling, #330).
     @ObservationIgnored private var following: (lesson: LiveLesson, watch: Task<Void, Never>, poll: Task<Void, Never>?)?
-    /// The sessions a read said are over, or a poll was refused for (`403`, `404`), never followed
-    /// again this run; and the picks counted, so a pick's answer is said only while it is the latest
-    /// on the same question.
+    /// The sessions a read said are over, never followed again this run; those a poll was refused
+    /// for (`403`, `404`: the student no longer in the class, removed mid-class, say), each by the
+    /// reads of `GET /v1/me` taken then (`SyncState.meReads`), followed again once a later read
+    /// lists them — added back, the lesson comes back with no relaunch (the owner's ruling,
+    /// 2026-10-23); and the picks counted, so a pick's answer is said only while it is the latest on
+    /// the same question.
     @ObservationIgnored private var lessonsOver: Set<String> = []
+    @ObservationIgnored private var lessonsRefused: [String: Int] = [:]
     @ObservationIgnored private var picks = 0
     /// Whether a press on Emergency Unlock is under way, its one-second hold running: Focus keeps its
     /// layout meanwhile, so a card coming or going never rebuilds the control under the finger
-    /// (ARCHITECTURE, "Live lesson", decision 1: never delayed, its hold unchanged).
+    /// (ARCHITECTURE, "Live lesson", decision 1: never delayed, its hold unchanged), and the card
+    /// ignores taps, so no second finger answers a question the screen no longer shows (the owner's
+    /// ruling, 2026-10-23).
     var unlockHeld = false
+
+    /// The sessions not to follow now: over, or refused with no read of `GET /v1/me` taken since.
+    private var notFollowed: Set<String> {
+        lessonsOver.union(lessonsRefused.filter { $0.value == sync?.meReads }.keys)
+    }
 
     /// Whether the student `GET /v1/me` names has been listed in a class on this phone (#143):
     /// which words Home's empty state says.
@@ -414,6 +425,10 @@ final class Phone {
             dropLesson()
         }
         if pending, deleting == .none { deleting = .pending }
+        // A relaunch finding the account deleted on Bali's server and its sign-in still to go (the
+        // app closed between the two): the phone's notes under the student go now, as a finished
+        // Delete account takes them (the owner's ruling, 2026-10-23).
+        if pending, inClass != nil || listSeenBy != nil { forgetNotes() }
         if signedIn == true { signingIn = false }
         // Made here, not the Keychain read at launch (nil before it).
         let made = changed && signedIn == true && self.signedIn != nil
@@ -836,15 +851,17 @@ final class Phone {
         follow()
     }
 
-    /// The account deleted on Bali's server (Delete account, the gap's fallback's too): the phone's
-    /// two notes under the student's id, `inClass` and `listSeenBy`, go from its defaults (the
-    /// owner's ruling, 2026-10-23), and so does the engine's `me`, whose classes a state it sent
-    /// before would otherwise keep her in again (`synced`). A sign-out keeps them, so the same
-    /// student is never asked again.
+    /// The account deleted on Bali's server (Delete account, the gap's fallback's too, or a relaunch
+    /// finding it so): the phone's two notes under the student's id, `inClass` and `listSeenBy`, go
+    /// from its defaults (the owner's rulings, 2026-10-23) — a frozen fixture's from itself only —
+    /// and so does the engine's `me`, whose classes a state it sent before would otherwise keep her
+    /// in again (`synced`). A sign-out keeps them, so the same student is never asked again.
     private func forgetNotes() {
         (inClass, listSeenBy) = (nil, nil)
-        for key in [Phone.inClassKey, Phone.listSeenByKey] {
-            UserDefaults.standard.removeObject(forKey: key)
+        if !frozen {
+            for key in [Phone.inClassKey, Phone.listSeenByKey] {
+                UserDefaults.standard.removeObject(forKey: key)
+            }
         }
         forgetMe()
         follow()
@@ -914,9 +931,14 @@ final class Phone {
     }
 
     /// The answer card to show (L8): the lesson's question — the open one, or the last closed one
-    /// until another opens — unless this phone hid it; nil when there is none.
+    /// until another opens — unless this phone hid it; nil when there is none, and once the session
+    /// followed is no longer the one to follow by the phone's clock (`lessonSession`): at its bell
+    /// the card goes as Home's card for the class does, Bali reached or not, where a screen that
+    /// stays past the bell (Home) would have kept it until the next read. A fixture's shows as made.
     var card: AnswerCard? {
-        guard let question = lesson?.presentation?.question, !questionHidden else { return nil }
+        guard let question = lesson?.presentation?.question, !questionHidden,
+            frozen || sync?.lessonSession(at: Date(), over: notFollowed) == following?.lesson.session
+        else { return nil }
         return AnswerCard(question, problem: lesson?.problem, sending: answering, said: answerSaid)
     }
 
@@ -928,7 +950,7 @@ final class Phone {
     private func follow() {
         guard !frozen else { return }
         let seen = signedIn == true && sync?.me.map { $0.user.id == listSeenBy } == true
-        let session = seen ? sync?.lessonSession(at: Date(), over: lessonsOver) : nil
+        let session = seen ? sync?.lessonSession(at: Date(), over: notFollowed) : nil
         guard session != following?.lesson.session else { return }
         dropLesson()
         guard let session, let engine else { return }
@@ -955,23 +977,25 @@ final class Phone {
     /// session is over — another session's followed, if one runs. So is a poll refused `403` or
     /// `404`: the student no longer in the session's class (removed mid-class, say), or no such
     /// session — no connection problem, so never the card's "No connection" line: the card goes,
-    /// and the next read of `GET /v1/me` says where the student stands (the conductor's call).
+    /// and the next read of `GET /v1/me` says where the student stands (the conductor's call), the
+    /// lesson followed again if it lists the session (`notFollowed`; the owner's ruling, 2026-10-23).
     func lessonRead(_ state: LessonState, of session: String) {
         guard frozen || session == following?.lesson.session else { return }
         if state.presentation?.question?.id != lesson?.presentation?.question?.id { letCardGo() }
         lesson = state
         let refused = if case .refused(status: 403...404, _)? = state.problem { true } else { false }
         guard state.presentation?.running == false || refused, !frozen else { return }
-        lessonsOver.insert(session)
+        if refused { lessonsRefused[session] = sync?.meReads ?? 0 } else { lessonsOver.insert(session) }
         follow()
     }
 
     /// A tap on an answer (L8): sent at once in one request of the lesson's, never through the
     /// outbox (decision 5), shown on its way, then what it said — of picks whose answers cross, the
     /// last one's. The answer Bali holds sends nothing again, unless the last pick didn't send. With
-    /// no lesson to send through (a fixture's), it didn't send (rule 5).
+    /// no lesson to send through (a fixture's), it didn't send (rule 5). None while Emergency Unlock
+    /// is held (`unlockHeld`).
     func answer(_ option: Int) async {
-        guard let card, card.open else { return }
+        guard !unlockHeld, let card, card.open else { return }
         let question = card.question
         guard option != question.answer?.option || answering != nil || answerSaid != nil else { return }
         picks += 1
@@ -983,8 +1007,12 @@ final class Phone {
         (answering, answerSaid) = (nil, AnswerCard.Said(result, held: held))
     }
 
-    /// Hide, on a closed question: kept by this phone alone, until another question shows.
-    func hideQuestion() { questionHidden = true }
+    /// Hide, on a closed question: kept by this phone alone, until another question shows. None
+    /// while Emergency Unlock is held (`unlockHeld`).
+    func hideQuestion() {
+        guard !unlockHeld else { return }
+        questionHidden = true
+    }
 
     /// Starts the sign-in, the engine and the enforcer, unless they run already: a start that
     /// failed can be tried again.
