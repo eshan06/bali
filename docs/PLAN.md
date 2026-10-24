@@ -276,7 +276,7 @@ own worker (M2), and a load gate of several classes on phones and laptops (L4, M
 One line each; each step's full notes are on its line in `docs/PLAN-ARCHIVE.md`.
 
 - **C2** 👀 ⚖️ The privacy policy and terms (Phase 6, **gate**): the portal's pages and the app's links are built with placeholder text, which the lawyer's words replace in place
-  - **C2-drafts** The owner's drafts, for Apple's external beta review (the owner, 2026-10-24) — ✅ this PR: `docs/legal/privacy-policy.md` and `terms-of-use.md`, from General Legal's CC0 templates, every fact filled; the lawyer's questions at each file's end (DECISIONS 2026-10-24). The lawyer's review comes before the pilot's first class
+  - **C2-drafts** The owner's drafts, for Apple's external beta review (the owner, 2026-10-24) — ✅ (#460): `docs/legal/privacy-policy.md` and `terms-of-use.md`, from General Legal's CC0 templates, every fact filled; the lawyer's questions at each file's end (DECISIONS 2026-10-24). The lawyer's review comes before the pilot's first class
   - **C2-text** The drafts' words on `/privacy` and `/terms` in place of the outline: text only, the notice and Placeholder chips gone, the privacy draft's table as lists, the lawyer's notes left off; no new board (the owner, 2026-10-24); `policy-pages.test.ts` converted — validation: the page tests, a screenshot of each page
 - **C7** 📱 The 13+ screen (Phase 6, **gate**): built, C7-server with it; left, the owner's first-launch check on the next TestFlight build
 - **S8** 🔧 Least-privilege database roles (Phase 6): the owner's decision (Open owner items, 1)
