@@ -10,6 +10,21 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-23 (Central) — The same answer card off the Focus screen (L8c, #451;
+`docs/DECISIONS.md`, 2026-10-23), L8's last PR on the Mac, so L8's screens are done: while a question
+shows, Unlocked has the card over its reason card, Screen Time off over its steps and Home, for a
+student not tapped in, over its classes, as the boards draw them, every other word and button where
+it was, and a screen's own line about something gone wrong above the card, as three intermediate
+boards drawn first on the app canvas show. With it, the owner's three small fixes: a relaunch that finds the account deleted on Bali's
+server clears the phone's two notes, a student removed and added back mid-class gets the card again
+once Bali reads their classes, and the card ignores taps while Emergency Unlock is held. And two
+found on the way: the card goes at its class's bell by the phone's clock, signal or not, and a state
+chip is read to VoiceOver as its word alone, never its icon's name. No board draws the card on the
+Screen Time grant screen (a student not tapped in whose Screen Time access is off) or on the Home
+opened from Unlocked or Waiting, so none shows there: the owner's call. No TestFlight build was
+sent. Next on the Mac: L8's 📱 device check, the owner's, then M8; on the Windows PC, the other three
+pre-pilot steps wait for the owner's word._
+
 _Last updated: 2026-10-23 (Central) — The answer card on Focus (L8b-2, #450; `docs/DECISIONS.md`,
 2026-10-23), the second of L8b's two PRs on the Mac, so L8b is done: while a question shows over
 shields the check verified, Focus's ring becomes the strip under the class's name, the card under it,

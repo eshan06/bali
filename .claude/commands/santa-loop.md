@@ -40,7 +40,7 @@ What blocks is defined in one place: the reviewer prompt in `.github/workflows/c
 
 ### Step 2: Dual independent review
 
-Launch both reviewers **in parallel** (one message, two tool uses). Every Claude reviewer this loop launches, Reviewer A and Reviewer B's Claude fallback in either round, runs at the Agent tool's `effort: "max"`, whatever effort the worker itself runs at: the owner's explicit instruction (2026-10-14; `docs/DECISIONS.md`), so the safety net never weakens. Each gets:
+Launch both reviewers **in parallel** (one message, two tool uses). Every Claude reviewer this loop launches, Reviewer A and Reviewer B's Claude fallback in either round, runs at the Agent tool's `effort: "max"`, whatever effort the worker itself runs at, except on a screen step (`.claude/commands/plan.md`, "The worker's effort"), where it runs at `effort: "xhigh"`: the owner's explicit instructions (2026-10-14, and 2026-10-24 for screen steps; `docs/DECISIONS.md`). The brief names the step's reviewer effort; with none named, `max`; and a diff that ends up changing anything plan.md keeps at `max` runs its reviewers at `max`, whatever the brief named. Each gets:
 
 - the rules from Step 1, verbatim
 - the diff (`git diff origin/main...HEAD`), not whole files — reviewers open files themselves when they need context
@@ -59,7 +59,7 @@ Launch both reviewers **in parallel** (one message, two tool uses). Every Claude
 
 #### Reviewer A: Claude (always runs)
 
-An Agent with `subagent_type: code-reviewer`, `model: opus` and `effort: "max"`.
+An Agent with `subagent_type: code-reviewer`, `model: opus` and the reviewer effort above (`"max"`, or `"xhigh"` on a screen step).
 
 #### Reviewer B: external model (Claude fallback only if no external CLI is installed)
 
@@ -97,7 +97,7 @@ gemini -p "$(cat "$PROMPT_FILE")" -m gemini-2.5-pro
 rm -f "$PROMPT_FILE"
 ```
 
-**Claude fallback** (neither CLI installed): a second Agent with `subagent_type: code-reviewer`, `model: opus` and `effort: "max"`, given Reviewer B's prompt. Say in the report that both reviewers share a model family — context isolation still holds, model diversity doesn't.
+**Claude fallback** (neither CLI installed): a second Agent with `subagent_type: code-reviewer`, `model: opus` and the reviewer effort above, given Reviewer B's prompt. Say in the report that both reviewers share a model family — context isolation still holds, model diversity doesn't.
 
 #### Design check (only when the diff touches user-facing UI)
 
@@ -125,7 +125,7 @@ Every design finding is a **WARN, never a blocker**: santa is never stricter tha
    - Missing tests → add them. A rule break → confirm the rule in CLAUDE.md or ARCHITECTURE.md, then fix it.
 3. **WARNs:** fix the easy ones now — a rename, a stray log, a comment, a small cleanup. They never start another round. One that needs a real rewrite goes in the PR description instead. Never open a follow-up PR just for WARNs.
 4. Commit: `fix: address santa-loop review findings (round N)`.
-5. **Round 2** — whenever round 1 had blockers, fixed or dismissed. Fresh reviewers, at `max` as in Step 2, get the fix diff (`git diff <round-1 head>..HEAD`), the round-1 list (fixed, dismissed and why) and two questions: did the fixes work without breaking anything, and does each dismissal hold up? A dismissal they reject gets fixed now — or the step is parked if you still can't pin the failure down. They don't re-raise anything else from round 1. Round-2 blockers get the same check-then-fix. There is no round 3 — the GitHub Claude Review checks the final code.
+5. **Round 2** — whenever round 1 had blockers, fixed or dismissed. Fresh reviewers, at Step 2's effort, get the fix diff (`git diff <round-1 head>..HEAD`), the round-1 list (fixed, dismissed and why) and two questions: did the fixes work without breaking anything, and does each dismissal hold up? A dismissal they reject gets fixed now — or the step is parked if you still can't pin the failure down. They don't re-raise anything else from round 1. Round-2 blockers get the same check-then-fix. There is no round 3 — the GitHub Claude Review checks the final code.
 6. **Park** only when a real blocker can't be fixed within this step or needs an owner decision: push, open the PR as a **draft** that lists it, leave auto-merge off, and report the step as parked.
 
 ### Step 5: Push

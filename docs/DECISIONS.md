@@ -8,6 +8,50 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-24** — **Four new app boards approved (the owner, in chat: "Approved: build all four
+  proposals … after M8"):** the slide on Unlocked, Screen Time off and Home (`UnlockedSlide`,
+  `ScreenTimeOffSlide`, `HomeSlide`), and the question card on the Screen Time ask screen
+  (`ScreenTimeAskQuestion`), drawn as proposals on the app canvas (its row "Approved by the owner,
+  2026-10-24"). Why: ARCHITECTURE's "Live lesson" decision 1 (the lesson works the same unlocked, with
+  protection off, or without Screen Time access) left them undrawn: as built through M8, a student
+  who unlocked or isn't tapped in sees the question but not the slide, while M6's LessonDecks line,
+  back once M8 lands, says every phone shows the page; and a student not tapped in whose Screen Time
+  access is off sees the Screen Time ask in Home's place, with no card. Built as PLAN's M8b, after M8.
+
+- **2026-10-24** — **Santa's reviewers run at `xhigh` on screen steps, `max` on everything else
+  (#453; the owner's ruling, in chat: "screens can go to xhigh. only screens").** Amends 2026-10-14
+  (below), which kept santa's Claude reviewers at `max` in every round whatever the worker's effort.
+  **A screen step:** a 👀 step building approved boards whose diff changes nothing but the portal's
+  pages and components (the 2026-10-14 folders), the app's screens (`ios/Bali/UI`, `ios/BaliShield`),
+  the words they show (their strings in BaliOutbox, wherever they sit) and the screen state they read in `Phone`, their
+  tests and fixtures, and in `docs/` only the step's own lines in PLAN, PLAN-ARCHIVE, DECISIONS and
+  DESIGN.md. **Still `max`:** any change to
+  `ios/BaliCore`, BaliOutbox's engine (the outbox, the sync engine, the enforcer, the router's rules: which screen shows when),
+  `apps/web/src/lib`, the API, `packages/`, the database, CI or workflows, `docs/ARCHITECTURE.md` or
+  the rules (this PR included); and any change to sign-in, sign-out, the account's read, the 13+
+  check, account deletion, Emergency Unlock's control or its hold (how it is pressed, held or sent,
+  not a layout around it), the consent list's gate and its words (`ConsentCard`, and the help
+  page's copy), the privacy policy's or terms'
+  words, the store's listing, App Privacy or age-rating answers (`docs/APP-STORE.md`), or a privacy
+  manifest or entitlements file, wherever its code sits (on the phone, `Phone`'s paths for each in
+  `ios/Bali/BaliApp.swift`, and `SignInView`, `AgeView`, `DeletingView`, `MeView`, `PolicyLinks` and
+  the intro's Sign up, each flow's strings with it).
+  A diff that ends up changing any of these runs its reviewers at `max`, whatever the brief named.
+  *Santa's round 1 (both reviewers) tightened the first draft*, which let a screen step with a
+  smaller logic change (a few lines of the sync engine, a query, ARCHITECTURE.md), the store's privacy
+  answers or the sign-in and 13+ screens keep `xhigh` reviewers; and
+  *the conductor's call while the owner sleeps, to confirm:* Emergency Unlock's control and hold stay
+  `max`, though on a screen, since they are the product's "always allowed" promise (stricter than the
+  ruling, never looser). The conductor names the reviewers'
+  effort in each brief (`.claude/commands/plan.md`'s template), `max` when in doubt;
+  `santa-loop.md`, Step 2, runs them at it. **The workers' own effort is unchanged:** a portal screen
+  step's worker at `xhigh` as before, an app screen step's at `max`. **Why:** a Mac step took 75 to
+  145 minutes, santa's two reviewers at `max` and their fix round about 30 to 45 of it, on steps
+  whose look an approved board fixes and whose tests pin it; Claude Review still checks the final
+  code at its own effort. **How it is judged:** as 2026-10-14's: blockers found later, by Claude
+  Review or after a merge, in screen steps reviewed at `xhigh`, against earlier ones at `max`; more
+  of them → back to `max`.
+
 - **2026-10-23** — **The same answer card off the Focus screen (L8c, #451, L8's last PR, so its
   screens are done), with the owner's three riders; the card goes at its class's bell by the
   phone's clock; a state chip reads its word alone to VoiceOver.** **The screens** (the app canvas's

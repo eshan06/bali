@@ -8,20 +8,16 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-23 (Central) — The same answer card off the Focus screen (L8c, #451;
-`docs/DECISIONS.md`, 2026-10-23), L8's last PR on the Mac, so L8's screens are done: while a question
-shows, Unlocked has the card over its reason card, Screen Time off over its steps and Home, for a
-student not tapped in, over its classes, as the boards draw them, every other word and button where
-it was, and a screen's own line about something gone wrong above the card, as three intermediate
-boards drawn first on the app canvas show. With it, the owner's three small fixes: a relaunch that finds the account deleted on Bali's
-server clears the phone's two notes, a student removed and added back mid-class gets the card again
-once Bali reads their classes, and the card ignores taps while Emergency Unlock is held. And two
-found on the way: the card goes at its class's bell by the phone's clock, signal or not, and a state
-chip is read to VoiceOver as its word alone, never its icon's name. No board draws the card on the
-Screen Time grant screen (a student not tapped in whose Screen Time access is off) or on the Home
-opened from Unlocked or Waiting, so none shows there: the owner's call. No TestFlight build was
-sent. Next on the Mac: L8's 📱 device check, the owner's, then M8; on the Windows PC, the other three
-pre-pilot steps wait for the owner's word._
+_Last updated: 2026-10-24 (Central) — santa's reviewers run at `xhigh` on screen steps (the owner's
+ruling; `docs/DECISIONS.md`, 2026-10-24): a step building approved boards, the portal's or the app's,
+and nothing else (not the engine, ARCHITECTURE.md, sign-in, sign-out, the account's read, the 13+
+check, account deletion, Emergency Unlock, the store's privacy answers, or the policy's or terms'
+words); every other step's
+reviewers, and every worker's effort, as before. Before it, L8c (#451): the
+answer card on Unlocked, Screen Time off and Home, so L8's screens are done. Next on the Mac: M8 (#452), L8's 📱
+device check (the owner's), then M8b, the four boards the owner approved on 2026-10-24 (the slide on Unlocked, Screen Time off
+and Home, the card on the Screen Time ask); on the Windows PC, the other three pre-pilot steps wait
+for the owner's word._
 
 ## Now
 
@@ -120,7 +116,7 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
   per core); each PGlite test database is restored from one migrated copy per test file. The
   real-Postgres lane (~5 minutes, unchanged) and Claude Review (6–12) now bound a PR's merge.
 
-- **Worker effort (the owner, 2026-10-14):** a worker that only builds an approved portal screen runs at `xhigh`, every other worker and santa's Claude reviewers at `max` (`.claude/commands/plan.md`, `santa-loop.md`); the first 3–5 `xhigh` screen steps' blockers and times, against earlier screen steps', decide whether it stays (DECISIONS 2026-10-14).
+- **Worker and reviewer effort (the owner, 2026-10-14 and 2026-10-24):** a worker that only builds an approved portal screen runs at `xhigh`, every other worker at `max`; santa's reviewers run at `xhigh` on a screen step and at `max` on every other (`.claude/commands/plan.md`, `santa-loop.md`); the first 3–5 `xhigh` steps' blockers and times decide whether each stays (DECISIONS 2026-10-14, 2026-10-24).
 
 **The pilot's critical path.** The prod TestFlight build (✅ uploaded) → the owner's phone
 test on prod, a block tap included (✅ the tap, 2026-10-12) → the privacy page (C2, the lawyer's words) → the external
@@ -254,6 +250,7 @@ Slice 2 — slides:
 - **M6** 👀 Portal presenter to v2's canvas — ✅ as part 1 (#413), 2a (#414), 2b-1 (#415), 2b-2 (#416), 2c (#417) and 2d (#418); DECISIONS 2026-10-16; LessonDecks' panel line comes back with M8 (the conductor's call, the owner's on 2026-10-16)
 - **M7** BaliCore's deck download and cache (for M8) — ✅ (#331; DECISIONS 2026-10-12)
 - **M8** 👀📱 iOS slide view to the app canvas: PDFKit, pinch zoom, each page's text as its VoiceOver label, Emergency Unlock untouched — validation: XCTest, the device check on a shielded phone
+- **M8b** 👀📱 The slide on Unlocked, Screen Time off and Home, and the question card on the Screen Time ask (the four boards the owner approved on 2026-10-24, the app canvas's row of that date; DECISIONS 2026-10-24), after M8 — validation: XCTest, screenshots beside the boards, the device check with M8's
 - **M9** Load and demo with a deck — ✅ (#335; DECISIONS 2026-10-12)
 - **M10** 📱 Exit check: a real class on prod follows a deck
 
