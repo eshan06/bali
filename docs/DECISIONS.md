@@ -30,10 +30,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `apps/web/src/lib`, the API, `packages/`, the database, CI or workflows, `docs/ARCHITECTURE.md` or
   the rules (this PR included); and any change to sign-in, sign-out, the account's read, the 13+
   check, account deletion, Emergency Unlock's control or its hold (how it is pressed, held or sent,
-  not a layout around it), the consent list's gate, the privacy policy's or terms'
+  not a layout around it), the consent list's gate and its words (`ConsentCard`, and the help
+  page's copy), the privacy policy's or terms'
   words, the store's listing, App Privacy or age-rating answers (`docs/APP-STORE.md`), or a privacy
   manifest or entitlements file, wherever its code sits (on the phone, `Phone`'s paths for each in
-  `ios/Bali/BaliApp.swift`, and `SignInView`, `AgeView`, `DeletingView`, `MeView`, `PolicyLinks`).
+  `ios/Bali/BaliApp.swift`, and `SignInView`, `AgeView`, `DeletingView`, `MeView`, `PolicyLinks` and
+  the intro's Sign up, each flow's strings with it).
   A diff that ends up changing any of these runs its reviewers at `max`, whatever the brief named.
   *Santa's round 1 (both reviewers) tightened the first draft*, which let a screen step with a
   smaller logic change (a few lines of the sync engine, a query, ARCHITECTURE.md), the store's privacy
