@@ -36,12 +36,14 @@ a real decision? Add a dated entry at the top: what was decided and why.
   Web, Share), whose sheets come up over Emergency Unlock (decision 1), as a fillable worksheet's
   field would bring up a keyboard. Cost: a student can't copy a slide's words. Pinch and the page's
   scroll stay PDFKit's, and a swipe starting on the slide scrolls the screen. **The deck** (M7's
-  `LiveLesson.deck(for:)`): asked for as the slide view shows it (`Phone.loadDeck`), never as the
-  poll names it, so no screen fetches up to 25 MB for a slide it doesn't show (*the worker's call*);
-  once per SHA-256: no second ask while one is on its way (M7 left that guard to M8) nor for the deck
-  held, a page turned asks nothing, a deck shown again is answered from `LiveLesson`'s memory for the
-  session, and Try again asks once more; only the lesson's current slide is ever asked for, so a stale
-  Try again fetches nothing. One parsed `PDFDocument` at a time, in memory alone: let go once the
+  `LiveLesson.deck(for:)`): asked for by the slide view at each change of what it shows
+  (`Phone.loadDeck`), never as the poll names it, so no screen fetches up to 25 MB for a slide it
+  doesn't show (*the worker's call*); fetched once per SHA-256, however often it is asked: no second
+  fetch while one is on its way (M7 left that guard to M8) nor for the deck held, a page turned
+  fetches nothing, a deck shown again is answered from `LiveLesson`'s memory for the session, and Try
+  again fetches once more; only the lesson's current slide is ever fetched, so a stale Try again
+  fetches nothing, and a deck let go and shown again inside one press on Emergency Unlock still loads
+  (santa's round 1). One parsed `PDFDocument` at a time, in memory alone: let go once the
   lesson shows another deck or none, and with the lesson at a sign-out or the session's end
   (`dropLesson`); the slide goes at its class's bell by the phone's clock, as the card does
   (`Phone.lessonCurrent`, L8c's rule, now the card's and the slide's). A deck PDFKit can't open, or
@@ -57,7 +59,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   hold with a slide showing, a link not opened, a long press selecting nothing; the phone locked
   mid-download. **Tests:** `AppTests.slideOnFocus`, `slideAndQuestion`, `slideStates`,
   `slideVoiceOver`, `slideLinks`, `slideOncePerDeck`, `slideAsksAsItShows`, `slideFits` and
-  `slideWaitsForTheHold`, each guard taken out in turn (13) failing its test; the PDFs drawn in code
+  `slideWaitsForTheHold`, each of 14 guards taken out in turn failing its test; the PDFs drawn in code
   (`UIGraphicsPDFRenderer`), none in the repo; `scrollEdges`' sweep skips PDFKit's own zoom view,
   no screen's scroll. Screenshots beside each board.
 
