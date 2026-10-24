@@ -4601,97 +4601,120 @@ struct AppTests {
     }
 
     @Test(
-        "iOS's prompt to send the class-started alert is asked once, right after onboarding's Screen Time step, its grant confirmed — the step still showing, before Home — and, allowed, the phone asks iOS for its device token (the owner's ruling, 2026-10-24); never on Home, Focus or Waiting, never after Protection off's Turn on Screen Time, never for a student who doesn't grant Screen Time, and never again: the step pressed again, or after a relaunch",
+        "iOS's prompt to send the class-started alert is asked once, as Home shows right after onboarding's Screen Time step (the owner's ruling, 2026-10-24) — its grant confirmed by its own ask, in Settings after Don't Allow, or kept by iOS through a reinstall — and, allowed, the phone asks iOS for its device token. Never on Waiting or Focus, which come in Home's place; never for a student who doesn't grant Screen Time, nor on an install whose step was done before, nor again after a relaunch; and a Home gone before iOS answered leaves it due",
         .timeLimit(.minutes(3)))
     func notifyAskedAfterScreenTime() async throws {
         let defaults = UserDefaults.standard
         let before = defaults.object(forKey: Phone.everApprovedKey)
         defer { defaults.set(before, forKey: Phone.everApprovedKey) }
         defaults.set(false, forKey: Phone.everApprovedKey)
-        // Never on Home, Focus or Waiting.
-        let asked = Asked()
-        var approved = Protection()
-        (approved.checked, approved.permission) = (true, .approved)
-        let (shown, _) = try standIn(StandIn(), protection: approved)
-        shown.notifications = asked.notifications
-        shown.signed(in: true, as: "ana", checked: true)
-        // The sign-in's own ask of iOS for a token, not allowed yet: settled, so it never runs late.
-        try await Task.sleep(for: .milliseconds(300))
-        shown.synced(try student(.out))
-        let (window, _) = try await laidOut(RootView(phone: shown)) { $0.contains("Hi, Ana") }
-        defer { window.isHidden = true }
-        func shows(_ label: String) async throws {
-            try await until {
-                window.layoutIfNeeded()
-                return ((try? voiceOver(in: window)) ?? []).contains { $0.accessibilityLabel == label }
+        var (step, denied, granted) = (Protection(), Protection(), Protection())
+        (step.checked, step.permission) = (true, .notDetermined)
+        (denied.checked, denied.permission, denied.permissionOff) = (true, .denied, true)
+        (granted.checked, granted.permission) = (true, .approved)
+        let running = SessionView(id: "s", classId: "c", endsAt: Date() + 600)
+        /// `phone`'s screens in a window, as the app shows them, until the test ends.
+        var windows: [UIWindow] = []
+        defer { for window in windows { window.isHidden = true } }
+        func showing(_ phone: Phone, once label: String) async throws -> (String) async throws -> Void {
+            let (window, _) = try await laidOut(RootView(phone: phone)) { $0.contains(label) }
+            windows.append(window)
+            return { label in
+                try await until {
+                    window.layoutIfNeeded()
+                    return ((try? voiceOver(in: window)) ?? []).contains { $0.accessibilityLabel == label }
+                }
             }
         }
-        let bell = Date() + 600
-        shown.synced(try student(.inSession(SessionView(id: "s", classId: "c", endsAt: bell), .focused)))
-        try await shows("Emergency Unlock. Your teacher will see it.")
-        shown.synced(try student(.waiting))
-        try await shows("Ready, waiting for your teacher")
-        try await Task.sleep(for: .milliseconds(300))
-        #expect(asked.asks == 0 && asked.registers == 0)
-        shown.signed(in: false)
-        // Onboarding's Screen Time step: granted, iOS's prompt asked at once, the step still showing.
-        var step = Protection()
-        (step.checked, step.permission) = (true, .notDetermined)
-        let onboarding = Asked()
-        let (phone, _) = try standIn(StandIn(), protection: step, screenTime: Granting())
-        (onboarding.phone, phone.notifications) = (phone, onboarding.notifications)
+        // The step's own ask granted: Waiting and Focus, in Home's place, ask nothing; Home then asks.
+        let asked = Asked()
+        let (phone, _) = try standIn(StandIn(), protection: step)
+        (asked.phone, phone.notifications) = (phone, asked.notifications)
         phone.signed(in: true, as: "ana", checked: true)
+        // The sign-in's own ask of iOS for a token, not allowed yet: settled, so it never runs late.
         try await Task.sleep(for: .milliseconds(300))
+        phone.synced(try student(.waiting))
+        let shows = try await showing(phone, once: "Ask me")
+        phone.protected(granted)
+        try await shows("Ready, waiting for your teacher")
+        phone.synced(try student(.inSession(running, .focused)))
+        try await shows("Emergency Unlock. Your teacher will see it.")
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(asked.asks == 0 && phone.notifyDue)
         phone.synced(try student(.out))
-        #expect(phone.shown.screen == .screenTime && onboarding.asks == 0)
-        await phone.askScreenTime()
-        #expect(onboarding.asks == 1 && onboarding.shownAtAsk == .screenTime)
-        try await until { onboarding.registers == 1 }
-        // Pressed again: asked nothing more.
-        await phone.askScreenTime()
-        #expect(onboarding.asks == 1)
+        try await until { asked.asks == 1 }
+        #expect(asked.shownAtAsk == .home && !phone.notifyDue)
+        try await until { asked.registers == 1 }
         phone.signed(in: false)
-        // A relaunch, iOS keeping the answer: the step again — access taken back since — asks nothing.
-        let (relaunched, _) = try standIn(StandIn(), protection: step, screenTime: Granting())
-        relaunched.notifications = onboarding.notifications
+        // A relaunch, or an install whose step was done before this build: Home asks nothing.
+        let (relaunched, _) = try standIn(StandIn(), protection: granted)
+        relaunched.notifications = asked.notifications
         relaunched.signed(in: true, as: "ana", checked: true)
         relaunched.synced(try student(.out))
-        await relaunched.askScreenTime()
-        #expect(onboarding.asks == 1)
+        relaunched.protected(granted)
+        _ = try await showing(relaunched, once: "Hi, Ana")
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(asked.asks == 1 && !relaunched.notifyDue)
         relaunched.signed(in: false)
-        // Protection off's Turn on Screen Time, a session's screen: granted, nothing asked.
-        let afterOff = Asked()
-        var off = Protection()
-        (off.checked, off.permission, off.permissionOff) = (true, .denied, true)
-        let (offPhone, _) = try standIn(StandIn(), protection: off, screenTime: Granting())
-        offPhone.notifications = afterOff.notifications
-        offPhone.signed(in: true, as: "ana", checked: true)
-        let running = SessionView(id: "s", classId: "c", endsAt: Date() + 600)
-        offPhone.synced(try student(.inSession(running, .protectionOff)))
-        #expect(offPhone.shown.screen == .protectionOff)
-        await offPhone.askScreenTime()
-        #expect(afterOff.asks == 0)
-        offPhone.signed(in: false)
-        // A student who doesn't grant Screen Time: never asked.
-        let notGranted = Asked()
-        let (refused, _) = try standIn(StandIn(), protection: step, screenTime: Granting(grants: false))
-        refused.notifications = notGranted.notifications
+        // Don't Allow, then Bali turned on in Settings: Home asks once it shows.
+        defaults.set(false, forKey: Phone.everApprovedKey)
+        let settings = Asked()
+        let (later, _) = try standIn(StandIn(), protection: step)
+        later.notifications = settings.notifications
+        later.signed(in: true, as: "ana", checked: true)
+        try await Task.sleep(for: .milliseconds(300))
+        later.synced(try student(.out))
+        later.protected(denied)
+        let laterShows = try await showing(later, once: "Open Settings")
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(settings.asks == 0 && !later.notifyDue)
+        later.protected(granted)
+        try await laterShows("Hi, Ana")
+        try await until { settings.asks == 1 }
+        later.signed(in: false)
+        // A reinstall where iOS kept Bali's grant: no step shows, and Home asks after the sign-in.
+        defaults.set(false, forKey: Phone.everApprovedKey)
+        let kept = Asked()
+        let (reinstalled, _) = try standIn(StandIn(), protection: granted)
+        reinstalled.notifications = kept.notifications
+        reinstalled.protected(granted)
+        reinstalled.signed(in: true, as: "ana", checked: true)
+        try await Task.sleep(for: .milliseconds(300))
+        reinstalled.synced(try student(.out))
+        _ = try await showing(reinstalled, once: "Hi, Ana")
+        try await until { kept.asks == 1 }
+        reinstalled.signed(in: false)
+        // A student who doesn't grant Screen Time: the step stays, and nothing is asked.
+        defaults.set(false, forKey: Phone.everApprovedKey)
+        let never = Asked()
+        let (refused, _) = try standIn(StandIn(), protection: step)
+        refused.notifications = never.notifications
         refused.signed(in: true, as: "ana", checked: true)
         refused.synced(try student(.out))
-        await refused.askScreenTime()
-        #expect(notGranted.asks == 0 && refused.askFailed == .cancelled)
+        refused.protected(denied)
+        _ = try await showing(refused, once: "Open Settings")
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(never.asks == 0 && !refused.notifyDue)
         refused.signed(in: false)
-        // An ask cancelled while iOS says how the student answered asks nothing (santa's round 1):
-        // its task cancelled before that answer came.
+        // A Home gone while iOS was saying how the student answered leaves it due (santa's round 1).
+        defaults.set(false, forKey: Phone.everApprovedKey)
         let slow = Slow()
-        let left = Phone()
+        let (left, _) = try standIn(StandIn(), protection: step)
         left.notifications = slow.notifications
+        left.signed(in: true, as: "ana", checked: true)
+        left.protected(granted)
         let asking = Task { await left.askToNotify() }
         try await until { slow.answering != nil }
         asking.cancel()
         slow.answer(.notDetermined)
         await asking.value
-        #expect(slow.asks == 0)
+        #expect(slow.asks == 0 && left.notifyDue)
+        let again = Task { await left.askToNotify() }
+        try await until { slow.answering != nil }
+        slow.answer(.notDetermined)
+        await again.value
+        #expect(slow.asks == 1 && !left.notifyDue)
+        left.signed(in: false)
     }
 
     @Test(
@@ -4713,7 +4736,7 @@ struct AppTests {
         asked.status = .authorized
         phone.signed(in: true, as: "ana", checked: true)
         try await until { asked.registers == 1 }
-        #expect(asked.asks == 0, "asked only on Waiting")
+        #expect(asked.asks == 0, "asked only as Home shows after the Screen Time step")
         let running = Task { await engine.run() }
         let logged = try await written {
             phone.registered(token: token)
@@ -5015,8 +5038,7 @@ private func signUp(_ phone: Phone, through pages: Pages) async {
 @MainActor
 private func standIn(
     _ server: any HTTPTransport, keychain: Keychain = Keychain(account: "ana"),
-    protection: Protection? = nil, tokens: (any TokenProvider)? = nil,
-    screenTime: (any ScreenTime)? = nil
+    protection: Protection? = nil, tokens: (any TokenProvider)? = nil
 ) throws -> (Phone, SyncEngine) {
     struct Signed: TokenProvider {
         func accessToken() async -> String? { "token" }
@@ -5031,10 +5053,7 @@ private func standIn(
         domain: URL(string: "https://bali.auth.test")!, clientId: "phone",
         redirectURI: URL(string: "bali://auth/callback")!)
     let signIn = SignIn(cognito: cognito, store: keychain, transport: server)
-    let enforcer = screenTime.map { Enforcer(engine: engine, screenTime: $0) }
-    return (
-        Phone(signIn: signIn, engine: engine, protection: protection, enforcer: enforcer), engine
-    )
+    return (Phone(signIn: signIn, engine: engine, protection: protection), engine)
 }
 
 /// A phone of the test's own as `Phone.start` makes it, over `server` and a sign-in over
@@ -5697,30 +5716,6 @@ private final class Asked {
             },
             register: { self.registers += 1 })
     }
-}
-
-/// Screen Time as a stand-in has it for a phone of the test's own: iOS's prompt for the access
-/// granted, or not (`grants`), the marker written as iOS confirms it, and no shield ever on.
-private actor Granting: ScreenTime {
-    private let grants: Bool
-    private var granted = Permission.notDetermined
-    private var marked = false
-
-    init(grants: Bool = true) { self.grants = grants }
-
-    func isShielding() -> Bool { false }
-    func shield() {}
-    func unshield() {}
-    func permission() -> Permission { granted }
-    func requestPermission() throws {
-        granted = grants ? .approved : .denied
-        if !grants { throw ScreenTimeAskError.cancelled }
-    }
-    func schedule(_ window: DateInterval?) {}
-    func monitorUnscheduled() -> Date? { nil }
-    func marker() -> Marker { marked ? .present : .unwritten }
-    func writeMarker() { marked = true }
-    func markerLostAt() -> Date? { nil }
 }
 
 /// iOS's notifications as a stand-in answers the phone slowly: how the student answered its prompt

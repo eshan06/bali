@@ -108,6 +108,9 @@ struct HomeView: View {
             }
             .scrollBounceBehavior(.basedOnSize).screenWide()
         }
+        // Onboarding's end, the Screen Time step done this run: iOS's prompt to send the
+        // class-started alert, once (`Phone.askToNotify`; the owner's ruling, 2026-10-24).
+        .task { await phone.askToNotify() }
     }
 
     /// A class in session, the student not focused in it (C3c), in D1's look: the state's chip and

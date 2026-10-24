@@ -19,16 +19,19 @@ a real decision? Add a dated entry at the top: what was decided and why.
   owner's ruling, in chat on 2026-10-24: "Notifications: ask during onboarding, right after the
   Screen Time step, not on Waiting."; the PR was a draft until it, with the conductor's
   recommendation, the first Waiting, which this replaces): iOS's own prompt, alerts and sound, no
-  Bali screen before it, once onboarding's Screen Time step has its grant confirmed, before Home
-  (`Phone.askScreenTime`, then `askToNotify`). Only on that step, the router's `screenTime`, which
-  never shows in a running session: never on Waiting, never over Focus, Emergency Unlock or a
-  session's screens, so never after Protection off's Turn on Screen Time, which shares the step's
-  button. A student who never grants Screen Time is never asked, since they can't tap in and the
-  alert can't help them. iOS prompts only while the student has never answered, so it is asked
-  once, and never again after a relaunch. The prompt is asked as the grant lands, so it can come up
-  over the Home the step leads to. An install already past that step is not asked: only the
-  owner's phone today, and build 10 has no push, so the owner reinstalls Bali before runbook 7's
-  step-6 check. *Registering* (N3, N4): while the sign-in is through the 13+ check, at
+  Bali screen before it, once onboarding's Screen Time step is done on this install, its grant
+  confirmed by any way in: its own ask, Settings after Don't Allow (santa's review of the change,
+  both reviewers: a student who went that way was never asked), or a reinstall where iOS kept the
+  grant and skipped the step. The step done (`Phone.remember`: `everApproved` set) makes it due;
+  Home asks it, the end of onboarding, signed in through the 13+ check (`HomeView`'s task,
+  `askToNotify`). So it comes up as the step gives way to Home, never on Waiting, never over Focus,
+  Emergency Unlock or a session's screens, which come in Home's place: a due ask waits for Home. A
+  student who never grants Screen Time never reaches Home and is never asked, since they can't tap
+  in and the alert can't help them. iOS prompts only while the student has never answered, so it
+  is asked once, and never again after a relaunch. An install whose step was done before this
+  build is not asked: only the owner's phone today, and build 10 has no push, so the owner
+  reinstalls Bali before runbook 7's step-6 check. *Registering* (N3, N4): while the sign-in is
+  through the 13+ check, at
   a launch signed in or a sign-in this run, and as the student allows notifications, the phone asks
   iOS for its device token, only once they are allowed (`.authorized`); the token goes to `PUT
   /v1/me/push-token` as lower-case hex under a fresh lower-case UUIDv7 (`EventID`), `sandbox` from a

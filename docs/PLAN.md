@@ -9,13 +9,13 @@ is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
 _Last updated: 2026-10-24 (Central) — The push's app half (#456; `docs/DECISIONS.md`, 2026-10-24):
-the entitlements; iOS's own prompt to send notifications, asked once right after onboarding's
-Screen Time step (the owner's ruling, 2026-10-24); the device token registered at each launch and
+the entitlements; iOS's own prompt to send notifications, asked once as Home shows right after
+onboarding's Screen Time step (the owner's ruling, 2026-10-24); the device token registered at each launch and
 taken off Bali at Sign out; and the owner's approved wait, a random 0–10 s before the first read
 after a fresh alert, Waiting and Home saying option B's words meanwhile. **Before the next TestFlight
 build, Push Notifications on `com.bali.Bali`** (runbook 7, step 3), or its signing may fail; build 10
-went before this, from `1d4496b6`. **An install past the Screen Time step is never asked:** the
-owner reinstalls Bali before runbook 7's step-6 check. Next on the Mac: the owner's sitting on build
+went before this, from `1d4496b6`. **An install whose Screen Time step was done before this build
+is never asked:** the owner reinstalls Bali before runbook 7's step-6 check. Next on the Mac: the owner's sitting on build
 10 (`ios/README.md`), then runbook 7 and N6's check; on the Windows PC, M6's LessonDecks line back
 (M8 landed) and the other three pre-pilot steps, which wait for the owner's word._
 
@@ -278,7 +278,7 @@ One line each; each step's full notes are on its line in `docs/PLAN-ARCHIVE.md`.
 - **C7** 📱 The 13+ screen (Phase 6, **gate**): built, C7-server with it; left, the owner's first-launch check on the next TestFlight build
 - **S8** 🔧 Least-privilege database roles (Phase 6): the owner's decision (Open owner items, 1)
 - **D2k** ⏸ The shield's new look (Phase 3): waits for a design the owner approves in Claude Design
-- **The push's app half** — ✅ (#456; DECISIONS 2026-10-24); left, runbook 7 (Push Notifications on `com.bali.Bali` before the next TestFlight build) and N6's end-to-end check, the owner's, Bali reinstalled first (an install past the Screen Time step is never asked)
+- **The push's app half** — ✅ (#456; DECISIONS 2026-10-24); left, runbook 7 (Push Notifications on `com.bali.Bali` before the next TestFlight build) and N6's end-to-end check, the owner's, Bali reinstalled first (an install whose Screen Time step was done before this build is never asked)
 
 ### Phase 3: known edges, carried forward
 

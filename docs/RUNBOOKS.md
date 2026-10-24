@@ -781,11 +781,9 @@ Holder or Admin role, and the Railway project.
    registers as `sandbox`; a TestFlight build on prod registers as `production`. On each:
    **delete Bali and install it again first**, since only onboarding asks to send
    notifications and an install already past it never asks. Sign in as a student in a class;
-   right after the Screen Time step, iOS asks to send notifications: **Allow**. A phone that
-   granted Bali Screen Time before may keep that grant and skip the step: then turn Bali off in
-   Settings → Screen Time → Apps with Screen Time Access, and Bali shows the step again. Tap the
-   block while the class is off (the tap waits for the Start), lock the phone, then press
-   **Start** on the portal.
+   as Home shows, right after the Screen Time step (skipped if iOS kept Bali's grant), iOS asks
+   to send notifications: **Allow**. Tap the block while the class is off (the tap waits for the
+   Start), lock the phone, then press **Start** on the portal.
    **Check:** within seconds the lock screen shows "{class name} has started" / "Open Bali
    to lock your apps.", and the API's log shows no APNs refusal. Open Bali from the alert:
    Waiting says "Checking in with your class" for up to 10 s, then Focus shows, the apps

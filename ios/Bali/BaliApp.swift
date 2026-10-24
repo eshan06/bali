@@ -277,6 +277,9 @@ final class Phone {
     /// How long Sign out waits for its token's removal before it goes on regardless (`signOut`) — a
     /// test's own in `BaliTests`.
     @ObservationIgnored var pushRemoval: TimeInterval = 3
+    /// Whether iOS's prompt to send the class-started alert is due: the Screen Time step done this
+    /// run (`remember`), asked once Home shows (`askToNotify`).
+    @ObservationIgnored private(set) var notifyDue = false
 
     /// The sessions not to follow now: over, or refused with no read of `GET /v1/me` taken since.
     private var notFollowed: Set<String> {
@@ -322,14 +325,9 @@ final class Phone {
         /// A phone over a sign-in and an engine a test made, never started (BaliTests): the calls
         /// `start` wires between them and the screens, tested over stand-ins for the Keychain and
         /// the server (C6a-2's and C6b-1's reviews) — and, given, what rule 3's check found, so the
-        /// router routes as over a running enforcer, and an enforcer over a stand-in for Screen
-        /// Time, for the permission's ask.
-        init(
-            signIn: SignIn, engine: SyncEngine, protection: Protection? = nil,
-            enforcer: Enforcer? = nil
-        ) {
+        /// router routes as over a running enforcer.
+        init(signIn: SignIn, engine: SyncEngine, protection: Protection? = nil) {
             (self.signIn, self.engine, self.protection) = (signIn, engine, protection)
-            self.enforcer = enforcer
         }
     #endif
 
@@ -975,29 +973,34 @@ final class Phone {
         follow()
     }
 
+    /// What rule 3's check found, as the enforcer says it (`start`): the screens' to read, and
+    /// `everApproved` kept by it.
+    func protected(_ protection: Protection) {
+        self.protection = protection
+        remember(protection)
+    }
+
     /// Keeps `everApproved` as a pass read the permission: set at approved, cleared once the check
     /// judges it off, left at a read not determined for a moment — the read it is there to see
-    /// past.
+    /// past. Set, the Screen Time step is done on this install — its grant confirmed by its own ask,
+    /// in Settings, or kept by iOS through a reinstall — and iOS's prompt to send the class-started
+    /// alert is due (`notifyDue`; the owner's ruling, 2026-10-24).
     func remember(_ protection: Protection) {
         let approved = protection.permission == .approved
         guard approved || protection.permissionOff, everApproved != approved else { return }
         everApproved = approved
         UserDefaults.standard.set(approved, forKey: Phone.everApprovedKey)
+        if approved { notifyDue = true }
     }
 
     /// Asks iOS for the Screen Time permission — its own prompt, through the enforcer — and keeps
-    /// why it did not finish. Asked on onboarding's Screen Time step (the router's `screenTime`,
-    /// never Protection off's Turn on Screen Time, a session's screen), a grant iOS confirmed is
-    /// followed at once by iOS's prompt to send the class-started alert (`askToNotify`; the owner's
-    /// ruling, 2026-10-24). Nothing on a frozen phone.
+    /// why it did not finish. Nothing on a frozen phone.
     func askScreenTime() async {
         guard let enforcer else { return }
         askFailed = nil
-        let onboarding = shown.screen == .screenTime
         do { try await enforcer.requestPermission() } catch {
-            return askFailed = error as? ScreenTimeAskError ?? .failed("\(error)")
+            askFailed = error as? ScreenTimeAskError ?? .failed("\(error)")
         }
-        if onboarding { await askToNotify() }
     }
 
     /// Bali opened from the class-started alert, delivered at `delivered` (ARCHITECTURE, "Push: a
@@ -1012,17 +1015,20 @@ final class Phone {
         Task { await engine.holdRead(until: until) }
     }
 
-    /// Right after onboarding's Screen Time step, its grant confirmed (`askScreenTime`; the owner's
-    /// ruling, 2026-10-24): iOS's own prompt to send notifications, alerts and sound, asked only
-    /// while the student has never answered it — so once, never again after a relaunch — and,
-    /// allowed, the device token asked for (`registerForPush`). Never on Waiting, nor over Focus,
-    /// Emergency Unlock or a session's screens: that step shows outside a running session. A
-    /// student who never grants Screen Time is never asked, and an ask cancelled while iOS says how
-    /// the student answered asks nothing (santa's round 1).
+    /// Home shows (`HomeView`'s task), signed in through the 13+ check, the Screen Time step done
+    /// this run (`notifyDue`): onboarding's end, right after that step (the owner's ruling,
+    /// 2026-10-24) — iOS's own prompt to send notifications, alerts and sound, asked only while the
+    /// student has never answered it, so once, never again after a relaunch, and, allowed, the device
+    /// token asked for (`registerForPush`). Never on Waiting, nor over Focus, Emergency Unlock or a
+    /// session's screens, which come in Home's place; never for a student who doesn't grant Screen
+    /// Time, nor an install whose step was done before this build. A Home gone before iOS said how
+    /// the student answered leaves it due (santa's round 1).
     func askToNotify() async {
-        guard !frozen, await notifications.status() == .notDetermined, !Task.isCancelled
-        else { return }
-        if await notifications.ask() { registerForPush() }
+        guard notifyDue, cleared == true, !frozen else { return }
+        let status = await notifications.status()
+        guard !Task.isCancelled else { return }
+        notifyDue = false
+        if status == .notDetermined, await notifications.ask() { registerForPush() }
     }
 
     /// Signed in through the 13+ check (`cleared`), or notifications just allowed: the device token
@@ -1277,10 +1283,7 @@ final class Phone {
         Task { await enforcer.run() }
         Task { for await state in await engine.updates() { self.synced(state) } }
         Task {
-            for await protection in await enforcer.updates() {
-                self.protection = protection
-                self.remember(protection)
-            }
+            for await protection in await enforcer.updates() { self.protected(protection) }
         }
         Task { await self.follow(signIn) }
         await engine.setForeground(foreground)
