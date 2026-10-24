@@ -19,7 +19,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   access is off sees the Screen Time ask in Home's place, with no card. Built as PLAN's M8b, after M8.
 
 - **2026-10-24** — **Santa's reviewers run at `xhigh` on screen steps, `max` on everything else
-  (#PRNUM; the owner's ruling, in chat: "screens can go to xhigh. only screens").** Amends 2026-10-14
+  (#453; the owner's ruling, in chat: "screens can go to xhigh. only screens").** Amends 2026-10-14
   (below), which kept santa's Claude reviewers at `max` in every round whatever the worker's effort.
   **A screen step:** a 👀 step building approved boards whose diff changes nothing but the portal's
   pages and components (the 2026-10-14 folders), the app's screens (`ios/Bali/UI`, `ios/BaliShield`),
