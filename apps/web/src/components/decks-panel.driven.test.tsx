@@ -120,7 +120,9 @@ describe('Show slides’ panel (LessonDecks)', () => {
   it('closes with its Close', async () => {
     const user = userEvent.setup();
     const { panel, onClose } = open();
-    await user.click(within(panel).getByRole('button', { name: 'Close' }));
+    const close = within(panel).getByRole('button', { name: 'Close' });
+    expect(close.getAttribute('type')).toBe('button');
+    await user.click(close);
     expect(onClose).toHaveBeenCalledOnce();
   });
 });
