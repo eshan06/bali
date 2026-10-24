@@ -380,10 +380,32 @@ extension SyncState {
     /// What Home's card says while the phone waits for its teacher's Start (#151; the owner's
     /// decision, 2026-10-01): Waiting's Back to home lands on the regular Home, which says the tap
     /// counted and when the phone locks, in the hero's place — as C3c's card does — never "Tap
-    /// your teacher's block" as if it had not. Nil otherwise.
+    /// your teacher's block" as if it had not; while Bali checks in after the class-started alert
+    /// (`checkingIn`), that the apps lock in a few seconds (the app canvas's PushWaitBHome). Nil
+    /// otherwise.
     public var waitingCard: String? {
-        standing == .waiting
-            ? "You're tapped in. Your phone locks when class starts, as long as Bali is open." : nil
+        guard standing == .waiting else { return nil }
+        return checkingIn
+            ? "You're tapped in. Your apps lock in a few seconds, as long as Bali is open."
+            : "You're tapped in. Your phone locks when class starts, as long as Bali is open."
+    }
+
+    /// What Waiting says (D1's Waiting artboard): its heading, its line and its card's — while Bali
+    /// checks in after the class-started alert (`checkingIn`), that the apps lock in a few seconds,
+    /// never that they are locked (the app canvas's PushWaitB, the owner's pick, 2026-10-23); its
+    /// own words again once that read answers or fails, a failure beside Try again.
+    public var waitingWords: (heading: String, line: String, card: String) {
+        checkingIn
+            ? (
+                "Checking in with your class",
+                "Your apps lock in a few seconds. No need to tap again.",
+                "Keep Bali open until your apps lock."
+            )
+            : (
+                "Ready, waiting for your teacher",
+                "You tapped your teacher's block before class started. Your phone locks when class starts, as long as Bali is open. No need to tap again.",
+                "Keep Bali open so it can start right away."
+            )
     }
 
     /// Out of any session, `GET /v1/me` listing the student in no class: Home's empty state, Tap in

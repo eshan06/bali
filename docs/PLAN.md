@@ -8,13 +8,14 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-24 (Central) — Phase 7's phone sitting written for the owner (`ios/README.md`,
-"Phase 7's phone sitting, on prod"): C7's first launch, L8's, M8's and M8b's device checks, and the
-exit checks L9, M10 and W6, each part opening with its starting state, on TestFlight build 10 (prod,
-from `1d4496b6`, dispatched 2026-10-24). Before it, M8b (#454): the slide on Unlocked, Screen Time
-off and Home, and the card on the Screen Time ask, so every phone screen of Phase 7 is built. Next on
-the Mac: the push's app half (option B's wait, for a fresh alert only), parked for the owner's word
-on when the app asks to send notifications; then the owner's sitting, runbook 7 and N6's check; on
+_Last updated: 2026-10-24 (Central) — The push's app half (#456; `docs/DECISIONS.md`, 2026-10-24),
+a draft parked for the owner's word on when the app asks to send notifications (iOS's own prompt,
+the first time a student lands on Waiting: the conductor's recommendation): the entitlements, the
+device token registered at each launch and taken off Bali at Sign out, and the owner's approved
+wait, a random 0–10 s before the first read after a fresh alert, Waiting and Home saying option B's
+words meanwhile. **Before the next TestFlight build, Push Notifications on `com.bali.Bali`** (runbook
+7, step 3), or its signing may fail; build 10 went before this, from `1d4496b6`. Next on the Mac: the
+owner's sitting on build 10 (`ios/README.md`), then, once #456 lands, runbook 7 and N6's check; on
 the Windows PC, M6's LessonDecks line back (M8 landed) and the other three pre-pilot steps, which
 wait for the owner's word._
 
@@ -41,7 +42,8 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
   runs unchanged, and `npm test` passes whole on the PC.
 - **The owner's Mac session (Xcode and the iPhone):** the app's Sign in & sign up is built; the app
   keeps D1's look until the owner approves a new one (its redesign rolled back, 2026-10-06). Left:
-  the push's app half (not started) and TestFlight build 9 for C7's phone test (📱). The phone's
+  the push's app half, built and parked as a draft (#456) for the owner's word on when the app asks
+  to send notifications, and TestFlight build 9 for C7's phone test (📱). The phone's
   Phase 7 screens are done: L8 (L8a, #443, L8b, #448 and #450, and L8c, #451), M8's slide view on
   Focus (#452) and M8b's slide off Focus and card on the Screen Time ask (#454); left, their 📱
   device checks, the owner's. C2's legal words (⚖️) go into the portal's pages, on the Windows PC.
@@ -100,10 +102,12 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
 - **The "class started" push (N1–N6, decided 2026-10-06):** a visible alert to the students
   whose waiting tap a Start converts; a doorbell, never the truth. N1 (the docs), N2 (CI) and N3 (the
   token endpoints; the app half's interface is on N3's line) ✅; **the backend half is done**
-  (N4–N6 ✅, 2026-10-06). Left: the app half (the Mac session) and the owner's console steps
-  (`docs/RUNBOOKS.md`, runbook 7); until then push is off on both deploys. Before it reaches a
-  school, #336's fix, measured (#438; DECISIONS 2026-10-22) and the owner's to pick. Not on
-  the pilot's critical path: it never delays C2 or the external TestFlight steps.
+  (N4–N6 ✅, 2026-10-06). The app half is built (#456; DECISIONS 2026-10-24), #336's fix in it (the
+  random wait, approved 2026-10-23), a draft waiting on the owner's word on when the app asks to send
+  notifications. Left: that word, then the owner's console steps (`docs/RUNBOOKS.md`, runbook 7:
+  Push Notifications on the App ID before the next TestFlight build) and N6's end-to-end check;
+  until then push is off on both deploys. Not on the pilot's critical path: it never delays C2 or
+  the external TestFlight steps.
 
 - **Deleted accounts' Cognito sign-ins (C3-cognito, 2026-10-09):** the server queues and deletes
   them; until the owner's runbook 9 sets each environment's key, dev and prod only queue (the
@@ -128,7 +132,7 @@ first class, production backups (L0b, the owner's console step; the owner, 2026-
 - The Windows PC (since 2026-10-14): the conductor, whose workers build the steps one at a time,
   the portal's UI included (`apps/web/src/app`, `apps/web/src/components`, its user-facing strings).
 - The Mac session: Xcode and the iPhone (`ios/Bali/UI`, `ios/BaliShield`, the app's user-facing
-  strings): TestFlight build 9, the push's app half.
+  strings): TestFlight build 9, the push's app half (#456, parked).
 - The owner: the consoles (AWS, Railway, Vercel, Sentry, App Store Connect), Apple, the
   lawyer, the school, and every iPhone check.
 
@@ -275,7 +279,7 @@ One line each; each step's full notes are on its line in `docs/PLAN-ARCHIVE.md`.
 - **C7** 📱 The 13+ screen (Phase 6, **gate**): built, C7-server with it; left, the owner's first-launch check on the next TestFlight build
 - **S8** 🔧 Least-privilege database roles (Phase 6): the owner's decision (Open owner items, 1)
 - **D2k** ⏸ The shield's new look (Phase 3): waits for a design the owner approves in Claude Design
-- **The push's app half** (N1–N6's backend is done): the Mac session's, its interface on N3's line and its notes on N2's, N4's and N6's; its wait screen the owner's pick, option B on the app canvas, for a fresh alert only (2026-10-23); then runbook 7, the owner's
+- **The push's app half** (N1–N6's backend is done) — built (#456; DECISIONS 2026-10-24), its wait option B for a fresh alert only (the owner, 2026-10-23); a draft parked for the owner's OK on when the app asks to send notifications (iOS's own prompt, the first time a student lands on Waiting); then runbook 7 (Push Notifications on `com.bali.Bali` before the next TestFlight build) and N6's end-to-end check, the owner's
 
 ### Phase 3: known edges, carried forward
 
@@ -337,7 +341,7 @@ Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect acc
 - The parked PRs #61 and #49.
 - 🔧 Production, still open: check that the next push to `main` deploys `bali-portal` on its own now that `vercel.json` is deleted (runbook 3, step 6); Railway 2FA, threat protection, CloudTrail, the backups (L0b) and the restore drill are on Phase 6's owner list above.
 - 👀 After the next deploy of `bali` and `bali prod` (P8's follow-up): the deploy log shows the migrations, then `Server listening`; a later redeploy's log for the old deployment shows `shutting down` with `signal: SIGTERM`.
-- Phase 7: **to decide**, #313 (what a teacher's own deletion, and the retention run, do with their words), kept as today for now (the owner's ruling, 2026-10-12); **tracked fixes**, #319 ✅ (#437, saved questions' id case), #326 (a slow upload outliving its deck; M5 aborts it at 25 minutes, and a stuck one once nothing is sent for 30 s, #436), #334 ✅ (#403, a timeout on the portal's polls; #432, on every other read and save but a deck's check and a class's create, which has one since 2026-10-23), #336 measured (#438; DECISIONS 2026-10-22), its fix the owner's to pick: the conductor's, a random wait of up to 10 s before the phone's first read after a push (the Mac's, in the push's app half), over more database connections (no better: the API's one process is what runs out) or a lighter first read (faster reads, not faster Starts); and a bell past the gate's 600 phones is over the Starts' 1 s with no push (1,200: 0.9–1.2 s), a later step's before a school that size; L0b is the owner's (Railway, above). The calls confirmed on 2026-10-12: this line in full in `docs/PLAN-ARCHIVE.md`.
+- Phase 7: **to decide**, #313 (what a teacher's own deletion, and the retention run, do with their words), kept as today for now (the owner's ruling, 2026-10-12); **tracked fixes**, #319 ✅ (#437, saved questions' id case), #326 (a slow upload outliving its deck; M5 aborts it at 25 minutes, and a stuck one once nothing is sent for 30 s, #436), #334 ✅ (#403, a timeout on the portal's polls; #432, on every other read and save but a deck's check and a class's create, which has one since 2026-10-23), #336 measured (#438; DECISIONS 2026-10-22), its fix, a random wait of up to 10 s before the phone's first read after a push, approved by the owner (2026-10-23) and built in the push's app half (#456); and a bell past the gate's 600 phones is over the Starts' 1 s with no push (1,200: 0.9–1.2 s), a later step's before a school that size; L0b is the owner's (Railway, above). The calls confirmed on 2026-10-12: this line in full in `docs/PLAN-ARCHIVE.md`.
 - #380: Present after the bell has no Start, so starting the next class from a projected tab shows the last recap's unlock reasons (the owner, 2026-10-14: tracked, not now); PresentEnded's line, "the session ended at 9:55 AM", waits with it (PV12b kept Present's "no session running")
 - Left for the owner on finished steps' lines (in full in `docs/PLAN-ARCHIVE.md`): P7's App Review path (decide its section 4, then fill the accounts and paste); P6's restore drill, its result recorded once a backup exists; S4's CSP check on the deployed portal after each Next upgrade (due now, for 15.5.28, #435); ⚖️ whether C7-server's yes rides Other Data Types; device rounds still marked pending (B5b's round 2, steps 7 and 9; B5c's round 3, steps 1 and 3; round 4, B6a and B6b); smaller calls on F (a refused tap's end-of-day drop or dismiss button; the waiting card's Tap in), B6c-2 (`.keep`/`.retry`), B5b (a rule for a replaced window, a code step to schedule) and D2 (Present's key per class).
 - ✅ **Answered** (the owner, 2026-10-14; DECISIONS 2026-10-14): PV5b's whole-page error kept; its review notes folded into PV15 and PV17a; PV4c's two test limits left.
@@ -351,9 +355,9 @@ Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect acc
   allowing only `AdminGetUser` and `AdminDeleteUser` on its own pool, a user and its access key,
   the two `COGNITO_DELETER_*` variables on dev's `bali` and prod's `bali prod`; the end-to-end
   check on dev (C3-cognito).
-- 🔧 Push: runbook 7 (`docs/RUNBOOKS.md`) — the APNs key, Push Notifications on the App ID,
-  the three `APNS_*` variables on dev and prod; its end-to-end check once the app half ships
-  (N6).
+- 🔧 Push: runbook 7 (`docs/RUNBOOKS.md`) — the APNs key, Push Notifications on the App ID (before
+  the next TestFlight build: the app half asks for `aps-environment`, #456), the three `APNS_*`
+  variables on dev and prod; its end-to-end check once the app half lands (N6).
 - 🔧 Dev's Cognito pool (`us-east-1_YTloqilwT`): turn on email as the attribute to verify, so a sign-up on its hosted page can be confirmed; today it ends on Cognito's error page with the account unconfirmed (found 2026-10-12; `docs/GOTCHAS.md`). The demo accounts sign in as they are.
 - 🔧 Delete dev's unused phone client `bali-ios-dev` (`33qr62dl4ee4inigneidmfe2s9`) in the dev pool; keep `bali-ios`, the demo's (2026-10-14).
 - 🔧 S4a's Sign out: check dev's web app client lists `http://localhost:3000/login` under Allowed sign-out URLs, and add it if not (`docs/WEB.md`).

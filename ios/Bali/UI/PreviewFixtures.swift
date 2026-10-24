@@ -159,6 +159,10 @@
             "homeWaiting": State(sync: standing(.waiting), opened: [.home]),
             "waiting": State(sync: standing(.waiting)),
             "waitingError": State(sync: standing(.waiting, failed: .networkError)),
+            // Opened from the class-started alert, its read held: Bali checking in (the app
+            // canvas's PushWaitB, and PushWaitBHome over Home).
+            "waitingChecking": State(sync: checkingIn(standing(.waiting))),
+            "homeWaitingChecking": State(sync: checkingIn(standing(.waiting)), opened: [.home]),
             // The owner's phone (#149): a scan of a block no teacher set up, said beside D1's card.
             "waitingTapRefused": State(sync: refusedTap(standing(.waiting))),
             "focus": State(protection: shielded(), sync: standing(.inSession(period3, .focused))),
@@ -852,6 +856,13 @@
 
         /// Focused in Period 3 again: the student's unlock recorded late, a return this phone's
         /// order cannot place gone ahead of it (A12).
+        /// `state`, opened from the class-started alert, the read it holds not answered yet.
+        private static func checkingIn(_ state: SyncState) -> SyncState {
+            var state = state
+            state.checkingIn = true
+            return state
+        }
+
         private static func superseded() -> SyncState {
             var state = standing(.inSession(period3, .focused))
             state.superseded = Superseded(session: period3.id, ordered: true)

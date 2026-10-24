@@ -783,6 +783,9 @@ waits for the Start learns of it only at the phone's next 30 s read or return to
 - **A doorbell, never the truth.** Opened, the phone reads the truth from the API, as the
   portal's stream reads the `events` table after a LISTEN/NOTIFY ping. No code — server or
   phone — may assume a notification arrived; the 30 s read and the return to the front stay.
+  Opened from an alert delivered within a minute, that first read waits a random time of up to
+  10 s, so a school's phones opened together at the bell spread their reads, and the student's own
+  action ends the wait (#336; the owner's approval, 2026-10-23; `docs/DECISIONS.md`, 2026-10-22).
 - **Sent after the Start's transaction commits** — never inside it, never from the
   transition engine. One alert per converted student's tokens, over APNs HTTP/2 with token
   auth (a `.p8` key): topic `com.bali.Bali`, team `H535678UF8`, `apns-push-type: alert`,
@@ -1589,7 +1592,8 @@ Each exists because v2 broke it and shipped a real bug
   the live lesson (Phase 7, 2026-10-05: questions and slides within a running session,
   totals only, phones polling; 2026-10-10: students on the web too, Slice 3), planned, its build
   under way since 2026-10-10; the Start's push to waiting
-  students (2026-10-06, a visible doorbell, never the truth), planned and not yet built.
+  students (2026-10-06, a visible doorbell, never the truth), its backend built and its app half
+  built (#456), waiting on the owner's word on when the app asks to send notifications.
 - **Open:** one design question, Phase 6: ISSUES #3's fallback, should Apple's answer
   call for one (the issue ranks the fallback designs, best fit first). Next: the build plan (what gets coded
   first). Items deliberately parked live in each section's "decided later" list.

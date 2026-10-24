@@ -10,6 +10,16 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-24 (Central) — Phase 7's phone sitting written for the owner (`ios/README.md`,
+"Phase 7's phone sitting, on prod"): C7's first launch, L8's, M8's and M8b's device checks, and the
+exit checks L9, M10 and W6, each part opening with its starting state, on TestFlight build 10 (prod,
+from `1d4496b6`, dispatched 2026-10-24). Before it, M8b (#454): the slide on Unlocked, Screen Time
+off and Home, and the card on the Screen Time ask, so every phone screen of Phase 7 is built. Next on
+the Mac: the push's app half (option B's wait, for a fresh alert only), parked for the owner's word
+on when the app asks to send notifications; then the owner's sitting, runbook 7 and N6's check; on
+the Windows PC, M6's LessonDecks line back (M8 landed) and the other three pre-pilot steps, which
+wait for the owner's word._
+
 _Last updated: 2026-10-24 (Central) — The slide off Focus and the card on the Screen Time ask (M8b,
 #454; `docs/DECISIONS.md`, 2026-10-24), the four boards the owner approved on 2026-10-24, in D1's
 look: a slide the teacher shows now shows on Unlocked, Screen Time off and Home (for a student not

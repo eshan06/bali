@@ -965,14 +965,15 @@ struct ScreenTests {
     }
 
     @Test(
-        "What Waiting promises (the owner's ruling, 2026-09-29): the phone locks when class starts only while Bali is open — armed, nothing is shielded, and the phone finds the Start by reading it, every 30 s in the foreground (decision 6) — never D1's 'the moment class starts'. The screen's own source is read, so a redraw cannot bring D1's words back unnoticed"
+        "What Waiting promises (the owner's ruling, 2026-09-29): the phone locks when class starts only while Bali is open — armed, nothing is shielded, and the phone finds the Start by reading it, every 30 s in the foreground (decision 6) — never D1's 'the moment class starts'. Its words are `waitingWords`, and the screen's own source is read, so a redraw cannot bring D1's words back unnoticed"
     )
     func waitingWords() throws {
-        let waiting = try sourceCode("Bali/UI/WaitingView.swift")
         #expect(
-            waiting.contains(
-                #""You tapped your teacher's block before class started. Your phone locks when class starts, as long as Bali is open. No need to tap again.""#
-            ))
+            SyncState().waitingWords.line
+                == "You tapped your teacher's block before class started. Your phone locks when class starts, as long as Bali is open. No need to tap again."
+        )
+        let waiting = try sourceCode("Bali/UI/WaitingView.swift")
+        #expect(waiting.contains(".waitingWords") && waiting.contains("Text(words.line)"))
         #expect(!waiting.contains("the moment class starts"))
     }
 
