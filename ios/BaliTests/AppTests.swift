@@ -459,7 +459,7 @@ struct AppTests {
                 "home", "homeLoading", "homeError", "homeUnread", "homeRefused", "homeFromUnlocked",
                 "homeFromUnlockedRetap", "homeInSession", "homeTapRefused", "homeTapRefusedThenTapped",
                 "homeWaiting", "homeNew", "homeNoClasses", "homeNoClassesTapStuck", "homeQuestion",
-                "homeFromUnlockedQuestion", "homeQuestionError",
+                "homeFromUnlockedQuestion", "homeQuestionError", "homeSlide", "homeSlideQuestion",
             ],
             ["meEditing", "meNameError"]
         )
@@ -4469,6 +4469,61 @@ struct AppTests {
         try await until { waiting.card != nil && waiting.slideShown != nil && waitShows("Open Settings") }
         #expect(waiting.shown.screen == .screenTime && !waitShows("Which?") && !waitShows("Slide 2 of 3"))
         waiting.signed(in: false)
+        // In Session over's place (the class the phone stood in rang its bell, no read since) while
+        // another class of the student's is in session: that lesson is followed, but no board draws
+        // it on the ask there either, so none shows.
+        let (over, _) = try standIn(server, protection: off)
+        over.signed(in: true, as: "ana", checked: true)
+        var rung = try classInSession()
+        rung.standing = .inSession(SessionView(id: "ended", classId: "p5", endsAt: Date() - 60), .focused)
+        over.synced(rung)
+        over.sawList()
+        over.setForeground(true)
+        let (overWindow, overShows) = shown(over)
+        defer { overWindow.isHidden = true }
+        try await until { over.card != nil && over.slideShown != nil && overShows("Open Settings") }
+        #expect(over.shown.screen == .screenTime && !overShows("Which?") && !overShows("Slide 2 of 3"))
+        over.signed(in: false)
+    }
+
+    @Test(
+        "The card and the slide on the Screen Time ask go at their class's bell by the phone's clock, as on Home (M8b; L8c's rule), Bali reached or not: offline at the bell, the ask never keeps a question or a slide, saying no connection, for a class that is over"
+    )
+    func askLessonGoesAtTheBell() async throws {
+        let defaults = UserDefaults.standard
+        let before = [Phone.inClassKey, Phone.listSeenByKey].map { ($0, defaults.object(forKey: $0)) }
+        defer { for (key, value) in before { defaults.set(value, forKey: key) } }
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        var off = Protection()
+        (off.checked, off.permission, off.permissionOff) = (true, .denied, true)
+        let server = LessonServer()
+        await server.show("deck", page: 2, of: pdfDeck())
+        // No page drawn: the deck refused, so it is said, as SlideFailed draws it (`offFocusSlideFits`).
+        await server.refuseDownloads(of: "deck")
+        let (phone, _) = try standIn(server, protection: off)
+        phone.signed(in: true, as: "ana", checked: true)
+        phone.synced(try classInSession())
+        phone.sawList()
+        phone.setForeground(true)
+        let window = UIWindow(windowScene: scene)
+        window.frame = CGRect(x: 0, y: 0, width: scene.screen.bounds.width, height: 3000)
+        window.rootViewController = UIHostingController(rootView: RootView(phone: phone))
+        window.isHidden = false
+        defer { window.isHidden = true }
+        func shows(_ label: String) -> Bool {
+            window.layoutIfNeeded()
+            return ((try? voiceOver(in: window)) ?? []).contains { $0.accessibilityLabel == label }
+        }
+        try await until { phone.shown.screen == .screenTime && shows("Which?") && shows("Slide 2 of 3") }
+        await server.goOffline()
+        try await until { phone.card?.offline == true }
+        // The bell set two seconds off only now, the card saying no connection, so no slow
+        // simulator reaches it first; the same session, so the lesson followed stays.
+        phone.synced(try classInSession(ringsIn: 2))
+        #expect(shows("Which?") && shows("Slide 2 of 3"))
+        try await until { !shows("Which?") && !shows("Slide 2 of 3") }
+        #expect(phone.card == nil && phone.slideShown == nil && phone.shown.screen == .screenTime)
+        phone.signed(in: false)
     }
 
     @Test(

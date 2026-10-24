@@ -14,10 +14,14 @@ import UIKit
 struct ScreenTimeView: View {
     let phone: Phone
     @Environment(\.openURL) private var openURL
+    /// The bell of the class in session, rung: the lesson goes then, by the phone's clock, Bali
+    /// reached or not, as Home's card for the class does (L8c's rule), the ask drawn again for it.
+    @State private var rung: Date?
 
     private var permission: Permission { phone.protection?.permission ?? .notDetermined }
 
     var body: some View {
+        let _ = rung
         let words = permission.screenTimeWords
         // Home's lesson, for a student not tapped in: never in Waiting's place or Session over's.
         // Out of any session the lesson is a class `GET /v1/me` lists, so its heading always has a
@@ -25,6 +29,7 @@ struct ScreenTimeView: View {
         let out = phone.sync?.standing == .out
         let (card, slide) = out ? (phone.card, phone.slideShown) : (nil, nil)
         let heading = card != nil || slide != nil ? phone.lessonHeading : nil
+        let bell = heading == nil ? nil : phone.sync?.inSessionCard(at: Date())?.bell
         ScreenScaffold {
             PageScroll {
                 VStack(spacing: 0) {
@@ -70,6 +75,11 @@ struct ScreenTimeView: View {
                     }
                 }
             }
+        }
+        .task(id: bell) {
+            guard let bell else { return }
+            await Screen.bell(bell, change: UIApplication.significantTimeChangeNotification)
+            if !Task.isCancelled { rung = bell }
         }
     }
 

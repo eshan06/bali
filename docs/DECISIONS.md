@@ -25,7 +25,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   place (`standing == .out`): never in Waiting's or Session over's, which no board draws with a
   lesson, and never during onboarding, a student in no class following none. Every other word and
   control of each screen reads and works as before, in its order. `SlideView`'s words start at the
-  left on the screens that centre theirs, as on Focus. **Drawn first** (*the worker's call*, under
+  left on the screens that centre theirs, as on Focus. **The ask's lesson goes at the bell** (santa's
+  round 1, both reviewers, a WARN fixed as L8c fixed the same on Home): nothing drew the ask again at
+  the bell, `Phone.bell` naming no session for a student not tapped in, so offline at the bell its
+  card, slide and class line stayed, saying no connection, for a class that was over; now the ask
+  wakes at the in-session class's bell, as Home's card does. **Drawn first** (*the worker's call*, under
   the brief's rule for a state no board draws: composed of drawn parts, drawn on the canvas first,
   labelled, then built): a row of six beside a sticky note, "Intermediate states for the boards of
   2026-10-24, drawn before they're built", each from the approved boards' own markup:
@@ -64,10 +68,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   every other word and control as without it, in order; the slide one element, its page alone, 16:9;
   Hide leaving the slide; none on the Home opened from Unlocked or Waiting), `offFocusSlideFits` (the
   default and accessibility sizes on three iPhones), `offFocusSlideWaits` (no lesson and no poll
-  before the list is seen, gone with a read showing none; none on the ask in onboarding or in
-  Waiting's place), `slideAsksOffFocus` (the deck asked for as it shows on Home, Try again), the
-  fixtures' cards and slides (`AppTests.fixtures`) and `LessonTests.lessonHeading` (BaliOutbox);
-  screenshots beside each board.
+  before the list is seen, gone with a read showing none; none on the ask in onboarding, in Waiting's
+  place or in Session over's), `slideAsksOffFocus` (the deck asked for as it shows on Home, Try
+  again), `askLessonGoesAtTheBell` (offline at the bell, the ask's lesson goes; it failed with the
+  ask's bell taken out), the fixtures' cards and slides (`AppTests.fixtures`), the two Home fixtures in
+  `AppTests.tabs`' list, and `LessonTests.lessonHeading` (BaliOutbox); each new piece taken out in turn
+  fails its test; screenshots beside each board.
 
 - **2026-10-24** — **`AppTests.ageAgainInClass` failing on CI (#452, both runs; #443's first): the
   test's own wait, never M8's slide code: the test shows no lesson and no deck.** Its helper
