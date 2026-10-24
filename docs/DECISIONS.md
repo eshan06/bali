@@ -8,6 +8,20 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-24** — **`AppTests.ageAgainInClass` failing on CI (#452, both runs; #443's first): the
+  test's own wait, never M8's slide code: the test shows no lesson and no deck.** Its helper
+  `signedIn` started the engine once the phone's 13+ answer read unanswered and the router had the
+  engine's state; but a phone whose sign-in isn't followed yet reads Sign up's own answer,
+  unanswered too, so on a slow runner the wait could pass before the sign-in's own ask of Bali. The
+  third part then made Bali reachable first: that ask got a yes, the phone went on to Home, and the
+  wait for a wake's failed read never came, 60 s, then the expectation failed (68 s in all, as on
+  CI). Reproduced on the Mac by slowing the stand-in Keychain's first read by 0.1 s: the same two
+  issues in both runs, the phone on Home, its age passed, Bali asked once; with every part slowed,
+  part 1 failed as well. **The fix:** the wait names the sign-in too (`signedIn == true`), as the
+  file's other waits on `ageNow` already do; with every part slowed the test passes. Why M8's runs
+  hit the race and main's re-run didn't is the runner's timing, not proven. Rode along: `weak let`
+  for `slideOncePerDeck`'s weak reference, never reassigned (a compiler warning).
+
 - **2026-10-24** — **The phone's slide view (M8, #452, the last of Phase 7's screens): the slide on
   Focus only, PDFKit's page alone with no link to open and nothing to select, the deck asked for once
   per SHA-256 as the slide shows, one document at a time.** **The screen** (the app canvas's row

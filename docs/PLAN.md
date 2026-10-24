@@ -250,7 +250,7 @@ Slice 2 — slides:
 - **M5** 👀 The slides page and upload — ✅ as M5a (#396), M5b part 1 (#397) and M5b part 2 (#400); DECISIONS 2026-10-15
 - **M6** 👀 Portal presenter to v2's canvas — ✅ as part 1 (#413), 2a (#414), 2b-1 (#415), 2b-2 (#416), 2c (#417) and 2d (#418); DECISIONS 2026-10-16; LessonDecks' panel line comes back with M8 (the conductor's call, the owner's on 2026-10-16)
 - **M7** BaliCore's deck download and cache (for M8) — ✅ (#331; DECISIONS 2026-10-12)
-- **M8** 👀📱 iOS slide view to the app canvas — ✅ (#452; DECISIONS 2026-10-24): the slide on Focus only, over shields the check verified; left, its 📱 device check on a shielded phone, the owner's, and a slide on Unlocked, Screen Time off and Home, which decision 1 asks for and no board draws yet (proposals for the owner are being drawn)
+- **M8** 👀📱 iOS slide view to the app canvas — ✅ (#452; DECISIONS 2026-10-24): the slide on Focus only, over shields the check verified; left, its 📱 device check on a shielded phone, the owner's, and a slide on Unlocked, Screen Time off and Home, which decision 1 asks for and no board draws yet (proposals for the owner are being drawn); its CI failure, `AppTests.ageAgainInClass`'s own wait, fixed in the same PR (DECISIONS 2026-10-24)
 - **M9** Load and demo with a deck — ✅ (#335; DECISIONS 2026-10-12)
 - **M10** 📱 Exit check: a real class on prod follows a deck
 

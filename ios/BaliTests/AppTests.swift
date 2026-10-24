@@ -2193,7 +2193,12 @@ struct AppTests {
                 Task { await phone.follow(signIn) },
                 Task { for await state in await engine.updates() { phone.synced(state) } },
             ]
-            try await until { phone.ageNow == .unanswered && phone.sync != nil }
+            // Signed in, too: until the sign-in is followed, `ageNow` is Sign up's own answer,
+            // unanswered, so a wait on it alone could start the engine, and the test reach Bali,
+            // before the sign-in's own ask (#452's CI).
+            try await until {
+                phone.signedIn == true && phone.ageNow == .unanswered && phone.sync != nil
+            }
             running.append(Task { await engine.run() })
             return (phone, engine)
         }
@@ -4028,7 +4033,7 @@ struct AppTests {
         #expect(await server.downloads == 1)
         await server.letBucketGo()
         try await until { shownDocument(phone)?.pageCount == 3 }
-        weak var firstDocument = shownDocument(phone)
+        weak let firstDocument = shownDocument(phone)
         // Another page of it: nothing fetched, the same document.
         await server.show("first", page: 2, of: first)
         try await until { phone.slideShown?.slide.page == 2 }
