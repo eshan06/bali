@@ -20,7 +20,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   draft): iOS's own prompt, alerts and sound, no Bali screen before it, the first time the student
   lands on Waiting, an armed tap waiting for the Start, the one moment the alert helps; never
   during onboarding, never over Focus or Emergency Unlock. iOS prompts only while the student has
-  never answered, so it is asked once (`Phone.askToNotify`, from Waiting's `task`). Weighed: during
+  never answered, so it is asked once (`Phone.askToNotify`, from Waiting's `task`). Its cost, for the
+  owner's word (santa's round 1): while iOS's prompt is up the app is inactive, so Waiting's 30 s
+  read pauses until the student answers, and a phone left on the prompt finds the Start only then;
+  for the same reason no read brings Focus under the prompt. Weighed: during
   onboarding after Screen Time (asked before the student knows why), and a Bali screen before iOS's
   prompt (it needs a board). *Registering* (N3, N4): while the sign-in is through the 13+ check, at
   a launch signed in or a sign-in this run, and as the student allows notifications, the phone asks
@@ -33,7 +36,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the phone, and one that does not land is sent again at the next launch or sign-in, never on a
   timer, and is no screen of the student's. Sign out sends `DELETE /v1/me/push-token` before the
   sign-in goes, the request carrying the student's token, and waits for it 3 s at most, then drops
-  it and signs out whatever it answered: never a Sign out held up by the network. A removal that does
+  it and signs out whatever it answered: never a Sign out held up by the network, nor by a token
+  renewal the removal waits on, which no cancelling ends (santa's round 1, both reviewers: Sign out
+  took 30 s, now a test). An Emergency Unlock recorded during that wait holds the sign-out back as
+  any unsent one does, the token registered again (santa's round 1; *its reachability doubtful,
+  fixed as the worker's call*, since the wait made the window). A removal that does
   not land is not retried, since a signed-out phone has no sign-in to send it under: the token stays
   on Bali under that account until a register moves it (this phone's next sign-in) or the account's
   deletion or the retention run deletes it (N4), so at worst that account's Start rings a phone
@@ -43,7 +50,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   delivered 60 s or less before the open (`notification.date`; one dated later, a clock set back,
   counts) holds the engine's next `GET /v1/me` until a time drawn uniformly from 0 to 10 s
   (`PushWait`, `SyncEngine.holdRead`), then goes on as before; an older alert reads at once, as any
-  return to the front. Nothing else waits: the outbox, and rule 3's check, go as ever. The student's
+  return to the front. A hold found more than 10 s ahead, the phone's clock turned back since, is
+  over (santa's round 1; *doubtful reachability, guarded as the worker's call*: it would have held
+  the read, and the lock, as long as the clock went back). Nothing else waits: the outbox, and rule
+  3's check, go as ever. The student's
   own action ends the wait at once: anything the phone records (a tap, Emergency Unlock, Back to
   focus; rule 3's own reports too), Try again, and any screen they open (Back to home, Join a class),
   as the brief listed; a tab chosen does not, since it sends nothing. Back to home ending it lets a

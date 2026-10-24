@@ -80,6 +80,22 @@ struct PushTests {
     }
 
     @Test(
+        "The phone's clock turned back during the hold never stretches it: a wake that finds the hold more than 10 s ahead reads at once (santa's round 1)"
+    )
+    func clockTurnedBack() async throws {
+        let rig = try Rig()
+        await rig.engine.holdRead(until: at(5))
+        await rig.engine.setForeground(true)
+        try await rig.sleeping([at(5)])
+        rig.clock.turn(by: -60)
+        await rig.engine.setForeground(true)
+        try await rig.server.next(meRoute).reply(200, Answer.me(nil))
+        let read = await rig.until { !$0.checkingIn }
+        #expect(read.me != nil && rig.clock.now() == at(-60))
+        await rig.stop()
+    }
+
+    @Test(
         "No alert, no wait: back in front, the truth is read at once, and nothing says Bali is checking in"
     )
     func noAlert() async throws {

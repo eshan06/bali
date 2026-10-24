@@ -4685,6 +4685,40 @@ struct AppTests {
         await quiet.signOut()
         #expect(ContinuousClock.now - pressed < .seconds(5))
         #expect(silent.empty && quiet.signOutFailed == nil)
+        // Nor one stuck renewing the token first, a wait no cancelling ends (`SignIn.renew`'s;
+        // santa's round 1, both reviewers).
+        let renewing = Keychain(account: "ana")
+        let (stuck, _) = try standIn(
+            PushServer(keychain: renewing), keychain: renewing, tokens: Renewing())
+        stuck.pushRemoval = 0.2
+        stuck.registered(token: token)
+        let again = ContinuousClock.now
+        await stuck.signOut()
+        #expect(ContinuousClock.now - again < .seconds(5))
+        #expect(renewing.empty && stuck.signOutFailed == nil)
+    }
+
+    @Test(
+        "The student's own moves on the phone end the wait the class-started alert set: Back to home, as any screen opened, and Try again read the truth at once, never at the hold (santa's round 1)",
+        .timeLimit(.minutes(3)))
+    func movesEndTheWait() async throws {
+        let moves: [(String, @MainActor (Phone) async -> Void)] = [
+            ("Back to home", { $0.open(.home) }), ("Try again", { await $0.retry() }),
+        ]
+        for (move, make) in moves {
+            let server = PushServer(keychain: Keychain(account: "ana"))
+            let (phone, engine) = try standIn(server)
+            let running = Task { await engine.run() }
+            await engine.holdRead(until: Date() + 9)
+            try await Task.sleep(for: .milliseconds(200))
+            #expect(await server.reads == 0, "\(move)")
+            let made = ContinuousClock.now
+            await make(phone)
+            try await until { await server.reads == 1 }
+            #expect(ContinuousClock.now - made < .seconds(4), "\(move)")
+            running.cancel()
+            await running.value
+        }
     }
 
     @Test(
@@ -4905,7 +4939,7 @@ private func signUp(_ phone: Phone, through pages: Pages) async {
 @MainActor
 private func standIn(
     _ server: any HTTPTransport, keychain: Keychain = Keychain(account: "ana"),
-    protection: Protection? = nil
+    protection: Protection? = nil, tokens: (any TokenProvider)? = nil
 ) throws -> (Phone, SyncEngine) {
     struct Signed: TokenProvider {
         func accessToken() async -> String? { "token" }
@@ -4913,7 +4947,8 @@ private func standIn(
     let url = FileManager.default.temporaryDirectory.appending(
         path: "phone-\(UUID().uuidString).sqlite")
     let client = APIClient(
-        baseURL: URL(string: "https://api.bali.test")!, tokens: Signed(), transport: server)
+        baseURL: URL(string: "https://api.bali.test")!, tokens: tokens ?? Signed(),
+        transport: server)
     let engine = SyncEngine(outbox: try Outbox(at: url), client: client)
     let cognito = Cognito(
         domain: URL(string: "https://bali.auth.test")!, clientId: "phone",
@@ -5581,7 +5616,7 @@ private final class Asked {
 }
 
 /// Bali's API as a stand-in answers the device token's register and removal: `GET /v1/me` with Ana
-/// in no class; `PUT /v1/me/push-token` registered, the request kept; `DELETE /v1/me/push-token`
+/// in no class, the reads counted; `PUT /v1/me/push-token` registered, the request kept; `DELETE /v1/me/push-token`
 /// removed — unless not `answersRemoval`, a removal on its way for good — the request kept with
 /// whether the sign-in, on `keychain`, was still there as it came. Anything else gets no answer.
 private actor PushServer: HTTPTransport {
@@ -5589,6 +5624,7 @@ private actor PushServer: HTTPTransport {
     private let answersRemoval: Bool
     private(set) var registered: RegisterPushTokenRequest?
     private(set) var removed: (token: String, signedIn: Bool)?
+    private(set) var reads = 0
 
     init(keychain: Keychain, answersRemoval: Bool = true) {
         (self.keychain, self.answersRemoval) = (keychain, answersRemoval)
@@ -5600,6 +5636,7 @@ private actor PushServer: HTTPTransport {
         let body: String
         switch "\(request.httpMethod ?? "") \(url.path())" {
         case "GET /v1/me":
+            reads += 1
             body = #"{"user":{"id":"ana","role":"student","displayName":"Ana"},"classes":[],"session":null}"#
         case "PUT /v1/me/push-token":
             registered = try JSONDecoder().decode(RegisterPushTokenRequest.self, from: sent)
@@ -5616,6 +5653,17 @@ private actor PushServer: HTTPTransport {
                 url: url, statusCode: 200, httpVersion: nil, headerFields: nil)
         else { throw URLError(.badURL) }
         return (Data(body.utf8), response)
+    }
+}
+
+/// A sign-in whose token is being renewed, for 30 s: waited on as `SignIn.renew`'s shared renewal
+/// is, through an unstructured task's value, which no cancelling ends.
+private struct Renewing: TokenProvider {
+    func accessToken() async -> String? {
+        await Task.detached {
+            try? await Task.sleep(for: .seconds(30))
+            return "token"
+        }.value
     }
 }
 

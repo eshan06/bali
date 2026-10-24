@@ -607,21 +607,20 @@ final class Phone {
         signOutFailed = nil
         guard sync.flatMap(SignOutWords.held) == nil else { return }
         guard let signIn, let engine else { return signOutFailed = Joining.notStarted }
-        switch await engine.unlockUnsent() {
-        case false?: break
-        case true?: return signOutFailed = SignOutWords.unsent
-        case nil: return signOutFailed = SignOutWords.unread
-        }
+        if let held = await Self.unsent(engine) { return signOutFailed = held }
         // The class-started alert's token off Bali first (N3): the request carries the student's
-        // own token, so it goes before the sign-in does — `pushRemoval` at most, then dropped, and
-        // the sign-out goes on whatever it answered (DECISIONS 2026-10-24).
+        // own token, so it goes before the sign-in does — waited for `pushRemoval` at most, never
+        // past it, a token renewal under way included (santa's round 1), and the sign-out goes on
+        // whatever it answered (DECISIONS 2026-10-24). An Emergency Unlock recorded meanwhile holds
+        // it back as any does, the token registered again for the sign-in kept.
         if let pushToken {
-            let limit = pushRemoval
-            await withTaskGroup(of: Void.self) { group in
-                group.addTask { await engine.removePushToken(pushToken) }
-                group.addTask { try? await Task.sleep(for: .seconds(limit)) }
-                await group.next()
-                group.cancelAll()
+            let (limit, (ends, end)) = (pushRemoval, AsyncStream.makeStream(of: Void.self))
+            Task { await engine.removePushToken(pushToken); end.yield() }
+            Task { try? await Task.sleep(for: .seconds(limit)); end.yield() }
+            for await _ in ends { break }
+            if let held = await Self.unsent(engine) {
+                registerForPush()
+                return signOutFailed = held
             }
         }
         do {
@@ -629,6 +628,16 @@ final class Phone {
             signOutFailed = nil
         } catch {
             signOutFailed = SignOutWords.failed
+        }
+    }
+
+    /// What Sign out says while the outbox file holds an Emergency Unlock unsent, or cannot say
+    /// whether it does (`SignOutWords`); nil once it holds none.
+    private static func unsent(_ engine: SyncEngine) async -> String? {
+        switch await engine.unlockUnsent() {
+        case false?: nil
+        case true?: SignOutWords.unsent
+        case nil: SignOutWords.unread
         }
     }
 
@@ -993,9 +1002,11 @@ final class Phone {
     /// Waiting shows (the conductor's recommendation, awaiting the owner): iOS's own prompt to send
     /// notifications, alerts and sound, asked only while the student has never answered it — so
     /// once — and, allowed, the device token asked for (`registerForPush`). Never during
-    /// onboarding, nor over Focus or Emergency Unlock: Waiting is a tap's, before the Start.
+    /// onboarding, nor over Focus or Emergency Unlock: Waiting is a tap's, before the Start, and a
+    /// Waiting gone while iOS was asked how the student answered asks nothing (santa's round 1).
     func askToNotify() async {
-        guard !frozen, await notifications.status() == .notDetermined else { return }
+        guard !frozen, await notifications.status() == .notDetermined, !Task.isCancelled
+        else { return }
         if await notifications.ask() { registerForPush() }
     }
 

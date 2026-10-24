@@ -854,8 +854,6 @@
             return state
         }
 
-        /// Focused in Period 3 again: the student's unlock recorded late, a return this phone's
-        /// order cannot place gone ahead of it (A12).
         /// `state`, opened from the class-started alert, the read it holds not answered yet.
         private static func checkingIn(_ state: SyncState) -> SyncState {
             var state = state
@@ -863,6 +861,8 @@
             return state
         }
 
+        /// Focused in Period 3 again: the student's unlock recorded late, a return this phone's
+        /// order cannot place gone ahead of it (A12).
         private static func superseded() -> SyncState {
             var state = standing(.inSession(period3, .focused))
             state.superseded = Superseded(session: period3.id, ordered: true)

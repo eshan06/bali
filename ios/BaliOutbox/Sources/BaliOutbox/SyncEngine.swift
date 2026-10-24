@@ -1040,7 +1040,7 @@ public actor SyncEngine {
             if foreground, state.standing == .waiting || outInClass { rereading = true }
             // Never during an account deletion (C4): `GET /v1/me` would make a fresh account.
             if !deleting, let sent = stored(stamp) {
-                if rereading, let readHold, readHold > clock.now() {
+                if holdingUntil != nil {
                     // Held by the class-started alert (`holdRead`): the pause below ends at the
                     // hold, or at the student's own action (`endWait`).
                 } else if rereading {
@@ -1113,11 +1113,20 @@ public actor SyncEngine {
         }
     }
 
+    /// Until when the read of the truth still waits for the class-started alert (`holdRead`): nil
+    /// once the hold is past — or more than `PushWait.longest` ahead, the phone's clock turned back
+    /// since, which never stretches the wait (santa's round 1).
+    private var holdingUntil: Date? {
+        guard rereading, let readHold, readHold > clock.now(),
+            readHold <= clock.now() + PushWait.longest
+        else { return nil }
+        return readHold
+    }
+
     /// When the read loop wakes on its own: for the check-in, in the foreground — and while where
     /// the phone stood is unread, within a minute, to read the file again.
     private var nextRead: Date? {
-        // A read the class-started alert held goes at the hold.
-        if rereading, let readHold, readHold > clock.now() { return readHold }
+        if let holdingUntil { return holdingUntil }
         if foreground { return clock.now() + Self.checkInInterval }
         return state.standing == .unread ? clock.now() + Outbox.backoffCap : nil
     }
