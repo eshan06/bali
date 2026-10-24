@@ -23,13 +23,14 @@ a real decision? Add a dated entry at the top: what was decided and why.
   (below), which kept santa's Claude reviewers at `max` in every round whatever the worker's effort.
   **A screen step:** a 👀 step building approved boards whose diff changes nothing but the portal's
   pages and components (the 2026-10-14 folders), the app's screens (`ios/Bali/UI`, `ios/BaliShield`),
-  the words they show (BaliOutbox's words types) and the screen state they read in `Phone`, their
+  the words they show (their strings in BaliOutbox, wherever they sit) and the screen state they read in `Phone`, their
   tests and fixtures, and in `docs/` only the step's own lines in PLAN, PLAN-ARCHIVE, DECISIONS and
   DESIGN.md. **Still `max`:** any change to
-  `ios/BaliCore`, BaliOutbox's engine (the outbox, the sync engine, the enforcer, the router's rules),
+  `ios/BaliCore`, BaliOutbox's engine (the outbox, the sync engine, the enforcer, the router's rules: which screen shows when),
   `apps/web/src/lib`, the API, `packages/`, the database, CI or workflows, `docs/ARCHITECTURE.md` or
   the rules (this PR included); and any change to sign-in, sign-out, the account's read, the 13+
-  check, account deletion, Emergency Unlock's control or its hold, the privacy policy's or terms'
+  check, account deletion, Emergency Unlock's control or its hold (how it is pressed, held or sent,
+  not a layout around it), the consent list's gate, the privacy policy's or terms'
   words, the store's listing, App Privacy or age-rating answers (`docs/APP-STORE.md`), or a privacy
   manifest or entitlements file, wherever its code sits (on the phone, `Phone`'s paths for each in
   `ios/Bali/BaliApp.swift`, and `SignInView`, `AgeView`, `DeletingView`, `MeView`, `PolicyLinks`).
