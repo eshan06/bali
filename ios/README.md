@@ -429,7 +429,10 @@ pilot's own, is the full exit check.
 ### Part 5 — the consent list's new lines, on the next build
 
 The first TestFlight build after build 10 adds two lines to what your teacher sees and shortens one under
-never sees, so the list asks you again, once.
+never sees, so the list asks you again, once. Install that build as an update over build 10, and do this
+part before runbook 7's step 6 (`docs/RUNBOOKS.md`), which deletes Bali and installs it again: a fresh
+install has seen neither list, so after it the screen comes once more with **Your answers to questions,
+counted only in the class's totals** among its lines.
 
 **Starting state:** no class running, so you're not tapped in. Build 10 is on the phone with Part 1 done:
 you're signed in with your prod student account, in your class, and you've seen **Your teacher can ask
