@@ -446,8 +446,9 @@ export const ageChecks = pgTable('age_checks', {
 
 /*
  * A deleted account's Cognito sign-in, waiting for the API to delete it from the pool (the owner's
- * decision, 2026-10-09): queued by `deleteAccount` in its own transaction, or by `DELETE /v1/me` for
- * a sign-in with no account here, and written beside the engine (`cognito-deletions.ts`). Keyed to
+ * decision, 2026-10-09): queued by `deleteAccount` in its own transaction, by the retention run in
+ * its own for each person it de-identifies (2026-10-28), or by `DELETE /v1/me` for a sign-in with
+ * no account here, and written beside the engine (`cognito-deletions.ts`). Keyed to
  * the Cognito user, not to a `users` row, since a sign-in the server never saw is queued too; really
  * deleted once its sign-in is gone. Its three ids are personal data: never logged, not exported (C5).
  */

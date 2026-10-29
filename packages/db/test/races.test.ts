@@ -21,6 +21,7 @@ import {
   armedTaps,
   blocks,
   classes,
+  cognitoDeletions,
   decks,
   deviceTokens,
   enrollments,
@@ -91,6 +92,9 @@ import type { Database } from '../src/types.js';
  */
 
 const REAL_PG = Boolean(process.env.TEST_DATABASE_URL);
+
+/** The Cognito pool a retention run here queues the sign-ins it removes under (2026-10-28). */
+const POOL = 'https://cognito-idp.us-east-1.amazonaws.com/us-east-1_races';
 
 let db: Database;
 let close: () => Promise<void>;
@@ -199,6 +203,11 @@ function liveOf(studentId: string) {
 
 async function eventOf(eventId: string) {
   return one(await db.select().from(events).where(eq(events.eventId, eventId)));
+}
+
+/** The deletions queued for the Cognito sign-in `sub` (2026-10-09). */
+function signInsQueued(sub: string) {
+  return db.select().from(cognitoDeletions).where(eq(cognitoDeletions.sub, sub));
 }
 
 describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
@@ -2363,6 +2372,7 @@ describe.runIf(REAL_PG)('a retention run under contention (real Postgres, C6b)',
             schoolId,
             at: new Date(Date.now() + 3 * 86_400_000),
             confirmName: `School ${tag}`,
+            issuer: POOL,
           }),
         ),
         later(lag, () =>
@@ -2412,13 +2422,17 @@ describe.runIf(REAL_PG)('a retention run under contention (real Postgres, C6b)',
         .where(
           and(eq(participations.sessionId, running.id), eq(participations.studentId, studentId)),
         );
+      const queued = await signInsQueued(`student-${tag}`);
       if (student.removedAt === null) {
-        // Kept: only a tap into the running lesson, ahead of the run, keeps them.
+        // Kept: only a tap into the running lesson, ahead of the run, keeps them, and their sign-in.
         expect(tapped.status).toBe('fulfilled');
         expect(inLesson).toHaveLength(1);
+        expect(queued).toEqual([]);
         continue;
       }
-      // De-identified: in no class, no lesson, no waiting tap, and no name anywhere.
+      // De-identified: in no class, no lesson, no waiting tap, and no name anywhere; their
+      // sign-in waits for the API, once.
+      expect(queued).toHaveLength(1);
       expect(student.displayName).toBeNull();
       expect(inLesson.filter((p) => p.endedAt === null)).toHaveLength(0);
       expect(
@@ -2437,6 +2451,75 @@ describe.runIf(REAL_PG)('a retention run under contention (real Postgres, C6b)',
       expect(renames.every((e) => e.payload === null)).toBe(true);
     }
   }, 60_000);
+
+  it('a retention run and the person’s own deletion, either first, leave their sign-in queued once (2026-10-28)', async () => {
+    /** A student whose records all lie in a year over since yesterday; the run de-identifies them. */
+    async function yearOver(tag: string) {
+      const { classId, studentId } = await seed(tag);
+      const { schoolId } = one(
+        await db
+          .select({ schoolId: classes.schoolId })
+          .from(classes)
+          .where(eq(classes.id, classId)),
+      );
+      const day = new Date(Date.now() - 86_400_000);
+      const two = (n: number) => String(n).padStart(2, '0');
+      await db
+        .update(schools)
+        .set({
+          schoolYearEndsOn: `${day.getFullYear()}-${two(day.getMonth() + 1)}-${two(day.getDate())}`,
+        })
+        .where(eq(schools.id, schoolId));
+      const old = new Date(Date.now() - 30 * 86_400_000);
+      await db.update(users).set({ createdAt: old }).where(eq(users.id, studentId));
+      await db
+        .update(enrollments)
+        .set({ createdAt: old })
+        .where(eq(enrollments.studentId, studentId));
+      const sub = `student-${tag}`;
+      return {
+        studentId,
+        sub,
+        retain: (on: Database) =>
+          applyRetention(on, {
+            schoolId,
+            at: new Date(),
+            confirmName: `School ${tag}`,
+            issuer: POOL,
+          }),
+        // DELETE /v1/me from the same sign-in, whose token names this deploy's pool.
+        remove: (on: Database) =>
+          deleteAccount(on, {
+            userId: studentId,
+            eventId: newUuidV7(),
+            at: new Date(),
+            signIn: { issuer: POOL, username: sub, sub },
+          }),
+      };
+    }
+
+    // The run first: it de-identifies and queues them; the deletion waits for it, then finds the
+    // account deleted already and queues nothing more.
+    const runFirst = await yearOver('race-retain-delete-run');
+    const deleted = await behindCommit(runFirst.retain, () => runFirst.remove(db));
+    if (deleted.status === 'rejected') throw deleted.reason as Error;
+    expect(deleted.value).toEqual({ outcome: 'already_deleted' });
+    expect(await signInsQueued(runFirst.sub)).toMatchObject([
+      { issuer: POOL, username: runFirst.sub },
+    ]);
+
+    // The deletion first: it queues the sign-in; the run waits for it, then finds the account
+    // gone, so it neither counts it nor queues it again.
+    const deletionFirst = await yearOver('race-retain-delete-own');
+    const retained = await behindCommit(deletionFirst.remove, () => deletionFirst.retain(db));
+    if (retained.status === 'rejected') throw retained.reason as Error;
+    expect(retained.value).toMatchObject({ outcome: 'applied', counts: { students: 0 } });
+    expect(await signInsQueued(deletionFirst.sub)).toHaveLength(1);
+    for (const { studentId } of [runFirst, deletionFirst]) {
+      const student = one(await db.select().from(users).where(eq(users.id, studentId)));
+      expect(student.removedAt).not.toBeNull();
+    }
+  }, 20_000);
 });
 
 describe.runIf(REAL_PG)('provisioning concurrency (real Postgres)', () => {
@@ -4920,7 +5003,12 @@ describe.runIf(REAL_PG)('live lesson questions under contention (real Postgres, 
       return {
         ...s,
         retain: (on: Database) =>
-          applyRetention(on, { schoolId, at: new Date(), confirmName: `School ${tag}` }),
+          applyRetention(on, {
+            schoolId,
+            at: new Date(),
+            confirmName: `School ${tag}`,
+            issuer: POOL,
+          }),
         answer: (on: Database) =>
           answerQuestion(on, {
             questionId: s.question.id,
@@ -5212,7 +5300,12 @@ describe.runIf(REAL_PG)('live lesson questions under contention (real Postgres, 
       return {
         teacherId: teacher.id,
         retain: (on: Database) =>
-          applyRetention(on, { schoolId: school.id, at: new Date(), confirmName: name }),
+          applyRetention(on, {
+            schoolId: school.id,
+            at: new Date(),
+            confirmName: name,
+            issuer: POOL,
+          }),
         draft: (on: Database) => createSavedQuestion(on, drafting(teacher.id)),
       };
     }
@@ -5460,7 +5553,12 @@ describe.runIf(REAL_PG)('live lesson questions under contention (real Postgres, 
       return {
         teacherId: teacher.id,
         retain: (on: Database) =>
-          applyRetention(on, { schoolId: school.id, at: new Date(), confirmName: name }),
+          applyRetention(on, {
+            schoolId: school.id,
+            at: new Date(),
+            confirmName: name,
+            issuer: POOL,
+          }),
         deck: (on: Database) => createDeck(on, deck),
       };
     }

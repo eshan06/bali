@@ -222,8 +222,11 @@ npm run school -- retention <school-id> --confirm "<name>"   # run it, once the 
   event, a lesson, a pre-bell tap of theirs or on them, an invite redeemed, a class joined, a class or block
   made, the account itself), with
   records at another school, or a teacher with a live class or block. Lessons,
-  participations and events stay, so reports add up. Logged as one `retention_applied`
-  event: the school's id, the day and counts, no name. Refused, writing nothing: no year
+  participations and events stay, so reports add up. Each person it de-identifies has their
+  Cognito sign-in queued for the API to delete, as an account deletion's is (2026-10-28;
+  runbook 9), under `AUTH_ISSUER`, the deploy's pool. Logged as one `retention_applied`
+  event: the school's id, the day and counts, no name. Refused, writing nothing: no
+  `AUTH_ISSUER` (preview too: run it where the API runs), no year
   end on record (it never guesses) or the year not over. A second run for the same day
   answers with the first one's counts; a new `year-end` starts the next year's.
   `RETENTION_COVERAGE` places every foreign key to `users`. When and how to run it on

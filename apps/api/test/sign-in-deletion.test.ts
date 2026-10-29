@@ -1,4 +1,12 @@
-import { cognitoDeletions, type Database, queueCognitoDeletion, users } from '@bali/db';
+import {
+  cognitoDeletions,
+  type Database,
+  enrollments,
+  parseSchoolCommand,
+  queueCognitoDeletion,
+  schools,
+  users,
+} from '@bali/db';
 import type { DeleteMeResponse, MeResponse } from '@bali/shared';
 import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
@@ -241,6 +249,56 @@ describe('a deleted account’s Cognito sign-in (2026-10-09)', () => {
     expect(calls).toEqual([]);
     expect(pool.size).toBe(1);
     expect(await queue()).toEqual([]);
+  });
+});
+
+describe('the sign-ins a retention run de-identifies (2026-10-28)', () => {
+  it('are deleted by the sweep, each by the sub it held, but one whose person came back since; a kept one is never touched', async () => {
+    // A school whose year ended in 2020: each teacher, with a live class and block, stays named;
+    // their students, with no record since, are de-identified.
+    const ana = await seedClassroom(db, 'retain-ana');
+    const ben = await seedClassroom(db, 'retain-ben', ana.school);
+    await db
+      .update(schools)
+      .set({ schoolYearEndsOn: '2020-06-01' })
+      .where(eq(schools.id, ana.school.id));
+    const inTheYear = new Date('2020-01-01');
+    for (const { student } of [ana, ben]) {
+      await db.update(users).set({ createdAt: inTheYear }).where(eq(users.id, student.id));
+      await db
+        .update(enrollments)
+        .set({ createdAt: inTheYear })
+        .where(eq(enrollments.studentId, student.id));
+    }
+    // Email sign-ins: Cognito makes each one's username its sub.
+    for (const { cognitoId } of [ana.student, ben.student, ana.teacher])
+      pool.set(cognitoId, cognitoId);
+
+    // The owner's run, in the API service's shell: this deploy's pool is its AUTH_ISSUER.
+    const run = parseSchoolCommand(['retention', ana.school.id, '--confirm', ana.school.name]);
+    await run!({ db, print: () => undefined, issuer: POOL });
+
+    // Ben signs in again before the sweep: his first call makes him a new account, so the sign-in
+    // is his to keep.
+    const token = await issuer.sign({ sub: ben.student.cognitoId, issuer: POOL });
+    const me = await app.inject({
+      method: 'GET',
+      url: '/v1/me',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(me.json<MeResponse>().user.id).not.toBe(ben.student.id);
+
+    await app.sweep();
+
+    expect(calls).toEqual([
+      { action: 'AdminGetUser', username: ana.student.cognitoId },
+      { action: 'AdminDeleteUser', username: ana.student.cognitoId },
+    ]);
+    expect([...pool.keys()].sort()).toEqual([ben.student.cognitoId, ana.teacher.cognitoId].sort());
+    expect(await queue()).toEqual([]);
+    const outcomes = logged('Cognito sign-in deletion done').map((line) => line.outcome);
+    expect(outcomes.sort()).toEqual(['came_back', 'deleted']);
+    expect(log()).not.toContain(ana.student.cognitoId);
   });
 });
 

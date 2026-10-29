@@ -109,10 +109,11 @@ never stored here, no screen can ever show it.
   for an answer under 13, which the phone never sends. Never unset: it goes only with the account
   (C3, C6a, C6b), and is in the student's export (C5).
 - `cognito_deletions` — one row per deleted account's Cognito sign-in waiting for the API to delete
-  it from the pool (2026-10-09; decision 3's amendment): the access token's issuer, username and
-  `sub`, how many tries, and when the next is due. Keyed to the Cognito user, not to a `users` row;
+  it from the pool (2026-10-09; decision 3's amendment), and per sign-in of someone the retention
+  run de-identified (2026-10-28): the issuer, username and `sub`, how many tries, and when the next
+  is due. Keyed to the Cognito user, not to a `users` row;
   deleted once the sign-in is gone, never exported. Not an engine table: written by the deletion's
-  transaction and beside the engine.
+  and the retention run's transactions and beside the engine.
 - `questions`, `responses`, `saved_questions`, `decks`, `session_presentations` — a live lesson's
   questions, each student's answer now, a teacher's drafts of questions, the teacher's PDF decks and
   the slide a session shows (Phase 7; "Live lesson", decisions 4 and 12). Written only by the
@@ -166,6 +167,13 @@ with a key of its own, and its minute sweep retries what is left, a row that kee
 longer each time. It never deletes another sign-in: the user is read first and deleted only while
 its `sub` is the one queued, since a username can come back with a new `sub`; nor one its person
 came back to: a live account holding that `sub` again (its first call since made one) keeps it.
+*Amended 2026-10-28 (the owner's decision):* the retention run's sign-ins go the same way. Its
+transaction queues the sign-in of each person it de-identifies, by the `sub` their row holds until
+it is erased, under the deploy's own pool (`AUTH_ISSUER`, which the owner's command refuses to run
+without), and the same deleter, with the same two checks, removes it. Cognito takes a local (email)
+sign-in's `sub` as its username, so every email sign-in is reached, all the pilot's pool has; a
+federated one (Google, Apple) is not, since Bali keeps no username, and offering one needs a way to
+reach it first.
 
 **4. A student can be in only one session at a time.** If a student in one session taps
 into another, their first participation is ended and recorded in the `events` table as
@@ -254,7 +262,9 @@ from `last_seen_at` (rule 2), never from the column.
   is a day the owner records; after it, the owner's retention run de-identifies, as an
   account deletion does, everyone whose records all lie on or before it (anyone with a later
   record, at another school, or a teacher with a live class or block is kept named), logged
-  as a `retention_applied` event of counts; lessons and their history stay. A student's own
+  as a `retention_applied` event of counts; lessons and their history stay. Their Cognito
+  sign-ins go too, queued in the run's transaction as a deletion's is (2026-10-28, decision 3's
+  amendment). A student's own
   deletion is decided (decision 3's amendment), and so is a school's written request to
   dispose of its data
   (C6a, 2026-10-04): every person of the school de-identified as an account deletion leaves

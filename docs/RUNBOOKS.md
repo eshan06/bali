@@ -57,8 +57,9 @@ uses values the one before it produced:
 - **Runbook 7, push:** open (added 2026-10-06, N6). Until it's done the API logs
   `push is off` at boot and sends no "class started" alert.
 - **Runbook 9, the Cognito sign-in deleter:** open (added 2026-10-09). Until it's done the API
-  logs `Cognito sign-in deletion is off` at boot and only queues each deleted account's sign-in;
-  the phone's own DeleteUser still deletes one when it lands.
+  logs `Cognito sign-in deletion is off` at boot and only queues each deleted account's sign-in,
+  and each one a retention run de-identifies (runbook 1, step 12); the phone's own DeleteUser
+  still deletes one when it lands. Due before Vanderbilt's retention run.
 - **Runbook 10, the deck bucket — done** (2026-10-12, PLAN's M0): dev's bucket
   `bali-decks-dev-eshshah` and prod's `bali-decks-prod-eshshah`; the check
   (`railway ssh --service bali -- npm run --silent deck-bucket:check`, and `--service "bali prod"`)
@@ -252,7 +253,8 @@ project for the API (its DSN).
       teachers' slide decks go with it, their titles emptied; the API deletes each one's PDF from
       the bucket by itself within the hour (runbook 10).
     - **Delete the school's sign-ins in Cognito.** The disposal doesn't reach them (the API
-      deletes the sign-in of an account that deletes itself, runbook 9, never a disposal's),
+      deletes the sign-in of an account that deletes itself, or that a retention run
+      de-identifies, runbook 9, never a disposal's),
       and each still holds an email address. In the production
       pool's **Users**, delete every user whose email is at the school's domain. A sign-in
       left there only ever makes a new, empty account.
@@ -288,13 +290,18 @@ project for the API (its DSN).
       it under "year ends". Put the run in your calendar for the week after that day.
     - **On the calendar day, check no parent's inspection request is open** for a student
       of the school (step 10).
+    - **Check the sign-in deleter is on** for that environment: its API's boot log says
+      `Cognito sign-in deletion is on` (runbook 9 sets its key). The run deletes the Cognito
+      sign-in of everyone it de-identifies (2026-10-28); with the deleter off, their sign-ins
+      wait in the queue, and anyone who signs in to Bali meanwhile keeps theirs.
     - **Preview it** in the same shell: `npm run school -- retention <school-id>`. It prints
       how many students, teachers, enrollments and pre-bell taps would go, and the ids of
       the accounts it keeps named: anyone with a record after the year's last day (an answer
       to a class question counts, and a teacher's saved question or slide deck added since), at another
       school, or a teacher with a live class or
       block. "no year end on record" or "isn't over until" means nothing was written: record
-      the day, or wait.
+      the day, or wait. "AUTH_ISSUER isn't set here" means the shell isn't the API service's
+      (step 9): nothing was written.
     - **Run it,** pasting the preview's last line,
       `npm run school -- retention <school-id> --confirm '<name>'`. It prints one line of
       counts with no name: keep it with the school's records. A second run says it ran
@@ -303,10 +310,16 @@ project for the API (its DSN).
       slide decks (each title, and the PDF, which the API deletes from the bucket by itself within
       the hour, reporting to Sentry, tagged `deck object deletion`, if it can't); every answer stays, by the
       number of the option picked, under the account it de-identifies.
+    - **Check the sign-ins are gone.** The run queues each de-identified person's Cognito sign-in
+      for the API, which deletes them from the pool by itself, about ten a minute. Its log shows a
+      `Cognito sign-in deletion done` line for each: `"outcome":"deleted"`, or `"came_back"` for
+      someone who signed in again since, whose sign-in is kept (Bali gave them a fresh, empty
+      account). The run reaches a sign-in by the `sub` it held, which Cognito takes for an email
+      sign-in: all the pilot's pool has. A Google or Apple sign-in, if the pool ever offers one,
+      isn't reached that way (its line says `"gone"`, and the user stays in the pool): offering one
+      needs a change here first (`docs/DECISIONS.md`, 2026-10-28).
     - **Next year:** record the new last day with `year-end`; whoever was kept named this
-      time is judged again against it. The Cognito sign-ins stay (a de-identified student
-      who signs in again starts a fresh, empty account); Railway's backups age out on their
-      schedule (step 4).
+      time is judged again against it. Railway's backups age out on their schedule (step 4).
 
 ---
 
@@ -877,8 +890,9 @@ matched to what the service should have.
 ## 9. Cognito: the API deletes a deleted account's sign-in
 
 What it makes: the API deleting each deleted account's Cognito sign-in from the pool (the owner's
-decision, 2026-10-09; ARCHITECTURE, data-model decision 3's amendment; PLAN's C3-cognito). The API
-already queues every deleted account's sign-in; until a deploy holds this key it deletes none, and
+decision, 2026-10-09; ARCHITECTURE, data-model decision 3's amendment; PLAN's C3-cognito), and the
+sign-in of each person a retention run de-identifies (2026-10-28; runbook 1, step 12). Each one is
+queued already; until a deploy holds this key the API deletes none, and
 its boot log says `Cognito sign-in deletion is off`. Each environment gets an IAM user of its own,
 allowed two calls on its own pool and nothing else, so a leaked dev key can't touch production.
 

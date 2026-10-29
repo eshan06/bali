@@ -15,6 +15,7 @@ import {
   armedTaps,
   blocks,
   classes,
+  cognitoDeletions,
   decks,
   deviceTokens,
   enrollments,
@@ -86,6 +87,17 @@ function one<T>(rows: T[]): T {
 
 /** The year ends tomorrow; the run happens three days on, so everything seeded now lies in it. */
 const LATER = () => fromNow(3 * DAY);
+
+/** This deploy's Cognito pool, its `AUTH_ISSUER`: the one the run queues sign-ins under. */
+const POOL = 'https://cognito-idp.us-east-1.amazonaws.com/us-east-1_retention';
+
+/** The sign-ins queued for deletion among `subs`, in order of sub. */
+const queuedFor = (subs: string[]) =>
+  db
+    .select()
+    .from(cognitoDeletions)
+    .where(inArray(cognitoDeletions.sub, subs))
+    .orderBy(cognitoDeletions.sub);
 
 /**
  * A school whose year ends tomorrow. Ms Rivera teaches Biology, still live,
@@ -251,6 +263,7 @@ describe('applyRetention (C6b)', () => {
       schoolId: s.school.id,
       at,
       confirmName: s.school.name,
+      issuer: POOL,
     });
 
     expect(result).toEqual({
@@ -318,9 +331,56 @@ describe('applyRetention (C6b)', () => {
     expect(after.unlocks).toMatchObject([{ studentId: s.ana.id, reason: 'nurse' }]);
   });
 
+  it('queues the sign-in of each person it de-identifies for the API to delete, once, and none of anyone kept (2026-10-28)', async () => {
+    const s = await seed('c6b-sign-ins');
+    const everyone = [s.rivera, s.old, s.ana, s.ben, s.cara, s.dan, s.eve].map((p) => p.cognitoId);
+    const at = LATER();
+
+    await applyRetention(db, {
+      schoolId: s.school.id,
+      at,
+      confirmName: s.school.name,
+      issuer: POOL,
+    });
+
+    // Ana and Mr Old, each by the sub their row held: a local sign-in's sub is a username
+    // Cognito takes. Due at once, as an account deletion's is.
+    const queued = [s.ana, s.old].map((gone) => ({
+      issuer: POOL,
+      username: gone.cognitoId,
+      sub: gone.cognitoId,
+      attempts: 0,
+      nextAttemptAt: at,
+    }));
+    expect(await queuedFor(everyone)).toMatchObject(queued);
+    // Queued in order of sub, never of the accounts (Mr Old's comes first by id), so the queue's
+    // order can't pair a waiting sub with the account it was.
+    expect(s.old.id < s.ana.id).toBe(true);
+    const byId = await db
+      .select({ sub: cognitoDeletions.sub })
+      .from(cognitoDeletions)
+      .where(inArray(cognitoDeletions.sub, everyone))
+      .orderBy(cognitoDeletions.id);
+    expect(byId.map((row) => row.sub)).toEqual([s.ana.cognitoId, s.old.cognitoId]);
+
+    // A second run for the year queues nothing more.
+    await applyRetention(db, {
+      schoolId: s.school.id,
+      at: fromNow(4 * DAY),
+      confirmName: s.school.name,
+      issuer: POOL,
+    });
+    expect(await queuedFor(everyone)).toMatchObject(queued);
+  });
+
   it('logs one retention_applied event of ids, the day and counts, naming no one', async () => {
     const s = await seed('c6b-log');
-    await applyRetention(db, { schoolId: s.school.id, at: LATER(), confirmName: s.school.name });
+    await applyRetention(db, {
+      schoolId: s.school.id,
+      at: LATER(),
+      confirmName: s.school.name,
+      issuer: POOL,
+    });
     const logged = one(
       await db
         .select()
@@ -370,12 +430,13 @@ describe('applyRetention (C6b)', () => {
       armed: await db.$count(armedTaps),
       tokens: await db.$count(deviceTokens),
       ageChecks: await db.$count(ageChecks),
+      queued: await db.$count(cognitoDeletions),
       classes: await db.select().from(classes).where(eq(classes.schoolId, s.school.id)),
       decks: await db.select().from(decks).where(eq(decks.schoolId, s.school.id)),
     });
     const before = await snapshot();
 
-    const preview = await applyRetention(db, { schoolId: s.school.id, at });
+    const preview = await applyRetention(db, { schoolId: s.school.id, at, issuer: POOL });
     expect(preview).toMatchObject({ outcome: 'preview' });
     expect(await snapshot()).toEqual(before);
 
@@ -383,6 +444,7 @@ describe('applyRetention (C6b)', () => {
       schoolId: s.school.id,
       at,
       confirmName: ' ' + s.school.name,
+      issuer: POOL,
     });
     if (preview.outcome !== 'preview' || applied.outcome !== 'applied') throw new Error('outcome');
     expect(applied.counts).toEqual(preview.counts);
@@ -390,6 +452,8 @@ describe('applyRetention (C6b)', () => {
     expect(await db.select().from(decks).where(eq(decks.teacherId, s.old.id))).toMatchObject([
       { title: '', removedAt: at },
     ]);
+    // The run queues the sign-ins its preview, rolled back, did not.
+    expect(await queuedFor([s.ana.cognitoId, s.old.cognitoId])).toHaveLength(2);
   });
 
   it('a second run for the same year answers with the first one’s counts and writes nothing', async () => {
@@ -399,6 +463,7 @@ describe('applyRetention (C6b)', () => {
       schoolId: s.school.id,
       at,
       confirmName: s.school.name,
+      issuer: POOL,
     });
     if (first.outcome !== 'applied') throw new Error(first.outcome);
     const logged = await db.$count(events);
@@ -408,6 +473,7 @@ describe('applyRetention (C6b)', () => {
       schoolId: s.school.id,
       at: fromNow(4 * DAY),
       confirmName: s.school.name,
+      issuer: POOL,
     });
     expect(again).toEqual({
       outcome: 'already_applied',
@@ -422,16 +488,23 @@ describe('applyRetention (C6b)', () => {
 
   it('a later year is judged afresh: who has stopped since goes then', async () => {
     const s = await seed('c6b-next');
-    await applyRetention(db, { schoolId: s.school.id, at: LATER(), confirmName: s.school.name });
+    await applyRetention(db, {
+      schoolId: s.school.id,
+      at: LATER(),
+      confirmName: s.school.name,
+      issuer: POOL,
+    });
     // Ben's lesson ends; the next year ends with nothing more of his.
     await db.execute(
       sql`update sessions set ended_at = now(), ends_at = now() where class_id = ${s.bio.id} and ended_at is null`,
     );
     await recordYearEnd(db, { schoolId: s.school.id, endsOn: localDay(5) });
+    const at = fromNow(7 * DAY);
     const next = await applyRetention(db, {
       schoolId: s.school.id,
-      at: fromNow(7 * DAY),
+      at,
       confirmName: s.school.name,
+      issuer: POOL,
     });
     expect(next).toMatchObject({ outcome: 'applied', yearEndsOn: localDay(5) });
     expect((await userRow(s.ben.id)).removedAt).not.toBeNull();
@@ -441,6 +514,11 @@ describe('applyRetention (C6b)', () => {
     for (const kept of [s.rivera, s.cara]) {
       expect((await userRow(kept.id)).removedAt).toBeNull();
     }
+    // Their sign-ins go with this year's run.
+    expect(await queuedFor([s.ben.cognitoId, s.eve.cognitoId])).toMatchObject([
+      { sub: s.ben.cognitoId, nextAttemptAt: at },
+      { sub: s.eve.cognitoId, nextAttemptAt: at },
+    ]);
   });
 
   it('keeps each person whose one record after the year is an event, a block, their class’s lesson or a tap on them', async () => {
@@ -510,6 +588,7 @@ describe('applyRetention (C6b)', () => {
       schoolId: school.id,
       at: LATER(),
       confirmName: school.name,
+      issuer: POOL,
     });
     if (result.outcome !== 'applied') throw new Error(result.outcome);
     expect(result.continuing).toEqual(
@@ -591,7 +670,12 @@ describe('applyRetention (C6b)', () => {
     const before = await answers();
     const at = LATER();
 
-    const result = await applyRetention(db, { schoolId: school.id, at, confirmName: school.name });
+    const result = await applyRetention(db, {
+      schoolId: school.id,
+      at,
+      confirmName: school.name,
+      issuer: POOL,
+    });
 
     expect(result).toMatchObject({
       outcome: 'applied',
@@ -660,7 +744,12 @@ describe('applyRetention (C6b)', () => {
     const next = await draft(writer.id, 'Ready for spring?', fromNow(2 * DAY + 12 * 60 * MIN));
     const at = LATER();
 
-    const result = await applyRetention(db, { schoolId: school.id, at, confirmName: school.name });
+    const result = await applyRetention(db, {
+      schoolId: school.id,
+      at,
+      confirmName: school.name,
+      issuer: POOL,
+    });
 
     expect(result).toMatchObject({
       outcome: 'applied',
@@ -717,7 +806,12 @@ describe('applyRetention (C6b)', () => {
     const next = await deck(maker.id, 'Spring cells', fromNow(2 * DAY + 12 * 60 * MIN));
     const at = LATER();
 
-    const result = await applyRetention(db, { schoolId: school.id, at, confirmName: school.name });
+    const result = await applyRetention(db, {
+      schoolId: school.id,
+      at,
+      confirmName: school.name,
+      issuer: POOL,
+    });
 
     expect(result).toMatchObject({
       outcome: 'applied',
@@ -766,6 +860,7 @@ describe('applyRetention (C6b)', () => {
       schoolId: s.school.id,
       at: LATER(),
       confirmName: s.school.name,
+      issuer: POOL,
     });
     if (result.outcome !== 'applied') throw new Error(result.outcome);
     expect(result.continuing).toEqual(expect.arrayContaining([hire.id, joiner.id]));
@@ -779,25 +874,37 @@ describe('applyRetention (C6b)', () => {
     const school = { id: s.school.id, name: s.school.name };
     const logged = await db.$count(events);
 
-    expect(await applyRetention(db, { schoolId: s.school.id, at: new Date() })).toEqual({
+    const issuer = POOL;
+    expect(await applyRetention(db, { schoolId: s.school.id, at: new Date(), issuer })).toEqual({
       outcome: 'year_not_over',
       school,
       yearEndsOn: localDay(1),
       overAt: yearOverAt(localDay(1)),
     });
     expect(
-      await applyRetention(db, { schoolId: s.school.id, at: LATER(), confirmName: 'Another' }),
+      await applyRetention(db, {
+        schoolId: s.school.id,
+        at: LATER(),
+        confirmName: 'Another',
+        issuer,
+      }),
     ).toEqual({ outcome: 'name_mismatch', school });
     await db.update(schools).set({ schoolYearEndsOn: null }).where(eq(schools.id, s.school.id));
     expect(
-      await applyRetention(db, { schoolId: s.school.id, at: LATER(), confirmName: s.school.name }),
+      await applyRetention(db, {
+        schoolId: s.school.id,
+        at: LATER(),
+        confirmName: s.school.name,
+        issuer,
+      }),
     ).toEqual({ outcome: 'no_year_end', school });
-    expect(await applyRetention(db, { schoolId: newUuidV7(), at: LATER() })).toEqual({
+    expect(await applyRetention(db, { schoolId: newUuidV7(), at: LATER(), issuer })).toEqual({
       outcome: 'unknown_school',
     });
 
     expect(await db.$count(events)).toBe(logged);
     expect((await userRow(s.ana.id)).displayName).toBe('Ana P c6b-refuse');
+    expect(await queuedFor([s.ana.cognitoId, s.old.cognitoId])).toEqual([]);
   });
 
   it('a disposed school has nothing left to retain', async () => {
@@ -812,7 +919,7 @@ describe('applyRetention (C6b)', () => {
       confirmName: school.name,
     });
     expect(disposed.outcome).toBe('disposed');
-    expect(await applyRetention(db, { schoolId: school.id, at: LATER() })).toEqual({
+    expect(await applyRetention(db, { schoolId: school.id, at: LATER(), issuer: POOL })).toEqual({
       outcome: 'school_disposed',
       school: { id: school.id, name: school.name },
     });
@@ -820,11 +927,12 @@ describe('applyRetention (C6b)', () => {
 });
 
 describe('npm run school -- year-end / retention', () => {
-  const run = async (argv: string[]) => {
+  /** The command as the API service's shell runs it, its `AUTH_ISSUER` set unless `io` says not. */
+  const run = async (argv: string[], io: { issuer?: string } = { issuer: POOL }) => {
     const lines: string[] = [];
     const command = parseSchoolCommand(argv);
     if (!command) throw new Error('usage');
-    await command({ db, print: (l) => lines.push(l) });
+    await command({ db, print: (l) => lines.push(l), ...io });
     return lines;
   };
 
@@ -899,6 +1007,7 @@ describe('npm run school -- year-end / retention', () => {
       `To go ahead: npm run school -- retention ${school.id} --confirm 'St. Mary'\\''s'`,
     );
     expect((await userRow(kim.id)).removedAt).toBeNull();
+    expect(await queuedFor(['kim-cmd', 't-cmd'])).toEqual([]);
 
     const done = await run(['retention', school.id, '--confirm', "St. Mary's"]);
     expect(done).toEqual([
@@ -911,11 +1020,56 @@ describe('npm run school -- year-end / retention', () => {
     ]);
     expect(done[0]).not.toContain('Mary');
     expect((await userRow(kim.id)).displayName).toBeNull();
+    // Kim's sign-in waits for the API, under the pool the command was given; the teacher's stays.
+    expect(await queuedFor(['kim-cmd', 't-cmd'])).toMatchObject([
+      { issuer: POOL, username: 'kim-cmd', sub: 'kim-cmd' },
+    ]);
     expect(await run(['retention', school.id])).toEqual([
       expect.stringMatching(
         /^the retention run for "St. Mary's"'s year ending 2020-06-01 ran on \S+: students 1, .*nothing more to do\. For its next year: npm run school -- year-end/,
       ),
     ]);
+  });
+
+  it('refuses without this deploy’s Cognito pool, its preview too, writing nothing (2026-10-28)', async () => {
+    const [school] = await db
+      .insert(schools)
+      .values({ name: 'No Pool High', schoolYearEndsOn: '2020-06-01' })
+      .returning();
+    if (!school) throw new Error('seed');
+    // A teacher whose records all lie in the year: the run would de-identify her.
+    const [lee] = await db
+      .insert(users)
+      .values({
+        cognitoId: 'lee-cmd',
+        role: 'teacher',
+        schoolId: school.id,
+        displayName: 'Ms Lee',
+        createdAt: new Date('2020-01-01'),
+      })
+      .returning();
+    if (!lee) throw new Error('seed');
+    const logged = await db.$count(events);
+
+    for (const io of [{}, { issuer: '' }]) {
+      for (const argv of [
+        ['retention', school.id],
+        ['retention', school.id, '--confirm', school.name],
+      ]) {
+        await expect(run(argv, io)).rejects.toThrow(/AUTH_ISSUER.*nothing was written/);
+      }
+    }
+    expect(await db.$count(events)).toBe(logged);
+    expect(await userRow(lee.id)).toMatchObject({
+      displayName: 'Ms Lee',
+      cognitoId: 'lee-cmd',
+      removedAt: null,
+    });
+    expect(await queuedFor(['lee-cmd'])).toEqual([]);
+
+    // In the API service's shell, where it is set, the run goes ahead.
+    await run(['retention', school.id, '--confirm', school.name]);
+    expect(await queuedFor(['lee-cmd'])).toMatchObject([{ issuer: POOL, sub: 'lee-cmd' }]);
   });
   it('refuses another name, saying the right one and writing nothing; a disposed school, says so', async () => {
     const [school] = await db

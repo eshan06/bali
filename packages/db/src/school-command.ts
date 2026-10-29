@@ -53,14 +53,19 @@ export const SCHOOL_USAGE = `usage: npm run school -- <command>
                                 de-identify; it writes nothing
   retention <school-id> --confirm "<name>"
                                 run it: everyone whose records all lie in the year that ended
-                                de-identified, their classes left; the lessons stay, logged by
-                                counts and never a name
+                                de-identified, their classes left and their sign-ins queued for
+                                deletion; the lessons stay, logged by counts and never a name
 
-It runs against DATABASE_URL, as npm run migrate does.`;
+It runs against DATABASE_URL, as npm run migrate does; retention also needs AUTH_ISSUER, the
+Cognito pool the API service deletes those sign-ins from.`;
 
 export interface SchoolCommandIO {
   db: Database;
   print: (line: string) => void;
+  /**
+   * This deploy's Cognito pool, its `AUTH_ISSUER`: where retention queues the sign-ins it removes.
+   */
+  issuer?: string;
 }
 
 /** A command whose arguments are checked, ready to run. */
@@ -391,16 +396,24 @@ const retained = (c: RetentionCounts) =>
 /**
  * Without a name, whom the school's retention run would de-identify; with the
  * school's own, the run, logged by the school's id, the year's last day and
- * counts alone (C6b).
+ * counts alone (C6b). Refused, before anything is read, without this deploy's
+ * Cognito pool: a sign-in queued under any other would never be deleted.
  */
 async function retention(
-  { db, print }: SchoolCommandIO,
+  { db, print, issuer }: SchoolCommandIO,
   schoolId: string,
   confirmName?: string,
 ): Promise<void> {
+  if (!issuer) {
+    throw new Error(
+      "AUTH_ISSUER isn't set here, so nothing was written: the run needs this deploy's Cognito " +
+        "pool to delete the sign-ins of everyone it de-identifies. Run it in the API service's " +
+        'shell, where it is set (docs/RUNBOOKS.md, runbook 1, step 9).',
+    );
+  }
   // This machine's clock, the server's inside the API service: it judges the year over.
   const at = new Date();
-  const result = await applyRetention(db, { schoolId, at, confirmName });
+  const result = await applyRetention(db, { schoolId, at, confirmName, issuer });
   const setYearEnd = `npm run school -- year-end ${schoolId} YYYY-MM-DD`;
   switch (result.outcome) {
     case 'unknown_school':
@@ -441,7 +454,10 @@ async function retention(
             result.continuing.join(', '),
         );
       }
-      print('Their lessons, taps and unlocks stay, naming no one. Nothing was written.');
+      print(
+        'Their Cognito sign-ins would go too, deleted by the API (docs/RUNBOOKS.md, runbook 9); ' +
+          'their lessons, taps and unlocks stay, naming no one. Nothing was written.',
+      );
       print(
         "First check no parent's inspection request is open for one of its students " +
           '(docs/RUNBOOKS.md, runbook 1, step 10).',

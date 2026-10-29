@@ -933,7 +933,9 @@ describe('decks in the privacy paths, and a delete that keeps failing (M4)', () 
       now = new Date('2026-10-12T15:00:00Z');
       const run = (confirmName?: string) => {
         const input = { schoolId: school.id, at: now, confirmName };
-        return path === 'a disposal' ? disposeSchool(db, input) : applyRetention(db, input);
+        return path === 'a disposal'
+          ? disposeSchool(db, input)
+          : applyRetention(db, { ...input, issuer: testEnv.AUTH_ISSUER });
       };
       const rows = () => Promise.all(theirs.map((deck) => rowOf(deck.id)));
       const before = await rows();

@@ -8,6 +8,47 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-28** — **The year-end retention run deletes the sign-ins of the people it de-identifies
+  (the owner's decision), reversing 2026-10-09's keep.** The run (C6b) took each person's name and
+  Bali's link to their sign-in, and left the Cognito sign-in itself, with its email and password, in
+  the pool on purpose, so a returning student could sign in with the same one (2026-10-09, the end of
+  C3-cognito's entry). The privacy policy's section 6 (C2-text, #461) says that after the year's last
+  day Bali removes "the names and sign-ins" of everyone whose records all fall on or before it. The
+  owner chose the policy's words. **Decided:** in its own transaction, before it erases each
+  person's `sub`, the run queues their sign-in in `cognito_deletions`, as an account deletion queues
+  one, and the API's deleter removes it from the pool with its two checks unchanged: a sign-in goes
+  only while its `sub` is the one queued, and one whose person came back (a live account holding that
+  `sub` again) is kept. A preview, rolled back, queues nothing; a second run for the same year queues
+  nothing more; anyone kept named keeps theirs. The run is the last moment Bali holds each one's
+  `sub`, so it is where they are queued: in order of sub, never of the accounts, so while the rows
+  wait their order can't pair a sub with the account it was (santa's review). **The pool:** a row is
+  tried only by the deploy whose
+  `AUTH_ISSUER` it names, so the owner's command passes its shell's `AUTH_ISSUER` through its IO
+  (`SchoolCommandIO.issuer`; the engine's `ApplyRetentionInput.issuer` is required) and refuses
+  without it, preview and run alike, before reading anything. In the API service's shell (runbook 1,
+  step 9), where the runbook already runs it, it is always set. **The limit:** Bali keeps a
+  sign-in's `sub`, not its username, and Cognito takes a local (email) sign-in's `sub` as its
+  username (2026-10-09), so every email sign-in is reached: all the pilot's pool has (runbook 2, no
+  Google or Apple sign-in). A federated one is not: AdminGetUser answers not found, the deleter
+  records the row done (`gone`), and the user stays. Offering Google or Apple sign-in needs its
+  username stored, or another way to reach it, first. **The owner's order:** runbook 9's key on the
+  environment before the run (runbook 1, step 12 now checks it); without it the rows wait in the
+  queue, and anyone who signs in to Bali meanwhile keeps their sign-in. The deleter tries up to ten
+  rows a pass, so a school's run clears in minutes, an hour or two for a large one; meanwhile the
+  pass an account deletion starts takes the oldest due rows first, so that deletion's own row can
+  wait behind the run's (the phone's own DeleteUser is still its first try). **Weighed:**
+  rewording section 6 to say the sign-in and its email stay with Amazon Cognito until the person
+  deletes their account. It would have kept a returning student's sign-in, but a student reading
+  the policy expects theirs gone; now a returning student signs up again, and one who comes back
+  before their row is tried keeps theirs. The disposal (C6a) is unchanged: its console step, every
+  user at the school's email domain, stays, and 2026-10-09's suggested follow-up is still open.
+  **Tests:** `retention.test.ts` (one queued row per de-identified account and none for a kept one,
+  in order of sub, none from a preview or a second run, the command refusing without the pool),
+  `races.test.ts` (the
+  run and the person's own deletion, either first, leave one row; the run racing a tap, a join, an
+  arm, a rename and an unlock queues exactly when it de-identifies) and `sign-in-deletion.test.ts`
+  (the command's rows deleted by the sweep against a fake pool, a returning student's kept).
+
 - **2026-10-28** — **Present hides Clock off, as it hides an unlock's reason (the owner's
   decision).** On the class page, a tile whose phone clock is set more than 2 minutes ahead says
   "Clock off", and the student panel says why. Present, the same grid projected for the room, said
@@ -5131,7 +5172,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   follow-up, its own step: the disposal queues each person it de-identifies by `sub` (every local
   sign-in goes by itself), the console step kept for what that leaves. The retention run keeps the
   sign-ins on purpose: it de-identifies a year's records, and a student who continues signs in
-  again with the same sign-in (runbook 1, step 12). Teachers' refusal (`teacher_has_classes`)
+  again with the same sign-in (runbook 1, step 12) (reversed 2026-10-28: the run queues each one
+  it de-identifies; the entry of that date above). Teachers' refusal (`teacher_has_classes`)
   is unchanged: a refused deletion queues nothing.
 
 - **2026-10-09** — **The 13+ check Bali could not be reached for is asked again in class** (#300's
