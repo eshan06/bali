@@ -250,7 +250,10 @@ async function insertEvent(
     userId?: string | null;
     occurredAt: Date;
     payload?: unknown;
-    /** The phone's own order for it (A12); only one `knownOrder` can compare is kept. */
+    /**
+     * The phone's own order for it (A12); only one `knownOrder` can compare is kept, and none on
+     * a record of an account de-identified already (`keptOrder`).
+     */
     order?: unknown;
     /**
      * The phone's claimed time, unclamped (S9): one far ahead of when the server
@@ -271,6 +274,7 @@ async function insertEvent(
     ahead === null
       ? (e.payload ?? null)
       : { ...(e.payload as Record<string, unknown> | null), [CLOCK_AHEAD_NOTE]: ahead };
+  const order = await keptOrder(tx, e.userId ?? null, e.order);
   const inserted = await tx
     .insert(events)
     .values({
@@ -281,7 +285,7 @@ async function insertEvent(
       userId: e.userId ?? null,
       occurredAt: e.occurredAt,
       payload,
-      ...orderColumns(e.order),
+      ...orderColumns(order),
     })
     .onConflictDoNothing({ target: events.eventId })
     .returning({ id: events.id });
@@ -2485,6 +2489,43 @@ function orderColumns(order: unknown): { orderInstall: string | null; orderSeq: 
   return { orderInstall: known?.install ?? null, orderSeq: known?.seq ?? null };
 }
 
+/**
+ * The order a record of `userId`'s keeps (`knownOrder`'s): none once that account is de-identified,
+ * as no record of theirs keeps one (`emptyOrders`) — an unlock still on its way can land after the
+ * removal. The account's row is read FOR KEY SHARE, the lock the record's foreign key takes anyway:
+ * a removal marks the row by an UPDATE of its Cognito subject, a key, so it holds the row FOR UPDATE
+ * from then to its commit, and this waits that out and reads the row removed; a removal that comes
+ * after this read waits for this record to commit before it marks the row, so the emptying it does
+ * next finds the record.
+ */
+async function keptOrder(
+  tx: Database,
+  userId: string | null,
+  order: unknown,
+): Promise<ActionOrder | null> {
+  const known = knownOrder(order);
+  if (known === null || userId === null) return known;
+  const owner = firstOrUndefined(
+    await tx
+      .select({ removedAt: users.removedAt })
+      .from(users)
+      .where(eq(users.id, userId))
+      .for('key share'),
+  );
+  return owner?.removedAt ? null : known;
+}
+
+/**
+ * The phone's order (A12) emptied on the events `where` picks, of accounts marked removed already:
+ * migration 0029's rewrite, which its trigger lets through only on a record carrying an order.
+ */
+async function emptyOrders(tx: Database, where: SQL): Promise<void> {
+  await tx
+    .update(events)
+    .set({ orderInstall: null, orderSeq: null })
+    .where(and(where, isNotNull(events.orderInstall)));
+}
+
 /** The payload stored on an event that already landed; null when it has none. */
 async function storedPayload(
   tx: Database,
@@ -4651,9 +4692,9 @@ export const ACCOUNT_DELETION_COVERAGE = {
   'participations.student_id':
     "a live one ended with its class's leave; all kept, under the account de-identified, so reports count as before",
   'events.user_id':
-    "kept, under the account de-identified; a rename's names emptied (migration 0015); account_deleted recorded, no payload",
+    "kept, under the account de-identified; a rename's names emptied (migration 0015), and each one's phone order (migration 0029); account_deleted recorded, no payload",
   'armed_taps.student_id':
-    'a waiting one consumed, so no Start weighs it; all kept, under the account de-identified',
+    'a waiting one consumed, so no Start weighs it; all kept, under the account de-identified, each one’s phone order emptied',
   'armed_taps.teacher_id':
     "kept: the taps students made on their block, those students' own; a teacher with a live block is refused",
   'teacher_invites.redeemed_by':
@@ -4693,8 +4734,9 @@ export interface DeleteAccountResult {
  * `enrollment_left`, a live participation ended on the session's feed) — in
  * session too, since a deletion never waits for a lesson; the row loses its
  * name and its Cognito subject and is marked removed; each rename it made
- * loses the names it carried (the one rewrite of `events` the database allows,
- * migration 0015); its phones' device tokens (N4) and its 13+ yes (C7-server)
+ * loses the names it carried, and each record of theirs the phone's order
+ * (A12), a tap kept from a Start too (the two rewrites of `events` the
+ * database allows, migrations 0015 and 0029); its phones' device tokens (N4) and its 13+ yes (C7-server)
  * are deleted; a teacher's drafts are removed, their words emptied, and their decks, their titles
  * emptied (their stored objects the API's sweep's, M4); its Cognito sign-in is queued
  * for the API to delete (2026-10-09);
@@ -4800,11 +4842,18 @@ export async function deleteAccount(
         .update(users)
         .set({ cognitoId: deletedCognitoId(me.id), displayName: null, removedAt: input.at })
         .where(eq(users.id, me.id));
-      // After the row is marked removed: the trigger allows this rewrite only then.
+      // After the row is marked removed: the trigger allows these rewrites only then.
       await tx
         .update(events)
         .set({ payload: null })
         .where(and(eq(events.userId, me.id), eq(events.type, 'display_name_changed')));
+      // The phone's order (A12), on every record of theirs and every tap kept from a Start: the
+      // phone keeps its outbox's id through every sign-in (migration 0029).
+      await emptyOrders(tx, eq(events.userId, me.id));
+      await tx
+        .update(armedTaps)
+        .set({ orderInstall: null, orderSeq: null })
+        .where(and(eq(armedTaps.studentId, me.id), isNotNull(armedTaps.orderInstall)));
 
       const isNew = await insertEvent(tx, {
         eventId,
@@ -4836,7 +4885,8 @@ export const SCHOOL_DISPOSAL_COVERAGE = {
   'enrollments.student_id': 'each in its classes ended, the student de-identified',
   'participations.student_id':
     'kept (none live: each lesson of it over, or ended first), under a person de-identified',
-  'events.user_id': "kept, under a person de-identified; a rename's names emptied (migration 0015)",
+  'events.user_id':
+    "kept, under a person de-identified; a rename's names emptied (migration 0015), and each one's phone order (migration 0029)",
   'armed_taps.student_id': 'deleted: the taps of its people',
   'armed_taps.teacher_id': "deleted: the taps on its teachers' blocks",
   'teacher_invites.school_id': 'an open invite deleted; a redeemed one kept, naming no one',
@@ -4936,7 +4986,8 @@ class RetentionPreview extends Error {
  * agreement). One transaction: every person of the school — its teachers, and
  * anyone enrolled in, present in or recorded in one of its classes — is
  * de-identified as an account deletion leaves one (C3: no name, no Cognito
- * subject, removed; a rename's names emptied); its enrollments end; its classes
+ * subject, removed; a rename's names emptied, and the phone's order on each
+ * record); its enrollments end; its classes
  * are removed and lose their names, its lessons' questions their words; its teachers' blocks are removed, and
  * their drafts with their words emptied, and its decks with their titles (their stored objects the
  * API's sweep's, M4); the taps
@@ -5149,8 +5200,10 @@ async function disposeOnce(tx: Database, input: DisposeSchoolInput): Promise<Dis
 
 /**
  * The accounts `ids` de-identified as a deletion leaves one (C3): no name, no
- * Cognito subject, removed, no 13+ yes; each rename's names emptied (migration
- * 0015's one rewrite of `events`). The caller holds their rows.
+ * Cognito subject, removed, no 13+ yes; each rename's names emptied, and the
+ * phone's order on each record (the two rewrites of `events` the database
+ * allows, migrations 0015 and 0029). The caller holds their rows, and deletes
+ * their pre-bell taps, so none keeps an order either.
  */
 async function deIdentify(tx: Database, ids: string[], at: Date): Promise<void> {
   if (ids.length === 0) return;
@@ -5160,7 +5213,7 @@ async function deIdentify(tx: Database, ids: string[], at: Date): Promise<void> 
     // `deletedCognitoId`'s format, set-based: a change to one changes both.
     .set({ cognitoId: sql`'deleted:' || ${users.id}`, displayName: null, removedAt: at })
     .where(inArray(users.id, ids));
-  // After the rows are marked removed: the trigger allows this rewrite only then.
+  // After the rows are marked removed: the trigger allows these rewrites only then.
   await tx
     .update(events)
     .set({ payload: null })
@@ -5171,6 +5224,7 @@ async function deIdentify(tx: Database, ids: string[], at: Date): Promise<void> 
         isNotNull(events.payload),
       ),
     );
+  await emptyOrders(tx, inArray(events.userId, ids));
 }
 
 /** Options emptied: as many empty strings as there were. */
@@ -5334,7 +5388,8 @@ export const RETENTION_COVERAGE = {
   'enrollments.student_id': 'each live one ended as a removal ends it, the student de-identified',
   'participations.student_id':
     'kept, under a person de-identified; a live one makes them continuing',
-  'events.user_id': "kept, under a person de-identified; a rename's names emptied (migration 0015)",
+  'events.user_id':
+    "kept, under a person de-identified; a rename's names emptied (migration 0015), and each one's phone order (migration 0029)",
   'armed_taps.student_id': 'deleted: the taps of a person it de-identifies',
   'armed_taps.teacher_id':
     'deleted: the taps on a teacher it de-identifies; one made after the year keeps them named',
@@ -5420,8 +5475,8 @@ export function yearOverAt(day: string): Date {
  * records are kept through the school year, then de-identified; aggregates
  * stay). Once the school's recorded year is over, each person of the school
  * whose records all lie in it is de-identified as an account deletion leaves
- * one (C3): no name, no Cognito subject, removed, a rename's names emptied;
- * each live enrollment ended as a removal ends it; their pre-bell taps and
+ * one (C3): no name, no Cognito subject, removed, a rename's names emptied,
+ * and the phone's order on each record; each live enrollment ended as a removal ends it; their pre-bell taps and
  * their phones' device tokens (N4) and their 13+ yes (C7-server) deleted; a de-identified teacher's removed classes lose their names,
  * their questions their words, their drafts are removed with theirs, and their decks with their
  * titles (M4); and each one's Cognito sign-in is queued under `issuer` for the API to delete, as

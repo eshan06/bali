@@ -331,6 +331,53 @@ describe('applyRetention (C6b)', () => {
     expect(after.unlocks).toMatchObject([{ studentId: s.ana.id, reason: 'nurse' }]);
   });
 
+  it('empties the phone’s order on the records of each person it de-identifies, and a continuing one keeps theirs (A12)', async () => {
+    const s = await seed('c6b-order');
+    const [hers, his] = [newUuidV7(), newUuidV7()];
+    // Ana's unlock lands after her lesson's bell, inside it and so inside the year; Ben's, in
+    // the lesson still running.
+    await unlock(db, {
+      sessionId: s.past.id,
+      studentId: s.ana.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date(),
+      order: { install: hers, seq: 1 },
+    });
+    const running = one(
+      await db
+        .select()
+        .from(sessions)
+        .where(and(eq(sessions.classId, s.bio.id), sql`${sessions.endedAt} is null`)),
+    );
+    await unlock(db, {
+      sessionId: running.id,
+      studentId: s.ben.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date(),
+      order: { install: his, seq: 1 },
+    });
+    const ordered = async (userId: string) =>
+      (await db.select().from(events).where(eq(events.userId, userId))).filter(
+        (e) => e.orderInstall !== null || e.orderSeq !== null,
+      );
+    expect(await ordered(s.ana.id)).toHaveLength(1);
+
+    const result = await applyRetention(db, {
+      schoolId: s.school.id,
+      at: LATER(),
+      confirmName: s.school.name,
+      issuer: POOL,
+    });
+
+    expect(result).toMatchObject({ outcome: 'applied', counts: { students: 1 } });
+    expect((await userRow(s.ana.id)).removedAt).not.toBeNull();
+    expect(await ordered(s.ana.id)).toEqual([]);
+    expect(await db.select().from(events).where(eq(events.orderInstall, hers))).toEqual([]);
+    expect(await ordered(s.ben.id)).toMatchObject([
+      { type: 'unlock', orderInstall: his, orderSeq: 1 },
+    ]);
+  });
+
   it('queues the sign-in of each person it de-identifies for the API to delete, once, and none of anyone kept (2026-10-28)', async () => {
     const s = await seed('c6b-sign-ins');
     const everyone = [s.rivera, s.old, s.ana, s.ben, s.cara, s.dan, s.eve].map((p) => p.cognitoId);

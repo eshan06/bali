@@ -253,9 +253,9 @@ export const events = pgTable(
     /**
      * The order the phone acted in (A12): its outbox file's id and the record's place in it, a
      * counter no clock moves — what orders a student's own unlock against their return. Both or
-     * neither; neither on an event no phone numbered (an old build's, one the server mints). A
-     * tap converted at Start carries its armed row's. Columns, not payload, so the live feed
-     * never carries them.
+     * neither; neither on an event no phone numbered (an old build's, one the server mints), nor
+     * on one of an account de-identified, which loses it (migration 0029). A tap converted at
+     * Start carries its armed row's. Columns, not payload, so the live feed never carries them.
      */
     orderInstall: uuid('order_install'),
     orderSeq: bigint('order_seq', { mode: 'number' }),
@@ -329,7 +329,10 @@ export const armedTaps = pgTable(
     eventId: uuid('event_id').notNull().unique(),
     /** Device time of the tap; clamped into the session window at conversion (rule 1). */
     deviceTime: timestamp('device_time', { withTimezone: true }).notNull(),
-    /** The phone's own order for the tap (A12), kept for the `tap_in` its conversion records. */
+    /**
+     * The phone's own order for the tap (A12), kept for the `tap_in` its conversion records;
+     * emptied by its student's account deletion (C3, migration 0029).
+     */
     orderInstall: uuid('order_install'),
     orderSeq: bigint('order_seq', { mode: 'number' }),
     /** End of the school day; conversion skips a past-expiry tap, a sweep clears it. */

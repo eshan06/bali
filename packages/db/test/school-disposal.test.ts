@@ -455,6 +455,29 @@ describe('disposeSchool (C6a)', () => {
     }
   });
 
+  it('empties the phone’s order on every event of its people, and leaves another school’s (A12)', async () => {
+    const s = await seed('c6a-order');
+    const other = await seed('c6a-order-other');
+    await pastBell(s.lesson.id);
+    const ordered = (rows: (typeof events.$inferSelect)[]) =>
+      rows.filter((e) => e.orderInstall !== null || e.orderSeq !== null);
+    const tap = one(ordered((await rowsOf(s)).events));
+    const theirs = ordered((await rowsOf(other)).events);
+    expect(theirs).toHaveLength(1);
+
+    await disposeSchool(db, { schoolId: s.school.id, at: new Date(), confirmName: s.school.name });
+
+    const after = await rowsOf(s);
+    expect(ordered(after.events)).toEqual([]);
+    // The tap itself stays, as it was but for its order.
+    expect(after.events.find((e) => e.eventId === tap.eventId)).toEqual({
+      ...tap,
+      orderInstall: null,
+      orderSeq: null,
+    });
+    expect(ordered((await rowsOf(other)).events)).toEqual(theirs);
+  });
+
   it('logs it as one school_disposed event of ids and counts, naming no one', async () => {
     const s = await seed('c6a-log');
     await pastBell(s.lesson.id);
@@ -781,26 +804,48 @@ describe('after a disposal', () => {
     const s = await seed('c6a-unlock');
     await pastBell(s.lesson.id);
     await disposeSchool(db, { schoolId: s.school.id, at: new Date(), confirmName: s.school.name });
+    // The same phone, sending as before (A12).
+    const phone = newUuidV7();
 
-    // A request that found Ana's account before the disposal: recorded in its lesson.
+    // A request that found Ana's account before the disposal: recorded in its lesson, with no
+    // order, as nothing of hers keeps one.
+    const lateId = newUuidV7();
     const late = await unlock(db, {
       sessionId: s.lesson.id,
       studentId: s.ana.id,
-      eventId: newUuidV7(),
+      eventId: lateId,
       deviceTime: new Date(),
+      order: { install: phone, seq: 5 },
     });
     expect(late).toMatchObject({ outcome: 'recorded', recordedAs: 'after_session_end' });
+    expect(one(await db.select().from(events).where(eq(events.eventId, lateId)))).toMatchObject({
+      userId: s.ana.id,
+      orderInstall: null,
+      orderSeq: null,
+    });
 
-    // Her sign-in now matches no account: the next call makes a fresh one, whose unlock is kept.
+    // Her sign-in now matches no account: the next call makes a fresh one, whose unlock is kept,
+    // its order with it.
     const reborn = await findOrCreateStudent(db, s.ana.cognitoId);
     expect(reborn.id).not.toBe(s.ana.id);
+    const orphanId = newUuidV7();
     const orphan = await unlock(db, {
       sessionId: s.lesson.id,
       studentId: reborn.id,
-      eventId: newUuidV7(),
+      eventId: orphanId,
       deviceTime: new Date(),
+      order: { install: phone, seq: 6 },
     });
     expect(orphan).toMatchObject({ outcome: 'recorded', recordedAs: 'not_enrolled' });
+    expect(one(await db.select().from(events).where(eq(events.eventId, orphanId)))).toMatchObject({
+      userId: reborn.id,
+      orderInstall: phone,
+      orderSeq: 6,
+    });
+    // Only the new account's record carries the phone's install.
+    expect(
+      (await db.select().from(events).where(eq(events.orderInstall, phone))).map((e) => e.userId),
+    ).toEqual([reborn.id]);
   });
 
   it('nothing of the school can start, join, register or redeem again', async () => {

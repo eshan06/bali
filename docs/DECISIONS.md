@@ -8,6 +8,44 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-29** — **A record made nameless no longer carries the phone's order (the owner's
+  decision: the server's fix, the phone unchanged).** Every record a student's phone sends (a tap,
+  an Emergency Unlock, a return to focus, Screen Time off or back on) carries the phone's order
+  (A12): a random id the phone gives the file its outbox lives in, and the record's place in that
+  file. The phone makes the id once and keeps it through Sign out, every sign-in and Delete
+  account, until Bali itself is deleted from the phone. An account deletion (C3), a school's
+  disposal (C6a) and the retention run (C6b) took the person's name and sign-in off their records
+  and kept the records for the counts, but each record kept that id. So someone who used Bali again
+  on the same phone (a new sign-up after Delete account, or the same sign-in after a retention run)
+  sent their new, named account's records under the id the nameless ones held, and anyone reading
+  the database could match the two.
+  **Decided:** each of the three empties the order, both of its columns, on every event of each
+  person it de-identifies, in its own transaction, once their row is marked removed; a deletion
+  empties it on the pre-bell taps it keeps too (a disposal and a retention run delete theirs). The
+  events trigger lets that through as its second rewrite (migration 0029): the order emptied, both
+  halves, nothing else of the row changed, only on an account marked removed and only where there
+  is an order to empty; any other UPDATE and every DELETE are refused as before. A record that lands
+  for an account already removed (an unlock still on its way) stores none: the engine reads the
+  account's row FOR KEY SHARE before it writes, the lock the record's foreign key takes anyway,
+  which waits out a removal that has marked the row; a removal that starts after that read waits for
+  the record to commit, then empties it. Migration 0029 empties it too on everything made nameless
+  before it, events and kept taps; it rewrites rows, so it waits for the owner's
+  `owner-approved-migration` label. **Why it changes nothing else:** the order is read only where
+  the engine compares one person's own records (A12–A14), and a removed account sends nothing more;
+  an unlock still on its way is judged by the server's times instead, as an old build's is. No
+  report, grid, feed or history reads it, and a lesson's report reads the same after (tests).
+  **Weighed:** the phone minting a fresh outbox id at Delete account instead (the owner chose the
+  server's fix): it would reach a deletion alone, since the phone never hears of a disposal or a
+  retention run, and it would need a new build and an iPhone check.
+  **Known cost:** one more read for each record that carries an order, the account's row by its
+  key, inside the session's lock on the tap path. **Tests:** `account-deletion.test.ts` (every
+  record and kept tap emptied, a classmate's kept, the report unchanged; four kinds of record landing
+  after, none ordered; the trigger letting through the emptying alone), `school-disposal.test.ts`
+  and `retention.test.ts` (each person it de-identifies, another school's and a kept person's
+  untouched; an unlock after a disposal stores none while the account the phone makes next keeps
+  its own), `migrations.test.ts` (0029 run as a deploy runs it, on rows made nameless before) and
+  `races.test.ts` (real Postgres: an unlock and each of the three, either first, leave no order).
+
 - **2026-10-29** — **A teacher's grid gets an event that commits late, however many events go out
   meanwhile.** An event's number (`seq`) is given out as its insert runs and the row shows when its
   transaction commits, so a slow write can show a lower number after higher ones. The live stream
