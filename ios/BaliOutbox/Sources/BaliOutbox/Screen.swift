@@ -12,9 +12,10 @@ public enum Screen: Sendable, Hashable {
     /// Your name (the approved Sign in & sign up design; the owner's decision, 2026-10-07): a
     /// student's account with no name names itself, so a teacher always sees a real one.
     case name
-    /// Once, after the update (L8a; the app canvas's ListChanged board): the consent list gained
-    /// two lines with a live lesson's questions, and it promises it "never grows without asking you
-    /// again", so a student who may have seen it before them sees the two, once.
+    /// Once, after an update (L8a; the app canvas's ListChanged board): the consent list gained
+    /// lines — two with a live lesson's questions (L8a), then how many answered and a clock set
+    /// ahead (2026-10-28) — and it promises it "never grows without asking you again", so a student
+    /// who may have seen it before them sees what it gained, once.
     case listChanged
     case intro, signIn, screenTime, join, home, waiting, focus, unlocked, protectionOff, sessionOver
     /// Home's neighbours in D1's tab bar (C6): the student's own history, and Me.
@@ -48,7 +49,7 @@ public enum Screen: Sendable, Hashable {
     /// question would show; in no class, never in one or removed from their last, the student
     /// lands on Home and its empty state, never a Join of its own (the owner's ruling, 2026-10-07);
     /// `listSeenBy`, the student who has seen the consent list as it stands on this phone, by their
-    /// id: a student `me` lists in a class who is not that one gets the list's two new lines once,
+    /// id: a student `me` lists in a class who is not that one gets what the list gained, once,
     /// after Your name (L8a; `listChanged`);
     /// `sessionOverClosed`,
     /// the session whose Session over the student closed, as it was then — its bell moved since, an
@@ -107,7 +108,7 @@ public enum Screen: Sendable, Hashable {
         // screen until one answers or fails — the phone's storage failing, none can be tried — so
         // no other screen flashes before Your name (the owner's ruling, 2026-10-07); a failed one,
         // or a sign-in kept from the last run, lets the screens go on, and Your name shows once a
-        // read answers. Then, by the same rules, the consent list's two new lines, once (L8a).
+        // read answers. Then, by the same rules, what the consent list gained, once (L8a).
         switch sync.standing {
         case .inSession(let session, _)
         where session.endsAt > now || !session.rings(as: sessionOverClosed):
@@ -123,7 +124,7 @@ public enum Screen: Sendable, Hashable {
                 return (.name, false)
             }
             // A student in a class joined it through the list's preview, so may have seen it before
-            // its answers lines; one who has seen it as it stands here is never asked again, and a
+            // its latest lines; one who has seen it as it stands here is never asked again, and a
             // join since showed them the list as it stands (`Phone.sawList`).
             if let me = sync.me, me.user.role.known == .student, !me.classes.isEmpty,
                 me.user.id != listSeenBy

@@ -2,8 +2,10 @@ import SwiftUI
 
 /// Once, after the update (L8a; the app canvas's ListChanged board), where the router sends a
 /// student it lists in a class who has not seen the consent list as it stands on this phone
-/// (`Screen.listChanged`): the list promises it "never grows without asking you again", so the two
-/// lines a live lesson's questions added, under what a teacher sees and never sees. See the whole
+/// (`Screen.listChanged`): the list promises it "never grows without asking you again", so the
+/// lines it gained since they last saw it here, under what a teacher sees and never sees
+/// (`ConsentCard.added`): how many answered and a clock set ahead (2026-10-28), and a live
+/// lesson's answers line too for one who never saw L8a's (`Phone.sawAnswersList`). See the whole
 /// list opens it as Me's What your teacher sees does; Continue is the way on, and keeps it seen
 /// (`Phone.sawList`). Never over a session's screens, which hold Emergency Unlock: the router's.
 struct ListChangedView: View {
@@ -24,7 +26,8 @@ struct ListChangedView: View {
                         .textStyle(.bodyLg).foregroundStyle(Theme.textSecondary)
                     }
                     .multilineTextAlignment(.center)
-                    ConsentCard(title: "Sees", lines: ConsentCard.added)
+                    ConsentCard(
+                        title: "Sees", lines: ConsentCard.added(sawAnswers: phone.sawAnswersList))
                     // 12 under the card, as drawn: the column's 24 less 12.
                     Button("See the whole list") { whole = true }
                         .textStyle(TextStyle(size: 15, line: 22, weight: .semibold))

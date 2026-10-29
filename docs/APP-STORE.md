@@ -67,15 +67,17 @@ Lean: the first. It says what happens and to whom, and nothing about control.
 > What your teacher sees:
 > • Your focus status: focused, unlocked, or Screen Time off
 > • If Bali stops hearing from your phone during class, and when it last did
+> • If your phone's clock is set ahead
 > • When you tap in, and when class ends for you
 > • When you unlock, and the reason if you share one
 > • If you leave this class
 > • Your answers to questions, counted only in the class's totals
+> • How many answered, which can show whether you did
 >
 > What your teacher never sees:
 > • Your screen, your apps, or what's in them
 > • Your messages or where you are
-> • Which answer is yours, or whether you answered
+> • Which answer is yours
 >
 > Bali never reads which apps you use. It quiets every app it can, so there is no list to
 > look at.
@@ -151,10 +153,11 @@ accounts and the video link once the review path (section 4) is chosen.
 > PRIVACY
 > - No ads, no tracking, no third-party analytics or advertising SDKs in the app.
 > - The teacher sees what the app shows the student before they join a class, word for
->   word, under "What your teacher sees": focus status, last contact during class, tap-in
->   and end times, unlocks and their reason if given, leaving the class, and answers to
->   class questions, counted only in the class's totals. Never the screen, apps, messages
->   or location, nor which answer is the student's or whether they answered.
+>   word, under "What your teacher sees": focus status, last contact during class, a phone
+>   clock set ahead, tap-in and end times, unlocks and their reason if given, leaving the
+>   class, answers to class questions, counted only in the class's totals, and how many
+>   answered, which can show whether the student did. Never the screen, apps, messages or
+>   location, nor which answer is the student's.
 >
 > HOW TO TRY IT
 > [🔧 From section 4, the chosen option: the accounts, the class code, the video link,
@@ -205,7 +208,9 @@ data; ⚖️ confirm a server-side error report triggered by an app request is n
 **Checks before pasting:**
 - The in-app "What your teacher sees" list, this table and the privacy policy (C2) must
   agree (#130). They do as of this draft, a live lesson's answers included: the list's two lines
-  on them came with L8a, before any build could answer, and the store listing's with L8b-2.
+  on them came with L8a, before any build could answer, and the store listing's with L8b-2. How
+  many answered, a clock set ahead and the never-sees line on answers (the owner, 2026-10-28)
+  changed the app's list, the policy's section 2, which shows it, and the listing together.
 - The app's privacy manifest (`ios/Bali/PrivacyInfo.xcprivacy`, C1) lists the same data
   types; CI fails when this table's types and the manifest's differ. The push token adds no type
   (it is a Device ID, already declared linked, App Functionality, not tracking), so the

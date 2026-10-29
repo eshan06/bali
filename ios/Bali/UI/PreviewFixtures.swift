@@ -19,7 +19,8 @@
         /// no screen opened over another, Home's tab chosen and no history read, no name being
         /// edited, no sign-out failed, no class being left, no account being deleted, no reason
         /// picked, no email named (#147), no class listed for the student on this phone before
-        /// (#143), and the consent list as it stands seen by Ana here (L8a), unless said otherwise.
+        /// (#143), and the consent list as it stands seen by Ana here (L8a; 2026-10-28), with no
+        /// note of L8a's list before it, unless said otherwise.
         struct State {
             var problem: String?
             var age = AgeCheck.Answer.passed
@@ -46,6 +47,7 @@
             var email: String?
             var everInClass = false
             var listSeenBy: String? = "ana"
+            var answersListSeenBy: String?
             /// A live lesson's last read (L8), and the answer card's own: a pick on its way, and
             /// what the last one said.
             var lesson: LessonState?
@@ -115,8 +117,10 @@
                 sync: standing(.out, me: nameless),
                 naming: naming(anaTyped, failure: Naming.words(.networkError, nil))),
             // Once, after the update (L8a; the app canvas's ListChanged board): Ana, in Period 3 and
-            // Period 5, has not seen the consent list as it stands on this phone.
-            "listChanged": State(listSeenBy: nil),
+            // Period 5, has not seen the consent list as it stands on this phone, only L8a's, so its
+            // lines since (2026-10-28); and, having seen neither, the lines of both.
+            "listChanged": State(listSeenBy: nil, answersListSeenBy: "ana"),
+            "listChangedBoth": State(listSeenBy: nil),
             "screenTime": State(protection: permission(.notDetermined)),
             "screenTimeDenied": State(protection: permission(.denied)),
             "screenTimeError": State(

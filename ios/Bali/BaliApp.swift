@@ -167,12 +167,21 @@ final class Phone {
     /// own, never the phone's defaults.
     private(set) var inClass = UserDefaults.standard.string(forKey: Phone.inClassKey)
     static let inClassKey = "inClass"
-    /// The student who has seen the consent list as it stands — its answers lines, a live lesson's
-    /// (L8a) — on this phone, by their id, kept as `inClass` is (`sawList`): the router shows the
-    /// one-time screen to a student `GET /v1/me` lists in a class who is not this one, and a list
-    /// that grows again keeps its own key. A fixture's is its own, never the phone's defaults.
+    /// The student who has seen the consent list as it stands — how many answered and a clock set
+    /// ahead (the owner, 2026-10-28), after a live lesson's answers lines (L8a) — on this phone,
+    /// by their id, kept as `inClass` is (`sawList`): the router shows the one-time screen to a
+    /// student `GET /v1/me` lists in a class who is not this one. A list that grows again keeps its
+    /// own key, as this one does, so a student who saw it before is asked again. A fixture's is
+    /// its own, never the phone's defaults.
     private(set) var listSeenBy = UserDefaults.standard.string(forKey: Phone.listSeenByKey)
-    static let listSeenByKey = "listSeenBy"
+    static let listSeenByKey = "listSeenBy2"
+    /// The student who saw the list here as it stood with a live lesson's answers lines (L8a's
+    /// key, which its builds wrote and none writes now): the one-time screen tells them only what
+    /// was added since (`sawAnswersList`). Gone with the account, as the other notes are. A
+    /// fixture's is its own.
+    private(set) var answersListSeenBy = UserDefaults.standard.string(
+        forKey: Phone.answersListSeenByKey)
+    static let answersListSeenByKey = "listSeenBy"
     /// The last ask for the Screen Time permission that did not finish (C1b), said on its screen
     /// until the next ask (rule 5).
     private(set) var askFailed: ScreenTimeAskError?
@@ -296,6 +305,10 @@ final class Phone {
     /// Whether the student `me` names is the one listed in a class on this phone (#143).
     private func listed(_ me: MeResponse?) -> Bool { me.map { $0.user.id == inClass } ?? false }
 
+    /// Whether the student `GET /v1/me` names saw the list here with a live lesson's answers lines
+    /// (L8a's key): what the one-time screen lists (`ConsentCard.added`).
+    var sawAnswersList: Bool { sync?.me.map { $0.user.id == answersListSeenBy } ?? false }
+
     init() {}
 
     /// The app's phone: the live one — or, in a Debug build launched with `-bali-screen <name>`,
@@ -316,7 +329,7 @@ final class Phone {
             (protection, sync, frozen) = (fixture.protection, fixture.sync, true)
             (everApproved, askFailed, joining) = (false, fixture.askFailed, fixture.joining)
             inClass = fixture.everInClass ? fixture.sync?.me?.user.id : nil
-            listSeenBy = fixture.listSeenBy
+            (listSeenBy, answersListSeenBy) = (fixture.listSeenBy, fixture.answersListSeenBy)
             (opened, tab, history) = (fixture.opened, fixture.tab, fixture.history)
             (naming, signOutFailed, email) = (fixture.naming, fixture.signOutFailed, fixture.email)
             (leaving, picking, pickFailed) = (fixture.leaving, fixture.picking, fixture.pickFailed)
@@ -505,7 +518,9 @@ final class Phone {
         // A relaunch finding the account deleted on Bali's server and its sign-in still to go (the
         // app closed between the two): the phone's notes under the student go now, as a finished
         // Delete account takes them (the owner's ruling, 2026-10-23).
-        if pending, inClass != nil || listSeenBy != nil { forgetNotes() }
+        if pending, inClass != nil || listSeenBy != nil || answersListSeenBy != nil {
+            forgetNotes()
+        }
         if signedIn == true { signingIn = false }
         // Made here, not the Keychain read at launch (nil before it).
         let made = changed && signedIn == true && self.signedIn != nil
@@ -961,14 +976,15 @@ final class Phone {
     }
 
     /// The account deleted on Bali's server (Delete account, the gap's fallback's too, or a relaunch
-    /// finding it so): the phone's two notes under the student's id, `inClass` and `listSeenBy`, go
-    /// from its defaults (the owner's rulings, 2026-10-23) — a frozen fixture's from itself only —
-    /// and so does the engine's `me`, whose classes a state it sent before would otherwise keep her
-    /// in again (`synced`). A sign-out keeps them, so the same student is never asked again.
+    /// finding it so): the phone's notes under the student's id, `inClass` and `listSeenBy` (and
+    /// L8a's `answersListSeenBy`), go from its defaults (the owner's rulings, 2026-10-23) — a
+    /// frozen fixture's from itself only — and so does the engine's `me`, whose classes a state it
+    /// sent before would otherwise keep her in again (`synced`). A sign-out keeps them, so the same
+    /// student is never asked again.
     private func forgetNotes() {
-        (inClass, listSeenBy) = (nil, nil)
+        (inClass, listSeenBy, answersListSeenBy) = (nil, nil, nil)
         if !frozen {
-            for key in [Phone.inClassKey, Phone.listSeenByKey] {
+            for key in [Phone.inClassKey, Phone.listSeenByKey, Phone.answersListSeenByKey] {
                 UserDefaults.standard.removeObject(forKey: key)
             }
         }

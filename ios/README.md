@@ -331,8 +331,9 @@ be made to lose its standing by hand, so the tests cover it.
 ## Phase 7's phone sitting, on prod: C7, L8, M8 and M8b, then L9, M10 and W6
 
 One sitting on TestFlight build 10 (prod, from `1d4496b6`), the owner's iPhone and the prod portal. It covers
-C7's first-launch check, L8's, M8's and M8b's device checks, and the three exit checks. Everything happens
-on prod: the answers you give are real records there, so use your own accounts and your own class.
+C7's first-launch check, L8's, M8's and M8b's device checks, and the three exit checks; Part 5, on the first
+build after it, checks the consent list's new lines. Everything happens on prod: the answers you give are
+real records there, so use your own accounts and your own class.
 
 **Before you start, once:**
 
@@ -424,6 +425,29 @@ home's **Open the lesson**). Airplane Mode is off.
 
 With one student, you, these checks prove the parts work end to end. A class with several students, the
 pilot's own, is the full exit check.
+
+### Part 5 — the consent list's new lines, on the next build
+
+The first TestFlight build after build 10 adds two lines to what your teacher sees and shortens one under
+never sees, so the list asks you again, once. Install that build as an update over build 10, and do this
+part before runbook 7's step 6 (`docs/RUNBOOKS.md`), which deletes Bali and installs it again: a fresh
+install has seen neither list, so after it the screen comes once more with **Your answers to questions,
+counted only in the class's totals** among its lines.
+
+**Starting state:** no class running, so you're not tapped in. Build 10 is on the phone with Part 1 done:
+you're signed in with your prod student account, in your class, and you've seen **Your teacher can ask
+questions now** once. Bali is closed. Airplane Mode is off. You won't need the sticker.
+
+1. Update Bali from the TestFlight app to the new build, then open it. Home shows for a moment, then
+   **Your teacher can ask questions now** again. Under **Sees**: **If your phone's clock is set ahead** and
+   **How many answered, which can show whether you did**. Under **Never sees**: **Which answer is yours**.
+2. Tap **See the whole list**: the whole list, those lines in it. Tap **Done**, then **Continue**: Home.
+3. Swipe Bali away in the app switcher and open it again: Home, and no screen about the list.
+4. Press **Start** on the portal without tapping in, and ask a question: within about 2 seconds, Home
+   shows the question card. **End** the class.
+
+**Check:** the screen comes once after the update, with only the lines added since build 10, and never
+again after a relaunch; the question card shows after it.
 
 ## CI
 
