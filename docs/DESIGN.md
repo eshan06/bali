@@ -170,7 +170,9 @@ tiles since PV8 (2026-10-14), on the class page and in Present alike, a
 phone's with one detail at most since PV9. Present is v2's since PV9 (2026-10-14):
 ClassPresent's page, the class page's own parts one size up, its code in a well of
 its own and +5, +10 and End kept; after the bell PresentEnded's "Class is over"
-alone; and the reconnect pill there too, and for a first connect past 3 s. A live question shows
+alone; and the reconnect pill there too, and for a first connect past 3 s. Its tiles never say Clock
+off since 2026-10-28 (the owner; ClassPresent redrawn), as they never say an unlock's reason (§5); the
+class page's tiles and the student panel still do. A live question shows
 there in the grid's place since L7's part 2 (2026-10-15), as PresentQuestion and PresentAnswer draw
 it: "N of M answered" while it is open, each answer's count once it is closed and its last read is
 in, the correct answer only once shown; its intermediate states as PresentQuestionStates and
@@ -840,7 +842,7 @@ where they differ (Present's included: §5); the input size stands.
   colour alone), switches into the **projector view**: four columns, names at
   20/28 semibold, chip labels at 14/20, cells at least 88 px tall, readable
   from the back of a classroom; the same chips and words, but an unlock's
-  reason (below). Those two
+  reason and Clock off (below). Those two
   sizes are a Present-only style on the type scale (the owner's ruling,
   2026-10-05): names 20 px and labels 14 px, as drawn, with their line
   heights on the 4-pt grid (the canvas drew 26 and 18; D2f-2 took them up to
@@ -861,9 +863,11 @@ where they differ (Present's included: §5); the input size stands.
   its header the ring, the class, the countdown, the join code at 34/44 and the
   controls, **+5, +10 and End kept** beside Present (the owner, 2026-10-12; built in PV9,
   where the header that folded the bell and `code-lg` into one row went).
-- **Present never shows an unlock's reason**, because the class can see it:
-  no line under "Unlocked" where the teacher's view says "Nurse" there
-  (2026-10-06).
+- **Present never shows an unlock's reason or Clock off**, because the class
+  can see it: no line under "Unlocked" where the teacher's view says "Nurse"
+  there (2026-10-06), and never "Clock off" for a phone whose clock is set
+  ahead, which the teacher's view adds to the tile's line (the owner,
+  2026-10-28).
 - **A session that ends in Present stays so** (D2g): the recap lists each unlock
   by who and when with no reason, How it ended is the projector view, and the
   toggle beside it leaves Present, the reasons back. *v2's look (§1):* How it

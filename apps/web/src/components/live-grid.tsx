@@ -193,10 +193,11 @@ const WORDS = {
 /**
  * One student's tile (ClassStates, ClassLive, PhoneClassLive, ClassPresent): the state's icon, the
  * name, the state's words (Silent's with its minutes, a Left state's after its flag), and one line:
- * an unlock's reason (`unlockNote`, never in Present, the projector the class can see), how long
- * since the phone was heard from (`lastSeenNote`) and Clock off (S9), each that applies, in that
- * order; on a phone only the detail PhoneClassLive draws (`brief`). `pulse` is `bali-softpulse`
- * (DESIGN.md §7) on the whole tile, and `onPulseEnd` hears it finish.
+ * an unlock's reason (`unlockNote`), how long since the phone was heard from (`lastSeenNote`) and
+ * Clock off (S9), each that applies, in that order; on a phone only the detail PhoneClassLive draws
+ * (`brief`). In Present, the projector the class can see, never the reason or Clock off: both are
+ * the teacher's alone (the owner, 2026-10-28). `pulse` is `bali-softpulse` (DESIGN.md §7) on the
+ * whole tile, and `onPulseEnd` hears it finish.
  */
 export function Tile({
   student: s,
@@ -226,7 +227,7 @@ export function Tile({
   const line = [
     ...(reason === null ? [] : [reason]),
     ...(seen === null ? [] : [seen]),
-    ...(s.clockOff ? ['Clock off'] : []),
+    ...(s.clockOff && !present ? ['Clock off'] : []),
   ];
   // On a phone one detail at most, as PhoneClassLive draws them: an Unlocked tile's reason, a
   // Focused tile's Clock off (the owner, 2026-10-14). The rest stays on a computer, and the panel.
@@ -406,8 +407,8 @@ export function LiveGrid({
   onStudentPanel?: () => void;
   /**
    * The projector view (DESIGN.md §5; ClassPresent): four columns of tiles one size up, readable
-   * from the back of a classroom; the same states and words, but never an unlock's reason: the
-   * class can see it (`unlockNote`).
+   * from the back of a classroom; the same states and words, but never an unlock's reason or Clock
+   * off: the class can see it (`Tile`).
    */
   present?: boolean;
   /**
