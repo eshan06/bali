@@ -8,6 +8,21 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-29** — **The privacy policy names a phone clock set ahead and the other-school
+  exception (the owner's words, approved 2026-10-28 and 2026-10-29).** Two lines on `/privacy`, word
+  for word. Section 1's student list gains "**Whether your phone's clock is set ahead.** So your
+  teacher knows your phone's times may be off (section 2).", in the list's own form, right after the
+  check-in, as section 2's list names the clock right after Bali not hearing from the phone (the
+  consent list's line, 2026-10-28, below): a phone clock more than 2 minutes ahead shows the teacher
+  Clock off (ARCHITECTURE, iOS app structure: "A changed phone clock is detected, not prevented").
+  Section 6's year-end line now says what the retention run already does (C6b; ARCHITECTURE, "Decided
+  later, on purpose"): "After that day, we remove the names and sign-ins of everyone whose records all
+  fall on or before it, unless they also have records at another school that uses Bali." The rest of
+  that item stays, and so does the rest of the page: the effective date and section 2's History
+  sentence wait for the owner. `docs/legal/` keeps only the questions for the lawyer, so it doesn't
+  change. **Tests:** `policy-pages.test.tsx`: the student list's rows 11 to 12, the clock line whole
+  and right after the check-in, and section 6's line whole; all three red on the page before.
+
 - **2026-10-29** — **A teacher's grid gets an event that commits late, however many events go out
   meanwhile.** An event's number (`seq`) is given out as its insert runs and the row shows when its
   transaction commits, so a slow write can show a lower number after higher ones. The live stream

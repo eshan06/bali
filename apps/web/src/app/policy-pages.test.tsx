@@ -16,8 +16,9 @@ import TermsPage, { metadata as termsMetadata } from './terms/page';
  * decision of 2026-10-22: the portal's tests drive the page): the owner's drafted words of
  * 2026-10-24 under each title and its date, every section in the draft's order, the sections the
  * owner named at the outline's ids, the privacy draft's table as a list, its section 2's lists the
- * app's and the help page's own (#130), Contact's mailto and the footer's links, and nothing of the
- * drafts' notes for the lawyer. Reached from /login and from the
+ * app's and the help page's own (#130), the owner's two later lines (section 1's clock set ahead,
+ * section 6's records at another school), Contact's mailto and the footer's links, and nothing of
+ * the drafts' notes for the lawyer. Reached from /login and from the
  * help page; framed by the shell with no menu, no Sign out and no read; whole in the server's HTML,
  * so the words need no script. That every page renders per request is rendering.test.ts's.
  */
@@ -229,11 +230,42 @@ describe('the privacy policy’s table of what Bali collects, as a list', () => 
     const students = screen.getByRole('heading', { level: 3, name: 'If you are a student' })
       .nextElementSibling as HTMLElement;
     const rows = within(students).getAllByRole('listitem');
-    expect(rows.map((row) => row.firstElementChild?.tagName)).toEqual(Array(11).fill('STRONG'));
+    expect(rows.map((row) => row.firstElementChild?.tagName)).toEqual(Array(12).fill('STRONG'));
     expect(rows[0]?.textContent).toBe(
       "The email you sign in with. To sign you in. It's held by our sign-in provider (Amazon Cognito), not in Bali's own database.",
     );
     expect(rows.at(-1)?.textContent).toBe('What you write when you email us. To answer you.');
+  });
+
+  it('names a phone clock set ahead right after the check-in, as section 2 lists it after not hearing from the phone', () => {
+    render(<PrivacyPage />);
+    const students = screen.getByRole('heading', { level: 3, name: 'If you are a student' })
+      .nextElementSibling as HTMLElement;
+    const rows = within(students).getAllByRole('listitem');
+    const checkIn = rows.findIndex((row) =>
+      row.textContent?.startsWith('A check-in from your phone about every 30 seconds'),
+    );
+    expect(checkIn).toBeGreaterThan(-1);
+    const clock = rows[checkIn + 1];
+    expect(clock?.firstElementChild?.textContent).toBe("Whether your phone's clock is set ahead.");
+    expect(clock?.textContent).toBe(
+      "Whether your phone's clock is set ahead. So your teacher knows your phone's times may be off (section 2).",
+    );
+    // The section it points to says it too.
+    expect(TEACHER_SEES).toContain("If your phone's clock is set ahead");
+  });
+});
+
+describe('the privacy policy’s section 6, how long records are kept', () => {
+  it('keeps the names of anyone with records at another school, as the retention run does', () => {
+    render(<PrivacyPage />);
+    const retention = screen.getByRole('region', { name: '6. How long records are kept' });
+    const items = within(retention)
+      .getAllByRole('listitem')
+      .map((item) => item.textContent);
+    expect(items[1]).toBe(
+      "After that day, we remove the names and sign-ins of everyone whose records all fall on or before it, unless they also have records at another school that uses Bali. What's left is counts that name no one, such as “3 unlocks in that session”.",
+    );
   });
 });
 
