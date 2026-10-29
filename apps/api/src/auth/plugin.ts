@@ -68,3 +68,13 @@ export function requireAuth(request: FastifyRequest): AuthedIdentity {
   }
   return request.auth;
 }
+
+/**
+ * When the request's verified token expires, in ms since the epoch: the verifier refuses it from
+ * then on (auth decision 2). Null for a token with no `exp`, which Cognito never issues. For
+ * handlers behind `authenticate`, as `requireAuth`.
+ */
+export function tokenExpiresAtMs(request: FastifyRequest): number | null {
+  const { exp } = requireAuth(request).claims;
+  return typeof exp === 'number' ? exp * 1000 : null;
+}

@@ -1,12 +1,12 @@
 import type { Database } from '@bali/db';
 import type { ApiErrorBody } from '@bali/shared';
-import type { FastifyInstance, LightMyRequestResponse } from 'fastify';
-import { errors as joseErrors } from 'jose';
+import type { FastifyInstance, FastifyRequest, LightMyRequestResponse } from 'fastify';
+import { decodeJwt, errors as joseErrors } from 'jose';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { buildApp } from '../src/app.js';
-import { requireAuth } from '../src/auth/plugin.js';
-import { createVerifier, type TokenVerifier } from '../src/auth/verify.js';
+import { requireAuth, tokenExpiresAtMs } from '../src/auth/plugin.js';
+import { type AuthedIdentity, createVerifier, type TokenVerifier } from '../src/auth/verify.js';
 import { ApiError } from '../src/errors.js';
 import { makeTestDb } from './helpers/db.js';
 import { testEnv } from './helpers/env.js';
@@ -258,5 +258,20 @@ describe('createVerifier failure classification', () => {
     const token = await issuer.sign({});
     // The key set resolves fine, but to the wrong key → signature fails.
     expect(await classify(token, otherIssuer.getKey)).toBe('unauthorized');
+  });
+});
+
+describe('tokenExpiresAtMs', () => {
+  const requestWith = (auth: AuthedIdentity | null) => ({ auth }) as FastifyRequest;
+
+  it("is the verified token's exp, in ms: when the verifier starts refusing it", async () => {
+    const token = await issuer.sign({ expiresInSeconds: 600 });
+    const identity = await issuer.verifier(token);
+    expect(tokenExpiresAtMs(requestWith(identity))).toBe(decodeJwt(token).exp! * 1000);
+  });
+
+  it('is null for a token with no exp, and refuses a request no one signed in on', () => {
+    expect(tokenExpiresAtMs(requestWith({ sub: 'someone', claims: {} }))).toBeNull();
+    expect(() => tokenExpiresAtMs(requestWith(null))).toThrow(ApiError);
   });
 });

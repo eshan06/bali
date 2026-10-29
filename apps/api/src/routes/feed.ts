@@ -9,7 +9,7 @@ import { EVENT_PAGE_LIMIT, type EventsPage, type SessionSnapshot } from '@bali/s
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
-import { requireAuth } from '../auth/plugin.js';
+import { tokenExpiresAtMs } from '../auth/plugin.js';
 import { requireSessionOwner } from '../auth/teacher.js';
 import { ApiError, parseRequest } from '../errors.js';
 import { SECURITY_HEADERS } from '../headers.js';
@@ -204,8 +204,7 @@ export function registerFeedRoutes(
     };
 
     const { teacher, session } = await requireSessionOwner(db, request, id);
-    // Cognito's access tokens always carry `exp`, in seconds.
-    const { exp } = requireAuth(request).claims;
+    const expiresAtMs = tokenExpiresAtMs(request);
 
     if (clientGone || request.raw.destroyed) {
       hijack().end();
@@ -238,7 +237,7 @@ export function registerFeedRoutes(
       after,
       // The stream ends with the token that opened it (Auth decision 2); the portal's reconnect
       // then gets the 401 that sends it to sign in, as any other request would.
-      expiresAtMs: typeof exp === 'number' ? exp * 1000 : null,
+      expiresAtMs,
       // The check that opened the stream, read again from the database on each re-poll: the
       // caller still a teacher, still this session's class's, still the account the stream was
       // opened and counted for. A refusal, or a read that fails, ends it, and the reconnect is
