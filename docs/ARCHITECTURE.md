@@ -957,11 +957,12 @@ never covers or delays Emergency Unlock, and its answers never enter the outbox.
   screens go on, and it shows once a read names none. A teacher's account never gets it.
 - **A changed phone clock is detected, not prevented.** iOS scheduling follows wall-clock
   time, so a clock change is a real bypass family; the server compares against its own clock
-  (rule 1) and surfaces it to the teacher rather than trusting it. Which of a student's own
-  actions came last — their unlock, or their return to focus — is not a clock's to say: the
-  phone numbers what it does with its outbox's counter, and the server orders the two by it
-  (A12, owner ruling 2026-09-24), so a clock turned back between them never undoes a real
-  unlock — nor does a return the phone made before it, however late it lands (A13), nor a
+  (rule 1) and surfaces it to the teacher rather than trusting it (Clock off, for a clock more
+  than 2 minutes ahead), and the consent list says so (the owner, 2026-10-28). Which of a
+  student's own actions came last — their unlock, or their return to focus — is not a clock's
+  to say: the phone numbers what it does with its outbox's counter, and the server orders the
+  two by it (A12, owner ruling 2026-09-24), so a clock turned back between them never undoes a
+  real unlock — nor does a return the phone made before it, however late it lands (A13), nor a
   tap it made before its tap into another class (A14). The clock still decides for a build
   that sends no order, and only for a late unlock: a return or a tap with none applies as
   it arrives.
@@ -1059,9 +1060,10 @@ nothing of a live lesson sits in the outbox ahead of an unlock (decision 5).
 
 **2. The owner's rulings (2026-10-05).**
 - **Results are totals only.** No screen, stream, report or export shown to a teacher or a
-  projector ever names who answered what, or which students answered at all: a teacher sees
-  counts. The one record that holds a student's answers by name is the student's own export
-  (C5), which shows that student their own.
+  projector ever names who answered what, or which students answered: a teacher sees counts.
+  A count can still show whether a student answered (decision 3's known limit), and the consent
+  list says so (decision 11; the owner, 2026-10-28). The one record that holds a student's
+  answers by name is the student's own export (C5), which shows that student their own.
 - **Phones follow by foreground polling**, about every 2 s with an ETag and `304`, not by a
   student stream (Live updates stays teacher-only); so does the student web (decision 13).
 - **Any student enrolled in the class whose session is running may answer**: tapped in or
@@ -1081,7 +1083,8 @@ nothing of a live lesson sits in the outbox ahead of an unlock (decision 5).
   sweep, a question already counts as closed (A17's rule: the server's clock decides).
 - **The small-group guard.** The per-option breakdown is shown only once at least **3**
   students have answered; before that a teacher sees "N answered" only, open or closed. The
-  teacher sees "N of M answered", and never which students answered or didn't. **One
+  teacher sees "N of M answered", and no student named as having answered or not, though the
+  count itself can tell (the known limit, below). **One
   population for N, the per-option counts and the guard:** everyone with a response to this
   question, counted from `responses`. An answer stays counted when its student leaves or is
   removed mid-session, as A9 keeps such a student on the grid, so the bars always total N and
@@ -1099,6 +1102,9 @@ nothing of a live lesson sits in the outbox ahead of an unlock (decision 5).
   the trivial cases; showing the breakdown only once the question closes would remove the
   live one too. The owner kept the live breakdown on the teacher's own screen and took it off
   the projector, which shows the counts only once the question closes (2026-10-09, decision 11).
+  And "N of M answered" itself shows whether each student answered when everyone or no one has,
+  or in a class of one or two. The owner kept it, and the consent list names it: "How many
+  answered, which can show whether you did" (2026-10-28, decision 11).
 
 **4. The data model (additive).** Four tables, each row's id a UUIDv7 (data-model decision 2):
 - `questions` — one row per question: `id`, `session_id`, `prompt`, `options` (jsonb, an
@@ -1410,12 +1416,18 @@ which replaced the look of the
   not tapped in. Phones stay foreground-only: no push for a question, and the shield is
   unchanged.
 - **The consent list** gains two lines: "Your answers to questions, counted only in the
-  class's totals" under Sees, and "Which answer is yours, or whether you answered" under Never
-  sees. The list promises it "never grows without asking you again", so a student who saw the
-  old list sees a one-time screen after the update with the two new lines and Continue. The phone
-  shows a student no answer card until it has shown them the list as it stands (the owner's
-  ruling, 2026-10-23), so one whose first open after the update is mid-class on Focus, where that
-  screen waits for the bell, answers from their next class on.
+  class's totals" under Sees, and "Which answer is yours" under Never sees. *Amended 2026-10-28
+  (the owner's decision):* the Never sees line said "Which answer is yours, or whether you
+  answered" until then, but "N of M answered" can show whether a student answered (decision 3's
+  known limit), so Sees names it, "How many answered, which can show whether you did", after the
+  answers line, and gains "If your phone's clock is set ahead" after the phone lines (iOS app
+  structure, rules: a changed clock is surfaced to the teacher). The list promises it "never
+  grows without asking you again", so a student who saw it before a change sees a one-time screen
+  after the update with what it gained since they saw it (a student who saw neither change, both
+  changes' lines) and Continue. The phone shows a student no answer card until it has shown them
+  the list as it stands (the owner's ruling, 2026-10-23), so one whose first open after the
+  update is mid-class on Focus, where that screen waits for the bell, answers from their next
+  class on.
 - **The portal.** One "Questions and slides" card between the session card and the live grid.
   While a question or a slide shows, Present shows it in place of the live grid; **while a
   question is open the projector shows only "N of M answered", and the counts per option only

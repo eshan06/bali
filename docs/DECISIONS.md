@@ -8,6 +8,33 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-28** — **The consent list names how many answered and a clock set ahead (the owner's
+  decision, in the owner's words).** The list told a student their teacher never sees "Which answer is yours,
+  or whether you answered", but the class's "N of M answered" shows whether each student answered
+  when everyone or no one has, or in a class of one or two; and it left out Clock off, which a phone
+  clock set more than 2 minutes ahead already shows the teacher (ARCHITECTURE, iOS app structure:
+  "A changed phone clock is detected, not prevented"). **Decided:** what a teacher sees gains "How
+  many answered, which can show whether you did", after the answers line, and "If your phone's
+  clock is set ahead", after the phone lines; never sees says "Which answer is yours". Every copy
+  changes at once: the app's `ConsentCard` (the intro's second page, Me's What your teacher sees,
+  Join's preview), `teacher-sees.ts` (the help page, and the privacy policy's section 2, whose own
+  words stay), `docs/APP-STORE.md`'s listing and review notes, and ARCHITECTURE's Live lesson
+  decisions 2, 3 and 11. **Asked again:** the list promises it "never grows without asking you
+  again", so the list as it stands is kept under a new key (`listSeenBy2`), as L8a's note planned,
+  and a student who saw L8a's list gets the one-time screen once more, listing what was added since:
+  the two new lines and the shortened one. A student who saw neither list gets both changes' lines,
+  the answers line too, so neither change goes untold; L8a's key (`listSeenBy`) is read only to tell
+  the two apart, and goes with the account, as the other notes do. The answer card waits for the
+  list as it stands, as it waited for L8a's (the owner's ruling, 2026-10-23). **Known limit:** the
+  one-time screen keeps its approved words (the ListChanged board), written for L8a's lines: its
+  title speaks of questions, which the clock line is not about, and its "That adds two lines" sits
+  over three lines for a student who saw neither list. New words for it are a design step for the
+  owner. **Tests:** `AppTests.consentList` (the lines, and what the one-time screen reads in each
+  case), `listOnce` (L8a's key read as the list before, never as the list as it stands),
+  `offFocusCardWaits` (no card and no poll for a student who saw only L8a's list),
+  `deleteAccountWiring` (L8a's note goes too, alone at a relaunch included), `waitingFits` (both
+  cases fit the smallest iPhone at the default text size), and `support.test.ts`'s count, 6 to 8.
+
 - **2026-10-28** — **A teacher's live stream ends with its access.** The stream checked its token
   and its teacher once, as it opened: one already open kept delivering after its token expired, or
   after its account stopped being that class's teacher, while every new request with the same token

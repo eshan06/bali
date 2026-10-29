@@ -130,33 +130,41 @@ struct JoinView: View {
 
 /// What a teacher sees of a student in their class, and never sees — the intro's second page (C1b),
 /// Me's What your teacher sees and the preview before joining (C2b): one list, so they never say
-/// different things, drawn as D1's ConsentPreview draws it — and the one-time screen's two lines
-/// it gained (L8a), `lines` its `added`. `title` heads what they see: "Sees", or "What Ms. Rivera
-/// sees".
+/// different things, drawn as D1's ConsentPreview draws it — and the one-time screen's lines it
+/// gained (L8a; 2026-10-28), `lines` its `added`. `title` heads what they see: "Sees", or "What
+/// Ms. Rivera sees".
 struct ConsentCard: View {
     let title: String
     var lines = (sees: ConsentCard.sees, neverSees: ConsentCard.neverSees)
     /// One column for both lists' icons, so every line starts where the others do.
     @ScaledMetric(relativeTo: .body) private var iconWidth: CGFloat = 24
 
-    /// The whole of it — the grid's silence and last-seen time too (owner, 2026-09-27) — its
-    /// answers lines last (L8a). The portal's help page says the same, word for word
+    /// The whole of it — the grid's silence and last-seen time too (owner, 2026-09-27), and its
+    /// Clock off after them (the owner, 2026-10-28) — its answers lines last (L8a), how many
+    /// answered the last of them (2026-10-28). The portal's help page says the same, word for word
     /// (`apps/web/src/app/support/support.test.ts` reads these from this file).
     static let sees = [
         "Your focus status: focused, unlocked, or Screen Time off",
         "If Bali stops hearing from your phone during class, and when it last did",
+        "If your phone's clock is set ahead",
         "When you tap in, and when class ends for you",
         "When you unlock, and the reason if you share one",
         "If you leave this class",
         "Your answers to questions, counted only in the class's totals",
+        "How many answered, which can show whether you did",
     ]
     static let neverSees = [
         "Your screen, your apps, or what's in them", "Your messages or where you are",
-        "Which answer is yours, or whether you answered",
+        "Which answer is yours",
     ]
-    /// The lines a live lesson's questions added (L8a; ARCHITECTURE, "Live lesson", decision 11),
-    /// the last of each list: all the one-time screen lists.
-    static let added = (sees: Array(sees.suffix(1)), neverSees: Array(neverSees.suffix(1)))
+    /// What the list gained since the student last saw it here, all the one-time screen lists: a
+    /// clock set ahead (`sees[2]`) and how many answered (the last), and the line on answers they
+    /// narrowed, the last of never sees (the owner, 2026-10-28) — and, to a student who never saw a
+    /// live lesson's answers lines here (L8a; ARCHITECTURE, "Live lesson", decision 11), its
+    /// answers line too, so neither change goes untold.
+    static func added(sawAnswers: Bool) -> (sees: [String], neverSees: [String]) {
+        ([sees[2]] + sees.suffix(sawAnswers ? 1 : 2), Array(neverSees.suffix(1)))
+    }
 
     var body: some View {
         Card {

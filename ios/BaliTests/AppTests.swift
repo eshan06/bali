@@ -902,11 +902,11 @@ struct AppTests {
     }
 
     @Test(
-        "Delete account through the phone's own sign-in and engine (C4b): confirmed, the deletion's screen shows and nothing else until the answer; Cognito's DeleteUser answering nothing leaves the account deleted and the sign-in waiting, said with Try again alone — and a relaunch over the same Keychain lands on that screen at once, before any press; Try again finishes it, the sign-in gone, the done screen holding over Sign in until OK. The account deleted on Bali's server, the phone's notes under the student, `inClass` and `listSeenBy`, go from its defaults (the owner's ruling, 2026-10-23)",
+        "Delete account through the phone's own sign-in and engine (C4b): confirmed, the deletion's screen shows and nothing else until the answer; Cognito's DeleteUser answering nothing leaves the account deleted and the sign-in waiting, said with Try again alone — and a relaunch over the same Keychain lands on that screen at once, before any press; Try again finishes it, the sign-in gone, the done screen holding over Sign in until OK. The account deleted on Bali's server, the phone's notes under the student, `inClass` and `listSeenBy` — and L8a's list seen, `answersListSeenBy` — go from its defaults (the owner's ruling, 2026-10-23)",
         .timeLimit(.minutes(3)))
     func deleteAccountWiring() async throws {
         let defaults = UserDefaults.standard
-        let notes = [Phone.inClassKey, Phone.listSeenByKey]
+        let notes = [Phone.inClassKey, Phone.listSeenByKey, Phone.answersListSeenByKey]
         let before = notes.map { ($0, defaults.object(forKey: $0)) }
         defer { for (key, value) in before { defaults.set(value, forKey: key) } }
         for key in notes { defaults.set("ana", forKey: key) }
@@ -914,7 +914,7 @@ struct AppTests {
         let server = Deleter(deleteUser: [nil, 200], holdsDeletion: true)
         let keychain = Keychain(account: "ana", scoped: true)
         let (phone, engine) = try standIn(server, keychain: keychain)
-        #expect(phone.inClass == "ana" && phone.listSeenBy == "ana")
+        #expect(phone.inClass == "ana" && phone.listSeenBy == "ana" && phone.answersListSeenBy == "ana")
         let signIn = try #require(phone.signIn)
         let following = Task { await phone.follow(signIn) }
         defer { following.cancel() }
@@ -941,7 +941,7 @@ struct AppTests {
         await deleting.value
         #expect(phone.deleting == .pending && phone.shown == (.deleting, false))
         #expect(await signIn.deletionPending() && !keychain.empty)
-        #expect(phone.inClass == nil && phone.listSeenBy == nil)
+        #expect(phone.inClass == nil && phone.listSeenBy == nil && phone.answersListSeenBy == nil)
         #expect(notes.allSatisfy { defaults.object(forKey: $0) == nil })
         // A state the engine sent before it forgot her, still listing her in Period 3, landing
         // late: she isn't kept in a class again.
@@ -963,6 +963,16 @@ struct AppTests {
         #expect(relaunched.deleting == .pending && relaunched.shown == (.deleting, false))
         #expect(relaunched.inClass == nil && relaunched.listSeenBy == nil)
         #expect(notes.allSatisfy { defaults.object(forKey: $0) == nil })
+        // L8a's note alone, as a student who saw its list from Me in no class leaves it: it goes
+        // at once too.
+        defaults.set("ana", forKey: Phone.answersListSeenByKey)
+        let (onlyL8a, _) = try standIn(server, keychain: keychain)
+        let onlyL8aSignIn = try #require(onlyL8a.signIn)
+        let followingOnlyL8a = Task { await onlyL8a.follow(onlyL8aSignIn) }
+        defer { followingOnlyL8a.cancel() }
+        try await until { onlyL8a.signedIn == true }
+        #expect(onlyL8a.deleting == .pending && onlyL8a.answersListSeenBy == nil)
+        #expect(defaults.object(forKey: Phone.answersListSeenByKey) == nil)
         // Try again: DeleteUser alone, no deletion again; done, the sign-in forgotten.
         await phone.deleteAccount()
         #expect(phone.deleting == .done && phone.shown == (.deleting, false))
@@ -1424,13 +1434,14 @@ struct AppTests {
     }
 
     @Test(
-        "Waiting fits the smallest iPhone — the iPhone 17e's 390 × 844 less its safe areas, 47 pt above and 34 below — and the owner's iPhone 15 Pro, 393 × 852 less 59 and 34, at the default text size, Back to home included, with its one card, or a failed read or a refused tap said too (#149: the owner's phone), and so does the one-time screen after the update, as the ListChanged board draws it (L8a); once the text outgrows the screen, each scrolls"
+        "Waiting fits the smallest iPhone — the iPhone 17e's 390 × 844 less its safe areas, 47 pt above and 34 below — and the owner's iPhone 15 Pro, 393 × 852 less 59 and 34, at the default text size, Back to home included, with its one card, or a failed read or a refused tap said too (#149: the owner's phone), and so does the one-time screen after the update, as the ListChanged board draws it (L8a), with the lines since L8a's list or, for a student who saw neither, both changes' (2026-10-28); once the text outgrows the screen, each scrolls"
     )
     func waitingFits() throws {
         let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         let cases: [(String, DynamicTypeSize)] = [
             ("waiting", .large), ("waitingError", .large), ("waitingTapRefused", .large),
             ("waiting", .accessibility2), ("listChanged", .large), ("listChanged", .accessibility2),
+            ("listChangedBoth", .large), ("listChangedBoth", .accessibility2),
         ]
         let phones = [CGSize(width: 390, height: 844 - 47 - 34), CGSize(width: 393, height: 852 - 59 - 34)]
         for (name, size) in cases {
@@ -2891,28 +2902,31 @@ struct AppTests {
     }
 
     @Test(
-        "The consent list as the app canvas's Consent board draws it (L8a): what a teacher sees, the answers line last, and never sees, the line on answers last — one list, so the intro's second page, Me's What your teacher sees and Join's preview each read it whole; the one-time screen reads its title, its line, the two lines the list gained and nothing else of it, See the whole list, then Continue, as the ListChanged board draws it, its title a header"
+        "The consent list as the app canvas's Consent board draws it (L8a), with the owner's lines of 2026-10-28: what a teacher sees, a clock set ahead after the phone lines and how many answered after the answers line, and never sees, the line on answers last, narrowed to which answer is yours — one list, so the intro's second page, Me's What your teacher sees and Join's preview each read it whole; the one-time screen reads its title, its line, the lines the list gained since the student saw it here — since L8a's list, a clock set ahead, how many answered and the narrowed line; since neither, the answers line too — and nothing else of it, See the whole list, then Continue, as the ListChanged board draws it, its title a header"
     )
     func consentList() async throws {
-        let added = (
-            sees: "Your answers to questions, counted only in the class's totals",
-            neverSees: "Which answer is yours, or whether you answered"
+        let (clock, answers, howMany, yours) = (
+            "If your phone's clock is set ahead",
+            "Your answers to questions, counted only in the class's totals",
+            "How many answered, which can show whether you did", "Which answer is yours"
         )
         #expect(
             ConsentCard.sees == [
                 "Your focus status: focused, unlocked, or Screen Time off",
-                "If Bali stops hearing from your phone during class, and when it last did",
+                "If Bali stops hearing from your phone during class, and when it last did", clock,
                 "When you tap in, and when class ends for you",
                 "When you unlock, and the reason if you share one", "If you leave this class",
-                added.sees,
+                answers, howMany,
             ])
         #expect(
             ConsentCard.neverSees == [
                 "Your screen, your apps, or what's in them", "Your messages or where you are",
-                added.neverSees,
+                yours,
             ])
-        #expect(ConsentCard.added.sees == [added.sees])
-        #expect(ConsentCard.added.neverSees == [added.neverSees])
+        let sinceAnswers = ConsentCard.added(sawAnswers: true)
+        #expect(sinceAnswers.sees == [clock, howMany] && sinceAnswers.neverSees == [yours])
+        let sinceNeither = ConsentCard.added(sawAnswers: false)
+        #expect(sinceNeither.sees == [clock, answers, howMany] && sinceNeither.neverSees == [yours])
         let whole = ConsentCard.sees + ConsentCard.neverSees
         let preview = Phone(fixture: try #require(PreviewFixtures.all["joinPreview"]))
         let intro = Phone(fixture: try #require(PreviewFixtures.all["intro"]))
@@ -2925,32 +2939,40 @@ struct AppTests {
             let at = whole.compactMap { labels.firstIndex(of: $0) }
             #expect(at.count == whole.count && at == at.sorted(), "\(name): \(labels)")
         }
-        let shown = Phone(fixture: try #require(PreviewFixtures.all["listChanged"]))
         let title = "Your teacher can ask questions now"
-        let read = try await elements(of: RootView(phone: shown), once: title)
-        let labels = read.map { $0.label ?? "" }
-        let order = [
-            title,
-            "During class, you can answer them here on Bali. That adds two lines to the list of what your teacher sees.",
-            added.sees, added.neverSees, "See the whole list", "Continue",
-        ]
-        let at = order.compactMap { labels.firstIndex(of: $0) }
-        #expect(at.count == order.count && at == at.sorted(), "\(labels)")
-        #expect(whole.filter { labels.contains($0) } == [added.sees, added.neverSees], "\(labels)")
-        #expect(read.first { $0.label == title }?.traits.contains(.header) == true)
-        for button in ["See the whole list", "Continue"] {
-            #expect(read.first { $0.label == button }?.traits.contains(.button) == true, "\(button)")
+        for (name, lines) in [
+            ("listChanged", [clock, howMany, yours]), ("listChangedBoth", [clock, answers, howMany, yours]),
+        ] {
+            let shown = Phone(fixture: try #require(PreviewFixtures.all[name]))
+            #expect(shown.sawAnswersList == (name == "listChanged"), "\(name)")
+            let read = try await elements(of: RootView(phone: shown), once: title)
+            let labels = read.map { $0.label ?? "" }
+            let order =
+                [
+                    title,
+                    "During class, you can answer them here on Bali. That adds two lines to the list of what your teacher sees.",
+                ] + lines + ["See the whole list", "Continue"]
+            let at = order.compactMap { labels.firstIndex(of: $0) }
+            #expect(at.count == order.count && at == at.sorted(), "\(name): \(labels)")
+            #expect(whole.filter { labels.contains($0) } == lines, "\(name): \(labels)")
+            #expect(read.first { $0.label == title }?.traits.contains(.header) == true, "\(name)")
+            for button in ["See the whole list", "Continue"] {
+                let traits = read.first { $0.label == button }?.traits
+                #expect(traits?.contains(.button) == true, "\(name): \(button)")
+            }
         }
     }
 
     @Test(
-        "The one-time screen shows once (L8a): to a student listed in a class who has not seen the list as it stands on this phone, never over a session's screens. Its Continue keeps them as one who has — in the phone's own defaults, keyed on the student as `inClass` is, a fresh Phone reading it back; a frozen fixture's stays its own — and Home shows, never the screen again, a read after or a sign-out and back included; See the whole list opens the list and keeps nothing. Join's preview, the list as it stands before a join, keeps them too, so a student joining a class after the update never sees it; and so does Me's What your teacher sees, reached from Home over Unlocked while the screen waits for the bell. Another student listed in a class still gets it. The key as it was before is put back after"
+        "The one-time screen shows once (L8a): to a student listed in a class who has not seen the list as it stands on this phone, never over a session's screens. Its Continue keeps them as one who has — in the phone's own defaults, keyed on the student as `inClass` is, a fresh Phone reading it back; a frozen fixture's stays its own — and Home shows, never the screen again, a read after or a sign-out and back included; See the whole list opens the list and keeps nothing. Join's preview, the list as it stands before a join, keeps them too, so a student joining a class after the update never sees it; and so does Me's What your teacher sees, reached from Home over Unlocked while the screen waits for the bell. Another student listed in a class still gets it. The list grown again (2026-10-28) keeps its own key: L8a's, which its builds wrote, reads as the list before it, never as the list as it stands, so a student who saw L8a's list is asked again and told what was added since, and seeing the list as it stands leaves L8a's key as it was. The keys as they were before are put back after"
     )
     func listOnce() async throws {
         let defaults = UserDefaults.standard
-        let before = [Phone.listSeenByKey, Phone.inClassKey].map { ($0, defaults.object(forKey: $0)) }
+        let keys = [Phone.listSeenByKey, Phone.answersListSeenByKey, Phone.inClassKey]
+        let before = keys.map { ($0, defaults.object(forKey: $0)) }
         defer { for (key, value) in before { defaults.set(value, forKey: key) } }
         defaults.removeObject(forKey: Phone.listSeenByKey)
+        defaults.removeObject(forKey: Phone.answersListSeenByKey)
         /// `GET /v1/me` as it answers student `id`, named, in Period 3 unless `inClass` says not.
         func me(_ id: String, inClass: Bool = true) throws -> MeResponse {
             let classes = inClass ? #"{"id":"p3","name":"Period 3","enrollmentId":"e3"}"# : ""
@@ -2978,13 +3000,21 @@ struct AppTests {
             _ = element?.accessibilityActivate()
             return window
         }
-        // The live phone keeps it in its own defaults, and a fresh one reads it back.
+        // Ana saw L8a's list here, under the key its builds wrote: after the update, the list
+        // before this one, never the list as it stands, so the screen asks her again.
+        #expect(Phone.answersListSeenByKey == "listSeenBy" && Phone.listSeenByKey != "listSeenBy")
+        defaults.set("ana", forKey: Phone.answersListSeenByKey)
         let state = try #require(PreviewFixtures.all["home"]?.sync)
         let live = Phone()
         live.synced(state)
+        #expect(live.listSeenBy == nil && live.answersListSeenBy == "ana" && live.sawAnswersList)
+        // The live phone keeps the list as it stands in its own defaults, and a fresh one reads it
+        // back; L8a's key stays as it was.
         live.sawList()
         #expect(live.listSeenBy == "ana" && Phone().listSeenBy == "ana")
+        #expect(defaults.string(forKey: Phone.answersListSeenByKey) == "ana")
         defaults.removeObject(forKey: Phone.listSeenByKey)
+        defaults.removeObject(forKey: Phone.answersListSeenByKey)
         // Ana, in Period 3 and Period 5, has not seen it here: the screen, no tab bar. See the
         // whole list keeps nothing; Continue keeps her, a frozen fixture's in itself only.
         let phone = Phone(fixture: try #require(PreviewFixtures.all["listChanged"]))
@@ -3816,12 +3846,15 @@ struct AppTests {
     }
 
     @Test(
-        "The card off the Focus screen (L8) shows only while the lesson has a question and this phone has shown the student the consent list as it stands (the owner's ruling, 2026-10-23): on Unlocked and Screen Time off, which the one-time screen never covers, no card and no poll before, and the card once the list is seen; on Home, the one-time screen in Home's place until then, and Home with the card after; and the card gone from each once a read shows no question"
+        "The card off the Focus screen (L8) shows only while the lesson has a question and this phone has shown the student the consent list as it stands (the owner's ruling, 2026-10-23), a student who saw it before it grew again (L8a's list; 2026-10-28) included: on Unlocked and Screen Time off, which the one-time screen never covers, no card and no poll before, and the card once the list is seen; on Home, the one-time screen in Home's place until then, and Home with the card after; and the card gone from each once a read shows no question"
     )
     func offFocusCardWaits() async throws {
         let defaults = UserDefaults.standard
-        let before = [Phone.inClassKey, Phone.listSeenByKey].map { ($0, defaults.object(forKey: $0)) }
+        let keys = [Phone.inClassKey, Phone.listSeenByKey, Phone.answersListSeenByKey]
+        let before = keys.map { ($0, defaults.object(forKey: $0)) }
         defer { for (key, value) in before { defaults.set(value, forKey: key) } }
+        // Ana saw L8a's list here: not the list as it stands.
+        defaults.set("ana", forKey: Phone.answersListSeenByKey)
         let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         var (approved, off) = (Protection(), Protection())
         (approved.checked, approved.permission) = (true, .approved)

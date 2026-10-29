@@ -32,7 +32,7 @@ function swiftList(name: string): string[] {
 describe('the help page says what the app says', () => {
   it('what a teacher sees, word for word', () => {
     expect(TEACHER_SEES).toEqual(swiftList('sees'));
-    expect(TEACHER_SEES).toHaveLength(6);
+    expect(TEACHER_SEES).toHaveLength(8);
   });
 
   it('what a teacher never sees, word for word', () => {
