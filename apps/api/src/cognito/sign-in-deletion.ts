@@ -13,6 +13,8 @@ import type { DeleteSignIn, Outcome } from './admin.js';
 /*
  * A deleted account's Cognito sign-in, deleted by the API (2026-10-09): queued with the deletion,
  * tried by a pass at once after the commit, then by each sweep while due (`claimCognitoDeletions`).
+ * A retention run's (2026-10-28), queued by the owner's command, waits for the next pass: a
+ * sweep's, or one a deletion starts, each taking the oldest due rows first.
  * The phone's own DeleteUser (C4) stays a first try. A log line names a row by its id, never the person.
  */
 

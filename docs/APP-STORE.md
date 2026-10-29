@@ -423,7 +423,9 @@ review accounts are made there:
    that record should be true. Either way, name the class "Demo" so it's never mistaken for
    a real one.
 6. **After review,** set a new password on both, or disable them (**Users** → the user →
-   **Disable**), and re-enable them for the next review.
+   **Disable**), and re-enable them for the next review. A retention run that de-identifies
+   them (their school has a year end, and they have no record after it) deletes their
+   sign-ins too (2026-10-28): make them again with steps 2–5.
 
 ### 5.5 What the beta can't show the reviewer
 

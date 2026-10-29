@@ -5177,7 +5177,12 @@ async function peopleOf(tx: Database, schoolId: string): Promise<string[]> {
 async function lockPeople(tx: Database, ids: string[]) {
   if (ids.length === 0) return [];
   return tx
-    .select({ id: users.id, role: users.role, removedAt: users.removedAt })
+    .select({
+      id: users.id,
+      role: users.role,
+      removedAt: users.removedAt,
+      cognitoId: users.cognitoId,
+    })
     .from(users)
     .where(inArray(users.id, ids))
     .orderBy(asc(users.id))
@@ -5271,6 +5276,11 @@ export interface ApplyRetentionInput {
   confirmName?: string;
   /** The idempotency key for the retention_applied event (rule 4); one is minted when absent. */
   eventId?: string;
+  /**
+   * This deploy's Cognito pool, its `AUTH_ISSUER` (2026-10-28): the run queues the sign-in of
+   * each person it de-identifies under it, for the API to delete, as an account deletion does.
+   */
+  issuer: string;
 }
 
 /**
@@ -5328,7 +5338,8 @@ export function yearOverAt(day: string): Date {
  * each live enrollment ended as a removal ends it; their pre-bell taps and
  * their phones' device tokens (N4) and their 13+ yes (C7-server) deleted; a de-identified teacher's removed classes lose their names,
  * their questions their words, their drafts are removed with theirs, and their decks with their
- * titles (M4). Their lessons,
+ * titles (M4); and each one's Cognito sign-in is queued under `issuer` for the API to delete, as
+ * a deletion's is (2026-10-28). Their lessons,
  * participations, events and answers stay, so every count still adds up.
  *
  * Kept named, and reported by id (`continuing`): an account with a record
@@ -5452,6 +5463,14 @@ async function retainOnce(tx: Database, input: ApplyRetentionInput): Promise<App
     await emptyQuestions(tx, inArray(questions.createdBy, teacherIds));
     await removeDrafts(tx, inArray(savedQuestions.teacherId, teacherIds), input.at);
     await removeDecks(tx, inArray(decks.teacherId, teacherIds), input.at);
+  }
+  // Their sign-ins (2026-10-28), each by the sub its row holds until `deIdentify` takes it, queued
+  // in this transaction as a deletion queues one: a committed run has queued every one, and a
+  // preview, rolled back, none. In order of sub, never of the accounts, so the queue's order can't
+  // pair a waiting sub with the account it was. Cognito takes a local (email) sign-in's sub as its
+  // username; the API's deleter still checks the sub first, and keeps one whose person came back.
+  for (const sub of gone.map((person) => person.cognitoId).sort()) {
+    await queueCognitoDeletion(tx, { issuer: input.issuer, username: sub, sub }, input.at);
   }
   await deIdentify(tx, goneIds, input.at);
 
