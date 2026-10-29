@@ -97,6 +97,8 @@ describe('live stream teardown', () => {
       sessionId: session.id,
       teacherId: teacher.id,
       after: 0,
+      expiresAtMs: null,
+      stillAllowed: () => Promise.resolve(true),
       // The client vanishes while the very first frame is being written — the
       // subscription is torn down with three more rows still in hand.
       write: (chunk) => {
@@ -126,6 +128,8 @@ describe('live stream teardown', () => {
       sessionId: session.id,
       teacherId: teacher.id,
       after: 0,
+      expiresAtMs: null,
+      stillAllowed: () => Promise.resolve(true),
       write: (chunk) => chunks.push(chunk),
       onClose: () => {
         closes += 1;

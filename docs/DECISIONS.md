@@ -8,6 +8,26 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-28** — **A teacher's live stream ends with its access.** The stream checked its token
+  and its teacher once, as it opened: one already open kept delivering after its token expired, or
+  after its account stopped being that class's teacher, while every new request with the same token
+  was refused. **Decided:** the hub ends a stream at its token's `exp`, on a timer set as it opens,
+  by the verifier's clock (a Node timer holds at most about 24.8 days, so a later expiry is waited
+  out in steps); and at each re-poll, about every 20 s, the route's own check (`requireSessionOwner`)
+  is read again before the next read: a refusal, an account other than the one the stream was opened
+  and counted for, or a read that fails ends it. The portal's stream client reconnects as after any
+  drop and gets the 401 (sent to sign in) or 403 any other request gets, so the portal is unchanged.
+  *Weighed:* the check before every read, a doorbell's included: at most one re-poll sooner, for
+  three more queries a read on every open grid at the bell; the re-poll is already how long a
+  stream may go without a fresh read of the table (Live updates, decision 3). **Tests:**
+  `stream-access.test.ts`, on both lanes over a real socket: an open stream's reader reports done
+  within one re-poll of its teacher's role changing and of its class moving to another teacher, the
+  reconnect then 403, and at its token's expiry, not before, the reconnect then 401; all three red
+  before the fix, the stream never ending. The hub's own: a check that refuses, or can't be read,
+  ends the stream before its next read, an expiry passed before it subscribed ends it with no read,
+  one 30 days off ends it neither early nor late (fake timers), and a client's disconnect and the
+  shutdown leave no timer behind.
+
 - **2026-10-28** — **A tap is judged by the student's place in the class under the session's
   lock, where a teacher's removal marks it (A19).** The route picks the session by a read that
   takes no lock, and `tapIn` checked under the lock that the session runs and the account stands,
