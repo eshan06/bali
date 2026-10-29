@@ -199,7 +199,8 @@ npm run school -- retention <school-id> --confirm "<name>"   # run it, once the 
   disposes, in one transaction (`disposeSchool`, `packages/db/src/transitions.ts`): every
   person of the school (its teachers, and anyone enrolled in, present in or recorded in one
   of its classes) is de-identified as an account deletion leaves one (C3: no name, no
-  Cognito subject, removed; a rename's names emptied); its enrollments end; its classes are
+  Cognito subject, removed; a rename's names emptied, and the phone's order on every record,
+  2026-10-29); its enrollments end; its classes are
   removed and lose their names; its teachers' blocks are removed (a tag can be registered
   again); its open invites and the pre-bell taps of its people and on its blocks are
   deleted; the school is marked removed. What stays names no one: its lessons, their
@@ -235,7 +236,8 @@ npm run school -- retention <school-id> --confirm "<name>"   # run it, once the 
   event, a lesson, a pre-bell tap of theirs or on them, an invite redeemed, a class joined, a class or block
   made, the account itself), with
   records at another school, or a teacher with a live class or block. Lessons,
-  participations and events stay, so reports add up. Each person it de-identifies has their
+  participations and events stay, so reports add up, the events of each person it
+  de-identifies without their phone's order (2026-10-29). Each person it de-identifies has their
   Cognito sign-in queued for the API to delete, as an account deletion's is (2026-10-28;
   runbook 9), under `AUTH_ISSUER`, the deploy's pool. Logged as one `retention_applied`
   event: the school's id, the day and counts, no name. Refused, writing nothing: no

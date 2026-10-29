@@ -153,8 +153,9 @@ way out.
 left as a leave leaves it, in session too; the `users` row stays, so every event of theirs
 still counts in its class's reports, but it loses its name and its Cognito subject and is
 marked removed; a tap of theirs still waiting for a Start is consumed; a rename's payload, the
-one place an event carried their name, is emptied
-(the one rewrite of `events` the database allows, migration 0015); and an `account_deleted`
+one place an event carried their name, is emptied, and every record of theirs loses the phone's
+order (A12; amended 2026-10-29, below), a tap kept from a Start too (the two rewrites of `events`
+the database allows, migrations 0015 and 0029); and an `account_deleted`
 event with no personal data records it. So the history stays answerable in counts and
 names no one. A teacher with a class or a block is refused: that account goes through the
 school. "Never lost" keeps its meaning from the phone to the server — the phone sends its
@@ -174,6 +175,21 @@ without), and the same deleter, with the same two checks, removes it. Cognito ta
 sign-in's `sub` as its username, so every email sign-in is reached, all the pilot's pool has; a
 federated one (Google, Apple) is not, since Bali keeps no username, and offering one needs a way to
 reach it first.
+*Amended 2026-10-29 (the owner's decision):* the phone's order goes with the name. Every record a
+phone's outbox sends carries its install id and the record's place in it (A12, API surface), and
+the phone keeps that id through every sign-out and sign-in until Bali is deleted from it, so the
+records of a person who comes back would carry the same id as the ones made nameless. A deletion, a
+disposal and a retention run each empty the order on every event of the person they de-identify, in
+their own transaction, after the row is marked removed: the second rewrite of `events` the database
+allows (migration 0029), both halves of the order emptied and nothing else of the row changed, and
+only on an account marked removed. A deletion empties it on the taps it keeps from a Start too; a
+disposal and a retention run delete those. A record that lands for an account already removed, an
+unlock still on its way, stores none: the engine reads the account's row FOR KEY SHARE before it
+writes, the lock the record's foreign key takes, which waits out a removal that has marked the row.
+Nothing reads it there: every comparison of orders is between one person's own records, and an
+account removed sends nothing more, so a late unlock is judged by the server's times (rule 1), as
+an old build's is. Migration 0029 emptied it on the rows made nameless before. The phone is
+unchanged.
 
 **4. A student can be in only one session at a time.** If a student in one session taps
 into another, their first participation is ended and recorded in the `events` table as
@@ -274,7 +290,8 @@ from `last_seen_at` (rule 2), never from the column.
   is a day the owner records; after it, the owner's retention run de-identifies, as an
   account deletion does, everyone whose records all lie on or before it (anyone with a later
   record, at another school, or a teacher with a live class or block is kept named), logged
-  as a `retention_applied` event of counts; lessons and their history stay. Their Cognito
+  as a `retention_applied` event of counts; lessons and their history stay, without the phone's
+  order on any record of theirs (2026-10-29, decision 3's amendment). Their Cognito
   sign-ins go too, queued in the run's transaction as a deletion's is (2026-10-28, decision 3's
   amendment). A student's own
   deletion is decided (decision 3's amendment), and so is a school's written request to
@@ -282,7 +299,8 @@ from `last_seen_at` (rule 2), never from the column.
   (C6a, 2026-10-04): every person of the school de-identified as an account deletion leaves
   one, its classes, blocks, open invites and pre-bell taps removed, the school marked
   removed, and a `school_disposed` event of counts naming no one; its lessons and their
-  history stay, naming no one. It is refused while a lesson of the school runs, naming each
+  history stay, naming no one, with no phone's order on any record of its people (2026-10-29). It
+  is refused while a lesson of the school runs, naming each
   lesson's session, class and bell, unless the owner tells it to end them (`--end-lessons`,
   2026-10-29): then it ends each as its teacher's End would, in its own transaction, and the
   classes go in that same transaction, so a Start behind it finds no class.
@@ -506,7 +524,9 @@ Student app:
   a Start — is late, recorded and noted the same way, so no tap ever takes a student back
   out of where their later tap put them. Optional — old builds send none — and never a
   reason to refuse: one the server cannot use (not a UUID install, not a positive safe
-  integer seq) is taken as none.
+  integer seq) is taken as none. Kept only while its account is: a deletion, a disposal or a
+  retention run empties it on every record of the person, and a record landing after keeps none
+  (data-model decision 3's amendment, 2026-10-29).
 - `POST /v1/sessions/{id}/checkin` — the every-30-seconds "still here"; the response
   carries the current truth (state, end time) so the phone can reconcile.
 - `POST /v1/sessions/{id}/unlock` and `POST /v1/sessions/{id}/refocus` — emergency

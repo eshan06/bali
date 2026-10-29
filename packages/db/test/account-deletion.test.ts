@@ -24,6 +24,7 @@ import {
   responses,
   savedQuestions,
   schools,
+  sessions,
   users,
 } from '../src/schema.js';
 import { makeTestDb } from '../src/testing.js';
@@ -38,12 +39,14 @@ import {
   endSession,
   joinClassByCode,
   openQuestion,
+  protectionOff,
   removeDeck,
   removeSavedQuestion,
   renameStudent,
   startSession,
   tapIn,
   unlock,
+  unlockUnderTap,
 } from '../src/transitions.js';
 import type { Database } from '../src/types.js';
 
@@ -52,7 +55,8 @@ import type { Database } from '../src/types.js';
  * leave leaves it, in session too; the row keeps its id, so every event of
  * theirs still counts in its class's reports, but loses its name and its
  * Cognito subject; a rename's payload, the one place an event named them, is
- * emptied — the single rewrite migration 0015 lets through.
+ * emptied (migration 0015), and every record of theirs loses the phone's order
+ * (migration 0029): the two rewrites of their history the database lets through.
  */
 
 let db: Database;
@@ -134,6 +138,21 @@ async function lesson(classId: string, ana: string, ben: string) {
 
 const eventsOf = (userId: string) =>
   db.select().from(events).where(eq(events.userId, userId)).orderBy(events.seq);
+
+/** The rows of `rows` still carrying any of the phone's order (A12). */
+const ordered = <T extends { orderInstall: string | null; orderSeq: number | null }>(rows: T[]) =>
+  rows.filter((r) => r.orderInstall !== null || r.orderSeq !== null);
+
+/** The database's own refusal, which the driver wraps in its error's `cause`. */
+async function refused(write: Promise<unknown>) {
+  const err = await write.then(
+    () => null,
+    (e: unknown) => e,
+  );
+  const messages: string[] = [];
+  for (let e = err; e instanceof Error; e = e.cause) messages.push(e.message);
+  expect(messages.join('\n')).toMatch(/events is append-only/);
+}
 
 /** The class's teacher asks `prompt` in the running `sessionId`. */
 const ask = async (sessionId: string, teacherId: string, prompt = 'Which?') =>
@@ -381,6 +400,120 @@ describe('deleteAccount (C3)', () => {
       .from(participations)
       .where(eq(participations.sessionId, session.id));
     expect(joined).toEqual([{ studentId: ben.id }]);
+  });
+
+  it('empties the phone’s order on every record of theirs, a tap kept from a Start too, and leaves a classmate’s (A12)', async () => {
+    const { teacher, ana, ben, first } = await seed('c3-order');
+    const [hers, his] = [newUuidV7(), newUuidV7()];
+    const { session } = await startSession(db, {
+      classId: first.id,
+      startedAt: fromNow(-10 * MIN),
+      endsAt: fromNow(30 * MIN),
+    });
+    const tap = (studentId: string, install: string) =>
+      tapIn(db, {
+        sessionId: session.id,
+        studentId,
+        eventId: newUuidV7(),
+        deviceTime: fromNow(-10 * MIN),
+        order: { install, seq: 1 },
+      });
+    await tap(ana.id, hers);
+    await tap(ben.id, his);
+    await unlock(db, {
+      sessionId: session.id,
+      studentId: ana.id,
+      eventId: newUuidV7(),
+      deviceTime: fromNow(-5 * MIN),
+      reason: 'nurse',
+      order: { install: hers, seq: 2 },
+    });
+    await endSession(db, { sessionId: session.id, at: new Date(), reason: 'ended' });
+    // A tap before the next lesson, still waiting for its Start.
+    await armTap(db, {
+      studentId: ana.id,
+      teacherId: teacher.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date(),
+      expiresAt: fromNow(60 * MIN),
+      order: { install: hers, seq: 3 },
+    });
+    const later = fromNow(60 * MIN);
+    const ended = one(await db.select().from(sessions).where(eq(sessions.id, session.id)));
+    const report = sessionReport(ended, await getSessionEvents(db, session.id), later);
+
+    await deleteAccount(db, { userId: ana.id, eventId: newUuidV7(), at: new Date() });
+
+    const mine = await eventsOf(ana.id);
+    expect(mine.map((e) => e.type)).toEqual(
+      expect.arrayContaining(['tap_in', 'unlock', 'account_deleted']),
+    );
+    expect(ordered(mine)).toEqual([]);
+    expect(
+      ordered(await db.select().from(armedTaps).where(eq(armedTaps.studentId, ana.id))),
+    ).toEqual([]);
+    // Nothing anywhere still carries her phone's install.
+    expect(await db.select().from(events).where(eq(events.orderInstall, hers))).toEqual([]);
+    expect(await db.select().from(armedTaps).where(eq(armedTaps.orderInstall, hers))).toEqual([]);
+    // A classmate's records keep theirs, and the lesson's report reads as it did.
+    expect(ordered(await eventsOf(ben.id))).toMatchObject([
+      { type: 'tap_in', orderInstall: his, orderSeq: 1 },
+    ]);
+    expect(sessionReport(ended, await getSessionEvents(db, session.id), later)).toEqual(report);
+  });
+
+  it('stores no order on a record that lands for the deleted account (A12)', async () => {
+    const { ana, ben, first } = await seed('c3-order-late');
+    const session = await lesson(first.id, ana.id, ben.id);
+    await endSession(db, { sessionId: session.id, at: new Date(), reason: 'ended' });
+    await deleteAccount(db, { userId: ana.id, eventId: newUuidV7(), at: new Date() });
+    const phone = newUuidV7();
+    const order = (seq: number) => ({ install: phone, seq });
+
+    // What a phone sent before it heard of the deletion, each recorded as ever (ISSUES #2): an
+    // unlock in the lesson, one naming a lesson that never was, one under a tap that never
+    // landed, and Screen Time off reported after the bell.
+    const late = [
+      await unlock(db, {
+        sessionId: session.id,
+        studentId: ana.id,
+        eventId: newUuidV7(),
+        deviceTime: new Date(),
+        order: order(4),
+      }),
+      await unlock(db, {
+        sessionId: newUuidV7(),
+        studentId: ana.id,
+        eventId: newUuidV7(),
+        deviceTime: new Date(),
+        order: order(5),
+      }),
+      await unlockUnderTap(db, {
+        tapEventId: newUuidV7(),
+        studentId: ana.id,
+        eventId: newUuidV7(),
+        deviceTime: new Date(),
+        order: order(6),
+      }),
+      await protectionOff(db, {
+        sessionId: session.id,
+        studentId: ana.id,
+        eventId: newUuidV7(),
+        deviceTime: new Date(),
+        order: order(7),
+      }),
+    ];
+
+    expect(late.map((r) => [r.outcome, r.recordedAs])).toEqual([
+      ['recorded', 'after_session_end'],
+      ['recorded', 'unknown_session'],
+      ['recorded', 'unknown_tap'],
+      ['recorded', 'after_session_end'],
+    ]);
+    const mine = await eventsOf(ana.id);
+    expect(mine.filter((e) => ['unlock', 'protection_off'].includes(e.type))).toHaveLength(5);
+    expect(ordered(mine)).toEqual([]);
+    expect(await db.select().from(events).where(eq(events.orderInstall, phone))).toEqual([]);
   });
 
   it('deletes the device tokens of its phones, and leaves a classmate’s (N4)', async () => {
@@ -677,7 +810,7 @@ describe('a deleted teacher (C3)', () => {
 });
 
 describe('the history after migration 0015', () => {
-  it('lets through only a deleted account’s rename losing its payload', async () => {
+  it('lets a deleted account’s rename lose its payload, and nothing else of it change', async () => {
     const { ana, ben } = await seed('c3-trigger');
     for (const studentId of [ana.id, ben.id]) {
       await renameStudent(db, { studentId, displayName: `N-${studentId}`, eventId: newUuidV7() });
@@ -686,16 +819,6 @@ describe('the history after migration 0015', () => {
     const rewrite = (userId: string, set: ReturnType<typeof sql>) =>
       db.execute(sql`update ${events} set ${set} where ${events.userId} = ${userId}
         and ${events.type} = 'display_name_changed'`);
-    /** The database's own refusal, which the driver wraps in its error's `cause`. */
-    async function refused(write: Promise<unknown>) {
-      const err = await write.then(
-        () => null,
-        (e: unknown) => e,
-      );
-      const messages: string[] = [];
-      for (let e = err; e instanceof Error; e = e.cause) messages.push(e.message);
-      expect(messages.join('\n')).toMatch(/events is append-only/);
-    }
 
     // A live account's rename keeps its names.
     await refused(rewrite(ben.id, sql`payload = null`));
@@ -710,5 +833,48 @@ describe('the history after migration 0015', () => {
         and ${events.type} = 'account_deleted'`),
     );
     await refused(db.execute(sql`delete from ${events} where ${events.userId} = ${ana.id}`));
+  });
+});
+
+describe('the history after migration 0029', () => {
+  it('lets a removed account’s record lose the phone’s order, both halves and nothing else', async () => {
+    const { ana, ben, first } = await seed('c3-trigger-order');
+    const { session } = await startSession(db, {
+      classId: first.id,
+      startedAt: fromNow(-10 * MIN),
+      endsAt: fromNow(30 * MIN),
+    });
+    for (const studentId of [ana.id, ben.id]) {
+      await tapIn(db, {
+        sessionId: session.id,
+        studentId,
+        eventId: newUuidV7(),
+        deviceTime: new Date(),
+        order: { install: newUuidV7(), seq: 1 },
+      });
+    }
+    // Made nameless before the deletion emptied the order itself: removed, its records ordered.
+    await db.update(users).set({ removedAt: new Date() }).where(eq(users.id, ana.id));
+    const rewrite = (userId: string, set: ReturnType<typeof sql>) =>
+      db.execute(sql`update ${events} set ${set} where ${events.userId} = ${userId}
+        and ${events.type} = 'tap_in'`);
+    const emptied = sql`order_install = null, order_seq = null`;
+
+    // A live account's records keep their order.
+    await refused(rewrite(ben.id, emptied));
+    // A removed one's: only the order, both halves of it, only emptied.
+    await refused(rewrite(ana.id, sql`order_install = ${newUuidV7()}`));
+    await refused(rewrite(ana.id, sql`order_seq = order_seq + 1`));
+    await refused(rewrite(ana.id, sql`order_install = null`));
+    await refused(rewrite(ana.id, sql`${emptied}, occurred_at = now()`));
+    await refused(rewrite(ana.id, sql`${emptied}, payload = '{"x":1}'::jsonb`));
+    await refused(rewrite(ana.id, sql`${emptied}, user_id = ${ben.id}`));
+    await expect(rewrite(ana.id, emptied)).resolves.toBeDefined();
+    expect(ordered(await eventsOf(ana.id))).toEqual([]);
+    // Emptied once: a second write would change nothing, and is refused as any other.
+    await refused(rewrite(ana.id, emptied));
+    // Any DELETE, as before.
+    await refused(db.execute(sql`delete from ${events} where ${events.userId} = ${ana.id}`));
+    expect(ordered(await eventsOf(ben.id))).toHaveLength(1);
   });
 });

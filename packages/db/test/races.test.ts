@@ -1948,11 +1948,15 @@ describe.runIf(REAL_PG)('account deletion under contention (real Postgres, C3)',
       const { classId, studentId } = await seed(`race-delete-${round}`);
       await seed(`race-delete-other-${round}`); // a class whose code the join uses
       const session = await openSession(classId);
+      // The phone's order on each of its records (A12), which the deletion empties.
+      const install = newUuidV7();
+      const order = (seq: number) => ({ install, seq });
       await tapIn(db, {
         sessionId: session.id,
         studentId,
         eventId: newUuidV7(),
         deviceTime: new Date(),
+        order: order(1),
       });
       const unlockId = newUuidV7();
       const deletion = () =>
@@ -1962,7 +1966,13 @@ describe.runIf(REAL_PG)('account deletion under contention (real Postgres, C3)',
         round % 2 === 1
           ? new Promise((resolve) => setTimeout(resolve, 10)).then(deletion)
           : deletion(),
-        unlock(db, { sessionId: session.id, studentId, eventId: unlockId, deviceTime: new Date() }),
+        unlock(db, {
+          sessionId: session.id,
+          studentId,
+          eventId: unlockId,
+          deviceTime: new Date(),
+          order: order(2),
+        }),
         renameStudent(db, { studentId, displayName: `Late ${round}`, eventId: newUuidV7() }),
         joinClassByCode(db, {
           studentId,
@@ -1978,6 +1988,7 @@ describe.runIf(REAL_PG)('account deletion under contention (real Postgres, C3)',
           studentId,
           eventId: newUuidV7(),
           deviceTime: new Date(),
+          order: order(3),
         }),
       ]);
 
@@ -2003,6 +2014,8 @@ describe.runIf(REAL_PG)('account deletion under contention (real Postgres, C3)',
         .from(events)
         .where(and(eq(events.userId, studentId), eq(events.type, 'display_name_changed')));
       expect(renames.every((e) => e.payload === null)).toBe(true);
+      // Nor any order of the phone's, on a record ahead of the deletion or behind it.
+      expect(await orderedEventsOf(studentId)).toEqual([]);
       const stillIn = await db
         .select()
         .from(enrollments)
@@ -2148,11 +2161,13 @@ describe.runIf(REAL_PG)('school disposal under contention (real Postgres, C6a)',
         await db.select({ id: classes.schoolId }).from(classes).where(eq(classes.id, classId)),
       ).id;
       const lesson = await openSession(classId);
+      const install = newUuidV7();
       await tapIn(db, {
         sessionId: lesson.id,
         studentId,
         eventId: newUuidV7(),
         deviceTime: new Date(),
+        order: { install, seq: 1 },
       });
       await endSession(db, { sessionId: lesson.id, at: new Date(), reason: 'ended' });
       const stranger = await findOrCreateStudent(db, `stranger-${tag}`, `Stranger ${round}`);
@@ -2206,6 +2221,7 @@ describe.runIf(REAL_PG)('school disposal under contention (real Postgres, C6a)',
             studentId,
             eventId: unlockId,
             deviceTime: new Date(),
+            order: { install, seq: 2 },
           }),
           // The school before the teacher, as the disposal takes them: never a deadlock.
           later(lag, () => createClass(db, { teacherId, schoolId, name: `Late ${round}` })),
@@ -2267,6 +2283,8 @@ describe.runIf(REAL_PG)('school disposal under contention (real Postgres, C6a)',
         .from(events)
         .where(and(eq(events.userId, studentId), eq(events.type, 'display_name_changed')));
       expect(renames.every((e) => e.payload === null)).toBe(true);
+      // Nor any order of the phone's (A12): the unlock's, ahead of it or behind it, included.
+      expect(await orderedEventsOf(studentId)).toEqual([]);
       expect(
         await db.select().from(armedTaps).where(eq(armedTaps.teacherId, teacherId)),
       ).toHaveLength(0);
@@ -2471,11 +2489,13 @@ describe.runIf(REAL_PG)('a retention run under contention (real Postgres, C6b)',
         })
         .where(eq(schools.id, schoolId));
       const past = await openSession(classId);
+      const install = newUuidV7();
       await tapIn(db, {
         sessionId: past.id,
         studentId,
         eventId: newUuidV7(),
         deviceTime: new Date(),
+        order: { install, seq: 1 },
       });
       await endSession(db, { sessionId: past.id, at: new Date(), reason: 'ended' });
       const { classId: otherClass } = await seed(`${tag}-other`);
@@ -2523,7 +2543,13 @@ describe.runIf(REAL_PG)('a retention run under contention (real Postgres, C6b)',
         later(lag, () =>
           renameStudent(db, { studentId, displayName: `Late ${round}`, eventId: newUuidV7() }),
         ),
-        unlock(db, { sessionId: past.id, studentId, eventId: unlockId, deviceTime: new Date() }),
+        unlock(db, {
+          sessionId: past.id,
+          studentId,
+          eventId: unlockId,
+          deviceTime: new Date(),
+          order: { install, seq: 2 },
+        }),
       ]);
 
       if (retained.status === 'rejected') throw retained.reason;
@@ -2569,6 +2595,8 @@ describe.runIf(REAL_PG)('a retention run under contention (real Postgres, C6b)',
         .from(events)
         .where(and(eq(events.userId, studentId), eq(events.type, 'display_name_changed')));
       expect(renames.every((e) => e.payload === null)).toBe(true);
+      // Nor any order of the phone's (A12): the unlock's, ahead of it or behind it, included.
+      expect(await orderedEventsOf(studentId)).toEqual([]);
     }
   }, 60_000);
 
@@ -2640,6 +2668,122 @@ describe.runIf(REAL_PG)('a retention run under contention (real Postgres, C6b)',
       expect(student.removedAt).not.toBeNull();
     }
   }, 20_000);
+});
+
+/** The events of `userId` still carrying any of the phone's order (A12). */
+function orderedEventsOf(userId: string) {
+  return db
+    .select()
+    .from(events)
+    .where(and(eq(events.userId, userId), isNotNull(events.orderInstall)));
+}
+
+describe.runIf(REAL_PG)('a record landing with a removal (real Postgres, A12)', () => {
+  /*
+   * A removal empties the phone's order on everything of the person's once their row is marked
+   * removed, and a record that lands for a removed account stores none, its owner read FOR KEY
+   * SHARE: the lock the record's foreign key takes, which waits for a removal's UPDATE of the
+   * row. Staged both ways, each transaction held open while the other waits on it: an unlock
+   * ahead of the removal is emptied by it; one behind it waits for its commit and stores none.
+   */
+  const DAY = 86_400_000;
+  /** Tomorrow, YYYY-MM-DD in this machine's zone: the year a retention run three days on ends. */
+  function tomorrow(): string {
+    const d = new Date(Date.now() + DAY);
+    const two = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}`;
+  }
+
+  /** A student whose lesson is over, and the unlock their phone made in it, still on its way. */
+  async function lessonOver(tag: string) {
+    const { classId, studentId } = await seed(tag);
+    const { schoolId } = one(
+      await db.select({ schoolId: classes.schoolId }).from(classes).where(eq(classes.id, classId)),
+    );
+    await db.update(schools).set({ schoolYearEndsOn: tomorrow() }).where(eq(schools.id, schoolId));
+    const install = newUuidV7();
+    const lesson = await openSession(classId);
+    await tapIn(db, {
+      sessionId: lesson.id,
+      studentId,
+      eventId: newUuidV7(),
+      deviceTime: new Date(),
+      order: { install, seq: 1 },
+    });
+    await endSession(db, { sessionId: lesson.id, at: new Date(), reason: 'ended' });
+    const unlockId = newUuidV7();
+    return {
+      tag,
+      studentId,
+      schoolId,
+      unlockId,
+      late: (on: Database) =>
+        unlock(on, {
+          sessionId: lesson.id,
+          studentId,
+          eventId: unlockId,
+          deviceTime: new Date(),
+          order: { install, seq: 2 },
+        }),
+    };
+  }
+  type Lesson = Awaited<ReturnType<typeof lessonOver>>;
+
+  const removals: [
+    string,
+    string,
+    (l: Lesson) => (on: Database) => Promise<{ outcome: string }>,
+  ][] = [
+    [
+      'deletion',
+      'deleted',
+      (l) => (on) =>
+        deleteAccount(on, { userId: l.studentId, eventId: newUuidV7(), at: new Date() }),
+    ],
+    [
+      'disposal',
+      'disposed',
+      (l) => (on) =>
+        disposeSchool(on, { schoolId: l.schoolId, at: new Date(), confirmName: `School ${l.tag}` }),
+    ],
+    [
+      'retention run',
+      'applied',
+      (l) => (on) =>
+        applyRetention(on, {
+          schoolId: l.schoolId,
+          at: new Date(Date.now() + 3 * DAY),
+          confirmName: `School ${l.tag}`,
+          issuer: POOL,
+        }),
+    ],
+  ];
+
+  for (const [name, outcome, removal] of removals) {
+    it(`an unlock and a ${name}, either first, leave no record of theirs ordered`, async () => {
+      async function after(l: Lesson) {
+        expect(await eventOf(l.unlockId)).toMatchObject({ userId: l.studentId, type: 'unlock' });
+        const student = one(await db.select().from(users).where(eq(users.id, l.studentId)));
+        expect(student.removedAt).not.toBeNull();
+        expect(await orderedEventsOf(l.studentId)).toEqual([]);
+      }
+      const key = name.split(' ')[0];
+
+      // The unlock first: the removal waits on the row the unlock holds, then empties its order.
+      const ahead = await lessonOver(`race-order-${key}-ahead`);
+      const removed = await behindCommit(ahead.late, () => removal(ahead)(db));
+      if (removed.status === 'rejected') throw removed.reason as Error;
+      expect(removed.value.outcome).toBe(outcome);
+      await after(ahead);
+
+      // The removal first: the unlock waits for its commit, then stores no order.
+      const behind = await lessonOver(`race-order-${key}-behind`);
+      const landed = await behindCommit(removal(behind), () => behind.late(db));
+      if (landed.status === 'rejected') throw landed.reason as Error;
+      expect(landed.value).toMatchObject({ outcome: 'recorded', recordedAs: 'after_session_end' });
+      await after(behind);
+    }, 20_000);
+  }
 });
 
 describe.runIf(REAL_PG)('provisioning concurrency (real Postgres)', () => {

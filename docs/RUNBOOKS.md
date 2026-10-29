@@ -291,7 +291,8 @@ project for the API (its DSN).
       failing is tried again at most an hour later), and reply only once no new event has come.
     - **Write back to the school,** by the agreement's channel, inside its days: the date of
       the disposal; what was removed (every name, Cognito subject and sign-in, class name,
-      block, open invite and pre-bell tap of the school, the words of every question asked
+      block, open invite and pre-bell tap of the school, the id and counter each student's phone
+      put on their records, the words of every question asked
       in its lessons, prompt and options, its teachers' saved questions, and their slide decks,
       title and PDF); what stays (lessons,
       unlocks with their reason, taps and their times, and each answer by the number of the
@@ -325,8 +326,10 @@ project for the API (its DSN).
     - **Run it,** pasting the preview's last line,
       `npm run school -- retention <school-id> --confirm '<name>'`. It prints one line of
       counts with no name: keep it with the school's records. A second run says it ran
-      already, with the same counts. Each teacher it de-identifies loses the names of their
-      removed classes, the words of the questions they asked, their saved questions and their
+      already, with the same counts. Each person it de-identifies loses, on every record, the id
+      and counter their phone put on it, as a deletion does. Each teacher it de-identifies loses
+      the names of their removed classes, the words of the questions they asked, their saved
+      questions and their
       slide decks (each title, and the PDF, which the API deletes from the bucket by itself within
       the hour, reporting to Sentry, tagged `deck object deletion`, if it can't); every answer stays, by the
       number of the option picked, under the account it de-identifies.
