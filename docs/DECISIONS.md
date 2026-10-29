@@ -38,7 +38,16 @@ a real decision? Add a dated entry at the top: what was decided and why.
   server's fix): it would reach a deletion alone, since the phone never hears of a disposal or a
   retention run, and it would need a new build and an iPhone check.
   **Known cost:** one more read for each record that carries an order, the account's row by its
-  key, inside the session's lock on the tap path. **Tests:** `account-deletion.test.ts` (every
+  key, inside the session's lock on the tap path (the load gate's harness sends no order, so it
+  doesn't measure it); and a removal now rewrites each ordered event of each person it
+  de-identifies, a new row version and the trigger's look at `users` each, inside its one
+  transaction: nothing at the pilot's size. **Left open:** the deploy that runs 0029 serves from
+  the old build until the new one is healthy, so a deletion or a late unlock the old build handles
+  in that minute keeps its order, and nothing comes back for it; left as it is at the pilot's
+  size, and re-running 0029's two UPDATEs after the deploy empties whatever it left. **For S8** (PLAN's open
+  owner items, 1): the runtime role's column-level grant on `events` is now `UPDATE(payload,
+  order_install, order_seq)`, or every deletion, disposal and retention run fails at the order.
+  **Tests:** `account-deletion.test.ts` (every
   record and kept tap emptied, a classmate's kept, the report unchanged; four kinds of record landing
   after, none ordered; the trigger letting through the emptying alone), `school-disposal.test.ts`
   and `retention.test.ts` (each person it de-identifies, another school's and a kept person's
