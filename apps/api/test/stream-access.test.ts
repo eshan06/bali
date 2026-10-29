@@ -260,6 +260,24 @@ describe("the hub's own end of a stream's access", () => {
     vi.useRealTimers();
   });
 
+  it("ends the stream, before its next read, when the re-check finds its caller's access gone", async () => {
+    const hub = hubWith({ repollMs: 20, heartbeatMs: 3_600_000 });
+    let closes = 0;
+    hub.subscribe(
+      input({
+        stillAllowed: () => Promise.resolve(false),
+        onClose: () => {
+          closes += 1;
+        },
+      }),
+    );
+    await until(() => closes > 0, 2000, 'the stream to end');
+    await sleep(100); // several re-polls on
+    expect(closes).toBe(1);
+    expect(reads, 'only the first read, before any re-poll').toBe(1);
+    expect(hub.countForTeacher(teacherId)).toBe(0);
+  });
+
   it("ends the stream when the re-check of its caller's access cannot be read", async () => {
     const hub = hubWith({ repollMs: 20, heartbeatMs: 3_600_000 });
     let closes = 0;
@@ -272,7 +290,9 @@ describe("the hub's own end of a stream's access", () => {
       }),
     );
     await until(() => closes > 0, 2000, 'the stream to end');
+    await sleep(100);
     expect(closes).toBe(1);
+    expect(reads, 'only the first read, before any re-poll').toBe(1);
     expect(hub.countForTeacher(teacherId)).toBe(0);
   });
 

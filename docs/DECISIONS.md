@@ -23,9 +23,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `stream-access.test.ts`, on both lanes over a real socket: an open stream's reader reports done
   within one re-poll of its teacher's role changing and of its class moving to another teacher, the
   reconnect then 403, and at its token's expiry, not before, the reconnect then 401; all three red
-  before the fix, the stream never ending. The hub's own: a check that can't be read ends the stream,
-  an expiry passed before it subscribed ends it with no read, one 30 days off ends it neither early
-  nor late (fake timers), and a client's disconnect and the shutdown leave no timer behind.
+  before the fix, the stream never ending. The hub's own: a check that refuses, or can't be read,
+  ends the stream before its next read, an expiry passed before it subscribed ends it with no read,
+  one 30 days off ends it neither early nor late (fake timers), and a client's disconnect and the
+  shutdown leave no timer behind.
 
 - **2026-10-28** — **A tap is judged by the student's place in the class under the session's
   lock, where a teacher's removal marks it (A19).** The route picks the session by a read that
