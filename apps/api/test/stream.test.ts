@@ -1,5 +1,6 @@
 import { type Database, enrollments, events, startSession, tapIn, users } from '@bali/db';
-import { EVENT_RESUME_OVERLAP, type FeedEvent } from '@bali/shared';
+import { EVENT_RESUME_OVERLAP, type FeedEvent, type SessionSnapshot } from '@bali/shared';
+import { sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -327,6 +328,131 @@ describe.runIf(REAL_PG)('GET /v1/sessions/:id/stream (SSE, real Postgres)', () =
     const delivered = stream.events.filter((e) => e.eventId === slowId);
     expect(delivered).toHaveLength(1);
     stream.close();
+  });
+
+  /**
+   * A write kept open on a connection of its own, the way a Start's single transaction is: it takes
+   * `slowId`'s seq in this session, then more seqs than the overlap in another class's session, and
+   * only then commits. `whileOpen` runs while it is still open.
+   */
+  async function lateWrite(
+    sessionId: string,
+    studentId: string,
+    otherSessionId: string,
+    whileOpen: (slowSeq: number) => Promise<void>,
+  ): Promise<{ slowId: string; slowSeq: number }> {
+    const client = (db as unknown as { $client: { reserve: () => Promise<Reserved> } }).$client;
+    const reserved = await client.reserve();
+    const slowId = randomUUID();
+    try {
+      await reserved`begin`;
+      const [slow] =
+        (await reserved`insert into events (id, event_id, type, session_id, user_id, occurred_at)
+        values (gen_random_uuid(), ${slowId}, 'left_for_other_session', ${sessionId}, ${studentId}, now())
+        returning seq`) as { seq: string }[];
+      const slowSeq = Number(slow!.seq);
+      for (let i = 0; i <= EVENT_RESUME_OVERLAP; i += 1) {
+        await reserved`insert into events (id, event_id, type, session_id, occurred_at)
+          values (gen_random_uuid(), ${randomUUID()}, 'came_back', ${otherSessionId}, now())`;
+      }
+      await whileOpen(slowSeq);
+      await reserved`commit`;
+      return { slowId, slowSeq };
+    } catch (err) {
+      await reserved`rollback`.catch(() => {});
+      throw err;
+    } finally {
+      reserved.release();
+    }
+  }
+
+  it('sends an event once though its write took more seqs than the overlap before committing', async () => {
+    const { teacher, student, session } = await seedRunning('stream-widegap');
+    const other = await seedRunning('stream-widegap-other');
+    const stream = await openStream(session.id, await tokenFor(teacher.cognitoId));
+    expect(stream.status).toBe(200);
+    await stream.waitFor((e) => e.some((x) => x.type === 'session_started'));
+
+    const fastId = randomUUID();
+    const { slowId } = await lateWrite(
+      session.id,
+      student.id,
+      other.session.id,
+      async (slowSeq) => {
+        await new Promise((r) => setTimeout(r, 300)); // re-polls while it is open
+        // A higher seq of this session commits first, and is sent.
+        await db.insert(events).values({
+          eventId: fastId,
+          type: 'refocus',
+          sessionId: session.id,
+          occurredAt: new Date(),
+        });
+        await stream.waitFor((e) => e.some((x) => x.eventId === fastId));
+        const fast = stream.events.find((x) => x.eventId === fastId)!;
+        expect(fast.seq).toBeGreaterThan(slowSeq + EVENT_RESUME_OVERLAP);
+      },
+    );
+
+    await stream.waitFor((e) => e.some((x) => x.eventId === slowId));
+    await new Promise((r) => setTimeout(r, 300)); // re-polls: a broken de-dupe would send it again
+    expect(stream.events.filter((e) => e.eventId === slowId)).toHaveLength(1);
+    expect(stream.events.filter((e) => e.eventId === fastId)).toHaveLength(1);
+    stream.close();
+  });
+
+  it('a grid loaded while such a write is open resumes from its settled point and gets the event once', async () => {
+    const { teacher, student, session } = await seedRunning('stream-boot-settled');
+    const other = await seedRunning('stream-boot-settled-other');
+    const token = await tokenFor(teacher.cognitoId);
+    // Seqs well past the overlap, so neither resume point below is simply the start.
+    await db.execute(sql`select setval(pg_get_serial_sequence('events', 'seq'), 1000)`);
+    await tapIn(db, {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId: randomUUID(),
+      deviceTime: new Date(),
+    });
+    const snapshot = async (): Promise<SessionSnapshot> => {
+      const res = await fetch(`http://127.0.0.1:${port}/v1/sessions/${session.id}`, {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      expect(res.status).toBe(200);
+      return (await res.json()) as SessionSnapshot;
+    };
+    const before = await snapshot(); // nothing writing: settled at every seq handed out
+
+    const fastId = randomUUID();
+    let stream: Stream | null = null;
+    const { slowId } = await lateWrite(
+      session.id,
+      student.id,
+      other.session.id,
+      async (slowSeq) => {
+        await db.insert(events).values({
+          eventId: fastId,
+          type: 'refocus',
+          sessionId: session.id,
+          occurredAt: new Date(),
+        });
+        const snap = await snapshot();
+        expect(snap.settledSeq).toBeGreaterThanOrEqual(before.settledSeq!);
+        expect(snap.settledSeq).toBeLessThan(slowSeq);
+        // Where a grid used to resume: past the open write.
+        expect(snap.latestSeq - EVENT_RESUME_OVERLAP).toBeGreaterThan(slowSeq);
+        // The portal's first connect (sse-client.ts): the overlap below the lower of the two.
+        const from = Math.max(0, Math.min(snap.latestSeq, snap.settledSeq!) - EVENT_RESUME_OVERLAP);
+        stream = await openStream(session.id, token, from);
+        await stream.waitFor((e) => e.some((x) => x.eventId === fastId));
+      },
+    );
+
+    const s = stream as Stream | null;
+    if (!s) throw new Error('the stream never opened');
+    await s.waitFor((e) => e.some((x) => x.eventId === slowId));
+    await new Promise((r) => setTimeout(r, 300));
+    expect(s.events.filter((e) => e.eventId === slowId)).toHaveLength(1);
+    expect(s.events.filter((e) => e.eventId === fastId)).toHaveLength(1);
+    s.close();
   });
 
   it('caps live streams per teacher (429)', async () => {

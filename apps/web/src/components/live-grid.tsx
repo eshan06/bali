@@ -516,6 +516,7 @@ export function LiveGrid({
           url: `${config.apiUrl}/v1/sessions/${sessionId}/stream`,
           getToken: getAccessToken,
           after: snap.latestSeq,
+          settled: snap.settledSeq,
           overlap: EVENT_RESUME_OVERLAP,
           onEvent: (e) => {
             setStudents((prev) => (prev ? applyEvent(prev, e) : prev));

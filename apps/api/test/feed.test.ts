@@ -3,6 +3,7 @@ import {
   endEnrollment,
   endSession,
   enrollments,
+  events,
   protectionOff,
   refocus,
   renameStudent,
@@ -72,6 +73,35 @@ describe('GET /v1/sessions/:id (snapshot)', () => {
     expect(body.students).toHaveLength(1);
     expect(body.students[0]!.state).toBe('focused');
     expect(body.students[0]!.joinedAt).not.toBeNull();
+  });
+
+  it('names a settled point: its latest seq when nothing is writing, never past it', async () => {
+    // The point the grid's first connect resumes below (ARCHITECTURE, Live updates): every event
+    // at or below it was written before the roster was read. Nothing is writing here, so every seq
+    // given out is settled, another class's newer one too; the read names none past its own.
+    const { teacher, student, session } = await seedRunning('snap-settled');
+    const other = await seedRunning('snap-settled-other');
+    await tapIn(db, {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId: randomUUID(),
+      deviceTime: new Date(),
+    });
+    await tapIn(db, {
+      sessionId: other.session.id,
+      studentId: other.student.id,
+      eventId: randomUUID(),
+      deviceTime: new Date(),
+    });
+    const newest = Math.max(
+      ...(await db.select({ seq: events.seq }).from(events)).map((e) => e.seq),
+    );
+
+    const body = (
+      await get(await ctx.tokenFor(teacher.cognitoId), `/v1/sessions/${session.id}`)
+    ).json<SessionSnapshot>();
+    expect(newest).toBeGreaterThan(body.latestSeq);
+    expect(body.settledSeq).toBe(body.latestSeq);
   });
 
   it('an enrolled student who has not tapped in shows null participation', async () => {

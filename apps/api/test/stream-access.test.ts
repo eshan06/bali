@@ -227,6 +227,8 @@ describe("the hub's own end of a stream's access", () => {
     },
   };
   const db = noRows as unknown as Database;
+  /** And a settled point that never moves: nothing is writing. */
+  const settled = { now: () => Promise.resolve(0), fresh: () => Promise.resolve(0) };
   const teacherId = '22222222-2222-4222-8222-222222222222';
 
   function input(overrides: Partial<SubscribeInput>): SubscribeInput {
@@ -245,7 +247,7 @@ describe("the hub's own end of a stream's access", () => {
   /** Every hub a test makes, closed in teardown: one a failed test left running reads no more. */
   const hubs: StreamHub[] = [];
   function hubWith(options: StreamHubOptions): StreamHub {
-    const hub = createStreamHub(db, options);
+    const hub = createStreamHub(db, { settled, ...options });
     hubs.push(hub);
     return hub;
   }

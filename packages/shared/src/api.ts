@@ -783,8 +783,19 @@ export interface SnapshotStudent {
 export interface SessionSnapshot {
   session: SessionView & { startedAt: string };
   ended: boolean;
-  /** The highest event seq for this session; stream from `latestSeq - EVENT_RESUME_OVERLAP`. */
+  /**
+   * The highest event seq for this session; stream from `EVENT_RESUME_OVERLAP` below it, or below
+   * `settledSeq` when that is lower.
+   */
   latestSeq: number;
+  /**
+   * A settled point, never above `latestSeq` (ARCHITECTURE, Live updates): every write handed a seq
+   * at or below it had finished before the roster was read, so the roster holds each of those
+   * events. The grid's stream resumes from `EVENT_RESUME_OVERLAP` below the lower of this and
+   * `latestSeq`, so an event committing late, under a seq below `latestSeq`, still reaches it.
+   * Additive: an older server omits it, and the grid resumes below `latestSeq` alone, as before.
+   */
+  settledSeq?: number;
   /**
    * Every student the session's feed can name: the class's active roster, and
    * anyone it holds a participation or an unlock for who has since left the
