@@ -12,7 +12,7 @@ AS $$
 BEGIN
   IF TG_OP = 'UPDATE' THEN
     IF EXISTS (SELECT 1 FROM users WHERE users.id = OLD.user_id AND users.removed_at IS NOT NULL) THEN
-      -- A rename loses the names it carried (0015).
+      -- A display_name_changed event loses the names it carried (0015).
       IF OLD.type = 'display_name_changed'
          AND NEW.payload IS NULL
          AND to_jsonb(NEW) - 'payload' = to_jsonb(OLD) - 'payload'
