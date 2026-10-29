@@ -239,6 +239,121 @@ describe('sse-client', () => {
     expect(urls[1]).toContain('after=3'); // reconnect: 5 - 2
   });
 
+  /*
+   * Where the grid resumes once the API names a settled point (ARCHITECTURE, Live updates): every
+   * event at or below it was written before the snapshot was read, or has reached this client. An
+   * event's seq is handed out as its write starts, so one far below the newest seq seen can still
+   * be committing; resuming from the overlap below the newest seq skips it for good.
+   */
+  it('resumes its first connect from the overlap below the snapshot’s settled point', async () => {
+    const urls: string[] = [];
+    const fetchImpl = vi.fn((url: string | URL | Request): Promise<Response> => {
+      urls.push(url instanceof Request ? url.url : String(url));
+      return Promise.resolve(streamResponse([': open\n\n']));
+    });
+    const client = createSseClient({
+      url: 'http://api/stream',
+      getToken: () => 't',
+      after: 100,
+      settled: 40,
+      onEvent: () => {},
+      fetchImpl,
+      baseBackoffMs: 5_000, // do not reconnect inside this test
+      overlap: 2,
+    });
+
+    await wait(20);
+    client.close();
+    expect(urls[0]).toContain('after=38'); // 40 - 2, never 100 - 2
+  });
+
+  it('reconnects from below the stream’s newest settled point, never past it', async () => {
+    const urls: string[] = [];
+    const fetchImpl = vi.fn((url: string | URL | Request): Promise<Response> => {
+      urls.push(url instanceof Request ? url.url : String(url));
+      const first = [
+        frame(evt(50, 'a')),
+        ': settled 45\n\n',
+        frame(evt(60, 'b')),
+        ': settled 55\n\n',
+      ];
+      return Promise.resolve(streamResponse(urls.length === 1 ? first : [': open\n\n']));
+    });
+    const client = createSseClient({
+      url: 'http://api/stream',
+      getToken: () => 't',
+      after: 10,
+      settled: 10,
+      onEvent: () => {},
+      fetchImpl,
+      baseBackoffMs: 5,
+      maxBackoffMs: 20,
+      overlap: 2,
+    });
+
+    await wait(40);
+    client.close();
+    expect(urls[0]).toContain('after=8'); // 10 - 2
+    expect(urls[1]).toContain('after=53'); // the settled 55, below the last seq 60, minus 2
+  });
+
+  it('keeps the overlap below its last seq when the settled point is past it', async () => {
+    // Another class's events move the settled point on; this session's last seq is the lower.
+    const urls: string[] = [];
+    const fetchImpl = vi.fn((url: string | URL | Request): Promise<Response> => {
+      urls.push(url instanceof Request ? url.url : String(url));
+      const first = [frame(evt(50, 'a')), ': settled 900\n\n'];
+      return Promise.resolve(streamResponse(urls.length === 1 ? first : [': open\n\n']));
+    });
+    const client = createSseClient({
+      url: 'http://api/stream',
+      getToken: () => 't',
+      after: 30,
+      settled: 400,
+      onEvent: () => {},
+      fetchImpl,
+      baseBackoffMs: 5,
+      maxBackoffMs: 20,
+      overlap: 2,
+    });
+
+    await wait(40);
+    client.close();
+    expect(urls[0]).toContain('after=28'); // 30 - 2
+    expect(urls[1]).toContain('after=48'); // 50 - 2
+  });
+
+  it('applies each event once across a reconnect that resumes from the settled point', async () => {
+    let calls = 0;
+    const fetchImpl = vi.fn((): Promise<Response> => {
+      calls += 1;
+      // The reconnect, from below the settled 45, brings 50 and 60 again, and the late 47.
+      const chunks =
+        calls === 1
+          ? [frame(evt(50, 'a')), frame(evt(60, 'b')), ': settled 45\n\n']
+          : [frame(evt(47, 'late')), frame(evt(50, 'a')), frame(evt(60, 'b')), frame(evt(70, 'c'))];
+      return Promise.resolve(streamResponse(chunks));
+    });
+    const received: string[] = [];
+    const client = createSseClient({
+      url: 'http://api/stream',
+      getToken: () => 't',
+      after: 40,
+      settled: 40,
+      onEvent: (e) => received.push(e.eventId),
+      fetchImpl,
+      baseBackoffMs: 5,
+      maxBackoffMs: 20,
+      overlap: 2,
+    });
+
+    for (let i = 0; i < 400 && calls < 3; i += 1) await wait(5);
+    await wait(10); // the third connect's frames, read
+    client.close();
+    expect(calls, 'it reconnected twice').toBeGreaterThanOrEqual(3);
+    expect(received).toEqual(['a', 'b', 'late', 'c']);
+  });
+
   it('signs out and stops reconnecting on a 401', async () => {
     const onUnauthorized = vi.fn();
     let calls = 0;

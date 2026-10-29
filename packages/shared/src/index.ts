@@ -10,10 +10,13 @@ export const API_VERSION = 'v1';
  * The live-updates overlap window (decision 2). An event's `seq` is handed out
  * when its row is inserted but only becomes visible on commit, so a slow
  * transaction can make a lower seq appear AFTER a higher one. Both the stream's
- * own re-read and a client reconnect therefore resume from
- * `lastSeq - EVENT_RESUME_OVERLAP` and dedupe by `event_id`, so a late-committing
- * event is still delivered exactly once. 50 covers far more concurrent in-flight
- * writers than a classroom ever has.
+ * own re-read and a client reconnect therefore resume from this far below
+ * `lastSeq`, or below the stream's settled point when that is lower, and dedupe
+ * by `event_id`, so a late-committing event is still delivered exactly once. The
+ * settled point (a seq every write handed one at or below it has finished) is
+ * what makes it so: seqs are counted across every session's events together, and
+ * one transaction, a Start joining every waiting tap of a class, can take more
+ * than this many before it commits.
  */
 export const EVENT_RESUME_OVERLAP = 50;
 

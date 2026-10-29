@@ -255,9 +255,10 @@ from `last_seen_at` (rule 2), never from the column.
   when the write finishes, so a slow 481 can show up *after* a fast 482. A screen that
   asked "everything after 482" would then never see 481 — one event skipped forever, with
   no error anywhere. So on reconnect the screen asks from slightly before its remembered
-  number and throws away rows it already has (it recognizes them by `event_id`).
-  Receiving an event twice costs nothing; silently missing one is how a teacher's grid
-  loses an emergency unlock.
+  number, and never from past a number every earlier write has finished at (one write can
+  take many numbers before it finishes; the server says which, Live updates), and throws
+  away rows it already has (it recognizes them by `event_id`). Receiving an event twice
+  costs nothing; silently missing one is how a teacher's grid loses an emergency unlock.
 - **Changes that touch several tables happen in one transaction.** Removing a student
   mid-session must update the enrollment, end the participation, and record the events —
   all together or not at all. A halfway-done removal is exactly the v2 bug that left a
@@ -776,12 +777,26 @@ after a genuinely new event that belongs to a session), so no writer can forget 
 fires inside the write's transaction, so Postgres delivers it on commit, never for a
 rolled-back event. The overlap window is `EVENT_RESUME_OVERLAP` in `@bali/shared`: a
 `seq` is handed out when a row is inserted but only becomes visible on commit, so a slow
-transaction can make a lower seq appear after a higher one. The stream re-reads a sliding
-`lastSeq − overlap` window and a reconnecting client resumes from `lastSeq − overlap`,
-both de-duping by `event_id`, so a late-committing event is still delivered exactly once.
-The boot snapshot (`GET /v1/sessions/{id}`) returns the latest seq to stream from, so the
-grid loads and goes live in one round trip. The stream reads the Authorization header only
-— never a token in the query string — so the portal drives it with `fetch`, not
+transaction can make a lower seq appear after a higher one. The stream's re-read and a
+reconnecting client both start from the overlap below a point and de-dupe by `event_id`,
+so a late-committing event is still delivered exactly once. *Amended 2026-10-29:* that
+point is the lower of the newest seq seen and a **settled point**, a seq every write
+handed one at or below it has finished. The overlap alone did not cover it: seqs are
+counted across every session's events together, and one transaction can take more than
+the overlap before it commits (a Start joining a class's waiting taps writes a student's
+leave into the class they were in, then a seq for each student after). An insert takes the
+`events` table's write lock before its row gets a seq and holds it until it commits or
+rolls back, so the API reads the newest seq given out, then which transactions hold that
+lock, and calls the seq settled once each of them has ended (`apps/api/src/sse/settled.ts`).
+The stream sends each new settled point after the events it covers, as an SSE comment
+(`: settled N`) that an older portal skips like a heartbeat. The boot snapshot
+(`GET /v1/sessions/{id}`) returns the latest seq and a settled point read before its
+roster (`settledSeq`, additive; it waits up to a quarter second for writes on their way),
+so the grid loads and goes live in one round trip, its first connect starting below both.
+An older API names no settled point, and the portal resumes below its last seq alone, as
+before. A write left open holds every settled point where it stands until it ends, and
+streams re-read what is above it meanwhile. The stream reads the Authorization header
+only — never a token in the query string — so the portal drives it with `fetch`, not
 `EventSource`. A stream lasts no longer than its access (2026-10-28): it ends at its token's
 expiry (Auth decision 2), and at the next re-poll once the route's own check, read again, refuses
 its caller or can't be read; the portal's reconnect then gets the 401 or 403 any request gets.

@@ -60,7 +60,12 @@ describe('the stream hub settles its LISTEN before close() returns', () => {
       },
     } as unknown as Database;
 
-    const hub = createStreamHub(db, { repollMs: 60_000, heartbeatMs: 60_000 });
+    const hub = createStreamHub(db, {
+      repollMs: 60_000,
+      heartbeatMs: 60_000,
+      // Nothing is writing: the subscriber's read goes on to the rows.
+      settled: { now: () => Promise.resolve(0), fresh: () => Promise.resolve(0) },
+    });
     hub.subscribe({
       sessionId: '11111111-1111-4111-8111-111111111111',
       teacherId: '22222222-2222-4222-8222-222222222222',
