@@ -162,6 +162,8 @@ npm run school -- list                               # every school, its agreeme
 npm run --silent school -- export-student <id> > record.json   # one student's whole record (C5)
 npm run school -- dispose <school-id>                # what disposing of its data would take (C6a)
 npm run school -- dispose <school-id> --confirm "<name>"   # dispose of it, on its written request
+npm run school -- dispose <school-id> --confirm "<name>" --end-lessons   # the same, ending its running lessons
+npm run school -- end-session <session-id>          # end a running lesson now, as its teacher's End would
 npm run school -- year-end <school-id> 2026-12-18    # the last day of its year or term (C6b)
 npm run school -- retention <school-id>              # who its retention run would de-identify
 npm run school -- retention <school-id> --confirm "<name>"   # run it, once the year is over
@@ -203,12 +205,23 @@ npm run school -- retention <school-id> --confirm "<name>"   # run it, once the 
   deleted; the school is marked removed. What stays names no one: its lessons, their
   participations and events, so counts still add up. It is logged as one `school_disposed`
   event, its payload the school's id and those counts, and the command prints one line of
-  the same: no name. Refused, writing nothing: a lesson of the school running (one past its
-  bell is ended as the sweep would end it), or a person of it with records at another school
-  too (listed by id; splitting an account between schools is not built). A second run says
-  it was disposed of already. `SCHOOL_DISPOSAL_COVERAGE` says what it does with each foreign
+  the same: no name. Refused, writing nothing: a lesson of the school running, each named by
+  its session's id, its class and its bell (one past its bell is ended as the sweep would end
+  it), or a person of it with records at another school too (listed by id; splitting an
+  account between schools is not built). With `--end-lessons` last (2026-10-29), a lesson
+  still running doesn't refuse it: each is ended in the same transaction, as its teacher's
+  End ends it, and its class removed with the rest, so no Start can follow; the preview with
+  it names them and ends none. A class's name, which its teacher wrote, is printed quoted, any
+  character a terminal would act on written as its code. A second run says it was disposed of
+  already. `SCHOOL_DISPOSAL_COVERAGE` says what it does with each foreign
   key to `users` or `schools`, and a test fails on one it doesn't name. The Cognito sign-ins
   and the backups are the owner's to clear: `docs/RUNBOOKS.md`, runbook 1, step 11.
+- **A running lesson ended by the owner (2026-10-29).** `end-session <session-id>` ends it
+  now, through the engine's own end (`endRunningSession`): its teacher's End, the same
+  `session_ended` event, its students' participations ended with it. A lesson over already,
+  ended or past its bell, is left as it is and said so; an id that isn't a UUID is refused
+  before anything connects. It doesn't stop the class being started again: the disposal's
+  `--end-lessons` does. On prod: `docs/RUNBOOKS.md`, runbook 1, steps 9 and 11.
 - **A school year's retention run (C6b).** `year-end <school-id> <day>` records the last
   day of the school's year or term (any day, past or future; again to correct it). After
   it — from the midnight after that day by the server's clock — `retention <school-id>`

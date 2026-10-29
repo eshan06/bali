@@ -1566,6 +1566,44 @@ export async function endSession(db: Database, input: EndSessionInput): Promise<
   );
 }
 
+export interface EndRunningSessionInput {
+  sessionId: string;
+  /** The server's clock: when it ends, and what it is judged running by. */
+  at: Date;
+}
+export type EndRunningSessionResult =
+  | { outcome: 'ended'; endedParticipations: number }
+  /** Over already: marked so (`endedAt`), or past its bell (`endsAt`) and not yet swept. */
+  | { outcome: 'over'; endedAt: Date | null; endsAt: Date }
+  | { outcome: 'unknown_session' };
+
+/**
+ * The owner's end of a running lesson (`npm run school -- end-session`; the owner's decision of
+ * 2026-10-28): its teacher's End, by the same transition and reason, so the history, the grid and
+ * the phones read it as theirs. Judged under the session's lock: one over already, marked so or
+ * past its bell (A17), is answered as over and left as it is, for the sweep to mark.
+ */
+export async function endRunningSession(
+  db: Database,
+  input: EndRunningSessionInput,
+): Promise<EndRunningSessionResult> {
+  // Retried on deadlock, as `endSession` is: it ends every participation in one statement.
+  return withDeadlockRetry(() =>
+    db.transaction(async (tx): Promise<EndRunningSessionResult> => {
+      const session = await loadSession(tx, input.sessionId, { forUpdate: true });
+      if (!session) return { outcome: 'unknown_session' };
+      if (!sessionRunning(session, input.at)) {
+        return { outcome: 'over', endedAt: session.endedAt, endsAt: session.endsAt };
+      }
+      const { endedParticipations } = await endHeldSession(tx, session, {
+        at: input.at,
+        reason: 'ended',
+      });
+      return { outcome: 'ended', endedParticipations };
+    }),
+  );
+}
+
 /**
  * `endSession`'s end, on a session row the caller holds FOR UPDATE — the one
  * end transition, which a Start runs too when the class it finds is past its
@@ -4797,7 +4835,7 @@ export const SCHOOL_DISPOSAL_COVERAGE = {
   'blocks.teacher_id': "its teachers' blocks: removed, so a tag can be registered again",
   'enrollments.student_id': 'each in its classes ended, the student de-identified',
   'participations.student_id':
-    'kept (none live: no lesson of it runs), under a person de-identified',
+    'kept (none live: each lesson of it over, or ended first), under a person de-identified',
   'events.user_id': "kept, under a person de-identified; a rename's names emptied (migration 0015)",
   'armed_taps.student_id': 'deleted: the taps of its people',
   'armed_taps.teacher_id': "deleted: the taps on its teachers' blocks",
@@ -4825,6 +4863,21 @@ export interface DisposeSchoolInput {
    * absent. A preview spends none, but meets an id already on record as a conflict.
    */
   eventId?: string;
+  /**
+   * The owner's word (`dispose … --end-lessons`): each lesson of the school still running is
+   * ended in this transaction, as its teacher's End ends it, where without it the disposal is
+   * refused (`in_session`).
+   */
+  endLessons?: boolean;
+}
+
+/** A lesson of the school running at the disposal's time: what its refusal names. */
+export interface RunningLesson {
+  sessionId: string;
+  classId: string;
+  className: string;
+  /** Its bell, when it ends by itself. */
+  endsAt: Date;
 }
 
 /**
@@ -4845,7 +4898,13 @@ export interface DisposalCounts {
 
 type NamedSchool = { id: string; name: string };
 export type DisposeSchoolResult =
-  | { outcome: 'disposed' | 'preview'; school: NamedSchool; counts: DisposalCounts }
+  | {
+      outcome: 'disposed' | 'preview';
+      school: NamedSchool;
+      counts: DisposalCounts;
+      /** The lessons it ended while they ran, told to (`endLessons`); none otherwise. */
+      ended: RunningLesson[];
+    }
   | {
       outcome: 'already_disposed';
       school: NamedSchool;
@@ -4854,7 +4913,7 @@ export type DisposeSchoolResult =
       counts: DisposalCounts | null;
     }
   | { outcome: 'name_mismatch'; school: NamedSchool }
-  | { outcome: 'in_session'; school: NamedSchool; sessions: number }
+  | { outcome: 'in_session'; school: NamedSchool; running: RunningLesson[] }
   | { outcome: 'shared_accounts'; school: NamedSchool; userIds: string[] }
   | { outcome: 'unknown_school' };
 
@@ -4887,8 +4946,11 @@ class RetentionPreview extends Error {
  * id and counts. What stays names no one: the lessons, their participations and
  * events, under rows that name no one, so counts still add up.
  *
- * Refused, writing nothing: while a lesson of the school runs (`in_session`; one
- * past its bell, not yet swept, is ended as the sweep would); and while a person
+ * Refused, writing nothing: while a lesson of the school runs (`in_session`,
+ * naming each; one past its bell, not yet swept, is ended as the sweep would),
+ * unless told to end them (`endLessons`, the owner's decision of 2026-10-28):
+ * then each is ended here as its teacher's End ends it, and its class removed in
+ * the same transaction, so a Start behind it finds no class; and while a person
  * of it also has records at another school (`shared_accounts`, by id): their
  * account is that school's too, and splitting it is not built. Without
  * `confirmName` it is a preview: the whole disposal runs and rolls back, so the
@@ -4951,7 +5013,7 @@ async function disposeOnce(tx: Database, input: DisposeSchoolInput): Promise<Dis
   // lock is read again after it.
   const people = await lockPeople(tx, await peopleOf(tx, school.id));
   const schoolClasses = await tx
-    .select({ id: classes.id })
+    .select({ id: classes.id, name: classes.name })
     .from(classes)
     .where(eq(classes.schoolId, school.id))
     .orderBy(asc(classes.id))
@@ -4981,8 +5043,16 @@ async function disposeOnce(tx: Database, input: DisposeSchoolInput): Promise<Dis
         .orderBy(asc(sessions.id))
         .for('update')
     : [];
-  const running = held.filter((s) => sessionRunning(s, input.at)).length;
-  if (running > 0) return { outcome: 'in_session', school, sessions: running };
+  const nameOf = new Map(schoolClasses.map((c) => [c.id, c.name]));
+  const running: RunningLesson[] = held
+    .filter((s) => sessionRunning(s, input.at))
+    .map((s) => ({
+      sessionId: s.id,
+      classId: s.classId,
+      className: nameOf.get(s.classId) ?? '',
+      endsAt: s.endsAt,
+    }));
+  if (running.length > 0 && !input.endLessons) return { outcome: 'in_session', school, running };
   const live = people.filter((p) => p.removedAt === null);
   const liveIds = live.map((p) => p.id);
   const shared = await tiedElsewhere(tx, school.id, liveIds);
@@ -4990,8 +5060,10 @@ async function disposeOnce(tx: Database, input: DisposeSchoolInput): Promise<Dis
 
   // Nothing is written above this line, so each refusal leaves all as it was.
   // Past its bell, not yet swept: ended as the sweep ends it, so no one is left in it.
+  // Still running, told to end it: ended now, as its teacher's End ends it.
   for (const session of held) {
-    await endHeldSession(tx, session, { at: input.at, reason: 'expired' });
+    const reason = sessionRunning(session, input.at) ? 'ended' : 'expired';
+    await endHeldSession(tx, session, { at: input.at, reason });
   }
 
   const peopleIds = people.map((p) => p.id);
@@ -5070,9 +5142,9 @@ async function disposeOnce(tx: Database, input: DisposeSchoolInput): Promise<Dis
     throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
   }
   if (input.confirmName === undefined) {
-    throw new DisposalPreview({ outcome: 'preview', school, counts });
+    throw new DisposalPreview({ outcome: 'preview', school, counts, ended: running });
   }
-  return { outcome: 'disposed', school, counts };
+  return { outcome: 'disposed', school, counts, ended: running };
 }
 
 /**

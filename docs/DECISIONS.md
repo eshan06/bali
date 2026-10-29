@@ -8,6 +8,44 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-29** — **The owner can end a running lesson, and a school's disposal can end its
+  running lessons (the owner's decision of 2026-10-28).** Before its bell only a class's own
+  teacher could end a lesson: the sweep and the disposal end only one past its bell, and a Start
+  answers the one running. So the disposal of a school's data on its written request (C6a), which
+  its data agreement gives the owner a set number of days to finish, was refused while any lesson
+  of the school ran, its runbook saying to run it again after the bell, and no owner command could
+  end one. The 16-hour bound (the entry below) bounds each lesson, but nothing stopped a class from
+  being started again as soon as one ended. **Decided, all three:** (1) `npm run school --
+  end-session <session-id>` ends a running lesson now, through the engine's own end
+  (`endRunningSession`): its teacher's End's transition and reason, `session_ended`, its
+  participations ended and its open question closed with it, so the history, the grid and the
+  phones read it as an End. A lesson over already, ended or past its bell (A17), is said so and
+  left as it is, the sweep's to mark; an id that isn't a UUID is refused before anything connects,
+  and one no session holds says so. (2) The disposal's refusal names each running lesson: its
+  session's id, its class (name and id) and its bell, so the owner can end it or wait for it. (3)
+  `dispose … --end-lessons` (last, after the name when there is one): each lesson of the school
+  still running is ended in the disposal's own transaction, as its teacher's End ends it, as the
+  disposal already ended one past its bell as the sweep would; its classes are removed in that
+  same transaction, so a Start behind it finds no class. Without the flag it is refused as before.
+  A preview with it, rolled back, ends none and names the lessons it would end, and its last line
+  carries the flag; the confirmed run's line adds the ids of the lessons it ended. The
+  `school_disposed` event is unchanged: each ended lesson records its own `session_ended`. **Why
+  the End's reason, not the sweep's:** the lesson is cut short before its bell, as an End cuts it;
+  `session_expired` says the bell rang. **Weighed:** end-session alone, with no flag: the class
+  could be started again before the disposal ran, and it would be refused again; ending running
+  lessons in every confirmed disposal: a class would then be cut short with no word from the
+  owner, so the flag says it. **Known limit, an End's:** a phone learns the lesson is over when
+  Bali next reaches the server; with Bali closed its shields stay to the bell, Emergency Unlock the
+  way out as always (iOS app structure, rules). **Tests:** `school-disposal.test.ts` (end-session
+  ends a running lesson as an End, and a student's leave and the disposal then go through; a lesson
+  ended or past its bell left as it is, nothing recorded; a non-UUID refused before connecting; the
+  unflagged disposal refused, naming each running lesson; the flagged one ends them and disposes,
+  and a Start after it is refused; its preview ends none and writes nothing; the command's lines)
+  and `races.test.ts` (real Postgres: the owner's end racing its teacher's End and an unlock ends
+  the lesson once and keeps the unlock; the flagged disposal racing a Start and an unlock is never
+  refused for a lesson, ends every lesson running, the Start's too when it lands first, and loses
+  no unlock).
+
 - **2026-10-29** — **A lesson runs at most 16 hours in all (the owner's decision of 2026-10-28).**
   Each extend was bounded on its own (`MAX_SESSION_MINUTES`, 480), the lesson as a whole by
   nothing. **Decided:**

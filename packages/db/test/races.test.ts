@@ -59,6 +59,7 @@ import {
   deleteAccount,
   disposeSchool,
   endEnrollment,
+  endRunningSession,
   endSession,
   expireDueSessions,
   extendSession,
@@ -391,6 +392,43 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
       // Step 1's invariant still holds: no live participation in an ended session.
       const ended = one(await db.select().from(sessions).where(eq(sessions.id, session.id)));
       expect(ended.endedAt).not.toBeNull();
+      expect(await liveParticipations(session.id)).toHaveLength(0);
+    }
+  });
+
+  it('the owner’s end racing its teacher’s End and an unlock ends the lesson once and keeps the unlock', async () => {
+    // The owner's end-session takes the session's row as the teacher's End does, so
+    // the two run one at a time: the first ends it, the second finds it over and
+    // records nothing. The unlock is recorded whichever lands first (ISSUES #2).
+    for (let round = 0; round < 12; round += 1) {
+      const { classId, studentId } = await seed(`race-owner-end-${round}`);
+      const session = await openSession(classId);
+      await tapIn(db, {
+        sessionId: session.id,
+        studentId,
+        eventId: newUuidV7(),
+        deviceTime: new Date(),
+      });
+
+      const [owner, teacher, unlocked] = await Promise.allSettled([
+        endRunningSession(db, { sessionId: session.id, at: new Date() }),
+        endSession(db, { sessionId: session.id, at: new Date(), reason: 'ended' }),
+        unlock(db, {
+          sessionId: session.id,
+          studentId,
+          eventId: newUuidV7(),
+          deviceTime: new Date(),
+        }),
+      ]);
+
+      if (owner.status === 'rejected') throw owner.reason;
+      if (teacher.status === 'rejected') throw teacher.reason;
+      if (unlocked.status === 'rejected') throw unlocked.reason;
+      // One of the two ended it; the other found it over.
+      expect(owner.value.outcome === 'ended').toBe(!teacher.value.ended);
+      expect(owner.value.outcome).not.toBe('unknown_session');
+      expect(await eventsOfType(session.id, 'session_ended')).toHaveLength(1);
+      expect(await eventsOfType(session.id, 'unlock')).toHaveLength(1);
       expect(await liveParticipations(session.id)).toHaveLength(0);
     }
   });
@@ -2246,6 +2284,88 @@ describe.runIf(REAL_PG)('school disposal under contention (real Postgres, C6a)',
           removedAt: null,
         });
       }
+    }
+  }, 60_000);
+
+  it('a disposal told to end the lessons running, racing a Start and an unlock in one, ends them all and loses no unlock', async () => {
+    // Told to end them (the owner's --end-lessons), the disposal ends each lesson
+    // it finds running, as their teacher's End ends it, in its own transaction.
+    // A Start takes the class's row as the disposal does, so it lands before it
+    // (and the lesson it made is ended with the rest) or after it (and finds no
+    // class). Never refused for a lesson, never a deadlock, never a 500; the
+    // unlock is recorded whichever lands first (ISSUES #2).
+    for (let round = 0; round < 12; round += 1) {
+      const tag = `race-dispose-end-${round}`;
+      const { classId, studentId, teacherId } = await seed(tag);
+      const schoolId = one(
+        await db.select({ id: classes.schoolId }).from(classes).where(eq(classes.id, classId)),
+      ).id;
+      // A second class of the school, in session, the student tapped in.
+      const other = one(
+        await db
+          .insert(classes)
+          .values({ teacherId, schoolId, name: `Other ${tag}`, joinCode: `${tag}-o` })
+          .returning(),
+      );
+      await db.insert(enrollments).values({ classId: other.id, studentId });
+      const lesson = await openSession(other.id);
+      await tapIn(db, {
+        sessionId: lesson.id,
+        studentId,
+        eventId: newUuidV7(),
+        deviceTime: new Date(),
+      });
+      const unlockId = newUuidV7();
+      const later = <T>(ms: number, call: () => Promise<T>) =>
+        new Promise((resolve) => setTimeout(resolve, ms)).then(call);
+
+      const [disposed, started, unlocked] = await Promise.allSettled([
+        later(round % 2 === 1 ? 5 : 0, () =>
+          disposeSchool(db, {
+            schoolId,
+            at: new Date(),
+            confirmName: `School ${tag}`,
+            endLessons: true,
+          }),
+        ),
+        later((round % 4) * 8, () => openSession(classId)),
+        later((round % 3) * 6, () =>
+          unlock(db, {
+            sessionId: lesson.id,
+            studentId,
+            eventId: unlockId,
+            deviceTime: new Date(),
+          }),
+        ),
+      ]);
+
+      if (disposed.status === 'rejected') throw disposed.reason;
+      if (unlocked.status === 'rejected') throw unlocked.reason;
+      if (disposed.value.outcome !== 'disposed') throw new Error(disposed.value.outcome);
+      expect(await eventOf(unlockId)).toMatchObject({ userId: studentId, type: 'unlock' });
+      const ended = disposed.value.ended.map((l) => l.sessionId).sort();
+      if (started.status === 'rejected') {
+        expect(started.reason).toMatchObject({ code: 'CLASS_NOT_FOUND' });
+        expect(ended).toEqual([lesson.id]);
+      } else {
+        expect(ended).toEqual([lesson.id, started.value.id].sort());
+      }
+      // No lesson of the school runs on and no one is left in one; each that ran
+      // was ended once, as an End ends it, and every class went with it.
+      expect(
+        await db
+          .select()
+          .from(sessions)
+          .where(and(inArray(sessions.classId, [classId, other.id]), isNull(sessions.endedAt))),
+      ).toHaveLength(0);
+      expect(await liveOf(studentId)).toHaveLength(0);
+      for (const id of ended) expect(await eventsOfType(id, 'session_ended')).toHaveLength(1);
+      expect(
+        await db
+          .select()
+          .from(classes)
+          .where(and(eq(classes.schoolId, schoolId), isNull(classes.removedAt))),
+      ).toHaveLength(0);
     }
   }, 60_000);
 
