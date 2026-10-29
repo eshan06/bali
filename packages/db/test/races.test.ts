@@ -1,4 +1,4 @@
-import type { EventType } from '@bali/shared';
+import { type EventType, MAX_SESSION_MINUTES, MAX_SESSION_TOTAL_MINUTES } from '@bali/shared';
 import { and, asc, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -21,6 +21,7 @@ import {
   armedTaps,
   blocks,
   classes,
+  cognitoDeletions,
   decks,
   deviceTokens,
   enrollments,
@@ -58,6 +59,7 @@ import {
   deleteAccount,
   disposeSchool,
   endEnrollment,
+  endRunningSession,
   endSession,
   expireDueSessions,
   extendSession,
@@ -91,6 +93,9 @@ import type { Database } from '../src/types.js';
  */
 
 const REAL_PG = Boolean(process.env.TEST_DATABASE_URL);
+
+/** The Cognito pool a retention run here queues the sign-ins it removes under (2026-10-28). */
+const POOL = 'https://cognito-idp.us-east-1.amazonaws.com/us-east-1_races';
 
 let db: Database;
 let close: () => Promise<void>;
@@ -199,6 +204,11 @@ function liveOf(studentId: string) {
 
 async function eventOf(eventId: string) {
   return one(await db.select().from(events).where(eq(events.eventId, eventId)));
+}
+
+/** The deletions queued for the Cognito sign-in `sub` (2026-10-09). */
+function signInsQueued(sub: string) {
+  return db.select().from(cognitoDeletions).where(eq(cognitoDeletions.sub, sub));
 }
 
 describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
@@ -382,6 +392,43 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
       // Step 1's invariant still holds: no live participation in an ended session.
       const ended = one(await db.select().from(sessions).where(eq(sessions.id, session.id)));
       expect(ended.endedAt).not.toBeNull();
+      expect(await liveParticipations(session.id)).toHaveLength(0);
+    }
+  });
+
+  it('the owner’s end racing its teacher’s End and an unlock ends the lesson once and keeps the unlock', async () => {
+    // The owner's end-session takes the session's row as the teacher's End does, so
+    // the two run one at a time: the first ends it, the second finds it over and
+    // records nothing. The unlock is recorded whichever lands first (ISSUES #2).
+    for (let round = 0; round < 12; round += 1) {
+      const { classId, studentId } = await seed(`race-owner-end-${round}`);
+      const session = await openSession(classId);
+      await tapIn(db, {
+        sessionId: session.id,
+        studentId,
+        eventId: newUuidV7(),
+        deviceTime: new Date(),
+      });
+
+      const [owner, teacher, unlocked] = await Promise.allSettled([
+        endRunningSession(db, { sessionId: session.id, at: new Date() }),
+        endSession(db, { sessionId: session.id, at: new Date(), reason: 'ended' }),
+        unlock(db, {
+          sessionId: session.id,
+          studentId,
+          eventId: newUuidV7(),
+          deviceTime: new Date(),
+        }),
+      ]);
+
+      if (owner.status === 'rejected') throw owner.reason;
+      if (teacher.status === 'rejected') throw teacher.reason;
+      if (unlocked.status === 'rejected') throw unlocked.reason;
+      // One of the two ended it; the other found it over.
+      expect(owner.value.outcome === 'ended').toBe(!teacher.value.ended);
+      expect(owner.value.outcome).not.toBe('unknown_session');
+      expect(await eventsOfType(session.id, 'session_ended')).toHaveLength(1);
+      expect(await eventsOfType(session.id, 'unlock')).toHaveLength(1);
       expect(await liveParticipations(session.id)).toHaveLength(0);
     }
   });
@@ -2240,6 +2287,88 @@ describe.runIf(REAL_PG)('school disposal under contention (real Postgres, C6a)',
     }
   }, 60_000);
 
+  it('a disposal told to end the lessons running, racing a Start and an unlock in one, ends them all and loses no unlock', async () => {
+    // Told to end them (the owner's --end-lessons), the disposal ends each lesson
+    // it finds running, as their teacher's End ends it, in its own transaction.
+    // A Start takes the class's row as the disposal does, so it lands before it
+    // (and the lesson it made is ended with the rest) or after it (and finds no
+    // class). Never refused for a lesson, never a deadlock, never a 500; the
+    // unlock is recorded whichever lands first (ISSUES #2).
+    for (let round = 0; round < 12; round += 1) {
+      const tag = `race-dispose-end-${round}`;
+      const { classId, studentId, teacherId } = await seed(tag);
+      const schoolId = one(
+        await db.select({ id: classes.schoolId }).from(classes).where(eq(classes.id, classId)),
+      ).id;
+      // A second class of the school, in session, the student tapped in.
+      const other = one(
+        await db
+          .insert(classes)
+          .values({ teacherId, schoolId, name: `Other ${tag}`, joinCode: `${tag}-o` })
+          .returning(),
+      );
+      await db.insert(enrollments).values({ classId: other.id, studentId });
+      const lesson = await openSession(other.id);
+      await tapIn(db, {
+        sessionId: lesson.id,
+        studentId,
+        eventId: newUuidV7(),
+        deviceTime: new Date(),
+      });
+      const unlockId = newUuidV7();
+      const later = <T>(ms: number, call: () => Promise<T>) =>
+        new Promise((resolve) => setTimeout(resolve, ms)).then(call);
+
+      const [disposed, started, unlocked] = await Promise.allSettled([
+        later(round % 2 === 1 ? 5 : 0, () =>
+          disposeSchool(db, {
+            schoolId,
+            at: new Date(),
+            confirmName: `School ${tag}`,
+            endLessons: true,
+          }),
+        ),
+        later((round % 4) * 8, () => openSession(classId)),
+        later((round % 3) * 6, () =>
+          unlock(db, {
+            sessionId: lesson.id,
+            studentId,
+            eventId: unlockId,
+            deviceTime: new Date(),
+          }),
+        ),
+      ]);
+
+      if (disposed.status === 'rejected') throw disposed.reason;
+      if (unlocked.status === 'rejected') throw unlocked.reason;
+      if (disposed.value.outcome !== 'disposed') throw new Error(disposed.value.outcome);
+      expect(await eventOf(unlockId)).toMatchObject({ userId: studentId, type: 'unlock' });
+      const ended = disposed.value.ended.map((l) => l.sessionId).sort();
+      if (started.status === 'rejected') {
+        expect(started.reason).toMatchObject({ code: 'CLASS_NOT_FOUND' });
+        expect(ended).toEqual([lesson.id]);
+      } else {
+        expect(ended).toEqual([lesson.id, started.value.id].sort());
+      }
+      // No lesson of the school runs on and no one is left in one; each that ran
+      // was ended once, as an End ends it, and every class went with it.
+      expect(
+        await db
+          .select()
+          .from(sessions)
+          .where(and(inArray(sessions.classId, [classId, other.id]), isNull(sessions.endedAt))),
+      ).toHaveLength(0);
+      expect(await liveOf(studentId)).toHaveLength(0);
+      for (const id of ended) expect(await eventsOfType(id, 'session_ended')).toHaveLength(1);
+      expect(
+        await db
+          .select()
+          .from(classes)
+          .where(and(eq(classes.schoolId, schoolId), isNull(classes.removedAt))),
+      ).toHaveLength(0);
+    }
+  }, 60_000);
+
   it('a redeem behind a disposal finds no invite, and one ahead of it is disposed of with the school', async () => {
     // Staged both ways, each transaction held open while the other waits on
     // the school's row: the disposal's FOR UPDATE, the redeem's FOR SHARE.
@@ -2363,6 +2492,7 @@ describe.runIf(REAL_PG)('a retention run under contention (real Postgres, C6b)',
             schoolId,
             at: new Date(Date.now() + 3 * 86_400_000),
             confirmName: `School ${tag}`,
+            issuer: POOL,
           }),
         ),
         later(lag, () =>
@@ -2412,13 +2542,17 @@ describe.runIf(REAL_PG)('a retention run under contention (real Postgres, C6b)',
         .where(
           and(eq(participations.sessionId, running.id), eq(participations.studentId, studentId)),
         );
+      const queued = await signInsQueued(`student-${tag}`);
       if (student.removedAt === null) {
-        // Kept: only a tap into the running lesson, ahead of the run, keeps them.
+        // Kept: only a tap into the running lesson, ahead of the run, keeps them, and their sign-in.
         expect(tapped.status).toBe('fulfilled');
         expect(inLesson).toHaveLength(1);
+        expect(queued).toEqual([]);
         continue;
       }
-      // De-identified: in no class, no lesson, no waiting tap, and no name anywhere.
+      // De-identified: in no class, no lesson, no waiting tap, and no name anywhere; their
+      // sign-in waits for the API, once.
+      expect(queued).toHaveLength(1);
       expect(student.displayName).toBeNull();
       expect(inLesson.filter((p) => p.endedAt === null)).toHaveLength(0);
       expect(
@@ -2437,6 +2571,75 @@ describe.runIf(REAL_PG)('a retention run under contention (real Postgres, C6b)',
       expect(renames.every((e) => e.payload === null)).toBe(true);
     }
   }, 60_000);
+
+  it('a retention run and the person’s own deletion, either first, leave their sign-in queued once (2026-10-28)', async () => {
+    /** A student whose records all lie in a year over since yesterday; the run de-identifies them. */
+    async function yearOver(tag: string) {
+      const { classId, studentId } = await seed(tag);
+      const { schoolId } = one(
+        await db
+          .select({ schoolId: classes.schoolId })
+          .from(classes)
+          .where(eq(classes.id, classId)),
+      );
+      const day = new Date(Date.now() - 86_400_000);
+      const two = (n: number) => String(n).padStart(2, '0');
+      await db
+        .update(schools)
+        .set({
+          schoolYearEndsOn: `${day.getFullYear()}-${two(day.getMonth() + 1)}-${two(day.getDate())}`,
+        })
+        .where(eq(schools.id, schoolId));
+      const old = new Date(Date.now() - 30 * 86_400_000);
+      await db.update(users).set({ createdAt: old }).where(eq(users.id, studentId));
+      await db
+        .update(enrollments)
+        .set({ createdAt: old })
+        .where(eq(enrollments.studentId, studentId));
+      const sub = `student-${tag}`;
+      return {
+        studentId,
+        sub,
+        retain: (on: Database) =>
+          applyRetention(on, {
+            schoolId,
+            at: new Date(),
+            confirmName: `School ${tag}`,
+            issuer: POOL,
+          }),
+        // DELETE /v1/me from the same sign-in, whose token names this deploy's pool.
+        remove: (on: Database) =>
+          deleteAccount(on, {
+            userId: studentId,
+            eventId: newUuidV7(),
+            at: new Date(),
+            signIn: { issuer: POOL, username: sub, sub },
+          }),
+      };
+    }
+
+    // The run first: it de-identifies and queues them; the deletion waits for it, then finds the
+    // account deleted already and queues nothing more.
+    const runFirst = await yearOver('race-retain-delete-run');
+    const deleted = await behindCommit(runFirst.retain, () => runFirst.remove(db));
+    if (deleted.status === 'rejected') throw deleted.reason as Error;
+    expect(deleted.value).toEqual({ outcome: 'already_deleted' });
+    expect(await signInsQueued(runFirst.sub)).toMatchObject([
+      { issuer: POOL, username: runFirst.sub },
+    ]);
+
+    // The deletion first: it queues the sign-in; the run waits for it, then finds the account
+    // gone, so it neither counts it nor queues it again.
+    const deletionFirst = await yearOver('race-retain-delete-own');
+    const retained = await behindCommit(deletionFirst.remove, () => deletionFirst.retain(db));
+    if (retained.status === 'rejected') throw retained.reason as Error;
+    expect(retained.value).toMatchObject({ outcome: 'applied', counts: { students: 0 } });
+    expect(await signInsQueued(deletionFirst.sub)).toHaveLength(1);
+    for (const { studentId } of [runFirst, deletionFirst]) {
+      const student = one(await db.select().from(users).where(eq(users.id, studentId)));
+      expect(student.removedAt).not.toBeNull();
+    }
+  }, 20_000);
 });
 
 describe.runIf(REAL_PG)('provisioning concurrency (real Postgres)', () => {
@@ -2769,6 +2972,69 @@ describe.runIf(REAL_PG)('concurrent extends (real Postgres)', () => {
         expect(await eventsOfType(session.id, 'session_extended'), first).toHaveLength(0);
         expect(await liveParticipations(session.id), first).toHaveLength(0);
       }
+    }
+  }, 30_000);
+
+  it('two extends racing at 16 hours in all: one lands on the bound, the other is refused, never both (the owner, 2026-10-28)', async () => {
+    /*
+     * Each press judges the session's total under the row lock it computes its new end in, so
+     * the second judges the first's committed bell. Staged: a holder takes the session's row,
+     * both presses park behind it, and its release lets them through one at a time. Judged on a
+     * read taken before the lock, both would pass and the lesson would end five minutes past
+     * the bound.
+     */
+    for (let round = 0; round < 4; round += 1) {
+      const { classId } = await seed(`race-extend-total-${round}`);
+      // The longest Start, a minute ago, and 475 minutes more: 15 h 55 min in all.
+      const startedAt = new Date(Date.now() - 60_000);
+      const { session } = await startSession(db, {
+        classId,
+        startedAt,
+        endsAt: new Date(startedAt.getTime() + MAX_SESSION_MINUTES * 60_000),
+      });
+      await extendSession(db, {
+        sessionId: session.id,
+        durationMinutes: 475,
+        at: new Date(),
+        eventId: newUuidV7(),
+      });
+      const cap = new Date(startedAt.getTime() + MAX_SESSION_TOTAL_MINUTES * 60_000);
+
+      const release = await holdSession(session.id);
+      const presses: ReturnType<typeof extendSession>[] = [];
+      let unstaged: Error | null = null;
+      try {
+        for (let i = 0; i < 2; i += 1) {
+          presses.push(
+            extendSession(db, {
+              sessionId: session.id,
+              durationMinutes: 5,
+              at: new Date(),
+              eventId: newUuidV7(),
+            }),
+          );
+        }
+        await waitForBlockedBackend(5_000, 2);
+      } catch (err) {
+        unstaged = err instanceof Error ? err : new Error(String(err));
+      } finally {
+        await release();
+      }
+      const results = await Promise.allSettled(presses);
+      if (unstaged !== null) throw unstaged;
+
+      expect(
+        results.filter((r) => r.status === 'fulfilled'),
+        `round ${round}`,
+      ).toHaveLength(1);
+      expect(
+        results.flatMap((r) => (r.status === 'rejected' ? [r.reason as unknown] : [])),
+        `round ${round}`,
+      ).toMatchObject([{ code: 'SESSION_TOO_LONG' }]);
+      const row = one(await db.select().from(sessions).where(eq(sessions.id, session.id)));
+      expect(row.endsAt, `round ${round}`).toEqual(cap);
+      expect(row.endedAt, `round ${round}`).toBeNull();
+      expect(await eventsOfType(session.id, 'session_extended'), `round ${round}`).toHaveLength(2);
     }
   }, 30_000);
 });
@@ -4920,7 +5186,12 @@ describe.runIf(REAL_PG)('live lesson questions under contention (real Postgres, 
       return {
         ...s,
         retain: (on: Database) =>
-          applyRetention(on, { schoolId, at: new Date(), confirmName: `School ${tag}` }),
+          applyRetention(on, {
+            schoolId,
+            at: new Date(),
+            confirmName: `School ${tag}`,
+            issuer: POOL,
+          }),
         answer: (on: Database) =>
           answerQuestion(on, {
             questionId: s.question.id,
@@ -5212,7 +5483,12 @@ describe.runIf(REAL_PG)('live lesson questions under contention (real Postgres, 
       return {
         teacherId: teacher.id,
         retain: (on: Database) =>
-          applyRetention(on, { schoolId: school.id, at: new Date(), confirmName: name }),
+          applyRetention(on, {
+            schoolId: school.id,
+            at: new Date(),
+            confirmName: name,
+            issuer: POOL,
+          }),
         draft: (on: Database) => createSavedQuestion(on, drafting(teacher.id)),
       };
     }
@@ -5460,7 +5736,12 @@ describe.runIf(REAL_PG)('live lesson questions under contention (real Postgres, 
       return {
         teacherId: teacher.id,
         retain: (on: Database) =>
-          applyRetention(on, { schoolId: school.id, at: new Date(), confirmName: name }),
+          applyRetention(on, {
+            schoolId: school.id,
+            at: new Date(),
+            confirmName: name,
+            issuer: POOL,
+          }),
         deck: (on: Database) => createDeck(on, deck),
       };
     }

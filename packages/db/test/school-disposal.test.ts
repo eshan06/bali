@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { recordAgeCheck } from '../src/age-checks.js';
 import { registerPushToken } from '../src/device-tokens.js';
 import { newUuidV7 } from '../src/ids.js';
-import { createBlock } from '../src/management.js';
+import { createBlock, updateClass } from '../src/management.js';
 import { findOrCreateStudent } from '../src/queries.js';
 import { parseSchoolCommand, shellQuote } from '../src/school-command.js';
 import * as schema from '../src/schema.js';
@@ -40,6 +40,8 @@ import {
   createSavedQuestion,
   deletedCognitoId,
   disposeSchool,
+  endEnrollment,
+  endSession,
   joinClassByCode,
   openQuestion,
   removeDeck,
@@ -253,6 +255,23 @@ async function pastBell(sessionId: string) {
   await backdateSessionEnd(db, { sessionId }, fromNow(-1 * MIN));
 }
 
+/** The types of the events recorded in a lesson, in the order recorded. */
+async function typesIn(sessionId: string) {
+  const rows = await db
+    .select({ type: events.type })
+    .from(events)
+    .where(eq(events.sessionId, sessionId))
+    .orderBy(events.seq);
+  return rows.map((e) => e.type);
+}
+
+/** What the owner's command prints, line by line. */
+async function run(argv: string[]) {
+  const lines: string[] = [];
+  await must(parseSchoolCommand(argv) ?? undefined)({ db, print: (l) => lines.push(l) });
+  return lines;
+}
+
 async function armBen(s: Awaited<ReturnType<typeof seed>>) {
   await armTap(db, {
     studentId: s.ben.id,
@@ -364,6 +383,8 @@ describe('disposeSchool (C6a)', () => {
         openInvites: 1,
         armedTaps: 1,
       },
+      // No lesson of it running, none ended.
+      ended: [],
     });
     const after = await rowsOf(s);
     expect(after.school[0]?.removedAt).toEqual(at);
@@ -542,7 +563,7 @@ describe('disposeSchool (C6a)', () => {
     expect(done.counts).toEqual(preview.counts);
   });
 
-  it('is refused while a lesson of the school runs; one past its bell is ended as the sweep would', async () => {
+  it('is refused while a lesson of the school runs, naming each; one past its bell is ended as the sweep would', async () => {
     const s = await seed('c6a-live');
     const before = await rowsOf(s);
 
@@ -555,7 +576,15 @@ describe('disposeSchool (C6a)', () => {
     ).toEqual({
       outcome: 'in_session',
       school: { id: s.school.id, name: s.school.name },
-      sessions: 1,
+      // What the owner needs to end it, or to wait for it: its session, its class and its bell.
+      running: [
+        {
+          sessionId: s.lesson.id,
+          classId: s.second.id,
+          className: s.second.name,
+          endsAt: s.lesson.endsAt,
+        },
+      ],
     });
     expect(await rowsOf(s)).toEqual(before);
 
@@ -581,6 +610,91 @@ describe('disposeSchool (C6a)', () => {
         ),
     );
     expect(ana.endedReason).toBe('session_expired');
+  });
+
+  it('told to end its lessons, ends each one running as its teacher’s End would, in the same transaction, and a Start behind it is refused', async () => {
+    const s = await seed('c6a-end-lessons');
+    const at = new Date();
+
+    const done = await disposeSchool(db, {
+      schoolId: s.school.id,
+      at,
+      confirmName: s.school.name,
+      endLessons: true,
+    });
+
+    expect(done).toEqual({
+      outcome: 'disposed',
+      school: { id: s.school.id, name: s.school.name },
+      counts: {
+        teachers: 1,
+        students: 2,
+        classes: 2,
+        sessions: 2,
+        blocks: 1,
+        openInvites: 1,
+        armedTaps: 0,
+      },
+      ended: [
+        {
+          sessionId: s.lesson.id,
+          classId: s.second.id,
+          className: s.second.name,
+          endsAt: s.lesson.endsAt,
+        },
+      ],
+    });
+    const after = await rowsOf(s);
+    // The running lesson ended now, as an End ends it: Ana's turn in it with it, its question
+    // closed. The one past its bell ended as the sweep ends it, at its bell.
+    expect(after.sessions.find((x) => x.id === s.lesson.id)?.endedAt).toEqual(at);
+    expect(after.participations.filter((p) => p.sessionId === s.lesson.id)).toMatchObject([
+      { studentId: s.ana.id, endedAt: at, endedReason: 'session_ended' },
+    ]);
+    expect(await typesIn(s.lesson.id)).toEqual(
+      expect.arrayContaining(['session_ended', 'question_closed']),
+    );
+    expect(await typesIn(s.lesson.id)).not.toContain('session_expired');
+    expect(await typesIn(s.past.id)).toContain('session_expired');
+    expect(after.questions).toMatchObject([{ closedAt: at }]);
+    // Disposed of whole, in that same transaction: no one named, every class removed.
+    expect(after.school[0]?.removedAt).toEqual(at);
+    expect(after.classes.every((c) => c.name === '' && c.removedAt !== null)).toBe(true);
+    expect(after.users.every((u) => u.displayName === null && u.removedAt !== null)).toBe(true);
+
+    // Its teacher can't start the class again: there is no class to start.
+    await expect(
+      startSession(db, { classId: s.second.id, startedAt: new Date(), endsAt: fromNow(40 * MIN) }),
+    ).rejects.toMatchObject({ code: 'CLASS_NOT_FOUND' });
+  });
+
+  it('a preview told to end its lessons ends none and writes nothing, and names the ones it would end', async () => {
+    const s = await seed('c6a-end-preview');
+    const before = await rowsOf(s);
+    const total = () => db.$count(events);
+    const count = await total();
+
+    const preview = await disposeSchool(db, {
+      schoolId: s.school.id,
+      at: new Date(),
+      endLessons: true,
+    });
+
+    expect(preview).toMatchObject({
+      outcome: 'preview',
+      counts: { sessions: 2 },
+      ended: [{ sessionId: s.lesson.id, classId: s.second.id, className: s.second.name }],
+    });
+    expect(await rowsOf(s)).toEqual(before);
+    expect(await total()).toBe(count);
+    // The lesson runs on, so a disposal not told to end it is still refused.
+    expect(
+      await disposeSchool(db, {
+        schoolId: s.school.id,
+        at: new Date(),
+        confirmName: s.school.name,
+      }),
+    ).toMatchObject({ outcome: 'in_session' });
   });
 
   it('is refused, by id, while a person of the school has records at another school', async () => {
@@ -729,11 +843,6 @@ describe('npm run school -- dispose', () => {
   it('previews, then disposes once confirmed by name, and logs no name', async () => {
     const s = await seed('c6a-command');
     await pastBell(s.lesson.id);
-    const run = async (argv: string[]) => {
-      const lines: string[] = [];
-      await must(parseSchoolCommand(argv) ?? undefined)({ db, print: (l) => lines.push(l) });
-      return lines;
-    };
 
     const preview = await run(['dispose', s.school.id]);
     expect(preview[0]).toContain(`"${s.school.name}"`);
@@ -801,6 +910,192 @@ describe('npm run school -- dispose', () => {
     );
     expect(() => parseSchoolCommand(['dispose', stranger, '--confirm', 'A', 'B'])).toThrow(
       /unexpected/,
+    );
+    // --end-lessons goes last, after the name when there is one.
+    expect(() =>
+      parseSchoolCommand(['dispose', stranger, '--end-lessons', '--confirm', 'A']),
+    ).toThrow(/--confirm "<name>" \[--end-lessons\]/);
+    expect(() => parseSchoolCommand(['dispose', stranger, '--end-lessons', 'A'])).toThrow(
+      /--confirm "<name>" \[--end-lessons\]/,
+    );
+    expect(() =>
+      parseSchoolCommand(['dispose', stranger, '--confirm', 'A', '--end-lessons', 'B']),
+    ).toThrow(/unexpected/);
+  });
+
+  it('names each lesson that holds it up, and how to end them', async () => {
+    const s = await seed('c6a-names');
+    const refusal = await run(['dispose', s.school.id, '--confirm', s.school.name]).then(
+      () => 'disposed',
+      (err: Error) => err.message,
+    );
+
+    expect(refusal).toContain(`"${s.school.name}" has 1 lesson(s) running; nothing was written.`);
+    expect(refusal).toContain(
+      `Session ${s.lesson.id}, in class "${s.second.name}" (${s.second.id}), its bell at ` +
+        `${s.lesson.endsAt.toISOString()}.`,
+    );
+    expect(refusal).toContain('npm run school -- end-session <session-id>');
+    expect(refusal).toContain(`npm run school -- dispose ${s.school.id} --end-lessons`);
+    expect(one(await db.select().from(schools).where(eq(schools.id, s.school.id))).removedAt).toBe(
+      null,
+    );
+  });
+
+  it('prints a class’s name with each character a terminal would act on written as its code', async () => {
+    const s = await seed('c6a-escaped');
+    // Its teacher names the class as they like (a rename checks only its length): here an ESC
+    // that clears the screen, an 8-bit CSI, a bidi override and a line separator.
+    await updateClass(db, { classId: s.second.id, name: 'Chem\u001b[2J\u009b8m\u202eend\u2028x' });
+
+    const refusal = await run(['dispose', s.school.id]).then(
+      () => 'disposed',
+      (err: Error) => err.message,
+    );
+    const preview = await run(['dispose', s.school.id, '--end-lessons']);
+
+    const shown = `in class "Chem\\u001b[2J\\u{9b}8m\\u{202e}end\\u{2028}x" (${s.second.id})`;
+    expect(refusal).toContain(shown);
+    expect(preview.join('\n')).toContain(shown);
+    for (const line of [refusal, ...preview]) {
+      expect(line.search(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u)).toBe(-1);
+    }
+  });
+
+  it('a name that doesn’t match keeps --end-lessons in the line it suggests', async () => {
+    const s = await seed('c6a-mismatch-end');
+    await expect(
+      run(['dispose', s.school.id, '--confirm', 'Nope', '--end-lessons']),
+    ).rejects.toThrow(
+      `To confirm: dispose ${s.school.id} --confirm '${s.school.name}' --end-lessons`,
+    );
+  });
+
+  it('with --end-lessons, previews the lessons it would end, then ends them as it disposes', async () => {
+    const s = await seed('c6a-command-end');
+    const running = () => db.select().from(sessions).where(eq(sessions.id, s.lesson.id));
+
+    const preview = await run(['dispose', s.school.id, '--end-lessons']);
+    expect(preview).toContain(
+      `It would end 1 lesson(s) still running, as their teacher's End would: Session ` +
+        `${s.lesson.id}, in class "${s.second.name}" (${s.second.id}), its bell at ` +
+        `${s.lesson.endsAt.toISOString()}.`,
+    );
+    expect(preview.join('\n')).toContain('Nothing was written');
+    expect(preview.at(-1)).toBe(
+      `To go ahead: npm run school -- dispose ${s.school.id} --confirm '${s.school.name}' --end-lessons`,
+    );
+    expect(one(await running()).endedAt).toBeNull();
+
+    const done = await run(['dispose', s.school.id, '--confirm', s.school.name, '--end-lessons']);
+    expect(done).toEqual([
+      expect.stringMatching(
+        new RegExp(
+          `^disposed of school ${s.school.id} on \\S+: teachers 1, students 2, classes 2, ` +
+            `sessions 2, blocks 1, open invites 1, pre-bell taps 0; it ended 1 lesson\\(s\\) ` +
+            `still running: ${s.lesson.id}$`,
+        ),
+      ),
+    ]);
+    expect(one(await running()).endedAt).not.toBeNull();
+  });
+});
+
+describe('npm run school -- end-session', () => {
+  it('ends a running lesson as its teacher’s End would; then a student may leave, and the school be disposed of', async () => {
+    const s = await seed('end-session');
+    const anaInLesson = one(
+      await db
+        .select()
+        .from(enrollments)
+        .where(and(eq(enrollments.classId, s.second.id), eq(enrollments.studentId, s.ana.id))),
+    );
+    const leave = () =>
+      endEnrollment(db, {
+        enrollmentId: anaInLesson.id,
+        reason: 'left_class',
+        at: new Date(),
+        eventId: newUuidV7(),
+      });
+    // While it runs, she can't leave its class (A19), and the school can't be disposed of.
+    await expect(leave()).rejects.toMatchObject({ code: 'CLASS_IN_SESSION' });
+    await expect(run(['dispose', s.school.id, '--confirm', s.school.name])).rejects.toThrow(
+      '1 lesson(s) running',
+    );
+
+    const said = await run(['end-session', s.lesson.id]);
+
+    expect(said).toEqual([
+      expect.stringMatching(
+        new RegExp(
+          `^ended session ${s.lesson.id} on \\S+, as its teacher's End would: ` +
+            '1 student\\(s\\) were in it$',
+        ),
+      ),
+    ]);
+    // Through the engine, as an End: the lesson and Ana's turn in it ended together, and recorded.
+    const lesson = one(await db.select().from(sessions).where(eq(sessions.id, s.lesson.id)));
+    expect(lesson.endedAt).not.toBeNull();
+    expect(said[0]).toContain(` on ${lesson.endedAt?.toISOString()},`);
+    expect(
+      one(
+        await db
+          .select()
+          .from(participations)
+          .where(
+            and(eq(participations.sessionId, s.lesson.id), eq(participations.studentId, s.ana.id)),
+          ),
+      ),
+    ).toMatchObject({ endedAt: lesson.endedAt, endedReason: 'session_ended' });
+    expect((await typesIn(s.lesson.id)).filter((t) => t.startsWith('session_'))).toEqual([
+      'session_started',
+      'session_ended',
+    ]);
+    // Its open question closed with it, at its end.
+    expect(await typesIn(s.lesson.id)).toContain('question_closed');
+    expect(
+      one(await db.select().from(questions).where(eq(questions.id, s.question.id))).closedAt,
+    ).toEqual(lesson.endedAt);
+
+    await expect(leave()).resolves.toMatchObject({ outcome: 'ended' });
+    expect(await run(['dispose', s.school.id, '--confirm', s.school.name])).toEqual([
+      expect.stringMatching(new RegExp(`^disposed of school ${s.school.id} on `)),
+    ]);
+  });
+
+  it('leaves a lesson already over as it is, ended or past its bell, and says so', async () => {
+    const s = await seed('end-session-over');
+    await endSession(db, { sessionId: s.lesson.id, at: new Date(), reason: 'ended' });
+    const endedAt = one(
+      await db.select().from(sessions).where(eq(sessions.id, s.lesson.id)),
+    ).endedAt;
+    const before = await rowsOf(s);
+    const total = () => db.$count(events);
+    const count = await total();
+
+    // Its teacher ended it.
+    expect(await run(['end-session', s.lesson.id])).toEqual([
+      `session ${s.lesson.id} was over already: it ended on ${endedAt?.toISOString()}; ` +
+        'nothing changed',
+    ]);
+    // Past its bell, not yet swept: over by the server's clock (A17), and the sweep's to mark.
+    expect(await run(['end-session', s.past.id])).toEqual([
+      `session ${s.past.id} was over already: its bell rang at ${s.past.endsAt.toISOString()}, ` +
+        'and the sweep marks it so; nothing changed',
+    ]);
+    expect(await rowsOf(s)).toEqual(before);
+    expect(await total()).toBe(count);
+  });
+
+  it('checks the id before connecting, and says when no session has it', async () => {
+    expect(() => parseSchoolCommand(['end-session'])).toThrow(/needs the session's id/);
+    expect(() => parseSchoolCommand(['end-session', 'nope'])).toThrow(/"nope" is not a session id/);
+    const stranger = newUuidV7();
+    expect(() => parseSchoolCommand(['end-session', stranger, 'more'])).toThrow(
+      /unexpected "more"/,
+    );
+    await expect(run(['end-session', stranger])).rejects.toThrow(
+      `no session on record has the id ${stranger}`,
     );
   });
 });

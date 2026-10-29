@@ -67,6 +67,16 @@ describe('errText', () => {
     ).toBe('This session is past its bell, so no time was added. End it, then start a new one.');
   });
 
+  it('says an extend past 16 hours in all in words, the bell standing (the owner, 2026-10-28)', () => {
+    const line = errText(
+      new ApiError(409, 'conflict', 'a session runs at most 16 hours in all', 'session_too_long'),
+    );
+    expect(line).toBe(
+      'A session runs 16 hours at most, so no time was added. It ends at the time shown.',
+    );
+    expect(line).not.toMatch(/[—!]/);
+  });
+
   it('holds the class page’s words (P10): no em-dash, no exclamation mark, a way on', () => {
     expect(NOT_A_SESSION_LENGTH).toBe(
       'A session runs 1 to 480 minutes. Enter a whole number of minutes.',

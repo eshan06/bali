@@ -4,9 +4,15 @@ import { EVENT_RESUME_OVERLAP, type FeedEvent } from '@bali/shared';
  * A tiny fetch-based SSE client for the live grid. It uses `fetch` + a
  * ReadableStream (never `EventSource`) so it can send the Authorization header —
  * no token in the query string. It:
- *   - resumes with `?after=lastSeq − overlap` and de-dupes by `event_id`, so a
- *     reconnect (or the server's own late-committer re-read) never double-applies
- *     an event and never misses the boundary (decision 2);
+ *   - resumes with `?after=` the overlap below `lastSeq`, or below the settled
+ *     point when that is lower, and de-dupes by `event_id`, so a reconnect (or
+ *     the server's own late-committer re-read) never double-applies an event and
+ *     never misses the boundary (decision 2). The settled point is a seq every
+ *     write handed one at or below it has finished; it starts as the boot
+ *     snapshot's `settledSeq` and moves up with each `: settled N` line the
+ *     stream sends. A write can still be open under a seq well short of
+ *     `lastSeq`, never under one short of the settled point. A boot read from
+ *     an older API names none, and the client resumes below `lastSeq` alone;
  *   - reconnects with exponential backoff on any drop, resetting only once a
  *     connection has LASTED (`stableAfterMs`) — a server that accepts and
  *     immediately drops answers 200 every time, so resetting on the status
@@ -24,6 +30,8 @@ export interface SseClientOptions {
   getToken: () => string | null;
   /** The resume point from the boot snapshot (its `latestSeq`). */
   after: number;
+  /** The boot snapshot's settled point (`settledSeq`), when its API names one. */
+  settled?: number;
   onEvent: (event: FeedEvent) => void;
   onStatus?: (status: SseStatus) => void;
   /**
@@ -67,6 +75,10 @@ export function createSseClient(opts: SseClientOptions): SseClient {
   const stableAfter = opts.stableAfterMs ?? 5_000;
 
   let lastSeq = opts.after;
+  let settled = opts.settled ?? null;
+  // A connect asks from the overlap below this, which never passes the settled point. It only
+  // moves up, so an id pruned below it is never sent again.
+  const resumePoint = (): number => (settled === null ? lastSeq : Math.min(lastSeq, settled));
   const delivered = new Map<string, number>(); // eventId -> seq, pruned to the window
   let closed = false;
   let attempt = 0;
@@ -86,7 +98,7 @@ export function createSseClient(opts: SseClientOptions): SseClient {
     if (delivered.has(event.eventId)) return; // already applied on this client
     delivered.set(event.eventId, event.seq);
     if (event.seq > lastSeq) lastSeq = event.seq;
-    const cutoff = lastSeq - overlap;
+    const cutoff = resumePoint() - overlap;
     for (const [id, seq] of delivered) if (seq <= cutoff) delivered.delete(id);
     opts.onEvent(event);
   }
@@ -96,8 +108,13 @@ export function createSseClient(opts: SseClientOptions): SseClient {
     let data: string | null = null;
     for (const line of frame.split('\n')) {
       if (line.startsWith('data:')) data = line.slice(line.startsWith('data: ') ? 6 : 5);
-      // `id:` and comment (`:`) lines carry no payload; the event_id inside
-      // `data` is the dedupe key, so they need no handling.
+      // The stream's settled point, sent once every event up to it has been. Taken only when
+      // the boot read named one: a client that began without one has pruned below its last seq
+      // alone, and must never resume from below that.
+      const point = /^: settled (\d+)$/.exec(line);
+      if (point && settled !== null) settled = Math.max(settled, Number(point[1]));
+      // `id:` and other comment (`:`) lines carry no payload; the event_id
+      // inside `data` is the dedupe key, so they need no handling.
     }
     if (data === null) return; // a comment/heartbeat frame — liveness, no payload
     let event: FeedEvent;
@@ -128,7 +145,7 @@ export function createSseClient(opts: SseClientOptions): SseClient {
   async function connect(): Promise<void> {
     if (closed) return;
     controller = new AbortController();
-    const resumeFrom = Math.max(0, lastSeq - overlap);
+    const resumeFrom = Math.max(0, resumePoint() - overlap);
     const sep = opts.url.includes('?') ? '&' : '?';
     const token = opts.getToken();
     opts.onStatus?.(attempt === 0 ? 'connecting' : 'reconnecting');
@@ -172,7 +189,7 @@ export function createSseClient(opts: SseClientOptions): SseClient {
     // attempts in 600ms with nothing backing off, which at the shipped default
     // is a browser knocking twice a second, per open tab, forever.
     if (Date.now() - openedAt >= stableAfter) attempt = 0;
-    if (!closed) scheduleReconnect(); // the stream ended; resume from lastSeq − overlap
+    if (!closed) scheduleReconnect(); // the stream ended; resume below `resumePoint()`
   }
 
   function close(): void {

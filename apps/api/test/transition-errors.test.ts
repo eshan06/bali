@@ -115,6 +115,12 @@ const EXPECTED: Record<
     reason: 'account_deleted',
     message: 'this account was deleted',
   },
+  SESSION_TOO_LONG: {
+    code: 'conflict',
+    status: 409,
+    reason: 'session_too_long',
+    message: 'a session runs at most 16 hours in all',
+  },
 };
 
 /**

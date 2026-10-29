@@ -23,6 +23,160 @@ a real decision? Add a dated entry at the top: what was decided and why.
   change. **Tests:** `policy-pages.test.tsx`: the student list's rows 11 to 12, the clock line whole
   and right after the check-in, and section 6's line whole; all three red on the page before.
 
+- **2026-10-29** — **A teacher's grid gets an event that commits late, however many events go out
+  meanwhile.** An event's number (`seq`) is given out as its insert runs and the row shows when its
+  transaction commits, so a slow write can show a lower number after higher ones. The live stream
+  re-read, and the portal resumed, from a fixed 50 numbers below the newest it had
+  (`EVENT_RESUME_OVERLAP`). But every session's events share one count, and one transaction can
+  take more than 50 before it commits: a Start joining a class's waiting taps writes the leave of a
+  student still in another running class, then a number for each student after it. If that other
+  class's grid was sent a later event meanwhile (a second student moving to another class, a
+  question closing) 50 or more numbers above the leave, the leave never reached it, and the
+  student's tile still read Focused until the grid's next snapshot read, up to 15 seconds on. A
+  grid opened while the Start ran missed it too: its stream began 50 below the newest number its
+  read saw.
+  **Decided:** no stream re-reads, and the portal never resumes, from past a **settled point**, a
+  number every write handed one at or below it has finished. Postgres takes the events table's
+  write lock before a row gets its number and holds it until the transaction commits or rolls back,
+  so the API reads the newest number given out, then which transactions hold that lock; the number
+  is settled once each of them has ended, and a write that began after holds only higher numbers
+  (`apps/api/src/sse/settled.ts`). A stream re-reads from 50 below the lower of its settled point
+  and the newest number it sent, and sends each new settled point once the events up to it are
+  sent, as an SSE comment line, which an older portal passes over like a heartbeat; a doorbell
+  that rings while a read is part way through its pages gets a read of its own after it. The
+  grid's read (`GET /v1/sessions/{id}`) names one too, `settledSeq` (additive), taken before its
+  roster, after waiting up to a quarter second for the writes on their way. Neither names a number
+  past the lesson's own newest, so neither tells a teacher anything of other classes' activity.
+  The portal resumes its first connect and every reconnect from 50 below the lower of its newest
+  number and its newest settled point; after a boot read from an older API, which names none, as
+  before, whatever its stream says later. Each event still arrives once, de-duped by its id. With
+  nothing writing, the settled point is the newest number given out, so every resume point is
+  where it was. **Nothing shown changes:** the leave turns the tile to Left as it commits, which
+  is what the grid's own rule for it always said; no line, state or label is new.
+  **Weighed:** a bigger window (no number bounds one transaction); noting each write's transaction
+  id before its number, or keeping it on the row (a change to every write, or a migration, where the
+  lock is already taken by every write, whatever code made it). A Start does the same work as
+  before: 30 Starts of 30 waiting taps each, through the API on PGlite, three runs each, averaged
+  109 ms before and 108.5 ms after. **Known cost:** a write left open holds every settled point
+  where it stands, so each stream re-reads its session's events from there until that write ends,
+  and the grid's read waits out its quarter second. **Tests:** `stream.test.ts` (real Postgres: a
+  write that took more than 50 numbers before committing reaches an open stream once; a grid read
+  while it is open names a settled point below it, and the stream from there gets it once),
+  `stream-resume.test.ts` (both lanes: the re-read never passes the settled point, says it as it
+  rises and never past its own newest, pages through a backlog above it, and reads again after a
+  doorbell mid-read), `settled-cursor.test.ts`, `settled.test.ts` (the two reads, and the lock's
+  hold on real Postgres), `feed.test.ts` (the read's `settledSeq`), `sse-client.test.ts` (first
+  connect and reconnect below the settled point, each event once, and none below the last seq after
+  a read that named no settled point) and `live-grid.driven.test.tsx` (the grid hands its read's
+  settled point to its stream).
+
+- **2026-10-29** — **The owner can end a running lesson, and a school's disposal can end its
+  running lessons (the owner's decision of 2026-10-28).** Before its bell only a class's own
+  teacher could end a lesson: the sweep and the disposal end only one past its bell, and a Start
+  answers the one running. So the disposal of a school's data on its written request (C6a), which
+  its data agreement gives the owner a set number of days to finish, was refused while any lesson
+  of the school ran, its runbook saying to run it again after the bell, and no owner command could
+  end one. The 16-hour bound (the entry below) bounds each lesson, but nothing stopped a class from
+  being started again as soon as one ended. **Decided, all three:** (1) `npm run school --
+  end-session <session-id>` ends a running lesson now, through the engine's own end
+  (`endRunningSession`): its teacher's End's transition and reason, `session_ended`, its
+  participations ended and its open question closed with it, so the history, the grid and the
+  phones read it as an End. A lesson over already, ended or past its bell (A17), is said so and
+  left as it is, the sweep's to mark; an id that isn't a UUID is refused before anything connects,
+  and one no session holds says so. (2) The disposal's refusal names each running lesson: its
+  session's id, its class (name and id) and its bell, so the owner can end it or wait for it. (3)
+  `dispose … --end-lessons` (last, after the name when there is one): each lesson of the school
+  still running is ended in the disposal's own transaction, as its teacher's End ends it, as the
+  disposal already ended one past its bell as the sweep would; its classes are removed in that
+  same transaction, so a Start behind it finds no class. Without the flag it is refused as before.
+  A preview with it, rolled back, ends none and names the lessons it would end, and its last line
+  carries the flag; the confirmed run's line adds the ids of the lessons it ended. The
+  `school_disposed` event is unchanged: each ended lesson records its own `session_ended`. **Why
+  the End's reason, not the sweep's:** the lesson is cut short before its bell, as an End cuts it;
+  `session_expired` says the bell rang. **Weighed:** end-session alone, with no flag: the class
+  could be started again before the disposal ran, and it would be refused again; ending running
+  lessons in every confirmed disposal: a class would then be cut short with no word from the
+  owner, so the flag says it. **Known limit, an End's:** a phone learns the lesson is over when
+  Bali next reaches the server; with Bali closed its shields stay to the bell, Emergency Unlock the
+  way out as always (iOS app structure, rules). **Tests:** `school-disposal.test.ts` (end-session
+  ends a running lesson as an End, and a student's leave and the disposal then go through; a lesson
+  ended or past its bell left as it is, nothing recorded; a non-UUID refused before connecting; the
+  unflagged disposal refused, naming each running lesson; the flagged one ends them and disposes,
+  and a Start after it is refused; its preview ends none and writes nothing; the command's lines)
+  and `races.test.ts` (real Postgres: the owner's end racing its teacher's End and an unlock ends
+  the lesson once and keeps the unlock; the flagged disposal racing a Start and an unlock is never
+  refused for a lesson, ends every lesson running, the Start's too when it lands first, and loses
+  no unlock).
+
+- **2026-10-29** — **A lesson runs at most 16 hours in all (the owner's decision of 2026-10-28).**
+  Each extend was bounded on its own (`MAX_SESSION_MINUTES`, 480), the lesson as a whole by
+  nothing. **Decided:**
+  a session runs at most 16 hours from its start, its Start and every extend together
+  (`MAX_SESSION_TOTAL_MINUTES` in `@bali/shared`, beside the per-press bound, which stays). A Start
+  is at most 480 minutes, so only an extend can pass it: `extendSession` refuses one whose new bell
+  would be more than 16 hours after the start, `SESSION_TOO_LONG`, sent as `409 session_too_long`
+  (additive to `API_ERROR_REASONS`, BaliCore's mirror of it too), and records nothing: the bell
+  stands, and the press's id stays unspent, so the same press sent again is refused again. An
+  extend landing exactly on the 16 hours is taken, and a landed extend's retry is its replay as
+  before. The total is judged under the session's row lock, on the bell read there, so of two
+  presses racing at the bound the second judges the first's bell. Such a lesson ends at its bell
+  as any does, the sweep ending it there. 16 hours is longer than any school day, so no real lesson
+  meets it: the longest Start and the longest extend reach it exactly. **The portal:** the class
+  page says it under +5, +10 and End, where an extend's other refusals are said, on the page and in
+  Present: "A session runs 16 hours at most, so no time was added. It ends at the time shown." A
+  refusal, so no Try again; the next press is a new one. Drawn first on the portal canvas as an
+  intermediate state (ClassStates, version 108, beside "+5 or +10 min after the bell"), then built
+  from that drawing (`no-ai-slop`). **Weighed:** adding only the minutes that still fit; the
+  teacher pressed +10 and would get 3, said nowhere, so a refusal that says why wins. **Tests:**
+  `transitions.test.ts` (refused past the 16 hours, nothing moved or recorded, its id unspent; one
+  landing exactly on them taken, its replay answered, a minute more refused; a lesson at the bound
+  swept at its bell), `races.test.ts` (two presses staged behind a held lock at the bound: one
+  lands, one is refused, the bell exactly on the bound), `session-lifecycle.test.ts` (the 409's
+  body, the landed extend's replay, one `session_extended` in the history), `transition-errors.test.ts`
+  and the class page driven in jsdom (`app/classes/[id]/page.test.tsx`: the line said as an alert
+  under the controls, on the page and in Present, no Try again, the bell where it was).
+
+- **2026-10-28** — **The year-end retention run deletes the sign-ins of the people it de-identifies
+  (the owner's decision), reversing 2026-10-09's keep.** The run (C6b) took each person's name and
+  Bali's link to their sign-in, and left the Cognito sign-in itself, with its email and password, in
+  the pool on purpose, so a returning student could sign in with the same one (2026-10-09, the end of
+  C3-cognito's entry). The privacy policy's section 6 (C2-text, #461) says that after the year's last
+  day Bali removes "the names and sign-ins" of everyone whose records all fall on or before it. The
+  owner chose the policy's words. **Decided:** in its own transaction, before it erases each
+  person's `sub`, the run queues their sign-in in `cognito_deletions`, as an account deletion queues
+  one, and the API's deleter removes it from the pool with its two checks unchanged: a sign-in goes
+  only while its `sub` is the one queued, and one whose person came back (a live account holding that
+  `sub` again) is kept. A preview, rolled back, queues nothing; a second run for the same year queues
+  nothing more; anyone kept named keeps theirs. The run is the last moment Bali holds each one's
+  `sub`, so it is where they are queued: in order of sub, never of the accounts, so while the rows
+  wait their order can't pair a sub with the account it was (santa's review). **The pool:** a row is
+  tried only by the deploy whose
+  `AUTH_ISSUER` it names, so the owner's command passes its shell's `AUTH_ISSUER` through its IO
+  (`SchoolCommandIO.issuer`; the engine's `ApplyRetentionInput.issuer` is required) and refuses
+  without it, preview and run alike, before reading anything. In the API service's shell (runbook 1,
+  step 9), where the runbook already runs it, it is always set. **The limit:** Bali keeps a
+  sign-in's `sub`, not its username, and Cognito takes a local (email) sign-in's `sub` as its
+  username (2026-10-09), so every email sign-in is reached: all the pilot's pool has (runbook 2, no
+  Google or Apple sign-in). A federated one is not: AdminGetUser answers not found, the deleter
+  records the row done (`gone`), and the user stays. Offering Google or Apple sign-in needs its
+  username stored, or another way to reach it, first. **The owner's order:** runbook 9's key on the
+  environment before the run (runbook 1, step 12 now checks it); without it the rows wait in the
+  queue, and anyone who signs in to Bali meanwhile keeps their sign-in. The deleter tries up to ten
+  rows a pass, so a school's run clears in minutes, an hour or two for a large one; meanwhile the
+  pass an account deletion starts takes the oldest due rows first, so that deletion's own row can
+  wait behind the run's (the phone's own DeleteUser is still its first try). **Weighed:**
+  rewording section 6 to say the sign-in and its email stay with Amazon Cognito until the person
+  deletes their account. It would have kept a returning student's sign-in, but a student reading
+  the policy expects theirs gone; now a returning student signs up again, and one who comes back
+  before their row is tried keeps theirs. The disposal (C6a) is unchanged: its console step, every
+  user at the school's email domain, stays, and 2026-10-09's suggested follow-up is still open.
+  **Tests:** `retention.test.ts` (one queued row per de-identified account and none for a kept one,
+  in order of sub, none from a preview or a second run, the command refusing without the pool),
+  `races.test.ts` (the
+  run and the person's own deletion, either first, leave one row; the run racing a tap, a join, an
+  arm, a rename and an unlock queues exactly when it de-identifies) and `sign-in-deletion.test.ts`
+  (the command's rows deleted by the sweep against a fake pool, a returning student's kept).
+
 - **2026-10-28** — **Present hides Clock off, as it hides an unlock's reason (the owner's
   decision).** On the class page, a tile whose phone clock is set more than 2 minutes ahead says
   "Clock off", and the student panel says why. Present, the same grid projected for the room, said
@@ -5146,7 +5300,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   follow-up, its own step: the disposal queues each person it de-identifies by `sub` (every local
   sign-in goes by itself), the console step kept for what that leaves. The retention run keeps the
   sign-ins on purpose: it de-identifies a year's records, and a student who continues signs in
-  again with the same sign-in (runbook 1, step 12). Teachers' refusal (`teacher_has_classes`)
+  again with the same sign-in (runbook 1, step 12) (reversed 2026-10-28: the run queues each one
+  it de-identifies; the entry of that date above). Teachers' refusal (`teacher_has_classes`)
   is unchanged: a refused deletion queues nothing.
 
 - **2026-10-09** — **The 13+ check Bali could not be reached for is asked again in class** (#300's

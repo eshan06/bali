@@ -109,10 +109,11 @@ never stored here, no screen can ever show it.
   for an answer under 13, which the phone never sends. Never unset: it goes only with the account
   (C3, C6a, C6b), and is in the student's export (C5).
 - `cognito_deletions` — one row per deleted account's Cognito sign-in waiting for the API to delete
-  it from the pool (2026-10-09; decision 3's amendment): the access token's issuer, username and
-  `sub`, how many tries, and when the next is due. Keyed to the Cognito user, not to a `users` row;
+  it from the pool (2026-10-09; decision 3's amendment), and per sign-in of someone the retention
+  run de-identified (2026-10-28): the issuer, username and `sub`, how many tries, and when the next
+  is due. Keyed to the Cognito user, not to a `users` row;
   deleted once the sign-in is gone, never exported. Not an engine table: written by the deletion's
-  transaction and beside the engine.
+  and the retention run's transactions and beside the engine.
 - `questions`, `responses`, `saved_questions`, `decks`, `session_presentations` — a live lesson's
   questions, each student's answer now, a teacher's drafts of questions, the teacher's PDF decks and
   the slide a session shows (Phase 7; "Live lesson", decisions 4 and 12). Written only by the
@@ -166,6 +167,13 @@ with a key of its own, and its minute sweep retries what is left, a row that kee
 longer each time. It never deletes another sign-in: the user is read first and deleted only while
 its `sub` is the one queued, since a username can come back with a new `sub`; nor one its person
 came back to: a live account holding that `sub` again (its first call since made one) keeps it.
+*Amended 2026-10-28 (the owner's decision):* the retention run's sign-ins go the same way. Its
+transaction queues the sign-in of each person it de-identifies, by the `sub` their row holds until
+it is erased, under the deploy's own pool (`AUTH_ISSUER`, which the owner's command refuses to run
+without), and the same deleter, with the same two checks, removes it. Cognito takes a local (email)
+sign-in's `sub` as its username, so every email sign-in is reached, all the pilot's pool has; a
+federated one (Google, Apple) is not, since Bali keeps no username, and offering one needs a way to
+reach it first.
 
 **4. A student can be in only one session at a time.** If a student in one session taps
 into another, their first participation is ended and recorded in the `events` table as
@@ -199,7 +207,12 @@ Start that would join them, and offline the phone's own clock ends the wait at t
 shields at that moment using its own clock, even with no internet. On the server, a small
 scheduled program marks the session and its participations as ended and adds a
 `session_expired` event. If the teacher adds time, that is recorded as its own
-`session_extended` event, so reports show exactly what happened. Time is added only before
+`session_extended` event, so reports show exactly what happened. A session runs at most 16 hours
+in all, its Start and every extend together (the owner, 2026-10-28; `MAX_SESSION_TOTAL_MINUTES`):
+an extend that would end it later than 16 hours after its start is refused
+(`409 session_too_long`) and records nothing, the bell standing, while one ending it exactly then
+is taken. Sixteen hours is longer than any school day, so the bound never cuts a real lesson
+short, and every lesson ends at its bell within a day of its start. Time is added only before
 the bell by the server's clock: past it, the phones have let go, so the session is over even
 before the sweep marks it, and an extend is refused as one for a session already ended (ruled
 2026-09-30). The teacher starts a new one instead: a Start past the old one's bell ends it as
@@ -208,6 +221,12 @@ back-to-back classes never wait for the sweep. Nor does anyone join a
 session past its bell, or return to focus in it (A17 — one rule for all three): a tap then arms
 for the teacher's next Start, as when nothing runs, and a refocus is refused as after the sweep.
 What a phone reports there — an unlock, protection off — is recorded by its own rules.
+*Amended 2026-10-29 (the owner's decision of 2026-10-28):* the owner can end a running lesson too,
+where only its teacher's End could: `npm run school -- end-session <session-id>`, through that
+End's own transition and reason (`session_ended`), so the history, the grid and the phones read it
+as an End. A lesson over already, marked so or past its bell, is left as it is. It doesn't stop the
+class from being started again; a school's disposal can end its running lessons and remove their
+classes in one transaction (C6a, below).
 
 **7. The every-30-seconds "still here" message only updates one column — it never adds
 history rows.** During a session, each app tells the server every ~30 seconds: "still
@@ -236,9 +255,10 @@ from `last_seen_at` (rule 2), never from the column.
   when the write finishes, so a slow 481 can show up *after* a fast 482. A screen that
   asked "everything after 482" would then never see 481 — one event skipped forever, with
   no error anywhere. So on reconnect the screen asks from slightly before its remembered
-  number and throws away rows it already has (it recognizes them by `event_id`).
-  Receiving an event twice costs nothing; silently missing one is how a teacher's grid
-  loses an emergency unlock.
+  number, and never from past a number every earlier write has finished at (one write can
+  take many numbers before it finishes; the server says which, Live updates), and throws
+  away rows it already has (it recognizes them by `event_id`). Receiving an event twice
+  costs nothing; silently missing one is how a teacher's grid loses an emergency unlock.
 - **Changes that touch several tables happen in one transaction.** Removing a student
   mid-session must update the enrollment, end the participation, and record the events —
   all together or not at all. A halfway-done removal is exactly the v2 bug that left a
@@ -254,13 +274,18 @@ from `last_seen_at` (rule 2), never from the column.
   is a day the owner records; after it, the owner's retention run de-identifies, as an
   account deletion does, everyone whose records all lie on or before it (anyone with a later
   record, at another school, or a teacher with a live class or block is kept named), logged
-  as a `retention_applied` event of counts; lessons and their history stay. A student's own
+  as a `retention_applied` event of counts; lessons and their history stay. Their Cognito
+  sign-ins go too, queued in the run's transaction as a deletion's is (2026-10-28, decision 3's
+  amendment). A student's own
   deletion is decided (decision 3's amendment), and so is a school's written request to
   dispose of its data
   (C6a, 2026-10-04): every person of the school de-identified as an account deletion leaves
   one, its classes, blocks, open invites and pre-bell taps removed, the school marked
   removed, and a `school_disposed` event of counts naming no one; its lessons and their
-  history stay, naming no one.
+  history stay, naming no one. It is refused while a lesson of the school runs, naming each
+  lesson's session, class and bell, unless the owner tells it to end them (`--end-lessons`,
+  2026-10-29): then it ends each as its teacher's End would, in its own transaction, and the
+  classes go in that same transaction, so a Start behind it finds no class.
 
 ## Auth
 
@@ -752,12 +777,28 @@ after a genuinely new event that belongs to a session), so no writer can forget 
 fires inside the write's transaction, so Postgres delivers it on commit, never for a
 rolled-back event. The overlap window is `EVENT_RESUME_OVERLAP` in `@bali/shared`: a
 `seq` is handed out when a row is inserted but only becomes visible on commit, so a slow
-transaction can make a lower seq appear after a higher one. The stream re-reads a sliding
-`lastSeq − overlap` window and a reconnecting client resumes from `lastSeq − overlap`,
-both de-duping by `event_id`, so a late-committing event is still delivered exactly once.
-The boot snapshot (`GET /v1/sessions/{id}`) returns the latest seq to stream from, so the
-grid loads and goes live in one round trip. The stream reads the Authorization header only
-— never a token in the query string — so the portal drives it with `fetch`, not
+transaction can make a lower seq appear after a higher one. The stream's re-read and a
+reconnecting client both start from the overlap below a point and de-dupe by `event_id`,
+so a late-committing event is still delivered exactly once. *Amended 2026-10-29:* that
+point is the lower of the newest seq seen and a **settled point**, a seq every write
+handed one at or below it has finished. The overlap alone did not cover it: seqs are
+counted across every session's events together, and one transaction can take more than
+the overlap before it commits (a Start joining a class's waiting taps writes a student's
+leave into the class they were in, then a seq for each student after). An insert takes the
+`events` table's write lock before its row gets a seq and holds it until it commits or
+rolls back, so the API reads the newest seq given out, then which transactions hold that
+lock, and calls the seq settled once each of them has ended (`apps/api/src/sse/settled.ts`).
+The stream sends each new settled point after the events it covers, as an SSE comment
+(`: settled N`) that an older portal skips like a heartbeat. The boot snapshot
+(`GET /v1/sessions/{id}`) returns the latest seq and a settled point read before its
+roster (`settledSeq`, additive; it waits up to a quarter second for writes on their way),
+so the grid loads and goes live in one round trip, its first connect starting below both.
+Neither names a seq past the session's own newest, so neither tells a teacher anything of
+other classes' events. A boot read from an older API names no settled point, and the
+portal resumes below its last seq alone, as before, whatever its stream says later. A
+write left open holds every settled point where it stands until it ends, and streams
+re-read what is above it meanwhile. The stream reads the Authorization header
+only — never a token in the query string — so the portal drives it with `fetch`, not
 `EventSource`. A stream lasts no longer than its access (2026-10-28): it ends at its token's
 expiry (Auth decision 2), and at the next re-poll once the route's own check, read again, refuses
 its caller or can't be read; the portal's reconnect then gets the 401 or 403 any request gets.

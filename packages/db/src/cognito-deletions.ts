@@ -5,7 +5,8 @@ import type { Database } from './types.js';
 
 /*
  * A deleted account's Cognito sign-in, queued for the API to delete from its pool (the owner's
- * decision, 2026-10-09; the API's half is apps/api/src/cognito/). Like device-tokens.ts these sit
+ * decision, 2026-10-09; the API's half is apps/api/src/cognito/), and since 2026-10-28 the sign-in
+ * of each person a retention run de-identifies, queued the same way. Like device-tokens.ts these sit
  * beside the transition engine: they never touch `participations` or `events`.
  */
 

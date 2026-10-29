@@ -59,8 +59,8 @@ export function streamErrorLog(code: string | undefined): {
 
 /**
  * The teacher grid's read + live sides (decision 5), all owner-only:
- * - GET /v1/sessions/:id — boot snapshot (session, roster, latest seq, the open question, what it
- *   shows).
+ * - GET /v1/sessions/:id — boot snapshot (session, roster, latest seq, the settled point its
+ *   stream resumes below, the open question, what it shows).
  * - GET /v1/sessions/:id/events?after=seq — catch-up page, seq-ascending.
  * - GET /v1/sessions/:id/stream — SSE live feed (Authorization header only, no
  *   token in the query string; the portal uses fetch, never EventSource).
@@ -84,6 +84,11 @@ export function registerFeedRoutes(
       const { id } = parseRequest(request, 'params', Params);
       const { session } = await requireSessionOwner(db, request, id);
 
+      // Taken first (ARCHITECTURE, Live updates): the roster read after it holds
+      // every event up to it, so the grid's stream can start below it and still
+      // meet an event that commits late under a seq below latestSeq. Sent no
+      // higher than latestSeq, so it says nothing of other classes' events.
+      const settled = await hub.settledSeq();
       // Read the cursor BEFORE the roster, never concurrently. Two independent
       // snapshots can straddle a commit: a roster read just before an unlock
       // paired with a latestSeq read just after would let the client's
@@ -108,6 +113,7 @@ export function registerFeedRoutes(
         },
         ended: session.endedAt !== null,
         latestSeq,
+        settledSeq: Math.min(settled, latestSeq),
         students: roster.map((r) => ({
           enrollmentId: r.enrollmentId,
           studentId: r.studentId,

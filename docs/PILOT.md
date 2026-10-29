@@ -178,7 +178,8 @@ At the end:
   for a session to build; the retention run de-identifies them at the term's end anyway.
 - **The retention run,** the week after `2026-12-18`: preview, then run
   `npm run school -- retention <school-id> [--confirm '<name>']` (runbook 1, step 12).
-  Named records become de-identified; counts stay.
+  Named records become de-identified and their sign-ins are deleted (runbook 9's key set
+  first); counts stay.
 - **Disposing of the school's data,** only on Vanderbilt's written request:
   `npm run school -- dispose <school-id>`, then with `--confirm` (runbook 1, step 11), and
   delete the school's sign-ins in Cognito. Its data waits in the backups until they age out:

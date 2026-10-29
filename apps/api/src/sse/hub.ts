@@ -2,6 +2,7 @@ import { type Database, getEventsSince } from '@bali/db';
 import { EVENT_PAGE_LIMIT, EVENT_RESUME_OVERLAP, STREAM_HEARTBEAT_MS } from '@bali/shared';
 
 import { frameFor } from './frame.js';
+import { type SettledCursor, settledCursorFor } from './settled.js';
 
 export interface StreamHubOptions {
   /**
@@ -13,6 +14,8 @@ export interface StreamHubOptions {
   heartbeatMs?: number;
   /** Live streams one teacher may hold at once. */
   maxPerTeacher?: number;
+  /** Where the streams' settled point comes from: the database's own unless a test gives one. */
+  settled?: SettledCursor;
 }
 
 export interface Subscriber {
@@ -51,6 +54,11 @@ export interface StreamHub {
   countForTeacher(teacherId: string): number;
   /** Attach a stream. The caller must have checked the per-teacher cap first. */
   subscribe(input: SubscribeInput): Subscriber;
+  /**
+   * The settled point as the grid's read takes it (`SettledCursor.fresh`): every event at or below
+   * it shows by the time it returns.
+   */
+  settledSeq(): Promise<number>;
   close(): Promise<void>;
 }
 
@@ -67,8 +75,11 @@ interface Internal {
  * re-reads the events table (the only source of truth) on a doorbell, on an
  * unconditional slow re-poll, and once at start. Correctness rests on the
  * re-poll; NOTIFY only cuts latency. Late-committing events (a low seq that
- * becomes visible after a higher one) are caught by re-reading a sliding
- * `EVENT_RESUME_OVERLAP` window and de-duping by event id (decision 2).
+ * becomes visible after a higher one) are caught by re-reading from the
+ * `EVENT_RESUME_OVERLAP` below the stream's settled point, or below the newest
+ * seq it sent when that is lower, and de-duping by event id (decision 2). A
+ * settled point is a seq every write handed one at or below it has finished
+ * (`SettledCursor`), so no event yet to show sits under where a read starts.
  *
  * A stream lasts no longer than the access that opened it: it ends at its token's expiry, and on
  * the first read after a re-poll once its caller's access, read again, is gone or can't be read.
@@ -76,6 +87,8 @@ interface Internal {
 export function createStreamHub(db: Database, options: StreamHubOptions = {}): StreamHub {
   const repollMs = options.repollMs ?? 20_000;
   const heartbeatMs = options.heartbeatMs ?? STREAM_HEARTBEAT_MS;
+  // Every stream here shares it: seqs are counted across all sessions' events together.
+  const cursor = options.settled ?? settledCursorFor(db);
   // The per-teacher cap is enforced at the route (before hijacking, so it returns
   // the standard 429); the hub only tracks counts via countForTeacher.
 
@@ -151,7 +164,19 @@ export function createStreamHub(db: Database, options: StreamHubOptions = {}): S
 
   function subscribe(input: SubscribeInput): Subscriber {
     let highSeq = input.after;
-    const delivered = new Map<string, number>(); // eventId -> seq, pruned to the window
+    // Every event of the session above `after` and at or below this has been sent here: the
+    // newest settled point a whole read of the session got past.
+    let settledHere = input.after;
+    // The settled point last sent to the client. Never above `highSeq`, so it names no seq beyond
+    // this session's own events.
+    let said = input.after;
+    const delivered = new Map<string, number>(); // eventId -> seq, pruned to where reads start
+    // A read of the session's events, page by page: where its next page starts, and the settled
+    // point taken before its first page.
+    let pass: { from: number; settled: number } | null = null;
+    // A doorbell or re-poll since the read under way began: its event may sit under the page that
+    // read has reached, so a fresh read follows it.
+    let woken = false;
     let running = false;
     let pending = false;
     let removed = false;
@@ -159,9 +184,23 @@ export function createStreamHub(db: Database, options: StreamHubOptions = {}): S
     let recheck = false;
     let expiry: ReturnType<typeof setTimeout> | undefined;
 
+    /**
+     * Where a read starts: the overlap below the settled point, or below the newest seq sent when
+     * that is lower. Never past the settled point, so an event still committing under a seq below
+     * the ones sent is read when it shows. It never moves back, so what is pruned below it is never
+     * read again.
+     */
+    const floor = (): number => Math.max(0, Math.min(highSeq, settledHere) - EVENT_RESUME_OVERLAP);
+
     async function readOnce(): Promise<boolean> {
-      const from = Math.max(0, highSeq - EVENT_RESUME_OVERLAP);
-      const rows = await getEventsSince(db, input.sessionId, from, EVENT_PAGE_LIMIT);
+      if (pass === null) {
+        woken = false;
+        // Read before the first page, so each page sees every event up to it.
+        const settled = await cursor.now();
+        pass = { from: floor(), settled };
+      }
+      const current = pass;
+      const rows = await getEventsSince(db, input.sessionId, current.from, EVENT_PAGE_LIMIT);
       for (const row of rows) {
         // The stream can be torn down while this read is in flight — a closed
         // tab, or the shutdown hook — and close() ends the HTTP response as it
@@ -170,15 +209,27 @@ export function createStreamHub(db: Database, options: StreamHubOptions = {}): S
         // land inside this loop, which is exactly what a client disconnecting
         // mid-delivery looks like.
         if (removed || closed) return false;
+        current.from = row.seq;
         if (row.seq <= input.after) continue; // at/below the resume point; the client has it
         if (delivered.has(row.eventId)) continue; // already sent on this stream
         input.write(frameFor(row));
         delivered.set(row.eventId, row.seq);
         if (row.seq > highSeq) highSeq = row.seq;
       }
-      const cutoff = highSeq - EVENT_RESUME_OVERLAP;
+      if (rows.length >= EVENT_PAGE_LIMIT) return true; // a full page: the read goes on
+      pass = null;
+      if (removed || closed) return false;
+      settledHere = Math.max(settledHere, current.settled);
+      const point = Math.min(settledHere, highSeq);
+      if (point > said) {
+        said = point;
+        // Sent after every event up to it, as a comment line: an older portal passes over it as
+        // it passes over the heartbeat, and a current one resumes from below it (sse-client.ts).
+        input.write(`: settled ${point}\n\n`);
+      }
+      const cutoff = floor();
       for (const [id, seq] of delivered) if (seq <= cutoff) delivered.delete(id);
-      return rows.length >= EVENT_PAGE_LIMIT; // a full page — a backlog may remain
+      return woken;
     }
 
     async function run(): Promise<void> {
@@ -201,7 +252,7 @@ export function createStreamHub(db: Database, options: StreamHubOptions = {}): S
             if (removed || closed) return;
           }
           const more = await readOnce();
-          if (more) pending = true; // keep draining a backlog
+          if (more) pending = true; // keep draining a backlog, or read again after a wake
         } while (pending && !removed && !closed);
       } catch {
         close();
@@ -211,7 +262,9 @@ export function createStreamHub(db: Database, options: StreamHubOptions = {}): S
     }
 
     function wake(): void {
-      if (!removed && !closed) void run();
+      if (removed || closed) return;
+      woken = true;
+      void run();
     }
 
     const repoll = setInterval(() => {
@@ -312,5 +365,5 @@ export function createStreamHub(db: Database, options: StreamHubOptions = {}): S
     }
   }
 
-  return { countForTeacher, subscribe, close };
+  return { countForTeacher, subscribe, settledSeq: () => cursor.fresh(), close };
 }

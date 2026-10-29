@@ -1,4 +1,4 @@
-import { type ApiErrorReason, MAX_SESSION_MINUTES } from '@bali/shared';
+import { type ApiErrorReason, MAX_SESSION_MINUTES, MAX_SESSION_TOTAL_MINUTES } from '@bali/shared';
 
 import { ApiError, NetworkError } from './api-client';
 
@@ -104,6 +104,10 @@ const REFUSALS = new Map<string | undefined, string>(
     // 12). An End in that gap ends it at its bell and shows the recap, and a Start then works.
     session_not_running:
       'This session is past its bell, so no time was added. End it, then start a new one.',
+    // The same route, for time that would run the session past MAX_SESSION_TOTAL_MINUTES from
+    // its start (the owner, 2026-10-28; drawn first on ClassStates): nothing was added, and its
+    // bell stands.
+    session_too_long: `A session runs ${MAX_SESSION_TOTAL_MINUTES / 60} hours at most, so no time was added. It ends at the time shown.`,
   } satisfies Partial<Record<ApiErrorReason, string>>),
 );
 

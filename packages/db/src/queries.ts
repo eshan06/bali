@@ -976,6 +976,41 @@ export async function getEventsSince(
     .limit(limit);
 }
 
+/** A raw statement's rows, whichever driver ran it: postgres.js answers an array, PGlite `{ rows }`. */
+function rowsOf<T>(result: unknown): T[] {
+  return Array.isArray(result) ? (result as T[]) : (result as { rows: T[] }).rows;
+}
+
+/**
+ * The newest seq the events table's counter has given out, its row committed or not; 0 before the
+ * first. The counter caches one value at a time (migration 0000), so no seq up to this one is given
+ * out later. Half of a live stream's settled point (`apps/api/src/sse/settled.ts`).
+ */
+export async function eventSeqHandedOut(db: Database): Promise<number> {
+  const [row] = rowsOf<{ seq: string | null }>(
+    await db.execute(
+      sql`select pg_sequence_last_value(pg_get_serial_sequence('events', 'seq')::regclass)::text as seq`,
+    ),
+  );
+  return Number(row?.seq ?? 0);
+}
+
+/**
+ * The transactions writing events now, by their virtual ids: the other half of a live stream's
+ * settled point. An insert takes the table's ROW EXCLUSIVE lock before its row gets a seq, and its
+ * transaction keeps the lock until it commits or rolls back, so a write that got a seq is named
+ * here until its row shows or never will. This database's locks only.
+ */
+export async function eventWriters(db: Database): Promise<string[]> {
+  const rows = rowsOf<{ vxid: string }>(
+    await db.execute(sql`select distinct virtualtransaction as vxid from pg_locks
+      where locktype = 'relation' and mode = 'RowExclusiveLock'
+        and database = (select oid from pg_database where datname = current_database())
+        and relation = 'events'::regclass`),
+  );
+  return rows.map((r) => r.vxid);
+}
+
 export interface ReportEventRow extends FeedEventRow {
   /** Its student's display name now; null when they have none, or the event names no one. */
   displayName: string | null;

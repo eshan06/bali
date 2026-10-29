@@ -24,6 +24,8 @@ import type {
   UnlockResponse,
 } from '@bali/shared';
 import {
+  MAX_SESSION_MINUTES,
+  MAX_SESSION_TOTAL_MINUTES,
   SILENCE_THRESHOLD_MS,
   stateChangeDisposition,
   tapDisposition,
@@ -269,6 +271,62 @@ describe('POST /v1/sessions/:id/extend', () => {
     expect(res.json()).toEqual({
       error: { code: 'conflict', reason: 'session_not_running', message: 'session has ended' },
     });
+  });
+
+  it('time past 16 hours in all is a 409 session_too_long, nothing recorded; time landing on them is taken (the owner, 2026-10-28)', async () => {
+    // As the longest Start makes it: 480 minutes from its start, a minute ago.
+    const { klass, teacher } = await seedClassroom(db, 'extend-total');
+    const startedAt = new Date(Date.now() - 60_000);
+    const { session } = await startSession(db, {
+      classId: klass.id,
+      startedAt,
+      endsAt: new Date(startedAt.getTime() + MAX_SESSION_MINUTES * 60_000),
+    });
+    const token = await ctx.tokenFor(teacher.cognitoId);
+    const extend = (durationMinutes: number, eventId: string) =>
+      post(token, `/v1/sessions/${session.id}/extend`, { durationMinutes, eventId });
+    const cap = new Date(startedAt.getTime() + MAX_SESSION_TOTAL_MINUTES * 60_000).toISOString();
+
+    // The longest extend lands exactly on 16 hours: taken.
+    const landedId = randomUUID();
+    const landed = await extend(MAX_SESSION_MINUTES, landedId);
+    expect(landed.statusCode).toBe(200);
+    expect(landed.json<ExtendSessionResponse>()).toEqual({
+      outcome: 'extended',
+      session: { id: session.id, classId: klass.id, endsAt: cap },
+    });
+
+    // Five minutes more is past them: refused in a reason of its own, every time, the refused id
+    // sent again included, since nothing was recorded under it.
+    const refusedId = randomUUID();
+    for (const eventId of [refusedId, refusedId, randomUUID()]) {
+      const res = await extend(5, eventId);
+      expect(res.statusCode).toBe(409);
+      expect(res.json()).toEqual({
+        error: {
+          code: 'conflict',
+          reason: 'session_too_long',
+          message: 'a session runs at most 16 hours in all',
+        },
+      });
+    }
+
+    // The landed one's retry is its replay still: the truth, never the refusal (rule 4).
+    const replay = await extend(MAX_SESSION_MINUTES, landedId);
+    expect(replay.statusCode).toBe(200);
+    expect(replay.json<ExtendSessionResponse>().session.endsAt).toBe(cap);
+
+    // The history holds the one extend, and the grid's bell is the bound's.
+    const extended = await db
+      .select()
+      .from(events)
+      .where(and(eq(events.sessionId, session.id), eq(events.type, 'session_extended')));
+    expect(extended.map((e) => e.eventId)).toEqual([landedId]);
+    const snap = await authedInject(ctx.app, token, {
+      method: 'GET',
+      url: `/v1/sessions/${session.id}`,
+    });
+    expect(snap.json<SessionSnapshot>().session.endsAt).toBe(cap);
   });
 
   it('rejects a bad duration (400)', async () => {

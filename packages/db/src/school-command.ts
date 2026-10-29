@@ -16,7 +16,9 @@ import {
   applyRetention,
   type DisposalCounts,
   disposeSchool,
+  endRunningSession,
   type RetentionCounts,
+  type RunningLesson,
 } from './transitions.js';
 import type { Database } from './types.js';
 
@@ -24,11 +26,14 @@ import type { Database } from './types.js';
  * The owner's school commands, `npm run school -- <command>`
  * (apps/api/scripts/school.ts): add a school, record its data agreement, mint a
  * teacher invite, list the schools, export one student's record, dispose of a
- * school's data, record its year's end and run its retention, against
- * DATABASE_URL as `npm run migrate`
+ * school's data, record its year's end and run its retention, and end a running
+ * lesson, against DATABASE_URL as `npm run migrate`
  * is. Every argument is checked before anything connects, and each refusal says
  * what was wrong and how to say it.
  */
+
+/** The disposal's word to end the school's running lessons as it disposes (2026-10-28). */
+const END_LESSONS = '--end-lessons';
 
 export const SCHOOL_USAGE = `usage: npm run school -- <command>
 
@@ -48,19 +53,29 @@ export const SCHOOL_USAGE = `usage: npm run school -- <command>
   dispose <school-id> --confirm "<name>"
                                 dispose of it: its teachers and students de-identified, its
                                 classes, blocks and open invites removed, logged by counts and
-                                never a name. Refused while a lesson of it runs
+                                never a name. Refused while a lesson of it runs, naming each
+  dispose <school-id> [--confirm "<name>"] --end-lessons
+                                the same, but a lesson of it still running is ended as its
+                                teacher's End ends it, in the disposal; the preview ends none
+  end-session <session-id>      end a running lesson now, as its teacher's End ends it; one
+                                over already is left as it is
   retention <school-id>         once the school's year is over, who its retention run would
                                 de-identify; it writes nothing
   retention <school-id> --confirm "<name>"
                                 run it: everyone whose records all lie in the year that ended
-                                de-identified, their classes left; the lessons stay, logged by
-                                counts and never a name
+                                de-identified, their classes left and their sign-ins queued for
+                                deletion; the lessons stay, logged by counts and never a name
 
-It runs against DATABASE_URL, as npm run migrate does.`;
+It runs against DATABASE_URL, as npm run migrate does; retention also needs AUTH_ISSUER, the
+Cognito pool the API service deletes those sign-ins from.`;
 
 export interface SchoolCommandIO {
   db: Database;
   print: (line: string) => void;
+  /**
+   * This deploy's Cognito pool, its `AUTH_ISSUER`: where retention queues the sign-ins it removes.
+   */
+  issuer?: string;
 }
 
 /** A command whose arguments are checked, ready to run. */
@@ -138,19 +153,34 @@ export function parseSchoolCommand(
       return (io) => exportStudent(io, who.trim());
     }
     case 'dispose': {
-      const [schoolId, flag, name, ...extra] = args;
+      const [schoolId, ...rest] = args;
       if (schoolId === undefined) {
         throw new Error(`dispose needs the school's id: dispose <school-id>`);
       }
       checkSchoolId(schoolId);
-      if (flag === undefined) return (io) => dispose(io, schoolId);
+      // Last, after the name when there is one; a word after `--confirm` is the name, whatever it is.
+      const endLessons = rest.at(-1) === END_LESSONS && rest.at(-2) !== '--confirm';
+      const [flag, name, ...extra] = endLessons ? rest.slice(0, -1) : rest;
+      if (flag === undefined) return (io) => dispose(io, schoolId, undefined, endLessons);
       if (flag !== '--confirm' || !name?.trim()) {
         throw new Error(
-          `dispose is confirmed with the school's name: dispose <school-id> --confirm "<name>"`,
+          `dispose is confirmed with the school's name: ` +
+            `dispose <school-id> --confirm "<name>" [${END_LESSONS}]`,
         );
       }
       nothingMore(extra);
-      return (io) => dispose(io, schoolId, name);
+      return (io) => dispose(io, schoolId, name, endLessons);
+    }
+    case 'end-session': {
+      const [sessionId, ...extra] = args;
+      if (sessionId === undefined) {
+        throw new Error(`end-session needs the session's id: end-session <session-id>`);
+      }
+      nothingMore(extra);
+      if (!isUuid(sessionId)) {
+        throw new Error(`"${sessionId}" is not a session id: dispose prints each running lesson's`);
+      }
+      return (io) => endSessionNow(io, sessionId);
     }
     case 'retention': {
       const [schoolId, flag, name, ...extra] = args;
@@ -317,18 +347,46 @@ const tally = (c: DisposalCounts) =>
   `pre-bell taps ${c.armedTaps}`;
 
 /**
+ * What a terminal would act on, or hide, rather than show, past what JSON escapes: the API's
+ * `UNPRINTABLE` (display-name.ts), less the lone surrogate halves JSON escapes itself.
+ */
+const UNSHOWN = /[\p{Cc}\p{Zl}\p{Zp}]|(?![\u200c\u200d])\p{Cf}/gu;
+
+/**
+ * A teacher's words, a class's name, quoted for the owner's terminal: as JSON quotes them, and each
+ * character that would still act on it or hide (a C1 control, a bidi override, a line separator)
+ * written as its code point, so no name can redraw or hide what a command prints.
+ */
+const quoted = (text: string) =>
+  JSON.stringify(text).replace(UNSHOWN, (c) => `\\u{${(c.codePointAt(0) ?? 0).toString(16)}}`);
+
+/** Each lesson by its session, its class and its bell: what ending it, or waiting, needs. */
+const lessons = (running: RunningLesson[]) =>
+  running
+    .map(
+      (l) =>
+        `Session ${l.sessionId}, in class ${quoted(l.className)} (${l.classId}), its bell at ` +
+        `${l.endsAt.toISOString()}.`,
+    )
+    .join(' ');
+
+/**
  * Without a name, what the disposal would take; with the school's own, the
- * disposal, logged by the school's id and counts alone (C6a).
+ * disposal, logged by the school's id and counts alone (C6a). With `endLessons`,
+ * a lesson of the school still running is ended in it, as its teacher's End ends it.
  */
 async function dispose(
   { db, print }: SchoolCommandIO,
   schoolId: string,
-  confirmName?: string,
+  confirmName: string | undefined,
+  endLessons: boolean,
 ): Promise<void> {
   // This machine's clock, the server's inside the API service (runbook 1, step 11). No
   // eventId: a re-run is answered by the school row, which says it is disposed of already.
   const at = new Date();
-  const result = await disposeSchool(db, { schoolId, at, confirmName });
+  const result = await disposeSchool(db, { schoolId, at, confirmName, endLessons });
+  // Carried into each line it suggests, so following one keeps what was asked.
+  const flag = endLessons ? ` ${END_LESSONS}` : '';
   switch (result.outcome) {
     case 'unknown_school':
       throw new Error(noSchool(schoolId));
@@ -342,12 +400,14 @@ async function dispose(
     case 'name_mismatch':
       throw new Error(
         `school ${schoolId} is named "${result.school.name}"; nothing was written. ` +
-          `To confirm: dispose ${schoolId} --confirm ${shellQuote(result.school.name)}`,
+          `To confirm: dispose ${schoolId} --confirm ${shellQuote(result.school.name)}${flag}`,
       );
     case 'in_session':
       throw new Error(
-        `"${result.school.name}" has ${result.sessions} lesson(s) running; nothing was written. ` +
-          'Run it again after the bell.',
+        `"${result.school.name}" has ${result.running.length} lesson(s) running; nothing was ` +
+          `written. ${lessons(result.running)} Run it again after the bell; or end one now: ` +
+          'npm run school -- end-session <session-id>; or end them as it disposes, ' +
+          `previewed first: npm run school -- dispose ${schoolId} ${END_LESSONS}`,
       );
     case 'shared_accounts':
       throw new Error(
@@ -360,6 +420,12 @@ async function dispose(
       print(
         `disposing of "${result.school.name}" (${schoolId}) would take: ${tally(result.counts)}`,
       );
+      if (result.ended.length > 0) {
+        print(
+          `It would end ${result.ended.length} lesson(s) still running, as their teacher's End ` +
+            `would: ${lessons(result.ended)}`,
+        );
+      }
       print(
         'Its teachers and students would be de-identified, its classes, blocks and open invites ' +
           'removed; its lessons stay, naming no one. Nothing was written.',
@@ -369,11 +435,48 @@ async function dispose(
           '(docs/RUNBOOKS.md, runbook 1, step 10).',
       );
       print(
-        `To go ahead: npm run school -- dispose ${schoolId} --confirm ${shellQuote(result.school.name)}`,
+        `To go ahead: npm run school -- dispose ${schoolId} --confirm ${shellQuote(result.school.name)}${flag}`,
       );
       return;
     case 'disposed':
-      print(`disposed of school ${schoolId} on ${at.toISOString()}: ${tally(result.counts)}`);
+      print(
+        `disposed of school ${schoolId} on ${at.toISOString()}: ${tally(result.counts)}` +
+          (result.ended.length > 0
+            ? `; it ended ${result.ended.length} lesson(s) still running: ` +
+              result.ended.map((l) => l.sessionId).join(', ')
+            : ''),
+      );
+      return;
+    default:
+      return unreachable(result);
+  }
+}
+
+/**
+ * A running lesson ended now, as its teacher's End ends it (the owner's decision
+ * of 2026-10-28); one over already is left as it is, and said so.
+ */
+async function endSessionNow({ db, print }: SchoolCommandIO, sessionId: string): Promise<void> {
+  // This machine's clock, the server's inside the API service (runbook 1, step 9).
+  const at = new Date();
+  const result = await endRunningSession(db, { sessionId, at });
+  switch (result.outcome) {
+    case 'unknown_session':
+      throw new Error(`no session on record has the id ${sessionId}`);
+    case 'over':
+      print(
+        `session ${sessionId} was over already: ` +
+          (result.endedAt
+            ? `it ended on ${result.endedAt.toISOString()}`
+            : `its bell rang at ${result.endsAt.toISOString()}, and the sweep marks it so`) +
+          '; nothing changed',
+      );
+      return;
+    case 'ended':
+      print(
+        `ended session ${sessionId} on ${at.toISOString()}, as its teacher's End would: ` +
+          `${result.endedParticipations} student(s) were in it`,
+      );
       return;
     default:
       return unreachable(result);
@@ -391,16 +494,24 @@ const retained = (c: RetentionCounts) =>
 /**
  * Without a name, whom the school's retention run would de-identify; with the
  * school's own, the run, logged by the school's id, the year's last day and
- * counts alone (C6b).
+ * counts alone (C6b). Refused, before anything is read, without this deploy's
+ * Cognito pool: a sign-in queued under any other would never be deleted.
  */
 async function retention(
-  { db, print }: SchoolCommandIO,
+  { db, print, issuer }: SchoolCommandIO,
   schoolId: string,
   confirmName?: string,
 ): Promise<void> {
+  if (!issuer) {
+    throw new Error(
+      "AUTH_ISSUER isn't set here, so nothing was written: the run needs this deploy's Cognito " +
+        "pool to delete the sign-ins of everyone it de-identifies. Run it in the API service's " +
+        'shell, where it is set (docs/RUNBOOKS.md, runbook 1, step 9).',
+    );
+  }
   // This machine's clock, the server's inside the API service: it judges the year over.
   const at = new Date();
-  const result = await applyRetention(db, { schoolId, at, confirmName });
+  const result = await applyRetention(db, { schoolId, at, confirmName, issuer });
   const setYearEnd = `npm run school -- year-end ${schoolId} YYYY-MM-DD`;
   switch (result.outcome) {
     case 'unknown_school':
@@ -441,7 +552,10 @@ async function retention(
             result.continuing.join(', '),
         );
       }
-      print('Their lessons, taps and unlocks stay, naming no one. Nothing was written.');
+      print(
+        'Their Cognito sign-ins would go too, deleted by the API (docs/RUNBOOKS.md, runbook 9); ' +
+          'their lessons, taps and unlocks stay, naming no one. Nothing was written.',
+      );
       print(
         "First check no parent's inspection request is open for one of its students " +
           '(docs/RUNBOOKS.md, runbook 1, step 10).',

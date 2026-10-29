@@ -34,15 +34,23 @@ const bali = vi.hoisted(() => {
   // One client and one sign-out for every render, as the hooks' memos keep them: the grid reads
   // once as it opens.
   const signOut = () => undefined;
-  return { reads, api: { get }, signOut };
+  /** What the grid asked of each stream it opened. */
+  const streams: unknown[] = [];
+  return { reads, api: { get }, signOut, streams };
 });
 
 vi.mock('@/lib/use-api', () => ({ useApi: () => bali.api, useSignOut: () => bali.signOut }));
-// No stream: the grid is its snapshot.
-vi.mock('@/lib/sse-client', () => ({ createSseClient: () => ({ close: () => undefined }) }));
+// No stream: the grid is its snapshot. What it asked for is kept.
+vi.mock('@/lib/sse-client', () => ({
+  createSseClient: (options: unknown) => {
+    bali.streams.push(options);
+    return { close: () => undefined };
+  },
+}));
 
 afterEach(() => {
   bali.reads.length = 0;
+  bali.streams.length = 0;
   cleanup();
 });
 
@@ -73,7 +81,11 @@ const unlock = (name: string, reason: UnlockReason) => ({
 });
 
 /** The grid on the class page while a session runs, or in Present, once Bali answers its read. */
-async function open(present: boolean, students: SnapshotStudent[]) {
+async function open(
+  present: boolean,
+  students: SnapshotStudent[],
+  more: Partial<SessionSnapshot> = {},
+) {
   render(<LiveGrid sessionId="S" livePage present={present} />);
   const snapshot: SessionSnapshot = {
     session: {
@@ -85,6 +97,7 @@ async function open(present: boolean, students: SnapshotStudent[]) {
     ended: false,
     latestSeq: 12,
     students,
+    ...more,
   };
   await act(async () => {
     const read = bali.reads.shift();
@@ -206,5 +219,17 @@ describe('the live grid on the class page and in Present (ClassPresent)', () => 
       expect(parts('Omar Siddiqui')).toEqual(['Omar Siddiqui', 'Focused']);
       cleanup();
     }
+  });
+});
+
+describe('the live grid’s stream', () => {
+  it('goes live from its read: its latest seq, and the settled point its stream resumes below', async () => {
+    // ARCHITECTURE, Live updates: an event committing late under a seq below the read's newest is
+    // still brought, as the stream resumes below the settled point the read names.
+    await open(false, [student('Omar Siddiqui')], { latestSeq: 12, settledSeq: 7 });
+    expect(bali.streams).toHaveLength(1);
+    const asked = bali.streams[0] as { url: string; after: number; settled?: number };
+    expect(asked.url).toMatch(/\/v1\/sessions\/S\/stream$/);
+    expect(asked).toMatchObject({ after: 12, settled: 7 });
   });
 });
