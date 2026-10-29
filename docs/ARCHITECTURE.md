@@ -758,7 +758,9 @@ both de-duping by `event_id`, so a late-committing event is still delivered exac
 The boot snapshot (`GET /v1/sessions/{id}`) returns the latest seq to stream from, so the
 grid loads and goes live in one round trip. The stream reads the Authorization header only
 — never a token in the query string — so the portal drives it with `fetch`, not
-`EventSource`.
+`EventSource`. A stream lasts no longer than its access (2026-10-28): it ends at its token's
+expiry (Auth decision 2), and at the next re-poll once the route's own check, read again, refuses
+its caller or can't be read; the portal's reconnect then gets the 401 or 403 any request gets.
 
 *Amended 2026-10-05 (Phase 7, Live lesson, decision 7):* students still get no stream — a
 phone follows a live lesson by polling `GET /v1/sessions/{id}/presentation` in the

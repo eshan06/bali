@@ -4,7 +4,10 @@ import { EVENT_PAGE_LIMIT, EVENT_RESUME_OVERLAP, STREAM_HEARTBEAT_MS } from '@ba
 import { frameFor } from './frame.js';
 
 export interface StreamHubOptions {
-  /** How often each stream re-reads the table regardless of NOTIFY (~20s in prod). */
+  /**
+   * How often each stream re-reads the table regardless of NOTIFY (~20s in prod), its caller's
+   * access read again first.
+   */
   repollMs?: number;
   /** How often to send an SSE comment so idle connections and proxies stay open (~20s). */
   heartbeatMs?: number;
@@ -21,11 +24,28 @@ export interface SubscribeInput {
   teacherId: string;
   /** Resume point: only events with seq greater than this are delivered. */
   after: number;
+  /**
+   * When the caller's access token expires, in ms since the epoch on the clock the verifier reads;
+   * null for a token that carries no expiry. The stream ends then: a token's reach ends at its
+   * expiry (ARCHITECTURE, Auth decision 2).
+   */
+  expiresAtMs: number | null;
+  /**
+   * Whether the caller may still read this stream, read again before the first read after each
+   * re-poll. False, or a rejection (the check could not be read), ends the stream.
+   */
+  stillAllowed: () => Promise<boolean>;
   /** Write an SSE chunk to the client. May throw if the socket is gone. */
   write: (chunk: string) => void;
-  /** Called when the stream fails (a write throws or a read errors) so the route ends the response. */
+  /**
+   * Called when the stream ends here (a write throws, a read errors, its token expires or its
+   * caller's access is gone) so the route ends the response.
+   */
   onClose: () => void;
 }
+
+/** The longest delay a Node timer holds: past it, a timer fires at once. */
+const MAX_TIMER_MS = 2 ** 31 - 1;
 
 export interface StreamHub {
   countForTeacher(teacherId: string): number;
@@ -49,6 +69,9 @@ interface Internal {
  * re-poll; NOTIFY only cuts latency. Late-committing events (a low seq that
  * becomes visible after a higher one) are caught by re-reading a sliding
  * `EVENT_RESUME_OVERLAP` window and de-duping by event id (decision 2).
+ *
+ * A stream lasts no longer than the access that opened it: it ends at its token's expiry, and on
+ * the first read after a re-poll once its caller's access, read again, is gone or can't be read.
  */
 export function createStreamHub(db: Database, options: StreamHubOptions = {}): StreamHub {
   const repollMs = options.repollMs ?? 20_000;
@@ -132,6 +155,9 @@ export function createStreamHub(db: Database, options: StreamHubOptions = {}): S
     let running = false;
     let pending = false;
     let removed = false;
+    // Set by each re-poll: the caller's access is read again before the next read.
+    let recheck = false;
+    let expiry: ReturnType<typeof setTimeout> | undefined;
 
     async function readOnce(): Promise<boolean> {
       const from = Math.max(0, highSeq - EVENT_RESUME_OVERLAP);
@@ -164,6 +190,16 @@ export function createStreamHub(db: Database, options: StreamHubOptions = {}): S
       try {
         do {
           pending = false;
+          if (recheck) {
+            // Inside the loop, so a check and a read never overlap and a re-poll that lands
+            // mid-read is checked before the read after it, a doorbell's included.
+            recheck = false;
+            if (!(await input.stillAllowed())) {
+              close();
+              return;
+            }
+            if (removed || closed) return;
+          }
           const more = await readOnce();
           if (more) pending = true; // keep draining a backlog
         } while (pending && !removed && !closed);
@@ -178,7 +214,10 @@ export function createStreamHub(db: Database, options: StreamHubOptions = {}): S
       if (!removed && !closed) void run();
     }
 
-    const repoll = setInterval(wake, repollMs);
+    const repoll = setInterval(() => {
+      recheck = true;
+      wake();
+    }, repollMs);
     const heartbeat = setInterval(() => {
       try {
         input.write(': keepalive\n\n');
@@ -187,11 +226,24 @@ export function createStreamHub(db: Database, options: StreamHubOptions = {}): S
       }
     }, heartbeatMs);
 
+    /**
+     * End the stream once its token has expired, on the verifier's clock, which refuses a token
+     * from the millisecond its `exp` names. An expiry further off than a timer holds is waited out
+     * in steps.
+     */
+    function armExpiry(expiresAtMs: number): void {
+      if (removed) return;
+      const left = expiresAtMs - Date.now();
+      if (left <= 0) close();
+      else expiry = setTimeout(() => armExpiry(expiresAtMs), Math.min(left, MAX_TIMER_MS));
+    }
+
     function close(): void {
       if (removed) return;
       removed = true;
       clearInterval(repoll);
       clearInterval(heartbeat);
+      clearTimeout(expiry);
       const set = bySession.get(input.sessionId);
       set?.delete(sub);
       if (set && set.size === 0) bySession.delete(input.sessionId);
@@ -209,8 +261,13 @@ export function createStreamHub(db: Database, options: StreamHubOptions = {}): S
     set.add(sub);
     byTeacher.set(input.teacherId, countForTeacher(input.teacherId) + 1);
 
-    ensureListening();
-    void run(); // initial catch-up from `after`
+    // Armed once the stream is registered, so a token that expired on its way here ends it, its
+    // slot given back, before any read.
+    if (input.expiresAtMs !== null) armExpiry(input.expiresAtMs);
+    if (!removed) {
+      ensureListening();
+      void run(); // initial catch-up from `after`
+    }
 
     return { close };
   }

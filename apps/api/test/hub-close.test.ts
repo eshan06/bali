@@ -65,6 +65,8 @@ describe('the stream hub settles its LISTEN before close() returns', () => {
       sessionId: '11111111-1111-4111-8111-111111111111',
       teacherId: '22222222-2222-4222-8222-222222222222',
       after: 0,
+      expiresAtMs: null,
+      stillAllowed: () => Promise.resolve(true),
       write: () => {},
       onClose: () => {},
     });
