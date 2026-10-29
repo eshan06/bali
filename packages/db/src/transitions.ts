@@ -123,6 +123,12 @@ import type { Database } from './types.js';
  * another session (`tappedSince`, one range of `events_order_tap_idx`), inside
  * the window — ~6.8 ms per tap against ~6.2 ms on this lane's runner the same
  * way, medians of four alternating runs: about a round trip each.
+ *
+ * A19's check of the class added one, inside the window: the look for the
+ * student's enrollment there (`inClass`, one probe of
+ * `enrollments_active_unique`) — about a round trip too: ~28.8 ms per tap
+ * against ~27.0 ms, medians of four alternating runs of 29 taps, on a Postgres
+ * in Docker on Windows, whose round trips are several times this lane's.
  */
 
 /** Every refusal the engine can make — a list, so a test can walk them all (A5). */
@@ -1718,16 +1724,37 @@ export interface TapInput {
   now?: Date;
 }
 export interface TapResult {
-  outcome: 'joined' | 'switched' | 'replay';
+  /**
+   * `not_enrolled`: the student is out of the session's class by the time its
+   * lock is held, removed since the route picked it (A19), so nothing is
+   * recorded and nothing joins; the route reads the tap afresh.
+   */
+  outcome: 'joined' | 'switched' | 'replay' | 'not_enrolled';
   /**
    * `unlocked` on a join that filed an unlock sent under this tap before it
    * arrived (decision 11). Null, as `participationId` and `session` are, on the
-   * replay of a tap no longer current (A4).
+   * replay of a tap no longer current (A4) and on `not_enrolled`.
    */
   state: ParticipationState | null;
   participationId: string | null;
   /** The session the tap is live in: never one it is no longer in, since it drives a shield. */
   session: SessionRow | null;
+}
+
+/** Whether the student is in the class now: an enrollment of theirs there not removed. */
+async function inClass(tx: Database, classId: string, studentId: string): Promise<boolean> {
+  const enrolled = await tx
+    .select({ id: enrollments.id })
+    .from(enrollments)
+    .where(
+      and(
+        eq(enrollments.classId, classId),
+        eq(enrollments.studentId, studentId),
+        isNull(enrollments.removedAt),
+      ),
+    )
+    .limit(1);
+  return enrolled.length > 0;
 }
 
 /** The teacher a class belongs to. */
@@ -1774,8 +1801,10 @@ async function lockStudentTaps(tx: Database, studentId: string): Promise<void> {
 /**
  * A tap into a running session — running at `now`, by `sessionRunning`: past
  * its bell, swept or not, it is refused as a swept one's is, and never joined
- * (A17; the route arms such a tap, as when nothing runs). If the student is
- * live in another session, that participation is ended as
+ * (A17; the route arms such a tap, as when nothing runs) — of a class the
+ * student is in, judged under the same lock: one their teacher removed them
+ * from since the route picked it records nothing (`not_enrolled`, A19). If the
+ * student is live in another session, that participation is ended as
  * `left_for_other_session` first (decision 4),
  * so switching classes is never counted as an emergency unlock. Reactivating a
  * participation in a session the student previously left updates the existing
@@ -1955,6 +1984,15 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
           .where(eq(users.id, input.studentId)),
       );
       if (caller?.removedAt) throw accountDeleted();
+      // Removed from the class after the route found it: a removal marks the
+      // enrollment only while holding this session's row (`endLiveEnrollment`),
+      // so read under it the answer is final, and one still on its way ends
+      // whatever this tap writes. Nothing is recorded, so a student out of the
+      // class is never live in its lesson (A19); the route reads the tap
+      // afresh, and it lands as it would have had the removal come first.
+      if (!(await inClass(tx, session.classId, input.studentId))) {
+        return { outcome: 'not_enrolled', state: null, participationId: null, session: null };
+      }
 
       const occurredAt = clampToWindow(input.deviceTime, session.startedAt, session.endsAt);
       const order = knownOrder(input.order);
@@ -2715,21 +2753,8 @@ async function unlockIn(
   // This does not weaken ISSUES #2: a student removed mid-session still has
   // their (now ended) participation row, so they keep attaching to the
   // session and their unlock is recorded against it exactly as before.
-  if (row === undefined) {
-    const enrolled = await tx
-      .select({ id: enrollments.id })
-      .from(enrollments)
-      .where(
-        and(
-          eq(enrollments.classId, session.classId),
-          eq(enrollments.studentId, input.studentId),
-          isNull(enrollments.removedAt),
-        ),
-      )
-      .limit(1);
-    if (enrolled.length === 0) {
-      return recordOrphanUnlock(tx, input, 'not_enrolled', { claimed_session_id: session.id });
-    }
+  if (row === undefined && !(await inClass(tx, session.classId, input.studentId))) {
+    return recordOrphanUnlock(tx, input, 'not_enrolled', { claimed_session_id: session.id });
   }
 
   const live = row !== undefined && row.endedAt === null ? row : undefined;

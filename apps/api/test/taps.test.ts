@@ -4,6 +4,7 @@ import {
   type Database,
   endSession,
   enrollments,
+  events,
   expireDueSessions,
   extendSession,
   participations,
@@ -450,51 +451,51 @@ describe('POST /v1/taps', () => {
 // never happened says so, rather than dying as vitest's own 5 s time-out.
 const REAL_PG = Boolean(process.env.TEST_DATABASE_URL);
 
+/** Take `sessionId`'s row and hold it: whatever locks it parks, in order, until the release. */
+async function hold(sessionId: string): Promise<() => Promise<void>> {
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let locked!: () => void;
+  const hasLock = new Promise<void>((resolve) => {
+    locked = resolve;
+  });
+  const holder = db
+    .transaction(async (tx) => {
+      await tx.select().from(sessions).where(eq(sessions.id, sessionId)).for('update');
+      locked();
+      await held;
+      throw new Error('rolled back on purpose');
+    })
+    .catch(() => undefined);
+  await hasLock;
+  return async () => {
+    release();
+    await holder;
+  };
+}
+
+/** Until `n` backends wait on a lock — or `call` has answered without waiting. */
+async function parked(n: number, call: Promise<unknown>): Promise<void> {
+  let answered = false;
+  const done = () => {
+    answered = true;
+  };
+  void call.then(done, done);
+  const deadline = Date.now() + 5_000;
+  for (;;) {
+    const rows = (await db.execute(
+      sql`select count(*)::int as n from pg_stat_activity
+          where datname = current_database() and wait_event_type = 'Lock'`,
+    )) as { n: number }[];
+    if (answered || (rows[0]?.n ?? 0) >= n) return;
+    if (Date.now() > deadline) throw new Error(`fewer than ${n} backend(s) ever parked`);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
 describe.runIf(REAL_PG)('POST /v1/taps at the bell (real Postgres, A17)', () => {
-  /** Take `sessionId`'s row and hold it: whatever locks it parks, in order, until the release. */
-  async function hold(sessionId: string): Promise<() => Promise<void>> {
-    let release!: () => void;
-    const held = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    let locked!: () => void;
-    const hasLock = new Promise<void>((resolve) => {
-      locked = resolve;
-    });
-    const holder = db
-      .transaction(async (tx) => {
-        await tx.select().from(sessions).where(eq(sessions.id, sessionId)).for('update');
-        locked();
-        await held;
-        throw new Error('rolled back on purpose');
-      })
-      .catch(() => undefined);
-    await hasLock;
-    return async () => {
-      release();
-      await holder;
-    };
-  }
-
-  /** Until `n` backends wait on a lock — or `call` has answered without waiting. */
-  async function parked(n: number, call: Promise<unknown>): Promise<void> {
-    let answered = false;
-    const done = () => {
-      answered = true;
-    };
-    void call.then(done, done);
-    const deadline = Date.now() + 5_000;
-    for (;;) {
-      const rows = (await db.execute(
-        sql`select count(*)::int as n from pg_stat_activity
-            where datname = current_database() and wait_event_type = 'Lock'`,
-      )) as { n: number }[];
-      if (answered || (rows[0]?.n ?? 0) >= n) return;
-      if (Date.now() > deadline) throw new Error(`fewer than ${n} backend(s) ever parked`);
-      await new Promise((resolve) => setTimeout(resolve, 10));
-    }
-  }
-
   /** A running lesson, and an app whose clock reads a second past its bell. */
   async function lesson(tag: string) {
     const room = await seedClassroom(db, tag);
@@ -574,3 +575,156 @@ describe.runIf(REAL_PG)('POST /v1/taps at the bell (real Postgres, A17)', () => 
     });
   }, 20_000);
 });
+
+describe.runIf(REAL_PG)(
+  'POST /v1/taps behind a removal from the class (real Postgres, A19)',
+  () => {
+    type Room = Awaited<ReturnType<typeof seedClassroom>>;
+
+    /**
+     * The class's teacher removes the student from `classId` while a tap of
+     * theirs is on its way. With the session's row held, the removal parks on
+     * it; then the tap, its read having found the class, parks behind it in the
+     * engine. Released, the removal commits first: between the tap's read and
+     * its lock.
+     */
+    async function removedMidTap(room: Room, sessionId: string, classId = room.klass.id) {
+      const enrollment = one(
+        await db
+          .select({ id: enrollments.id })
+          .from(enrollments)
+          .where(
+            and(
+              eq(enrollments.classId, classId),
+              eq(enrollments.studentId, room.student.id),
+              isNull(enrollments.removedAt),
+            ),
+          ),
+      );
+      const teacher = await ctx.tokenFor(room.teacher.cognitoId);
+      const student = await ctx.tokenFor(room.student.cognitoId);
+      const release = await hold(sessionId);
+      const removing = authedInject(ctx.app, teacher, {
+        method: 'DELETE',
+        url: `/v1/enrollments/${enrollment.id}`,
+      });
+      let tapping: ReturnType<typeof tap> | undefined;
+      try {
+        await parked(1, removing);
+        tapping = tap(student, { tagId: room.block.tagId });
+        await parked(2, tapping);
+      } finally {
+        await release();
+      }
+      const removed = await removing;
+      return {
+        removed: { status: removed.statusCode, body: removed.json<unknown>() },
+        tapped: await tapping,
+      };
+    }
+
+    it.each([
+      ['not in the lesson yet', false],
+      ['live in the lesson', true],
+    ])(
+      'a student %s whose tap lands behind it arms, as after it, and is never live in the lesson',
+      async (_, tappedIn) => {
+        const room = await seedClassroom(db, `tap-removed-${tappedIn ? 'live' : 'out'}`);
+        const { session } = await startSession(db, {
+          classId: room.klass.id,
+          startedAt: new Date(Date.now() - 60_000),
+          endsAt: new Date(Date.now() + 25 * 60_000),
+        });
+        if (tappedIn) {
+          const first = await tap(await ctx.tokenFor(room.student.cognitoId), {
+            tagId: room.block.tagId,
+          });
+          expect(first.body.outcome).toBe('joined');
+        }
+
+        const { removed, tapped } = await removedMidTap(room, session.id);
+
+        expect(removed).toEqual({
+          status: 200,
+          body: { outcome: 'ended', reason: 'removed_from_class', endedParticipation: tappedIn },
+        });
+        // What the same tap gets once the removal has committed: armed, waiting
+        // for the teacher's next Start, joining nothing.
+        expect(tapped).toEqual({
+          status: 200,
+          body: { outcome: 'armed', session: null, state: null },
+        });
+        expect(
+          await db.select().from(armedTaps).where(eq(armedTaps.studentId, room.student.id)),
+        ).toHaveLength(1);
+        // The removal's end stands: nobody live in the lesson, nothing recorded
+        // in it but the first tap, if there was one.
+        const rows = await db
+          .select()
+          .from(participations)
+          .where(eq(participations.sessionId, session.id));
+        expect(rows).toEqual(
+          tappedIn ? [expect.objectContaining({ endedReason: 'removed_from_class' })] : [],
+        );
+        expect(rows.every((row) => row.endedAt !== null)).toBe(true);
+        const taps = await db
+          .select()
+          .from(events)
+          .where(and(eq(events.sessionId, session.id), eq(events.type, 'tap_in')));
+        expect(taps).toHaveLength(tappedIn ? 1 : 0);
+      },
+      20_000,
+    );
+
+    it('a tap behind a removal from the newest class joins the older one still running, as after it', async () => {
+      // The block serves every class of its teacher, and a tap joins the newest
+      // running one the student is in. Read afresh behind the removal, the tap
+      // lands where it would have had the removal come first.
+      const room = await seedClassroom(db, 'tap-removed-newest');
+      const second = one(
+        await db
+          .insert(classes)
+          .values({
+            teacherId: room.teacher.id,
+            schoolId: room.school.id,
+            name: 'Second period',
+            joinCode: 'JOIN-tap-removed-2',
+          })
+          .returning(),
+      );
+      await db.insert(enrollments).values({ classId: second.id, studentId: room.student.id });
+      const older = await startSession(db, {
+        classId: room.klass.id,
+        startedAt: new Date(Date.now() - 120_000),
+        endsAt: new Date(Date.now() + 25 * 60_000),
+      });
+      const newer = await startSession(db, {
+        classId: second.id,
+        startedAt: new Date(Date.now() - 60_000),
+        endsAt: new Date(Date.now() + 25 * 60_000),
+      });
+
+      const { removed, tapped } = await removedMidTap(room, newer.session.id, second.id);
+
+      expect(removed.status).toBe(200);
+      expect(tapped).toEqual({
+        status: 200,
+        body: {
+          outcome: 'joined',
+          session: {
+            id: older.session.id,
+            classId: room.klass.id,
+            endsAt: older.session.endsAt.toISOString(),
+          },
+          state: 'focused',
+        },
+      });
+      expect(
+        await db
+          .select()
+          .from(participations)
+          .where(eq(participations.sessionId, newer.session.id)),
+      ).toEqual([]);
+    }, 20_000);
+  },
+);
