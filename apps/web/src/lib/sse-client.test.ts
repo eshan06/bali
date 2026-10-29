@@ -323,6 +323,33 @@ describe('sse-client', () => {
     expect(urls[1]).toContain('after=48'); // 50 - 2
   });
 
+  it('keeps resuming below its last seq when its read named no settled point', async () => {
+    // A boot read from an older API, then a stream from a newer one (a deploy between): the
+    // client has pruned below its last seq alone, so a settled point the stream names below that
+    // would ask for events it no longer knows it applied.
+    const urls: string[] = [];
+    const fetchImpl = vi.fn((url: string | URL | Request): Promise<Response> => {
+      urls.push(url instanceof Request ? url.url : String(url));
+      const first = [frame(evt(120, 'a')), ': settled 90\n\n'];
+      return Promise.resolve(streamResponse(urls.length === 1 ? first : [': open\n\n']));
+    });
+    const client = createSseClient({
+      url: 'http://api/stream',
+      getToken: () => 't',
+      after: 100,
+      onEvent: () => {},
+      fetchImpl,
+      baseBackoffMs: 5,
+      maxBackoffMs: 20,
+      overlap: 2,
+    });
+
+    await wait(40);
+    client.close();
+    expect(urls[0]).toContain('after=98');
+    expect(urls[1]).toContain('after=118'); // 120 - 2, never 90 - 2
+  });
+
   it('applies each event once across a reconnect that resumes from the settled point', async () => {
     let calls = 0;
     const fetchImpl = vi.fn((): Promise<Response> => {

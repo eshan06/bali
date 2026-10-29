@@ -27,14 +27,17 @@ a real decision? Add a dated entry at the top: what was decided and why.
   is settled once each of them has ended, and a write that began after holds only higher numbers
   (`apps/api/src/sse/settled.ts`). A stream re-reads from 50 below the lower of its settled point
   and the newest number it sent, and sends each new settled point once the events up to it are
-  sent, as an SSE comment line, which an older portal passes over like a heartbeat. The grid's
-  read (`GET /v1/sessions/{id}`) names one too, `settledSeq` (additive), taken before its roster,
-  after waiting up to a quarter second for the writes on their way. The portal resumes its first
-  connect and every reconnect from 50 below the lower of its newest number and its newest settled
-  point; from an older API, which names none, as before. Each event still arrives once, de-duped by
-  its id. With nothing writing, the settled point is the newest number given out, so every resume
-  point is where it was. **Nothing shown changes:** the leave turns the tile to Left as it commits,
-  which is what the grid's own rule for it always said; no line, state or label is new.
+  sent, as an SSE comment line, which an older portal passes over like a heartbeat; a doorbell
+  that rings while a read is part way through its pages gets a read of its own after it. The
+  grid's read (`GET /v1/sessions/{id}`) names one too, `settledSeq` (additive), taken before its
+  roster, after waiting up to a quarter second for the writes on their way. Neither names a number
+  past the lesson's own newest, so neither tells a teacher anything of other classes' activity.
+  The portal resumes its first connect and every reconnect from 50 below the lower of its newest
+  number and its newest settled point; after a boot read from an older API, which names none, as
+  before, whatever its stream says later. Each event still arrives once, de-duped by its id. With
+  nothing writing, the settled point is the newest number given out, so every resume point is
+  where it was. **Nothing shown changes:** the leave turns the tile to Left as it commits, which
+  is what the grid's own rule for it always said; no line, state or label is new.
   **Weighed:** a bigger window (no number bounds one transaction); noting each write's transaction
   id before its number, or keeping it on the row (a change to every write, or a migration, where the
   lock is already taken by every write, whatever code made it). A Start does the same work as
@@ -45,10 +48,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   write that took more than 50 numbers before committing reaches an open stream once; a grid read
   while it is open names a settled point below it, and the stream from there gets it once),
   `stream-resume.test.ts` (both lanes: the re-read never passes the settled point, says it as it
-  rises, and pages through a backlog above it), `settled-cursor.test.ts`, `settled.test.ts` (the
-  two reads, and the lock's hold on real Postgres), `feed.test.ts` (the read's `settledSeq`),
-  `sse-client.test.ts` (first connect and reconnect below the settled point, each event once) and
-  `live-grid.driven.test.tsx` (the grid hands its read's settled point to its stream).
+  rises and never past its own newest, pages through a backlog above it, and reads again after a
+  doorbell mid-read), `settled-cursor.test.ts`, `settled.test.ts` (the two reads, and the lock's
+  hold on real Postgres), `feed.test.ts` (the read's `settledSeq`), `sse-client.test.ts` (first
+  connect and reconnect below the settled point, each event once, and none below the last seq after
+  a read that named no settled point) and `live-grid.driven.test.tsx` (the grid hands its read's
+  settled point to its stream).
 
 - **2026-10-29** — **The owner can end a running lesson, and a school's disposal can end its
   running lessons (the owner's decision of 2026-10-28).** Before its bell only a class's own

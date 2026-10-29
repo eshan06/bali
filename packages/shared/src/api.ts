@@ -789,11 +789,11 @@ export interface SessionSnapshot {
    */
   latestSeq: number;
   /**
-   * A settled point (ARCHITECTURE, Live updates): every write handed a seq at or below it had
-   * finished before the roster was read, so the roster holds each of those events. The grid's
-   * stream resumes from `EVENT_RESUME_OVERLAP` below the lower of this and `latestSeq`, so an event
-   * committing late, under a seq below `latestSeq`, still reaches it. Additive: an older server
-   * omits it, and the grid resumes below `latestSeq` alone, as before.
+   * A settled point, never above `latestSeq` (ARCHITECTURE, Live updates): every write handed a seq
+   * at or below it had finished before the roster was read, so the roster holds each of those
+   * events. The grid's stream resumes from `EVENT_RESUME_OVERLAP` below the lower of this and
+   * `latestSeq`, so an event committing late, under a seq below `latestSeq`, still reaches it.
+   * Additive: an older server omits it, and the grid resumes below `latestSeq` alone, as before.
    */
   settledSeq?: number;
   /**

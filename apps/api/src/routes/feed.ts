@@ -86,8 +86,9 @@ export function registerFeedRoutes(
 
       // Taken first (ARCHITECTURE, Live updates): the roster read after it holds
       // every event up to it, so the grid's stream can start below it and still
-      // meet an event that commits late under a seq below latestSeq.
-      const settledSeq = await hub.settledSeq();
+      // meet an event that commits late under a seq below latestSeq. Sent no
+      // higher than latestSeq, so it says nothing of other classes' events.
+      const settled = await hub.settledSeq();
       // Read the cursor BEFORE the roster, never concurrently. Two independent
       // snapshots can straddle a commit: a roster read just before an unlock
       // paired with a latestSeq read just after would let the client's
@@ -112,7 +113,7 @@ export function registerFeedRoutes(
         },
         ended: session.endedAt !== null,
         latestSeq,
-        settledSeq,
+        settledSeq: Math.min(settled, latestSeq),
         students: roster.map((r) => ({
           enrollmentId: r.enrollmentId,
           studentId: r.studentId,

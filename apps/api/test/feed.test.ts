@@ -75,10 +75,10 @@ describe('GET /v1/sessions/:id (snapshot)', () => {
     expect(body.students[0]!.joinedAt).not.toBeNull();
   });
 
-  it('names a settled point, every seq handed out when nothing is writing', async () => {
-    // The point the grid's first connect resumes from (ARCHITECTURE, Live updates): every event at
-    // or below it was written before the roster was read. Nothing is writing here, so that is
-    // every seq handed out so far, another class's newer one too.
+  it('names a settled point: its latest seq when nothing is writing, never past it', async () => {
+    // The point the grid's first connect resumes below (ARCHITECTURE, Live updates): every event
+    // at or below it was written before the roster was read. Nothing is writing here, so every seq
+    // given out is settled, another class's newer one too; the read names none past its own.
     const { teacher, student, session } = await seedRunning('snap-settled');
     const other = await seedRunning('snap-settled-other');
     await tapIn(db, {
@@ -100,8 +100,8 @@ describe('GET /v1/sessions/:id (snapshot)', () => {
     const body = (
       await get(await ctx.tokenFor(teacher.cognitoId), `/v1/sessions/${session.id}`)
     ).json<SessionSnapshot>();
-    expect(body.settledSeq).toBeGreaterThanOrEqual(newest);
-    expect(body.settledSeq).toBeGreaterThan(body.latestSeq);
+    expect(newest).toBeGreaterThan(body.latestSeq);
+    expect(body.settledSeq).toBe(body.latestSeq);
   });
 
   it('an enrolled student who has not tapped in shows null participation', async () => {

@@ -11,8 +11,8 @@ import { EVENT_RESUME_OVERLAP, type FeedEvent } from '@bali/shared';
  *     write handed one at or below it has finished; it starts as the boot
  *     snapshot's `settledSeq` and moves up with each `: settled N` line the
  *     stream sends. A write can still be open under a seq well short of
- *     `lastSeq`, never under one short of the settled point. An older API sends
- *     neither, and the client resumes below `lastSeq` alone;
+ *     `lastSeq`, never under one short of the settled point. A boot read from
+ *     an older API names none, and the client resumes below `lastSeq` alone;
  *   - reconnects with exponential backoff on any drop, resetting only once a
  *     connection has LASTED (`stableAfterMs`) — a server that accepts and
  *     immediately drops answers 200 every time, so resetting on the status
@@ -108,9 +108,11 @@ export function createSseClient(opts: SseClientOptions): SseClient {
     let data: string | null = null;
     for (const line of frame.split('\n')) {
       if (line.startsWith('data:')) data = line.slice(line.startsWith('data: ') ? 6 : 5);
-      // The stream's settled point, sent once every event up to it has been.
+      // The stream's settled point, sent once every event up to it has been. Taken only when
+      // the boot read named one: a client that began without one has pruned below its last seq
+      // alone, and must never resume from below that.
       const point = /^: settled (\d+)$/.exec(line);
-      if (point) settled = Math.max(settled ?? 0, Number(point[1]));
+      if (point && settled !== null) settled = Math.max(settled, Number(point[1]));
       // `id:` and other comment (`:`) lines carry no payload; the event_id
       // inside `data` is the dedupe key, so they need no handling.
     }

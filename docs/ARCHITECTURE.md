@@ -793,9 +793,11 @@ The stream sends each new settled point after the events it covers, as an SSE co
 (`GET /v1/sessions/{id}`) returns the latest seq and a settled point read before its
 roster (`settledSeq`, additive; it waits up to a quarter second for writes on their way),
 so the grid loads and goes live in one round trip, its first connect starting below both.
-An older API names no settled point, and the portal resumes below its last seq alone, as
-before. A write left open holds every settled point where it stands until it ends, and
-streams re-read what is above it meanwhile. The stream reads the Authorization header
+Neither names a seq past the session's own newest, so neither tells a teacher anything of
+other classes' events. A boot read from an older API names no settled point, and the
+portal resumes below its last seq alone, as before, whatever its stream says later. A
+write left open holds every settled point where it stands until it ends, and streams
+re-read what is above it meanwhile. The stream reads the Authorization header
 only — never a token in the query string — so the portal drives it with `fetch`, not
 `EventSource`. A stream lasts no longer than its access (2026-10-28): it ends at its token's
 expiry (Auth decision 2), and at the next re-poll once the route's own check, read again, refuses

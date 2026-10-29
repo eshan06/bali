@@ -1,4 +1,4 @@
-import { type Database, events, startSession, tapIn } from '@bali/db';
+import { type Database, events, type FeedEventRow, startSession, tapIn } from '@bali/db';
 import { EVENT_PAGE_LIMIT, EVENT_RESUME_OVERLAP, type FeedEvent } from '@bali/shared';
 import { sql } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
@@ -143,7 +143,7 @@ describe('a live stream re-reads from below its settled point', () => {
     expect(stream.delivered.filter((e) => e.eventId === fast)).toHaveLength(1);
   });
 
-  it('says its settled point as it rises, once each, and never one at or below where it began', async () => {
+  it('says its settled point as it rises, once each, never past the newest seq it sent', async () => {
     const { teacher, student, session } = await seedRunning('resume-says');
     const cursor = heldAt(0);
     const stream = open(session.id, teacher.id, cursor);
@@ -159,7 +159,8 @@ describe('a live stream re-reads from below its settled point', () => {
     });
     await until(() => stream.delivered.length === 2, 'the tap');
     const top = Math.max(...stream.delivered.map((e) => e.seq));
-    cursor.seq = top;
+    // Other classes' events move the settled point on; the stream names none of their seqs.
+    cursor.seq = top + 500;
     await until(() => stream.chunks.includes(`: settled ${top}\n\n`), 'the settled point');
     await sleep(100);
     expect(stream.chunks.filter((c) => c.startsWith(': settled'))).toEqual([
@@ -195,5 +196,78 @@ describe('a live stream re-reads from below its settled point', () => {
       'an event after the backlog',
     );
     expect(stream.delivered).toHaveLength(backlog + 2);
+  });
+});
+
+describe('a doorbell while a read is part way through its pages', () => {
+  it('reads again from below the settled point once that read is done', async () => {
+    // A stand-in database: each page the stream asks for is the test's to answer, and the
+    // doorbell is the test's to ring.
+    const answers: Promise<FeedEventRow[]>[] = [];
+    let asked = 0;
+    const doorbell: { ring?: (sessionId: string) => void } = {};
+    const chain = {
+      select: () => chain,
+      from: () => chain,
+      where: () => chain,
+      orderBy: () => chain,
+      limit: () => answers[asked++] ?? Promise.resolve([]),
+    };
+    const fake = {
+      ...chain,
+      $client: {
+        listen: (_channel: string, onPing: (sessionId: string) => void) => {
+          doorbell.ring = onPing;
+          return Promise.resolve(() => {});
+        },
+      },
+    } as unknown as Database;
+    const row = (seq: number): FeedEventRow => ({
+      seq,
+      eventId: randomUUID(),
+      type: 'came_back',
+      userId: null,
+      occurredAt: new Date(),
+      payload: null,
+    });
+
+    // The first page is full, 1001 to 1201 without 1100: a write still holds 1100. The page after
+    // it is empty; then 1100 shows.
+    let answerFirst!: (rows: FeedEventRow[]) => void;
+    answers.push(new Promise((resolve) => (answerFirst = resolve)));
+    answers.push(Promise.resolve([]));
+    const late = row(1100);
+    answers.push(Promise.resolve([late]));
+
+    const hub = createStreamHub(fake, {
+      repollMs: 3_600_000, // no re-poll here: only the doorbell
+      heartbeatMs: 3_600_000,
+      settled: heldAt(1000),
+    });
+    hubs.push(hub);
+    const delivered: string[] = [];
+    hub.subscribe({
+      sessionId: 'S',
+      teacherId: 'T',
+      after: 1000,
+      expiresAtMs: null,
+      stillAllowed: () => Promise.resolve(true),
+      write: (chunk) => {
+        const data = chunk.split('\n').find((line) => line.startsWith('data: '));
+        if (data) delivered.push((JSON.parse(data.slice(6)) as FeedEvent).eventId);
+      },
+      onClose: () => {},
+    });
+    await until(() => asked === 1 && doorbell.ring !== undefined, 'the first page asked');
+
+    // 1100 commits while that page is out, and its doorbell rings.
+    doorbell.ring!('S');
+    const first: FeedEventRow[] = [];
+    for (let seq = 1001; seq <= 1201; seq += 1) if (seq !== 1100) first.push(row(seq));
+    expect(first).toHaveLength(EVENT_PAGE_LIMIT);
+    answerFirst(first);
+
+    await until(() => delivered.includes(late.eventId), 'the event the doorbell rang for');
+    expect(delivered).toHaveLength(EVENT_PAGE_LIMIT + 1);
   });
 });

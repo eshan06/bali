@@ -167,10 +167,16 @@ export function createStreamHub(db: Database, options: StreamHubOptions = {}): S
     // Every event of the session above `after` and at or below this has been sent here: the
     // newest settled point a whole read of the session got past.
     let settledHere = input.after;
+    // The settled point last sent to the client. Never above `highSeq`, so it names no seq beyond
+    // this session's own events.
+    let said = input.after;
     const delivered = new Map<string, number>(); // eventId -> seq, pruned to where reads start
     // A read of the session's events, page by page: where its next page starts, and the settled
     // point taken before its first page.
     let pass: { from: number; settled: number } | null = null;
+    // A doorbell or re-poll since the read under way began: its event may sit under the page that
+    // read has reached, so a fresh read follows it.
+    let woken = false;
     let running = false;
     let pending = false;
     let removed = false;
@@ -188,6 +194,7 @@ export function createStreamHub(db: Database, options: StreamHubOptions = {}): S
 
     async function readOnce(): Promise<boolean> {
       if (pass === null) {
+        woken = false;
         // Read before the first page, so each page sees every event up to it.
         const settled = await cursor.now();
         pass = { from: floor(), settled };
@@ -212,15 +219,17 @@ export function createStreamHub(db: Database, options: StreamHubOptions = {}): S
       if (rows.length >= EVENT_PAGE_LIMIT) return true; // a full page: the read goes on
       pass = null;
       if (removed || closed) return false;
-      if (current.settled > settledHere) {
-        settledHere = current.settled;
+      settledHere = Math.max(settledHere, current.settled);
+      const point = Math.min(settledHere, highSeq);
+      if (point > said) {
+        said = point;
         // Sent after every event up to it, as a comment line: an older portal passes over it as
         // it passes over the heartbeat, and a current one resumes from below it (sse-client.ts).
-        input.write(`: settled ${settledHere}\n\n`);
+        input.write(`: settled ${point}\n\n`);
       }
       const cutoff = floor();
       for (const [id, seq] of delivered) if (seq <= cutoff) delivered.delete(id);
-      return false;
+      return woken;
     }
 
     async function run(): Promise<void> {
@@ -243,7 +252,7 @@ export function createStreamHub(db: Database, options: StreamHubOptions = {}): S
             if (removed || closed) return;
           }
           const more = await readOnce();
-          if (more) pending = true; // keep draining a backlog
+          if (more) pending = true; // keep draining a backlog, or read again after a wake
         } while (pending && !removed && !closed);
       } catch {
         close();
@@ -253,7 +262,9 @@ export function createStreamHub(db: Database, options: StreamHubOptions = {}): S
     }
 
     function wake(): void {
-      if (!removed && !closed) void run();
+      if (removed || closed) return;
+      woken = true;
+      void run();
     }
 
     const repoll = setInterval(() => {
