@@ -104,6 +104,13 @@ function tile(name: string): HTMLElement {
 /** What a tile says, its parts read in order with no space between them, as the markup has them. */
 const says = (el: HTMLElement) => (el.textContent ?? '').replace(/\s+/g, ' ');
 
+/** A tile's words part by part, its name first: the name, the state and its line, if it has one. */
+function parts(name: string): string[] {
+  const words = screen.getByText(name).parentElement;
+  if (!words) throw new Error(`no words for ${name}`);
+  return Array.from(words.children, (part) => (part.textContent ?? '').replace(/\s+/g, ' '));
+}
+
 describe('the live grid on the class page and in Present (ClassPresent)', () => {
   const omar = student('Omar Siddiqui', { clockOff: true });
 
@@ -115,11 +122,15 @@ describe('the live grid on the class page and in Present (ClassPresent)', () => 
   });
 
   it('never says Clock off in Present, the projector the class can see (the owner, 2026-10-28)', async () => {
-    await open(true, [omar]);
+    // And a phone heard from 70 s ago, whose line says "last seen" and whose one detail on a phone
+    // would be Clock off on the class page.
+    await open(true, [omar, student('Wei Zhang', { clockOff: true, lastSeenAt: ago(70) })]);
     const omarsTile = tile('Omar Siddiqui');
     // The state alone, as for any focused student: no line, no tooltip, nothing for a screen reader.
+    expect(parts('Omar Siddiqui')).toEqual(['Omar Siddiqui', 'Focused']);
     expect(says(omarsTile)).toBe(['Omar Siddiqui', 'Focused'].join(''));
     expect(within(omarsTile).queryByTitle(CLOCK_OFF)).toBeNull();
+    expect(parts('Wei Zhang')).toEqual(['Wei Zhang', 'Focused', 'last seen 1 min ago']);
     expect(document.body.innerHTML).not.toMatch(/clock/i);
     // A tile alone there, never a button.
     expect(screen.queryByRole('button')).toBeNull();
@@ -132,6 +143,7 @@ describe('the live grid on the class page and in Present (ClassPresent)', () => 
   };
   /** Every tile that carries an unlock, each with this reason, and the phone with its clock off. */
   const carrying = (reason: UnlockReason) => [
+    student('Ethan Park', { state: 'unlocked', unlock: unlock('Ethan Park', reason) }),
     student('Jaylen Brooks', {
       state: 'unlocked',
       unlock: unlock('Jaylen Brooks', reason),
@@ -158,7 +170,13 @@ describe('the live grid on the class page and in Present (ClassPresent)', () => 
   it('says each unlock’s reason on the class page', async () => {
     for (const reason of UNLOCK_REASONS) {
       await open(false, carrying(reason));
-      for (const name of ['Jaylen Brooks', 'Lucas Ferreira', 'Mateo Silva', 'Priya Natarajan']) {
+      for (const name of [
+        'Ethan Park',
+        'Jaylen Brooks',
+        'Lucas Ferreira',
+        'Mateo Silva',
+        'Priya Natarajan',
+      ]) {
         expect(says(tile(name)), `${name}, ${reason}`).toMatch(WORDS[reason]);
       }
       cleanup();
@@ -171,17 +189,21 @@ describe('the live grid on the class page and in Present (ClassPresent)', () => 
       // Nowhere in the grid: not a tile's words, nor a tooltip or a label on any tag.
       expect(document.body.innerHTML, reason).not.toMatch(WORDS[reason]);
       expect(document.body.innerHTML, reason).not.toMatch(/clock/i);
-      expect(says(tile('Jaylen Brooks'))).toBe(
-        ['Jaylen Brooks', 'Unlocked', 'last seen 5 min ago'].join(''),
-      );
-      expect(says(tile('Lucas Ferreira'))).toBe(
-        ['Lucas Ferreira', 'Protection off', 'Unlocked · last seen 5 min ago'].join(''),
-      );
-      expect(says(tile('Mateo Silva'))).toBe(['Mateo Silva', 'Left · unlocked'].join(''));
-      expect(says(tile('Priya Natarajan'))).toBe(
-        ['Priya Natarajan', 'Left · protection off', 'Unlocked'].join(''),
-      );
-      expect(says(tile('Omar Siddiqui'))).toBe(['Omar Siddiqui', 'Focused'].join(''));
+      // An Unlocked tile whose line was its reason alone, and a Left one, have no line at all.
+      expect(parts('Ethan Park')).toEqual(['Ethan Park', 'Unlocked']);
+      expect(parts('Jaylen Brooks')).toEqual(['Jaylen Brooks', 'Unlocked', 'last seen 5 min ago']);
+      expect(parts('Lucas Ferreira')).toEqual([
+        'Lucas Ferreira',
+        'Protection off',
+        'Unlocked · last seen 5 min ago',
+      ]);
+      expect(parts('Mateo Silva')).toEqual(['Mateo Silva', 'Left · unlocked']);
+      expect(parts('Priya Natarajan')).toEqual([
+        'Priya Natarajan',
+        'Left · protection off',
+        'Unlocked',
+      ]);
+      expect(parts('Omar Siddiqui')).toEqual(['Omar Siddiqui', 'Focused']);
       cleanup();
     }
   });
