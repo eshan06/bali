@@ -211,15 +211,17 @@ npm run school -- retention <school-id> --confirm "<name>"   # run it, once the 
   account between schools is not built). With `--end-lessons` last (2026-10-29), a lesson
   still running doesn't refuse it: each is ended in the same transaction, as its teacher's
   End ends it, and its class removed with the rest, so no Start can follow; the preview with
-  it names them and ends none. A second run says it was disposed of already.
+  it names them and ends none. A class's name, which its teacher wrote, is printed quoted, any
+  character a terminal would act on written as its code. A second run says it was disposed of
+  already. `SCHOOL_DISPOSAL_COVERAGE` says what it does with each foreign
+  key to `users` or `schools`, and a test fails on one it doesn't name. The Cognito sign-ins
+  and the backups are the owner's to clear: `docs/RUNBOOKS.md`, runbook 1, step 11.
 - **A running lesson ended by the owner (2026-10-29).** `end-session <session-id>` ends it
   now, through the engine's own end (`endRunningSession`): its teacher's End, the same
   `session_ended` event, its students' participations ended with it. A lesson over already,
   ended or past its bell, is left as it is and said so; an id that isn't a UUID is refused
   before anything connects. It doesn't stop the class being started again: the disposal's
-  `--end-lessons` does. On prod: `docs/RUNBOOKS.md`, runbook 1, steps 9 and 11. `SCHOOL_DISPOSAL_COVERAGE` says what it does with each foreign
-  key to `users` or `schools`, and a test fails on one it doesn't name. The Cognito sign-ins
-  and the backups are the owner's to clear: `docs/RUNBOOKS.md`, runbook 1, step 11.
+  `--end-lessons` does. On prod: `docs/RUNBOOKS.md`, runbook 1, steps 9 and 11.
 - **A school year's retention run (C6b).** `year-end <school-id> <day>` records the last
   day of the school's year or term (any day, past or future; again to correct it). After
   it — from the midnight after that day by the server's clock — `retention <school-id>`

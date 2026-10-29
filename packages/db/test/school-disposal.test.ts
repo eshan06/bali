@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { recordAgeCheck } from '../src/age-checks.js';
 import { registerPushToken } from '../src/device-tokens.js';
 import { newUuidV7 } from '../src/ids.js';
-import { createBlock } from '../src/management.js';
+import { createBlock, updateClass } from '../src/management.js';
 import { findOrCreateStudent } from '../src/queries.js';
 import { parseSchoolCommand, shellQuote } from '../src/school-command.js';
 import * as schema from '../src/schema.js';
@@ -942,6 +942,35 @@ describe('npm run school -- dispose', () => {
     );
   });
 
+  it('prints a class’s name with each character a terminal would act on written as its code', async () => {
+    const s = await seed('c6a-escaped');
+    // Its teacher names the class as they like (a rename checks only its length): here an ESC
+    // that clears the screen, an 8-bit CSI, a bidi override and a line separator.
+    await updateClass(db, { classId: s.second.id, name: 'Chem\u001b[2J\u009b8m\u202eend\u2028x' });
+
+    const refusal = await run(['dispose', s.school.id]).then(
+      () => 'disposed',
+      (err: Error) => err.message,
+    );
+    const preview = await run(['dispose', s.school.id, '--end-lessons']);
+
+    const shown = `in class "Chem\\u001b[2J\\u{9b}8m\\u{202e}end\\u{2028}x" (${s.second.id})`;
+    expect(refusal).toContain(shown);
+    expect(preview.join('\n')).toContain(shown);
+    for (const line of [refusal, ...preview]) {
+      expect(line.search(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u)).toBe(-1);
+    }
+  });
+
+  it('a name that doesn’t match keeps --end-lessons in the line it suggests', async () => {
+    const s = await seed('c6a-mismatch-end');
+    await expect(
+      run(['dispose', s.school.id, '--confirm', 'Nope', '--end-lessons']),
+    ).rejects.toThrow(
+      `To confirm: dispose ${s.school.id} --confirm '${s.school.name}' --end-lessons`,
+    );
+  });
+
   it('with --end-lessons, previews the lessons it would end, then ends them as it disposes', async () => {
     const s = await seed('c6a-command-end');
     const running = () => db.select().from(sessions).where(eq(sessions.id, s.lesson.id));
@@ -1022,6 +1051,11 @@ describe('npm run school -- end-session', () => {
       'session_started',
       'session_ended',
     ]);
+    // Its open question closed with it, at its end.
+    expect(await typesIn(s.lesson.id)).toContain('question_closed');
+    expect(
+      one(await db.select().from(questions).where(eq(questions.id, s.question.id))).closedAt,
+    ).toEqual(lesson.endedAt);
 
     await expect(leave()).resolves.toMatchObject({ outcome: 'ended' });
     expect(await run(['dispose', s.school.id, '--confirm', s.school.name])).toEqual([

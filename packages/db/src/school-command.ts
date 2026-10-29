@@ -346,12 +346,26 @@ const tally = (c: DisposalCounts) =>
   `sessions ${c.sessions}, blocks ${c.blocks}, open invites ${c.openInvites}, ` +
   `pre-bell taps ${c.armedTaps}`;
 
+/**
+ * What a terminal would act on, or hide, rather than show, past what JSON escapes: the API's
+ * `UNPRINTABLE` (display-name.ts), less the lone surrogate halves JSON escapes itself.
+ */
+const UNSHOWN = /[\p{Cc}\p{Zl}\p{Zp}]|(?![\u200c\u200d])\p{Cf}/gu;
+
+/**
+ * A teacher's words, a class's name, quoted for the owner's terminal: as JSON quotes them, and each
+ * character that would still act on it or hide (a C1 control, a bidi override, a line separator)
+ * written as its code point, so no name can redraw or hide what a command prints.
+ */
+const quoted = (text: string) =>
+  JSON.stringify(text).replace(UNSHOWN, (c) => `\\u{${(c.codePointAt(0) ?? 0).toString(16)}}`);
+
 /** Each lesson by its session, its class and its bell: what ending it, or waiting, needs. */
 const lessons = (running: RunningLesson[]) =>
   running
     .map(
       (l) =>
-        `Session ${l.sessionId}, in class "${l.className}" (${l.classId}), its bell at ` +
+        `Session ${l.sessionId}, in class ${quoted(l.className)} (${l.classId}), its bell at ` +
         `${l.endsAt.toISOString()}.`,
     )
     .join(' ');
@@ -371,6 +385,8 @@ async function dispose(
   // eventId: a re-run is answered by the school row, which says it is disposed of already.
   const at = new Date();
   const result = await disposeSchool(db, { schoolId, at, confirmName, endLessons });
+  // Carried into each line it suggests, so following one keeps what was asked.
+  const flag = endLessons ? ` ${END_LESSONS}` : '';
   switch (result.outcome) {
     case 'unknown_school':
       throw new Error(noSchool(schoolId));
@@ -384,7 +400,7 @@ async function dispose(
     case 'name_mismatch':
       throw new Error(
         `school ${schoolId} is named "${result.school.name}"; nothing was written. ` +
-          `To confirm: dispose ${schoolId} --confirm ${shellQuote(result.school.name)}`,
+          `To confirm: dispose ${schoolId} --confirm ${shellQuote(result.school.name)}${flag}`,
       );
     case 'in_session':
       throw new Error(
@@ -419,8 +435,7 @@ async function dispose(
           '(docs/RUNBOOKS.md, runbook 1, step 10).',
       );
       print(
-        `To go ahead: npm run school -- dispose ${schoolId} --confirm ${shellQuote(result.school.name)}` +
-          (endLessons ? ` ${END_LESSONS}` : ''),
+        `To go ahead: npm run school -- dispose ${schoolId} --confirm ${shellQuote(result.school.name)}${flag}`,
       );
       return;
     case 'disposed':

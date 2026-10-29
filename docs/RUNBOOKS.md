@@ -271,8 +271,12 @@ project for the API (its DSN).
       deletes the sign-in of an account that deletes itself, or that a retention run
       de-identifies, runbook 9, never a disposal's),
       and each still holds an email address. In the production
-      pool's **Users**, delete every user whose email is at the school's domain. A sign-in
-      left there only ever makes a new, empty account.
+      pool's **Users**, delete every user whose email is at the school's domain. A phone
+      still signed in only ever makes a new, empty account, holding its sign-in's id and
+      nothing else, and that account stays. Deleting the sign-in doesn't stop it at once: an
+      access token already issued works for up to an hour. After `--end-lessons`, each phone
+      that was in a lesson it ended makes one at its next check-in, within a minute, whatever
+      you do.
     - **Backups:** Railway's backups (step 4) still hold the school's data until they age
       out. Note the day the last backup from before the disposal expires (the Backups tab
       lists each backup's time; its retention is the schedule's). While prod has no backups,
@@ -292,7 +296,8 @@ project for the API (its DSN).
       title and PDF); what stays (lessons,
       unlocks with their reason, taps and their times, and each answer by the number of the
       option picked, under accounts that name no one, kept
-      as counts); and the day the last backup holding its data expires. If the agreement
+      as counts, and any empty account a phone still signed in made after it, holding only its
+      sign-in's id); and the day the last backup holding its data expires. If the agreement
       requires that de-identified records go too, stop before disposing and raise it: this
       command keeps them.
 12. **A school year's retention run (C6b).** The owner's ruling: named records are kept
