@@ -18,6 +18,7 @@ import {
   isActionOrder,
   isUnlockReason,
   MAX_SESSION_MINUTES,
+  MAX_SESSION_TOTAL_MINUTES,
   SILENCE_THRESHOLD_MS,
   tidyDisplayName,
 } from '@bali/shared';
@@ -148,6 +149,7 @@ export const TRANSITION_ERROR_CODES = [
   'PROTECTION_NOT_OFF',
   'TEACHER_HAS_CLASSES',
   'ACCOUNT_DELETED',
+  'SESSION_TOO_LONG',
 ] as const;
 export type TransitionErrorCode = (typeof TRANSITION_ERROR_CODES)[number];
 
@@ -1492,6 +1494,18 @@ export async function extendSession(db: Database, input: ExtendSessionInput): Pr
     // reads the same instant back as a valid Date quite happily.
     if (Number.isNaN(newEndsAt.getTime())) {
       throw new TransitionError('INVALID_EXTENSION', 'extension is out of range');
+    }
+    // The session's own bound, its Start and every extend together (the owner, 2026-10-28): a
+    // lesson ends within MAX_SESSION_TOTAL_MINUTES of its start, so the sweep ends it within a
+    // day, as it ends any. Judged on the end read under this lock, like the arithmetic above, so
+    // of two presses racing at the bound the second judges the first's bell, never both land.
+    // Landing exactly on it is taken. Refused, nothing is written: the bell stands, and the id
+    // stays unspent, so the same press sent again is refused again, never answered as a replay.
+    if (newEndsAt.getTime() - session.startedAt.getTime() > MAX_SESSION_TOTAL_MINUTES * 60_000) {
+      throw new TransitionError(
+        'SESSION_TOO_LONG',
+        `a session runs at most ${MAX_SESSION_TOTAL_MINUTES} minutes in all`,
+      );
     }
 
     const updated = firstOrUndefined(

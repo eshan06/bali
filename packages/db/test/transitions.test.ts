@@ -1,4 +1,4 @@
-import { MAX_SESSION_MINUTES, type UnlockReason } from '@bali/shared';
+import { MAX_SESSION_MINUTES, MAX_SESSION_TOTAL_MINUTES, type UnlockReason } from '@bali/shared';
 import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -3823,6 +3823,91 @@ describe('extendSession', () => {
       0,
     );
   });
+
+  it('refuses an extend that would run the session past 16 hours in all, and records nothing (the owner, 2026-10-28)', async () => {
+    // The longest Start, 480 minutes from 09:00, and 475 more: 15 h 55 min in all, the bell at
+    // 00:55. Every press is a fresh one, each well inside MAX_SESSION_MINUTES on its own; what
+    // passes the bound is the session's total.
+    const { klass } = await seedClass('extend-total');
+    const w = window('2026-01-01T09:00:00Z', MAX_SESSION_MINUTES);
+    const { session } = await startSession(db, { classId: klass.id, ...w });
+    const near = await extendSession(db, {
+      sessionId: session.id,
+      durationMinutes: 475,
+      at: new Date('2026-01-01T16:00:00Z'),
+      eventId: newUuidV7(),
+    });
+    expect(near.endsAt).toEqual(new Date('2026-01-02T00:55:00Z'));
+
+    const refusedId = newUuidV7();
+    for (const [durationMinutes, eventId] of [
+      [10, refusedId],
+      [6, newUuidV7()],
+      [MAX_SESSION_MINUTES, newUuidV7()],
+      // The refused press sent again: nothing was recorded under its id, so it is no replay.
+      [10, refusedId],
+    ] as const) {
+      await expect(
+        extendSession(db, {
+          sessionId: session.id,
+          durationMinutes,
+          at: new Date('2026-01-02T00:50:00Z'),
+          eventId,
+        }),
+      ).rejects.toMatchObject({ code: 'SESSION_TOO_LONG' });
+    }
+
+    // The bell did not move, the session runs, and the history holds no extend that never was.
+    const after = one(await db.select().from(sessions).where(eq(sessions.id, session.id)));
+    expect(after.endsAt).toEqual(near.endsAt);
+    expect(after.endedAt).toBeNull();
+    expect((await eventsFor(session.id)).map((e) => e.type)).toEqual([
+      'session_started',
+      'session_extended',
+    ]);
+    expect(await db.select().from(events).where(eq(events.eventId, refusedId))).toEqual([]);
+  });
+
+  it('takes an extend that lands exactly on 16 hours in all, its replay answered, and none past it', async () => {
+    const { klass } = await seedClass('extend-total-exact');
+    const w = window('2026-01-01T09:00:00Z', MAX_SESSION_MINUTES);
+    const { session } = await startSession(db, { classId: klass.id, ...w });
+    const cap = new Date(w.startedAt.getTime() + MAX_SESSION_TOTAL_MINUTES * 60_000);
+    expect(cap).toEqual(new Date('2026-01-02T01:00:00Z'));
+
+    const eventId = newUuidV7();
+    const exact = await extendSession(db, {
+      sessionId: session.id,
+      durationMinutes: MAX_SESSION_MINUTES,
+      at: new Date('2026-01-01T16:59:00Z'),
+      eventId,
+    });
+    expect(exact.endsAt).toEqual(cap);
+
+    // Its retry after a lost answer is the replay it always was (rule 4), at the bound or not.
+    const replay = await extendSession(db, {
+      sessionId: session.id,
+      durationMinutes: MAX_SESSION_MINUTES,
+      at: new Date('2026-01-02T00:30:00Z'),
+      eventId,
+    });
+    expect(replay.endsAt).toEqual(cap);
+
+    // One minute more is past it.
+    await expect(
+      extendSession(db, {
+        sessionId: session.id,
+        durationMinutes: 1,
+        at: new Date('2026-01-02T00:30:00Z'),
+        eventId: newUuidV7(),
+      }),
+    ).rejects.toMatchObject({ code: 'SESSION_TOO_LONG' });
+    const after = one(await db.select().from(sessions).where(eq(sessions.id, session.id)));
+    expect(after.endsAt).toEqual(cap);
+    expect((await eventsFor(session.id)).filter((e) => e.type === 'session_extended')).toHaveLength(
+      1,
+    );
+  });
 });
 
 describe('endSession & expiry', () => {
@@ -3963,6 +4048,51 @@ describe('endSession & expiry', () => {
     });
     const over = one(await db.select().from(sessions).where(eq(sessions.id, session.id)));
     expect(over.endedAt).toEqual(extended.endsAt);
+  });
+
+  it('a lesson at 16 hours in all ends at its bell, as any does: time pressed for past it is refused', async () => {
+    // The owner's bound (2026-10-28): the longest Start and the longest extend reach it exactly,
+    // the bell at 01:00 the next day. Ten more minutes pressed before that bell are refused, so
+    // the sweep at the bell ends the lesson as it ends any, its student with it.
+    const { klass, student } = await seedClass('expire-at-total');
+    const w = window('2026-01-01T09:00:00Z', MAX_SESSION_MINUTES);
+    const { session } = await startSession(db, { classId: klass.id, ...w });
+    await tapIn(db, {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+    await extendSession(db, {
+      sessionId: session.id,
+      durationMinutes: MAX_SESSION_MINUTES,
+      at: new Date('2026-01-01T16:30:00Z'),
+      eventId: newUuidV7(),
+    });
+    const bell = new Date(w.startedAt.getTime() + MAX_SESSION_TOTAL_MINUTES * 60_000);
+    await expect(
+      extendSession(db, {
+        sessionId: session.id,
+        durationMinutes: 10,
+        at: new Date(bell.getTime() - 15 * 60_000),
+        eventId: newUuidV7(),
+      }),
+    ).rejects.toMatchObject({ code: 'SESSION_TOO_LONG' });
+
+    // A second before the bell the sweep leaves it running; at the bell it ends it.
+    expect(await expireDueSessions(db, new Date(bell.getTime() - 1_000))).not.toContain(session.id);
+    expect(await expireDueSessions(db, bell)).toContain(session.id);
+    const row = one(await db.select().from(sessions).where(eq(sessions.id, session.id)));
+    expect(row.endsAt).toEqual(bell);
+    expect(row.endedAt).toEqual(bell);
+    const part = one(
+      await db.select().from(participations).where(eq(participations.sessionId, session.id)),
+    );
+    expect(part.endedReason).toBe('session_expired');
+    expect(part.endedAt).toEqual(bell);
+    expect((await eventsFor(session.id)).filter((e) => e.type === 'session_expired')).toHaveLength(
+      1,
+    );
   });
 });
 

@@ -3688,7 +3688,8 @@
                         "deck_not_ready",
                         "deck_rejected",
                         "page_out_of_range",
-                        "deck_in_use"
+                        "deck_in_use",
+                        "session_too_long"
                       ]
                     },
                     "message": {

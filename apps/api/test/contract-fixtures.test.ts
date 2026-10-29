@@ -1170,6 +1170,7 @@ describe('the contract fixtures (contracts/fixtures)', () => {
     const reasons = errors.map((f) => (f.body as ApiErrorBody).error.reason).filter(Boolean);
     const portal = new Set<string>([
       'invalid_extension',
+      'session_too_long',
       'invite_code_invalid',
       'invite_not_found',
       'invite_used',

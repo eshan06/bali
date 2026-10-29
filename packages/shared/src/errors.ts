@@ -112,6 +112,10 @@ export const API_ERROR_REASONS = [
   'deck_rejected',
   'page_out_of_range',
   'deck_in_use',
+  // POST /v1/sessions/{id}/extend: the time would run the session past
+  // `MAX_SESSION_TOTAL_MINUTES` from its start (a 409). Nothing was recorded,
+  // and the bell stands.
+  'session_too_long',
 ] as const;
 export type ApiErrorReason = (typeof API_ERROR_REASONS)[number];
 
