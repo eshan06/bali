@@ -22,8 +22,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   drops both, and a note beside ClassPresent records the decision. **Tests:** the Present test now
   drives the grid (jsdom, Testing Library; `live-grid.driven.test.tsx`): the class page's grid says
   Clock off with its tooltip on a tile that opens the panel; Present says that Focused tile's state
-  alone, with "clock" nowhere in its markup (red before the change); and the reason test moved
-  there, every reason on each tile that carries an unlock. `live-grid.test.ts` keeps the rest, two
+  alone, and a phone heard from 70 s ago its "last seen" alone, with "clock" nowhere in its markup
+  (red before the change); and the reason test moved there, every reason on each tile that carries
+  an unlock, read part by part so a tile with no line has none. `live-grid.test.ts` keeps the rest, two
   of its Present tiles now sized with "last seen" in place of Clock off; it still reads source text,
   so `source-text-tests.test.ts` lists it still. DESIGN.md §1 and §5 say it.
 
