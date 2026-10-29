@@ -27,8 +27,8 @@ import { CLOCK_OFF } from './student-panel';
 /*
  * A student's tile on the live grid (PV8; ClassStates' twelve, ClassLive, PhoneClassLive at 390 px
  * and ClassPresent's), rendered: tinted in its state, every one the same size, the state's icon,
- * the name, the state's words and one line: an unlock's reason (never in Present), "last seen" or
- * Clock off.
+ * the name, the state's words and one line: an unlock's reason, "last seen" or Clock off. That
+ * Present never says the reason or Clock off is driven in `live-grid.driven.test.tsx`.
  */
 const NOW = new Date('2026-10-07T14:30:00.000Z');
 const ago = (s: number) => new Date(NOW.getTime() - s * 1000);
@@ -121,39 +121,6 @@ describe('a tile on the live grid (PV8)', () => {
       expect(tile.state?.words, state).toBe(state);
       expect(tile.line?.words, state).toBe(line);
     }
-  });
-
-  it('never shows an unlock’s reason in Present, the projector the class can see', () => {
-    /** Nowhere in a Present tile's markup: not its words, nor a tooltip or a label on any tag. */
-    const noReason = (html: string) => expect(html).not.toMatch(/bathroom|nurse|other reason/i);
-    for (const reason of ['bathroom', 'nurse', 'other'] as const) {
-      const offHtml = render(
-        student({ state: 'protection_off', unlock: unlocked(reason), lastSeenAt: ago(330) }),
-        true,
-      );
-      const off = parts(offHtml);
-      expect(off.state?.words).toBe('Protection off');
-      expect(off.line?.words).toBe('Unlocked · last seen 5 min ago');
-      noReason(offHtml);
-      const html = render(student({ state: 'unlocked', unlock: unlocked(reason) }), true);
-      expect(parts(html).state?.words).toBe('Unlocked');
-      expect(parts(html).line).toBeUndefined();
-      noReason(html);
-      // Both Left tiles that carry an unlock.
-      for (const state of ['unlocked', 'protection_off'] as const) {
-        noReason(render(student({ state, unlock: unlocked(reason), endedAt: ago(60) }), true));
-      }
-      // The teacher's own view says it.
-      expect(render(student({ state: 'unlocked', unlock: unlocked(reason) }))).toMatch(
-        /bathroom|nurse|other reason/i,
-      );
-    }
-    // ClassPresent's: "last seen" alone, a Left tile with no line, and Clock off.
-    const seen = student({ state: 'unlocked', unlock: unlocked('bathroom'), lastSeenAt: ago(330) });
-    expect(parts(render(seen, true)).line?.words).toBe('last seen 5 min ago');
-    const left = student({ state: 'unlocked', unlock: unlocked('other'), endedAt: ago(60) });
-    expect(parts(render(left, true)).line).toBeUndefined();
-    expect(parts(render(student({ clockOff: true }), true)).line?.words).toBe('Clock off');
   });
 
   it('says Clock off with its tooltip in the panel’s words (the owner, 2026-10-14), after the reason and "last seen"', () => {
@@ -302,11 +269,21 @@ describe('a tile on the live grid (PV8)', () => {
     );
     expect(parts(html).line?.html).toBe('<span class="max-sm:hidden">last seen 5 min ago</span>');
     // Present has no phone layout: its line is the same at every width.
-    expect(render(student({ clockOff: true }), true)).not.toMatch(/sm:hidden/);
+    const seen = render(
+      student({ state: 'unlocked', unlock: unlocked('bathroom'), lastSeenAt: ago(330) }),
+      true,
+    );
+    expect(parts(seen).line?.words).toBe('last seen 5 min ago');
+    expect(seen).not.toMatch(/sm:hidden/);
   });
 
   it('is one size up in Present, as ClassPresent draws it: 100 px tall, 12 × 18 px in, a 24 px icon', () => {
-    const tile = parts(render(student({ clockOff: true }), true));
+    const tile = parts(
+      render(
+        student({ state: 'unlocked', unlock: unlocked('bathroom'), lastSeenAt: ago(330) }),
+        true,
+      ),
+    );
     expect(tile.tile).toEqual(
       expect.arrayContaining([
         'grid',

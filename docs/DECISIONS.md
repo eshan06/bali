@@ -8,6 +8,26 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-28** — **Present hides Clock off, as it hides an unlock's reason (the owner's
+  decision).** On the class page, a tile whose phone clock is set more than 2 minutes ahead says
+  "Clock off", and the student panel says why. Present, the same grid projected for the room, said
+  it too: 2026-10-06's entry kept it there as something about the phone, unlike the reason, which
+  the student adds for the teacher. **Decided, reversing that call for Present:** Present never says
+  Clock off, on any tile, nor its tooltip, so the room never learns whose phone clock is set ahead.
+  The class page's tiles (the tooltip, and a Focused tile's one detail on a phone, included) and the
+  student panel keep it: the teacher still sees it, as the consent list now tells the student (the
+  entry below). **The canvas** (version 107): ClassPresent's Focused tile with Clock off (Omar
+  Siddiqui) shows its state alone, and so does that tile in ClassStates' row of Present tiles, its
+  heading now "with no reason and no Clock off (the owner, 2026-10-28)"; the tiles' note says Present
+  drops both, and a note beside ClassPresent records the decision. **Tests:** the Present test now
+  drives the grid (jsdom, Testing Library; `live-grid.driven.test.tsx`): the class page's grid says
+  Clock off with its tooltip on a tile that opens the panel; Present says that Focused tile's state
+  alone, and a phone heard from 70 s ago its "last seen" alone, with "clock" nowhere in its markup
+  (red before the change); and the reason test moved there, every reason on each tile that carries
+  an unlock, read part by part so a tile with no line has none. `live-grid.test.ts` keeps the rest, two
+  of its Present tiles now sized with "last seen" in place of Clock off; it still reads source text,
+  so `source-text-tests.test.ts` lists it still. DESIGN.md §1 and §5 say it.
+
 - **2026-10-28** — **The consent list names how many answered and a clock set ahead (the owner's
   decision, in the owner's words).** The list told a student their teacher never sees "Which answer is yours,
   or whether you answered", but the class's "N of M answered" shows whether each student answered
