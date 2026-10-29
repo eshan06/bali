@@ -96,6 +96,10 @@ export default function PrivacyPage() {
                   So Bali can tell your teacher honestly whether your phone is still focused.
                 </li>
                 <li>
+                  <strong>Whether your phone&apos;s clock is set ahead.</strong> So your teacher
+                  knows your phone&apos;s times may be off (section 2).
+                </li>
+                <li>
                   <strong>
                     The reason for an Emergency Unlock, only if you pick one: bathroom, nurse or
                     other.
@@ -281,8 +285,8 @@ export default function PrivacyPage() {
               </li>
               <li>
                 After that day, we remove the names and sign-ins of everyone whose records all fall
-                on or before it. What&apos;s left is counts that name no one, such as “3 unlocks in
-                that session”.
+                on or before it, unless they also have records at another school that uses Bali.
+                What&apos;s left is counts that name no one, such as “3 unlocks in that session”.
               </li>
               <li>
                 A school can ask us in writing to dispose of all its data. We remove names from
