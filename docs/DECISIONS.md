@@ -8,6 +8,27 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-28** — **A tap is judged by the student's place in the class under the session's
+  lock, where a teacher's removal marks it (A19).** The route picks the session by a read that
+  takes no lock, and `tapIn` checked under the lock that the session runs and the account stands,
+  but not the class: a tap reaching the lock just behind a removal joined the student it had
+  removed, or brought back the participation it had ended. **Decided:** under the lock, before
+  anything is recorded, `tapIn` asks whether the student is in the session's class now (`inClass`,
+  which `unlock`'s `not_enrolled` check now shares). Out of it, nothing is recorded and the engine
+  answers `not_enrolled`, an outcome only the route sees, so a student out of a class is never live
+  in its lesson, as A19 already held for a Start. **In place, not refused:** the route reads the
+  tap afresh, once, and it lands as it would have had the removal come first: in another running
+  class of the block's teacher the student is still in, or armed, a `200` either way. Removed from
+  a second class in that same moment, it arms. *Weighed:* refusing it `409 session_not_running`,
+  as A17 refuses a tap whose session was marked over since the read. The phone keeps and retries
+  such a tap and the retry arms, but meanwhile it says the tap couldn't be recorded, and the reason
+  would be untrue, the session running; a reason of its own would grow the phone's vocabulary for
+  an answer no client needs. **Cost:** one probe of `enrollments_active_unique` inside the
+  session's window (the module's note in `transitions.ts`). **Tests:** on real Postgres, the
+  removal committing between the tap's read and its lock, the student not yet in the lesson and
+  live in it, and a removal from the newer of two running classes, whose tap joins the older; all
+  three red before the fix. On PGlite, the engine's answer and that it records nothing.
+
 - **2026-10-24** — **M6's LessonDecks panel line back (#457): "Pick a deck. Every phone in this
   class shows the page you're on, and so does Present."** M6 left the second sentence out until W5
   and M8 made it true (the conductor's call of 2026-10-16, approved by the owner the same day; below).

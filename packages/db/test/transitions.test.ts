@@ -425,6 +425,104 @@ describe('tapIn', () => {
     });
     expect((await eventsFor(session.id)).filter((e) => e.type === 'tap_in')).toHaveLength(1);
   });
+
+  it('joins nothing for a student out of the class and records nothing; one back in it joins (A19)', async () => {
+    // The route picks the session by a read that takes no lock, so the engine
+    // asks again under the session's lock, where a removal marks the
+    // enrollment. Out of the class — removed, or never in it — the tap is
+    // answered `not_enrolled`, and the route reads it afresh.
+    const { school, klass, student } = await seedClass('tap-not-enrolled');
+    const { session } = await startSession(db, {
+      classId: klass.id,
+      ...window('2026-01-01T09:00:00Z'),
+    });
+    const enrollment = one(
+      await db
+        .select()
+        .from(enrollments)
+        .where(and(eq(enrollments.classId, klass.id), eq(enrollments.studentId, student.id))),
+    );
+    await endEnrollment(db, {
+      enrollmentId: enrollment.id,
+      reason: 'removed_from_class',
+      at: new Date('2026-01-01T09:01:00Z'),
+    });
+    const outsider = one(
+      await db
+        .insert(users)
+        .values({ cognitoId: 'student-tap-not-enrolled-2', role: 'student', schoolId: school.id })
+        .returning(),
+    );
+    const tap = (studentId: string) => ({
+      sessionId: session.id,
+      studentId,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T09:02:00Z'),
+    });
+
+    for (const studentId of [student.id, outsider.id]) {
+      expect(await tapIn(db, tap(studentId))).toEqual({
+        outcome: 'not_enrolled',
+        state: null,
+        participationId: null,
+        session: null,
+      });
+    }
+    expect(
+      await db.select().from(participations).where(eq(participations.sessionId, session.id)),
+    ).toEqual([]);
+    expect((await eventsFor(session.id)).map((e) => e.type)).toEqual(['session_started']);
+
+    // Joined again by the code: a new enrollment, live, and the tap joins.
+    await db.insert(enrollments).values({ classId: klass.id, studentId: student.id });
+    expect(await tapIn(db, tap(student.id))).toMatchObject({
+      outcome: 'joined',
+      state: 'focused',
+      session: { id: session.id },
+    });
+  });
+
+  it('never revives the participation a removal ended: a new tap joins nothing (A19)', async () => {
+    // Removed mid-session, the student's row ends as `removed_from_class`. A
+    // tap of theirs that reaches the lock after it (a new one, not a retry,
+    // which A4 answers as its replay) leaves that row as the removal left it.
+    const { klass, student } = await seedClass('tap-removed-live');
+    const { session } = await startSession(db, {
+      classId: klass.id,
+      ...window('2026-01-01T09:00:00Z'),
+    });
+    const tap = (deviceTime: string) => ({
+      sessionId: session.id,
+      studentId: student.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date(deviceTime),
+    });
+    expect((await tapIn(db, tap('2026-01-01T09:01:00Z'))).outcome).toBe('joined');
+    const enrollment = one(
+      await db
+        .select()
+        .from(enrollments)
+        .where(and(eq(enrollments.classId, klass.id), eq(enrollments.studentId, student.id))),
+    );
+    await endEnrollment(db, {
+      enrollmentId: enrollment.id,
+      reason: 'removed_from_class',
+      at: new Date('2026-01-01T09:05:00Z'),
+    });
+
+    expect((await tapIn(db, tap('2026-01-01T09:06:00Z'))).outcome).toBe('not_enrolled');
+    expect(
+      one(await db.select().from(participations).where(eq(participations.sessionId, session.id))),
+    ).toMatchObject({
+      endedAt: new Date('2026-01-01T09:05:00Z'),
+      endedReason: 'removed_from_class',
+    });
+    expect((await eventsFor(session.id)).map((e) => e.type)).toEqual([
+      'session_started',
+      'tap_in',
+      'enrollment_removed',
+    ]);
+  });
 });
 
 describe('state changes', () => {
