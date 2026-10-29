@@ -209,6 +209,11 @@ project for the API (its DSN).
    `railway link` (choose the project and `production`), then
    `railway ssh --service <api service name>`, and in that shell
    `npm run school -- list`. Never turn the TCP proxy back on for this.
+   - **To end a running lesson** (the school asks, or one holds up a disposal, step 11):
+     `npm run school -- end-session <session-id>`, in that shell. It ends the lesson as its
+     teacher's End would and prints how many students were in it; a lesson over already is left as
+     it is, and says so. Its teacher can start the class again afterwards: to dispose of a school
+     whatever its classes do, use step 11's `--end-lessons`.
 10. **A parent's inspection request (FERPA; C5).** The request reaches you through the
     school; its data agreement gives you days, not weeks, to hand over the student's whole
     record. The day it arrives:
@@ -242,14 +247,24 @@ project for the API (its DSN).
     - **Preview it:** `npm run school -- dispose <school-id>` (`npm run school -- list`
       gives the id). It prints the school's name and what would go
       (teachers, students, classes, sessions, blocks, open invites, pre-bell taps) and writes
-      nothing. "lesson(s) running" means a class is in session: run it again after the bell.
+      nothing. "lesson(s) running" means a class is in session, and it names each: the
+      session's id, its class and its bell. If the agreement's days allow, run it again after
+      the bell. If they don't, or a class keeps being started again, either end one with
+      `npm run school -- end-session <session-id>` (step 9), or preview again with
+      `--end-lessons` last: `npm run school -- dispose <school-id> --end-lessons` lists the
+      lessons the disposal would end and ends none. Ending a lesson cuts the class short, as
+      its teacher's End would: tell the school's contact first.
       "records at another school too" lists accounts by id: nothing was written, and this
       command can't split one; stop and raise it.
     - **Dispose of it**, with the name exactly as the preview printed it: paste the
       preview's last line, `npm run school -- dispose <school-id> --confirm '<name>'` (the
       name single-quoted, so an apostrophe or `$` in it reaches the command as typed).
       It prints one line, `disposed of school <id> on <time>: teachers …`, with no name: keep
-      it with the school's request. Running it again says it was disposed of already. Its
+      it with the school's request. Running it again says it was disposed of already. After a
+      preview with `--end-lessons` the pasted line ends with it too: the disposal then ends
+      each lesson still running, as its teacher's End would, and removes its class in the same
+      step, so no one can start it again; its line ends `it ended N lesson(s) still running:`
+      and their ids. Its
       teachers' slide decks go with it, their titles emptied; the API deletes each one's PDF from
       the bucket by itself within the hour (runbook 10).
     - **Delete the school's sign-ins in Cognito.** The disposal doesn't reach them (the API

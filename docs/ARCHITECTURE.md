@@ -221,6 +221,12 @@ back-to-back classes never wait for the sweep. Nor does anyone join a
 session past its bell, or return to focus in it (A17 — one rule for all three): a tap then arms
 for the teacher's next Start, as when nothing runs, and a refocus is refused as after the sweep.
 What a phone reports there — an unlock, protection off — is recorded by its own rules.
+*Amended 2026-10-29 (the owner's decision of 2026-10-28):* the owner can end a running lesson too,
+where only its teacher's End could: `npm run school -- end-session <session-id>`, through that
+End's own transition and reason (`session_ended`), so the history, the grid and the phones read it
+as an End. A lesson over already, marked so or past its bell, is left as it is. It doesn't stop the
+class from being started again; a school's disposal can end its running lessons and remove their
+classes in one transaction (C6a, below).
 
 **7. The every-30-seconds "still here" message only updates one column — it never adds
 history rows.** During a session, each app tells the server every ~30 seconds: "still
@@ -275,7 +281,10 @@ from `last_seen_at` (rule 2), never from the column.
   (C6a, 2026-10-04): every person of the school de-identified as an account deletion leaves
   one, its classes, blocks, open invites and pre-bell taps removed, the school marked
   removed, and a `school_disposed` event of counts naming no one; its lessons and their
-  history stay, naming no one.
+  history stay, naming no one. It is refused while a lesson of the school runs, naming each
+  lesson's session, class and bell, unless the owner tells it to end them (`--end-lessons`,
+  2026-10-29): then it ends each as its teacher's End would, in its own transaction, and the
+  classes go in that same transaction, so a Start behind it finds no class.
 
 ## Auth
 
