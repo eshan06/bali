@@ -113,16 +113,25 @@ export const STREAM_HEARTBEAT_MS = 20_000;
  *    refusal code `startSession` does not have — recorded in PLAN.md rather
  *    than widened into the PR that found it.
  *
- * Per operation either way, not per session: `extendSession` adds to whatever
- * end it finds, so N presses still move a session arbitrarily far and nothing
- * enforces a total. That is the intended design — a teacher who keeps pressing
- * "add time" means it — but the distinction belongs here, because this comment
- * is what an iOS client mirrors.
+ * Per operation either way: `extendSession` adds to whatever end it finds, so
+ * this bounds one press, never the session. The session's own bound is
+ * `MAX_SESSION_TOTAL_MINUTES`, below, its Start and every extend together.
  *
  * Eight hours: longer than any school day, so it never refuses a real lesson,
  * and short enough that a bad value is caught as a bad value.
  */
 export const MAX_SESSION_MINUTES = 480;
+
+/**
+ * The longest a session runs in all, from its start to its bell, its Start and
+ * every extend together: 16 hours (the owner, 2026-10-28). A Start through
+ * `/v1` is at most `MAX_SESSION_MINUTES`, so only an extend can pass it, and
+ * `extendSession` refuses one that would (`session_too_long`, a 409),
+ * recording nothing. An extend landing exactly on it is taken. So a lesson
+ * started through `/v1` always ends within a day of its start, at its bell, as
+ * any lesson does (the engine's `startSession` itself bounds no window, above).
+ */
+export const MAX_SESSION_TOTAL_MINUTES = 16 * 60;
 
 /** Response shape of GET /healthz. */
 export interface HealthzResponse {

@@ -207,7 +207,12 @@ Start that would join them, and offline the phone's own clock ends the wait at t
 shields at that moment using its own clock, even with no internet. On the server, a small
 scheduled program marks the session and its participations as ended and adds a
 `session_expired` event. If the teacher adds time, that is recorded as its own
-`session_extended` event, so reports show exactly what happened. Time is added only before
+`session_extended` event, so reports show exactly what happened. A session runs at most 16 hours
+in all, its Start and every extend together (the owner, 2026-10-28; `MAX_SESSION_TOTAL_MINUTES`):
+an extend that would end it later than 16 hours after its start is refused
+(`409 session_too_long`) and records nothing, the bell standing, while one ending it exactly then
+is taken. Sixteen hours is longer than any school day, so the bound never cuts a real lesson
+short, and every lesson ends at its bell within a day of its start. Time is added only before
 the bell by the server's clock: past it, the phones have let go, so the session is over even
 before the sweep marks it, and an extend is refused as one for a session already ended (ruled
 2026-09-30). The teacher starts a new one instead: a Start past the old one's bell ends it as

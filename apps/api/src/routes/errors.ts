@@ -1,5 +1,5 @@
 import { TransitionError, type TransitionErrorCode } from '@bali/db';
-import type { ApiErrorCode, ApiErrorReason } from '@bali/shared';
+import { type ApiErrorCode, type ApiErrorReason, MAX_SESSION_TOTAL_MINUTES } from '@bali/shared';
 
 import { ApiError } from '../errors.js';
 
@@ -59,6 +59,13 @@ const REFUSALS: Record<
   ],
   // A join or a rename that reached an account deleted on its way. Nothing was recorded.
   ACCOUNT_DELETED: ['conflict', 'account_deleted', 'this account was deleted'],
+  // An extend that would run the session past MAX_SESSION_TOTAL_MINUTES from its start: the
+  // duration is a good one, the session has no room for it. Nothing was recorded.
+  SESSION_TOO_LONG: [
+    'conflict',
+    'session_too_long',
+    `a session runs at most ${MAX_SESSION_TOTAL_MINUTES / 60} hours in all`,
+  ],
 };
 
 /**

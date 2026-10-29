@@ -1,4 +1,4 @@
-import type { EventType } from '@bali/shared';
+import { type EventType, MAX_SESSION_MINUTES, MAX_SESSION_TOTAL_MINUTES } from '@bali/shared';
 import { and, asc, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -2852,6 +2852,69 @@ describe.runIf(REAL_PG)('concurrent extends (real Postgres)', () => {
         expect(await eventsOfType(session.id, 'session_extended'), first).toHaveLength(0);
         expect(await liveParticipations(session.id), first).toHaveLength(0);
       }
+    }
+  }, 30_000);
+
+  it('two extends racing at 16 hours in all: one lands on the bound, the other is refused, never both (the owner, 2026-10-28)', async () => {
+    /*
+     * Each press judges the session's total under the row lock it computes its new end in, so
+     * the second judges the first's committed bell. Staged: a holder takes the session's row,
+     * both presses park behind it, and its release lets them through one at a time. Judged on a
+     * read taken before the lock, both would pass and the lesson would end five minutes past
+     * the bound.
+     */
+    for (let round = 0; round < 4; round += 1) {
+      const { classId } = await seed(`race-extend-total-${round}`);
+      // The longest Start, a minute ago, and 475 minutes more: 15 h 55 min in all.
+      const startedAt = new Date(Date.now() - 60_000);
+      const { session } = await startSession(db, {
+        classId,
+        startedAt,
+        endsAt: new Date(startedAt.getTime() + MAX_SESSION_MINUTES * 60_000),
+      });
+      await extendSession(db, {
+        sessionId: session.id,
+        durationMinutes: 475,
+        at: new Date(),
+        eventId: newUuidV7(),
+      });
+      const cap = new Date(startedAt.getTime() + MAX_SESSION_TOTAL_MINUTES * 60_000);
+
+      const release = await holdSession(session.id);
+      const presses: ReturnType<typeof extendSession>[] = [];
+      let unstaged: Error | null = null;
+      try {
+        for (let i = 0; i < 2; i += 1) {
+          presses.push(
+            extendSession(db, {
+              sessionId: session.id,
+              durationMinutes: 5,
+              at: new Date(),
+              eventId: newUuidV7(),
+            }),
+          );
+        }
+        await waitForBlockedBackend(5_000, 2);
+      } catch (err) {
+        unstaged = err instanceof Error ? err : new Error(String(err));
+      } finally {
+        await release();
+      }
+      const results = await Promise.allSettled(presses);
+      if (unstaged !== null) throw unstaged;
+
+      expect(
+        results.filter((r) => r.status === 'fulfilled'),
+        `round ${round}`,
+      ).toHaveLength(1);
+      expect(
+        results.flatMap((r) => (r.status === 'rejected' ? [r.reason as unknown] : [])),
+        `round ${round}`,
+      ).toMatchObject([{ code: 'SESSION_TOO_LONG' }]);
+      const row = one(await db.select().from(sessions).where(eq(sessions.id, session.id)));
+      expect(row.endsAt, `round ${round}`).toEqual(cap);
+      expect(row.endedAt, `round ${round}`).toBeNull();
+      expect(await eventsOfType(session.id, 'session_extended'), `round ${round}`).toHaveLength(2);
     }
   }, 30_000);
 });

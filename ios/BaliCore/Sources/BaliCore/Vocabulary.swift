@@ -127,4 +127,5 @@ public enum ApiErrorReason: String, CaseIterable, Sendable, Encodable {
     case deckNotFound = "deck_not_found", deckStorageOff = "deck_storage_off"
     case deckNotReady = "deck_not_ready", deckRejected = "deck_rejected"
     case pageOutOfRange = "page_out_of_range", deckInUse = "deck_in_use"
+    case sessionTooLong = "session_too_long"
 }

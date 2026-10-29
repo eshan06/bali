@@ -8,6 +8,34 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-29** — **A lesson runs at most 16 hours in all (the owner's decision of 2026-10-28).**
+  Each extend was bounded on its own (`MAX_SESSION_MINUTES`, 480), the lesson as a whole by
+  nothing. **Decided:**
+  a session runs at most 16 hours from its start, its Start and every extend together
+  (`MAX_SESSION_TOTAL_MINUTES` in `@bali/shared`, beside the per-press bound, which stays). A Start
+  is at most 480 minutes, so only an extend can pass it: `extendSession` refuses one whose new bell
+  would be more than 16 hours after the start, `SESSION_TOO_LONG`, sent as `409 session_too_long`
+  (additive to `API_ERROR_REASONS`, BaliCore's mirror of it too), and records nothing: the bell
+  stands, and the press's id stays unspent, so the same press sent again is refused again. An
+  extend landing exactly on the 16 hours is taken, and a landed extend's retry is its replay as
+  before. The total is judged under the session's row lock, on the bell read there, so of two
+  presses racing at the bound the second judges the first's bell. Such a lesson ends at its bell
+  as any does, the sweep ending it there. 16 hours is longer than any school day, so no real lesson
+  meets it: the longest Start and the longest extend reach it exactly. **The portal:** the class
+  page says it under +5, +10 and End, where an extend's other refusals are said, on the page and in
+  Present: "A session runs 16 hours at most, so no time was added. It ends at the time shown." A
+  refusal, so no Try again; the next press is a new one. Drawn first on the portal canvas as an
+  intermediate state (ClassStates, version 108, beside "+5 or +10 min after the bell"), then built
+  from that drawing (`no-ai-slop`). **Weighed:** adding only the minutes that still fit; the
+  teacher pressed +10 and would get 3, said nowhere, so a refusal that says why wins. **Tests:**
+  `transitions.test.ts` (refused past the 16 hours, nothing moved or recorded, its id unspent; one
+  landing exactly on them taken, its replay answered, a minute more refused; a lesson at the bound
+  swept at its bell), `races.test.ts` (two presses staged behind a held lock at the bound: one
+  lands, one is refused, the bell exactly on the bound), `session-lifecycle.test.ts` (the 409's
+  body, the landed extend's replay, one `session_extended` in the history), `transition-errors.test.ts`
+  and the class page driven in jsdom (`app/classes/[id]/page.test.tsx`: the line said as an alert
+  under the controls, on the page and in Present, no Try again, the bell where it was).
+
 - **2026-10-28** — **The year-end retention run deletes the sign-ins of the people it de-identifies
   (the owner's decision), reversing 2026-10-09's keep.** The run (C6b) took each person's name and
   Bali's link to their sign-in, and left the Cognito sign-in itself, with its email and password, in
