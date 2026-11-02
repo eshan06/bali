@@ -452,6 +452,19 @@ struct AppTests {
     }
 
     @Test(
+        "FocusFinal is D1's whenever it is read (GA5's CI run): its bell 1:52 away, the last two minutes, on Focus — the bell set as it is read, never at the fixtures' first read, which drew it as Session over two minutes into a run"
+    )
+    func focusFinal() async throws {
+        // The fixtures read, then a second and a half gone: a bell set at that read is 1:51 away.
+        _ = PreviewFixtures.all
+        try await Task.sleep(for: .milliseconds(1500))
+        let phone = Phone(fixture: try #require(PreviewFixtures.all["focusFinal"]))
+        let words = FocusWords(try #require(phone.sync), phone.protection, now: Date())
+        #expect(words.countdown == "1:52" && words.final, "\(words.countdown)")
+        #expect(phone.shown.screen == .focus)
+    }
+
+    @Test(
         "D1's tab bar (C6a) shows wherever the router honours a tab — its own Home, Home opened over Unlocked (C5c) or over Waiting (#151), History and Me, but while Me's name is edited (C6b) — never over the last run's shields' Home, Waiting, Join or a session's screens; a tab chosen shows its screen, History's read kept from one visit to the next (#141) and as it was when chosen again while it shows (santa's round 1); the tab is Home again once the screens opened close — the standing changed — the history read kept, or who is signed in changes, the history read gone with it; a read that keeps them keeps the tab; Me's Join a class has its way back to Me (C6b)"
     )
     func tabs() async throws {
