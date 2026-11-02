@@ -8,14 +8,15 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-01 (Central) — GA3 (#474; `docs/DECISIONS.md`, 2026-11-01), the first of the
-audit's fixes (GA1–GA6 below; the owner's ruling, 2026-11-01): on the phone's Focus screen at the
-largest text sizes, Hold to unlock stays whole on the first screen in every state, and a question or
-a slide comes before the class, so the question and its first answers show with it; the default size
-and FocusLargeText's are unchanged (the app canvas's largest-text boards, version 44). Still
-**before the next TestFlight build, Push Notifications on `com.bali.Bali`** (runbook 7, step 3), and
-the owner reinstalls Bali before runbook 7's step-6 check. Next: GA1's drawing waits for the owner;
-GA2, GA4 and GA5 are the conductor's to hand out._
+_Last updated: 2026-11-01 (Central) — GA2 (#475; `docs/DECISIONS.md`, 2026-11-01): on a live class
+page the unlock pop-ups start at the grid's top right, over its first tiles, under the counts and the
+Questions and slides card, at every width, and never rise above the grid as it scrolls, so none
+covers +5, +10, End session, Present or the card's buttons (the portal canvas's GA2 boards, version
+116). Its known limit: on a short window with a question or a slide showing, a new pop-up can wait
+below the window's edge, beside its tile. GA3 before it (#474). The owner approved GA1's option A
+(2026-11-01). Still **before the next TestFlight build, Push Notifications on `com.bali.Bali`**
+(runbook 7, step 3), and the owner reinstalls Bali before runbook 7's step-6 check. Next: GA6, then
+GA4, then GA5._
 
 ## Now
 
@@ -50,7 +51,7 @@ the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOK
   (#434; DECISIONS 2026-10-22), jsdom and Testing Library, dev only, opted into per file
   (`docs/WEB.md`, Testing the portal), `try-again.test.tsx` the pattern. Each UI step from now on
   converts the source-text tests it touches and adds none; `src/source-text-tests.test.ts` lists the
-  30 left (New class's converted, 2026-10-23; the policy pages', and the help page's moved to its guards, C2-text), a list that only shrinks.
+  29 left (New class's converted, 2026-10-23; the policy pages', and the help page's moved to its guards, C2-text; the unlock pop-ups', GA2), a list that only shrinks.
 - **A stuck slide upload stops (the owner, 2026-10-22: "ok fine the 30 s and 25 min outer limit is
   good")** ✅ (#436; DECISIONS 2026-10-22): nothing sent for 30 s stops it as one with no answer, in
   the boards' line with Try again; 2 minutes for the bucket's answer once the whole file is sent (the
@@ -274,12 +275,12 @@ The owner's ruling of 2026-11-01 (`docs/DECISIONS.md`): the gstack audit's (2026
 7 cheap findings first, the rest polish left for later. The audit's list lives outside the repo, on
 the owner's Mac.
 
-- **GA1** 👀 End session's confirm, drawn for the owner (C2-01; the canvas only, no PR): awaiting the owner
-- **GA2** 👀 The unlock pop-up never covers the teacher's controls (C01/DR-08)
+- **GA1** 👀 End session's confirm, drawn for the owner (C2-01; the canvas only, no PR): the owner approved option A on 2026-11-01, the dialog, worded "End session now?" with its button "End session" to match the header's button (not the drawn "End class"); GA6 builds it (DECISIONS 2026-11-01)
+- **GA2** 👀 The unlock pop-up never covers the teacher's controls (C01/DR-08) — ✅ (#475; DECISIONS 2026-11-01)
 - **GA3** 👀 Focus at the largest text: Emergency Unlock and the question on the first screen (IOS-018, IOS-017) — ✅ (#474; DECISIONS 2026-11-01)
 - **GA4** The class page for screen readers and the keyboard: the reconnect pill announced, Mark correct and Close named, focus after End, Start and a closed pop-up (DR-05, D01, C02, C2-02)
 - **GA5** 👀 The app's refusals whole at the largest text with the keyboard up, and busy buttons' labels as drawn (IOS-001, IOS-008)
-- **GA6** 👀 End session's confirm, built once the owner approves GA1's drawing
+- **GA6** 👀 End session's confirm, built to GA1's option A (approved 2026-11-01): next
 
 ### Still open in earlier phases
 

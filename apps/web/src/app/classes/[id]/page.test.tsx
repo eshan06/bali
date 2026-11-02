@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import type { ClassDetail, RosterResponse, SessionSnapshot } from '@bali/shared';
-import { cleanup, render, screen } from '@testing-library/react';
+import type { ClassDetail, FeedEvent, RosterResponse, SessionSnapshot } from '@bali/shared';
+import { act, cleanup, render, screen } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -80,6 +80,9 @@ const bali = vi.hoisted(() => {
     if (method === 'GET' && path === `/v1/classes/${CLASS}/roster`) return [200, roster];
     if (method === 'GET' && path === `/v1/sessions/${SESSION}`) return [200, snapshot];
     if (method === 'POST' && path === `/v1/sessions/${SESSION}/extend`) return [409, tooLong];
+    // The student panel's read of the session's moments (PV11a): none yet.
+    const moments = new RegExp(`^/v1/sessions/${SESSION}/events\\?after=(\\d+)$`).exec(path);
+    if (method === 'GET' && moments) return [200, { events: [], nextAfter: Number(moments[1]) }];
     unexpected.push(`${method} ${path}`);
     return [404, { error: { code: 'not_found', message: 'not found' } }];
   };
@@ -103,6 +106,8 @@ const bali = vi.hoisted(() => {
     sent,
     unexpected,
     fetch,
+    /** Each stream the grid opened, its events the test's to bring. */
+    streams: [] as { onEvent: (e: FeedEvent) => void }[],
     router: { replace: vi.fn(), push: vi.fn() },
     signOut: vi.fn(),
     client: null as ApiClient | null,
@@ -118,8 +123,14 @@ vi.mock('@/lib/auth', async (importOriginal) => ({
   getAccessToken: () => 'token',
 }));
 vi.mock('@/lib/use-api', () => ({ useApi: () => bali.client, useSignOut: () => bali.signOut }));
-// No stream: the grid is its snapshot.
-vi.mock('@/lib/sse-client', () => ({ createSseClient: () => ({ close: () => undefined }) }));
+// No stream runs: the grid is its snapshot, and each event a test brings through the grid's own
+// handler, as the stream would.
+vi.mock('@/lib/sse-client', () => ({
+  createSseClient: (options: { onEvent: (e: FeedEvent) => void }) => {
+    bali.streams.push(options);
+    return { close: () => undefined };
+  },
+}));
 vi.mock('@/lib/monitoring', () => ({ captureApiFailure: vi.fn() }));
 
 const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -143,6 +154,7 @@ afterEach(() => {
   sessionStorage.clear();
   bali.sent.length = 0;
   bali.unexpected.length = 0;
+  bali.streams.length = 0;
   vi.mocked(captureApiFailure).mockClear();
 });
 
@@ -205,4 +217,93 @@ describe('a class live, time past 16 hours in all (the owner, 2026-10-28)', () =
       expect(bali.unexpected).toEqual([]);
     });
   }
+});
+
+/*
+ * An unlock the grid's stream brings opens its pop-up (PV10; ClassUnlock), placed as GA2's boards
+ * draw it: over the grid's top right, never over the teacher's controls. jsdom lays nothing out, so
+ * the place is the box it is laid over: the tiles' own, after the header, the counts with Present
+ * and the Questions and slides card, holding none of their controls (the audit's C01, where a click
+ * on End session landed on a pop-up). Screenshots at each width show the rest, beside their boards.
+ */
+describe('a class live, an unlock lands (GA2)', () => {
+  const CONTROLS = ['+5 min', '+10 min', 'End session', 'Present', 'Ask a question', 'Show slides'];
+  /** Ana's unlock, as the stream brings it: a `seq` past the read's newest (4) lands live. */
+  const unlocked = (seq: number): FeedEvent => ({
+    seq,
+    eventId: `019a0000-0000-7000-8000-00000000${String(seq).padStart(4, '0')}`,
+    type: 'unlock',
+    userId: 'u-ana',
+    occurredAt: new Date().toISOString(),
+    payload: { reason: 'nurse' },
+  });
+  /** The page, its grid read and its stream open. */
+  async function live() {
+    render(<ClassDetailPage />);
+    await screen.findByRole('button', { name: /^Ana Rodríguez/ });
+    await vi.waitFor(() => expect(bali.streams).toHaveLength(1));
+  }
+  const bring = async (e: FeedEvent) => {
+    await act(async () => {
+      bali.streams[0]?.onEvent(e);
+      await Promise.resolve();
+    });
+  };
+
+  it('lays its pop-up over the grid’s tiles alone, after every control of the header and the card', async () => {
+    await live();
+    await bring(unlocked(5));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toMatch(/^Ana Rodríguez used Emergency Unlock/);
+    // Beside her tile's pulse (bali-softpulse), which the same live unlock starts.
+    const anasTile = screen.getByRole('button', { name: /^Ana Rodríguez/ });
+    expect(anasTile.querySelector('.animate-softpulse')).not.toBeNull();
+    // The pop-ups' layer, and the positioned box it is laid over: the tiles' own.
+    const layer = alert.closest('.absolute');
+    const box = layer?.parentElement;
+    expect(layer?.classList.contains('inset-y-0')).toBe(true);
+    expect(box?.classList.contains('relative')).toBe(true);
+    expect(box?.contains(screen.getByRole('button', { name: /^Ana Rodríguez/ }))).toBe(true);
+    // Every control of the header, the counts' row and the card is outside that box, before it.
+    for (const name of CONTROLS) {
+      const control = screen.getByRole('button', { name });
+      expect(box?.contains(control), name).toBe(false);
+      expect(control.compareDocumentPosition(box as Node), name).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+    }
+    const card = screen.getByRole('heading', { name: 'Questions and slides' });
+    expect(box?.contains(card)).toBe(false);
+    expect(bali.unexpected).toEqual([]);
+  });
+
+  it('opens none for an unlock its read already held, as the stream’s first connect replays it', async () => {
+    await live();
+    await bring(unlocked(4));
+    expect(screen.queryByText(/used Emergency Unlock/)).toBeNull();
+    // Her tile says Unlocked, as the replay applies it, and doesn't pulse.
+    const anasTile = screen.getByRole('button', { name: /^Ana Rodríguez/ });
+    expect(anasTile.textContent).toMatch(/Unlocked/);
+    expect(anasTile.querySelector('.animate-softpulse')).toBeNull();
+  });
+
+  it('closes on Open student, the student’s panel opening from their tile', async () => {
+    const user = userEvent.setup();
+    await live();
+    await bring(unlocked(5));
+    await user.click(await screen.findByRole('button', { name: 'Open student' }));
+    expect(screen.queryByText(/used Emergency Unlock/)).toBeNull();
+    const tile = screen.getByRole('button', { name: /^Ana Rodríguez/ });
+    expect(tile.getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('never shows one in Present, the projector the class can see', async () => {
+    sessionStorage.setItem(`bali.present.${bali.CLASS}`, 'on');
+    render(<ClassDetailPage />);
+    await screen.findByText('Ana Rodríguez');
+    await vi.waitFor(() => expect(bali.streams).toHaveLength(1));
+    await bring(unlocked(5));
+    expect(screen.queryByText(/used Emergency Unlock/)).toBeNull();
+  });
 });

@@ -89,20 +89,21 @@ export const reasonWords = (reason: UnlockReason | null) =>
 const DOT = '\u00a0· ';
 
 /**
- * The stack's layer, over the page's whole frame (the shell's 30/36 px in, 22/16 on a phone), placed
- * against the class page's own root: it takes no room and nobody's clicks but the pop-ups' own, over
- * the reconnect pill's layer (z-10) should the two meet on a phone.
+ * The stack's layer, over the grid's tiles alone, out to the page's frame on either side (the
+ * shell's 36 px in, 16 on a phone), placed against the box that holds the tiles (`LiveGrid`): it
+ * takes no room and nobody's clicks but the pop-ups' own, over the reconnect pill's layer (z-10)
+ * should the two meet on a phone. The header, the counts with Present and the Questions and slides
+ * card are above it, so no pop-up ever covers them (GA2's boards; the audit's C01).
  */
-const LAYER =
-  'pointer-events-none absolute -inset-x-9 -top-7.5 bottom-0 z-20 max-sm:-inset-x-4 max-sm:-top-5.5';
+const LAYER = 'pointer-events-none absolute -inset-x-9 inset-y-0 z-20 max-sm:-inset-x-4';
 /**
- * The stack as ClassUnlocks draws it: 96 px from the frame's top and 18 px from its right, 380 px
- * wide at most, 10 px apart. It stays in view as the page scrolls, 18 px from the top (v2.css's
- * `.toast`), so a new unlock isn't left above a grid scrolled to its last row; at rest the two are
- * one. A stack taller than the page under it scrolls with the page.
+ * The stack as GA2's boards draw it: at the grid's top right, over its first tiles, 18 px from the
+ * frame's right, 380 px wide at most (on a phone 18 px from each side), 10 px apart. It stays in view
+ * as the grid scrolls, 18 px from the window's top (v2.css's `.toast`), so a new unlock isn't left
+ * above a grid scrolled to its last row, and never rises above the grid's top. A stack taller than
+ * the grid scrolls with the page.
  */
-const STACK =
-  'sticky top-4.5 mt-24 mr-4.5 ml-auto flex w-95 max-w-[calc(100%-36px)] flex-col gap-2.5';
+const STACK = 'sticky top-4.5 mr-4.5 ml-auto flex w-95 max-w-[calc(100%-36px)] flex-col gap-2.5';
 /**
  * One pop-up (v2.css's `.toast`): white, a hairline and a 3 px orange-400 top edge, 14 px corners,
  * `shadow-3`, 14/10/14/16 px in; the lock in its tint's 36 px well, the words, then Close.
@@ -111,8 +112,9 @@ const POPUP =
   'pointer-events-auto grid grid-cols-[36px_minmax(0,1fr)_auto] items-start gap-3 rounded-md border border-t-3 border-border-default border-t-unlock-edge bg-surface-card pt-3.5 pr-2.5 pb-3.5 pl-4 shadow-3';
 
 /**
- * The unlock pop-ups (PV10; ClassUnlock, ClassUnlocks): each unlock the stream brings, newest on
- * top, until it is closed. The live grid holds them, so they go with the session's live page, as
+ * The unlock pop-ups (PV10; ClassUnlock, ClassUnlocks, placed as GA2's boards draw them): each
+ * unlock the stream brings, newest on top, until it is closed, over the grid's top right. The live
+ * grid holds them, so they go with the session's live page, as
  * ClassUnlock draws them on it alone; each unlock then shows in the recap (How it ended, where its
  * tile showed too, went in PV12b). Its words are an alert, so a screen reader says each as it opens
  * ("Ethan Park used Emergency Unlock. Nurse · 9:31 AM") without moving focus; Close is described by

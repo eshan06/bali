@@ -8,6 +8,31 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-01** — **The unlock pop-ups start at the grid's top right, never over the teacher's
+  controls (GA2; the audit's C01/DR-08).** ClassUnlock placed the stack 96 px from the page's top,
+  over the counts, before the Questions and slides card existed; built that way, it covered
+  Present and the card's buttons at 1440, and +5, +10 and End session on a smaller window, and in
+  the audit a real click on End session landed on a pop-up. **Decided:** the stack is laid over the
+  tiles' own box (`LiveGrid`) instead of the whole page: at the grid's top right, over its first
+  tiles, at every width; kept 18 px from the window's top as the grid scrolls (sticky, as before)
+  and never above the grid's top, so nothing above the grid can be under it. Its look, words,
+  width, stacking, Close and Open student are unchanged. Drawn first as intermediate states on the
+  portal canvas (version 116: GA2Unlock, GA2UnlocksQuestion, GA2UnlocksScrolled, GA2UnlockSlide1024,
+  GA2Unlocks768, GA2Unlock720, GA2UnlocksPhone, GA2UnlockPhoneSlide). **Weighed:** keeping it over
+  the counts (impossible at 1440 without covering Present and the card's buttons) and an in-flow
+  stack that pushes the page down (no cover, but the page jumps as each unlock lands). **Known
+  limit:** on a short window (a phone, or 200% zoom) with a question or a slide showing, the grid
+  can start below the window's bottom edge, so a new pop-up waits there beside its tile until it is
+  closed; the Unlocked count above the card changes at once and a screen reader says the pop-up as
+  it opens. Tests: the converted `unlock-popups.test.tsx` (driven in jsdom; off the source-text
+  list) and the class page's own (`app/classes/[id]/page.test.tsx`): the pop-up's box holds the
+  tiles and none of the header's or the card's controls, all of which come before it.
+
+- **2026-11-01** — **End session asks first, in a dialog (GA1, option A; the owner's approval).**
+  Of GA1's two drawn proposals (the canvas's GA1A and GA1B rows), the owner approved A: End session
+  opens a dialog, as New code's does, worded "End session now?" with its button "End session" to
+  match the header's own button, not the drawn "End class". GA6 builds it.
+
 - **2026-11-01** — **Focus at the largest text sizes (GA3, #474; the audit's IOS-018 and IOS-017):
   Hold to unlock whole on the first screen in every Focus state, and a question's prompt and first
   answers with it.** At the accessibility sizes past the large one FocusLargeText draws (AX2 to AX5,

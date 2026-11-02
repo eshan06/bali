@@ -10,6 +10,15 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-11-01 (Central) — GA3 (#474; `docs/DECISIONS.md`, 2026-11-01), the first of the
+audit's fixes (GA1–GA6 below; the owner's ruling, 2026-11-01): on the phone's Focus screen at the
+largest text sizes, Hold to unlock stays whole on the first screen in every state, and a question or
+a slide comes before the class, so the question and its first answers show with it; the default size
+and FocusLargeText's are unchanged (the app canvas's largest-text boards, version 44). Still
+**before the next TestFlight build, Push Notifications on `com.bali.Bali`** (runbook 7, step 3), and
+the owner reinstalls Bali before runbook 7's step-6 check. Next: GA1's drawing waits for the owner;
+GA2, GA4 and GA5 are the conductor's to hand out._
+
 _Last updated: 2026-10-24 (Central) — C2-text (#461; `docs/DECISIONS.md`, 2026-10-24): the owner's
 drafted privacy policy and terms (#460) on `/privacy` and `/terms` in the outline's place, its
 notice and Placeholder chips gone, the notes for the lawyer left off. The pages are now the one copy

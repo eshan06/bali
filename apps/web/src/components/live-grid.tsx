@@ -679,48 +679,68 @@ export function LiveGrid({
   // Its tiles are buttons, and its panel shows, on the live page alone, and never in Present.
   const selects = livePage && !present;
   const shown = selects && panel !== null ? students[panel.studentId] : undefined;
+  // The unlock pop-ups (ClassUnlock, ClassUnlocks, placed as GA2's boards draw them), never on the
+  // projector: laid over the tiles' own box, so never over the header, the counts or the Questions
+  // and slides card above it. Open student closes its pop-up, as ClassStudent draws none.
+  const unlocks = selects ? (
+    <UnlockPopups
+      unlocks={popups.open}
+      students={students}
+      onClose={(eventId) => tell({ kind: 'close', eventId })}
+      onOpen={(u) => {
+        tell({ kind: 'close', eventId: u.eventId });
+        open(u.studentId);
+      }}
+    />
+  ) : null;
 
   return (
     <div className="flex flex-col gap-3">
       {health}
       {rows.length === 0 ? (
-        <p className="text-body text-text-secondary">No students enrolled yet.</p>
+        <div className="relative">
+          <p className="text-body text-text-secondary">No students enrolled yet.</p>
+          {unlocks}
+        </div>
       ) : (
         // Fewer columns as the grid narrows, never smaller type (§5); the tiles straight on the page.
-        <div className="@container">
-          <ul className={`grid ${present ? PRESENT_COLUMNS : COLUMNS}`}>
-            {rows.map((s) => {
-              const unlock = s.unlock?.eventId;
-              return (
-                <Tile
-                  key={s.studentId}
-                  student={s}
-                  now={now}
-                  present={present}
-                  pulse={softpulses(s, gridDisplay(s, now), liveUnlocks)}
-                  onPulseEnd={() =>
-                    setLiveUnlocks((prev) => {
-                      const next = new Set(prev);
-                      if (unlock !== undefined) next.delete(unlock);
-                      return next;
-                    })
-                  }
-                  select={
-                    selects
-                      ? {
-                          id: tileId(s.studentId),
-                          panel: panelId,
-                          selected: panel?.studentId === s.studentId,
-                          // A second press closes it again, focus staying on the tile.
-                          onSelect: () =>
-                            panel?.studentId === s.studentId ? setPanel(null) : open(s.studentId),
-                        }
-                      : undefined
-                  }
-                />
-              );
-            })}
-          </ul>
+        <div className="relative">
+          <div className="@container">
+            <ul className={`grid ${present ? PRESENT_COLUMNS : COLUMNS}`}>
+              {rows.map((s) => {
+                const unlock = s.unlock?.eventId;
+                return (
+                  <Tile
+                    key={s.studentId}
+                    student={s}
+                    now={now}
+                    present={present}
+                    pulse={softpulses(s, gridDisplay(s, now), liveUnlocks)}
+                    onPulseEnd={() =>
+                      setLiveUnlocks((prev) => {
+                        const next = new Set(prev);
+                        if (unlock !== undefined) next.delete(unlock);
+                        return next;
+                      })
+                    }
+                    select={
+                      selects
+                        ? {
+                            id: tileId(s.studentId),
+                            panel: panelId,
+                            selected: panel?.studentId === s.studentId,
+                            // A second press closes it again, focus staying on the tile.
+                            onSelect: () =>
+                              panel?.studentId === s.studentId ? setPanel(null) : open(s.studentId),
+                          }
+                        : undefined
+                    }
+                  />
+                );
+              })}
+            </ul>
+          </div>
+          {unlocks}
         </div>
       )}
       {/* The student's panel (ClassStudent), read again for each student; Close or Escape gives
@@ -737,19 +757,6 @@ export function LiveGrid({
           onClose={() => {
             document.getElementById(tileId(shown.studentId))?.focus();
             setPanel(null);
-          }}
-        />
-      ) : null}
-      {/* The unlock pop-ups (ClassUnlock, ClassUnlocks), after the grid, never on the projector.
-          Open student closes its pop-up, as ClassStudent draws none. */}
-      {selects ? (
-        <UnlockPopups
-          unlocks={popups.open}
-          students={students}
-          onClose={(eventId) => tell({ kind: 'close', eventId })}
-          onOpen={(u) => {
-            tell({ kind: 'close', eventId: u.eventId });
-            open(u.studentId);
           }}
         />
       ) : null}

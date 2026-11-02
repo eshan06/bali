@@ -74,7 +74,6 @@ const STILL_READING = [
   'components/student-lesson.test.ts',
   'components/student-panel.test.ts',
   'components/student-slide.test.ts',
-  'components/unlock-popups.test.ts',
 ];
 
 /**
