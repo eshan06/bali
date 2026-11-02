@@ -8,14 +8,15 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-02 (Central) — GA4 (#477; `docs/DECISIONS.md`, 2026-11-02): the class page
-for screen readers and the keyboard, nothing on screen changed. A lost or quiet live feed is said
-to a screen reader (the pill, the line over the grid, Home's live card's line), each Mark correct is
-named by its answer's letter and each Close by whose pop-up or panel it closes; after Start focus
-goes to the class's name, after the last unlock pop-up closes to its student's tile, and after
-Chrome's second Escape closes End session's dialog on its way, to End session. GA6 before it
-(#476). Still **before the next TestFlight build, Push Notifications on `com.bali.Bali`** (runbook 7,
-step 3), and the owner reinstalls Bali before runbook 7's step-6 check. Next: GA5._
+_Last updated: 2026-11-02 (Central) — GA5 (#478; `docs/DECISIONS.md`, 2026-11-02), the last of the
+audit's fixes, so **GA1–GA6 are all done**: on Your name and Join at the largest text size with the
+keyboard up, a refusal under Continue shows whole, Continue's block pinned while the field fits above
+it and scrolling with the page on the smallest iPhones (the Sign in & sign up canvas's keyboard
+boards, version 15); and a disabled or busy primary's label is white on its dimmed fill, as the
+boards draw it. GA4 before it (#477). Still **before the next TestFlight build, Push Notifications on
+`com.bali.Bali`** (runbook 7, step 3), and the owner reinstalls Bali before runbook 7's step-6 check.
+Next: the owner's call on GA5's known limit, the smallest iPhones (DECISIONS 2026-11-02); the
+audit's polish waits, as ruled._
 
 ## Now
 
@@ -278,7 +279,7 @@ the owner's Mac.
 - **GA2** 👀 The unlock pop-up never covers the teacher's controls (C01/DR-08) — ✅ (#475; DECISIONS 2026-11-01); its known limit, a pop-up below a short window's edge, approved by the owner (2026-11-02)
 - **GA3** 👀 Focus at the largest text: Emergency Unlock and the question on the first screen (IOS-018, IOS-017) — ✅ (#474; DECISIONS 2026-11-01)
 - **GA4** The class page for screen readers and the keyboard: the reconnect pill announced, Mark correct and Close named, focus after Start and a closed pop-up (DR-05, D01, C02, C2-02; End's focus is GA6's) — ✅ (#477; DECISIONS 2026-11-02)
-- **GA5** 👀 The app's refusals whole at the largest text with the keyboard up, and busy buttons' labels as drawn (IOS-001, IOS-008)
+- **GA5** 👀 The app's refusals whole at the largest text with the keyboard up, and busy buttons' labels as drawn (IOS-001, IOS-008) — ✅ (#478; DECISIONS 2026-11-02)
 - **GA6** 👀 End session's confirm, built to GA1's option A (C2-01, End's part of C2-02) — ✅ (#476; DECISIONS 2026-11-01)
 
 ### Still open in earlier phases

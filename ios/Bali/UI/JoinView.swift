@@ -7,12 +7,16 @@ import SwiftUI
 /// on Home (the owner's ruling, 2026-10-07): the student types their class's code, sees what it
 /// opens before anything is joined — the class, its teacher, and what that teacher sees, the
 /// intro's own list — and joins it. A look or a join that did not finish is said under its button,
-/// which is the way on (rule 5). The rules are `Joining`'s (BaliOutbox), the calls `Phone`'s.
+/// which is the way on (rule 5), the button and its line pinned under the page while they leave the
+/// code's field room, else scrolling with it, so the line is never cut off (GA5). The rules are
+/// `Joining`'s (BaliOutbox), the calls `Phone`'s.
 struct JoinView: View {
     let phone: Phone
     /// The field's text, kept as a code is written (`Joining.type`) at every keystroke.
     @State private var text: String
     @FocusState private var typing: Bool
+    /// The code field's height: the page room the pinned button leaves.
+    @State private var fieldHeight: CGFloat = 0
 
     /// A look-up or a join under way: the code, the buttons and the way back wait for its answer.
     private var busy: Bool { phone.joining.busy }
@@ -31,7 +35,7 @@ struct JoinView: View {
     /// The code (D1's JoinCode): back to the screen that opened it (C3).
     @ViewBuilder private var entry: some View {
         if phone.canGoBack { back { phone.back() } }
-        ScrollView {
+        PinnedFooter(keep: fieldHeight) {
             VStack(alignment: .leading, spacing: 24) {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Join a class").textStyle(.label).textCase(.uppercase)
@@ -65,15 +69,18 @@ struct JoinView: View {
                                 .stroke(typing ? Theme.arc : Theme.borderStrong, lineWidth: 2)
                         )
                         .shadow(color: Theme.shadow, radius: 1, y: 1)
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
+                            fieldHeight = $0
+                        }
                     Text("Codes never use 0, O, 1, I or L, so there's nothing to mix up.")
                         .textStyle(.caption).foregroundStyle(Theme.textTertiary)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+        } footer: {
+            action(busy ? "Checking…" : "Continue", enabled: phone.joining.complete, phone.lookUp)
         }
-        .scrollBounceBehavior(.basedOnSize).screenWide()
         .onAppear { typing = true }
-        action(busy ? "Checking…" : "Continue", enabled: phone.joining.complete, phone.lookUp)
     }
 
     /// What the code opens, before anything is joined (D1's ConsentPreview): "your teacher" when
@@ -81,7 +88,7 @@ struct JoinView: View {
     @ViewBuilder private func previewing(_ preview: JoinCodePreviewResponse) -> some View {
         let teacher = preview.teacher.displayName ?? "your teacher"
         back { phone.joining.back() }
-        ScrollView {
+        PinnedFooter {
             VStack(alignment: .leading, spacing: 20) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(preview.alreadyEnrolled ? "You're in this class already" : "You're joining")
@@ -95,15 +102,15 @@ struct JoinView: View {
                     .textStyle(.caption).foregroundStyle(Theme.textTertiary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+        } footer: {
+            action(
+                busy ? "Joining…" : preview.alreadyEnrolled ? "Continue" : "Join \(preview.class.name)",
+                enabled: true, phone.join)
+            Button("Not my class") { phone.joining.back() }
+                .textStyle(TextStyle(size: 15, line: 22, weight: .semibold))
+                .foregroundStyle(Theme.textSecondary).frame(maxWidth: .infinity, minHeight: 44)
+                .padding(.top, 4).disabled(busy)
         }
-        .scrollBounceBehavior(.basedOnSize).screenWide()
-        action(
-            busy ? "Joining…" : preview.alreadyEnrolled ? "Continue" : "Join \(preview.class.name)",
-            enabled: true, phone.join)
-        Button("Not my class") { phone.joining.back() }
-            .textStyle(TextStyle(size: 15, line: 22, weight: .semibold))
-            .foregroundStyle(Theme.textSecondary).frame(maxWidth: .infinity, minHeight: 44)
-            .padding(.top, 4).disabled(busy)
     }
 
     /// The page's primary action, busy while it runs, and under it why the last try did not
@@ -200,6 +207,9 @@ struct ConsentCard: View {
     }
     #Preview("Join — no such class") {
         RootView(phone: Phone(fixture: PreviewFixtures.all["joinError"]!))
+    }
+    #Preview("Join — the preview, refused") {
+        RootView(phone: Phone(fixture: PreviewFixtures.all["joinPreviewRefused"]!))
     }
     #Preview("Join — from Home") {
         RootView(phone: Phone(fixture: PreviewFixtures.all["joinFromHome"]!))

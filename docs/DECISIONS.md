@@ -8,6 +8,55 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-02** — **A Debug fixture whose bell is minutes away is made at each read (GA5's CI run,
+  #478).** The fixtures (`PreviewFixtures.all`) were made once, at their first read, so FocusFinal's
+  bell, D1's 1:52 away, rang 1:52 after that read. On GA5's CI run GA3's `focusFirstScreen` began
+  114 s after `AppTests.fixtures` first read them (93 s on GA3's own run, before GA5's 29-second
+  refusal test ran ahead of it) and drew FocusFinal as Session over, which holds no Emergency Unlock,
+  so it failed; on the Mac, the fixtures read and 113 s gone, GA3's test fails the same way.
+  **Decided:** FocusFinal is made at each read of `all`, its bell 1:52 from then, as D1 draws it, in
+  a test, a preview or `-bali-screen focusFinal`; the rest, some of which build outboxes, stay made
+  once. **Known limit:** Period 3's bell is 27 minutes from the first read, so a run or a preview
+  left open longer draws its fixtures past the bell; made at each read too if one ever lasts that
+  long. Test: `AppTests.focusFinal`, which read 1:51 a second and a half after a read until the fix.
+
+- **2026-11-02** — **The app's refusals whole at the largest text with the keyboard up, and a
+  dimmed primary's label as the boards draw it (GA5, #478; the audit's IOS-001 and IOS-008).** On
+  Your name and Join a refusal is said under Continue, in a block pinned under the page, and offered
+  less than its height the line was cut to "…": on the iPhone 17e and 17 Pro at the largest text size
+  with the keyboard up, "A classmate already uses that name. Tr…". **Decided:** the block (Continue,
+  what is said under it and, on Your name, Sign out; on Join's preview, Join and Not my class) takes
+  its own height, so no line of it is cut, and stays pinned while it leaves the page room for the field
+  being typed in; past that it scrolls with the page, after it (`PinnedFooter`, `Theme.swift`), the
+  room measured as offered, never grown by the block (santa's round 1: Join's preview, which keeps no
+  field's room, had stayed pinned and run off the screen under a long class's name). On the 17e and
+  17 Pro every refusal now shows whole above the keyboard, the page over it shrunk to the field, whose
+  text iOS keeps in view. Drawn first as intermediate states on the Sign in & sign up canvas (version
+  15): Name-largest-keyboard and Join-largest-keyboard on the 17 Pro; on the iPhone SE
+  Name-largest-keyboard-small and Join-largest-keyboard-small with their scrolled ends, and
+  Join-preview-largest-small-end. No canvas drew Join's refusal, so its boards sit beside
+  Join-from-home there. **Known limit:** on the smallest iPhones (SE, mini) at the largest sizes the
+  block and the field can't fit together above the keyboard, so they scroll as one, nothing cut; as
+  the keyboard comes back after a failed save or look-up iOS keeps the field in view, and the refusal
+  is a scroll down (Your name says it to VoiceOver as it comes; Join, as before, doesn't). There Join
+  now shows less at first than main did, which kept Continue and the refusal's first lines on the
+  screen, cut short. And Join's preview, under a class's name long enough that its block fits only
+  until a refusal joins it (about 60 characters on an SE at the largest size), moves Join, the refusal
+  and Not my class from the bottom of the screen to after the whole page as a join fails: the student
+  is left where they were in the page, Join gone from view, VoiceOver's focus on it dropped and
+  nothing said, until they scroll. **Weighed:** keeping the keyboard down after a
+  refusal at those sizes, which shows it whole there too but changes the keyboard's return after a
+  failed save (#292's review), and scrolling the preview to its block's end as a refusal joins it:
+  left for the owner. **IOS-008:** a dimmed control is dimmed as one layer (`Dimmed`), as the
+  boards' 60 % opacity draws it. Dimmed piece by piece, a disabled or busy primary's white label was
+  dimmed again over its own dimmed fill, (201, 214, 208) on (120, 152, 137), 2.1:1; now it is white at
+  60 % over the page, (252, 251, 250), 3.1:1, on every primary, Delete account's too. A secondary and
+  Sign out change by 2 RGB units at most. Tests: `AppTests.refusalsWhole` (each Your name refusal and
+  Join's, its preview's under a long class's name too, at the default and three accessibility sizes,
+  on the 17e, the 17 Pro and the SE, the keyboard up and not: whole, under its button, on the screen
+  or reached by a scroll, nothing pushed off it, and a pinned block leaving the field room) and
+  `dimmedAsDrawn`; both fail on main's views.
+
 - **2026-11-02** — **The class page for screen readers and the keyboard (GA4, #477; the audit's
   DR-05, D01, C02 and C2-02's remaining cases).** Nothing on screen changes. The live feed lost
   (the pill) or quiet (the line over the grid) is a status, as a student's "Can't reach Bali" is, so

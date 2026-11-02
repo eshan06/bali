@@ -61,8 +61,19 @@
         /// Where the fixture deck stands on the phone (M8).
         enum Deck { case loading, failed, ready }
 
-        /// Each named for the screen it shows, then a state of it (`AppTests.fixtures` pins that).
-        static let all: [String: State] = [
+        /// Each named for the screen it shows, then a state of it (`AppTests.fixtures` pins that):
+        /// made once, at the first read, but FocusFinal at each, its bell 1:52 from whenever it is
+        /// read, as D1 draws it. Made once, it rang 1:52 after the first read, and a test that drew
+        /// it later drew Session over (GA5's CI run).
+        static var all: [String: State] {
+            var all = madeOnce
+            let lastMinutes = SessionView(id: "session", classId: "p3", endsAt: Date() + 112)
+            all["focusFinal"] = State(
+                protection: shielded(), sync: standing(.inSession(lastMinutes, .focused)))
+            return all
+        }
+
+        private static let madeOnce: [String: State] = [
             "starting": State(signedIn: nil, protection: nil, sync: nil),
             // The 13+ check (C7) once Sign up is pressed: the question, nothing picked; both
             // picked, Continue ready; a second Sign up this run, the intro seen, its page opening
@@ -153,6 +164,12 @@
                 sync: standing(.out, me: ana(newcomer: true)),
                 joining: joining(failure: Joining.words(.status(404), .classNotFound)),
                 opened: [.join]),
+            // The preview after a join that didn't reach Bali, under a long class's name (GA5):
+            // at the largest text size, Join's own label takes lines of its own.
+            "joinPreviewRefused": State(
+                sync: standing(.out, me: ana(newcomer: true)),
+                joining: joining(opens: longPreview, failure: Joining.words(.networkError, nil)),
+                opened: [.join]),
             "joinFromHome": State(joining: joining(), opened: [.join]),
             "home": State(),
             "homeLoading": State(sync: standing(.out, me: nil)),
@@ -170,8 +187,7 @@
             // The owner's phone (#149): a scan of a block no teacher set up, said beside D1's card.
             "waitingTapRefused": State(sync: refusedTap(standing(.waiting))),
             "focus": State(protection: shielded(), sync: standing(.inSession(period3, .focused))),
-            "focusFinal": State(
-                protection: shielded(), sync: standing(.inSession(lastMinutes, .focused))),
+            // "focusFinal": made at each read (`all`).
             "focusOffline": State(
                 protection: shielded(), sync: offline(standing(.inSession(period3, .focused)))),
             "focusTapHeld": State(protection: shielded(), sync: offline(heldTap())),
@@ -426,11 +442,11 @@
             return arguments[at + 1]
         }
 
-        /// A class whose bell is 27 minutes away — Period 3's, with Ms. Rivera — one whose bell
-        /// is 1:52 away (D1's FocusFinal), and one whose bell rang a minute ago.
+        /// A class whose bell is 27 minutes away — Period 3's, with Ms. Rivera — and one whose bell
+        /// rang a minute ago, both from the fixtures' first read. ponytail: Period 3's bell is set
+        /// once, so a run or a preview open more than 27 minutes past that read draws its fixtures
+        /// past the bell; made at each read, as FocusFinal's is (`all`), if one ever lasts that long.
         private static let period3 = SessionView(id: "session", classId: "p3", endsAt: Date() + 27 * 60)
-        private static let lastMinutes = SessionView(
-            id: "session", classId: "p3", endsAt: Date() + 112)
         private static let periodOver = SessionView(
             id: "session", classId: "p3", endsAt: Date() - 60)
 
@@ -552,6 +568,11 @@
             JoinCodePreviewResponse.self,
             from: Data(
                 #"{"class":{"id":"class","name":"Period 3 — Algebra II"},"teacher":{"displayName":"Ms. Rivera"},"alreadyEnrolled":false}"#
+                    .utf8))
+        private static let longPreview = try? BaliJSON.makeDecoder().decode(
+            JoinCodePreviewResponse.self,
+            from: Data(
+                #"{"class":{"id":"class","name":"BSCI 1510 Introduction to Biological Sciences, Section 002"},"teacher":{"displayName":"Ms. Rivera"},"alreadyEnrolled":false}"#
                     .utf8))
 
         /// The Join screen with `KWX49Q` typed: what it `opens`, once looked up, or why not.

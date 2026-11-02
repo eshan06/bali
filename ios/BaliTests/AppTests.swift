@@ -452,6 +452,19 @@ struct AppTests {
     }
 
     @Test(
+        "FocusFinal is D1's whenever it is read (GA5's CI run): its bell 1:52 away, the last two minutes, on Focus — the bell set as it is read, never at the fixtures' first read, which drew it as Session over two minutes into a run"
+    )
+    func focusFinal() async throws {
+        // The fixtures read, then a second and a half gone: a bell set at that read is 1:51 away.
+        _ = PreviewFixtures.all
+        try await Task.sleep(for: .milliseconds(1500))
+        let phone = Phone(fixture: try #require(PreviewFixtures.all["focusFinal"]))
+        let words = FocusWords(try #require(phone.sync), phone.protection, now: Date())
+        #expect(words.countdown == "1:52" && words.final, "\(words.countdown)")
+        #expect(phone.shown.screen == .focus)
+    }
+
+    @Test(
         "D1's tab bar (C6a) shows wherever the router honours a tab — its own Home, Home opened over Unlocked (C5c) or over Waiting (#151), History and Me, but while Me's name is edited (C6b) — never over the last run's shields' Home, Waiting, Join or a session's screens; a tab chosen shows its screen, History's read kept from one visit to the next (#141) and as it was when chosen again while it shows (santa's round 1); the tab is Home again once the screens opened close — the standing changed — the history read kept, or who is signed in changes, the history read gone with it; a read that keeps them keeps the tab; Me's Join a class has its way back to Me (C6b)"
     )
     func tabs() async throws {
@@ -2788,6 +2801,94 @@ struct AppTests {
     }
 
     @Test(
+        "A refusal under its button is never cut off (GA5; IOS-001): every Your name refusal and Join's, its preview's too under a long class's name, at the default and the accessibility text sizes, on the iPhone 17e, the iPhone 17 Pro and the iPhone SE, the keyboard up and not — whole, under the button, nothing pushed off the screen; pinned under the page while the page keeps room for the field (the canvas's largest-text boards with the keyboard up), else scrolling with it, where a scroll reaches every line"
+    )
+    func refusalsWhole() async throws {
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let sizes: [DynamicTypeSize] = [.large, .accessibility1, .accessibility3, .accessibility5]
+        // Each phone less its status bar and, the keyboard up, the keyboard, as the Simulator lays
+        // them out (2026-11-02): the iPhone 17e, the iPhone 17 Pro and the iPhone SE (3rd
+        // generation), the smallest a student brings.
+        let phones = [
+            CGSize(width: 390, height: 844 - 47 - 334), CGSize(width: 390, height: 844 - 47 - 34),
+            CGSize(width: 402, height: 874 - 62 - 335), CGSize(width: 402, height: 874 - 62 - 34),
+            CGSize(width: 375, height: 667 - 20 - 260), CGSize(width: 375, height: 667 - 20),
+        ]
+        // Join's preview among them under a long class's name, Join's own label taking lines of its
+        // own (santa's round 1: it stayed pinned, off the screen, with nothing to scroll).
+        for name in ["nameTaken", "nameInvalid", "nameBlank", "nameCantSave", "joinError", "joinPreviewRefused"] {
+            let fixture = try #require(PreviewFixtures.all[name])
+            let words = try #require(fixture.naming.failure ?? fixture.joining.failure)
+            // The preview's fixture is the preview, never Join's code with a refusal (santa's round 2).
+            #expect((fixture.joining.preview != nil) == (name == "joinPreviewRefused"), "\(name)")
+            // The button the line is said under, and what comes last under it.
+            let button = fixture.joining.preview.map { "Join \($0.class.name)" } ?? "Continue"
+            let last = name.hasPrefix("name") ? "Sign out" : fixture.joining.preview == nil ? nil : "Not my class"
+            for size in sizes {
+                for frame in phones {
+                    let hosting = UIHostingController(
+                        rootView: RootView(phone: Phone(fixture: fixture)).environment(\.dynamicTypeSize, size))
+                    hosting.safeAreaRegions = []
+                    let window = UIWindow(windowScene: scene)
+                    window.frame = CGRect(origin: .zero, size: frame)
+                    window.rootViewController = hosting
+                    window.isHidden = false
+                    defer { window.isHidden = true }
+                    var read: [NSObject] = []
+                    /// Read once the layout has settled — the footer's place follows its measured
+                    /// height, a layout after the first — and stays so for 30 ms.
+                    func settled() async throws {
+                        var (last, same) = (CGRect?.none, 0)
+                        try await until {
+                            window.layoutIfNeeded()
+                            read = (try? voiceOver(in: window)) ?? []
+                            let now = read.first { $0.accessibilityLabel == words }?.accessibilityFrame
+                            (same, last) = (now != nil && now == last ? same + 1 : 0, now)
+                            return same >= 6
+                        }
+                    }
+                    try await settled()
+                    let said = "\(name), \(size), \(frame)"
+                    func at(_ label: String) throws -> CGRect {
+                        try #require(read.first { $0.accessibilityLabel == label }, "\(said)").accessibilityFrame
+                    }
+                    // Whole: as tall as its words are at the width between the gutters.
+                    let whole = UIHostingController(
+                        rootView: Text(words).textStyle(.body).environment(\.dynamicTypeSize, size)
+                    ).sizeThatFits(in: CGSize(width: frame.width - 2 * Theme.gutter, height: 10_000))
+                    let shown = try at(words)
+                    #expect(shown.height >= whole.height - 0.5, "\(said): \(shown.height) for \(whole.height)")
+                    // Scrolled to the end, its last line on the screen, under its button: pinned
+                    // under the page, or reached by a scroll with it.
+                    let scroll = try #require(scrollViews(in: window).first, "\(said)")
+                    let end = scroll.contentSize.height + scroll.adjustedContentInset.bottom - scroll.bounds.height
+                    scroll.setContentOffset(
+                        CGPoint(x: scroll.contentOffset.x, y: max(-scroll.adjustedContentInset.top, end)), animated: false)
+                    try await settled()
+                    let (refusal, action) = (try at(words), try at(button))
+                    #expect(refusal.maxY <= frame.height + 0.5, "\(said): \(refusal)")
+                    #expect(refusal.minY >= action.maxY - 0.5, "\(said): \(refusal) under \(action)")
+                    // Nothing pushed off the screen: Join's Back still on it, what comes last reached.
+                    if name.hasPrefix("join") {
+                        let back = try at("Back")
+                        #expect(back.minY >= -0.5, "\(said): \(back)")
+                    }
+                    if let last {
+                        let end = try at(last)
+                        #expect(end.maxY <= frame.height + 0.5, "\(said): \(end)")
+                    }
+                    // Pinned, under a page that keeps room for the field, on the screens with one.
+                    let page = scroll.convert(scroll.bounds, to: window)
+                    if action.minY >= page.maxY - 0.5, fixture.joining.preview == nil {
+                        let field = try #require(textFields(in: window).first, "\(said)")
+                        #expect(page.height >= field.frame.height - 0.5, "\(said): \(page.height)")
+                    }
+                }
+            }
+        }
+    }
+
+    @Test(
         "The permission once read approved is kept in the phone's own defaults (C1b) — set at a read of approved, cleared once the check judges the permission off (denied, or not determined for the grace), left at a read not determined for a moment — and a fresh Phone reads it back; with it, not determined routes as approved. The flag as it was before is put back after"
     )
     func everApproved() throws {
@@ -3361,6 +3462,45 @@ struct AppTests {
         for y in 38...40 { #expect(pixel(50, y) == [255, 255, 255, 255], "\(y): \(pixel(50, y))") }
         let page = [0xF7, 0xF5, 0xF2]
         #expect(zip(pixel(50, 58), page).allSatisfy { $0 < $1 }, "\(pixel(50, 58))")
+    }
+
+    @Test(
+        "A dimmed primary — disabled, or busy with its words changed — is dimmed as one layer, as the boards draw it (GA5; IOS-008; DESIGN.md §4): its fill and its white label each at 60 % over the page, never the label dimmed again over its own dimmed fill, which drew Signing up… and Saving… at 2.1:1; Delete account's red the same"
+    )
+    func dimmedAsDrawn() throws {
+        /// 60 % of `hex` over the page, as the boards' `opacity: 0.6` draws it.
+        func dimmed(_ hex: Int) -> [Int] {
+            let (colour, page): ([Int], [Int]) = ([hex >> 16 & 0xFF, hex >> 8 & 0xFF, hex & 0xFF], [0xF7, 0xF5, 0xF2])
+            return (0..<3).map { (i: Int) -> Int in
+                let mixed: Double = 0.6 * Double(colour[i]) + 0.4 * Double(page[i])
+                return Int(mixed.rounded())
+            }
+        }
+        func near(_ found: [Int], _ wanted: [Int]) -> Bool {
+            zip(found, wanted).allSatisfy { abs($0 - $1) <= 3 }
+        }
+        for (destructive, fill) in [(false, 0x245A43), (true, 0xA93D31)] {
+            // A button 200 × 56 on the page, 10 from its edges; its label large, so its strokes
+            // hold whole pixels.
+            let renderer = ImageRenderer(
+                content: Button("Continue") {}.buttonStyle(PrimaryButtonStyle(destructive: destructive))
+                    .disabled(true).frame(width: 200).padding(10).background(Theme.page)
+                    .environment(\.dynamicTypeSize, .accessibility1))
+            renderer.scale = 1
+            let image = try #require(renderer.uiImage)
+            let (pixel, height) = (try pixels(of: image), Int(image.size.height))
+            // The fill beside the label, and the label at its lightest.
+            let beside = Array(pixel(20, height / 2).prefix(3))
+            #expect(near(beside, dimmed(fill)), "destructive \(destructive): \(beside)")
+            var label: [Int] = [0, 0, 0]
+            for x in 10..<210 {
+                for y in 10..<(height - 10) {
+                    let found = Array(pixel(x, y).prefix(3))
+                    if found.reduce(0, +) > label.reduce(0, +) { label = found }
+                }
+            }
+            #expect(near(label, dimmed(0xFFFFFF)), "destructive \(destructive): \(label)")
+        }
     }
 
     @Test(

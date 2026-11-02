@@ -166,13 +166,16 @@ struct SecondaryButtonStyle: ButtonStyle {
 }
 
 /// A control dimmed to 60 % while `on` — disabled, or busy with its words changed at once —
-/// over `Motion.dim`: only the dim moves, never the words.
+/// over `Motion.dim`: only the dim moves, never the words. Dimmed as one layer, as the boards draw
+/// it: dimmed piece by piece, a primary's white label was drawn at 60 % over its own dimmed fill,
+/// 2.1:1 where the boards' is 3.1:1 (GA5, IOS-008).
 struct Dimmed: ViewModifier {
     let on: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func body(content: Content) -> some View {
-        content.animation(Motion.dim(reduceMotion: reduceMotion)) { $0.opacity(on ? 0.6 : 1) }
+        content.compositingGroup()
+            .animation(Motion.dim(reduceMotion: reduceMotion)) { $0.opacity(on ? 0.6 : 1) }
     }
 }
 
@@ -281,6 +284,44 @@ struct PageScroll<Content: View>: View {
             .scrollBounceBehavior(.basedOnSize)
         }
         .screenWide()
+    }
+}
+
+/// A page scrolling over its footer, the screen's button and what is said under it, pinned at the
+/// bottom while the footer, at its own height, leaves the page room for `keep`: the field being
+/// typed in. Past that, as with the keyboard up at the largest text sizes on a small phone, the
+/// footer scrolls with the page, after it. Either way no line is ever cut off (DESIGN.md §5; GA5):
+/// offered less than its height, a refusal under Continue was cut to "…" (IOS-001).
+struct PinnedFooter<Page: View, Footer: View>: View {
+    var keep: CGFloat = 0
+    @ViewBuilder let page: () -> Page
+    @ViewBuilder let footer: () -> Footer
+    /// The height the page and the footer share, as offered whatever they hold, and the footer's
+    /// own: one width wherever it is.
+    @State private var room = CGFloat.infinity
+    @State private var footerHeight: CGFloat = 0
+
+    var body: some View {
+        let pinned = footerHeight + keep <= room
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(spacing: 0) {
+                    page()
+                    if !pinned { measured }
+                }
+            }
+            .scrollBounceBehavior(.basedOnSize).screenWide()
+            if pinned { measured }
+        }
+        // The space offered, never the footer's own height: with no least height, a pinned footer
+        // taller than the space made the frame as tall as it, and stayed pinned (santa's round 1).
+        .frame(minHeight: 0, maxHeight: .infinity, alignment: .top)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { room = $0 }
+    }
+
+    private var measured: some View {
+        VStack(spacing: 0) { footer() }.fixedSize(horizontal: false, vertical: true)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { footerHeight = $0 }
     }
 }
 

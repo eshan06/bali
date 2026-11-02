@@ -10,6 +10,15 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-11-02 (Central) — GA4 (#477; `docs/DECISIONS.md`, 2026-11-02): the class page
+for screen readers and the keyboard, nothing on screen changed. A lost or quiet live feed is said
+to a screen reader (the pill, the line over the grid, Home's live card's line), each Mark correct is
+named by its answer's letter and each Close by whose pop-up or panel it closes; after Start focus
+goes to the class's name, after the last unlock pop-up closes to its student's tile, and after
+Chrome's second Escape closes End session's dialog on its way, to End session. GA6 before it
+(#476). Still **before the next TestFlight build, Push Notifications on `com.bali.Bali`** (runbook 7,
+step 3), and the owner reinstalls Bali before runbook 7's step-6 check. Next: GA5._
+
 _Last updated: 2026-11-01 (Central) — GA6 (#476; `docs/DECISIONS.md`, 2026-11-01): End session
 asks first, in a dialog, on a live class page and in Present, as GA1's option A draws it in the
 owner's words ("End session now?", its button End session; the portal canvas's GA1A boards and

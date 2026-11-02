@@ -7,12 +7,16 @@ import SwiftUI
 /// id. Required: Continue saves it as Me's card does (`Naming`, A8's `PATCH /v1/me`), Saving…
 /// while it runs, and the router moves on once `me` has it; Sign out, Me's, is the only other way
 /// on. A save that set no name is said under Continue in Me's words, Continue the way to try again
-/// (rule 5).
+/// (rule 5). The page scrolls over Continue and what is said under it, pinned while they leave the
+/// field room; past that, at the largest text sizes with the keyboard up on a small phone, they
+/// scroll with it, so no line of a refusal is ever cut off (GA5; the canvas's largest-text boards).
 struct NameView: View {
     let phone: Phone
     /// The field's text, kept as `Naming.type` keeps a name, at every keystroke.
     @State private var text: String
     @FocusState private var typing: Bool
+    /// The field's height: the page room Continue's pinned block leaves.
+    @State private var fieldHeight: CGFloat = 0
 
     init(phone: Phone) {
         self.phone = phone
@@ -22,7 +26,7 @@ struct NameView: View {
     var body: some View {
         let naming = phone.naming
         ScreenScaffold {
-            ScrollView {
+            PinnedFooter(keep: fieldHeight) {
                 VStack(alignment: .leading, spacing: 24) {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("What's your name?").textStyle(.h1).accessibilityAddTraits(.isHeader)
@@ -33,23 +37,26 @@ struct NameView: View {
                         Text("Name").textStyle(TextStyle(size: 13, line: 18, weight: .semibold))
                             .foregroundStyle(Theme.textSecondary).accessibilityHidden(true)
                         field(busy: naming.busy)
+                            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
+                                fieldHeight = $0
+                            }
                         Text("Your teachers see this name.").textStyle(.caption)
                             .foregroundStyle(Theme.textTertiary)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+            } footer: {
+                Button(naming.busy ? "Saving…" : "Continue", action: save)
+                    .buttonStyle(PrimaryButtonStyle()).disabled(naming.busy || !naming.complete)
+                    .padding(.top, 16)
+                if let failure = naming.failure {
+                    Text(failure).textStyle(.body).frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 12)
+                }
+                // Dimmed with Continue while a save runs, as the canvas draws it.
+                SignOutButton(phone: phone).disabled(naming.busy).modifier(Dimmed(on: naming.busy))
+                    .frame(maxWidth: .infinity).padding(.top, 8)
             }
-            .scrollBounceBehavior(.basedOnSize).screenWide()
-            Button(naming.busy ? "Saving…" : "Continue", action: save)
-                .buttonStyle(PrimaryButtonStyle()).disabled(naming.busy || !naming.complete)
-                .padding(.top, 16)
-            if let failure = naming.failure {
-                Text(failure).textStyle(.body).frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, 12)
-            }
-            // Dimmed with Continue while a save runs, as the canvas draws it.
-            SignOutButton(phone: phone).disabled(naming.busy).modifier(Dimmed(on: naming.busy))
-                .frame(maxWidth: .infinity).padding(.top, 8)
         }
         // The keyboard once the screen has faded in, so the two never move together (the approved
         // motion spec).
