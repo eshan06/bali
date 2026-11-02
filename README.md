@@ -4,7 +4,7 @@ getbali.app: the one-page demo. This branch holds only the site; the product liv
 
 The design is the owner-approved Claude Design canvas "Bali demo site"
 (https://claude.ai/artifact/EdpxNeVy1iiEHqUcy7UwXs). `canvas/` is a copy of its files as approved
-(version 16, 2026-11-02). Change the design on the canvas first, get the owner's approval, then copy the
+(version 18, 2026-11-02; `VideoPlaying.dc.html` draws the video playing in place). Change the design on the canvas first, get the owner's approval, then copy the
 changed files in here.
 
 - `canvas/`: the approved canvas files: the page (`Main.dc.html`), the app and portal screens it shows,
@@ -25,7 +25,8 @@ changed files in here.
 1. `npm ci && npx playwright install chromium webkit` (once).
 2. `npm test`: builds, runs the quick checks, then the browser tests. All must pass.
 3. The santa-loop review (two independent reviewers, as on `main`): only proven problems block.
-4. Push to `demo2`. Vercel (project `bali-web`, production branch `demo2`) builds and deploys it.
+4. Push to `demo2`. Vercel builds and deploys it: project `bali-web`, production branch `demo2`, root
+   directory blank (the repo root), ignored build step `[ "$VERCEL_GIT_COMMIT_REF" != "demo2" ]`.
 5. Check the live site: `BASE_URL=https://www.getbali.app npx playwright test`.
 
 Commits carry the owner's identity only, with no Claude attribution of any kind.

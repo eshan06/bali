@@ -12,9 +12,9 @@ const headers = Object.fromEntries(config.headers[0].headers.map((h) => [h.key, 
 const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.txt': 'text/plain; charset=utf-8' };
 
 createServer((req, res) => {
-  let file = normalize(join(dist, decodeURIComponent(new URL(req.url, 'http://localhost').pathname)));
-  if (file !== dist && !file.startsWith(dist + sep)) return res.writeHead(403, headers).end();
   try {
+    let file = normalize(join(dist, decodeURIComponent(new URL(req.url, 'http://localhost').pathname)));
+    if (file !== dist && !file.startsWith(dist + sep)) return res.writeHead(403, headers).end();
     if (statSync(file).isDirectory()) file = join(file, 'index.html');
     const body = readFileSync(file);
     res.writeHead(200, { ...headers, 'Content-Type': types[extname(file)] || 'application/octet-stream' }).end(body);

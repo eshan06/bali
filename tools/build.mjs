@@ -68,9 +68,9 @@ page = page.replace(/<path class="b-slingp" d="\{\{sl\.d\d\}\}" style="[^"]*"><\
 page = swap(page, '<sc-if value="{{landing}}" hint-placeholder-val="{{ false }}"><div class="b-veil" aria-hidden="true"></div></sc-if>', '<div class="b-veil" aria-hidden="true" hidden></div>');
 page = swap(page, '{{copyLabel}}', '<span class="b-copytext">Copy address</span>');
 page = swap(page, '<span class="sr-only" aria-live="polite">{{copyMsg}}</span>', '<span class="sr-only b-copymsg" aria-live="polite"></span>');
-// The canvas can't hold a player, so its poster opens YouTube; here the poster plays the video in place
-// (src/site.js), and still opens YouTube if the script never runs.
-page = swap(page, 'aria-label="Play the Bali classroom demo (YouTube, opens in a new tab)">', 'aria-label="Play the Bali classroom demo" data-video="iLtbApxTNTA">');
+// The canvas can't hold a player, so its poster opens YouTube; here src/site.js plays the video in place
+// (the canvas's VideoPlaying board), and without the script the poster still opens YouTube, as it says.
+page = swap(page, 'aria-label="Play the Bali classroom demo (YouTube, opens in a new tab)">', 'aria-label="Play the Bali classroom demo (YouTube, opens in a new tab)" data-video="iLtbApxTNTA">');
 
 const left = ['{{', 'dc-import', 'sc-for', 'sc-if', '.dc.html', 'onClick'].filter((s) => page.includes(s));
 if (left.length) throw new Error(`build: canvas-only markup left over: ${left.join(', ')}`);

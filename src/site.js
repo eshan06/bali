@@ -19,6 +19,24 @@
     root.style.setProperty('--cy', (first.offsetTop + h / 2).toFixed(1) + 'px');
   };
 
+  // The chapter on screen at a scroll position (in vh): the last one at least half open.
+  const opens = [60, 240, 420, 640, 820, 1000];
+  const chapterAt = (at) => opens.reduce((n, open, i) => (at >= open + 60 ? i + 2 : n), 1);
+  // Only that chapter takes keyboard focus: in live mode the others sit stacked under it, and Tab would
+  // land on links nobody can see. They stay readable to screen readers. 0 lets every chapter take focus.
+  const chapters = [...root.querySelectorAll('.b-ch')];
+  let focusable = -1;
+  const letFocus = (n) => {
+    if (n === focusable) return;
+    focusable = n;
+    chapters.forEach((chapter, i) => {
+      for (const el of chapter.querySelectorAll('a[href], button')) {
+        if (n && i + 1 !== n) el.setAttribute('tabindex', '-1');
+        else el.removeAttribute('tabindex');
+      }
+    });
+  };
+
   // Live mode: every b- animation is paused, and its time is the eased scroll position, in vh (1ms = 1vh).
   const still = matchMedia('(prefers-reduced-motion: reduce)');
   const fits = matchMedia('(max-height: 1600px)');
@@ -30,6 +48,7 @@
     root.classList.toggle('is-live', !still.matches && fits.matches);
     anims = null;
     pos = null;
+    if (!root.classList.contains('is-live')) letFocus(0);
     fit();
   };
   still.addEventListener('change', decide);
@@ -45,6 +64,7 @@
       if (pos === null) pos = target;
       pos += (target - pos) * (1 - Math.pow(0.915, dt / 16.7));
       if (Math.abs(target - pos) < 0.02) pos = target;
+      letFocus(chapterAt(pos));
       if (!anims) {
         anims = document.getAnimations().filter((a) => a.animationName && a.animationName.indexOf('b-') === 0);
         shown = null;
@@ -94,12 +114,7 @@
     if (still.matches) return land('auto');
     const at = typeof pos === 'number' ? pos : scrollY / (innerHeight / 100);
     if (!root.classList.contains('is-live') || at > 1180) return land('smooth');
-    // The ring on screen: the last chapter at least half open at this scroll position.
-    let ch = 1;
-    [60, 240, 420, 640, 820, 1000].forEach((open, i) => {
-      if (at >= open + 60) ch = i + 2;
-    });
-    const sec = root.querySelector('.b-ch-' + ch);
+    const sec = root.querySelector('.b-ch-' + chapterAt(at));
     const svg = sec.querySelector('.b-emblem svg');
     const arc = sec.querySelector('.b-arc');
     const path = sec.querySelector('.b-slingp');
@@ -175,8 +190,11 @@
     }
   });
 
-  // The video: nothing loads from YouTube until someone presses play, and then only the privacy-enhanced player.
+  // The video: nothing loads from YouTube until someone presses play, and then only the privacy-enhanced player,
+  // in the poster's box (the canvas's VideoPlaying board). Without this script the poster opens YouTube in a
+  // new tab, as its label in the page says; with it, the video plays here.
   const poster = root.querySelector('.b-poster[data-video]');
+  poster.setAttribute('aria-label', 'Play the Bali classroom demo');
   poster.addEventListener('click', (e) => {
     e.preventDefault();
     const box = document.createElement('div');

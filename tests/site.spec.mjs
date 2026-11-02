@@ -91,10 +91,22 @@ test('Skip works from the middle of the story, from that chapter\'s ring', async
   await expect(page.getByRole('heading', { name: 'Phones are winning the high school classroom.' })).toBeFocused({ timeout: 3000 });
 });
 
+test('only the chapter on screen takes keyboard focus', async ({ page }) => {
+  await openLive(page);
+  const watch = page.getByRole('link', { name: 'Watch an animation' });
+  const talk = page.getByRole('link', { name: 'Talk to us' });
+  await expect(talk).toHaveAttribute('tabindex', '-1');
+  await expect(watch).not.toHaveAttribute('tabindex', '-1');
+  await page.evaluate(() => scrollTo(0, innerHeight * 11.5));
+  await expect(talk).not.toHaveAttribute('tabindex', '-1', { timeout: 3000 });
+  await expect(watch).toHaveAttribute('tabindex', '-1');
+});
+
 test('with Reduce Motion the story stacks and Skip jumps straight there', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
   await expect(root(page)).not.toHaveClass(/is-live/);
+  await expect(page.getByRole('link', { name: 'Talk to us' })).not.toHaveAttribute('tabindex', '-1');
   await page.getByRole('link', { name: 'Skip the tour' }).click();
   const target = page.getByRole('heading', { name: 'Phones are winning the high school classroom.' });
   await expect(target).toBeFocused({ timeout: 500 });
