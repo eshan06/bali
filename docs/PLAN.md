@@ -32,6 +32,10 @@ environments (M0); the portal's sign-in lasting the school day (2026-10-13); the
 the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOKS.md`,
 `docs/PILOT.md`.
 
+**The demo site** (www.getbali.app) is the Vercel project `bali-web`, built only from the orphan
+branch `demo2`, never `main`: a change there is tested, reviewed by santa and pushed straight to the
+branch, with no PR, as its README says (#479; `docs/DECISIONS.md`, 2026-11-02).
+
 **In flight.**
 - **The conductor on the Windows PC (the owner, 2026-10-14):** an always-on PC runs the conductor,
   one worker at a time, and builds the portal's UI steps from PV7 on, screenshotted in a preview tab

@@ -8,6 +8,31 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-02** — **The demo site on its own orphan branch, `demo2` (the owner; #479).** The
+  one-page demo at www.getbali.app (getbali.app forwards there) is the Vercel project `bali-web`
+  (team `evc123`), and since 2026-11-02 it deploys `demo2`, an orphan branch of this repo that holds
+  the site alone: production branch `demo2`, root directory blank, ignored build step
+  `[ "$VERCEL_GIT_COMMIT_REF" != "demo2" ]`, so no push to `main` or to a PR's branch builds it. The
+  page is the owner-approved Claude Design canvas "Bali demo site"
+  (https://claude.ai/artifact/EdpxNeVy1iiEHqUcy7UwXs): `canvas/` holds its files as approved
+  (version 18), and a change is drawn there and approved first, then copied in. `tools/build.mjs`
+  builds `dist/` from them, and `tools/check.mjs` checks `dist/` on every Vercel build (every link
+  and file resolves, no canvas-only markup or inline script is left, size budgets, the security
+  policy), so a broken page fails its build and the last good version stays live. `src/site.js` and
+  `src/live.js` are the page's script. `tests/site.spec.mjs` holds 15 Playwright tests, run in
+  Chromium and WebKit at laptop and phone sizes: 58 runs, WebKit skipping the copy button's success
+  case (only Chromium lets a test grant clipboard access). **Decided (the owner):** a change to
+  `demo2` passes `npm test` (the build, the checks, the browser tests) and the santa-loop review,
+  then is pushed straight to the branch, with no PR and no GitHub CI; after the deploy,
+  `BASE_URL=https://www.getbali.app npx playwright test` runs the same tests against the live site.
+  The branch's README is the how-to; the design sign-off and the no-attribution rule hold there as
+  on `main`. The old `demo` branch, which `bali-web` deployed before `demo2` (the first one-page
+  site, canvas version 12, in `apps/web`), is the fallback: switching back takes three Vercel
+  settings, production branch `demo`, root directory `apps/web` and the ignored build step keyed to
+  `demo`. **Known limit:** nothing forces `demo2`'s checks. With direct pushes and no rule on the
+  branch, `npm test` and the review run because its README says to; Vercel's build check is the
+  only hard stop.
+
 - **2026-11-02** — **A Debug fixture whose bell is minutes away is made at each read (GA5's CI run,
   #478).** The fixtures (`PreviewFixtures.all`) were made once, at their first read, so FocusFinal's
   bell, D1's 1:52 away, rang 1:52 after that read. On GA5's CI run GA3's `focusFirstScreen` began
