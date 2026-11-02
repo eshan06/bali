@@ -64,10 +64,11 @@ page = page.replace(/<dc-import name="(\w+)" hint-size="[^"]*"><\/dc-import>/g, 
 
 // The canvas's live state becomes plain markup that src/site.js drives.
 page = swap(page, '<div class="{{rootCls}}">', '<div class="bw"><script src="/live.js"></script>');
-page = page.replace(/ onClick="\{\{(goDetails|goContact|goWatch|copy)\}\}"/g, '');
+page = page.replace(/ onClick="\{\{(goDetails|goContact|goWatch|copy1|copy2)\}\}"/g, '');
 page = page.replace(/<path class="b-slingp" d="\{\{sl\.d\d\}\}" style="[^"]*"><\/path>/g, '<path class="b-slingp"></path>');
 page = swap(page, '<sc-if value="{{landing}}" hint-placeholder-val="{{ false }}"><div class="b-veil" aria-hidden="true"></div></sc-if>', '<div class="b-veil" aria-hidden="true" hidden></div>');
-page = swap(page, '{{copyLabel}}', '<span class="b-copytext">Copy address</span>');
+page = swap(page, '{{copyLabel1}}', '<span class="b-copytext">Copy address</span>');
+page = swap(page, '{{copyLabel2}}', '<span class="b-copytext">Copy address</span>');
 page = swap(page, '<span class="sr-only" aria-live="polite">{{copyMsg}}</span>', '<span class="sr-only b-copymsg" aria-live="polite"></span>');
 // The canvas can't hold a player, so its poster opens YouTube; here src/site.js plays the video in place
 // (the canvas's VideoPlaying board), and without the script the poster still opens YouTube, as it says.

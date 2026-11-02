@@ -4,7 +4,6 @@
   const root = document.querySelector('.bw');
   const first = root.querySelector('.b-ch-1 .b-wrap');
   const veil = root.querySelector('.b-veil');
-  const EMAIL = 'eshan.shah@vanderbilt.edu';
 
   // Fit each chapter's scene (760 x 560) beside the headline, and record where the ring's centre lands.
   const fit = () => {
@@ -217,26 +216,29 @@
   root.querySelector('.b-fab').addEventListener('click', (e) => fly('contact', e));
   root.querySelector('.b-watch').addEventListener('click', (e) => fly('watch', e));
 
-  // Copy address: says what happened either way; on failure the address stays on screen to copy by hand.
-  const copyText = root.querySelector('.b-copytext');
+  // Copy address, one button per address: says what happened either way; on failure the address stays on
+  // screen to copy by hand.
   const copyMsg = root.querySelector('.b-copymsg');
-  let copyTimer = 0;
-  const copied = (ok) => {
-    copyText.textContent = ok ? 'Copied' : 'Couldn’t copy';
-    copyMsg.textContent = ok ? 'Email address copied.' : 'Couldn’t copy. The address is shown above.';
-    clearTimeout(copyTimer);
-    copyTimer = setTimeout(() => {
-      copyText.textContent = 'Copy address';
-      copyMsg.textContent = '';
-    }, 2400);
-  };
-  copyText.closest('button').addEventListener('click', () => {
-    try {
-      navigator.clipboard.writeText(EMAIL).then(() => copied(true), () => copied(false));
-    } catch (e) {
-      copied(false);
-    }
-  });
+  for (const button of root.querySelectorAll('button[data-copy]')) {
+    const text = button.querySelector('.b-copytext');
+    let timer = 0;
+    const copied = (ok) => {
+      text.textContent = ok ? 'Copied' : 'Couldn’t copy';
+      copyMsg.textContent = ok ? 'Email address copied.' : 'Couldn’t copy. The address is shown above.';
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        text.textContent = 'Copy address';
+        copyMsg.textContent = '';
+      }, 2400);
+    };
+    button.addEventListener('click', () => {
+      try {
+        navigator.clipboard.writeText(button.dataset.copy).then(() => copied(true), () => copied(false));
+      } catch (e) {
+        copied(false);
+      }
+    });
+  }
 
   // The video: nothing loads from YouTube until someone presses play, and then only the privacy-enhanced player,
   // in the poster's box (the canvas's VideoPlaying board). Without this script the poster opens YouTube in a

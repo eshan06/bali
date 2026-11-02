@@ -2,6 +2,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { test as base, expect } from '@playwright/test';
 
 const EMAIL = 'eshan.shah@vanderbilt.edu';
+const JONATHAN = 'jonathan.n.bani-esraili@vanderbilt.edu';
 const PLAYER = 'https://www.youtube-nocookie.com/embed/iLtbApxTNTA?autoplay=1&rel=0';
 
 const test = base.extend({
@@ -181,15 +182,17 @@ test('the video loads only when someone presses play', async ({ page, youtube })
   await expect.poll(() => youtube[0]).toBe(PLAYER);
 });
 
-test('Copy address copies it and says so', async ({ page, context, browserName }) => {
+test('each Copy address copies its own address and says so', async ({ page, context, browserName }) => {
   test.skip(browserName !== 'chromium', 'only Chromium lets a test grant clipboard access');
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.goto('/');
-  const button = page.getByRole('button', { name: 'Copy address' });
-  await button.scrollIntoViewIfNeeded();
-  await button.click();
-  await expect(page.getByRole('button', { name: 'Copied' })).toBeVisible();
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(EMAIL);
+  for (const address of [EMAIL, JONATHAN]) {
+    const button = page.getByRole('button', { name: `Copy address ${address}` });
+    await button.scrollIntoViewIfNeeded();
+    await button.click();
+    await expect(page.getByRole('button', { name: `Copied ${address}` })).toBeVisible();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(address);
+  }
 });
 
 test('a copy that fails says so, and the address stays on screen', async ({ page }) => {
@@ -197,12 +200,12 @@ test('a copy that fails says so, and the address stays on screen', async ({ page
     Object.defineProperty(navigator, 'clipboard', { value: { writeText: () => Promise.reject(new Error('blocked')) } }),
   );
   await page.goto('/');
-  const button = page.getByRole('button', { name: 'Copy address' });
+  const button = page.getByRole('button', { name: `Copy address ${JONATHAN}` });
   await button.scrollIntoViewIfNeeded();
   await button.click();
-  await expect(page.getByRole('button', { name: 'Couldn’t copy' })).toBeVisible();
+  await expect(page.getByRole('button', { name: `Couldn’t copy ${JONATHAN}` })).toBeVisible();
   await expect(page.locator('.b-copymsg')).toHaveText('Couldn’t copy. The address is shown above.');
-  await expect(page.getByRole('link', { name: EMAIL })).toBeVisible();
+  await expect(page.getByRole('link', { name: JONATHAN })).toBeVisible();
 });
 
 test('every link goes somewhere real', async ({ page }) => {
@@ -211,9 +214,9 @@ test('every link goes somewhere real', async ({ page }) => {
   expect(hrefs.length).toBeGreaterThan(15);
   for (const href of hrefs) {
     if (href.startsWith('#')) await expect(page.locator(href), href).toHaveCount(1);
-    else expect(href).toMatch(/^https:\/\/|^mailto:eshan\.shah@vanderbilt\.edu$/);
+    else expect(href).toMatch(/^https:\/\/|^mailto:(eshan\.shah|jonathan\.n\.bani-esraili)@vanderbilt\.edu$/);
   }
-  await expect(page.getByRole('link', { name: EMAIL })).toHaveAttribute('href', `mailto:${EMAIL}`);
+  for (const address of [EMAIL, JONATHAN]) await expect(page.getByRole('link', { name: address })).toHaveAttribute('href', `mailto:${address}`);
 });
 
 test('no serious accessibility problems', async ({ page }) => {

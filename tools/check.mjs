@@ -21,13 +21,16 @@ for (const id of ['top', 'details', 'watch', 'contact', 'h-why', 'h-watch', 'h-c
 for (const href of hrefs) {
   if (href.startsWith('#')) need(ids.has(href.slice(1)), `${href} points at something on the page`);
   else if (href.startsWith('/')) need(existsSync(join(dist, href)), `${href} is in dist/`);
-  else need(/^https:\/\/|^mailto:eshan\.shah@vanderbilt\.edu$/.test(href), `${href} is https or the contact address`);
+  else need(/^https:\/\/|^mailto:(eshan\.shah|jonathan\.n\.bani-esraili)@vanderbilt\.edu$/.test(href), `${href} is https or a contact address`);
 }
 for (const src of [...html.matchAll(/\ssrc="([^"]*)"/g)].map((m) => m[1])) need(src.startsWith('/') && existsSync(join(dist, src)), `${src} is one of our files in dist/`);
 need(!/<script(?![^>]*\ssrc=)[^>]*>/.test(html), 'no inline scripts (the security policy allows only our own files)');
 need(!/\{\{|dc-import|sc-for|sc-if|\.dc\.html/.test(html), 'no canvas-only markup left');
 need(html.includes('data-video="iLtbApxTNTA"'), 'the video poster');
 need(html.includes('<p>Coming soon!</p>'), 'the Android answer');
+for (const address of ['eshan.shah@vanderbilt.edu', 'jonathan.n.bani-esraili@vanderbilt.edu']) {
+  need(html.includes(`href="mailto:${address}"`) && html.includes(`data-copy="${address}"`), `${address} under Talk to us, with its copy button`);
+}
 for (const [file, kb] of [['index.html', 200], ['site.css', 40], ['site.js', 16], ['v2.css', 60]]) {
   const size = statSync(join(dist, file)).size / 1024;
   need(size <= kb, `${file} is ${size.toFixed(0)} KB, over its ${kb} KB budget`);
