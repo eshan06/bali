@@ -256,9 +256,15 @@ describe('the grid’s health, said (ClassStale; DR-05)', () => {
 
       const pill = screen.getByRole('status');
       expect(said(pill)).toEqual({ words: 'Reconnecting… last updated 0s ago', age: '0s ago' });
-      // Its stone dot, then the words as one piece of the pill's row.
+      // Its stone dot, 7 px and round, then the words as one piece of the pill's row.
       expect(pill.children).toHaveLength(2);
       expect(pill.firstElementChild?.getAttribute('aria-hidden')).toBe('true');
+      expect(classes(pill.firstElementChild)).toEqual([
+        'size-1.75',
+        'shrink-0',
+        'rounded-full',
+        'bg-pip',
+      ]);
       // White, a strong edge, shadow-2, 13/18 medium in the secondary ink, 6 × 14 px (DESIGN.md §4),
       // 14 px from the page's top and in view as it scrolls.
       expect(classes(pill)).toEqual(

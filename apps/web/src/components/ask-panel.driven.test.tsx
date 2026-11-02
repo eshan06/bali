@@ -42,7 +42,12 @@ function Writing({ start }: { start: QuestionDraft }) {
 
 const marks = () =>
   screen.getAllByRole('button', { name: /^(Mark correct|Correct), answer [A-F]$/ });
-const named = () => marks().map((b) => [b.getAttribute('aria-label'), b.textContent]);
+/** Each toggle's name, its words, and whether it shows the check (the pressed one alone). */
+const named = () =>
+  marks().map((b) => [
+    b.getAttribute('aria-label'),
+    `${b.querySelector('svg.lucide-check') ? '✓ ' : ''}${b.textContent}`,
+  ]);
 
 describe('each answer’s Mark correct (LessonWrite; D01)', () => {
   it('is named by its answer’s letter, after the words it shows, as Remove is', async () => {
@@ -73,7 +78,7 @@ describe('each answer’s Mark correct (LessonWrite; D01)', () => {
     expect(b.textContent).toBe('Correct');
     expect(named()).toEqual([
       ['Mark correct, answer A', 'Mark correct'],
-      ['Correct, answer B', 'Correct'],
+      ['Correct, answer B', '✓ Correct'],
       ['Mark correct, answer C', 'Mark correct'],
       ['Mark correct, answer D', 'Mark correct'],
     ]);
