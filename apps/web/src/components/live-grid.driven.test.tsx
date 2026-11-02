@@ -6,7 +6,7 @@ import {
   type UnlockReason,
 } from '@bali/shared';
 import { act, cleanup, render, screen, within } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { LiveGrid } from './live-grid';
 import { CLOCK_OFF } from './student-panel';
@@ -219,6 +219,125 @@ describe('the live grid on the class page and in Present (ClassPresent)', () => 
       expect(parts('Omar Siddiqui')).toEqual(['Omar Siddiqui', 'Focused']);
       cleanup();
     }
+  });
+});
+
+/*
+ * The grid's health (ClassStale; ARCHITECTURE, Web portal, decision 4): a lost stream said as the
+ * floating pill, a quiet one in the stone line over the tiles, each a status a screen reader hears
+ * as it comes (the audit's DR-05; CLAUDE.md: no silent failures), as a student hears "Can't reach
+ * Bali", but never at each second's tick of its age (`aria-live="off"`, as YourPhone's minutes).
+ */
+describe('the grid’s health, said (ClassStale; DR-05)', () => {
+  // The grid's clock on a fake one that also runs as time does, so its read's answer still lands.
+  beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true }));
+  afterEach(() => vi.useRealTimers());
+  /** The stream's state, as the stream tells the grid. */
+  const status = async (to: 'open' | 'reconnecting') => {
+    const stream = bali.streams[0] as { onStatus: (s: string) => void } | undefined;
+    if (!stream) throw new Error('no stream');
+    await act(async () => {
+      stream.onStatus(to);
+      await Promise.resolve();
+    });
+  };
+  /** A status's words, and its ticking age, which is never said as it changes. */
+  const said = (line: HTMLElement) => ({
+    words: line.textContent,
+    age: line.querySelector('[aria-live="off"]')?.textContent ?? null,
+  });
+  const classes = (el: Element | null | undefined) => Array.from(el?.classList ?? []);
+
+  for (const present of [false, true]) {
+    it(`says a lost stream as the floating pill over the tiles, a status${present ? ', in Present' : ''}`, async () => {
+      await open(present, [student('Omar Siddiqui')]);
+      expect(screen.queryByRole('status')).toBeNull();
+      await status('reconnecting');
+
+      const pill = screen.getByRole('status');
+      expect(said(pill)).toEqual({ words: 'Reconnecting… last updated 0s ago', age: '0s ago' });
+      // Its stone dot, then the words as one piece of the pill's row.
+      expect(pill.children).toHaveLength(2);
+      expect(pill.firstElementChild?.getAttribute('aria-hidden')).toBe('true');
+      // White, a strong edge, shadow-2, 13/18 medium in the secondary ink, 6 × 14 px (DESIGN.md §4),
+      // 14 px from the page's top and in view as it scrolls.
+      expect(classes(pill)).toEqual(
+        expect.arrayContaining([
+          'sticky',
+          'top-3.5',
+          'mx-auto',
+          'w-fit',
+          'rounded-full',
+          'border',
+          'border-border-strong',
+          'bg-surface-card',
+          'shadow-2',
+          'px-3.5',
+          'py-1.5',
+          'text-caption',
+          'font-medium',
+          'text-text-secondary',
+        ]),
+      );
+      // Its layer over the page's whole height, taking no room or clicks: 30 px less 16 is 14 px
+      // from the frame's top (22 less 8 on a phone). Before the tiles.
+      expect(classes(pill.parentElement)).toEqual(
+        expect.arrayContaining([
+          'pointer-events-none',
+          'absolute',
+          'inset-x-0',
+          '-top-4',
+          'bottom-0',
+          'max-sm:-top-2',
+        ]),
+      );
+      expect(pill.compareDocumentPosition(tile('Omar Siddiqui'))).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+
+      // Seconds on, the same status: its age moves where it isn't said, the words said as they were.
+      const words = pill.lastElementChild?.firstChild;
+      await act(() => vi.advanceTimersByTimeAsync(5000));
+      expect(screen.getByRole('status')).toBe(pill);
+      expect(said(pill)).toEqual({ words: 'Reconnecting… last updated 5s ago', age: '5s ago' });
+      expect(pill.lastElementChild?.firstChild).toBe(words);
+      expect(words?.textContent).toBe('Reconnecting… last updated ');
+
+      // Back, and nothing is said over the grid.
+      await status('open');
+      expect(screen.queryByRole('status')).toBeNull();
+    });
+  }
+
+  it('says a quiet stream in the stone line over the tiles, a status', async () => {
+    await open(false, [student('Omar Siddiqui')]);
+    await status('open');
+    // Three heartbeats missed with no sign of life: a minute.
+    await act(() => vi.advanceTimersByTimeAsync(59_000));
+    expect(screen.queryByRole('status')).toBeNull();
+    await act(() => vi.advanceTimersByTimeAsync(2000));
+
+    const line = screen.getByRole('status');
+    expect(said(line)).toEqual({
+      words: 'Live feed has gone quiet. Last updated 1 min ago.',
+      age: '1 min ago.',
+    });
+    expect(classes(line)).toEqual([
+      'rounded-sm',
+      'border',
+      'border-border-default',
+      'bg-surface-sunken',
+      'px-4',
+      'py-3',
+      'text-body',
+      'text-text-primary',
+      'tabular-nums',
+    ]);
+    // In the page's flow, over the tiles: no layer.
+    expect(classes(line.parentElement)).toEqual(['flex', 'flex-col', 'gap-3']);
+    expect(line.compareDocumentPosition(tile('Omar Siddiqui'))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
   });
 });
 

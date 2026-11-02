@@ -8,6 +8,26 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-02** — **The class page for screen readers and the keyboard (GA4, #477; the audit's
+  DR-05, D01, C02 and C2-02's remaining cases).** Nothing on screen changes. The live feed lost
+  (the pill) or quiet (the line over the grid) is a status, as a student's "Can't reach Bali" is, so
+  a screen reader hears it as it comes and as its reason changes; its age, which ticks each second,
+  is kept out of what is said (`aria-live="off"`, as YourPhone's minutes). **The worker's widening:**
+  Home's live card says the same line, so it is a status too. Each Mark correct, in Your questions
+  and the class page's Write a new question, is named "Mark correct, answer A" ("Correct, answer A"
+  once pressed), its visible words first; the unlock pop-up's Close is "Close Ethan Park's pop-up"
+  and the student panel's "Close Ethan Park's panel". The side panel's Close (Ask a question, Show
+  slides) stays "Close": it never stacks, and C02 named the other two. **The conductor's calls,
+  where no board says where focus goes** (DESIGN.md §1's pattern: the nearest place that stays, as
+  End's goes to the class's name): after Start, the live page in its place, focus on the class's
+  name, unless the teacher moved it meanwhile, and never as a page opens on a class in session;
+  the last unlock pop-up closed, focus on its student's tile, as the student panel's Close gives it,
+  else the class's name, and from the page's body too (a click in Safari); and when Chrome's second
+  Escape closes End session's dialog while its end is on its way (GA6's review WARN), focus on End
+  session, held, until the answer says what follows. Converted from source text into driven tests:
+  the grid's pill and line, Home's line, the student panel's head, and the toggles' checks in Your
+  questions and the side panel's form; each of their files stays on the list, still reading source.
+
 - **2026-11-01** — **End session asks first, in a dialog, built (GA6, #476; the audit's C2-01, and
   End's part of C2-02).** Built from GA1's option A as the owner approved it, in the owner's words
   (the canvas's GA1A boards, relabelled approved, option B's kept as not chosen; version 117): End
@@ -38,7 +58,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   limit:** on a short window (a phone, or 200% zoom) with a question or a slide showing, the grid
   can start below the window's bottom edge, so a new pop-up waits there beside its tile until it is
   closed; the Unlocked count above the card changes at once and a screen reader says the pop-up as
-  it opens. Tests: the converted `unlock-popups.test.tsx` (driven in jsdom; off the source-text
+  it opens. **The owner said yes to that known limit (2026-11-02).** Tests: the converted `unlock-popups.test.tsx` (driven in jsdom; off the source-text
   list) and the class page's own (`app/classes/[id]/page.test.tsx`): the pop-up's box holds the
   tiles and none of the header's or the card's controls, all of which come before it.
 

@@ -375,7 +375,7 @@ describe('writing a question (QuestionsEdit)', () => {
     expect(html).not.toContain('Remove answer');
     // Every answer is the Field's own input, typed at 16 px (the owner's ruling).
     expect(html.match(/<input [^>]*class="[^"]*\btext-input\b[^"]*"/g)).toHaveLength(2);
-    expect(html.match(/aria-pressed="false"[^>]*>Mark correct</g)).toHaveLength(2);
+    // Each Mark correct, named by its letter (D01), is driven in `saved-questions.driven.test.tsx`.
     expect(text(html)).toContain(
       'Add an answer Marking a correct answer is optional. When you close the question, you choose whether students see it. Save Cancel',
     );
@@ -386,10 +386,8 @@ describe('writing a question (QuestionsEdit)', () => {
     const html = render(view(BOARD, form(WRITTEN, { draft: BOARD[0] })));
     expect(html).toContain('>What does the vertex of y = (x − 3)(x − 4) tell you?</textarea>');
     expect(text(html)).toContain('52 / 500');
-    expect(html).toMatch(
-      /aria-pressed="true"[^>]*><svg[^>]*lucide-check[^>]*>.*?<\/svg>Correct<\/button>/,
-    );
-    // Its letter stays grey, 28 px, as QuestionsEdit draws it: the Correct button says which.
+    // Its letter stays grey, 28 px, as QuestionsEdit draws it: the Correct button says which (its
+    // check and its name driven in `saved-questions.driven.test.tsx`).
     expect(html).toMatch(
       /<span aria-hidden="true" class="[^"]*\bsize-7\b[^"]*\bbg-surface-sunken\b[^"]*">A<\/span>/,
     );
@@ -402,7 +400,8 @@ describe('writing a question (QuestionsEdit)', () => {
     expect(render(view(BOARD, form(six)))).not.toContain('Add an answer');
   });
 
-  it('hands each change to the page: a word typed, the correct one marked, an answer added or removed', () => {
+  // The correct one marked, pressed by its name, is driven in `saved-questions.driven.test.tsx`.
+  it('hands each change to the page: a word typed, an answer added or removed', () => {
     const on = actions();
     const tree = QuestionsView(view([], form(WRITTEN), {}, on));
     const typed = (name: string, value: string) =>
@@ -418,13 +417,6 @@ describe('writing a question (QuestionsEdit)', () => {
         'Where it turns',
       ],
     });
-    press(tree, 'Correct');
-    expect(on.change).toHaveBeenLastCalledWith({ ...WRITTEN, correctOption: null });
-    const marks = hosts(tree).filter(
-      (e) => words(e.props.children as ReactNode) === 'Mark correct',
-    );
-    (marks[1].props.onClick as () => void)();
-    expect(on.change).toHaveBeenLastCalledWith({ ...WRITTEN, correctOption: 2 });
     press(tree, 'Add an answer');
     press(tree, 'Remove answer B');
     press(tree, 'Cancel');
@@ -684,8 +676,6 @@ describe('the form once a save is answered', () => {
     );
     expect(html).not.toMatch(/\sdisabled=""/);
     expect(html).toMatch(/<button type="button" aria-disabled="true" class="[^"]*">Cancel</);
-    // Each answer's toggle is described by its answer, for a screen reader.
-    expect(html).toMatch(/aria-pressed="true" aria-describedby="q-a0"/);
   });
 
   it('holds every card’s Edit while a save is on its way', () => {

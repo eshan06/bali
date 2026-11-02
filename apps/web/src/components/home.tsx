@@ -21,7 +21,7 @@ import { type Ref, useCallback, useEffect, useId, useState, useSyncExternalStore
 
 import { type ActivityRead, pollActivity } from '@/lib/activity';
 import { type LastSession, lastOf, liveNow, type TaughtClass } from '@/lib/classes';
-import { gridDisplay, latestUnlock, staleWords } from '@/lib/grid-state';
+import { gridDisplay, latestUnlock } from '@/lib/grid-state';
 import { bareTime, classFigures, nameOf, type RecapFormat, sessionTimes } from '@/lib/recap';
 import { readReport, type ReportRead } from '@/lib/reports';
 import { bellTime, laterBell } from '@/lib/session-controls';
@@ -31,7 +31,7 @@ import { Blocks } from './blocks';
 import { buttonClass } from './button';
 import { CARD_ALONE } from './card';
 import { classLine, FirstClass, LiveChip } from './classes';
-import { DOT, type GridNow, LiveGrid, stateCounts } from './live-grid';
+import { DOT, type GridNow, LiveGrid, StaleWords, stateCounts } from './live-grid';
 import { joinedLine, LIVE_CARD, LiveCardHead, LiveCounts, useClock } from './live-header';
 import { Figures } from './recap-card';
 import { QUIET_LINK } from './text-link';
@@ -109,7 +109,11 @@ export function LiveCardView({
         now={now}
       />
       <LiveCounts counts={counts} />
-      {grid.stale ? <p className={`${NOTICE} tabular-nums`}>{staleWords(grid.stale)}</p> : null}
+      {grid.stale ? (
+        <p role="status" className={`${NOTICE} tabular-nums`}>
+          <StaleWords stale={grid.stale} />
+        </p>
+      ) : null}
       <div className="flex flex-wrap items-center gap-2.5">
         <Link href={`/classes/${classId}`} aria-describedby={id} className={buttonClass('primary')}>
           Open the class

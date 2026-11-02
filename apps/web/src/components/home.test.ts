@@ -798,31 +798,7 @@ describe('the live card (PV17b; Main, HomeMoreStates, HomeLiveStates)', () => {
     expect(html).toMatch(/>Present<\/a><\/div><\/section>$/);
   });
 
-  it('says a lost or quiet live feed under the counts in the class page’s own line, the counts kept (HomeLiveStates)', () => {
-    const line = (stale: GridNow['stale']) =>
-      /<\/ul><p class="([^"]*)">([^<]*)<\/p><div class="flex flex-wrap items-center gap-2\.5">/.exec(
-        card(grid({ stale })),
-      );
-    const lost = line({ reason: 'reconnecting', secondsAgo: 40 });
-    expect(lost?.[2]).toBe('Reconnecting… last updated 40s ago');
-    expect(lost?.[1]?.split(' ')).toEqual(
-      expect.arrayContaining([
-        'rounded-sm',
-        'border',
-        'border-border-default',
-        'bg-surface-sunken',
-        'px-4',
-        'py-3',
-        'text-body',
-        'text-text-primary',
-        'tabular-nums',
-      ]),
-    );
-    expect(line({ reason: 'stale', secondsAgo: 120 })?.[2]).toBe(
-      'Live feed has gone quiet. Last updated 2 min ago.',
-    );
-    expect(card(grid())).not.toMatch(/Reconnecting|gone quiet/);
-  });
+  // A lost or quiet live feed's line, said as a status (DR-05), is driven in `home.driven.test.tsx`.
 
   it('says its name and Loading this session… until the session is read: the ring’s track, no time, no way in (HomeMoreStates)', () => {
     const html = card(grid({ students: null }), null);

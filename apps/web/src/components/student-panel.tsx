@@ -82,9 +82,10 @@ export function PanelView({ id, student, chip, read, now, onClose, onRetry }: Pa
           {panel?.tappedInAt ? <p className={NOTE}>Tapped in at {time(panel.tappedInAt)}</p> : null}
         </div>
         {chip}
+        {/* Named for whose panel it closes, as the pop-ups' Close is (the audit's C02). */}
         <button
           type="button"
-          aria-label="Close"
+          aria-label={`Close ${name}'s panel`}
           onClick={onClose}
           className="grid size-9 shrink-0 cursor-pointer place-items-center rounded-item text-text-tertiary hover:bg-surface-sunken hover:text-text-primary"
         >

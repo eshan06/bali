@@ -427,7 +427,7 @@ describe('the panel, writing a new question (LessonWrite)', () => {
     expect(html).not.toContain('Remove answer');
     // Every answer is the Field's own input, typed at 16 px (the owner's ruling).
     expect(html.match(/<input [^>]*class="[^"]*\btext-input\b[^"]*"/g)).toHaveLength(2);
-    expect(html.match(/aria-pressed="false"[^>]*>Mark correct</g)).toHaveLength(2);
+    // Each Mark correct, named by its letter (D01), is driven in `ask-panel.driven.test.tsx`.
   });
 
   it('ends with Ask the class and Cancel, what the guard means, and nothing failed yet', () => {

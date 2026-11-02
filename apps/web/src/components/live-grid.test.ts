@@ -502,21 +502,9 @@ describe('the grid counted for the class page (PV7)', () => {
   });
 });
 
+// A lost stream's pill and a quiet one's line, said as a status (DR-05), are driven in
+// `live-grid.driven.test.tsx`.
 describe('the grid’s lines on the class page while a session runs (PV7)', () => {
-  /** A constant's class list, by its name. */
-  const classes = (name: string) =>
-    (new RegExp(`const ${name} =\\s*'([^']*)'`).exec(source)?.[1] ?? '').split(' ');
-
-  it('says a lost stream in the floating pill, and a quiet one in the stone line over the grid', () => {
-    expect(source).toMatch(
-      /const health =\s*stale && !over \? \(\s*livePage && stale\.reason === 'reconnecting' \? \(\s*<div className=\{PILL_LAYER\}>\s*<p className=\{PILL\}>\s*<span aria-hidden="true" className="size-1\.75 shrink-0 rounded-full bg-pip" \/>\s*\{staleWords\(stale\)\}[^]*?\) : \(\s*<p className="rounded-sm border border-border-default bg-surface-sunken px-4 py-3 text-body text-text-primary tabular-nums">/,
-    );
-    // Over the tiles.
-    expect(source).toMatch(
-      /<div className="flex flex-col gap-3">\s*\{health\}\s*\{rows\.length === 0/,
-    );
-  });
-
   it('gives its tiles’ place to Present’s question, its stream and its own lines kept (L7, part 2)', () => {
     // Off, no tile and no loading line; a boot that failed still says so with Try again, and the
     // grid's health is said alone, so a lost stream is still the pill over the question.
@@ -540,40 +528,6 @@ describe('the grid’s lines on the class page while a session runs (PV7)', () =
     expect(before(false)).toBe('');
     expect(before(true)).toBe(
       '<p role="status" class="text-body text-text-secondary">Loading grid…</p>',
-    );
-  });
-
-  it('floats the pill as ClassStale draws it, 14 px from the page’s top, in view as it scrolls', () => {
-    // White, a strong edge, shadow-2, 13/18 medium in the secondary ink, 6 × 14 px (DESIGN.md §4).
-    expect(classes('PILL')).toEqual(
-      expect.arrayContaining([
-        'sticky',
-        'top-3.5',
-        'mx-auto',
-        'w-fit',
-        'rounded-full',
-        'border',
-        'border-border-strong',
-        'bg-surface-card',
-        'shadow-2',
-        'px-3.5',
-        'py-1.5',
-        'text-caption',
-        'font-medium',
-        'text-text-secondary',
-      ]),
-    );
-    // Its layer over the page's whole height, taking no room or clicks: 30 px less 16 is 14 px
-    // from the frame's top (22 less 8 on a phone).
-    expect(classes('PILL_LAYER')).toEqual(
-      expect.arrayContaining([
-        'pointer-events-none',
-        'absolute',
-        'inset-x-0',
-        '-top-4',
-        'bottom-0',
-        'max-sm:-top-2',
-      ]),
     );
   });
 

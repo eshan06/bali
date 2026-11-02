@@ -360,6 +360,24 @@ const PILL_LAYER = 'pointer-events-none absolute inset-x-0 -top-4 bottom-0 z-10 
 const PILL =
   'sticky top-3.5 mx-auto flex w-fit max-w-full items-center gap-2 rounded-full border border-border-strong bg-surface-card px-3.5 py-1.5 text-caption font-medium text-text-secondary shadow-2';
 
+/**
+ * The grid's health in words (`staleWords`), inside a status (DR-05): a screen reader hears it as
+ * it comes and as its reason changes, as a student hears "Can't reach Bali", but not its age at
+ * each second's tick (`aria-live="off"`, as YourPhone's minutes). One span, so the pill's flex row
+ * lays it out as one piece.
+ */
+export function StaleWords({ stale }: { stale: Staleness }) {
+  const words = staleWords(stale);
+  // The words' one figure is the grid's age, which ticks: from it on, unsaid as it changes.
+  const age = words.search(/\d/);
+  return (
+    <span>
+      {words.slice(0, age)}
+      <span aria-live="off">{words.slice(age)}</span>
+    </span>
+  );
+}
+
 /** The grid as it stands, for Home's live card to draw in its own words (`LiveGrid`'s `card`). */
 export interface GridNow {
   /** Every student, once the snapshot is read; null until then. */
@@ -658,14 +676,17 @@ export function LiveGrid({
     stale && !over ? (
       livePage && stale.reason === 'reconnecting' ? (
         <div className={PILL_LAYER}>
-          <p className={PILL}>
+          <p role="status" className={PILL}>
             <span aria-hidden="true" className="size-1.75 shrink-0 rounded-full bg-pip" />
-            {staleWords(stale)}
+            <StaleWords stale={stale} />
           </p>
         </div>
       ) : (
-        <p className="rounded-sm border border-border-default bg-surface-sunken px-4 py-3 text-body text-text-primary tabular-nums">
-          {staleWords(stale)}
+        <p
+          role="status"
+          className="rounded-sm border border-border-default bg-surface-sunken px-4 py-3 text-body text-text-primary tabular-nums"
+        >
+          <StaleWords stale={stale} />
         </p>
       )
     ) : null;
@@ -686,6 +707,7 @@ export function LiveGrid({
     <UnlockPopups
       unlocks={popups.open}
       students={students}
+      tileOf={tileId}
       onClose={(eventId) => tell({ kind: 'close', eventId })}
       onOpen={(u) => {
         tell({ kind: 'close', eventId: u.eventId });

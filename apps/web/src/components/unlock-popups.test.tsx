@@ -169,6 +169,7 @@ describe('a pop-up, as ClassUnlock draws it', () => {
       <UnlockPopups
         unlocks={unlocks}
         students={students}
+        tileOf={(studentId) => `tile-${studentId}`}
         onClose={on.close ?? (() => undefined)}
         onOpen={on.open ?? (() => undefined)}
       />,
@@ -255,7 +256,11 @@ describe('a pop-up, as ClassUnlock draws it', () => {
     show([unlock('e1')], STUDENTS, { close, open });
     const words = 'Ethan Park used Emergency Unlock';
     const openStudent = screen.getByRole('button', { name: 'Open student', description: words });
-    const closeIt = screen.getByRole('button', { name: 'Close', description: words });
+    // Named for whose pop-up it closes, as several stack (the audit's C02).
+    const closeIt = screen.getByRole('button', {
+      name: "Close Ethan Park's pop-up",
+      description: words,
+    });
     const [popup] = popups();
     if (!popup) throw new Error('no pop-up');
     // Two buttons and no link: Open student out of the alert, so a screen reader says the unlock
@@ -288,8 +293,9 @@ describe('a pop-up, as ClassUnlock draws it', () => {
   it('offers Open student once the student’s tile is on the grid, where their panel opens', () => {
     show([unlock('e1', { studentId: 'u3-0000-cccc' })]);
     expect(screen.queryByRole('button', { name: 'Open student' })).toBeNull();
+    // Its Close named by the student's id, as its words name them until the grid has them.
     expect(screen.getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual([
-      'Close',
+      "Close u3-0000-'s pop-up",
     ]);
   });
 
@@ -328,7 +334,7 @@ describe('a pop-up, as ClassUnlock draws it', () => {
     expect(classes(well?.querySelector('svg'))).toContain('lucide-lock-open');
     expect(well?.querySelector('svg')?.getAttribute('width')).toBe('18');
     // Close 32 px, 6 px up, in the tertiary ink, grey on hover as the menu's Sign out.
-    expect(classes(screen.getByRole('button', { name: 'Close' }))).toEqual(
+    expect(classes(screen.getByRole('button', { name: /^Close / }))).toEqual(
       expect.arrayContaining([
         'size-8',
         '-mt-1.5',
@@ -385,29 +391,52 @@ describe('a pop-up, as ClassUnlock draws it', () => {
 });
 
 describe('closing a pop-up', () => {
-  /** The pop-ups as the grid keeps them: a Close shuts its own. */
-  function Kept({ unlocks }: { unlocks: Unlock[] }) {
+  /**
+   * The pop-ups as the grid keeps them, a Close shutting its own, in a page with its heading and,
+   * unless told, each student's tile.
+   */
+  function Kept({ unlocks, tiles = true }: { unlocks: Unlock[]; tiles?: boolean }) {
     const [popups, tell] = useReducer(
       popupsAfter,
       unlocks.reduceRight((state, u) => popupsAfter(state, opened(u)), NO_POPUPS),
     );
     return (
-      <UnlockPopups
-        unlocks={popups.open}
-        students={STUDENTS}
-        onClose={(eventId) => tell({ kind: 'close', eventId })}
-        onOpen={() => undefined}
-      />
+      <main>
+        <h1>Biology, period 3</h1>
+        {tiles
+          ? Object.entries(STUDENTS).map(([id, s]) => (
+              <button key={id} type="button" id={`tile-${id}`}>
+                {s.displayName ?? id}
+              </button>
+            ))
+          : null}
+        <UnlockPopups
+          unlocks={popups.open}
+          students={STUDENTS}
+          tileOf={(studentId) => `tile-${studentId}`}
+          onClose={(eventId) => tell({ kind: 'close', eventId })}
+          onOpen={() => undefined}
+        />
+      </main>
     );
   }
+  /** A pop-up's Close, by its unlock: named for whose pop-up it is, described by its words. */
   const closeOf = (id: string) => {
     const words = document.getElementById(`unlock-${id}`)?.textContent ?? '';
     return screen
-      .getAllByRole('button', { name: 'Close', description: words })
+      .getAllByRole('button', { name: "Close Ethan Park's pop-up", description: words })
       .find((b) => b.getAttribute('aria-describedby') === `unlock-${id}`) as HTMLElement;
   };
+  const tileOf = (name: string) => screen.getByRole('button', { name });
 
-  it('moves focus to the Close of the pop-up that takes its place, else the one above it', async () => {
+  it('names each Close for whose pop-up it closes (the audit’s C02)', () => {
+    render(<Kept unlocks={[unlock('c', { studentId: 'u2-0000-bbbb' }), unlock('a')]} />);
+    expect(
+      screen.getAllByRole('button', { name: /^Close / }).map((b) => b.getAttribute('aria-label')),
+    ).toEqual(["Close u2-0000-'s pop-up", "Close Ethan Park's pop-up"]);
+  });
+
+  it('moves focus to the Close of the pop-up that takes its place, else the one above it, by click and by keyboard', async () => {
     const user = userEvent.setup();
     render(<Kept unlocks={[unlock('c'), unlock('b'), unlock('a')]} />);
     expect(screen.getAllByRole('alert').map((a) => a.firstElementChild?.id)).toEqual([
@@ -422,6 +451,38 @@ describe('closing a pop-up', () => {
     await user.keyboard('{Enter}');
     expect(screen.getAllByRole('alert')).toHaveLength(1);
     expect(document.activeElement).toBe(closeOf('c'));
+  });
+
+  it('moves focus to its student’s tile as the last one closes, never the page (GA4), by keyboard and by click', async () => {
+    const user = userEvent.setup();
+    render(<Kept unlocks={[unlock('a')]} />);
+    closeOf('a').focus();
+    await user.keyboard('{Enter}');
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(document.activeElement).toBe(tileOf('Ethan Park'));
+    cleanup();
+
+    render(<Kept unlocks={[unlock('a')]} />);
+    await user.click(closeOf('a'));
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(document.activeElement).toBe(tileOf('Ethan Park'));
+  });
+
+  it('moves focus to the class’s name as the last one closes, its student’s tile not on the grid', async () => {
+    const user = userEvent.setup();
+    render(<Kept unlocks={[unlock('a')]} tiles={false} />);
+    await user.click(closeOf('a'));
+    const name = screen.getByRole('heading', { name: 'Biology, period 3' });
+    expect(document.activeElement).toBe(name);
+    expect(name.getAttribute('tabindex')).toBe('-1');
+  });
+
+  it('moves focus on from a Close pressed while the page’s body held it, as a click does in Safari', async () => {
+    render(<Kept unlocks={[unlock('a')]} />);
+    expect(document.activeElement).toBe(document.body);
+    closeOf('a').click();
+    await Promise.resolve();
+    expect(document.activeElement).toBe(tileOf('Ethan Park'));
   });
 
   it('leaves focus alone when the Close pressed didn’t hold it', async () => {
