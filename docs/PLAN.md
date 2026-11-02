@@ -8,18 +8,14 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-10-24 (Central) — C2-text (#461; `docs/DECISIONS.md`, 2026-10-24): the owner's
-drafted privacy policy and terms (#460) on `/privacy` and `/terms` in the outline's place, its
-notice and Placeholder chips gone, the notes for the lawyer left off. The pages are now the one copy
-of the words (`docs/legal/` keeps only the notes), and the policy's section 2 shows the app's own two
-lists, as the help page does (#130); both pages stay out of search results until the lawyer's
-version replaces them in place. Before it, M6's LessonDecks panel line back (#457) and the push's
-app half (#456): **before the next TestFlight build, Push Notifications on `com.bali.Bali`**
-(runbook 7, step 3), or its signing may fail; build 10 went before it, from `1d4496b6`. **An install
-whose Screen Time step was done before that build is never asked:** the owner reinstalls Bali before
-runbook 7's step-6 check. Next on the Mac: the owner's sitting on build 10 (`ios/README.md`), then
-runbook 7 and N6's check; on the Windows PC, the other three pre-pilot steps, which wait for the
-owner's word._
+_Last updated: 2026-11-01 (Central) — GA3 (#474; `docs/DECISIONS.md`, 2026-11-01), the first of the
+audit's fixes (GA1–GA6 below; the owner's ruling, 2026-11-01): on the phone's Focus screen at the
+largest text sizes, Hold to unlock stays whole on the first screen in every state, and a question or
+a slide comes before the class, so the question and its first answers show with it; the default size
+and FocusLargeText's are unchanged (the app canvas's largest-text boards, version 43). Still
+**before the next TestFlight build, Push Notifications on `com.bali.Bali`** (runbook 7, step 3), and
+the owner reinstalls Bali before runbook 7's step-6 check. Next: GA1's drawing waits for the owner;
+GA2, GA4 and GA5 are the conductor's to hand out._
 
 ## Now
 
@@ -271,6 +267,19 @@ Slice 3 — students on the web (added 2026-10-10; ARCHITECTURE, "Live lesson", 
 ARCHITECTURE's "Live lesson", "Settled"): `event_id` refused both ways (L1, L3b), the guard
 wherever counts are read (L3, L7c), the portal's `sha256` check (M6, W5), the PDF check in its
 own worker (M2), and a load gate of several classes on phones and laptops (L4, M9).
+
+### The audit's fixes (GA; one PR each; 👀 = the owner looks at screenshots)
+
+The owner's ruling of 2026-11-01 (`docs/DECISIONS.md`): the gstack audit's (2026-10-24) 3 crucial and
+7 cheap findings first, the rest polish left for later. The audit's list lives outside the repo, on
+the owner's Mac.
+
+- **GA1** 👀 End session's confirm, drawn for the owner (C2-01; the canvas only, no PR): awaiting the owner
+- **GA2** 👀 The unlock pop-up never covers the teacher's controls (C01/DR-08)
+- **GA3** 👀 Focus at the largest text: Emergency Unlock and the question on the first screen (IOS-018, IOS-017) — ✅ (#474; DECISIONS 2026-11-01)
+- **GA4** The class page for screen readers and the keyboard: the reconnect pill announced, Mark correct and Close named, focus after End, Start and a closed pop-up (DR-05, D01, C02, C2-02)
+- **GA5** 👀 The app's refusals whole at the largest text with the keyboard up, and busy buttons' labels as drawn (IOS-001, IOS-008)
+- **GA6** 👀 End session's confirm, built once the owner approves GA1's drawing
 
 ### Still open in earlier phases
 

@@ -9,6 +9,7 @@ import UIKit
 struct FocusView: View {
     let phone: Phone
     @Environment(\.openURL) private var openURL
+    @Environment(\.dynamicTypeSize) private var textSize
     /// Whether the page over the pinned Emergency Unlock scrolls: a hairline then marks its edge.
     @State private var scrolls = false
     /// The card and slide shown — with the strip and Emergency Unlock pinned — or neither, the ring's
@@ -37,9 +38,16 @@ struct FocusView: View {
         }
     }
 
+    /// Past the large text size FocusLargeText draws (AX1) the text crowds the screen, so Focus
+    /// makes room for what matters first (GA3; the app canvas's largest-text boards): the line under
+    /// Emergency Unlock scrolls with the page, and a lesson comes before the class.
+    private var crowded: Bool { textSize >= .accessibility2 }
+
     /// D1's three groups — the class; the state, the ring and the claim; and Emergency Unlock —
     /// at least D1's 24 pt apart, each at its own height: only the spacers give, since a group
-    /// offered less than its own height, the ring's fixed, would cut its lines instead.
+    /// offered less than its own height, the ring's fixed, would cut its lines instead. Emergency
+    /// Unlock is pinned at the bottom, where D1 draws it, so a page the text outgrows scrolls above
+    /// it (GA3; the app canvas's FocusLargestText and FocusLargestTextEnd).
     private func page(_ focus: FocusWords) -> some View {
         ScreenScaffold {
             PageScroll {
@@ -48,40 +56,58 @@ struct FocusView: View {
                     Spacer(minLength: 24)
                     middle(focus).fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 24)
-                    lower(focus).fixedSize(horizontal: false, vertical: true)
+                    notes(focus).fixedSize(horizontal: false, vertical: true)
                 }
                 .multilineTextAlignment(.center)
+                .onGeometryChange(for: Bool.self, of: overflows) { scrolls = $0 }
             }
+            pinned(focus, gap: 24, paused: focus.claim == .paused)
         }
     }
 
     /// Focus while a question or a slide shows (L8, M8; the app canvas's Main, FocusAnswered,
     /// FocusRevealed, FocusLargeText, FocusSlide and FocusSlideQuestion): the class, the ring become
     /// the strip, the card, the slide under it, then what else Focus says, scrolling over Emergency
-    /// Unlock, pinned at the bottom at every text size.
+    /// Unlock, pinned at the bottom at every text size. Crowded, the card and the slide come first,
+    /// so the question is on the first screen (GA3; FocusQuestionLargestText, FocusSlideLargestText).
     private func lesson(_ focus: FocusWords, _ shown: Lesson) -> some View {
         ScreenScaffold {
             ScrollView {
                 VStack(spacing: 20) {
-                    heading(focus).multilineTextAlignment(.center)
-                    Strip(focus: focus) { chips(focus) }
+                    if !crowded { top(focus) }
                     if let card = shown.card { AnswerCardView(card: card, phone: phone) }
                     if let slide = shown.slide { SlideView(shown: slide, phone: phone) }
+                    if crowded { top(focus) }
                     notes(focus).multilineTextAlignment(.center)
                 }
-                .onGeometryChange(for: Bool.self) { geometry in
-                    geometry.size.height > (geometry.bounds(of: .scrollView)?.height ?? .infinity) + 0.5
-                } action: { scrolls = $0 }
+                .onGeometryChange(for: Bool.self, of: overflows) { scrolls = $0 }
             }
             .scrollBounceBehavior(.basedOnSize).screenWide()
-            EmergencyUnlock(phone: phone, caption: focus.caption, paused: true, failed: $unlockFailed)
-                .multilineTextAlignment(.center).padding(.top, 16).frame(maxWidth: .infinity)
-                .overlay(alignment: .top) {
-                    if scrolls {
-                        Rectangle().fill(Theme.border).frame(height: 1).padding(.horizontal, -Theme.gutter)
-                    }
-                }
+            pinned(focus, gap: 16, paused: true)
         }
+    }
+
+    /// Emergency Unlock pinned under the page, `gap` below it, a hairline marking its edge once the
+    /// page scrolls (FocusLargeText's), at its own height whatever the page holds: offered less, its
+    /// pill was squeezed shorter than its words. Crowded, its line scrolls with the page, and only
+    /// why the last press didn't go through stays under it (rule 5).
+    private func pinned(_ focus: FocusWords, gap: CGFloat, paused: Bool) -> some View {
+        EmergencyUnlock(
+            phone: phone, caption: crowded ? nil : focus.caption, paused: paused, failed: $unlockFailed
+        )
+        .multilineTextAlignment(.center).padding(.top, gap).frame(maxWidth: .infinity)
+        .overlay(alignment: .top) {
+            if scrolls {
+                Rectangle().fill(Theme.border).frame(height: 1).padding(.horizontal, -Theme.gutter)
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// The class over the strip.
+    @ViewBuilder private func top(_ focus: FocusWords) -> some View {
+        heading(focus).multilineTextAlignment(.center)
+        Strip(focus: focus) { chips(focus) }
     }
 
     /// The class, and under it its teacher and bell.
@@ -128,17 +154,8 @@ struct FocusView: View {
         if focus.offline != nil { Chip(kind: .notIn, icon: "wifi.slash", text: "No connection") }
     }
 
-    /// What Focus says beside the countdown, then Emergency Unlock and its line.
-    private func lower(_ focus: FocusWords) -> some View {
-        VStack(spacing: 24) {
-            notes(focus)
-            EmergencyUnlock(
-                phone: phone, caption: focus.caption, paused: focus.claim == .paused, failed: $unlockFailed)
-        }
-    }
-
     /// Why an unlock gave way (C5a); why nothing reaches the teacher; offline, D1's card; a wake
-    /// iOS refused.
+    /// iOS refused; and, crowded, the line from under Emergency Unlock.
     private func notes(_ focus: FocusWords) -> some View {
         VStack(spacing: 24) {
             ForEach([focus.superseded, focus.stalled].compactMap { $0 }, id: \.self) { words in
@@ -159,8 +176,14 @@ struct FocusView: View {
             if let note = focus.unscheduled {
                 Text(note).textStyle(.caption).foregroundStyle(Theme.textSecondary)
             }
+            if crowded { Text(focus.caption).textStyle(.caption).foregroundStyle(Theme.textTertiary) }
         }
     }
+}
+
+/// Whether a page is taller than its scroll view shows.
+private func overflows(_ geometry: GeometryProxy) -> Bool {
+    geometry.size.height > (geometry.bounds(of: .scrollView)?.height ?? .infinity) + 0.5
 }
 
 /// What of a live lesson Focus shows: its card, its slide, both — the question first (decision 11)
@@ -230,7 +253,8 @@ extension FocusWords {
 /// shields on, all a failure may say of them.
 struct EmergencyUnlock: View {
     let phone: Phone
-    let caption: String
+    /// Nil where the screen says it elsewhere (Focus, crowded): then only a press that failed.
+    let caption: String?
     let paused: Bool
     /// The screen's own, so it outlives a change of the screen's layout.
     @Binding var failed: UnlockFailure?
@@ -246,8 +270,9 @@ struct EmergencyUnlock: View {
                     }
                 }
             }
-            Text(failed?.words(paused: paused) ?? caption).textStyle(.caption)
-                .foregroundStyle(failed == nil ? Theme.textTertiary : Theme.text)
+            if let line = failed?.words(paused: paused) ?? caption {
+                Text(line).textStyle(.caption).foregroundStyle(failed == nil ? Theme.textTertiary : Theme.text)
+            }
         }
         // A press the screen ended mid-hold says nothing more, so a layout never stays held for it.
         .onDisappear { phone.unlockHeld = false }

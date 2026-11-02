@@ -3660,6 +3660,101 @@ struct AppTests {
     }
 
     @Test(
+        "At every accessibility text size, on the iPhone 17e and the iPhone 17 Pro, Hold to unlock is pinned whole under the page on Focus's first screen in every Focus state, with a question, a slide or neither (GA3; IOS-018, IOS-017), and with a question its prompt and first answer are on it too, but the longest case's, a question longer than the screen; past the large size FocusLargeText draws, the question comes before the class and the line under Emergency Unlock is the page's last (the app canvas's largest-text boards), while at that size the class comes first and the line stays under it, as drawn"
+    )
+    func focusFirstScreen() async throws {
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let fixtures = [
+            "focus", "focusFinal", "focusOffline", "focusTapHeld", "focusNoShields", "focusUnscheduled",
+            "focusSuperseded", "focusSignedOut", "focusQuestion", "focusAnswered", "focusRevealed", "focusSending",
+            "focusFailed", "focusTooLate", "focusClosed", "focusRight", "focusNoAnswer", "focusQuestionOffline",
+            "focusLong", "focusSlide", "focusSlideQuestion", "focusSlideLoading", "focusSlideFailed",
+        ]
+        let sizes: [DynamicTypeSize] = [.accessibility1, .accessibility2, .accessibility3, .accessibility4, .accessibility5]
+        // The iPhone 17e's and the iPhone 17 Pro's, less their safe areas, as `questionFits` has them.
+        let phones = [CGSize(width: 390, height: 844 - 47 - 34), CGSize(width: 402, height: 874 - 62 - 34)]
+        let unlockLabel = "Emergency Unlock. Your teacher will see it."
+        for name in fixtures {
+            for size in sizes {
+                for frame in phones {
+                    let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))
+                    let hosting = UIHostingController(
+                        rootView: RootView(phone: phone).environment(\.dynamicTypeSize, size))
+                    hosting.safeAreaRegions = []
+                    let window = UIWindow(windowScene: scene)
+                    window.frame = CGRect(origin: .zero, size: frame)
+                    window.rootViewController = hosting
+                    window.isHidden = false
+                    defer { window.isHidden = true }
+                    window.layoutIfNeeded()
+                    var read: [NSObject] = []
+                    try await until {
+                        read = (try? voiceOver(in: window)) ?? []
+                        return read.contains { $0.accessibilityLabel == unlockLabel }
+                    }
+                    /// Where VoiceOver finds the element whose label `matches`.
+                    func at(_ matches: (String) -> Bool) throws -> CGRect {
+                        try #require(read.first { matches($0.accessibilityLabel ?? "") }, "\(name), \(size)")
+                            .accessibilityFrame
+                    }
+                    let said = "\(name), \(size), \(frame)"
+                    let scroll = try #require(scrollViews(in: window).first, "\(said)")
+                    let page = scroll.convert(scroll.bounds, to: window)
+                    let unlock = try at { $0 == unlockLabel }
+                    #expect(unlock.minY >= page.maxY - 0.5 && unlock.maxY <= frame.height + 0.5, "\(said): \(unlock)")
+                    // The line: the page's last, or under Emergency Unlock.
+                    let crowded = size >= .accessibility2
+                    let line = try at { $0.hasPrefix("Works without Wi-Fi.") }
+                    let end = scroll.convert(CGRect(origin: .zero, size: scroll.contentSize), to: window).maxY
+                    #expect(crowded ? abs(line.maxY - end) <= 1 : line.minY >= unlock.maxY, "\(said): \(line), \(end)")
+                    guard let card = phone.card else { continue }
+                    let prompt = try at { $0 == card.question.prompt }
+                    let first = try at { $0.hasPrefix("A, ") }
+                    if name != "focusLong" {
+                        #expect(prompt.maxY <= page.maxY + 0.5 && first.maxY <= page.maxY + 0.5, "\(said): \(first)")
+                    }
+                    let title = try at { $0 == "Period 3 — Algebra II" }
+                    #expect((prompt.minY < title.minY) == crowded, "\(said): \(prompt) \(title)")
+                }
+            }
+        }
+    }
+
+    @Test(
+        "At the largest text size a press that didn't go through says so under Emergency Unlock, whole on the first screen, while the line it replaces is the page's last (GA3; rule 5; the app canvas's FocusLargestTextFailed)"
+    )
+    func focusFailureCrowded() async throws {
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        for name in ["focus", "focusQuestion"] {
+            let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))
+            let hosting = UIHostingController(
+                rootView: RootView(phone: phone).environment(\.dynamicTypeSize, .accessibility5))
+            hosting.safeAreaRegions = []
+            let window = UIWindow(windowScene: scene)
+            window.frame = CGRect(x: 0, y: 0, width: 390, height: 844 - 47 - 34)
+            window.rootViewController = hosting
+            window.isHidden = false
+            defer { window.isHidden = true }
+            func read() -> [NSObject] {
+                window.layoutIfNeeded()
+                return (try? voiceOver(in: window)) ?? []
+            }
+            func element(_ label: String) -> NSObject? { read().first { $0.accessibilityLabel == label } }
+            try await until { element("Emergency Unlock. Your teacher will see it.") != nil }
+            // VoiceOver's one step on a frozen phone, which hasn't started: it says so.
+            try #require(element("Emergency Unlock. Your teacher will see it.")).accessibilityActivate()
+            try await until { element(Joining.notStarted) != nil }
+            let unlock = try #require(element("Emergency Unlock. Your teacher will see it.")).accessibilityFrame
+            let failure = try #require(element(Joining.notStarted)).accessibilityFrame
+            #expect(failure.minY >= unlock.maxY && failure.maxY <= window.bounds.height + 0.5, "\(name): \(failure)")
+            let line = try #require(read().first { ($0.accessibilityLabel ?? "").hasPrefix("Works without Wi-Fi.") })
+            let scroll = try #require(scrollViews(in: window).first)
+            let end = scroll.convert(CGRect(origin: .zero, size: scroll.contentSize), to: window).maxY
+            #expect(abs(line.accessibilityFrame.maxY - end) <= 1, "\(name): \(line.accessibilityFrame), \(end)")
+        }
+    }
+
+    @Test(
         "VoiceOver on a question (L8): the strip's time read as the ring's, and its chip; each answer a button read with its letter and words, the student's own read as Your answer and selected; closed, each answer with its marks, the correct one's and theirs, and Hide read as Hide this question; Emergency Unlock the same button, its label unchanged"
     )
     func questionVoiceOver() async throws {
