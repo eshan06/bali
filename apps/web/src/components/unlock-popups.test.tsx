@@ -262,7 +262,18 @@ describe('a pop-up, as ClassUnlock draws it', () => {
     // alone as it opens, then Close at the end.
     expect(within(popup).getAllByRole('button')).toEqual([openStudent, closeIt]);
     expect(popup.querySelector('a')).toBeNull();
-    expect(screen.getByRole('alert').contains(openStudent)).toBe(false);
+    expect([openStudent.getAttribute('type'), closeIt.getAttribute('type')]).toEqual([
+      'button',
+      'button',
+    ]);
+    // In the words' column, right after the alert, and out of it.
+    const alert = screen.getByRole('alert');
+    expect(alert.contains(openStudent)).toBe(false);
+    expect(alert.nextElementSibling).toBe(openStudent);
+    expect(classes(alert.parentElement)).toEqual(['min-w-0']);
+    // Close: the X, its icon alone.
+    expect(classes(closeIt.querySelector('svg'))).toContain('lucide-x');
+    expect(closeIt.textContent).toBe('');
     // v2.css's `.t-act`: 13/18 semibold in orange-700, 8 px under the words.
     expect(classes(openStudent)).toEqual(
       expect.arrayContaining(['mt-2', 'text-caption', 'font-semibold', 'text-unlock-link']),
@@ -306,9 +317,14 @@ describe('a pop-up, as ClassUnlock draws it', () => {
       ]),
     );
     const well = popup?.firstElementChild;
-    expect(classes(well)).toEqual(
-      expect.arrayContaining(['size-9', 'rounded-sm', 'bg-state-emergency-bg']),
-    );
+    expect(classes(well)).toEqual([
+      'grid',
+      'size-9',
+      'place-items-center',
+      'rounded-sm',
+      'bg-state-emergency-bg',
+      'text-state-emergency-fg',
+    ]);
     expect(classes(well?.querySelector('svg'))).toContain('lucide-lock-open');
     expect(well?.querySelector('svg')?.getAttribute('width')).toBe('18');
     // Close 32 px, 6 px up, in the tertiary ink, grey on hover as the menu's Sign out.

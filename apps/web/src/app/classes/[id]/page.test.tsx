@@ -256,6 +256,9 @@ describe('a class live, an unlock lands (GA2)', () => {
 
     const alert = await screen.findByRole('alert');
     expect(alert.textContent).toMatch(/^Ana Rodríguez used Emergency Unlock/);
+    // Beside her tile's pulse (bali-softpulse), which the same live unlock starts.
+    const anasTile = screen.getByRole('button', { name: /^Ana Rodríguez/ });
+    expect(anasTile.querySelector('.animate-softpulse')).not.toBeNull();
     // The pop-ups' layer, and the positioned box it is laid over: the tiles' own.
     const layer = alert.closest('.absolute');
     const box = layer?.parentElement;
@@ -279,6 +282,10 @@ describe('a class live, an unlock lands (GA2)', () => {
     await live();
     await bring(unlocked(4));
     expect(screen.queryByText(/used Emergency Unlock/)).toBeNull();
+    // Her tile says Unlocked, as the replay applies it, and doesn't pulse.
+    const anasTile = screen.getByRole('button', { name: /^Ana Rodríguez/ });
+    expect(anasTile.textContent).toMatch(/Unlocked/);
+    expect(anasTile.querySelector('.animate-softpulse')).toBeNull();
   });
 
   it('closes on Open student, the student’s panel opening from their tile', async () => {
