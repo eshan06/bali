@@ -208,10 +208,12 @@ export function AskPanel({
                     aria-invalid={refusal ? true : undefined}
                     aria-describedby={refusal ? `${id}-a${i}-said` : undefined}
                   />
+                  {/* Named by its answer's letter, as Remove is, after the words it shows. */}
                   <Button
                     variant="secondary"
                     size="sm"
                     aria-pressed={right}
+                    aria-label={`${right ? 'Correct' : 'Mark correct'}, answer ${letterOf(i)}`}
                     onClick={() => set({ correctOption: right ? null : i })}
                   >
                     {right ? <Check size={16} aria-hidden="true" /> : null}

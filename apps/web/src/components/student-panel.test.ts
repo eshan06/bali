@@ -249,15 +249,8 @@ describe('the panel, as ClassStudent draws it', () => {
     );
   });
 
-  it('heads it with the name, which takes focus as it opens, and Close', () => {
-    expect(html).toMatch(/<h2 id="g-panel-name" tabindex="-1" class="text-h3 wrap-anywhere">/);
-    expect(html).toMatch(
-      /<button type="button" aria-label="Close" class="[^"]*"><svg[^>]*lucide-x/,
-    );
-    expect(classes(/<div class="(flex items-start[^"]*)">/)).toEqual(
-      expect.arrayContaining(['gap-3', 'border-b', 'pt-5', 'pr-3.5', 'pb-4', 'pl-5']),
-    );
-  });
+  // Its head, the name and Close named for whose panel it is (C02), is driven in
+  // `student-panel.driven.test.tsx`.
 
   it('marks each moment with a grey 26 px dot, its icon, and a hairline to the next', () => {
     expect(html).toMatch(

@@ -77,8 +77,20 @@ const bali = vi.hoisted(() => {
   /** Every request the page sent, in order, and any Bali has no answer for. */
   const sent: { method: string; path: string; body: unknown }[] = [];
   const unexpected: string[] = [];
+  /**
+   * Whether the class's session runs yet: none until a Start, when a test says so; and whether a
+   * Start's answer waits for the test to give it (`starts`).
+   */
+  const now = { running: true, holdStart: false };
+  const starts: (() => void)[] = [];
   const answer = (method: string, path: string): [number, unknown] => {
-    if (method === 'GET' && path === `/v1/classes/${CLASS}`) return [200, klass];
+    if (method === 'GET' && path === `/v1/classes/${CLASS}`) {
+      return [200, now.running ? klass : { ...klass, liveSessionId: null }];
+    }
+    if (method === 'POST' && path === `/v1/classes/${CLASS}/sessions`) {
+      now.running = true;
+      return [201, { outcome: 'created', session: snapshot.session, armedConverted: 0 }];
+    }
     if (method === 'GET' && path === `/v1/classes/${CLASS}/roster`) return [200, roster];
     if (method === 'GET' && path === `/v1/sessions/${SESSION}`) return [200, snapshot];
     if (method === 'POST' && path === `/v1/sessions/${SESSION}/extend`) return [409, tooLong];
@@ -107,7 +119,11 @@ const bali = vi.hoisted(() => {
         ends.push({ answer, fail });
       });
     }
-    return Promise.resolve().then(() => {
+    const held =
+      now.holdStart && method === 'POST' && path === `/v1/classes/${CLASS}/sessions`
+        ? new Promise<void>((go) => starts.push(go))
+        : Promise.resolve();
+    return held.then(() => {
       sent.push({ method, path, body });
       const [status, json] = answer(method, path);
       return new Response(JSON.stringify(json), {
@@ -120,6 +136,8 @@ const bali = vi.hoisted(() => {
     CLASS,
     SESSION,
     endsAt,
+    now,
+    starts,
     sent,
     unexpected,
     ends,
@@ -170,6 +188,9 @@ afterEach(() => {
   if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
   cleanup();
   sessionStorage.clear();
+  bali.now.running = true;
+  bali.now.holdStart = false;
+  bali.starts.length = 0;
   bali.sent.length = 0;
   bali.unexpected.length = 0;
   bali.streams.length = 0;
@@ -317,6 +338,24 @@ describe('a class live, an unlock lands (GA2)', () => {
     expect(tile.getAttribute('aria-expanded')).toBe('true');
   });
 
+  // The last one closed, nothing takes its Close's place: focus goes to the tile of the student it
+  // named, never the page's body (the audit's C2-02; GA4, the conductor's call).
+  for (const by of ['click', 'keyboard'] as const) {
+    it(`closes on its Close, named for whose it is, focus then on the student’s tile, by ${by}`, async () => {
+      const user = userEvent.setup();
+      await live();
+      await bring(unlocked(5));
+      const close = await screen.findByRole('button', { name: "Close Ana Rodríguez's pop-up" });
+      if (by === 'click') await user.click(close);
+      else {
+        close.focus();
+        await user.keyboard('{Enter}');
+      }
+      expect(screen.queryByText(/used Emergency Unlock/)).toBeNull();
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: /^Ana Rodríguez/ }));
+    });
+  }
+
   it('never shows one in Present, the projector the class can see', async () => {
     sessionStorage.setItem(`bali.present.${bali.CLASS}`, 'on');
     render(<ClassDetailPage />);
@@ -324,6 +363,81 @@ describe('a class live, an unlock lands (GA2)', () => {
     await vi.waitFor(() => expect(bali.streams).toHaveLength(1));
     await bring(unlocked(5));
     expect(screen.queryByText(/used Emergency Unlock/)).toBeNull();
+  });
+});
+
+/*
+ * A Start takes the page before a session away, Start with it, and the live page takes its place:
+ * focus goes to the class's name, never the page's body (the audit's C2-02, confirmed with real
+ * clicks; GA4, the conductor's call, End's place since GA6). A page opened on a class in session
+ * leaves focus where the browser puts it.
+ */
+describe('a class’s Start, focus then on the class’s name (GA4)', () => {
+  const name = () => screen.getByRole('heading', { level: 1, name: 'Biology, period 3' });
+  /** The page before a session, its class read: Start in its card. */
+  async function before() {
+    bali.now.running = false;
+    render(
+      <main>
+        <ClassDetailPage />
+      </main>,
+    );
+    return screen.findByRole('button', { name: /^Start \d+-minute session$/ });
+  }
+
+  for (const by of ['click', 'keyboard'] as const) {
+    it(`starts the session, the live page in its place, focus on the class’s name, by ${by}`, async () => {
+      const user = userEvent.setup();
+      const start = await before();
+      if (by === 'click') await user.click(start);
+      else {
+        start.focus();
+        await user.keyboard('{Enter}');
+      }
+      await screen.findByRole('button', { name: 'End session' });
+      expect(screen.queryByRole('button', { name: /^Start/ })).toBeNull();
+      await vi.waitFor(() => expect(document.activeElement).toBe(name()));
+      expect(name().getAttribute('tabindex')).toBe('-1');
+      expect(bali.sent.filter(({ method }) => method === 'POST')).toEqual([
+        {
+          method: 'POST',
+          path: `/v1/classes/${bali.CLASS}/sessions`,
+          body: { durationMinutes: 50 },
+        },
+      ]);
+      expect(bali.unexpected).toEqual([]);
+    });
+  }
+
+  it('leaves focus where the teacher moved it while the Start was on its way', async () => {
+    const user = userEvent.setup();
+    bali.now.holdStart = true;
+    const start = await before();
+    // The side menu's stand-in, outside the page.
+    const menu = document.createElement('a');
+    menu.href = '/classes';
+    document.body.append(menu);
+    await user.click(start);
+    expect(start.textContent).toBe('Starting…');
+    menu.focus();
+    await act(async () => {
+      bali.starts[0]?.();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    await screen.findByRole('button', { name: 'End session' });
+    expect(document.activeElement).toBe(menu);
+    menu.remove();
+  });
+
+  it('moves no focus on a page opened on a class in session', async () => {
+    render(
+      <main>
+        <ClassDetailPage />
+      </main>,
+    );
+    await screen.findByText('Ana Rodríguez');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(document.activeElement).toBe(document.body);
   });
 });
 
@@ -374,6 +488,14 @@ describe('End session asks first, in a dialog (GA6)', () => {
   /** The confirm, found by its title: the class page's only dialog while a session runs. */
   const confirm = () => screen.getByRole('dialog', { name: 'End session now?' });
   const inConfirm = (name: string) => within(confirm()).getByRole('button', { name });
+  /** Chrome's second Escape with no click between: a `cancel` that can't be held, then closed. */
+  const chromeCloses = () =>
+    act(async () => {
+      const dialog = confirm() as HTMLDialogElement;
+      dialog.dispatchEvent(new Event('cancel'));
+      dialog.close();
+      await Promise.resolve();
+    });
   const endsSent = () => bali.sent.filter(({ path }) => path.endsWith('/end'));
   /** The class's name, the page's heading, on the page after the bell and on Present's. */
   const name = () => screen.getByRole('heading', { level: 1, name: 'Biology, period 3' });
@@ -543,6 +665,41 @@ describe('End session asks first, in a dialog (GA6)', () => {
       expect(inConfirm('End session')).toBeDefined();
       expect(document.activeElement).toBe(inConfirm('Cancel'));
       expect(endsSent()).toHaveLength(1);
+    });
+
+    // Chrome closes a modal on a second Escape with no click between, its `cancel` one that can't
+    // be held (GA6's review): focus then on End session, held, never the page's body, until Bali's
+    // answer says what follows (GA4).
+    it(`keeps focus on End session when Chrome’s second Escape closes it while Ending…, then goes on as the answer says${where}`, async () => {
+      const { user, end } = await live(present);
+      await user.click(end);
+      await user.click(inConfirm('End session'));
+      await user.keyboard('{Escape}');
+      expect(inConfirm('Ending…')).toBeDefined();
+      await chromeCloses();
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(document.activeElement).toBe(end);
+      expect(end.getAttribute('aria-disabled')).toBe('true');
+      expect(endsSent()).toHaveLength(1);
+
+      await answerEnd(200, { outcome: 'ended', endedParticipations: 1 });
+      await ended(present);
+    });
+
+    it(`opens the confirm again to say an end that failed after Chrome’s second Escape closed it${where}`, async () => {
+      const { user, end } = await live(present);
+      await user.click(end);
+      await user.click(inConfirm('End session'));
+      await user.keyboard('{Escape}');
+      await chromeCloses();
+      expect(document.activeElement).toBe(end);
+      await act(async () => {
+        bali.ends[0]?.fail();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+      expect(within(confirm()).getByRole('alert').textContent).toBe(CANT_REACH);
+      expect(inConfirm('Try again')).toBeDefined();
+      expect(document.activeElement).not.toBe(document.body);
     });
 
     it(`goes with the live page when the bell ends the session while it is open, focus on the class’s name${where}`, async () => {

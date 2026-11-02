@@ -203,7 +203,11 @@ the right over the live page, opened by a tile, a button there marked while its 
 (`.tile.is-selected`), and by a pop-up's Open student; its states as PanelStates draws them,
 but going silent and coming back listed as the recap marks them and Clock off's line "This
 phone's clock is off, so its times may be off too.", the tile's Clock off tooltip too (the owner,
-2026-10-14); never in Present.
+2026-10-14); never in Present. Since GA4 (2026-11-02), with nothing on screen changed: the pill and
+the line over the grid are a status a screen reader hears, never their age's tick; each Close says
+whose pop-up or panel it closes and each Mark correct its answer's letter; and focus goes to the
+class's name after Start, to the student's tile as the last pop-up closes (else the class's name),
+and to End session if the browser closes its dialog while the end is on its way.
 Reports is v2's since PV13 (2026-10-15): a menu page, one class at a time picked
 with pills, its sessions as a table in a box that scrolls sideways beside each
 one's average focus as a bar, and `/classes/[id]/reports` a redirect to it with

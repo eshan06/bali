@@ -464,10 +464,12 @@ export function QuestionForm({ form, on }: { form: Form; on: QuestionsActions })
                     aria-invalid={refusal ? true : undefined}
                     aria-describedby={refusal ? `${answerId(i)}-said` : undefined}
                   />
+                  {/* Named by its answer's letter, as Remove is, after the words it shows. */}
                   <Button
                     variant="secondary"
                     size="sm"
                     aria-pressed={right}
+                    aria-label={`${right ? 'Correct' : 'Mark correct'}, answer ${LETTERS[i]}`}
                     aria-describedby={answerId(i)}
                     onClick={() => on.change({ ...words, correctOption: right ? null : i })}
                   >

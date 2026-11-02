@@ -3,6 +3,7 @@
 import { type FeedEvent, isUnlockReason, type UnlockReason } from '@bali/shared';
 import { LockOpen, X } from 'lucide-react';
 
+import { land } from '@/components/try-again';
 import type { Students } from '@/lib/grid-state';
 import { bellTime } from '@/lib/session-controls';
 
@@ -117,21 +118,26 @@ const POPUP =
  * grid holds them, so they go with the session's live page, as
  * ClassUnlock draws them on it alone; each unlock then shows in the recap (How it ended, where its
  * tile showed too, went in PV12b). Its words are an alert, so a screen reader says each as it opens
- * ("Ethan Park used Emergency Unlock. Nurse · 9:31 AM") without moving focus; Close is described by
- * them, and closing one moves focus to the Close of the pop-up that takes its place, else the one
- * above it.
+ * ("Ethan Park used Emergency Unlock. Nurse · 9:31 AM") without moving focus; Close, named for
+ * whose pop-up it closes ("Close Ethan Park's pop-up", the audit's C02), is described by them, and
+ * closing one moves focus to the Close of the pop-up that takes its place, else the one above it,
+ * and the last one's to its student's tile, else the class's name, never the page (GA4, the
+ * conductor's call).
  * Open student (PV11b) opens the student's panel, described by the same words, once their tile is
  * on the grid.
  */
 export function UnlockPopups({
   unlocks,
   students,
+  tileOf,
   onClose,
   onOpen,
 }: {
   unlocks: readonly Unlock[];
   /** The grid's students, so a pop-up names each as their tile does now. */
   students: Students;
+  /** A student's tile's id, where focus goes as the last pop-up closes. */
+  tileOf: (studentId: string) => string;
   onClose: (eventId: string) => void;
   /** Open student: the panel for whoever unlocked. */
   onOpen: (unlock: Unlock) => void;
@@ -173,13 +179,16 @@ export function UnlockPopups({
             </div>
             <button
               type="button"
-              aria-label="Close"
+              aria-label={`Close ${nameOf(u)}'s pop-up`}
               aria-describedby={`unlock-${u.eventId}`}
               onClick={(e) => {
                 const popup = e.currentTarget.parentElement;
                 const next = popup?.nextElementSibling ?? popup?.previousElementSibling;
-                if (document.activeElement === e.currentTarget) {
-                  next?.querySelector<HTMLElement>('button[aria-label="Close"]')?.focus();
+                const at = document.activeElement;
+                if (at === e.currentTarget || at === document.body) {
+                  const close = next?.querySelector<HTMLElement>(':scope > button');
+                  if (close) close.focus();
+                  else land(document, [tileOf(u.studentId)]);
                 }
                 onClose(u.eventId);
               }}

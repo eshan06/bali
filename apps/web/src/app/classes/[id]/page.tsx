@@ -327,6 +327,18 @@ export default function ClassDetailPage() {
     land(document, []);
   }, [over]);
 
+  // A session shown on the page before one (a Start's answer, or the read after one got none): the
+  // Start's card went with that page, so focus, on Start or the page's body then, goes to the
+  // class's name, as End's does (the audit's C2-02; GA4, the conductor's call). Never on a reload,
+  // which opens on the live page.
+  const before = klass !== null && !live;
+  const wasBefore = useRef(false);
+  useEffect(() => {
+    const at = document.activeElement;
+    if (live && wasBefore.current && (at === null || at === document.body)) land(document, []);
+    wasBefore.current = before;
+  }, [live, before]);
+
   // The class's last pick on this computer, and Present as this tab left it, read once the page is
   // in the browser (never at render, where the server has no storage), so before the class's read
   // can show a grid or the recap; a length that isn't a preset reopens Other with it. Opened from
@@ -549,11 +561,13 @@ export default function ClassDetailPage() {
         if (sending.current) e.preventDefault();
       }}
       onClose={() => {
-        // Closed by a second Escape while the end is on its way: its answer says what follows.
+        // Focus back on End session, held while the end is on its way, never the page's body:
+        // Chrome closes the dialog on a second Escape all the same. Then its answer says what
+        // follows.
+        endButton.current?.focus();
         if (sending.current) return;
         endAsked.current = false;
         setEndSaid(null);
-        endButton.current?.focus();
       }}
       className={DIALOG}
     >
