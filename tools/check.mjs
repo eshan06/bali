@@ -32,6 +32,13 @@ for (const [file, kb] of [['index.html', 200], ['site.css', 40], ['site.js', 16]
   const size = statSync(join(dist, file)).size / 1024;
   need(size <= kb, `${file} is ${size.toFixed(0)} KB, over its ${kb} KB budget`);
 }
+// iPhone Safari enlarges small text on its own, and inside the scaled-down screen pictures that piles the
+// lines on top of each other (seen on the owner's iPhone, 2026-11-02). The page turns that off.
+const css = readFileSync(join(dist, 'site.css'), 'utf8');
+need(/html\{[^}]*-webkit-text-size-adjust:100%[^}]*\}/.test(css) && /html\{[^}]*[^-]text-size-adjust:100%[^}]*\}/.test(css), 'html turns off iPhone Safari\'s text enlarging (text-size-adjust: 100%)');
+// With the enlarging off, iPhone Safari draws text inside CSS zoom at its full size, so the pictures scale with
+// transforms instead.
+need(!/[{;]\s*zoom\s*:/.test(css.replace(/\/\*[\s\S]*?\*\//g, '')), 'no CSS zoom (iPhone Safari draws zoomed text at full size); scale with transform');
 const config = JSON.parse(readFileSync(join(root, 'vercel.json'), 'utf8'));
 const csp = config.headers[0].headers.find((h) => h.key === 'Content-Security-Policy');
 need(csp && /script-src 'self'(;|$)/.test(csp.value) && csp.value.includes('frame-src https://www.youtube-nocookie.com'), 'the security policy: our scripts only, YouTube\'s privacy-enhanced player only');
