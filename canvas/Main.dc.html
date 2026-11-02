@@ -72,7 +72,13 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 .b-p-side{left:552px;top:160px}
 .b-w-recap{left:0;top:110px}
 .b-p-side6{left:556px;top:166px}
-.zoom{transform:scale(var(--z));transform-origin:0 0}
+.zoom{width:max-content;transform:scale(var(--z));transform-origin:0 0}
+/* A transform doesn't shrink a box the way zoom did, so each picture's box is the size it's drawn at. */
+.b-p-main{width:calc(426px * 0.62);height:calc(898px * 0.62)}
+.b-p-side,.b-p-side6{width:calc(426px * 0.44);height:calc(898px * 0.44)}
+.b-w-grid{width:calc(1440px * 0.42);height:calc(944px * 0.42)}
+.b-w-recap{width:calc(1440px * 0.42);height:calc(804px * 0.42)}
+.b-proj{width:calc(1964px * 0.3);height:calc(1004px * 0.3)}
 .b-z62{--z:0.62}.b-z44{--z:0.44}.b-z42{--z:0.42}.b-z30{--z:0.3}
 .b-copy{position:absolute;left:calc(var(--gx) + var(--sh));top:50%;transform:translateY(-50%);width:var(--copyw);z-index:3}
 .display{font-size:var(--fs);line-height:1.07;font-weight:600;letter-spacing:-0.02em;text-wrap:balance}
@@ -223,12 +229,7 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 @keyframes b-draw{from{stroke-dasharray:0 566}}
 @keyframes b-phonearc{from{stroke-dasharray:0 677.3}}
 @keyframes b-hold{from{stroke-dasharray:0 200}to{stroke-dasharray:122.5 200}}
-@keyframes b-on{from{opacity:0}}
 @keyframes b-wipe{from{clip-path:inset(0 100% 0 0 round 14px)}to{clip-path:inset(0 0 0 0 round 14px)}}
-@keyframes b-rise{from{opacity:0;transform:translateY(18px)}}
-@keyframes b-drawx{from{transform:scaleX(0)}}
-@keyframes b-pop{from{opacity:0;transform:scale(0.4)}}
-@keyframes b-cueout{to{opacity:0}}
 /* Live mode: the script sets every b- animation's time to the eased scroll position, in vh (1ms = 1vh of scroll). */
 .is-live .b-stage{position:sticky;top:0;height:100vh;overflow:hidden}
 .is-live .b-ch{position:absolute;inset:0;height:auto}
@@ -245,16 +246,14 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 .is-live .b-ch:not(.b-ch-7) .b-out{will-change:transform;animation:b-away linear both paused;animation-duration:var(--al);animation-delay:var(--a0)}
 .is-live .b-ch:not(.b-ch-1) .b-in{animation:b-settle linear both paused;animation-duration:var(--rl);animation-delay:var(--r0)}
 .is-live .b-arcrot{animation:b-spin linear both paused;animation-duration:1180ms;animation-delay:0ms}
-.is-live .b-cue{animation:b-cueout linear both paused;animation-duration:30ms;animation-delay:0ms}
 .is-live .b-ch-2 .b-arc{animation:b-draw linear both paused;animation-duration:110ms;animation-delay:150ms}
 .is-live .b-ch-2 .b-p-main circle[stroke="#2C6F51"]{animation:b-phonearc linear both paused;animation-duration:110ms;animation-delay:150ms}
 .is-live .b-flip .b-top{animation:b-wipe linear both paused;animation-duration:12ms;animation-delay:calc(320ms + var(--i) * 3.6ms)}
 .is-live .b-ch-4 .b-p-main circle[stroke="#6F3F1B"]{animation:b-hold linear both paused;animation-duration:65ms;animation-delay:520ms}
-.is-live .b-ch-4 .b-lay-b{animation:b-on linear both paused;animation-duration:20ms;animation-delay:585ms}
-.is-live .b-ch-4 .b-card{animation:b-rise linear both paused;animation-duration:25ms;animation-delay:600ms}
-.is-live .b-ch-5 .b-p-side figure{animation:b-rise linear both paused;animation-duration:30ms;animation-delay:770ms}
-.is-live .b-ch-6 .mline .ln{transform-origin:left center;animation:b-drawx linear both paused;animation-duration:90ms;animation-delay:900ms}
-.is-live .b-ch-6 .mline .mk{animation:b-pop linear both paused;animation-duration:45ms;animation-delay:950ms}
+/* The small fades, rises and draws inside the scenes are set from the scroll by the script, not by CSS
+   animations: paused opacity and transform animations there made Chrome leave parts of the chapter changes
+   undrawn (found with the owner, 2026-11-02). */
+.b-ch-6 .mline .ln{transform-origin:left center}
 .pose .b-runway{display:none}
 .pose .b-topbar{position:absolute}
 .pose .b-stage{position:relative;height:900px;overflow:hidden}
@@ -528,6 +527,25 @@ class Component extends DCLogic {
     this.decide = () => {
       const live = !still.matches && fits.matches;
       if (live !== !!(this.state && this.state.live)) { this.anims = null; this.setState({ live: live }); }
+      if (!live) this.small(null);
+    };
+    // [selector, start, length] in vh of scroll, and how each one looks at t (0 to 1); null clears them.
+    const rise = (el, t) => { el.style.opacity = t; el.style.transform = 'translateY(' + 18 * (1 - t) + 'px)'; };
+    const small = [
+      ['.b-cue', 0, 30, (el, t) => { el.style.opacity = 1 - t; }],
+      ['.b-ch-4 .b-lay-b', 585, 20, (el, t) => { el.style.opacity = t; }],
+      ['.b-ch-4 .b-card', 600, 25, rise],
+      ['.b-ch-5 .b-p-side figure', 770, 30, rise],
+      ['.b-ch-6 .mline .ln', 900, 90, (el, t) => { el.style.transform = 'scaleX(' + t + ')'; }],
+      ['.b-ch-6 .mline .mk', 950, 45, (el, t) => { el.style.opacity = t; el.style.transform = 'scale(' + (0.4 + 0.6 * t) + ')'; }],
+    ];
+    this.small = (at) => {
+      for (const [sel, start, length, apply] of small) {
+        for (const el of document.querySelectorAll('.bw ' + sel)) {
+          if (at === null) { el.style.opacity = ''; el.style.transform = ''; }
+          else apply(el, Math.min(1, Math.max(0, (at - start) / length)));
+        }
+      }
     };
     this.mqs = [still, fits];
     this.mqs.forEach((m) => m.addEventListener('change', this.decide));
@@ -548,6 +566,7 @@ class Component extends DCLogic {
         }
         if (this.pos !== this.shown) {
           for (let i = 0; i < this.anims.length; i++) this.anims[i].currentTime = this.pos;
+          this.small(this.pos);
           this.shown = this.pos;
         }
       }

@@ -102,10 +102,56 @@ test('only the chapter on screen takes keyboard focus', async ({ page }) => {
   await expect(watch).toHaveAttribute('tabindex', '-1');
 });
 
+test('in the story only the chapters that can show draw their screens', async ({ page }) => {
+  await openLive(page);
+  const drawn = () => page.evaluate(() => [...document.querySelectorAll('.b-ch')].map((c) => !c.classList.contains('b-off')));
+  expect(await drawn()).toEqual([true, false, false, false, false, false, false]);
+  await page.evaluate(() => scrollTo(0, innerHeight * 7));
+  await expect.poll(drawn, { timeout: 3000 }).toEqual([false, false, false, true, true, false, false]);
+});
+
+// Paused opacity and transform CSS animations inside the zooming, circle-clipped chapters made Chrome leave
+// parts of the chapter changes undrawn, so the chapters beneath showed through (the owner saw it scrolling back
+// up fast, 2026-11-02; Playwright's Chromium doesn't show it, the installed Chrome does). Of the scroll-driven
+// (b-) animations, only the chapter-wide zoom (.b-out, .b-in) and the ring's turn (an SVG group) may animate
+// those; the rest is set from the scroll.
+test('no opacity or movement CSS animations inside the scenes', async ({ page }) => {
+  await openLive(page);
+  const risky = await page.evaluate(() =>
+    document
+      .getAnimations()
+      .filter((a) => a.animationName.startsWith('b-') && a.effect.getKeyframes().some((k) => 'opacity' in k || 'transform' in k))
+      .map((a) => a.effect.target)
+      .filter((el) => el.closest('.b-ch') && !el.matches('.b-out, .b-in, .b-arcrot'))
+      .map((el) => `${el.tagName.toLowerCase()}.${el.getAttribute('class')}`),
+  );
+  expect(risky).toEqual([]);
+  // And the scene effects still follow the scroll: the slide on chapter 5's phone rises in as it should.
+  const slide = page.locator('.b-ch-5 .b-p-side figure');
+  await expect(slide).toHaveCSS('opacity', '0');
+  await page.evaluate(() => scrollTo(0, innerHeight * 8.2));
+  await expect(slide).toHaveCSS('opacity', '1', { timeout: 4000 });
+});
+
+test('each screen picture\'s box is the size it is drawn at', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  const off = await page.locator('.b-dev').evaluateAll((boxes) =>
+    boxes.filter((b) => b.querySelector(':scope > .zoom')).map((b) => {
+      const outer = b.getBoundingClientRect();
+      const drawn = b.querySelector(':scope > .zoom').getBoundingClientRect();
+      return Math.max(Math.abs(outer.width - drawn.width), Math.abs(outer.height - drawn.height));
+    }),
+  );
+  expect(off.length).toBe(8);
+  for (const px of off) expect(px).toBeLessThan(1.5);
+});
+
 test('with Reduce Motion the story stacks and Skip jumps straight there', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
   await expect(root(page)).not.toHaveClass(/is-live/);
+  await expect(page.locator('.b-ch.b-off')).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Talk to us' })).not.toHaveAttribute('tabindex', '-1');
   await page.getByRole('link', { name: 'Skip the tour' }).click();
   const target = page.getByRole('heading', { name: 'Phones are winning the high school classroom.' });

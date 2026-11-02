@@ -25,6 +25,18 @@
   // Only that chapter takes keyboard focus: in live mode the others sit stacked under it, and Tab would
   // land on links nobody can see. They stay readable to screen readers. 0 lets every chapter take focus.
   const chapters = [...root.querySelectorAll('.b-ch')];
+  // In live mode only the chapters that can show draw their ring and screens (the heavy part): one opening
+  // until the next has fully covered it. Drawing all seven made the browser fall behind on fast scrolls and
+  // show stale pieces (the owner's Chrome, 2026-11-02). The pictures are aria-hidden; their labels stay.
+  // `at` null draws every chapter (the stacked layout).
+  let drawn = '';
+  const draw = (at) => {
+    const show = chapters.map((c, i) => at === null || ((i === 0 || at > opens[i - 1] - 1) && (i === 6 || at < opens[i] + 121)));
+    const key = show.join();
+    if (key === drawn) return;
+    drawn = key;
+    chapters.forEach((chapter, i) => chapter.classList.toggle('b-off', !show[i]));
+  };
   let focusable = -1;
   const letFocus = (n) => {
     if (n === focusable) return;
@@ -35,6 +47,36 @@
         else el.removeAttribute('tabindex');
       }
     });
+  };
+
+  // The small fades, rises and draws inside the scenes are set straight from the scroll, not by CSS
+  // animations: paused opacity and transform animations there made Chrome leave parts of the chapter changes
+  // undrawn, so the chapters beneath showed through (the owner saw it scrolling back up fast, 2026-11-02).
+  // [elements, start, length] in vh of scroll, and how each looks at t (0 to 1); null clears them.
+  const rise = (el, t) => {
+    el.style.opacity = t;
+    el.style.transform = 'translateY(' + 18 * (1 - t) + 'px)';
+  };
+  const small = [
+    ['.b-cue', 0, 30, (el, t) => { el.style.opacity = 1 - t; }],
+    ['.b-ch-4 .b-lay-b', 585, 20, (el, t) => { el.style.opacity = t; }],
+    ['.b-ch-4 .b-card', 600, 25, rise],
+    ['.b-ch-5 .b-p-side figure', 770, 30, rise],
+    ['.b-ch-6 .mline .ln', 900, 90, (el, t) => { el.style.transform = 'scaleX(' + t + ')'; }],
+    ['.b-ch-6 .mline .mk', 950, 45, (el, t) => {
+      el.style.opacity = t;
+      el.style.transform = 'scale(' + (0.4 + 0.6 * t) + ')';
+    }],
+  ].map(([sel, start, length, apply]) => [[...root.querySelectorAll(sel)], start, length, apply]);
+  const setSmall = (at) => {
+    for (const [els, start, length, apply] of small) {
+      for (const el of els) {
+        if (at === null) {
+          el.style.opacity = '';
+          el.style.transform = '';
+        } else apply(el, Math.min(1, Math.max(0, (at - start) / length)));
+      }
+    }
   };
 
   // Live mode: every b- animation is paused, and its time is the eased scroll position, in vh (1ms = 1vh).
@@ -48,7 +90,11 @@
     root.classList.toggle('is-live', !still.matches && fits.matches);
     anims = null;
     pos = null;
-    if (!root.classList.contains('is-live')) letFocus(0);
+    if (!root.classList.contains('is-live')) {
+      letFocus(0);
+      draw(null);
+      setSmall(null);
+    }
     fit();
   };
   still.addEventListener('change', decide);
@@ -65,12 +111,14 @@
       pos += (target - pos) * (1 - Math.pow(0.915, dt / 16.7));
       if (Math.abs(target - pos) < 0.02) pos = target;
       letFocus(chapterAt(pos));
+      draw(pos);
       if (!anims) {
         anims = document.getAnimations().filter((a) => a.animationName && a.animationName.indexOf('b-') === 0);
         shown = null;
       }
       if (pos !== shown) {
         for (const a of anims) a.currentTime = pos;
+        setSmall(pos);
         shown = pos;
       }
     }

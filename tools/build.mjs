@@ -41,6 +41,7 @@ css = `@font-face{font-family:'Instrument Sans';src:url(/fonts/instrument-sans-l
 ${css}
 .b-player{cursor:auto;background:#161513}
 .b-player iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.b-ch.b-off .zoom,.b-ch.b-off .b-emblem{visibility:hidden}
 `;
 
 // The grid's 28 tiles, laid out as the canvas's renderVals lays them out.
