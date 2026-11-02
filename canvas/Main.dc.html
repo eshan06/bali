@@ -1,0 +1,692 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bali: focus for the whole class</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="v2.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap">
+<style>
+body{margin:0;background:#F7F5F2}
+.bw{--gx:max(40px,min(6vw - 30px,120px),calc(50% - 1300px));--fs:clamp(56px,min(3.9vw,7.8vh),112px);--copyw:calc(var(--fs) * 7.75);--sh:0px;--k:0.95;--cx:66%;--cy:50%;--d:532px;position:relative;font-family:'Instrument Sans',-apple-system,'Segoe UI',sans-serif;color:#211F1B;background:#F7F5F2;-webkit-font-smoothing:antialiased;font-size:17px;line-height:26px}
+.bw *{box-sizing:border-box}
+:where(.bw) :where(h1,h2,h3,p,ul,ol,figure){margin:0;padding:0}
+:where(.bw) :where(ul,ol){list-style:none}
+.bw a{color:#245A43}
+.bw a:focus-visible,.bw button:focus-visible,.bw summary:focus-visible{outline:none;box-shadow:0 0 0 2px #F7F5F2,0 0 0 4px #2C6F51;border-radius:10px}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.b-topbar{position:fixed;top:0;left:0;right:0;z-index:30;height:80px;display:flex;align-items:center;gap:24px;padding:0 var(--gx);transition:background-color 200ms cubic-bezier(0.2,0,0,1),box-shadow 200ms cubic-bezier(0.2,0,0,1)}
+.is-past .b-topbar{background:#F7F5F2;box-shadow:0 1px 0 #E3DFD8}
+.bw-brand{display:inline-flex;align-items:center;gap:10px;font-size:20px;line-height:28px;font-weight:600;color:#211F1B;text-decoration:none}
+.bw .bw-brand{color:#211F1B}
+.b-skip{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 16px 0 12px;border-radius:999px;background:rgba(255,255,255,0.72);box-shadow:inset 0 0 0 1px #E3DFD8;font-size:15px;line-height:22px;font-weight:600;white-space:nowrap;text-decoration:none;transition:background-color 150ms cubic-bezier(0.2,0,0,1)}
+.bw .b-skip{color:#211F1B}
+.bw .b-skip:hover{background:#FFFFFF}
+.b-skip svg{flex:none;color:#245A43}
+.is-past .b-skip{display:none}
+.b-navend{margin-left:auto;display:flex;align-items:center;gap:10px}
+.b-navend .b-narrow{display:none}
+.bw-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 18px;border:0;border-radius:10px;font-family:inherit;font-size:15px;line-height:22px;font-weight:600;text-decoration:none;white-space:nowrap;cursor:pointer;transition:background-color 150ms cubic-bezier(0.2,0,0,1)}
+.bw .bw-btn-primary{background:#245A43;color:#FFFFFF}
+.bw .bw-btn-primary:hover{background:#1E4936}
+.bw .bw-btn-secondary{background:#FFFFFF;color:#211F1B;box-shadow:inset 0 0 0 1px #D2CCC2}
+.bw .bw-btn-secondary:hover{background:#EFECE7}
+.bw-btn-lg{min-height:max(52px,calc(var(--fs) * 0.93));padding:0 max(24px,calc(var(--fs) * 0.43));font-size:max(17px,calc(var(--fs) * 0.304))}
+.b-fab{position:fixed;right:max(20px,var(--gx));bottom:24px;z-index:40;display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:52px;padding:0 22px 0 18px;border-radius:999px;background:#245A43;font-size:16px;line-height:22px;font-weight:600;text-decoration:none;white-space:nowrap;box-shadow:0 0 0 2px #F7F5F2,0 10px 28px rgba(33,28,21,0.18),0 2px 6px rgba(33,28,21,0.10);transition:opacity 200ms cubic-bezier(0.2,0,0,1),transform 200ms cubic-bezier(0.2,0,0,1),background-color 150ms cubic-bezier(0.2,0,0,1),visibility 0s}
+.bw .b-fab{color:#FFFFFF}
+.bw .b-fab:hover{background:#1E4936}
+.b-fab svg{flex:none}
+.is-near .b-fab{opacity:0;transform:translateY(12px);visibility:hidden;pointer-events:none;transition:opacity 200ms cubic-bezier(0.2,0,0,1),transform 200ms cubic-bezier(0.2,0,0,1),visibility 0s 200ms}
+.b-ch{position:relative;height:min(100vh,900px);overflow:hidden;background:#F7F5F2}
+.b-out,.b-in{position:absolute;inset:0;transform-origin:var(--cx) var(--cy)}
+.b-wrap{position:absolute;left:calc(var(--gx) + var(--copyw) + 32px);right:var(--gx);top:72px;bottom:48px;display:flex;align-items:center;justify-content:center}
+.b-scene{position:relative;flex:none;width:760px;height:560px;zoom:var(--k)}
+.b-emblem{position:absolute;left:100px;top:0;width:560px;height:560px}
+.b-emblem svg{display:block;width:100%;height:100%;overflow:visible}
+.b-disc{fill:var(--disc)}
+.b-ring{fill:none;stroke:var(--ring);stroke-width:9}
+.b-arc{fill:none;stroke:var(--arc);stroke-width:9;stroke-linecap:round;stroke-dasharray:518 566}
+.b-arcrot{transform-box:fill-box;transform-origin:center}
+.is-slinging .b-arc{visibility:hidden}
+.b-ch-1{--disc:#DCEDE3;--ring:#BCDCCA;--arc:#2C6F51}
+.b-ch-2{--disc:#BCDCCA;--ring:#92C3A9;--arc:#245A43}
+.b-ch-2 .b-arc{stroke-dasharray:400 566}
+.b-ch-3{--disc:#F0F7F3;--ring:#DCEDE3;--arc:#2C6F51}
+.b-ch-4{--disc:#F7E6D2;--ring:#EFCEA4;--arc:#C97A2D}
+.b-ch-5{--disc:#DCEDE3;--ring:#BCDCCA;--arc:#2C6F51}
+.b-ch-6{--disc:#EFECE7;--ring:#E3DFD8;--arc:#8A847A}
+.b-ch-7{--disc:#245A43;--ring:#BCDCCA;--arc:#2C6F51}
+.b-dev{position:absolute;width:fit-content}
+.b-p-main{left:430px;top:1px}
+.b-w-grid{left:77px;top:82px}
+.b-card{left:0;top:380px;z-index:2;width:290px;padding:12px;border-radius:18px;background:#FFFFFF;box-shadow:0 18px 40px rgba(33,28,21,0.14)}
+.b-proj{left:20px;top:96px}
+.b-p-side{left:552px;top:160px}
+.b-w-recap{left:0;top:110px}
+.b-p-side6{left:556px;top:166px}
+.zoom{zoom:var(--z)}
+.b-z62{--z:0.62}.b-z44{--z:0.44}.b-z42{--z:0.42}.b-z30{--z:0.3}
+.b-copy{position:absolute;left:calc(var(--gx) + var(--sh));top:50%;transform:translateY(-50%);width:var(--copyw);z-index:3}
+.display{font-size:var(--fs);line-height:1.07;font-weight:600;letter-spacing:-0.02em;text-wrap:balance}
+.b-ch-1 .display{font-size:calc(var(--fs) * 1.5)}
+.b-lede{margin-top:calc(var(--fs) * 0.36);font-size:max(17px,calc(var(--fs) * 0.33));line-height:1.5;color:#5B564E;text-wrap:pretty}
+.b-watch{display:inline-flex;align-items:center;gap:12px;margin-top:calc(var(--fs) * 0.5);font-size:max(15px,calc(var(--fs) * 0.268));line-height:1.47;font-weight:600;text-decoration:none}
+.bw .b-watch{color:#211F1B}
+.b-play{width:max(44px,calc(var(--fs) * 0.786));height:max(44px,calc(var(--fs) * 0.786));border-radius:999px;background:#FFFFFF;box-shadow:inset 0 0 0 1px #D2CCC2;display:flex;align-items:center;justify-content:center;padding-left:3px;transition:background-color 150ms cubic-bezier(0.2,0,0,1)}
+.b-watch:hover .b-play{background:#EFECE7}
+.b-count{position:absolute;left:calc(var(--gx) + var(--sh));bottom:32px;display:flex;align-items:center;gap:10px;font-size:13px;line-height:18px;font-weight:600;color:#6B665D;font-variant-numeric:tabular-nums;z-index:3}
+.b-count i{display:block;width:40px;height:1px;background:#D2CCC2}
+.b-cue{position:absolute;left:50%;bottom:24px;transform:translateX(-50%);z-index:4;display:inline-flex;align-items:center;gap:10px;padding:10px 14px 10px 18px;border-radius:999px;background:#FFFFFF;box-shadow:0 8px 24px rgba(33,28,21,0.10),inset 0 0 0 1px #E3DFD8;font-size:15px;line-height:22px;font-weight:600;color:#211F1B;white-space:nowrap}
+.b-cue svg{flex:none;display:block;color:#245A43}
+.b-cta{margin-top:calc(var(--fs) * 0.571)}
+.b-fine{margin-top:calc(var(--fs) * 0.357);font-size:max(15px,calc(var(--fs) * 0.268));line-height:1.47;color:#5B564E;max-width:34ch}
+.win{width:1440px;border-radius:28px;overflow:hidden;background:#FFFFFF;box-shadow:0 40px 100px rgba(33,28,21,0.16),0 6px 18px rgba(33,28,21,0.08)}
+.win-bar{height:44px;display:flex;align-items:center;gap:10px;padding:0 20px;background:#EFECE7;border-bottom:1px solid #E3DFD8}
+.win-bar span{width:14px;height:14px;border-radius:999px;background:#D2CCC2}
+.win-screen{width:1440px;height:900px;overflow:hidden;position:relative;background:#F7F5F2}
+.bezel{position:relative;width:426px;padding:12px;border-radius:67px;background:#26241F;box-shadow:0 40px 90px rgba(33,28,21,0.20),0 8px 20px rgba(33,28,21,0.12)}
+.screen{width:402px;height:874px;border-radius:55px;overflow:hidden;position:relative;background:#F7F5F2}
+.island{position:absolute;top:26px;left:50%;width:125px;height:37px;margin-left:-62.5px;border-radius:999px;background:#161513}
+.display-bezel{padding:22px;border-radius:36px;background:#26241F;box-shadow:0 40px 100px rgba(33,28,21,0.18)}
+.screen-wide{width:1920px;height:960px;overflow:hidden;border-radius:14px;position:relative;background:#F7F5F2}
+.b-stack{display:grid}
+.b-stack > *{grid-area:1/1}
+.cells > li.b-flip{display:grid}
+.b-flip > .tile{grid-area:1/1;width:100%}
+.hd-hide{display:none !important}
+.b-card .cells{grid-template-columns:minmax(0,1fr)}
+.b-card .tile{width:100%}
+.b-card-label{font-size:13px;line-height:18px;font-weight:600;color:#6B665D;margin:2px 4px 8px}
+.b-runway{display:none}
+.b-after{background:#F7F5F2}
+.b-sec{padding:clamp(80px,9vw,144px) var(--gx) 0}
+.b-box{position:relative;max-width:1480px;margin:0 auto}
+.b-h2{font-size:clamp(34px,3.4vw,60px);line-height:1.08;font-weight:600;letter-spacing:-0.02em;text-wrap:balance;max-width:22ch}
+.b-h2:focus{outline:none}
+.b-h3{font-size:clamp(24px,2vw,30px);line-height:1.2;font-weight:600;letter-spacing:-0.01em}
+.b-lead{margin-top:20px;font-size:clamp(18px,1.35vw,22px);line-height:1.5;color:#5B564E;max-width:44ch}
+.b-stats{margin-top:clamp(40px,5vw,72px);display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(28px,4vw,72px)}
+.b-num{font-size:clamp(64px,7.2vw,132px);line-height:0.95;font-weight:600;letter-spacing:-0.045em;color:#245A43;font-variant-numeric:tabular-nums}
+.b-stat{margin-top:20px;font-size:clamp(18px,1.4vw,22px);line-height:1.45;max-width:24ch}
+.b-src{display:inline-block;margin-top:12px;font-size:15px;line-height:22px}
+.bw .b-src{color:#6B665D;text-decoration:underline;text-decoration-color:#D2CCC2;text-underline-offset:3px}
+.bw .b-src:hover{color:#211F1B;text-decoration-color:currentColor}
+.b-steps{margin-top:clamp(40px,5vw,72px);display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(28px,4vw,72px)}
+.b-steps svg{display:block}
+.b-steps h3{margin-top:20px;font-size:clamp(20px,1.6vw,24px);line-height:1.3;font-weight:600}
+.b-steps p{margin-top:8px;font-size:clamp(17px,1.25vw,19px);line-height:1.55;color:#5B564E;max-width:34ch}
+.b-poster{position:relative;display:block;margin-top:clamp(32px,4vw,56px);max-width:1240px;aspect-ratio:16/9;border-radius:28px;overflow:hidden;background:#DCEDE3;text-decoration:none;cursor:pointer}
+.b-pring{position:absolute;left:50%;top:50%;width:auto;height:80%;transform:translate(-50%,-50%)}
+.b-pplay{position:absolute;left:50%;top:50%;width:clamp(72px,8vw,120px);height:clamp(72px,8vw,120px);border-radius:999px;background:#FFFFFF;box-shadow:0 12px 32px rgba(33,28,21,0.16);display:flex;align-items:center;justify-content:center;padding-left:6px;transform:translate(-50%,-50%);transition:transform 200ms cubic-bezier(0.2,0,0,1)}
+.b-poster:hover .b-pplay{transform:translate(-50%,-50%) scale(1.06)}
+.b-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}
+.b-cardx{padding:clamp(28px,3vw,44px);border-radius:28px;background:#FFFFFF;box-shadow:0 1px 2px rgba(33,28,21,0.06),inset 0 0 0 1px #E3DFD8}
+.b-checks{margin-top:24px;display:grid;gap:16px}
+.b-checks li{display:flex;align-items:flex-start;gap:12px;font-size:clamp(17px,1.3vw,19px);line-height:1.5}
+.b-checks svg{flex:none;margin-top:2px;color:#2C6F51}
+.b-priv{position:relative;overflow:hidden;margin-top:clamp(80px,9vw,144px);padding:clamp(72px,8vw,128px) var(--gx);background:#245A43;color:#FFFFFF}
+.b-priv .b-h2{max-width:20ch}
+.b-priv p{margin-top:24px;font-size:clamp(18px,1.4vw,22px);line-height:1.5;color:#DCEDE3;max-width:52ch}
+.b-plink{display:inline-block;margin-top:28px;font-size:17px;line-height:24px;font-weight:600}
+.bw .b-plink{color:#FFFFFF;text-decoration:underline;text-decoration-color:rgba(255,255,255,0.5);text-underline-offset:4px}
+.bw .b-plink:hover{text-decoration-color:#FFFFFF}
+.b-priv .b-plink:focus-visible{box-shadow:0 0 0 2px #245A43,0 0 0 4px #FFFFFF}
+.b-priv-ring{position:absolute;right:calc(var(--gx) - 12%);top:50%;width:min(46vw,640px);height:auto;transform:translateY(-50%)}
+.b-needs{margin-top:clamp(40px,5vw,72px);display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:clamp(24px,3vw,48px)}
+.b-needs li{display:flex;flex-direction:column;gap:16px;font-size:clamp(17px,1.3vw,19px);line-height:1.5}
+.b-needs b{font-weight:600}
+.b-ic{display:flex;align-items:center;justify-content:center;width:52px;height:52px;border-radius:16px;background:#EFECE7;color:#245A43}
+.b-faq{margin-top:clamp(32px,4vw,56px);max-width:980px;border-top:1px solid #E3DFD8}
+.b-faq details{border-bottom:1px solid #E3DFD8}
+.b-faq summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:24px;min-height:72px;padding:20px 0;font-size:clamp(19px,1.5vw,22px);line-height:1.35;font-weight:600;cursor:pointer}
+.b-faq summary::-webkit-details-marker{display:none}
+.b-faq summary svg{flex:none;color:#245A43;transition:transform 200ms cubic-bezier(0.2,0,0,1)}
+.b-faq details[open] summary svg{transform:rotate(45deg)}
+.b-faq details p{padding:0 0 24px;font-size:clamp(17px,1.3vw,19px);line-height:1.6;color:#5B564E;max-width:62ch}
+.b-contact{padding-bottom:clamp(80px,9vw,144px)}
+.b-email{display:inline-block;margin-top:28px;font-size:clamp(26px,3.4vw,56px);line-height:1.15;font-weight:600;letter-spacing:-0.02em;overflow-wrap:anywhere}
+.bw .b-email{color:#245A43;text-decoration:underline;text-decoration-thickness:2px;text-decoration-color:#BCDCCA;text-underline-offset:8px}
+.bw .b-email:hover{text-decoration-color:currentColor}
+.b-row{margin-top:28px;display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+.b-pagefoot{display:flex;align-items:center;gap:24px;padding:28px var(--gx);border-top:1px solid #E3DFD8;font-size:13px;line-height:18px;color:#6B665D}
+.b-pagefoot nav{margin-left:auto;display:flex;gap:20px}
+.bw .b-pagefoot a{color:#5B564E;text-decoration:none}
+.bw .b-pagefoot a:hover{color:#211F1B}
+.b-slingp{fill:none;stroke:var(--arc);stroke-width:9;stroke-linecap:round}
+.is-slinging .b-slingp{animation:sling-go 1000ms cubic-bezier(0.45,0,0.8,0.3) both}
+.is-slinging .b-ch .b-dev,.is-slinging .b-copy,.is-slinging .b-count,.is-slinging .b-cue{filter:opacity(0);transition:filter 420ms linear 420ms}
+.is-slinging .b-disc{opacity:0;transition:opacity 420ms linear 420ms}
+.is-slinging .b-ring{opacity:0;transition:opacity 200ms linear 800ms}
+.b-veil{position:fixed;inset:0;z-index:26;background:#F7F5F2;pointer-events:none;animation:sling-out 420ms cubic-bezier(0.2,0,0,1) both}
+@media (max-height:760px){
+.b-topbar{height:64px}
+.b-wrap{top:64px;bottom:40px}
+}
+@media (max-width:1100px){
+.bw{--fs:44px}
+.b-needs{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:767px){
+.bw{--gx:20px;--fs:36px}
+.b-topbar{height:64px;gap:12px}
+.bw-brand .b-word{display:none}
+.b-skip{min-height:40px;padding:0 12px 0 10px;font-size:14px}
+.b-navend .b-wide{display:none}
+.b-navend .b-narrow{display:inline-flex}
+.b-navend{gap:8px}
+.b-navend .bw-btn{min-height:40px;padding:0 14px;font-size:14px}
+.b-fab{right:16px;bottom:16px;width:52px;padding:0}
+.b-fab-t{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.b-copy{top:84px;transform:none;width:auto;right:20px}
+.b-lede{margin-top:12px;font-size:15px;line-height:22px}
+.b-watch{margin-top:14px}
+.b-wrap{left:12px;right:12px;top:236px;bottom:76px}
+.b-count{bottom:28px}
+.b-cue{left:20px;bottom:20px;transform:none;font-size:14px;padding:8px 12px 8px 16px}
+.b-ch-1 .b-count{display:none}
+.b-fine{font-size:13px;line-height:18px}
+.b-cta{margin-top:20px}
+.b-stats,.b-steps,.b-two,.b-needs{grid-template-columns:minmax(0,1fr)}
+.b-poster{border-radius:20px}
+.b-priv-ring{display:none}
+.b-pagefoot{flex-direction:column;align-items:flex-start;gap:8px}
+.b-pagefoot nav{margin-left:0}
+}
+@media (max-width:767px) and (max-height:700px){
+.b-wrap{top:276px}
+}
+@media (prefers-reduced-motion:no-preference){
+.b-cue svg{animation:cue-nudge 1.6s ease-in-out 0.8s 4}
+}
+@media (prefers-reduced-motion:reduce){.bw-btn,.b-play,.b-skip,.b-fab,.b-topbar,.b-pplay,.b-faq summary svg{transition:none}}
+@keyframes cue-nudge{0%,100%{transform:translateY(0)}50%{transform:translateY(3px)}}
+@keyframes sling-go{to{stroke-dashoffset:calc(var(--travel) * -1)}}
+@keyframes sling-out{from{opacity:1}to{opacity:0}}
+@keyframes b-hole{
+0%{clip-path:circle(0px at var(--cx) var(--cy))}
+25%{clip-path:circle(calc(var(--d) * 0.3) at var(--cx) var(--cy))}
+50%{clip-path:circle(calc(var(--d) * 0.85) at var(--cx) var(--cy))}
+75%{clip-path:circle(calc(var(--d) * 1.7) at var(--cx) var(--cy))}
+100%{clip-path:circle(150% at var(--cx) var(--cy))}
+}
+@keyframes b-away{0%{transform:scale(1)}25%{transform:scale(1.3)}50%{transform:scale(1.9)}75%{transform:scale(2.9)}100%{transform:scale(4)}}
+@keyframes b-settle{from{transform:scale(1.08)}}
+@keyframes b-spin{to{transform:rotate(300deg)}}
+@keyframes b-draw{from{stroke-dasharray:0 566}}
+@keyframes b-phonearc{from{stroke-dasharray:0 677.3}}
+@keyframes b-hold{from{stroke-dasharray:0 200}to{stroke-dasharray:122.5 200}}
+@keyframes b-on{from{opacity:0}}
+@keyframes b-wipe{from{clip-path:inset(0 100% 0 0 round 14px)}to{clip-path:inset(0 0 0 0 round 14px)}}
+@keyframes b-rise{from{opacity:0;transform:translateY(18px)}}
+@keyframes b-drawx{from{transform:scaleX(0)}}
+@keyframes b-pop{from{opacity:0;transform:scale(0.4)}}
+@keyframes b-cueout{to{opacity:0}}
+/* Live mode: the script sets every b- animation's time to the eased scroll position, in vh (1ms = 1vh of scroll). */
+.is-live .b-stage{position:sticky;top:0;height:100vh;overflow:hidden}
+.is-live .b-ch{position:absolute;inset:0;height:auto}
+.is-live .b-ch-1{z-index:1}.is-live .b-ch-2{z-index:2}.is-live .b-ch-3{z-index:3}.is-live .b-ch-4{z-index:4}.is-live .b-ch-5{z-index:5}.is-live .b-ch-6{z-index:6}.is-live .b-ch-7{z-index:7}
+.is-live .b-runway{display:block;height:1180vh}
+.is-live .b-ch-1{--a0:60ms;--al:120ms}
+.is-live .b-ch-2{--r0:60ms;--rl:120ms;--a0:240ms;--al:120ms}
+.is-live .b-ch-3{--r0:240ms;--rl:120ms;--a0:420ms;--al:120ms}
+.is-live .b-ch-4{--r0:420ms;--rl:120ms;--a0:640ms;--al:120ms}
+.is-live .b-ch-5{--r0:640ms;--rl:120ms;--a0:820ms;--al:120ms}
+.is-live .b-ch-6{--r0:820ms;--rl:120ms;--a0:1000ms;--al:120ms}
+.is-live .b-ch-7{--r0:1000ms;--rl:120ms}
+.is-live .b-ch:not(.b-ch-1){will-change:clip-path;animation:b-hole linear both paused;animation-duration:var(--rl);animation-delay:var(--r0)}
+.is-live .b-ch:not(.b-ch-7) .b-out{will-change:transform;animation:b-away linear both paused;animation-duration:var(--al);animation-delay:var(--a0)}
+.is-live .b-ch:not(.b-ch-1) .b-in{animation:b-settle linear both paused;animation-duration:var(--rl);animation-delay:var(--r0)}
+.is-live .b-arcrot{animation:b-spin linear both paused;animation-duration:1180ms;animation-delay:0ms}
+.is-live .b-cue{animation:b-cueout linear both paused;animation-duration:30ms;animation-delay:0ms}
+.is-live .b-ch-2 .b-arc{animation:b-draw linear both paused;animation-duration:110ms;animation-delay:150ms}
+.is-live .b-ch-2 .b-p-main circle[stroke="#2C6F51"]{animation:b-phonearc linear both paused;animation-duration:110ms;animation-delay:150ms}
+.is-live .b-flip .b-top{animation:b-wipe linear both paused;animation-duration:12ms;animation-delay:calc(320ms + var(--i) * 3.6ms)}
+.is-live .b-ch-4 .b-p-main circle[stroke="#6F3F1B"]{animation:b-hold linear both paused;animation-duration:65ms;animation-delay:520ms}
+.is-live .b-ch-4 .b-lay-b{animation:b-on linear both paused;animation-duration:20ms;animation-delay:585ms}
+.is-live .b-ch-4 .b-card{animation:b-rise linear both paused;animation-duration:25ms;animation-delay:600ms}
+.is-live .b-ch-5 .b-p-side figure{animation:b-rise linear both paused;animation-duration:30ms;animation-delay:770ms}
+.is-live .b-ch-6 .mline .ln{transform-origin:left center;animation:b-drawx linear both paused;animation-duration:90ms;animation-delay:900ms}
+.is-live .b-ch-6 .mline .mk{animation:b-pop linear both paused;animation-duration:45ms;animation-delay:950ms}
+.pose .b-runway{display:none}
+.pose .b-topbar{position:absolute}
+.pose .b-stage{position:relative;height:900px;overflow:hidden}
+.pose .b-ch{display:none;position:absolute;inset:0;height:auto}
+.pose .b-ch-3,.pose .b-ch-4{display:block}
+.pose .b-ch-4{z-index:4;clip-path:circle(calc(var(--d) * 0.74) at var(--cx) var(--cy))}
+.pose .b-ch-3 .b-out{transform:scale(1.78)}
+.pose .b-ch-4 .b-in{transform:scale(1.044)}
+.pose,.pose *{animation:none !important}
+</style>
+</helmet>
+<div class="{{rootCls}}">
+
+<header class="b-topbar">
+<a class="bw-brand" href="#top" translate="no" aria-label="Bali, back to the top"><svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="24" fill="none" stroke="#BCDCCA" stroke-width="10"></circle><path d="M26.6 8.61A24 24 0 1 1 8.61 26.6" fill="none" stroke="#2C6F51" stroke-width="10" stroke-linecap="round"></path></svg><span class="b-word">Bali</span></a>
+<a class="b-skip" href="#details" onClick="{{goDetails}}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 6 5 5 5-5"></path><path d="m7 13 5 5 5-5"></path></svg>Skip the tour</a>
+<div class="b-navend"><a class="bw-btn bw-btn-secondary b-wide" href="https://bali-portal.vercel.app/login">Student sign in</a><a class="bw-btn bw-btn-primary b-wide" href="https://bali-portal.vercel.app/login">Teacher sign in</a><a class="bw-btn bw-btn-primary b-narrow" href="https://bali-portal.vercel.app/login">Sign in</a></div>
+</header>
+
+<a class="b-fab" href="#contact" onClick="{{goContact}}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="16" x="2" y="4" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path></svg><span class="b-fab-t">Contact us</span></a>
+
+<main id="top">
+<div class="b-story">
+<div class="b-stage">
+
+<section class="b-ch b-ch-1" aria-labelledby="h-1">
+<div class="b-out"><div class="b-in">
+<div class="b-wrap"><div class="b-scene">
+<div class="b-emblem" aria-hidden="true"><svg viewBox="0 0 200 200"><circle class="b-disc" cx="100" cy="100" r="80"></circle><circle class="b-ring" cx="100" cy="100" r="90"></circle><g class="b-arcrot"><circle class="b-arc" cx="100" cy="100" r="90" transform="rotate(-90 100 100)"></circle></g><path class="b-slingp" d="{{sl.d1}}" style="stroke-dasharray: {{sl.dash}}; --travel: {{sl.travel}}px"></path></svg></div>
+<div class="b-dev b-p-main" role="img" aria-label="Bali on a student's iPhone, ready to scan the teacher's block"><div class="zoom b-z62" inert="inert" aria-hidden="true"><div class="bezel"><div class="screen"><dc-import name="AppHome" hint-size="402px,874px"></dc-import></div><span class="island"></span></div></div></div>
+</div></div>
+<div class="b-copy"><h1 id="h-1" class="display">Tap in.</h1><p class="b-lede">Bali locks students' apps for class. They tap their iPhone on your Bali block, the apps open again at the bell, and you see the whole room live.</p><a class="b-watch" href="#watch" onClick="{{goWatch}}"><span class="b-play" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="#245A43"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l11-6.5a1 1 0 0 0 0-1.72l-11-6.5A1 1 0 0 0 8 5.5z"></path></svg></span>Watch an animation</a></div>
+<div class="b-count" aria-hidden="true"><span>1</span><i></i><span>7</span></div>
+<p class="b-cue">Scroll to see how it works<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"></path><path d="m19 12-7 7-7-7"></path></svg></p>
+</div></div>
+</section>
+
+<section class="b-ch b-ch-2" aria-labelledby="h-2">
+<div class="b-out"><div class="b-in">
+<div class="b-wrap"><div class="b-scene">
+<div class="b-emblem" aria-hidden="true"><svg viewBox="0 0 200 200"><circle class="b-disc" cx="100" cy="100" r="80"></circle><circle class="b-ring" cx="100" cy="100" r="90"></circle><g class="b-arcrot"><circle class="b-arc" cx="100" cy="100" r="90" transform="rotate(-90 100 100)"></circle></g><path class="b-slingp" d="{{sl.d2}}" style="stroke-dasharray: {{sl.dash}}; --travel: {{sl.travel}}px"></path></svg></div>
+<div class="b-dev b-p-main" role="img" aria-label="The phone in focus, counting down to the end of class"><div class="zoom b-z62" inert="inert" aria-hidden="true"><div class="bezel"><div class="screen"><dc-import name="AppFocus" hint-size="402px,874px"></dc-import></div><span class="island"></span></div></div></div>
+</div></div>
+<div class="b-copy"><h2 id="h-2" class="display">Focus until the bell.</h2></div>
+<div class="b-count" aria-hidden="true"><span>2</span><i></i><span>7</span></div>
+</div></div>
+</section>
+
+<section class="b-ch b-ch-3" aria-labelledby="h-3">
+<div class="b-out"><div class="b-in">
+<div class="b-wrap"><div class="b-scene">
+<div class="b-emblem" aria-hidden="true"><svg viewBox="0 0 200 200"><circle class="b-disc" cx="100" cy="100" r="80"></circle><circle class="b-ring" cx="100" cy="100" r="90"></circle><g class="b-arcrot"><circle class="b-arc" cx="100" cy="100" r="90" transform="rotate(-90 100 100)"></circle></g><path class="b-slingp" d="{{sl.d3}}" style="stroke-dasharray: {{sl.dash}}; --travel: {{sl.travel}}px"></path></svg></div>
+<div class="b-dev b-w-grid" role="img" aria-label="The teacher's live grid filling as a sample class of 28 taps in"><div class="zoom b-z42" inert="inert" aria-hidden="true"><div class="win"><div class="win-bar"><span></span><span></span><span></span></div><div class="win-screen">
+<div class="app shell">
+<div class="sidenav"><span class="brand" translate="no"><svg width="20" height="20" viewBox="0 0 64 64" aria-hidden="true" style="flex: none"><circle cx="32" cy="32" r="24" fill="none" stroke="#BCDCCA" stroke-width="10"></circle><path d="M26.6 8.61A24 24 0 1 1 8.61 26.6" fill="none" stroke="#2C6F51" stroke-width="10" stroke-linecap="round"></path></svg>Bali</span><span class="navlink"><svg class="ic" width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"></path><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>Home</span><span class="navlink" aria-current="page"><svg class="ic" width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><rect width="7" height="7" x="3" y="3" rx="1"></rect><rect width="7" height="7" x="14" y="3" rx="1"></rect><rect width="7" height="7" x="14" y="14" rx="1"></rect><rect width="7" height="7" x="3" y="14" rx="1"></rect></svg>Classes</span><span class="navlink"><svg class="ic" width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"></path><path d="M7 16h8"></path><path d="M7 11h12"></path><path d="M7 6h3"></path></svg>Reports</span><span class="navlink"><svg class="ic" width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><path d="M12 17h.01"></path></svg>Questions</span><span class="navlink"><svg class="ic" width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 3h20"></path><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"></path><path d="m7 21 5-5 5 5"></path></svg>Slides</span><div class="nav-gap"></div><div class="navfoot"><span class="ava" aria-hidden="true">MR</span><span class="who">Ms. Rivera</span></div></div>
+<div class="main">
+<div class="class-head"><svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true" style="flex: none"><circle cx="22.0" cy="22.0" r="19.5" fill="none" stroke="var(--arc-track)" stroke-width="5"></circle><circle cx="22.0" cy="22.0" r="19.5" fill="none" stroke="var(--arc-fill)" stroke-width="5" stroke-linecap="round" stroke-dasharray="65.0 122.5" transform="rotate(-90 22.0 22.0)"></circle></svg><div class="title"><h1>Algebra II, period 3</h1><p class="meta">Live · join code <span class="mono" translate="no">VMAF7E</span></p></div><div class="countdown"><span class="t">26:41</span><span class="sub">ends 10:45 AM</span></div><div class="actions"><span class="btn btn-secondary">+5 min</span><span class="btn btn-secondary">+10 min</span><span class="btn btn-secondary" style="margin-left: 8px">End session</span></div></div>
+<ul class="cells">
+<sc-for list="{{tiles}}" as="t" hint-placeholder-count="28">
+<li class="b-flip" style="--i: {{t.i}}"><span class="tile t-notjoined"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle></svg><span class="tx"><span class="nm">{{t.name}}</span><span class="st">Not here</span><span class="dt"></span></span></span><span class="{{t.topCls}}"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg><span class="tx"><span class="nm">{{t.name}}</span><span class="st">Focused</span><span class="dt"></span></span></span></li>
+</sc-for>
+</ul>
+</div>
+</div>
+</div></div></div></div>
+</div></div>
+<div class="b-copy"><h2 id="h-3" class="display">The whole room, live.</h2></div>
+<div class="b-count" aria-hidden="true"><span>3</span><i></i><span>7</span></div>
+</div></div>
+</section>
+
+<section class="b-ch b-ch-4" aria-labelledby="h-4">
+<div class="b-out"><div class="b-in">
+<div class="b-wrap"><div class="b-scene">
+<div class="b-emblem" aria-hidden="true"><svg viewBox="0 0 200 200"><circle class="b-disc" cx="100" cy="100" r="80"></circle><circle class="b-ring" cx="100" cy="100" r="90"></circle><g class="b-arcrot"><circle class="b-arc" cx="100" cy="100" r="90" transform="rotate(-90 100 100)"></circle></g><path class="b-slingp" d="{{sl.d4}}" style="stroke-dasharray: {{sl.dash}}; --travel: {{sl.travel}}px"></path></svg></div>
+<div class="b-dev b-p-main" role="img" aria-label="Emergency Unlock: holding for one second, then the phone unlocked with Bathroom picked"><div class="zoom b-z62" inert="inert" aria-hidden="true"><div class="bezel"><div class="screen"><div class="b-stack"><div class="b-lay-a"><dc-import name="AppHold" hint-size="402px,874px"></dc-import></div><div class="b-lay-b"><dc-import name="AppUnlocked" hint-size="402px,874px"></dc-import></div></div></div><span class="island"></span></div></div></div>
+<div class="b-dev b-card" role="img" aria-label="On the teacher's grid: Ana Rodríguez, Unlocked, Bathroom"><p class="b-card-label" aria-hidden="true">On your grid</p><ul class="cells" aria-hidden="true"><li><span class="tile t-emergency pulse-frame"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width: 20px; height: 20px; margin-top: 1px;"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg><span class="tx"><span class="nm">Ana Rodríguez</span><span class="st">Unlocked</span><span class="dt">Bathroom</span></span></span></li></ul></div>
+</div></div>
+<div class="b-copy"><h2 id="h-4" class="display">Emergency Unlock, any time.</h2></div>
+<div class="b-count" aria-hidden="true"><span>4</span><i></i><span>7</span></div>
+</div></div>
+</section>
+
+<section class="b-ch b-ch-5" aria-labelledby="h-5">
+<div class="b-out"><div class="b-in">
+<div class="b-wrap"><div class="b-scene">
+<div class="b-emblem" aria-hidden="true"><svg viewBox="0 0 200 200"><circle class="b-disc" cx="100" cy="100" r="80"></circle><circle class="b-ring" cx="100" cy="100" r="90"></circle><g class="b-arcrot"><circle class="b-arc" cx="100" cy="100" r="90" transform="rotate(-90 100 100)"></circle></g><path class="b-slingp" d="{{sl.d5}}" style="stroke-dasharray: {{sl.dash}}; --travel: {{sl.travel}}px"></path></svg></div>
+<div class="b-dev b-proj" role="img" aria-label="Slide 4 of 12 on the projector: Factoring quadratics"><div class="zoom b-z30" inert="inert" aria-hidden="true"><div class="display-bezel"><div class="screen-wide"><dc-import name="PortalSlide" hint-size="1920px,1080px"></dc-import></div></div></div></div>
+<div class="b-dev b-p-side" role="img" aria-label="The same slide arriving on a student's phone"><div class="zoom b-z44" inert="inert" aria-hidden="true"><div class="bezel"><div class="screen"><dc-import name="AppSlide" hint-size="402px,874px"></dc-import></div><span class="island"></span></div></div></div>
+</div></div>
+<div class="b-copy"><h2 id="h-5" class="display">Slides on every phone.</h2></div>
+<div class="b-count" aria-hidden="true"><span>5</span><i></i><span>7</span></div>
+</div></div>
+</section>
+
+<section class="b-ch b-ch-6" aria-labelledby="h-6">
+<div class="b-out"><div class="b-in">
+<div class="b-wrap"><div class="b-scene">
+<div class="b-emblem" aria-hidden="true"><svg viewBox="0 0 200 200"><circle class="b-disc" cx="100" cy="100" r="80"></circle><circle class="b-ring" cx="100" cy="100" r="90"></circle><g class="b-arcrot"><circle class="b-arc" cx="100" cy="100" r="90" transform="rotate(-90 100 100)"></circle></g><path class="b-slingp" d="{{sl.d6}}" style="stroke-dasharray: {{sl.dash}}; --travel: {{sl.travel}}px"></path></svg></div>
+<div class="b-dev b-w-recap" role="img" aria-label="The recap after a sample class: who was focused part of the time, with what happened and when"><div class="zoom b-z42" inert="inert" aria-hidden="true"><div class="win"><div class="win-bar"><span></span><span></span><span></span></div><div class="win-screen" style="height: 760px;"><div style="margin-top: -216px;"><dc-import name="PortalRecap" hint-size="1440px,1610px"></dc-import></div></div></div></div></div>
+<div class="b-dev b-p-side6" role="img" aria-label="Class is over. All your apps are back."><div class="zoom b-z44" inert="inert" aria-hidden="true"><div class="bezel"><div class="screen"><dc-import name="AppSessionOver" hint-size="402px,874px"></dc-import></div><span class="island"></span></div></div></div>
+</div></div>
+<div class="b-copy"><h2 id="h-6" class="display">A recap after the bell.</h2></div>
+<div class="b-count" aria-hidden="true"><span>6</span><i></i><span>7</span></div>
+</div></div>
+</section>
+
+<section class="b-ch b-ch-7" aria-labelledby="h-7">
+<div class="b-out"><div class="b-in">
+<div class="b-wrap"><div class="b-scene">
+<div class="b-emblem" aria-hidden="true"><svg viewBox="0 0 200 200"><circle class="b-disc" cx="100" cy="100" r="80"></circle><circle class="b-ring" cx="100" cy="100" r="90"></circle><g class="b-arcrot"><circle class="b-arc" cx="100" cy="100" r="90" transform="rotate(-90 100 100)"></circle></g><path class="b-slingp" d="{{sl.d7}}" style="stroke-dasharray: {{sl.dash}}; --travel: {{sl.travel}}px"></path></svg></div>
+</div></div>
+<div class="b-copy"><h2 id="h-7" class="display">Want Bali in your classroom?</h2><a class="bw-btn bw-btn-primary bw-btn-lg b-cta" href="mailto:eshan.shah@vanderbilt.edu">Talk to us</a><p class="b-fine">Bali never sees a student's screen, messages, location or apps.</p></div>
+<div class="b-count" aria-hidden="true"><span>7</span><i></i><span>7</span></div>
+</div></div>
+</section>
+
+</div>
+<div class="b-runway" aria-hidden="true"></div>
+</div>
+
+<div class="b-after">
+
+<section class="b-sec" id="details" aria-labelledby="h-why">
+<div class="b-box">
+<h2 id="h-why" class="b-h2" tabindex="-1">Phones are winning the high school classroom.</h2>
+<ul class="b-stats">
+<li><p class="b-num">97%</p><p class="b-stat">of students ages 11 to 17 use their phones during the school day.</p><a class="b-src" href="https://www.commonsensemedia.org/research/constant-companion-a-week-in-the-life-of-a-young-persons-smartphone-use" target="_blank" rel="noopener">Common Sense Media, 2023<span class="sr-only"> (opens in a new tab)</span></a></li>
+<li><p class="b-num">72%</p><p class="b-stat">of U.S. high school teachers say phone distraction is a major classroom problem.</p><a class="b-src" href="https://www.pewresearch.org/short-reads/2024/06/12/72-percent-of-us-high-school-teachers-say-cellphone-distraction-is-a-major-problem-in-the-classroom/" target="_blank" rel="noopener">Pew Research Center, 2024<span class="sr-only"> (opens in a new tab)</span></a></li>
+<li><p class="b-num">33</p><p class="b-stat">states have passed laws limiting phones in K-12 schools.</p><a class="b-src" href="https://news.ballotpedia.org/2026/03/30/kansas-becomes-the-33rd-state-to-enact-a-k-12-cellphone-ban/" target="_blank" rel="noopener">Ballotpedia, March 2026<span class="sr-only"> (opens in a new tab)</span></a></li>
+</ul>
+</div>
+</section>
+
+<section class="b-sec" aria-labelledby="h-how">
+<div class="b-box">
+<h2 id="h-how" class="b-h2">How it works</h2>
+<ol class="b-steps">
+<li><svg width="56" height="56" viewBox="0 0 56 56" aria-hidden="true"><circle cx="28" cy="28" r="24" fill="none" stroke="#BCDCCA" stroke-width="6"></circle><circle cx="28" cy="28" r="24" fill="none" stroke="#2C6F51" stroke-width="6" stroke-linecap="round" stroke-dasharray="50.3 150.8" transform="rotate(-90 28 28)"></circle><text x="28" y="34.5" text-anchor="middle" font-size="18" font-weight="600" fill="#211F1B">1</text></svg><h3>Start the class</h3><p>Start the session from any browser. New students join once with your class code.</p></li>
+<li><svg width="56" height="56" viewBox="0 0 56 56" aria-hidden="true"><circle cx="28" cy="28" r="24" fill="none" stroke="#BCDCCA" stroke-width="6"></circle><circle cx="28" cy="28" r="24" fill="none" stroke="#2C6F51" stroke-width="6" stroke-linecap="round" stroke-dasharray="100.5 150.8" transform="rotate(-90 28 28)"></circle><text x="28" y="34.5" text-anchor="middle" font-size="18" font-weight="600" fill="#211F1B">2</text></svg><h3>Students tap in</h3><p>Each student holds their iPhone to your Bali block. Their apps lock on the spot, even without Wi-Fi.</p></li>
+<li><svg width="56" height="56" viewBox="0 0 56 56" aria-hidden="true"><circle cx="28" cy="28" r="24" fill="none" stroke="#2C6F51" stroke-width="6"></circle><text x="28" y="34.5" text-anchor="middle" font-size="18" font-weight="600" fill="#211F1B">3</text></svg><h3>Apps open at the bell</h3><p>Everything comes back on its own when class ends, and you get a recap of the class.</p></li>
+</ol>
+</div>
+</section>
+
+<section class="b-sec" id="watch" aria-labelledby="h-watch">
+<div class="b-box">
+<h2 id="h-watch" class="b-h2" tabindex="-1">See Bali in a classroom</h2>
+<a class="b-poster" href="https://www.youtube.com/watch?v=iLtbApxTNTA" target="_blank" rel="noopener" aria-label="Play the Bali classroom demo (YouTube, opens in a new tab)"><svg class="b-pring" viewBox="0 0 200 200" aria-hidden="true"><circle cx="100" cy="100" r="80" fill="#F0F7F3"></circle><circle cx="100" cy="100" r="90" fill="none" stroke="#BCDCCA" stroke-width="9"></circle><circle cx="100" cy="100" r="90" fill="none" stroke="#2C6F51" stroke-width="9" stroke-linecap="round" stroke-dasharray="518 566" transform="rotate(-90 100 100)"></circle></svg><span class="b-pplay" aria-hidden="true"><svg width="36" height="36" viewBox="0 0 24 24" fill="#245A43"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l11-6.5a1 1 0 0 0 0-1.72l-11-6.5A1 1 0 0 0 8 5.5z"></path></svg></span></a>
+</div>
+</section>
+
+<section class="b-sec" aria-label="For teachers and students">
+<div class="b-box b-two">
+<div class="b-cardx">
+<h2 class="b-h3">For teachers</h2>
+<ul class="b-checks">
+<li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>A live grid of who's focused and who's unlocked</li>
+<li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>Add 5 or 10 minutes, or end class early</li>
+<li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>Questions and slides on every phone</li>
+<li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>A recap after the bell, every unlock included</li>
+</ul>
+</div>
+<div class="b-cardx">
+<h2 class="b-h3">For students</h2>
+<ul class="b-checks">
+<li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>Calls, FaceTime, Messages and Emergency SOS keep working</li>
+<li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>Emergency Unlock any time: hold for one second</li>
+<li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>Saying why is optional</li>
+<li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>Apps open at the bell, even with Bali closed</li>
+</ul>
+</div>
+</div>
+</section>
+
+<section class="b-priv" aria-labelledby="h-priv">
+<svg class="b-priv-ring" viewBox="0 0 200 200" aria-hidden="true"><circle cx="100" cy="100" r="90" fill="none" stroke="#2C6F51" stroke-width="9"></circle><circle cx="100" cy="100" r="90" fill="none" stroke="#BCDCCA" stroke-width="9" stroke-linecap="round" stroke-dasharray="400 566" transform="rotate(-90 100 100)"></circle></svg>
+<div class="b-box">
+<h2 id="h-priv" class="b-h2">Bali never sees a student's screen, messages, location or apps.</h2>
+<p>Teachers see what they need to run the class: who's focused, when each student taps in or unlocks, and the reason if they share one. A student's answers to questions count only toward the class's totals.</p>
+<a class="b-plink" href="https://bali-portal.vercel.app/privacy">Read the privacy policy</a>
+</div>
+</section>
+
+<section class="b-sec" aria-labelledby="h-need">
+<div class="b-box">
+<h2 id="h-need" class="b-h2">What you need</h2>
+<ul class="b-needs">
+<li><span class="b-ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"></rect><path d="M12 18h.01"></path></svg></span><span><b>Students:</b> an iPhone on iOS 17 or later, with the Bali app</span></li>
+<li><span class="b-ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="14" x="2" y="3" rx="2"></rect><line x1="8" x2="16" y1="21" y2="21"></line><line x1="12" x2="12" y1="17" y2="21"></line></svg></span><span><b>You:</b> any web browser</span></li>
+<li><span class="b-ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8.32a7.43 7.43 0 0 1 0 7.36"></path><path d="M9.46 6.21a11.76 11.76 0 0 1 0 11.58"></path><path d="M12.91 4.1a15.91 15.91 0 0 1 .01 15.8"></path><path d="M16.37 2a20.16 20.16 0 0 1 0 20"></path></svg></span><span>A Bali block in your classroom</span></li>
+<li><span class="b-ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="16" x="2" y="4" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path></svg></span><span>A school email address to sign in</span></li>
+</ul>
+</div>
+</section>
+
+<section class="b-sec" aria-labelledby="h-faq">
+<div class="b-box">
+<h2 id="h-faq" class="b-h2">Questions</h2>
+<div class="b-faq">
+<details><summary>What happens in an emergency?<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg></summary><p>Students can unlock any time by holding for one second, and their apps open right away. Calls, FaceTime, Messages and Emergency SOS never lock. Every unlock shows on your grid and in the recap.</p></details>
+<details><summary>Does it work without Wi-Fi?<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg></summary><p>Yes. A tap locks the apps right away with no signal, and the phone tells your grid once it's back online.</p></details>
+<details><summary>Can a student turn Bali off?<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg></summary><p>They can switch off Bali's Screen Time access in Settings. If they do, your grid shows Screen Time off for them.</p></details>
+<details><summary>Is there an Android version?<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg></summary><p>Coming soon!</p></details>
+</div>
+</div>
+</section>
+
+<section class="b-sec b-contact" id="contact" aria-labelledby="h-contact">
+<div class="b-box">
+<h2 id="h-contact" class="b-h2" tabindex="-1">Talk to us</h2>
+<p class="b-lead">Questions, or want Bali in your classroom? Email us.</p>
+<a class="b-email" href="mailto:eshan.shah@vanderbilt.edu">eshan.shah@vanderbilt.edu</a>
+<div class="b-row"><button class="bw-btn bw-btn-secondary" type="button" onClick="{{copy}}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg>{{copyLabel}}</button><span class="sr-only" aria-live="polite">{{copyMsg}}</span></div>
+</div>
+</section>
+
+<footer class="b-pagefoot"><span>© 2026 Bali</span><nav aria-label="Policies and help"><a href="https://bali-portal.vercel.app/privacy">Privacy policy</a><a href="https://bali-portal.vercel.app/terms">Terms</a><a href="https://bali-portal.vercel.app/support">Help</a></nav></footer>
+
+</div>
+</main>
+
+<sc-if value="{{landing}}" hint-placeholder-val="{{ false }}"><div class="b-veil" aria-hidden="true"></div></sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"pose":{"editor":null},"$preview":{"width":1440,"height":10860}}'>
+class Component extends DCLogic {
+  componentDidMount() {
+    if (typeof window === 'undefined') return;
+    // Fit each chapter's scene (760 × 560) beside the headline, and record where the ring's centre lands.
+    this.fit = () => {
+      const root = document.querySelector('.bw');
+      const wrap = root && root.querySelector('.b-ch-1 .b-wrap');
+      if (!wrap || !wrap.offsetWidth) return;
+      const w = wrap.offsetWidth;
+      const h = wrap.offsetHeight;
+      const k = Math.max(0.3, Math.min(w / 760, h / 560, 2));
+      root.style.setProperty('--k', k.toFixed(4));
+      root.style.setProperty('--sh', (window.innerWidth > 767 ? (w - 760 * k) / 2 : 0).toFixed(1) + 'px');
+      root.style.setProperty('--d', (560 * k).toFixed(1) + 'px');
+      root.style.setProperty('--cx', (wrap.offsetLeft + w / 2).toFixed(1) + 'px');
+      root.style.setProperty('--cy', (wrap.offsetTop + h / 2).toFixed(1) + 'px');
+    };
+    this.fit();
+    window.addEventListener('resize', this.fit);
+    const first = document.querySelector('.bw .b-ch-1 .b-wrap');
+    if (window.ResizeObserver && first) {
+      this.ro = new ResizeObserver(() => this.fit());
+      this.ro.observe(first);
+    }
+    // Past the story, the top bar gets its own ground and Skip goes; near Contact, the floating button steps aside.
+    this.onScroll = () => {
+      if (this.sraf) return;
+      this.sraf = requestAnimationFrame(() => {
+        this.sraf = 0;
+        const after = document.querySelector('.bw .b-after');
+        const contact = document.getElementById('contact');
+        const past = !!after && after.getBoundingClientRect().top <= 72;
+        const near = !!contact && contact.getBoundingClientRect().top < window.innerHeight * 0.8;
+        const st = this.state || {};
+        if (past !== !!st.past || near !== !!st.near) this.setState({ past: past, near: near });
+      });
+    };
+    window.addEventListener('scroll', this.onScroll, { passive: true });
+    window.addEventListener('resize', this.onScroll);
+    this.onScroll();
+    if (this.props.pose || !window.matchMedia) return;
+    const still = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const fits = window.matchMedia('(max-height: 1600px)');
+    this.decide = () => {
+      const live = !still.matches && fits.matches;
+      if (live !== !!(this.state && this.state.live)) { this.anims = null; this.setState({ live: live }); }
+    };
+    this.mqs = [still, fits];
+    this.mqs.forEach((m) => m.addEventListener('change', this.decide));
+    this.decide();
+    this.pos = null;
+    let last = 0;
+    const tick = (now) => {
+      const dt = last ? Math.min(64, now - last) : 16.7;
+      last = now;
+      if (this.state && this.state.live) {
+        const target = window.scrollY / (window.innerHeight / 100);
+        if (this.pos === null) this.pos = target;
+        this.pos += (target - this.pos) * (1 - Math.pow(0.915, dt / 16.7));
+        if (Math.abs(target - this.pos) < 0.02) this.pos = target;
+        if (!this.anims) {
+          this.anims = document.getAnimations().filter((a) => a.animationName && a.animationName.indexOf('b-') === 0);
+          this.shown = null;
+        }
+        if (this.pos !== this.shown) {
+          for (let i = 0; i < this.anims.length; i++) this.anims[i].currentTime = this.pos;
+          this.shown = this.pos;
+        }
+      }
+      this.raf = requestAnimationFrame(tick);
+    };
+    this.raf = requestAnimationFrame(tick);
+  }
+  componentDidUpdate() {
+    this.anims = null;
+    if (this.fit) this.fit();
+  }
+  componentWillUnmount() {
+    cancelAnimationFrame(this.raf);
+    cancelAnimationFrame(this.sraf);
+    clearTimeout(this.t1);
+    clearTimeout(this.t2);
+    clearTimeout(this.t3);
+    if (this.fit) window.removeEventListener('resize', this.fit);
+    if (this.onScroll) {
+      window.removeEventListener('scroll', this.onScroll);
+      window.removeEventListener('resize', this.onScroll);
+    }
+    if (this.ro) this.ro.disconnect();
+    (this.mqs || []).forEach((m) => m.removeEventListener('change', this.decide));
+  }
+  // Skip, Contact and Watch: in the story, the ring's bar speeds round behind the screens, breaks off in a
+  // straight line and flies off as the page clears, then the page lands on the section. Elsewhere it just
+  // scrolls there. The bar is drawn in the ring's own coordinates (200 × 200, centre 100,100, radius 90).
+  fly(id, ev) {
+    if (ev && ev.preventDefault) ev.preventDefault();
+    if (this.flying || typeof window === 'undefined') return;
+    const target = document.getElementById(id);
+    if (!target) return;
+    const land = (how) => {
+      target.scrollIntoView({ behavior: how, block: 'start' });
+      const h = target.querySelector('[tabindex="-1"]');
+      if (h) h.focus({ preventScroll: true });
+    };
+    const still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (still) return land('auto');
+    const st = this.state || {};
+    const pos = typeof this.pos === 'number' ? this.pos : window.scrollY / (window.innerHeight / 100);
+    if (!st.live || pos > 1180) return land('smooth');
+    // The ring on screen: the last chapter at least half open at this scroll position.
+    let ch = 1;
+    [60, 240, 420, 640, 820, 1000].forEach((open, i) => { if (pos >= open + 60) ch = i + 2; });
+    const sec = document.querySelector('.bw .b-ch-' + ch);
+    const svg = sec && sec.querySelector('.b-emblem svg');
+    const arc = sec && sec.querySelector('.b-arc');
+    const turn = sec && sec.querySelector('.b-arcrot');
+    if (!svg || !arc || !turn) return land('smooth');
+    const k = svg.getBoundingClientRect().width / 200;
+    const m = getComputedStyle(turn).transform;
+    let rot = 0;
+    if (m && m !== 'none') {
+      const v = m.slice(m.indexOf('(') + 1, -1).split(',').map(parseFloat);
+      rot = Math.atan2(v[1], v[0]);
+    }
+    const C = 2 * Math.PI * 90;
+    const dash = Math.min(parseFloat(getComputedStyle(arc).strokeDasharray) || 518, C);
+    const span = (2 * Math.PI * dash) / C;
+    // Angles run clockwise from three o'clock; the bar's tail starts at twelve, turned by the scroll.
+    // It lets go at six o'clock and flies off to the left, under the headline, clear of the screens.
+    const tail = rot - Math.PI / 2;
+    const exit = Math.PI;
+    let rel = exit - Math.PI / 2;
+    while (rel < tail + span + Math.PI / 2) rel += 2 * Math.PI;
+    const f = (n) => n.toFixed(2);
+    const at = (a) => f(100 + 90 * Math.cos(a)) + ' ' + f(100 + 90 * Math.sin(a));
+    let d = 'M' + at(tail);
+    for (let a = tail; a < rel - 1e-6; ) {
+      const b = Math.min(a + Math.PI * 0.9, rel);
+      d += ' A90 90 0 0 1 ' + at(b);
+      a = b;
+    }
+    // Far enough, in the ring's units, to leave the screen from anywhere on it.
+    const away = Math.hypot(window.innerWidth, window.innerHeight) / k;
+    const len = 90 * span;
+    const out = away + len + 10;
+    d += ' L' + f(100 + 90 * Math.cos(rel) + Math.cos(exit) * out) + ' ' + f(100 + 90 * Math.sin(rel) + Math.sin(exit) * out);
+    const around = 90 * (rel - tail);
+    this.flying = true;
+    this.setState({ sling: { ch: ch, d: d, dash: f(len) + ' ' + f(around + out + len), travel: f(around + away + 9) } });
+    clearTimeout(this.t1);
+    clearTimeout(this.t2);
+    this.t1 = setTimeout(() => {
+      land('auto');
+      this.pos = null;
+      this.setState({ sling: null, landing: true });
+      this.t2 = setTimeout(() => {
+        this.flying = false;
+        this.setState({ landing: false });
+      }, 420);
+    }, 1000);
+  }
+  copy() {
+    const done = (ok) => {
+      this.setState({ copied: ok ? 'ok' : 'no' });
+      clearTimeout(this.t3);
+      this.t3 = setTimeout(() => this.setState({ copied: '' }), 2400);
+    };
+    try {
+      navigator.clipboard.writeText('eshan.shah@vanderbilt.edu').then(() => done(true), () => done(false));
+    } catch (e) {
+      done(false);
+    }
+  }
+  renderVals() {
+    const names = ['Ana Rodríguez', 'Marcus Bell', 'Priya Natarajan', 'Jaylen Brooks', 'Sofia Marchetti', 'Tomás Herrera', 'Keisha Thompson', 'Wei Zhang', 'Amara Okafor', 'Liam O’Connell', 'Fatima Al-Sayed', 'Diego Ramírez', 'Noor Haddad', 'Ethan Park', 'Zuri Mensah', 'Isabella Nguyen', 'Caleb Washington', 'Mei Tanaka', 'Omar Siddiqui', 'Grace Kim', 'Mateo Silva', 'Ryan Patel', 'Hannah Levi', 'Lucas Ferreira', 'Chloe Dubois', 'Samuel Adeyemi', 'Lena Fischer', 'Aisha Bello'];
+    const order = [0, 7, 19, 2, 11, 26, 4, 13, 21, 9, 16, 1, 24, 6, 18, 12, 27, 3, 10, 23, 5, 17, 20, 8, 15];
+    const tiles = names.map((name, i) => {
+      const rank = order.indexOf(i);
+      return { name: name, i: rank < 0 ? 0 : rank, topCls: 'tile t-focused b-top' + (rank < 0 ? ' hd-hide' : '') };
+    });
+    const st = this.state || {};
+    const pose = this.props.pose || '';
+    const live = !!st.live && !pose;
+    const s = st.sling;
+    return {
+      tiles: tiles,
+      rootCls: 'bw' + (pose ? ' pose' : '') + (live ? ' is-live' : '') + (st.past ? ' is-past' : '') + (st.near ? ' is-near' : '') + (s ? ' is-slinging' : ''),
+      goDetails: (e) => this.fly('details', e),
+      goWatch: (e) => this.fly('watch', e),
+      goContact: (e) => this.fly('contact', e),
+      sl: {
+        d1: s && s.ch === 1 ? s.d : '',
+        d2: s && s.ch === 2 ? s.d : '',
+        d3: s && s.ch === 3 ? s.d : '',
+        d4: s && s.ch === 4 ? s.d : '',
+        d5: s && s.ch === 5 ? s.d : '',
+        d6: s && s.ch === 6 ? s.d : '',
+        d7: s && s.ch === 7 ? s.d : '',
+        dash: s ? s.dash : '0 1',
+        travel: s ? s.travel : '0',
+      },
+      landing: !!st.landing,
+      copy: () => this.copy(),
+      copyLabel: st.copied === 'ok' ? 'Copied' : st.copied === 'no' ? 'Couldn’t copy' : 'Copy address',
+      copyMsg: st.copied === 'ok' ? 'Email address copied.' : st.copied === 'no' ? 'Couldn’t copy. The address is shown above.' : '',
+    };
+  }
+}
+</script>
+</body>
+</html>

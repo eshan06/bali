@@ -1,0 +1,18 @@
+{
+  "name": "bali-demo-site",
+  "private": true,
+  "type": "module",
+  "description": "getbali.app: the one-page demo, built from the approved Claude Design canvas.",
+  "scripts": {
+    "build": "node tools/build.mjs && node tools/check.mjs",
+    "serve": "node tools/serve.mjs",
+    "test": "npm run build && playwright test"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
+    "@playwright/test": "1.64.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
