@@ -153,6 +153,12 @@
                 sync: standing(.out, me: ana(newcomer: true)),
                 joining: joining(failure: Joining.words(.status(404), .classNotFound)),
                 opened: [.join]),
+            // The preview after a join that didn't reach Bali, under a long class's name (GA5):
+            // at the largest text size, Join's own label takes lines of its own.
+            "joinPreviewRefused": State(
+                sync: standing(.out, me: ana(newcomer: true)),
+                joining: joining(opens: longPreview, failure: Joining.words(.networkError, nil)),
+                opened: [.join]),
             "joinFromHome": State(joining: joining(), opened: [.join]),
             "home": State(),
             "homeLoading": State(sync: standing(.out, me: nil)),
@@ -552,6 +558,11 @@
             JoinCodePreviewResponse.self,
             from: Data(
                 #"{"class":{"id":"class","name":"Period 3 — Algebra II"},"teacher":{"displayName":"Ms. Rivera"},"alreadyEnrolled":false}"#
+                    .utf8))
+        private static let longPreview = try? BaliJSON.makeDecoder().decode(
+            JoinCodePreviewResponse.self,
+            from: Data(
+                #"{"class":{"id":"class","name":"BSCI 1510 Introduction to Biological Sciences, Section 002"},"teacher":{"displayName":"Ms. Rivera"},"alreadyEnrolled":false}"#
                     .utf8))
 
         /// The Join screen with `KWX49Q` typed: what it `opens`, once looked up, or why not.
