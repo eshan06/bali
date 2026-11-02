@@ -19,7 +19,7 @@ import { Button, buttonClass } from '@/components/button';
 import { CARD_ALONE } from '@/components/card';
 import { DecksPanel } from '@/components/decks-panel';
 import { Field } from '@/components/field';
-import { JoinCode } from '@/components/join-code';
+import { DIALOG, JoinCode } from '@/components/join-code';
 import { LiveGrid, type StateCounts } from '@/components/live-grid';
 import { LiveCounts, LiveHeader } from '@/components/live-header';
 import { PresentQuestion } from '@/components/present-question';
@@ -28,7 +28,7 @@ import { isOpen, QuestionCard, useLiveQuestion } from '@/components/question-car
 import { endedToday, RecapCard } from '@/components/recap-card';
 import { usePresenting } from '@/components/shell';
 import { SlideCard } from '@/components/slide-card';
-import { TryAgain } from '@/components/try-again';
+import { land, TryAgain } from '@/components/try-again';
 import { SAVE_TIMEOUT_MS } from '@/lib/api-client';
 import { getAccessToken } from '@/lib/auth';
 import { errText, NOT_A_SESSION_LENGTH, SESSION_ALREADY_RUNNING } from '@/lib/errors';
@@ -88,7 +88,8 @@ const students = (count: number) => `${count} ${count === 1 ? 'student' : 'stude
  * the roster in three columns beside the join code's card. Until the class is read, a Loading or
  * Error card holds the session's place: a session may be live. While one runs (PV7; ClassLive,
  * ClassStale, ClassStates' lines during a session): the header with the ring, "Live · 25 of 28
- * joined" and the join code, the countdown and the bell, +5, +10 and End; the class counted by state
+ * joined" and the join code, the countdown and the bell, +5, +10 and End session, which asks first in
+ * a dialog (GA6; GA1AClassLive, GA1APresent, GA1AStates); the class counted by state
  * beside Present, then the live grid, and no roster: the grid names every student. In Present
  * (PV9; ClassPresent), the same parts one size up for the projector, the code in a well of its own
  * and +5, +10 and End kept beside Present (the owner, 2026-10-12), so a class of 28 fits one 1080p
@@ -131,8 +132,8 @@ export default function ClassDetailPage() {
   // Try again as Loading…, whichever Try again sent it (ClassRetryStates).
   const [classReading, setClassReading] = useState(false);
   const [rosterReading, setRosterReading] = useState(false);
-  // Which send is under way, if any: every control holds while one is, and only a Start's own
-  // button says "Starting…" (an End's answer can come after the grid already says it ended).
+  // Which send is under way, if any: every control holds while one is; a Start's own button says
+  // "Starting…", and an End's, in its confirm, "Ending…".
   const [busy, setBusy] = useState<'start' | 'end' | 'extend' | null>(null);
   // A send under way: a second press before the page redraws sends nothing.
   const sending = useRef(false);
@@ -162,12 +163,21 @@ export default function ClassDetailPage() {
     toggled.current = false;
   }, [present]);
   // Extend (P10): the last attempt whose answer never came, resent by Try again; and what is said
-  // beside the grid: a failure (with Try again), a refusal or an End that failed (its button is
-  // the retry), or a note on the session shown.
+  // beside the grid: a failure (with Try again), a refusal, or a note on the session shown. An End
+  // that failed is said in its confirm instead (`endSaid`, GA6).
   const unanswered = useRef<ExtendAttempt | null>(null);
   const [said, setSaid] = useState<{ kind: 'failed' | 'refused' | 'note'; message: string } | null>(
     null,
   );
+  // End session asks first, in a dialog (GA6; GA1's option A, approved 2026-11-01): pressed, it
+  // opens the confirm and sends nothing; the confirm's own End session sends the end, and an end
+  // that failed is said in it (`endSaid`). `endAsked`: opened and not cancelled, so once the session
+  // is over, by this end, the bell or another tab, focus goes to the class's name.
+  const endDialog = useRef<HTMLDialogElement>(null);
+  const endButton = useRef<HTMLButtonElement>(null);
+  const endCancel = useRef<HTMLButtonElement>(null);
+  const endAsked = useRef(false);
+  const [endSaid, setEndSaid] = useState<string | null>(null);
   // The live question (L7): its card over the grid, and asking one in the side panel, where a
   // student's panel shows: one of the teacher's questions picked (L7b, part 2; LessonAsk), or one
   // written there (LessonWrite), what is written kept until it is asked or cancelled. A new session
@@ -309,6 +319,14 @@ export default function ClassDetailPage() {
     void readRoster();
   }, [over, readRoster]);
 
+  // Over while End session's confirm was open or its end on its way: the confirm went with the live
+  // page, so focus goes to the class's name, after the bell or on Present's (GA1AStates).
+  useEffect(() => {
+    if (!over || !endAsked.current) return;
+    endAsked.current = false;
+    land(document, []);
+  }, [over]);
+
   // The class's last pick on this computer, and Present as this tab left it, read once the page is
   // in the browser (never at render, where the server has no storage), so before the class's read
   // can show a grid or the recap; a length that isn't a preset reopens Other with it. Opened from
@@ -426,18 +444,30 @@ export default function ClassDetailPage() {
     });
   }
 
+  /** End session: its confirm opened, Cancel focused, nothing sent. */
+  function askEnd() {
+    if (sending.current) return;
+    setEndSaid(null);
+    endAsked.current = true;
+    endDialog.current?.showModal();
+    // Cancel first: a stray Enter or Space ends nothing.
+    endCancel.current?.focus();
+  }
+
   function endSession() {
     if (!grid) return;
     const ending = grid.id;
     void once('end', async () => {
-      setSaid(null);
+      setEndSaid(null);
       try {
         // Within a save's limit: an End sent again after one landed answers `already_ended`.
         await api.post(`/v1/sessions/${ending}/end`, undefined, SAVE_TIMEOUT_MS);
         onEnded(ending);
       } catch (err) {
-        // Said beside the controls; End itself sends it again.
-        setSaid({ kind: 'refused', message: errText(err) });
+        // Said in the confirm, opened again if the browser closed it meanwhile (a second Escape);
+        // its Try again sends it again.
+        setEndSaid(errText(err));
+        if (endDialog.current && !endDialog.current.open) endDialog.current.showModal();
       }
     });
   }
@@ -494,13 +524,71 @@ export default function ClassDetailPage() {
   ));
   const end = (className = '') => (
     <Button
+      ref={endButton}
       variant="secondary"
-      onClick={endSession}
+      aria-haspopup="dialog"
+      onClick={askEnd}
       aria-disabled={busy !== null}
       className={className}
     >
       End session
     </Button>
+  );
+  // End session's confirm (GA1AClassLive, GA1APresent, GA1AStates; on a phone GA6EndPhone): v2's
+  // dialog, New code's, the same on the class page and in Present, where the room sees it, saying
+  // nothing about any student. Cancel first; End session in the primary green, never red. While the
+  // end is on its way, Ending…, Cancel and Escape held; a failure said here, Try again in End
+  // session's place. Cancel or Escape closes it, focus back on End session.
+  const endConfirm = (
+    <dialog
+      ref={endDialog}
+      aria-labelledby={`${id}-end`}
+      aria-describedby={`${id}-end-line`}
+      onCancel={(e) => {
+        // Escape holds while the end is on its way, as Cancel does.
+        if (sending.current) e.preventDefault();
+      }}
+      onClose={() => {
+        // Closed by a second Escape while the end is on its way: its answer says what follows.
+        if (sending.current) return;
+        endAsked.current = false;
+        setEndSaid(null);
+        endButton.current?.focus();
+      }}
+      className={DIALOG}
+    >
+      <h2 id={`${id}-end`} className="text-dialog-title">
+        End session now?
+      </h2>
+      <p id={`${id}-end-line`} className="-mt-2 text-body text-text-secondary">
+        Every student&apos;s apps come back, and you can&apos;t undo this.
+      </p>
+      {endSaid ? (
+        <p role="alert" className="-mt-2 text-body">
+          {endSaid}
+        </p>
+      ) : null}
+      <div className="flex flex-wrap justify-end gap-2.5">
+        <Button
+          ref={endCancel}
+          variant="secondary"
+          onClick={() => {
+            if (!sending.current) endDialog.current?.close();
+          }}
+          aria-disabled={busy !== null}
+        >
+          Cancel
+        </Button>
+        <TryAgain
+          variant="primary"
+          size="md"
+          onRetry={endSession}
+          held={busy !== null}
+          then={[]}
+          send={{ words: 'End session', sending: 'Ending…', failed: endSaid !== null }}
+        />
+      </div>
+    </dialog>
   );
   // The live grid counted, once its session's grid is read.
   const counts = grid !== null && counted?.session === grid.id ? counted.counts : null;
@@ -636,6 +724,8 @@ export default function ClassDetailPage() {
           <PresentSlide id={id} lesson={slides} slide={slides.slide} />
         ) : null}
       </section>
+      {/* End session's confirm, shown only while open, as a modal over the page. */}
+      {endConfirm}
       {panel === 'decks' ? (
         <DecksPanel id={`${id}-panel`} lesson={slides} onShown={shown} onClose={closePanel} />
       ) : null}

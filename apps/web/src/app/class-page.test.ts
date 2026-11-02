@@ -317,7 +317,8 @@ describe('the class page while a session runs (ClassLive)', () => {
   });
 });
 
-describe('the class page’s Start and End, each within a save’s limit (the owner, 2026-10-16)', () => {
+// End's, asked first in its confirm since GA6, is driven in classes/[id]/page.test.tsx.
+describe('the class page’s Start, within a save’s limit (the owner, 2026-10-16)', () => {
   it('sends a Start within SAVE_TIMEOUT_MS, its failure said under the lengths, Start sending the same again', () => {
     // No `eventId` on the route: a Start sent again while one runs is answered with that session
     // (`existing`, the API's own tests), so one cut here that landed is never two sessions.
@@ -352,13 +353,5 @@ describe('the class page’s Start and End, each within a save’s limit (the ow
       /useEffect\(\(\) => \{\s*lostStart\.current = null;\s*\}, \[grid\?\.id\]\);/,
     );
     expect(page.match(/lostStart\.current = /g)).toHaveLength(3);
-  });
-
-  it('sends an End within SAVE_TIMEOUT_MS, its failure said beside the controls, End sending it again', () => {
-    // An End sent again after one landed is answered `already_ended`, and the recap shows.
-    expect(page).toMatch(
-      /await api\.post\(`\/v1\/sessions\/\$\{ending\}\/end`, undefined, SAVE_TIMEOUT_MS\);\s*onEnded\(ending\);/,
-    );
-    expect(page).toMatch(/setSaid\(\{ kind: 'refused', message: errText\(err\) \}\);/);
   });
 });

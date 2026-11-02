@@ -8,6 +8,20 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-01** — **End session asks first, in a dialog, built (GA6, #476; the audit's C2-01, and
+  End's part of C2-02).** Built from GA1's option A as the owner approved it, in the owner's words
+  (the canvas's GA1A boards, relabelled approved, option B's kept as not chosen; version 117): End
+  session, on a live class page and in Present alike, opens New code's dialog and sends nothing,
+  Cancel focused; the dialog's End session sends the end (Ending…, Cancel and Escape held), a
+  failure is said in the dialog with Try again in End session's place, no longer beside the
+  controls; Cancel or Escape gives focus back to End session. **The worker's calls:** once the
+  session is over while the dialog was open or its end on its way, focus goes to the class's name
+  however it ended, by this end, the bell or another tab (the board draws only this end's), since
+  the dialog goes with the live page and focus would otherwise fall to the page's body; and the
+  dialog at a phone's width was drawn first as an intermediate state (GA6EndPhone, 24 px in from
+  each side and 120 px down, as ClassesNewPhone). The End's source-text test is converted into the
+  class page's driven tests (`app/classes/[id]/page.test.tsx`), which fail on `main`'s page.
+
 - **2026-11-01** — **The unlock pop-ups start at the grid's top right, never over the teacher's
   controls (GA2; the audit's C01/DR-08).** ClassUnlock placed the stack 96 px from the page's top,
   over the counts, before the Questions and slides card existed; built that way, it covered

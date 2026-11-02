@@ -8,15 +8,13 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-01 (Central) — GA2 (#475; `docs/DECISIONS.md`, 2026-11-01): on a live class
-page the unlock pop-ups start at the grid's top right, over its first tiles, under the counts and the
-Questions and slides card, at every width, and never rise above the grid as it scrolls, so none
-covers +5, +10, End session, Present or the card's buttons (the portal canvas's GA2 boards, version
-116). Its known limit: on a short window with a question or a slide showing, a new pop-up can wait
-below the window's edge, beside its tile. GA3 before it (#474). The owner approved GA1's option A
-(2026-11-01). Still **before the next TestFlight build, Push Notifications on `com.bali.Bali`**
-(runbook 7, step 3), and the owner reinstalls Bali before runbook 7's step-6 check. Next: GA6, then
-GA4, then GA5._
+_Last updated: 2026-11-01 (Central) — GA6 (#476; `docs/DECISIONS.md`, 2026-11-01): End session
+asks first, in a dialog, on a live class page and in Present, as GA1's option A draws it in the
+owner's words ("End session now?", its button End session; the portal canvas's GA1A boards and
+GA6EndPhone, version 117): nothing is sent until the dialog's End session, a failure is said in the
+dialog with Try again, and once the session is over focus goes to the class's name. GA2 before it
+(#475). Still **before the next TestFlight build, Push Notifications on `com.bali.Bali`** (runbook 7,
+step 3), and the owner reinstalls Bali before runbook 7's step-6 check. Next: GA4, then GA5._
 
 ## Now
 
@@ -275,12 +273,12 @@ The owner's ruling of 2026-11-01 (`docs/DECISIONS.md`): the gstack audit's (2026
 7 cheap findings first, the rest polish left for later. The audit's list lives outside the repo, on
 the owner's Mac.
 
-- **GA1** 👀 End session's confirm, drawn for the owner (C2-01; the canvas only, no PR): the owner approved option A on 2026-11-01, the dialog, worded "End session now?" with its button "End session" to match the header's button (not the drawn "End class"); GA6 builds it (DECISIONS 2026-11-01)
+- **GA1** 👀 End session's confirm, drawn for the owner (C2-01; the canvas only, no PR): the owner approved option A on 2026-11-01, worded "End session now?" with its button "End session" — ✅ built by GA6 (#476; DECISIONS 2026-11-01)
 - **GA2** 👀 The unlock pop-up never covers the teacher's controls (C01/DR-08) — ✅ (#475; DECISIONS 2026-11-01)
 - **GA3** 👀 Focus at the largest text: Emergency Unlock and the question on the first screen (IOS-018, IOS-017) — ✅ (#474; DECISIONS 2026-11-01)
-- **GA4** The class page for screen readers and the keyboard: the reconnect pill announced, Mark correct and Close named, focus after End, Start and a closed pop-up (DR-05, D01, C02, C2-02)
+- **GA4** The class page for screen readers and the keyboard: the reconnect pill announced, Mark correct and Close named, focus after Start and a closed pop-up (DR-05, D01, C02, C2-02; End's focus is GA6's)
 - **GA5** 👀 The app's refusals whole at the largest text with the keyboard up, and busy buttons' labels as drawn (IOS-001, IOS-008)
-- **GA6** 👀 End session's confirm, built to GA1's option A (approved 2026-11-01): next
+- **GA6** 👀 End session's confirm, built to GA1's option A (C2-01, End's part of C2-02) — ✅ (#476; DECISIONS 2026-11-01)
 
 ### Still open in earlier phases
 

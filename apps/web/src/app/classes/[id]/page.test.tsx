@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 import type { ClassDetail, FeedEvent, RosterResponse, SessionSnapshot } from '@bali/shared';
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { type ApiClient, createApiClient } from '@/lib/api-client';
+import { DIALOG } from '@/components/join-code';
+import { type ApiClient, createApiClient, SAVE_TIMEOUT_MS } from '@/lib/api-client';
+import { CANT_REACH } from '@/lib/errors';
 import { captureApiFailure } from '@/lib/monitoring';
 
 import ClassDetailPage from './page';
@@ -83,15 +85,29 @@ const bali = vi.hoisted(() => {
     // The student panel's read of the session's moments (PV11a): none yet.
     const moments = new RegExp(`^/v1/sessions/${SESSION}/events\\?after=(\\d+)$`).exec(path);
     if (method === 'GET' && moments) return [200, { events: [], nextAfter: Number(moments[1]) }];
+    // After the bell, the recap's read of the last session (PV12b): none to show here.
+    if (method === 'GET' && path === `/v1/classes/${CLASS}/reports/sessions?limit=1`) {
+      return [200, { sessions: [], nextBefore: null }];
+    }
     unexpected.push(`${method} ${path}`);
     return [404, { error: { code: 'not_found', message: 'not found' } }];
   };
-  /** `fetch`, answered at once as Bali would answer it. */
-  const fetch = (url: string | URL | Request, init?: RequestInit) =>
-    Promise.resolve().then(() => {
-      const method = init?.method ?? 'GET';
-      const path = (url as string).replace('http://api', '');
-      const body = typeof init?.body === 'string' ? (JSON.parse(init.body) as unknown) : null;
+  /** Each End on its way, its answer the test's to give, or no answer at all (its time limit). */
+  const ends: { answer: (res: Response) => void; fail: () => void }[] = [];
+  /** `fetch`, answered at once as Bali would answer it; an End when the test says. */
+  const fetch = (url: string | URL | Request, init?: RequestInit) => {
+    const method = init?.method ?? 'GET';
+    const path = (url as string).replace('http://api', '');
+    const body = typeof init?.body === 'string' ? (JSON.parse(init.body) as unknown) : null;
+    if (method === 'POST' && path === `/v1/sessions/${SESSION}/end`) {
+      sent.push({ method, path, body });
+      return new Promise<Response>((answer, reject) => {
+        const fail = () => reject(new TypeError('Failed to fetch'));
+        init?.signal?.addEventListener('abort', fail);
+        ends.push({ answer, fail });
+      });
+    }
+    return Promise.resolve().then(() => {
       sent.push({ method, path, body });
       const [status, json] = answer(method, path);
       return new Response(JSON.stringify(json), {
@@ -99,12 +115,14 @@ const bali = vi.hoisted(() => {
         headers: { 'content-type': 'application/json' },
       });
     });
+  };
   return {
     CLASS,
     SESSION,
     endsAt,
     sent,
     unexpected,
+    ends,
     fetch,
     /** Each stream the grid opened, its events the test's to bring. */
     streams: [] as { onEvent: (e: FeedEvent) => void }[],
@@ -155,6 +173,7 @@ afterEach(() => {
   bali.sent.length = 0;
   bali.unexpected.length = 0;
   bali.streams.length = 0;
+  bali.ends.length = 0;
   vi.mocked(captureApiFailure).mockClear();
 });
 
@@ -306,4 +325,243 @@ describe('a class live, an unlock lands (GA2)', () => {
     await bring(unlocked(5));
     expect(screen.queryByText(/used Emergency Unlock/)).toBeNull();
   });
+});
+
+/*
+ * End session asks first, in a dialog (GA6; the audit's C2-01: one click ended class for every
+ * phone, with no undo), as GA1's option A draws it (GA1AClassLive, GA1APresent, GA1AStates; the
+ * owner's approval of 2026-11-01, in the owner's words), on the class page and in Present alike.
+ * Once ended, focus goes to the class's name (the audit's C2-02, End session's part). jsdom draws a
+ * `<dialog>` but has no `showModal` or `close`, nor the browser's Escape on a modal: the stand-ins
+ * below do what the browser does, no more. The page sits in a `<main>`, as the shell's (PagePlace).
+ */
+describe('End session asks first, in a dialog (GA6)', () => {
+  const LINE = 'Every student’s apps come back, and you can’t undo this.'.replaceAll('’', "'");
+
+  /** The browser's Escape on an open modal: `cancel`, then closed unless that was prevented. */
+  function escape(e: KeyboardEvent) {
+    const open = document.querySelector<HTMLDialogElement>('dialog[open]');
+    if (e.key !== 'Escape' || !open) return;
+    const cancel = new Event('cancel', { cancelable: true });
+    open.dispatchEvent(cancel);
+    if (!cancel.defaultPrevented) open.close();
+  }
+  const showModal = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, 'showModal');
+  const close = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, 'close');
+  beforeAll(() => {
+    HTMLDialogElement.prototype.showModal = function (this: HTMLDialogElement) {
+      this.setAttribute('open', '');
+    };
+    HTMLDialogElement.prototype.close = function (this: HTMLDialogElement) {
+      if (!this.open) return;
+      this.removeAttribute('open');
+      this.dispatchEvent(new Event('close'));
+    };
+    document.addEventListener('keydown', escape);
+  });
+  afterAll(() => {
+    document.removeEventListener('keydown', escape);
+    for (const [name, was] of [
+      ['showModal', showModal],
+      ['close', close],
+    ] as const) {
+      if (was) Object.defineProperty(HTMLDialogElement.prototype, name, was);
+      else delete (HTMLDialogElement.prototype as Partial<HTMLDialogElement>)[name];
+    }
+  });
+  afterEach(() => vi.useRealTimers());
+
+  /** The confirm, found by its title: the class page's only dialog while a session runs. */
+  const confirm = () => screen.getByRole('dialog', { name: 'End session now?' });
+  const inConfirm = (name: string) => within(confirm()).getByRole('button', { name });
+  const endsSent = () => bali.sent.filter(({ path }) => path.endsWith('/end'));
+  /** The class's name, the page's heading, on the page after the bell and on Present's. */
+  const name = () => screen.getByRole('heading', { level: 1, name: 'Biology, period 3' });
+
+  /** The page live, its grid read, Present on or off; End session in its header, at rest. */
+  async function live(present: boolean) {
+    if (present) sessionStorage.setItem(`bali.present.${bali.CLASS}`, 'on');
+    const user = userEvent.setup();
+    render(
+      <main>
+        <ClassDetailPage />
+      </main>,
+    );
+    await screen.findByText('Ana Rodríguez');
+    await vi.waitFor(() => expect(bali.streams).toHaveLength(1));
+    const end = screen.getByRole('button', { name: 'End session' });
+    return { user, end };
+  }
+
+  /** The End on its way now, answered with its JSON and `status`, what it set off drawn. */
+  async function answerEnd(status: number, body: unknown) {
+    const end = bali.ends.at(-1);
+    if (!end) throw new Error('no End on its way');
+    await act(async () => {
+      end.answer(Response.json(body, { status }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+  }
+
+  /** Over: the page after the bell (ClassEnded), or Present's Class is over (PresentEnded). */
+  async function ended(present: boolean) {
+    if (present) await screen.findByRole('heading', { name: 'Class is over' });
+    else await screen.findByRole('button', { name: /^Start \d+-minute session$/ });
+    expect(screen.queryByText('End session now?')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'End session' })).toBeNull();
+    // Focus on the class's name, never left on the page's body.
+    await vi.waitFor(() => expect(document.activeElement).toBe(name()));
+    expect(name().getAttribute('tabindex')).toBe('-1');
+  }
+
+  for (const present of [false, true]) {
+    const where = present ? ', in Present' : '';
+
+    it(`opens on End session and sends nothing, Cancel focused; Cancel and Escape close it, focus back on End session${where}`, async () => {
+      const { user, end } = await live(present);
+      expect(end.getAttribute('aria-haspopup')).toBe('dialog');
+      expect(screen.queryByRole('dialog')).toBeNull();
+
+      await user.click(end);
+      // v2's dialog, New code's, titled and described in the owner's words, saying nothing about
+      // any student: the room sees it in Present.
+      expect(confirm().tagName).toBe('DIALOG');
+      expect(confirm().className).toBe(DIALOG);
+      expect(screen.getByRole('dialog', { description: LINE })).toBe(confirm());
+      expect(confirm().textContent).toBe(`End session now?${LINE}CancelEnd session`);
+      expect(document.activeElement).toBe(inConfirm('Cancel'));
+      // Cancel secondary, End session the primary green: nothing red.
+      expect(inConfirm('Cancel').classList).toContain('border-border-strong');
+      expect(inConfirm('End session').classList).toContain('bg-action-primary-bg');
+      expect(confirm().innerHTML).not.toMatch(/destructive|red-/);
+      expect(within(confirm()).queryByRole('alert')).toBeNull();
+      expect(endsSent()).toEqual([]);
+
+      await user.click(inConfirm('Cancel'));
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(document.activeElement).toBe(end);
+
+      await user.click(end);
+      expect(document.activeElement).toBe(inConfirm('Cancel'));
+      await user.keyboard('{Escape}');
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(document.activeElement).toBe(end);
+
+      // +5 and +10 stay as they are, and the class runs on: nothing was sent.
+      expect(screen.getByRole('button', { name: '+5 min' })).toBeDefined();
+      expect(screen.getByRole('button', { name: '+10 min' })).toBeDefined();
+      expect(endsSent()).toEqual([]);
+      expect(bali.unexpected).toEqual([]);
+    });
+
+    it(`sends the end once from its End session, Ending… holding Cancel and Escape; ended, focus on the class’s name${where}`, async () => {
+      const { user, end } = await live(present);
+      await user.click(end);
+      const send = inConfirm('End session');
+      await user.click(send);
+
+      expect(endsSent()).toEqual([
+        { method: 'POST', path: `/v1/sessions/${bali.SESSION}/end`, body: null },
+      ]);
+      // One button throughout, so focus stays on it: Ending… while the end is on its way.
+      expect(inConfirm('Ending…')).toBe(send);
+      expect(send.getAttribute('aria-busy')).toBe('true');
+      expect(send.getAttribute('aria-disabled')).toBe('true');
+      expect(inConfirm('Cancel').getAttribute('aria-disabled')).toBe('true');
+      // A second press, Cancel and Escape: nothing sent, the confirm kept.
+      await user.click(send);
+      await user.click(inConfirm('Cancel'));
+      await user.keyboard('{Escape}');
+      expect(confirm()).toBeDefined();
+      expect(endsSent()).toHaveLength(1);
+
+      await answerEnd(200, { outcome: 'ended', endedParticipations: 1 });
+      await ended(present);
+      expect(endsSent()).toHaveLength(1);
+      expect(bali.unexpected).toEqual([]);
+    });
+
+    it(`says no answer in the confirm after a save’s 10 s, Try again in End session’s place sending the end again${where}`, async () => {
+      const { user, end } = await live(present);
+      await user.click(end);
+      const send = inConfirm('End session');
+      send.focus();
+      // The End's time limit on a fake clock: no answer at all.
+      vi.useFakeTimers();
+      fireEvent.click(send);
+      await act(() => vi.advanceTimersByTimeAsync(SAVE_TIMEOUT_MS - 1));
+      expect(inConfirm('Ending…')).toBe(send);
+      expect(within(confirm()).queryByRole('alert')).toBeNull();
+      await act(() => vi.advanceTimersByTimeAsync(1));
+      vi.useRealTimers();
+
+      // Today's line, in the confirm, under its own; Try again in End session's place, focused.
+      const line = within(confirm()).getByRole('alert');
+      expect(line.textContent).toBe(CANT_REACH);
+      expect(confirm().textContent).toBe(`End session now?${LINE}${CANT_REACH}CancelTry again`);
+      expect(inConfirm('Try again')).toBe(send);
+      expect(document.activeElement).toBe(send);
+      expect(inConfirm('Cancel').getAttribute('aria-disabled')).toBe('false');
+      expect(captureApiFailure).toHaveBeenCalledWith(
+        'POST',
+        `/v1/sessions/${bali.SESSION}/end`,
+        'network',
+      );
+      // Nothing said beside the controls: the confirm says it.
+      expect(screen.getAllByRole('alert')).toEqual([line]);
+
+      // Try again sends the end again, the line going while it is on its way.
+      await user.click(send);
+      expect(endsSent()).toHaveLength(2);
+      expect(endsSent()[1]).toEqual(endsSent()[0]);
+      expect(inConfirm('Ending…')).toBe(send);
+      expect(within(confirm()).queryByRole('alert')).toBeNull();
+
+      // The first had landed: answered as already ended, and the page goes on as it would.
+      await answerEnd(200, { outcome: 'already_ended', endedParticipations: 0 });
+      await ended(present);
+      expect(bali.unexpected).toEqual([]);
+    });
+
+    it(`closes on Cancel after a failure, focus on End session, and opens afresh${where}`, async () => {
+      const { user, end } = await live(present);
+      await user.click(end);
+      await user.click(inConfirm('End session'));
+      await act(async () => {
+        bali.ends[0]?.fail();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+      expect(within(confirm()).getByRole('alert').textContent).toBe(CANT_REACH);
+
+      await user.click(inConfirm('Cancel'));
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(document.activeElement).toBe(end);
+      expect(screen.queryByRole('alert')).toBeNull();
+
+      await user.click(end);
+      expect(within(confirm()).queryByRole('alert')).toBeNull();
+      expect(inConfirm('End session')).toBeDefined();
+      expect(document.activeElement).toBe(inConfirm('Cancel'));
+      expect(endsSent()).toHaveLength(1);
+    });
+
+    it(`goes with the live page when the bell ends the session while it is open, focus on the class’s name${where}`, async () => {
+      const { user, end } = await live(present);
+      await user.click(end);
+      expect(document.activeElement).toBe(inConfirm('Cancel'));
+      await act(async () => {
+        bali.streams[0]?.onEvent({
+          seq: 5,
+          eventId: '019a0000-0000-7000-8000-000000000105',
+          type: 'session_expired',
+          userId: null,
+          occurredAt: new Date().toISOString(),
+          payload: {},
+        });
+        await Promise.resolve();
+      });
+      await ended(present);
+      expect(endsSent()).toEqual([]);
+    });
+  }
 });
