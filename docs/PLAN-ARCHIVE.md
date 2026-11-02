@@ -10,6 +10,19 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-10-24 (Central) — C2-text (#461; `docs/DECISIONS.md`, 2026-10-24): the owner's
+drafted privacy policy and terms (#460) on `/privacy` and `/terms` in the outline's place, its
+notice and Placeholder chips gone, the notes for the lawyer left off. The pages are now the one copy
+of the words (`docs/legal/` keeps only the notes), and the policy's section 2 shows the app's own two
+lists, as the help page does (#130); both pages stay out of search results until the lawyer's
+version replaces them in place. Before it, M6's LessonDecks panel line back (#457) and the push's
+app half (#456): **before the next TestFlight build, Push Notifications on `com.bali.Bali`**
+(runbook 7, step 3), or its signing may fail; build 10 went before it, from `1d4496b6`. **An install
+whose Screen Time step was done before that build is never asked:** the owner reinstalls Bali before
+runbook 7's step-6 check. Next on the Mac: the owner's sitting on build 10 (`ios/README.md`), then
+runbook 7 and N6's check; on the Windows PC, the other three pre-pilot steps, which wait for the
+owner's word._
+
 _Last updated: 2026-10-24 (Central) — M6's LessonDecks panel line back (#457; `docs/DECISIONS.md`,
 2026-10-24): Show slides' panel says "Pick a deck. Every phone in this class shows the page you're
 on, and so does Present." again, now that phones (M8, M8b) and the student web (W5) show the slide.

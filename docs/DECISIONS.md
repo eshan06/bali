@@ -8,6 +8,44 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-01** — **Focus at the largest text sizes (GA3, #474; the audit's IOS-018 and IOS-017):
+  Hold to unlock whole on the first screen in every Focus state, and a question's prompt and first
+  answers with it.** At the accessibility sizes past the large one FocusLargeText draws (AX2 to AX5,
+  `FocusView.crowded`), Focus makes room for what matters first, as the app canvas's new row draws
+  it (six boards at AX5 and one at AX1, intermediate states drawn before they were built; version 44).
+  With a question or a slide, the card and the slide come first and the class and the strip after
+  them, so on the iPhone 17e at AX5 the prompt and answers A and B show above Hold to unlock; before,
+  the class, the bell line and the countdown filled the space and the card began below the fold.
+  The line under Hold to unlock ("Works without Wi-Fi. Letting go early does nothing.") becomes the
+  page's last line, and only why a press didn't go through stays under it (rule 5). With neither,
+  Hold to unlock is pinned at the bottom too, at every text size, so a page the text outgrows
+  scrolls above it, as with a question; before, the whole page scrolled and Hold to unlock was its
+  last thing, below the fold from AX1 already in five states (offline, a tap held, signed out, a
+  late unlock, iOS refusing the wake: the new test, run on main). The pinned block takes
+  its own height, as the page's groups do (`fixedSize`): offered less, the pill had been squeezed
+  shorter than its words, 208 pt for the 238 its four lines need at AX5, and 70 for 84 at AX1. The
+  control itself, its words, its hold and its send, is unchanged. **What stays:** at the default
+  size every Focus fixture's screen matches the last build's on both phones, line for line; at
+  FocusLargeText's size (AX1) a question's screen does too, the page above the pill unmoved, but
+  for the pill, now the 84 pt its words need (the board draws 82) where it was squeezed to 70.
+  **Why AX2:** at AX1 the board's layout already shows the question (the audit's check, and the new
+  test); at AX2 the class and the strip push the card below the fold on the 17e. **Known limits:** the
+  longest question (the `focusLong` fixture's, CardLong's, about 200 characters) is longer than
+  the screen at these sizes, so its card starts on the first screen and the rest scrolls; and at
+  AX5, while a failed press is said under Hold to unlock, that line takes the first answers' room.
+  **Weighed:** capping the text size of Hold to unlock, or of the class and the strip, at
+  FocusLargeText's. The brief kept the control as it is, and a cap would shrink the class and the
+  time for the students who need them large. Tests: `AppTests.focusFirstScreen` (every Focus
+  fixture at AX1 to AX5 on both phones: Hold to unlock pinned whole on the screen at its own
+  height, the prompt and first answer above it, and the order of card, slide and class and the
+  line's place by size) and `focusFailureCrowded`; both fail on main's Focus screen.
+
+- **2026-11-01** — **The gstack audit's fixes: the crucial and the cheap ones first (the owner's
+  ruling).** A report-only audit on 2026-10-24 (gstack, the portal and the iPhone app at the default
+  and the largest text size, against the approved boards) listed its findings outside the repo, on
+  the owner's Mac. The owner chose to fix its 3 crucial and 7 cheap findings now, in six steps
+  (PLAN's GA1–GA6), and to leave the rest, polish, for later.
+
 - **2026-10-29** — **A record made nameless no longer carries the phone's order (the owner's
   decision: the server's fix, the phone unchanged).** Every record a student's phone sends (a tap,
   an Emergency Unlock, a return to focus, Screen Time off or back on) carries the phone's order
