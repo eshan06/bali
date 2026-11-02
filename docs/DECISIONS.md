@@ -11,8 +11,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
 - **2026-11-01** — **Focus at the largest text sizes (GA3, #474; the audit's IOS-018 and IOS-017):
   Hold to unlock whole on the first screen in every Focus state, and a question's prompt and first
   answers with it.** At the accessibility sizes past the large one FocusLargeText draws (AX2 to AX5,
-  `FocusView.crowded`), Focus makes room for what matters first, as the app canvas's six
-  largest-text boards draw them (intermediate states, drawn before they were built; version 43).
+  `FocusView.crowded`), Focus makes room for what matters first, as the app canvas's new row draws
+  it (six boards at AX5 and one at AX1, intermediate states drawn before they were built; version 44).
   With a question or a slide, the card and the slide come first and the class and the strip after
   them, so on the iPhone 17e at AX5 the prompt and answers A and B show above Hold to unlock; before,
   the class, the bell line and the countdown filled the space and the card began below the fold.
@@ -36,8 +36,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   **Weighed:** capping the text size of Hold to unlock, or of the class and the strip, at
   FocusLargeText's. The brief kept the control as it is, and a cap would shrink the class and the
   time for the students who need them large. Tests: `AppTests.focusFirstScreen` (every Focus
-  fixture at AX1 to AX5 on both phones: Hold to unlock whole on the screen, the prompt and first
-  answer above it, and the order and the line's place by size) and `focusFailureCrowded`.
+  fixture at AX1 to AX5 on both phones: Hold to unlock pinned whole on the screen at its own
+  height, the prompt and first answer above it, and the order of card, slide and class and the
+  line's place by size) and `focusFailureCrowded`; both fail on main's Focus screen.
 
 - **2026-11-01** — **The gstack audit's fixes: the crucial and the cheap ones first (the owner's
   ruling).** A report-only audit on 2026-10-24 (gstack, the portal and the iPhone app at the default

@@ -3702,18 +3702,29 @@ struct AppTests {
                     let page = scroll.convert(scroll.bounds, to: window)
                     let unlock = try at { $0 == unlockLabel }
                     #expect(unlock.minY >= page.maxY - 0.5 && unlock.maxY <= frame.height + 0.5, "\(said): \(unlock)")
+                    // The pill at its own height: its words, as wide as the pill leaves them (its
+                    // 10-pt padding, the 44-pt lock, the 12 between and the 12 after), and the padding.
+                    let words = UIHostingController(rootView: UnlockWords().environment(\.dynamicTypeSize, size))
+                        .sizeThatFits(in: CGSize(width: unlock.width - 88, height: 10_000))
+                    #expect(unlock.height >= words.height + 20 - 0.5, "\(said): \(unlock.height) for \(words.height)")
                     // The line: the page's last, or under Emergency Unlock.
                     let crowded = size >= .accessibility2
                     let line = try at { $0.hasPrefix("Works without Wi-Fi.") }
                     let end = scroll.convert(CGRect(origin: .zero, size: scroll.contentSize), to: window).maxY
                     #expect(crowded ? abs(line.maxY - end) <= 1 : line.minY >= unlock.maxY, "\(said): \(line), \(end)")
+                    // A lesson's card and slide: before the class once crowded, after it at that size.
+                    guard phone.card != nil || phone.slideShown != nil else { continue }
+                    let title = try at { $0 == "Period 3 — Algebra II" }
+                    if phone.slideShown != nil {
+                        let slide = try at { $0 == "Slide 4 of 12" }
+                        #expect((slide.minY < title.minY) == crowded, "\(said): \(slide) \(title)")
+                    }
                     guard let card = phone.card else { continue }
                     let prompt = try at { $0 == card.question.prompt }
                     let first = try at { $0.hasPrefix("A, ") }
                     if name != "focusLong" {
                         #expect(prompt.maxY <= page.maxY + 0.5 && first.maxY <= page.maxY + 0.5, "\(said): \(first)")
                     }
-                    let title = try at { $0 == "Period 3 — Algebra II" }
                     #expect((prompt.minY < title.minY) == crowded, "\(said): \(prompt) \(title)")
                 }
             }

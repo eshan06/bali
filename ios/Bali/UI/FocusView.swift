@@ -47,7 +47,7 @@ struct FocusView: View {
     /// at least D1's 24 pt apart, each at its own height: only the spacers give, since a group
     /// offered less than its own height, the ring's fixed, would cut its lines instead. Emergency
     /// Unlock is pinned at the bottom, where D1 draws it, so a page the text outgrows scrolls above
-    /// it (GA3; the app canvas's FocusLargestText and FocusLargestTextEnd).
+    /// it (GA3; the app canvas's FocusLargeTextLong, FocusLargestText and FocusLargestTextEnd).
     private func page(_ focus: FocusWords) -> some View {
         ScreenScaffold {
             PageScroll {
