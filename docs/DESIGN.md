@@ -160,7 +160,9 @@ v2's since PV6 (2026-10-13): its header, the length picker, the roster beside th
 join code's card with Copy, and New code's confirm a dialog (`JoinCode`). The page
 while one runs is v2's since PV7 (2026-10-14):
 ClassLive's header with the ring and the countdown, the state counts, the
-reconnect pill, no roster and no New code.
+reconnect pill, no roster and no New code. Since GA6 (2026-11-01) its End session, there and in
+Present, asks first in New code's dialog, "End session now?", Cancel focused and End session in the
+primary green, never red (GA1AClassLive, GA1APresent, GA1AStates; GA6EndPhone on a phone).
 The page after the bell is v2's since PV12b (2026-10-15): ClassEnded's line, "28 students ·
 the session ended at 9:55 AM" for a session that ended today, and its recap, the figures
 over who wasn't focused the whole time (a row each: the name, a thin line with its marks,

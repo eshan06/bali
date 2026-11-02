@@ -10,6 +10,16 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-11-01 (Central) — GA2 (#475; `docs/DECISIONS.md`, 2026-11-01): on a live class
+page the unlock pop-ups start at the grid's top right, over its first tiles, under the counts and the
+Questions and slides card, at every width, and never rise above the grid as it scrolls, so none
+covers +5, +10, End session, Present or the card's buttons (the portal canvas's GA2 boards, version
+116). Its known limit: on a short window with a question or a slide showing, a new pop-up can wait
+below the window's edge, beside its tile. GA3 before it (#474). The owner approved GA1's option A
+(2026-11-01). Still **before the next TestFlight build, Push Notifications on `com.bali.Bali`**
+(runbook 7, step 3), and the owner reinstalls Bali before runbook 7's step-6 check. Next: GA6, then
+GA4, then GA5._
+
 _Last updated: 2026-11-01 (Central) — GA3 (#474; `docs/DECISIONS.md`, 2026-11-01), the first of the
 audit's fixes (GA1–GA6 below; the owner's ruling, 2026-11-01): on the phone's Focus screen at the
 largest text sizes, Hold to unlock stays whole on the first screen in every state, and a question or
