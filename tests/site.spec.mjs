@@ -144,14 +144,18 @@ test('chapter 2 shows a locked app, and chapter 5 a question over the slide', as
   await expect(page.getByRole('img', { name: "Opening another app in class shows Bali's screen: Focused with Bali." })).toHaveCount(1);
   await expect(page.getByRole('heading', { name: 'Slides and questions on every phone.' })).toHaveCount(1);
   await expect(page.getByRole('img', { name: "On a student's phone, a question they answered and the same slide under it" })).toHaveCount(1);
-  // The locked app's phone rises in once the Focus phone is in place, and the question card after the slide.
+  // The locked app's phone rises in once the Focus phone is in place. On chapter 5 the slide and then the
+  // question rise in while its circle opens, so the phone is never shown empty: by the time the circle has
+  // uncovered the phone (7.1 screens down), both are there.
   const shield = page.locator('.b-ch-2 .b-p-shield');
+  const slide = page.locator('.b-ch-5 .b-p-side figure');
   const question = page.locator('.b-ch-5 .b-p-side section');
   await expect(shield).toHaveCSS('opacity', '0');
   await expect(question).toHaveCSS('opacity', '0');
   await page.evaluate(() => scrollTo(0, innerHeight * 2.3));
   await expect(shield).toHaveCSS('opacity', '1', { timeout: 10000 });
-  await page.evaluate(() => scrollTo(0, innerHeight * 8.2));
+  await page.evaluate(() => scrollTo(0, innerHeight * 7.1));
+  await expect(slide).toHaveCSS('opacity', '1', { timeout: 10000 });
   await expect(question).toHaveCSS('opacity', '1', { timeout: 10000 });
 });
 
