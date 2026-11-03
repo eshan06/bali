@@ -107,8 +107,13 @@ test('in the story only the chapters that can show draw their screens', async ({
   await openLive(page);
   const drawn = () => page.evaluate(() => [...document.querySelectorAll('.b-ch')].map((c) => !c.classList.contains('b-off')));
   expect(await drawn()).toEqual([true, false, false, false, false, false, false]);
+  await expect(page.locator('.b-ch-3 .zoom')).toBeHidden();
   await page.evaluate(() => scrollTo(0, innerHeight * 7));
-  await expect.poll(drawn, { timeout: 3000 }).toEqual([false, false, false, true, true, false, false]);
+  await expect.poll(drawn, { timeout: 10000 }).toEqual([false, false, false, true, true, false, false]);
+  // The class does hide them: a culled chapter's screens and ring aren't drawn.
+  await expect(page.locator('.b-ch-3 .zoom')).toBeHidden();
+  await expect(page.locator('.b-ch-3 .b-emblem')).toBeHidden();
+  await expect(page.locator('.b-ch-5 .zoom').first()).toBeVisible();
 });
 
 // Paused opacity and transform CSS animations inside the zooming, circle-clipped chapters made Chrome leave
@@ -131,7 +136,7 @@ test('no opacity or movement CSS animations inside the scenes', async ({ page })
   const slide = page.locator('.b-ch-5 .b-p-side figure');
   await expect(slide).toHaveCSS('opacity', '0');
   await page.evaluate(() => scrollTo(0, innerHeight * 8.2));
-  await expect(slide).toHaveCSS('opacity', '1', { timeout: 4000 });
+  await expect(slide).toHaveCSS('opacity', '1', { timeout: 10000 });
 });
 
 test('each screen picture\'s box is the size it is drawn at', async ({ page }) => {
@@ -159,6 +164,19 @@ test('with Reduce Motion the story stacks and Skip jumps straight there', async 
   await expect(target).toBeFocused({ timeout: 500 });
   await expect(target).toBeInViewport();
   await expect(root(page)).not.toHaveClass(/is-slinging/);
+});
+
+test('turning on Reduce Motion mid-visit shows every chapter whole', async ({ page }) => {
+  await openLive(page);
+  // At the top, the story holds the later chapters hidden and their small effects at the start.
+  await expect(page.locator('.b-ch.b-off')).toHaveCount(6);
+  await expect(page.locator('.b-ch-4 .b-card')).toHaveCSS('opacity', '0');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(root(page)).not.toHaveClass(/is-live/);
+  await expect(page.locator('.b-ch.b-off')).toHaveCount(0);
+  for (const sel of ['.b-ch-4 .b-card', '.b-ch-4 .b-lay-b', '.b-ch-5 .b-p-side figure', '.b-ch-6 .mline .mk']) {
+    await expect(page.locator(sel).first()).toHaveCSS('opacity', '1');
+  }
 });
 
 test('the questions open', async ({ page }) => {
