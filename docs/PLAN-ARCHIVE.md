@@ -10,6 +10,16 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-11-02 (Central) — GA5 (#478; `docs/DECISIONS.md`, 2026-11-02), the last of the
+audit's fixes, so **GA1–GA6 are all done**: on Your name and Join at the largest text size with the
+keyboard up, a refusal under Continue shows whole, Continue's block pinned while the field fits above
+it and scrolling with the page on the smallest iPhones (the Sign in & sign up canvas's keyboard
+boards, version 15); and a disabled or busy primary's label is white on its dimmed fill, as the
+boards draw it. GA4 before it (#477). Still **before the next TestFlight build, Push Notifications on
+`com.bali.Bali`** (runbook 7, step 3), and the owner reinstalls Bali before runbook 7's step-6 check.
+Next: the owner's call on GA5's known limit, the smallest iPhones (DECISIONS 2026-11-02); the
+audit's polish waits, as ruled._
+
 _Last updated: 2026-11-02 (Central) — GA4 (#477; `docs/DECISIONS.md`, 2026-11-02): the class page
 for screen readers and the keyboard, nothing on screen changed. A lost or quiet live feed is said
 to a screen reader (the pill, the line over the grid, Home's live card's line), each Mark correct is
@@ -1421,7 +1431,51 @@ Not PRs — the owner, the lawyer and the school (under Open owner items):
 
 ### Portal redesign (v2's look) steps (PV; one PR each; 👀 = the owner looks at screenshots)
 
-The finished steps' full lines; the open steps and this section's intro are in `docs/PLAN.md`.
+The section's intro and its one-line list as `docs/PLAN.md` held them until 2026-11-02, when AN0
+moved them here and PLAN.md kept one line; the finished steps' full lines follow them.
+
+**Done** (2026-10-16): PV0–PV17, the last PV17c-2 (#425). Approved by the owner 2026-10-12 (`docs/DECISIONS.md`): the portal and the student web redrawn in
+v2's look, to the canvas [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (its boards named on each
+step; its row "An idea, not in the plan: questions suggested from your slides" is out), its look
+`v2.css` (DESIGN.md §1: the style facts, what it changes, what it supersedes, its call). Its
+own plan, beside Phase 7: the drawings, the reads and the pages Phase 7's web screens sit on first
+(PV1–PV15), then Phase 7's web screens (Phase 7 steps: L7, W3, W4, L7b, L3c, L7c; M5, M6, W5), then
+the rest (PV16, PV17). Each UI step builds its boards with every state they draw, the words and
+states of the canvases v2's replaces carried over except where it changes them (DESIGN.md,
+Sources); an intermediate state no board draws is drawn on the canvas first, labelled as one, and
+then built from that drawing without waiting for the owner's approval, and anything new shown about
+a student, or anything else no board draws, waits for it (CLAUDE.md, Working rules); a
+page keeps today's layout until its step lands, while PV4's shared pieces (buttons, fields, chips,
+cards) change on every page at once. Each step is one PR from a fresh worker, under ~400
+changed lines not counting tests (the estimates below are from the boards; a step past it splits,
+as noted). **Cloud-buildable:** PV2, PV3, PV3b. **The Mac session's:** PV4–PV6; **the Windows PC's:** PV7–PV17 (2026-10-14). **A UI step's
+validation** (each 👀): vitest, `npm run typecheck && npm run lint && npm test`, `/santa-loop` with
+`web-design-guidelines` and `no-ai-slop`, and screenshots beside its boards for the owner.
+
+- **PV0** The redesign's plan (docs) — ✅ (#342; DECISIONS 2026-10-12)
+- **PV1** 👀 What no board draws, approved on the canvas — ✅ (2026-10-12, #346; DECISIONS 2026-10-12)
+- **PV2** API: each class's summary on `/v1/me` — ✅ (#344; DECISIONS 2026-10-12)
+- **PV3** API: Recent activity, `GET /v1/me/activity` — ✅ (#345; DECISIONS 2026-10-12)
+- **PV3b** A class list in a fixed order — ✅ (#347; DECISIONS 2026-10-12)
+- **PV4** 👀 The groundwork, `v2.css`'s shared pieces — ✅ (#351; DECISIONS 2026-10-13)
+- **PV4b** 👀 The icons at the canvas's 1.75 stroke — ✅ (#353; DECISIONS 2026-10-13)
+- **PV4c** PV4b's tests — ✅ (#357; DECISIONS 2026-10-13)
+- **PV5** 👀 The shell, v2's side menu — ✅ (#352; DECISIONS 2026-10-13)
+- **PV5b** 👀 The shell's read of the account — ✅ (#356; DECISIONS 2026-10-13)
+- **PV6** 👀 A class before a session — ✅ (#355; DECISIONS 2026-10-13)
+- **PV7** 👀 A class live — ✅ (#375; DECISIONS 2026-10-14)
+- **PV8** 👀 Tiles — ✅ (#377; DECISIONS 2026-10-14)
+- **PV9** 👀 Present — ✅ (#379; DECISIONS 2026-10-14)
+- **PV10** 👀 The unlock pop-up — ✅ (#381; DECISIONS 2026-10-14)
+- **PV11** 👀 The student panel — ✅ as PV11a (#382) and PV11b (#383; DECISIONS 2026-10-14)
+- **PV12** 👀 The recap (ClassEnded) — ✅ as PV12a (#384) and PV12b (#386; DECISIONS 2026-10-15)
+- **PV13** 👀 Reports — ✅ (#387; DECISIONS 2026-10-15)
+- **PV14** 👀 A session's report — ✅ (#401; DECISIONS 2026-10-15)
+- **PV15** 👀 The entry pages — ✅ (#388; DECISIONS 2026-10-15). **Then Phase 7's web screens** (Phase 7 steps)
+- **PV16** 👀 Classes — ✅ as PV16a (#420) and PV16b (#421); DECISIONS 2026-10-16
+- **PV17** 👀 Home (Main, HomeIdle, HomeNew, HomeStates) — ✅ as PV17a (#422), PV17b (#423), PV17c-1 (#424) and PV17c-2 (#425); DECISIONS 2026-10-16
+
+The finished steps' full lines:
 
 - **PV0** This docs PR: DESIGN.md's v2 look (its style facts, the rulings it supersedes, its open call), these steps, Phase 7's web steps re-pointed at the new canvas (L3c added), the decisions, and production backups (L0b) moved to before the first actual pilot — validation: docs only — ✅ (2026-10-12)
 - **PV1** 👀 The owner checks and approves, on the canvas, what no board draws, each drawn in its look before any is built (no code): the classes home's "Questions and slides" card (L7b's; the menu's Questions and Slides take its place: confirm); L7c's Questions on the class page's recap (only the report page draws them); Present after the bell (How it ended, its projector view, is gone); W5's full-screen slide; `/support`, `/privacy`, `/terms` and `/auth/callback`; a teacher's page at phone width; an empty Classes page; a teacher with no display name; Copy's success and failure; the student panel's loading, failure and other students' states; several unlock pop-ups at once; Home's live card, Last session and Recent activity loading, failing and empty. And two corrections: ClassEnded's line under "Focused the whole time" ("Tapped in by 9:08 AM and focused until the bell.") against the owner's rule that a late tap-in still counts (DESIGN.md §1), and ReportOpened's recap card, still titled "Last session", whose "Open its report" links to its own page — validation: the owner's approval on the canvas, dated in `docs/DECISIONS.md`; a step building one of these waits for it — ✅ approved by the owner (2026-10-12; `docs/DECISIONS.md`): the classes home's card gone; L7c's Questions on the report page only; a teacher's page at phone width as a class live (two columns of short tiles) and Home, Present and Recent activity hidden under 640 px; Present after the bell "Class is over" alone; the rest as drawn

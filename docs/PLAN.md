@@ -8,15 +8,14 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-02 (Central) — GA5 (#478; `docs/DECISIONS.md`, 2026-11-02), the last of the
-audit's fixes, so **GA1–GA6 are all done**: on Your name and Join at the largest text size with the
-keyboard up, a refusal under Continue shows whole, Continue's block pinned while the field fits above
-it and scrolling with the page on the smallest iPhones (the Sign in & sign up canvas's keyboard
-boards, version 15); and a disabled or busy primary's label is white on its dimmed fill, as the
-boards draw it. GA4 before it (#477). Still **before the next TestFlight build, Push Notifications on
-`com.bali.Bali`** (runbook 7, step 3), and the owner reinstalls Bali before runbook 7's step-6 check.
-Next: the owner's call on GA5's known limit, the smallest iPhones (DECISIONS 2026-11-02); the
-audit's polish waits, as ruled._
+_Last updated: 2026-11-02 (Central) — AN0 (#480; `docs/DECISIONS.md`, 2026-11-02): Android planned
+as its own phases, 8–11, its steps in `docs/PLAN-ANDROID.md` under this file's rules, and
+ARCHITECTURE's "Android app structure" proposed, its lock left to AN1's spike on the owner's Android
+phones. Before it, GA5 (#478), the last of the audit's fixes. Still **before the next TestFlight
+build, Push Notifications on `com.bali.Bali`** (runbook 7, step 3), and the owner reinstalls Bali
+before runbook 7's step-6 check. Next: the owner's call on GA5's known limit, the smallest iPhones
+(DECISIONS 2026-11-02); Android's AN1 once the owner names its phones; the audit's polish waits, as
+ruled._
 
 ## Now
 
@@ -49,6 +48,9 @@ branch, with no PR, as its README says (#479; `docs/DECISIONS.md`, 2026-11-02).
   Phase 7 screens are done: L8 (L8a, #443, L8b, #448 and #450, and L8c, #451), M8's slide view on
   Focus (#452) and M8b's slide off Focus and card on the Screen Time ask (#454); left, their 📱
   device checks, the owner's. C2's legal words (⚖️) go into the portal's pages, on the Windows PC.
+- **Android (the owner, 2026-11-02)**: Phases 8–11, the steps in `docs/PLAN-ANDROID.md` (AN0 ✅);
+  AN1 next, the lock spike on a Pixel and a Samsung (📱 the owner's Android phones). Not on the
+  pilot's critical path.
 - **The portal redesign in v2's look (PV0–PV17, the owner, 2026-10-12)** ✅ (2026-10-16): every step
   done, with PV3b, PV4b, PV4c and PV5b; the last, PV17c-2, Home's Last session (#425).
 - **The portal's tests drive the page (the owner, 2026-10-22: "Yes, go gradually")**: the setup ✅
@@ -135,6 +137,8 @@ first class, production backups (L0b, the owner's console step; the owner, 2026-
   the portal's UI included (`apps/web/src/app`, `apps/web/src/components`, its user-facing strings).
 - The Mac session: Xcode and the iPhone (`ios/Bali/UI`, `ios/BaliShield`, the app's user-facing
   strings): TestFlight build 9.
+- Android (Phases 8–11): the Windows PC builds its steps, the screens included; cloud sessions its
+  API step (AN11) and docs; the owner its phones and Google's consoles (`docs/PLAN-ANDROID.md`).
 - The owner: the consoles (AWS, Railway, Vercel, Sentry, App Store Connect), Apple, the
   lawyer, the school, and every iPhone check.
 
@@ -146,7 +150,7 @@ class.
 ## Phases
 
 One line each. Phases 3–6's step lists, the push's (N1–N6) and this table in full are in
-`docs/PLAN-ARCHIVE.md`.
+`docs/PLAN-ARCHIVE.md`; Android's steps, Phases 8–11, are in `docs/PLAN-ANDROID.md`.
 
 | Phase | What | Status |
 |---|---|---|
@@ -158,49 +162,16 @@ One line each. Phases 3–6's step lists, the push's (N1–N6) and this table in
 | 5 | Pilot readiness: prod, Sentry, TestFlight, App Store, runbooks | ✅ cloud steps done; **prod live 2026-10-05**; open: the owner's items |
 | 6 | Security and compliance; gates Phase 5's student-facing steps | ✅ cloud steps done; open: C2 (⚖️ the lawyer's words), C7's phone check 📱, S8 (the owner's decision) |
 | 7 | Live lesson: questions and PDF slides in a running session, followed on the phone and the web | building (Phase 7 steps) |
+| 8 | Android: the lock, both candidates measured on a Pixel and a Samsung first (iOS's Phase 0) | planned (AN0 ✅, 2026-11-02); AN1 next 📱 |
+| 9 | Android: the engine, BaliCore's and BaliOutbox's twin, no screens | planned, after AN1b |
+| 10 | Android: the screens, from the approved boards | planned, after AS0's canvas |
+| 11 | Android: on Play, its testing tracks, device gate and exit check | planned |
 
 ### Portal redesign (v2's look) steps (PV; one PR each; 👀 = the owner looks at screenshots)
 
-**Done** (2026-10-16): PV0–PV17, the last PV17c-2 (#425). Approved by the owner 2026-10-12 (`docs/DECISIONS.md`): the portal and the student web redrawn in
-v2's look, to the canvas [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (its boards named on each
-step; its row "An idea, not in the plan: questions suggested from your slides" is out), its look
-`v2.css` (DESIGN.md §1: the style facts, what it changes, what it supersedes, its call). Its
-own plan, beside Phase 7: the drawings, the reads and the pages Phase 7's web screens sit on first
-(PV1–PV15), then Phase 7's web screens (Phase 7 steps: L7, W3, W4, L7b, L3c, L7c; M5, M6, W5), then
-the rest (PV16, PV17). Each UI step builds its boards with every state they draw, the words and
-states of the canvases v2's replaces carried over except where it changes them (DESIGN.md,
-Sources); an intermediate state no board draws is drawn on the canvas first, labelled as one, and
-then built from that drawing without waiting for the owner's approval, and anything new shown about
-a student, or anything else no board draws, waits for it (CLAUDE.md, Working rules); a
-page keeps today's layout until its step lands, while PV4's shared pieces (buttons, fields, chips,
-cards) change on every page at once. Each step is one PR from a fresh worker, under ~400
-changed lines not counting tests (the estimates below are from the boards; a step past it splits,
-as noted). **Cloud-buildable:** PV2, PV3, PV3b. **The Mac session's:** PV4–PV6; **the Windows PC's:** PV7–PV17 (2026-10-14). **A UI step's
-validation** (each 👀): vitest, `npm run typecheck && npm run lint && npm test`, `/santa-loop` with
-`web-design-guidelines` and `no-ai-slop`, and screenshots beside its boards for the owner.
-
-- **PV0** The redesign's plan (docs) — ✅ (#342; DECISIONS 2026-10-12)
-- **PV1** 👀 What no board draws, approved on the canvas — ✅ (2026-10-12, #346; DECISIONS 2026-10-12)
-- **PV2** API: each class's summary on `/v1/me` — ✅ (#344; DECISIONS 2026-10-12)
-- **PV3** API: Recent activity, `GET /v1/me/activity` — ✅ (#345; DECISIONS 2026-10-12)
-- **PV3b** A class list in a fixed order — ✅ (#347; DECISIONS 2026-10-12)
-- **PV4** 👀 The groundwork, `v2.css`'s shared pieces — ✅ (#351; DECISIONS 2026-10-13)
-- **PV4b** 👀 The icons at the canvas's 1.75 stroke — ✅ (#353; DECISIONS 2026-10-13)
-- **PV4c** PV4b's tests — ✅ (#357; DECISIONS 2026-10-13)
-- **PV5** 👀 The shell, v2's side menu — ✅ (#352; DECISIONS 2026-10-13)
-- **PV5b** 👀 The shell's read of the account — ✅ (#356; DECISIONS 2026-10-13)
-- **PV6** 👀 A class before a session — ✅ (#355; DECISIONS 2026-10-13)
-- **PV7** 👀 A class live — ✅ (#375; DECISIONS 2026-10-14)
-- **PV8** 👀 Tiles — ✅ (#377; DECISIONS 2026-10-14)
-- **PV9** 👀 Present — ✅ (#379; DECISIONS 2026-10-14)
-- **PV10** 👀 The unlock pop-up — ✅ (#381; DECISIONS 2026-10-14)
-- **PV11** 👀 The student panel — ✅ as PV11a (#382) and PV11b (#383; DECISIONS 2026-10-14)
-- **PV12** 👀 The recap (ClassEnded) — ✅ as PV12a (#384) and PV12b (#386; DECISIONS 2026-10-15)
-- **PV13** 👀 Reports — ✅ (#387; DECISIONS 2026-10-15)
-- **PV14** 👀 A session's report — ✅ (#401; DECISIONS 2026-10-15)
-- **PV15** 👀 The entry pages — ✅ (#388; DECISIONS 2026-10-15). **Then Phase 7's web screens** (Phase 7 steps)
-- **PV16** 👀 Classes — ✅ as PV16a (#420) and PV16b (#421); DECISIONS 2026-10-16
-- **PV17** 👀 Home (Main, HomeIdle, HomeNew, HomeStates) — ✅ as PV17a (#422), PV17b (#423), PV17c-1 (#424) and PV17c-2 (#425); DECISIONS 2026-10-16
+**Done** (2026-10-16): PV0–PV17, the last PV17c-2 (#425), to the canvas
+[Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4), approved by the
+owner 2026-10-12; the section's intro and its step lines are in `docs/PLAN-ARCHIVE.md`.
 
 ### Phase 7 steps (live lesson; one PR each; 👀 = the owner looks at screenshots, 📱 = needs the owner's iPhone, 🔧 = the owner in a console)
 
@@ -347,6 +318,7 @@ Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect acc
 
 **The rest of the owner's queue:**
 
+- Android's four (the phones, the Play account, the timing, the lock after AN1): `docs/PLAN-ANDROID.md`, Open owner items.
 - 🔧 Sentry: confirm monitor `api-sweep`'s `production` environment is active and alerting (dev checks in to the same slug, #239's review; runbook 6, step 2).
 - ⏳ Apple's developer agreement §3.3.3(P) on Family Controls (ISSUES #3): asked by the owner on 2026-10-13, **case 102994872143** (`docs/APP-STORE.md` §5.6 holds the question as sent); waiting on Apple's answer, to record in ISSUES #3.
 - #165 the Me page: D2j's redesign was rolled back (2026-10-06), so a better Me waits for a design the owner approves; the issue, closed by #266, is the owner's to reopen.
@@ -455,6 +427,9 @@ decision log, <date>" means the entry with that date there.
 - A step done: its line becomes one line (id, title, ✅, PR, DECISIONS date), its full line moved
   word for word to `docs/PLAN-ARCHIVE.md`. Before building a step, search the archive for its id:
   finished steps' notes say what they left for it ("for L7 to wire").
+- An Android step updates `docs/PLAN-ANDROID.md` by these same rules, and here Android's lines
+  (Now, its phase rows, its owner items): its Now line at least when it changes source, as CLAUDE.md
+  asks of every source change.
 - Made a real decision? It goes at the top of `docs/DECISIONS.md`, not here.
 - Built a new feature? Add a row under Go-live features with a one-line
   architecture note; if a design decision changed, ARCHITECTURE.md is updated

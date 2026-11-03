@@ -8,6 +8,49 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-02** — **Android as its own phases, 8–11, its lock spike first (the owner; AN0, #480).**
+  The owner, in the conductor's chat: "I want to start working on the android app for bali. I want
+  it to function exactly the same as the ios counterpart." Then: "yeah lets build out the docs for
+  android. I think android will needs its own phases though right? like it will take some time to
+  build out everything. but now we have the screens and stuff settled." **Decided:** Android gets
+  its own phases, as the owner asked: 8, the lock (iOS's Phase 0); 9, the engine (BaliCore's and
+  BaliOutbox's twin, no screens); 10, the screens, from approved boards; 11, on Play. Its steps live
+  in a file of their own, `docs/PLAN-ANDROID.md`, under PLAN.md's rules (the conductor's shape,
+  which the owner asked for): the current state only, a finished step one line, its notes word for
+  word in `docs/PLAN-ARCHIVE.md`, under 6,000 words (AN2 puts the cap in CI). Every rule, decision
+  and archive stays shared: ARCHITECTURE.md, this log, PLAN-ARCHIVE.md, ISSUES.md, CLAUDE.md and
+  `contracts/`. PLAN.md stays the file every session reads first and carries Android's phase rows,
+  one line in Now and a pointer; CLAUDE.md's "Read first" sends an Android task to the new file. The
+  spike first (the conductor's order, as Phase 0 proved the shields before the iOS app was built):
+  AN1 measures both candidate locks on a Pixel and a Samsung before any of the app is built.
+  ARCHITECTURE's new "Android app structure" is **proposed**, the conductor's recommendations for
+  the owner to confirm: native Kotlin and Compose; BaliOutbox's and BaliCore's rules ported with
+  their tests, the six rules and the phone's rules holding except where the section says otherwise;
+  one app, no extensions; push through FCM, the server's second sender, by an additive field on the
+  push-token endpoint; sign-in through Cognito's hosted UI in a Custom Tab. ISSUES #6 (the lock is
+  softer than iOS's) and #7 (Play's Accessibility rules) are opened. To make room, PLAN.md's
+  finished portal-redesign list moved word for word to the archive, leaving one line. **Why:**
+  Android gives an ordinary app no Screen Time: both locks open to Bali, an Accessibility service
+  that covers the app in front or usage access polled with an overlay, run in Bali's own process
+  and stop when it stops, so whether one holds up on real phones decides everything after it. Four
+  phases and about 30 open steps don't fit under PLAN.md's 8,000-word cap (7,797 words before this
+  PR); every session would otherwise read Android's steps; and Android's PRs would collide in
+  PLAN.md with the Mac's and the PC's. Parity comes from what is shared: the six rules, the phone's
+  rules, and `contracts/`'s fixtures, which BaliCore decodes and Kotlin will too. **Set aside:** one
+  PLAN.md for both apps (its cap, its readers, its collisions); Kotlin Multiplatform (the iOS core is
+  already Swift and tested, and `contracts/` already holds both apps to one server); device-owner
+  mode on students' own phones (Android's full lock needs a factory-reset phone the school manages:
+  the K-12 path, in the section's "Decided later"). **Still open:** the lock, (a) or (b), after AN1
+  (AN1b); which Pixel and which Samsung; the Play account, an organization (not under the 12-tester
+  rule; it needs a D-U-N-S number) or personal (a closed test of at least 12 testers, opted in 14
+  days in a row, before production); whether Android joins the Vanderbilt pilot, so no Go-live row
+  yet; whether the approved iOS boards stand for Android's screens once AS0's canvas is approved;
+  Play's answer on the Accessibility route (ISSUES #7); and whether an `android/` change may meet
+  the plan check with `docs/PLAN-ANDROID.md` alone, which CLAUDE.md's working rule (every source
+  change updates `docs/PLAN.md`) would need amended first, in a PR of its own: until then an Android
+  step that changes source updates Android's Now line in PLAN.md too, one line where the step list
+  would have been. Not on the pilot's critical path.
+
 - **2026-11-02** — **The demo site on its own orphan branch, `demo2` (the owner; #479).** The
   one-page demo at www.getbali.app (getbali.app forwards there) is the Vercel project `bali-web`
   (team `evc123`), and since 2026-11-02 it deploys `demo2`, an orphan branch of this repo that holds
