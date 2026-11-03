@@ -139,6 +139,22 @@ test('no opacity or movement CSS animations inside the scenes', async ({ page })
   await expect(slide).toHaveCSS('opacity', '1', { timeout: 10000 });
 });
 
+test('chapter 2 shows a locked app, and chapter 5 a question over the slide', async ({ page }) => {
+  await openLive(page);
+  await expect(page.getByRole('img', { name: "Opening another app in class shows Bali's screen: Focused with Bali." })).toHaveCount(1);
+  await expect(page.getByRole('heading', { name: 'Slides and questions on every phone.' })).toHaveCount(1);
+  await expect(page.getByRole('img', { name: "On a student's phone, a question they answered and the same slide under it" })).toHaveCount(1);
+  // The locked app's phone rises in once the Focus phone is in place, and the question card after the slide.
+  const shield = page.locator('.b-ch-2 .b-p-shield');
+  const question = page.locator('.b-ch-5 .b-p-side section');
+  await expect(shield).toHaveCSS('opacity', '0');
+  await expect(question).toHaveCSS('opacity', '0');
+  await page.evaluate(() => scrollTo(0, innerHeight * 2.3));
+  await expect(shield).toHaveCSS('opacity', '1', { timeout: 10000 });
+  await page.evaluate(() => scrollTo(0, innerHeight * 8.2));
+  await expect(question).toHaveCSS('opacity', '1', { timeout: 10000 });
+});
+
 test('each screen picture\'s box is the size it is drawn at', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
@@ -149,7 +165,7 @@ test('each screen picture\'s box is the size it is drawn at', async ({ page }) =
       return Math.max(Math.abs(outer.width - drawn.width), Math.abs(outer.height - drawn.height));
     }),
   );
-  expect(off.length).toBe(8);
+  expect(off.length).toBe(9);
   for (const px of off) expect(px).toBeLessThan(1.5);
 });
 
@@ -174,7 +190,7 @@ test('turning on Reduce Motion mid-visit shows every chapter whole', async ({ pa
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await expect(root(page)).not.toHaveClass(/is-live/);
   await expect(page.locator('.b-ch.b-off')).toHaveCount(0);
-  for (const sel of ['.b-ch-4 .b-card', '.b-ch-4 .b-lay-b', '.b-ch-5 .b-p-side figure', '.b-ch-6 .mline .mk']) {
+  for (const sel of ['.b-ch-2 .b-p-shield', '.b-ch-4 .b-card', '.b-ch-4 .b-lay-b', '.b-ch-5 .b-p-side figure', '.b-ch-5 .b-p-side section', '.b-ch-6 .mline .mk']) {
     await expect(page.locator(sel).first()).toHaveCSS('opacity', '1');
   }
 });

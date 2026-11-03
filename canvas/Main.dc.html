@@ -70,12 +70,13 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 .b-card{left:0;top:380px;z-index:2;width:290px;padding:12px;border-radius:18px;background:#FFFFFF;box-shadow:0 18px 40px rgba(33,28,21,0.14)}
 .b-proj{left:20px;top:96px}
 .b-p-side{left:552px;top:160px}
+.b-p-shield{left:282px;top:160px}
 .b-w-recap{left:0;top:110px}
 .b-p-side6{left:556px;top:166px}
 .zoom{width:max-content;transform:scale(var(--z));transform-origin:0 0}
 /* A transform doesn't shrink a box the way zoom did, so each picture's box is the size it's drawn at. */
 .b-p-main{width:calc(426px * 0.62);height:calc(898px * 0.62)}
-.b-p-side,.b-p-side6{width:calc(426px * 0.44);height:calc(898px * 0.44)}
+.b-p-side,.b-p-side6,.b-p-shield{width:calc(426px * 0.44);height:calc(898px * 0.44)}
 .b-w-grid{width:calc(1440px * 0.42);height:calc(944px * 0.42)}
 .b-w-recap{width:calc(1440px * 0.42);height:calc(804px * 0.42)}
 .b-proj{width:calc(1964px * 0.3);height:calc(1004px * 0.3)}
@@ -297,6 +298,7 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 <div class="b-wrap"><div class="b-scene">
 <div class="b-emblem" aria-hidden="true"><svg viewBox="0 0 200 200"><circle class="b-disc" cx="100" cy="100" r="80"></circle><circle class="b-ring" cx="100" cy="100" r="90"></circle><g class="b-arcrot"><circle class="b-arc" cx="100" cy="100" r="90" transform="rotate(-90 100 100)"></circle></g><path class="b-slingp" d="{{sl.d2}}" style="stroke-dasharray: {{sl.dash}}; --travel: {{sl.travel}}px"></path></svg></div>
 <div class="b-dev b-p-main" role="img" aria-label="The phone in focus, counting down to the end of class"><div class="zoom b-z62" inert="inert" aria-hidden="true"><div class="bezel"><div class="screen"><dc-import name="AppFocus" hint-size="402px,874px"></dc-import></div><span class="island"></span></div></div></div>
+<div class="b-dev b-p-shield" role="img" aria-label="Opening another app in class shows Bali's screen: Focused with Bali."><div class="zoom b-z44" inert="inert" aria-hidden="true"><div class="bezel"><div class="screen"><dc-import name="AppShield" hint-size="402px,874px"></dc-import></div><span class="island"></span></div></div></div>
 </div></div>
 <div class="b-copy"><h2 id="h-2" class="display">Focus until the bell.</h2></div>
 <div class="b-count" aria-hidden="true"><span>2</span><i></i><span>7</span></div>
@@ -343,9 +345,9 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 <div class="b-wrap"><div class="b-scene">
 <div class="b-emblem" aria-hidden="true"><svg viewBox="0 0 200 200"><circle class="b-disc" cx="100" cy="100" r="80"></circle><circle class="b-ring" cx="100" cy="100" r="90"></circle><g class="b-arcrot"><circle class="b-arc" cx="100" cy="100" r="90" transform="rotate(-90 100 100)"></circle></g><path class="b-slingp" d="{{sl.d5}}" style="stroke-dasharray: {{sl.dash}}; --travel: {{sl.travel}}px"></path></svg></div>
 <div class="b-dev b-proj" role="img" aria-label="Slide 4 of 12 on the projector: Factoring quadratics"><div class="zoom b-z30" inert="inert" aria-hidden="true"><div class="display-bezel"><div class="screen-wide"><dc-import name="PortalSlide" hint-size="1920px,1080px"></dc-import></div></div></div></div>
-<div class="b-dev b-p-side" role="img" aria-label="The same slide arriving on a student's phone"><div class="zoom b-z44" inert="inert" aria-hidden="true"><div class="bezel"><div class="screen"><dc-import name="AppSlide" hint-size="402px,874px"></dc-import></div><span class="island"></span></div></div></div>
+<div class="b-dev b-p-side" role="img" aria-label="On a student's phone, a question they answered and the same slide under it"><div class="zoom b-z44" inert="inert" aria-hidden="true"><div class="bezel"><div class="screen"><dc-import name="AppSlideQuestion" hint-size="402px,874px"></dc-import></div><span class="island"></span></div></div></div>
 </div></div>
-<div class="b-copy"><h2 id="h-5" class="display">Slides on every phone.</h2></div>
+<div class="b-copy"><h2 id="h-5" class="display">Slides and questions on every phone.</h2></div>
 <div class="b-count" aria-hidden="true"><span>5</span><i></i><span>7</span></div>
 </div></div>
 </section>
@@ -537,9 +539,11 @@ class Component extends DCLogic {
     const rise = (el, t) => { el.style.opacity = t; el.style.transform = 'translateY(' + 18 * (1 - t) + 'px)'; };
     const small = [
       ['.b-cue', 0, 30, (el, t) => { el.style.opacity = 1 - t; }],
+      ['.b-ch-2 .b-p-shield', 190, 25, rise],
       ['.b-ch-4 .b-lay-b', 585, 20, (el, t) => { el.style.opacity = t; }],
       ['.b-ch-4 .b-card', 600, 25, rise],
       ['.b-ch-5 .b-p-side figure', 770, 30, rise],
+      ['.b-ch-5 .b-p-side section', 780, 30, rise],
       ['.b-ch-6 .mline .ln', 900, 90, (el, t) => { el.style.transform = 'scaleX(' + t + ')'; }],
       ['.b-ch-6 .mline .mk', 950, 45, (el, t) => { el.style.opacity = t; el.style.transform = 'scale(' + (0.4 + 0.6 * t) + ')'; }],
     ];

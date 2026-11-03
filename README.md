@@ -4,9 +4,8 @@ getbali.app: the one-page demo. This branch holds only the site; the product liv
 
 The design is the owner-approved Claude Design canvas "Bali demo site"
 (https://claude.ai/artifact/EdpxNeVy1iiEHqUcy7UwXs). `canvas/` is a copy of its files as approved
-(version 21, 2026-11-02; `VideoPlaying.dc.html` draws the video playing in place). Change the design on the canvas first, get the owner's approval, then copy the
-changed files in here. Version 21 also holds a proposal for chapters 2 and 5 (`Proposal*.dc.html`,
-`AppShield.dc.html`, `AppSlideQuestion.dc.html`) waiting for that approval; none of it is copied here yet.
+(version 23, 2026-11-02; `VideoPlaying.dc.html` draws the video playing in place). Change the design on the canvas first, get the owner's approval, then copy the
+changed files in here.
 
 - `canvas/`: the approved canvas files: the page (`Main.dc.html`), the app and portal screens it shows,
   and the portal stylesheet they're drawn with (`v2.css`).
