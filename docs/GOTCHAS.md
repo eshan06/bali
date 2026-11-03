@@ -128,6 +128,16 @@ The PC whose clone is `C:\dev\bali` holds Android's SDK and its test emulators
   the folder holding only `.installer/`; Android 17's Play Store image
   (`android-37.0/google_apis_playstore_ps16k`) still is one. An image is installed when its folder
   holds `source.properties` and `package.xml`.
+- **A reboot can end the emulator instead.** `adb reboot`, or the power menu's Reboot to safe
+  mode, often powers the emulator off, or hangs it with adb still listing it and its shell never
+  answering. Stop it (`emu kill`; if that hangs too, end `qemu-system-x86_64-headless.exe`) and
+  start it again with `--cold`: that is a boot all the same, and a Safe Mode asked for still takes.
+  Safe Mode also turns Airplane mode on, and it stays on after
+  (`adb shell cmd connectivity airplane-mode disable`).
+- **A worktree's worker can't hand adb or bash a script file.** Its isolation check refuses
+  `adb shell sh <file>` and `source`, often `bash <file>` and some long `adb shell '…'` strings,
+  as text it can't read. Inline a short loop in `adb shell '…'`, and split a long one into plain
+  commands.
 
 ## Cloud sessions / dev environment
 

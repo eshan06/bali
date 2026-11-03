@@ -14,11 +14,12 @@ structure", proposed until AN1b settles the lock.
   disagrees.
 - **Under 6,000 words.** AN2 puts the cap in CI, as `plan-words.sh` holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-03 (Central) — AN1's setup (`docs/DECISIONS.md`, 2026-11-03): AN1 runs on
-the emulator first and on the phones later (the owner), and the spike's code waits for the owner's
-word; Android 15, 16 and 17 emulators are set up on the PC whose clone is `C:\dev\bali`; AN2's
-contract tests run on every PR, as BaliCore's do. Next: AN1's spike, once the owner says its code
-can start. Not on the pilot's critical path._
+_Last updated: 2026-11-03 (Central) — AN1, part 1 (`docs/DECISIONS.md`, 2026-11-03): the lock
+spike measured both locks on the Android 15, 16 and 17 emulators, its code on `spike/android-lock`
+(never merged). Neither lock holds up alone: (a) covers more but stays off after a force-stop or
+Safe Mode; (b) comes back by itself but misses picture-in-picture and every profile. Next: AN1's
+part 2 on a Pixel and a Samsung, once the owner has them (Open owner items, 1), then AN1b. Not on
+the pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -80,22 +81,15 @@ first and then on real phones, before any of the app is built, as Phase 0 proved
   before its Accessibility service can be turned on: the checklist says how each build was
   installed — validation: every line answered on both phones
 
-  **On the emulator first** (the owner, 2026-11-02: "we will do it on the simulator I have android
-  simulator on this. I can get an android device later"): every line an emulator can answer, on
-  Android 15, 16 and 17 (`Bali_Spike_API35`–`37`, Who builds what). A real block over NFC, the
-  Samsung's battery saver and the battery a lesson costs wait for the phones, and AN1b waits for
-  both. The emulators are set up (2026-11-03); the spike's code starts at the owner's word ("just
-  setup. nothing with code yet", 2026-11-02). To check first (the spike worker's expectations, not
-  findings):
-  - whether a force-stop takes Bali off `enabled_accessibility_services` under (a);
-  - the Stop button that Android 13 and later give (b)'s foreground service in quick settings'
-    active apps;
-  - that an emulator may not sleep as a phone does (log uptime beside elapsed time on every tick);
-  - that ticks over `adb reverse` ride loopback, which Doze may let through (send them to
-    `10.0.2.2`);
-  - that usage events carry no window bounds, so (b) may cover an allowed app in split screen;
-  - Samsung's in-call screen, its own package (`com.samsung.android.incallui`), on the allow-list;
-  - that an overlay doesn't pause the app under it, whose sound may play on.
+  **Part 1, on the emulators** ✅ (Android 15, 16 and 17; the code on `spike/android-lock`, never
+  merged; DECISIONS 2026-11-03): neither lock holds up alone. (a) covers split screen window by
+  window, picture-in-picture, the work profile and Private Space, but a force-stop or Safe Mode
+  switches it off until the student switches it on again; (b) comes back by itself after both, but
+  misses picture-in-picture and every profile, covers the allowed half of a split screen, and gets
+  a Stop button in quick settings. **Part 2, on the phones, waits for them** (Open owner items, 1):
+  a real block over NFC with Bali open and closed, the Samsung's battery saver and its in-call
+  screen (`com.samsung.android.incallui`), the battery a lesson costs, and every other line again,
+  Doze above all (an emulator's CPU never sleeps). AN1b waits for both.
 - **AN1b** The lock decided (docs): AN1's measurements into `docs/DECISIONS.md`; the owner's pick
   (Open owner items, 4) moves ARCHITECTURE's "Android app structure" from proposed to decided;
   ISSUES #6 and #7 updated. If neither lock holds up, the owner decides what becomes of Phases
