@@ -8,6 +8,106 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-03** — **AN1, part 1: both locks measured on the Android 15, 16 and 17 emulators (the
+  owner's go; the spike's worker).** The owner, in the conductor's chat: "i dont have real phones
+  yet but yes start the lock test on three emulators now". The spike is the branch
+  `spike/android-lock` (`android/spike/`, never merged): a fake session on the phone's clock, both
+  locks, Emergency Unlock's one-second hold, the allow-list asked of Android, a protection-off
+  detector, a check-in tick every 30 s sent to `10.0.2.2`, and an NFC reader with `BlockTag`'s
+  rules ported and tested, for part 2. It ran on `Bali_Spike_API35`–`37` (Pixel 7, `google_apis`,
+  software graphics, so every timing is slower than a phone's), built with targetSdk 35 and
+  installed with `adb install` unless a line says otherwise, its times taken from `logcat -v epoch`.
+  **The headline: on the emulators neither lock holds up alone.** (a) covers what (b) can't (split
+  screen window by window, picture-in-picture, the work profile and Private Space; Settings never
+  hides it) and has no notification or Stop button, but a force-stop or a trip to Safe Mode takes
+  Bali off Android's list of switched-on services, so it stays off until the student switches it
+  on again. (b) comes back by itself after both, but it misses picture-in-picture and every
+  profile, covers the allowed half of a split screen (or, beside Settings, is hidden by it), and
+  quick settings gives its service a Stop button. Under both, a blocked app's sound plays on and a
+  guest user is out of reach; and Doze proved little, because an emulator's CPU never sleeps
+  (`sleptMs` 0 on every tick).
+
+  **Lock (a), the Accessibility service** (✅ held, ❌ didn't, — doesn't apply):
+
+  | Line | Android 15 | Android 16 | Android 17 | Notes |
+  |---|---|---|---|---|
+  | Every app covered, the allow-list never | ✅, but YouTube bare behind its permission prompt (Files crashed by itself once, covered on a retry) | ✅, but Maps' and Calendar's first cold starts still bare 4 s in | ✅, but Contacts and YouTube bare behind their prompts, and Calendar's and Gemini's first launches bare 5 s in | Retried, the slow first launches were covered within 2–4 s. A permission prompt in a blocked app's task hides the app's window from (a), so it shows dimmed behind the prompt |
+  | Launch to cover, 15 launches (median, worst) | 570 ms, 1,404 | 507, 1,647; a cold Calendar bare 4 s in | 745, 1,557; Contacts bare all 3 times (its prompt), a cold Calendar bare 4 s in | Always after the app's first frame, by a median 228 ms (15), 271 (16), 286 (17): (a) learns of a window once it's drawn |
+  | Swiped from recents | ✅ held | ✅ held | ✅ held | The system's binding keeps Bali's process |
+  | Force-stopped | ❌ off, and off Android's list: opening Bali doesn't bring it back | ❌ same | ❌ same | Bali sees it when opened (exit reason `[FORCE STOP]`) |
+  | Rebooted mid-session | ✅ back by itself, 13 s after the screen came on | ✅ 11.5 s | ✅ 20 s | |
+  | Safe Mode | ❌ off, and off the list for good: still off after the next normal boot | ❌ same | ❌ same | Through the power menu (long-press Power off) |
+  | Quick settings' Stop | — not listed: no foreground service | — | — | |
+  | Doze, forced, screen off | ✅ 10 min, 20 of 20 ticks reached the host | ✅ 10 min, 20 of 20 | ✅ 50 min, 100 of 100 | Lock still on after; the emulator's CPU never slept |
+  | Split screen | ✅ only the blocked half covered, Settings usable | ✅ same | ✅ same | Neither lock covers the system bars: a 63-px strip of the app shows under the gesture bar |
+  | Picture-in-picture | ✅ the cover follows the small window | ✅ | ✅ | |
+  | Opened from a notification | ✅ | ✅ | ✅ | |
+  | A link in Messages that opens Chrome | ✅ | ✅ | ✅ | |
+  | A blocked app's sound | ❌ plays on | ❌ | ❌ | `dumpsys audio`: started, not muted |
+  | Work profile | ✅ covered | ✅ | ✅ | Profiles made with `pm create-user` |
+  | Private Space | ✅ covered | ✅ | ✅ | |
+  | Guest user | ❌ bare; back in the owner's user, (a) took 66 s to return | ❌; 30 s | ❌; 30 s | |
+  | Advanced Protection | — | ✅ (a) stays on, covers, and can still be switched on | ✅ same | Turned on with `cmd advanced_protection`: Settings' switch needs a screen lock, which this session's permissions refused to set. Its page belongs to Google Play services, so (a) covers it |
+  | Emergency Unlock | ✅ a 0.4 s tap does nothing; the hold: cover off 58 ms after its second | ✅ 77 ms | ✅ 211 ms | |
+  | Protection taken back | ✅ a force-stop noticed when Bali was opened | ✅ same | ✅ and switched off in Settings: noticed at once, by the service and by the switch's watcher | |
+  | Restricted settings | `adb install`: switched on in Settings. From Files: "App was denied access"; App info offers "Allow restricted settings" | same | `adb install`: switched on. From Files: not run, the tap on the APK never reached the installer | Recorded as a downloaded file (`packageSource=3`). On 17, opened through adb, Files' tap was refused as the shell's own request |
+
+  **Lock (b), usage access polled, and an overlay:**
+
+  | Line | Android 15 | Android 16 | Android 17 | Notes |
+  |---|---|---|---|---|
+  | Every app covered, the allow-list never | ✅, but YouTube bare behind its permission prompt | ✅ same | ✅, but Contacts and YouTube bare behind their prompts | The prompt (the permission controller, allowed) resumed last |
+  | Launch to cover at 250 ms, 500 ms, 1 s (median, worst) | 441 ms, 598; 423, 1,330; 744, 1,468 | 323, 784; 493, 1,636; 559, 1,368 | 317, 699; 280, 747; 572, 919 (Contacts bare behind its prompt in each) | At 250 ms a cold start's cover lands before the app's first frame (15: every time; 16 and 17: worst 12 and 74 ms after it); at 1 s, up to 490 ms after |
+  | Swiped from recents | ✅ held | ✅ held | ✅ held | The foreground service keeps the process |
+  | Force-stopped | ❌ off; its grants kept; back as soon as Bali is opened | ❌ same | ❌ same | Android sends BOOT_COMPLETED as a stopped app is opened |
+  | Rebooted mid-session | ✅ back by itself (BOOT_COMPLETED), 39 s after the screen came on | ✅ 38 s | ✅ 54 s | |
+  | Safe Mode | ❌ off; grants kept; ✅ back by itself at the next normal boot | same | same | |
+  | Quick settings' Stop | ❌ "Active apps" lists Bali; Stop kills it (`[STOP APP]`), off until it's opened | ❌ same | ❌ same | While the cover is up, Android also posts its own "displaying over other apps" notification, a shortcut to the overlay's switch (seen on 17) |
+  | Doze, forced, screen off | ✅ 10 min, 20 of 20 ticks | ✅ 10 min, 20 of 20 | ✅ 50 min, 100 of 100 | |
+  | Split screen | ❌ covers the allowed half too (Messages out of reach); beside Settings, the cover is hidden and the blocked half shows | ❌ same | ❌ same | Usage events carry no bounds; Settings hides other apps' overlays while it's on screen |
+  | Picture-in-picture | ❌ bare | ❌ | ❌ | Home resumes last |
+  | Opened from a notification | ✅ | ✅ | ✅ | |
+  | A link in Messages that opens Chrome | ✅ | ✅ | ✅ | |
+  | A blocked app's sound | ❌ plays on | ❌ | ❌ | |
+  | Work profile | ❌ bare | ❌ | ❌ | Usage events are the user's own |
+  | Private Space | ❌ bare | ❌ | ❌ | |
+  | Guest user | ❌ bare; covers at once back in the owner's user | ❌ same | ❌ same | |
+  | Advanced Protection | — | not run: the line asks about (a) | ✅ grants kept, still covers | Turned on with `cmd`, as for (a) |
+  | Emergency Unlock | ✅ a 0.4 s tap does nothing; the hold: cover off 49 ms after | ✅ 234 ms (its next poll) | ✅ 75 ms | |
+  | Protection taken back | ✅ a force-stop or Stop noticed when Bali was opened | ✅ same | ✅ and usage access or the overlay taken back: noticed at once (0.1–0.2 s), and with either gone nothing is covered | |
+  | Restricted settings | `adb install`: fine. From Files: usage access "App was denied access", Display over other apps "Disabled" | From Files: usage access "Controlled by Restricted Setting" | `adb install`: fine. From Files: not run, as for (a) | |
+
+  **The rest of the allow-list, checked on 17 only** (the loops on 15 and 16 missed it): under both
+  locks the emergency dialer (`com.android.phone`) and the keyboard were never covered, and the
+  shade worked over a covered app ((a)'s cover steps aside while it's open; (b)'s sits under it).
+  Android named the parts as expected: Google's Phone app (the dialer role), Google Messages (the
+  SMS role), `com.android.phone` and Telecom, Settings, the permission controller and the package
+  installer, the Pixel launcher, two keyboards (Gboard and Google's voice typing) and System UI.
+  Two holes it leaves: Settings' pages that Google Play services draws (Advanced Protection's
+  among them) are covered as the list stands, and a permission prompt lets a blocked app show
+  behind it.
+
+  **The worker's read, not a decision** (the lock is the owner's pick, at AN1b): (a) is the
+  stronger lock while it runs. It sees windows and their bounds, so it covers what (b) can't by
+  design (split screen, picture-in-picture, the profiles), keeps no notification or Stop button,
+  and Settings doesn't hide it. Its weak spots: it learns of a window only once the window is
+  drawn, so a blocked app always shows first (a fifth to half a second past its first frame from
+  a cold start, half a second to a second when it comes back from the background, longer on a
+  slow launch or behind a permission prompt); and its failures stick, since a force-stop or Safe
+  Mode leaves it off until the student switches it on again in Settings, which Bali can report but
+  not undo. (b)'s failures heal (it's back at the next open or boot), but its holes are built in.
+  Neither answers Play's question (ISSUES #7), and every emulator timing is slower than a phone's.
+  Android 17 changed nothing material for either lock on these images, and Advanced Protection,
+  turned on by `cmd`, left both alone; whether Google's own switch does more is part 2's to see.
+
+  **For part 2, on the phones:** both locks again on the Pixel and the Samsung, the Doze lines
+  above all (a phone's CPU sleeps, an emulator's didn't); a real block read over NFC, with Bali
+  open and closed; the Samsung's battery saver and its in-call screen
+  (`com.samsung.android.incallui`, a package of its own, which the allow-list must also find);
+  the battery a lesson costs; and Advanced Protection turned on through Settings itself (a phone
+  with a screen lock can), not by `cmd`. Each phone needs USB debugging, and the tick host set to
+  the PC's address on the same Wi-Fi (`--es tickHost`), as the spike's README says.
+
 - **2026-11-03** — **AN1 on the emulator first, its code at the owner's word; Android's contract
   tests on every PR (the owner; the conductor).** The owner, 2026-11-02, on the lock spike: "we
   will do it on the simulator I have android simulator on this. I can get an android device later".

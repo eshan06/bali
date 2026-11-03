@@ -10,6 +10,21 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-11-03 (Central) — AN1's setup (`docs/DECISIONS.md`, 2026-11-03): Android's
+lock spike runs on the emulator first and on the owner's phones later, its code waiting for the
+owner's word; Android 15, 16 and 17 emulators set up on the PC whose clone is `C:\dev\bali`;
+Android's contract tests to run on every PR, as BaliCore's do (AN2). Before it, AN0 (#480), Android
+as its own phases. Still **before the next TestFlight build, Push Notifications on `com.bali.Bali`**
+(runbook 7, step 3), and the owner reinstalls Bali before runbook 7's step-6 check. Next: the
+owner's call on GA5's known limit, the smallest iPhones (DECISIONS 2026-11-02); AN1's spike once the
+owner says its code can start; the audit's polish waits, as ruled._
+
+`docs/PLAN-ANDROID.md`'s, replaced the same day: _Last updated: 2026-11-03 (Central) — AN1's setup
+(`docs/DECISIONS.md`, 2026-11-03): AN1 runs on the emulator first and on the phones later (the
+owner), and the spike's code waits for the owner's word; Android 15, 16 and 17 emulators are set up
+on the PC whose clone is `C:\dev\bali`; AN2's contract tests run on every PR, as BaliCore's do.
+Next: AN1's spike, once the owner says its code can start. Not on the pilot's critical path._
+
 _Last updated: 2026-11-02 (Central) — AN0 (#480; `docs/DECISIONS.md`, 2026-11-02): Android planned
 as its own phases, 8–11, its steps in `docs/PLAN-ANDROID.md` under this file's rules, and
 ARCHITECTURE's "Android app structure" proposed, its lock left to AN1's spike on the owner's Android
@@ -1887,6 +1902,31 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
     ruling, 2026-09-30; until then a Start answered with the old one, up to
     the sweep's minute). Phase 2 had allowed it, with a fresh window from the
     press.
+
+## Android (`docs/PLAN-ANDROID.md`)
+
+Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
+file).
+
+AN1's notes on running on the emulator first, as they read until part 1 was done (2026-11-03;
+`docs/DECISIONS.md`, 2026-11-03):
+
+  **On the emulator first** (the owner, 2026-11-02: "we will do it on the simulator I have android
+  simulator on this. I can get an android device later"): every line an emulator can answer, on
+  Android 15, 16 and 17 (`Bali_Spike_API35`–`37`, Who builds what). A real block over NFC, the
+  Samsung's battery saver and the battery a lesson costs wait for the phones, and AN1b waits for
+  both. The emulators are set up (2026-11-03); the spike's code starts at the owner's word ("just
+  setup. nothing with code yet", 2026-11-02). To check first (the spike worker's expectations, not
+  findings):
+  - whether a force-stop takes Bali off `enabled_accessibility_services` under (a);
+  - the Stop button that Android 13 and later give (b)'s foreground service in quick settings'
+    active apps;
+  - that an emulator may not sleep as a phone does (log uptime beside elapsed time on every tick);
+  - that ticks over `adb reverse` ride loopback, which Doze may let through (send them to
+    `10.0.2.2`);
+  - that usage events carry no window bounds, so (b) may cover an allowed app in split screen;
+  - Samsung's in-call screen, its own package (`com.samsung.android.incallui`), on the allow-list;
+  - that an overlay doesn't pause the app under it, whose sound may play on.
 
 ## How to update this file (every session that changes code)
 
