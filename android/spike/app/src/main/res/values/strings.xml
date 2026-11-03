@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="a11y_description">The lock spike, (a): during a fake session, covers any app that isn\'t on the allow-list.</string>
+</resources>
