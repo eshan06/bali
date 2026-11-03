@@ -221,6 +221,89 @@ deleted (data-model decision 3), and ISSUES #2 says an unlock record is never lo
 **Done when:** the owner's policy is written, and C3–C6 have landed (C3, C5 and C6 have;
 C4a, the phone's Delete account engine, has too; its Me screen button, C4b, is next).
 
+## 6. Android's lock is Bali's own, so it is softer than iOS's
+
+**The problem.** On an iPhone the shields are the system's: Screen Time keeps them on with Bali
+force-quit and takes them off at the bell from its own monitor. Android gives an ordinary app
+nothing like it. The two locks open to Bali (ARCHITECTURE, "Android app structure", decision 2) are
+an Accessibility service that sees which app comes to the front and covers it with Bali's block
+screen, or usage access, polled, with an overlay ("Display over other apps"). Both run in Bali's
+own process. Force-stopping Bali or switching the service off ends the lock, some phone makers'
+battery savers may stop it unasked, a reboot into Safe Mode runs no app but the system's, and the
+blocked app can flash before the cover lands. Android's full lock, device-owner mode, needs a
+factory-reset phone the school manages: never a student's own.
+
+**What others do (researched 2026-11-02).** Android's app blockers live with the same limits.
+AppBlock, a common one, asks for usage access to see which app is in use, Display over other apps
+to show its block screen, and Accessibility for its website blocking and some of its app blocking,
+and asks to be left out of battery optimization and, on some phones, to start itself after a
+reboot. Its help pages warn that some makers' phones (Xiaomi, Huawei, Oppo) turn Accessibility
+services off to save battery, that Samsung's power monitor can interfere, that Safe Mode turns it
+off, and that Android 17's Advanced Protection may restrict it
+([AppBlock's permissions help](https://appblock.app/help/android/troubleshooting-and-permissions/)).
+Google's own Family Link can block a supervised child's apps at the system's level, but it is
+Google's own, not something another app can use.
+
+**The plan.**
+- The spike first (AN1, `docs/PLAN-ANDROID.md`): both locks on a Pixel and a Samsung, each way out
+  measured (recents, a force-stop, a reboot and Safe Mode, battery savers and Doze, split screen,
+  picture-in-picture, an app opened from a notification, a work profile, Private Space, a guest
+  user, Advanced Protection), and how fast the cover lands. The owner picks the lock from the
+  measurements (AN1b).
+- Honest, not fought (the mirror rule): what the lock can't stop, the teacher sees. The service
+  switched off is protection off, with iOS's events; a stopped Bali goes quiet on the grid within
+  about a minute; no screen claims a lock the last check didn't verify (rule 3).
+- What the school is told about Android's lock, before any Android phone joins a class, is the
+  owner's call (`docs/PLAN-ANDROID.md`, Open owner items, 3).
+- The full lock later: device-owner mode on school-owned phones, the K-12 path (ARCHITECTURE,
+  "Android app structure", Decided later).
+
+**Done when:** AN1's measurements are on record (AN1b), the owner has picked the lock, and the
+device gate (AP3) shows the grid telling the truth about every way out AN1 found.
+
+## 7. Google Play's Accessibility rules may not fit a classroom lock
+
+The twin of #3, Apple's terms, for Android.
+
+**The problem.** If AN1 picks lock (a), Bali uses an API that Play guards
+([Use of the AccessibilityService API](https://support.google.com/googleplay/android-developer/answer/10964491)).
+Only an app whose primary purpose is supporting people with disabilities may declare itself an
+accessibility tool (`isAccessibilityTool`), which Bali isn't. Every other app needs a prominent
+disclosure inside the app, shown in its normal use, never only in a menu, the listing or a privacy
+policy, saying what the API reads and how it is used; the user's affirmative consent (a tap to
+accept, a box ticked); a declaration in the Play Console, with a video of the disclosure and of what
+happens when the user says no; and the listing saying so. The API may never stop a user from
+disabling or uninstalling an app or service unless a parent authorizes it through a parental-control
+app or an administrator through enterprise management software
+([Permissions and APIs that Access Sensitive Information](https://support.google.com/googleplay/android-developer/answer/16558241)),
+and a teacher's tool on a student's own phone is neither. Play's newer rule against apps that act
+on their own through the API spares a fixed rule a person set, such as "a blocked app comes to the
+front: cover it". The declaration is made again whenever the app's use of the API changes, and a
+deceptive or undeclared use can suspend the app. Separately, a personal developer account made after
+2023-11-13 reaches production only after a closed test of at least 12 testers, opted in for 14 days
+in a row
+([App testing requirements](https://support.google.com/googleplay/android-developer/answer/14151465)).
+
+**What others do (researched 2026-11-02).** A screen-time app's developer reports four refusals
+from Play over its Accessibility disclosure, until they took the service out and saw the app in
+front by polling usage access instead, about 800 ms behind: lock (b), which needs no Accessibility
+declaration
+([their account](https://dev.to/lui61140/why-i-removed-accessibilityservice-from-my-android-app-and-finally-got-into-play-store-4i52)).
+AppBlock asks for both (#6).
+
+**The plan.**
+- AN1 measures both locks, so (b) is a measured fallback if Play refuses (a), not a guess.
+- If (a): the disclosure and the consent are drawn on AS0's canvas, with the permission steps, and
+  built from it; the declaration, its video and the listing's words are in AP1's drafts
+  (`docs/PLAY-STORE.md`). The service reads only which app is in front, to cover it, and keeps and
+  sends none of it, which the declaration says.
+- If (b): AP1 checks what Play asks of it too, its foreground service among them.
+- The kind of Play account decides the 12-tester wait (`docs/PLAN-ANDROID.md`, Open owner items, 2).
+- No Android build reaches a student before Play has reviewed the one they install (AP4).
+
+**Done when:** Play has accepted the build students install, with its Accessibility declaration if
+it uses lock (a) (AP4).
+
 ---
 
 ## Considered and set aside (so we don't re-argue them)

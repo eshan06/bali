@@ -14,7 +14,9 @@ is always allowed and always recorded.
    cut? A finished step is one line there, with its PR and its DECISIONS
    date; the why goes in `docs/DECISIONS.md`; finished history lives in
    `docs/PLAN-ARCHIVE.md` — search it like DECISIONS, never read it front
-   to back. A CI check holds PLAN.md under 8,000 words.
+   to back. A CI check holds PLAN.md under 8,000 words. Android's phases
+   and open steps live in `docs/PLAN-ANDROID.md` under PLAN.md's rules, so
+   read it too when the task is Android's.
 3. `docs/GOTCHAS.md` — live traps of this environment and process (git
    plumbing, CI, cloud sessions, dev). Skim it so known traps aren't
    rediscovered the hard way.
