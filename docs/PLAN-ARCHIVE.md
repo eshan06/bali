@@ -10,6 +10,20 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-11-02 (Central) — AN0 (#480; `docs/DECISIONS.md`, 2026-11-02): Android planned
+as its own phases, 8–11, its steps in `docs/PLAN-ANDROID.md` under this file's rules, and
+ARCHITECTURE's "Android app structure" proposed, its lock left to AN1's spike on the owner's Android
+phones. Before it, GA5 (#478), the last of the audit's fixes. Still **before the next TestFlight
+build, Push Notifications on `com.bali.Bali`** (runbook 7, step 3), and the owner reinstalls Bali
+before runbook 7's step-6 check. Next: the owner's call on GA5's known limit, the smallest iPhones
+(DECISIONS 2026-11-02); Android's AN1 once the owner names its phones; the audit's polish waits, as
+ruled._
+
+`docs/PLAN-ANDROID.md`'s, replaced the same day: _Last updated: 2026-11-02 (Central) — AN0 (#480;
+`docs/DECISIONS.md`, 2026-11-02): the plan. Phases 8–11 written, ARCHITECTURE's "Android app
+structure" proposed, ISSUES #6 and #7 opened. Next: AN1, the lock spike, once the owner names the
+phones (Open owner items, 1). Not on the pilot's critical path._
+
 _Last updated: 2026-11-02 (Central) — GA5 (#478; `docs/DECISIONS.md`, 2026-11-02), the last of the
 audit's fixes, so **GA1–GA6 are all done**: on Your name and Join at the largest text size with the
 keyboard up, a refusal under Continue shows whole, Continue's block pinned while the field fits above
