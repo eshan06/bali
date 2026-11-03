@@ -8,14 +8,14 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-02 (Central) — AN0 (#480; `docs/DECISIONS.md`, 2026-11-02): Android planned
-as its own phases, 8–11, its steps in `docs/PLAN-ANDROID.md` under this file's rules, and
-ARCHITECTURE's "Android app structure" proposed, its lock left to AN1's spike on the owner's Android
-phones. Before it, GA5 (#478), the last of the audit's fixes. Still **before the next TestFlight
-build, Push Notifications on `com.bali.Bali`** (runbook 7, step 3), and the owner reinstalls Bali
-before runbook 7's step-6 check. Next: the owner's call on GA5's known limit, the smallest iPhones
-(DECISIONS 2026-11-02); Android's AN1 once the owner names its phones; the audit's polish waits, as
-ruled._
+_Last updated: 2026-11-03 (Central) — AN1's setup (`docs/DECISIONS.md`, 2026-11-03): Android's
+lock spike runs on the emulator first and on the owner's phones later, its code waiting for the
+owner's word; Android 15, 16 and 17 emulators set up on the PC whose clone is `C:\dev\bali`;
+Android's contract tests to run on every PR, as BaliCore's do (AN2). Before it, AN0 (#480), Android
+as its own phases. Still **before the next TestFlight build, Push Notifications on `com.bali.Bali`**
+(runbook 7, step 3), and the owner reinstalls Bali before runbook 7's step-6 check. Next: the
+owner's call on GA5's known limit, the smallest iPhones (DECISIONS 2026-11-02); AN1's spike once the
+owner says its code can start; the audit's polish waits, as ruled._
 
 ## Now
 
@@ -49,8 +49,9 @@ branch, with no PR, as its README says (#479; `docs/DECISIONS.md`, 2026-11-02).
   Focus (#452) and M8b's slide off Focus and card on the Screen Time ask (#454); left, their 📱
   device checks, the owner's. C2's legal words (⚖️) go into the portal's pages, on the Windows PC.
 - **Android (the owner, 2026-11-02)**: Phases 8–11, the steps in `docs/PLAN-ANDROID.md` (AN0 ✅);
-  AN1 next, the lock spike on a Pixel and a Samsung (📱 the owner's Android phones). Not on the
-  pilot's critical path.
+  AN1 next, the lock spike, on the emulator first (Android 15, 16 and 17, set up 2026-11-03) and
+  then on a Pixel and a Samsung (📱 the owner's Android phones); its code waits for the owner's
+  word. Not on the pilot's critical path.
 - **The portal redesign in v2's look (PV0–PV17, the owner, 2026-10-12)** ✅ (2026-10-16): every step
   done, with PV3b, PV4b, PV4c and PV5b; the last, PV17c-2, Home's Last session (#425).
 - **The portal's tests drive the page (the owner, 2026-10-22: "Yes, go gradually")**: the setup ✅
@@ -162,7 +163,7 @@ One line each. Phases 3–6's step lists, the push's (N1–N6) and this table in
 | 5 | Pilot readiness: prod, Sentry, TestFlight, App Store, runbooks | ✅ cloud steps done; **prod live 2026-10-05**; open: the owner's items |
 | 6 | Security and compliance; gates Phase 5's student-facing steps | ✅ cloud steps done; open: C2 (⚖️ the lawyer's words), C7's phone check 📱, S8 (the owner's decision) |
 | 7 | Live lesson: questions and PDF slides in a running session, followed on the phone and the web | building (Phase 7 steps) |
-| 8 | Android: the lock, both candidates measured on a Pixel and a Samsung first (iOS's Phase 0) | planned (AN0 ✅, 2026-11-02); AN1 next 📱 |
+| 8 | Android: the lock, both candidates measured on the emulator, then on a Pixel and a Samsung (iOS's Phase 0) | planned (AN0 ✅, 2026-11-02); AN1 next, its emulators set up (2026-11-03), then 📱 |
 | 9 | Android: the engine, BaliCore's and BaliOutbox's twin, no screens | planned, after AN1b |
 | 10 | Android: the screens, from the approved boards | planned, after AS0's canvas |
 | 11 | Android: on Play, its testing tracks, device gate and exit check | planned |

@@ -14,18 +14,22 @@ structure", proposed until AN1b settles the lock.
   disagrees.
 - **Under 6,000 words.** AN2 puts the cap in CI, as `plan-words.sh` holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-02 (Central) — AN0 (#480; `docs/DECISIONS.md`, 2026-11-02): the plan.
-Phases 8–11 written, ARCHITECTURE's "Android app structure" proposed, ISSUES #6 and #7 opened.
-Next: AN1, the lock spike, once the owner names the phones (Open owner items, 1). Not on the
-pilot's critical path._
+_Last updated: 2026-11-03 (Central) — AN1's setup (`docs/DECISIONS.md`, 2026-11-03): AN1 runs on
+the emulator first and on the phones later (the owner), and the spike's code waits for the owner's
+word; Android 15, 16 and 17 emulators are set up on the PC whose clone is `C:\dev\bali`; AN2's
+contract tests run on every PR, as BaliCore's do. Next: AN1's spike, once the owner says its code
+can start. Not on the pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
 
 ## Who builds what
 
-- **The Windows PC:** every Android step, the screens included. Android Studio's SDK and emulator
-  run there; its traps go in `docs/GOTCHAS.md`'s "The Windows PC" as they're found.
+- **The PC whose clone is `C:\dev\bali`:** every Android step, the screens included. It has the
+  SDK, Google's command-line tools and three test emulators, each a Pixel 7 with 4 GB:
+  `Bali_Spike_API35`, `Bali_Spike_API36` and `Bali_Spike_API37` (Android 15, 16 and 17; set up and
+  cold-booted 2026-11-03). The owner's own `Pixel_7` is never used. Its traps are in
+  `docs/GOTCHAS.md`'s "Android's SDK on Windows".
 - **Cloud sessions:** the API's push (AN11) and docs. Also the steps that are Kotlin alone, tested
   on the JVM with no emulator, once the owner allows Gradle's hosts in the cloud environment
   (GOTCHAS, "Egress is allowlisted").
@@ -51,8 +55,8 @@ screen, Airplane mode, the sticker.
 Android has no Screen Time for an ordinary app, so the lock is Bali's own (ARCHITECTURE, "Android
 app structure", decision 2; ISSUES #6). Two candidates: **(a)** an Accessibility service that sees
 which app comes to the front and covers it with Bali's block screen, and **(b)** usage access,
-polled, with an overlay ("Display over other apps"). The spike measures both on real phones before
-any of the app is built, as Phase 0 proved the shields first.
+polled, with an overlay ("Display over other apps"). The spike measures both, on the emulators
+first and then on real phones, before any of the app is built, as Phase 0 proved the shields first.
 
 - **AN0** The plan (docs): this file, ARCHITECTURE's "Android app structure" (proposed), PLAN.md's
   rows, the decision, ISSUES #6 and #7, and CLAUDE.md's pointer — ✅ (#480; DECISIONS 2026-11-02)
@@ -75,6 +79,23 @@ any of the app is built, as Phase 0 proved the shields first.
   A build that doesn't come from Play may meet Android's "restricted settings" (13 and later)
   before its Accessibility service can be turned on: the checklist says how each build was
   installed — validation: every line answered on both phones
+
+  **On the emulator first** (the owner, 2026-11-02: "we will do it on the simulator I have android
+  simulator on this. I can get an android device later"): every line an emulator can answer, on
+  Android 15, 16 and 17 (`Bali_Spike_API35`–`37`, Who builds what). A real block over NFC, the
+  Samsung's battery saver and the battery a lesson costs wait for the phones, and AN1b waits for
+  both. The emulators are set up (2026-11-03); the spike's code starts at the owner's word ("just
+  setup. nothing with code yet", 2026-11-02). To check first (the spike worker's expectations, not
+  findings):
+  - whether a force-stop takes Bali off `enabled_accessibility_services` under (a);
+  - the Stop button that Android 13 and later give (b)'s foreground service in quick settings'
+    active apps;
+  - that an emulator may not sleep as a phone does (log uptime beside elapsed time on every tick);
+  - that ticks over `adb reverse` ride loopback, which Doze may let through (send them to
+    `10.0.2.2`);
+  - that usage events carry no window bounds, so (b) may cover an allowed app in split screen;
+  - Samsung's in-call screen, its own package (`com.samsung.android.incallui`), on the allow-list;
+  - that an overlay doesn't pause the app under it, whose sound may play on.
 - **AN1b** The lock decided (docs): AN1's measurements into `docs/DECISIONS.md`; the owner's pick
   (Open owner items, 4) moves ARCHITECTURE's "Android app structure" from proposed to decided;
   ISSUES #6 and #7 updated. If neither lock holds up, the owner decides what becomes of Phases
@@ -89,7 +110,12 @@ BaliOutbox's rules run on Linux; `contracts/` holds both apps to the same server
   `android/` with the modules `core`, `outbox` and `app`; `android.yml`, the build, Android Lint and
   the JVM tests on Linux, run only when `android/` or the workflow changes, decided by a changes job
   as `ios.yml` decides (a workflow filtered by paths never reports, so a required check would wait
-  on it); the plan check counting `android/` as source, and this file's 6,000-word cap
+  on it); its contract tests (`core` decoding `contracts/fixtures/`, `outbox` running
+  `contracts/outbox/`) instead on every PR but a docs-only one, never filtered by path, as
+  `ci.yml`'s BaliCore Swift job runs, since the contract spans `apps/api`, `packages/shared` and
+  `contracts/`: a server change that breaks the phone's reading of an answer goes red on its own PR
+  (the conductor, 2026-11-03, from the owner's question: "will the same checks happen for android
+  server work and all that?"); the plan check counting `android/` as source, and this file's 6,000-word cap
   (`plan-words.sh docs/PLAN-ANDROID.md 6000`). Letting an update to this file alone meet the check
   for an `android/` change, never for `apps/`, `packages/` or `ios/`, needs CLAUDE.md's working rule,
   which asks every source change for `docs/PLAN.md`, amended first in a PR of its own; `.gitignore`

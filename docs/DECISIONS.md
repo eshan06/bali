@@ -8,6 +8,28 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-03** — **AN1 on the emulator first, its code at the owner's word; Android's contract
+  tests on every PR (the owner; the conductor).** The owner, 2026-11-02, on the lock spike: "we
+  will do it on the simulator I have android simulator on this. I can get an android device later".
+  So AN1 runs every line an emulator can answer first, on Android 15, 16 and 17. It leaves a real
+  block over NFC, the Samsung's battery saver and the battery a lesson costs to the phones, and AN1b
+  still waits for both. On the download of the images: "yes download them. just setup. nothing with
+  code yet". The spike's worker, which had written no code, was stopped, and only the setup was
+  done, on the PC whose clone is `C:\dev\bali`. The owner OK'd each download by its name, source and
+  size: Google's command-line tools (`commandlinetools-win-16111833`); the emulator 37.2.13, which
+  Android 17's image needs; and the Android 16 and 17 images (`android-36` and `android-37.0`,
+  `google_apis`, x86_64). The Android 17 folder already there was a partial download from May, not
+  an image. Three test AVDs, `Bali_Spike_API35`, `Bali_Spike_API36` and `Bali_Spike_API37`, each a
+  Pixel 7 with 4 GB, each cold-booted to its Android version and shut down; the owner's own
+  `Pixel_7` untouched. **The contract tests (the conductor's call, from the owner's question: "will
+  the same checks happen for android server work and all that?"):** AN2 had Android's JVM tests run
+  only when `android/` changes. BaliCore's Swift job runs on every PR but a docs-only one, never
+  filtered by path, because the contract spans `apps/api`, `packages/shared` and `contracts/`
+  (`ci.yml`). AN2's line now gives Android's contract tests the same rule, so a server change that
+  breaks the phone's reading of an answer goes red on its own PR; the full Android build stays
+  behind its changes job. Server work for Android (AN11) keeps every check server work has today.
+  The setup's three SDK traps are in GOTCHAS ("Android's SDK on Windows").
+
 - **2026-11-02** — **Android as its own phases, 8–11, its lock spike first (the owner; AN0, #480).**
   The owner, in the conductor's chat: "I want to start working on the android app for bali. I want
   it to function exactly the same as the ios counterpart." Then: "yeah lets build out the docs for

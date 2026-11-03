@@ -108,6 +108,27 @@ the clone is `C:\Users\Eshan Shah\Downloads\github\bali`. Its path has a space: 
   publish refused with "you haven't viewed the latest version" wants a read of the artifact itself
   (only its `url`), not only of its files, before it goes.
 
+## Android's SDK on Windows
+
+The PC whose clone is `C:\dev\bali` holds Android's SDK and its test emulators
+(`docs/PLAN-ANDROID.md`, Who builds what).
+
+- **The SDK's `.bat` tools split a package name at its semicolons.** From Git Bash,
+  `sdkmanager.bat "system-images;android-36;google_apis;x86_64"` reaches cmd as four names
+  ("Package system-images not found") and installs nothing, yet exits 0. `sdkmanager` now wraps
+  the Android CLI: run `cmdline-tools/latest/bin/android.exe sdk install
+  system-images/android-36/google_apis/x86_64`, with slashes. Make an AVD through the JBR's `java`
+  with `-classpath <cmdline-tools>/lib/avdmanager-classpath.jar com.android.sdklib.tool.AvdManagerCli
+  create avd …`, where a quoted argument keeps its semicolons.
+- **`android emulator start` never ends behind a pipe.** It returns once the emulator has booted,
+  but the emulator keeps the command's output open, so `android emulator start … | tail` waits
+  until the emulator stops (the Bash tool's 10 minutes, then the background). Send its output to a
+  file, and stop the emulator with `adb -s emulator-5554 emu kill`.
+- **An image's folder isn't an installed image.** A download Android Studio left unfinished leaves
+  the folder holding only `.installer/`; Android 17's Play Store image
+  (`android-37.0/google_apis_playstore_ps16k`) still is one. An image is installed when its folder
+  holds `source.properties` and `package.xml`.
+
 ## Cloud sessions / dev environment
 
 - **A sign-up on dev's hosted page fails.** Dev's Cognito pool (`us-east-1_YTloqilwT`) verifies
