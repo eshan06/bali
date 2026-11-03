@@ -89,8 +89,10 @@ BaliOutbox's rules run on Linux; `contracts/` holds both apps to the same server
   `android/` with the modules `core`, `outbox` and `app`; `android.yml`, the build, Android Lint and
   the JVM tests on Linux, run only when `android/` or the workflow changes, decided by a changes job
   as `ios.yml` decides (a workflow filtered by paths never reports, so a required check would wait
-  on it); the plan check counting `android/` as source, met by an update to `docs/PLAN.md` or this
-  file, and this file's 6,000-word cap (`plan-words.sh docs/PLAN-ANDROID.md 6000`); `.gitignore`
+  on it); the plan check counting `android/` as source, and this file's 6,000-word cap
+  (`plan-words.sh docs/PLAN-ANDROID.md 6000`). Letting an update to this file alone meet the check
+  for an `android/` change, never for `apps/`, `packages/` or `ios/`, needs CLAUDE.md's working rule,
+  which asks every source change for `docs/PLAN.md`, amended first in a PR of its own; `.gitignore`
   entries for Android Studio's local files (`local.properties`, `.gradle/`, `.kotlin/`, `.idea/`,
   `build/`); `android/README.md`; and the applicationId, minSdk and targetSdk decided (iOS's id is
   `com.bali.Bali`; the PC's untracked `android/` folder holds an old debug build as
@@ -102,8 +104,8 @@ BaliOutbox's rules run on Linux; `contracts/` holds both apps to the same server
   `bali://t/<code>` or `https://<host>/t/<code>`). Every `contracts/fixtures/` file is decoded in a
   test, as BaliCore's Linux job decodes them, so a new fixture fails until `core` reads it
 - **AN4** The outbox store (twin: BaliOutbox's `Outbox` and `OutboxRecord`): Room in the app's own
-  storage; the records; the unlock contract (`contracts/outbox/`; no response ever means delete); the
-  outbox's counter and its install id, the phone's order (A12); and Bali's files left out of
+  storage; the records; the unlock contract (`contracts/outbox/`; no response ever means delete);
+  the outbox's counter and its install id, the phone's order (A12); and Bali's files left out of
   Android's backup (ARCHITECTURE, "Android app structure")
 - **AN5** The sync engine (twin: `SyncEngine`): the drain with backoff and jitter, the 30-second
   check-in while Bali is open, and the reconcile (`readMayReconcile` and the typed dispositions),
@@ -113,24 +115,32 @@ BaliOutbox's rules run on Linux; `contracts/` holds both apps to the same server
   token to Bali's API before the 13+ check, but the check's own read and a deletion's) and the
   deletion token; only a real `401` signs anyone out. 🔧 The owner makes Android's Cognito app
   clients on dev and prod (no secret; the scopes iOS's client has, `aws.cognito.signin.user.admin`
-  among them for Delete account)
-- **AN7** 📱 The lock (twin: BaliOutbox's `Enforcement`, `ProtectionOff` and `Bell`): AN1b's method;
+  among them for Delete account) and adds their ids to `AUTH_AUDIENCE` on dev's and prod's API, or
+  the API refuses Android's tokens with a `401`, which signs the student out
+- **AN7** 📱 The lock (twin: BaliOutbox's `Enforcement`, `Bell` and `PhoneBell`): AN1b's method;
   the system allow-list (decision 2); rule 3 at every check-in; protection off and on, with iOS's
-  events; the bell, from the session's window; and a Debug readout like iOS's for the phone checks
-  — validation: the rules' JVM tests, then the device check on both phones
-- **AN8** 📱 The tap over NFC (twin: `BlockReader`, B6): reader mode while Bali's "hold your phone
-  to the block" screen shows; the offline tap in under a second; the tap's dispositions
-  (`tapDisposition`); and, if AN1 found it works, the block's link opening Bali when it's closed —
-  validation: the JVM tests, then a real block on both phones, offline
+  events; the bell, from the session's window; and a Debug readout like iOS's for the phone checks.
+  For the owner: whether the lock's service checks in while it runs, so that a quiet Android phone
+  means a stopped Bali (ARCHITECTURE, "Android app structure", the rules) — validation: the rules'
+  JVM tests, then the device check on both phones
+- **AN8** 📱 The tap over NFC (twin: `BlockReader`, B6): reader mode, started from the Debug readout
+  until AS4 builds Bali's "hold your phone to the block" screen; the offline tap in under a second;
+  the tap's dispositions (`tapDisposition`); and, if AN1 found it works, the block's link opening
+  Bali when it's closed — validation: the JVM tests, then a real block on both phones, offline
 - **AN9** The account's flows (twin: `Join`, `Me`, `History`, `Age`, `Deletion`): Join with the
   consent list, Me, History, the 13+ check (C7, C7-server), Your name, and Delete account (what the
   phone queued first, every Emergency Unlock first, then `DELETE /v1/me`, then Cognito's DeleteUser)
-- **AN10** The router (twin: `Screen.swift`): which screen shows when, its rules and tests ported;
-  and the block screen's words (twin: `ShieldWords`), from AS0's approved boards
+- **AN10** The router and the screens' rules (twin: `Screen.swift`, `FocusWords`, `UnlockedWords`,
+  `ProtectionOffWords` and `ShieldWords`): which screen shows when, and what Focus, Unlocked,
+  Protection off and the block screen say (rule 3: no countdown over nothing locked), their rules
+  and tests ported; the words from AS0's approved boards, so AN10 follows AS0
 - **AN11** The API's push (cloud; twin: `apps/api/src/push/apns.ts`): an FCM sender beside APNs,
   under the same rules (after the Start commits, the same words, no personal data, a token reported
-  gone deleted); an additive field on the push-token endpoint naming the token's service, absent
-  meaning APNs, so every shipped iPhone calls it as today; the privacy paths (the deletion, the
+  gone deleted); an additive field on the push-token endpoint, `PUT` and `DELETE`, naming the
+  token's service, absent meaning APNs, so every shipped iPhone calls it as today; under it, each
+  service's own token format (an FCM token, mixed case with `:`, `-` and `_`, kept as sent, never
+  lower-cased as an APNs token is), what `environment` means for an FCM token, and each sender
+  sending to, and deleting, only its own service's tokens; the privacy paths (the deletion, the
   disposal, the retention run, the export) holding FCM's tokens as they hold APNs's; the fixtures
   and `openapi.json` regenerated; integration tests for the happy path, authz, validation and
   replay. 🔧 The owner makes the Firebase project and puts its key on Railway, dev then prod —
@@ -138,9 +148,8 @@ BaliOutbox's rules run on Linux; `contracts/` holds both apps to the same server
 - **AN12** The app's push (twin: the push's app half, #456): the FCM token registered at each launch
   and removed at Sign out; Android's notification permission (Android 13 and later) asked once,
   right after onboarding's permission steps, as iOS asks after its Screen Time step; and #336's
-  random wait of up to 10 s
-  before the first read after a fresh alert — validation: the JVM tests, then an end-to-end check
-  like N6's on an Android phone (📱)
+  random wait of up to 10 s before the first read after a fresh alert — validation: the JVM tests,
+  then an end-to-end check like N6's on an Android phone (📱)
 - **AN13** The live lesson's engine (twin: `LiveLesson`, L5, and M7's deck download and cache): the
   poll and the answer, the deck downloaded, checked against its `sha256` and cached, and a page
   drawn with `PdfRenderer`; answers never enter the outbox
@@ -164,8 +173,8 @@ rules); `docs/DESIGN.md` read first, its Android section from AS0; every user-fa
   `AgeView`, `IntroView`, `NameView`)
 - **AS3** 👀 The permission steps and the push prompt (twin: `ScreenTimeView`, and the prompt iOS
   asks as Home shows)
-- **AS4** 👀 Home, Join with the consent preview, and Waiting (twin: `HomeView`, `JoinView`,
-  `WaitingView`)
+- **AS4** 👀 Home, the tap's "hold your phone to the block" screen, Join with the consent preview,
+  and Waiting (twin: `HomeView` and its tap, `JoinView`, `WaitingView`)
 - **AS5** 👀 Focus, Emergency Unlock's hold, and the block screen (twin: `FocusView`, BaliShield)
 - **AS6** 👀 Unlocked, Protection off and Session over (twin: `UnlockedView`, `ProtectionOffView`,
   `SessionOverView`)
@@ -185,8 +194,8 @@ rules); `docs/DESIGN.md` read first, its Android section from AS0; every user-fa
 - **AP3** 📱 The device test gate (twin: B5 and B6): a Pixel and a Samsung through the whole loop on
   dev
 - **AP4** 🔧 ⚖️ The pilot's track: closed testing (on a personal account, at least 12 testers opted
-  in for 14 days in a row before production); the privacy policy names Android's processors, Google's push
-  (FCM) and Play, before the first Android build reaches a student
+  in for 14 days in a row before production); the privacy policy names Android's processors,
+  Google's push (FCM) and Play, before the first Android build reaches a student
 - **AP5** 📱 The exit check: a real class on prod with iPhones and Android phones at once, every
   chip agreeing with the teacher's grid
 
@@ -209,9 +218,10 @@ PLAN.md's own rules ("How to update this file"), for Android's steps:
   building a step, search the archive for its id.
 - Re-date the status line with the newest change and what's next; the line it replaces goes word for
   word to the same archive section.
-- An Android PR updates this file, and PLAN.md only where Android's lines there change: its Now
-  line, its phase rows, its owner-items line. Until AN2 teaches the plan check, an `android/` change
-  isn't held to this, so hold to it by hand.
+- An Android PR updates this file, and Android's lines in PLAN.md: its Now line at least when the PR
+  changes source, since CLAUDE.md's working rule asks every source change for `docs/PLAN.md`; its
+  phase rows and its owner-items line when they change. Until AN2 teaches the plan check, an
+  `android/` change isn't held to either, so hold to both by hand.
 - A real decision goes at the top of `docs/DECISIONS.md`; a changed design, into ARCHITECTURE's
   "Android app structure".
 - Past 6,000 words: finished detail moves word for word to the archive, the why to DECISIONS.

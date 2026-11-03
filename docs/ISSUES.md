@@ -250,9 +250,11 @@ Google's own, not something another app can use.
   picture-in-picture, an app opened from a notification, a work profile, Private Space, a guest
   user, Advanced Protection), and how fast the cover lands. The owner picks the lock from the
   measurements (AN1b).
-- Honest, not fought (the mirror rule): what the lock can't stop, the teacher sees. The service
-  switched off is protection off, with iOS's events; a stopped Bali goes quiet on the grid within
-  about a minute; no screen claims a lock the last check didn't verify (rule 3).
+- Honest, not fought (the mirror rule): what the lock can't stop is never shown as focus. The
+  service switched off is protection off, with iOS's events; a stopped Bali goes quiet on the grid
+  within about a minute, a tile that on Android can't yet say whether the lock still holds (AN7
+  asks whether the running service checks in, so quiet would mean stopped); no screen claims a lock
+  the last check didn't verify (rule 3).
 - What the school is told about Android's lock, before any Android phone joins a class, is the
   owner's call (`docs/PLAN-ANDROID.md`, Open owner items, 3).
 - The full lock later: device-owner mode on school-owned phones, the K-12 path (ARCHITECTURE,

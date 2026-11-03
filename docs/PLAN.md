@@ -427,8 +427,9 @@ decision log, <date>" means the entry with that date there.
 - A step done: its line becomes one line (id, title, ✅, PR, DECISIONS date), its full line moved
   word for word to `docs/PLAN-ARCHIVE.md`. Before building a step, search the archive for its id:
   finished steps' notes say what they left for it ("for L7 to wire").
-- An Android step updates `docs/PLAN-ANDROID.md` by these same rules, and this file only where
-  Android's lines here change (Now, its phase rows, its owner items).
+- An Android step updates `docs/PLAN-ANDROID.md` by these same rules, and here Android's lines
+  (Now, its phase rows, its owner items): its Now line at least when it changes source, as CLAUDE.md
+  asks of every source change.
 - Made a real decision? It goes at the top of `docs/DECISIONS.md`, not here.
 - Built a new feature? Add a row under Go-live features with a one-line
   architecture note; if a design decision changed, ARCHITECTURE.md is updated

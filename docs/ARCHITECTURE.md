@@ -1138,8 +1138,11 @@ read and a deletion's.
 - **A force-stopped app ends the lock.** Where iOS keeps the shields to the bell with the app
   force-quit, Android's lock stops with Bali. Check-ins stop, so within about a minute the grid
   shows the phone gone quiet, as it does a force-quit iPhone, and nothing pretends it is still
-  locked. Whether Bali, opened again within the session, also reports how long it was stopped is
-  AN7's question for the owner.
+  locked. But a quiet tile says less than on iOS: an iPhone gone quiet keeps its shields unless
+  Screen Time was taken back, while a quiet Android phone may be stopped, or only out of Bali's
+  foreground with its lock still on. Two questions for the owner, AN7's: whether the lock's service
+  checks in while it runs, so that quiet means stopped, and whether Bali, opened again within the
+  session, reports how long it was stopped.
 - **The bell needs no extension.** The lock covers apps only inside the session's window, by the
   phone's clock as on iOS (a changed clock detected, not prevented), so at the bell it simply stops
   covering; nothing has to wake at the bell to take it off.
@@ -1152,8 +1155,9 @@ read and a deletion's.
 ### What's weaker than on iOS, plainly
 
 - The lock is Bali's own, not the system's: a force-stop, the service switched off, a reboot into
-  Safe Mode or a phone maker's battery saver frees the phone until Bali runs again. The grid says
-  so (gone quiet, or protection off); nothing on the phone can stop it.
+  Safe Mode or a phone maker's battery saver frees the phone until Bali runs again, and nothing on
+  the phone can stop it. The grid shows protection off for the switch; for the rest it shows the
+  phone gone quiet, which on Android can't say whether the lock still holds (the rules above).
 - A blocked app can show for a moment before the cover lands; under (b), which polls, for longer.
 - (b) also keeps a foreground service, and its notification, for the whole session.
 - Play may refuse the Accessibility route (ISSUES #7), and Android 17's Advanced Protection is

@@ -45,7 +45,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   rule; it needs a D-U-N-S number) or personal (a closed test of at least 12 testers, opted in 14
   days in a row, before production); whether Android joins the Vanderbilt pilot, so no Go-live row
   yet; whether the approved iOS boards stand for Android's screens once AS0's canvas is approved;
-  and Play's answer on the Accessibility route (ISSUES #7). Not on the pilot's critical path.
+  Play's answer on the Accessibility route (ISSUES #7); and whether an `android/` change may meet
+  the plan check with `docs/PLAN-ANDROID.md` alone, which CLAUDE.md's working rule (every source
+  change updates `docs/PLAN.md`) would need amended first, in a PR of its own: until then an Android
+  step that changes source updates Android's Now line in PLAN.md too, one line where the step list
+  would have been. Not on the pilot's critical path.
 
 - **2026-11-02** — **The demo site on its own orphan branch, `demo2` (the owner; #479).** The
   one-page demo at www.getbali.app (getbali.app forwards there) is the Vercel project `bali-web`
