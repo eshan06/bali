@@ -11,7 +11,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: android-${{ github.head_ref }}
+  # The PR's number, not its branch's name, which a fork's PR can share.
+  group: android-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
@@ -42,7 +43,8 @@ jobs:
   build:
     name: Android build · Lint · JVM tests
     needs: changes
-    if: needs.changes.outputs.android == 'true'
+    # Skipped only on a false, so a failed decision builds (as the load gate): a skip counts as a pass.
+    if: ${{ !cancelled() && needs.changes.outputs.android != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     defaults:
@@ -55,7 +57,7 @@ jobs:
       # JDK 21, as the PC's Android Studio has it: the runner's own, nothing downloaded.
       - name: Use JDK 21
         run: |
-          [ -x "$JAVA_HOME_21_X64/bin/java" ] || { echo "::error::The runner has no JDK 21 (JAVA_HOME_21_X64)."; exit 1; }
+          [ -n "${JAVA_HOME_21_X64:-}" ] && [ -x "$JAVA_HOME_21_X64/bin/java" ] || { echo "::error::The runner has no JDK 21 (JAVA_HOME_21_X64)."; exit 1; }
           echo "JAVA_HOME=$JAVA_HOME_21_X64" >> "$GITHUB_ENV"
       # Gradle and the dependencies; a PR's first run starts from main's (ci.yml's contract tests).
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0

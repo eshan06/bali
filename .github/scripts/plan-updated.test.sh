@@ -1,9 +1,10 @@
 #!/bin/bash
 # Self-test for plan-updated.sh: a source change in apps/, packages/, ios/ or android/ fails
-# without docs/PLAN.md, a moved-out file included, and docs/PLAN-ANDROID.md alone never stands in
-# for it; docs/PLAN.md, a commit's [no-plan], Dependabot's manifests and a change to no source
-# pass; a base that isn't there fails. plan-check.yml runs it first, so a check that stops counting
-# fails instead of passing.
+# without docs/PLAN.md, a moved-out file and a name git quotes included, and neither
+# docs/PLAN-ANDROID.md nor a name that only ends in a line docs/PLAN.md stands in for it;
+# docs/PLAN.md, a commit's [no-plan], Dependabot's manifests and a change to no source pass; a base
+# that isn't there fails. plan-check.yml runs it first, so a check that stops counting fails
+# instead of passing.
 #
 #   .github/scripts/plan-updated.test.sh
 set -euo pipefail
@@ -57,6 +58,7 @@ expect fail 'ios/ without the plan' someone 'echo more >>ios/App.swift'
 expect pass 'apps/ with the plan' someone 'echo more >>apps/app.ts; echo more >>docs/PLAN.md'
 expect fail 'a source file moved out of android/' someone 'git mv android/App.kt tools/App.kt'
 expect fail 'a file beside the plan, not the plan' someone 'echo more >>apps/app.ts; echo x >docs/PLAN.md.bak'
+expect fail 'a source file whose name git quotes' someone "echo new >'apps/café.ts'"
 expect pass 'a trivial fix [no-plan]' someone 'echo more >>android/App.kt'
 expect pass 'no source changed' someone 'echo more >>docs/notes.md'
 expect pass 'no change at all' someone ':'
@@ -66,6 +68,19 @@ expect fail 'manifests alone, not Dependabot' someone 'echo more >>apps/web/pack
 
 if "$CHECK" no-such-base someone >/dev/null 2>&1; then
   echo "FAIL: a base that isn't there passed instead of failing"
+  failures=$((failures + 1))
+fi
+
+# A source change beside a path that only ends in a line reading docs/PLAN.md: never the plan. It
+# goes straight into the index, since no Windows file name may hold a newline.
+git checkout -q --detach "$BASE"
+echo more >>apps/app.ts
+git add -A
+git -c core.protectNTFS=false update-index --add \
+  --cacheinfo "100644,$(git hash-object -w docs/notes.md),$(printf 'x\ndocs/PLAN.md')"
+git commit -qm 'a name ending in a line docs/PLAN.md'
+if "$CHECK" "$BASE" someone >"$OUT" 2>&1; then
+  echo "FAIL: a name ending in a line docs/PLAN.md passed as the plan"
   failures=$((failures + 1))
 fi
 

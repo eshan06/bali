@@ -77,19 +77,25 @@ a real decision? Add a dated entry at the top: what was decided and why.
 
   **CI.** `android.yml`: "Android changes" decides through `touches.sh`, its self-test first, as
   `ios.yml` does, and "Android build · Lint · JVM tests" builds the app and the modules, runs the
-  app's lint and every module's tests. "Android contract tests (JVM)" in `ci.yml` runs `core`'s and
-  `outbox`'s suites on every PR but a docs-only one, beside the Swift job. Both check the wrapper's
-  jar first (`gradle/actions/wrapper-validation`, v6.4.1) and cache Gradle with `actions/cache`. Not
-  `gradle/actions/setup-gradle`: from v6 its caching is a proprietary component under Gradle's terms
-  of use, which using it accepts, and accepting terms is the owner's. Main requires none of these
-  checks yet: adding them to `protect-main` is the owner's.
+  app's lint and every module's tests. Unlike `ios.yml`'s, the build runs when its decision fails
+  (`!cancelled()`, as the load gate's): "Android changes" is no required check, and a required
+  check skipped counts as passed (#368). "Android contract tests (JVM)" in `ci.yml` runs `core`'s
+  and `outbox`'s suites on every PR but a docs-only one, beside the Swift job. Both check the
+  wrapper's jar first (`gradle/actions/wrapper-validation`, v6.4.1) and cache Gradle with
+  `actions/cache`. Not `gradle/actions/setup-gradle`: from v6 its caching is a proprietary component
+  under Gradle's terms of use, which using it accepts, and accepting terms is the owner's. Main
+  requires none of these checks yet: adding them to `protect-main` is the owner's. ESLint skips
+  `android/**/build/`, where Gradle's test reports keep JavaScript that failed `npm run lint` on the
+  PC after an Android build (santa's review).
 
   **The plan check** moved into `.github/scripts/plan-updated.sh`, with a self-test whose cases
   include `android/`: `android/` is source now, so an Android change needs `docs/PLAN.md`, as
   CLAUDE.md asks of every source change, and `docs/PLAN-ANDROID.md` alone never stands in for it (a
-  case pins that). Nothing loosened, and one thing tightened: a source file moved out of `apps/`,
-  `packages/`, `ios/` or `android/` counts now, as `touches.sh` counts one (`--no-renames`, #368).
-  `plan-words.sh docs/PLAN-ANDROID.md 6000` runs beside PLAN.md's cap.
+  case pins that). Nothing loosened, and two things tightened, as `touches.sh` counts paths (#368):
+  a source file moved out of `apps/`, `packages/`, `ios/` or `android/` counts now
+  (`--no-renames`), and so does one whose name git quotes, such as `apps/café.ts` (`-z`); each path
+  is matched whole, so a name holding a newline can't pass for `docs/PLAN.md` (santa's review; a
+  case pins each). `plan-words.sh docs/PLAN-ANDROID.md 6000` runs beside PLAN.md's cap.
 
   **Git.** `.gitignore` ignores `local.properties`, `.gradle/`, `.kotlin/` and `.idea/` under
   `android/` alone (each module's `build/` was ignored already); `android/.gitattributes` keeps

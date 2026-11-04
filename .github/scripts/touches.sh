@@ -1,9 +1,9 @@
 #!/bin/bash
-# Whether a PR touches the paths a job watches, for ios.yml's "iOS changes",
-# android.yml's "Android changes" and load-gate.yml's "Load gate changes": any
-# file it changes from <base> to HEAD matches <pattern>, an extended regex.
-# Prints true or false. A diff that fails, or a pattern grep refuses, fails the
-# script, never an answer, so no job is skipped on a guess.
+# Whether a PR touches the paths a job watches, for the iOS, Android and load gate
+# workflows' changes jobs: any file it changes from <base> to HEAD
+# matches <pattern>, an extended regex. Prints true or false. A diff that fails,
+# or a pattern grep refuses, fails the script, never an answer, so no job is
+# skipped on a guess.
 #
 #   .github/scripts/touches.sh <base> <pattern>
 #

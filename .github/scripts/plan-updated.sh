@@ -8,30 +8,32 @@
 #   .github/scripts/plan-updated.sh <base> <pr-author>
 #
 # A moved file counts where it left as well as where it went (--no-renames), and each path as it
-# is (-z), as in touches.sh. docs/PLAN-ANDROID.md alone never stands in for docs/PLAN.md: that
-# needs CLAUDE.md's rule changed first (docs/PLAN-ANDROID.md, AN2). plan-updated.test.sh pins each
-# case.
+# is (-z), as in touches.sh: a NUL ends each, so a name holding a newline stays one path to every
+# grep -z. docs/PLAN-ANDROID.md alone never stands in for docs/PLAN.md: that needs CLAUDE.md's
+# rule changed first (docs/PLAN-ANDROID.md, AN2). plan-updated.test.sh pins each case.
 set -euo pipefail
 
 base=$1
 author=$2
-changed=$(git diff -z --no-renames --name-only "$base"...HEAD | tr '\0' '\n')
+changed=$(mktemp)
+trap 'rm -f "$changed"' EXIT
+git diff -z --no-renames --name-only "$base"...HEAD >"$changed"
 messages=$(git log --format=%B "$base"..HEAD)
 echo "Changed files:"
-echo "$changed"
+tr '\0' '\n' <"$changed"
 
-if ! grep -qE '^(apps|packages|ios|android)/' <<<"$changed"; then
+if ! grep -qzE '^(apps|packages|ios|android)/' "$changed"; then
   echo "No source changes: plan update not required."
   exit 0
 fi
 # Both conditions on purpose: a human commit on a Dependabot branch makes the diff more than
 # manifests, and a session adding a dependency (a plan-worthy decision) is not exempt merely
 # because its diff is manifests alone (docs/PLAN.md, 2026-09-20).
-if [ "$author" = 'dependabot[bot]' ] && ! grep -vqE '(^|/)package(-lock)?\.json$' <<<"$changed"; then
+if [ "$author" = 'dependabot[bot]' ] && ! grep -vqzE '(^|/)package(-lock)?\.json$' "$changed"; then
   echo "Dependabot manifest-only change: plan update not required."
   exit 0
 fi
-if grep -qxF docs/PLAN.md <<<"$changed"; then
+if grep -qzxF docs/PLAN.md "$changed"; then
   echo "docs/PLAN.md updated: ok."
   exit 0
 fi
