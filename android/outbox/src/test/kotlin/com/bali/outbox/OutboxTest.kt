@@ -109,6 +109,7 @@ class SchemaTest : OutboxFiles() {
             assertEquals(3, records.size)
             assertEquals(listOf(1 to 409, 0 to null, 0 to null), records.map { it.attempts to it.lastStatus })
             // Protection off was reported for this session: reopening doesn't report it again.
+            assertEquals("s", reopened.state(Outbox.Key.Reported))
             assertNull(reopened.record(Change.ProtectionOff("s"), t0))
             assertEquals(listOf("1"), reopened.texts("PRAGMA user_version"))
         }

@@ -283,7 +283,9 @@ class Outbox private constructor(internal val file: OutboxDatabase, private val 
         write { db ->
             val record = dao.record(sent.eventId)?.record() ?: return@write null
             val disposition = sent.disposition
-            if (disposition == Disposition.Tap(TapDisposition.WaitForStart) || disposition == Disposition.Tap(TapDisposition.RetryAndSurface)) {
+            if (disposition == Disposition.Tap(TapDisposition.WaitForStart) ||
+                disposition == Disposition.Tap(TapDisposition.RetryAndSurface)
+            ) {
                 db.refile("tapId = ?", sent.eventId, now)
             } else if (disposition == Disposition.Unlock(UnlockDisposition.Recorded) && sent.session == null) {
                 // Kept with no session, its tap not answered: stuck at the bound, not arrived.
@@ -301,11 +303,11 @@ class Outbox private constructor(internal val file: OutboxDatabase, private val 
             val attempts = record.attempts + 1
             val answers = record.answers + if (answered) 1 else 0
             db.step(
-                "UPDATE outbox SET attempts = ?, answers = ?, stuck = ?, nextAttemptAt = ?, lastStatus = ?, lastReason = ?, " +
-                    "lastMessage = ?, refusedStatus = COALESCE(?, refusedStatus) WHERE eventId = ?",
-                attempts, answers, record.stuck || disposition.refused || answers >= BOUND, times.text(now + backoff(attempts)),
-                sent.status, sent.error?.error?.reason?.wire, sent.error?.error?.message, sent.status.takeIf { disposition.refused },
-                sent.eventId,
+                "UPDATE outbox SET attempts = ?, answers = ?, stuck = ?, nextAttemptAt = ?, lastStatus = ?, " +
+                    "lastReason = ?, lastMessage = ?, refusedStatus = COALESCE(?, refusedStatus) WHERE eventId = ?",
+                attempts, answers, record.stuck || disposition.refused || answers >= BOUND,
+                times.text(now + backoff(attempts)), sent.status, sent.error?.error?.reason?.wire,
+                sent.error?.error?.message, sent.status.takeIf { disposition.refused }, sent.eventId,
             )
             disposition
         }
@@ -319,7 +321,12 @@ class Outbox private constructor(internal val file: OutboxDatabase, private val 
      * session, now.
      */
     private suspend fun PooledConnection.refile(condition: String, id: String, now: Instant) {
-        val presses = texts("SELECT eventId FROM outbox WHERE kind = 'unlock' AND tapId IS NOT NULL AND sessionId IS NOT NULL AND $condition", id)
+        val presses =
+            texts(
+                "SELECT eventId FROM outbox WHERE kind = 'unlock' AND tapId IS NOT NULL AND sessionId IS NOT NULL " +
+                    "AND $condition",
+                id,
+            )
         for (pressId in presses) {
             val press = checkNotNull(dao.record(pressId)).row
             val followUp = EventId.mint(now)
