@@ -14,14 +14,15 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-04 (Central) — AN3d, the core's client (#492; `docs/DECISIONS.md`,
-2026-11-04): BaliCore's `APIClient.swift` in Kotlin with its tests: every student endpoint, each
-answer returned unjudged and its errors keyed on `reason`, no request sent without a token; its
-calls suspend, over OkHttp set up as iOS's URLSession, following no redirect and sending a request
-with a body once; OkHttp 5.4.0 until compileSdk 37. Before it, AN3c, event ids, tags and config.
-Next: AN4, the outbox store; Android 17's SDK platform for the owner to OK before the first step
-with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); CodeQL for Android's Kotlin,
-the owner's call (7); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
+_Last updated: 2026-11-04 (Central) — AN4a, the unlock contract (#493; `docs/DECISIONS.md`,
+2026-11-04): BaliCore's `UnlockContract.swift` and `OutboxContract.swift` in Kotlin with their
+tests: the unlock's, the tap's and the state change's tables and the reconcile rule, every
+`contracts/outbox/` case answered by the port in `outbox`'s tests, and each fixture's disposition the
+port's, through the client too; an unlock leaves the outbox only once the server has recorded it.
+AN4 is three PRs now, AN4a to AN4c. Before it, AN3d, the core's client. Next: AN4b, the records;
+Android 17's SDK platform for the owner to OK before the first step with today's AndroidX, and
+OkHttp 5.5 with it (Open owner items, 6); CodeQL for Android's Kotlin, the owner's call (7); AN1's
+part 2 once the owner has the phones. Not on the pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -129,12 +130,15 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN3b** The core's wire types — ✅ (#490; DECISIONS 2026-11-04)
 - **AN3c** The core's event ids, NFC tag reading and app config — ✅ (#491; DECISIONS 2026-11-04)
 - **AN3d** The core's client — ✅ (#492; DECISIONS 2026-11-04)
-- **AN4** The outbox store (twin: BaliOutbox's `Outbox` and `OutboxRecord`): Room in the app's own
-  storage; the records (OutboxTests' `eventIds` is `core`'s already, AN3c's); the unlock contract
-  (`contracts/outbox/`; no response ever means delete), with ContractFixtureTests' outbox
-  dispositions, which AN3b left, and APIClientTests', which AN3d left; the outbox's counter and its
-  install id, the phone's order (A12); and Bali's files left out of Android's backup (ARCHITECTURE,
-  "Android app structure")
+- **AN4a** The unlock contract — ✅ (#493; DECISIONS 2026-11-04)
+- **AN4b** The records (twin: BaliOutbox's `OutboxRecord`): the records as plain Kotlin (OutboxTests'
+  `eventIds` is `core`'s already, AN3c's): the change, its request, sending it through AN3d's client,
+  `Sent` and the outbox's own disposition
+- **AN4c** The outbox store (twin: BaliOutbox's `Outbox`): Room in the app's own storage, without
+  the app group's cross-process coordination, which Android has no twin of (one app, no extensions:
+  ARCHITECTURE, "Android app structure", decision 3); the outbox's counter and its install id, the
+  phone's order (A12); and Bali's files left out of Android's backup (ARCHITECTURE, "Android app
+  structure")
 - **AN5** The sync engine (twin: `SyncEngine`): the drain with backoff and jitter, the 30-second
   check-in while the screen is on (ARCHITECTURE, the battery plan; AN7 drives it from the lock's
   service), and the reconcile (`readMayReconcile` and the typed dispositions), all on a fake clock

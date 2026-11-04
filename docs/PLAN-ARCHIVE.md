@@ -10,6 +10,16 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN4a's on 2026-11-04: _Last updated: 2026-11-04 (Central) —
+AN3d, the core's client (#492; `docs/DECISIONS.md`, 2026-11-04): BaliCore's `APIClient.swift` in
+Kotlin with its tests: every student endpoint, each answer returned unjudged and its errors keyed on
+`reason`, no request sent without a token; its calls suspend, over OkHttp set up as iOS's
+URLSession, following no redirect and sending a request with a body once; OkHttp 5.4.0 until
+compileSdk 37. Before it, AN3c, event ids, tags and config. Next: AN4, the outbox store; Android
+17's SDK platform for the owner to OK before the first step with today's AndroidX, and OkHttp 5.5
+with it (Open owner items, 6); CodeQL for Android's Kotlin, the owner's call (7); AN1's part 2 once
+the owner has the phones. Not on the pilot's critical path._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN3d's on 2026-11-04: _Last updated: 2026-11-04 (Central) —
 AN3c, the core's event ids, NFC tag reading and app config (#491; `docs/DECISIONS.md`, 2026-11-04):
 BaliCore's `EventID.swift`, `BlockTag.swift` and `AppConfig.swift` in Kotlin with their tests:
@@ -2033,6 +2043,17 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN4a's line, as it read until it was done (2026-11-04; `docs/DECISIONS.md`, 2026-11-04). The
+conductor split AN4's line into AN4a, AN4b and AN4c that day, every word of it kept in one of them:
+AN4a's here, AN4b's and AN4c's in `docs/PLAN-ANDROID.md`.
+
+- **AN4a** The unlock contract (twin: BaliCore's `UnlockContract.swift` and `OutboxContract.swift`):
+  the unlock contract (`contracts/outbox/`; no response ever means delete) and its siblings, the
+  tap's and the state change's tables, with `SendResult`, `ReconcileStamp` and `readMayReconcile`,
+  in `core` as on iOS; OutboxContractTests' suites in `outbox`, which runs `contracts/outbox/`
+  (ARCHITECTURE, "Android app structure", decision 4); with ContractFixtureTests' outbox
+  dispositions, which AN3b left, and APIClientTests', which AN3d left
 
 AN3d's line, as it read until it was done (2026-11-04; `docs/DECISIONS.md`, 2026-11-04):
 

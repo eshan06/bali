@@ -209,10 +209,10 @@ data class RefocusRequest(val eventId: String, val deviceTime: Instant, val orde
 
 @Serializable
 data class RefocusResponse(
-    val outcome: OrUnknown<Outcome>,
+    override val outcome: OrUnknown<Outcome>,
     val state: OrUnknown<ParticipationState>?,
-    val session: SessionView?,
-) {
+    override val session: SessionView?,
+) : StateChangeAnswer {
     /** `REFOCUS_OUTCOMES`. */
     @Serializable(with = Outcome.Wire::class)
     enum class Outcome(override val wire: String) : Vocabulary {
@@ -227,11 +227,11 @@ data class ProtectionOffRequest(val eventId: String, val deviceTime: Instant, va
 
 @Serializable
 data class ProtectionOffResponse(
-    val outcome: OrUnknown<Outcome>,
+    override val outcome: OrUnknown<Outcome>,
     val recordedAs: OrUnknown<ProtectionOffRecordedAs>?,
     val state: OrUnknown<ParticipationState>?,
-    val session: SessionView?,
-) {
+    override val session: SessionView?,
+) : StateChangeAnswer {
     /** `PROTECTION_OFF_OUTCOMES`. */
     @Serializable(with = Outcome.Wire::class)
     enum class Outcome(override val wire: String) : Vocabulary {
@@ -247,10 +247,10 @@ data class ProtectionOnRequest(val eventId: String, val deviceTime: Instant, val
 /** [state]: where it returned the student, or on a replay the state now; none once they're out. */
 @Serializable
 data class ProtectionOnResponse(
-    val outcome: OrUnknown<Outcome>,
+    override val outcome: OrUnknown<Outcome>,
     val state: OrUnknown<ParticipationState>?,
-    val session: SessionView?,
-) {
+    override val session: SessionView?,
+) : StateChangeAnswer {
     /** `PROTECTION_ON_OUTCOMES`. */
     @Serializable(with = Outcome.Wire::class)
     enum class Outcome(override val wire: String) : Vocabulary {

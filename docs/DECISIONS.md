@@ -8,6 +8,60 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-04** — **AN4a, the unlock contract: BaliCore's `UnlockContract.swift` and
+  `OutboxContract.swift` in Kotlin (the conductor's calls, awaiting the owner's look; AN4a, #493).**
+  The owner was asleep and asked for the recommended option on every question, so each call here is
+  the conductor's, for the owner to look at.
+
+  **AN4 in three PRs** (the conductor): AN4a, the outbox tables (the unlock's, the tap's and the
+  state change's, `SendResult`, `ReconcileStamp` and `readMayReconcile`); AN4b, the records,
+  BaliOutbox's `OutboxRecord.swift` as plain Kotlin (the change, its request, sending it through
+  AN3d's client, `Sent` and the outbox's own disposition); AN4c, the store, BaliOutbox's
+  `Outbox.swift` on Room in the app's own storage, without the app group's cross-process
+  coordination, which Android has no twin of (one app, no extensions), with the outbox's counter and
+  install id (A12) and Bali's files left out of Android's backup. Each is one PR under ~400 lines
+  (`docs/PLAN-ANDROID.md`).
+
+  **Where it lives:** the tables in `core` (`UnlockContract.kt`, `OutboxContract.kt`), as BaliCore
+  holds them; their case files run in `outbox`'s tests, as ARCHITECTURE's decision 4 has it, where
+  iOS runs them in BaliCore's. `SendResult` moved from `ApiClient.kt` to `OutboxContract.kt`, where
+  Swift has it. The Swift's rules and words, ported; where Kotlin differs, said plainly:
+  - **Each disposition is a `Vocabulary` enum,** its `wire` Swift's raw value: the TypeScript's
+    spelling, which `contracts/` holds. Never sent or decoded; the tests compare by it.
+  - **`StateChangeAnswer` is a sealed interface** that `Api.kt`'s three answers name (a refocus's, a
+    protection-off report's, the lock back on's): the TypeScript's closed union, where Swift
+    retrofits a protocol by extensions, which Kotlin lacks. The outcome is read from its wire value,
+    as Swift reads the raw value, so a refocus answered `recorded` reads as a report's would. Still
+    one entry point, so a literal `null` compiles (Swift's #70 review).
+  - **`ReconcileStamp` is a data class of `val`s,** where Swift's is a struct of `var`s: a Kotlin
+    class is a reference, so a count changed in place would move every stamp taken of it. Its counts
+    stay `Int`s: one run's changes, and the outbox's records.
+  - Every `when` over an outcome names each value, so one `core` adds doesn't compile until it is
+    placed, as Swift's `switch` doesn't.
+
+  **Where the TypeScript and Swift differ, by Swift's own note, the port follows Swift:** the
+  TypeScript reads the raw body and the ports the answer decoded as its type, so on a malformed body
+  the API never sends (a `session` that is not a session) the TypeScript may delete where the ports
+  keep (`OutboxContract.swift`, `SendResult`). No case file or fixture holds one. And Swift's
+  comment listing the state change's refusals missed #167's words: the port's follows the
+  TypeScript's, where Screen Time back on (Android's lock back on) also returns a refocus out of
+  protection off, and its own 409 with protection not off is among them. No rule differs.
+
+  **The tests:** OutboxContractTests.swift's three suites, in `outbox`: every case file answered by
+  the port (each body under each result, every result once, and the dispositions reached exactly
+  the port's: none it lacks, no discard of its own), each state-change case for all three answers;
+  every function the port has with its cases and every file one it ports; the literal `null`; and
+  ReconcileTests' seven scenarios. ContractFixtureTests' outbox dispositions, which AN3b left: each
+  fixture's `disposition` the port's, and the walk finding one for every outbox port and none
+  elsewhere. APIClientTests', which AN3d left: each fixture's disposition through the client; no
+  answer, an answer that can't be read, a `401` and no token read by every table (`retry`,
+  `reauth`); and the transport's timeout and redirects kept. Tried, each failing by name, then
+  reverted: a case of `contracts/outbox/unlock.json` changed to say a `401` means recorded; two
+  fixtures' dispositions changed; a `discard` value added to `UnlockDisposition`; a case file of a
+  function the port lacks; and the outcome read from each answer's own values, which failed the
+  refocus's and the lock back on's `recorded`, 24 cases. Nothing was added to the PC's SDK: its
+  folders were compared before and after.
+
 - **2026-11-04** — **AN3d, the core's client: BaliCore's `APIClient.swift` in Kotlin, over OkHttp
   (the conductor's calls, awaiting the owner's look; AN3d, #492).** The owner was asleep and asked
   for the recommended option on every question, so each call here is the conductor's, for the

@@ -1,12 +1,14 @@
 // BaliOutbox's twin (ARCHITECTURE, "Android app structure", decision 5): the outbox, the sync
 // engine, the lock's rules and which screen shows when, plain Kotlin whose tests run on the JVM.
-// AN4 picks the outbox's store: Room's JVM build keeps its tests here too.
+// AN4c picks the outbox's store: Room's JVM build keeps its tests here too.
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     `java-library`
     alias(libs.plugins.kotlin.jvm)
+    // The tests read contracts/outbox/'s case files as typed values (OutboxContractTest.kt).
+    alias(libs.plugins.kotlin.serialization)
     // Without it the app's Android Lint never reads this module (app/build.gradle.kts).
     alias(libs.plugins.android.lint)
     alias(libs.plugins.animalsniffer)

@@ -111,6 +111,8 @@ class OkHttpTransportTest {
                 val waited = started.elapsedNow()
                 assertEquals(SendResult.NetworkError, unlock.result)
                 assertEquals(NoAnswer.Unreachable, unlock.noAnswer)
+                // And the record kept.
+                assertEquals(UnlockDisposition.Retry, unlockDisposition(unlock.result, unlock.answer))
                 assertTrue(waited > 0.5.seconds && waited < stall, "waited $waited")
             }
         }
@@ -130,6 +132,7 @@ class OkHttpTransportTest {
                         assertNull(tap.noAnswer, "$status")
                         // Not a 2xx, so no outcome: the tap is kept and sent again, never deleted.
                         assertNull(tap.answer, "$status")
+                        assertEquals(TapDisposition.Retry, tapDisposition(tap.result, tap.answer), "$status")
                         val sent = server.takeRequest()
                         assertEquals("POST /v1/taps HTTP/1.1", sent.requestLine)
                         assertEquals("Bearer token-real", sent.headers["Authorization"])

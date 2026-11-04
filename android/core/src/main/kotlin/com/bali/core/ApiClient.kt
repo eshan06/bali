@@ -36,12 +36,6 @@ private class DeletionTokens(private val tokens: TokenProvider) : TokenProvider 
     override suspend fun accessToken() = tokens.deletionToken()
 }
 
-/** One send's result, as every outbox table takes it (AN4): its status, or no answer (`'network_error'`). */
-sealed interface SendResult {
-    data class Status(val code: Int) : SendResult
-    data object NetworkError : SendResult
-}
-
 /** Why a call has no answer: [SendResult.NetworkError], which every outbox table reads as retry. */
 enum class NoAnswer {
     /** The token provider had none to give, so nothing was sent: not "can't reach the server". */
