@@ -8,13 +8,13 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-03 (Central) — AN1, part 1 (`docs/DECISIONS.md`, 2026-11-03): Android's
-lock spike measured both locks on the Android 15, 16 and 17 emulators, and neither holds up alone;
-its part 2 waits for the owner's Pixel and Samsung. Before it, AN1's setup, and AN0 (#480), Android
-as its own phases. Still **before the next TestFlight build, Push Notifications on `com.bali.Bali`**
-(runbook 7, step 3), and the owner reinstalls Bali before runbook 7's step-6 check. Next: the
-owner's call on GA5's known limit, the smallest iPhones (DECISIONS 2026-11-02); AN1's part 2 once
-the owner has the phones; the audit's polish waits, as ruled._
+_Last updated: 2026-11-03 (Central) — the pilot's last list (the owner, 2026-11-03; `docs/DECISIONS.md`,
+2026-11-03): every phone check left, the class-started alert's among them, on a new prod build
+(`ios/README.md`'s sitting, Parts 1–7), the block's fresh code, PostHog, and the external beta review,
+which is Apple's answer; no prod backups and no lawyer's words for the Vanderbilt pilot. Before it, AN1,
+part 1. Next: a session builds the retire-a-block command; the owner the new build and the sitting; the
+owner's call on GA5's known limit, the smallest iPhones (DECISIONS 2026-11-02); AN1's part 2 once the
+owner has the phones; the audit's polish waits, as ruled._
 
 ## Now
 
@@ -26,8 +26,8 @@ in `docs/PLAN-ARCHIVE.md`), `docs/DECISIONS.md` the why, Open owner items the ow
 `bali-production` (sign-up for `@vanderbilt.edu` only); the sweep every minute in the API, with
 `sweep-cron` its backup and Sentry Cron `api-sweep` its monitor; deck storage on in both
 environments (M0); the portal's sign-in lasting the school day (2026-10-13); the school
-"Vanderbilt" set up, its year end 2026-12-18. **No prod backups yet:** L0b turns them on before
-the Vanderbilt pilot's first class. The details: `docs/DEPLOY.md`, `docs/RUNBOOKS.md`,
+"Vanderbilt" set up, its year end 2026-12-18. **No prod backups**, and none for the Vanderbilt
+pilot (the owner, 2026-11-03; L0b). The details: `docs/DEPLOY.md`, `docs/RUNBOOKS.md`,
 `docs/PILOT.md`.
 
 **The demo site** (www.getbali.app) is the Vercel project `bali-web`, built only from the orphan
@@ -108,10 +108,10 @@ branch, with no PR, as its README says (#479; `docs/DECISIONS.md`, 2026-11-02).
   token endpoints; the app half's interface is on N3's line) ✅; **the backend half is done**
   (N4–N6 ✅, 2026-10-06). The app half ✅ (#456; DECISIONS 2026-10-24), #336's fix in it (the random
   wait, approved 2026-10-23), the prompt right after onboarding's Screen Time step (the owner,
-  2026-10-24). Left: the owner's console steps (`docs/RUNBOOKS.md`, runbook 7: Push Notifications on
-  the App ID before the next TestFlight build) and N6's end-to-end check, Bali reinstalled first;
-  until then push is off on both deploys. Not on the pilot's critical path: it never delays C2 or
-  the external TestFlight steps.
+  2026-10-24). Runbook 7 is done on prod, and build 11 carries the app half (the owner, 2026-10-24,
+  as #458 records). Left: dev's step 4, and N6's end-to-end check before the pilot (the owner,
+  2026-11-03: "check this notifications stuff before we pilot"), Bali reinstalled first (the sitting's
+  Part 6).
 
 - **Deleted accounts' Cognito sign-ins (C3-cognito, 2026-10-09):** the server queues and deletes
   them; until the owner's runbook 9 sets each environment's key, dev and prod only queue (the
@@ -125,18 +125,28 @@ branch, with no PR, as its README says (#479; `docs/DECISIONS.md`, 2026-11-02).
 
 - **Worker and reviewer effort (the owner, 2026-10-14 and 2026-10-24):** a worker that only builds an approved portal screen runs at `xhigh`, every other worker at `max`; santa's reviewers run at `xhigh` on a screen step and at `max` on every other (`.claude/commands/plan.md`, `santa-loop.md`); the first 3–5 `xhigh` steps' blockers and times decide whether each stays (DECISIONS 2026-10-14, 2026-10-24).
 
-**The pilot's critical path.** The prod TestFlight build (✅ uploaded) → the owner's phone
-test on prod, a block tap included (✅ the tap, 2026-10-12) → the privacy page (C2: the owner's drafts on the pages, C2-text, for the beta review; the lawyer's words before the pilot's first class) → the external
-TestFlight group `Vanderbilt pilot` and Beta App Review (`docs/APP-STORE.md`, section 5) →
-Apple's answer on §3.3.3(P) (ISSUES #3; asked 2026-10-13, case 102994872143, waiting); and before the
-first class, production backups (L0b, the owner's console step; the owner, 2026-10-12).
+**Before the pilot (the owner, 2026-11-03; DECISIONS 2026-11-03).** Left, in order:
+1. A new prod TestFlight build from `main`: build 11 predates the audit's iOS fixes (GA3, GA5) and the
+   consent list's new lines (#466). The owner's.
+2. 📱 The phone sitting on it, whole (`ios/README.md`, "Phase 7's phone sitting, on prod", Parts 1–7):
+   C7's first launch, L8's, M8's and M8b's device checks, the exit checks L9, M10 and W6, the consent
+   list's new lines, the class-started alert end to end (N6), and every other student flow. The owner's.
+3. The block's fresh code (`docs/PILOT.md`, setup step 6): a session builds the owner command that
+   retires a block; the owner writes the new code, registers it and retires the old one.
+4. PostHog, for monitoring: not designed yet, so its plan comes first (what it records, from which
+   app, and nothing personal about a student), and the privacy pages name it before it is on.
+5. The external TestFlight group `Vanderbilt pilot` and Beta App Review (`docs/APP-STORE.md`, section
+   5), which is Apple's answer on §3.3.3(P) (ISSUES #3).
+
+Not needed for the Vanderbilt pilot (the owner, 2026-11-03): production backups (L0b) and the lawyer's
+words (C2); the owner's drafts stand on `/privacy` and `/terms`.
 
 **Who does what.**
 - Cloud sessions: the backend, CI and docs. Never UI, never a console.
 - The Windows PC (since 2026-10-14): the conductor, whose workers build the steps one at a time,
   the portal's UI included (`apps/web/src/app`, `apps/web/src/components`, its user-facing strings).
 - The Mac session: Xcode and the iPhone (`ios/Bali/UI`, `ios/BaliShield`, the app's user-facing
-  strings): TestFlight build 9.
+  strings): the next prod TestFlight build.
 - Android (Phases 8–11): the Windows PC builds its steps, the screens included; cloud sessions its
   API step (AN11) and docs; the owner its phones and Google's consoles (`docs/PLAN-ANDROID.md`).
 - The owner: the consoles (AWS, Railway, Vercel, Sentry, App Store Connect), Apple, the
@@ -144,8 +154,8 @@ first class, production backups (L0b, the owner's console step; the owner, 2026-
 
 **Phase 7, Live lesson: building.** Every step with no screen is done, L3c the last (2026-10-15);
 M0 is done (deck storage on, 2026-10-12); the web screens come after the redesign's PV15 (✅ #388),
-W3 the first (✅ #392), M5 (✅ #400), L7 (✅ #402, #405), W4 (✅ #406, #407, #408, its follow-up #409), L7b (✅ #393, #394, #395, #411), L7c (✅ #412), M6 (✅ #413–#418), W5 (✅ #419), so every web screen of Phase 7 is built, and the phone's L8, M8 and M8b (✅ L8a–L8c, M8, #452, and M8b, #454, their 📱 device checks left). L0b, production backups, is the owner's, before the Vanderbilt pilot's first
-class.
+W3 the first (✅ #392), M5 (✅ #400), L7 (✅ #402, #405), W4 (✅ #406, #407, #408, its follow-up #409), L7b (✅ #393, #394, #395, #411), L7c (✅ #412), M6 (✅ #413–#418), W5 (✅ #419), so every web screen of Phase 7 is built, and the phone's L8, M8 and M8b (✅ L8a–L8c, M8, #452, and M8b, #454, their 📱 device checks left). L0b, production backups, is not for the Vanderbilt pilot (the owner,
+2026-11-03).
 
 ## Phases
 
@@ -189,7 +199,7 @@ the owner's.
 
 Slice 1 — live questions:
 - **L0** The plan (docs) — ✅ (#230; DECISIONS 2026-10-05)
-- **L0b** 🔧 The owner: production backups on before the first actual pilot, the Vanderbilt pilot's first class (the owner, 2026-10-12: "we will do the backups later before our first actual pilot", and that pilot is the Vanderbilt one, withdrawing the ruling of 2026-10-05 that ran it without them; until then it was before any build that can answer reaches prod, answers being education records, and before any screen, settled and ordered 2026-10-10), holding back no screen: Railway's Pro plan (runbook 1, step 4), or the nightly `pg_dump` to encrypted S3 that is built ready to enable (Open owner items) — validation: runbook 4's restore drill
+- **L0b** 🔧 **Not for the Vanderbilt pilot** (the owner, 2026-11-03: "we dont need hte prod backups"). The owner: production backups on before the first actual pilot, the Vanderbilt pilot's first class (the owner, 2026-10-12: "we will do the backups later before our first actual pilot", and that pilot is the Vanderbilt one, withdrawing the ruling of 2026-10-05 that ran it without them; until then it was before any build that can answer reaches prod, answers being education records, and before any screen, settled and ordered 2026-10-10), holding back no screen: Railway's Pro plan (runbook 1, step 4), or the nightly `pg_dump` to encrypted S3 that is built ready to enable (Open owner items) — validation: runbook 4's restore drill
 - **L1** Database and engine: questions and answers — ✅ (#310; no DECISIONS entry of its own)
 - **L2** Privacy plumbing for answers and questions — ✅ (#311; DECISIONS 2026-10-11)
 - **L3** Teacher API — ✅ as L3a and L3r
@@ -261,8 +271,8 @@ the owner's Mac.
 
 One line each; each step's full notes are on its line in `docs/PLAN-ARCHIVE.md`.
 
-- **C2** 👀 ⚖️ The privacy policy and terms (Phase 6, **gate**): the portal's pages and the app's links are built, the pages holding the owner's drafts (C2-text), the one copy of the words (`docs/legal/` keeps the notes for the lawyer), which the lawyer's words replace in place
-  - **C2-drafts** The owner's drafts, for Apple's external beta review (the owner, 2026-10-24) — ✅ (#460): `docs/legal/privacy-policy.md` and `terms-of-use.md`, from General Legal's CC0 templates, every fact filled; the lawyer's questions at each file's end (DECISIONS 2026-10-24). The lawyer's review comes before the pilot's first class
+- **C2** 👀 ⚖️ The privacy policy and terms (Phase 6, **gate**): the portal's pages and the app's links are built, the pages holding the owner's drafts (C2-text), the one copy of the words (`docs/legal/` keeps the notes for the lawyer), which the lawyer's words replace in place; not needed before the Vanderbilt pilot (the owner, 2026-11-03)
+  - **C2-drafts** The owner's drafts, for Apple's external beta review (the owner, 2026-10-24) — ✅ (#460): `docs/legal/privacy-policy.md` and `terms-of-use.md`, from General Legal's CC0 templates, every fact filled; the lawyer's questions at each file's end (DECISIONS 2026-10-24). The lawyer's review is not needed before the Vanderbilt pilot (the owner, 2026-11-03)
   - **C2-text** The drafts' words on `/privacy` and `/terms` — ✅ (#461; DECISIONS 2026-10-24)
 - **C7** 📱 The 13+ screen (Phase 6, **gate**): built, C7-server with it; left, the owner's first-launch check on the next TestFlight build
 - **S8** 🔧 Least-privilege database roles (Phase 6): the owner's decision (Open owner items, 1)
@@ -303,7 +313,7 @@ Researched 2026-10-05; findings in [`docs/ROADMAP-RESEARCH.md`](ROADMAP-RESEARCH
 
 **Phase 6's owner list** (not PRs — the owner, the lawyer and the school):
 
-- 🚨 Apple's §3.3.3(P) (ISSUES #3): ask App Review whether a teacher-started session and the teacher's grid are allowed, and settle a fallback design if not — **gate**, and the first thing to do — asked by the owner 2026-10-13, case 102994872143 (`docs/APP-STORE.md` §5.6, as sent); waiting on Apple's answer
+- 🚨 Apple's §3.3.3(P) (ISSUES #3): ask App Review whether a teacher-started session and the teacher's grid are allowed, and settle a fallback design if not — **gate**, and the first thing to do — asked by the owner 2026-10-13, case 102994872143 (`docs/APP-STORE.md` §5.6, as sent); **answered** (the owner, 2026-11-03): submit it for review, since App Review decides only once it sees the build, so Beta App Review is the answer
 - Confirm the later K-12 pilot's state (likely Los Angeles or New Jersey) and the school's phone policy (ISSUES #4); the first, preliminary pilot is adults at Vanderbilt, on their own phones
 - ⚖️ The privacy policy and terms; the school's data agreement (FERPA's school-official terms, the state's law or the SDPC NDPA); a breach plan; opinions on the state's phone-ban and app-store age laws
 - Decision: who sees unlock reasons. (How accounts are made: decided 2026-10-04, self sign-up gated to `@vanderbilt.edu`, S11; MFA Optional with TOTP; the portal on `<project>.vercel.app` for now)
@@ -320,7 +330,7 @@ Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect acc
 
 - Android's four (the phones, the Play account, the timing, the lock after AN1): `docs/PLAN-ANDROID.md`, Open owner items.
 - 🔧 Sentry: confirm monitor `api-sweep`'s `production` environment is active and alerting (dev checks in to the same slug, #239's review; runbook 6, step 2).
-- ⏳ Apple's developer agreement §3.3.3(P) on Family Controls (ISSUES #3): asked by the owner on 2026-10-13, **case 102994872143** (`docs/APP-STORE.md` §5.6 holds the question as sent); waiting on Apple's answer, to record in ISSUES #3.
+- ✅ Apple's developer agreement §3.3.3(P) on Family Controls (ISSUES #3): asked by the owner on 2026-10-13, **case 102994872143** (`docs/APP-STORE.md` §5.6 holds the question as sent); Apple's answer, submit it for review (the owner, 2026-11-03), recorded in ISSUES #3.
 - #165 the Me page: D2j's redesign was rolled back (2026-10-06), so a better Me waits for a design the owner approves; the issue, closed by #266, is the owner's to reopen.
 - #130 App Store readiness.
 - #175 Screen Time turned back on in Settings, noticed by Bali itself.

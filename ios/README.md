@@ -330,14 +330,19 @@ be made to lose its standing by hand, so the tests cover it.
 
 ## Phase 7's phone sitting, on prod: C7, L8, M8 and M8b, then L9, M10 and W6
 
-One sitting on TestFlight build 10 (prod, from `1d4496b6`), the owner's iPhone and the prod portal. It covers
-C7's first-launch check, L8's, M8's and M8b's device checks, and the three exit checks; Part 5, on the first
-build after it, checks the consent list's new lines. Everything happens on prod: the answers you give are
-real records there, so use your own accounts and your own class.
+One sitting on the newest prod TestFlight build, built from `main` after the audit's fixes (build 12 or
+later; the sitting was first written for build 10), the owner's iPhone and the prod portal. It covers C7's
+first-launch check, L8's, M8's and M8b's device checks, and the three exit checks; Part 5 checks the consent
+list's new lines, Part 6 the class-started alert end to end (N6), and Part 7 every other student flow.
+Together they are every phone check left before the pilot (the owner, 2026-11-03). Everything happens on
+prod: the answers you give are real records there, so use your own accounts and your own class.
+
+**The order:** Part 5 first, as an update over the build on the phone now (10 or 11). Then Part 1, which
+deletes Bali and installs it fresh, then Parts 2–4, 6 and 7.
 
 **Before you start, once:**
 
-- Install build 10 from the TestFlight app once Apple has processed it.
+- Have the newest prod build ready in the TestFlight app once Apple has processed it.
 - On a laptop, keep two windows open on `https://bali-portal.vercel.app`: your prod teacher account in
   one, and your prod student account in a second browser profile for W6.
 - Upload a real lesson deck on the portal's **Your slides**: a PDF exported with photos, 10–25 MB and
@@ -347,8 +352,8 @@ real records there, so use your own accounts and your own class.
 
 ### Part 1 — C7: the first launch
 
-**Starting state:** no class running. Bali is deleted from the phone, then build 10 is installed fresh from
-TestFlight. Airplane Mode is off. You won't need the sticker.
+**Starting state:** no class running. Bali is deleted from the phone, then the newest build is installed
+fresh from TestFlight. Airplane Mode is off. You won't need the sticker.
 
 1. Open Bali: **Sign up or sign in**. Tap **Sign up**: **When were you born?**, both menus on
    **Choose**. Pick a month and year 13 or more years ago, then **Continue**. The intro's pages follow,
@@ -356,10 +361,11 @@ TestFlight. Airplane Mode is off. You won't need the sticker.
    Sign in, and nothing was kept.
 2. Tap **Sign in** and sign in with your prod student account. There's no birth question, because Bali's
    server already holds your yes. If you're in a class, **Your teacher can ask questions now** shows
-   once: tap **Continue**. Then the Screen Time ask (allow it) and Home, which lists your class.
+   once: tap **Continue**. Then the Screen Time ask (allow it) and Home, which lists your class. Over Home,
+   iOS asks to let Bali send notifications: tap **Allow** (Part 6 needs it).
 
 **Check:** the birth question comes only with Sign up; Sign in goes straight through; the one-time screen
-shows once and never again after a relaunch.
+and the notifications ask show once and never again after a relaunch.
 
 ### Part 2 — L8: a locked phone answers
 
@@ -426,15 +432,15 @@ home's **Open the lesson**). Airplane Mode is off.
 With one student, you, these checks prove the parts work end to end. A class with several students, the
 pilot's own, is the full exit check.
 
-### Part 5 — the consent list's new lines, on the next build
+### Part 5 — the consent list's new lines, as an update (do it first)
 
-The first TestFlight build after build 10 adds two lines to what your teacher sees and shortens one under
-never sees, so the list asks you again, once. Install that build as an update over build 10, and do this
-part before runbook 7's step 6 (`docs/RUNBOOKS.md`), which deletes Bali and installs it again: a fresh
-install has seen neither list, so after it the screen comes once more with **Your answers to questions,
+The newest build adds two lines to what your teacher sees and shortens one under never sees (#466; builds
+10 and 11 don't have them), so the list asks you again, once. Install it as an update over build 10 or 11,
+and do this part before Part 1, which deletes Bali and installs it again: a fresh install has seen neither
+list, so after it the screen comes once more with **Your answers to questions,
 counted only in the class's totals** among its lines.
 
-**Starting state:** no class running, so you're not tapped in. Build 10 is on the phone with Part 1 done:
+**Starting state:** no class running, so you're not tapped in. Build 10 or 11 is on the phone:
 you're signed in with your prod student account, in your class, and you've seen **Your teacher can ask
 questions now** once. Bali is closed. Airplane Mode is off. You won't need the sticker.
 
@@ -448,6 +454,59 @@ questions now** once. Bali is closed. Airplane Mode is off. You won't need the s
 
 **Check:** the screen comes once after the update, with only the lines added since build 10, and never
 again after a relaunch; the question card shows after it.
+
+### Part 6 — the class-started alert (N6; runbook 7, step 6)
+
+**Starting state:** no class running. You're signed in on the newest build, installed fresh in Part 1, with
+notifications allowed there. Airplane Mode is off. The sticker is your prod block. Runbook 7 is done on
+prod: `bali prod`'s deploy log says `push is on`.
+
+1. Tap your block: Waiting, "Ready, waiting for your teacher".
+2. Lock the phone.
+3. On the portal, press **Start** for your class.
+4. Within seconds, the lock screen shows "{class name} has started" / "Open Bali to lock your apps."
+5. Open it and unlock the phone. Bali shows "Checking in with your class" for up to 10 seconds, then
+   Focus, with your apps locked.
+6. **End** the class. Then do steps 1–5 again, this time force-quitting Bali before step 3. The alert
+   opens Bali cold, and the result is the same.
+7. Once more, but wait 90 seconds after the alert arrives before you open it. Bali checks at once, with
+   no "Checking in" wait, since the wait is only for an alert opened within about a minute.
+
+**Check:** the alert names the class and nothing else, with no student name. A student who taps after
+Start gets no alert, and none shows while Bali is open on screen: both by design. The API's log on
+Railway shows no APNs refusal (`BadDeviceToken` would mean the build registered under the wrong
+environment). No alert at all: Settings → Notifications → Bali must say Allowed; if Bali isn't listed,
+the phone was never asked (an install set up before build 11), so delete Bali and start at Part 1.
+
+### Part 7 — every other student flow
+
+**Starting state for each:** your class not running, unless the step says to start it. You're signed in
+on the newest build, Airplane Mode is off, and the sticker is your prod block.
+
+1. **Me and History.** In Me, change your name and save it. Open **What your teacher sees**: it has the
+   two new lines. The privacy policy and terms links open. History lists today's moments, newest first.
+2. **Join a class.** On the portal, **Create class** "Test class" and copy its code. On the phone: Home →
+   **Join a class** → type the code → the preview ("What your teacher sees") → **Join**. Home now lists
+   Test class.
+3. **Bali's shield.** Start your class and tap in. Open a blocked app (Instagram, say): Bali's shield
+   "Focused with Bali" covers it.
+4. **Emergency Unlock with a reason.** Hold Emergency Unlock for 1 second: Unlocked. Pick **Bathroom**.
+   The teacher's grid shows you unlocked, with the reason. **Lock my apps again**: Focused.
+5. **No signal.** Turn on Airplane Mode and hold Emergency Unlock: you're unlocked at once and the
+   shield is gone. Turn Airplane Mode off: within two minutes the teacher's grid shows the unlock.
+   **Lock my apps again**.
+6. **Screen Time turned off.** Settings → Screen Time → Apps with Screen Time Access → turn Bali off.
+   Bali shows Screen Time is off, and the grid shows it too. Turn Bali back on in Settings, then tap
+   **Turn on Screen Time** in Bali: Focus again, with no new tap (Bali doesn't notice Settings alone,
+   #175).
+7. **The bell with Bali closed.** Start your class with a bell a few minutes away and tap in.
+   Force-quit Bali and wait past the bell: your apps unlock by themselves within about a minute. Open
+   Bali: class over.
+8. **Leave a class.** Me → Test class's **Leave** → **Leave class**. Home no longer lists it.
+9. **Sign out and back in.** Me → **Sign out**, then Sign in: Home, with your class.
+10. **Delete account,** only with a spare @vanderbilt.edu account, since it really deletes one: Me →
+    **Delete account** → confirm. Bali returns to Sign up or sign in. With no spare account, skip it: it
+    passed on dev builds.
 
 ## CI
 
