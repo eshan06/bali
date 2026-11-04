@@ -10,6 +10,14 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-11-03 (Central) — AN1, part 1 (`docs/DECISIONS.md`, 2026-11-03): Android's
+lock spike measured both locks on the Android 15, 16 and 17 emulators, and neither holds up alone;
+its part 2 waits for the owner's Pixel and Samsung. Before it, AN1's setup, and AN0 (#480), Android
+as its own phases. Still **before the next TestFlight build, Push Notifications on `com.bali.Bali`**
+(runbook 7, step 3), and the owner reinstalls Bali before runbook 7's step-6 check. Next: the
+owner's call on GA5's known limit, the smallest iPhones (DECISIONS 2026-11-02); AN1's part 2 once
+the owner has the phones; the audit's polish waits, as ruled._
+
 _Last updated: 2026-11-03 (Central) — AN1's setup (`docs/DECISIONS.md`, 2026-11-03): Android's
 lock spike runs on the emulator first and on the owner's phones later, its code waiting for the
 owner's word; Android 15, 16 and 17 emulators set up on the PC whose clone is `C:\dev\bali`;

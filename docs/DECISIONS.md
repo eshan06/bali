@@ -8,6 +8,22 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-03** — **What's left before the Vanderbilt pilot (the owner).** In chat, after a read of
+  this plan: "apple said just submit it for review. they dont know until we do that. we dont need hte
+  prod backups, lawyer terms for this audit", then "we need to do all the remaining phone tests from
+  phases 4 5 6 7... and then also check this notifications stuff before we pilot. also we need to add
+  posthog for monitoring and stuff". So: **Apple's §3.3.3(P) answer is the review itself** (ISSUES
+  #3), the external Beta App Review of the first `Vanderbilt pilot` build; **no production backups**
+  for the Vanderbilt pilot, withdrawing L0b's ruling of 2026-10-12 (the cost, said plainly: a lost
+  prod database loses the pilot's records for good); **no lawyer's words** before it, the owner's
+  drafts standing on `/privacy` and `/terms` (C2-text); **every phone check left** runs on a new
+  prod build from `main`, since build 11 predates GA3, GA5 and #466, as `ios/README.md`'s sitting,
+  now Parts 1–7: Part 6 the class-started alert end to end (N6), from the unmerged #458, and Part 7
+  every other student flow, its Screen Time step corrected to the known edge #175 (Bali doesn't
+  notice Settings alone); and **PostHog** before the pilot, planned first (what it records, from
+  which app, nothing personal about a student) and named by the privacy pages before it is on. The
+  block's fresh code still needs the owner command that retires a block (`docs/PILOT.md`, setup
+  step 6), a session's.
 - **2026-11-03** — **AN1, part 1: both locks measured on the Android 15, 16 and 17 emulators (the
   owner's go; the spike's worker).** The owner, in the conductor's chat: "i dont have real phones
   yet but yes start the lock test on three emulators now". The spike is the branch
