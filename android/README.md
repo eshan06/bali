@@ -59,8 +59,8 @@ AN4 picks the outbox's store; Room's JVM build keeps its tests here, on the JVM.
 ## Android Lint
 
 The app's lint fails on any warning, in every module, but four checks of versions (a newer release
-or the SDK on the machine trips them, not the code; targetSdk follows Play's rule, not the newest
-Android) and the app's missing icon, waived in the manifest until an icon is drawn and approved.
+trips them, not the code; targetSdk follows Play's rule, not the newest Android) and the app's
+missing icon, waived in the manifest until an icon is drawn and approved.
 Lint can keep its last report after a change to the manifest alone:
 `./gradlew :app:lint --rerun-tasks` reads everything again. CI's runs start clean.
 

@@ -69,11 +69,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   checks its own). Set aside: making both Android libraries, whose tests would still run on the JVM
   but whose Room would then need Robolectric.
 
-  **Lint** fails on any warning, but four checks that a newer release or the machine's SDK trips,
-  not the code (GradleDependency, AndroidGradlePluginVersion, NewerVersionAvailable, and OldTargetApi,
-  which weighs targetSdk against the newest platform installed, 37 on CI's runner, so it would fail
-  there alone), and the app's missing icon, waived in the manifest until an icon is drawn and
-  approved.
+  **Lint** fails on any warning, but four checks that a newer release trips, not the code
+  (GradleDependency, AndroidGradlePluginVersion, NewerVersionAvailable, and OldTargetApi, which asks
+  for the newest Android, 17, and failed on the PC: targetSdk follows Play's rule instead), and the
+  app's missing icon, waived in the manifest until an icon is drawn and approved.
 
   **CI.** `android.yml`: "Android changes" decides through `touches.sh`, its self-test first, as
   `ios.yml` does, and "Android build · Lint · JVM tests" builds the app and the modules, runs the
