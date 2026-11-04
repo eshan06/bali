@@ -18,7 +18,7 @@ import kotlinx.serialization.json.JsonPrimitive
  * The phone's contract (ARCHITECTURE, "The fixtures are the phone's contract"): the API's real
  * answer to every student request, as `contracts/fixtures/` holds it, read in place from the repo
  * and never copied into this module, as BaliCore's tests read it. Gradle names the folder
- * (build.gradle.kts). ContractFixtureTests.swift's port; its outbox dispositions are AN4's.
+ * (build.gradle.kts). ContractFixtureTests.swift's port.
  */
 object Contract {
     /** The repo's `contracts/`. A run outside Gradle leaves it unset, and it throws. */
@@ -47,8 +47,8 @@ object Contract {
     }
 
     /**
-     * One fixture file, as `Fixture` in apps/api/test/helpers/contract.ts writes it; its
-     * `disposition`, what the TypeScript outbox table says of the answer, is AN4's to read.
+     * One fixture file, as `Fixture` in apps/api/test/helpers/contract.ts writes it. Its
+     * [disposition] is what the TypeScript outbox table says of the answer: the port must agree.
      */
     @Serializable
     data class Fixture(
@@ -57,6 +57,7 @@ object Contract {
         val status: Int,
         val type: String,
         val body: JsonElement,
+        val disposition: String?,
     ) {
         @Serializable
         data class Request(val path: String, val body: JsonElement?)
@@ -110,6 +111,26 @@ object Contract {
             "DELETE /v1/enrollments/{id}" to EndEnrollmentRequest.serializer(),
             "POST /v1/questions/{id}/answers" to AnswerRequest.serializer(),
         )
+
+    /**
+     * Each endpoint whose answers go through an outbox table, as the port's disposition of an
+     * answer: its status, and on a 2xx its body, decoded as the app decodes it (any other status
+     * carries the error shape, which no table reads). Each fixture of one carries the TypeScript
+     * table's disposition, to agree with.
+     */
+    val outboxes: Map<String, (Int, JsonElement) -> String> =
+        mapOf(
+            "POST /v1/taps" to table(TapResponse.serializer(), ::tapDisposition),
+            "POST /v1/sessions/{id}/unlock" to table(UnlockResponse.serializer(), ::unlockDisposition),
+            "POST /v1/taps/{eventId}/unlock" to table(UnlockResponse.serializer(), ::unlockDisposition),
+            "POST /v1/sessions/{id}/refocus" to table(RefocusResponse.serializer(), ::stateChangeDisposition),
+            "POST /v1/sessions/{id}/protection-off" to table(ProtectionOffResponse.serializer(), ::stateChangeDisposition),
+            "POST /v1/sessions/{id}/protection-on" to table(ProtectionOnResponse.serializer(), ::stateChangeDisposition),
+        )
+
+    /** [port], an outbox table, reading a fixture's answer: decoded as [type] on a 2xx, else none. */
+    private fun <A> table(type: KSerializer<A>, port: (SendResult, A?) -> Vocabulary): (Int, JsonElement) -> String =
+        { status, body -> port(SendResult.Status(status), if (status in 200..299) appDecode(type, body) else null).wire }
 
     /**
      * [json] decoded as [type], strictly, so a vocabulary value `core` lacks fails rather than
@@ -281,10 +302,38 @@ class ContractFixtureTest {
     }
 
     @Test
+    fun eachFixturesDispositionTheTypeScriptOutboxTablesIsThePorts() {
+        val wrong =
+            Contract.fixturePaths().mapNotNull { path ->
+                val fixture = Contract.load(path)
+                val port = Contract.outboxes[fixture.endpoint]
+                val expected = fixture.disposition
+                when {
+                    // A disposition no port here reads would be one nothing checks.
+                    port == null -> expected?.let { "$path: core has no outbox for ${fixture.endpoint}" }
+                    expected == null -> "$path: an outbox answer with no disposition"
+                    else -> {
+                        val got =
+                            try {
+                                port(fixture.status, fixture.body)
+                            } catch (error: SerializationException) {
+                                "an answer the app can't decode (${error.message})"
+                            }
+                        if (got == expected) null else "$path: the port's disposition is $got, not $expected"
+                    }
+                }
+            }
+        assertTrue(wrong.isEmpty(), wrong.joinToString("\n"))
+    }
+
+    @Test
     fun theWalkFindsAFixtureOfEveryTypeAndRequestCoreMapsAndNoneItDoesNot() {
         val fixtures = Contract.fixturePaths().map(Contract::load)
         assertEquals(Contract.responseTypes.keys, fixtures.map { it.type }.toSet())
         val requests = fixtures.filter { it.request.body != null }.map { it.endpoint }
         assertEquals(Contract.requestTypes.keys, requests.toSet())
+        // Every outbox port meets the API's real answers, and only a port's answers carry one.
+        val dispositions = fixtures.filter { it.disposition != null }.map { it.endpoint }
+        assertEquals(Contract.outboxes.keys, dispositions.toSet())
     }
 }

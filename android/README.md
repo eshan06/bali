@@ -69,7 +69,11 @@ its pooled one turns out closed, as URLSession's does. Its tests run against Moc
 local port. Gradle picks OkHttp's Android build for the app and its JVM build for `core`'s tests.
 Its calls suspend (kotlinx.coroutines), as Swift's are async.
 
-AN4 picks the outbox's store; Room's JVM build keeps its tests here, on the JVM.
+**The outbox tables** (`core`'s `UnlockContract.kt` and `OutboxContract.kt`, BaliCore's twins) say
+what the outbox does with a record after each send; no answer ever drops an unlock the server hasn't
+recorded. `outbox`'s tests run every `contracts/outbox/` case against them, and `core`'s check each
+fixture's disposition. AN4c picks the outbox's store; Room's JVM build keeps its tests here, on the
+JVM.
 
 ## Android Lint
 

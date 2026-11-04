@@ -73,13 +73,26 @@ inline fun <reified T> Contract.Fixture.sent(): T = BaliJson.decodeFromJsonEleme
 /** [json] decoded as the app decodes an answer: a value it doesn't know is unknown, never a failure. */
 fun <T> appDecode(type: KSerializer<T>, json: JsonElement): T = BaliJson.decodeFromString(type, json.toString())
 
-/** A call of the client's, made from what a fixture's request holds. */
-private fun call(block: suspend (ApiClient, Contract.Fixture) -> ApiResponse<*>) = block
+/** What one send came back as, and its outbox table's disposition of it: none where no outbox sends it. */
+private data class Sent(val response: ApiResponse<*>, val disposition: String? = null)
+
+/** [port], an outbox table, reading this answer as the app's outbox does. */
+private fun <A> ApiResponse<A>.read(port: (SendResult, A?) -> Vocabulary) = Sent(this, port(result, answer).wire)
+
+/** A call of the client's, made from what a fixture's request holds, that no outbox sends. */
+private fun call(block: suspend (ApiClient, Contract.Fixture) -> ApiResponse<*>): suspend (ApiClient, Contract.Fixture) -> Sent =
+    { client, fixture -> Sent(block(client, fixture)) }
+
+/** A call an outbox sends, its answer read by the outbox's table, [port]. */
+private fun <A> outbox(
+    port: (SendResult, A?) -> Vocabulary,
+    block: suspend (ApiClient, Contract.Fixture) -> ApiResponse<A>,
+): suspend (ApiClient, Contract.Fixture) -> Sent = { client, fixture -> block(client, fixture).read(port) }
 
 /**
  * The API client against the phone's contract, APIClientTests.swift's APIClientFixtureTests: each
- * fixture's request sent as the API read it, once, and its answer returned as the app reads it.
- * Each answer's disposition, the outbox table's, is AN4's, as ContractFixtureTest's is.
+ * fixture's request sent as the API read it, once, and its answer returned as the app reads it,
+ * which its outbox table reads as the TypeScript's did (the fixture's disposition).
  */
 class ApiClientFixtureTest {
     private val base = "https://api.bali.test"
@@ -94,17 +107,19 @@ class ApiClientFixtureTest {
             "DELETE /v1/me/push-token" to call { client, fixture -> client.removePushToken(fixture.sent()) },
             "GET /v1/me/age-check" to call { client, _ -> client.ageCheck() },
             "PUT /v1/me/age-check" to call { client, fixture -> client.recordAgeCheck(fixture.sent()) },
-            "POST /v1/taps" to call { client, fixture -> client.tap(fixture.sent()) },
+            "POST /v1/taps" to outbox(::tapDisposition) { client, fixture -> client.tap(fixture.sent()) },
             "POST /v1/sessions/{id}/checkin" to call { client, fixture -> client.checkIn(fixture.parameter, fixture.sent()) },
-            "POST /v1/sessions/{id}/unlock" to call { client, fixture -> client.unlock(fixture.parameter, fixture.sent()) },
+            "POST /v1/sessions/{id}/unlock" to
+                outbox(::unlockDisposition) { client, fixture -> client.unlock(fixture.parameter, fixture.sent()) },
             "POST /v1/taps/{eventId}/unlock" to
-                call { client, fixture -> client.unlockUnderTap(fixture.parameter, fixture.sent()) },
+                outbox(::unlockDisposition) { client, fixture -> client.unlockUnderTap(fixture.parameter, fixture.sent()) },
             "PATCH /v1/unlocks/{eventId}" to call { client, fixture -> client.changeReason(fixture.parameter, fixture.sent()) },
-            "POST /v1/sessions/{id}/refocus" to call { client, fixture -> client.refocus(fixture.parameter, fixture.sent()) },
+            "POST /v1/sessions/{id}/refocus" to
+                outbox(::stateChangeDisposition) { client, fixture -> client.refocus(fixture.parameter, fixture.sent()) },
             "POST /v1/sessions/{id}/protection-off" to
-                call { client, fixture -> client.protectionOff(fixture.parameter, fixture.sent()) },
+                outbox(::stateChangeDisposition) { client, fixture -> client.protectionOff(fixture.parameter, fixture.sent()) },
             "POST /v1/sessions/{id}/protection-on" to
-                call { client, fixture -> client.protectionOn(fixture.parameter, fixture.sent()) },
+                outbox(::stateChangeDisposition) { client, fixture -> client.protectionOn(fixture.parameter, fixture.sent()) },
             "POST /v1/enrollments" to call { client, fixture -> client.join(fixture.sent()) },
             "DELETE /v1/enrollments/{id}" to call { client, fixture -> client.leave(fixture.parameter, fixture.sent()) },
             "GET /v1/join-codes/{code}" to call { client, fixture -> client.previewJoinCode(fixture.parameter) },
@@ -116,7 +131,7 @@ class ApiClientFixtureTest {
         )
 
     @Test
-    fun eachFixtureTheClientSendsItsRequestOnceAndReturnsItsAnswer(): Unit =
+    fun eachFixtureTheClientSendsItsRequestOnceAndReturnsItsAnswerAsTheFixturesDisposition(): Unit =
         runBlocking {
             val wrong = Contract.fixturePaths().flatMap { path -> problems(path).map { "$path: $it" } }
             assertTrue(wrong.isEmpty(), wrong.joinToString("\n"))
@@ -132,12 +147,15 @@ class ApiClientFixtureTest {
         val fixture = Contract.load(path)
         val call = calls[fixture.endpoint] ?: return listOf("no call for ${fixture.endpoint}")
         val transport = TransportDouble.answering(fixture.status, fixture.body.toString())
-        val response = call(ApiClient(URI(base), FixedToken(token), transport), fixture)
+        val (response, disposition) = call(ApiClient(URI(base), FixedToken(token), transport), fixture)
         val problems = mutableListOf<String>()
 
         fun expect(what: String, actual: Any?, wanted: Any?) {
             if (actual != wanted) problems += "$what is $actual, not $wanted"
         }
+
+        // Fed the fixture's answer, the client returns what the outbox table reads as the TypeScript did.
+        expect("the disposition", disposition, fixture.disposition)
 
         // Fed the fixture's answer, the client returns it as the app reads it: its status, and its
         // body as the endpoint's answer on a 2xx, as the one error shape on any other.
@@ -166,28 +184,30 @@ class ApiClientFixtureTest {
 
 private val at: Instant = Instant.ofEpochSecond(946_684_860)
 
-/** One record an outbox sends, sent through a client. */
-private class OutboxCall(val name: String, val send: suspend (ApiClient) -> ApiResponse<*>)
+/** One record an outbox sends, sent through a client and read by its table. */
+private class OutboxCall(val name: String, val send: suspend (ApiClient) -> Sent)
 
 private val records =
     listOf(
-        OutboxCall("tap") { it.tap(TapRequest("TAG-1", "e1", at)) },
-        OutboxCall("unlock") { it.unlock("s1", UnlockRequest("e1", at, UnlockReason.Nurse)) },
-        OutboxCall("unlock under a tap") { it.unlockUnderTap("t1", UnlockRequest("e1", at, UnlockReason.Nurse)) },
-        OutboxCall("refocus") { it.refocus("s1", RefocusRequest("e1", at)) },
-        OutboxCall("protection off") { it.protectionOff("s1", ProtectionOffRequest("e1", at)) },
-        OutboxCall("protection on") { it.protectionOn("s1", ProtectionOnRequest("e1", at)) },
+        OutboxCall("tap") { it.tap(TapRequest("TAG-1", "e1", at)).read(::tapDisposition) },
+        OutboxCall("unlock") { it.unlock("s1", UnlockRequest("e1", at, UnlockReason.Nurse)).read(::unlockDisposition) },
+        OutboxCall("unlock under a tap") {
+            it.unlockUnderTap("t1", UnlockRequest("e1", at, UnlockReason.Nurse)).read(::unlockDisposition)
+        },
+        OutboxCall("refocus") { it.refocus("s1", RefocusRequest("e1", at)).read(::stateChangeDisposition) },
+        OutboxCall("protection off") { it.protectionOff("s1", ProtectionOffRequest("e1", at)).read(::stateChangeDisposition) },
+        OutboxCall("protection on") { it.protectionOn("s1", ProtectionOnRequest("e1", at)).read(::stateChangeDisposition) },
     )
 
 /**
- * The API client: no answer, an answer it can't read, a 401, no token. APIClientTests.swift's
- * APIClientTests; what each table makes of these answers is AN4's (`retry`, `reauth`).
+ * The API client: no answer, an answer it can't read, a 401, no token, and what each outbox table
+ * makes of them. APIClientTests.swift's APIClientTests.
  */
 class ApiClientTest {
     private val base = URI("https://api.bali.test")
 
     @Test
-    fun noAnswerOfflineATimeoutADroppedConnectionACancelledCallIsNoAnswerSentOnce(): Unit =
+    fun noAnswerOfflineATimeoutADroppedConnectionACancelledCallIsNoAnswerSentOnceAndEveryTableKeepsTheRecord(): Unit =
         runBlocking {
             val errors =
                 listOf(
@@ -197,33 +217,39 @@ class ApiClientTest {
             for (error in errors) {
                 for (record in records) {
                     val transport = TransportDouble.throwing(error)
-                    val response = record.send(ApiClient(base, FixedToken("t"), transport))
+                    val (response, disposition) = record.send(ApiClient(base, FixedToken("t"), transport))
                     val case = "${record.name}, $error"
                     assertEquals(SendResult.NetworkError, response.result, case)
                     assertEquals(NoAnswer.Unreachable, response.noAnswer, case)
                     assertNull(response.answer, case)
                     assertNull(response.error, case)
+                    assertEquals("retry", disposition, case)
                     assertEquals(1, transport.sent.size, case)
                 }
             }
         }
 
     @Test
-    fun anAnswerThatDoesNotDecodeIsNoneAndItsStatusStillStands(): Unit =
+    fun anAnswerThatDoesNotDecodeIsNoneAndItsStatusStillStandsA2xxKeepsTheRecord(): Unit =
         runBlocking {
             val answers =
                 listOf(
-                    200 to "<html>Service Unavailable</html>", 200 to """{"outcome":42}""", 201 to "",
-                    401 to "<html>Unauthorized</html>", 502 to "<html>Bad Gateway</html>",
+                    Triple(200, "<html>Service Unavailable</html>", "retry"),
+                    Triple(200, """{"outcome":42}""", "retry"),
+                    Triple(201, "", "retry"),
+                    Triple(401, "<html>Unauthorized</html>", "reauth"),
+                    Triple(502, "<html>Bad Gateway</html>", "retry"),
                 )
-            for ((status, body) in answers) {
+            for ((status, body, kept) in answers) {
                 for (record in records) {
-                    val response = record.send(ApiClient(base, FixedToken("t"), TransportDouble.answering(status, body)))
+                    val (response, disposition) =
+                        record.send(ApiClient(base, FixedToken("t"), TransportDouble.answering(status, body)))
                     val case = "${record.name}, $status $body"
                     assertEquals(SendResult.Status(status), response.result, case)
                     assertNull(response.noAnswer, case)
                     assertNull(response.answer, case)
                     assertNull(response.error, case)
+                    assertEquals(kept, disposition, case)
                 }
             }
         }
@@ -258,9 +284,10 @@ class ApiClientTest {
             for (record in records) {
                 val transport = TransportDouble.answering(401, """{"error":{"code":"unauthorized","message":"token expired"}}""")
                 val tokens = RefreshingToken()
-                val response = record.send(ApiClient(base, tokens, transport))
+                val (response, disposition) = record.send(ApiClient(base, tokens, transport))
                 assertEquals(SendResult.Status(401), response.result, record.name)
                 assertEquals(ApiErrorCode.Unauthorized, response.error?.error?.code?.known, record.name)
+                assertEquals("reauth", disposition, record.name)
                 // No refresh and no resend of its own: one token asked for, one request sent.
                 assertEquals(1, tokens.asked, record.name)
                 assertEquals(1, transport.sent.size, record.name)
@@ -273,10 +300,11 @@ class ApiClientTest {
             for (token in listOf(null, "")) {
                 for (record in records) {
                     val transport = TransportDouble.answering(401)
-                    val response = record.send(ApiClient(base, FixedToken(token), transport))
+                    val (response, disposition) = record.send(ApiClient(base, FixedToken(token), transport))
                     val case = "${record.name}, token $token"
                     assertEquals(SendResult.NetworkError, response.result, case)
                     assertEquals(NoAnswer.NoToken, response.noAnswer, case)
+                    assertEquals("retry", disposition, case)
                     assertTrue(transport.sent.isEmpty(), case)
                 }
             }
