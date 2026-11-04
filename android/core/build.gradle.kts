@@ -20,7 +20,11 @@ kotlin.compilerOptions.jvmTarget = JvmTarget.JVM_17
 dependencies {
     // Its types are core's own API's: an error's details, every type's serializer.
     api(libs.kotlinx.serialization.json)
+    // The API client's transport and its waits, neither in core's own API (ApiClient.kt).
+    implementation(libs.okhttp)
+    implementation(libs.kotlinx.coroutines.core)
     testImplementation(libs.kotlin.test)
+    testImplementation(libs.mockwebserver)
     // The classes held to Android 10's API, which Android Lint can't do here (README.md).
     signature(libs.gummy.bears.api29) { artifact { type = "signature" } }
 }

@@ -8,6 +8,73 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-04** — **AN3d, the core's client: BaliCore's `APIClient.swift` in Kotlin, over OkHttp
+  (the conductor's calls, awaiting the owner's look; AN3d, #492).** The owner was asleep and asked
+  for the recommended option on every question, so each call here is the conductor's, for the
+  owner to look at.
+
+  **The transport: OkHttp,** Android's usual HTTP client and plain JVM, so `core` stays plain
+  Kotlin and its tests run on the JVM, against MockWebServer, OkHttp's own local server. The JDK's
+  `HttpURLConnection` refuses `PATCH`, so on the JVM, where `core`'s tests run, it couldn't send
+  Bali's two (`PATCH /v1/me`, `PATCH /v1/unlocks/{eventId}`). **Swift's `async` is Kotlin's
+  `suspend`** (kotlinx.coroutines 1.11.0): a call waits on OkHttp's own thread, never the
+  caller's, and a cancelled caller cancels it. The client and its tests talk to a seam of `core`'s
+  own (`HttpTransport`, `HttpRequest`, `HttpAnswer`), so OkHttp's types stay out of `core`'s API.
+
+  **OkHttp 5.4.0, not 5.5.1, until compileSdk 37.** OkHttp 5.5's Android build declares
+  `minCompileSdk=37`, so the app's build failed on 5.5.1 (`checkDebugAarMetadata`): it needs
+  `platforms;android-37.0`, the owner's to add (`docs/PLAN-ANDROID.md`, Open owner items, 6). 5.4.0
+  builds on 36.1. What 5.5.0 and 5.5.1 add that 5.4.0 lacks (OkHttp's changelog, read
+  2026-11-04): eight compromised eMudhra intermediate certificates blocked, which Google has
+  already pushed to every phone with Play services, as every phone Bali installs on from Play has;
+  a stricter hostname check for IP addresses, where Bali calls one DNS name; and an HTTP/1 request
+  body's write timeout, where Bali's bodies are a few hundred bytes and the 30 s bound on a whole
+  exchange holds anyway. No Android build reaches a student before compileSdk 37 comes with the
+  first AndroidX step, so 5.5 comes with item 6.
+
+  **Set up as iOS's URLSession** (`URLSessionTransport.makeSession`): no cache and no cookies (an
+  ephemeral session keeps cookies in memory; here there are none); 15 s for each wait, to
+  connect, to send and for the next byte (iOS's request timeout), and 30 s for a whole exchange
+  (its resource timeout); a request's own wait, the client's `timeout`, set on a copy of the client
+  sharing its connections, OkHttp's way to set one call's; and no redirect followed, so a token
+  never reaches another host. **One setting more:** `retryOnConnectionFailure(false)`, since
+  OkHttp's default sends a request again after a `408` and on a dropped connection, where
+  URLSession returns them and the client's rule is that a request goes once, the outbox deciding
+  whether to send it again. Said plainly: a request that meets a connection the server has already
+  closed comes back as no answer, and the outbox sends it again after its backoff where OkHttp
+  would at once; its event id makes either safe. OkHttp still sends a request again after a `503`
+  saying `Retry-After: 0`, and after a `421` on a connection two hosts share, which no setting turns
+  off (its source, 5.4.0's `RetryAndFollowUpInterceptor`): the API sets `Retry-After` on a `429`
+  alone, and the app calls one host.
+
+  **Where Kotlin and OkHttp differ, said plainly:**
+  - **A path segment of dots.** OkHttp resolves `.` and `..` in a path, `%2E` and `%2E%2E` too,
+    where Foundation's `URL` leaves them, so a join code `..` would have gone to `GET /v1/`. The
+    transport sends no URL whose path OkHttp would change: it is no answer (`Unreachable`), as iOS
+    answers a request it can't build. Only a code typed as `.` or `..` meets it, and the Join
+    screen keeps letters and digits only (iOS's `Joining.type`, AN9's), so never in practice.
+  - **A cancelled caller stays cancelled.** Swift's cancelled call is `.unreachable`; a cancelled
+    coroutine's `CancellationException` goes on, as coroutines expect. No table reads an answer
+    either way, so the record is kept.
+  - **A body that isn't UTF-8 is no answer,** as Swift's decoder reads it, never one read with
+    replacement characters.
+  - **Swift's `unlock(tap:_:)` is `unlockUnderTap`:** Kotlin can't tell two calls apart by their
+    labels alone.
+
+  **The tests,** APIClientTests.swift's three suites. Every `contracts/fixtures/` request is sent
+  through the client, its answer checked as the app reads it and its request as the API read it,
+  once, with its token, wait and content type; each answer's disposition, the outbox table's, is
+  AN4's, with the tables, as ContractFixtureTest's is. No answer, an answer that can't be read, a
+  `401` and no token are checked as the tables take them (the result, why no answer, the answer and
+  the error) where Swift checks the disposition too. URLSessionTransportTests' run over
+  MockWebServer and a socket never accepted, with three more: a `PATCH` on the wire, a `408` sent
+  once, and the dots. Tried: each of the transport's settings broken on purpose (redirects
+  followed, OkHttp's resends on, the dots let through, a request's own wait ignored) failed its
+  test, the last after two minutes; then restored. **DeleteUserTests.swift is sign-in's,**
+  Cognito's DeleteUser and the sign-in's tokens throughout, so it goes with AN6; its one part of the
+  client, `forDeletion`, is APIClientTests' `deletionToken`, ported here. Nothing was added to the
+  PC's SDK: its folders were compared before and after.
+
 - **2026-11-04** — **AN3c, the core's event ids, NFC tag reading and app config: BaliCore's
   `EventID.swift`, `BlockTag.swift` and `AppConfig.swift` in Kotlin (the conductor's calls,
   awaiting the owner's look; AN3c, #491).** The owner was asleep and asked for the recommended

@@ -61,6 +61,13 @@ rewrites for Android 10 passes, as it should: `List.of` (Android 11) becomes D8'
 app. Kotlin's own work everywhere (`listOf`, `removeAt(0)`). The check takes no exceptions: never
 loosen it to pass code.
 
+**The API client** (`core`'s `ApiClient.kt`, BaliCore's `APIClient.swift`) puts each request on the
+wire through `HttpTransport`; the app's is `OkHttpTransport`, OkHttp set up as iOS's URLSession is:
+no cache or cookies, 15 s for each wait and 30 s for a whole exchange, no redirect followed, and
+nothing sent again after a 408 or a dropped connection. Its tests run against MockWebServer on a local port. Gradle picks
+OkHttp's Android build for the app and its JVM build for `core`'s tests. Its calls suspend
+(kotlinx.coroutines), as Swift's are async.
+
 AN4 picks the outbox's store; Room's JVM build keeps its tests here, on the JVM.
 
 ## Android Lint
@@ -82,6 +89,8 @@ Lint can keep its last report after a change to the manifest alone:
 - **The Android plugin and Kotlin:** `gradle/libs.versions.toml`. The plugin's own Kotlin is lifted
   to the catalog's. Each plugin release names the Gradle and build tools it needs.
   kotlinx.serialization's library follows Kotlin: each release names the Kotlin it was built with.
+- **OkHttp** stays on 5.4.0 while compileSdk is 36.1: 5.5's Android build needs compileSdk 37,
+  Android 17's platform, the owner's to add (`docs/PLAN-ANDROID.md`, Open owner items, 6).
 - **animal-sniffer's plugin** (2.0.1) calls two Gradle features Gradle 10 removes, which every
   build warns of. Upgrading to Gradle 10 needs a release of it that doesn't, or the same check made
   another way: never the check dropped.

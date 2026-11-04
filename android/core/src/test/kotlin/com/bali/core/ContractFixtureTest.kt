@@ -47,11 +47,17 @@ object Contract {
     }
 
     /**
-     * One fixture file, as `Fixture` in apps/api/test/helpers/contract.ts writes it; its status and
-     * its `disposition`, what the TypeScript outbox table says of the answer, are AN4's to read.
+     * One fixture file, as `Fixture` in apps/api/test/helpers/contract.ts writes it; its
+     * `disposition`, what the TypeScript outbox table says of the answer, is AN4's to read.
      */
     @Serializable
-    data class Fixture(val endpoint: String, val request: Request, val type: String, val body: JsonElement) {
+    data class Fixture(
+        val endpoint: String,
+        val request: Request,
+        val status: Int,
+        val type: String,
+        val body: JsonElement,
+    ) {
         @Serializable
         data class Request(val path: String, val body: JsonElement?)
     }
