@@ -8,6 +8,149 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-04** — **AN1b, the lock decided: (a), no VPN for now, the battery plan, and Android's
+  gaps logged for launch (the owner; AN1b, #487).** The owner settled it in the conductor's chat
+  before AN1's part 2 has its phones. The lock: "we will use a)". To the conductor's picks, lock (c)
+  left out and the battery plan's two calls: "yes those picks are fine". And: "log the gaps with
+  android for something we will check before launch".
+
+  **The lock is (a), the Accessibility service; (b) is dropped.** AN1's part 1 (2026-11-03, below)
+  is the why: (a) covers what (b) can't by design (split screen window by window,
+  picture-in-picture, the work profile and Private Space), has no notification or Stop button, and
+  Settings doesn't hide it, while (b)'s holes are built in. (a)'s weak spot stays: its failures
+  stick, a force-stop or Safe Mode leaving it off until the student switches it on again, which
+  Bali reports but can't undo. ARCHITECTURE's "Android app structure" moves from proposed to
+  decided, as AN1b's line set out, and its decision 2 names (a) alone. AN1's part 2, on a Pixel and
+  a Samsung, still runs before launch, to confirm that (a) holds on real phones. Said plainly: with
+  (b) dropped, no second lock stands behind (a) if Play refuses it (ISSUES #7); what Android does
+  then is the owner's call, with (b)'s numbers from part 1 on record.
+
+  **No VPN for now.** (c) covers nothing (part 1c, below); it asks a second consent in Android's
+  words ("monitor network traffic"), allows one VPN at a time, misses the profiles, and needs a
+  second Play declaration. It stays out, revisited only if part 2 or the pilot shows students
+  switching (a) off often. If it ever comes back, two rules hold: Bali never turns the VPN back on
+  after a student disconnects it, though Android would let a consented app do so, since Bali never
+  fights the student; and it opts out of always-on (`android.net.VpnService.SUPPORTS_ALWAYS_ON`
+  false, untested), so no student cuts the whole phone off outside class with "Block connections
+  without VPN", as part 1c saw happen. ISSUES #7's second declaration, Play's `VpnService`, is no
+  longer needed.
+
+  **The battery plan, the owner's two calls** (ARCHITECTURE, "Android app structure", the battery
+  plan):
+  - **Check-ins follow the screen,** AN7's first question answered: every 30 s while the screen is
+    on, from the lock's service, whatever app is in front; once as it goes off and once as it comes
+    on; never while it is off. The research's why: a 30-s check-in with the screen off doesn't
+    happen on a phone. A Handler's delay counts uptime, and "Time spent in deep sleep will add an
+    additional delay to execution" [doc]; AN1's 100 of 100 ticks came from emulators whose CPU
+    never slept. Forcing it takes a wake lock, which Play now punishes (two hours or more of
+    non-exempt partial wake locks with the screen off, in more than 5% of sessions over 28 days,
+    brings a warning on the listing and no place in recommendations, from 2026-03-01 [doc]), or a
+    foreground service, or alarms that Doze defers. Each check-in also wakes the radio: a 3G radio
+    draws power for at least 18 s after a transfer, so three a minute keep it on [doc]; LTE's tail
+    was measured near 1 W for about 11.6 s [measured, 2011 hardware], so 100 check-ins a lesson
+    would cost about 2% of a phone's battery [inference], near the 2% an hour Doorman's reviews
+    complain of. With the screen on, the service's binding (`BIND_FOREGROUND_SERVICE_WHILE_AWAKE`)
+    keeps Bali clear of Android's power limits [AOSP]. What the grid then means: an awake phone
+    gone quiet means Bali stopped or the phone lost its network; a phone asleep on the desk reads
+    silent after 90 s, as an iPhone does today, since iOS checks in only while Bali is in front
+    (`SyncEngine`, checked in the code). No server, API or grid change. Set aside, from report B: a
+    `screen` field on the check-in and a heartbeat about every 10 minutes asleep, so an asleep phone
+    would wait about 20 minutes before Silent. It changes the state rule, the sweep and the reports'
+    silent minutes: an architecture change. AN7's second question stays open: whether Bali, opened
+    again, reports how long it was stopped (Android 11's `ApplicationExitInfo` can tell it). That
+    would be new information about a student, so it needs a board and the owner's approval first.
+  - **A covered app is sent to the background, as Home does.** The research's why: Android honours
+    a covered app's keep-screen-on flag unless an opaque window filling the display from its top
+    edge sits above it, and the spike's cover starts below the status bar [AOSP, the research's
+    reading], so a covered video or game can keep the screen on, playing underneath (part 1 heard
+    the sound). TimeLimit, Curbox and Mindful send a blocked app away too, and so does Doorman's
+    Lockdown [code; Doorman's listing]. Left: a music app, a picture-in-picture window and a
+    split-screen half play on. Leaving the block screen goes to the home screen, as the iPhone
+    shield's OK does, and the block screen's look doesn't change.
+
+  **The rest is research, with no decision needed,** now ARCHITECTURE's rules:
+  - Outside a lesson the service subscribes to nothing: `setServiceInfo` with eventTypes 0, flags 0
+    and packageNames [Bali], and `setCacheEnabled(false)` on API 33 and later; it is widened only
+    in a lesson. The events, flags and packages "can be dynamically set at runtime" [doc], and
+    setting them leaves the Settings switch on [AOSP]. Each app drops the events no service asked
+    for before sending anything, but eventTypes 0 alone still has every app send its window-state
+    events; packageNames [Bali] stops that [AOSP].
+  - In a lesson, window events only: never content or scroll events, the chattiest kinds, sent per
+    changing view and never merged, and no node read. A single read (`getRoot`,
+    `rootInActiveWindow`, `getSource`) has every app send the accessibility cache's eleven event
+    types from then on [AOSP]; the spike's `window.root` fallback is such a read.
+  - Nothing runs with the screen off: no alarm, exact or not, no foreground service, no wake lock
+    past the few seconds of the screen-off check-in, and no request to skip battery optimization,
+    which Play forbids "unless the core function of the app is adversely affected" [doc]. Bali can
+    use FCM, and its lock needs nothing while the screen is off, so it doesn't qualify [inference].
+  - Push only as visible, high-priority FCM notifications: FCM may lower high-priority messages
+    that show nothing, judging a pattern over 7 days per app instance [doc].
+  - The outbox saves a record first and sends it at once; a network callback sends it again as a
+    network comes back, and expedited WorkManager work, which gets network through Doze, is the
+    backstop [doc].
+  - The live lesson is read only while Bali's screen is visible: its 2-s poll keeps an LTE radio on
+    the whole time it runs [inference].
+  - The block screen is static: it draws once [inference].
+
+  **Not taken from the research:** report A's dark cover and Focus, each minute's text from
+  TIME_TICK. A dark screen draws far less on an OLED phone [measured, Google's, via Android
+  Authority], but the app and the shield are light only by the owner's ruling (D1, kept on
+  2026-10-04; DESIGN.md §1), and Focus's countdown ticks by the second on the approved boards,
+  iOS's and AS0's. A dark or minute-only Focus would be a new look, for the owner to approve on a
+  board. **Left open,** each a new state that needs a board and the owner's approval: telling a
+  student plainly when a battery setting stops Bali's pushes and sync (`isBackgroundRestricted`); a
+  check as Bali opens that names the one fix for that phone's maker; and asking Samsung's students
+  to put Bali in Never sleeping apps at setup, only if part 2 shows a sleeping list breaks the lock.
+
+  **Two conflicts the phones settle (AN1's part 2):**
+  - Deep Doze's timing. Report B reads AOSP's defaults as about 64 minutes of a still phone (30
+    inactive, 30 watching for motion, up to 4.5 sensing), so a plain 50-minute lesson ends first;
+    report C as about 35 minutes after light Doze, which starts about 4 minutes after the screen
+    goes off. Each phone's `dumpsys deviceidle` prints the constants in force.
+  - Whether the bound service keeps its network in Doze. B reads the binding as passing a
+    capability that lets the network through Doze and Battery Saver, as AN1's forced-Doze ticks did
+    on the emulators; C reads the same flag's "only applies while the device is awake" as the
+    network cut once the screen is off. `dumpsys activity processes` and `dumpsys netpolicy`, with
+    the phone asleep, settle it. The check-ins by the screen work either way.
+
+  **The gaps** are ISSUES #6's list, each with the way it is checked before Android launches, and
+  the device gate (AP3) checks every one again on both phones: a force-stop or Safe Mode; makers'
+  battery savers (Samsung's sleeping-app lists untested); the moment before the cover; sound that
+  plays on; a guest user; a permission prompt; Advanced Protection on Android 17, which
+  "automatically restricts AccessibilityService access" to verified accessibility tools [doc:
+  Google, 2026-10-01]; a device or profile owner, which can keep Bali's service from being switched
+  on (`setPermittedAccessibilityServices`) [doc]; and Play (ISSUES #7). The Accessibility step's
+  disclosure lost "Bali keeps and sends none of it." in the owner's canvas cuts of 2026-11-04, with
+  the matching sentence of the service's description in Settings (AS0 approved, #486, below); if
+  Play's review asks for it, it goes back.
+
+  **AN1's part 2 gains the battery test** (`docs/ANDROID-PHONE-TESTS.md`): report C's three runs,
+  a desk lesson, a busy one and a school day, with their pass marks and the makers' checks, and the
+  phone questions of reports A and B.
+
+  **Sources:** three research reports of 2026-11-04, model output kept outside the repo: (A) the
+  lock service's own cost; (B) check-ins, push, the outbox and (c)'s cost; (C) phone makers, Play
+  and the phone test plan. Every claim above keeps its report's label: [doc] Android's or Google's
+  documents, [AOSP] the platform's source as the reports read it, [code] open-source apps,
+  [measured], [inference]. The documents linked were opened again on 2026-11-04; the source
+  readings and the makers' reports are the reports' own. The key links:
+  [AccessibilityServiceInfo](https://developer.android.com/reference/android/accessibilityservice/AccessibilityServiceInfo),
+  [AccessibilityManager](https://github.com/aosp-mirror/platform_frameworks_base/blob/main/core/java/android/view/accessibility/AccessibilityManager.java)
+  and [AccessibilityCache](https://github.com/aosp-mirror/platform_frameworks_base/blob/main/core/java/android/view/accessibility/AccessibilityCache.java),
+  [DisplayContent](https://github.com/aosp-mirror/platform_frameworks_base/blob/main/services/core/java/com/android/server/wm/DisplayContent.java),
+  [AccessibilityServiceConnection](https://android.googlesource.com/platform/frameworks/base/+/refs/heads/android16-release/services/accessibility/java/com/android/server/accessibility/AccessibilityServiceConnection.java),
+  [Handler.postDelayed](https://developer.android.com/reference/android/os/Handler#postDelayed(java.lang.Runnable,%20long)),
+  [Play's wake-lock enforcement](https://android-developers.googleblog.com/2026/03/battery-technical-quality-enforcement.html),
+  [the radio's state machine](https://developer.android.com/develop/connectivity/network-ops/network-access-optimization),
+  [Huang et al., MobiSys 2012](https://experts.umn.edu/en/publications/a-close-examination-of-performance-and-power-characteristics-of-4/),
+  [Doze and App Standby](https://developer.android.com/training/monitoring-device-state/doze-standby),
+  [FCM's priorities](https://firebase.google.com/docs/cloud-messaging/android/message-priority),
+  [Android 15's stopped state](https://developer.android.com/about/versions/15/behavior-changes-all),
+  [Advanced Protection](https://blog.google/security/android-advanced-protection-updates/),
+  [DevicePolicyManager](https://developer.android.com/reference/android/app/admin/DevicePolicyManager),
+  [Samsung's sleeping apps](https://www.samsung.com/us/support/answer/ANS00088422/) and
+  [dontkillmyapp](https://dontkillmyapp.com/).
+
 - **2026-11-04** — **AS0 approved: the Android canvas as it stands, after the owner's cuts (the
   owner; AS0's worker).** The conductor asked in chat, "Is the Android canvas approved as it
   stands?", and the owner answered "approved":

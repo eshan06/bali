@@ -1049,10 +1049,10 @@ never covers or delays Emergency Unlock, and its answers never enter the outbox.
 
 ## Android app structure
 
-**Proposed (2026-11-02): the conductor's recommendations, the owner's to confirm**
-(`docs/DECISIONS.md`, 2026-11-02). Nothing in this section is decided until the owner says so. The
-lock (decision 2) stays open until AN1's spike has measured both candidates on real phones, and
-AN1b moves the section from proposed to decided (`docs/PLAN-ANDROID.md`).
+**Decided (2026-11-04): the owner picked the lock, (a) ("we will use a)"),** and with it the section
+moves from proposed to decided, as AN1b's line set out (`docs/DECISIONS.md`, 2026-11-02 and
+2026-11-04). AN1's part 2, on a Pixel and a Samsung, still runs before launch to confirm that (a)
+holds on real phones (`docs/PLAN-ANDROID.md`).
 
 The Android student app, the iPhone app's twin (the owner, 2026-11-02: "I want it to function
 exactly the same as the ios counterpart"). Its philosophy is iOS's: a mirror, not a cage.
@@ -1065,7 +1065,7 @@ Android can't keep the iOS way is named here, never bent quietly.
 | iOS | Android |
 |---|---|
 | Swift and SwiftUI | Kotlin and Jetpack Compose |
-| The shields (Screen Time: Family Controls, ManagedSettings) | Bali's own lock: the app in front, if blocked, covered by Bali (decision 2) |
+| The shields (Screen Time: Family Controls, ManagedSettings) | Bali's own lock: the app in front, if blocked, covered by Bali and sent to the background (decision 2) |
 | The DeviceActivity monitor (`ios/BaliMonitor`) | Nothing to remove at the bell: the lock is a function of the session's window |
 | BaliShield (`ios/BaliShield`), what a shield shows | The block screen, one of the app's own screens |
 | GRDB in the app group | SQLite through Room, in the app's own storage |
@@ -1080,24 +1080,26 @@ Android can't keep the iOS way is named here, never bent quietly.
 | `ios.yml` on macOS | `android.yml` on Linux |
 | TestFlight and the App Store | Play's testing tracks, then production |
 
-### The decisions (proposed, 2026-11-02)
+### The decisions (2026-11-02, decided 2026-11-04)
 
 **1. Native Kotlin and Compose.** Not Kotlin Multiplatform: the iOS core is already Swift, written
 and tested, and `contracts/` already holds both apps to one server, so a shared core would cost a
 rewrite of BaliCore and buy little.
 
-**2. The lock: (a) or (b), chosen by AN1.** (a) An Accessibility service that sees which app comes
-to the front and covers it with the block screen; (b) usage access, polled, plus an overlay
-("Display over other apps"). Either is Bali's own, running in Bali's process, so it stops when Bali
-stops: force-stopping Bali or switching the service off ends it, some phone makers' battery savers
-may stop it, and a blocked app can flash before the cover lands. It never fights the student: the
+**2. The lock: (a), an Accessibility service** (the owner, 2026-11-04). It sees which app comes to
+the front, covers it with the block screen, and sends it to the background as Home does (the
+battery plan, below). It is Bali's own, running in Bali's process, so it stops when Bali stops:
+force-stopping Bali or switching the service off ends it, some phone makers' battery savers may
+stop it, and a blocked app can flash before the cover lands. It never fights the student: the
 phone app and the messaging app the student has set as default, emergency calls, Settings, the
 keyboard and the home screen are never covered, and Emergency Unlock is always there. Bali never
 blocks its own removal or the switch that turns it off: that is both the mirror rule and Play's
 policy (ISSUES #7). It reads only which app is in front, to decide whether to cover it, and keeps
 and sends none of it: as on iOS, the server never learns which apps a student opens. Device-owner
 mode, Android's full lock, needs a factory-reset phone the school manages, so it can't work on a
-student's own phone (Decided later).
+student's own phone (Decided later). AN1's other two candidates are out: (b), usage access polled
+with an overlay, was dropped, and (c), a VPN beside (a), left out for now (Decided later;
+`docs/DECISIONS.md`, 2026-11-04).
 
 **3. One app, no extensions.** The lock, the block screen and the bell are the app's own parts, its
 service and its screens, not separate programs the system runs for it, and nothing has to wake at a
@@ -1130,19 +1132,22 @@ read and a deletion's.
 
 ### Rules that keep the phone honest, where Android's differ
 
-- **Protection off is the lock's own switch.** Switching off Bali's service, or taking back the
-  access it runs on, ends the lock, as taking back Screen Time drops the shields. The next check, at
-  each check-in and as Bali starts or comes to the front, notices it and reports it with iOS's
-  events (`protection-off`, then `protection-on` and #167's return), and the grid shows "turned
-  protection off".
+- **Protection off is the lock's own switch.** Switching Bali's service off ends the lock, as
+  taking back Screen Time drops the shields. The next check, at each check-in and as Bali starts or
+  comes to the front, notices it and reports it with iOS's events (`protection-off`, then
+  `protection-on` and #167's return), and the grid shows "turned protection off".
 - **A force-stopped app ends the lock.** Where iOS keeps the shields to the bell with the app
-  force-quit, Android's lock stops with Bali. Check-ins stop, so within about a minute the grid
-  shows the phone gone quiet, as it does a force-quit iPhone, and nothing pretends it is still
-  locked. But a quiet tile says less than on iOS: an iPhone gone quiet keeps its shields unless
-  Screen Time was taken back, while a quiet Android phone may be stopped, or only out of Bali's
-  foreground with its lock still on. Two questions for the owner, AN7's: whether the lock's service
-  checks in while it runs, so that quiet means stopped, and whether Bali, opened again within the
-  session, reports how long it was stopped.
+  force-quit, Android's lock stops with Bali, and a force-stop or Safe Mode takes the service off
+  Android's list of switched-on services, so it stays off until the student switches it on again.
+  Check-ins stop, so within about a minute the grid shows the phone gone quiet, as it does a
+  force-quit iPhone; once Bali is opened again it reports protection off, and nothing pretends the
+  phone is still locked. But a quiet tile says less than on iOS: an iPhone gone quiet keeps its
+  shields unless Screen Time was taken back, while a quiet Android phone may be asleep with its lock
+  on, or stopped. AN7's first question is answered (the battery plan, below): the lock's service
+  checks in while the screen is on, so an awake phone gone quiet means Bali stopped or the phone
+  lost its network. Its second stays open: whether Bali, opened again within the session, reports
+  how long it was stopped. That would be new information about a student, so it needs a board and
+  the owner's approval first.
 - **The bell needs no extension.** The lock covers apps only inside the session's window, by the
   phone's clock as on iOS (a changed clock detected, not prevented), so at the bell it simply stops
   covering; nothing has to wake at the bell to take it off.
@@ -1152,18 +1157,53 @@ read and a deletion's.
   counter and install id, the sign-in): a restored counter would rank a new record behind ones the
   server already holds (A12), and a restored sign-in would open a reinstall signed in.
 
+### The battery plan (the owner, 2026-11-04)
+
+The owner's two calls ("yes those picks are fine"), and the rules the battery research set beside
+them (`docs/DECISIONS.md`, 2026-11-04, with its sources). AN1's part 2 measures them on the phones
+(`docs/ANDROID-PHONE-TESTS.md`).
+
+- **Check-ins follow the screen** (AN7's first question). The lock's service checks in every 30 s
+  while the screen is on, whatever app is in front, and once as the screen goes off and once as it
+  comes on; never while it is off. So an awake phone gone quiet means Bali stopped or the phone lost
+  its network, and a phone asleep on the desk reads silent after 90 s, as an iPhone does today. The
+  server, the API and the grid are unchanged.
+- **A covered app goes to the background.** Once a blocked app is covered, Bali also sends it to the
+  background, as Home does, so a covered video can't keep the screen on and most apps' sound stops;
+  a music app, a picture-in-picture window and a split-screen half play on. Leaving the block screen
+  goes to the home screen, as the iPhone shield's OK does. The block screen's look is unchanged.
+- **The service listens only in a lesson.** Outside one it subscribes to nothing: `setServiceInfo`
+  with eventTypes 0, flags 0 and packageNames [Bali], and `setCacheEnabled(false)` from API 33. In a
+  lesson it takes window events only: never content or scroll events, and no node read, since a
+  single read turns on the accessibility cache's event stream from every app.
+- **Nothing runs with the screen off:** no alarm, exact or not, no foreground service, no wake lock
+  past the few seconds of the screen-off check-in, and no request to skip battery optimization,
+  which Play forbids an app like Bali.
+- **Push** goes only as a visible, high-priority FCM notification. **The outbox** saves a record
+  first and sends it at once; a network callback sends it again when a network comes back, and
+  expedited WorkManager work is the backstop. **The live lesson** is read only while Bali's screen
+  is visible. **The block screen** is static: it draws once.
+
 ### What's weaker than on iOS, plainly
 
-- The lock is Bali's own, not the system's: a force-stop, the service switched off, a reboot into
-  Safe Mode or a phone maker's battery saver frees the phone until Bali runs again, and nothing on
-  the phone can stop it. The grid shows protection off for the switch; for the rest it shows the
-  phone gone quiet, which on Android can't say whether the lock still holds (the rules above).
-- A blocked app can show for a moment before the cover lands; under (b), which polls, for longer.
-- (b) also keeps a foreground service, and its notification, for the whole session.
-- Play may refuse the Accessibility route (ISSUES #7), and Android 17's Advanced Protection is
-  reported to turn off any Accessibility service that isn't a disability tool.
-- What Android keeps apart, a work profile, Private Space or another user, may be out of the lock's
-  reach (AN1 measures it).
+ISSUES #6 lists every gap with the way it is checked before Android launches, and the device gate
+(AP3) checks them all again on a Pixel and a Samsung.
+
+- The lock is Bali's own, not the system's: a force-stop or a reboot into Safe Mode switches it off
+  until the student switches it on again, a phone maker's battery saver can switch it off or freeze
+  it, and nothing on the phone can stop either. The grid shows protection off once Bali sees the
+  switch off, at once or when Bali is next opened; until then it shows the phone gone quiet, as it
+  shows one asleep, so on Android a quiet tile can't say whether the lock still holds (the rules
+  above).
+- A blocked app can show for a moment before the cover lands, and behind a permission prompt. Its
+  sound can play on where sending it to the background doesn't stop it: a music app, a
+  picture-in-picture window, a split-screen half.
+- The lock may not switch on at all: where Play refuses the Accessibility route (ISSUES #7), on
+  Android 17 with Advanced Protection on, which limits Accessibility to verified accessibility tools,
+  and on a phone whose device or profile owner (a school's, an employer's or a parent's management
+  app) keeps Bali's service from being switched on.
+- A guest user on the phone is out of the lock's reach; a work profile and Private Space are covered
+  (AN1, part 1).
 - Phones differ by maker, so the device gate (AP3) runs on a Pixel and a Samsung, not one phone.
 
 ### Decided later, on purpose
@@ -1171,6 +1211,10 @@ read and a deletion's.
 - **Device-owner mode for school-owned phones** (the K-12 path): a factory-reset phone the school
   enrolls and manages, where Android's own management controls hold apps as Screen Time does; never
   a student's own phone. The twin of ISSUES #3's first fallback, school-owned devices under MDM.
+- **Lock (c), a VPN beside (a)** (AN1, part 1c): left out for now (the owner, 2026-11-04), and
+  revisited only if AN1's part 2 or the pilot shows students switching (a) off often. If it comes
+  back, Bali never turns the VPN back on after a student disconnects it, since it never fights the
+  student, and it opts out of always-on.
 
 ## Web portal
 
@@ -1795,10 +1839,11 @@ Each exists because v2 broke it and shipped a real bug
   totals only, phones polling; 2026-10-10: students on the web too, Slice 3), planned, its build
   under way since 2026-10-10; the Start's push to waiting
   students (2026-10-06, a visible doorbell, never the truth), its backend and its app half built
-  (#456), the app asking to send it right after onboarding's Screen Time step (the owner, 2026-10-24).
-- **Proposed:** the Android app (2026-11-02, "Android app structure"): native Kotlin and Compose,
-  iOS's rules ported with their tests, push through FCM, sign-in through Cognito's hosted UI, its
-  lock left to AN1's spike; the owner's to confirm (`docs/PLAN-ANDROID.md`, Phases 8–11).
+  (#456), the app asking to send it right after onboarding's Screen Time step (the owner, 2026-10-24);
+  the Android app (2026-11-02, decided 2026-11-04, "Android app structure"): native Kotlin and
+  Compose, iOS's rules ported with their tests, push through FCM, sign-in through Cognito's hosted
+  UI, its lock an Accessibility service, with its battery plan, which AN1's part 2 confirms on a
+  Pixel and a Samsung before launch (`docs/PLAN-ANDROID.md`, Phases 8–11).
 - **Open:** one design question, Phase 6: ISSUES #3's fallback, should Apple's answer
   call for one (the issue ranks the fallback designs, best fit first). Next: the build plan (what gets coded
   first). Items deliberately parked live in each section's "decided later" list.

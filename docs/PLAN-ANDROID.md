@@ -4,7 +4,7 @@ Android's phases (8–11) and open steps, kept beside `docs/PLAN.md` and under i
 2026-11-02; `docs/DECISIONS.md`, 2026-11-02). PLAN.md stays the file every session reads first: it
 carries Android's phase rows, one line in Now and a pointer here, and a session whose task is
 Android's reads this file too (CLAUDE.md, Read first). The design is ARCHITECTURE's "Android app
-structure", proposed until AN1b settles the lock.
+structure", decided at AN1b (2026-11-04).
 
 - **The current state only.** A finished step is one line (its id, its title, ✅, its PR, its
   DECISIONS date); its full notes move word for word to `docs/PLAN-ARCHIVE.md`, and the why goes in
@@ -14,11 +14,13 @@ structure", proposed until AN1b settles the lock.
   disagrees.
 - **Under 6,000 words.** AN2 puts the cap in CI, as `plan-words.sh` holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-04 (Central) — AS0 approved (`docs/DECISIONS.md`, 2026-11-04): the owner
-approved the Android canvas as it stands, 148 boards drawing lock (a) alone, with the Words board's
-calls as drawn and 18 of the iPhone's lines cut on Android; the approved iPhone boards stand for the
-rest of Android's screens. Before it, AN1, part 1c. Next: AN1b, the lock decided, in its own PR;
-AN1's part 2 once the owner has the phones (Open owner items, 1). Not on the pilot's critical path._
+_Last updated: 2026-11-04 (Central) — AN1b, the lock decided (`docs/DECISIONS.md`, 2026-11-04):
+the owner picked (a), the Accessibility service, so ARCHITECTURE's "Android app structure" is
+decided; (b) is dropped and (c), the VPN, left out for now. The battery plan's two calls: check-ins
+only while the screen is on, and a covered app sent to the background. Android's gaps are logged in
+ISSUES #6, each checked again at AP3. Before it, AS0 approved, the Android canvas as it stands.
+Next: AN1's part 2, with its battery test, once the owner has the phones (Open owner items, 1),
+still before launch; AN2 at the owner's go. Not on the pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -52,29 +54,29 @@ screen, Airplane mode, the sticker.
 
 ## Phase 8, Android: the lock (iOS's Phase 0)
 
-Android has no Screen Time for an ordinary app, so the lock is Bali's own (ARCHITECTURE, "Android
-app structure", decision 2; ISSUES #6). Two candidates: **(a)** an Accessibility service that sees
-which app comes to the front and covers it with Bali's block screen, and **(b)** usage access,
-polled, with an overlay ("Display over other apps"). The spike measures both, on the emulators
-first and then on real phones, before any of the app is built, as Phase 0 proved the shields first.
+Android has no Screen Time for an ordinary app, so the lock is Bali's own: **(a)**, an
+Accessibility service that sees which app comes to the front and covers it with Bali's block screen
+(the owner's pick, AN1b; ARCHITECTURE, "Android app structure", decision 2; ISSUES #6). The spike
+measured it on the emulators beside (b), usage access polled with an overlay, now dropped, and (c),
+a VPN, left out; on real phones it confirms (a) before launch, as Phase 0 proved the shields first.
 
 - **AN0** The plan (docs): this file, ARCHITECTURE's "Android app structure" (proposed), PLAN.md's
   rows, the decision, ISSUES #6 and #7, and CLAUDE.md's pointer — ✅ (#480; DECISIONS 2026-11-02)
-- **AN1** 📱 The lock spike: (a) and (b), each on a Pixel and a Samsung (Open owner items, 1).
-  Throwaway code on a branch of its own, never merged; the step writes a checklist for the owner,
-  and the answers go to AN1b:
+- **AN1** 📱 The lock spike: (a), (b) and (c) on the emulators, then (a), the owner's pick (AN1b),
+  on a Pixel and a Samsung (Open owner items, 1), still before launch, to confirm that it holds.
+  Throwaway code on a branch of its own, never merged; the step writes a checklist for the owner:
   - every app covered, and how fast: how long a blocked app shows before the cover lands;
   - Bali swiped away from recents, force-stopped, and the phone rebooted mid-session, into Safe
     Mode too;
   - the Samsung's battery saver, and Doze over a 50-minute class;
   - split screen, picture-in-picture, and an app opened from a notification;
   - apps in a work profile or Private Space, and a guest user;
-  - Advanced Protection: Android 16's, and Android 17's, which is reported to turn off any
-    Accessibility service that isn't a disability tool;
+  - Advanced Protection: Android 16's, and Android 17's, which limits Accessibility to verified
+    accessibility tools (ISSUES #6);
   - Emergency Unlock: the lock off at once, and the phone, messages and emergency calls never
     covered;
   - a real block's Text and URI records read (`BlockTag`), with Bali open and closed;
-  - the battery a lesson costs.
+  - the battery a lesson costs: part 2's battery test, below.
 
   A build that doesn't come from Play may meet Android's "restricted settings" (13 and later)
   before its Accessibility service can be turned on: the checklist says how each build was
@@ -88,7 +90,7 @@ first and then on real phones, before any of the app is built, as Phase 0 proved
   a Stop button in quick settings. **Part 2, on the phones, waits for them** (Open owner items, 1):
   a real block over NFC with Bali open and closed, the Samsung's battery saver and its in-call
   screen (`com.samsung.android.incallui`), the battery a lesson costs, and every other line again,
-  Doze above all (an emulator's CPU never sleeps). AN1b waits for both.
+  Doze above all (an emulator's CPU never sleeps), for (a) alone.
 
   **Part 1c, lock (c), a VPN on the phone alone** ✅ (the owner, 2026-11-03: "Yes, test it";
   Android 15, 16 and 17; the code on `spike/android-lock`, never merged; DECISIONS 2026-11-03): no
@@ -98,17 +100,27 @@ first and then on real phones, before any of the app is built, as Phase 0 proved
   to (a), it leaves what (a) misses unable to load anything new, and it comes back by itself after
   a force-stop or Safe Mode, where (a) doesn't. Against it: Android's VPN dialog; one VPN at a time,
   another app's taking over at once and an always-on one keeping Bali's from starting; the profiles
-  and the guest user out of reach; and a second Play declaration (ISSUES #7). Part 2 adds its
-  battery, alone and with (a).
-- **AN1b** The lock decided (docs): AN1's measurements into `docs/DECISIONS.md`; the owner's pick
-  (Open owner items, 4) moves ARCHITECTURE's "Android app structure" from proposed to decided;
-  ISSUES #6 and #7 updated. If neither lock holds up, the owner decides what becomes of Phases
-  9–11 before any of them starts — validation: docs only
+  and the guest user out of reach; and a second Play declaration (ISSUES #7). Left out at AN1b, so
+  part 2 doesn't measure it.
+
+  **Part 2's battery test** (the battery research; DECISIONS 2026-11-04; in full in
+  `docs/ANDROID-PHONE-TESTS.md`): the battery plan built into the spike first (check-ins by the
+  screen, the service narrowed outside a lesson, the covered app sent to the background), each with
+  a switch. Then three runs on each phone, each against a run with no session: a desk lesson (50
+  minutes, the screen off), a busy one (the screen on for 35 of 50) and a school day (four lessons),
+  read from batterystats and the charge counter. Their pass marks: no wake lock, alarm or foreground
+  service, and nothing sent while the screen is off but its one check-in. The makers' checks, each
+  mid-session with Bali closed: the Samsung's Optimize now, Clean now, Power saving, Sleeping, Deep
+  sleeping and Restricted; the Pixel's Battery Saver, Restricted and hibernation. And the questions
+  only phones answer, the two conflicts first: deep Doze's timing, and whether the service keeps its
+  network in Doze.
+- **AN1b** The lock decided (docs): (a), the Accessibility service; no VPN for now; the battery
+  plan's two calls; Android's gaps logged for launch — ✅ (#487; DECISIONS 2026-11-04)
 
 ## Phase 9, Android: the engine (BaliCore's and BaliOutbox's twin, no screens)
 
-After AN1b. Every rule in plain Kotlin where the JVM tests reach it, never in a screen, as
-BaliOutbox's rules run on Linux; `contracts/` holds both apps to the same server.
+After AN1b, at the owner's go. Every rule in plain Kotlin where the JVM tests reach it, never in a
+screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the same server.
 
 - **AN2** The project and CI (twin: `ios/project.yml`, `ios.yml`, `ios/README.md`): Gradle under
   `android/` with the modules `core`, `outbox` and `app`; `android.yml`, the build, Android Lint and
@@ -138,8 +150,8 @@ BaliOutbox's rules run on Linux; `contracts/` holds both apps to the same server
   the outbox's counter and its install id, the phone's order (A12); and Bali's files left out of
   Android's backup (ARCHITECTURE, "Android app structure")
 - **AN5** The sync engine (twin: `SyncEngine`): the drain with backoff and jitter, the 30-second
-  check-in while Bali is open, and the reconcile (`readMayReconcile` and the typed dispositions),
-  all on a fake clock
+  check-in while the screen is on (ARCHITECTURE, the battery plan; AN7 drives it from the lock's
+  service), and the reconcile (`readMayReconcile` and the typed dispositions), all on a fake clock
 - **AN6** Sign-in (twin: `SignIn`, `TokenStore`): Cognito's hosted UI in a Custom Tab, the code
   grant with PKCE; tokens sealed by a Keystore key; the refresh, Sign out, `Tokens.checked` (no
   token to Bali's API before the 13+ check, but the check's own read and a deletion's) and the
@@ -147,12 +159,17 @@ BaliOutbox's rules run on Linux; `contracts/` holds both apps to the same server
   clients on dev and prod (no secret; the scopes iOS's client has, `aws.cognito.signin.user.admin`
   among them for Delete account) and adds their ids to `AUTH_AUDIENCE` on dev's and prod's API, or
   the API refuses Android's tokens with a `401`, which signs the student out
-- **AN7** 📱 The lock (twin: BaliOutbox's `Enforcement`, `Bell` and `PhoneBell`): AN1b's method;
-  the system allow-list (decision 2); rule 3 at every check-in; protection off and on, with iOS's
-  events; the bell, from the session's window; and a Debug readout like iOS's for the phone checks.
-  For the owner: whether the lock's service checks in while it runs, so that a quiet Android phone
-  means a stopped Bali (ARCHITECTURE, "Android app structure", the rules) — validation: the rules'
-  JVM tests, then the device check on both phones
+- **AN7** 📱 The lock (twin: BaliOutbox's `Enforcement`, `Bell` and `PhoneBell`): the
+  Accessibility service, (a), as ARCHITECTURE's battery plan has it (listening only in a lesson,
+  and then to window events, the covered app sent to the background); the system allow-list
+  (decision 2); rule 3 at every check-in; protection off and on, with iOS's events; the bell, from
+  the session's window; and a Debug readout like iOS's for the phone checks. Its first question is
+  answered (the owner, 2026-11-04): the service checks in every 30 s while the screen is on, once
+  as it goes off and once as it comes on, so an awake phone gone quiet means Bali stopped or lost
+  its network. Still for the owner: whether Bali, opened again, reports how long it was stopped;
+  that is new information about a student, so it needs a board and the owner's approval first
+  (ARCHITECTURE, "Android app structure", the rules) — validation: the rules' JVM tests, then the
+  device check on both phones
 - **AN8** 📱 The tap over NFC (twin: `BlockReader`, B6): reader mode, started from the Debug readout
   until AS4 builds Bali's "hold your phone to the block" screen; the offline tap in under a second;
   the tap's dispositions (`tapDisposition`); and, if AN1 found it works, the block's link opening
@@ -213,12 +230,13 @@ rules); `docs/DESIGN.md` read first, its Android section from AS0; every user-fa
 
 - **AP1** The Play drafts (docs): `docs/PLAY-STORE.md`, the twin of `docs/APP-STORE.md`: the
   listing, Data safety, the content rating, the target audience, the Accessibility declaration and
-  its in-app disclosure (if AN1b picks (a); ISSUES #7), how Play's reviewer tries Bali without a
+  its in-app disclosure (lock (a), AN1b; ISSUES #7), how Play's reviewer tries Bali without a
   block, and the testing tracks
 - **AP2** 🔧 The Play Console: the account (Open owner items, 2), the app record and Play App
   Signing; and a workflow that uploads to the internal track (twin: `testflight.yml`)
 - **AP3** 📱 The device test gate (twin: B5 and B6): a Pixel and a Samsung through the whole loop on
-  dev
+  dev, and every gap in ISSUES #6 checked again on both, as its line says, before launch (the owner,
+  2026-11-04; `docs/ANDROID-PHONE-TESTS.md`)
 - **AP4** 🔧 ⚖️ The pilot's track: closed testing (on a personal account, at least 12 testers opted
   in for 14 days in a row before production); the privacy policy names Android's processors,
   Google's push (FCM) and Play, before the first Android build reaches a student
@@ -227,13 +245,14 @@ rules); `docs/DESIGN.md` read first, its Android section from AS0; every user-fa
 
 ## Open owner items
 
-1. **The phones:** which Pixel and which Samsung. AN1 needs both, and so do AN7, AN8, AP3 and AP5.
+1. **The phones:** which Pixel and which Samsung. AN1 needs both, one of them on Android 17 for
+   Advanced Protection's check (ISSUES #6), and so do AN7, AN8, AP3 and AP5.
 2. **The Play account:** an organization (not under the 12-tester rule; it needs a D-U-N-S number)
    or personal (a closed test of at least 12 testers, opted in 14 days in a row, before production
    access).
 3. **Timing:** in the Vanderbilt pilot, or after it. Until the owner says, Android has no Go-live
    row and nothing here is on the pilot's critical path.
-4. **After AN1:** which lock, (a) or (b) (AN1b).
+4. ✅ **After AN1:** which lock: (a), the Accessibility service (the owner, 2026-11-04; AN1b).
 5. ✅ **AS0's canvas:** approved as it stands, its Words board's calls as drawn, and the approved
    iPhone boards stand for the rest of Android's screens (the owner, 2026-11-04; DECISIONS
    2026-11-04).
