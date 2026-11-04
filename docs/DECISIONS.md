@@ -8,6 +8,23 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-04** — **iOS's `record` shows a failed read after its state step, as Android's does
+  (the owner's go; #500).** AN5a's reviewers found the order in Android's port (#499, its entry
+  below), and iOS had it too: in `SyncEngine.record`, a read of the queue or the report failing
+  right after the record's write was shown before the state step that applies the change, so the
+  change of state it made kept the old standing, focused, over the unlock's that the write had just
+  kept, until the state step kept the unlock's back. Killed between those two writes, or the second
+  refused, the next launch stood focused, shielded over the student's Emergency Unlock; the unlock
+  itself still went, and its answer lifted the shields. The owner, in chat, once the conductor had
+  explained it: "also yeah just fix on ios too". Now both reads are made first and their failures
+  shown after the step, as on Android, a read that answered no report kept apart from one that
+  failed. The test, `StandingKeptTests.keptOverAFailedRead`, relaunches at each commit: pushed
+  alone, it failed on CI, and it passes with the fix. Checked and left as is: no other `failed()`
+  keeps an old standing over a newer one, since only `record` keeps a standing ahead of its state
+  step; in `answered`, a failed read in the unlock guard is shown and then hidden again by the
+  state step copied before it, the guard keeping the phone unlocked (named for the owner). It
+  reaches phones with the next TestFlight build.
+
 - **2026-11-04** — **CodeQL scans Android's Kotlin, through CodeQL's advanced setup,
   `.github/workflows/codeql.yml` (the owner; open owner item 7).** The conductor asked the owner,
   "Should I prepare the CodeQL workflow so the Android code gets scanned?", and the owner answered:

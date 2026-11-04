@@ -446,11 +446,13 @@ public actor SyncEngine {
         changes += 1
         // A read that fails keeps the last list — with this record, which the file holds now: the
         // phone acts on what it just did (an unlock's shields off, a tap's on) whatever the read.
-        let queued = stored(outbox.records) ?? state.queued + [record]
-        let reportedOff = stored(outbox.reportedOff) ?? state.reportedOff
+        let queued = Result { try outbox.records() }
+        let reportedOff = Result { try outbox.reportedOff() }
         update {
             $0.standing = standing
-            ($0.queued, $0.reportedOff) = (queued, reportedOff)
+            $0.queued = (try? queued.get()) ?? $0.queued + [record]
+            // The read's own answer, none included: `try?` would take a none for a failure.
+            if case .success(let off) = reportedOff { $0.reportedOff = off }
             ($0.refused, $0.superseded) = (nil, nil)
             // Screen Time going off or coming back is no turn of the student's (A9): the unlock
             // recorded still stands, its reason changeable once back on (A20; santa's round 1).
@@ -458,6 +460,10 @@ public actor SyncEngine {
             // The file's newest tap now, written with it.
             if case .tap = change { $0.lastTap = record.eventId }
         }
+        // Shown after that step, never before it: the change of state a failure makes would keep
+        // the standing this record replaced over the one its write just kept (AN5a's santa review).
+        if case .failure(let error) = queued { _ = failed(error) }
+        if case .failure(let error) = reportedOff { _ = failed(error) }
         // Whatever the phone records — the student's tap, Emergency Unlock or Back to focus, or
         // what rule 3's check found — goes now, and ends a wait the class-started alert set.
         endWait()

@@ -1595,6 +1595,36 @@ struct StandingKeptTests {
     }
 
     @Test(
+        "A read of the queue that fails right after an Emergency Unlock's record is shown after the record's own step, never before it, where it would keep the standing the record replaced over the unlock's: the file keeps the unlock's, and a relaunch at any commit from the record's stands unlocked, never shielded (AN5a's santa review)"
+    )
+    func keptOverAFailedRead() async throws {
+        let (outbox, url) = try makeOutbox()
+        let rig = try Rig(outbox: outbox)
+        try await rig.tapIn()
+        try poison(outbox)
+        let relaunches = try Relaunches(url)
+        outbox.pool.add(transactionObserver: relaunches, extent: .observerLifetime)
+        let unlock = try #require(try await rig.engine.emergencyUnlock())
+        outbox.pool.remove(transactionObserver: relaunches)
+        // The phone acts on what it just did, whatever the read: its shields off, the unlock
+        // queued, and the failure shown (rule 5).
+        let unlocked = Standing.inSession(session(), .unlocked)
+        let state = await rig.engine.state
+        #expect(state.standing == unlocked && state.link == .storageFailed)
+        #expect(state.queued.map(\.eventId) == [unlock.eventId])
+        #expect(try outbox.standing() == unlocked)
+        // Killed at any commit from the record's on, the next launch stands unlocked. Shown before
+        // the state step, the failure's write made a commit of its own here, standing focused.
+        #expect(!relaunches.engines.isEmpty)
+        for engine in relaunches.engines {
+            let relaunched = await engine.state
+            #expect(relaunched.standing == unlocked)
+            #expect(relaunched.shieldedUntil(t0) == nil)
+        }
+        await rig.stop()
+    }
+
+    @Test(
         "A standing the file would not give back at launch is never taken off from nothing: the shields stay, nothing is written over it, and it is read again within a minute"
     )
     func unread() async throws {
