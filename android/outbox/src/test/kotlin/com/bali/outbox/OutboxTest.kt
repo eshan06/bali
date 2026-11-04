@@ -9,6 +9,7 @@ import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import androidx.sqlite.execSQL
 import com.bali.core.ActionOrder
 import com.bali.core.ApiErrorReason
+import com.bali.core.ParticipationState
 import com.bali.core.UnlockReason
 import java.io.File
 import java.time.Instant
@@ -66,7 +67,11 @@ internal fun row(eventId: String, kind: String, changed: OutboxRow.() -> OutboxR
 /** A lower-case UUID, the install's form. */
 val lowerCaseUuid = Regex("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 
-/** The outbox's file: OutboxTests' SchemaTests, their parts no rule holds (AN4d's hold the rest). */
+/**
+ * The outbox's file: OutboxTests' SchemaTests, their parts no rule holds, and `offFrom`, which
+ * `record` holds. AN4e's: `reopens`' records sent and protection off reported once, and
+ * `migratesEmpty`'s `nextDue` and `awaiting`.
+ */
 class SchemaTest : OutboxFiles() {
     @Test
     fun anEmptyFileIsMadeToTheSchemaAndHoldsNothing(): Unit =
@@ -192,6 +197,87 @@ class SchemaTest : OutboxFiles() {
             BundledSQLiteDriver().open(file.path).use { sqlite ->
                 sqlite.prepare("SELECT eventId FROM outbox").use { assertEquals(true, it.step()); assertEquals("u", it.getText(0)) }
             }
+        }
+
+    @Test
+    fun protectionOffKeepsWhereThePhoneStoodBeforeItWhichTheLockBackOnReturnsToTheNextReportWritesItAnewATapForgetsIt(): Unit =
+        runBlocking {
+            val (outbox, _) = makeOutbox()
+            for ((before, kept) in listOf(ParticipationState.Unlocked to ParticipationState.Unlocked, ParticipationState.Focused to ParticipationState.Focused)) {
+                outbox.keep(Standing.InSession(session(), before))
+                record(outbox, Change.ProtectionOff("s"))
+                assertEquals(kept to "s", outbox.offFrom() to outbox.reportedOff())
+                // Kept for a back on made again (santa's round 1).
+                record(outbox, Change.ProtectionOn("s"))
+                assertEquals(kept to null, outbox.offFrom() to outbox.reportedOff())
+            }
+            // An Emergency Unlock since, the latest turn the server records, under protection off
+            // too, is where a back on made again returns (santa's round 2).
+            record(outbox, Change.Unlock("s", null))
+            assertEquals(ParticipationState.Unlocked, outbox.offFrom())
+            // Standing in protection off already, or in another session, nothing new is known:
+            // reported again from protection off, it keeps the first (#167).
+            outbox.keep(Standing.InSession(session(), ParticipationState.Unlocked))
+            record(outbox, Change.ProtectionOff("s"))
+            outbox.keep(Standing.InSession(session(), ParticipationState.ProtectionOff))
+            outbox.protectionRestored()
+            record(outbox, Change.ProtectionOff("s"))
+            assertEquals(ParticipationState.Unlocked, outbox.offFrom())
+            record(outbox, Change.Tap("tag"))
+            assertNull(outbox.offFrom())
+            outbox.keep(Standing.InSession(session("t"), ParticipationState.Unlocked))
+            record(outbox, Change.ProtectionOff("s"))
+            assertNull(outbox.offFrom())
+        }
+}
+
+/**
+ * The conductor's call (`docs/DECISIONS.md`, 2026-11-04, AN4d): each write reaches the disk as it
+ * commits, `synchronous = FULL`, the file kept in WAL, though Room opens every connection at NORMAL.
+ */
+class DurabilityTest : OutboxFiles() {
+    @Test
+    fun everyWriteGoesThroughTheConnectionThatWritesAtFullWhereRoomOpensItAtNormalTheFileStillInWal(): Unit =
+        runBlocking {
+            val writes: List<Pair<String, suspend (Outbox) -> Unit>> =
+                listOf(
+                    "record" to { it.record(Change.Tap("tag"), t0) },
+                    "release" to { it.release(t0) },
+                    "explain" to { it.explain(UnlockReason.Nurse, t0, emptySet()) },
+                    "protectionRestored" to { it.protectionRestored() },
+                    "keep" to { it.keep(Standing.Waiting) },
+                    "file" to { it.file(Standing.Waiting) },
+                    "keepWaitEnds" to { it.keepWaitEnds(t0) },
+                    "setState" to { it.setState(Outbox.Key.LastTap, "t") },
+                )
+            for ((name, write) in writes) {
+                val (outbox, file) = makeOutbox()
+                assertEquals(1L, outbox.synchronous(), name)
+                write(outbox)
+                assertEquals(2L, outbox.synchronous(), name)
+                assertEquals(listOf("wal"), outbox.texts("PRAGMA journal_mode"), name)
+                // Reopened, Room's connection starts at NORMAL again, until the next write.
+                outbox.close()
+                val reopened = open(file)
+                assertEquals(1L, reopened.synchronous(), name)
+                write(reopened)
+                assertEquals(2L, reopened.synchronous(), name)
+            }
+        }
+
+    @Test
+    fun aWriteCommitsAtFullFromTheConnectionsFirstWriteSetBeforeItsTransactionBegins(): Unit =
+        runBlocking {
+            // The level the record's insert ran at, read inside its write by a trigger: one set
+            // after the transaction would leave a connection's first write at NORMAL (santa's review).
+            val (outbox, _) = makeOutbox()
+            outbox.execute(
+                "CREATE TRIGGER level AFTER INSERT ON outbox BEGIN INSERT OR REPLACE INTO outboxState (key, value) " +
+                    "VALUES ('level', (SELECT synchronous FROM pragma_synchronous)); END",
+            )
+            assertEquals(1L, outbox.synchronous())
+            record(outbox, Change.Tap("tag"))
+            assertEquals(listOf("2"), outbox.texts("SELECT value FROM outboxState WHERE key = 'level'"))
         }
 }
 

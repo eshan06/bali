@@ -8,6 +8,99 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-04** — **AN4d, the outbox's recording: BaliOutbox's `Outbox` in Kotlin, its recording
+  side, every write synced to the disk (the conductor's calls, awaiting the owner's look; AN4d,
+  #496).** The owner was asleep and asked for the recommended option on every question, so each call
+  here is the conductor's, for the owner to look at.
+
+  **AN4d in two PRs** (the conductor): AN4d, what the phone did, recorded on AN4c's store (`record`,
+  `release`, `explain`, the standing and the rules' state); AN4e, the send's side (`Due` and
+  `nextDue`, `settle`, `refile`, the backoff, jitter and bound, `retryNow`, `awaiting`,
+  `holdsUnlock`), with every test that needs `settle` or `nextDue` (`docs/PLAN-ANDROID.md`).
+
+  **Durability: every write at `synchronous = FULL`, WAL kept** (the conductor's call, replacing
+  AN4c's "Durability, as on iOS", below). From this step, the first to write unlocks, each of the
+  outbox's writes reaches the disk as it commits. Why: an Emergency Unlock's record is never
+  discarded (CLAUDE.md), and under NORMAL the phone losing power or crashing in the seconds after a
+  write can undo it; and Bali writes a handful of records a class, so a sync per write costs nothing
+  anyone notices. Room sets NORMAL itself on every connection it opens, as Room 2.8.5's classes show
+  (`BaseRoomConnectionManager`, read 2026-11-04: the first connection with the file's setup, each
+  later one alone, and the builder's callbacks on the first alone, which may be a reader), so nothing
+  set at the open holds for the writer: each write sets FULL on Room's one writer connection before
+  its transaction begins (`Outbox.kt`'s `write`), a statement of microseconds. Shown on the JVM
+  (`DurabilityTest`) and on `Bali_Spike_API35` (`OutboxFileTest`): the connection that writes reads
+  `PRAGMA synchronous` back as 1 before the file's first write and 2 after it, for each of the
+  store's writes and again after a reopen, the journal still WAL. `Outbox.synchronous()`, public, is
+  that read, for the instrumented test. iOS is untouched: its GRDB pool runs NORMAL, and the
+  conductor tells the owner.
+
+  **Where it lives:** `outbox`'s `Outbox.kt`, the rules, and `Standing.kt`: SyncEngine.swift's
+  `Standing` (with `acting`, `isFocused` and `sessionId`) and its kept form, the file's; the rest of
+  SyncEngine, `SyncState` included, is AN5's. Each write is one transaction on the writer
+  (`immediateTransaction`), as GRDB's `pool.write` is, and Room's DAO calls inside it join it; each
+  read is one too, so a standing and the unlocks not filed yet are read as one write left them. What
+  is public is what is public on iOS (`record`, `release`, `explain`, `reportedOff`,
+  `protectionRestored`, `standing`); the rest is `internal`. Where Kotlin and Room differ, said
+  plainly:
+  - **The SQL is iOS's,** run on Room's connection, `RETURNING` included (the bundled SQLite is
+    3.50.1), so whether a filing filed one is what its UPDATE returns (#96's review); the insert and
+    a record's read are Room's generated code.
+  - **The kept form** spells out each key and value as iOS's does: `standing` (`out`, `waiting` or
+    `in_session`), and in a session `sessionId`, `classId`, `endsAt` (ISO 8601, to the millisecond)
+    and `state`, left out for none. Additive only, like `/v1`: a key a later build adds is passed
+    over, a state this build doesn't know reads as none, never focus, and one it can't read throws.
+    `Standing.Unread` is never kept: keeping it throws, and the write is undone.
+  - **`waitEnds` is kept as the file keeps every time** (`Times`: UTC, to the millisecond), where iOS
+    keeps seconds since 1970: Android's file is Android's alone, with one form of time in it. A value
+    it can't read is none, as on iOS.
+  - **A hold is a `java.time.Duration`,** Swift's `TimeInterval`, under `record`'s `hold`, Swift's
+    `holding:`.
+  - **A write is cancelled with its caller,** where GRDB's `pool.write` can't be cut short: cancelled
+    before it commits, it is undone, nothing kept; after, it stands, and the caller hears only the
+    cancel. Nothing calls the store yet; the sync engine (AN5) makes its writes where no screen can
+    cancel them, and never hands `record` or `keep` `Standing.Unread`, whose keeping undoes the
+    write, the change with it, as on iOS, whose engine passes none for it (santa's review).
+  - **`record` reads where the phone stood with decoding's errors only swallowed** (a kept standing
+    it can't read is none), where iOS's `try?` swallows a database error too; a read failing there
+    would fail the write's insert anyway (santa's review: noted for parity, never reached).
+
+  **The tests,** every iOS test that reaches these rules through the outbox alone: RecordTests'
+  `queues`, with the refocus's `follows`; `supersedes`, but its in-flight refocus's answer, which
+  needs `settle`; and `protectionOffOnce`; SchemaTests' `offFrom`; UnreadUnlockTests' `filing`;
+  UnlockRouteTests' `refocusFollows`; and StandingKeptTests' `keptForm`. Those that need `settle` or
+  `nextDue` are on AN4e's line, those that need the engine on AN5's. New, for each rule no iOS test
+  reaches through the outbox alone: a refocus's `follows` (another session's unlock, one under a tap
+  made in a session, one gone, and one not filed yet, filed by the refocus's own write); an unlock
+  held for its reason, sent at once by whatever the phone does next; `release` (never an unlock sent
+  once and backing off, one due already, nor one made at a time the phone's clock has since been set
+  back past); `explain` (the latest unlock's reason while it has never been sent, any other held
+  unlock released with it; too late once on its way, sent or gone); the standing kept in the write
+  that records or files, a write the file refuses keeping neither; where the phone stood before
+  protection off read before the report's own standing is kept (santa's review); `lastTap`;
+  `waitEnds`; `Standing`'s own rules; a kept standing this build can't read; and the durability
+  tests, one reading the level a write commits at from inside it, with a trigger (santa's review).
+  Tried, each failing by name, then reverted: the FULL left out, set after the transaction, and
+  `release` sent around it; an unlock not superseding refocuses; protection off reported again; an
+  unlock not where a back on returns; where the phone stood read after the report's standing is
+  kept; a refocus following only its session's unlocks; an unlock under a tap naming no session; a
+  kept state this build doesn't know read as focus; `explain` over a send; `release` without its
+  guard; an unlock not filed yet leaving the standing be; the standing kept apart from its filing,
+  and apart from its record; the filing after the record's insert; a tap not kept as the last; and
+  `waitEnds` throwing on iOS's form. Nothing was added to the PC's SDK: its folders were compared
+  before and after.
+
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini
+  CLI on this PC, so context isolation holds and model diversity doesn't): 0 blockers. Its WARNs:
+  the two tests above, added; the cancel and `Unread` notes, put in the store's docs and on AN5's
+  line; and the parity note on what `record`'s read swallows, left as said above.
+
+  **The proof on the phone:** `OutboxFileTest` on `Bali_Spike_API35` (Android 15), with `./gradlew
+  :app:connectedDebugAndroidTest`: the app recorded a tap, and an Emergency Unlock under it held for
+  its reason in the standing it left, through `record`; gave the reason; and read it all back after a
+  reopen; the writer at NORMAL before the first write and FULL after it, the journal WAL. Passed: 3
+  tests, 0 failures; without the FULL it failed (`expected:<2> but was:<1>`, tried). Gradle
+  uninstalls both apps after.
+
 - **2026-11-04** — **AN4c, the outbox store: BaliOutbox's `Outbox` file in Kotlin, on Room (the
   conductor's calls, awaiting the owner's look; AN4c, #495).** The owner was asleep and asked for the
   recommended option on every question, so each call here is the conductor's, for the owner to look
@@ -48,6 +141,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
     crashing or being force-stopped, but the phone itself crashing or losing power in the seconds
     after a write, before the file is written out, can undo it. Set aside: a rollback journal with
     `synchronous = FULL` (Room's `TRUNCATE`), a disk sync on every write, for a risk that small.
+    (Superseded the same day by AN4d's call, above: every write at `synchronous = FULL`, WAL kept.)
 
   **The SQLite: Room's bundled one** (`androidx.sqlite:sqlite-bundled`, `BundledSQLiteDriver`), on
   the JVM's tests and on the phone, as recommended: both run SQLite 3.50.1, its source id read from
