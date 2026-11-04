@@ -14,13 +14,12 @@ structure", proposed until AN1b settles the lock.
   disagrees.
 - **Under 6,000 words.** AN2 puts the cap in CI, as `plan-words.sh` holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-03 (Central) — AS0, the Android canvas (`docs/DECISIONS.md`, 2026-11-03):
-every screen group drawn on
-[Bali Android app screens](https://claude.ai/artifact/SZPLe9WcymZJ1Bvrgj5KoE), both locks side by
-side where they differ, the iPhone's words with 30 lines changed, 21 new and 4 gone; DESIGN.md's
-Android section proposed. Before it, AN1's part 1 on the emulators. Next: the owner's look at the
-canvas (Open owner items, 5); AN1's part 2 once the owner has the phones (Open owner items, 1),
-then AN1b. Not on the pilot's critical path._
+_Last updated: 2026-11-03 (Central) — AN1, part 1c (`docs/DECISIONS.md`, 2026-11-03): lock (c), a
+VPN on the phone alone, measured on the Android 15, 16 and 17 emulators, its code on
+`spike/android-lock` (never merged). It takes a blocked app's internet within 1.6 s but covers
+nothing, so it is something that could be added to (a), not a lock of its own. Before it, AS0, the
+Android canvas. Next: the owner's look at the canvas (Open owner items, 5); AN1's part 2 once the
+owner has the phones (Open owner items, 1), then AN1b. Not on the pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -91,6 +90,17 @@ first and then on real phones, before any of the app is built, as Phase 0 proved
   a real block over NFC with Bali open and closed, the Samsung's battery saver and its in-call
   screen (`com.samsung.android.incallui`), the battery a lesson costs, and every other line again,
   Doze above all (an emulator's CPU never sleeps). AN1b waits for both.
+
+  **Part 1c, lock (c), a VPN on the phone alone** ✅ (the owner, 2026-11-03: "Yes, test it";
+  Android 15, 16 and 17; the code on `spike/android-lock`, never merged; DECISIONS 2026-11-03): no
+  server, only the blocked apps routed in, their packets dropped unread. It takes a blocked app's
+  internet within 1.6 s of the session's start (0.2 s on 17) and gives it back within 0.6 s of
+  Emergency Unlock, but covers nothing: a blocked app opens and shows what it holds offline. Added
+  to (a), it leaves what (a) misses unable to load anything new, and it comes back by itself after
+  a force-stop or Safe Mode, where (a) doesn't. Against it: Android's VPN dialog; one VPN at a time,
+  another app's taking over at once and an always-on one keeping Bali's from starting; the profiles
+  and the guest user out of reach; and a second Play declaration (ISSUES #7). Part 2 adds its
+  battery, alone and with (a).
 - **AN1b** The lock decided (docs): AN1's measurements into `docs/DECISIONS.md`; the owner's pick
   (Open owner items, 4) moves ARCHITECTURE's "Android app structure" from proposed to decided;
   ISSUES #6 and #7 updated. If neither lock holds up, the owner decides what becomes of Phases

@@ -8,6 +8,128 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-03** — **AN1, part 1c: lock (c), a VPN on the phone alone, measured on the Android 15,
+  16 and 17 emulators (the owner's go; the spike's worker).** The owner, in the conductor's chat,
+  after hearing how Doorman's Android app works: "Yes, test it", then "ok yeah you can just test
+  it... dont wait for my canvas approval to do this vpn test". Doorman (`com.derivative.gopher`),
+  as the conductor gathered it from its Play listing and press: each school picks "Focus mode", a
+  `VpnService` tunnel to Doorman's server that lets only approved apps and sites through, or
+  "Lockdown mode", an Accessibility service that sends the student home with a "Time to Focus"
+  notice (our (a)); 1.3 stars over 63 reviews, citing the battery (13% over 6.5 hours) and NFC
+  taking two or three tries; and a school committee member's report that it fails on phones that
+  already have another parental-control app, because Android allows one VPN at a time. **Bali's
+  (c)** is a `VpnService` with no server and nothing forwarded: while a session runs, only the
+  blocked apps are routed into it (one `addAllowedApplication` each: every app with a launcher icon
+  that the allow-list doesn't hold), never the allow-list's apps or Bali itself, and Bali never
+  reads the tunnel, so every packet those apps send, DNS included, is dropped unread. It is built
+  into the spike (`spike/android-lock`, commit `50bff21`, never merged) beside (a) and (b), with the
+  same fake session, Emergency Unlock's one-second hold, allow-list, protection-off detector,
+  check-in tick to `10.0.2.2` and logcat times; a mode that runs (a) and (c) together; a stand-in
+  app that probes the host every 100 ms; and a second build of the spike under another package name
+  as "another VPN", so no VPN app came from the web. The full set ran on `Bali_Spike_API37`, the
+  starred lines (★) on `Bali_Spike_API35` and `36`, on software-drawn emulators slower than a phone.
+
+  **The headline: (c) takes a blocked app's internet within 1.6 s of the session's start (0.2 s on
+  Android 17), and covers nothing.** A blocked app still opens and shows whatever it holds without
+  the internet (a cached page, a downloaded video, the camera, a game), so (c) is no lock on its
+  own. Beside (a), it means what (a) misses (the flash before its cover, an app behind a permission
+  prompt) can load nothing new, and it comes back by itself after a force-stop or Safe Mode, where
+  (a) stays off.
+  Against it: Android's VPN dialog, one VPN at a time (another app's takes over at once, and an
+  always-on one keeps Bali's from starting at all), the profiles and the guest user out of reach,
+  and a second Play declaration. **Found and fixed in the spike:** a VPN routes by uid, not by
+  package. SIM Toolkit (`com.android.stk`) has a launcher icon and runs as the phone's uid, 1001,
+  which it shares with `com.android.phone` (the emergency dialer's package, on the allow-list), the
+  telephony provider and the MMS service; the first run on 17 routed them all into the tunnel. The
+  spike now never routes an app that shares a uid with the allow-list or runs as one of Android's
+  own uids.
+
+  **Lock (c), the VPN** (✅ held, ❌ didn't, — doesn't apply; on 15 and 16 only the ★ lines ran):
+
+  | Line | Android 15 | Android 16 | Android 17 | Notes |
+  |---|---|---|---|---|
+  | ★ Blocked apps offline, the allow-list never | ✅ lost 0.15–1.0 s after the session started (the VPN up in 160–798 ms, the first run after a boot the slowest) | ✅ 0.4–1.6 s (the VPN up in 279–1,345 ms) | ✅ 0.09–0.23 s (the VPN up in 117–186 ms) | Five runs each, the stand-in probing every 100 ms: no probe got through once the VPN had been up 0.2 s (15) or 0.45 s (16), none at all on 17. No uid of the allow-list's in the VPN's set on any version (`dumpsys connectivity`), once the fix above was in; Bali's ticks reached the host throughout |
+  | ★ What a blocked app shows | YouTube its own "Update your app" screen (this image's YouTube is too old to run) | YouTube's feed as grey placeholders behind its notification prompt | YouTube's grey placeholders 90 s in, no error; Gmail its welcome screen (no account); Chrome its first-run terms, which the worker didn't accept, so no page was tried | No app said "offline": the phone reports a working network and the packets go nowhere, so apps wait out their own timeouts. A name looked up failed after 20 s on all three ("Unable to resolve host"). These images hold no messaging app but Messages, the SMS default and allowed, so the stand-in stood in |
+  | ★ Offline content | ❌ all of it works: the camera records, its video plays in Photos | ❌ same | ❌ same, and the stand-in, which needs no network, works as before | Photos is blocked, yet plays a local video. These images hold no game, and Chrome's offline one is behind its first-run screen |
+  | ★ A connection already open | ✅ cut 31 ms after the VPN came up | ✅ 143 ms | ✅ 196 ms | The stand-in's stream ends "Software caused connection abort": Android closes a routed app's connections as the VPN comes up. On 17 a YouTube video then played on 33 s from its buffer and hung, spinning, with no error |
+  | ★ Swiped from recents | ✅ held | ✅ held | ✅ held | The system's binding to the VPN service keeps Bali's process |
+  | ★ Force-stopped | ❌ off at once (the VPN down in 0.22 s, a blocked app online 0.31 s after); ✅ back, no dialog, 0.8 s after Bali is opened | ❌ 0.40 s, online 0.44 s after; ✅ 1.0 s | ❌ 0.47 s, online 0.54 s after; ✅ 1.6 s | As for (b), Android sends BOOT_COMPLETED as a stopped app is opened; the consent stays |
+  | ★ Rebooted mid-session | ✅ back by itself, no dialog, 38 s after the screen came on | ✅ 69 s | ✅ 75 s | By BOOT_COMPLETED; blocked apps are online until then. An update of Bali mid-session (17): down 1.45 s, back by itself, no dialog |
+  | ★ Safe Mode | ❌ off; ✅ back by itself at the next normal boot, 32 s after the screen came on | ❌; ✅ 61 s | ❌; ✅ 65 s | Through the power menu. On 15 the reboot out of Safe Mode hung the emulator, which was ended and started cold (GOTCHAS) |
+  | ★ Quick settings | — no VPN tile | — | — | The panel's foot reads "Your personal apps are connected to the internet through Bali spike"; on 17 it opens "…Your network activity, including emails and browsing data, is visible to your VPN provider", with Open VPN settings |
+  | ★ Settings: Disconnect | ✅ noticed (`onRevoke`) 273 ms after the tap | ✅ 259 ms | ✅ 165 ms | The consent stays, so the spike arms again, unasked, as soon as Bali is opened |
+  | ★ Settings: Forget VPN | ✅ noticed 249 ms after the tap | ✅ 314 ms | ✅ 140 ms | The consent goes: Bali can only report it and ask again |
+  | ★ Active apps' Stop | — not listed | — | — | No foreground service and no notification: the system's binding alone keeps Bali running |
+  | ★ Another VPN takes over | ✅ noticed 235 ms after the student's OK to the other's dialog | ✅ 241 ms | ✅ 244 ms | Bali's consent stays, so either app takes the VPN back with no dialog: on 17 Bali did at once when told to, and after a reboot both apps armed and the last to start won |
+  | Another VPN set always-on | | | ❌ Bali's VPN can't start: its consent dialog closes itself, nothing shown | Doorman's committee member's report, seen |
+  | Always-on VPN, set in Settings | | | Force-stop: ❌ stays off, and Android posts "Disconnected from always-on VPN". Reboot: ✅ Android starts Bali's VPN itself, 26 s after the screen came on | Bali never sets it |
+  | "Block connections without VPN" | | | ❌ every app but Bali offline while the VPN is down: after a force-stop, outside a session, and for 30 s after a reboot; in a session, the allow-list's apps too | Settings asks first: "Require VPN connection? When this setting is on, you won't have an internet connection until the VPN successfully connects". It blocks every uid but Bali's |
+  | Doze, forced, screen off | | | ✅ 10 min, 20 of 20 ticks, the VPN up throughout | The emulator's CPU never slept |
+  | Split screen | | | ✅ the blocked half offline (19 of 19 probes), Messages' half untouched; nothing covered | |
+  | Picture-in-picture | | | ✅ offline (28 of 28), and on screen | |
+  | Opened from a notification | | | ✅ offline (15 of 15) | A blocked app's pushes come through Google Play services, which isn't routed, so they still arrive (not measured) |
+  | A link in Messages that opens Chrome | | | — not run: Messages and Chrome stop at their first-run screens on this image (sign-in, terms) | Chrome is routed by its uid |
+  | Work profile | | | ❌ the stand-in kept its internet (22 of 22) | A VPN covers its own profile only |
+  | Private Space | | | ❌ 22 of 22 | Unlocked from the launcher first |
+  | Guest user | | | ❌ 13 of 13; back in the owner's user, the VPN was still up | |
+  | ★ Emergency Unlock | ✅ a 0.4 s tap does nothing; the hold: the VPN down 27–52 ms after its second, a blocked app online 47–172 ms after (median 95) | ✅ 28–124 ms; online 107–597 ms (median 209) | ✅ 34–58 ms; online 25–114 ms (median 99) | Five runs each |
+  | Restricted settings | | | — not run | Files isn't allowed to install apps on these AVDs, and the worker left that switch alone |
+  | The rest of the allow-list | ✅ none routed | ✅ | ✅ | The emergency dialer, the SMS default, Telecom, Settings, the permission screens, the installer, the launcher, the keyboards and System UI, by uid |
+
+  **(a) and (c) together, Android 17:**
+
+  | Line | Android 17 | Notes |
+  |---|---|---|
+  | The flash before the cover | ✅ offline through it: the stand-in's cover landed 0.88 s after its first frame, and its first probe, sent before that frame, already failed; none got through | The flash shows only what the app holds offline |
+  | An app behind a permission prompt | ❌ still bare: Contacts shows dimmed behind its notification prompt, uncovered, as in part 1 | (c) takes its internet, not its own data, which shows |
+  | The guest user | ❌ out of both locks' reach | (a) from part 1, (c) above |
+  | Force-stopped | (a) ❌ off for good, as in part 1; (c) ✅ back as soon as Bali is opened | The pair falls back to (c) alone: apps open uncovered, but offline |
+  | Safe Mode | from the separate runs: (a) off for good (part 1), (c) back at the next normal boot | The same fall-back |
+  | Split screen, picture-in-picture, a notification | (a) covers (part 1), and (c) takes the internet (above) | |
+
+  **Android's VPN dialog, word for word, the same on 15, 16 and 17:** "Connection request", then
+  "Bali spike wants to set up a VPN connection that allows it to monitor network traffic. Only
+  accept if you trust the source." and "[a key] appears at the top of your screen when VPN is
+  active.", with Cancel and OK. Only the app's name is Bali's. It is asked once: not again after a
+  reboot or an update, again after Forget VPN or a Cancel; while another app's always-on VPN is
+  set, it closes by itself.
+
+  **Play's `VpnService` declaration**
+  ([the policy](https://support.google.com/googleplay/android-developer/answer/12564964)): only an
+  app whose core function is a VPN, or one of a list of kinds (parental control and enterprise
+  management, device security such as a firewall, network tools, browsers, carriers' apps), may use
+  it, and a use outside them is refused. It takes its own declaration in the Play Console: the
+  category, a video of the VPN in use, whether it collects or shares data, a video of its own
+  prominent disclosure (consent, refusal, and the disclosure shown again after a refusal), whether
+  it redirects other apps' traffic for money, and the listing saying it uses the VPN. The disclosure
+  is in the app, in its normal use, separate from (a)'s, with an affirmative consent. Bali is a
+  teacher's tool, not a parent's; the nearest honest kind is a firewall, which (c) is, and whether
+  Play accepts it is Play's to answer, as for the Accessibility API (ISSUES #7). The policy's rule to
+  encrypt the data to the tunnel's endpoint assumes an endpoint; Bali's tunnel has none, reads
+  nothing and sends nothing off the phone, which the declaration would say.
+
+  **The worker's read, not a decision:** (c) is no lock alone, since it covers nothing and leaves
+  every offline thing open; as something added to (a), it narrows (a)'s holes and heals where (a)
+  doesn't. What it adds: during (a)'s flash, behind a permission prompt and in picture-in-picture
+  a blocked app can fetch nothing; open connections are cut at once; after a force-stop or Safe
+  Mode, (c) is back at the next open or boot without asking, so the phone falls back to "apps open
+  but offline" while (a) waits for the student to switch it on again; and it keeps no notification
+  or Stop button. What it costs: a second consent, in Android's words, which say Bali can "monitor
+  network traffic" and, in the shade, that "emails and browsing data" are visible to it, more than
+  Bali does, in words Bali can't change; one VPN at a time, so a student's own VPN or
+  parental-control app takes it in a quarter of a second and an always-on one keeps it from starting
+  (Bali can only report that, and must never take the VPN back unasked, which Android would let a
+  consented app do); the work profile and Private Space, which (a) covers and (c) doesn't, and the
+  guest user, which neither reaches; apps that hang on their timeouts instead of saying they're
+  offline; a student who turns on Always-on and "Block connections without VPN" for Bali cuts the
+  whole phone off outside class (declaring `android.net.VpnService.SUPPORTS_ALWAYS_ON` false would
+  stop it, not tested); the uid trap above; and a second Play declaration. Its battery is part 2's
+  to measure: Bali's tunnel reads and forwards nothing, unlike Doorman's, but no number says so yet.
+
+  **For part 2, on the phones:** (c)'s battery over a lesson, alone and with (a); Doze with a CPU
+  that sleeps; a build installed from Files, for restricted settings and the VPN dialog; and a
+  real messaging app beside the SMS default, which the emulators lacked.
+
 - **2026-11-03** — **AS0, the Android canvas, drawn for the owner's approval (the owner; AS0's
   worker).** The owner: "Screens first", and "draw them in the claude design system. should be in a
   different artifact than ios". So the canvas is its own artifact,

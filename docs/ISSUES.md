@@ -289,6 +289,20 @@ deceptive or undeclared use can suspend the app. Separately, a personal develope
 in a row
 ([App testing requirements](https://support.google.com/googleplay/android-developer/answer/14151465)).
 
+**Beside it, the VPN's declaration** (AN1, part 1c; `docs/DECISIONS.md`, 2026-11-03). If lock
+(c), a VPN on the phone alone, is added to (a), Bali also uses `VpnService`, which Play guards too
+([VpnService](https://support.google.com/googleplay/android-developer/answer/12564964)). Only an
+app whose core function is a VPN, or one of a list of kinds (parental control and enterprise
+management, device security such as a firewall, network tools, browsers, carriers' apps), may use
+it, and a use outside them is refused. It takes a declaration of its own: the kind, a video of the
+VPN in use, whether it collects or shares data, a video of its own prominent disclosure (the
+consent, the refusal, and the disclosure shown again after a refusal), whether it redirects other
+apps' traffic for money, and the listing saying it uses a VPN. Its disclosure is separate from
+(a)'s, in the app's normal use, with an affirmative consent. Bali is a teacher's tool, not a
+parent's; the nearest honest kind is a firewall, which (c) is, and whether Play takes it is
+Play's to answer, as for the Accessibility API. Bali's tunnel has no far end: it reads nothing and
+sends nothing off the phone, which the declaration would say.
+
 **What others do (researched 2026-11-02).** A screen-time app's developer reports four refusals
 from Play over its Accessibility disclosure, until they took the service out and saw the app in
 front by polling usage access instead, about 800 ms behind: lock (b), which needs no Accessibility
@@ -303,11 +317,14 @@ AppBlock asks for both (#6).
   (`docs/PLAY-STORE.md`). The service reads only which app is in front, to cover it, and keeps and
   sends none of it, which the declaration says.
 - If (b): AP1 checks what Play asks of it too, its foreground service among them.
+- If (c) is added to (a): its disclosure and consent are drawn on the canvas beside (a)'s (AS0
+  didn't draw them), and its declaration, its two videos and the listing's words go into AP1's
+  drafts beside (a)'s.
 - The kind of Play account decides the 12-tester wait (`docs/PLAN-ANDROID.md`, Open owner items, 2).
 - No Android build reaches a student before Play has reviewed the one they install (AP4).
 
 **Done when:** Play has accepted the build students install, with its Accessibility declaration if
-it uses lock (a) (AP4).
+it uses lock (a), and its VpnService declaration if (c) is added (AP4).
 
 ---
 

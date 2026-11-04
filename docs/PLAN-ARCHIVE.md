@@ -10,6 +10,23 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-11-03 (Central) — AS0, the Android canvas (`docs/DECISIONS.md`, 2026-11-03):
+Android's screens drawn on their own canvas for the owner's approval, both locks side by side where
+they differ, and DESIGN.md's Android section proposed. Before it, the pilot's last list: every phone
+check left on a new prod build, the block's fresh code, PostHog and the external beta review; no prod
+backups and no lawyer's words for the Vanderbilt pilot. Next: a session builds the retire-a-block
+command; the owner the new build and the sitting; the owner's look at the Android canvas; the owner's
+call on GA5's known limit, the smallest iPhones (DECISIONS 2026-11-02); AN1's part 2 once the owner
+has the phones; the audit's polish waits, as ruled._
+
+`docs/PLAN-ANDROID.md`'s, replaced the same day: _Last updated: 2026-11-03 (Central) — AS0, the
+Android canvas (`docs/DECISIONS.md`, 2026-11-03): every screen group drawn on
+[Bali Android app screens](https://claude.ai/artifact/SZPLe9WcymZJ1Bvrgj5KoE), both locks side by
+side where they differ, the iPhone's words with 30 lines changed, 21 new and 4 gone; DESIGN.md's
+Android section proposed. Before it, AN1's part 1 on the emulators. Next: the owner's look at the
+canvas (Open owner items, 5); AN1's part 2 once the owner has the phones (Open owner items, 1),
+then AN1b. Not on the pilot's critical path._
+
 _Last updated: 2026-11-03 (Central) — the pilot's last list (the owner, 2026-11-03; `docs/DECISIONS.md`,
 2026-11-03): every phone check left, the class-started alert's among them, on a new prod build
 (`ios/README.md`'s sitting, Parts 1–7), the block's fresh code, PostHog, and the external beta review,
