@@ -10,7 +10,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
 
 - **2026-11-04** — **AN3a, the core's vocabulary and JSON coding, and Android 10's API check:
   kotlinx.serialization, and animal-sniffer with gummy-bears (the conductor's calls, awaiting the
-  owner's look; AN3a, #NNN).** The owner was asleep and asked for the recommended option on every
+  owner's look; AN3a, #489).** The owner was asleep and asked for the recommended option on every
   question, so each call here is the conductor's, for the owner to look at.
 
   **AN3 in three PRs** (the conductor): AN3a, the vocabulary, the JSON coding and the error body,
@@ -31,13 +31,16 @@ a real decision? Add a dated entry at the top: what was decided and why.
   BaliCore's `JSONValue` is kotlinx's own `JsonElement`, not a type of ours.
 
   **The vocabulary:** one enum per list, each value spelled as the API spells it (`wire`, Swift's
-  raw value), in its list's order. Its own coding refuses a value it doesn't know, as Swift's raw
-  values do: that is what the phone keeps and sends. An answer reads a vocabulary through
-  `OrUnknown`, `Known` or `Unknown`, the unknown kept as sent and sent back so; an error's reason
-  reads one it doesn't know as none. So a bare vocabulary field in an answer would fail on a newer
-  server's value: AN3b's wire types wrap each one in `OrUnknown`, as BaliCore's do. The contract
-  tests' strict reading (`StrictJson`, internal to `core`) is `BaliJson` with a mark added to its
-  module, Swift's `userInfo[.strictVocabulary]`, so a copy of it stays strict. The vocabulary test
+  raw value), in its list's order. An answer reads a vocabulary through `OrUnknown`, `Known` or
+  `Unknown`, the unknown kept as sent and sent back so; an error's reason reads one it doesn't know
+  as none. A vocabulary's own coding sends any value, but reads one only for the three BaliCore
+  makes Codable, what the phone keeps and sends (a participation's state, an unlock's reason, a push
+  environment), refusing a value it doesn't know, as Swift's raw values do. Read alone, every other
+  vocabulary refuses even a value it knows: BaliCore can't decode it alone, so a response type that
+  forgets `OrUnknown` doesn't compile there, and here it fails on the first fixture it reads, not on
+  a newer server's value (santa's review). The contract tests' strict reading (`StrictJson`,
+  internal to `core`) is `BaliJson` with a mark added to its module, Swift's
+  `userInfo[.strictVocabulary]`, so a copy of it stays strict. The vocabulary test
   reads `packages/shared/src/` in place, an input of `core`'s test task: `'hall_pass'` added to
   `UNLOCK_REASONS` failed `:core:test`, run again rather than cached, naming the list and both
   sides; then reverted.

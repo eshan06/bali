@@ -18,10 +18,16 @@ interface Vocabulary {
 }
 
 /**
- * A vocabulary's own coding, by each value's [Vocabulary.wire]: what the phone sends and keeps. A
- * value it doesn't know fails, as Swift's raw values do, so an answer reads one through [OrUnknown].
+ * A vocabulary's own coding, by each value's [Vocabulary.wire]. It sends any value, but reads one
+ * only where [readsAlone], BaliCore's Codable ones: what the phone keeps and sends, a value it
+ * doesn't know refused, as Swift's raw values do. Every other vocabulary is read through
+ * [OrUnknown] only, as BaliCore can't decode it alone: so an answer's field that forgets
+ * [OrUnknown] fails on the first answer it reads, not on a newer server's value.
  */
-abstract class VocabularySerializer<K : Vocabulary>(private val values: List<K>) : KSerializer<K> {
+abstract class VocabularySerializer<K : Vocabulary>(
+    private val values: List<K>,
+    private val readsAlone: Boolean = false,
+) : KSerializer<K> {
     override val descriptor: SerialDescriptor =
         PrimitiveSerialDescriptor(values.first().javaClass.name, PrimitiveKind.STRING)
 
@@ -31,6 +37,7 @@ abstract class VocabularySerializer<K : Vocabulary>(private val values: List<K>)
     override fun serialize(encoder: Encoder, value: K) = encoder.encodeString(value.wire)
 
     override fun deserialize(decoder: Decoder): K {
+        if (!readsAlone) throw SerializationException("${descriptor.serialName} is read through OrUnknown only")
         val wire = decoder.decodeString()
         return of(wire) ?: throw SerializationException("${descriptor.serialName} has no value \"$wire\" in this build")
     }
@@ -91,11 +98,11 @@ enum class UserRole(override val wire: String) : Vocabulary {
     object Wire : VocabularySerializer<UserRole>(entries)
 }
 
-/** `PARTICIPATION_STATES`: a participation's stored state, which the phone's own records keep. */
+/** `PARTICIPATION_STATES`: a stored state, which the phone's records keep; an answer's is [OrUnknown]. */
 @Serializable(with = ParticipationState.Wire::class)
 enum class ParticipationState(override val wire: String) : Vocabulary {
     Focused("focused"), Unlocked("unlocked"), ProtectionOff("protection_off");
-    object Wire : VocabularySerializer<ParticipationState>(entries)
+    object Wire : VocabularySerializer<ParticipationState>(entries, readsAlone = true)
 }
 
 /** `DisplayState`: a stored state, or one derived from it and the time (never stored). */
@@ -168,7 +175,7 @@ enum class ReturnRecordedAs(override val wire: String) : Vocabulary {
 @Serializable(with = UnlockReason.Wire::class)
 enum class UnlockReason(override val wire: String) : Vocabulary {
     Bathroom("bathroom"), Nurse("nurse"), Other("other");
-    object Wire : VocabularySerializer<UnlockReason>(entries)
+    object Wire : VocabularySerializer<UnlockReason>(entries, readsAlone = true)
 }
 
 /**
@@ -178,7 +185,7 @@ enum class UnlockReason(override val wire: String) : Vocabulary {
 @Serializable(with = PushEnvironment.Wire::class)
 enum class PushEnvironment(override val wire: String) : Vocabulary {
     Sandbox("sandbox"), Production("production");
-    object Wire : VocabularySerializer<PushEnvironment>(entries)
+    object Wire : VocabularySerializer<PushEnvironment>(entries, readsAlone = true)
 }
 
 /** `HISTORY_EVENT_TYPES`: the moments a student's history shows; the app skips an unknown one. */

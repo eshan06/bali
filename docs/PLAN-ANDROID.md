@@ -14,7 +14,7 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-04 (Central) — AN3a, the core's vocabulary and JSON coding (#NNN;
+_Last updated: 2026-11-04 (Central) — AN3a, the core's vocabulary and JSON coding (#489;
 `docs/DECISIONS.md`, 2026-11-04): `@bali/shared`'s lists in Kotlin, a value `core` doesn't know
 read as unknown, and a test that reads the TypeScript lists in place; kotlinx.serialization for
 every body; and `core`'s and `outbox`'s classes held to Android 10's API in `android.yml`. AN3 is
@@ -124,7 +124,7 @@ After AN1b, at the owner's go. Every rule in plain Kotlin where the JVM tests re
 screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the same server.
 
 - **AN2** The project and CI — ✅ (#488; DECISIONS 2026-11-04)
-- **AN3a** The core's vocabulary and JSON coding, and Android 10's API check — ✅ (#NNN; DECISIONS
+- **AN3a** The core's vocabulary and JSON coding, and Android 10's API check — ✅ (#489; DECISIONS
   2026-11-04)
 - **AN3b** The core's wire types (twin: BaliCore's `API.swift`): the wire types, each answer's
   vocabulary read through `OrUnknown` (AN3a), and `api.ts`'s lists of each response's own outcomes

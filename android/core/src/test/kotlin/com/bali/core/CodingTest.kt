@@ -75,12 +75,21 @@ class ForwardCompatibilityTest {
         assertNull(answer.state)
     }
 
+    /** An answer's field that forgot [OrUnknown], which BaliCore would refuse to compile. */
+    @Serializable
+    private data class Bare(val outcome: TapOutcome)
+
     @Test
-    fun aVocabularysOwnCodingSendsItsWireValueAndRefusesOneItDoesNotKnow() {
-        // The phone's own records and requests: what it sends is always one it knows.
+    fun aVocabularysOwnCodingSendsItsWireValueAndReadsOneOnlyWhereBaliCoreDoes() {
+        // The phone's own records and requests: BaliCore's Codable vocabularies, a value it knows.
         assertEquals("\"nurse\"", encoded(UnlockReason.Nurse))
         assertEquals(ParticipationState.ProtectionOff, decode<ParticipationState>("\"protection_off\""))
+        assertEquals(PushEnvironment.Sandbox, decode<PushEnvironment>("\"sandbox\""))
         assertFailsWith<SerializationException> { decode<UnlockReason>("\"stretch\"") }
+        // Any other is read through OrUnknown only: alone, even a value it knows fails at once.
+        assertEquals("""{"outcome":"joined"}""", encoded(Bare(TapOutcome.Joined)))
+        assertFailsWith<SerializationException> { decode<Bare>("""{"outcome":"joined"}""") }
+        assertFailsWith<SerializationException> { decode<ApiErrorReason>("\"protection_off\"") }
     }
 
     @Test
@@ -116,6 +125,16 @@ class ForwardCompatibilityTest {
         assertEquals(bare, encoded(body))
         val full = """{"error":{"code":"conflict","reason":"protection_off","message":"No.","details":{"seen":1}}}"""
         assertEquals(full, encoded(decode<ApiErrorBody>(full)))
+    }
+
+    /** A body whose field has a default that isn't none. */
+    @Serializable
+    private data class Counted(val tag: String, val count: Int = 0, val note: String? = null)
+
+    @Test
+    fun everyFieldButNoneIsSentItsDefaultToo() {
+        // As Swift sends every field it has: a default left out would read as a missing field.
+        assertEquals("""{"tag":"t","count":0}""", encoded(Counted("t")))
     }
 
     @Test
