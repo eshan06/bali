@@ -10,6 +10,15 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN3b's on 2026-11-04: _Last updated: 2026-11-04 (Central) —
+AN3a, the core's vocabulary and JSON coding (#489; `docs/DECISIONS.md`, 2026-11-04):
+`@bali/shared`'s lists in Kotlin, a value `core` doesn't know read as unknown, and a test that reads
+the TypeScript lists in place; kotlinx.serialization for every body; and `core`'s and `outbox`'s
+classes held to Android 10's API in `android.yml`. AN3 is three PRs now, AN3a to AN3c. Before it,
+AN2, the project and CI. Next: AN3b, the wire types; Android 17's SDK platform for the owner to OK
+before the first step with today's AndroidX (Open owner items, 6); CodeQL for Android's Kotlin, the
+owner's call (7); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN3a's on 2026-11-04: _Last updated: 2026-11-04 (Central) —
 AN2, the project and CI (#488; `docs/DECISIONS.md`, 2026-11-04): Gradle under `android/` with
 `core`, `outbox` and `app`, the app `com.bali.bali` for Android 10 and later, targeting Android 16;
@@ -2004,6 +2013,14 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN3b's line, as it read until it was done (2026-11-04; `docs/DECISIONS.md`, 2026-11-04):
+
+- **AN3b** The core's wire types (twin: BaliCore's `API.swift`): the wire types, each answer's
+  vocabulary read through `OrUnknown` (AN3a), and `api.ts`'s lists of each response's own outcomes
+  added to the vocabulary test, with CodingTests' cases for them. Every `contracts/fixtures/` file
+  is decoded in a test, as BaliCore's Linux job decodes them, so a new fixture fails until `core`
+  reads it (ContractFixtureTests' port, without the outbox dispositions, which are AN4's)
 
 AN3a's line, as it read until it was done (2026-11-04; `docs/DECISIONS.md`, 2026-11-04). The
 conductor split AN3's line into AN3a, AN3b and AN3c that day, every word of it kept in one of them:
