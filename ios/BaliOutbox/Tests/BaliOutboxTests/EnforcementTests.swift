@@ -1613,7 +1613,8 @@ struct StandingKeptTests {
         #expect(state.standing == unlocked && state.link == .storageFailed)
         #expect(state.queued.map(\.eventId) == [unlock.eventId])
         #expect(try outbox.standing() == unlocked)
-        // Killed at any commit from the record's on, the next launch stands unlocked.
+        // Killed at any commit from the record's on, the next launch stands unlocked. Shown before
+        // the state step, the failure's write made a commit of its own here, standing focused.
         #expect(!relaunches.engines.isEmpty)
         for engine in relaunches.engines {
             let relaunched = await engine.state
