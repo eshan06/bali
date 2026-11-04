@@ -8,13 +8,12 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-04 (Central) — AS0 approved (`docs/DECISIONS.md`, 2026-11-04): the owner
-approved the Android canvas as it stands, 148 boards drawing lock (a) alone, after cutting 18 of the
-iPhone's lines on Android; the approved iPhone boards stand for the rest of Android's screens, and
-DESIGN.md's Android section is no longer proposed. Before it, AN1, part 1c, the VPN lock. Next: a
-session builds the retire-a-block command; the owner the new build and the sitting; the owner's call
-on GA5's known limit, the smallest iPhones (DECISIONS 2026-11-02); AN1b, the lock decided, in its own
-PR; AN1's part 2 once the owner has the phones; the audit's polish waits, as ruled._
+_Last updated: 2026-11-04 (Central) — AN1b (`docs/DECISIONS.md`, 2026-11-04): Android's lock
+decided, (a), the Accessibility service, with no VPN for now, a battery plan, and Android's gaps
+logged in ISSUES #6 for the device gate to check before launch. Before it, AS0 approved, the
+Android canvas as it stands. Next: a session builds the retire-a-block command; the owner the new
+build and the sitting; the owner's call on GA5's known limit, the smallest iPhones (DECISIONS
+2026-11-02); AN1's part 2 once the owner has the phones; the audit's polish waits, as ruled._
 
 ## Now
 
@@ -48,12 +47,13 @@ branch, with no PR, as its README says (#479; `docs/DECISIONS.md`, 2026-11-02).
   Focus (#452) and M8b's slide off Focus and card on the Screen Time ask (#454); left, their 📱
   device checks, the owner's. C2's legal words (⚖️) go into the portal's pages, on the Windows PC.
 - **Android (the owner, 2026-11-02)**: Phases 8–11, the steps in `docs/PLAN-ANDROID.md` (AN0 ✅);
-  AN1, the lock spike: part 1 on the Android 15, 16 and 17 emulators ✅ (DECISIONS 2026-11-03),
-  neither lock holding up alone; part 1c, lock (c), a VPN on the phone alone ✅ (DECISIONS
-  2026-11-03), which takes a blocked app's internet but covers nothing, so it could be added to (a);
-  part 2 on a Pixel and a Samsung waits for the owner's Android phones (📱). AS0, the screens'
-  canvas, ✅ approved as it stands (#484, #486; DECISIONS 2026-11-04): lock (a) alone, the approved
-  iPhone boards standing for the rest. Not on the pilot's critical path.
+  AN1, the lock spike: parts 1 and 1c on the Android 15, 16 and 17 emulators ✅ (DECISIONS
+  2026-11-03); AN1b ✅ (DECISIONS 2026-11-04): the owner picked (a), the Accessibility service, with
+  no VPN for now and a battery plan, so ARCHITECTURE's "Android app structure" is decided; part 2 on
+  a Pixel and a Samsung, with its battery test, waits for the owner's Android phones (📱) and still
+  runs before launch; AN2 at the owner's go. AS0, the screens' canvas, ✅ approved as it stands
+  (#484, #486; DECISIONS 2026-11-04): lock (a) alone, the approved iPhone boards standing for the
+  rest. Not on the pilot's critical path.
 - **The portal redesign in v2's look (PV0–PV17, the owner, 2026-10-12)** ✅ (2026-10-16): every step
   done, with PV3b, PV4b, PV4c and PV5b; the last, PV17c-2, Home's Last session (#425).
 - **The portal's tests drive the page (the owner, 2026-10-22: "Yes, go gradually")**: the setup ✅
@@ -175,8 +175,8 @@ One line each. Phases 3–6's step lists, the push's (N1–N6) and this table in
 | 5 | Pilot readiness: prod, Sentry, TestFlight, App Store, runbooks | ✅ cloud steps done; **prod live 2026-10-05**; open: the owner's items |
 | 6 | Security and compliance; gates Phase 5's student-facing steps | ✅ cloud steps done; open: C2 (⚖️ the lawyer's words), C7's phone check 📱, S8 (the owner's decision) |
 | 7 | Live lesson: questions and PDF slides in a running session, followed on the phone and the web | building (Phase 7 steps) |
-| 8 | Android: the lock, both candidates measured on the emulator, then on a Pixel and a Samsung (iOS's Phase 0) | building: AN1's part 1 on the emulators ✅ (2026-11-03), and part 1c, the VPN that could be added to (a) ✅ (2026-11-03); its part 2 📱 waits for the phones |
-| 9 | Android: the engine, BaliCore's and BaliOutbox's twin, no screens | planned, after AN1b |
+| 8 | Android: the lock, the candidates measured on the emulators, then (a) on a Pixel and a Samsung (iOS's Phase 0) | building: AN1's parts 1 and 1c on the emulators ✅ (2026-11-03); AN1b, lock (a) decided ✅ (2026-11-04); AN1's part 2 📱 waits for the phones, before launch |
+| 9 | Android: the engine, BaliCore's and BaliOutbox's twin, no screens | planned: AN1b done, AN2 at the owner's go |
 | 10 | Android: the screens, from the approved boards | AS0's canvas approved ✅ (2026-11-04); AS1–AS8 build from it |
 | 11 | Android: on Play, its testing tracks, device gate and exit check | planned |
 
@@ -331,7 +331,7 @@ Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect acc
 
 **The rest of the owner's queue:**
 
-- Android's four still open (the phones, the Play account, the timing, the lock after AN1; AS0's canvas approved, 2026-11-04): `docs/PLAN-ANDROID.md`, Open owner items.
+- Android's three still open (the phones, the Play account, the timing; AS0's canvas approved and the lock answered at AN1b, 2026-11-04): `docs/PLAN-ANDROID.md`, Open owner items.
 - 🔧 Sentry: confirm monitor `api-sweep`'s `production` environment is active and alerting (dev checks in to the same slug, #239's review; runbook 6, step 2).
 - ✅ Apple's developer agreement §3.3.3(P) on Family Controls (ISSUES #3): asked by the owner on 2026-10-13, **case 102994872143** (`docs/APP-STORE.md` §5.6 holds the question as sent); Apple's answer, submit it for review (the owner, 2026-11-03), recorded in ISSUES #3.
 - #165 the Me page: D2j's redesign was rolled back (2026-10-06), so a better Me waits for a design the owner approves; the issue, closed by #266, is the owner's to reopen.

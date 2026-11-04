@@ -228,12 +228,10 @@ C4a, the phone's Delete account engine, has too; its Me screen button, C4b, is n
 
 **The problem.** On an iPhone the shields are the system's: Screen Time keeps them on with Bali
 force-quit and takes them off at the bell from its own monitor. Android gives an ordinary app
-nothing like it. The two locks open to Bali (ARCHITECTURE, "Android app structure", decision 2) are
-an Accessibility service that sees which app comes to the front and covers it with Bali's block
-screen, or usage access, polled, with an overlay ("Display over other apps"). Both run in Bali's
-own process. Force-stopping Bali or switching the service off ends the lock, some phone makers'
-battery savers may stop it unasked, a reboot into Safe Mode runs no app but the system's, and the
-blocked app can flash before the cover lands. Android's full lock, device-owner mode, needs a
+nothing like it, so Bali's lock is its own: an Accessibility service that sees which app comes to
+the front, covers it with Bali's block screen and sends it to the background (the owner's pick,
+2026-11-04: "we will use a)"; ARCHITECTURE, "Android app structure", decision 2). It runs in Bali's
+own process, so whatever stops Bali stops the lock. Android's full lock, device-owner mode, needs a
 factory-reset phone the school manages: never a student's own.
 
 **What others do (researched 2026-11-02).** Android's app blockers live with the same limits.
@@ -247,30 +245,77 @@ off, and that Android 17's Advanced Protection may restrict it
 Google's own Family Link can block a supervised child's apps at the system's level, but it is
 Google's own, not something another app can use.
 
+**The gaps, each checked before Android launches** (the owner, 2026-11-04: "log the gaps with
+android for something we will check before launch"). AN1's part 1 found most of them on the
+emulators (`docs/DECISIONS.md`, 2026-11-03) and the battery research the rest (2026-11-04). AN1's
+part 2 measures them on a Pixel and a Samsung, and the device gate (AP3) checks every one again on
+both phones, on the build students will install, before Android launches
+(`docs/ANDROID-PHONE-TESTS.md`).
+
+1. **A force-stop or Safe Mode switches the lock off** until the student switches it on again;
+   Bali can say so, not undo it. The grid shows it, the phone gone quiet and then protection off
+   once Bali is opened, but the phone is free meanwhile. *Checked:* Bali force-stopped, and the
+   phone booted into Safe Mode and back, each mid-session: the grid's tile at each step, and the
+   lock back only once the student switches it on.
+2. **Phone makers' battery savers** (Samsung, Xiaomi, OnePlus, Oppo, Motorola) can switch the lock
+   off or freeze it, by users' and developers' reports. Samsung's sleeping-app lists are untested.
+   *Checked:* the battery test's makers' checks on the Samsung and the Pixel, each mid-session with
+   Bali closed: the blocked app still covered, the switch on and the service bound, and protection
+   off reported whenever the lock is off. The other makers' phones aren't among the two, so their
+   reports stay reports.
+3. **A blocked app shows for a moment before the cover lands:** on the emulators a median of half
+   to three quarters of a second from launch, always after the app's first frame, and longer on a
+   slow first launch. *Checked:* launch to cover, timed on both phones as part 1 timed it.
+4. **A blocked app's sound can play on.** Most apps stop once they are sent to the background;
+   music apps, a picture-in-picture window and a split-screen half don't. *Checked:* a video app, a
+   music app, a picture-in-picture window and a split-screen half, each playing as a lesson starts:
+   which go quiet.
+5. **A guest user on the phone is out of reach:** nothing is covered there, though a work profile
+   and Private Space are. *Checked:* a guest user switched to mid-session: what it shows, what the
+   grid says meanwhile, and how soon the lock is back in the student's own user (30–66 s on the
+   emulators).
+6. **A permission prompt can show the blocked app behind it,** dimmed and uncovered, until the
+   prompt is answered. *Checked:* blocked apps opened for the first time, whose prompts show
+   (Contacts' and YouTube's did on the emulators): what shows behind the prompt, and the cover once
+   it is answered.
+7. **Advanced Protection on Android 17 limits Accessibility to verified accessibility tools,** so
+   Bali's lock may not switch on there
+   ([Google, 2026-10-01](https://blog.google/security/android-advanced-protection-updates/)). Part 1
+   turned it on only by `cmd`, which left (a) alone, and couldn't test Google's own switch.
+   *Checked:* Advanced Protection turned on through Settings, on the phone with Android 17 and a
+   screen lock, with Bali's service on: whether the service stays on, and whether it can be switched
+   on again.
+8. **A device or profile owner,** such as a school's, an employer's or a parent's management app,
+   can keep Bali's service from being switched on
+   ([`setPermittedAccessibilityServices`](https://developer.android.com/reference/android/app/admin/DevicePolicyManager)).
+   *Checked:* a test management app, such as Google's Test DPC, keeping Bali off its permitted list:
+   what Bali's permission step and the grid show.
+9. **Play may not approve the Accessibility use** (#7). The Accessibility step's disclosure lost
+   "Bali keeps and sends none of it." in the owner's canvas cuts of 2026-11-04, with the matching
+   sentence of the service's description in Settings; if Play's review asks for it, it goes back.
+   *Checked:* by Play's review of the build students install (AP4); on both phones, the disclosure
+   shown in Bali's normal use, and No thanks leaving the service off.
+
 **The plan.**
-- The spike first (AN1, `docs/PLAN-ANDROID.md`): both locks on a Pixel and a Samsung, each way out
-  measured (recents, a force-stop, a reboot and Safe Mode, battery savers and Doze, split screen,
-  picture-in-picture, an app opened from a notification, a work profile, Private Space, a guest
-  user, Advanced Protection), and how fast the cover lands. The owner picks the lock from the
-  measurements (AN1b).
 - Honest, not fought (the mirror rule): what the lock can't stop is never shown as focus. The
   service switched off is protection off, with iOS's events; a stopped Bali goes quiet on the grid
-  within about a minute, a tile that on Android can't yet say whether the lock still holds (AN7
-  asks whether the running service checks in, so quiet would mean stopped); no screen claims a lock
-  the last check didn't verify (rule 3).
+  within about a minute. The lock's service checks in every 30 s while the screen is on (the
+  battery plan, the owner's call of 2026-11-04), so an awake phone gone quiet means Bali stopped or
+  the phone lost its network, while one asleep reads silent after 90 s, as an iPhone does; no
+  screen claims a lock the last check didn't verify (rule 3).
 - What the school is told about Android's lock, before any Android phone joins a class, is the
   owner's call (`docs/PLAN-ANDROID.md`, Open owner items, 3).
 - The full lock later: device-owner mode on school-owned phones, the K-12 path (ARCHITECTURE,
   "Android app structure", Decided later).
 
-**Done when:** AN1's measurements are on record (AN1b), the owner has picked the lock, and the
-device gate (AP3) shows the grid telling the truth about every way out AN1 found.
+**Done when:** AN1's part 2 has confirmed (a) on a Pixel and a Samsung, and the device gate (AP3)
+has checked every gap above on both, the grid telling the truth about each.
 
 ## 7. Google Play's Accessibility rules may not fit a classroom lock
 
 The twin of #3, Apple's terms, for Android.
 
-**The problem.** If AN1 picks lock (a), Bali uses an API that Play guards
+**The problem.** Lock (a), the owner's pick (2026-11-04, AN1b), uses an API that Play guards
 ([Use of the AccessibilityService API](https://support.google.com/googleplay/android-developer/answer/10964491)).
 Only an app whose primary purpose is supporting people with disabilities may declare itself an
 accessibility tool (`isAccessibilityTool`), which Bali isn't. Every other app needs a prominent
@@ -289,19 +334,10 @@ deceptive or undeclared use can suspend the app. Separately, a personal develope
 in a row
 ([App testing requirements](https://support.google.com/googleplay/android-developer/answer/14151465)).
 
-**Beside it, the VPN's declaration** (AN1, part 1c; `docs/DECISIONS.md`, 2026-11-03). If lock
-(c), a VPN on the phone alone, is added to (a), Bali also uses `VpnService`, which Play guards too
-([VpnService](https://support.google.com/googleplay/android-developer/answer/12564964)). Only an
-app whose core function is a VPN, or one of a list of kinds (parental control and enterprise
-management, device security such as a firewall, network tools, browsers, carriers' apps), may use
-it, and a use outside them is refused. It takes a declaration of its own: the kind, a video of the
-VPN in use, whether it collects or shares data, a video of its own prominent disclosure (the
-consent, the refusal, and the disclosure shown again after a refusal), whether it redirects other
-apps' traffic for money, and the listing saying it uses a VPN. Its disclosure is separate from
-(a)'s, in the app's normal use, with an affirmative consent. Bali is a teacher's tool, not a
-parent's; the nearest honest kind is a firewall, which (c) is, and whether Play takes it is
-Play's to answer, as for the Accessibility API. Bali's tunnel has no far end: it reads nothing and
-sends nothing off the phone, which the declaration would say.
+**No VPN declaration.** Lock (c), a VPN on the phone alone, stays out (the owner, 2026-11-04), so
+Bali needs no second declaration for Play's `VpnService`
+([VpnService](https://support.google.com/googleplay/android-developer/answer/12564964)). What it
+would ask, should (c) ever come back, is in `docs/DECISIONS.md` (2026-11-03, AN1 part 1c).
 
 **What others do (researched 2026-11-02).** A screen-time app's developer reports four refusals
 from Play over its Accessibility disclosure, until they took the service out and saw the app in
@@ -311,20 +347,20 @@ declaration
 AppBlock asks for both (#6).
 
 **The plan.**
-- AN1 measures both locks, so (b) is a measured fallback if Play refuses (a), not a guess.
-- If (a): the disclosure and the consent are drawn on AS0's canvas, with the permission steps, and
-  built from it; the declaration, its video and the listing's words are in AP1's drafts
+- The disclosure and the consent are drawn on AS0's canvas, with the permission steps, and built
+  from it; the declaration, its video and the listing's words are in AP1's drafts
   (`docs/PLAY-STORE.md`). The service reads only which app is in front, to cover it, and keeps and
-  sends none of it, which the declaration says.
-- If (b): AP1 checks what Play asks of it too, its foreground service among them.
-- If (c) is added to (a): its disclosure and consent are drawn on the canvas beside (a)'s (AS0
-  didn't draw them), and its declaration, its two videos and the listing's words go into AP1's
-  drafts beside (a)'s.
+  sends none of it, which the declaration says. The disclosure itself lost "Bali keeps and sends
+  none of it." in the owner's canvas cuts of 2026-11-04 (AS0 approved, `docs/DECISIONS.md`): if
+  Play's review asks for it, it goes back (#6).
+- If Play refuses (a), what Android does is the owner's call. (b) was dropped on 2026-11-04, so no
+  second lock is ready behind (a); AN1's part 1 measured it, so its holes are known
+  (`docs/DECISIONS.md`, 2026-11-03).
 - The kind of Play account decides the 12-tester wait (`docs/PLAN-ANDROID.md`, Open owner items, 2).
 - No Android build reaches a student before Play has reviewed the one they install (AP4).
 
-**Done when:** Play has accepted the build students install, with its Accessibility declaration if
-it uses lock (a), and its VpnService declaration if (c) is added (AP4).
+**Done when:** Play has accepted the build students install, with its Accessibility declaration
+(AP4).
 
 ---
 

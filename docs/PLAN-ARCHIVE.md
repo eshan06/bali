@@ -10,6 +10,21 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-11-04 (Central) — AS0 approved (`docs/DECISIONS.md`, 2026-11-04): the owner
+approved the Android canvas as it stands, 148 boards drawing lock (a) alone, after cutting 18 of the
+iPhone's lines on Android; the approved iPhone boards stand for the rest of Android's screens, and
+DESIGN.md's Android section is no longer proposed. Before it, AN1, part 1c, the VPN lock. Next: a
+session builds the retire-a-block command; the owner the new build and the sitting; the owner's call
+on GA5's known limit, the smallest iPhones (DECISIONS 2026-11-02); AN1b, the lock decided, in its own
+PR; AN1's part 2 once the owner has the phones; the audit's polish waits, as ruled._
+
+`docs/PLAN-ANDROID.md`'s, replaced the same day: _Last updated: 2026-11-04 (Central) — AS0 approved
+(`docs/DECISIONS.md`, 2026-11-04): the owner approved the Android canvas as it stands, 148 boards
+drawing lock (a) alone, with the Words board's calls as drawn and 18 of the iPhone's lines cut on
+Android; the approved iPhone boards stand for the rest of Android's screens. Before it, AN1, part 1c.
+Next: AN1b, the lock decided, in its own PR; AN1's part 2 once the owner has the phones (Open owner
+items, 1). Not on the pilot's critical path._
+
 _Last updated: 2026-11-03 (Central) — AN1, part 1c (`docs/DECISIONS.md`, 2026-11-03): lock (c), a
 VPN on the phone alone, measured on the Android 15, 16 and 17 emulators; it takes a blocked app's
 internet within 1.6 s but covers nothing, so it could be added to (a), not used alone. Before it,
@@ -1963,6 +1978,56 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN1b's line, as it read until it was done (2026-11-04; `docs/DECISIONS.md`, 2026-11-04):
+
+- **AN1b** The lock decided (docs): AN1's measurements into `docs/DECISIONS.md`; the owner's pick
+  (Open owner items, 4) moves ARCHITECTURE's "Android app structure" from proposed to decided;
+  ISSUES #6 and #7 updated. If neither lock holds up, the owner decides what becomes of Phases
+  9–11 before any of them starts — validation: docs only
+
+AN1's line, as it read until AN1b picked (a) (2026-11-04; `docs/DECISIONS.md`, 2026-11-04):
+
+- **AN1** 📱 The lock spike: (a) and (b), each on a Pixel and a Samsung (Open owner items, 1).
+  Throwaway code on a branch of its own, never merged; the step writes a checklist for the owner,
+  and the answers go to AN1b:
+  - every app covered, and how fast: how long a blocked app shows before the cover lands;
+  - Bali swiped away from recents, force-stopped, and the phone rebooted mid-session, into Safe
+    Mode too;
+  - the Samsung's battery saver, and Doze over a 50-minute class;
+  - split screen, picture-in-picture, and an app opened from a notification;
+  - apps in a work profile or Private Space, and a guest user;
+  - Advanced Protection: Android 16's, and Android 17's, which is reported to turn off any
+    Accessibility service that isn't a disability tool;
+  - Emergency Unlock: the lock off at once, and the phone, messages and emergency calls never
+    covered;
+  - a real block's Text and URI records read (`BlockTag`), with Bali open and closed;
+  - the battery a lesson costs.
+
+  A build that doesn't come from Play may meet Android's "restricted settings" (13 and later)
+  before its Accessibility service can be turned on: the checklist says how each build was
+  installed — validation: every line answered on both phones
+
+  **Part 1, on the emulators** ✅ (Android 15, 16 and 17; the code on `spike/android-lock`, never
+  merged; DECISIONS 2026-11-03): neither lock holds up alone. (a) covers split screen window by
+  window, picture-in-picture, the work profile and Private Space, but a force-stop or Safe Mode
+  switches it off until the student switches it on again; (b) comes back by itself after both, but
+  misses picture-in-picture and every profile, covers the allowed half of a split screen, and gets
+  a Stop button in quick settings. **Part 2, on the phones, waits for them** (Open owner items, 1):
+  a real block over NFC with Bali open and closed, the Samsung's battery saver and its in-call
+  screen (`com.samsung.android.incallui`), the battery a lesson costs, and every other line again,
+  Doze above all (an emulator's CPU never sleeps). AN1b waits for both.
+
+  **Part 1c, lock (c), a VPN on the phone alone** ✅ (the owner, 2026-11-03: "Yes, test it";
+  Android 15, 16 and 17; the code on `spike/android-lock`, never merged; DECISIONS 2026-11-03): no
+  server, only the blocked apps routed in, their packets dropped unread. It takes a blocked app's
+  internet within 1.6 s of the session's start (0.2 s on 17) and gives it back within 0.6 s of
+  Emergency Unlock, but covers nothing: a blocked app opens and shows what it holds offline. Added
+  to (a), it leaves what (a) misses unable to load anything new, and it comes back by itself after
+  a force-stop or Safe Mode, where (a) doesn't. Against it: Android's VPN dialog; one VPN at a time,
+  another app's taking over at once and an always-on one keeping Bali's from starting; the profiles
+  and the guest user out of reach; and a second Play declaration (ISSUES #7). Part 2 adds its
+  battery, alone and with (a).
 
 AS0's line, as it read until the owner approved the canvas (2026-11-04; `docs/DECISIONS.md`,
 2026-11-04):
