@@ -91,6 +91,9 @@ class BlockTagTest {
                 listOf(uri(0x04, "bali.app/x/t/T7XK2M9QPF")), listOf(uri(0x03, "bali.app/t/T7XK2M9QPF")),
                 listOf(uri(0x05, "T7XK2M9QPF")), listOf(uri(0x00, "http://bali.app/t/T7XK2M9QPF")),
                 listOf(uri(0x00, "bali://s/T7XK2M9QPF")), listOf(uri(0x00, "T7XK2M9QPF")),
+                // Links java.net.URI can't read, a space in one and a broken escape in the other:
+                // none, never a crash.
+                listOf(uri(0x00, "bali://t/T7XK2M9QPF x")), listOf(uri(0x04, "bali.app/t/%zz")),
                 // The code, but in a record of another format or type: a media type (one named "T"
                 // too), an absolute URI, an external type, a smart poster.
                 listOf(record(2, "text/plain", "T7XK2M9QPF")), listOf(record(2, "T", "${Char(2)}enT7XK2M9QPF")),
