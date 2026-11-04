@@ -12,15 +12,16 @@ structure", decided at AN1b (2026-11-04).
 - **Everything but the steps is shared.** ARCHITECTURE.md, DECISIONS.md, PLAN-ARCHIVE.md,
   ISSUES.md, CLAUDE.md and `contracts/` serve iOS and the server too, and win where this file
   disagrees.
-- **Under 6,000 words.** AN2 puts the cap in CI, as `plan-words.sh` holds PLAN.md under 8,000.
+- **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-04 (Central) — AN1b, the lock decided (`docs/DECISIONS.md`, 2026-11-04):
-the owner picked (a), the Accessibility service, so ARCHITECTURE's "Android app structure" is
-decided; (b) is dropped and (c), the VPN, left out for now. The battery plan's two calls: check-ins
-only while the screen is on, and a covered app sent to the background. Android's gaps are logged in
-ISSUES #6, each checked again at AP3. Before it, AS0 approved, the Android canvas as it stands.
-Next: AN1's part 2, with its battery test, once the owner has the phones (Open owner items, 1),
-still before launch; AN2 at the owner's go. Not on the pilot's critical path._
+_Last updated: 2026-11-04 (Central) — AN2, the project and CI (#488; `docs/DECISIONS.md`,
+2026-11-04): Gradle under `android/` with `core`, `outbox` and `app`, the app `com.bali.bali` for
+Android 10 and later, targeting Android 16; `android.yml` builds, lints and tests it when `android/`
+changes, and the contract tests run on every PR but a docs-only one; the plan check counts
+`android/` as source. Found: Android Lint doesn't check `core`'s and `outbox`'s calls against
+Android 10, so AN3 adds that check. Before it, AN1b, the lock decided. Next: AN3, the core; Android
+17's SDK platform for the owner to OK before the first step with today's AndroidX (Open owner items,
+6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -122,29 +123,14 @@ a VPN, left out; on real phones it confirms (a) before launch, as Phase 0 proved
 After AN1b, at the owner's go. Every rule in plain Kotlin where the JVM tests reach it, never in a
 screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the same server.
 
-- **AN2** The project and CI (twin: `ios/project.yml`, `ios.yml`, `ios/README.md`): Gradle under
-  `android/` with the modules `core`, `outbox` and `app`; `android.yml`, the build, Android Lint and
-  the JVM tests on Linux, run only when `android/` or the workflow changes, decided by a changes job
-  as `ios.yml` decides (a workflow filtered by paths never reports, so a required check would wait
-  on it); its contract tests (`core` decoding `contracts/fixtures/`, `outbox` running
-  `contracts/outbox/`) instead on every PR but a docs-only one, never filtered by path, as
-  `ci.yml`'s BaliCore Swift job runs, since the contract spans `apps/api`, `packages/shared` and
-  `contracts/`: a server change that breaks the phone's reading of an answer goes red on its own PR
-  (the conductor, 2026-11-03, from the owner's question: "will the same checks happen for android
-  server work and all that?"); the plan check counting `android/` as source, and this file's 6,000-word cap
-  (`plan-words.sh docs/PLAN-ANDROID.md 6000`). Letting an update to this file alone meet the check
-  for an `android/` change, never for `apps/`, `packages/` or `ios/`, needs CLAUDE.md's working rule,
-  which asks every source change for `docs/PLAN.md`, amended first in a PR of its own; `.gitignore`
-  entries for Android Studio's local files (`local.properties`, `.gradle/`, `.kotlin/`, `.idea/`,
-  `build/`); `android/README.md`; and the applicationId, minSdk and targetSdk decided (iOS's id is
-  `com.bali.Bali`; the PC's untracked `android/` folder holds an old debug build as
-  `com.bali.student`, never committed; targetSdk as Play's yearly rule requires) — validation:
-  `android.yml` green on its own PR, the plan check's self-test with an `android/` case
+- **AN2** The project and CI — ✅ (#488; DECISIONS 2026-11-04)
 - **AN3** The core (twin: BaliCore): the wire types and the vocabulary (`@bali/shared`'s lists, a
   value it doesn't know read as none), UUIDv7 event ids, the API client and its errors (keyed on
   `reason`, never the message), and `BlockTag` (an NDEF Text record, or a URI record,
   `bali://t/<code>` or `https://<host>/t/<code>`). Every `contracts/fixtures/` file is decoded in a
-  test, as BaliCore's Linux job decodes them, so a new fixture fails until `core` reads it
+  test, as BaliCore's Linux job decodes them, so a new fixture fails until `core` reads it. And the
+  check AN2 found missing: `core`'s and `outbox`'s compiled classes held to Android 10's API, which
+  Android Lint doesn't do for them (DECISIONS 2026-11-04)
 - **AN4** The outbox store (twin: BaliOutbox's `Outbox` and `OutboxRecord`): Room in the app's own
   storage; the records; the unlock contract (`contracts/outbox/`; no response ever means delete);
   the outbox's counter and its install id, the phone's order (A12); and Bali's files left out of
@@ -256,6 +242,10 @@ rules); `docs/DESIGN.md` read first, its Android section from AS0; every user-fa
 5. ✅ **AS0's canvas:** approved as it stands, its Words board's calls as drawn, and the approved
    iPhone boards stand for the rest of Android's screens (the owner, 2026-11-04; DECISIONS
    2026-11-04).
+6. **The SDK, for what comes next:** Android 17's platform (`platforms;android-37.0`, 64 MB, from
+   Google's SDK repository) on the PC before the first step with today's AndroidX, which needs
+   compileSdk 37 (androidx.core 1.19, Compose 1.12; DECISIONS 2026-11-04); and Android 10 and 12 or
+   13 to test on, as emulator images (each a download) or phones, for ISSUES #6's gap 10.
 
 ## How to update this file
 
@@ -268,8 +258,8 @@ PLAN.md's own rules ("How to update this file"), for Android's steps:
   word to the same archive section.
 - An Android PR updates this file, and Android's lines in PLAN.md: its Now line at least when the PR
   changes source, since CLAUDE.md's working rule asks every source change for `docs/PLAN.md`; its
-  phase rows and its owner-items line when they change. Until AN2 teaches the plan check, an
-  `android/` change isn't held to either, so hold to both by hand.
+  phase rows and its owner-items line when they change. The plan check holds an `android/` change
+  to PLAN.md (AN2); this file it holds to its cap alone, so keep its lines by hand.
 - A real decision goes at the top of `docs/DECISIONS.md`; a changed design, into ARCHITECTURE's
   "Android app structure".
 - Past 6,000 words: finished detail moves word for word to the archive, the why to DECISIONS.

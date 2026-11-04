@@ -8,6 +8,93 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-04** — **AN2, Android's project and CI: `com.bali.bali`, Android 10 and later, targeting
+  Android 16 (the conductor's calls, awaiting the owner's look; AN2, #488).** The owner was away and
+  asked for the recommended option on every question, so each call here is the conductor's, for the
+  owner to look at.
+
+  **The ids and the levels.** *applicationId* `com.bali.bali`: iOS's `com.bali.Bali`, lowercased as
+  Android's ids are by convention. Play's public listing for it
+  (`https://play.google.com/store/apps/details?id=com.bali.bali`) answered 404 on 2026-11-04, as
+  `com.bali.Bali`'s and the PC's old `com.bali.student`'s did, while a known app's answered 200: no
+  public app holds it, though an unpublished or removed one could, which only the first upload
+  shows. The id becomes permanent at that upload (AP2), so it can still change until then.
+  *targetSdk* 36, Play's rule since 2026-08-31, read on Google's page that day: "New apps and app
+  updates must target Android 16 (API level 36) or higher"
+  (`https://developer.android.com/google/play/requirements/target-sdk`). *minSdk* 29, Android 10, as
+  the spike set it: nothing Bali plans needs newer. The lock's Accessibility service, its window
+  events and its Home action are older; Android 10 lets an Accessibility service start a screen from
+  the background; Custom Tabs, the Keystore's AES keys (Android 6) and NFC's reader mode are older
+  too; the newer pieces are used where they exist (the notification permission and
+  `setCacheEnabled(false)` from 13, the transfer rules of the backup from 12, AN4's). Said plainly:
+  the PC has only Android 15, 16 and 17 emulators, so Android 10 to 14 are untested until the owner
+  adds an image (ISSUES #6, gap 10). *compileSdk* 36.1 with build tools 36.1.0: what the PC's SDK
+  holds, and CI's runner too (its image's list, 2026-11-04), so it is the same build on both. The
+  Android plugin's default build tools, 36.0.0, aren't on the PC, so they're pinned, and
+  `android.builder.sdkDownload=false` fails a build that lacks a package, by name, instead of
+  installing it (the owner's rule for this step: nothing new for the SDK). Nothing was added to the
+  PC's SDK; its folders were compared before and after.
+
+  **For the owner, soon: Android 17's platform.** The current AndroidX libraries need compileSdk 37:
+  androidx.core 1.19.1 and Compose UI 1.12.1 declare `minCompileSdk=37` (their AAR metadata, read
+  2026-11-04; Room 2.8.5 needs 34, androidx.browser 1.10.0 36). The first step that adds them needs
+  `platforms;android-37.0`, "Android SDK Platform 37.0" from Google's SDK repository, 64 MB, on the
+  PC; CI's runner has it. That download is the owner's to OK, and the step that first needs it asks.
+
+  **The versions,** each the newest stable on 2026-11-04: Gradle 9.8.2, its download pinned by its
+  SHA-256; the Android plugin 9.5.0; Kotlin 2.4.21, which lifts the plugin's own Kotlin (2.2.10), so
+  every module compiles with one. Kotlin's table lists 2.4.21 as tested up to Gradle 9.7.0 and the
+  plugin 9.3.1; the build gives no warning with `--warning-mode all`. JDK 21 runs the build, Android
+  Studio's own on the PC and the runner's Temurin in CI, with no toolchain, so Gradle never downloads
+  a JDK (`org.gradle.java.installations.auto-download=false` holds it); every module compiles to Java
+  17's bytecode.
+
+  **The modules,** as ARCHITECTURE's decision 5 has them: `core` and `outbox` plain Kotlin, so their
+  tests run on a JDK alone, `outbox` on `core`, the app on both. `outbox` stays plain Kotlin so AN4's
+  Room, through its JVM build, keeps its tests on the JVM. The contract plumbing: each module's test
+  task names the repo's `contracts/` in a system property and makes it an input, so a changed fixture
+  or table runs the tests again (a new case file in `contracts/outbox/` re-ran `:outbox:test` and
+  failed it, nothing else changed). The first tests find every fixture and every case file in place,
+  and fail on the wrong folder or none (both tried).
+
+  **Found, for AN3: Android Lint's API check doesn't reach `core` or `outbox`.** The app's lint reads
+  their code (`checkDependencies`, with `com.android.lint` applied to each: without it the app's lint
+  reads nothing of theirs, tried) and fails on a warning there (tried: `String.format` with no locale
+  in `core`). But they're compiled against the JDK, so NewApi never weighs them against the app's
+  minSdk: `java.util.List.of`, which Android 11 added, passed lint in `core` (tried). Such a call
+  passes every test here and fails on an older phone, and the PC's emulators are all Android 15 or
+  later, so nothing here would catch, say, a list's `removeFirst()`, which Android 15 added. The
+  conductor's call: AN3, the first step with code in `core`, adds a check of both modules' compiled
+  classes against Android 10's API (animal-sniffer with the gummy-bears API 29 signatures, as OkHttp
+  checks its own). Set aside: making both Android libraries, whose tests would still run on the JVM
+  but whose Room would then need Robolectric.
+
+  **Lint** fails on any warning, but four checks that a newer release or the machine's SDK trips,
+  not the code (GradleDependency, AndroidGradlePluginVersion, NewerVersionAvailable, and OldTargetApi,
+  which weighs targetSdk against the newest platform installed, 37 on CI's runner, so it would fail
+  there alone), and the app's missing icon, waived in the manifest until an icon is drawn and
+  approved.
+
+  **CI.** `android.yml`: "Android changes" decides through `touches.sh`, its self-test first, as
+  `ios.yml` does, and "Android build · Lint · JVM tests" builds the app and the modules, runs the
+  app's lint and every module's tests. "Android contract tests (JVM)" in `ci.yml` runs `core`'s and
+  `outbox`'s suites on every PR but a docs-only one, beside the Swift job. Both check the wrapper's
+  jar first (`gradle/actions/wrapper-validation`, v6.4.1) and cache Gradle with `actions/cache`. Not
+  `gradle/actions/setup-gradle`: from v6 its caching is a proprietary component under Gradle's terms
+  of use, which using it accepts, and accepting terms is the owner's. Main requires none of these
+  checks yet: adding them to `protect-main` is the owner's.
+
+  **The plan check** moved into `.github/scripts/plan-updated.sh`, with a self-test whose cases
+  include `android/`: `android/` is source now, so an Android change needs `docs/PLAN.md`, as
+  CLAUDE.md asks of every source change, and `docs/PLAN-ANDROID.md` alone never stands in for it (a
+  case pins that). Nothing loosened, and one thing tightened: a source file moved out of `apps/`,
+  `packages/`, `ios/` or `android/` counts now, as `touches.sh` counts one (`--no-renames`, #368).
+  `plan-words.sh docs/PLAN-ANDROID.md 6000` runs beside PLAN.md's cap.
+
+  **Git.** `.gitignore` ignores `local.properties`, `.gradle/`, `.kotlin/` and `.idea/` under
+  `android/` alone (each module's `build/` was ignored already); `android/.gitattributes` keeps
+  `gradlew` LF, `gradlew.bat` CRLF and the jar binary; `gradlew` is committed executable.
+
 - **2026-11-04** — **AN1b, the lock decided: (a), no VPN for now, the battery plan, and Android's
   gaps logged for launch (the owner; AN1b, #487).** The owner settled it in the conductor's chat
   before AN1's part 2 has its phones. The lock: "we will use a)". To the conductor's picks, lock (c)

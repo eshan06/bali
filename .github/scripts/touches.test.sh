@@ -2,8 +2,8 @@
 # Self-test for touches.sh: a watched file changed, one moved in or out of the
 # watched paths, or one whose name git quotes touches them; a file elsewhere,
 # one moved elsewhere, or no change at all does not; a base that isn't there
-# and a pattern grep refuses fail instead of answering. ios.yml and load-gate.yml run it first, so a
-# decision that stops working fails instead of skipping their job.
+# and a pattern grep refuses fail instead of answering. ios.yml, android.yml and load-gate.yml run
+# it first, so a decision that stops working fails instead of skipping their job.
 #
 #   .github/scripts/touches.test.sh
 set -euo pipefail

@@ -1,8 +1,9 @@
-# The plan backstop: a PR that changes source code must also update
-# docs/PLAN.md, so every session/contributor leaves the shared status doc
-# accurate. Escape hatch for trivial fixes: put [no-plan] in a commit message.
-# It also keeps docs/PLAN.md, which every session reads first, under 8,000
-# words: the current state only, finished history in docs/PLAN-ARCHIVE.md.
+# The plan backstop: a PR that changes source code (apps/, packages/, ios/,
+# android/) must also update docs/PLAN.md, so every session/contributor leaves
+# the shared status doc accurate. Escape hatch for trivial fixes: put
+# [no-plan] in a commit message. It also keeps docs/PLAN.md, which every
+# session reads first, under 8,000 words, and docs/PLAN-ANDROID.md under
+# 6,000: the current state only, finished history in docs/PLAN-ARCHIVE.md.
 name: Plan doc
 
 on:
@@ -25,7 +26,11 @@ jobs:
       - run: .github/scripts/plan-words.test.sh
       - name: docs/PLAN.md stays under 8,000 words
         run: .github/scripts/plan-words.sh docs/PLAN.md 8000
+      - name: docs/PLAN-ANDROID.md stays under 6,000 words
+        run: .github/scripts/plan-words.sh docs/PLAN-ANDROID.md 6000
 
+      # Its self-test first, as above. plan-updated.sh says what counts.
+      - run: .github/scripts/plan-updated.test.sh
       - name: Source changes must update docs/PLAN.md
         env:
           # Through env, not inline interpolation, so neither the author
@@ -33,33 +38,4 @@ jobs:
           # may contain $, backticks, ;).
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
           BASE_REF: ${{ github.base_ref }}
-        run: |
-          BASE="origin/$BASE_REF"
-          CHANGED="$(git diff --name-only "$BASE"...HEAD)"
-          echo "Changed files:"
-          echo "$CHANGED"
-          if ! echo "$CHANGED" | grep -qE '^(apps/|packages/|ios/)'; then
-            echo "No source changes — plan update not required."
-            exit 0
-          fi
-          # Dependabot's PRs are exempt while they stay what Dependabot ships:
-          # nothing but dependency-manifest changes. Both conditions on purpose:
-          # a human commit on a Dependabot branch makes the diff non-manifest
-          # and trips the backstop, and a session adding a new dependency (a
-          # plan-worthy decision) is not exempt merely because its diff is
-          # manifest-only (policy: docs/PLAN.md, 2026-09-20).
-          if [ "$PR_AUTHOR" = "dependabot[bot]" ] \
-            && ! echo "$CHANGED" | grep -vqE '(^|/)package(-lock)?\.json$'; then
-            echo "Dependabot manifest-only change — plan update not required."
-            exit 0
-          fi
-          if echo "$CHANGED" | grep -q '^docs/PLAN\.md$'; then
-            echo "docs/PLAN.md updated — ok."
-            exit 0
-          fi
-          if git log --format=%B "$BASE"..HEAD | grep -qF '[no-plan]'; then
-            echo "[no-plan] escape used — ok."
-            exit 0
-          fi
-          echo "::error::This PR changes source code but not docs/PLAN.md. Update the plan (status + what landed), or add [no-plan] to a commit message if the change is truly trivial."
-          exit 1
+        run: .github/scripts/plan-updated.sh "origin/$BASE_REF" "$PR_AUTHOR"

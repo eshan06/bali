@@ -1,0 +1,13 @@
+# Every version the build names (README.md, "Updating"). AGP's own Kotlin is upgraded to `kotlin`.
+[versions]
+agp = "9.5.0"
+kotlin = "2.4.21"
+
+[libraries]
+# Kotlin's assertions on JUnit 5, its engine and the launcher Gradle 9 no longer brings itself.
+kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+android-lint = { id = "com.android.lint", version.ref = "agp" }
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

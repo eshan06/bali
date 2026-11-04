@@ -1,0 +1,5 @@
+# Gradle's start scripts: the shell one LF, for Linux and CI; the batch one CRLF, since cmd misreads
+# labels in a file of LF lines. The wrapper's jar is a binary, never converted.
+/gradlew text eol=lf
+/gradlew.bat text eol=crlf
+/gradle/wrapper/gradle-wrapper.jar binary
