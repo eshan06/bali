@@ -36,10 +36,7 @@ private class DeletionTokens(private val tokens: TokenProvider) : TokenProvider 
     override suspend fun accessToken() = tokens.deletionToken()
 }
 
-/**
- * One send attempt's result, as every outbox table takes it (AN4): the status the server answered
- * with, or no answer at all, `'network_error'` in the TypeScript. BaliCore's `SendResult`.
- */
+/** One send's result, as every outbox table takes it (AN4): its status, or no answer (`'network_error'`). */
 sealed interface SendResult {
     data class Status(val code: Int) : SendResult
     data object NetworkError : SendResult
@@ -49,10 +46,7 @@ sealed interface SendResult {
 enum class NoAnswer {
     /** The token provider had none to give, so nothing was sent: not "can't reach the server". */
     NoToken,
-    /**
-     * No HTTP answer came: offline, a timeout, a dropped connection, a cancelled call; or, never in
-     * practice, a request that couldn't be built.
-     */
+    /** No HTTP answer came: offline, a timeout, a dropped connection; or, never in practice, an unbuildable request. */
     Unreachable,
 }
 
@@ -106,8 +100,8 @@ interface HttpTransport {
 
 /**
  * The student endpoints on the API at [baseUrl], its scheme, host and any path. Each call answers
- * with what the server said, whatever it said, and sends its request once: whether to send it
- * again is the outbox's to decide.
+ * with what the server said, sending its request once: whether to send it again is the outbox's to
+ * decide. A cancelled caller stays cancelled, never answered: no table reads it, so its record stays.
  */
 class ApiClient(
     val baseUrl: URI,
@@ -237,9 +231,7 @@ class ApiClient(
                 // Only with a body: Fastify refuses a JSON type on an empty one, a DELETE's, with a 400.
                 if (data != null) headers["Content-Type"] = "application/json"
                 HttpRequest(method, URI.create(baseUrl.toString().trimEnd('/') + path), headers, data, timeout)
-            } catch (error: IllegalArgumentException) {
-                return noAnswer(NoAnswer.Unreachable)
-            }
+            } catch (error: IllegalArgumentException) { return noAnswer(NoAnswer.Unreachable) }
         val reply = try { transport.send(request) } catch (error: IOException) { return noAnswer(NoAnswer.Unreachable) }
         // A body is read only as its status's: a 2xx's as the answer, any other's as the error.
         val ok = reply.status in 200..299
@@ -269,16 +261,13 @@ private fun <A> noAnswer(why: NoAnswer) = ApiResponse<A>(SendResult.NetworkError
 private fun <T> decoded(type: KSerializer<T>, body: ByteArray): T? =
     try {
         BaliJson.decodeFromString(type, body.decodeToString(throwOnInvalidSequence = true))
-    } catch (error: IllegalArgumentException) { // SerializationException among them
-        null
-    } catch (error: CharacterCodingException) {
+    } catch (error: Exception) { // kotlinx's SerializationException, or a CharacterCodingException
         null
     }
 
 /**
  * [value] as one path segment or query value: every byte but an ASCII letter or digit, `-`, `_` or
- * `~` percent-encoded, so nothing a student types, a space, a `/`, a `?`, a `..`, changes the URL's
- * shape.
+ * `~` percent-encoded, so nothing a student types (a space, a `/`, a `?`, a `..`) changes the URL.
  */
 internal fun escaped(value: String): String =
     value.encodeToByteArray().joinToString("") { byte ->

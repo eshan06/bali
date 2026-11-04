@@ -36,16 +36,23 @@ a real decision? Add a dated entry at the top: what was decided and why.
   ephemeral session keeps cookies in memory; here there are none); 15 s for each wait, to
   connect, to send and for the next byte (iOS's request timeout), and 30 s for a whole exchange
   (its resource timeout); a request's own wait, the client's `timeout`, set on a copy of the client
-  sharing its connections, OkHttp's way to set one call's; and no redirect followed, so a token
-  never reaches another host. **One setting more:** `retryOnConnectionFailure(false)`, since
-  OkHttp's default sends a request again after a `408` and on a dropped connection, where
-  URLSession returns them and the client's rule is that a request goes once, the outbox deciding
-  whether to send it again. Said plainly: a request that meets a connection the server has already
-  closed comes back as no answer, and the outbox sends it again after its backoff where OkHttp
-  would at once; its event id makes either safe. OkHttp still sends a request again after a `503`
-  saying `Retry-After: 0`, and after a `421` on a connection two hosts share, which no setting turns
-  off (its source, 5.4.0's `RetryAndFollowUpInterceptor`): the API sets `Retry-After` on a `429`
-  alone, and the app calls one host.
+  sharing its connections, OkHttp's way to set one call's; and no redirect followed, so nothing
+  goes anywhere the client didn't build: OkHttp drops the token on a redirect to another host, but
+  a `307` or `308` would carry the body there, a tap's or an unlock's, and a `301` or `302` would
+  make a POST a GET.
+
+  **A request with a body goes once; a read may go again, as URLSession's does.** OkHttp sends a
+  request again of its own after a `408`, a `503` saying `Retry-After: 0`, a `421` on a connection
+  two hosts share, and on a connection that drops (5.4.0's `RetryAndFollowUpInterceptor`, read
+  2026-11-04), where URLSession returns all but the last, and that one only for a read. So every
+  body is one-shot (`Once`, OkHttp's own switch: it never sends such a body twice), which keeps
+  the client's rule that a write goes once, the outbox deciding whether to send it again, and
+  OkHttp's recovery stays on for the rest: a read that meets a pooled connection the server has
+  closed goes again on a fresh one, as URLSession's does, rather than coming back as no answer
+  (santa's review: with recovery off, a read after the phone sat idle past the server's keep-alive
+  would say Bali can't be reached). Said plainly: a write that meets such a connection comes back
+  as no answer, and the outbox sends it again after its backoff, as on iOS; its event id makes any
+  resend safe.
 
   **Where Kotlin and OkHttp differ, said plainly:**
   - **A path segment of dots.** OkHttp resolves `.` and `..` in a path, `%2E` and `%2E%2E` too,
@@ -67,10 +74,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   AN4's, with the tables, as ContractFixtureTest's is. No answer, an answer that can't be read, a
   `401` and no token are checked as the tables take them (the result, why no answer, the answer and
   the error) where Swift checks the disposition too. URLSessionTransportTests' run over
-  MockWebServer and a socket never accepted, with three more: a `PATCH` on the wire, a `408` sent
-  once, and the dots. Tried: each of the transport's settings broken on purpose (redirects
-  followed, OkHttp's resends on, the dots let through, a request's own wait ignored) failed its
-  test, the last after two minutes; then restored. **DeleteUserTests.swift is sign-in's,**
+  MockWebServer and a socket never accepted, with more: a `PATCH` on the wire; a write's `408`, and
+  its `503` saying `Retry-After: 0`, sent once; a read on a closed pooled connection sent again and
+  a write not; OkHttp's call cancelled with its caller; an answer cut off in its body; and the
+  dots. Tried: each of the transport's settings broken on purpose (redirects followed, a body sent
+  twice, recovery off, the cancel dropped, the dots let through, a request's own wait ignored)
+  failed its test, the last after two minutes; then restored. **DeleteUserTests.swift is sign-in's,**
   Cognito's DeleteUser and the sign-in's tokens throughout, so it goes with AN6; its one part of the
   client, `forDeletion`, is APIClientTests' `deletionToken`, ported here. Nothing was added to the
   PC's SDK: its folders were compared before and after.

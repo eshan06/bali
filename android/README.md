@@ -63,10 +63,11 @@ loosen it to pass code.
 
 **The API client** (`core`'s `ApiClient.kt`, BaliCore's `APIClient.swift`) puts each request on the
 wire through `HttpTransport`; the app's is `OkHttpTransport`, OkHttp set up as iOS's URLSession is:
-no cache or cookies, 15 s for each wait and 30 s for a whole exchange, no redirect followed, and
-nothing sent again after a 408 or a dropped connection. Its tests run against MockWebServer on a local port. Gradle picks
-OkHttp's Android build for the app and its JVM build for `core`'s tests. Its calls suspend
-(kotlinx.coroutines), as Swift's are async.
+no cache or cookies, 15 s for each wait and 30 s for a whole exchange, and no redirect followed. A
+request with a body goes once, whatever comes back; a read goes again on a fresh connection when
+its pooled one turns out closed, as URLSession's does. Its tests run against MockWebServer on a
+local port. Gradle picks OkHttp's Android build for the app and its JVM build for `core`'s tests.
+Its calls suspend (kotlinx.coroutines), as Swift's are async.
 
 AN4 picks the outbox's store; Room's JVM build keeps its tests here, on the JVM.
 

@@ -11,15 +11,17 @@ import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.CookieJar
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import okhttp3.MediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.RequestBody
 import okhttp3.Response
+import okio.BufferedSink
 
 /**
  * The app's transport, over OkHttp: BaliCore's `URLSessionTransport`, set up as its `makeSession`
- * sets iOS's ([makeClient]). A 3xx, a 408 or a dropped connection comes back as itself, never
- * followed or sent again by OkHttp, for the outbox to judge.
+ * sets iOS's ([makeClient]). A 3xx comes back as itself, never followed, and a request with a body
+ * goes once ([Once]), whatever comes back, for the outbox to judge.
  */
 class OkHttpTransport internal constructor(private val client: OkHttpClient) : HttpTransport {
     constructor() : this(makeClient())
@@ -55,7 +57,7 @@ class OkHttpTransport internal constructor(private val client: OkHttpClient) : H
         if (url.encodedPath != request.url.rawPath) throw IOException("a path OkHttp would change")
         val built =
             try {
-                Request.Builder().url(url).method(request.method, request.body?.toRequestBody())
+                Request.Builder().url(url).method(request.method, request.body?.let(::Once))
                     .apply { request.headers.forEach { (name, value) -> header(name, value) } }.build()
             } catch (error: IllegalArgumentException) {
                 throw IOException("a request OkHttp can't send")
@@ -71,10 +73,10 @@ class OkHttpTransport internal constructor(private val client: OkHttpClient) : H
         /**
          * No cache and no cookies: nothing about a student is kept, and a read of the truth is never
          * answered from a store. A request's wait for its next byte is bounded, and a whole
-         * exchange. No redirect is followed: one would carry every header, the bearer token
-         * included, to whichever host its `Location` names, and the API never redirects. OkHttp
-         * sends nothing again after a 408 or a dropped connection; only after a 503 saying
-         * `Retry-After: 0`, which the API never sends, or a 421 on a connection two hosts share.
+         * exchange. No redirect is followed: a 307 or 308 would carry a request's body to whichever
+         * host its `Location` names, a 301 or 302 make a POST a GET, and the API never redirects.
+         * OkHttp's recovery stays on for a read, sent again on a fresh connection when its pooled
+         * one turns out closed, as URLSession sends one; a request with a body never ([Once]).
          */
         internal fun makeClient(): OkHttpClient =
             OkHttpClient.Builder()
@@ -84,7 +86,7 @@ class OkHttpTransport internal constructor(private val client: OkHttpClient) : H
                 .callTimeout(EXCHANGE_TIMEOUT.inWholeMilliseconds, MILLISECONDS)
                 .followRedirects(false)
                 .followSslRedirects(false)
-                .retryOnConnectionFailure(false)
+                .retryOnConnectionFailure(true)
                 .build()
 
         /** Each of a request's waits, for a connection, to send and for the next byte, [timeout]. */
@@ -93,4 +95,12 @@ class OkHttpTransport internal constructor(private val client: OkHttpClient) : H
                 .writeTimeout(timeout.inWholeMilliseconds, MILLISECONDS)
                 .readTimeout(timeout.inWholeMilliseconds, MILLISECONDS)
     }
+}
+
+/** A body OkHttp sends at most once (its own switch): never again after a 408, a 503 or a dropped connection. */
+private class Once(private val bytes: ByteArray) : RequestBody() {
+    override fun contentType(): MediaType? = null // The client's own Content-Type header goes.
+    override fun contentLength() = bytes.size.toLong()
+    override fun isOneShot() = true
+    override fun writeTo(sink: BufferedSink) { sink.write(bytes) }
 }

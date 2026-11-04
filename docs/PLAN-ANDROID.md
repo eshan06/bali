@@ -17,8 +17,8 @@ structure", decided at AN1b (2026-11-04).
 _Last updated: 2026-11-04 (Central) — AN3d, the core's client (#492; `docs/DECISIONS.md`,
 2026-11-04): BaliCore's `APIClient.swift` in Kotlin with its tests: every student endpoint, each
 answer returned unjudged and its errors keyed on `reason`, no request sent without a token; its
-calls suspend, over OkHttp set up as iOS's URLSession, following no redirect and resending nothing
-after a 408 or a dropped connection; OkHttp 5.4.0 until compileSdk 37. Before it, AN3c, event ids, tags and config.
+calls suspend, over OkHttp set up as iOS's URLSession, following no redirect and sending a request
+with a body once; OkHttp 5.4.0 until compileSdk 37. Before it, AN3c, event ids, tags and config.
 Next: AN4, the outbox store; Android 17's SDK platform for the owner to OK before the first step
 with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); CodeQL for Android's Kotlin,
 the owner's call (7); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
@@ -132,8 +132,9 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN4** The outbox store (twin: BaliOutbox's `Outbox` and `OutboxRecord`): Room in the app's own
   storage; the records (OutboxTests' `eventIds` is `core`'s already, AN3c's); the unlock contract
   (`contracts/outbox/`; no response ever means delete), with ContractFixtureTests' outbox
-  dispositions, which AN3b left, and APIClientTests', which AN3d left; the outbox's counter and its install id, the phone's order (A12);
-  and Bali's files left out of Android's backup (ARCHITECTURE, "Android app structure")
+  dispositions, which AN3b left, and APIClientTests', which AN3d left; the outbox's counter and its
+  install id, the phone's order (A12); and Bali's files left out of Android's backup (ARCHITECTURE,
+  "Android app structure")
 - **AN5** The sync engine (twin: `SyncEngine`): the drain with backoff and jitter, the 30-second
   check-in while the screen is on (ARCHITECTURE, the battery plan; AN7 drives it from the lock's
   service), and the reconcile (`readMayReconcile` and the typed dispositions), all on a fake clock
