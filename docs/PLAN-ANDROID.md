@@ -14,12 +14,13 @@ structure", proposed until AN1b settles the lock.
   disagrees.
 - **Under 6,000 words.** AN2 puts the cap in CI, as `plan-words.sh` holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-03 (Central) — AN1, part 1 (`docs/DECISIONS.md`, 2026-11-03): the lock
-spike measured both locks on the Android 15, 16 and 17 emulators, its code on `spike/android-lock`
-(never merged). Neither lock holds up alone: (a) covers more but stays off after a force-stop or
-Safe Mode; (b) comes back by itself but misses picture-in-picture and every profile. Next: AN1's
-part 2 on a Pixel and a Samsung, once the owner has them (Open owner items, 1), then AN1b. Not on
-the pilot's critical path._
+_Last updated: 2026-11-03 (Central) — AS0, the Android canvas (`docs/DECISIONS.md`, 2026-11-03):
+every screen group drawn on
+[Bali Android app screens](https://claude.ai/artifact/SZPLe9WcymZJ1Bvrgj5KoE), both locks side by
+side where they differ, the iPhone's words with 30 lines changed, 21 new and 4 gone; DESIGN.md's
+Android section proposed. Before it, AN1's part 1 on the emulators. Next: the owner's look at the
+canvas (Open owner items, 5); AN1's part 2 once the owner has the phones (Open owner items, 1),
+then AN1b. Not on the pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -186,7 +187,11 @@ rules); `docs/DESIGN.md` read first, its Android section from AS0; every user-fa
   system NFC sheet) and the block screen (BaliShield's twin); and `docs/DESIGN.md`'s Android
   section. The owner approves it, and rules whether the approved iOS boards then stand for the rest
   (the owner, 2026-11-02: "now we have the screens and stuff settled") — validation: the canvas
-  opened and every board checked before it's reported
+  opened and every board checked before it's reported. **Drawn, waiting for the owner's approval**
+  (DECISIONS 2026-11-03): [Bali Android app screens](https://claude.ai/artifact/SZPLe9WcymZJ1Bvrgj5KoE),
+  165 boards, every one checked; its Words board lists each changed, new and gone line, and its
+  calls are the owner's (Open owner items, 5). Lock (c), the VPN lock under test, isn't drawn: its
+  test decides whether it needs screens
 - **AS1** 👀 The theme and shared pieces (twin: `Theme.swift`): `bali-tokens.json` in Compose, type
   that follows the font scale, and the hold-to-unlock control (one second, as on iOS)
 - **AS2** 👀 Sign in and sign up: the 13+ check, the intro and Your name (twin: `SignInView`,
@@ -228,6 +233,9 @@ rules); `docs/DESIGN.md` read first, its Android section from AS0; every user-fa
 3. **Timing:** in the Vanderbilt pilot, or after it. Until the owner says, Android has no Go-live
    row and nothing here is on the pilot's critical path.
 4. **After AN1:** which lock, (a) or (b) (AN1b).
+5. **AS0's canvas:** approve it, with the calls on its Words board ("Lock off" for the ruled "Screen
+   Time off", the always-works line, the 21 new lines, the font and the icons), and rule whether
+   the approved iPhone boards then stand for the rest.
 
 ## How to update this file
 

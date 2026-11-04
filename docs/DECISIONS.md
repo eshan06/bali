@@ -8,6 +8,35 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-03** — **AS0, the Android canvas, drawn for the owner's approval (the owner; AS0's
+  worker).** The owner: "Screens first", and "draw them in the claude design system. should be in a
+  different artifact than ios". So the canvas is its own artifact,
+  [Bali Android app screens](https://claude.ai/artifact/SZPLe9WcymZJ1Bvrgj5KoE), made from Claude
+  Design's Design type in the Bali Design System and published to nothing else, no iOS canvas and
+  not the design system: 165 boards, a row per step (AS1–AS8), every one opened and checked.
+  **How it is drawn:** the built iPhone app's words, word for word (its UI and BaliOutbox's words),
+  the built app and the approved canvases (D1, Sign in & sign up, Live lesson) winning over the
+  canvases of 2026-10-06; Material 3's controls carrying the tokens (DESIGN.md's Android section,
+  proposed); Android's own screens drawn as a Pixel shows them; every state, 200% font size on
+  Android 14's curve, and TalkBack. Where the lock changes a screen, its two boards sit side by
+  side, "If lock (a)" and "If lock (b)", as AN1's part 1 measured them: the permission step, Focus
+  and the block screen in split screen and picture-in-picture, (b)'s notification and Stop, the
+  lock-off screen (after a force-stop, (a) back through Settings, (b) by opening Bali), Me's card.
+  Lock (c), the VPN lock under test, isn't drawn: its test decides whether it needs screens.
+  **The words** (the canvas's Words board): 30 lines changed, each because it names what Android
+  lacks: "Calls, texts and emergency calls always work" for "Calls, FaceTime, Messages and Emergency
+  SOS always work"; "the back of your phone" for the top of an iPhone; Screen Time's lines become
+  Bali's lock's ("Lock off", "Lock back on", "Bali's lock is off", "Checking Bali's lock…"), and the
+  Screen Time step's become each lock's permission step. 21 are new: the sheet that holds the phone
+  to the block ("Ready to scan", NFC off), (a)'s disclosure ("What Bali sees", Agree and No thanks)
+  and its description in Settings, (b)'s two switches and its notification, the block screen's
+  Open Bali, the alert's channel ("Class started"). 4 are gone: iOS's failed bell schedule, the
+  older-sign-in stop before Delete account, the step's "Asking…", and iOS's NFC prompt. Nothing new
+  about a student is drawn. **For the owner:** "Lock off" in place of the ruled "Screen Time off"
+  (or the grid's "Protection off"); the always-works line; the 21 new lines; Instrument Sans as drawn
+  or Roboto, and lucide as drawn or Material Symbols; and whether the approved iPhone boards then
+  stand for the rest (PLAN-ANDROID, Open owner items, 5). The privacy policy, drawn in its Custom
+  Tab, still says iPhone: its Android words are the lawyer's, before AP4.
 - **2026-11-03** — **What's left before the Vanderbilt pilot (the owner).** In chat, after a read of
   this plan: "apple said just submit it for review. they dont know until we do that. we dont need hte
   prod backups, lawyer terms for this audit", then "we need to do all the remaining phone tests from
