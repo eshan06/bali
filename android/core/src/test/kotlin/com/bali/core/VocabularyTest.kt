@@ -39,8 +39,7 @@ object Shared {
 
 /**
  * Each vocabulary against the `@bali/shared` list it mirrors, read from the TypeScript itself: a
- * value added there fails here until `core` has it too, even one no fixture carries yet. AN3b
- * adds the lists of `api.ts` that each response type keeps for its own outcomes.
+ * value added there fails here until `core` has it too, even one no fixture carries yet.
  */
 class VocabularyTest {
     /** Each vocabulary: the file its list is in, the list, and `core`'s values for it. */
@@ -58,7 +57,22 @@ class VocabularyTest {
             Triple("outbox-contract.ts", "TAP_OUTCOMES", TapOutcome.entries),
             Triple("outbox-contract.ts", "STATE_CHANGE_OUTCOMES", StateChangeOutcome.entries),
             Triple("unlock-contract.ts", "UNLOCK_RECORDED_OUTCOMES", UnlockOutcome.entries),
+            // Each response's own: a value one gains fails here even with no fixture carrying it;
+            // `removed_from_class` is a teacher's answer, never in a student fixture.
+            Triple("api.ts", "UPDATE_ME_OUTCOMES", UpdateMeResponse.Outcome.entries),
+            Triple("api.ts", "DELETE_ME_OUTCOMES", DeleteMeResponse.Outcome.entries),
             Triple("api.ts", "PUSH_ENVIRONMENTS", PushEnvironment.entries),
+            Triple("api.ts", "REGISTER_PUSH_TOKEN_OUTCOMES", RegisterPushTokenResponse.Outcome.entries),
+            Triple("api.ts", "REMOVE_PUSH_TOKEN_OUTCOMES", RemovePushTokenResponse.Outcome.entries),
+            Triple("api.ts", "CHECK_IN_STATUSES", CheckInResponse.Status.entries),
+            Triple("api.ts", "REFOCUS_OUTCOMES", RefocusResponse.Outcome.entries),
+            Triple("api.ts", "UNLOCK_REASON_OUTCOMES", UnlockReasonResponse.Outcome.entries),
+            Triple("api.ts", "PROTECTION_OFF_OUTCOMES", ProtectionOffResponse.Outcome.entries),
+            Triple("api.ts", "PROTECTION_ON_OUTCOMES", ProtectionOnResponse.Outcome.entries),
+            Triple("api.ts", "ENROLLMENT_JOIN_OUTCOMES", EnrollmentJoinResponse.Outcome.entries),
+            Triple("api.ts", "END_ENROLLMENT_OUTCOMES", EndEnrollmentResponse.Outcome.entries),
+            Triple("api.ts", "END_ENROLLMENT_REASONS", EndEnrollmentResponse.Reason.entries),
+            Triple("api.ts", "ANSWER_OUTCOMES", AnswerResponse.Outcome.entries),
         )
 
     @Test

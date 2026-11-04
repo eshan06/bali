@@ -14,14 +14,14 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-04 (Central) — AN3a, the core's vocabulary and JSON coding (#489;
-`docs/DECISIONS.md`, 2026-11-04): `@bali/shared`'s lists in Kotlin, a value `core` doesn't know
-read as unknown, and a test that reads the TypeScript lists in place; kotlinx.serialization for
-every body; and `core`'s and `outbox`'s classes held to Android 10's API in `android.yml`. AN3 is
-three PRs now, AN3a to AN3c. Before it, AN2, the project and CI. Next: AN3b, the wire types; Android
-17's SDK platform for the owner to OK before the first step with today's AndroidX (Open owner items,
-6); CodeQL for Android's Kotlin, the owner's call (7); AN1's part 2 once the owner has the phones.
-Not on the pilot's critical path._
+_Last updated: 2026-11-04 (Central) — AN3b, the core's wire types (#490; `docs/DECISIONS.md`,
+2026-11-04): BaliCore's `API.swift` in Kotlin, each answer's vocabulary read through `OrUnknown` and
+its own outcomes held to `api.ts`'s lists; and every `contracts/fixtures/` file decoded strictly,
+read back whole, its nulls probed and its request sent as the API reads it, so a new fixture fails
+until `core` reads it. Before it, AN3a, the vocabulary and JSON coding. Next: AN3c, the core's
+client; Android 17's SDK platform for the owner to OK before the first step with today's AndroidX
+(Open owner items, 6); CodeQL for Android's Kotlin, the owner's call (7); AN1's part 2 once the
+owner has the phones. Not on the pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -126,19 +126,16 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN2** The project and CI — ✅ (#488; DECISIONS 2026-11-04)
 - **AN3a** The core's vocabulary and JSON coding, and Android 10's API check — ✅ (#489; DECISIONS
   2026-11-04)
-- **AN3b** The core's wire types (twin: BaliCore's `API.swift`): the wire types, each answer's
-  vocabulary read through `OrUnknown` (AN3a), and `api.ts`'s lists of each response's own outcomes
-  added to the vocabulary test, with CodingTests' cases for them. Every `contracts/fixtures/` file
-  is decoded in a test, as BaliCore's Linux job decodes them, so a new fixture fails until `core`
-  reads it (ContractFixtureTests' port, without the outbox dispositions, which are AN4's)
+- **AN3b** The core's wire types — ✅ (#490; DECISIONS 2026-11-04)
 - **AN3c** The core's client (twin: BaliCore's `EventID.swift`, `APIClient.swift`, `BlockTag.swift`
   and `AppConfig.swift`): UUIDv7 event ids, the API client and its errors (keyed on `reason`, never
   the message), `BlockTag` (an NDEF Text record, or a URI record, `bali://t/<code>` or
   `https://<host>/t/<code>`), and `AppConfig`
 - **AN4** The outbox store (twin: BaliOutbox's `Outbox` and `OutboxRecord`): Room in the app's own
-  storage; the records; the unlock contract (`contracts/outbox/`; no response ever means delete);
-  the outbox's counter and its install id, the phone's order (A12); and Bali's files left out of
-  Android's backup (ARCHITECTURE, "Android app structure")
+  storage; the records; the unlock contract (`contracts/outbox/`; no response ever means delete),
+  with ContractFixtureTests' outbox dispositions, which AN3b left; the outbox's counter and its
+  install id, the phone's order (A12); and Bali's files left out of Android's backup (ARCHITECTURE,
+  "Android app structure")
 - **AN5** The sync engine (twin: `SyncEngine`): the drain with backoff and jitter, the 30-second
   check-in while the screen is on (ARCHITECTURE, the battery plan; AN7 drives it from the lock's
   service), and the reconcile (`readMayReconcile` and the typed dispositions), all on a fake clock

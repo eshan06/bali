@@ -8,6 +8,43 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-04** — **AN3b, the core's wire types, and every fixture decoded (the conductor's
+  calls, awaiting the owner's look; AN3b, #490).** The owner was asleep and asked for the
+  recommended option on every question, so each call here is the conductor's, for the owner to
+  look at.
+
+  **The types:** `core`'s `Api.kt`, BaliCore's `API.swift` field for field: every student
+  endpoint's request and answer, each answer's vocabulary read through `OrUnknown`, and the
+  outcomes each answer keeps for itself (`api.ts`'s thirteen lists, `UPDATE_ME_OUTCOMES` to
+  `ANSWER_OUTCOMES`) as enums nested in it, as Swift nests them, read through `OrUnknown` only. The
+  vocabulary test holds each to its list: `'paused'` added to `CHECK_IN_STATUSES` and
+  `'graduated'` to `END_ENROLLMENT_REASONS` failed it, naming both lists; then reverted.
+  - **A class's field is `schoolClass`,** `@SerialName("class")`: `class` is Kotlin's keyword, and
+    a property named `` `class` `` would clash with the JVM's `getClass()`.
+  - **An order's `seq` is a `Long`:** Swift's `Int` is 64 bits, and the API takes any positive
+    safe integer, past a Kotlin `Int`. A page or an option stays an `Int`.
+  - **Every time in the file is contextual** (`@file:UseContextualSerialization(Instant::class)`):
+    the same `WireTime` as AN3a's `@Contextual`, without a mark on each field.
+  - **An answer's fields have no defaults:** one left out reads as none by `BaliJson`'s
+    `explicitNulls = false`, as Swift's decoding reads it. A request's `order` and an unlock's
+    `reason` default to none, as Swift's initializers do, and so does `MeResponse.armed`.
+    `Presentation` and its question are plain values, changed through `copy`: Swift's
+    `internal(set) var` is for the live lesson, AN13's.
+
+  **The contract test,** ContractFixtureTests.swift's port without its outbox dispositions, which
+  AN4 adds (`docs/PLAN-ANDROID.md`): the response and request type maps; each fixture's answer
+  decoded strictly and encoded back, equal with its nulls dropped; the null-field probe, each null
+  swapped for `["probe"]`, which `core` reads only if the decode then fails at that field or the
+  probe comes back; each request read and sent back exactly; and the walk, which finds a fixture of
+  every type and request the maps hold and none they don't. kotlin.test has no parameterized tests,
+  so one test reads every fixture and lists each one's problems with its path. Where a decode
+  failed, Swift's `DecodingError` path, is read from kotlinx's message (`at path:
+  $.events[0].session`), and a test pins that wording, so a release that changes it fails by name.
+  Tried: five fixtures added locally, then removed, each failing with its own line: an answer's
+  field `core` doesn't read, a tap outcome it doesn't know, an unlock reason it doesn't know inside
+  a history's list, a null field it never reads beside a request field it doesn't send, and a type
+  it has none for, which the walk caught too.
+
 - **2026-11-04** — **AN3a, the core's vocabulary and JSON coding, and Android 10's API check:
   kotlinx.serialization, and animal-sniffer with gummy-bears (the conductor's calls, awaiting the
   owner's look; AN3a, #489).** The owner was asleep and asked for the recommended option on every
