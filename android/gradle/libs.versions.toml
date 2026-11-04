@@ -3,6 +3,8 @@
 agp = "9.5.0"
 kotlin = "2.4.21"
 kotlinx-serialization = "1.12.0"
+kotlinx-coroutines = "1.11.0"
+okhttp = "5.4.0"
 animalsniffer = "2.0.1"
 gummy-bears = "0.16.0"
 
@@ -11,6 +13,12 @@ gummy-bears = "0.16.0"
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 # The JSON coding of every body (core's Json.kt); its compiler plugin is Kotlin's own.
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
+# Swift's async: the API client's calls suspend, and wait on OkHttp's call, cancellable.
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
+# The API client's transport (core's OkHttpTransport.kt); 5.5's Android build needs compileSdk 37 (README.md).
+okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
+# A local HTTP server, for the transport's tests.
+mockwebserver = { module = "com.squareup.okhttp3:mockwebserver3", version.ref = "okhttp" }
 # Android 10's API (minSdk 29) as animal-sniffer signatures, with the calls D8 rewrites for it.
 gummy-bears-api29 = { module = "com.toasttab.android:gummy-bears-api-29", version.ref = "gummy-bears" }
 

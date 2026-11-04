@@ -10,6 +10,16 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN3d's on 2026-11-04: _Last updated: 2026-11-04 (Central) —
+AN3c, the core's event ids, NFC tag reading and app config (#491; `docs/DECISIONS.md`, 2026-11-04):
+BaliCore's `EventID.swift`, `BlockTag.swift` and `AppConfig.swift` in Kotlin with their tests:
+UUIDv7 ids; a block's code read from NDEF records given as plain bytes, trimmed of the space
+Foundation trims; and the build's config read, its app side left to AN6. AN3c is two PRs now, AN3c
+and AN3d. Before it, AN3b, the wire types. Next: AN3d, the core's client; Android 17's SDK platform
+for the owner to OK before the first step with today's AndroidX (Open owner items, 6); CodeQL for
+Android's Kotlin, the owner's call (7); AN1's part 2 once the owner has the phones. Not on the
+pilot's critical path._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN3c's on 2026-11-04: _Last updated: 2026-11-04 (Central) —
 AN3b, the core's wire types (#490; `docs/DECISIONS.md`, 2026-11-04): BaliCore's `API.swift` in
 Kotlin, each answer's vocabulary read through `OrUnknown` and its own outcomes held to `api.ts`'s
@@ -2023,6 +2033,11 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN3d's line, as it read until it was done (2026-11-04; `docs/DECISIONS.md`, 2026-11-04):
+
+- **AN3d** The core's client (twin: BaliCore's `APIClient.swift`): the API client and its errors
+  (keyed on `reason`, never the message)
 
 AN3c's line, as it read until it was done (2026-11-04; `docs/DECISIONS.md`, 2026-11-04). The
 conductor split AN3c's line into AN3c and AN3d that day, every word of it kept in one of them:

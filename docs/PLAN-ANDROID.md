@@ -14,14 +14,14 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-04 (Central) — AN3c, the core's event ids, NFC tag reading and app config
-(#491; `docs/DECISIONS.md`, 2026-11-04): BaliCore's `EventID.swift`, `BlockTag.swift` and
-`AppConfig.swift` in Kotlin with their tests: UUIDv7 ids; a block's code read from NDEF records
-given as plain bytes, trimmed of the space Foundation trims; and the build's config read, its app
-side left to AN6. AN3c is two PRs now, AN3c and AN3d. Before it, AN3b, the wire types. Next: AN3d,
-the core's client; Android 17's SDK platform for the owner to OK before the first step with today's
-AndroidX (Open owner items, 6); CodeQL for Android's Kotlin, the owner's call (7); AN1's part 2 once
-the owner has the phones. Not on the pilot's critical path._
+_Last updated: 2026-11-04 (Central) — AN3d, the core's client (#492; `docs/DECISIONS.md`,
+2026-11-04): BaliCore's `APIClient.swift` in Kotlin with its tests: every student endpoint, each
+answer returned unjudged and its errors keyed on `reason`, no request sent without a token; its
+calls suspend, over OkHttp set up as iOS's URLSession, following no redirect and sending a request
+with a body once; OkHttp 5.4.0 until compileSdk 37. Before it, AN3c, event ids, tags and config.
+Next: AN4, the outbox store; Android 17's SDK platform for the owner to OK before the first step
+with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); CodeQL for Android's Kotlin,
+the owner's call (7); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -128,13 +128,13 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
   2026-11-04)
 - **AN3b** The core's wire types — ✅ (#490; DECISIONS 2026-11-04)
 - **AN3c** The core's event ids, NFC tag reading and app config — ✅ (#491; DECISIONS 2026-11-04)
-- **AN3d** The core's client (twin: BaliCore's `APIClient.swift`): the API client and its errors
-  (keyed on `reason`, never the message)
+- **AN3d** The core's client — ✅ (#492; DECISIONS 2026-11-04)
 - **AN4** The outbox store (twin: BaliOutbox's `Outbox` and `OutboxRecord`): Room in the app's own
   storage; the records (OutboxTests' `eventIds` is `core`'s already, AN3c's); the unlock contract
   (`contracts/outbox/`; no response ever means delete), with ContractFixtureTests' outbox
-  dispositions, which AN3b left; the outbox's counter and its install id, the phone's order (A12);
-  and Bali's files left out of Android's backup (ARCHITECTURE, "Android app structure")
+  dispositions, which AN3b left, and APIClientTests', which AN3d left; the outbox's counter and its
+  install id, the phone's order (A12); and Bali's files left out of Android's backup (ARCHITECTURE,
+  "Android app structure")
 - **AN5** The sync engine (twin: `SyncEngine`): the drain with backoff and jitter, the 30-second
   check-in while the screen is on (ARCHITECTURE, the battery plan; AN7 drives it from the lock's
   service), and the reconcile (`readMayReconcile` and the typed dispositions), all on a fake clock
@@ -246,8 +246,9 @@ rules); `docs/DESIGN.md` read first, its Android section from AS0; every user-fa
    2026-11-04).
 6. **The SDK, for what comes next:** Android 17's platform (`platforms;android-37.0`, 64 MB, from
    Google's SDK repository) on the PC before the first step with today's AndroidX, which needs
-   compileSdk 37 (androidx.core 1.19, Compose 1.12; DECISIONS 2026-11-04); and Android 10 and 12 or
-   13 to test on, as emulator images (each a download) or phones, for ISSUES #6's gap 10.
+   compileSdk 37 (androidx.core 1.19, Compose 1.12; DECISIONS 2026-11-04), as OkHttp 5.5 does, so
+   `core` stays on 5.4.0 until then (AN3d); and Android 10 and 12 or 13 to test on, as emulator
+   images (each a download) or phones, for ISSUES #6's gap 10.
 7. **CodeQL and Android's Kotlin:** CodeQL doesn't scan Android's Kotlin; scanning it needs CodeQL's
    advanced setup (default setup switched off by the owner, and a workflow that builds `android/`),
    the owner's call (DECISIONS 2026-11-04).
