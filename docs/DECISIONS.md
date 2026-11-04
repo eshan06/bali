@@ -46,7 +46,13 @@ a real decision? Add a dated entry at the top: what was decided and why.
   newest, which `v4` names today); `security-events: write` on the job alone, for the upload,
   `contents: read` otherwise; `pull_request`, never `pull_request_target`, and no secret; and a
   checkout that keeps no token (`persist-credentials: false`, as `migration-guard.yml`'s), since the
-  Kotlin build runs the PR's own Gradle code.
+  Kotlin build runs the PR's own Gradle code. Said plainly: that build still runs in the job whose
+  token can write to code scanning, as in GitHub's own setup, so code in it (a PR's build script,
+  or a plugin or library its dependencies bring) could read the token from the runner's memory and
+  dismiss or overwrite alerts while the job runs (santa's review). A fork's PR gets a read-only
+  token, and whoever can push a branch here can dismiss alerts anyway. Closing it would take the
+  upload into a job of its own that runs no PR code; this step keeps GitHub's standard, for the
+  owner to weigh.
 
   **The switch is the owner's.** While default setup is on, GitHub refuses an advanced setup's
   uploads. So the workflow was proven first with `upload: never`, every language green and its
