@@ -11,26 +11,32 @@ import androidx.sqlite.SQLiteStatement
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import com.bali.core.EventId
 import com.bali.core.ParticipationState
+import com.bali.core.TapDisposition
+import com.bali.core.UnlockDisposition
 import com.bali.core.UnlockReason
 import java.time.Duration
 import java.time.Instant
 import java.time.format.DateTimeParseException
+import kotlin.math.roundToLong
+import kotlin.random.Random
 
 /**
  * The phone's outbox, BaliOutbox's `Outbox`: each tap, Emergency Unlock, refocus and protection-off
  * report it acted on, kept until an answer lets it go. Its file is Room's, in the app's own storage,
  * which only Bali opens, so it needs none of the app group's coordination iOS's file has (one app,
- * no extensions: ARCHITECTURE, "Android app structure", decision 3). Here are the rules that record
- * what the phone did (AN4d); those that send it and settle its answers are AN4e's.
+ * no extensions: ARCHITECTURE, "Android app structure", decision 3). `core`'s tables say what an
+ * answer means; this applies them, with the rules no table can express: those that record what the
+ * phone did (AN4d), and those that send it (AN4e). The sync engine (AN5) sends [nextDue]'s record
+ * ([OutboxRecord.send]) and hands its answer to [settle], each with its `now`.
  *
  * Each write is one transaction, all or nothing, and reaches the disk before it returns: Room keeps
  * the file in WAL at `synchronous = NORMAL`, under which the phone losing power in the seconds after
  * a write can undo it, so every write sets FULL first (`docs/DECISIONS.md`, 2026-11-04, AN4d): an
  * Emergency Unlock's record is never discarded. Unlike iOS's, a write is cancelled with its caller:
  * undone before it commits, or, after, kept with the caller hearing only the cancel; so the sync
- * engine (AN5) writes where no screen can cancel it.
+ * engine (AN5) writes where no screen can cancel it. [random], from 0 to 1, is the jitter's.
  */
-class Outbox private constructor(internal val file: OutboxDatabase) : AutoCloseable {
+class Outbox private constructor(internal val file: OutboxDatabase, private val random: () -> Double) : AutoCloseable {
     internal val dao = file.dao()
     private val times = Times()
 
@@ -230,6 +236,160 @@ class Outbox private constructor(internal val file: OutboxDatabase) : AutoClosea
         return filed
     }
 
+    /** What [nextDue] finds to do: send a record now, wait, or nothing. */
+    sealed interface Due {
+        data class Send(val record: OutboxRecord) : Due
+
+        /** Nothing is due before [until]. */
+        data class Wait(val until: Instant) : Due
+
+        /** Nothing is queued that can go: an unlock not filed yet goes nowhere (B6b). */
+        data object Idle : Due
+    }
+
+    /**
+     * The next record to send, in the order the phone acted. A pending (not stuck) record holds every
+     * record behind it, backoff included; a stuck one holds nothing, retried on its own backoff among
+     * them. A refocus waits for the unlock it returns from to be recorded, stuck or not: landing after
+     * it, that unlock would leave the server's truth `unlocked`. An unlock not filed yet goes nowhere,
+     * and holds nothing (B6b).
+     */
+    suspend fun nextDue(now: Instant): Due {
+        val records = records()
+        val queued = records.mapTo(HashSet()) { it.eventId }
+        var wake: Instant? = null
+        for (record in records) {
+            if (record.follows in queued || record.change.isUnfiled) continue
+            if (record.nextAttemptAt <= now) return Due.Send(record)
+            wake = minOf(wake ?: record.nextAttemptAt, record.nextAttemptAt)
+            if (!record.stuck) break
+        }
+        return wake?.let(Due::Wait) ?: Due.Idle
+    }
+
+    /**
+     * Applies one send's answer, [sent], which only the record's own send makes, so its own kind's table
+     * has decided it, and returns the disposition; none once the record is gone, superseded in flight,
+     * so its answer is older than the phone's truth. An ending disposition deletes it; any other keeps
+     * it, due after [backoff], with its answer for a screen: stuck at a refusal, or at [BOUND] answers
+     * that left it unsettled (any status but 401, 408 and 429, none of them this record's). Stuck stays
+     * stuck, and never deletes: an unlock leaves only once recorded. A tap's session is handed to the
+     * unlocks filed under it, to guard (decision 11), and a tap that joins no class, armed or refused,
+     * has them filed again where the phone stood, as has an unlock under a tap kept with no session
+     * ([refile], B6d). A send cancelled with its caller makes no [Sent] (AN4b): its record stays as it
+     * was, for the sync engine (AN5) to send again.
+     */
+    suspend fun settle(sent: Sent, now: Instant): Disposition? =
+        write { db ->
+            val record = dao.record(sent.eventId)?.record() ?: return@write null
+            val disposition = sent.disposition
+            if (disposition == Disposition.Tap(TapDisposition.WaitForStart) ||
+                disposition == Disposition.Tap(TapDisposition.RetryAndSurface)
+            ) {
+                db.refile("tapId = ?", sent.eventId, now)
+            } else if (disposition == Disposition.Unlock(UnlockDisposition.Recorded) && sent.session == null) {
+                // Kept with no session, its tap not answered: stuck at the bound, not arrived.
+                db.refile("eventId = ? AND tapId IN (SELECT eventId FROM outbox WHERE kind = 'tap')", sent.eventId, now)
+            }
+            if (!disposition.keeps) {
+                val session = sent.session
+                if (disposition == Disposition.Tap(TapDisposition.ApplySession) && session != null) {
+                    db.step("UPDATE outbox SET sessionId = ? WHERE tapId = ?", session.id, sent.eventId)
+                }
+                db.step("DELETE FROM outbox WHERE eventId = ?", sent.eventId)
+                return@write disposition
+            }
+            val answered = sent.status?.let { it !in listOf(401, 408, 429) } ?: false
+            val attempts = record.attempts + 1
+            val answers = record.answers + if (answered) 1 else 0
+            db.step(
+                "UPDATE outbox SET attempts = ?, answers = ?, stuck = ?, nextAttemptAt = ?, lastStatus = ?, " +
+                    "lastReason = ?, lastMessage = ?, refusedStatus = COALESCE(?, refusedStatus) WHERE eventId = ?",
+                attempts, answers, record.stuck || disposition.refused || answers >= BOUND,
+                times.text(now + backoff(attempts)), sent.status, sent.error?.error?.reason?.wire,
+                sent.error?.error?.message, sent.status.takeIf { disposition.refused }, sent.eventId,
+            )
+            disposition
+        }
+
+    /**
+     * The owner's ruling (2026-09-25, B6d): an Emergency Unlock filed under a tap that joins no class,
+     * each unlock under [condition] still holding the session the phone stood in when it was made, is
+     * filed again in that session: a session unlock of its own, with the press's reason, time and order,
+     * so the server places it against whatever the phone did since (A12, A13). Once: the press gives
+     * its session up to it, in the same write, and a refocus there returns from it, the unlock of its
+     * session, now.
+     */
+    private suspend fun PooledConnection.refile(condition: String, id: String, now: Instant) {
+        val presses =
+            texts(
+                "SELECT eventId FROM outbox WHERE kind = 'unlock' AND tapId IS NOT NULL AND sessionId IS NOT NULL " +
+                    "AND $condition",
+                id,
+            )
+        for (pressId in presses) {
+            val press = checkNotNull(dao.record(pressId)).row
+            val followUp = EventId.mint(now)
+            dao.insert(
+                OutboxRow(
+                    eventId = followUp, kind = "unlock", sessionId = press.sessionId, reason = press.reason,
+                    recordedAt = press.recordedAt, nextAttemptAt = now, orderSeq = press.seq,
+                ),
+            )
+            step("UPDATE outbox SET sessionId = NULL WHERE eventId = ?", pressId)
+            step("UPDATE outbox SET follows = ? WHERE follows = ?", followUp, pressId)
+            if (value(Key.LastUnlock) == pressId) setValue(Key.LastUnlock, followUp)
+        }
+    }
+
+    /**
+     * Every queued record due now, its backoff cut short: the student's retry (rule 5), or a fresh token
+     * after a reauth. It changes nothing else: stuck stays stuck, and the order holds.
+     */
+    suspend fun retryNow(now: Instant) {
+        write { it.step("UPDATE outbox SET nextAttemptAt = ? WHERE nextAttemptAt > ?", times.text(now), times.text(now)) }
+    }
+
+    /**
+     * The wait after a record's [attempt]-th unsettled send: 2 s, 4 s, 8 s… up to [BACKOFF_CAP], plus
+     * up to as much again at random, so a school's phones never retry in unison. A random value outside
+     * 0 to 1 is held to it: never less than the wait, never more than twice it.
+     */
+    internal fun backoff(attempt: Int): Duration {
+        val wait = minOf(1L shl attempt.coerceIn(1, 6), BACKOFF_CAP.seconds)
+        val jitter = random().let { if (it in 0.0..1.0) it else if (it > 1) 1.0 else 0.0 }
+        return Duration.ofSeconds(wait).plusNanos((wait * jitter * 1e9).roundToLong())
+    }
+
+    /**
+     * How many changes await their answer, as `ReconcileStamp` counts one, any disposition but retry or
+     * reauth, for its `awaiting`: every record not stuck, but a refocus waiting on a stuck unlock (the
+     * server has seen neither), and an unlock not filed yet, which no answer reaches before a read says
+     * where it goes (B6b). A stuck record stops holding reads; an unrecorded unlock still guards its
+     * session ([holdsUnlock]).
+     */
+    suspend fun awaiting(): Int {
+        val records = records()
+        val stuck = records.filter { it.stuck }.mapTo(HashSet()) { it.eventId }
+        return records.count { !it.stuck && !it.change.isUnfiled && it.follows !in stuck }
+    }
+
+    /**
+     * Whether an unrecorded unlock of [session], made after the record at [after] (its seq, A12), is
+     * queued, or one under a tap still queued, or one not filed yet (B6b), its session unnamed: it may
+     * be any. While one is, neither a read nor an older tap's answer puts that session's lock back on.
+     * An unlock under a tap is of the session its tap's answer names, else of the one the phone stood
+     * in (#94's review). A follow-up stands where its press does (B6d).
+     */
+    suspend fun holdsUnlock(session: String, after: Long = 0): Boolean =
+        read {
+            it.step(
+                "SELECT 1 FROM outbox WHERE kind = 'unlock' AND COALESCE(orderSeq, seq) > ? AND (sessionId = ? " +
+                    "OR tapId IN (SELECT eventId FROM outbox WHERE kind = 'tap') OR sessionId IS NULL AND tapId IS NULL)",
+                after, session,
+            )
+        }
+
     /**
      * `PRAGMA synchronous` on the connection the file's writes go through: FULL (2) once one has, as
      * each sets it first, where Room opens every connection at NORMAL (1). The app's instrumented test
@@ -281,13 +441,20 @@ class Outbox private constructor(internal val file: OutboxDatabase) : AutoClosea
     }
 
     companion object {
+        /** How many server answers may leave a record unsettled before it is stuck. */
+        const val BOUND = 8
+
+        /** The longest backoff, before its jitter. */
+        val BACKOFF_CAP: Duration = Duration.ofSeconds(60)
+
         /**
          * The outbox in the file [builder] names, made at its first open, on the SQLite Room bundles,
-         * the same on the JVM's tests and on the phone. A file a newer build made is refused, never
-         * read through a schema this one doesn't know, nor wiped: Room has no migration down.
+         * the same on the JVM's tests and on the phone; [random], from 0 to 1, is the jitter's, which
+         * the tests choose. A file a newer build made is refused, never read through a schema this
+         * one doesn't know, nor wiped: Room has no migration down.
          */
-        fun open(builder: RoomDatabase.Builder<OutboxDatabase>): Outbox =
-            Outbox(builder.setDriver(BundledSQLiteDriver()).addCallback(Created).build())
+        fun open(builder: RoomDatabase.Builder<OutboxDatabase>, random: () -> Double = { Random.nextDouble() }): Outbox =
+            Outbox(builder.setDriver(BundledSQLiteDriver()).addCallback(Created).build(), random)
     }
 }
 
@@ -308,12 +475,36 @@ private suspend fun PooledConnection.setValue(key: Outbox.Key, value: String?) {
     }
 }
 
-/** Runs [sql] with [args] bound in turn, text or none, and steps it once: whether that gave a row. */
-private suspend fun PooledConnection.step(sql: String, vararg args: String?): Boolean = usePrepared(sql) { it.bind(args).step() }
+/** Runs [sql] with [args] bound in turn, and steps it once: whether that gave a row. */
+private suspend fun PooledConnection.step(sql: String, vararg args: Any?): Boolean = usePrepared(sql) { it.bind(args).step() }
 
 /** The text [sql] reads first, with [args] bound in turn; none for no row, or none there. */
-private suspend fun PooledConnection.text(sql: String, vararg args: String?): String? =
+private suspend fun PooledConnection.text(sql: String, vararg args: Any?): String? =
     usePrepared(sql) { it.bind(args).takeIf { read -> read.step() && !read.isNull(0) }?.getText(0) }
 
-private fun SQLiteStatement.bind(args: Array<out String?>) =
-    apply { args.forEachIndexed { index, arg -> if (arg == null) bindNull(index + 1) else bindText(index + 1, arg) } }
+/** The text of the first column of every row [sql] reads, with [args] bound in turn. */
+private suspend fun PooledConnection.texts(sql: String, vararg args: Any?): List<String> =
+    usePrepared(sql) { rows ->
+        rows.bind(args)
+        buildList { while (rows.step()) add(rows.getText(0)) }
+    }
+
+/**
+ * Binds [args] in turn: text as text, a number or a truth as an integer, as GRDB binds Swift's, or
+ * none. Never a number as text: `COALESCE(orderSeq, seq) > '5'`, an expression of no affinity against
+ * text, is false for every integer.
+ */
+private fun SQLiteStatement.bind(args: Array<out Any?>) =
+    apply {
+        args.forEachIndexed { at, arg ->
+            val index = at + 1
+            when (arg) {
+                null -> bindNull(index)
+                is String -> bindText(index, arg)
+                is Long -> bindLong(index, arg)
+                is Int -> bindLong(index, arg.toLong())
+                is Boolean -> bindLong(index, if (arg) 1L else 0L)
+                else -> throw IllegalArgumentException("No SQL value for a ${arg::class.simpleName}")
+            }
+        }
+    }

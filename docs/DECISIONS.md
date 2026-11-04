@@ -8,6 +8,79 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-04** — **AN4e, the outbox's sending: BaliOutbox's `Outbox` in Kotlin, its sending side
+  (the conductor's calls, awaiting the owner's look; AN4e, #497).** The owner was asleep and asked
+  for the recommended option on every question, so each call here is the conductor's, for the owner
+  to look at.
+
+  **Where it lives:** `outbox`'s `Outbox.kt`, beside AN4d's recording: `Due` and `nextDue`, `settle`,
+  `refile`, `retryNow`, the backoff, its jitter and the bound (`BOUND`, 8; `BACKOFF_CAP`, a minute),
+  `awaiting` and `holdsUnlock`, the Swift's rules and SQL run on Room's connection, every write
+  through AN4d's path at `synchronous = FULL`. What is public is what is public on iOS; `backoff` is
+  internal, as Swift's is. Where Kotlin differs, said plainly:
+  - **The jitter's source is `Outbox.open`'s `random`,** from 0 to 1, which the tests choose, as
+    iOS's `init(at:random:)` takes one. The app's is Kotlin's `Random`, not a secure generator: a
+    retry's spread hides nothing (iOS's default draws from the system's generator, which is). A
+    value outside 0 to 1 is held to it, as on iOS: never less than the wait, never more than twice.
+  - **A backoff is a `java.time.Duration`,** Swift's `TimeInterval`, to the nanosecond; the file
+    keeps the time it ends to the millisecond, as it keeps every time (AN4c).
+  - **`holdsUnlock`'s `after` is a `Long`,** A12's seq, where Swift's is an `Int` of 64 bits.
+  - **`refile` reads each press and inserts its follow-up through Room's generated code,** where
+    iOS's SQL reads and inserts them, as AN4d's `record` inserts; the follow-up's columns are iOS's:
+    its own id, the press's session, reason, time and order, due at once.
+  - **`settle` takes only a `Sent`,** which a record's own send alone makes (AN4b): a send cancelled
+    with its caller makes none and leaves its record as it was, its attempt uncounted, where iOS
+    settles it as no answer. The drain's handling of it is AN5's, on its line.
+
+  **Found: a number bound as text broke `holdsUnlock`.** AN4d's statements bound every value as
+  text, which none of its SQL minded. `holdsUnlock` compares `COALESCE(orderSeq, seq) > ?`, an
+  expression with no type affinity, against the bound value, so SQLite converts neither, and it ranks
+  every text above every number: bound as text, the seq made the comparison false for every unlock,
+  and no unlock guarded its session (tried: five tests failed). The store binds a number or a truth
+  as an integer now, as GRDB binds Swift's, and text as text.
+
+  **The tests,** every one AN4e's line lists, ported from iOS: SchemaTests' `reopens` (its records
+  sent, protection off reported once) and `migratesEmpty`'s `nextDue` and `awaiting`;
+  ActionOrderTests' `seqs`; SettleTests through the store (every case of the TypeScript's three
+  tables, over 900 sends a kind, each record going exactly when its disposition ends it; each fixture's
+  answer kept; the backoff, the jitter, a 401, 408, 429 or no answer never counted, the bound, and a
+  refusal stuck at once); RecordTests' `supersedes`, its in-flight refocus's answer coming back to
+  nothing; OrderTests', AwaitingTests' and UnlockSafetyTests' suites, the random walk seeded by
+  Kotlin's `Random` (12 seeds of 120 steps); UnlockRouteTests' `settleNamesTheSession`; RefiledTests'
+  `once`, `refusedThenLanded` and `keptBeforeItsScan`; and ReasonTests' `refiledReason`, held iOS's
+  15 s. New, for each rule no iOS test reaches through the outbox: an unlock not filed yet going
+  nowhere, holding nothing behind it, awaiting nothing and guarding every session until it is filed
+  (UnreadUnlockTests reach these through the engine); the wait for the soonest record that could go;
+  `retryNow` (every record due now, one due already left be, stuck staying stuck, the order holding);
+  a refusal's status kept on its record whatever answers come after (the riders); a follow-up
+  guarding its session from its press's place in the order, never its own; and the durability tests:
+  `settle` and `retryNow` in AN4d's list of writes, and the level each one's UPDATE ran at, read
+  inside it by a trigger. Tried, each failing by name, then reverted: numbers bound as text; a
+  pending record not holding those behind it; a refocus not waiting on its unlock; an unlock not
+  filed yet sent; the wait the first record's, not the soonest; a 401 counted toward the bound; the
+  bound at the ninth answer; stuck not staying stuck; the jitter not held to 0 to 1; the cap at 64 s;
+  a refusal's status overwritten; a gone record's answer settled; a kept answer's reason and message
+  dropped; a tap's session not handed to the unlocks under it; the press keeping its session, its
+  order, its refocus or its place as the latest unlock; no refile for an unlock kept with no session;
+  `retryNow` moving a record due already; `holdsUnlock` by a follow-up's own seq; `awaiting` counting
+  a refocus behind a stuck unlock, or an unlock not filed yet; and `settle` or `retryNow` writing
+  without FULL. Nothing was added to the PC's SDK: its folders were compared before and after.
+
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini
+  CLI on this PC, so context isolation holds and model diversity doesn't): 0 blockers. Their one
+  WARN, the same from both: the binder takes any value and refuses a type it can't bind only at run
+  time, so a later call binding an `Instant` or an enum would compile, then fail its write. Left as
+  it is, said in the PR: every call binds text, a number, a truth or none, and the tests run each;
+  a typed SQL value would change every statement for a mistake no call makes.
+
+  **The proof on the phone:** `OutboxFileTest` on `Bali_Spike_API35` (Android 15), with `./gradlew
+  :app:connectedDebugAndroidTest`: the app recorded an Emergency Unlock through the store; reopened,
+  its writer at NORMAL, `nextDue` named it, its send went unanswered and `settle` kept it, the writer
+  at FULL after; reopened again, it was kept with one attempt and no answer, due 2 s to 4 s later by
+  the app's own jitter, and `nextDue` waited for it; answered recorded, it was gone, and `nextDue`
+  idle. Passed: 4 tests, 0 failures; with `settle` not setting FULL it failed (`expected:<2> but
+  was:<1>`, tried). Gradle uninstalls both apps after.
+
 - **2026-11-04** — **AN4d, the outbox's recording: BaliOutbox's `Outbox` in Kotlin, its recording
   side, every write synced to the disk (the conductor's calls, awaiting the owner's look; AN4d,
   #496).** The owner was asleep and asked for the recommended option on every question, so each call

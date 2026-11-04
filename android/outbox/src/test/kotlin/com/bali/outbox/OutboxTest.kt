@@ -9,6 +9,8 @@ import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import androidx.sqlite.execSQL
 import com.bali.core.ActionOrder
 import com.bali.core.ApiErrorReason
+import com.bali.core.BaliJson
+import com.bali.core.EventId
 import com.bali.core.ParticipationState
 import com.bali.core.UnlockReason
 import java.io.File
@@ -24,6 +26,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.jsonObject
 
 /**
  * Each test's files, in a folder of its own, deleted once the test is over and every outbox it
@@ -36,10 +39,11 @@ abstract class OutboxFiles {
     /** A new file's path, in a folder of its own. */
     fun temporaryFile(): File = createTempDirectory(folder.toPath(), "outbox").toFile().resolve("outbox.sqlite")
 
-    /** The outbox in [file], opened as the app opens it, through Room's JVM builder. */
-    fun open(file: File): Outbox = Outbox.open(Room.databaseBuilder<OutboxDatabase>(file.path)).also { opened += it }
+    /** The outbox in [file], opened as the app opens it, through Room's JVM builder, its jitter fixed at [random]. */
+    fun open(file: File, random: Double = 0.0): Outbox =
+        Outbox.open(Room.databaseBuilder<OutboxDatabase>(file.path)) { random }.also { opened += it }
 
-    fun makeOutbox(): Pair<Outbox, File> = temporaryFile().let { open(it) to it }
+    fun makeOutbox(random: Double = 0.0): Pair<Outbox, File> = temporaryFile().let { open(it, random) to it }
 
     @AfterTest
     fun deleteFiles() {
@@ -67,17 +71,15 @@ internal fun row(eventId: String, kind: String, changed: OutboxRow.() -> OutboxR
 /** A lower-case UUID, the install's form. */
 val lowerCaseUuid = Regex("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 
-/**
- * The outbox's file: OutboxTests' SchemaTests, their parts no rule holds, and `offFrom`, which
- * `record` holds. AN4e's: `reopens`' records sent and protection off reported once, and
- * `migratesEmpty`'s `nextDue` and `awaiting`.
- */
+/** The outbox's file: OutboxTests' SchemaTests, `offFrom` among them. */
 class SchemaTest : OutboxFiles() {
     @Test
     fun anEmptyFileIsMadeToTheSchemaAndHoldsNothing(): Unit =
         runBlocking {
             val (outbox, _) = makeOutbox()
             assertEquals(emptyList(), outbox.records())
+            assertEquals(Outbox.Due.Idle, outbox.nextDue(t0))
+            assertEquals(0, outbox.awaiting())
             // Room's version 1, as every migration of iOS's file is applied: Android's first file.
             assertEquals(listOf("1"), outbox.texts("PRAGMA user_version"))
             assertEquals(
@@ -95,16 +97,20 @@ class SchemaTest : OutboxFiles() {
     fun whatIsQueuedOutlivesTheProcessReopenedTheFileHoldsItAllAndTheRulesState(): Unit =
         runBlocking {
             val (outbox, file) = makeOutbox()
-            outbox.dao.insert(row("u", "unlock") { copy(sessionId = "s", reason = "nurse", attempts = 1, lastStatus = 409) })
-            outbox.dao.insert(row("r", "refocus") { copy(sessionId = "s", follows = "u") })
-            outbox.setState(Outbox.Key.Reported, "s")
+            val unlock = record(outbox, Change.Unlock("s", UnlockReason.Nurse))
+            send(outbox, unlock, 409, """{"error":{"code":"conflict","message":"no"}}""")
+            record(outbox, Change.Refocus("s"))
+            record(outbox, Change.ProtectionOff("s"))
             val records = outbox.records()
             outbox.close()
 
             val reopened = open(file)
             assertEquals(records, reopened.records())
-            assertEquals(2, records.size)
+            assertEquals(3, records.size)
+            assertEquals(listOf(1 to 409, 0 to null, 0 to null), records.map { it.attempts to it.lastStatus })
+            // Protection off was reported for this session: reopening doesn't report it again.
             assertEquals("s", reopened.state(Outbox.Key.Reported))
+            assertNull(reopened.record(Change.ProtectionOff("s"), t0))
             assertEquals(listOf("1"), reopened.texts("PRAGMA user_version"))
         }
 
@@ -249,6 +255,13 @@ class DurabilityTest : OutboxFiles() {
                     "file" to { it.file(Standing.Waiting) },
                     "keepWaitEnds" to { it.keepWaitEnds(t0) },
                     "setState" to { it.setState(Outbox.Key.LastTap, "t") },
+                    // A record queued beside the store's writes, by Room's own, which sets nothing.
+                    "settle" to { outbox ->
+                        val id = EventId.mint(t0)
+                        outbox.dao.insert(row(id, "tap") { copy(tagId = "tag") })
+                        outbox.settle(assertNotNull(assertNotNull(current(outbox, id)).send(client(Canned(503)))), t0)
+                    },
+                    "retryNow" to { it.retryNow(t0) },
                 )
             for ((name, write) in writes) {
                 val (outbox, file) = makeOutbox()
@@ -279,10 +292,57 @@ class DurabilityTest : OutboxFiles() {
             record(outbox, Change.Tap("tag"))
             assertEquals(listOf("2"), outbox.texts("SELECT value FROM outboxState WHERE key = 'level'"))
         }
+
+    @Test
+    fun aSettleAndARetryCommitAtFullReadFromInsideEachWriteOnAConnectionNothingElseSetItOn(): Unit =
+        runBlocking {
+            val writes: List<Pair<String, suspend (Outbox) -> Unit>> =
+                listOf(
+                    "settle" to { it.settle(assertNotNull(assertNotNull(current(it, "t")).send(client(Canned(503)))), t0) },
+                    "retryNow" to { it.retryNow(t0) },
+                )
+            for ((name, write) in writes) {
+                // Queued by Room's own write, which leaves the connection at NORMAL; the level each
+                // write's UPDATE ran at, read inside it by a trigger.
+                val (outbox, _) = makeOutbox()
+                outbox.dao.insert(row("t", "tap") { copy(tagId = "tag", nextAttemptAt = t0.plusSeconds(10)) })
+                outbox.execute(
+                    "CREATE TRIGGER level AFTER UPDATE ON outbox BEGIN INSERT OR REPLACE INTO outboxState (key, value) " +
+                        "VALUES ('level', (SELECT synchronous FROM pragma_synchronous)); END",
+                )
+                assertEquals(1L, outbox.synchronous(), name)
+                write(outbox)
+                assertEquals(listOf("2"), outbox.texts("SELECT value FROM outboxState WHERE key = 'level'"), name)
+            }
+        }
 }
 
-/** The phone's own order (A12): OutboxTests' ActionOrderTests, their parts no rule holds (AN4d's hold the rest). */
+/** The phone's own order (A12): OutboxTests' ActionOrderTests. */
 class ActionOrderTest : OutboxFiles() {
+    @Test
+    fun eachRecordGoesWithItsOwnSeqNeverReusedOnceARecordIsGoneAndTheSameOneOnEveryRetry(): Unit =
+        runBlocking {
+            val (outbox, _) = makeOutbox()
+            val install = assertNotNull(outbox.install())
+            val nth = { seq: Long -> ActionOrder(install, seq) }
+            val tap = record(outbox, Change.Tap("tag"))
+            val unlock = record(outbox, Change.Unlock("s", null))
+            assertEquals(listOf(nth(1), nth(2)), listOf(tap.order, unlock.order))
+            // The tap answered and gone, the next record still comes after it.
+            send(outbox, tap, 200, Answer.armed)
+            assertNull(current(outbox, tap.eventId))
+            assertEquals(nth(3), record(outbox, Change.Refocus("s")).order)
+
+            // Unanswered and sent again: the same order on the wire each time.
+            val wire = Canned(503)
+            repeat(2) {
+                val queued = assertNotNull(current(outbox, unlock.eventId))
+                outbox.settle(assertNotNull(queued.send(client(wire))), t0)
+            }
+            val orders = wire.sent.map { BaliJson.parseToJsonElement(checkNotNull(it.body).decodeToString()).jsonObject["order"] }
+            assertEquals(listOf(nth(2), nth(2)), orders.map { BaliJson.decodeFromJsonElement(ActionOrder.serializer(), checkNotNull(it)) })
+        }
+
     @Test
     fun eachFileIsGivenItsInstallOnceALowerCaseUuidTheSameEveryTimeItOpensAnotherFilesItsOwn(): Unit =
         runBlocking {

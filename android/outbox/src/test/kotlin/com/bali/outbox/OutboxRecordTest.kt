@@ -219,30 +219,42 @@ class OutboxRecordTest {
 @Serializable
 data class Fixture(val status: Int, val body: JsonElement, val disposition: String)
 
+/** The dispositions that end a record: every other keeps it. */
+val ending = setOf("apply_session", "wait_for_start", "reread", "recorded", "drop")
+
+/** Each table's case file, and a change of each kind it reads. */
+val tables =
+    mapOf(
+        "tap.json" to listOf(Change.Tap("tag")),
+        "unlock.json" to listOf(Change.Unlock("s", null), Change.UnlockUnderTap("t", null)),
+        "state-change.json" to listOf(Change.Refocus("s"), Change.ProtectionOff("s"), Change.ProtectionOn("s")),
+    )
+
+/** Each outbox endpoint's fixture folder, and a change of its kind: BaliOutbox's `Contract.endpoints`. */
+val endpoints =
+    listOf(
+        "taps" to Change.Tap("tag"),
+        "unlock" to Change.Unlock("session", null),
+        "tap-unlock" to Change.UnlockUnderTap("tap", null),
+        "refocus" to Change.Refocus("session"),
+        "protection-off" to Change.ProtectionOff("session"),
+        "protection-on" to Change.ProtectionOn("session"),
+    )
+
+/** The fixtures of [folder] under `contracts/fixtures/`, read in place as [OutboxCases] reads its files. */
+fun fixtures(folder: String): List<Pair<String, Fixture>> {
+    val directory = OutboxCases.directory.resolveSibling("fixtures").resolve(folder)
+    check(directory.isDirectory) { "no folder at $directory" }
+    return directory
+        .listFiles()
+        .orEmpty()
+        .filter { it.isFile && it.name.endsWith(".json") }
+        .sortedBy { it.name }
+        .map { it.name to BaliJson.decodeFromString(Fixture.serializer(), it.readText()) }
+}
+
 /** One send and what its kind's table made of the answer: SettleTests' parts no store holds. */
 class SendTest {
-    /** The dispositions that end a record: every other keeps it. */
-    private val ending = setOf("apply_session", "wait_for_start", "reread", "recorded", "drop")
-
-    /** Each table's case file, and a change of each kind it reads. */
-    private val tables =
-        mapOf(
-            "tap.json" to listOf(Change.Tap("tag")),
-            "unlock.json" to listOf(Change.Unlock("s", null), Change.UnlockUnderTap("t", null)),
-            "state-change.json" to listOf(Change.Refocus("s"), Change.ProtectionOff("s"), Change.ProtectionOn("s")),
-        )
-
-    /** Each outbox endpoint's fixture folder, and a change of its kind: BaliOutbox's `Contract.endpoints`. */
-    private val endpoints =
-        listOf(
-            "taps" to Change.Tap("tag"),
-            "unlock" to Change.Unlock("session", null),
-            "tap-unlock" to Change.UnlockUnderTap("tap", null),
-            "refocus" to Change.Refocus("session"),
-            "protection-off" to Change.ProtectionOff("session"),
-            "protection-on" to Change.ProtectionOn("session"),
-        )
-
     @Test
     fun onEveryResultAndBodyTheTypeScriptsTablesAnswerASendIsReadByItsOwnKindsTableAndKeptExactlyWhenThatSaysAnUnlockUntilRecorded(): Unit =
         runBlocking {
@@ -354,18 +366,6 @@ class SendTest {
     }
 
     private fun JsonObject.text(key: String): String? = (this[key] as? JsonPrimitive)?.contentOrNull
-
-    /** The fixtures of [folder] under `contracts/fixtures/`, read in place as [OutboxCases] reads its files. */
-    private fun fixtures(folder: String): List<Pair<String, Fixture>> {
-        val directory = OutboxCases.directory.resolveSibling("fixtures").resolve(folder)
-        check(directory.isDirectory) { "no folder at $directory" }
-        return directory
-            .listFiles()
-            .orEmpty()
-            .filter { it.isFile && it.name.endsWith(".json") }
-            .sortedBy { it.name }
-            .map { it.name to BaliJson.decodeFromString(Fixture.serializer(), it.readText()) }
-    }
 
     @Test
     fun withNoTokenToGiveASendSendsNothingAndSaysSoNeverAsAServerOutOfReachAndTheRecordIsKept(): Unit =

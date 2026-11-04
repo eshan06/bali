@@ -6,12 +6,22 @@ import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import androidx.sqlite.execSQL
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.bali.core.ApiClient
+import com.bali.core.HttpAnswer
+import com.bali.core.HttpRequest
+import com.bali.core.HttpTransport
 import com.bali.core.ParticipationState
 import com.bali.core.SessionView
+import com.bali.core.TokenProvider
+import com.bali.core.UnlockDisposition
 import com.bali.core.UnlockReason
 import com.bali.outbox.Change
+import com.bali.outbox.Disposition
+import com.bali.outbox.Outbox
 import com.bali.outbox.OutboxRecord
 import com.bali.outbox.Standing
+import java.io.IOException
+import java.net.URI
 import java.time.Duration
 import java.time.Instant
 import kotlinx.coroutines.runBlocking
@@ -29,8 +39,8 @@ import org.xmlpull.v1.XmlPullParser
  * The outbox's file inside the app, on Android's Room and the SQLite it bundles for the phone: what
  * outbox's JVM tests can't show, since they pass on Room's JVM build whether or not the app can open
  * the file (Gradle's pick of Room's Android build, the driver's native library, Room's generated code).
- * That the store's writes reach the disk as they commit, on Android's Room as on the JVM's (AN4d). And
- * the backup rules that keep the file on the phone.
+ * That the store's writes reach the disk as they commit, on Android's Room as on the JVM's (AN4d), and
+ * that a send's answer settles through it (AN4e). And the backup rules that keep the file on the phone.
  */
 @RunWith(AndroidJUnit4::class)
 class OutboxFileTest {
@@ -106,6 +116,52 @@ class OutboxFileTest {
             assertEquals(at.plusSeconds(2), records[1].nextAttemptAt)
             assertEquals(stood, standing)
         }
+
+    @Test
+    fun aRecordSentIsSettledThroughTheStoreKeptWithItsAnswerAndItsBackoffThenGoneOnceRecorded(): Unit =
+        runBlocking {
+            val at = Instant.ofEpochSecond(1_790_000_000)
+            val outbox = context.outbox()
+            val unlock = checkNotNull(outbox.record(Change.Unlock("s", UnlockReason.Nurse), at))
+            outbox.close()
+            // Reopened, Room's writer is at NORMAL again, so the settle's own write sets FULL.
+            val sending = context.outbox()
+            assertEquals(1L, sending.synchronous())
+            assertEquals(Outbox.Due.Send(unlock), sending.nextDue(at))
+            // No answer: kept, due after 2 s and up to as much again, at random, as the app's jitter.
+            val unanswered = checkNotNull(unlock.send(client(null)))
+            assertEquals(Disposition.Unlock(UnlockDisposition.Retry), sending.settle(unanswered, at))
+            assertEquals(2L, sending.synchronous())
+            sending.close()
+
+            val reopened = context.outbox()
+            val kept = reopened.records().single()
+            assertEquals(listOf(1, 0), listOf(kept.attempts, kept.answers))
+            assertTrue("${kept.nextAttemptAt}", kept.nextAttemptAt in at.plusSeconds(2)..at.plusSeconds(4))
+            assertEquals(Outbox.Due.Wait(kept.nextAttemptAt), reopened.nextDue(at))
+            // Recorded, it goes.
+            val recorded = """{"outcome":"recorded","recordedAs":"no_live_participation","state":null,"session":null,"reason":null}"""
+            val answered = checkNotNull(kept.send(client(200, recorded)))
+            assertEquals(Disposition.Unlock(UnlockDisposition.Recorded), reopened.settle(answered, kept.nextAttemptAt))
+            reopened.close()
+            val drained = context.outbox()
+            assertEquals(emptyList<OutboxRecord>(), drained.records())
+            assertEquals(Outbox.Due.Idle, drained.nextDue(kept.nextAttemptAt))
+            drained.close()
+        }
+
+    /** The real client, over a transport answering every request with [status] and [body], or with no answer when [status] is none. */
+    private fun client(status: Int?, body: String = "") =
+        ApiClient(
+            URI("https://api.bali.test"),
+            object : TokenProvider {
+                override suspend fun accessToken() = "token"
+            },
+            object : HttpTransport {
+                override suspend fun send(request: HttpRequest) =
+                    HttpAnswer(status ?: throw IOException("no answer"), emptyMap(), body.encodeToByteArray())
+            },
+        )
 
     // Lint fails a manifest that drops either rules file (DataExtractionRules, UnusedResources); this
     // holds what they say, and allowBackup, which lint doesn't hold.
