@@ -1060,6 +1060,42 @@ Example prompts that fit this system:
 - "Draw the student's session-over screen: the mark at 72, an h1, a body-lg
   line, one primary button; light; no animation beyond a 200 ms fade."
 
+## Android (proposed until the owner approves AS0)
+
+Android's screens have their own canvas, apart from the iPhone's (the owner, 2026-11-03: "should be
+in a different artifact than ios"):
+[Bali Android app screens](https://claude.ai/artifact/SZPLe9WcymZJ1Bvrgj5KoE), AS0 in
+`docs/PLAN-ANDROID.md`, in the Bali Design System, a row per step (AS1–AS8). Until AN1b picks the
+lock, a screen the lock changes is drawn twice, side by side, "If lock (a)" and "If lock (b)".
+Nothing on it is built before the owner approves it, and this section is proposed until then.
+
+- **The words** are the built iPhone app's, word for word. A line changes only where it names
+  something Android lacks (FaceTime, Emergency SOS, Screen Time, iOS, the top of an iPhone). The
+  canvas's Words board lists every line changed (30), new (21) and gone (4), and
+  `docs/DECISIONS.md` (2026-11-03) the owner's calls among them.
+- **The look:** the tokens in Material 3's roles: `primary` is action-primary-bg,
+  `tertiaryContainer` the emergency pair, `error` the destructive red, `errorContainer` Lock off's
+  chip, `surfaceContainerLowest` the card, `surfaceContainerHigh` the sunken well, `outline`
+  `border-input`, `outlineVariant` border-default. Dynamic colour off; light only, as D1. D1's type
+  scale in sp, following Android's font size (drawn at 100% and at 200%, Android 14's curve), the
+  countdown fixed at 64 dp. Buttons 56 dp at radius 14, Material's outlined field, cards at radius 20
+  with shadow-1, sheets at radius 20, chips at radius 14, touch targets 48 dp. Depth is the warm
+  shadow, never Material's tonal tint; motion is §7's, Remove animations standing in for Reduce
+  Motion. Drawn in Instrument Sans and JetBrains Mono, with lucide's icons: both the owner's call
+  (Roboto, Material Symbols).
+- **Material 3 where Android has the control:** Filled, Outlined and Text buttons; the outlined
+  text field; the navigation bar for the tab bar, its labels stopping at 150%; modal bottom sheets;
+  the segmented button for an unlock's reason; exposed dropdown menus for the 13+ question; Custom
+  Tabs for sign-in and the policy pages. **Bali's own, as on the iPhone:** the state chips,
+  Emergency Unlock's one-second hold (its spring, its Reduce Motion look, 48 dp of drift), the ring
+  and its strip, the answer rows and the slide.
+- **Android's own screens:** the permission step in the Screen Time ask's place, one per lock ((a)
+  Play's prominent disclosure with Agree as the consent, ISSUES #7; (b) two switches); "hold your
+  phone to the block", Bali's own sheet since Android has no NFC sheet, NFC off included; the block
+  screen, BaliShield's twin, with Open Bali; (b)'s notification for the whole class; the
+  class-started alert's channel. Android's own surfaces (Settings, its dialogs, the shade, the
+  keyboard, a Custom Tab's bar) are drawn as a Pixel shows them, never restyled.
+
 ## Design tooling
 
 Copied into `.claude/skills/` at a fixed upstream version, each with a Bali
