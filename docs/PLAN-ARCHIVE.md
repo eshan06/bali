@@ -10,6 +10,22 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-11-04 (Central) — AN1b (`docs/DECISIONS.md`, 2026-11-04): Android's lock
+decided, (a), the Accessibility service, with no VPN for now, a battery plan, and Android's gaps
+logged in ISSUES #6 for the device gate to check before launch. Before it, AS0 approved, the
+Android canvas as it stands. Next: a session builds the retire-a-block command; the owner the new
+build and the sitting; the owner's call on GA5's known limit, the smallest iPhones (DECISIONS
+2026-11-02); AN1's part 2 once the owner has the phones; the audit's polish waits, as ruled._
+
+`docs/PLAN-ANDROID.md`'s, replaced the same day: _Last updated: 2026-11-04 (Central) — AN1b, the
+lock decided (`docs/DECISIONS.md`, 2026-11-04): the owner picked (a), the Accessibility service, so
+ARCHITECTURE's "Android app structure" is decided; (b) is dropped and (c), the VPN, left out for
+now. The battery plan's two calls: check-ins only while the screen is on, and a covered app sent to
+the background. Android's gaps are logged in ISSUES #6, each checked again at AP3. Before it, AS0
+approved, the Android canvas as it stands. Next: AN1's part 2, with its battery test, once the
+owner has the phones (Open owner items, 1), still before launch; AN2 at the owner's go. Not on the
+pilot's critical path._
+
 _Last updated: 2026-11-04 (Central) — AS0 approved (`docs/DECISIONS.md`, 2026-11-04): the owner
 approved the Android canvas as it stands, 148 boards drawing lock (a) alone, after cutting 18 of the
 iPhone's lines on Android; the approved iPhone boards stand for the rest of Android's screens, and
@@ -1978,6 +1994,37 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN2's line, as it read until it was done (2026-11-04; `docs/DECISIONS.md`, 2026-11-04):
+
+- **AN2** The project and CI (twin: `ios/project.yml`, `ios.yml`, `ios/README.md`): Gradle under
+  `android/` with the modules `core`, `outbox` and `app`; `android.yml`, the build, Android Lint and
+  the JVM tests on Linux, run only when `android/` or the workflow changes, decided by a changes job
+  as `ios.yml` decides (a workflow filtered by paths never reports, so a required check would wait
+  on it); its contract tests (`core` decoding `contracts/fixtures/`, `outbox` running
+  `contracts/outbox/`) instead on every PR but a docs-only one, never filtered by path, as
+  `ci.yml`'s BaliCore Swift job runs, since the contract spans `apps/api`, `packages/shared` and
+  `contracts/`: a server change that breaks the phone's reading of an answer goes red on its own PR
+  (the conductor, 2026-11-03, from the owner's question: "will the same checks happen for android
+  server work and all that?"); the plan check counting `android/` as source, and this file's 6,000-word cap
+  (`plan-words.sh docs/PLAN-ANDROID.md 6000`). Letting an update to this file alone meet the check
+  for an `android/` change, never for `apps/`, `packages/` or `ios/`, needs CLAUDE.md's working rule,
+  which asks every source change for `docs/PLAN.md`, amended first in a PR of its own; `.gitignore`
+  entries for Android Studio's local files (`local.properties`, `.gradle/`, `.kotlin/`, `.idea/`,
+  `build/`); `android/README.md`; and the applicationId, minSdk and targetSdk decided (iOS's id is
+  `com.bali.Bali`; the PC's untracked `android/` folder holds an old debug build as
+  `com.bali.student`, never committed; targetSdk as Play's yearly rule requires) — validation:
+  `android.yml` green on its own PR, the plan check's self-test with an `android/` case
+
+`docs/PLAN-ANDROID.md`'s cap line and its rule for the plan check, as they read until AN2 put both in
+the check (2026-11-04):
+
+- **Under 6,000 words.** AN2 puts the cap in CI, as `plan-words.sh` holds PLAN.md under 8,000.
+
+- An Android PR updates this file, and Android's lines in PLAN.md: its Now line at least when the PR
+  changes source, since CLAUDE.md's working rule asks every source change for `docs/PLAN.md`; its
+  phase rows and its owner-items line when they change. Until AN2 teaches the plan check, an
+  `android/` change isn't held to either, so hold to both by hand.
 
 AN1b's line, as it read until it was done (2026-11-04; `docs/DECISIONS.md`, 2026-11-04):
 

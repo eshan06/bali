@@ -295,6 +295,12 @@ both phones, on the build students will install, before Android launches
    sentence of the service's description in Settings; if Play's review asks for it, it goes back.
    *Checked:* by Play's review of the build students install (AP4); on both phones, the disclosure
    shown in Bali's normal use, and No thanks leaving the service off.
+10. **Android 10 to 14 are untested.** Bali runs on Android 10 and later (minSdk 29, AN2), but the
+    PC has only Android 15, 16 and 17 emulators, so nothing older has run it. A Java API an older
+    phone lacks would fail only there, since Android Lint doesn't check `core`'s and `outbox`'s
+    calls against Android 10 (`docs/DECISIONS.md`, 2026-11-04, AN2). *Checked:* the build students
+    install, through a whole lesson, on Android 10 and on Android 12 or 13, as emulator images the
+    owner adds (each a download the owner OKs) or as phones.
 
 **The plan.**
 - Honest, not fought (the mirror rule): what the lock can't stop is never shown as focus. The

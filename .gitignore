@@ -31,6 +31,12 @@ coverage/
 .swiftpm/
 # XcodeGen writes it from ios/project.yml, which is the project (ios/README.md)
 ios/Bali.xcodeproj/
+# Android Studio's and Gradle's own files in android/ (android/README.md): the SDK's path, their
+# caches, the IDE's project. Each module's build/ is ignored above.
+android/local.properties
+android/.gradle/
+android/.kotlin/
+android/.idea/
 
 # graphify knowledge graph — regenerable (`graphify update .`), stays local
 graphify-out/

@@ -91,6 +91,10 @@ the clone is `C:\Users\Eshan Shah\Downloads\github\bali`. Its path has a space: 
 - **npm runs scripts in Git Bash by a setting outside the repo.** The scripts use `NODE_ENV=…`
   prefixes and quoted globs, which cmd can't run, so `script-shell` names Git Bash in Node 22's own
   global npmrc. fnm installing a newer 22.x starts without it: set it again there.
+- **Git Bash rewrites a `<rev>:<path>` whose path starts with a dot.** `git show
+  origin/main:.github/workflows/claude-review.yml` (santa-loop's Step 1) reaches git as
+  `origin\main;.github\workflows\claude-review.yml`, "ambiguous argument", while
+  `origin/main:docs/PLAN.md` passes. Prefix such a command with `MSYS_NO_PATHCONV=1`.
 - **`cd` in the Bash tool can fail if fnm's `--use-on-cd` is on.** It turns `cd` into its own
   function, which can stop with "We can't find the necessary environment variables to replace the
   Node version". Keep it out of `~/.bashrc`; otherwise use `git -C <path>`, absolute paths or `builtin cd`.

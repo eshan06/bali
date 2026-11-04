@@ -1,6 +1,6 @@
 #!/bin/bash
-# Fails when docs/PLAN.md, which every session reads first, passes its word cap.
-# PLAN.md holds the current state only: a finished step's full notes go word for
+# Fails when docs/PLAN.md, which every session reads first, or docs/PLAN-ANDROID.md passes its cap.
+# Each holds the current state only: a finished step's full notes go word for
 # word to docs/PLAN-ARCHIVE.md, the why to docs/DECISIONS.md (DECISIONS, 2026-10-13).
 #
 #   .github/scripts/plan-words.sh [file] [cap]

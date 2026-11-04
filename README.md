@@ -16,6 +16,7 @@ v3 and isn't finished yet; [docs/PLAN.md](docs/PLAN.md) says where it stands.
 | `packages/db`     | Drizzle schema, migrations, and the Postgres client               |
 | `packages/shared` | Types and constants shared by server and clients                  |
 | `ios/BaliCore`    | The iOS apps' shared Swift package (not an npm workspace)         |
+| `android`         | The Android app, Gradle (not an npm workspace) — see its README   |
 
 ## From zero
 
@@ -38,7 +39,8 @@ instead of a crash somewhere downstream.
 `ios/BaliCore` needs Swift 6, on macOS or Linux: `swift test` there decodes every contract
 fixture in `contracts/fixtures/` with the Swift types, in place, and checks its outbox tables
 against the TypeScript's answers in the fixtures and in `contracts/outbox/`. `npm run fixtures`
-regenerates both directories.
+regenerates both directories. Android's `core` and `outbox` read the same two directories in place:
+`./gradlew :core:test :outbox:test` in `android/`, on JDK 21 ([android/README.md](android/README.md)).
 
 ## The exit demo (phone simulator)
 

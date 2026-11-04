@@ -286,3 +286,35 @@ jobs:
           apt-get install -y -qq --no-install-recommends libsqlite3-dev
       - run: swift test
         working-directory: ios/BaliOutbox
+
+  # The Swift job's twin for Android (docs/PLAN-ANDROID.md, AN2): `core` decodes every contract
+  # fixture and `outbox` runs contracts/outbox/, so a change to an answer, a fixture or a table goes
+  # red here until the Kotlin catches up. On every PR but a docs-only one, not path-filtered, for
+  # the Swift job's reason; the whole Android build runs in android.yml, only when android/ changes.
+  # Both modules' whole suites run here: plain Kotlin on the JVM.
+  android-contracts:
+    name: Android contract tests (JVM)
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.docs-only != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      # As in android.yml: the wrapper's jar checked, then JDK 21, the runner's own.
+      - uses: gradle/actions/wrapper-validation@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      - name: Use JDK 21
+        run: |
+          [ -n "${JAVA_HOME_21_X64:-}" ] && [ -x "$JAVA_HOME_21_X64/bin/java" ] || { echo "::error::The runner has no JDK 21 (JAVA_HOME_21_X64)."; exit 1; }
+          echo "JAVA_HOME=$JAVA_HOME_21_X64" >> "$GITHUB_ENV"
+      # Saved from main's runs, which every PR's first run, here and in android.yml, starts from.
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-tests-${{ hashFiles('android/**/*.gradle.kts', 'android/gradle.properties', 'android/gradle/libs.versions.toml', 'android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: gradle-${{ runner.os }}-tests-
+      - run: ./gradlew :core:test :outbox:test

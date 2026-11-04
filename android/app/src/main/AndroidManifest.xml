@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The app's name and nothing else yet: every screen waits for Phase 10's steps
+     (docs/PLAN-ANDROID.md), and the icon for one drawn and approved, so lint's icon check waits too. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <application
+        android:label="@string/app_name"
+        tools:ignore="MissingApplicationIcon" />
+
+</manifest>
