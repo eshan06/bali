@@ -916,6 +916,60 @@ Context from v2: Cognito was AWS (kept for v3) and an RDS Postgres instance exis
 but the v2 API itself was never deployed — it only ran locally, with the website on
 Vercel. The old RDS instance should be decommissioned once v2 is fully retired.
 
+## Analytics (PostHog)
+
+Decided 2026-11-04 (the owner's rulings; `docs/DECISIONS.md`, 2026-11-04): how Bali learns how it
+is used, without learning anything about a student. PostHog, its project "Bali production" on
+PostHog's US cloud, receives counted events from two places, and nothing else of Bali's.
+
+- **The teacher portal's pages and the server, never a phone.** The portal sends only for a
+  teacher's account: its `/` serves students too, so the gate is the account read (`home.kind ===
+  'teacher'`), never the route. The API sends its own. The iPhone app and the Android app send
+  PostHog nothing and carry no analytics code: Apple's developer agreement (§3.3.3(P), ISSUES #3)
+  forbids sharing a phone's usage data beyond the individual and their device, and
+  `docs/APP-STORE.md`'s review note promises "no third-party analytics or advertising SDKs in the
+  app". The server's totals are still counted from what the phones send, and that clause's "or
+  otherwise" may reach them: Apple's review stays the answer (ISSUES #3).
+- **What it may hold.** From the server, a class's totals only: a session started, ended or
+  extended; how many students are enrolled and how many tapped in; the session's length; the
+  class's focus minutes and unlocks, as totals. From the portal, a teacher's own actions only:
+  signed in, created a class, registered a block, started, ended or extended a session, asked a
+  question, showed slides, opened Present, opened a report or the recap. A teacher is known by
+  Bali's internal user id alone. Every event carries `environment`, so a dev key, if one is ever
+  set, files apart. Its known limit: with one student enrolled or tapped in, a class's totals are
+  that student's numbers. Whether the server holds them back below a count, as a question's
+  breakdown waits for 3 answers, is the owner's call before A2.
+- **What it never holds:** a student's name, email or user id, or any event about one student; a
+  teacher's email or name; a URL; free text in any property. Once an account deletion, a disposal
+  or the retention run takes a teacher's name and sign-in off their row, their events there name no
+  one by themselves; Bali's own records can still lead back to a teacher who deleted their own
+  account, whose removed classes keep their names (#313).
+- **Nothing captured on its own.** No autocapture, no session replay, no heatmaps, no exception
+  capture (errors are Sentry's). The project is set to match: session replay, web autocapture and
+  exception autocapture off, the client's IP address discarded.
+- **Off until its key is set,** as Sentry and push are: the portal reads `NEXT_PUBLIC_POSTHOG_KEY`,
+  with an optional host (`https://us.i.posthog.com` by default), and the API `POSTHOG_KEY`. The
+  owner sets them, in Vercel's `bali-portal` and Railway's `bali prod`.
+- **No PostHog SDK, a plain POST** (the conductor's call, awaiting the owner). Each side sends its
+  events with a small `fetch` to PostHog's capture endpoint. posthog-js loads more scripts from
+  PostHog's hosts as it runs, and any script on the portal's pages can read the access token, which
+  is why the portal runs no script but its own (S4, `apps/web/src/lib/csp.ts`). A POST needs one
+  `connect-src` origin, PostHog's, listed only while the key is set. On the server, a few lines beat
+  a new dependency. That origin's cost, said plainly: it takes events for every PostHog project, so
+  a script running in the page could send the token through it to a project of its own, where today
+  `connect-src` lets nothing out but to the API, Cognito, Sentry and the deck bucket. The portal's
+  events sent through Bali's API instead would keep that whole: the owner's pick, before A3a.
+- **Never in the way.** A send is fire-and-forget, bounded by a timeout, and made once what it
+  counts has happened: on the server, after the commit, as the Start's push is
+  (`apps/api/src/routes/sessions.ts`). A replay changes nothing and sends nothing, so a resent Start
+  counts once. A send never fails or delays a request or a page; a failure is logged with nothing
+  personal in it and never shown, since nothing the user did has failed.
+- **Named before it is on.** The privacy policy names PostHog as a service provider before a key is
+  set (PLAN's A4). The App Store privacy label (Product Interaction used for Analytics), the app's
+  privacy manifest to match, which ships inside the build, and `docs/APP-STORE.md`'s answers and
+  review note are the owner's, later; until then they say Product Interaction serves App
+  Functionality only.
+
 ## iOS app structure
 
 How the student app is organized so the phone can read the tap, enforce the shields, work
@@ -1843,9 +1897,13 @@ Each exists because v2 broke it and shipped a real bug
   the Android app (2026-11-02, decided 2026-11-04, "Android app structure"): native Kotlin and
   Compose, iOS's rules ported with their tests, push through FCM, sign-in through Cognito's hosted
   UI, its lock an Accessibility service, with its battery plan, which AN1's part 2 confirms on a
-  Pixel and a Samsung before launch (`docs/PLAN-ANDROID.md`, Phases 8–11).
+  Pixel and a Samsung before launch (`docs/PLAN-ANDROID.md`, Phases 8–11); analytics (2026-11-04,
+  "Analytics (PostHog)"): PostHog on the teacher portal's pages and the server only, never a phone,
+  a class's totals and a teacher's actions, nothing about one student, off until its key is set.
 - **Open:** one design question, Phase 6: ISSUES #3's fallback, should Apple's answer
-  call for one (the issue ranks the fallback designs, best fit first). Next: the build plan (what gets coded
+  call for one (the issue ranks the fallback designs, best fit first). Analytics has two, the
+  owner's before A2 and A3a: a class of one's totals, and PostHog's shared origin in the CSP or the
+  API as a relay ("Analytics (PostHog)"). Next: the build plan (what gets coded
   first). Items deliberately parked live in each section's "decided later" list.
 - **Deploys:** the portal builds from `main` as the Vercel project `bali-portal`; the demo site,
   www.getbali.app, is the Vercel project `bali-web`, which builds only `demo2`, an orphan branch

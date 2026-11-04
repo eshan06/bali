@@ -8,6 +8,93 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-04** — **PostHog's rules: the teacher portal's pages and the server only, a class's
+  totals and a teacher's actions, nothing about one student (the owner's rulings, in chat with the
+  conductor; A1, #503).** The owner asked for PostHog before the pilot on 2026-11-03 ("also we need to add
+  posthog for monitoring and stuff", the entry below), its plan first. The rulings, now
+  ARCHITECTURE's "Analytics (PostHog)":
+  - **Where:** the teacher portal's pages (`apps/web`), for teacher accounts only, and the server
+    (`apps/api`). The portal's `/` serves students too, so the gate is the account read's
+    `home.kind === 'teacher'`, never the route. **Never the iPhone app or the Android app:** Apple's
+    developer agreement (§3.3.3(P), ISSUES #3) forbids sharing a phone's usage data beyond the
+    individual and their device, and `docs/APP-STORE.md`'s review note promises "no third-party
+    analytics or advertising SDKs in the app".
+  - **What:** never a student's name, email or user id, and no event about one student. A teacher is
+    known only by Bali's internal user id, never their email or name. The server's events are a
+    class's totals: a session started, ended or extended; students enrolled and students tapped in;
+    the session's length; the class's focus minutes and unlocks, as totals. The portal's are a
+    teacher's actions: signed in, created a class, registered a block, started, ended or extended a
+    session, asked a question, showed slides, opened Present, opened a report or the recap. No URL
+    and no free text in any event's properties; each event carries `environment`, so a dev key, if
+    one is ever set, files apart.
+  - **Nothing captured on its own:** no autocapture, no session replay, no exception capture (Sentry
+    has errors), no heatmaps. The project is set the same way: "Bali production", US cloud, project
+    id 711039, Central time, session replay off, web autocapture off, the client's IP discarded,
+    exception autocapture off (set up on 2026-11-04 by the owner, the conductor driving the
+    settings; read back from PostHog's API).
+  - **Off until its key is set,** as Sentry and push are: the portal reads `NEXT_PUBLIC_POSTHOG_KEY`
+    and an optional host (`https://us.i.posthog.com` by default), the API its own `POSTHOG_KEY`. The
+    owner sets them in Vercel (`bali-portal`) and Railway (`bali prod`); prod is off-limits to
+    sessions.
+  - **Named first:** the privacy policy names PostHog as a service provider (A4) before a key is
+    set. The App Store privacy label (Product Interaction gains the purpose Analytics) and
+    `docs/APP-STORE.md`'s review note are the owner's, later: "we can change the wording on privacy
+    stuff on apple later. just add that to the list of things we need to do pre pilot" (PLAN's
+    Before the pilot, 6).
+
+  **The conductor's call, awaiting the owner: no PostHog SDK in either app.** Each sends its events
+  with a small `fetch` to PostHog's capture endpoint. posthog-js loads further scripts from
+  PostHog's asset hosts, and the portal's CSP (`apps/web/src/lib/csp.ts`) is there so no script runs
+  but the portal's own (S4), since any script on its pages can read the access token; a plain POST
+  needs one `connect-src` origin, added only while the key is set. On the server, a few lines beat a
+  new dependency (CLAUDE.md, Ponytail). A send is fire-and-forget after the commit, bounded by a
+  timeout, never failing or delaying a request, a failure logged without personal data, as the
+  Start's push is (`apps/api/src/routes/sessions.ts`). Checked while writing it down: the CSP's
+  `'strict-dynamic'` lets a script that the portal's own scripts add run from any host, so the CSP
+  alone would not keep posthog-js's further scripts out; leaving the SDK out is what does.
+
+  **The steps** (PLAN's Before the pilot, 4), one PR each: A1, these docs; A2, the server's class
+  totals; A3a, the portal's sender, on for teachers only, with PostHog's origin in the CSP; A3b, the
+  portal's teacher events; A4, `/privacy` names PostHog. Then the owner's keys.
+
+  **Said plainly:** the server's totals are counted from what the phones send, and ISSUES #3 notes
+  that §3.3.3(P)'s "or otherwise" may reach what Bali records itself, not only what the framework
+  hands it. Totals that name no student are the narrowest reading of that, not an answer to it:
+  Apple's review stays the answer (ISSUES #3).
+
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (Codex refuses
+  every model on this Mac and no Gemini CLI is installed, so context isolation holds and model
+  diversity doesn't): 0 blockers. Their WARNs, each now named in ARCHITECTURE's section, the first
+  three for the owner:
+  - **PostHog's origin is shared** (both reviewers). `https://us.i.posthog.com` takes events for
+    every PostHog project, the project named by the key in the body, so once it is in `connect-src`
+    a script running in the portal could post the access token to a project of its own. S4 made
+    `connect-src` the token's second barrier ("lets nothing leave but for the API, Cognito and
+    Sentry", 2026-10-04), and M5 refused S3's path-style origin, every bucket of a region, for the
+    same reason. It is not such a script's only way out (a navigation is another), but it is one
+    the CSP closes today. Their suggestion: the portal sends its teacher events to Bali's API,
+    already listed, which checks each one (no URL, no free text) and forwards it with the key kept
+    on the server, so the CSP is unchanged and PostHog never sees a teacher's IP address. The
+    owner's pick, with the no-SDK call, before A3a.
+  - **A class of one** (both). With one student enrolled or tapped in, a class's focus minutes and
+    unlocks are that student's own, which "no event about one student" means to rule out. Their
+    suggestions: hold those totals back below a count, as a question's breakdown waits for 3
+    answers, and send unlocks as one number, never by reason ("nurse" may be health data,
+    `docs/APP-STORE.md`'s table). The owner's call, before A2.
+  - **The privacy manifest ships inside the build** (both). `ios/Bali/PrivacyInfo.xcprivacy` gives
+    Product Interaction App Functionality only, and CI's check compares data types, not purposes
+    (`.github/scripts/privacy-manifests.py`), so Analytics added to the label later needs the
+    manifest changed too, in item 1's build or another, and `docs/APP-STORE.md`'s "Nothing is used
+    for Analytics" with it. And the keys at the end of item 4 turn the server's totals on before
+    item 6 changes any of them. Both are now in PLAN's item 6, for the owner to order.
+  - **A de-identified teacher's id** (Reviewer B). This entry's draft said the privacy paths need
+    nothing new, since PostHog's events then name no one. True of PostHog alone, not once Bali's
+    data is joined in: a teacher who deleted their own account keeps their removed classes' names
+    (#313), and PostHog's sign-in and page times are stored nowhere else. As Bali treats its own
+    kept records, so said plainly instead.
+  - **A replay sends nothing** (Reviewer B): a resent Start answers `existing`, so A2 counts a
+    session started only on `created`. Written into the section.
+
 - **2026-11-04** — **AN5b, the sync engine's drain: BaliOutbox's `SyncEngine` in Kotlin, its drain
   (the conductor's calls, awaiting the owner's look; AN5b, #501).** The owner isn't reviewing each
   step and asked for the recommended option on every question, so each call here is the conductor's,
