@@ -28,9 +28,9 @@ import com.bali.core.unlockDisposition
 import java.time.Instant
 
 // The outbox's records, BaliOutbox's OutboxRecord.swift: what the phone did, the request each one
-// sends on every attempt, and one send of it answered (`Sent`), read by its own kind's table in
-// `core`. The store keeps them, maps them to its rows and settles each answer (AN4c); the sync
-// engine sends them (AN5). Neither decides here what an answer means: `core`'s tables do.
+// sends on every attempt, one send of it answered (`Sent`), read by its own kind's table in `core`,
+// and each read from its row. The store keeps them (Outbox.kt) and settles each answer (AN4d); the
+// sync engine sends them (AN5). Neither decides here what an answer means: `core`'s tables do.
 
 /** What the phone did: acted on at once, and queued to send. */
 sealed interface Change {
@@ -183,6 +183,37 @@ data class OutboxRecord internal constructor(
      */
     suspend fun send(client: ApiClient): Sent? = Sent.of(this, client)
 }
+
+/** The record a row holds, GRDB's `init(row:)`: a kind this build doesn't know is refused, never read as another. */
+internal fun QueuedRow.record(): OutboxRecord {
+    fun session() = row.sessionId ?: error("The outbox's ${row.kind} ${row.eventId} names no session")
+    val reason = row.reason?.let(UnlockReason.Wire::of)
+    val change =
+        when (row.kind) {
+            "tap" -> Change.Tap(row.tagId ?: error("The outbox's tap ${row.eventId} names no tag"))
+            // Filed under its tap, it stays so once the tap's answer names a session (decision 11);
+            // filed under neither, it waits to be (B6b).
+            "unlock" ->
+                row.tapId?.let { Change.UnlockUnderTap(it, reason) }
+                    ?: row.sessionId?.let { Change.Unlock(it, reason) }
+                    ?: Change.UnlockUnfiled(reason)
+            "refocus" -> Change.Refocus(session())
+            "protection_off" -> Change.ProtectionOff(session())
+            "protection_on" -> Change.ProtectionOn(session())
+            else -> throw UnknownKind(row.kind)
+        }
+    return OutboxRecord(
+        eventId = row.eventId, change = change, recordedAt = row.recordedAt, attempts = row.attempts,
+        answers = row.answers, nextAttemptAt = row.nextAttemptAt, stuck = row.stuck,
+        lastStatus = row.lastStatus, lastReason = row.lastReason?.let(ApiErrorReason.Wire::of),
+        lastMessage = row.lastMessage, refusedStatus = row.refusedStatus, follows = row.follows,
+        // A follow-up's order is its press's (B6d): the same act, filed a second time.
+        order = install?.let { ActionOrder(it, row.orderSeq ?: row.seq) },
+    )
+}
+
+/** A row of a kind this build doesn't know. */
+internal class UnknownKind(val kind: String) : Exception("The outbox holds a record of a kind this build doesn't know: $kind")
 
 /** One send of a record, answered, and what its table made of the answer: the store's `settle` takes it. */
 class Sent private constructor(

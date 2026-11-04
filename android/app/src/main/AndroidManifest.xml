@@ -1,11 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The app's name and nothing else yet: every screen waits for Phase 10's steps
-     (docs/PLAN-ANDROID.md), and the icon for one drawn and approved, so lint's icon check waits too. -->
+<!-- The app's name and its backup rules, nothing else yet: every screen waits for Phase 10's steps
+     (docs/PLAN-ANDROID.md), and the icon for one drawn and approved, so lint's icon check waits too.
+     Nothing of Bali's leaves the phone in a backup or a transfer to a new phone, so a reinstall
+     starts signed out, with an outbox of its own (ARCHITECTURE, "Android app structure"):
+     allowBackup="false" stops a backup, and on Android 10 and 11 a transfer too; from Android 12 a
+     transfer ignores it, so dataExtractionRules leaves everything out there; and fullBackupContent
+     leaves everything out on Android 10 and 11 as well. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
     <application
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
         android:label="@string/app_name"
-        tools:ignore="MissingApplicationIcon" />
+        tools:ignore="MissingApplicationIcon"
+        tools:targetApi="31" />
 
 </manifest>

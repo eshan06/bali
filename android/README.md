@@ -2,7 +2,8 @@
 
 The student app, the iPhone app's twin, over two modules of plain Kotlin (`docs/ARCHITECTURE.md`,
 "Android app structure"). Phase 9 builds the engine and Phase 10 the screens
-(`docs/PLAN-ANDROID.md`); until then the app is Bali's name and nothing else: no screen, no icon.
+(`docs/PLAN-ANDROID.md`); until then the app is Bali's name, the outbox's file and the backup rules
+that keep it on the phone: no screen, no icon.
 
 | Folder                      | What it is                                                                                                                |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
@@ -34,6 +35,11 @@ You need JDK 21 (Android Studio's own, its JBR, as `JAVA_HOME`) and Android's SD
    `./gradlew :app:installDebug`, and stop it after with `adb -s emulator-5554 emu kill`
    (`docs/GOTCHAS.md`, "Android's SDK on Windows"). With no screen there's no icon to tap: Settings →
    Apps lists it as Bali.
+4. The app's instrumented tests (`app/src/androidTest`) run on one of those emulators, started as
+   in 3: `./gradlew :app:connectedDebugAndroidTest` installs the app and its test app, runs them and
+   uninstalls both. They show what the JVM's tests can't: that the app opens the outbox's file on
+   Android's Room. CI builds them but has no emulator to run them, so a step that changes the file
+   runs them here and puts the result in its PR.
 
 The build installs nothing: `gradle.properties` turns off the Android plugin's own installs, so a
 missing platform or build tools fails the build by name, and Gradle never downloads a JDK. A step
@@ -78,14 +84,25 @@ fixture's disposition.
 and the request each one sends, the same on every attempt. A record's `send` puts it through the
 client once and reads the answer by its own kind's table: the only way to make a `Sent`, what the
 store settles. Their tests send a record of each kind through every `contracts/outbox/` case and
-every outbox fixture. AN4c picks the outbox's store; Room's JVM build keeps its tests here, on the
-JVM.
+every outbox fixture.
+
+**The outbox's file** (`outbox`'s `OutboxDatabase.kt` and `Outbox.kt`, BaliOutbox's `Outbox`) is
+Room's: its JVM build in `outbox`'s tests and its Android build in the app, Gradle picking each, over
+the SQLite Room bundles (`BundledSQLiteDriver`), the same on the JVM and on the phone. KSP generates
+Room's code from `OutboxDatabase.kt`, and Room writes each version's schema to `outbox/schemas/` as
+the build runs: commit it with the version, so a migration is checked against the schema it starts
+from. The table is iOS's, its checks included, which Room can't declare: they're made with it as the
+file is created, and a migration that makes the table again carries them, as iOS's do. The app opens
+the file in its own storage (`app`'s `OutboxFile.kt`); its backup rules (`app/src/main/res/xml/`)
+leave everything of Bali's out of a backup and of a transfer to a new phone.
 
 ## Android Lint
 
 The app's lint fails on any warning, in every module, but four checks of versions (a newer release
 trips them, not the code; targetSdk follows Play's rule, not the newest Android) and the app's
-missing icon, waived in the manifest until an icon is drawn and approved.
+missing icon, waived in the manifest until an icon is drawn and approved. Room's generated code in
+`outbox` is left out by `outbox/lint.xml`, as lint leaves an Android module's generated code out by
+itself: in a plain Kotlin module it can't tell it apart.
 Lint can keep its last report after a change to the manifest alone:
 `./gradlew :app:lint --rerun-tasks` reads everything again. CI's runs start clean.
 
@@ -102,6 +119,9 @@ Lint can keep its last report after a change to the manifest alone:
   kotlinx.serialization's library follows Kotlin: each release names the Kotlin it was built with.
 - **OkHttp** stays on 5.4.0 while compileSdk is 36.1: 5.5's Android build needs compileSdk 37,
   Android 17's platform, the owner's to add (`docs/PLAN-ANDROID.md`, Open owner items, 6).
+- **Room and KSP:** Room's runtime, compiler and Gradle plugin share one version. KSP's version is
+  its own since 2.3, not Kotlin's. `androidx.sqlite`'s bundled driver may be newer than the Room it
+  serves: Room names the oldest it takes.
 - **animal-sniffer's plugin** (2.0.1) calls two Gradle features Gradle 10 removes, which every
   build warns of. Upgrading to Gradle 10 needs a release of it that doesn't, or the same check made
   another way: never the check dropped.
@@ -111,9 +131,9 @@ Lint can keep its last report after a change to the manifest alone:
 ## CI
 
 The **Android** workflow (`.github/workflows/android.yml`) runs on every PR that touches `android/`
-or the workflow: it builds the app and the modules, checks the modules against Android 10's API,
-runs the app's Android Lint and every module's JVM tests, on Linux with JDK 21 and the runner's SDK,
-deciding whether to run as `ios.yml` does.
+or the workflow: it builds the app, its instrumented tests (never run: no emulator) and the modules,
+checks the modules against Android 10's API, runs the app's Android Lint and every module's JVM
+tests, on Linux with JDK 21 and the runner's SDK, deciding whether to run as `ios.yml` does.
 `core`'s and `outbox`'s tests also run on every PR but a docs-only one ("Android contract tests
 (JVM)" in `ci.yml`), as BaliCore's Swift tests do, so a server change that breaks the phone's
 reading of an answer goes red on its own PR.

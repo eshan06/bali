@@ -19,6 +19,8 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
+        // The instrumented tests (src/androidTest), on an emulator: README.md, "On the PC".
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     // Java 17's bytecode, as core's and outbox's.
@@ -41,4 +43,8 @@ android {
 dependencies {
     implementation(project(":core"))
     implementation(project(":outbox"))
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.junit)
+    // The outbox's file written as SQLite alone, beside Room (OutboxFileTest.kt).
+    androidTestImplementation(libs.sqlite.bundled)
 }

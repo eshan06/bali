@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Room's code, which KSP generates from OutboxDatabase.kt, is Room's to check, not lint's: it calls
+     Room's restricted API, as it's meant to. Lint leaves an Android module's generated code out by
+     itself, but can't tell it apart in this plain Kotlin one (README.md, "Android Lint"). -->
+<lint>
+    <issue id="all">
+        <ignore path="build/generated/ksp/**" />
+    </issue>
+</lint>

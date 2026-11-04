@@ -69,9 +69,10 @@ jobs:
           restore-keys: |
             gradle-${{ runner.os }}-build-
             gradle-${{ runner.os }}-
-      # With the runner's SDK, which the build never adds to: a package it lacks fails here.
+      # With the runner's SDK, which the build never adds to: a package it lacks fails here. The
+      # app's instrumented tests are built too, never run: there's no emulator here (android/README.md).
       - name: Build the app and the modules
-        run: ./gradlew assemble
+        run: ./gradlew assemble :app:assembleDebugAndroidTest
       # core's and outbox's classes against Android 10's API, which Android Lint can't check in them:
       # a call Android 10 lacks fails here (android/README.md, "core and outbox").
       - name: Android 10's API (core, outbox)
