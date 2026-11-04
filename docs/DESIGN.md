@@ -1075,8 +1075,9 @@ words.
 - **The words** are the built iPhone app's, word for word, except where the canvas's Words board,
   the record of Android's words, says otherwise: 28 lines changed, 14 new, 22 gone. A line changes
   only where it names something Android lacks (FaceTime, Emergency SOS, Screen Time, iOS, the top
-  of an iPhone) or where the owner cut it, on every Android screen (2026-11-04; iOS keeps every
-  one). Of the 22 gone, the owner cut 18 and 4 have no Android twin. A line the board marks "not
+  of an iPhone) or where the owner cut it, on every Android screen (2026-11-04; the iPhone follows
+  in WC1–WC8, with three exceptions, and WC8 recounts these: DECISIONS 2026-11-04). Of the 22
+  gone, the owner cut 18 and 4 have no Android twin. A line the board marks "not
   drawn" belongs to a state no board shows, and changes the same way. Settled with the approval:
   "Lock off" and "Lock back on" for the ruled "Screen Time off" and "Screen Time back on"; "Calls,
   texts and emergency calls always work" for "Calls, FaceTime, Messages and Emergency SOS always
