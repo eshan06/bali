@@ -10,6 +10,16 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN3a's on 2026-11-04: _Last updated: 2026-11-04 (Central) —
+AN2, the project and CI (#488; `docs/DECISIONS.md`, 2026-11-04): Gradle under `android/` with
+`core`, `outbox` and `app`, the app `com.bali.bali` for Android 10 and later, targeting Android 16;
+`android.yml` builds, lints and tests it when `android/` changes, and the contract tests run on
+every PR but a docs-only one; the plan check counts `android/` as source. Found: Android Lint
+doesn't check `core`'s and `outbox`'s calls against Android 10, so AN3 adds that check. Before it,
+AN1b, the lock decided. Next: AN3, the core; Android 17's SDK platform for the owner to OK before
+the first step with today's AndroidX (Open owner items, 6); AN1's part 2 once the owner has the
+phones. Not on the pilot's critical path._
+
 _Last updated: 2026-11-04 (Central) — AN1b (`docs/DECISIONS.md`, 2026-11-04): Android's lock
 decided, (a), the Accessibility service, with no VPN for now, a battery plan, and Android's gaps
 logged in ISSUES #6 for the device gate to check before launch. Before it, AS0 approved, the
@@ -1994,6 +2004,22 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN3a's line, as it read until it was done (2026-11-04; `docs/DECISIONS.md`, 2026-11-04). The
+conductor split AN3's line into AN3a, AN3b and AN3c that day, every word of it kept in one of them:
+AN3a's here, AN3b's and AN3c's in `docs/PLAN-ANDROID.md`.
+
+- **AN3a** The core (twin: BaliCore), its vocabulary and JSON coding (twin: `Vocabulary.swift`,
+  `JSON.swift` and `Errors.swift`'s `ApiErrorBody`): the vocabulary (`@bali/shared`'s lists, a
+  value it doesn't know read as none), with `ApiErrorCode` and `ApiErrorReason`, and VocabularyTests'
+  port, reading the TypeScript lists in place from `packages/shared/src/`, an input of the test
+  task, so a value added there fails Android's contract job until `core` has it; the JSON coding,
+  BaliJSON's decoder and encoder and the JSON value type, and the error body alone (the client's
+  typed errors are AN3c's), with kotlinx.serialization, recorded in DECISIONS, and CodingTests'
+  matching cases. And the check AN2 found missing: `core`'s and `outbox`'s compiled classes held to
+  Android 10's API, which Android Lint doesn't do for them (DECISIONS 2026-11-04), wired so
+  `android.yml` fails on a violation — validation: `android.yml` green, the check shown failing on a
+  deliberate violation, and the vocabulary test on a value added to a `@bali/shared` list
 
 AN2's line, as it read until it was done (2026-11-04; `docs/DECISIONS.md`, 2026-11-04):
 

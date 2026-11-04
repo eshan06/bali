@@ -2,12 +2,21 @@
 [versions]
 agp = "9.5.0"
 kotlin = "2.4.21"
+kotlinx-serialization = "1.12.0"
+animalsniffer = "2.0.1"
+gummy-bears = "0.16.0"
 
 [libraries]
 # Kotlin's assertions on JUnit 5, its engine and the launcher Gradle 9 no longer brings itself.
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
+# The JSON coding of every body (core's Json.kt); its compiler plugin is Kotlin's own.
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
+# Android 10's API (minSdk 29) as animal-sniffer signatures, with the calls D8 rewrites for it.
+gummy-bears-api29 = { module = "com.toasttab.android:gummy-bears-api-29", version.ref = "gummy-bears" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-lint = { id = "com.android.lint", version.ref = "agp" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+animalsniffer = { id = "ru.vyarus.animalsniffer", version.ref = "animalsniffer" }
