@@ -62,6 +62,39 @@ a real decision? Add a dated entry at the top: what was decided and why.
   hands it. Totals that name no student are the narrowest reading of that, not an answer to it:
   Apple's review stays the answer (ISSUES #3).
 
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (Codex refuses
+  every model on this Mac and no Gemini CLI is installed, so context isolation holds and model
+  diversity doesn't): 0 blockers. Their WARNs, each now named in ARCHITECTURE's section, the first
+  three for the owner:
+  - **PostHog's origin is shared** (both reviewers). `https://us.i.posthog.com` takes events for
+    every PostHog project, the project named by the key in the body, so once it is in `connect-src`
+    a script running in the portal could post the access token to a project of its own. S4 made
+    `connect-src` the token's second barrier ("lets nothing leave but for the API, Cognito and
+    Sentry", 2026-10-04), and M5 refused S3's path-style origin, every bucket of a region, for the
+    same reason. It is not such a script's only way out (a navigation is another), but it is one
+    the CSP closes today. Their suggestion: the portal sends its teacher events to Bali's API,
+    already listed, which checks each one (no URL, no free text) and forwards it with the key kept
+    on the server, so the CSP is unchanged and PostHog never sees a teacher's IP address. The
+    owner's pick, with the no-SDK call, before A3a.
+  - **A class of one** (both). With one student enrolled or tapped in, a class's focus minutes and
+    unlocks are that student's own, which "no event about one student" means to rule out. Their
+    suggestions: hold those totals back below a count, as a question's breakdown waits for 3
+    answers, and send unlocks as one number, never by reason ("nurse" may be health data,
+    `docs/APP-STORE.md`'s table). The owner's call, before A2.
+  - **The privacy manifest ships inside the build** (both). `ios/Bali/PrivacyInfo.xcprivacy` gives
+    Product Interaction App Functionality only, and CI's check compares data types, not purposes
+    (`.github/scripts/privacy-manifests.py`), so Analytics added to the label later needs the
+    manifest changed too, in item 1's build or another, and `docs/APP-STORE.md`'s "Nothing is used
+    for Analytics" with it. And the keys at the end of item 4 turn the server's totals on before
+    item 6 changes any of them. Both are now in PLAN's item 6, for the owner to order.
+  - **A de-identified teacher's id** (Reviewer B). This entry's draft said the privacy paths need
+    nothing new, since PostHog's events then name no one. True of PostHog alone, not once Bali's
+    data is joined in: a teacher who deleted their own account keeps their removed classes' names
+    (#313), and PostHog's sign-in and page times are stored nowhere else. As Bali treats its own
+    kept records, so said plainly instead.
+  - **A replay sends nothing** (Reviewer B): a resent Start answers `existing`, so A2 counts a
+    session started only on `created`. Written into the section.
+
 - **2026-11-04** — **AN5b, the sync engine's drain: BaliOutbox's `SyncEngine` in Kotlin, its drain
   (the conductor's calls, awaiting the owner's look; AN5b, #501).** The owner isn't reviewing each
   step and asked for the recommended option on every question, so each call here is the conductor's,

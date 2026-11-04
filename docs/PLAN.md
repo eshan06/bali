@@ -12,10 +12,10 @@ _Last updated: 2026-11-04 (Central) — A1, PostHog's rules (`docs/DECISIONS.md`
 PostHog on the teacher portal's pages and the server only, never a phone; a class's totals and a
 teacher's actions, nothing about one student; off until the owner sets its keys; no SDK, a plain
 POST (the conductor's call, awaiting the owner). Before it, AN5b, Android's engine's drain (#501).
-Next: A2, the server's class totals, then A3a, A3b and A4; a session builds the retire-a-block
-command; the owner the new build and the sitting; the owner's call on GA5's known limit, the smallest
-iPhones (DECISIONS 2026-11-02); AN5c, Android's read loop; AN1's part 2 once the owner has the
-phones; the audit's polish waits, as ruled._
+Next: the owner's two PostHog calls, a class of one and the CSP's origin, then A2–A4; a session
+builds the retire-a-block command; the owner the new build and the sitting; the owner's call on
+GA5's known limit, the smallest iPhones (DECISIONS 2026-11-02); AN5c, Android's read loop; AN1's
+part 2 once the owner has the phones; the audit's polish waits, as ruled._
 
 ## Now
 
@@ -142,16 +142,19 @@ branch, with no PR, as its README says (#479; `docs/DECISIONS.md`, 2026-11-02).
    retires a block; the owner writes the new code, registers it and retires the old one.
 4. PostHog (ARCHITECTURE's "Analytics (PostHog)"; DECISIONS 2026-11-04), one PR each:
    - **A1** Its rules in the docs — ✅ (DECISIONS 2026-11-04)
-   - **A2** The server's class totals
-   - **A3a** The portal's sender, on for teachers only, with PostHog's origin in the CSP
+   - **A2** The server's class totals, after the owner's call on a class of one
+   - **A3a** The portal's sender, on for teachers only, after the owner's pick: PostHog's shared
+     origin in the CSP, or the API as a relay
    - **A3b** The portal's teacher events
    - **A4** `/privacy` names PostHog, before a key is set
    - Then the owner's keys: `NEXT_PUBLIC_POSTHOG_KEY` in Vercel's `bali-portal`, `POSTHOG_KEY` in
      Railway's `bali prod`.
 5. The external TestFlight group `Vanderbilt pilot` and Beta App Review (`docs/APP-STORE.md`, section
    5), which is Apple's answer on §3.3.3(P) (ISSUES #3).
-6. For PostHog, the App Store privacy label (Product Interaction gains the purpose Analytics) and
-   `docs/APP-STORE.md`'s review note ("no third-party analytics…"). The owner's, later (the owner,
+6. For PostHog, the App Store privacy label (Product Interaction gains the purpose Analytics), the
+   app's privacy manifest to match (it ships inside the build: item 1's, or another), and
+   `docs/APP-STORE.md`'s answers and review note ("no third-party analytics…"); until then they say
+   App Functionality only, though item 4's keys turn the totals on. The owner's, later (the owner,
    2026-11-04: "we can change the wording on privacy stuff on apple later").
 
 Not needed for the Vanderbilt pilot (the owner, 2026-11-03): production backups (L0b) and the lawyer's
