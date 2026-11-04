@@ -38,11 +38,7 @@ struct AgeView: View {
                     Spacer()
                     VStack(alignment: .leading, spacing: 24) {
                         BaliMark(size: 72)
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("When were you born?").textStyle(.h1)
-                            Text("Bali never saves or sends your birth month and year.")
-                                .textStyle(.bodyLg).foregroundStyle(Theme.textSecondary)
-                        }
+                        Text("When were you born?").textStyle(.h1)
                         VStack(alignment: .leading, spacing: 16) {
                             field("Month", picked: picks.month.map { Birth.monthName($0) }) {
                                 ForEach(picks.months(at: today), id: \.self) { month in
