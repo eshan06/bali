@@ -8,6 +8,69 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-04** — **AN3a, the core's vocabulary and JSON coding, and Android 10's API check:
+  kotlinx.serialization, and animal-sniffer with gummy-bears (the conductor's calls, awaiting the
+  owner's look; AN3a, #489).** The owner was asleep and asked for the recommended option on every
+  question, so each call here is the conductor's, for the owner to look at.
+
+  **AN3 in three PRs** (the conductor): AN3a, the vocabulary, the JSON coding and the error body,
+  with Android 10's API check; AN3b, the wire types and every fixture decoded; AN3c, event ids, the
+  API client, `BlockTag` and `AppConfig`. Each is one PR under ~400 lines (`docs/PLAN-ANDROID.md`).
+
+  **The JSON library: kotlinx.serialization** 1.12.0, JetBrains', its compiler plugin Kotlin's own
+  (2.4.21; the library is built with 2.4.10): serializers generated at build time, no reflection,
+  and its R8 rules in its own jar. ARCHITECTURE names none. Set aside: Moshi (reflection, or code
+  generated through KSP, a second compiler plugin) and Gson (reflection, blind to Kotlin's
+  nullability).
+
+  **BaliJSON's twin, `BaliJson`,** codes a body as Swift's Codable does: a field this build doesn't
+  know is skipped, an optional field left out reads as none and none is left out when sent
+  (`explicitNulls = false`), and every other field is sent (`encodeDefaults = true`). A time is a
+  `java.time.Instant` (Android 8 and later, so within Android 10's API) marked `@Contextual`: read
+  with or without milliseconds (`Instant.parse`), sent with them, as `toISOString()` writes it.
+  BaliCore's `JSONValue` is kotlinx's own `JsonElement`, not a type of ours.
+
+  **The vocabulary:** one enum per list, each value spelled as the API spells it (`wire`, Swift's
+  raw value), in its list's order. An answer reads a vocabulary through `OrUnknown`, `Known` or
+  `Unknown`, the unknown kept as sent and sent back so; an error's reason reads one it doesn't know
+  as none. A vocabulary's own coding sends any value, but reads one only for the three BaliCore
+  makes Codable, what the phone keeps and sends (a participation's state, an unlock's reason, a push
+  environment), refusing a value it doesn't know, as Swift's raw values do. Read alone, every other
+  vocabulary refuses even a value it knows: BaliCore can't decode it alone, so a response type that
+  forgets `OrUnknown` doesn't compile there, and here it fails on the first fixture it reads, not on
+  a newer server's value (santa's review). The contract tests' strict reading (`StrictJson`,
+  internal to `core`) is `BaliJson` with a mark added to its module, Swift's
+  `userInfo[.strictVocabulary]`, so a copy of it stays strict. The vocabulary test
+  reads `packages/shared/src/` in place, an input of `core`'s test task: `'hall_pass'` added to
+  `UNLOCK_REASONS` failed `:core:test`, run again rather than cached, naming the list and both
+  sides; then reverted.
+
+  **Android 10's API check:** animal-sniffer (the `ru.vyarus.animalsniffer` Gradle plugin 2.0.1,
+  animal-sniffer 1.24) against gummy-bears' API 29 signatures (0.16.0), on `core`'s and `outbox`'s
+  own classes, in `check` and in `android.yml`'s step "Android 10's API (core, outbox)", with no
+  exceptions configured. Tried: a list's `removeFirst()` and `java.util.HexFormat` in `core`, and a
+  list's `removeLast()` in `outbox`, each failed it; then removed. Their dependencies' classes
+  (Kotlin's library, kotlinx.serialization) aren't checked: each is built for Android itself.
+
+  **Found: `List.of` passes, and rightly.** Gummy-bears counts what D8 rewrites for an older
+  Android, and in the app's debug build D8 turned `List.of(1, 2)` into its own copy
+  (`$$ExternalSyntheticBackport`), while `removeFirst()` stayed a call Android 10 lacks. So AN2's
+  README, which listed `List.of` among the calls that fail on the phone, was wrong about it; it says
+  so now.
+
+  **Said plainly: the plugin isn't ready for Gradle 10.** It calls two Gradle features that Gradle
+  10 and 11 remove (`ReportingExtension.file`, `Configuration.setVisible`), so every build now warns
+  that it is "incompatible with Gradle 10", where AN2's gave no warning. Gradle 10's upgrade needs a
+  release of the plugin without them, or the same check made another way (`android/README.md`,
+  Updating), never the check dropped. Set aside: Toast's Expediter, which checks dependencies'
+  classes too but calls itself under active development, and a task of our own calling
+  animal-sniffer, more build code for the same check.
+
+  **CodeQL doesn't scan Android's Kotlin** (the conductor, from #488's first push to `main`: default
+  setup's "Analyze (java-kotlin)" failed, its build mode "none" unable to scan Kotlin, and GitHub
+  kept the old languages). Scanning it needs CodeQL's advanced setup, the owner's call
+  (`docs/PLAN-ANDROID.md`, Open owner items, 7).
+
 - **2026-11-04** — **AN2, Android's project and CI: `com.bali.bali`, Android 10 and later, targeting
   Android 16 (the conductor's calls, awaiting the owner's look; AN2, #488).** The owner was away and
   asked for the recommended option on every question, so each call here is the conductor's, for the

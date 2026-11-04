@@ -72,6 +72,10 @@ jobs:
       # With the runner's SDK, which the build never adds to: a package it lacks fails here.
       - name: Build the app and the modules
         run: ./gradlew assemble
+      # core's and outbox's classes against Android 10's API, which Android Lint can't check in them:
+      # a call Android 10 lacks fails here (android/README.md, "core and outbox").
+      - name: Android 10's API (core, outbox)
+        run: ./gradlew :core:animalsnifferMain :outbox:animalsnifferMain
       # The app's lint reads core's and outbox's code too, and fails on a warning.
       - name: Android Lint
         run: ./gradlew :app:lint

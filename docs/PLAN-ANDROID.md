@@ -14,14 +14,14 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-04 (Central) — AN2, the project and CI (#488; `docs/DECISIONS.md`,
-2026-11-04): Gradle under `android/` with `core`, `outbox` and `app`, the app `com.bali.bali` for
-Android 10 and later, targeting Android 16; `android.yml` builds, lints and tests it when `android/`
-changes, and the contract tests run on every PR but a docs-only one; the plan check counts
-`android/` as source. Found: Android Lint doesn't check `core`'s and `outbox`'s calls against
-Android 10, so AN3 adds that check. Before it, AN1b, the lock decided. Next: AN3, the core; Android
+_Last updated: 2026-11-04 (Central) — AN3a, the core's vocabulary and JSON coding (#489;
+`docs/DECISIONS.md`, 2026-11-04): `@bali/shared`'s lists in Kotlin, a value `core` doesn't know
+read as unknown, and a test that reads the TypeScript lists in place; kotlinx.serialization for
+every body; and `core`'s and `outbox`'s classes held to Android 10's API in `android.yml`. AN3 is
+three PRs now, AN3a to AN3c. Before it, AN2, the project and CI. Next: AN3b, the wire types; Android
 17's SDK platform for the owner to OK before the first step with today's AndroidX (Open owner items,
-6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
+6); CodeQL for Android's Kotlin, the owner's call (7); AN1's part 2 once the owner has the phones.
+Not on the pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -46,10 +46,10 @@ Each step is one PR from a fresh worker, under ~400 changed lines not counting t
 iOS twin: the Swift it ports, whose rules come with their tests (ARCHITECTURE, "Android app
 structure", the parity rule). A step that grows past that is split (AN4a, AN4b…). Two aren't PRs:
 AN1's spike is a branch never merged, and AS0 is the canvas alone. **An engine step's validation:**
-`android.yml` green (the build, Android Lint and the JVM tests), its twin's tests ported and
-passing, and `/santa-loop`. **A screen step's** adds Compose UI tests that drive each state its
-boards draw, and screenshots from the emulator at the default and the largest font scale, beside
-its boards (👀). **A phone test** (📱) opens every part with its starting state (CLAUDE.md, the
+`android.yml` green (the build, Android 10's API check, Android Lint and the JVM tests), its twin's
+tests ported and passing, and `/santa-loop`. **A screen step's** adds Compose UI tests that drive
+each state its boards draw, and screenshots from the emulator at the default and the largest font
+scale, beside its boards (👀). **A phone test** (📱) opens every part with its starting state (CLAUDE.md, the
 owner's standing orders): the phone and its Android version, the class, focused or unlocked, the
 screen, Airplane mode, the sticker.
 
@@ -124,13 +124,17 @@ After AN1b, at the owner's go. Every rule in plain Kotlin where the JVM tests re
 screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the same server.
 
 - **AN2** The project and CI — ✅ (#488; DECISIONS 2026-11-04)
-- **AN3** The core (twin: BaliCore): the wire types and the vocabulary (`@bali/shared`'s lists, a
-  value it doesn't know read as none), UUIDv7 event ids, the API client and its errors (keyed on
-  `reason`, never the message), and `BlockTag` (an NDEF Text record, or a URI record,
-  `bali://t/<code>` or `https://<host>/t/<code>`). Every `contracts/fixtures/` file is decoded in a
-  test, as BaliCore's Linux job decodes them, so a new fixture fails until `core` reads it. And the
-  check AN2 found missing: `core`'s and `outbox`'s compiled classes held to Android 10's API, which
-  Android Lint doesn't do for them (DECISIONS 2026-11-04)
+- **AN3a** The core's vocabulary and JSON coding, and Android 10's API check — ✅ (#489; DECISIONS
+  2026-11-04)
+- **AN3b** The core's wire types (twin: BaliCore's `API.swift`): the wire types, each answer's
+  vocabulary read through `OrUnknown` (AN3a), and `api.ts`'s lists of each response's own outcomes
+  added to the vocabulary test, with CodingTests' cases for them. Every `contracts/fixtures/` file
+  is decoded in a test, as BaliCore's Linux job decodes them, so a new fixture fails until `core`
+  reads it (ContractFixtureTests' port, without the outbox dispositions, which are AN4's)
+- **AN3c** The core's client (twin: BaliCore's `EventID.swift`, `APIClient.swift`, `BlockTag.swift`
+  and `AppConfig.swift`): UUIDv7 event ids, the API client and its errors (keyed on `reason`, never
+  the message), `BlockTag` (an NDEF Text record, or a URI record, `bali://t/<code>` or
+  `https://<host>/t/<code>`), and `AppConfig`
 - **AN4** The outbox store (twin: BaliOutbox's `Outbox` and `OutboxRecord`): Room in the app's own
   storage; the records; the unlock contract (`contracts/outbox/`; no response ever means delete);
   the outbox's counter and its install id, the phone's order (A12); and Bali's files left out of
@@ -246,6 +250,9 @@ rules); `docs/DESIGN.md` read first, its Android section from AS0; every user-fa
    Google's SDK repository) on the PC before the first step with today's AndroidX, which needs
    compileSdk 37 (androidx.core 1.19, Compose 1.12; DECISIONS 2026-11-04); and Android 10 and 12 or
    13 to test on, as emulator images (each a download) or phones, for ISSUES #6's gap 10.
+7. **CodeQL and Android's Kotlin:** CodeQL doesn't scan Android's Kotlin; scanning it needs CodeQL's
+   advanced setup (default setup switched off by the owner, and a workflow that builds `android/`),
+   the owner's call (DECISIONS 2026-11-04).
 
 ## How to update this file
 

@@ -26,9 +26,9 @@ You need JDK 21 (Android Studio's own, its JBR, as `JAVA_HOME`) and Android's SD
 1. Tell Gradle where the SDK is, once: Android Studio writes `local.properties` when it opens this
    folder; from a shell, write `sdk.dir=C\:\\Users\\<you>\\AppData\\Local\\Android\\Sdk` there, or
    set `ANDROID_HOME`. Git ignores the file.
-2. `./gradlew build` builds the app (its debug and release APKs), runs Android Lint and every
-   module's JVM tests. `./gradlew :core:test :outbox:test` runs the contract tests alone; they need
-   a JDK and no SDK.
+2. `./gradlew build` builds the app (its debug and release APKs), runs Android Lint, every
+   module's JVM tests and the check of Android 10's API (below).
+   `./gradlew :core:test :outbox:test` runs the contract tests alone; they need a JDK and no SDK.
 3. To see the debug build install, start one of the PC's test emulators, `Bali_Spike_API35`, `36` or
    `37` (never the owner's `Pixel_7`, and never signed in to a Google account), then
    `./gradlew :app:installDebug`, and stop it after with `adb -s emulator-5554 emu kill`
@@ -42,17 +42,24 @@ that needs a new SDK package names it, its source and its size for the owner fir
 ## `core` and `outbox`
 
 Both are plain Kotlin, so their tests run on a JDK alone, as BaliCore's and BaliOutbox's run on
-Linux. Their tests read the repo's `contracts/` in place, never a copy: Gradle names the folder in
-the `bali.contracts` system property and makes it an input of the test task, so a changed fixture
-runs them again. Run outside Gradle, the property is unset and they fail, never passing on nothing.
-They compile to Java 17's bytecode, which the app's build turns into Android's.
+Linux. Their tests read the repo's `contracts/` in place, never a copy, and `core`'s read
+`@bali/shared`'s lists (`packages/shared/src/`) so too: Gradle names each folder in a system
+property (`bali.contracts`, `bali.shared`) and makes it an input of the test task, so a changed
+fixture or list runs them again. Run outside Gradle, the properties are unset and they fail, never
+passing on nothing. They compile to Java 17's bytecode, which the app's build turns into Android's.
+Every body is coded with kotlinx.serialization, its compiler plugin Kotlin's own (`core`'s
+`Json.kt`).
 
-**What Android Lint can't see in them.** The app's lint reads their code (`checkDependencies`; each
-applies `com.android.lint`, without which it reads nothing of theirs), but they're built against
-the JDK, not Android, so lint's check for an API newer than the app's minSdk (NewApi) never reaches
-them. A Java API that Android 10 lacks builds and passes here and fails on the phone: `List.of` and
-a list's `removeFirst()` (Android 11 and 15), `java.net.http` (no Android). Kotlin's own work
-everywhere (`listOf`, `removeAt(0)`). `docs/DECISIONS.md` (2026-11-04, AN2) says what AN3 adds.
+**Android 10's API, which Android Lint can't see in them.** The app's lint reads their code
+(`checkDependencies`; each applies `com.android.lint`, without which it reads nothing of theirs),
+but they're built against the JDK, not Android, so lint's check for an API newer than the app's
+minSdk (NewApi) never reaches them. So animal-sniffer checks their compiled classes against
+Android 10's API, the gummy-bears API 29 signatures, in `check` and in `android.yml`
+(`./gradlew :core:animalsnifferMain :outbox:animalsnifferMain`): a call Android 10 lacks fails it,
+such as a list's `removeFirst()` (Android 15) or `java.util.HexFormat` (Android 14). What D8
+rewrites for Android 10 passes, as it should: `List.of` (Android 11) becomes D8's own copy in the
+app. Kotlin's own work everywhere (`listOf`, `removeAt(0)`). The check takes no exceptions: never
+loosen it to pass code.
 
 AN4 picks the outbox's store; Room's JVM build keeps its tests here, on the JVM.
 
@@ -74,14 +81,19 @@ Lint can keep its last report after a change to the manifest alone:
   `gradlew` LF and `gradlew.bat` CRLF.
 - **The Android plugin and Kotlin:** `gradle/libs.versions.toml`. The plugin's own Kotlin is lifted
   to the catalog's. Each plugin release names the Gradle and build tools it needs.
+  kotlinx.serialization's library follows Kotlin: each release names the Kotlin it was built with.
+- **animal-sniffer's plugin** (2.0.1) calls two Gradle features Gradle 10 removes, which every
+  build warns of. Upgrading to Gradle 10 needs a release of it that doesn't, or the same check made
+  another way: never the check dropped.
 - **compileSdk and the build tools:** only to packages the PC's SDK and CI's runner both hold
   ([the runner's list](https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md)).
 
 ## CI
 
 The **Android** workflow (`.github/workflows/android.yml`) runs on every PR that touches `android/`
-or the workflow: it builds the app and the modules, runs the app's Android Lint and every module's
-JVM tests, on Linux with JDK 21 and the runner's SDK, deciding whether to run as `ios.yml` does.
+or the workflow: it builds the app and the modules, checks the modules against Android 10's API,
+runs the app's Android Lint and every module's JVM tests, on Linux with JDK 21 and the runner's SDK,
+deciding whether to run as `ios.yml` does.
 `core`'s and `outbox`'s tests also run on every PR but a docs-only one ("Android contract tests
 (JVM)" in `ci.yml`), as BaliCore's Swift tests do, so a server change that breaks the phone's
 reading of an answer goes red on its own PR.
