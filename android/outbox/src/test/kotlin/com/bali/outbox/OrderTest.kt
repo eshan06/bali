@@ -148,6 +148,23 @@ class OrderTest : OutboxFiles() {
             assertEquals(Outbox.Due.Send(filed), outbox.nextDue(t0))
         }
 
+    // The wait the drain sleeps until, which iOS's tests reach through the engine's clock.
+    @Test
+    fun nothingDueTheWaitIsForTheSoonestRecordThatCouldGoAStuckOneAheadOrThePendingOneBehindIt(): Unit =
+        runBlocking {
+            val (outbox, _) = makeOutbox()
+            val tap = record(outbox, Change.Tap("tag"))
+            val unlock = record(outbox, Change.Unlock("s", null))
+            record(outbox, Change.ProtectionOff("s"))
+            // The tap refused, stuck and due again in 2 s; the unlock behind it unanswered a second later.
+            send(outbox, tap, 409, Answer.badInput)
+            send(outbox, unlock, null, at = at(1))
+            assertEquals(Outbox.Due.Wait(at(2)), outbox.nextDue(at(1)))
+            // Refused again, the tap waits 4 s: the unlock, due at 3 s, is the sooner now.
+            send(outbox, tap, 409, Answer.badInput, at(2))
+            assertEquals(Outbox.Due.Wait(at(3)), outbox.nextDue(at(2)))
+        }
+
     @Test
     fun theStudentsRetryMakesEveryQueuedRecordDueNowAStuckOneTooAndChangesNothingElse(): Unit =
         runBlocking {
