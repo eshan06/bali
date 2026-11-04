@@ -10,6 +10,14 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-11-04 (Central) — AN2 (#488; `docs/DECISIONS.md`, 2026-11-04): Android's
+project and CI, its first code on `main`: Gradle under `android/`, the app `com.bali.bali` for
+Android 10 and later, `android.yml`'s build, lint and JVM tests, Android's contract tests on every
+PR but a docs-only one, and the plan check counting `android/` as source. Before it, AN1b, Android's
+lock decided. Next: a session builds the retire-a-block command; the owner the new build and the
+sitting; the owner's call on GA5's known limit, the smallest iPhones (DECISIONS 2026-11-02); AN3,
+Android's core; AN1's part 2 once the owner has the phones; the audit's polish waits, as ruled._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN5b's on 2026-11-04: _Last updated: 2026-11-04 (Central) —
 CodeQL scans Android's Kotlin (#498; `docs/DECISIONS.md`, 2026-11-04): CodeQL's advanced setup,
 `.github/workflows/codeql.yml`, beside GitHub Actions and JavaScript/TypeScript, every module's code
