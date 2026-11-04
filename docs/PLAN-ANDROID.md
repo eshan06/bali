@@ -14,17 +14,17 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-04 (Central) — AN4e, the outbox's sending (#497; `docs/DECISIONS.md`,
-2026-11-04): BaliOutbox's `Outbox` in Kotlin, its sending side, with its tests: the next record in
-the order the phone acted, a pending one holding those behind it and a stuck one not; each answer
-settled by its own kind's table, a record kept until its answer ends it, an unlock until recorded;
-the backoff from 2 s to a minute, its jitter, and stuck at a refusal or after 8 answers; an unlock
-under a scan that joins no class filed again where the phone stood; the retry; and what holds the
-phone's reads. The app settled a record on `Bali_Spike_API35`. AN4 is done. Before it, AN4d, the
-recording. Next: AN5, the sync engine; Android 17's SDK platform for the owner to OK before the first
-step with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); CodeQL for Android's
-Kotlin, the owner's call (7); AN1's part 2 once the owner has the phones. Not on the pilot's critical
-path._
+_Last updated: 2026-11-04 (Central) — AN5a, the sync engine's frame (#499; `docs/DECISIONS.md`,
+2026-11-04): BaliOutbox's `SyncEngine` in Kotlin, its frame, with its tests and the rig the next
+steps test on: Swift's actor as a lock each stretch holds, Room's calls included, let go at each
+`await`; each public call in the engine's own scope, so a screen cancelled stops waiting and the
+write goes on; the engine made from the file; `record`, its standing kept in its own write, never
+`Unread`; `updates` as a `StateFlow`; and each loop's rings. Found: Room runs a write to its end
+whatever its caller, so a cancel could skip the state it leaves. AN5 is five PRs now, AN5a–AN5e.
+Before it, AN4e, the sending. Next: AN5b, the drain; Android 17's SDK platform for the owner to OK
+before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); CodeQL for
+Android's Kotlin, the owner's call (7); AN1's part 2 once the owner has the phones. Not on the pilot's
+critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -137,20 +137,61 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN4c** The outbox store — ✅ (#495; DECISIONS 2026-11-04)
 - **AN4d** The outbox's recording — ✅ (#496; DECISIONS 2026-11-04)
 - **AN4e** The outbox's sending — ✅ (#497; DECISIONS 2026-11-04)
-- **AN5** The sync engine (twin: `SyncEngine`): the drain with backoff and jitter, the 30-second
-  check-in while the screen is on (ARCHITECTURE, the battery plan; AN7 drives it from the lock's
-  service), and the reconcile (`readMayReconcile` and the typed dispositions), all on a fake clock;
-  `SyncState`, the rest of SyncEngine.swift (`Standing` and its kept form are AN4d's); its writes to
-  the outbox made where no screen can cancel them, and none given `Standing.Unread` (AN4d's review);
-  a send cancelled with its caller, which makes no `Sent` and leaves its record as it was, its attempt
-  uncounted, where iOS settles it as no answer (AN4b); and the tests that reach the outbox's
-  recording through the engine: StandingKeptTests' `kept` and `keptWithItsStanding`,
-  UnreadUnlockTests' but `filing`, ReasonTests' but `refiledReason`, and UnlockRouteTests' `route`
-  and `endsTheTapsShield`
+- **AN5a** The sync engine's frame — ✅ (#499; DECISIONS 2026-11-04)
+- **AN5b** The engine's drain (twin: `SyncEngine`'s `drain`, `answered`, `retryNow` and `reread`):
+  the drain with backoff and jitter; each answer settled, the queue and `sending` changed in one
+  write, a session's answer applied and the other cases named for AN5c–AN5e; `heard`'s link; the
+  standing an answer leaves kept in the file (moved from AN5a, which has no answer to keep); and a
+  send cancelled with its caller, which makes no `Sent` and leaves its record as it was, its attempt
+  uncounted, where iOS settles it as no answer (AN4b). With them the fields their code first sets
+  (`rereading`, `refreshed`), the top of each pass answering the rings before it, and the rig's
+  `tapIn`. Tests: DrainTests' `sendsAtOnce`, `backsOff`, `inOrder`, `ringWhileBusy`, `noToken`,
+  `runsAgain`, `storageFails` and `retryNow`; AnswerTests' `tapAnswered`, `actsAtOnce` and
+  `laterChangeStands`; and new: a run cancelled mid-send leaves its record due, a record whose caller
+  was cancelled is sent, and an answer's standing is kept
+- **AN5c** The engine's read loop (twin: `SyncEngine`'s `read`, `reconcile` and `heard`): the
+  30-second check-in while the screen is on (ARCHITECTURE, the battery plan; AN7 drives it from the
+  lock's service: on, a read at once, then every 30 s, rule 3's check at each wake; off, one check-in
+  in a session, then nothing), and the reconcile (`readMayReconcile` and the typed dispositions), all
+  on a fake clock; the unlock guard; the 401 rule (`heard`'s refresh, once per rejection, one at a
+  time) and the refusal shown; `record`'s report again; and `me`, its failure and its reads. Bali's own
+  screen going behind still sends a held unlock at once. With them `checkInInterval`, the screen's
+  and the check's fields and `reauth`, and the rig's `foreground`. Tests: DrainTests' `reauth`,
+  `reauthFails`, `retryNowEndsRejection`, `sharedRefresh` and `dropShown`; AnswerTests'
+  `tapWithoutWindow`, `unlockNoted` and `supersededGoneIsTheAPIs`; ReadTests but `waitingStays`;
+  StaleReadTests' `readBeforeChange`, `readWhileAwaiting`, `unlockGuard` and
+  `refocusAfterStuckUnlock`; ClassesTests' `classes`, `failed`, `outReads`, `classesOverStaleStanding`
+  and `outTakesPastSession`; StandingKeptTests' `unread`, `unreadSettled` and `checkAtEachWake`; the
+  engine's half of ProtectionOffTests' `reportedAgain` and `onlyFocusAgain`; and `cadence` and
+  `checkAtEachWake` set to the screen (its going off sends one check-in, where iOS's going behind
+  sends none), with a new test for it
+- **AN5d** The engine's wait for the Start (#166; twin: `SyncEngine`'s `armed` and
+  `SyncState.waitEnds`): an arming's wait, kept for a relaunch, and its end at the end of the day by
+  the phone's clock, a `ZoneId`'s; and the reads while waiting. Tests: AnswerTests' `armed`;
+  ReadTests' `waitingStays`; ClassesTests' `waitingReads`, `armedPastTheBell` and `overIsNoStart`;
+  StandingKeptTests' `kept`, `unreadArmed`, `unreadArmedOut` and `unreadArmedFileBack`; and the
+  engine's half of DroppedWaitTests' seven and WaitingHomeTests' `startFromHome` (their screens'
+  checks are AN10's)
+- **AN5e** Emergency Unlock in the engine (twin: `SyncEngine`'s `emergencyUnlock`, `pressUnlock`,
+  `explain` and `backToFocus`): where it is filed (under a tap not answered, in its session, or not
+  yet: B6b), its reason, held 15 s for it (`reasonHold`), and the late unlock (`Superseded`,
+  `RecordedUnlock`); `record`'s lock back on and what each change clears; from `Enforcement`, the
+  tap's cap and `shieldedUntil`, from `Unlocked`, `unlock(in:)`, and from `Join`, the renewal on a
+  401, the engine's own until AN9; outcomes as types, the words AN10's; and `unanswered`. Tests:
+  ShieldedUntilTests' three; UnderTapEngineTests' seven; RefiledTests' `refiled`, `joined`, `guards`
+  and `afterThePress`; StaleReadTests' `lateUnlockLands`, `lateAnswerWithNoReturn`,
+  `lateUnlockOverStuckUnlock`, `lateUnlockAfterReturn` and `protectionOffOverStuckUnlock`; the
+  engine's half of BackOnTests' `once`, `lateUnlocked`, `unlockedSince` and `notKnown`;
+  `keptWithItsStanding`'s lock check, which AN5a left; and the tests that reach the outbox's
+  recording through the engine: UnreadUnlockTests' but `filing`, ReasonTests' but `refiledReason`,
+  and UnlockRouteTests' `route` and `endsTheTapsShield`
 - **AN6** Sign-in (twin: `SignIn`, `TokenStore`): Cognito's hosted UI in a Custom Tab, the code
   grant with PKCE; tokens sealed by a Keystore key; the refresh, Sign out, `Tokens.checked` (no
   token to Bali's API before the 13+ check, but the check's own read and a deletion's) and the
-  deletion token; only a real `401` signs anyone out; and `AppConfig`'s app side, which AN3c left
+  deletion token; only a real `401` signs anyone out; the engine's `make` over the sign-in, its tokens
+  and refresh, a token that arrives sending everything again, with SignInEngineTests'
+  `signInSendsAtOnce`, `reauthRenews`, `refusedWaitsForSignIn` and `ownRenewalSendsAtOnce` (AN5's
+  split); and `AppConfig`'s app side, which AN3c left
   here: Android's build setting its values, with a test pinning its keys to both sides, as iOS's
   pins Info.plist to `project.yml`. 🔧 The owner makes Android's Cognito app clients on dev and
   prod (no secret; the scopes iOS's client has, `aws.cognito.signin.user.admin` among them for
@@ -160,7 +201,10 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
   Accessibility service, (a), as ARCHITECTURE's battery plan has it (listening only in a lesson,
   and then to window events, the covered app sent to the background); the system allow-list
   (decision 2); rule 3 at every check-in; protection off and on, with iOS's events; the bell, from
-  the session's window; and a Debug readout like iOS's for the phone checks. Its first question is
+  the session's window; and a Debug readout like iOS's for the phone checks. From SyncEngine.swift,
+  `setTapCap`, and the enforcer's suites: EnforcerTests, RevokedWhileRunningTests, LaunchGraceTests,
+  the rest of ProtectionOffTests and BackOnTests, and StandingKeptTests' `unreadCapped` and
+  `unreadCappedOverHeld` (AN5's split). Its first question is
   answered (the owner, 2026-11-04): the service checks in every 30 s while the screen is on, once
   as it goes off and once as it comes on, so an awake phone gone quiet means Bali stopped or lost
   its network. Still for the owner: whether Bali, opened again, reports how long it was stopped;
@@ -173,11 +217,17 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
   Bali when it's closed — validation: the JVM tests, then a real block on both phones, offline
 - **AN9** The account's flows (twin: `Join`, `Me`, `History`, `Age`, `Deletion`): Join with the
   consent list, Me, History, the 13+ check (C7, C7-server), Your name, and Delete account (what the
-  phone queued first, every Emergency Unlock first, then `DELETE /v1/me`, then Cognito's DeleteUser)
+  phone queued first, every Emergency Unlock first, then `DELETE /v1/me`, then Cognito's DeleteUser);
+  with SyncEngine.swift's calls for them (`lookUp`, `history`, `ageCheck`, `join`, `rename`, `leave`,
+  `unlockUnsent`, `forgetMe`, `deleteAccount`, the 13+ yes at each wake) and their suites:
+  JoinEngineTests, LeaveEngineTests, MeEngineTests, HistoryEngineTests, AgeFallbackTests,
+  DeleteAccountTests and DeletionOrderTests (AN5's split)
 - **AN10** The router and the screens' rules (twin: `Screen.swift`, `FocusWords`, `UnlockedWords`,
   `ProtectionOffWords` and `ShieldWords`): which screen shows when, and what Focus, Unlocked,
   Protection off and the block screen say (rule 3: no countdown over nothing locked), their rules
-  and tests ported; the words from AS0's approved boards, so AN10 follows AS0
+  and tests ported; from SyncEngine.swift, Home's Tap in (`tapIn`) and every word the engine says,
+  with TapInTests, BellRedrawTests and UnlockedTests (AN5's split); the words from AS0's approved
+  boards, so AN10 follows AS0
 - **AN11** The API's push (cloud; twin: `apps/api/src/push/apns.ts`): an FCM sender beside APNs,
   under the same rules (after the Start commits, the same words, no personal data, a token reported
   gone deleted); an additive field on the push-token endpoint, `PUT` and `DELETE`, naming the
@@ -192,7 +242,9 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN12** The app's push (twin: the push's app half, #456): the FCM token registered at each launch
   and removed at Sign out; Android's notification permission (Android 13 and later) asked once,
   right after onboarding's permission steps, as iOS asks after its Screen Time step; and #336's
-  random wait of up to 10 s before the first read after a fresh alert — validation: the JVM tests,
+  random wait of up to 10 s before the first read after a fresh alert; from SyncEngine.swift,
+  `PushWait`, `holdRead`, `endWait` and the token's register and remove (an FCM token sent as it
+  comes, never as hex), with PushTests but its words (AN5's split) — validation: the JVM tests,
   then an end-to-end check like N6's on an Android phone (📱)
 - **AN13** The live lesson's engine (twin: `LiveLesson`, L5, and M7's deck download and cache): the
   poll and the answer, the deck downloaded, checked against its `sha256` and cached, and a page

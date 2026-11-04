@@ -110,6 +110,18 @@ as it commits, and an Emergency Unlock's record outlives the phone losing power 
 connection, each number bound as a number, never as text, which SQLite ranks above every number
 (AN4e).
 
+**The sync engine** (`outbox`'s `SyncEngine.kt` and `SyncState.kt`, BaliOutbox's `SyncEngine`) is
+the one owner of the phone's server communication, built in five steps from its frame (AN5a); the
+app records what the phone did through it, never the outbox itself. Swift's actor is a lock each
+stretch holds, Room's calls included, let go at each `await`; no stretch is cut short by a cancel;
+and each public call runs in the engine's own scope, the app's, so a screen cancelled stops waiting
+while the write goes on: an Emergency Unlock's record is never discarded. Room runs a write to its
+end whatever its caller, so a cancel landing as it returned would skip the state it leaves
+(`docs/DECISIONS.md`, 2026-11-04, AN5a). Its tests run on a rig of their own (`EngineSupport.kt`,
+BaliOutbox's `EngineSupport.swift`): a clock the test moves, since coroutines-test's virtual time
+can't drive Room's queries, a server answered by hand, and the bundled driver watched, which sees
+each commit as GRDB's `TransactionObserver` does.
+
 ## Android Lint
 
 The app's lint fails on any warning, in every module, but four checks of versions (a newer release

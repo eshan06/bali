@@ -7,6 +7,7 @@ import androidx.room.execSQL
 import androidx.room.immediateTransaction
 import androidx.room.useReaderConnection
 import androidx.room.useWriterConnection
+import androidx.sqlite.SQLiteDriver
 import androidx.sqlite.SQLiteStatement
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import com.bali.core.EventId
@@ -32,9 +33,10 @@ import kotlin.random.Random
  * Each write is one transaction, all or nothing, and reaches the disk before it returns: Room keeps
  * the file in WAL at `synchronous = NORMAL`, under which the phone losing power in the seconds after
  * a write can undo it, so every write sets FULL first (`docs/DECISIONS.md`, 2026-11-04, AN4d): an
- * Emergency Unlock's record is never discarded. Unlike iOS's, a write is cancelled with its caller:
- * undone before it commits, or, after, kept with the caller hearing only the cancel; so the sync
- * engine (AN5) writes where no screen can cancel it. [random], from 0 to 1, is the jitter's.
+ * Emergency Unlock's record is never discarded. Nor does a caller's cancel cut a write short: Room
+ * runs each in a scope of its own, to its end, the caller waiting for it, then hearing only the
+ * cancel, whatever it was to do next left undone; so the sync engine (AN5) writes where no screen can
+ * cancel it. [random], from 0 to 1, is the jitter's.
  */
 class Outbox private constructor(internal val file: OutboxDatabase, private val random: () -> Double) : AutoCloseable {
     internal val dao = file.dao()
@@ -454,7 +456,14 @@ class Outbox private constructor(internal val file: OutboxDatabase, private val 
          * one doesn't know, nor wiped: Room has no migration down.
          */
         fun open(builder: RoomDatabase.Builder<OutboxDatabase>, random: () -> Double = { Random.nextDouble() }): Outbox =
-            Outbox(builder.setDriver(BundledSQLiteDriver()).addCallback(Created).build(), random)
+            open(builder, random, BundledSQLiteDriver())
+
+        /**
+         * [open], over [driver]: the bundled one, which a test's wraps to see each commit as it lands,
+         * as GRDB's `TransactionObserver` does on iOS.
+         */
+        internal fun open(builder: RoomDatabase.Builder<OutboxDatabase>, random: () -> Double, driver: SQLiteDriver): Outbox =
+            Outbox(builder.setDriver(driver).addCallback(Created).build(), random)
     }
 }
 

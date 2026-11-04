@@ -8,6 +8,87 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-04** — **AN5a, the sync engine's frame: BaliOutbox's `SyncEngine` in Kotlin, its frame
+  (the conductor's calls, awaiting the owner's look; AN5a, #499).** The owner isn't reviewing each
+  step and asked for the recommended option on every question, so each call here is the conductor's,
+  for the owner to look at.
+
+  **AN5 in five PRs** (the conductor): AN5a, the frame; AN5b, the drain; AN5c, the read loop (the
+  check-ins while the screen is on, the reconcile, the 401 rule); AN5d, the wait for the Start
+  (#166); AN5e, Emergency Unlock (where it is filed, its reason, the late unlock). Each line in
+  `docs/PLAN-ANDROID.md` names its part of SyncEngine.swift and its iOS tests, and AN6's, AN7's,
+  AN9's, AN10's and AN12's lines name the parts that are theirs. Moved from the planning read, as the
+  code has it: the standing an answer leaves kept in the file, to AN5b, since AN5a has no answers;
+  each field and constant to the step whose code reads it (`checkInInterval` AN5c's, `reasonHold`
+  AN5e's, `rereading` and `refreshed` AN5b's); the rig's `tapIn` and `foreground` to the loops they
+  wait on; and `keptWithItsStanding`'s lock check to AN5e, whose `shieldedUntil` it calls.
+
+  **Where it lives:** `outbox`'s `SyncEngine.kt` (`SyncClock`, `SystemClock`, the engine and a loop's
+  `Rings`) and `SyncState.kt` (`SyncState`'s core and `Link`); `outbox` takes coroutines as `api`
+  now, the engine's own API being its scope and its flow. Where Kotlin differs, said plainly:
+  - **Swift's actor is a `Mutex`** no stretch takes twice: held through each stretch Swift runs
+    without an `await`, Room's reads and writes included, and let go at each `await` (a send, a
+    refresh, the check, a pause). A dispatcher of the engine's own wouldn't do: Room's calls suspend,
+    so a settle or a check-in could land between `record`'s write and its state update.
+  - **No stretch is cut short** (`withContext(NonCancellable)`): a cancel lands after it.
+  - **Each public call runs in the engine's own scope** (`scope.async { … }.await()`), the app's
+    under a `SupervisorJob` of the engine's: a caller cancelled stops waiting at once, and the
+    stretch, its write included, goes on, so an Emergency Unlock's record is never discarded.
+  - **The engine is made by a suspend factory, `SyncEngine.open`,** Room's reads suspending: it takes
+    the app's scope, the clock and `refresh` (`{ false }` until AN6's sign-in), the seams AN6 and AN7
+    fill. It reads the file as Swift's `init` does, each part on its own, keeping and publishing
+    nothing, as Swift's `didSet` doesn't run in an `init`.
+  - **`SyncState` is a data class of `val`s,** each change a copy, as AN4a's `ReconcileStamp` is: a
+    state a screen holds never moves under it. **`updates` is a `StateFlow`,** the newest state only,
+    as Swift's stream keeps the newest.
+  - **A loop's rings are a conflated channel** (`Rings`): a ring made while the loop is busy ends its
+    next pause at once, many as one. A pause's deadline is the engine's clock's, its alarm a child of
+    the pause, cancelled when a ring ends it, so it leaves no ring behind, where Swift numbers each
+    pause.
+  - **`SystemClock`'s uptime is `System.nanoTime`'s,** which no setting of the time moves and which,
+    like iOS's, stops while the phone sleeps: only a span between two readings means anything.
+  - **No `isSuspension`:** Android has no app group, so every storage failure is shown.
+  - **`stored` returns a `Result`,** where Swift's gives an optional of an optional: a read that
+    answered none (`reportedOff` after a tap) is kept apart from one that failed.
+  - **`run` lets go of its one run however it ends,** as Swift's `defer` does.
+  - **`Outbox.open` takes a driver,** internally: the bundled one, which a test's wraps to see each
+    commit, Room having no twin of GRDB's `TransactionObserver`. The app's `open` is unchanged.
+
+  **Found: Room runs a write to its end whatever its caller.** Room 2.8.5 runs each connection's work
+  in a scope of its own, under the database's `SupervisorJob`, on the JVM and on Android (its
+  `DBUtil.getCoroutineContext` and `getQueryContext`, read 2026-11-04): a caller cancelled mid-write
+  neither cuts it short nor undoes it, but waits for it, then hears the cancel in place of its result,
+  and whatever it was to do next is left undone. AN4d's note, a write "cancelled with its caller",
+  was wrong: `Outbox.kt`'s doc now says so, held by a test (`DurabilityTest`). The engine's pattern
+  stands, its why sharper: a cancel landing as a write returns would skip the state the write leaves
+  (the queue shown, the standing kept, the drain rung), which `NonCancellable` keeps from happening.
+
+  **The rig** (EngineSupport.swift's): `TestClock`, a `SyncClock` the test moves, since
+  coroutines-test's virtual time can't drive Room's queries, which run outside its scheduler;
+  `Server` over core's `HttpTransport`, each request waiting for the test's answer; `Tokens`; and
+  `Rig`, its run started at once, with `EngineFiles` stopping each test's engines. `Relaunches` opens,
+  at each commit to the file, the engine the next launch would, through `Watching`, the bundled driver
+  watched, which also holds a write once begun (`HeldWrite`) while a test cancels its caller.
+  `Answer`'s engine answers come with the tests that send them.
+
+  **The tests:** TestClockTests' `heldSleepCancels`; StandingKeptTests' `keptWithItsStanding`, but
+  its lock check (AN5e's); and new: a record whose caller is cancelled still kept, the caller waiting
+  no longer; `Unread` never handed to the file; the standing kept in the file by each change's own
+  write, the queue, the report and the last tap with it, and read back by a relaunch; a standing a
+  launch couldn't keep, kept at its first change, filing the press made unread; a run cancelled
+  mid-stretch finishing it, and letting go of its run; one run at a time; the engine made from the
+  file, a part it can't read shown; the rings' rules; `SyncState`'s `pendingTap` and `holdsUnfiled`;
+  the rig's server; and a write run to its end. Tried, each failing by name, then reverted: the
+  standing kept apart from its record (a relaunch stood focused beside the unlock); the call in its
+  caller's coroutine (the cancelled caller waited for the write); `Unread` handed to the file; a
+  stretch a cancel cuts short (the press filed, the queue shown unfiled); the standing taken as kept
+  over an unlock not filed; the queue not read again after a filing; two runs at once; a run never
+  let go; every ring queued; an alarm that outlives its pause; a sleep no cancel ends; a queue it
+  can't read not shown; and a read that answered none taken for a failure. Not reached yet: `changes`,
+  the drain's ring, and the engine's own `Unread` check in `update`, the file refusing to keep `Unread`
+  all the same, each seen first by AN5b's and AN5c's tests. Nothing was added to the PC's SDK: its
+  folders were compared before and after.
+
 - **2026-11-04** — **AN4e, the outbox's sending: BaliOutbox's `Outbox` in Kotlin, its sending side
   (the conductor's calls, awaiting the owner's look; AN4e, #497).** The owner was asleep and asked
   for the recommended option on every question, so each call here is the conductor's, for the owner

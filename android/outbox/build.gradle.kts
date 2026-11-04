@@ -33,11 +33,11 @@ dependencies {
     api(project(":core"))
     // The app builds the file with Room's own builder, Android's, and hands it to Outbox.open.
     api(libs.room.runtime)
+    // The sync engine's own API: the scope its calls run in, its state as a flow (SyncEngine.kt).
+    api(libs.kotlinx.coroutines.core)
     implementation(libs.sqlite.bundled)
     ksp(libs.room.compiler)
     testImplementation(libs.kotlin.test)
-    // runBlocking, for the tests of a record's send, which suspends as the client's calls do.
-    testImplementation(libs.kotlinx.coroutines.core)
     // The classes held to Android 10's API, which Android Lint can't do here (README.md).
     signature(libs.gummy.bears.api29) { artifact { type = "signature" } }
 }
