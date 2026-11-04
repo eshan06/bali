@@ -8,6 +8,52 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-04** — **AN3c, the core's event ids, NFC tag reading and app config: BaliCore's
+  `EventID.swift`, `BlockTag.swift` and `AppConfig.swift` in Kotlin (the conductor's calls,
+  awaiting the owner's look; AN3c, #491).** The owner was asleep and asked for the recommended
+  option on every question, so each call here is the conductor's, for the owner to look at.
+
+  **AN3c in two PRs** (the conductor): AN3c, event ids, `BlockTag` and `AppConfig`; AN3d, the API
+  client and its errors, keyed on `reason`, never the message. Each is one PR under ~400 lines
+  (`docs/PLAN-ANDROID.md`).
+
+  **Event ids:** `EventId.mint`, `EventID.swift` step for step: sixteen bytes from `SecureRandom`,
+  as Swift takes them from the system's secure generator, never a plain `Random` (an id repeated
+  across phones would read as a replay); the first six the time in milliseconds; then UUIDv7's
+  version and variant; written out in lower-case hex by hand, since Java doesn't promise
+  `UUID.toString()`'s case and the API takes lower case only. Its tests: LiveLessonTests'
+  EventIDAfterTests, and OutboxTests' `eventIds`, BaliOutbox's test of BaliCore's code, ported to
+  `core` beside it, so AN4 leaves it. Said plainly: `core`'s own lint, which `check` runs and which
+  knows no minSdk, warns `TrulyRandom` there (`SecureRandom` was seeded badly on Android 4.3 and
+  older); the app's lint, the gate, reads `core` at Android 10 and reports nothing, so nothing is
+  waived.
+
+  **`BlockTag`:** `BlockTag.code(records)`, `BlockTag.swift`'s rules, with BlockTagTests' cases. A
+  record is the three fields of Android's `NdefRecord` (`tnf`, a `Short`; `type`; `payload`), so
+  `core` stays plain Kotlin and AN8 hands them over as they come. `BlockRead`, what a scan found,
+  shares the Swift file and comes with it, for AN5's sync engine and AN8's reader. Where Kotlin's
+  library and Foundation's differ:
+  - **The space trimmed around a code is Foundation's,** `whitespacesAndNewlines` as
+    swift-corelibs-foundation's CFUniChar.c lists it (read 2026-11-04), not Kotlin's `trim()`:
+    every character compared on the JVM, Kotlin's `isWhitespace()` differs in six, U+001C to
+    U+001F, which only Kotlin trims, and U+0085 and U+200B, which only Foundation does. A test pins
+    the six.
+  - **A link is read with `java.net.URI`,** where BaliCore reads it with `URLComponents`: alike for
+    the two forms a block's link takes. A link of neither, such as `https:t/<code>` with no `//`,
+    from which `URLComponents` reads the path `t/<code>` and Java no path, is no block here; only a
+    hand-written tag could hold one.
+
+  **`AppConfig`:** `AppConfig.from(info)`, `AppConfig.swift`'s reading under iOS's Info.plist key
+  names, with AppConfigTests' `reads` and one test more: a value that isn't a URL where one is
+  wanted, or isn't text, reads as not set up. A URL is what `java.net.URI` reads, so a value with a
+  space is none here, where iOS 17's `URL(string:)` percent-encodes it; the build sets these values,
+  never a student. `Cognito`, the three values sign-in needs, comes from `SignIn.swift`. **The app's
+  side waits for AN6, sign-in,** as the conductor recommended: where Android's build sets the
+  values, and the test pinning the keys to both sides, as AppConfigTests' `agree` pins Info.plist
+  to `project.yml`. Android's Cognito app client and its redirect URI are AN6's and the owner's
+  (🔧), so wired now it would hold placeholders. AppConfigTests' `appIcon`, iOS's check of its own
+  icon, has no twin until Android's app has an icon.
+
 - **2026-11-04** — **AN3b, the core's wire types, and every fixture decoded (the conductor's
   calls, awaiting the owner's look; AN3b, #490).** The owner was asleep and asked for the
   recommended option on every question, so each call here is the conductor's, for the owner to
