@@ -3,6 +3,8 @@ package com.bali.outbox
 import androidx.sqlite.SQLiteException
 import com.bali.core.ActionOrder
 import com.bali.core.BaliJson
+import com.bali.core.MeResponse
+import com.bali.core.OrUnknown
 import com.bali.core.ParticipationState
 import com.bali.core.ProtectionOffRequest
 import com.bali.core.RefocusRequest
@@ -74,6 +76,40 @@ object Answer {
     val unknownBlock = """{"error":{"code":"not_found","message":"unknown block"}}"""
 
     fun refused(reason: String) = """{"error":{"code":"conflict","reason":"$reason","message":"$reason"}}"""
+
+    /** An unlock recorded after its session's end: no state, the session it ended named. */
+    fun unlockAfterEnd(view: SessionView = session()) =
+        """{"outcome":"recorded","recordedAs":"after_session_end","state":null,"session":${json(view)},"reason":null}"""
+
+    /**
+     * A late unlock of a student no longer in the session: recorded, with no state (A11), its session
+     * named, as the API answers it (`unlock/recorded-superseded-gone`; #119's review).
+     */
+    val supersededGone = """{"outcome":"recorded","recordedAs":"superseded","state":null,"session":${json(session())},"reason":null}"""
+
+    fun protectionOff(view: SessionView = session()) =
+        """{"outcome":"applied","recordedAs":null,"state":"protection_off","session":${json(view)}}"""
+
+    /** A check-in's answer: the session [view] live, the phone in [state]. */
+    fun live(view: SessionView = session(), state: String = "focused") = """{"status":"live","state":"$state","session":${json(view)}}"""
+
+    /** A check-in's answer: nothing live there any more. */
+    val gone = """{"status":"gone","state":null,"session":null}"""
+
+    /**
+     * `GET /v1/me`'s answer: the live session [view] in [state] (none: none), and [classes], each as
+     * [inClass] writes one.
+     */
+    fun me(view: SessionView? = session(), state: String = "focused", classes: List<String> = emptyList()): String {
+        val live =
+            view?.let {
+                BaliJson.encodeToString(MeResponse.Session.serializer(), MeResponse.Session(it.id, it.classId, it.endsAt, OrUnknown.Unknown(state)))
+            }
+        return """{"user":{"id":"u","role":"student","displayName":null},"classes":[${classes.joinToString(",")}],"session":$live}"""
+    }
+
+    /** Class [id] as `GET /v1/me` names it, with its teacher. */
+    fun inClass(id: String) = """{"id":"$id","name":"Class $id","teacher":{"displayName":"Ms. Rivera"}}"""
 
     private fun json(view: SessionView) = BaliJson.encodeToString(SessionView.serializer(), view)
 }

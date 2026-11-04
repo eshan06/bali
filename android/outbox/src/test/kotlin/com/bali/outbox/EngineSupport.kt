@@ -17,6 +17,7 @@ import java.io.File
 import java.io.IOException
 import java.time.Duration
 import java.time.Instant
+import java.time.format.DateTimeFormatterBuilder
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -50,14 +51,17 @@ import kotlinx.serialization.json.jsonPrimitive
 
 // The engine's test rig, BaliOutbox's EngineSupport.swift: a clock the test moves, a server it answers
 // by hand, B4's stand-in for the tokens, and an engine running over them. coroutines-test's virtual
-// time can't stand in for the clock: Room's queries run outside its scheduler. The rig's `foreground`
-// comes with the read loop it waits on (AN5c's), and `Answer`'s engine answers with the tests that
-// send them.
+// time can't stand in for the clock: Room's queries run outside its scheduler. The rig's `screenOn` is
+// iOS's `foreground`, the check-ins following the screen (AN5c), and `Answer`'s engine answers come
+// with the tests that send them.
 
 /** The routes the engine's tests answer, as [Server.Exchange.route] names them: BaliOutbox's tests' own. */
 val tapRoute = "POST /v1/taps"
 val unlockRoute = "POST /v1/sessions/s/unlock"
 val refocusRoute = "POST /v1/sessions/s/refocus"
+val protectionOffRoute = "POST /v1/sessions/s/protection-off"
+val checkInRoute = "POST /v1/sessions/s/checkin"
+val meRoute = "GET /v1/me"
 
 /**
  * How long, in real time, a test waits for the engine before it fails instead of hanging: well past
@@ -65,6 +69,9 @@ val refocusRoute = "POST /v1/sessions/s/refocus"
  * it all.
  */
 val patience = 60.seconds
+
+/** [time] as the API writes one, with its milliseconds: a request's `deviceTime`. BaliOutbox's tests' `iso`. */
+fun wire(time: Instant): String = DateTimeFormatterBuilder().appendInstant(3).toFormatter().format(time)
 
 /** Waits, in real time, for [condition]; never true in time fails the test. */
 suspend fun eventually(condition: suspend () -> Boolean) {
@@ -282,6 +289,16 @@ class Rig(val engine: SyncEngine, val outbox: Outbox, val server: Server, val cl
         until { it.standing == Standing.InSession(view, ParticipationState.Focused) && it.queued.isEmpty() }
     }
 
+    /**
+     * The screen on, the read of the truth it makes at once answered with [me]; the read loop then waits
+     * for its next check-in. BaliOutbox's tests' `foreground`.
+     */
+    suspend fun screenOn(me: String = Answer.me()) {
+        engine.setScreenOn(true)
+        server.next(meRoute).reply(200, me)
+        eventually { clock.deadlines.contains(clock.now() + SyncEngine.CHECK_IN_INTERVAL) }
+    }
+
     /** Stops the engine: its loops must end. */
     suspend fun stop() {
         running.cancel()
@@ -380,27 +397,34 @@ class HeldWrite {
 
 /**
  * The bundled driver, its writes watched on the connection that makes each: [began] runs as a write's
- * transaction begins, and [committed] as it lands, before its write returns.
+ * transaction begins, and [committed] as it lands, before its write returns; [stepping] runs with each
+ * statement's SQL as it steps, and refuses the step by throwing, as a failing disk refuses one read.
+ * (Room keeps each statement it prepares on its connection, so a step, not a prepare, is each use.)
  */
 class Watching(
     private val began: () -> Unit = {},
     private val committed: () -> Unit = {},
+    private val stepping: (String) -> Unit = {},
     private val bundled: SQLiteDriver = BundledSQLiteDriver(),
 ) : SQLiteDriver by bundled {
-    override fun open(fileName: String): SQLiteConnection = Watched(bundled.open(fileName), began, committed)
+    override fun open(fileName: String): SQLiteConnection = Watched(bundled.open(fileName), began, committed, stepping)
 }
 
 /**
  * A connection whose transactions are watched: Room begins a write `IMMEDIATE` (its file's creation
  * `EXCLUSIVE`) and a read `DEFERRED`, so only a write's end is a commit.
  */
-private class Watched(private val connection: SQLiteConnection, private val began: () -> Unit, private val committed: () -> Unit) :
-    SQLiteConnection by connection {
+private class Watched(
+    private val connection: SQLiteConnection,
+    private val began: () -> Unit,
+    private val committed: () -> Unit,
+    private val stepping: (String) -> Unit,
+) : SQLiteConnection by connection {
     private var writing = false
 
     override fun prepare(sql: String): SQLiteStatement {
         val statement = connection.prepare(sql)
-        val stepped: (() -> Unit)? =
+        val stepped: () -> Unit =
             when {
                 sql.startsWith("BEGIN IMMEDIATE") || sql.startsWith("BEGIN EXCLUSIVE") -> {
                     {
@@ -417,15 +441,19 @@ private class Watched(private val connection: SQLiteConnection, private val bega
                     }
                 }
                 sql == "ROLLBACK TRANSACTION" -> ({ writing = false })
-                else -> null
+                else -> ({})
             }
-        return if (stepped == null) statement else Stepped(statement, stepped)
+        return Stepped(statement, { stepping(sql) }, stepped)
     }
 }
 
-/** A statement whose every step runs [stepped] once it has. */
-private class Stepped(private val statement: SQLiteStatement, private val stepped: () -> Unit) : SQLiteStatement by statement {
-    override fun step(): Boolean = statement.step().also { stepped() }
+/** A statement whose every step runs [before] first, which may refuse it, and [stepped] once it has. */
+private class Stepped(private val statement: SQLiteStatement, private val before: () -> Unit, private val stepped: () -> Unit) :
+    SQLiteStatement by statement {
+    override fun step(): Boolean {
+        before()
+        return statement.step().also { stepped() }
+    }
 }
 
 /** The rig's clock: BaliOutbox's tests' TestClockTests. */

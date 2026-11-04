@@ -1,6 +1,7 @@
 package com.bali.outbox
 
 import com.bali.core.ApiErrorReason
+import com.bali.core.BaliJson
 import com.bali.core.ParticipationState
 import com.bali.core.UnlockReason
 import java.net.URI
@@ -9,10 +10,14 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.jsonObject
 
 /** [t0] as the API writes a time: a record's `deviceTime`, when the phone acted. */
 private const val SENT_AT = "2026-09-21T14:13:20.000Z"
@@ -20,7 +25,7 @@ private const val SENT_AT = "2026-09-21T14:13:20.000Z"
 /** In session s, ending [endsAt] seconds after [t0], in [state]. */
 private fun inSession(state: ParticipationState, endsAt: Long = 3000) = Standing.InSession(session(endsAt = endsAt), state)
 
-/** The drain: the outbox, sent through the one client. BaliOutbox's DrainTests, AN5b's part. */
+/** The drain: the outbox, sent through the one client. BaliOutbox's DrainTests, AN5b's and AN5c's parts. */
 class DrainTest : EngineFiles() {
     @Test
     fun whatThePhoneDidGoesAtOnceCarryingItsEventIdAndLeavesOnceTheServerHasIt(): Unit =
@@ -131,17 +136,116 @@ class DrainTest : EngineFiles() {
         }
 
     @Test
-    fun a401IsSignInsTheServerHeardItNeverASignOutTheRecordKeptUncountedAndSentAgainOnceDue(): Unit =
+    fun a401TheSignInRefreshesTheTokenAndEverythingGoesAgainAtOnceOncePerRejectionAFreshTokenRefusedTooWaitsOutTheBackoff(): Unit =
         runBlocking {
-            // A fresh token is AN5c's to ask for; none to be had, it waits out the backoff as here.
+            val rig = rig()
+            val unlock = assertNotNull(rig.engine.record(Change.Unlock("s", null)))
+            rig.server.next().reply(401)
+            val again = rig.server.next(unlockRoute)
+            assertEquals(listOf(unlock.eventId, "Bearer token-2"), listOf(again.eventId, again.token))
+            assertEquals(1, rig.tokens.refreshes)
+            assertEquals(Link.SignIn, rig.engine.updates.value.link)
+            again.reply(401)
+            var state = rig.until { it.retryAt == at(4) }
+            assertEquals(Link.SignIn, state.link)
+            assertEquals(1, rig.tokens.refreshes)
+            // Nothing but a 401 since: a later rejection waits too, with no new refresh.
+            rig.clock.advance(4)
+            rig.server.next(unlockRoute).reply(401)
+            rig.until { it.retryAt == at(12) }
+            assertEquals(1, rig.tokens.refreshes)
+            // Any other answer ends the rejection: the next 401 refreshes again.
+            rig.clock.advance(8)
+            rig.server.next(unlockRoute).reply(200, Answer.unlocked())
+            state = rig.until { it.queued.isEmpty() }
+            assertEquals(Link.Reached, state.link)
+            rig.engine.record(Change.ProtectionOff("s"))
+            rig.server.next(protectionOffRoute).reply(401)
+            assertEquals("Bearer token-3", rig.server.next(protectionOffRoute).token)
+            assertEquals(2, rig.tokens.refreshes)
+        }
+
+    @Test
+    fun a401WithNoFreshTokenToBeHadIsSignInsNeverASignOutTheRecordKeptUncountedNothingSpinsAndTheNext401AsksAgain(): Unit =
+        runBlocking {
             val rig = rig(refreshWorks = false)
             val tap = assertNotNull(rig.engine.record(Change.Tap("tag")))
             rig.server.next(tapRoute).reply(401)
-            val state = rig.until { it.retryAt == at(2) }
+            var state = rig.until { it.retryAt == at(2) }
             assertEquals(listOf(Link.SignIn, t0), listOf(state.link, state.heardAt))
             assertEquals(listOf(listOf(1, 0, false)), state.queued.map { listOf(it.attempts, it.answers, it.stuck) })
+            assertEquals(1, rig.tokens.refreshes)
+            rig.sleeping(at(2))
+            assertEquals(emptyList(), rig.server.waiting)
+            // A backoff later, refused again: one more refresh, and the next backoff.
             rig.clock.advance(2)
-            assertEquals(tap.eventId, rig.server.next(tapRoute).eventId)
+            val again = rig.server.next(tapRoute)
+            assertEquals(tap.eventId, again.eventId)
+            again.reply(401)
+            state = rig.until { it.retryAt == at(6) }
+            assertEquals(Link.SignIn, state.link)
+            assertEquals(2, rig.tokens.refreshes)
+        }
+
+    @Test
+    fun aFreshTokenRefusedTooIsNotRefreshedAgainUntilTheSignInsRetryNowAfterWhichTheNext401Refreshes(): Unit =
+        runBlocking {
+            // B4 owes the retry for every token it gets but through the refresh.
+            val rig = rig()
+            rig.engine.record(Change.Tap("tag"))
+            rig.server.next(tapRoute).reply(401)
+            rig.server.next(tapRoute).reply(401)
+            rig.until { it.retryAt == at(4) }
+            assertEquals(1, rig.tokens.refreshes)
+            rig.engine.retryNow()
+            rig.server.next(tapRoute).reply(401)
+            assertEquals("Bearer token-3", rig.server.next(tapRoute).token)
+            assertEquals(2, rig.tokens.refreshes)
+        }
+
+    @Test
+    fun two401sAtOnceTheOutboxsAndACheckInsShareOneRefreshAndEverythingGoesAgainOnceWithTheFreshToken(): Unit =
+        runBlocking {
+            val rig = rig()
+            rig.tapIn()
+            rig.screenOn()
+            val unlock = assertNotNull(rig.engine.record(Change.Unlock("s", null)))
+            val sent = rig.server.next(unlockRoute)
+            rig.clock.advance(30)
+            val checkIn = rig.server.next(checkInRoute)
+            rig.tokens.hold()
+            sent.reply(401)
+            eventually { rig.tokens.refreshes == 1 }
+            // The check-in's 401, heard while that refresh runs: a second later, so the test sees it.
+            rig.clock.advance(1)
+            checkIn.reply(401)
+            rig.until { it.heardAt == at(31) }
+            // Past the unlock's backoff, nothing goes with the old token: both loops wait on the refresh.
+            // (Real time for a loop that didn't to send.)
+            rig.clock.advance(2)
+            delay(100)
+            assertEquals(emptyList(), rig.server.waiting)
+            rig.tokens.release()
+            val again = rig.server.next(unlockRoute)
+            assertEquals(listOf(unlock.eventId, "Bearer token-2"), listOf(again.eventId, again.token))
+            assertEquals("Bearer token-2", rig.server.next(meRoute).token)
+            assertEquals(1, rig.tokens.refreshes)
+        }
+
+    @Test
+    fun aStateChangeTheServerRefusesIsDroppedNeverSentAgainAndShownUntilThePhonesNextChange(): Unit =
+        runBlocking {
+            val rig = rig()
+            rig.engine.record(Change.ProtectionOff("s"))
+            rig.server.next(protectionOffRoute).reply(409, Answer.refused("not_participating"))
+            val state = rig.until { it.refused != null }
+            assertEquals(Refusal(Change.ProtectionOff("s"), 409, ApiErrorReason.NotParticipating, "not_participating"), state.refused)
+            assertEquals(emptyList(), state.queued)
+            // And the truth is read again.
+            rig.server.next(meRoute)
+            // The student acts again: that refusal is history, no longer shown.
+            rig.engine.record(Change.Tap("tag"))
+            assertNull(rig.engine.updates.value.refused)
         }
 
     @Test
@@ -248,7 +352,7 @@ class DrainTest : EngineFiles() {
         }
 }
 
-/** Applying answers: the phone's truth. BaliOutbox's AnswerTests, AN5b's part. */
+/** Applying answers: the phone's truth. BaliOutbox's AnswerTests, AN5b's and AN5c's parts. */
 class AnswerTest : EngineFiles() {
     @Test
     fun aTapIsLockedForAtOnceWhileUnansweredThenThePhoneIsInTheSessionItsAnswerNamesInTheStateItNames(): Unit =
@@ -297,4 +401,43 @@ class AnswerTest : EngineFiles() {
             val state = rig.until { it.queued.isEmpty() }
             assertEquals(inSession(ParticipationState.Focused, endsAt = 5000), state.standing)
         }
+
+    @Test
+    fun aTapRecordedButNoLongerCurrentOrRefusedNamesNoWindowItsLockEndsAndTheTruthIsReadAgain(): Unit =
+        runBlocking {
+            for ((status, body) in listOf(200 to Answer.replayNoSession, 409 to Answer.refused("session_not_running"))) {
+                val rig = rig()
+                rig.tapIn()
+                rig.engine.record(Change.Tap("tag"))
+                rig.server.next(tapRoute).reply(status, body)
+                rig.server.next(meRoute).reply(200, Answer.me(null))
+                val state = rig.until { it.standing == Standing.Out }
+                assertNull(state.pendingTap, "$status")
+                rig.stop()
+            }
+        }
+
+    @Test
+    fun anUnlockRecordedWithANoteNamesNoLiveSessionNoneOneOverOrNoneLeftLateOnceTheStudentHasLeftItSoTheTruthIsReadAgain(): Unit =
+        runBlocking {
+            for (answer in listOf(Answer.unlockKept("no_live_participation"), Answer.unlockAfterEnd(), Answer.supersededGone)) {
+                val rig = rig()
+                rig.tapIn()
+                rig.engine.record(Change.Unlock("s", null))
+                rig.server.next(unlockRoute).reply(200, answer)
+                rig.server.next(meRoute).reply(200, Answer.me(null))
+                rig.until { it.standing == Standing.Out && it.queued.isEmpty() }
+                rig.stop()
+            }
+        }
+
+    @Test
+    fun theLateUnlocksAnswerTheseTestsHandWriteIsTheApisOwnAsItsFixtureRecordsIt() {
+        // #119's review: recorded, superseded, no state, its session named.
+        val real = fixtures("unlock").single { it.first == "recorded-superseded-gone.json" }.second.body.jsonObject
+        val written = BaliJson.parseToJsonElement(Answer.supersededGone).jsonObject
+        assertEquals(real.keys, written.keys)
+        for (key in listOf("outcome", "recordedAs", "state", "reason")) assertEquals(real[key], written[key], key)
+        assertTrue(real["session"] != JsonNull && written["session"] != JsonNull)
+    }
 }

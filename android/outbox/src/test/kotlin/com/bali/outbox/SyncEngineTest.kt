@@ -2,6 +2,7 @@ package com.bali.outbox
 
 import com.bali.core.ParticipationState
 import com.bali.core.UnlockReason
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -161,7 +162,7 @@ class SyncEngineTest : EngineFiles() {
         }
 }
 
-/** The engine keeps its standing: StandingKeptTests, AN5a's and AN5b's parts (`docs/PLAN-ANDROID.md`). */
+/** The engine keeps its standing: StandingKeptTests, AN5a's to AN5c's parts (`docs/PLAN-ANDROID.md`). */
 class StandingKeptTest : EngineFiles() {
     @Test
     fun thePhonesOwnChangeAndTheStandingItLeavesAreKeptInOneWriteKilledAtAnyMomentAfterAnEmergencyUnlockARelaunchNeverLocksOverIt(): Unit =
@@ -249,6 +250,74 @@ class StandingKeptTest : EngineFiles() {
             assertEquals(filed, current(outbox, press.eventId)?.change)
             assertEquals(inSession(ParticipationState.Unlocked), outbox.standing())
             running.cancelAndJoin()
+        }
+
+    /** A relaunch whose file holds where the phone stood, focused until 1200 s, in a form this build can't read: its rig, and that standing. */
+    private suspend fun unreadable(): Pair<Rig, Standing> {
+        val (outbox, _) = makeOutbox()
+        val kept = Standing.InSession(session(endsAt = 1200), ParticipationState.Focused)
+        outbox.keep(kept)
+        spoilStanding(outbox)
+        return rig(outbox) to kept
+    }
+
+    @Test
+    fun aStandingTheFileWouldNotGiveBackAtLaunchIsNeverWrittenOverFromNothingAndIsReadAgainWithinAMinute(): Unit =
+        runBlocking {
+            // The lock's half, its cover left as it was, is AN7's.
+            val (rig, kept) = unreadable()
+            val unread = rig.engine.updates.value
+            assertEquals(listOf(Standing.Unread, Link.StorageFailed), listOf(unread.standing, unread.link))
+            // The next change of state writes nothing over it: a read of the truth, unanswered. Were the
+            // engine's own `Unread` check gone, its keeping would fail and say so instead.
+            rig.engine.retryNow()
+            rig.server.next(meRoute).reply(null)
+            rig.until { it.link == Link.Unreachable }
+            assertEquals("spoiled", rig.outbox.state(Outbox.Key.Standing))
+            // Readable again: read within a minute, and followed.
+            rig.outbox.keep(kept)
+            rig.sleeping(at(60))
+            rig.clock.advance(60)
+            rig.until { it.standing == kept }
+            // And kept again as it changes.
+            rig.engine.record(Change.Unlock("s", null))
+            assertEquals(Standing.InSession(session(endsAt = 1200), ParticipationState.Unlocked), rig.outbox.standing())
+        }
+
+    @Test
+    fun aStandingTheFileCantGiveBackIsSettledByTheServersTruthTooThePhoneIsNeverStrandedBehindIt(): Unit =
+        runBlocking {
+            // The class ended while the app was closed: the server has the phone in no session.
+            val (rig, _) = unreadable()
+            rig.screenOn(Answer.me(null))
+            assertEquals(Standing.Out, rig.engine.updates.value.standing)
+            assertEquals(Standing.Out, rig.outbox.standing())
+        }
+
+    @Test
+    fun rule3sCheckRunsAtEachWakeWhileTheScreenIsOnTheReadAsItComesOnAndEachCheckInAndBeforeTheCheckInAsItGoesOffNeverWhileOff(): Unit =
+        runBlocking {
+            // Where iOS's going behind runs none, the screen going off runs it once, before its check-in.
+            val checks = AtomicInteger()
+            val rig = rig()
+            rig.engine.atEachWake { checks.incrementAndGet() }
+            rig.tapIn()
+            assertEquals(0, checks.get())
+            rig.screenOn()
+            assertEquals(1, checks.get())
+            rig.clock.advance(30)
+            val checkIn = rig.server.next(checkInRoute)
+            assertEquals(2, checks.get())
+            checkIn.reply(200, Answer.live())
+            rig.sleeping(at(60))
+            rig.engine.setScreenOn(false)
+            val off = rig.server.next(checkInRoute)
+            assertEquals(3, checks.get())
+            off.reply(200, Answer.live())
+            rig.sleeping()
+            rig.clock.advance(60)
+            rig.sleeping()
+            assertEquals(3, checks.get())
         }
 
     @Test
