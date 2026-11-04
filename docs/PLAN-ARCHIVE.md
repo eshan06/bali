@@ -10,6 +10,18 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN4e's on 2026-11-04: _Last updated: 2026-11-04 (Central) — AN4d,
+the outbox's recording (#496; `docs/DECISIONS.md`, 2026-11-04): BaliOutbox's `Outbox` in Kotlin, its
+recording side, with its tests: what the phone did queued with the standing it leaves, in one write; a
+tap or an unlock superseding queued refocuses; protection off reported once per revocation, with where
+the phone stood before it; an unlock held for its reason, and one not filed yet filed once the phone
+knows where it stands; `Standing` and its kept form; and every write synced to the disk as it commits
+(`synchronous = FULL`, the conductor's call). The app wrote through `record` on `Bali_Spike_API35`.
+AN4 is five PRs now, the sending AN4e's. Before it, AN4c, the store. Next: AN4e, the sending; Android
+17's SDK platform for the owner to OK before the first step with today's AndroidX, and OkHttp 5.5 with
+it (Open owner items, 6); CodeQL for Android's Kotlin, the owner's call (7); AN1's part 2 once the
+owner has the phones. Not on the pilot's critical path._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN4d's on 2026-11-04: _Last updated: 2026-11-04 (Central) —
 AN4c, the outbox store (#495; `docs/DECISIONS.md`, 2026-11-04): BaliOutbox's `Outbox` file in Kotlin,
 on Room, with its tests: iOS's table as Room's version 1, its checks included, the install minted once
@@ -2075,6 +2087,19 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN4e's line, as it read until it was done (2026-11-04; `docs/DECISIONS.md`, 2026-11-04).
+
+- **AN4e** The outbox's sending, the store's rules (twin: BaliOutbox's `Outbox`, its sending side):
+  `Due` and `nextDue`, `settle`, `refile`, the backoff, jitter and bound, `retryNow`, `awaiting` and
+  `holdsUnlock`, on AN4c's store, with the tests that need them, each needing `settle` or `nextDue`:
+  SchemaTests' `reopens` (its records sent, protection off reported once) and `migratesEmpty`'s
+  `nextDue` and `awaiting`; ActionOrderTests' `seqs`; SettleTests' kept records, backoff, jitter and
+  bound; RecordTests' `supersedes`, its in-flight refocus's answer coming back to nothing; OrderTests',
+  AwaitingTests' and UnlockSafetyTests' suites; UnlockRouteTests' `settleNamesTheSession`;
+  RefiledTests' `once`, `refusedThenLanded` and `keptBeforeItsScan`; and ReasonTests'
+  `refiledReason` — validation: the JVM tests, then the app's instrumented test settling a record on
+  an emulator
 
 AN4d's line, as it read until it was done (2026-11-04; `docs/DECISIONS.md`, 2026-11-04). The
 conductor split AN4d's line into AN4d and AN4e that day, every word of it kept in one of them:
