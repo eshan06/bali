@@ -43,14 +43,14 @@ sealed interface Change {
     /**
      * `POST /v1/taps/{eventId}/unlock`: an unlock made while the phone's own tap [tap] was
      * unanswered, filed under it (owner decision 11): sent there always, even once the tap's answer
-     * names a session, whose lock it then guards (the store's `holdsUnlock`, AN4c).
+     * names a session, whose lock it then guards (the store's `holdsUnlock`, AN4d).
      */
     data class UnlockUnderTap(val tap: String, val reason: UnlockReason?) : Change
 
     /**
      * An Emergency Unlock made where the phone stood unread, no tap of its own unanswered (B6b): its
      * session not known, it is kept and never sent until the phone knows where it stands, then filed
-     * as one of the two above (the store's `file`, AN4c).
+     * as one of the two above (the store's `file`, AN4d).
      */
     data class UnlockUnfiled(val reason: UnlockReason?) : Change
 
@@ -158,7 +158,7 @@ data class OutboxRecord internal constructor(
 
     /**
      * The request to send, built from what was stored: every attempt sends the same. None for an
-     * unlock not filed yet, which goes nowhere until it is (the store's `nextDue`, AN4c).
+     * unlock not filed yet, which goes nowhere until it is (the store's `nextDue`, AN4d).
      */
     val request: Request?
         get() {

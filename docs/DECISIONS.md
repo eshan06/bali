@@ -43,18 +43,21 @@ a real decision? Add a dated entry at the top: what was decided and why.
   - **A file a newer build made is refused,** Room having no migration down, and nothing in it is
     wiped: never `fallbackToDestructiveMigration` (the unlock contract). SharingTests' `tooNew` is
     ported for it.
-  - **Durability.** Room keeps the file in WAL with `synchronous = NORMAL`, its default: a write
-    outlives Bali crashing or being force-stopped, but the phone itself crashing or losing power in
-    the seconds after a write, before Android writes the file out, can undo it. Set aside: a rollback
-    journal with `synchronous = FULL` (Room's `TRUNCATE`), a disk sync on every write, for a risk
-    that small.
+  - **Durability, as on iOS.** Room keeps the file in WAL with `synchronous = NORMAL`, its default,
+    as GRDB 7.11.1's pool keeps iOS's (its `setUpWALMode`, read 2026-11-04): a write outlives Bali
+    crashing or being force-stopped, but the phone itself crashing or losing power in the seconds
+    after a write, before the file is written out, can undo it. Set aside: a rollback journal with
+    `synchronous = FULL` (Room's `TRUNCATE`), a disk sync on every write, for a risk that small.
 
   **The SQLite: Room's bundled one** (`androidx.sqlite:sqlite-bundled`, `BundledSQLiteDriver`), on
   the JVM's tests and on the phone, as recommended: both run SQLite 3.50.1, its source id read from
   the JVM jar's libraries and from the APK's. Set aside: Android's own SQLite, whose version is the
   phone's Android's (Android 10's is 3.22), so the tests would run a SQLite no phone runs. It costs
   about 1.2 MB of native library per processor type, 4.9 MB for the four in the build's APK; Play's
-  bundles send each phone its own.
+  bundles send each phone its own. Said plainly (santa's review): 3.50.1 predates 3.50.2's fix of
+  CVE-2025-6965, a crafted aggregate query, which only SQL Bali doesn't write could reach (every
+  statement is the app's own, its values bound); the driver moves past it with its next stable
+  release.
 
   **The versions,** each the newest stable on 2026-11-04 and each built against compileSdk 36.1,
   so none waits on owner item 6: Room 2.8.5 (its runtime, compiler and Gradle plugin);
@@ -66,9 +69,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   15), run with `./gradlew :app:connectedDebugAndroidTest`: the app's opener made the file through
   Android's Room and the bundled SQLite's native library, its checks and install with it; a row
   written beside it was kept or refused by those checks; and `records()`, Room's generated code, read
-  it back as an unlock under its tap, with its times and its order. Passed (1 test, 0.5 s); a wrong
-  expectation failed it (tried). Gradle uninstalls both apps after. CI builds it (`android.yml`),
-  never runs it: no emulator.
+  it back as an unlock under its tap, with its times and its order. Passed, with the backup rules'
+  test (below): 2 tests, 0 failures; a wrong expectation failed it (tried). Gradle uninstalls both
+  apps after. CI builds it (`android.yml`), never runs it: no emulator.
 
   **Lint and Room's generated code:** the app's lint read Room's generated code in `outbox` as
   `outbox`'s own, which a plain Kotlin module can't tell apart, and failed on 223 calls of Room's
@@ -83,9 +86,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   rules, a backup and a transfer each took all three; with `allowBackup="false"` alone, the backup
   was "not allowed" but a transfer still took all three; with this build's rules, the backup was
   "not allowed" and a transfer measured nothing, which the transport declines as an empty backup.
-  Lint checks the rules' files (a misspelled domain failed it, tried). Android 10 and 11 are untested
-  here, with no emulator image (ISSUES #6, gap 10). The emulator's backup settings were put back as
-  found, and the test's backups deleted.
+  Lint checks the rules' files (a misspelled domain failed it, tried) and fails a manifest that drops
+  either one (tried); the instrumented test holds `allowBackup` off and every domain left out of each
+  section (a domain dropped failed it, tried; santa's review). Android 10 and 11 are untested here,
+  with no emulator image (ISSUES #6, gap 10). The emulator's backup settings were put back as found,
+  and the test's backups deleted.
 
   **The tests,** OutboxTests' SchemaTests and ActionOrderTests, their parts no rule holds:
   `migratesEmpty`'s schema (Room's version 1, every column in iOS's order), `reopens`' storage,
@@ -94,7 +99,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   drained file: every row gone, the next is 4, and 5 after a reopen; and SharingTests' `tooNew`.
   New: each kind's row read as its change, with every column; a follow-up's order its press's, and
   where it stands; a file with no install; a kind this build doesn't know refused; the state's keys,
-  iOS's names; the times' text and order; and Room reading the checks' table as its own. No twin:
+  iOS's names; the times' text and order; Room reading the checks' table as its own; and the table's
+  SQL as version 1 makes it, a copy in the test, since Room's schema holds no checks: changed with
+  no new version, it fails (santa's review: a kind added there alone failed it, tried). No twin:
   SchemaTests' `fromV2` to `fromV5` and ActionOrderTests' `fromV1`, files older builds made, where
   Android's first file is version 1. AN4d's: `reopens`' records sent and protection off reported
   once, `migratesEmpty`'s `nextDue` and `awaiting`, `offFrom` and `seqs`. Tried, each failing by

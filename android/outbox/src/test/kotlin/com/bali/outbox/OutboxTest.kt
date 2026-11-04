@@ -136,6 +136,37 @@ class SchemaTest : OutboxFiles() {
         }
 
     @Test
+    fun theTableIsVersion1sChecksIncludedAsEveryFileMadeAtVersion1HasIt(): Unit =
+        runBlocking {
+            // Room's schema (schemas/) holds the columns, never the checks, so this copy holds the
+            // table as files on phones have it: a change to it comes with a new version and a
+            // migration that makes the table again, never alone.
+            val version1 =
+                """
+                CREATE TABLE outbox (
+                  seq INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, eventId TEXT NOT NULL,
+                  kind TEXT NOT NULL CHECK (kind IN
+                    ('tap', 'unlock', 'refocus', 'protection_off', 'protection_on')),
+                  tagId TEXT CHECK ((kind = 'tap') = (tagId IS NOT NULL)),
+                  sessionId TEXT
+                    CHECK (kind = 'unlock' OR (kind = 'tap') = (sessionId IS NULL)),
+                  tapId TEXT CHECK (tapId IS NULL OR kind = 'unlock'),
+                  reason TEXT, follows TEXT, recordedAt TEXT NOT NULL,
+                  attempts INTEGER NOT NULL DEFAULT 0, answers INTEGER NOT NULL DEFAULT 0,
+                  nextAttemptAt TEXT NOT NULL, stuck INTEGER NOT NULL DEFAULT 0,
+                  lastStatus INTEGER, lastReason TEXT, lastMessage TEXT,
+                  orderSeq INTEGER CHECK (orderSeq IS NULL OR kind = 'unlock'),
+                  refusedStatus INTEGER)
+                """
+            val (outbox, _) = makeOutbox()
+            val words = Regex("\\s+")
+            assertEquals(
+                version1.trim().replace(words, " "),
+                outbox.texts("SELECT sql FROM sqlite_master WHERE name = 'outbox'").single()?.trim()?.replace(words, " "),
+            )
+        }
+
+    @Test
     fun roomReadsTheTableItsChecksAreMadeOnAsItsOwn(): Unit =
         runBlocking {
             val (outbox, file) = makeOutbox()

@@ -45,7 +45,7 @@ import kotlinx.serialization.json.putJsonObject
 val t0: Instant = Instant.ofEpochSecond(1_790_000_000)
 
 /**
- * A record of [change] as the store queues one (AN4c): an id minted [at] the moment the phone acted,
+ * A record of [change] as the store queues one (AN4d): an id minted [at] the moment the phone acted,
  * due at once, never sent, [order] its place in what the phone did.
  */
 fun queued(change: Change, at: Instant = t0, order: ActionOrder? = null) =
