@@ -368,6 +368,26 @@ class SendTest {
     }
 
     @Test
+    fun withNoTokenToGiveASendSendsNothingAndSaysSoNeverAsAServerOutOfReachAndTheRecordIsKept(): Unit =
+        runBlocking {
+            // The drain tells the two apart: no token waits for a sign-in, settling nothing (AN5;
+            // SyncEngine.swift's drain and its sends before a deletion).
+            val none =
+                object : TokenProvider {
+                    override suspend fun accessToken(): String? = null
+                }
+            for ((change, _) in sendable) {
+                val transport = Canned(200)
+                val sent = assertNotNull(queued(change).send(client(transport, none)), "$change")
+                assertEquals(NoAnswer.NoToken, sent.noAnswer, "$change")
+                assertEquals(SendResult.NetworkError, sent.result, "$change")
+                assertNull(sent.status, "$change")
+                assertTrue(sent.disposition.keeps, "$change")
+                assertTrue(transport.sent.isEmpty(), "$change")
+            }
+        }
+
+    @Test
     fun onlyRecordedLetsAnUnlockLeaveTheOutboxAndEveryDispositionKeepsOrEndsItsRecordByName() {
         // No answer drops an unlock the server hasn't recorded (ISSUES #2).
         for (disposition in UnlockDisposition.entries) {

@@ -51,12 +51,14 @@ a real decision? Add a dated entry at the top: what was decided and why.
   own kind's table and kept exactly when its disposition keeps it, an unlock until recorded, a
   refusal sticking only a tap or an unlock; SettleTests' `fixtures`: every outbox fixture back as its
   disposition, with its status, its error's reason and message, its session and state, and an
-  unlock's superseded and kept reason; and every disposition of the three tables kept or ended by
-  name. Tried, each failing by name, then reverted: an unlock's retry let go; an unlock under a tap
-  sent to its session's endpoint; a refocus sent with its due time for the time it was made;
-  superseded read from `tap_armed`; the lock back on counted a return; an unlock's order dropped; the
-  lock back on's state not read; and a state change's drop counted a refusal. Nothing was added to
-  the PC's SDK: its folders were compared before and after.
+  unlock's superseded and kept reason; every disposition of the three tables kept or ended by name;
+  and a send with no token, which sends nothing and says so, never as a server out of reach, since
+  AN5's drain waits for a sign-in on it (santa's review). Tried, each failing by name, then reverted:
+  an unlock's retry let go; an unlock under a tap sent to its session's endpoint; a refocus sent with
+  its due time for the time it was made; superseded read from `tap_armed`; the lock back on counted a
+  return; an unlock's order dropped; the lock back on's state not read; a state change's drop counted
+  a refusal; and no token said as a server out of reach. Nothing was added to the PC's SDK: its
+  folders were compared before and after.
 
 - **2026-11-04** — **AN4a, the unlock contract: BaliCore's `UnlockContract.swift` and
   `OutboxContract.swift` in Kotlin (the conductor's calls, awaiting the owner's look; AN4a, #493).**
