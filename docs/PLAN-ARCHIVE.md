@@ -10,6 +10,14 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN5b's on 2026-11-04: _Last updated: 2026-11-04 (Central) —
+CodeQL scans Android's Kotlin (#498; `docs/DECISIONS.md`, 2026-11-04): CodeQL's advanced setup,
+`.github/workflows/codeql.yml`, beside GitHub Actions and JavaScript/TypeScript, every module's code
+and tests built for it on every PR; default setup switched off by the owner (Open owner items, 7).
+Before it, AN5a, the sync engine's frame. Next: AN5b, the drain; Android 17's SDK platform for the
+owner to OK before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items,
+6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
+
 `docs/PLAN-ANDROID.md`'s, replaced by CodeQL's (#498) on 2026-11-04: _Last updated: 2026-11-04
 (Central) — AN5a, the sync engine's frame (#499; `docs/DECISIONS.md`, 2026-11-04): BaliOutbox's
 `SyncEngine` in Kotlin, its frame, with its tests and the rig the next steps test on: Swift's actor
@@ -2111,6 +2119,20 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN5b's line, as it read until it was done (2026-11-04; `docs/DECISIONS.md`, 2026-11-04).
+
+- **AN5b** The engine's drain (twin: `SyncEngine`'s `drain`, `answered`, `retryNow` and `reread`):
+  the drain with backoff and jitter; each answer settled, the queue and `sending` changed in one
+  write, a session's answer applied and the other cases named for AN5c–AN5e; `heard`'s link; the
+  standing an answer leaves kept in the file (moved from AN5a, which has no answer to keep); and a
+  send cancelled with its caller, which makes no `Sent` and leaves its record as it was, its attempt
+  uncounted, where iOS settles it as no answer (AN4b). With them the fields their code first sets
+  (`rereading`, `refreshed`), the top of each pass answering the rings before it, and the rig's
+  `tapIn`. Tests: DrainTests' `sendsAtOnce`, `backsOff`, `inOrder`, `ringWhileBusy`, `noToken`,
+  `runsAgain`, `storageFails` and `retryNow`; AnswerTests' `tapAnswered`, `actsAtOnce` and
+  `laterChangeStands`; and new: a run cancelled mid-send leaves its record due, a record whose caller
+  was cancelled is sent, and an answer's standing is kept
 
 AN5a's line, as it read until it was done (2026-11-04; `docs/DECISIONS.md`, 2026-11-04). The
 conductor split AN5's line into AN5a–AN5e that day, every word of it kept in one of them: AN5a's

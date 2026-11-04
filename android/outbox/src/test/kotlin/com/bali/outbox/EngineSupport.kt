@@ -8,7 +8,9 @@ import com.bali.core.BaliJson
 import com.bali.core.HttpAnswer
 import com.bali.core.HttpRequest
 import com.bali.core.HttpTransport
+import com.bali.core.ParticipationState
 import com.bali.core.SendResult
+import com.bali.core.SessionView
 import com.bali.core.TapRequest
 import com.bali.core.TokenProvider
 import java.io.File
@@ -48,9 +50,14 @@ import kotlinx.serialization.json.jsonPrimitive
 
 // The engine's test rig, BaliOutbox's EngineSupport.swift: a clock the test moves, a server it answers
 // by hand, B4's stand-in for the tokens, and an engine running over them. coroutines-test's virtual
-// time can't stand in for the clock: Room's queries run outside its scheduler. The rig's `tapIn` and
-// `foreground` come with the loops they wait on (AN5b's drain, AN5c's read), and `Answer`'s engine
-// answers with the tests that send them.
+// time can't stand in for the clock: Room's queries run outside its scheduler. The rig's `foreground`
+// comes with the read loop it waits on (AN5c's), and `Answer`'s engine answers with the tests that
+// send them.
+
+/** The routes the engine's tests answer, as [Server.Exchange.route] names them: BaliOutbox's tests' own. */
+val tapRoute = "POST /v1/taps"
+val unlockRoute = "POST /v1/sessions/s/unlock"
+val refocusRoute = "POST /v1/sessions/s/refocus"
 
 /**
  * How long, in real time, a test waits for the engine before it fails instead of hanging: well past
@@ -267,6 +274,13 @@ class Rig(val engine: SyncEngine, val outbox: Outbox, val server: Server, val cl
 
     /** Waits until the clock has exactly these sleeps: the engine is waiting on them. */
     suspend fun sleeping(vararg deadlines: Instant) = eventually { clock.deadlines == deadlines.toList() }
+
+    /** Taps into [view] as the server answers it: the phone in that session, focused. */
+    suspend fun tapIn(view: SessionView = session()) {
+        engine.record(Change.Tap("tag"))
+        server.next(tapRoute).reply(200, Answer.joined(view))
+        until { it.standing == Standing.InSession(view, ParticipationState.Focused) && it.queued.isEmpty() }
+    }
 
     /** Stops the engine: its loops must end. */
     suspend fun stop() {

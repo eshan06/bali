@@ -1,6 +1,11 @@
 package com.bali.outbox
 
 import com.bali.core.ApiClient
+import com.bali.core.NoAnswer
+import com.bali.core.SendResult
+import com.bali.core.StateChangeDisposition
+import com.bali.core.TapDisposition
+import com.bali.core.UnlockDisposition
 import java.time.Duration
 import java.time.Instant
 import kotlin.coroutines.cancellation.CancellationException
@@ -22,8 +27,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
-// The sync engine, BaliOutbox's SyncEngine.swift: its frame, AN5a's. The drain is AN5b's, the read
-// loop AN5c's, the wait for the Start AN5d's and Emergency Unlock AN5e's, each on the pattern set
+// The sync engine, BaliOutbox's SyncEngine.swift: its frame, AN5a's, and its drain, AN5b's. The read
+// loop is AN5c's, the wait for the Start AN5d's and Emergency Unlock AN5e's, each on the pattern set
 // here: Swift's actor as a lock each stretch holds (docs/PLAN-ANDROID.md).
 
 /** The engine's clock: the time records are stamped with, and waiting on it: a test's own there. */
@@ -93,6 +98,12 @@ class SyncEngine private constructor(
 
     /** `ReconcileStamp.changes`: each change the phone makes, and each answer to one. */
     private var changes = 0
+
+    /** Whether the truth is to be read again ([reread]): the read loop's, at its next wake (AN5c). */
+    private var rereading = false
+
+    /** Whether a fresh token was already tried since the last answer that wasn't a 401: AN5c's refresh. */
+    private var refreshed = false
     private var running = false
     private val drainRings = Rings(clock)
     private val readRings = Rings(clock)
@@ -122,9 +133,141 @@ class SyncEngine private constructor(
         }
     }
 
-    // The loops' passes are AN5b's (the drain) and AN5c's (the read): till then each waits on its rings.
-    private suspend fun drain(): Nothing { while (true) drainRings.pause(null) }
+    /** The outbox, in order: the record due, sent and settled; then the next, or a wait for one. */
+    private suspend fun drain(): Nothing {
+        while (true) {
+            val found = alone { due() }
+            // Answered, the next pass goes at once; else the drain waits for what is due, or a ring.
+            val waits = if (found is Outbox.Due.Send) send(found.record) ?: continue else found
+            val wake = (waits as? Outbox.Due.Wait)?.until
+            alone { update { it.copy(retryAt = wake) } }
+            drainRings.pause(wake)
+        }
+    }
 
+    /**
+     * The top of a pass, which answers every ring made before it: the record due, marked on its way, or
+     * when one is due. A file it can't read is shown, and read again within a minute.
+     */
+    private suspend fun due(): Outbox.Due {
+        drainRings.answer()
+        val due = tried { outbox.nextDue(clock.now()) }.getOrElse { return Outbox.Due.Wait(failed()) }
+        // Never an unlock not filed yet (`nextDue`): it has nowhere to go.
+        if (due is Outbox.Due.Send) update { it.copy(sending = it.sending + due.record.eventId) }
+        return due
+    }
+
+    /**
+     * Sends [record] with the engine let go of, as Swift's `await` lets go of its actor; then, in one
+     * stretch, settles the answer and applies it: none once answered, the next pass going at once, else
+     * what the drain waits for. Cancelled with its run, the send makes no [Sent] (AN4b): the record stays
+     * as it was, due, its attempt uncounted, and on its way, since it may have reached the server, until
+     * the next run sends it at once under its event id and settles it. iOS settles it as no answer.
+     */
+    private suspend fun send(record: OutboxRecord): Outbox.Due? {
+        val sent = record.send(client)
+        return alone {
+            when {
+                // An unlock not filed yet sends nothing, and `nextDue` never names one.
+                sent == null -> {
+                    update { it.copy(sending = it.sending - record.eventId) }
+                    Outbox.Due.Idle
+                }
+                // No token: nothing went, so nothing is settled: the record waits on sign-in (a ring), or a
+                // minute. Never a sign-out, never a dropped record.
+                sent.noAnswer == NoAnswer.NoToken -> {
+                    update { it.copy(sending = it.sending - record.eventId, link = Link.SignIn) }
+                    Outbox.Due.Wait(clock.now() + Outbox.BACKOFF_CAP)
+                }
+                // A settle the file refuses leaves the record on its way: the file counts it never sent.
+                else -> {
+                    val disposition = tried { outbox.settle(sent, clock.now()) }.getOrElse { return@alone Outbox.Due.Wait(failed()) }
+                    answered(record, sent, disposition)
+                    null
+                }
+            }
+        }
+    }
+
+    /**
+     * A change's answer, settled. A change's own answer is the truth as of that change, but a later change
+     * of the phone's, still waiting for its own answer, stands over it until then. Each disposition is
+     * placed by name ([effect]).
+     */
+    private suspend fun answered(record: OutboxRecord, sent: Sent, disposition: Disposition?) {
+        heard(sent.result, sent.noAnswer)
+        knowLastTap()
+        val queued = queue()
+        val applies = stored { outbox.awaiting() }.getOrNull() == 0
+        val effect = disposition.effect
+        // A live participation names its session and its state; a note (an unlock after the end names the
+        // session it ended) names no window to be in, so the truth is read again.
+        val session = sent.session
+        val participation = sent.state
+        val live = if (session != null && participation != null) Standing.InSession(session, participation) else null
+        // To come: the unlock guard and a dropped change shown (AN5c), an arming's wait (AN5d), and the
+        // unlock recorded, a late one said why (AN5e).
+        update { now ->
+            // Settled, and the queue read again, in one step: no screen sees the record neither on its way
+            // nor answered.
+            val next = now.copy(queued = queued, sending = now.sending - record.eventId)
+            if (effect == Effect.Lands && applies && live != null) next.copy(standing = live) else next
+        }
+        if (effect == Effect.Rereads || effect == Effect.Drops || effect == Effect.Lands && live == null) reread()
+        if (effect != Effect.Again) changes += 1
+    }
+
+    /** What an answer does to the phone's truth ([effect]). */
+    private enum class Effect {
+        /** Kept to go again, a retry or a reauth: no answer counted (`ReconcileStamp`). */
+        Again,
+
+        /** Counted, the truth the phone holds left as it is. */
+        Stands,
+
+        /** The session a live participation names, applied while no change of the phone's awaits its answer. */
+        Lands,
+
+        /** Armed: the wait for the Start, AN5d's; till then it stands. */
+        Waits,
+
+        /** The truth read again. */
+        Rereads,
+
+        /** Dropped, never sent again, and the truth read again; the refusal shown is AN5c's. */
+        Drops,
+    }
+
+    /** What each disposition does: one `core` adds must be placed here. */
+    private val Disposition?.effect: Effect
+        get() =
+            when (this) {
+                // Superseded in flight: its answer is older than the phone's truth.
+                null -> Effect.Stands
+                is Disposition.Tap ->
+                    when (disposition) {
+                        TapDisposition.Retry, TapDisposition.Reauth -> Effect.Again
+                        TapDisposition.ApplySession -> Effect.Lands
+                        TapDisposition.WaitForStart -> Effect.Waits
+                        TapDisposition.Reread, TapDisposition.RetryAndSurface -> Effect.Rereads
+                    }
+                is Disposition.Unlock ->
+                    when (disposition) {
+                        UnlockDisposition.Retry, UnlockDisposition.Reauth -> Effect.Again
+                        UnlockDisposition.Recorded -> Effect.Lands
+                        // Refused, it is kept and shown, and still stands on the phone (`holdsUnlock`).
+                        UnlockDisposition.RetryAndSurface -> Effect.Stands
+                    }
+                is Disposition.StateChange ->
+                    when (disposition) {
+                        StateChangeDisposition.Retry, StateChangeDisposition.Reauth -> Effect.Again
+                        StateChangeDisposition.ApplySession -> Effect.Lands
+                        StateChangeDisposition.Reread -> Effect.Rereads
+                        StateChangeDisposition.Drop -> Effect.Drops
+                    }
+            }
+
+    // The read loop's pass is AN5c's: till then it waits on its rings.
     private suspend fun read(): Nothing { while (true) readRings.pause(null) }
 
     /**
@@ -157,6 +300,17 @@ class SyncEngine private constructor(
             if (queued.isFailure || reportedOff.isFailure) failed()
             drainRings.ring()
             record
+        }
+
+    /**
+     * Everything queued goes now, and the truth is read again: the student's retry (rule 5), and the
+     * sign-in's once it gives a token (AN6). Its caller cancelled, it stops waiting, and goes on all the
+     * same.
+     */
+    suspend fun retryNow() =
+        call {
+            refreshed = false
+            sendAndReadNow()
         }
 
     /**
@@ -203,6 +357,33 @@ class SyncEngine private constructor(
             )
         if (standing != null && queued != null && !state.holdsUnfiled) kept = standing
         published.value = state
+    }
+
+    /**
+     * Any answer, or none, for [SyncState.link], and when the server last answered; any status but a 401
+     * ends a rejection ([refreshed]). A 401 is sign-in's: its refresh, once per rejection, is AN5c's.
+     */
+    private suspend fun heard(result: SendResult, noAnswer: NoAnswer?) {
+        if (result !is SendResult.Status) {
+            return update { it.copy(link = if (noAnswer == NoAnswer.NoToken) Link.SignIn else Link.Unreachable) }
+        }
+        val now = clock.now()
+        if (result.code != 401) refreshed = false
+        update { it.copy(heardAt = now, link = if (result.code == 401) Link.SignIn else Link.Reached) }
+    }
+
+    /** The truth to be read again (`GET /v1/me`), at the read loop's next wake. */
+    private fun reread() {
+        rereading = true
+        readRings.ring()
+    }
+
+    /** Everything queued due now and read again for the screens, the truth to be read, both loops rung. */
+    private suspend fun sendAndReadNow() {
+        stored { outbox.retryNow(clock.now()) }
+        refreshQueue()
+        reread()
+        drainRings.ring()
     }
 
     /**
@@ -291,6 +472,9 @@ internal class Rings(private val clock: SyncClock) {
     private val rung = Channel<Unit>(Channel.CONFLATED)
 
     fun ring() { rung.trySend(Unit) }
+
+    /** Answers every ring made before now: the top of a pass, which does what they rang for. */
+    fun answer() { rung.tryReceive() }
 
     /**
      * Waits for [deadline] (none: none), by the engine's clock, or a ring, whichever comes first. The
