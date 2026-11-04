@@ -87,6 +87,19 @@ class VocabularyTest {
     }
 
     @Test
+    fun aHistorysOtherRecordedAsListsAreInsideAnUnlocksWhichItReadsThemAs() {
+        // A history moment's recordedAs is an unlock's note, a protection off's or a return's (A13),
+        // read as UnlockRecordedAs: a value added to either of the others alone would read as unknown.
+        val unlock = Shared.values("UNLOCK_RECORDED_AS", Shared.source("index.ts")).toSet()
+        val outside =
+            listOf("PROTECTION_OFF_RECORDED_AS", "RETURN_RECORDED_AS").mapNotNull { list ->
+                val values = Shared.values(list, Shared.source("index.ts")) - unlock
+                if (values.isEmpty()) null else "$list has $values, which UNLOCK_RECORDED_AS lacks"
+            }
+        assertTrue(outside.isEmpty(), outside.joinToString("\n"))
+    }
+
+    @Test
     fun displayStateIsTheStoredStatesThenTheDerivedOnes() {
         val stored = Shared.values("PARTICIPATION_STATES", Shared.source("index.ts"))
         val type = Regex("""export type DisplayState = ParticipationState(.*);""").find(Shared.source("state.ts"))

@@ -45,6 +45,13 @@ a real decision? Add a dated entry at the top: what was decided and why.
   a history's list, a null field it never reads beside a request field it doesn't send, and a type
   it has none for, which the walk caught too.
 
+  **Santa's one WARN, taken:** a history moment's `recordedAs` reads a protection off's and a
+  return's notes as an unlock's (`UnlockRecordedAs`), as Swift does, but nothing held
+  `PROTECTION_OFF_RECORDED_AS` and `RETURN_RECORDED_AS` inside `UNLOCK_RECORDED_AS`, so a value
+  added to either alone would read as unknown. A vocabulary test holds them there now (`'overtaken'`
+  added to `RETURN_RECORDED_AS` alone failed it; reverted). BaliCore's VocabularyTests has the same
+  gap, for an iOS step to close.
+
 - **2026-11-04** — **AN3a, the core's vocabulary and JSON coding, and Android 10's API check:
   kotlinx.serialization, and animal-sniffer with gummy-bears (the conductor's calls, awaiting the
   owner's look; AN3a, #489).** The owner was asleep and asked for the recommended option on every
