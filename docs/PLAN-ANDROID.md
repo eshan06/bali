@@ -310,9 +310,9 @@ rules); `docs/DESIGN.md` read first, its Android section from AS0; every user-fa
    compileSdk 37 (androidx.core 1.19, Compose 1.12; DECISIONS 2026-11-04), as OkHttp 5.5 does, so
    `core` stays on 5.4.0 until then (AN3d); and Android 10 and 12 or 13 to test on, as emulator
    images (each a download) or phones, for ISSUES #6's gap 10.
-7. **CodeQL and Android's Kotlin:** CodeQL doesn't scan Android's Kotlin; scanning it needs CodeQL's
-   advanced setup (default setup switched off by the owner, and a workflow that builds `android/`),
-   the owner's call (DECISIONS 2026-11-04).
+7. ✅ **CodeQL and Android's Kotlin:** scanned, through CodeQL's advanced setup
+   (`.github/workflows/codeql.yml`), beside GitHub Actions and JavaScript/TypeScript; default setup
+   switched off by the owner (the owner, 2026-11-04: "Yes, prep it"; DECISIONS 2026-11-04).
 
 ## How to update this file
 

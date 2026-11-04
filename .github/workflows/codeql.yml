@@ -1,0 +1,88 @@
+# CodeQL's advanced setup (docs/PLAN-ANDROID.md, Open owner items, 7): what default setup scanned,
+# GitHub Actions and JavaScript/TypeScript, with its query suite and threat model (CodeQL's own
+# defaults) on its triggers, and Android's Kotlin, which default setup can't scan: its build mode
+# "none" reads no Kotlin. Each language keeps default setup's check name and category, so the
+# alerts already raised carry on. While default setup is on, GitHub refuses this workflow's uploads;
+# switching it off is the owner's (docs/DECISIONS.md, 2026-11-04).
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # Weekly, when default setup ran: Mondays at 15:44 UTC.
+  schedule:
+    - cron: '44 15 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  # A PR's newer push cancels its older run. Main's pushes and the weekly run are never cancelled,
+  # each in its own commit's group (ci.yml says why). The PR's number, not its branch's name, which
+  # a fork's PR can share.
+  group: codeql-${{ github.event_name }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write # the upload
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: actions
+            build-mode: none
+          - language: javascript-typescript
+            build-mode: none
+          # Built on every PR, not only one that touches android/: a PR without main's Kotlin
+          # analysis leaves GitHub's CodeQL check unable to tell which alerts the PR brings.
+          - language: java-kotlin
+            build-mode: manual
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false # the token never reaches the PR's own code, which the Kotlin build runs
+
+      # Set up as android.yml sets up its build: the wrapper's jar checked, JDK 21, the runner's SDK
+      # with nothing installed, and Gradle's cache.
+      - if: matrix.language == 'java-kotlin'
+        uses: gradle/actions/wrapper-validation@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      - name: Use JDK 21
+        if: matrix.language == 'java-kotlin'
+        run: |
+          [ -n "${JAVA_HOME_21_X64:-}" ] && [ -x "$JAVA_HOME_21_X64/bin/java" ] || { echo "::error::The runner has no JDK 21 (JAVA_HOME_21_X64)."; exit 1; }
+          echo "JAVA_HOME=$JAVA_HOME_21_X64" >> "$GITHUB_ENV"
+      - if: matrix.language == 'java-kotlin'
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-codeql-${{ hashFiles('android/**/*.gradle.kts', 'android/gradle.properties', 'android/gradle/libs.versions.toml', 'android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-codeql-
+            gradle-${{ runner.os }}-
+
+      - uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      # CodeQL reads only the Kotlin it sees compiled: every module's code and tests, compiled in
+      # this job's own processes, so no Gradle daemon, no Kotlin daemon and no build cache.
+      - name: Build android/
+        if: matrix.language == 'java-kotlin'
+        working-directory: android
+        run: ./gradlew --no-daemon --no-build-cache -Pkotlin.compiler.execution.strategy=in-process assembleDebug assembleDebugAndroidTest compileDebugUnitTestKotlin testClasses
+
+      - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          category: /language:${{ matrix.language }}
+          upload: never

@@ -50,8 +50,10 @@ uses values the one before it produced:
   connected to the repo then, so step 2 wasn't needed; it now builds the demo site from the orphan branch `demo2` alone (2026-11-02). Step 6 done (2026-10-06): `vercel.json` deleted. `bali-portal` hadn't been deploying `main` by itself (the owner deployed by hand); check the next push to `main` deploys it.
 - **Runbook 4, the restore drill — on hold** until prod's first backup (runbook 1, step 4). Its half A, a
   `pg_dump` into a scratch database, works without them (skip its step 1).
-- **Runbook 5, GitHub:** the load gate is a required check (7); CodeQL's default setup is on (5;
-  2026-10-13: JavaScript/TypeScript and GitHub Actions, not a required check); the rest is open.
+- **Runbook 5, GitHub:** the load gate is a required check (7); CodeQL runs on its advanced setup,
+  `.github/workflows/codeql.yml` (5; JavaScript/TypeScript, GitHub Actions and Android's
+  Java/Kotlin, not required checks; default setup from 2026-10-13 until the owner switched it off
+  for Kotlin, `docs/DECISIONS.md`, 2026-11-04); the rest is open.
 - **Runbook 6, alerts:** open.
 - **Runbook 8, Railway's IaC:** open (added 2026-10-06, P8); due before 2026-12-01.
 - **Runbook 7, push:** open (added 2026-10-06, N6). Until it's done the API logs
@@ -698,11 +700,15 @@ All on `github.com/eshan06/bali` → **Settings**, as the owner.
 4. **Private vulnerability reporting.** Same page → **Private vulnerability
    reporting → Enable** (offered on public repos). **Check:** **Security →
    Advisories** shows a "Report a vulnerability" button to outsiders.
-5. **CodeQL, default setup.** Same page → **Code scanning → CodeQL analysis → Set up →
-   Default**. Languages: JavaScript/TypeScript and GitHub Actions. Swift builds on
-   macOS runners and bills those minutes; leave it out unless you want it.
-   **Check:** **Actions** shows a CodeQL run finishing; **Security → Code scanning**
-   lists results (or none).
+5. **CodeQL, advanced setup.** `.github/workflows/codeql.yml` scans JavaScript/TypeScript,
+   GitHub Actions and Android's Java/Kotlin (`docs/DECISIONS.md`, 2026-11-04). Keep default
+   setup off: while it's on, GitHub refuses the workflow's uploads, and turning it on disables
+   the workflow. Switching from it: **Settings → Advanced Security → CodeQL analysis** → **…**
+   → **Switch to advanced** → **Disable CodeQL**, and leave uncommitted the workflow GitHub
+   then offers. Swift builds on macOS runners and bills those minutes; leave it out unless
+   you want it.
+   **Check:** **Actions** shows a CodeQL run finishing its three Analyze jobs; **Security →
+   Code scanning** lists results (or none).
 6. **Approval for outside contributors' workflows.** **Settings → Actions → General
    → Fork pull request workflows from outside collaborators** → **Require approval
    for all outside collaborators**. *(On a private repo this section reads
