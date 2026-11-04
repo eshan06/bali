@@ -10,6 +10,17 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN4b's on 2026-11-04: _Last updated: 2026-11-04 (Central) —
+AN4a, the unlock contract (#493; `docs/DECISIONS.md`, 2026-11-04): BaliCore's `UnlockContract.swift`
+and `OutboxContract.swift` in Kotlin with their tests: the unlock's, the tap's and the state change's
+tables and the reconcile rule, every `contracts/outbox/` case answered by the port in `outbox`'s
+tests, and each fixture's disposition the port's, through the client too; an unlock leaves the
+outbox only once the server has recorded it. AN4 is three PRs now, AN4a to AN4c. Before it, AN3d,
+the core's client. Next: AN4b, the records; Android 17's SDK platform for the owner to OK before the
+first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); CodeQL for
+Android's Kotlin, the owner's call (7); AN1's part 2 once the owner has the phones. Not on the
+pilot's critical path._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN4a's on 2026-11-04: _Last updated: 2026-11-04 (Central) —
 AN3d, the core's client (#492; `docs/DECISIONS.md`, 2026-11-04): BaliCore's `APIClient.swift` in
 Kotlin with its tests: every student endpoint, each answer returned unjudged and its errors keyed on
@@ -2043,6 +2054,12 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN4b's line, as it read until it was done (2026-11-04; `docs/DECISIONS.md`, 2026-11-04):
+
+- **AN4b** The records (twin: BaliOutbox's `OutboxRecord`): the records as plain Kotlin (OutboxTests'
+  `eventIds` is `core`'s already, AN3c's): the change, its request, sending it through AN3d's client,
+  `Sent` and the outbox's own disposition
 
 AN4a's line, as it read until it was done (2026-11-04; `docs/DECISIONS.md`, 2026-11-04). The
 conductor split AN4's line into AN4a, AN4b and AN4c that day, every word of it kept in one of them:
