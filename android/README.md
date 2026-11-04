@@ -38,8 +38,8 @@ You need JDK 21 (Android Studio's own, its JBR, as `JAVA_HOME`) and Android's SD
 4. The app's instrumented tests (`app/src/androidTest`) run on one of those emulators, started as
    in 3: `./gradlew :app:connectedDebugAndroidTest` installs the app and its test app, runs them and
    uninstalls both. They show what the JVM's tests can't: that the app opens the outbox's file on
-   Android's Room. CI builds them but has no emulator to run them, so a step that changes the file
-   runs them here and puts the result in its PR.
+   Android's Room, and writes it through the store at FULL. CI builds them but has no emulator to run
+   them, so a step that changes the file or its writes runs them here and puts the result in its PR.
 
 The build installs nothing: `gradle.properties` turns off the Android plugin's own installs, so a
 missing platform or build tools fails the build by name, and Gradle never downloads a JDK. A step
@@ -95,6 +95,14 @@ from. The table is iOS's, its checks included, which Room can't declare: they're
 file is created, and a migration that makes the table again carries them, as iOS's do. The app opens
 the file in its own storage (`app`'s `OutboxFile.kt`); its backup rules (`app/src/main/res/xml/`)
 leave everything of Bali's out of a backup and of a transfer to a new phone.
+
+**The outbox's rules** (`outbox`'s `Outbox.kt`, BaliOutbox's `Outbox`) record what the phone did,
+with the standing it leaves (`Standing.kt`, kept in a form of its own), in one write; sending it and
+settling its answers is AN4e's. Each write is one transaction on Room's writer connection, set to
+`synchronous = FULL` first, since Room opens every connection at NORMAL: so a write reaches the disk
+as it commits, and an Emergency Unlock's record outlives the phone losing power right after
+(`docs/DECISIONS.md`, 2026-11-04, AN4d). The file stays in WAL. The SQL is iOS's, run on Room's
+connection.
 
 ## Android Lint
 

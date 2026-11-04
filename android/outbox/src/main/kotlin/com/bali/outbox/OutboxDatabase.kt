@@ -7,7 +7,6 @@ import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.Insert
-import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.RoomDatabase
@@ -74,23 +73,19 @@ internal data class QueuedRow(@Embedded val row: OutboxRow, val install: String?
 internal const val SELECTION =
     "SELECT outbox.*, (SELECT value FROM outboxState WHERE key = '$INSTALL') AS install FROM outbox"
 
+// Called inside one of the store's writes, a DAO call joins it, on its connection (Outbox.kt).
 @Dao
 internal interface OutboxDao {
     /** Everything queued, in the order the phone acted: a follow-up stands where its press does (B6d). */
     @Query("$SELECTION ORDER BY COALESCE(orderSeq, seq), seq")
     suspend fun records(): List<QueuedRow>
 
+    /** The record [eventId] as the file holds it now; none once it's gone. */
+    @Query("$SELECTION WHERE eventId = :eventId")
+    suspend fun record(eventId: String): QueuedRow?
+
     @Insert
     suspend fun insert(row: OutboxRow): Long
-
-    @Query("SELECT value FROM outboxState WHERE key = :key")
-    suspend fun state(key: String): String?
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun keep(state: OutboxState)
-
-    @Query("DELETE FROM outboxState WHERE key = :key")
-    suspend fun forget(key: String)
 }
 
 /**

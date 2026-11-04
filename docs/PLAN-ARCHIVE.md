@@ -10,6 +10,17 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN4d's on 2026-11-04: _Last updated: 2026-11-04 (Central) —
+AN4c, the outbox store (#495; `docs/DECISIONS.md`, 2026-11-04): BaliOutbox's `Outbox` file in Kotlin,
+on Room, with its tests: iOS's table as Room's version 1, its checks included, the install minted once
+and a counter never reused; each record read from its row; the SQLite Room bundles, on the JVM's
+tests and the phone alike; and Bali's files left out of a backup and of a transfer to a new phone.
+The app opened, wrote and read the file on `Bali_Spike_API35`. AN4 is four PRs now, the store's rules
+AN4d's. Before it, AN4b, the records. Next: AN4d, the store's rules; Android 17's SDK platform for the
+owner to OK before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items,
+6); CodeQL for Android's Kotlin, the owner's call (7); AN1's part 2 once the owner has the phones. Not
+on the pilot's critical path._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN4c's on 2026-11-04: _Last updated: 2026-11-04 (Central) —
 AN4b, the outbox's records (#494; `docs/DECISIONS.md`, 2026-11-04): BaliOutbox's `OutboxRecord.swift`
 in Kotlin with its tests: what the phone did, the request each record sends, the same on every
@@ -2064,6 +2075,20 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN4d's line, as it read until it was done (2026-11-04; `docs/DECISIONS.md`, 2026-11-04). The
+conductor split AN4d's line into AN4d and AN4e that day, every word of it kept in one of them:
+AN4d's here, AN4e's in `docs/PLAN-ANDROID.md`.
+
+- **AN4d** The outbox's recording, the store's rules (twin: BaliOutbox's `Outbox`, its rules, its
+  recording side): `record`, `release`, `explain`, the standing and the rules' state (`reportedOff`,
+  `offFrom`, `lastTap`, `waitEnds`, `protectionRestored`, `keep` and `file`), with `Standing` and its
+  kept form from SyncEngine.swift, on AN4c's store, with the tests that need them: OutboxTests'
+  RecordTests; SchemaTests' `offFrom`; UnreadUnlockTests' `filing`, UnlockRouteTests'
+  `refocusFollows` and StandingKeptTests' `keptForm`; and a test of its own for each rule no iOS test
+  reaches through the outbox alone. From it, the first step to write unlocks, the file's writes at
+  `synchronous = FULL`, WAL kept (the conductor's call) — validation: the JVM tests, then the app's
+  instrumented test writing through `record` on an emulator, as AN4c's wrote beside the store
 
 AN4c's line, as it read until it was done (2026-11-04; `docs/DECISIONS.md`, 2026-11-04). The
 conductor split AN4c's line into AN4c and AN4d that day, every word of it kept in one of them:

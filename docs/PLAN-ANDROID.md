@@ -14,15 +14,17 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-04 (Central) — AN4c, the outbox store (#495; `docs/DECISIONS.md`,
-2026-11-04): BaliOutbox's `Outbox` file in Kotlin, on Room, with its tests: iOS's table as Room's
-version 1, its checks included, the install minted once and a counter never reused; each record read
-from its row; the SQLite Room bundles, on the JVM's tests and the phone alike; and Bali's files left
-out of a backup and of a transfer to a new phone. The app opened, wrote and read the file on
-`Bali_Spike_API35`. AN4 is four PRs now, the store's rules AN4d's. Before it, AN4b, the records.
-Next: AN4d, the store's rules; Android 17's SDK platform for the owner to OK before the first step
-with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); CodeQL for Android's Kotlin, the
-owner's call (7); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
+_Last updated: 2026-11-04 (Central) — AN4d, the outbox's recording (#496; `docs/DECISIONS.md`,
+2026-11-04): BaliOutbox's `Outbox` in Kotlin, its recording side, with its tests: what the phone did
+queued with the standing it leaves, in one write; a tap or an unlock superseding queued refocuses;
+protection off reported once per revocation, with where the phone stood before it; an unlock held for
+its reason, and one not filed yet filed once the phone knows where it stands; `Standing` and its kept
+form; and every write synced to the disk as it commits (`synchronous = FULL`, the conductor's call).
+The app wrote through `record` on `Bali_Spike_API35`. AN4 is five PRs now, the sending AN4e's.
+Before it, AN4c, the store. Next: AN4e, the sending; Android 17's SDK platform for the owner to OK
+before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); CodeQL for
+Android's Kotlin, the owner's call (7); AN1's part 2 once the owner has the phones. Not on the
+pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -133,16 +135,24 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN4a** The unlock contract — ✅ (#493; DECISIONS 2026-11-04)
 - **AN4b** The records — ✅ (#494; DECISIONS 2026-11-04)
 - **AN4c** The outbox store — ✅ (#495; DECISIONS 2026-11-04)
-- **AN4d** The store's rules (twin: BaliOutbox's `Outbox`, its rules): `record`, `release`,
-  `explain`, the standing, `nextDue`, `settle`, `refile`, the backoff, jitter and bound, `retryNow`,
-  `awaiting` and `holdsUnlock`, on AN4c's store, with the tests that need them: OutboxTests'
-  RecordTests; SchemaTests' `reopens` (its records sent, protection off reported once),
-  `migratesEmpty`'s `nextDue` and `awaiting`, and `offFrom`; ActionOrderTests' `seqs`; and
-  SettleTests' kept records, backoff, jitter and bound — validation: the JVM tests, then the app's
-  instrumented test writing through `record` on an emulator, as AN4c's wrote beside the store
+- **AN4d** The outbox's recording — ✅ (#496; DECISIONS 2026-11-04)
+- **AN4e** The outbox's sending, the store's rules (twin: BaliOutbox's `Outbox`, its sending side):
+  `Due` and `nextDue`, `settle`, `refile`, the backoff, jitter and bound, `retryNow`, `awaiting` and
+  `holdsUnlock`, on AN4c's store, with the tests that need them, each needing `settle` or `nextDue`:
+  SchemaTests' `reopens` (its records sent, protection off reported once) and `migratesEmpty`'s
+  `nextDue` and `awaiting`; ActionOrderTests' `seqs`; SettleTests' kept records, backoff, jitter and
+  bound; RecordTests' `supersedes`, its in-flight refocus's answer coming back to nothing; OrderTests',
+  AwaitingTests' and UnlockSafetyTests' suites; UnlockRouteTests' `settleNamesTheSession`;
+  RefiledTests' `once`, `refusedThenLanded` and `keptBeforeItsScan`; and ReasonTests'
+  `refiledReason` — validation: the JVM tests, then the app's instrumented test settling a record on
+  an emulator
 - **AN5** The sync engine (twin: `SyncEngine`): the drain with backoff and jitter, the 30-second
   check-in while the screen is on (ARCHITECTURE, the battery plan; AN7 drives it from the lock's
-  service), and the reconcile (`readMayReconcile` and the typed dispositions), all on a fake clock
+  service), and the reconcile (`readMayReconcile` and the typed dispositions), all on a fake clock;
+  `SyncState`, the rest of SyncEngine.swift (`Standing` and its kept form are AN4d's); and the tests
+  that reach the outbox's recording through the engine: StandingKeptTests' `kept` and
+  `keptWithItsStanding`, UnreadUnlockTests' but `filing`, ReasonTests' but `refiledReason`, and
+  UnlockRouteTests' `route` and `endsTheTapsShield`
 - **AN6** Sign-in (twin: `SignIn`, `TokenStore`): Cognito's hosted UI in a Custom Tab, the code
   grant with PKCE; tokens sealed by a Keystore key; the refresh, Sign out, `Tokens.checked` (no
   token to Bali's API before the 13+ check, but the check's own read and a deletion's) and the
