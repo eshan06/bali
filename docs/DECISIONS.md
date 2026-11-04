@@ -77,14 +77,16 @@ a real decision? Add a dated entry at the top: what was decided and why.
   write, the queue, the report and the last tap with it, and read back by a relaunch; a standing a
   launch couldn't keep, kept at its first change, filing the press made unread; a run cancelled
   mid-stretch finishing it, and letting go of its run; one run at a time; the engine made from the
-  file, a part it can't read shown; the rings' rules; `SyncState`'s `pendingTap` and `holdsUnfiled`;
-  the rig's server; and a write run to its end. Tried, each failing by name, then reverted: the
+  file, a part it can't read shown; a read of the queue failing after a record, shown, the last list
+  kept with the record; the rings' rules; `SyncState`'s `pendingTap` and `holdsUnfiled`; the rig's
+  server; and a write run to its end. Tried, each failing by name, then reverted: the
   standing kept apart from its record (a relaunch stood focused beside the unlock); the call in its
   caller's coroutine (the cancelled caller waited for the write); `Unread` handed to the file; a
   stretch a cancel cuts short (the press filed, the queue shown unfiled); the standing taken as kept
   over an unlock not filed; the queue not read again after a filing; two runs at once; a run never
   let go; every ring queued; an alarm that outlives its pause; a sleep no cancel ends; a queue it
-  can't read not shown; and a read that answered none taken for a failure. Not reached yet: `changes`,
+  can't read not shown, at launch or after a record; the record left out of the list a failed read
+  keeps; and a read that answered none taken for a failure. Not reached yet: `changes`,
   the drain's ring, and the engine's own `Unread` check in `update`, the file refusing to keep `Unread`
   all the same, each seen first by AN5b's and AN5c's tests. Nothing was added to the PC's SDK: its
   folders were compared before and after.

@@ -123,13 +123,9 @@ class SyncEngine private constructor(
     }
 
     // The loops' passes are AN5b's (the drain) and AN5c's (the read): till then each waits on its rings.
-    private suspend fun drain(): Nothing {
-        while (true) drainRings.pause(null)
-    }
+    private suspend fun drain(): Nothing { while (true) drainRings.pause(null) }
 
-    private suspend fun read(): Nothing {
-        while (true) readRings.pause(null)
-    }
+    private suspend fun read(): Nothing { while (true) readRings.pause(null) }
 
     /**
      * Queues what the phone just did, acted on at once, and sends it; none when there's nothing to send
@@ -193,10 +189,10 @@ class SyncEngine private constructor(
      * couldn't be read.
      */
     private suspend fun load() {
-        val queued = orNone { outbox.records() }
-        val reportedOff = orNone { outbox.reportedOff() }
-        val lastTap = orNone { outbox.lastTap() }
-        val standing = orNone { outbox.standing() }
+        val queued = tried { outbox.records() }.getOrNull()
+        val reportedOff = tried { outbox.reportedOff() }.getOrNull()
+        val lastTap = tried { outbox.lastTap() }.getOrNull()
+        val standing = tried { outbox.standing() }.getOrNull()
         state =
             SyncState(
                 standing = standing ?: Standing.Unread, queued = queued.orEmpty(), reportedOff = reportedOff,
@@ -223,7 +219,7 @@ class SyncEngine private constructor(
      */
     private suspend fun knowLastTap() {
         if (state.lastTap != null) return
-        val lastTap = orNone { outbox.lastTap() } ?: return
+        val lastTap = tried { outbox.lastTap() }.getOrNull() ?: return
         update { it.copy(lastTap = lastTap) }
     }
 
@@ -239,34 +235,25 @@ class SyncEngine private constructor(
     private suspend fun keepStanding() {
         val standing = state.standing
         kept = standing
-        stored { outbox.file(standing) }
-            .onSuccess { filed ->
-                if (filed) {
-                    refreshQueue()
-                    drainRings.ring()
-                }
-            }.onFailure { kept = null }
+        val filed = stored { outbox.file(standing) }.getOrNull()
+        if (filed == null) kept = null
+        if (filed == true) {
+            refreshQueue()
+            drainRings.ring()
+        }
     }
 
     /** What [read] reads from the outbox, or writes; a failure is shown (rule 5). */
-    private suspend fun <T> stored(read: suspend () -> T): Result<T> =
+    private suspend fun <T> stored(read: suspend () -> T): Result<T> = tried(read).onFailure { failed() }
+
+    /** What [read] reads, or its failure, unshown, as Swift's `try?`: a cancel is never taken for one. */
+    private suspend fun <T> tried(read: suspend () -> T): Result<T> =
         try {
             Result.success(read())
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
-            failed()
             Result.failure(error)
-        }
-
-    /** What [read] reads, or none when it fails, unshown: Swift's `try?`. */
-    private suspend fun <T> orNone(read: suspend () -> T): T? =
-        try {
-            read()
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (_: Exception) {
-            null
         }
 
     /**
@@ -287,10 +274,7 @@ class SyncEngine private constructor(
          * can give a token, since the drain waits on it.
          */
         suspend fun open(
-            outbox: Outbox,
-            client: ApiClient,
-            scope: CoroutineScope,
-            clock: SyncClock = SystemClock,
+            outbox: Outbox, client: ApiClient, scope: CoroutineScope, clock: SyncClock = SystemClock,
             refresh: suspend () -> Boolean = { false },
         ): SyncEngine = SyncEngine(outbox, client, scope, clock, refresh).apply { lock.withLock { load() } }
     }
@@ -303,9 +287,7 @@ class SyncEngine private constructor(
 internal class Rings(private val clock: SyncClock) {
     private val rung = Channel<Unit>(Channel.CONFLATED)
 
-    fun ring() {
-        rung.trySend(Unit)
-    }
+    fun ring() { rung.trySend(Unit) }
 
     /**
      * Waits for [deadline] (none: none), by the engine's clock, or a ring, whichever comes first. The

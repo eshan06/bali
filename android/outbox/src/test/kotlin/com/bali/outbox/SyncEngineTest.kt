@@ -77,6 +77,21 @@ class SyncEngineTest : EngineFiles() {
         }
 
     @Test
+    fun aQueueReadThatFailsAfterARecordIsShownAndKeepsTheLastListWithTheRecordTheFileHoldsNow(): Unit =
+        runBlocking {
+            val (outbox, _) = makeOutbox()
+            outbox.keep(inSession(ParticipationState.Focused))
+            val rig = rig(outbox)
+            poison(outbox)
+            val unlock = assertNotNull(rig.engine.record(Change.Unlock("s", null)))
+            // The phone acts on what it just did, whatever the read: its lock off, the unlock queued.
+            val state = rig.engine.updates.value
+            assertEquals(inSession(ParticipationState.Unlocked), state.standing)
+            assertEquals(listOf(unlock), state.queued)
+            assertEquals(Link.StorageFailed, state.link)
+        }
+
+    @Test
     fun whereThePhoneStandsUnreadIsNeverHandedToTheFileTheChangeKeptAndNothingWrittenOverTheFilesStanding(): Unit =
         runBlocking {
             val (outbox, _) = makeOutbox()
