@@ -66,6 +66,13 @@ a real decision? Add a dated entry at the top: what was decided and why.
   a refocus behind a stuck unlock, or an unlock not filed yet; and `settle` or `retryNow` writing
   without FULL. Nothing was added to the PC's SDK: its folders were compared before and after.
 
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini
+  CLI on this PC, so context isolation holds and model diversity doesn't): 0 blockers. Their one
+  WARN, the same from both: the binder takes any value and refuses a type it can't bind only at run
+  time, so a later call binding an `Instant` or an enum would compile, then fail its write. Left as
+  it is, said in the PR: every call binds text, a number, a truth or none, and the tests run each;
+  a typed SQL value would change every statement for a mistake no call makes.
+
   **The proof on the phone:** `OutboxFileTest` on `Bali_Spike_API35` (Android 15), with `./gradlew
   :app:connectedDebugAndroidTest`: the app recorded an Emergency Unlock through the store; reopened,
   its writer at NORMAL, `nextDue` named it, its send went unanswered and `settle` kept it, the writer
