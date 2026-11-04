@@ -26,7 +26,9 @@ import java.time.format.DateTimeParseException
  * Each write is one transaction, all or nothing, and reaches the disk before it returns: Room keeps
  * the file in WAL at `synchronous = NORMAL`, under which the phone losing power in the seconds after
  * a write can undo it, so every write sets FULL first (`docs/DECISIONS.md`, 2026-11-04, AN4d): an
- * Emergency Unlock's record is never discarded.
+ * Emergency Unlock's record is never discarded. Unlike iOS's, a write is cancelled with its caller:
+ * undone before it commits, or, after, kept with the caller hearing only the cancel; so the sync
+ * engine (AN5) writes where no screen can cancel it.
  */
 class Outbox private constructor(internal val file: OutboxDatabase) : AutoCloseable {
     internal val dao = file.dao()
@@ -42,6 +44,8 @@ class Outbox private constructor(internal val file: OutboxDatabase) : AutoClosea
      * back on returns to: kept until a tap or the next report, so a back on made again returns there
      * too, and unlocked by an Emergency Unlock since. An unlock waiting for its reason is due [hold]
      * later (C5a), and whatever the phone does next sends one at once: the student has moved on.
+     * [standing] is never [Standing.Unread], whose keeping throws and undoes the write, the change with
+     * it: the engine passes none for it, as iOS's does.
      */
     suspend fun record(change: Change, now: Instant, standing: Standing? = null, hold: Duration = Duration.ZERO): OutboxRecord? =
         write { db ->

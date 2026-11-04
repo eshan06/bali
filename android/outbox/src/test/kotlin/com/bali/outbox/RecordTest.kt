@@ -169,6 +169,18 @@ class RecordTest : OutboxFiles() {
         }
 
     @Test
+    fun whereThePhoneStoodBeforeProtectionOffIsReadBeforeTheStandingTheReportLeavesIsKept(): Unit =
+        runBlocking {
+            // The engine records the report with the standing it leaves, protection off there (iOS's
+            // `state.standing.acting(change)`; santa's review).
+            val (outbox, _) = makeOutbox()
+            val off = Standing.InSession(session(), ParticipationState.ProtectionOff)
+            outbox.keep(Standing.InSession(session(), ParticipationState.Unlocked))
+            record(outbox, Change.ProtectionOff("s"), standing = off)
+            assertEquals(ParticipationState.Unlocked to off, outbox.offFrom() to outbox.standing())
+        }
+
+    @Test
     fun anUnlockWaitingForItsReasonIsDueItsHoldLaterAndWhateverThePhoneDoesNextSendsItAtOnce(): Unit =
         runBlocking {
             for (next in listOf(Change.Refocus("s"), Change.Tap("tag"), Change.ProtectionOff("s"), Change.Unlock("s", null))) {

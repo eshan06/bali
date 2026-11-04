@@ -149,8 +149,9 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN5** The sync engine (twin: `SyncEngine`): the drain with backoff and jitter, the 30-second
   check-in while the screen is on (ARCHITECTURE, the battery plan; AN7 drives it from the lock's
   service), and the reconcile (`readMayReconcile` and the typed dispositions), all on a fake clock;
-  `SyncState`, the rest of SyncEngine.swift (`Standing` and its kept form are AN4d's); and the tests
-  that reach the outbox's recording through the engine: StandingKeptTests' `kept` and
+  `SyncState`, the rest of SyncEngine.swift (`Standing` and its kept form are AN4d's); its writes to
+  the outbox made where no screen can cancel them, and none given `Standing.Unread` (AN4d's review);
+  and the tests that reach the outbox's recording through the engine: StandingKeptTests' `kept` and
   `keptWithItsStanding`, UnreadUnlockTests' but `filing`, ReasonTests' but `refiledReason`, and
   UnlockRouteTests' `route` and `endsTheTapsShield`
 - **AN6** Sign-in (twin: `SignIn`, `TokenStore`): Cognito's hosted UI in a Custom Tab, the code

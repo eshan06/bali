@@ -264,6 +264,21 @@ class DurabilityTest : OutboxFiles() {
                 assertEquals(2L, reopened.synchronous(), name)
             }
         }
+
+    @Test
+    fun aWriteCommitsAtFullFromTheConnectionsFirstWriteSetBeforeItsTransactionBegins(): Unit =
+        runBlocking {
+            // The level the record's insert ran at, read inside its write by a trigger: one set
+            // after the transaction would leave a connection's first write at NORMAL (santa's review).
+            val (outbox, _) = makeOutbox()
+            outbox.execute(
+                "CREATE TRIGGER level AFTER INSERT ON outbox BEGIN INSERT OR REPLACE INTO outboxState (key, value) " +
+                    "VALUES ('level', (SELECT synchronous FROM pragma_synchronous)); END",
+            )
+            assertEquals(1L, outbox.synchronous())
+            record(outbox, Change.Tap("tag"))
+            assertEquals(listOf("2"), outbox.texts("SELECT value FROM outboxState WHERE key = 'level'"))
+        }
 }
 
 /** The phone's own order (A12): OutboxTests' ActionOrderTests, their parts no rule holds (AN4d's hold the rest). */

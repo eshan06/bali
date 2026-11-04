@@ -55,6 +55,14 @@ a real decision? Add a dated entry at the top: what was decided and why.
     it can't read is none, as on iOS.
   - **A hold is a `java.time.Duration`,** Swift's `TimeInterval`, under `record`'s `hold`, Swift's
     `holding:`.
+  - **A write is cancelled with its caller,** where GRDB's `pool.write` can't be cut short: cancelled
+    before it commits, it is undone, nothing kept; after, it stands, and the caller hears only the
+    cancel. Nothing calls the store yet; the sync engine (AN5) makes its writes where no screen can
+    cancel them, and never hands `record` or `keep` `Standing.Unread`, whose keeping undoes the
+    write, the change with it, as on iOS, whose engine passes none for it (santa's review).
+  - **`record` reads where the phone stood with decoding's errors only swallowed** (a kept standing
+    it can't read is none), where iOS's `try?` swallows a database error too; a read failing there
+    would fail the write's insert anyway (santa's review: noted for parity, never reached).
 
   **The tests,** every iOS test that reaches these rules through the outbox alone: RecordTests'
   `queues`, with the refocus's `follows`; `supersedes`, but its in-flight refocus's answer, which
@@ -67,16 +75,24 @@ a real decision? Add a dated entry at the top: what was decided and why.
   once and backing off, one due already, nor one made at a time the phone's clock has since been set
   back past); `explain` (the latest unlock's reason while it has never been sent, any other held
   unlock released with it; too late once on its way, sent or gone); the standing kept in the write
-  that records or files, a write the file refuses keeping neither; `lastTap`; `waitEnds`;
-  `Standing`'s own rules; a kept standing this build can't read; and the durability test. Tried, each
-  failing by name, then reverted: the FULL left out, and `release` sent around it; an unlock not
-  superseding refocuses; protection off reported again; an unlock not where a back on returns; a
-  refocus following only its session's unlocks; an unlock under a tap naming no session; a kept state
-  this build doesn't know read as focus; `explain` over a send; `release` without its guard; an
-  unlock not filed yet leaving the standing be; the standing kept apart from its filing, and apart
-  from its record; the filing after the record's insert; a tap not kept as the last; and `waitEnds`
-  throwing on iOS's form. Nothing was added to the PC's SDK: its folders were compared before and
-  after.
+  that records or files, a write the file refuses keeping neither; where the phone stood before
+  protection off read before the report's own standing is kept (santa's review); `lastTap`;
+  `waitEnds`; `Standing`'s own rules; a kept standing this build can't read; and the durability
+  tests, one reading the level a write commits at from inside it, with a trigger (santa's review).
+  Tried, each failing by name, then reverted: the FULL left out, set after the transaction, and
+  `release` sent around it; an unlock not superseding refocuses; protection off reported again; an
+  unlock not where a back on returns; where the phone stood read after the report's standing is
+  kept; a refocus following only its session's unlocks; an unlock under a tap naming no session; a
+  kept state this build doesn't know read as focus; `explain` over a send; `release` without its
+  guard; an unlock not filed yet leaving the standing be; the standing kept apart from its filing,
+  and apart from its record; the filing after the record's insert; a tap not kept as the last; and
+  `waitEnds` throwing on iOS's form. Nothing was added to the PC's SDK: its folders were compared
+  before and after.
+
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini
+  CLI on this PC, so context isolation holds and model diversity doesn't): 0 blockers. Its WARNs:
+  the two tests above, added; the cancel and `Unread` notes, put in the store's docs and on AN5's
+  line; and the parity note on what `record`'s read swallows, left as said above.
 
   **The proof on the phone:** `OutboxFileTest` on `Bali_Spike_API35` (Android 15), with `./gradlew
   :app:connectedDebugAndroidTest`: the app recorded a tap, and an Emergency Unlock under it held for
