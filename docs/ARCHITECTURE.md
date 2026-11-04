@@ -937,7 +937,9 @@ PostHog's US cloud, receives counted events from two places, and nothing else of
   Bali's internal user id alone. Every event carries `environment`, so a dev key, if one is ever
   set, files apart.
 - **What it never holds:** a student's name, email or user id, or any event about one student; a
-  teacher's email or name; a URL; free text in any property.
+  teacher's email or name; a URL; free text in any property. So the privacy paths need nothing new:
+  once an account deletion, a disposal or the retention run takes a teacher's name and sign-in off
+  their row, the id on their events names no one.
 - **Nothing captured on its own.** No autocapture, no session replay, no heatmaps, no exception
   capture (errors are Sentry's). The project is set to match: session replay, web autocapture and
   exception autocapture off, the client's IP address discarded.
