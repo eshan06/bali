@@ -2,6 +2,7 @@ package com.bali.outbox
 
 import androidx.sqlite.SQLiteException
 import com.bali.core.ActionOrder
+import com.bali.core.BaliJson
 import com.bali.core.ParticipationState
 import com.bali.core.ProtectionOffRequest
 import com.bali.core.RefocusRequest
@@ -29,7 +30,49 @@ suspend fun record(outbox: Outbox, change: Change, at: Instant = t0, standing: S
 suspend fun current(outbox: Outbox, eventId: String): OutboxRecord? = outbox.dao.record(eventId)?.record()
 
 /** Session [id], ending [endsAt] seconds after [t0], as the phone keeps it and an answer names it. */
-fun session(id: String = "s", endsAt: Long = 3000) = SessionView(id, "c", t0.plusSeconds(endsAt))
+fun session(id: String = "s", endsAt: Long = 3000) = SessionView(id, "c", at(endsAt))
+
+/** [seconds] after [t0]. */
+fun at(seconds: Long): Instant = t0.plusSeconds(seconds)
+
+/**
+ * One send of [record] as the sync engine will make it, its request through the real client, answered
+ * with [status] and [body] (no answer at all when [status] is none), then settled at [at]: BaliOutbox's
+ * tests' `send`. None for an unlock not filed yet, which sends nothing (B6b), and for a record gone.
+ */
+suspend fun send(outbox: Outbox, record: OutboxRecord, status: Int?, body: String = "", at: Instant = t0): Disposition? =
+    record.send(client(Canned(status, body)))?.let { outbox.settle(it, at) }
+
+/** The answers the tests send, as the API writes them: BaliOutbox's tests' `Answer`. */
+object Answer {
+    fun joined(view: SessionView = session(), state: String = "focused") =
+        """{"outcome":"joined","session":${json(view)},"state":"$state"}"""
+
+    val armed = """{"outcome":"armed","session":null,"state":null}"""
+    val replayNoSession = """{"outcome":"replay","session":null,"state":null}"""
+
+    fun unlocked(view: SessionView = session()) =
+        """{"outcome":"applied","recordedAs":null,"state":"unlocked","session":${json(view)},"reason":null}"""
+
+    /** An unlock kept with no session: its tap armed, or unknown to the server (A11). */
+    fun unlockKept(note: String) = """{"outcome":"recorded","recordedAs":"$note","state":null,"session":null,"reason":null}"""
+
+    /** An unlock recorded with no participation live: OrderTests' `recorded`. */
+    val recorded = """{"outcome":"recorded","recordedAs":"no_live_participation"}"""
+
+    /** A refocus or a report applied. */
+    val applied = """{"outcome":"applied"}"""
+
+    /** A refusal: OrderTests' `refused`. */
+    val badInput = """{"error":{"code":"bad_input","message":"refused"}}"""
+
+    /** A tap of a tag no teacher registered: refused. */
+    val unknownBlock = """{"error":{"code":"not_found","message":"unknown block"}}"""
+
+    fun refused(reason: String) = """{"error":{"code":"conflict","reason":"$reason","message":"$reason"}}"""
+
+    private fun json(view: SessionView) = BaliJson.encodeToString(SessionView.serializer(), view)
+}
 
 /** A UUIDv7, in lower case. */
 val uuidV7 = Regex("[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}")
@@ -80,7 +123,6 @@ class RecordTest : OutboxFiles() {
             assertEquals(changes, records.map { it.change })
         }
 
-    // Its in-flight refocus's answer, which comes back to nothing, is AN4e's: it needs `settle`.
     @Test
     fun aLaterTapOrUnlockOneFiledUnderATapTooSupersedesEveryQueuedRefocusDeletedNeverSent(): Unit =
         runBlocking {
@@ -92,9 +134,11 @@ class RecordTest : OutboxFiles() {
                 record(outbox, Change.Refocus("t"))
                 val tap = record(outbox, Change.Tap("tag"))
                 // A refocus queued after the tap is superseded in its turn.
-                record(outbox, Change.Refocus("s"))
+                val inFlight = record(outbox, Change.Refocus("s"))
                 val latest = record(outbox, later)
                 assertEquals(listOf(unlock, report, tap, latest).map { it.eventId }, outbox.records().map { it.eventId }, "$later")
+                // One that was in flight comes back to nothing: its answer is older than the phone's truth.
+                assertNull(send(outbox, inFlight, 200, Answer.applied), "$later")
                 // Nothing supersedes an unlock, a tap or a protection-off report.
                 record(outbox, Change.Tap("tag"))
                 record(outbox, Change.Unlock("s", null))
