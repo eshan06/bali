@@ -14,17 +14,13 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-04 (Central) — AN5a, the sync engine's frame (#499; `docs/DECISIONS.md`,
-2026-11-04): BaliOutbox's `SyncEngine` in Kotlin, its frame, with its tests and the rig the next
-steps test on: Swift's actor as a lock each stretch holds, Room's calls included, let go at each
-`await`; each public call in the engine's own scope, so a screen cancelled stops waiting and the
-write goes on; the engine made from the file; `record`, its standing kept in its own write, never
-`Unread`; `updates` as a `StateFlow`; and each loop's rings. Found: Room runs a write to its end
-whatever its caller, so a cancel could skip the state it leaves. AN5 is five PRs now, AN5a–AN5e.
-Before it, AN4e, the sending. Next: AN5b, the drain; Android 17's SDK platform for the owner to OK
-before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); CodeQL for
-Android's Kotlin, the owner's call (7); AN1's part 2 once the owner has the phones. Not on the pilot's
-critical path._
+_Last updated: 2026-11-04 (Central) — CodeQL scans Android's Kotlin (#498; `docs/DECISIONS.md`,
+2026-11-04): CodeQL's advanced setup, `.github/workflows/codeql.yml`, beside GitHub Actions and
+JavaScript/TypeScript, every module's code and tests built for it on every PR; default setup
+switched off by the owner (Open owner items, 7). Before it, AN5a, the sync engine's frame. Next:
+AN5b, the drain; Android 17's SDK platform for the owner to OK before the first step with today's
+AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the owner has the phones.
+Not on the pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.

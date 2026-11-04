@@ -10,6 +10,18 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by CodeQL's (#498) on 2026-11-04: _Last updated: 2026-11-04
+(Central) — AN5a, the sync engine's frame (#499; `docs/DECISIONS.md`, 2026-11-04): BaliOutbox's
+`SyncEngine` in Kotlin, its frame, with its tests and the rig the next steps test on: Swift's actor
+as a lock each stretch holds, Room's calls included, let go at each `await`; each public call in the
+engine's own scope, so a screen cancelled stops waiting and the write goes on; the engine made from
+the file; `record`, its standing kept in its own write, never `Unread`; `updates` as a `StateFlow`;
+and each loop's rings. Found: Room runs a write to its end whatever its caller, so a cancel could
+skip the state it leaves. AN5 is five PRs now, AN5a–AN5e. Before it, AN4e, the sending. Next: AN5b,
+the drain; Android 17's SDK platform for the owner to OK before the first step with today's
+AndroidX, and OkHttp 5.5 with it (Open owner items, 6); CodeQL for Android's Kotlin, the owner's
+call (7); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN5a's on 2026-11-04: _Last updated: 2026-11-04 (Central) — AN4e,
 the outbox's sending (#497; `docs/DECISIONS.md`, 2026-11-04): BaliOutbox's `Outbox` in Kotlin, its
 sending side, with its tests: the next record in the order the phone acted, a pending one holding those
