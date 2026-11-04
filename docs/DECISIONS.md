@@ -53,6 +53,13 @@ a real decision? Add a dated entry at the top: what was decided and why.
   - **`run` lets go of its one run however it ends,** as Swift's `defer` does.
   - **`Outbox.open` takes a driver,** internally: the bundled one, which a test's wraps to see each
     commit, Room having no twin of GRDB's `TransactionObserver`. The app's `open` is unchanged.
+  - **A read that fails after `record`'s write is shown after its state step, never before it**
+    (santa's review). Shown before, as iOS shows it (SyncEngine.swift:445–451), the change of state
+    the failure makes keeps the standing the record replaced over the one its write just kept, and
+    the next step keeps it back: a relaunch between the two stands where the phone stood before,
+    locked over an Emergency Unlock. Reaching it takes a read failing right after a write that
+    worked, then a kill within milliseconds, so its reach is doubtful; the fix is two lines, so
+    Android takes it. iOS has the same window: the owner's to decide.
 
   **Found: Room runs a write to its end whatever its caller.** Room 2.8.5 runs each connection's work
   in a scope of its own, under the database's `SupervisorJob`, on the JVM and on Android (its
@@ -68,8 +75,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `Server` over core's `HttpTransport`, each request waiting for the test's answer; `Tokens`; and
   `Rig`, its run started at once, with `EngineFiles` stopping each test's engines. `Relaunches` opens,
   at each commit to the file, the engine the next launch would, through `Watching`, the bundled driver
-  watched, which also holds a write once begun (`HeldWrite`) while a test cancels its caller.
-  `Answer`'s engine answers come with the tests that send them.
+  watched, which also holds a write once begun (`HeldWrite`) while a test cancels its caller. Room's
+  own bookkeeping, its invalidation tracker, commits after a write too, on its own time, so a test
+  judges only the commits from its change's own on. `Answer`'s engine answers come with the tests
+  that send them.
 
   **The tests:** TestClockTests' `heldSleepCancels`; StandingKeptTests' `keptWithItsStanding`, but
   its lock check (AN5e's); and new: a record whose caller is cancelled still kept, the caller waiting
@@ -78,8 +87,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   launch couldn't keep, kept at its first change, filing the press made unread; a run cancelled
   mid-stretch finishing it, and letting go of its run; one run at a time; the engine made from the
   file, a part it can't read shown; a read of the queue failing after a record, shown, the last list
-  kept with the record; the rings' rules; `SyncState`'s `pendingTap` and `holdsUnfiled`; the rig's
-  server; and a write run to its end. Tried, each failing by name, then reverted: the
+  kept with the record, and every relaunch from the record's commit standing unlocked; a tap made
+  while an unlock writes, waiting for it, so it never keeps the lock over it; the rings' rules;
+  `SyncState`'s `pendingTap` and `holdsUnfiled`; the rig's server; and a write run to its end.
+  Tried, each failing by name, then reverted: the lock left out (the tap kept the lock over the
+  unlock); the failure shown before `record`'s state step (a relaunch after the record's commit
+  stood focused); the
   standing kept apart from its record (a relaunch stood focused beside the unlock); the call in its
   caller's coroutine (the cancelled caller waited for the write); `Unread` handed to the file; a
   stretch a cancel cuts short (the press filed, the queue shown unfiled); the standing taken as kept
@@ -90,6 +103,21 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the drain's ring, and the engine's own `Unread` check in `update`, the file refusing to keep `Unread`
   all the same, each seen first by AN5b's and AN5c's tests. Nothing was added to the PC's SDK: its
   folders were compared before and after.
+
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini
+  CLI on this PC, so context isolation holds and model diversity doesn't): 0 blockers. Their WARNs:
+  the failed read shown before `record`'s state step (both: fixed, above, with its test); no test of
+  the lock itself (both: added, the tap made while an unlock writes); the instrumented test's run
+  missing from the PR (both: run, below); `record`'s report again and lock back on missing from the
+  frame (left: AN5c's and AN5e's, as split, and nothing calls the engine before them); and a write
+  that fails for a caller already gone, which no screen shows (left: iOS's `record` leaves the
+  showing to its caller too, and a screen that is gone shows nothing on either phone).
+
+  **The proof on the phone:** `Outbox.open` changed, so `OutboxFileTest` ran on `Bali_Spike_API35`
+  (Android 15) with `./gradlew :app:connectedDebugAndroidTest`: the app opened its file through the
+  public `open`, now over the internal one, and recorded, read, settled and backed up as before.
+  Passed: 4 tests, 0 failures. Gradle uninstalls both apps after; the engine itself has no Android
+  code yet, so its proof is the JVM's.
 
 - **2026-11-04** — **AN4e, the outbox's sending: BaliOutbox's `Outbox` in Kotlin, its sending side
   (the conductor's calls, awaiting the owner's look; AN4e, #497).** The owner was asleep and asked

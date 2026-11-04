@@ -12,7 +12,10 @@ import kotlin.test.fail
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -79,16 +82,46 @@ class SyncEngineTest : EngineFiles() {
     @Test
     fun aQueueReadThatFailsAfterARecordIsShownAndKeepsTheLastListWithTheRecordTheFileHoldsNow(): Unit =
         runBlocking {
-            val (outbox, _) = makeOutbox()
+            val (outbox, relaunches) = relaunching(temporaryFile())
             outbox.keep(inSession(ParticipationState.Focused))
             val rig = rig(outbox)
             poison(outbox)
+            relaunches.watching = true
             val unlock = assertNotNull(rig.engine.record(Change.Unlock("s", null)))
+            relaunches.watching = false
             // The phone acts on what it just did, whatever the read: its lock off, the unlock queued.
             val state = rig.engine.updates.value
             assertEquals(inSession(ParticipationState.Unlocked), state.standing)
             assertEquals(listOf(unlock), state.queued)
             assertEquals(Link.StorageFailed, state.link)
+            // Shown after the record's own step, so no write since the record's keeps where the phone
+            // stood before it (santa's review): a relaunch at any commit from the record's, the first
+            // to stand unlocked, stands unlocked. (Room's own bookkeeping commits too, before it.)
+            val relaunched = relaunches.engines.map { it.updates.value.standing }.dropWhile { it != inSession(ParticipationState.Unlocked) }
+            assertTrue(relaunched.isNotEmpty())
+            assertEquals(relaunched.map { inSession(ParticipationState.Unlocked) }, relaunched)
+        }
+
+    @Test
+    fun callsAtOnceNeverInterleaveATapMadeWhileAnUnlockIsWritingSeesTheUnlockAndNeverKeepsTheLockOverIt(): Unit =
+        runBlocking {
+            // The lock that stands for Swift's actor (santa's review): without it, the tap reads the
+            // standing the unlock's write is about to change, and keeps it over the unlock.
+            val held = HeldWrite()
+            val outbox = open(temporaryFile(), driver = Watching(began = held.hold))
+            outbox.keep(inSession(ParticipationState.Focused))
+            val rig = rig(outbox)
+            held.arm()
+            val unlock = async { rig.engine.record(Change.Unlock("s", null)) }
+            held.began()
+            val tap = async { rig.engine.record(Change.Tap("tag")) }
+            // Time for the tap's call to reach the engine; it waits there, in the correct engine, for
+            // the unlock's stretch, its state step included.
+            delay(100)
+            held.release()
+            withTimeout(patience) { listOf(unlock, tap).awaitAll() }
+            assertEquals(inSession(ParticipationState.Unlocked), rig.engine.updates.value.standing)
+            assertEquals(inSession(ParticipationState.Unlocked), outbox.standing())
         }
 
     @Test

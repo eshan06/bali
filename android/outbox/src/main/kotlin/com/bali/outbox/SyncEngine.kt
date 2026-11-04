@@ -145,13 +145,16 @@ class SyncEngine private constructor(
             changes += 1
             // A read that fails keeps the last list, with this record, which the file holds now: the
             // phone acts on what it just did (an unlock's lock off, a tap's on) whatever the read.
-            val queued = stored { outbox.records() }.getOrElse { state.queued + record }
-            val reportedOff = stored { outbox.reportedOff() }.getOrElse { state.reportedOff }
-            update {
+            val queued = tried { outbox.records() }
+            val reportedOff = tried { outbox.reportedOff() }
+            update { now ->
                 // The file's newest tap now, written with it.
-                val lastTap = if (change is Change.Tap) record.eventId else it.lastTap
-                it.copy(standing = standing, queued = queued, reportedOff = reportedOff, lastTap = lastTap)
+                val lastTap = if (change is Change.Tap) record.eventId else now.lastTap
+                val off = reportedOff.getOrElse { now.reportedOff }
+                now.copy(standing = standing, queued = queued.getOrElse { now.queued + record }, reportedOff = off, lastTap = lastTap)
             }
+            // Shown after that step, never before it: then the standing this record replaced would be kept again.
+            if (queued.isFailure || reportedOff.isFailure) failed()
             drainRings.ring()
             record
         }
