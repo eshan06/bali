@@ -10,7 +10,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
 
 - **2026-11-04** — **PostHog's rules: the teacher portal's pages and the server only, a class's
   totals and a teacher's actions, nothing about one student (the owner's rulings, in chat with the
-  conductor; A1).** The owner asked for PostHog before the pilot on 2026-11-03 ("also we need to add
+  conductor; A1, #503).** The owner asked for PostHog before the pilot on 2026-11-03 ("also we need to add
   posthog for monitoring and stuff", the entry below), its plan first. The rulings, now
   ARCHITECTURE's "Analytics (PostHog)":
   - **Where:** the teacher portal's pages (`apps/web`), for teacher accounts only, and the server

@@ -8,7 +8,7 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-04 (Central) — A1, PostHog's rules (`docs/DECISIONS.md`, 2026-11-04):
+_Last updated: 2026-11-04 (Central) — A1, PostHog's rules (#503; `docs/DECISIONS.md`, 2026-11-04):
 PostHog on the teacher portal's pages and the server only, never a phone; a class's totals and a
 teacher's actions, nothing about one student; off until the owner sets its keys; no SDK, a plain
 POST (the conductor's call, awaiting the owner). Before it, AN5b, Android's engine's drain (#501).
@@ -141,7 +141,7 @@ branch, with no PR, as its README says (#479; `docs/DECISIONS.md`, 2026-11-02).
 3. The block's fresh code (`docs/PILOT.md`, setup step 6): a session builds the owner command that
    retires a block; the owner writes the new code, registers it and retires the old one.
 4. PostHog (ARCHITECTURE's "Analytics (PostHog)"; DECISIONS 2026-11-04), one PR each:
-   - **A1** Its rules in the docs — ✅ (DECISIONS 2026-11-04)
+   - **A1** Its rules in the docs — ✅ (#503; DECISIONS 2026-11-04)
    - **A2** The server's class totals, after the owner's call on a class of one
    - **A3a** The portal's sender, on for teachers only, after the owner's pick: PostHog's shared
      origin in the CSP, or the API as a relay
