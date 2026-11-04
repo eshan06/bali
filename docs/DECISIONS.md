@@ -27,7 +27,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   module's code and tests compiled (`assembleDebug`, `assembleDebugAndroidTest`,
   `compileDebugUnitTestKotlin`, `testClasses`). CodeQL reads only the Kotlin it sees compiled, so
   the build runs no Gradle daemon (`--no-daemon`), no Kotlin daemon
-  (`kotlin.compiler.execution.strategy=in-process`) and no build cache (`--no-build-cache`).
+  (`kotlin.compiler.execution.strategy=in-process`) and no build cache (`--no-build-cache`). On
+  this PR it ran all 75 of its Gradle tasks, none from a cache, in about 3 minutes, the job's
+  analysis included: CodeQL extracted 35 Kotlin files, every one of the 33 under `android/` and
+  the 2 Room generates (`OutboxDao_Impl.kt`, `OutboxDatabase_Impl.kt`), 5,384 lines, with no
+  extraction error or warning. The other two, the same run: 389 JavaScript/TypeScript files and
+  the 12 workflow files.
 
   **Kotlin's version:** CodeQL 2.27.4, the bundle codeql-action v4.39.3 runs and the version default
   setup ran today, supports Kotlin to the 2.4.2x series: it calls a version "too recent" from 2.4.30

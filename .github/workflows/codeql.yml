@@ -82,28 +82,6 @@ jobs:
         working-directory: android
         run: ./gradlew --no-daemon --no-build-cache -Pkotlin.compiler.execution.strategy=in-process assembleDebug assembleDebugAndroidTest compileDebugUnitTestKotlin testClasses
 
-      - id: analyze
-        uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+      - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           category: /language:${{ matrix.language }}
-          upload: never
-
-      # Temporary, this PR's proof alone, removed before it uploads: the files each language
-      # extracted, its metrics and its results, read from the SARIF.
-      - name: What CodeQL extracted
-        env:
-          SARIF: ${{ steps.analyze.outputs.sarif-output }}
-        run: |
-          ls -la "$SARIF"
-          for f in "$SARIF"/*.sarif; do
-            echo "== $f"
-            jq -r '[.runs[].invocations[]?.toolExecutionNotifications[]? | select(.descriptor.id | endswith("successfully-extracted-files")) | .locations[]?.physicalLocation.artifactLocation.uri] | unique | .[]' "$f" > "$RUNNER_TEMP/extracted.txt"
-            echo "files extracted: $(wc -l < "$RUNNER_TEMP/extracted.txt")"
-            sed -n 's/.*\.\([^./]*\)$/\1/p' "$RUNNER_TEMP/extracted.txt" | sort | uniq -c
-            grep -E '\.(kt|java)$' "$RUNNER_TEMP/extracted.txt" || true
-            jq -r '.runs[].properties.metricResults[]? | "\(.ruleId) \(.value // "-")"' "$f"
-            jq -r '.runs[].invocations[]?.toolExecutionNotifications[]? | select(.level == "error" or .level == "warning") | "\(.level) \(.descriptor.id): \(.message.text)"' "$f" | sort | uniq -c | head -40
-            echo "results: $(jq '[.runs[].results[]?] | length' "$f")"
-            jq -r '.runs[].results[]? | "\(.ruleId) \(.level // "-") \(.locations[0].physicalLocation.artifactLocation.uri):\(.locations[0].physicalLocation.region.startLine)"' "$f" | head -60
-          done
-          echo "tracked .kt under android/: $(git ls-files 'android/*.kt' | wc -l)"
