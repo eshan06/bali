@@ -19,6 +19,8 @@ interface TokenProvider {
      * nobody signed in yet): never a sign-out, nor a reason to drop a record. Nothing is sent then,
      * never earning a `401` nobody said: the answer is [NoAnswer.NoToken], which every outbox table
      * reads as retry. Nor is a token refreshed: a `401` comes back as a value, for the caller's reauth.
+     * It never throws, nor ends on a cancel of its own, as Swift's type promises: a token it can't give
+     * is none, since the sync engine's drain asks for one before every send it makes.
      */
     suspend fun accessToken(): String?
 

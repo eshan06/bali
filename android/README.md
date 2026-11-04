@@ -117,10 +117,13 @@ stretch holds, Room's calls included, let go at each `await`; no stretch is cut 
 and each public call runs in the engine's own scope, the app's, so a screen cancelled stops waiting
 while the write goes on: an Emergency Unlock's record is never discarded. Room runs a write to its
 end whatever its caller, so a cancel landing as it returned would skip the state it leaves
-(`docs/DECISIONS.md`, 2026-11-04, AN5a). Its tests run on a rig of their own (`EngineSupport.kt`,
-BaliOutbox's `EngineSupport.swift`): a clock the test moves, since coroutines-test's virtual time
-can't drive Room's queries, a server answered by hand, and the bundled driver watched, which sees
-each commit as GRDB's `TransactionObserver` does.
+(`docs/DECISIONS.md`, 2026-11-04, AN5a). Its drain (AN5b) sends the queue one record at a time, in
+the order the phone acted, and applies each answer in one step, the queue read again with it. A
+send cancelled with the engine's run makes no answer, so its record stays as it was, due, and goes
+again at the next run under its event id, where iOS counts it an attempt with no answer. Its tests
+run on a rig of their own (`EngineSupport.kt`, BaliOutbox's `EngineSupport.swift`): a clock the
+test moves, since coroutines-test's virtual time can't drive Room's queries, a server answered by
+hand, and the bundled driver watched, which sees each commit as GRDB's `TransactionObserver` does.
 
 ## Android Lint
 

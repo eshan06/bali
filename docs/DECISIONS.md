@@ -8,6 +8,94 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-04** — **AN5b, the sync engine's drain: BaliOutbox's `SyncEngine` in Kotlin, its drain
+  (the conductor's calls, awaiting the owner's look; AN5b, #501).** The owner isn't reviewing each
+  step and asked for the recommended option on every question, so each call here is the conductor's,
+  for the owner to look at.
+
+  **Where it lives:** `outbox`'s `SyncEngine.kt`, on AN5a's frame: the drain (`drain`, its pass's top
+  `due`, and `send`), `answered` with each disposition placed by name (`Effect`), `heard`'s link,
+  `retryNow`, `reread` and `sendAndReadNow`, the fields their code first sets (`rereading`,
+  `refreshed`), and `Rings.answer`. AN5a's pattern holds: each stretch Swift runs between two
+  `await`s holds the lock, the send alone lets go of it, and no stretch is cut short. Where Kotlin
+  differs, said plainly:
+  - **A send cancelled with the engine's run makes no `Sent`** (AN4b): the record stays as it was,
+    due, its attempt uncounted, and on its way (`sending`), since it may have reached the server, so a
+    reason given meanwhile wouldn't go with it (C5c; santa's review). The next run sends it at once
+    under its event id, and its answer takes it off its way. iOS settles it as no answer instead,
+    counting the attempt, and sends it again once its backoff, 2 s or more, is over.
+  - **`heard` brings iOS's `refreshed = false` with its link** (santa's review): any status but a
+    401 ends a rejection, so the field means what it says before AN5c's refresh reads it.
+  - **`retryAt` is set in a stretch of its own** as the drain pauses, where Swift's pass sets it: a
+    change made between the two rings the drain, whose next pass says the next wait, so a screen may
+    see the last one for an instant.
+  - **No `while !Task.isCancelled`:** a cancel ends the send or the pause, and with it the loop.
+  - **Each disposition does one of six things** (`Effect`), named for the steps that fill them: a
+    refused change dropped (its refusal shown, AN5c's), an arming's wait (AN5d's), and, in a session's
+    answer, the unlock guard (AN5c's) and the unlock recorded and a late one said why (AN5e's). Till
+    then a drop reads the truth again, and an arming counts an answer and changes nothing.
+
+  **Known, as on iOS: an answer's standing is kept in a write after its settle's.** Killed between
+  the two, a relaunch stands where the phone stood before the answer, its record gone, until the next
+  read. It never locks over an Emergency Unlock, whose own write kept its standing: what it holds back
+  is a tap's answer, the lock for a session coming on at the next read instead of at once. Its reach is
+  doubtful (a kill within milliseconds of an answer), and keeping it in the settle's own write would
+  change `settle` on both phones: left as iOS has it, the conductor's call; the owner's to decide for
+  either phone.
+
+  **For AN5c:** until its unlock guard lands, an answer naming focus can put the lock back over an
+  Emergency Unlock not yet recorded: one the server refused or stuck at the bound (a later report's
+  answer, say), or one made where the phone stood unread (any answer then, which files it there too).
+  Nothing calls the engine yet, so no phone can reach it, and the guard lands before AN7 or AN10
+  wires the engine. `changes`, `rereading` and `refreshed` have no reader yet: its reconcile, read
+  loop and refresh are the first, and its loop's pass answers its rings at its top, as the drain's
+  does.
+
+  **For AN5e:** `explain` takes an unlock neither on its way nor sent (`attempts = 0`) as never sent.
+  A send cancelled with the run, then one with no token, leaves a record the server may hold that
+  way: the no-token path takes it off its way, as iOS's does, where iOS had counted the cancel. A
+  reason given then would be said saved and kept by no one (A1). Its reach is doubtful (the run
+  cancelled mid-send while the app lives on, then no token); weigh it with `explain`.
+
+  **For AN6:** `TokenProvider.accessToken()` never throws, nor ends on a cancel of its own, as
+  Swift's type promises, and its doc says so now (santa's review): the drain asks it before every
+  send, and a throw there would end the run, every run after it too, or the drain alone.
+
+  **The tests:** DrainTests' `sendsAtOnce` (the record on its way while in flight, and the phone in the
+  session the answer names), `backsOff`, `inOrder`, `ringWhileBusy` (named for what it pins: the pass
+  after an answer reads the file anyway), `noToken`, `runsAgain`, `storageFails` and `retryNow`;
+  AnswerTests' `tapAnswered`, `actsAtOnce` and `laterChangeStands`; and new: a run cancelled mid-send
+  leaving its record due and on its way, its attempt uncounted, the next run sending it at once and
+  its answer taking it off its way; a record whose caller was cancelled, sent (AN5a's test, extended);
+  an answer's standing kept in the file and read back by a relaunch; a change made while the drain
+  waits, sent at once (`record`'s ring, which a run's first record can't show: it races the drain's
+  first pass); a 401 said as sign-in, the record kept and the answer uncounted, with no fresh token to
+  be had, which AN5c's refresh keeps so; an answer the file refuses to settle, shown, the record still
+  on its way, and sent again within a minute; and `Rings.answer` (santa's review). `storageFails`
+  takes the retry a second on and waits for its read: unwaited, that read could fail just before the
+  file came back and date its minute from the clock moved after it (seen: 2 runs in 6). Tried, each
+  failing by name, then reverted: `record`'s ring left out; the record taken off its way at a cancel,
+  and kept on it after an answer and with no token; a record sent unmarked; an answer applied over a
+  later change still unanswered; no answer said as heard; a 401 said as reached; a refused settle let
+  go of, or waiting on a ring; the retry's write left out, and its ring; the answer's standing set
+  past `update`, so never kept; an unreadable file waiting on a ring; the queue not read again with an
+  answer; a tap's session, and an unlock's, not applied; and `Rings.answer` answering nothing. The
+  drain's own call of it fails no test: an extra pass of the drain reads the file again and sends
+  nothing it wouldn't. Nothing was added to the PC's SDK: its folders were compared before and after.
+
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini
+  CLI on this PC, so context isolation holds and model diversity doesn't): 0 blockers. Their WARNs:
+  the unlock guard missing until AN5c (both: left, as split; For AN5c, above, with the unread case);
+  a cancelled send taken off its way while its file counts it never sent, so AN5e's `explain` would
+  take a reason the server may never keep (both: fixed, it stays on its way; what's left, For AN5e);
+  a throw from the token provider ending the run, or a stray cancel ending the drain alone (both: left
+  to AN6, the contract written on `TokenProvider`); `heard` without iOS's `refreshed = false` (both:
+  fixed); `Rings.answer` untested (fixed); `ringWhileBusy`'s name claiming its ring (renamed); and the
+  PR's number not yet in the docs (filled in).
+
+  **The proof:** `Outbox.open` and `android/app` are unchanged, so the JVM tests are the proof, and no
+  emulator ran.
+
 - **2026-11-04** — **iOS's `record` shows a failed read after its state step, as Android's does
   (the owner's go; #500).** AN5a's reviewers found the order in Android's port (#499, its entry
   below), and iOS had it too: in `SyncEngine.record`, a read of the queue or the report failing

@@ -14,13 +14,16 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-04 (Central) — CodeQL scans Android's Kotlin (#498; `docs/DECISIONS.md`,
-2026-11-04): CodeQL's advanced setup, `.github/workflows/codeql.yml`, beside GitHub Actions and
-JavaScript/TypeScript, every module's code and tests built for it on every PR; default setup
-switched off by the owner (Open owner items, 7). Before it, AN5a, the sync engine's frame. Next:
-AN5b, the drain; Android 17's SDK platform for the owner to OK before the first step with today's
-AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the owner has the phones.
-Not on the pilot's critical path._
+_Last updated: 2026-11-04 (Central) — AN5b, the sync engine's drain (#501; `docs/DECISIONS.md`,
+2026-11-04): BaliOutbox's `SyncEngine` in Kotlin, its drain, with its tests: the outbox sent one
+record at a time in the order the phone acted, each after its backoff and jitter; each answer settled
+and applied, the queue read again and the record no longer on its way in one step, a session's
+answer applied while no later change awaits its own, the other cases named for AN5c–AN5e; no token
+waiting on sign-in; the student's retry; and a send cancelled with the engine's run leaving its
+record due, its attempt uncounted. Before it, CodeQL scanning Android's Kotlin. Next: AN5c, the read
+loop; Android 17's SDK platform for the owner to OK before the first step with today's AndroidX, and
+OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the
+pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -134,17 +137,7 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN4d** The outbox's recording — ✅ (#496; DECISIONS 2026-11-04)
 - **AN4e** The outbox's sending — ✅ (#497; DECISIONS 2026-11-04)
 - **AN5a** The sync engine's frame — ✅ (#499; DECISIONS 2026-11-04)
-- **AN5b** The engine's drain (twin: `SyncEngine`'s `drain`, `answered`, `retryNow` and `reread`):
-  the drain with backoff and jitter; each answer settled, the queue and `sending` changed in one
-  write, a session's answer applied and the other cases named for AN5c–AN5e; `heard`'s link; the
-  standing an answer leaves kept in the file (moved from AN5a, which has no answer to keep); and a
-  send cancelled with its caller, which makes no `Sent` and leaves its record as it was, its attempt
-  uncounted, where iOS settles it as no answer (AN4b). With them the fields their code first sets
-  (`rereading`, `refreshed`), the top of each pass answering the rings before it, and the rig's
-  `tapIn`. Tests: DrainTests' `sendsAtOnce`, `backsOff`, `inOrder`, `ringWhileBusy`, `noToken`,
-  `runsAgain`, `storageFails` and `retryNow`; AnswerTests' `tapAnswered`, `actsAtOnce` and
-  `laterChangeStands`; and new: a run cancelled mid-send leaves its record due, a record whose caller
-  was cancelled is sent, and an answer's standing is kept
+- **AN5b** The engine's drain — ✅ (#501; DECISIONS 2026-11-04)
 - **AN5c** The engine's read loop (twin: `SyncEngine`'s `read`, `reconcile` and `heard`): the
   30-second check-in while the screen is on (ARCHITECTURE, the battery plan; AN7 drives it from the
   lock's service: on, a read at once, then every 30 s, rule 3's check at each wake; off, one check-in

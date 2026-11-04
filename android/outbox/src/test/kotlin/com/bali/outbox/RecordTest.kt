@@ -48,11 +48,15 @@ object Answer {
     fun joined(view: SessionView = session(), state: String = "focused") =
         """{"outcome":"joined","session":${json(view)},"state":"$state"}"""
 
+    fun replay(view: SessionView = session(), state: String) = """{"outcome":"replay","session":${json(view)},"state":"$state"}"""
+
     val armed = """{"outcome":"armed","session":null,"state":null}"""
     val replayNoSession = """{"outcome":"replay","session":null,"state":null}"""
 
     fun unlocked(view: SessionView = session()) =
         """{"outcome":"applied","recordedAs":null,"state":"unlocked","session":${json(view)},"reason":null}"""
+
+    fun refocused(view: SessionView = session()) = """{"outcome":"applied","state":"focused","session":${json(view)}}"""
 
     /** An unlock kept with no session: its tap armed, or unknown to the server (A11). */
     fun unlockKept(note: String) = """{"outcome":"recorded","recordedAs":"$note","state":null,"session":null,"reason":null}"""

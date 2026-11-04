@@ -56,7 +56,7 @@ class SyncEngineTest : EngineFiles() {
         }
 
     @Test
-    fun aRecordWhoseCallerIsCancelledIsStillKeptTheCallerStopsWaitingAtOnceAndTheWriteGoesOn(): Unit =
+    fun aRecordWhoseCallerIsCancelledIsStillKeptAndSentTheCallerStopsWaitingAtOnceAndTheWriteGoesOn(): Unit =
         runBlocking {
             val held = HeldWrite()
             val outbox = open(temporaryFile(), driver = Watching(began = held.hold))
@@ -71,12 +71,13 @@ class SyncEngineTest : EngineFiles() {
                 fail("the cancelled caller waited for the write")
             }
             assertEquals(emptyList(), outbox.records())
-            // The write goes on all the same: the Emergency Unlock is kept, and acted on.
+            // The write goes on all the same: the Emergency Unlock is kept, acted on, and sent.
             held.release()
             val state = rig.until { it.queued.isNotEmpty() }
             assertEquals(listOf(Change.Unlock("s", null)), outbox.records().map { it.change })
             assertEquals(inSession(ParticipationState.Unlocked), state.standing)
             assertEquals(inSession(ParticipationState.Unlocked), outbox.standing())
+            assertEquals(state.queued.single().eventId, rig.server.next(unlockRoute).eventId)
         }
 
     @Test
@@ -160,7 +161,7 @@ class SyncEngineTest : EngineFiles() {
         }
 }
 
-/** The engine keeps its standing: StandingKeptTests, AN5a's part (`docs/PLAN-ANDROID.md`). */
+/** The engine keeps its standing: StandingKeptTests, AN5a's and AN5b's parts (`docs/PLAN-ANDROID.md`). */
 class StandingKeptTest : EngineFiles() {
     @Test
     fun thePhonesOwnChangeAndTheStandingItLeavesAreKeptInOneWriteKilledAtAnyMomentAfterAnEmergencyUnlockARelaunchNeverLocksOverIt(): Unit =
@@ -211,6 +212,23 @@ class StandingKeptTest : EngineFiles() {
             }
             rig.stop()
             assertEquals(inSession(ParticipationState.ProtectionOff), engine(open(file)).updates.value.standing)
+        }
+
+    @Test
+    fun theStandingAnAnswerLeavesIsKeptInTheFileAndARelaunchStartsThere(): Unit =
+        runBlocking {
+            val (outbox, file) = makeOutbox()
+            val rig = rig(outbox)
+            rig.tapIn()
+            assertEquals(inSession(ParticipationState.Focused), outbox.standing())
+            // A replay's: the state now, an unlock made since, in the session as it runs now.
+            rig.engine.record(Change.Tap("tag"))
+            val now = Standing.InSession(session(endsAt = 4000), ParticipationState.Unlocked)
+            rig.server.next(tapRoute).reply(200, Answer.replay(session(endsAt = 4000), state = "unlocked"))
+            rig.until { it.standing == now && it.queued.isEmpty() }
+            assertEquals(now, outbox.standing())
+            rig.stop()
+            assertEquals(now, engine(open(file)).updates.value.standing)
         }
 
     @Test
@@ -289,6 +307,17 @@ class RingsTest {
             rings.ring()
             withTimeout(patience) { again.join() }
             assertEquals(emptyList(), clock.deadlines)
+        }
+
+    @Test
+    fun aPassesTopAnswersTheRingsMadeBeforeItItsPauseThenWaitsForTheNext(): Unit =
+        runBlocking {
+            val rings = Rings(TestClock())
+            repeat(2) { rings.ring() }
+            rings.answer()
+            assertNull(withTimeoutOrNull(100.milliseconds) { rings.pause(null) })
+            rings.ring()
+            withTimeout(patience) { rings.pause(null) }
         }
 
     @Test
