@@ -25,6 +25,8 @@ import kotlin.math.sin
 /**
  * A blocked app on demand, for the spike's "ways around the cover": `--es do tone|stop|pip|notify`
  * (`--ei delay <s>` for notify), and `--ez pipOnLeave true` to go into picture-in-picture at Home.
+ * For lock (c), its internet: `--es do net|netstop|stream|streamstop|dns` (`--ei ms`, `--es host`,
+ * `--es name`; see [Net]).
  */
 class TargetActivity : Activity() {
     private var pipOnLeave = false
@@ -48,11 +50,18 @@ class TargetActivity : Activity() {
 
     private fun handle(intent: Intent) {
         if (intent.hasExtra("pipOnLeave")) pipOnLeave = intent.getBooleanExtra("pipOnLeave", false)
+        val host = intent.getStringExtra("host") ?: "10.0.2.2:8787"
         when (intent.getStringExtra("do")) {
             "tone" -> startTone()
             "stop" -> playing = false
             "pip" -> enterPip()
             "notify" -> notifyLater(intent.getIntExtra("delay", 5))
+            // Lock (c): this app's internet, probed, streamed and looked up.
+            "net" -> Net.startProbes(host, intent.getIntExtra("ms", 100).toLong())
+            "netstop" -> Net.stopProbes()
+            "stream" -> Net.startStream(host)
+            "streamstop" -> Net.stopStream()
+            "dns" -> Net.dns(intent.getStringExtra("name") ?: "www.google.com")
         }
         intent.removeExtra("do")
     }

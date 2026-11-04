@@ -13,6 +13,8 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- The check-in tick, sent to the host at 10.0.2.2 on the emulator. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Lock (c): whether another app's VPN is up, before Bali arms its own. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Part 2's block, read in reader mode. -->
     <uses-permission android:name="android.permission.NFC" />
     <uses-feature
@@ -56,12 +58,17 @@
         <intent>
             <action android:name="android.view.InputMethod" />
         </intent>
+        <!-- Lock (c) routes every app with a launcher icon that the allow-list doesn't hold. -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
     </queries>
 
     <application
         android:name=".SpikeApp"
         android:allowBackup="false"
-        android:label="Bali spike"
+        android:label="@string/app_label"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.DeviceDefault"
         android:usesCleartextTraffic="true">
@@ -114,6 +121,16 @@
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="The lesson's focus lock: which app is in front, covered if blocked" />
+        </service>
+
+        <!-- Lock (c): a VPN on the phone alone. Only the system can bind it. -->
+        <service
+            android:name=".BlockVpnService"
+            android:exported="true"
+            android:permission="android.permission.BIND_VPN_SERVICE">
+            <intent-filter>
+                <action android:name="android.net.VpnService" />
+            </intent-filter>
         </service>
 
         <receiver

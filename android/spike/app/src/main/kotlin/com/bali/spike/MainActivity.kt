@@ -3,6 +3,7 @@ package com.bali.spike
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
+import android.net.VpnService
 import android.nfc.NdefMessage
 import android.nfc.NfcAdapter
 import android.nfc.Tag
@@ -21,7 +22,8 @@ import android.widget.TextView
 /**
  * The spike's one screen: the session, each lock's state, Emergency Unlock and the NFC reader.
  * adb drives it too: `am start -n com.bali.spike/.MainActivity --es cmd start --es mode b
- * --ei minutes 50 --ei poll 250`, `--es cmd end`, `--es tickHost 10.0.2.2:8787`.
+ * --ei minutes 50 --ei poll 250` (mode a, b, c or ac), `--es cmd end`, `--es cmd arm` (lock (c)
+ * armed again), `--es tickHost 10.0.2.2:8787`.
  */
 class MainActivity : Activity() {
     private lateinit var status: TextView
@@ -53,8 +55,11 @@ class MainActivity : Activity() {
         button("Start (b), poll 250 ms, 50 min") { startLock(Session.B, 50, 250) }
         button("Start (b), poll 500 ms, 50 min") { startLock(Session.B, 50, 500) }
         button("Start (b), poll 1 s, 50 min") { startLock(Session.B, 50, 1000) }
+        button("Start (c), the VPN, 50 min") { startLock(Session.C, 50, 0) }
+        button("Start (a) and (c), 50 min") { startLock(Session.AC, 50, 0) }
         column.addView(holdToUnlock(this, "app"))
         button("End session") { Session.end("app") }
+        button("VPN settings") { startActivity(Intent(Settings.ACTION_VPN_SETTINGS)) }
         button("Accessibility settings") { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
         button("Usage access settings") { startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }
         button("Display over other apps") {
@@ -83,6 +88,8 @@ class MainActivity : Activity() {
                 intent.getIntExtra("poll", 500).toLong(),
             )
             "end" -> Session.end("adb")
+            // (c) armed again on purpose: asks for consent if it's gone, or takes the VPN back.
+            "arm" -> armVpn("adb-arm")
         }
         intent.removeExtra("cmd")
         if (intent.action == NfcAdapter.ACTION_NDEF_DISCOVERED) {
@@ -98,7 +105,28 @@ class MainActivity : Activity() {
     private fun startLock(lock: String, minutes: Int, poll: Long) {
         Session.start(lock, minutes, poll)
         if (lock == Session.B) startForegroundService(Intent(this, PollService::class.java))
+        if (Session.runs(Session.C)) armVpn("start")
         render()
+    }
+
+    /** Lock (c): Android's consent dialog the first time, then the VPN. */
+    private fun armVpn(by: String) {
+        val ask = VpnService.prepare(this)
+        if (ask == null) {
+            BlockVpnService.arm(this, by)
+            return
+        }
+        Spike.log("vpn-consent-asked", "by" to by)
+        startActivityForResult(ask, VPN_CONSENT)
+    }
+
+    @Deprecated("Activity's own; the spike has no AndroidX")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != VPN_CONSENT) return
+        val ok = resultCode == RESULT_OK
+        Spike.log("vpn-consent-answer", "ok" to ok)
+        if (ok && Session.activeFor(Session.C)) BlockVpnService.arm(this, "consent")
     }
 
     override fun onResume() {
@@ -110,6 +138,17 @@ class MainActivity : Activity() {
             if (Session.mode == Session.B && Protection.usageAccess(this) && Protection.overlay(this)) {
                 startForegroundService(Intent(this, PollService::class.java))
                 Spike.log("lock-restarted", "lock" to Session.B, "by" to "app-front")
+            }
+            // (c) comes back by itself only while the consent stands and no other VPN is up:
+            // Bali never takes the VPN from another app unasked.
+            if (Session.runs(Session.C) && !BlockVpnService.up) {
+                val other = Protection.otherVpn(this)
+                if (!other && Protection.vpnConsent(this)) {
+                    BlockVpnService.arm(this, "app-front")
+                    Spike.log("lock-restarted", "lock" to Session.C, "by" to "app-front")
+                } else {
+                    Spike.log("vpn-not-restarted", "otherVpn" to other, "consent" to Protection.vpnConsent(this))
+                }
             }
         }
         main.post(refresh)
@@ -183,5 +222,9 @@ class MainActivity : Activity() {
         reading = false
         NfcAdapter.getDefaultAdapter(this)?.disableReaderMode(this)
         Spike.log("nfc-reader-off")
+    }
+
+    private companion object {
+        const val VPN_CONSENT = 7
     }
 }

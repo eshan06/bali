@@ -68,7 +68,7 @@ class BlockAccessibilityService : AccessibilityService() {
     private fun evaluate(why: String) {
         if (!::covers.isInitialized) return
         if (!Session.activeFor(Session.A)) {
-            covers.hideAll(if (Session.mode == Session.A) "unlocked-or-bell" else "no-session")
+            covers.hideAll(if (Session.runs(Session.A)) "unlocked-or-bell" else "no-session")
             return
         }
         val onScreen = try {

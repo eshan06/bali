@@ -8,10 +8,13 @@ import android.os.Looper
  * The fake session: a window of N minutes on the phone's clock (no server), which lock runs it, and
  * Emergency Unlock. The lock is a function of the window: a lock covers only while [active].
  * Kept in the app's own storage so a reboot or a restarted process finds it. Main thread only.
+ * [mode] names the locks it runs: "a", "b", "c", or "ac" for (a) and (c) together.
  */
 object Session {
     const val A = "a"
     const val B = "b"
+    const val C = "c"
+    const val AC = "ac"
 
     private lateinit var app: Context
     private val main = Handler(Looper.getMainLooper())
@@ -56,7 +59,10 @@ object Session {
     fun active(now: Long = System.currentTimeMillis()) =
         mode.isNotEmpty() && unlockedWall == 0L && now >= startWall && now < endWall
 
-    fun activeFor(lock: String) = mode == lock && active()
+    /** Does the session run [lock], alone or beside another? */
+    fun runs(lock: String) = mode.isNotEmpty() && lock in mode
+
+    fun activeFor(lock: String) = runs(lock) && active()
 
     fun describe(): String {
         if (mode.isEmpty()) return "none"

@@ -36,17 +36,26 @@ class SpikeApp : Application() {
     }
 }
 
-/** After a reboot, or an update of Bali, lock (b) starts again if the session is still on. */
+/** After a reboot, or an update of Bali, locks (b) and (c) start again if the session is still on. */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         Session.init(context)
         Spike.log("boot-receiver", "action" to intent.action, "session" to Session.describe(), "protection" to Protection.summary(context))
-        if (!Session.activeFor(Session.B)) return
-        try {
-            context.startForegroundService(Intent(context, PollService::class.java))
-            Spike.log("lock-restarted", "lock" to Session.B, "by" to intent.action)
-        } catch (e: RuntimeException) {
-            Spike.log("lock-restart-failed", "lock" to Session.B, "by" to intent.action, "err" to "${e.javaClass.simpleName}:${e.message}")
+        if (Session.activeFor(Session.B)) {
+            try {
+                context.startForegroundService(Intent(context, PollService::class.java))
+                Spike.log("lock-restarted", "lock" to Session.B, "by" to intent.action)
+            } catch (e: RuntimeException) {
+                Spike.log("lock-restart-failed", "lock" to Session.B, "by" to intent.action, "err" to "${e.javaClass.simpleName}:${e.message}")
+            }
+        }
+        if (Session.activeFor(Session.C)) {
+            try {
+                BlockVpnService.arm(context, intent.action ?: "boot")
+                Spike.log("lock-restarted", "lock" to Session.C, "by" to intent.action)
+            } catch (e: RuntimeException) {
+                Spike.log("lock-restart-failed", "lock" to Session.C, "by" to intent.action, "err" to "${e.javaClass.simpleName}:${e.message}")
+            }
         }
     }
 }
