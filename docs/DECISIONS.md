@@ -8,6 +8,58 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-04** — **AN4b, the outbox's records: BaliOutbox's `OutboxRecord.swift` in Kotlin (the
+  conductor's calls, awaiting the owner's look; AN4b, #494).** The owner was asleep and asked for the
+  recommended option on every question, so each call here is the conductor's, for the owner to look
+  at.
+
+  **Where it lives:** `outbox`'s `OutboxRecord.kt`, the Swift file's twin: what the phone did
+  (`Change`); one queued record (`OutboxRecord`) and the request it sends (`request`), the same on
+  every attempt, its event id, the time the phone acted and its order included; `send`, which puts it
+  through AN3d's client once and reads the answer by its own kind's table in `core`; `Sent`, that send
+  answered; and `Disposition`, with whether it keeps the record (`keeps`) and whether a refusal sticks
+  it (`refused`). `outbox` takes `core` as `api` now, since the records' API is `core`'s types. GRDB's
+  row mapping (`FetchableRecord`, `init(row:)`) is the store's, so it goes with AN4c on Room, and so
+  do the tests that need the store (`docs/PLAN-ANDROID.md`, AN4c's line). The Swift's rules and
+  words, ported; where Kotlin differs, said plainly:
+  - **`Change`, `OutboxRecord.Request` and `Disposition` are sealed interfaces** of data classes,
+    Swift's enums with values. Every rule over them (`isUnlock`, `reason`, `isReturn`, `request`,
+    `keeps`, the send) names each case, so one added doesn't compile until it is placed.
+  - **Only a record's own send makes a `Sent`:** its constructor is private and its companion's `of`
+    is the send, where Swift's `init` is `fileprivate`, which Kotlin lacks. So the store's `settle`
+    can't read an answer by another kind's table here either.
+  - **Swift's `ChangeAnswer` protocol isn't ported:** `outbox` can't add an interface to `core`'s
+    answer types, so each branch of the send reads its own answer's session and state, and an
+    unlock's whether it was superseded and the reason the server keeps; no other answer says either,
+    as Swift's defaults have it. `core` is unchanged.
+  - **`OutboxRecord` is a data class with an internal constructor:** only the store makes one, as
+    only GRDB's `init(row:)` does on iOS, and its changes come back as a new record, a value as
+    Swift's struct is. Its `follows` and `order` are internal, as in Swift.
+  - **A send cancelled with its caller makes no `Sent`:** a cancelled coroutine stays cancelled (the
+    client's rule, AN3d), so nothing is settled and the record stays as it was, due as before, where
+    Swift settles a cancelled send as no answer and counts its attempt. Either way the record is kept
+    and goes again under its event id; AN5's drain, the caller, has to expect it.
+  - Swift's `send(through:)` is `send(client)`.
+
+  **The tests,** the parts of BaliOutbox's that reach a record without a store: RecordTests' `queues`,
+  its requests (each change's, under its event id, the time the phone acted and its order; an unlock
+  filed under its tap; a file with no install sending no order); UnreadUnlockTests' unfiled unlock
+  (no request, nothing sent, no token asked); each record on its own endpoint with its own body, an
+  unlock under a tap under that tap; ActionOrderTests' `seqs`, its wire (every attempt the same
+  request, kept and stuck too); the change's own rules; SettleTests' `everyGeneratedCase`: every
+  `contracts/outbox/` case sent by a record of each kind its table reads, 925 sends each, read by its
+  own kind's table and kept exactly when its disposition keeps it, an unlock until recorded, a
+  refusal sticking only a tap or an unlock; SettleTests' `fixtures`: every outbox fixture back as its
+  disposition, with its status, its error's reason and message, its session and state, and an
+  unlock's superseded and kept reason; every disposition of the three tables kept or ended by name;
+  and a send with no token, which sends nothing and says so, never as a server out of reach, since
+  AN5's drain waits for a sign-in on it (santa's review). Tried, each failing by name, then reverted:
+  an unlock's retry let go; an unlock under a tap sent to its session's endpoint; a refocus sent with
+  its due time for the time it was made; superseded read from `tap_armed`; the lock back on counted a
+  return; an unlock's order dropped; the lock back on's state not read; a state change's drop counted
+  a refusal; and no token said as a server out of reach. Nothing was added to the PC's SDK: its
+  folders were compared before and after.
+
 - **2026-11-04** — **AN4a, the unlock contract: BaliCore's `UnlockContract.swift` and
   `OutboxContract.swift` in Kotlin (the conductor's calls, awaiting the owner's look; AN4a, #493).**
   The owner was asleep and asked for the recommended option on every question, so each call here is

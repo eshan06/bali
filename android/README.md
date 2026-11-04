@@ -72,7 +72,13 @@ Its calls suspend (kotlinx.coroutines), as Swift's are async.
 **The outbox tables** (`core`'s `UnlockContract.kt` and `OutboxContract.kt`, BaliCore's twins) say
 what the outbox does with a record after each send; no answer ever drops an unlock the server hasn't
 recorded. `outbox`'s tests run every `contracts/outbox/` case against them, and `core`'s check each
-fixture's disposition. AN4c picks the outbox's store; Room's JVM build keeps its tests here, on the
+fixture's disposition.
+
+**The records** (`outbox`'s `OutboxRecord.kt`, BaliOutbox's twin) are what the phone did (`Change`)
+and the request each one sends, the same on every attempt. A record's `send` puts it through the
+client once and reads the answer by its own kind's table: the only way to make a `Sent`, what the
+store settles. Their tests send a record of each kind through every `contracts/outbox/` case and
+every outbox fixture. AN4c picks the outbox's store; Room's JVM build keeps its tests here, on the
 JVM.
 
 ## Android Lint

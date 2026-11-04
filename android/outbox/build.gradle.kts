@@ -20,8 +20,11 @@ java.targetCompatibility = JavaVersion.VERSION_17
 kotlin.compilerOptions.jvmTarget = JvmTarget.JVM_17
 
 dependencies {
-    implementation(project(":core"))
+    // Its records' API is core's types: the requests, the answers, the client (OutboxRecord.kt).
+    api(project(":core"))
     testImplementation(libs.kotlin.test)
+    // runBlocking, for the tests of a record's send, which suspends as the client's calls do.
+    testImplementation(libs.kotlinx.coroutines.core)
     // The classes held to Android 10's API, which Android Lint can't do here (README.md).
     signature(libs.gummy.bears.api29) { artifact { type = "signature" } }
 }
