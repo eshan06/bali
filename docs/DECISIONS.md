@@ -8,6 +8,71 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-04** — **CodeQL scans Android's Kotlin, through CodeQL's advanced setup,
+  `.github/workflows/codeql.yml` (the owner; open owner item 7).** The conductor asked the owner,
+  "Should I prepare the CodeQL workflow so the Android code gets scanned?", and the owner answered:
+  "Yes, prep it".
+
+  **What it scans:** everything default setup scanned, and Kotlin. GitHub Actions and
+  JavaScript/TypeScript as default setup scanned them: build mode none, its query suite (default)
+  and threat model (remote), on its triggers (PRs to `main`, `main`'s pushes, and weekly, at its own
+  time, Mondays at 15:44 UTC). Each language keeps default setup's category, `/language:<lang>`, so
+  the alerts it raised (24 dismissed, 1 fixed) carry on rather than start over, and its check name,
+  `Analyze (<lang>)`. And `java-kotlin`, which default setup can't scan: its build mode none reads
+  no Kotlin, and its "Analyze (java-kotlin)" failed on #488's first push to `main` (AN3a's entry,
+  below).
+
+  **The Kotlin build:** set up as `android.yml` sets up its own (the wrapper's jar checked, JDK 21,
+  the runner's SDK with nothing installed, Gradle's cache under a key of its own), then every
+  module's code and tests compiled (`assembleDebug`, `assembleDebugAndroidTest`,
+  `compileDebugUnitTestKotlin`, `testClasses`). CodeQL reads only the Kotlin it sees compiled, so
+  the build runs no Gradle daemon (`--no-daemon`), no Kotlin daemon
+  (`kotlin.compiler.execution.strategy=in-process`) and no build cache (`--no-build-cache`). On
+  this PR it ran all 75 of its Gradle tasks, none from a cache, in about 3 minutes, the job's
+  analysis included: CodeQL extracted 35 Kotlin files, every one of the 33 under `android/` and
+  the 2 Room generates (`OutboxDao_Impl.kt`, `OutboxDatabase_Impl.kt`), 5,384 lines, with no
+  extraction error or warning. The other two, the same run: 389 JavaScript/TypeScript files and
+  the 12 workflow files.
+
+  **Kotlin's version:** CodeQL 2.27.4, the bundle codeql-action v4.39.3 runs and the version default
+  setup ran today, supports Kotlin to the 2.4.2x series: it calls a version "too recent" from 2.4.30
+  on (its `kotlin-version-too-new` diagnostic). `android/` builds with 2.4.21. A Kotlin upgrade
+  CodeQL doesn't support yet fails "Analyze (java-kotlin)", so it waits for a codeql-action that
+  does.
+
+  **On every PR, not only one that touches `android/`** (this step's call). GitHub's CodeQL check
+  on a PR whose results lack a configuration `main` has says it "cannot determine the alerts
+  introduced by this pull request". So skipping Kotlin wherever `android/` is untouched would leave
+  each of those PRs a CodeQL check that can't say what the PR brings, and `protect-main`'s
+  code-scanning rule, which waits for a tool's results, might wait on Kotlin's. The cost: an
+  Android build on every PR, free on a public repository's runners, beside the other checks.
+
+  **The workflow's rules:** actions pinned by commit, as the others are (codeql-action v4.39.3, the
+  newest, which `v4` names today); `security-events: write` on the job alone, for the upload,
+  `contents: read` otherwise; `pull_request`, never `pull_request_target`, and no secret; and a
+  checkout that keeps no token (`persist-credentials: false`, as `migration-guard.yml`'s), since the
+  Kotlin build runs the PR's own Gradle code. Said plainly: that build still runs in the job whose
+  token can write to code scanning, as in GitHub's own setup, so code in it (a PR's build script,
+  or a plugin or library its dependencies bring) could read the token from the runner's memory and
+  dismiss or overwrite alerts while the job runs (santa's review). A fork's PR gets a read-only
+  token, and whoever can push a branch here can dismiss alerts anyway. Closing it would take the
+  upload into a job of its own that runs no PR code; this step keeps GitHub's standard, for the
+  owner to weigh.
+
+  **The switch is the owner's.** While default setup is on, GitHub refuses an advanced setup's
+  uploads. So the workflow was proven first with `upload: never`, every language green and its
+  files extracted, then pushed uploading, its Analyze jobs failing on the upload until the owner
+  switched default setup off (**Settings → Advanced Security → CodeQL analysis → … → Switch to
+  advanced → Disable CodeQL**, leaving uncommitted the workflow GitHub then offers); then they ran
+  again, and the PR merged once every check was green. Still no CodeQL check is required on
+  `protect-main`; its code-scanning rule (high-or-worse security alerts, and errors) reads this
+  workflow's results as it read default setup's.
+
+  **Said plainly: `ui` isn't scanned.** `protect-main` holds `ui` too, but nothing has been pushed
+  there since 2026-10-05, before default setup came on, and no PR has ever targeted it; its tree
+  has no `android/`, so the Kotlin job would fail there. A PR into `ui` would get no CodeQL results,
+  which the code-scanning rule waits for, until `codeql.yml` names the branch.
+
 - **2026-11-04** — **AN5a, the sync engine's frame: BaliOutbox's `SyncEngine` in Kotlin, its frame
   (the conductor's calls, awaiting the owner's look; AN5a, #499).** The owner isn't reviewing each
   step and asked for the recommended option on every question, so each call here is the conductor's,
