@@ -10,6 +10,16 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN4c's on 2026-11-04: _Last updated: 2026-11-04 (Central) —
+AN4b, the outbox's records (#494; `docs/DECISIONS.md`, 2026-11-04): BaliOutbox's `OutboxRecord.swift`
+in Kotlin with its tests: what the phone did, the request each record sends, the same on every
+attempt, and its send through the client, read by its own kind's table; every `contracts/outbox/`
+case and every outbox fixture sent by a record, an unlock kept until recorded. Before it, AN4a, the
+unlock contract. Next: AN4c, the store; Android 17's SDK platform for the owner to OK before the
+first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); CodeQL for Android's
+Kotlin, the owner's call (7); AN1's part 2 once the owner has the phones. Not on the pilot's critical
+path._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN4b's on 2026-11-04: _Last updated: 2026-11-04 (Central) —
 AN4a, the unlock contract (#493; `docs/DECISIONS.md`, 2026-11-04): BaliCore's `UnlockContract.swift`
 and `OutboxContract.swift` in Kotlin with their tests: the unlock's, the tap's and the state change's
@@ -2054,6 +2064,19 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN4c's line, as it read until it was done (2026-11-04; `docs/DECISIONS.md`, 2026-11-04). The
+conductor split AN4c's line into AN4c and AN4d that day, every word of it kept in one of them:
+AN4c's here, AN4d's in `docs/PLAN-ANDROID.md`.
+
+- **AN4c** The outbox store (twin: BaliOutbox's `Outbox`, its file): Room in the app's own storage,
+  without the app group's cross-process coordination, which Android has no twin of (one app, no
+  extensions: ARCHITECTURE, "Android app structure", decision 3); the outbox's counter and its
+  install id, the phone's order (A12); and Bali's files left out of Android's backup (ARCHITECTURE,
+  "Android app structure"). With what AN4b left to the store: the records' row mapping, GRDB's
+  `init(row:)` (an unlock filed under its tap, in its session, or neither; a follow-up's order its
+  press's, B6d; a kind it doesn't know refused), and the tests that need the store: OutboxTests'
+  SchemaTests and ActionOrderTests, their parts no rule of AN4d's holds
 
 AN4b's line, as it read until it was done (2026-11-04; `docs/DECISIONS.md`, 2026-11-04):
 

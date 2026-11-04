@@ -13,6 +13,9 @@ contracts/fixtures/
 contracts/outbox/
 contracts/openapi.json
 
+# Written by Room's compiler as the Android build runs — regenerate, never reformat or hand-edit
+android/outbox/schemas/
+
 # Hand-written design docs — formatter churn there is pure diff noise
 docs/
 

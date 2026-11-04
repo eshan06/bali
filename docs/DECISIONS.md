@@ -8,6 +8,107 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-04** — **AN4c, the outbox store: BaliOutbox's `Outbox` file in Kotlin, on Room (the
+  conductor's calls, awaiting the owner's look; AN4c, #495).** The owner was asleep and asked for the
+  recommended option on every question, so each call here is the conductor's, for the owner to look
+  at.
+
+  **AN4c in two PRs** (the conductor): AN4c, the store's file; AN4d, the store's rules on it
+  (`record`, `release`, `explain`, the standing, `nextDue`, `settle`, `refile`, the backoff, jitter
+  and bound, `retryNow`, `awaiting`, `holdsUnlock`) with the tests that need them
+  (`docs/PLAN-ANDROID.md`).
+
+  **Where it lives:** `outbox`'s `OutboxDatabase.kt`, Room's database: the `outbox` table and
+  `outboxState` as iOS's migrations leave them, v1 to v6 (#167's `protection_on` included), as
+  Room's version 1; `Outbox.kt`, the store: its open, `records`, the rules' state by key, `close`;
+  and `OutboxRecord.kt`'s row mapping, GRDB's `init(row:)`. The app's `OutboxFile.kt` opens it in
+  the app's own storage, `databases/outbox.sqlite`, iOS's name, with Android's Room builder; the
+  tests open theirs with Room's JVM one. Room's calls suspend, as AN4b's send does, so the store's
+  do. Where Room and GRDB differ, said plainly:
+  - **The checks.** Room can't declare a CHECK, so the file's first open, in the transaction that
+    makes it, makes the table again with iOS's checks, its columns and index as Room's entity has
+    them. Room checks a table's columns and indexes, never its checks, and a test opens the file as
+    Room opens one it didn't make, checking every table against its own, so the two can't drift.
+    iOS's `eventId … UNIQUE` is Room's unique index on it; `seq` is `NOT NULL`, as Room makes an
+    autoincrement key, and so is `outboxState`'s key, as Room requires: neither lets in a row iOS's
+    file refuses. A migration that makes the table again carries the checks, as iOS's v3, v4 and v6
+    do.
+  - **The schema of each version** is Room's, written to `outbox/schemas/` as the build runs and
+    committed, so a later version's migration is checked against it; Prettier leaves it alone.
+  - **A time is text, as GRDB keeps a `Date`:** UTC, to the millisecond (`2026-09-21
+    14:13:20.250`), so a time compared in SQL (AN4d's `release`, `retryNow`) compares as on iOS.
+  - **The install** is minted once, in the transaction that makes the file, as iOS's v2 mints it: a
+    lower-case random UUID. `seq` is AUTOINCREMENT, never reused or lowered while the file lives
+    (A12), and a reinstall's file starts again at 1 under an install of its own.
+  - **A file a newer build made is refused,** Room having no migration down, and nothing in it is
+    wiped: never `fallbackToDestructiveMigration` (the unlock contract). SharingTests' `tooNew` is
+    ported for it.
+  - **Durability, as on iOS.** Room keeps the file in WAL with `synchronous = NORMAL`, its default,
+    as GRDB 7.11.1's pool keeps iOS's (its `setUpWALMode`, read 2026-11-04): a write outlives Bali
+    crashing or being force-stopped, but the phone itself crashing or losing power in the seconds
+    after a write, before the file is written out, can undo it. Set aside: a rollback journal with
+    `synchronous = FULL` (Room's `TRUNCATE`), a disk sync on every write, for a risk that small.
+
+  **The SQLite: Room's bundled one** (`androidx.sqlite:sqlite-bundled`, `BundledSQLiteDriver`), on
+  the JVM's tests and on the phone, as recommended: both run SQLite 3.50.1, its source id read from
+  the JVM jar's libraries and from the APK's. Set aside: Android's own SQLite, whose version is the
+  phone's Android's (Android 10's is 3.22), so the tests would run a SQLite no phone runs. It costs
+  about 1.2 MB of native library per processor type, 4.9 MB for the four in the build's APK; Play's
+  bundles send each phone its own. Said plainly (santa's review): 3.50.1 predates 3.50.2's fix of
+  CVE-2025-6965, a crafted aggregate query, which only SQL Bali doesn't write could reach (every
+  statement is the app's own, its values bound); the driver moves past it with its next stable
+  release.
+
+  **The versions,** each the newest stable on 2026-11-04 and each built against compileSdk 36.1,
+  so none waits on owner item 6: Room 2.8.5 (its runtime, compiler and Gradle plugin);
+  `androidx.sqlite` 2.7.1, where Room asks 2.6.2 at least, so Gradle takes 2.7.1 for Room too; KSP
+  2.3.13, whose version is its own since 2.3, not Kotlin's, and which runs with Kotlin 2.4.21; and
+  AndroidX Test's runner 1.7.0 and JUnit extension 1.3.0.
+
+  **The proof on the phone:** `app`'s instrumented `OutboxFileTest` on `Bali_Spike_API35` (Android
+  15), run with `./gradlew :app:connectedDebugAndroidTest`: the app's opener made the file through
+  Android's Room and the bundled SQLite's native library, its checks and install with it; a row
+  written beside it was kept or refused by those checks; and `records()`, Room's generated code, read
+  it back as an unlock under its tap, with its times and its order. Passed, with the backup rules'
+  test (below): 2 tests, 0 failures; a wrong expectation failed it (tried). Gradle uninstalls both
+  apps after. CI builds it (`android.yml`), never runs it: no emulator.
+
+  **Lint and Room's generated code:** the app's lint read Room's generated code in `outbox` as
+  `outbox`'s own, which a plain Kotlin module can't tell apart, and failed on 223 calls of Room's
+  restricted API there; `outbox/lint.xml` leaves `build/generated/ksp/` out, as lint leaves an
+  Android module's generated code out by itself. Tried: a `String.format` with no locale in
+  `outbox`'s own code still fails lint.
+
+  **The backup:** `allowBackup="false"`, `dataExtractionRules` (every domain out of a backup and of
+  a transfer, Android 12 and later) and `fullBackupContent` (every domain, Android 10 and 11). Shown
+  on `Bali_Spike_API35` with Android's local test transport, its transfer mode included
+  (`is_device_transfer=true`), and files put in `databases/`, `files/` and `shared_prefs/`: with no
+  rules, a backup and a transfer each took all three; with `allowBackup="false"` alone, the backup
+  was "not allowed" but a transfer still took all three; with this build's rules, the backup was
+  "not allowed" and a transfer measured nothing, which the transport declines as an empty backup.
+  Lint checks the rules' files (a misspelled domain failed it, tried) and fails a manifest that drops
+  either one (tried); the instrumented test holds `allowBackup` off and every domain left out of each
+  section (a domain dropped failed it, tried; santa's review). Android 10 and 11 are untested here,
+  with no emulator image (ISSUES #6, gap 10). The emulator's backup settings were put back as found,
+  and the test's backups deleted.
+
+  **The tests,** OutboxTests' SchemaTests and ActionOrderTests, their parts no rule holds:
+  `migratesEmpty`'s schema (Room's version 1, every column in iOS's order), `reopens`' storage,
+  `refusesMalformedRows` (each refusal read as a check's, so a slip in the test's SQL can't pass it;
+  a repeated event id refused too) and `install`; A12's counter, as iOS's `fromV2` shows it on a
+  drained file: every row gone, the next is 4, and 5 after a reopen; and SharingTests' `tooNew`.
+  New: each kind's row read as its change, with every column; a follow-up's order its press's, and
+  where it stands; a file with no install; a kind this build doesn't know refused; the state's keys,
+  iOS's names; the times' text and order; Room reading the checks' table as its own; and the table's
+  SQL as version 1 makes it, a copy in the test, since Room's schema holds no checks: changed with
+  no new version, it fails (santa's review: a kind added there alone failed it, tried). No twin:
+  SchemaTests' `fromV2` to `fromV5` and ActionOrderTests' `fromV1`, files older builds made, where
+  Android's first file is version 1. AN4d's: `reopens`' records sent and protection off reported
+  once, `migratesEmpty`'s `nextDue` and `awaiting`, `offFrom` and `seqs`. Tried, each failing by
+  name, then reverted: the table without AUTOINCREMENT (the next seq 1, not 4), without its unique
+  index, with a column's default unlike Room's, with the kind's check loosened, and a follow-up read
+  with its own order. Nothing was added to the PC's SDK: its folders were compared before and after.
+
 - **2026-11-04** — **AN4b, the outbox's records: BaliOutbox's `OutboxRecord.swift` in Kotlin (the
   conductor's calls, awaiting the owner's look; AN4b, #494).** The owner was asleep and asked for the
   recommended option on every question, so each call here is the conductor's, for the owner to look

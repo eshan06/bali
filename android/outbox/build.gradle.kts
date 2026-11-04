@@ -1,6 +1,6 @@
 // BaliOutbox's twin (ARCHITECTURE, "Android app structure", decision 5): the outbox, the sync
 // engine, the lock's rules and which screen shows when, plain Kotlin whose tests run on the JVM.
-// AN4c picks the outbox's store: Room's JVM build keeps its tests here too.
+// The outbox's file is Room's, through its JVM build, so its tests run here too (AN4c).
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -9,6 +9,9 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
     // The tests read contracts/outbox/'s case files as typed values (OutboxContractTest.kt).
     alias(libs.plugins.kotlin.serialization)
+    // Room's code, generated from OutboxDatabase.kt; its schema kept in schemas/ (README.md).
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.room)
     // Without it the app's Android Lint never reads this module (app/build.gradle.kts).
     alias(libs.plugins.android.lint)
     alias(libs.plugins.animalsniffer)
@@ -19,9 +22,19 @@ java.sourceCompatibility = JavaVersion.VERSION_17
 java.targetCompatibility = JavaVersion.VERSION_17
 kotlin.compilerOptions.jvmTarget = JvmTarget.JVM_17
 
+// Each version of the file's schema, written by Room's compiler and committed, so a migration is
+// checked against the schema it starts from.
+room {
+    schemaDirectory("$projectDir/schemas")
+}
+
 dependencies {
     // Its records' API is core's types: the requests, the answers, the client (OutboxRecord.kt).
     api(project(":core"))
+    // The app builds the file with Room's own builder, Android's, and hands it to Outbox.open.
+    api(libs.room.runtime)
+    implementation(libs.sqlite.bundled)
+    ksp(libs.room.compiler)
     testImplementation(libs.kotlin.test)
     // runBlocking, for the tests of a record's send, which suspends as the client's calls do.
     testImplementation(libs.kotlinx.coroutines.core)
