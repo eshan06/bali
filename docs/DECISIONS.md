@@ -8,6 +8,102 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-04** — **AN5c, the sync engine's read loop: BaliOutbox's `SyncEngine` in Kotlin, its reads
+  (the conductor's calls, awaiting the owner's look; AN5c, #NNN).** The owner isn't reviewing each
+  step and asked for the recommended option on every question, so each call here is the conductor's,
+  for the owner to look at.
+
+  **The owner's rulings, relayed by the conductor** (the owner: "ok just leave it as is on both
+  phones"). AN5b's call stands on both phones: an answer's standing is kept in a write after its
+  settle's, so a kill between the two relaunches at the old standing until the next read, never over
+  an Emergency Unlock (AN5b's entry, below). And the conductor's reading of the same words: iOS's
+  `answered`, whose failed read in the unlock guard is shown and then hidden again by the state step
+  copied before it (#500's entry, below), stays as it is for now. Android's port shows it, as
+  CLAUDE.md's "No silent failures" requires (below).
+
+  **Where it lives:** `outbox`'s `SyncEngine.kt`: the read loop (`read`, its pass's top `wake`,
+  `reading`, `readMe`, `checkedIn`, `nextRead`), `readStanding`, `standing(me)` but its wait for the
+  Start (AN5d's), `reconcile` over core's `readMayReconcile`, the unlock guard (`keepsUnlocked`) in
+  `reconcile` and in `answered`, `stamp`, `heard`'s refresh (`reauth`, `reauthed`), the refusal shown
+  (`Refusal`), `record`'s report again, `setScreenOn`, `setInFront`, `atEachWake` and
+  `CHECK_IN_INTERVAL`; and `SyncState`'s `refused`, `me`, `meFailed`, `meReads` and `hasClasses`.
+  AN5a's pattern holds: each stretch Swift runs between two `await`s holds the lock, and the sends,
+  the refresh and rule 3's check alone let go of it. Where Kotlin differs, said plainly:
+  - **The check-ins follow the screen, not the app** (ARCHITECTURE, the battery plan; AN5c's line).
+    `setScreenOn`, the lock's service's (AN7): on, the truth read at once, then a check-in every 30 s,
+    rule 3's check at each wake, out of a session too (C1c); off, one check-in in a session, rule 3's
+    check before it, since every check-in verifies what it claims (rule 3), then nothing until it is
+    on again; out of a session, nothing at all. The battery plan's "once as it comes on" is that read
+    of the truth, as an iPhone coming to the front reads it, its first check-in 30 s later (the
+    conductor's reading of the line).
+  - **Bali's own screen (`setInFront`):** behind, an unlock held for its reason goes at once (C5a), as
+    iOS's going behind sends it; in front, the truth is read at once, as iOS's coming back reads it
+    (the conductor's call: with the screen already on, nothing else reads `me` out of a class).
+  - **A pass takes what its rings rang for at its top,** where it answers them: whether it reads the
+    truth, and whether it checks in. What a ring made after the top rang for is the next pass's, so
+    no pass wakes for nothing. iOS's takes a read asked for during rule 3's check in that same pass,
+    and the ring left behind wakes it once more, for a check-in up to 30 s early; a test that turns
+    the screen on as its rig starts raced it here (seen: 1 run in 2). Held by a test.
+  - **`heard` returns its refresh, and its caller waits for it after its stretch,** the engine let
+    go, where Swift waits in `heard`'s middle: a 401 carries nothing for the rest of the stretch to
+    apply, so the state it leaves is the same. One refresh at a time, which every 401 heard while it
+    runs shares, in the engine's scope, so a loop cancelled while it waits leaves it to end for the
+    other; its end is a stretch of its own (`reauthed`), which lets go of it, where Swift's lets go in
+    whichever waiter resumes first. A refresh that throws reads as none, the phone shown waiting on
+    sign-in, though `open`'s doc now says it never throws.
+  - **The unlock guard's failed read is shown after the step it guards, never before** (#500's
+    worker found the order): in `answered`, iOS shows it, then its state step, copied before the
+    failure, hides it again, the phone left unlocked and nothing said. Android takes the step first,
+    then shows it, as AN5a's `record` does; `keepsUnlocked` gives none for a read that failed, the
+    phone kept unlocked. `reconcile` shows its own the same way.
+  - **`answered` asks the guard only of an answer that applies;** Swift asks it of every focus named,
+    and uses it only when one applies.
+  - **The check (`atEachWake`) is read under the lock and run with it let go;** it never throws, as
+    Swift's type promises.
+  - **Seams, as the split has them:** a read's `me` applies even if the phone changed it meanwhile,
+    until AN9's `meChanges`; no read hold (AN12); no 13+ yes, `ageAgain`, deletion or `counted` (AN9).
+
+  **For AN5d:** a waiting phone's reads join `wake`'s, at the top of the pass, beside the read out of
+  a session in a class; `standing(me)`'s wait and `readStanding`'s arming are yours. **For AN7:**
+  `setScreenOn` and `atEachWake` are the service's hooks; the check runs with the engine let go, so it
+  may record what it finds. **Left as it was: the drain's no-token path,** so AN5b's note for AN5e
+  stands.
+
+  **The tests:** DrainTests' `reauth`, `reauthFails` (AN5b's 401 test, extended),
+  `retryNowEndsRejection`, `sharedRefresh` (and nothing sent with the old token, the backoff over,
+  while the refresh runs) and `dropShown`; AnswerTests' `tapWithoutWindow`, `unlockNoted` and
+  `supersededGoneIsTheAPIs`; ReadTests but `waitingStays`, `cadence` set to the screen;
+  StaleReadTests' `readBeforeChange`, `readWhileAwaiting`, `unlockGuard` and
+  `refocusAfterStuckUnlock`; ClassesTests' `classes`, `failed`, `outReads`, `classesOverStaleStanding`
+  and `outTakesPastSession`; StandingKeptTests' `unread`, which first pins the engine's own `Unread`
+  check in `update` (AN5a's note), `unreadSettled`, and `checkAtEachWake` set to the screen; and the
+  engine's half of ProtectionOffTests' `reportedAgain` and `onlyFocusAgain`. New: the screen going off
+  checking in once in a session, rule 3's check and the report it makes first, then nothing, and out
+  of a session nothing at all; a read asked for while a wake runs, the next wake's, with no early
+  check-in after it; Bali's screen going behind sending a held unlock; the unlock guard, against an
+  answer naming focus and then a read, over an Emergency Unlock the server refused, one stuck after 8
+  answers, and one made where the phone stood unread, which the answer files there; and a failed read
+  inside the guard, the phone unlocked and the failure still showing after the step. The rig's driver
+  watches each statement's step (Room keeps the statements it prepares on their connection, so a
+  step, not a prepare, is each use), and that test refuses the guard's read alone.
+
+  Tried, each failing by name, then reverted: the guard left out of `answered` (4 tests), and out of
+  `reconcile` (4); iOS's order, the failure shown, then hidden by the state copied before it, and the
+  failure never shown (the failed read's test); a refresh at every 401 (2), and one of its own for
+  each (`sharedRefresh`); the drain not waiting on the refresh (`sharedRefresh`); a fresh token
+  sending nothing again (3); the refusal unshown, and a record never ending its showing (`dropShown`);
+  no report again (`reportedAgain`); no check-in as the screen goes off (3); rule 3's check run out of
+  a session as it goes off, and not run before its check-in (2); `Unread` handed to the file, and
+  where the phone stood never read again (`unread`); no read out of a session in a class
+  (`outReads`); a check-in's 404 not read again (`checkInGone`); every read applied, stale or not
+  (`readWhileAwaiting`, `classesOverStaleStanding`; `readBeforeChange` passes, the guard holding there
+  too); a read with no answer not tried again (2), and a read never counted (`failed`); the read
+  taken after rule 3's check, as iOS takes it (the early check-in's test); and going behind sending
+  no held unlock. Nothing was added to the PC's SDK: its folders were compared before and after.
+
+  **The proof:** `Outbox.open` and `android/app` are unchanged, so the JVM tests are the proof, and no
+  emulator ran.
+
 - **2026-11-04** — **PostHog: the owner's four rulings, and the iPhone app's privacy manifest gives
   Product Interaction the purpose Analytics (the owner, in chat with the conductor; A5, #505).** The
   owner answered the open calls of A1's entry ("PostHog's rules", below) and two more, each with the
