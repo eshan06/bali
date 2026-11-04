@@ -137,7 +137,12 @@ The PC whose clone is `C:\dev\bali` holds Android's SDK and its test emulators
 - **A worktree's worker can't hand adb or bash a script file.** Its isolation check refuses
   `adb shell sh <file>` and `source`, often `bash <file>` and some long `adb shell '…'` strings,
   as text it can't read. Inline a short loop in `adb shell '…'`, and split a long one into plain
-  commands.
+  commands. A host-side `for` loop around adb, a command named by a variable (`$A shell …`) and a
+  long Python heredoc are refused too: write each adb call out in full, one after another.
+- **Git Bash rewrites a device path handed to adb.** `adb shell uiautomator dump /sdcard/ui.xml`
+  and `adb exec-out cat /sdcard/ui.xml` reach adb as `C:/Program Files/Git/sdcard/ui.xml`, so the
+  dump lands nowhere and the read fails, or reads an old file. Prefix such a command with
+  `MSYS_NO_PATHCONV=1`.
 
 ## Cloud sessions / dev environment
 
