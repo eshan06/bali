@@ -10,6 +10,15 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-11-04 (Central) — A1, PostHog's rules (#503; `docs/DECISIONS.md`, 2026-11-04):
+PostHog on the teacher portal's pages and the server only, never a phone; a class's totals and a
+teacher's actions, nothing about one student; off until the owner sets its keys; no SDK, a plain
+POST (the conductor's call, awaiting the owner). Before it, AN5b, Android's engine's drain (#501).
+Next: the owner's two PostHog calls, a class of one and the CSP's origin, then A2–A4; a session
+builds the retire-a-block command; the owner the new build and the sitting; the owner's call on
+GA5's known limit, the smallest iPhones (DECISIONS 2026-11-02); AN5c, Android's read loop; AN1's
+part 2 once the owner has the phones; the audit's polish waits, as ruled._
+
 _Last updated: 2026-11-04 (Central) — AN2 (#488; `docs/DECISIONS.md`, 2026-11-04): Android's
 project and CI, its first code on `main`: Gradle under `android/`, the app `com.bali.bali` for
 Android 10 and later, `android.yml`'s build, lint and JVM tests, Android's contract tests on every

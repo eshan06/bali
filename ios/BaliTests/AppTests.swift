@@ -2293,7 +2293,7 @@ struct AppTests {
     }
 
     @Test(
-        "Sign in as the approved Sign in & sign up design draws it: its title, then Sign up and Sign in, each a button; while a page opens its button says so and neither takes a press; a page that could not open is said under the buttons, naming its page, before the caption; and the intro's last page's button is Sign up, Signing up… and dimmed while its page opens, and still once the router has gone on from it, the page closed, so the intro held under the sheet holds still (the approved motion spec)"
+        "Sign in as the approved Sign in & sign up design draws it: its title, with no line under it (the owner's cut, 2026-11-04), then Sign up and Sign in, each a button; while a page opens its button says so and neither takes a press; a page that could not open is said under the buttons, naming its page, before the caption; and the intro's last page's button is Sign up, Signing up… and dimmed while its page opens, and still once the router has gone on from it, the page closed, so the intro held under the sheet holds still (the approved motion spec)"
     )
     func signInScreen() async throws {
         let title = "Sign\u{A0}up or sign\u{A0}in"
@@ -2319,6 +2319,8 @@ struct AppTests {
                 + ["Trouble signing in? Ask your teacher."]
             let at = order.compactMap { labels.firstIndex(of: $0) }
             #expect(at.count == order.count && at == at.sorted(), "\(name): \(labels)")
+            #expect(
+                Array(labels.drop { $0 != title }.prefix(2)) == [title, up], "\(name): \(labels)")
             for button in [up, inside] {
                 let traits = try #require(read.first { $0.label == button }, "\(name)").traits
                 #expect(traits.contains(.button), "\(name): \(button)")
@@ -2365,7 +2367,7 @@ struct AppTests {
     }
 
     @Test(
-        "The age question's Continue as the approved design's age boards draw it: both picked, Continue; a second Sign up this run, its page opening from Continue, Signing up… with no press taken, the question's menus still there (the owner's ruling, 2026-10-07: every Sign up asks)"
+        "The age question's Continue as the approved design's age boards draw it: the question with no line under it (the owner's cut, 2026-11-04), then its menus; both picked, Continue; a second Sign up this run, its page opening from Continue, Signing up… with no press taken, the question's menus still there (the owner's ruling, 2026-10-07: every Sign up asks)"
     )
     func ageContinue() async throws {
         for (name, label, busy) in [
@@ -2376,6 +2378,10 @@ struct AppTests {
             let button = try #require(read.first { $0.label == label }, "\(name)")
             #expect(button.traits.contains(.notEnabled) == busy, "\(name)")
             #expect(read.contains { $0.label == "Month" } && read.contains { $0.label == "Year" })
+            let (title, labels) = ("When were you born?", read.map { $0.label ?? "" })
+            #expect(
+                Array(labels.drop { $0 != title }.prefix(2)) == [title, "Month"],
+                "\(name): \(labels)")
         }
     }
 

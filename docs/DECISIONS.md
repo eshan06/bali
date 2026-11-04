@@ -8,6 +8,43 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-04** — **The iPhone and the student web make the owner's Android cuts, with three
+  exceptions (the owner; WC1, #502).** In a Mac conductor session the owner asked for the iPhone,
+  in its own wording, to make the cuts that AS0's approval records ("AS0 approved", #486, below),
+  where iOS had kept every line of its own. Three exceptions: the block screen keeps one line, in the owner's
+  words, "This app is paused for class. Open Bali to Emergency Unlock." ("website" for "app" over a
+  website); the lines only Android has don't apply (the Accessibility disclosure's and its Settings
+  description's); and the answered card's "Your answer is in. You can change it until the question
+  closes." stays, as on Android. The student web cuts its card's two lines too: the open card's
+  "Pick an answer. You can change it until the question closes." and "Your teacher sees the class's
+  totals, never which answer is yours." Waiting loses its first sentence on the iPhone, as on
+  Android.
+
+  **Boards first:** the owner approved them ("Approve all", 2026-11-04) at D1, "Bali student app
+  screens", v17 (`1793830300-d86e`, https://claude.ai/artifact/DdfRPhHu4whXLxe58hBAie); Sign in &
+  sign up v19 (`1793830334-bc4e`, https://claude.ai/artifact/McyYhpX1UTq1nU6oCCwPwG); Live lesson
+  app screens v47 (`1793830359-8d71`, https://claude.ai/artifact/CZpFbFuxnRrLcuywtJGfVQ); and Bali
+  portal in v2's look v120 (`1793830375-5feb`, https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4).
+  Left as they were: the Design System canvas's three "Student app flow" cards (a dated copy of
+  D1), the help page's line on calls, and D1's Shield board's old title "Focused with Bali until
+  10:45" (the app says "Focused with Bali").
+
+  **The steps, one PR each:** WC1 Sign in and the 13+ question; WC2 Join and the list-changed
+  screen; WC3 Focus, Home's hold and the block screen; WC4 Unlocked, its reason card, Screen Time
+  off and Waiting; WC5 the Screen Time step, History and Me; WC6 the iPhone's answer card; WC7 the
+  student web's card (ARCHITECTURE's Live lesson decision 13 quotes its privacy line); WC8 the
+  Android canvas Words board's "gone" list and DESIGN.md's Android counts, once the rest has
+  merged.
+
+  **WC1 (#502):** Sign in loses "You only do this once. After that, Bali remembers you." and the
+  13+ question "Bali never saves or sends your birth month and year.", each with the 12 pt that
+  held it under its title. The rest keeps its spacing, the boards' 24 pt from the mark to the title
+  and, on the question, from the title to the Month menu, and the shorter block sits a little lower
+  between the same spacers, as the boards draw it. No other word, behaviour or layout changes.
+  AppTests' `signInScreen` and `ageContinue` now check that each title is followed at once by what
+  the boards draw next, Sign up (or Signing up…) and the Month menu, so a line put back under
+  either title fails, as both checks did on the old screens.
+
 - **2026-11-04** — **PostHog's rules: the teacher portal's pages and the server only, a class's
   totals and a teacher's actions, nothing about one student (the owner's rulings, in chat with the
   conductor; A1, #503).** The owner asked for PostHog before the pilot on 2026-11-03 ("also we need to add

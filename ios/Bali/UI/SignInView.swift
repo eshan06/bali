@@ -25,12 +25,8 @@ struct SignInView: View {
                     Spacer()
                     VStack(alignment: .leading, spacing: 24) {
                         BaliMark(size: 72)
-                        VStack(alignment: .leading, spacing: 12) {
-                            // Each way's two words kept on one line, as the canvas keeps them.
-                            Text("Sign\u{A0}up or sign\u{A0}in").textStyle(.h1)
-                            Text("You only do this once. After that, Bali remembers you.")
-                                .textStyle(.bodyLg).foregroundStyle(Theme.textSecondary)
-                        }
+                        // Each way's two words kept on one line, as the canvas keeps them.
+                        Text("Sign\u{A0}up or sign\u{A0}in").textStyle(.h1)
                     }
                     Spacer()
                     VStack(spacing: 12) {
