@@ -10,6 +10,18 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN5a's on 2026-11-04: _Last updated: 2026-11-04 (Central) — AN4e,
+the outbox's sending (#497; `docs/DECISIONS.md`, 2026-11-04): BaliOutbox's `Outbox` in Kotlin, its
+sending side, with its tests: the next record in the order the phone acted, a pending one holding those
+behind it and a stuck one not; each answer settled by its own kind's table, a record kept until its
+answer ends it, an unlock until recorded; the backoff from 2 s to a minute, its jitter, and stuck at a
+refusal or after 8 answers; an unlock under a scan that joins no class filed again where the phone
+stood; the retry; and what holds the phone's reads. The app settled a record on `Bali_Spike_API35`.
+AN4 is done. Before it, AN4d, the recording. Next: AN5, the sync engine; Android 17's SDK platform for
+the owner to OK before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items,
+6); CodeQL for Android's Kotlin, the owner's call (7); AN1's part 2 once the owner has the phones. Not
+on the pilot's critical path._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN4e's on 2026-11-04: _Last updated: 2026-11-04 (Central) — AN4d,
 the outbox's recording (#496; `docs/DECISIONS.md`, 2026-11-04): BaliOutbox's `Outbox` in Kotlin, its
 recording side, with its tests: what the phone did queued with the standing it leaves, in one write; a
@@ -2087,6 +2099,28 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN5a's line, as it read until it was done (2026-11-04; `docs/DECISIONS.md`, 2026-11-04). The
+conductor split AN5's line into AN5a–AN5e that day, every word of it kept in one of them: AN5a's
+here, AN5b's to AN5e's in `docs/PLAN-ANDROID.md`.
+
+- **AN5a** The sync engine (twin: `SyncEngine`), its frame: `SyncState`, the rest of SyncEngine.swift
+  (`Standing` and its kept form are AN4d's), split five ways, AN5a–AN5e, with the parts AN6, AN7,
+  AN9, AN10 and AN12 take named on their lines. AN5a's part: `SyncClock` and `SystemClock`, its
+  uptime `System.nanoTime`'s; `SyncState`'s core and `Link`; the engine made from the file by a
+  suspend factory that takes the app's scope and `refresh` (AN6 and AN7 fill them); `run`'s frame,
+  each loop's rings a conflated channel; `record`, but its report again (AN5c's) and its lock back on
+  (AN5e's); `updates` as a `StateFlow`; and the storage helpers, but `isSuspension` (no app group).
+  Swift's actor is a lock held through each stretch Swift's runs without an `await`, Room's calls
+  included, and let go at each `await`; each public call runs in the engine's own scope, so its
+  writes to the outbox made where no screen can cancel them, and none given `Standing.Unread`
+  (AN4d's review). Each field comes with the code that reads it, so `checkInInterval`, `reasonHold`
+  and the rest are on the lines of the steps that use them. Tests, on EngineSupport.swift's rig in
+  Kotlin (a test clock, a server answered by hand, the tokens' stand-in): TestClockTests'
+  `heldSleepCancels`; StandingKeptTests' `keptWithItsStanding`, an engine relaunched at each commit
+  through a test's driver, which `Outbox.open` takes; and new: a record whose caller is cancelled
+  still kept, `Unread` never handed to `record` or kept, and the standing kept in the file —
+  validation: the JVM tests, and the app's instrumented test on an emulator, `Outbox.open` changed
 
 AN4e's line, as it read until it was done (2026-11-04; `docs/DECISIONS.md`, 2026-11-04).
 

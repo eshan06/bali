@@ -4,6 +4,7 @@ import androidx.room.Room
 import androidx.room.execSQL
 import androidx.room.useReaderConnection
 import androidx.room.useWriterConnection
+import androidx.sqlite.SQLiteDriver
 import androidx.sqlite.SQLiteException
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import androidx.sqlite.execSQL
@@ -25,7 +26,12 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.jsonObject
 
 /**
@@ -39,9 +45,12 @@ abstract class OutboxFiles {
     /** A new file's path, in a folder of its own. */
     fun temporaryFile(): File = createTempDirectory(folder.toPath(), "outbox").toFile().resolve("outbox.sqlite")
 
-    /** The outbox in [file], opened as the app opens it, through Room's JVM builder, its jitter fixed at [random]. */
-    fun open(file: File, random: Double = 0.0): Outbox =
-        Outbox.open(Room.databaseBuilder<OutboxDatabase>(file.path)) { random }.also { opened += it }
+    /**
+     * The outbox in [file], opened as the app opens it, through Room's JVM builder, its jitter fixed at
+     * [random], over [driver], the bundled one unless a test watches its commits ([Relaunches]).
+     */
+    fun open(file: File, random: Double = 0.0, driver: SQLiteDriver = BundledSQLiteDriver()): Outbox =
+        Outbox.open(Room.databaseBuilder<OutboxDatabase>(file.path), { random }, driver).also { opened += it }
 
     fun makeOutbox(random: Double = 0.0): Pair<Outbox, File> = temporaryFile().let { open(it, random) to it }
 
@@ -276,6 +285,24 @@ class DurabilityTest : OutboxFiles() {
                 write(reopened)
                 assertEquals(2L, reopened.synchronous(), name)
             }
+        }
+
+    @Test
+    fun aCallersCancelNeverCutsAWriteShortRoomRunsItToItsEndTheCallerWaitingThenHearingOnlyTheCancel(): Unit =
+        runBlocking {
+            // The write held once it has begun, while its caller is cancelled (AN5a found it).
+            val held = HeldWrite()
+            val outbox = open(temporaryFile(), driver = Watching(began = held.hold))
+            outbox.records()
+            held.arm()
+            val caller = launch(Dispatchers.IO) { outbox.record(Change.Unlock("s", null), t0) }
+            held.began()
+            caller.cancel()
+            assertNull(withTimeoutOrNull(100.milliseconds) { caller.join() }, "the caller stopped waiting")
+            held.release()
+            withTimeout(patience) { caller.join() }
+            assertTrue(caller.isCancelled)
+            assertEquals(listOf(Change.Unlock("s", null)), outbox.records().map { it.change })
         }
 
     @Test
