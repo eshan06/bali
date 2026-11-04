@@ -8,6 +8,54 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-04** — **PostHog: the owner's four rulings, and the iPhone app's privacy manifest gives
+  Product Interaction the purpose Analytics (the owner, in chat with the conductor; A5, #PR).** The
+  owner answered A1's open calls (the entry below) and two more, each with the option quoted; each
+  is now in ARCHITECTURE's "Analytics (PostHog)":
+  1. **A class's totals are always sent, whatever its size** ("Always send", over holding focus
+     minutes and unlocks back under 3 students or under 5). The cost, said plainly: with one or two
+     students, the totals are those students' own numbers, which "no event about one student"
+     otherwise rules out. Unlocks still go as one number, never split by reason ("nurse" may be
+     health data), as the question said.
+  2. **The portal's events go through Bali's server** ("Through Bali's server", the recommended
+     option): the portal posts each event to a new teacher-only endpoint of Bali's API, which checks
+     the event's name and properties against the allow-list and forwards it to PostHog with the
+     server's key. The portal's CSP is unchanged and never lists a PostHog origin:
+     `us.i.posthog.com` takes events for every PostHog project, so listing it would let an injected
+     script send the access token to a project of its own. Ad blockers can't drop the events either.
+     This replaces A1's A3a (the portal's sender and the CSP's origin) and settles the no-SDK
+     question for the portal: there is no PostHog code in the browser at all, so the portal holds no
+     PostHog key and the owner sets one key, the API's. The server's own plain POST stays the
+     conductor's call.
+  3. **A teacher's PostHog events are kept when they delete their account** ("Keep them, say so",
+     recommended): the events carry Bali's internal id alone, and `/privacy` says they stay (A4).
+     Bali makes no deletion call to PostHog, so the server holds no PostHog admin key; a school's
+     disposal and the retention run leave them too. #313's note stands beside it: a teacher who
+     deleted their own account keeps their removed classes' names, so Bali's own data can still
+     lead from the id back to them.
+  4. **The iPhone app's privacy manifest changes in the next build** ("In the next build",
+     recommended, over waiting for the App Store label): A5, this entry's PR, so PLAN's item 1, the
+     new prod build, carries it.
+
+  **The manifest** (`ios/Bali/PrivacyInfo.xcprivacy`): Product Interaction serves Analytics beside
+  App Functionality, since A2's totals are counted from the phone's focus records and Bali uses
+  them to learn how it is used. Linked to the user stays as it was (the records sit under the
+  student's account), and Tracking No. The extensions declare no collected type and still don't:
+  they send nothing to Bali's server. The app itself still sends PostHog nothing and carries no
+  analytics code. CI's check (`.github/scripts/privacy-manifests.py`) now pins each collected
+  type's purposes, App Functionality alone or, for Product Interaction, with Analytics, and refuses
+  a purpose Apple doesn't document (any string with the right prefix passed before); its tests fail
+  without the new purpose, and one more pins that the app's own Swift folder is scanned for
+  required-reason calls, which no test did. The purposes are pinned in the check, not read from
+  `docs/APP-STORE.md`, whose table says App Functionality alone until the owner edits the label to
+  match (PLAN's Before the pilot, 6; the table's checks now say so).
+
+  **Said plainly:** A2's count of enrolled students comes from class membership, which the label
+  files under Other Data Types, and Apple's Analytics purpose covers measuring audience size, so on
+  the strict reading that type serves Analytics too. A5 leaves it at App Functionality, as
+  ARCHITECTURE named Product Interaction alone: the owner's call, before item 1's build carries the
+  manifest. Recommended: declare it too, the safe reading the label already takes for Device ID.
+
 - **2026-11-04** — **The iPhone and the student web make the owner's Android cuts, with three
   exceptions (the owner; WC1, #502).** In a Mac conductor session the owner asked for the iPhone,
   in its own wording, to make the cuts that AS0's approval records ("AS0 approved", #486, below),
@@ -91,8 +139,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   alone would not keep posthog-js's further scripts out; leaving the SDK out is what does.
 
   **The steps** (PLAN's Before the pilot, 4), one PR each: A1, these docs; A2, the server's class
-  totals; A3a, the portal's sender, on for teachers only, with PostHog's origin in the CSP; A3b, the
-  portal's teacher events; A4, `/privacy` names PostHog. Then the owner's keys.
+  totals; A3a, the portal's sender, on for teachers only, after the owner's pick between PostHog's
+  origin in the CSP and the API as a relay; A3b, the portal's teacher events; A4, `/privacy` names
+  PostHog. Then the owner's keys. Re-listed since by the owner's rulings (the entry above): A5
+  added, and A3a the API's endpoint for the portal's events, the CSP unchanged.
 
   **Said plainly:** the server's totals are counted from what the phones send, and ISSUES #3 notes
   that §3.3.3(P)'s "or otherwise" may reach what Bali records itself, not only what the framework
