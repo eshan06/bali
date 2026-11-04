@@ -14,14 +14,14 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-04 (Central) — AN3b, the core's wire types (#490; `docs/DECISIONS.md`,
-2026-11-04): BaliCore's `API.swift` in Kotlin, each answer's vocabulary read through `OrUnknown` and
-its own outcomes held to `api.ts`'s lists; and every `contracts/fixtures/` file decoded strictly,
-read back whole, its nulls probed and its request sent as the API reads it, so a new fixture fails
-until `core` reads it. Before it, AN3a, the vocabulary and JSON coding. Next: AN3c, the core's
-client; Android 17's SDK platform for the owner to OK before the first step with today's AndroidX
-(Open owner items, 6); CodeQL for Android's Kotlin, the owner's call (7); AN1's part 2 once the
-owner has the phones. Not on the pilot's critical path._
+_Last updated: 2026-11-04 (Central) — AN3c, the core's event ids, NFC tag reading and app config
+(#491; `docs/DECISIONS.md`, 2026-11-04): BaliCore's `EventID.swift`, `BlockTag.swift` and
+`AppConfig.swift` in Kotlin with their tests: UUIDv7 ids; a block's code read from NDEF records
+given as plain bytes, trimmed of the space Foundation trims; and the build's config read, its app
+side left to AN6. AN3c is two PRs now, AN3c and AN3d. Before it, AN3b, the wire types. Next: AN3d,
+the core's client; Android 17's SDK platform for the owner to OK before the first step with today's
+AndroidX (Open owner items, 6); CodeQL for Android's Kotlin, the owner's call (7); AN1's part 2 once
+the owner has the phones. Not on the pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -127,25 +127,26 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN3a** The core's vocabulary and JSON coding, and Android 10's API check — ✅ (#489; DECISIONS
   2026-11-04)
 - **AN3b** The core's wire types — ✅ (#490; DECISIONS 2026-11-04)
-- **AN3c** The core's client (twin: BaliCore's `EventID.swift`, `APIClient.swift`, `BlockTag.swift`
-  and `AppConfig.swift`): UUIDv7 event ids, the API client and its errors (keyed on `reason`, never
-  the message), `BlockTag` (an NDEF Text record, or a URI record, `bali://t/<code>` or
-  `https://<host>/t/<code>`), and `AppConfig`
+- **AN3c** The core's event ids, NFC tag reading and app config — ✅ (#491; DECISIONS 2026-11-04)
+- **AN3d** The core's client (twin: BaliCore's `APIClient.swift`): the API client and its errors
+  (keyed on `reason`, never the message)
 - **AN4** The outbox store (twin: BaliOutbox's `Outbox` and `OutboxRecord`): Room in the app's own
-  storage; the records; the unlock contract (`contracts/outbox/`; no response ever means delete),
-  with ContractFixtureTests' outbox dispositions, which AN3b left; the outbox's counter and its
-  install id, the phone's order (A12); and Bali's files left out of Android's backup (ARCHITECTURE,
-  "Android app structure")
+  storage; the records (OutboxTests' `eventIds` is `core`'s already, AN3c's); the unlock contract
+  (`contracts/outbox/`; no response ever means delete), with ContractFixtureTests' outbox
+  dispositions, which AN3b left; the outbox's counter and its install id, the phone's order (A12);
+  and Bali's files left out of Android's backup (ARCHITECTURE, "Android app structure")
 - **AN5** The sync engine (twin: `SyncEngine`): the drain with backoff and jitter, the 30-second
   check-in while the screen is on (ARCHITECTURE, the battery plan; AN7 drives it from the lock's
   service), and the reconcile (`readMayReconcile` and the typed dispositions), all on a fake clock
 - **AN6** Sign-in (twin: `SignIn`, `TokenStore`): Cognito's hosted UI in a Custom Tab, the code
   grant with PKCE; tokens sealed by a Keystore key; the refresh, Sign out, `Tokens.checked` (no
   token to Bali's API before the 13+ check, but the check's own read and a deletion's) and the
-  deletion token; only a real `401` signs anyone out. 🔧 The owner makes Android's Cognito app
-  clients on dev and prod (no secret; the scopes iOS's client has, `aws.cognito.signin.user.admin`
-  among them for Delete account) and adds their ids to `AUTH_AUDIENCE` on dev's and prod's API, or
-  the API refuses Android's tokens with a `401`, which signs the student out
+  deletion token; only a real `401` signs anyone out; and `AppConfig`'s app side, which AN3c left
+  here: Android's build setting its values, with a test pinning its keys to both sides, as iOS's
+  pins Info.plist to `project.yml`. 🔧 The owner makes Android's Cognito app clients on dev and
+  prod (no secret; the scopes iOS's client has, `aws.cognito.signin.user.admin` among them for
+  Delete account) and adds their ids to `AUTH_AUDIENCE` on dev's and prod's API, or the API
+  refuses Android's tokens with a `401`, which signs the student out
 - **AN7** 📱 The lock (twin: BaliOutbox's `Enforcement`, `Bell` and `PhoneBell`): the
   Accessibility service, (a), as ARCHITECTURE's battery plan has it (listening only in a lesson,
   and then to window events, the covered app sent to the background); the system allow-list
