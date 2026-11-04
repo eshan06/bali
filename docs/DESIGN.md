@@ -1060,19 +1060,28 @@ Example prompts that fit this system:
 - "Draw the student's session-over screen: the mark at 72, an h1, a body-lg
   line, one primary button; light; no animation beyond a 200 ms fade."
 
-## Android (proposed until the owner approves AS0)
+## Android
 
 Android's screens have their own canvas, apart from the iPhone's (the owner, 2026-11-03: "should be
 in a different artifact than ios"):
 [Bali Android app screens](https://claude.ai/artifact/SZPLe9WcymZJ1Bvrgj5KoE), AS0 in
-`docs/PLAN-ANDROID.md`, in the Bali Design System, a row per step (AS1–AS8). Until AN1b picks the
-lock, a screen the lock changes is drawn twice, side by side, "If lock (a)" and "If lock (b)".
-Nothing on it is built before the owner approves it, and this section is proposed until then.
+`docs/PLAN-ANDROID.md`, in the Bali Design System, a row per step (AS1–AS8). The owner approved it
+as it stands at version 51: 148 boards (2026-11-04; `docs/DECISIONS.md`). It draws lock (a), the
+Accessibility service, alone: the boards drawn for lock (b) are gone. The approved iPhone boards
+stand for the rest of Android's screens (the Words board's call, settled with the approval): a
+screen the canvas doesn't draw is built from its approved iPhone board, in this section's look and
+words.
 
-- **The words** are the built iPhone app's, word for word. A line changes only where it names
-  something Android lacks (FaceTime, Emergency SOS, Screen Time, iOS, the top of an iPhone). The
-  canvas's Words board lists every line changed (30), new (21) and gone (4), and
-  `docs/DECISIONS.md` (2026-11-03) the owner's calls among them.
+- **The words** are the built iPhone app's, word for word, except where the canvas's Words board,
+  the record of Android's words, says otherwise: 28 lines changed, 14 new, 22 gone. A line changes
+  only where it names something Android lacks (FaceTime, Emergency SOS, Screen Time, iOS, the top
+  of an iPhone) or where the owner cut it, on every Android screen (2026-11-04; iOS keeps every
+  one). Of the 22 gone, the owner cut 18 and 4 have no Android twin. A line the board marks "not
+  drawn" belongs to a state no board shows, and changes the same way. Settled with the approval:
+  "Lock off" and "Lock back on" for the ruled "Screen Time off" and "Screen Time back on"; "Calls,
+  texts and emergency calls always work" for "Calls, FaceTime, Messages and Emergency SOS always
+  work", on the intro's first page alone; and the new lines as drawn, Open Bali on the block screen
+  among them.
 - **The look:** the tokens in Material 3's roles: `primary` is action-primary-bg,
   `tertiaryContainer` the emergency pair, `error` the destructive red, `errorContainer` Lock off's
   chip, `surfaceContainerLowest` the card, `surfaceContainerHigh` the sunken well, `outline`
@@ -1081,20 +1090,23 @@ Nothing on it is built before the owner approves it, and this section is propose
   countdown fixed at 64 dp. Buttons 56 dp at radius 14, Material's outlined field, cards at radius 20
   with shadow-1, sheets at radius 20, chips at radius 14, touch targets 48 dp. Depth is the warm
   shadow, never Material's tonal tint; motion is §7's, Remove animations standing in for Reduce
-  Motion. Drawn in Instrument Sans and JetBrains Mono, with lucide's icons: both the owner's call
-  (Roboto, Material Symbols).
+  Motion. Type in Instrument Sans, the portal's face, bundled with the app, and JetBrains Mono;
+  icons from lucide, as vector drawables at 24 dp with 2 dp strokes; not Roboto and Material
+  Symbols (the owner's call, settled with the approval). Roboto shows only on Android's own screens.
 - **Material 3 where Android has the control:** Filled, Outlined and Text buttons; the outlined
   text field; the navigation bar for the tab bar, its labels stopping at 150%; modal bottom sheets;
   the segmented button for an unlock's reason; exposed dropdown menus for the 13+ question; Custom
   Tabs for sign-in and the policy pages. **Bali's own, as on the iPhone:** the state chips,
   Emergency Unlock's one-second hold (its spring, its Reduce Motion look, 48 dp of drift), the ring
   and its strip, the answer rows and the slide.
-- **Android's own screens:** the permission step in the Screen Time ask's place, one per lock ((a)
-  Play's prominent disclosure with Agree as the consent, ISSUES #7; (b) two switches); "hold your
+- **Android's own screens:** the permission step in the Screen Time ask's place, Play's prominent
+  disclosure ("What Bali sees") with Agree as the consent and No thanks leaving the switch alone
+  (ISSUES #7), then Android's own Accessibility settings and its full-control dialog; "hold your
   phone to the block", Bali's own sheet since Android has no NFC sheet, NFC off included; the block
-  screen, BaliShield's twin, with Open Bali; (b)'s notification for the whole class; the
-  class-started alert's channel. Android's own surfaces (Settings, its dialogs, the shade, the
-  keyboard, a Custom Tab's bar) are drawn as a Pixel shows them, never restyled.
+  screen, BaliShield's twin, "Focused with Bali" with OK and Open Bali, over only the blocked window
+  in split screen and over the small window in picture-in-picture; the class-started alert's
+  channel. Android's own surfaces (Settings, its dialogs, the shade, the keyboard, a Custom Tab's
+  bar) are drawn as a Pixel shows them, never restyled.
 
 ## Design tooling
 

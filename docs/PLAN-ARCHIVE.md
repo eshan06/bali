@@ -10,6 +10,22 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-11-03 (Central) — AN1, part 1c (`docs/DECISIONS.md`, 2026-11-03): lock (c), a
+VPN on the phone alone, measured on the Android 15, 16 and 17 emulators; it takes a blocked app's
+internet within 1.6 s but covers nothing, so it could be added to (a), not used alone. Before it,
+AS0, the Android canvas, drawn for the owner's approval. Next: a session builds the retire-a-block
+command; the owner the new build and the sitting; the owner's look at the Android canvas; the owner's
+call on GA5's known limit, the smallest iPhones (DECISIONS 2026-11-02); AN1's part 2 once the owner
+has the phones; the audit's polish waits, as ruled._
+
+`docs/PLAN-ANDROID.md`'s, replaced the same day: _Last updated: 2026-11-03 (Central) — AN1, part 1c
+(`docs/DECISIONS.md`, 2026-11-03): lock (c), a VPN on the phone alone, measured on the Android 15, 16
+and 17 emulators, its code on `spike/android-lock` (never merged). It takes a blocked app's internet
+within 1.6 s but covers nothing, so it is something that could be added to (a), not a lock of its
+own. Before it, AS0, the Android canvas. Next: the owner's look at the canvas (Open owner items, 5);
+AN1's part 2 once the owner has the phones (Open owner items, 1), then AN1b. Not on the pilot's
+critical path._
+
 _Last updated: 2026-11-03 (Central) — AS0, the Android canvas (`docs/DECISIONS.md`, 2026-11-03):
 Android's screens drawn on their own canvas for the owner's approval, both locks side by side where
 they differ, and DESIGN.md's Android section proposed. Before it, the pilot's last list: every phone
@@ -1947,6 +1963,21 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AS0's line, as it read until the owner approved the canvas (2026-11-04; `docs/DECISIONS.md`,
+2026-11-04):
+
+- **AS0** 👀 The Android canvas (Claude Design; no code): a board per screen group in Android's own
+  controls, the approved iOS boards' words and states carried over; the Android-only screens: the
+  permission steps in place of the Screen Time ask, "hold your phone to the block" (Android has no
+  system NFC sheet) and the block screen (BaliShield's twin); and `docs/DESIGN.md`'s Android
+  section. The owner approves it, and rules whether the approved iOS boards then stand for the rest
+  (the owner, 2026-11-02: "now we have the screens and stuff settled") — validation: the canvas
+  opened and every board checked before it's reported. **Drawn, waiting for the owner's approval**
+  (DECISIONS 2026-11-03): [Bali Android app screens](https://claude.ai/artifact/SZPLe9WcymZJ1Bvrgj5KoE),
+  165 boards, every one checked; its Words board lists each changed, new and gone line, and its
+  calls are the owner's (Open owner items, 5). Lock (c), the VPN lock under test, isn't drawn: its
+  test decides whether it needs screens
 
 AN1's notes on running on the emulator first, as they read until part 1 was done (2026-11-03;
 `docs/DECISIONS.md`, 2026-11-03):

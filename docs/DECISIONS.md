@@ -8,6 +8,49 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-04** — **AS0 approved: the Android canvas as it stands, after the owner's cuts (the
+  owner; AS0's worker).** The conductor asked in chat, "Is the Android canvas approved as it
+  stands?", and the owner answered "approved":
+  [Bali Android app screens](https://claude.ai/artifact/SZPLe9WcymZJ1Bvrgj5KoE) at its live version,
+  v51 (`1793777499-6f25`), 148 boards. It draws lock (a) alone, the owner's pick that AN1b records:
+  the boards for lock (b) are gone. So AS0 is done, DESIGN.md's Android section is no longer
+  proposed, and AS1–AS8 build from the canvas. **The owner's cuts, before the approval:** the owner
+  cut wording on the canvas, then asked for those lines to go "everywhere on android". iOS keeps
+  every line of its own. Gone on Android: the block screen's "This app is paused for class…";
+  Focus's "Every app is paused…" and its "Works without Wi-Fi…", offline's too; the Accessibility
+  disclosure's "Bali keeps and sends none of it…" and the matching sentence in the service's
+  description in Settings, two lines only Android had; the permission step's "You can change this
+  any time in Settings."; the answer card's two lines ("Tap an answer…" and "Your teacher sees the
+  class's totals…"); Sign in's "You only do this once…"; the 13+ question's "Bali never saves or
+  sends your birth month and year."; Join's two lines on the code ("Six letters and numbers…" and
+  "Codes never use 0, O, 1, I or L…"); Unlocked's "Saved on your phone first…"; the reason card's
+  "Your teacher sees the reason you pick."; the lock-off screen's "It's always your call…";
+  History's "The same moments your teachers see…"; Me's "Leaving a class is recorded…"; the
+  list-changed screen's "During class, you can answer them here on Bali…"; the calls-and-texts line
+  everywhere but the intro's first page, Me's "Bali pauses every app…" with it; and the two italic
+  notes that named the last two states on History's states board, the board's labels, not the
+  app's words. Waiting's line also loses its first sentence, "You tapped your teacher's block before
+  class started." (the Words board counts it as changed).
+
+  **The counts:** 148 boards where AS0 drew 165, so 17 removed: the 16 drawn for lock (b), and
+  AS5-Focus-200-end, which no longer scrolls; about 65 boards changed. Android's words against the
+  iPhone's, on the Words board: 28 lines changed, 14 new, 22 gone (18 cut by the owner, 4 with no
+  Android twin), where AS0 had 30, 21 and 4.
+
+  **The Words board's calls, settled as drawn** (PLAN-ANDROID's owner item 5): "Lock off" and "Lock
+  back on" for the ruled "Screen Time off" and "Screen Time back on", not the grid's "Protection
+  off"; "Calls, texts and emergency calls always work" for "Calls, FaceTime, Messages and Emergency
+  SOS always work", now on the intro's first page alone; the 14 new lines as drawn, Open Bali on the
+  block screen among them; Instrument Sans and lucide's icons, not Roboto and Material Symbols; and
+  the approved iPhone boards stand for "the rest of Android's screens", the board's own words.
+
+  **The screens now say less, and the owner approved them knowing it:** the block screen shows only
+  "Focused with Bali", with OK and Open Bali; the answer card gives no instruction; the reason card
+  no longer says the teacher sees the reason; Join doesn't say where the code comes from; the
+  list-changed screen doesn't tie its two new rows to answering; the 13+ question doesn't say what
+  Bali keeps; and History's last two states have no labels. **The cut disclosure line comes back if
+  Play's review asks for it** (ISSUES #7): it was the disclosure's only word that Bali keeps and
+  sends none of what the service sees, which Play's declaration (AP1) still says.
 - **2026-11-03** — **AN1, part 1c: lock (c), a VPN on the phone alone, measured on the Android 15,
   16 and 17 emulators (the owner's go; the spike's worker).** The owner, in the conductor's chat,
   after hearing how Doorman's Android app works: "Yes, test it", then "ok yeah you can just test

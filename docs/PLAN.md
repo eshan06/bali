@@ -8,13 +8,13 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-03 (Central) — AN1, part 1c (`docs/DECISIONS.md`, 2026-11-03): lock (c), a
-VPN on the phone alone, measured on the Android 15, 16 and 17 emulators; it takes a blocked app's
-internet within 1.6 s but covers nothing, so it could be added to (a), not used alone. Before it,
-AS0, the Android canvas, drawn for the owner's approval. Next: a session builds the retire-a-block
-command; the owner the new build and the sitting; the owner's look at the Android canvas; the owner's
-call on GA5's known limit, the smallest iPhones (DECISIONS 2026-11-02); AN1's part 2 once the owner
-has the phones; the audit's polish waits, as ruled._
+_Last updated: 2026-11-04 (Central) — AS0 approved (`docs/DECISIONS.md`, 2026-11-04): the owner
+approved the Android canvas as it stands, 148 boards drawing lock (a) alone, after cutting 18 of the
+iPhone's lines on Android; the approved iPhone boards stand for the rest of Android's screens, and
+DESIGN.md's Android section is no longer proposed. Before it, AN1, part 1c, the VPN lock. Next: a
+session builds the retire-a-block command; the owner the new build and the sitting; the owner's call
+on GA5's known limit, the smallest iPhones (DECISIONS 2026-11-02); AN1b, the lock decided, in its own
+PR; AN1's part 2 once the owner has the phones; the audit's polish waits, as ruled._
 
 ## Now
 
@@ -52,8 +52,8 @@ branch, with no PR, as its README says (#479; `docs/DECISIONS.md`, 2026-11-02).
   neither lock holding up alone; part 1c, lock (c), a VPN on the phone alone ✅ (DECISIONS
   2026-11-03), which takes a blocked app's internet but covers nothing, so it could be added to (a);
   part 2 on a Pixel and a Samsung waits for the owner's Android phones (📱). AS0, the screens'
-  canvas, is drawn and waits for the owner's approval (👀; DECISIONS 2026-11-03). Not on the
-  pilot's critical path.
+  canvas, ✅ approved as it stands (#484, #486; DECISIONS 2026-11-04): lock (a) alone, the approved
+  iPhone boards standing for the rest. Not on the pilot's critical path.
 - **The portal redesign in v2's look (PV0–PV17, the owner, 2026-10-12)** ✅ (2026-10-16): every step
   done, with PV3b, PV4b, PV4c and PV5b; the last, PV17c-2, Home's Last session (#425).
 - **The portal's tests drive the page (the owner, 2026-10-22: "Yes, go gradually")**: the setup ✅
@@ -177,7 +177,7 @@ One line each. Phases 3–6's step lists, the push's (N1–N6) and this table in
 | 7 | Live lesson: questions and PDF slides in a running session, followed on the phone and the web | building (Phase 7 steps) |
 | 8 | Android: the lock, both candidates measured on the emulator, then on a Pixel and a Samsung (iOS's Phase 0) | building: AN1's part 1 on the emulators ✅ (2026-11-03), and part 1c, the VPN that could be added to (a) ✅ (2026-11-03); its part 2 📱 waits for the phones |
 | 9 | Android: the engine, BaliCore's and BaliOutbox's twin, no screens | planned, after AN1b |
-| 10 | Android: the screens, from the approved boards | AS0's canvas drawn 👀 (2026-11-03), waiting for the owner's approval; AS1–AS8 after it |
+| 10 | Android: the screens, from the approved boards | AS0's canvas approved ✅ (2026-11-04); AS1–AS8 build from it |
 | 11 | Android: on Play, its testing tracks, device gate and exit check | planned |
 
 ### Portal redesign (v2's look) steps (PV; one PR each; 👀 = the owner looks at screenshots)
@@ -331,7 +331,7 @@ Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect acc
 
 **The rest of the owner's queue:**
 
-- Android's five (the phones, the Play account, the timing, the lock after AN1, AS0's canvas): `docs/PLAN-ANDROID.md`, Open owner items.
+- Android's four still open (the phones, the Play account, the timing, the lock after AN1; AS0's canvas approved, 2026-11-04): `docs/PLAN-ANDROID.md`, Open owner items.
 - 🔧 Sentry: confirm monitor `api-sweep`'s `production` environment is active and alerting (dev checks in to the same slug, #239's review; runbook 6, step 2).
 - ✅ Apple's developer agreement §3.3.3(P) on Family Controls (ISSUES #3): asked by the owner on 2026-10-13, **case 102994872143** (`docs/APP-STORE.md` §5.6 holds the question as sent); Apple's answer, submit it for review (the owner, 2026-11-03), recorded in ISSUES #3.
 - #165 the Me page: D2j's redesign was rolled back (2026-10-06), so a better Me waits for a design the owner approves; the issue, closed by #266, is the owner's to reopen.
