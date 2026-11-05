@@ -166,7 +166,7 @@ class SyncEngineTest : EngineFiles() {
         }
 }
 
-/** The engine keeps its standing: StandingKeptTests, AN5a's to AN5d's parts (`docs/PLAN-ANDROID.md`). */
+/** The engine keeps its standing: StandingKeptTests, AN5a's to AN5d's parts, and the lock's, AN7a's (`docs/PLAN-ANDROID.md`). */
 class StandingKeptTest : EngineFiles() {
     @Test
     fun theStandingIsKeptInTheFileAsItChangesWaitingTooAndAStateThisBuildDoesntKnowKeptAsNone(): Unit =
@@ -276,20 +276,15 @@ class StandingKeptTest : EngineFiles() {
             running.cancelAndJoin()
         }
 
-    /** A relaunch whose file holds where the phone stood, focused until 1200 s, in a form this build can't read: its rig, and that standing. */
-    private suspend fun unreadable(): Pair<Rig, Standing> {
-        val (outbox, _) = makeOutbox()
-        val kept = Standing.InSession(session(endsAt = 1200), ParticipationState.Focused)
-        outbox.keep(kept)
-        spoilStanding(outbox)
-        return rig(outbox) to kept
-    }
-
     @Test
-    fun aStandingTheFileWouldNotGiveBackAtLaunchIsNeverWrittenOverFromNothingAndIsReadAgainWithinAMinute(): Unit =
+    fun aStandingTheFileWouldNotGiveBackAtLaunchIsNeverTakenOffFromNothingTheLastRunsLockStaysNothingIsWrittenOverItAndItIsReadAgainWithinAMinute(): Unit =
         runBlocking {
-            // The lock's half, its cover left as it was, is AN7's.
-            val (rig, kept) = unreadable()
+            val (phone, kept) = unreadable()
+            val rig = phone.rig
+            var now = phone.enforcer.updates.value
+            assertTrue(now.locked)
+            assertNull(now.until)
+            assertEquals(0, phone.lock.unlocks)
             val unread = rig.engine.updates.value
             assertEquals(listOf(Standing.Unread, Link.StorageFailed), listOf(unread.standing, unread.link))
             // The next change of state writes nothing over it: a read of the truth, unanswered. Were the
@@ -298,11 +293,15 @@ class StandingKeptTest : EngineFiles() {
             rig.server.next(meRoute).reply(null)
             rig.until { it.link == Link.Unreachable }
             assertEquals("spoiled", rig.outbox.state(Outbox.Key.Standing))
-            // Readable again: read within a minute, and followed.
+            // Readable again: read within a minute, and followed, the lock kept to its end, its own now.
             rig.outbox.keep(kept)
             rig.sleeping(at(60))
             rig.clock.advance(60)
             rig.until { it.standing == kept }
+            now = phone.until { it.until == at(1200) }
+            assertTrue(now.locked)
+            assertEquals(at(1200), phone.lock.until)
+            assertEquals(0, phone.lock.unlocks)
             // And kept again as it changes.
             rig.engine.record(Change.Unlock("s", null))
             assertEquals(Standing.InSession(session(endsAt = 1200), ParticipationState.Unlocked), rig.outbox.standing())
@@ -312,22 +311,34 @@ class StandingKeptTest : EngineFiles() {
     fun aStandingTheFileCantGiveBackIsSettledByTheServersTruthTooThePhoneIsNeverStrandedBehindIt(): Unit =
         runBlocking {
             // The class ended while the app was closed: the server has the phone in no session.
-            val (rig, _) = unreadable()
+            val (phone, _) = unreadable()
+            val rig = phone.rig
             rig.screenOn(Answer.me(null))
             assertEquals(Standing.Out, rig.engine.updates.value.standing)
             assertEquals(Standing.Out, rig.outbox.standing())
+            phone.until { !it.locked }
+            assertFalse(phone.lock.holds)
         }
 
     @Test
-    fun overAStandingNotReadATapAnsweredArmedAsksTheServerWhereThePhoneStandsArmingEndsNothing(): Unit =
+    fun overAStandingNotReadATapAnsweredArmedAsksTheServerWhereThePhoneStandsArmingEndsNothingAndNeverTakesTheLockOff(): Unit =
         runBlocking {
-            // The lock's half, its cover never taken off meanwhile, is AN7's.
-            val (rig, _) = unreadable()
+            val (phone, _) = unreadable()
+            val rig = phone.rig
             rig.engine.record(Change.Tap("another teacher's"))
+            // The tap's cap, over the last run's lock, which is never given that end.
+            phone.until { it.until == at(SyncState.TAP_CAP.seconds) }
+            assertNull(phone.lock.until)
             rig.server.next(tapRoute).reply(200, Answer.armed)
             assertEquals(Standing.Unread, rig.until { it.queued.isEmpty() }.standing)
+            phone.until { it.until == null }
+            assertTrue(phone.lock.holds)
+            assertEquals(0, phone.lock.unlocks)
             rig.server.next(meRoute).reply(200, Answer.me(session(endsAt = 1200)))
             rig.until { it.standing == Standing.InSession(session(endsAt = 1200), ParticipationState.Focused) }
+            phone.until { it.until == at(1200) }
+            assertEquals(at(1200), phone.lock.until)
+            assertEquals(0, phone.lock.unlocks)
             // Known now, the standing carries the truth itself, as it would have without the gap: a read
             // naming no session later leaves the phone out.
             rig.clock.advance(1)
@@ -339,7 +350,7 @@ class StandingKeptTest : EngineFiles() {
     @Test
     fun overAStandingNotReadATapAnsweredArmedLeavesThePhoneWaitingWhenTheReadOfTheTruthItAsksForNamesNoSession(): Unit =
         runBlocking {
-            val (rig, _) = unreadable()
+            val rig = unreadable().first.rig
             rig.engine.record(Change.Tap("tag"))
             rig.server.next(tapRoute).reply(200, Answer.armed)
             rig.server.next(meRoute).reply(200, Answer.me(null))
@@ -350,7 +361,7 @@ class StandingKeptTest : EngineFiles() {
     @Test
     fun andWhenTheFileGivesBackWhereThePhoneStoodBeforeThatReadComesTheArmingIsCarriedOntoItOutBecomesWaiting(): Unit =
         runBlocking {
-            val (rig, _) = unreadable()
+            val rig = unreadable().first.rig
             rig.engine.record(Change.Tap("tag"))
             val tap = rig.server.next(tapRoute)
             // Readable again: the phone was in no session.
@@ -359,6 +370,67 @@ class StandingKeptTest : EngineFiles() {
             rig.server.next(meRoute).reply(200, Answer.me(null))
             rig.until { it.standing == Standing.Waiting }
             assertEquals(Standing.Waiting, rig.outbox.standing())
+        }
+
+    @Test
+    fun overAStandingNotReadTheLockATapNotYetAnsweredPutOnComesOffAtDecision7sCapTheEnforcersOwnNotEnforcementFromNothing(): Unit =
+        runBlocking {
+            // StandingKeptTests' `unreadCapped`.
+            val (phone, _) = unreadable(held = false)
+            val rig = phone.rig
+            // Offline: the tap is never answered.
+            rig.engine.record(Change.Tap("tag"))
+            phone.until { it.locked && it.until == at(SyncState.TAP_CAP.seconds) }
+            rig.server.next(tapRoute).reply(null)
+            rig.clock.advance(SyncState.TAP_CAP)
+            phone.until { !it.locked }
+            assertFalse(phone.lock.holds)
+            assertEquals(Standing.Unread, rig.engine.updates.value.standing)
+        }
+
+    @Test
+    fun overAStandingNotReadTheLockATapPutOnIsTheEnforcersOwnSoItsAnswerArmedTakesItOffBeforeItsCap(): Unit =
+        runBlocking {
+            // No iOS twin: there the shields stay till the enforcer takes them off, where Android's lock
+            // stops at its end by itself, so the cap alone can't show the enforcer's own come off.
+            val (phone, _) = unreadable(held = false)
+            val rig = phone.rig
+            rig.engine.record(Change.Tap("tag"))
+            phone.until { it.locked }
+            rig.server.next(tapRoute).reply(200, Answer.armed)
+            phone.until { !it.locked && it.until == null }
+            assertFalse(phone.lock.holds)
+            assertEquals(1, phone.lock.unlocks)
+            assertEquals(Standing.Unread, rig.engine.updates.value.standing)
+        }
+
+    @Test
+    fun overAStandingNotReadTheLastRunsLockPerhapsASessionsStillRunningIsNeverTakenOffAtTheCapOfATapNotYetAnsweredOnlyWhereThePhoneStoodOnceKnown(): Unit =
+        runBlocking {
+            // StandingKeptTests' `unreadCappedOverHeld` (#91's review). Where the phone stood, unread:
+            // focused in a session ending ten minutes after the cap.
+            val cap = SyncState.TAP_CAP.seconds
+            val (phone, kept) = unreadable(endsAt = cap + 600)
+            val rig = phone.rig
+            // Offline: the tap is never answered.
+            rig.engine.record(Change.Tap("tag"))
+            phone.until { it.until == at(cap) }
+            rig.server.next(tapRoute).reply(null)
+            rig.until { it.retryAt == at(2) }
+            rig.clock.advance(SyncState.TAP_CAP)
+            phone.until { it.until == null }
+            assertTrue(phone.lock.holds)
+            assertEquals(0, phone.lock.unlocks)
+            // Read again, the file says the session still runs: its lock stays to its bell, given that end.
+            rig.outbox.keep(kept)
+            eventually { rig.clock.deadlines.contains(at(cap + 60)) }
+            rig.clock.advance(60)
+            phone.until { it.until == at(cap + 600) && it.locked }
+            assertEquals(at(cap + 600), phone.lock.until)
+            assertEquals(0, phone.lock.unlocks)
+            rig.clock.advance(540)
+            phone.until { !it.locked }
+            assertFalse(phone.lock.holds)
         }
 
     @Test
@@ -482,5 +554,16 @@ class SyncStateTest {
         assertNull(SyncState(queued = listOf(first.copy(stuck = true), unlock)).pendingTap)
         assertFalse(SyncState(queued = listOf(first, unlock)).holdsUnfiled)
         assertTrue(SyncState(queued = listOf(unlock, queued(Change.UnlockUnfiled(null)))).holdsUnfiled)
+    }
+
+    @Test
+    fun theStudentsUnlockHasTheLastWordOnTheLockOneAfterTheTapNotYetAnsweredOrWithNoneOneMadeWhereThePhoneStoodUnreadNeverASessionsLeftQueuedAlone() {
+        // Enforcement.swift's `unlockedLast`, which the enforcer reads (EnforcerTest, UnreadUnlockTest).
+        val (tap, unlock, unfiled) = listOf(queued(Change.Tap("a")), queued(Change.Unlock("s", null)), queued(Change.UnlockUnfiled(null)))
+        assertFalse(SyncState(queued = listOf(unlock)).unlockedLast)
+        assertTrue(SyncState(queued = listOf(unlock, unfiled)).unlockedLast)
+        assertFalse(SyncState(queued = listOf(tap)).unlockedLast)
+        assertTrue(SyncState(queued = listOf(tap, unlock)).unlockedLast)
+        assertFalse(SyncState(queued = listOf(unlock, tap)).unlockedLast)
     }
 }

@@ -10,6 +10,18 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN7a's on 2026-11-05: _Last updated: 2026-11-05 (Central) — AN6c,
+sign-in's app side (#520; `docs/DECISIONS.md`,
+2026-11-05): the tokens sealed by a Keystore key of the app's own, a file that can never be opened
+again read as nothing saved; Cognito's hosted UI in the phone's browser, an Auth Tab where it has one,
+else a Custom Tab, ephemeral where it offers that (where not, its cookies shared: the conductor's call,
+awaiting the owner), its answer taken only for the waiting sign-in, with its state; the redirect
+`com.bali.bali:/auth/callback`; and `AppConfig`'s app side, pinned, the client id empty until the
+owner's. AN6 is done. Next: AN7, the lock; Android's Cognito clients, the owner's (Open owner items,
+8); Android 17's SDK platform for the owner to OK before the first step with today's AndroidX, and
+OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the
+pilot's critical path._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN6c's on 2026-11-05: _Last updated: 2026-11-05 (Central) — AN6b,
 sign-in itself (#518; `docs/DECISIONS.md`,
 2026-11-05): BaliCore's `SignIn` in Kotlin but `deleteUser`, with its tests: the sign-in over the
@@ -2287,6 +2299,25 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN7a's line, as it read when it was done (2026-11-05; `docs/DECISIONS.md`, 2026-11-05). The conductor
+split AN7's line into AN7a–AN7f that day, every word of it kept in one of them: AN7a's here, AN7b's to
+AN7f's in `docs/PLAN-ANDROID.md`.
+
+- **AN7a** The lock follows the engine (twin: BaliOutbox's `Enforcement`, its enforcer; `Bell` and
+  `PhoneBell` have no twin but `relaunchAndCap`'s cap, the lock keeping its own end): the lock behind a
+  seam (`Lock`, its switch `LockSwitch`) and what a screen may claim of it (`Protection`); the bell,
+  from the session's window: the lock put on until it, or a tap's cap, an end it keeps by the phone's
+  clock, and again as the end moves, a switch starting locked too, never one off; over a standing not
+  read, the last run's lock kept, given an end only once that is known, and taken off before then only
+  by the student's unlock (`unlockedLast`); and rule 3's check, hooked at each wake, putting the lock
+  back. Swift's actor is a lock each stretch holds, let go at each call into the lock or the engine, so
+  a check lands while a pass waits. From SyncEngine.swift, `setTapCap`, from `Enforcement`,
+  `unlockedLast`, and the enforcer's suites: EnforcerTests, UnreadUnlockTests' `leftByTheLastRun`, and
+  StandingKeptTests' `unreadCapped` and `unreadCappedOverHeld` (AN5's split), with the lock's half of
+  UnreadUnlockTests but `filing` and of StandingKeptTests' `unread`, `unreadSettled` and `unreadArmed`,
+  on the rig with a fake lock; and new: the end moved by a re-tap and an extension, a switch starting,
+  a check landing while a pass waits — validation: the rules' JVM tests
 
 AN6c's line, as it read until it was done (2026-11-05; `docs/DECISIONS.md`, 2026-11-05). Its 🔧, the
 owner's Cognito clients, is Open owner item 8 there now.

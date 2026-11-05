@@ -10,8 +10,9 @@ import java.time.Instant
 import java.time.ZoneId
 
 // What the sync engine knows, SyncEngine.swift's `SyncState`: its core, AN5a's, the read loop's, AN5c's,
-// the wait's, AN5d's, and Emergency Unlock's, AN5e's, with Enforcement.swift's rule of when the lock is on
-// (`shieldedUntil`), the lock's own (AN7) to follow.
+// the wait's, AN5d's, and Emergency Unlock's, AN5e's, with Enforcement.swift's rules of when the lock is on
+// (`shieldedUntil`) and when the student's unlock takes the last run's off (`unlockedLast`, AN7a's), which
+// the enforcer follows (Enforcer.kt).
 
 /**
  * What the engine knows, for the screens and the lock ([SyncEngine.updates]). A value, as Swift's
@@ -67,7 +68,7 @@ data class SyncState(
      * so the card offers none (C5c).
      */
     val sending: Set<String> = emptySet(),
-    /** How long a tap not yet answered is locked for: decision 7's [TAP_CAP], or a Debug build's shorter one (AN7). */
+    /** How long a tap not yet answered is locked for: decision 7's [TAP_CAP], or a Debug build's shorter one ([SyncEngine.setTapCap]). */
     val cap: Duration = TAP_CAP,
     /**
      * Who the student is and their classes, as `GET /v1/me` last answered, for Home and the router
@@ -134,6 +135,15 @@ data class SyncState(
             if (queued.dropWhile { it.eventId != tap.eventId }.any { it.change.isUnlock }) return null
             return tap.recordedAt + cap
         }
+
+    /**
+     * Whether the student's Emergency Unlock has the last word on the lock: one after the tap not yet
+     * answered, this run's or the last's (that tap holds the queue, so nothing since can have put the lock
+     * back on), or, with none, one made where the phone stood unread. Over a standing not read, it takes the
+     * last run's lock off too: the way out of a lock the phone can no longer justify (B6b). A session's
+     * unlock the last run left queued alone doesn't: a tap answered since may have put the lock back on.
+     */
+    val unlockedLast: Boolean get() = if (pendingTap == null) holdsUnfiled else tapHeldUntil == null
 
     /**
      * The latest Emergency Unlock queued for [session]: that session's own, or one filed under a tap or

@@ -51,8 +51,9 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 // The sync engine, BaliOutbox's SyncEngine.swift: its frame, AN5a's, its drain, AN5b's, its read loop,
-// AN5c's, its wait for the Start, AN5d's, and Emergency Unlock, AN5e's: where it is filed, its reason
-// and the late unlock. Swift's actor is a lock each stretch holds (docs/PLAN-ANDROID.md).
+// AN5c's, its wait for the Start, AN5d's, Emergency Unlock, AN5e's: where it is filed, its reason and the
+// late unlock, and the phone check's cap, AN7a's. Swift's actor is a lock each stretch holds
+// (docs/PLAN-ANDROID.md).
 
 /** The engine's clock: the time records are stamped with, the zone its days end in, and waiting on it: a test's own there. */
 interface SyncClock {
@@ -155,7 +156,7 @@ class SyncEngine private constructor(
     /** Whether the screen went on or off since the read loop's last wake, whose check-in that is ([setScreenOn]). */
     private var screenTurned = false
 
-    /** Rule 3's check of the lock, the lock's service's (AN7): [atEachWake]. */
+    /** Rule 3's check of the lock, the enforcer's: [atEachWake]. */
     private var check: (suspend () -> Unit)? = null
     private var running = false
     private val drainRings = Rings(clock)
@@ -776,11 +777,19 @@ class SyncEngine private constructor(
         }
 
     /**
-     * Runs [check], rule 3's check of the lock (AN7's), before each check-in, and at each wake while the
-     * screen is on, out of a session too (C1c), with the engine let go, so it may record what it finds. It
-     * never throws, as Swift's type promises; one that does checked nothing: that wake sends no check-in.
+     * Runs [check], rule 3's check of the lock (the enforcer's, [Enforcer.run]), before each check-in, and
+     * at each wake while the screen is on, out of a session too (C1c), with the engine let go, so it may
+     * record what it finds. It never throws, as Swift's type promises; one that does checked nothing: that
+     * wake sends no check-in.
      */
     suspend fun atEachWake(check: suspend () -> Unit) = call { this.check = check }
+
+    /**
+     * A shorter cap than decision 7's on a tap not yet answered, none: decision 7's, for the phone check
+     * (B5b's), which a Debug build runs at 15 minutes rather than wait out 50 (AN7d's readout). Made in the
+     * state's one step, so the lock follows it at once. Its caller cancelled, it goes on all the same.
+     */
+    suspend fun setTapCap(cap: Duration?) = call { update { it.copy(cap = cap ?: SyncState.TAP_CAP) } }
 
     /**
      * Runs [block] in the engine's own scope, with the engine to itself: its caller cancelled stops
