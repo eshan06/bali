@@ -207,8 +207,8 @@ struct HomeView: View {
 /// The student's classes as `GET /v1/me` names them, each with its teacher — or, until a read
 /// answers, why not — and Join a class, opened over the screen with a way back: Home's (C3) and
 /// Me's (C6b), under `title`. Me's, `leaves`, has D1's Leave on each class, its question under
-/// it, and D1's line under them (C6c) — a class's Leave held while the phone stands in its lesson,
-/// judged once for the class, so its button and its line agree, and again at the lesson's bell.
+/// it (C6c) — a class's Leave held while the phone stands in its lesson, judged once for the
+/// class, so its button and its line agree, and again at the lesson's bell.
 struct ClassesSection: View {
     let phone: Phone
     let title: String
@@ -254,9 +254,6 @@ struct ClassesSection: View {
                             if leaves { LeaveQuestion(row: row, phone: phone, held: held) }
                         }
                     }
-                }
-                if leaves {
-                    Text(Leaving.recorded).textStyle(.caption).foregroundStyle(Theme.textTertiary)
                 }
             } else if let words = phone.sync?.meWords {
                 Retry(words: words, phone: phone)

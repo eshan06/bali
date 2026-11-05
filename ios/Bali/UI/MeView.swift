@@ -5,8 +5,8 @@ import UIKit
 
 /// Me (C6b; D1's Me), where the router sends the Me tab: the name the student's teachers see,
 /// edited in place (A8's `PATCH /v1/me`, `Naming`); their classes with each teacher, and Join a
-/// class over it with a way back (`ClassesSection`); what Bali does in class, Screen Time's state
-/// and what a teacher sees (the intro's own page); the portal's privacy policy and terms
+/// class over it with a way back (`ClassesSection`); During class, Screen Time's state and what a
+/// teacher sees (the intro's own page); the portal's privacy policy and terms
 /// (`PolicyLinks`, C2b); and Sign out, whose sign-in it ends said under it (#147), which waits
 /// while an Emergency Unlock is unsent (`SignOutWords`); D1's Leave on each class, asked first,
 /// never while the phone stands in that class's lesson (C6c, `Leaving`); and, at the very bottom,
@@ -127,26 +127,19 @@ struct MeView: View {
 
     private func save() { Task { await phone.saveName() } }
 
-    /// D1's card of Bali in class: what pauses and what never does, Screen Time's state — Settings,
-    /// where it changes; Off where the router shows Me over a standing not read (`meScreenTimeOff`;
-    /// Riders-2's santa) — and what a teacher sees.
+    /// D1's card of Bali in class: its heading, Screen Time's state — Settings, where it changes;
+    /// Off where the router shows Me over a standing not read (`meScreenTimeOff`; Riders-2's
+    /// santa) — and what a teacher sees.
     private var about: some View {
         let off = phone.protection?.permissionOff == true
         return Card(padding: 0) {
             VStack(spacing: 0) {
-                HStack(alignment: .top, spacing: 12) {
+                HStack(spacing: 12) {
                     Image(systemName: "shield").font(.system(size: 20)).foregroundStyle(Theme.brand)
                         .frame(width: 40, height: 40).background(Theme.sunken, in: .circle)
                         .accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("During class")
-                            .textStyle(TextStyle(size: 15, line: 22, weight: .semibold))
-                        Text(
-                            "Bali pauses every app. Calls, FaceTime, Messages and Emergency SOS always work, because iOS keeps them on."
-                        )
-                        .textStyle(.caption).foregroundStyle(Theme.textSecondary)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    Text("During class").textStyle(TextStyle(size: 15, line: 22, weight: .semibold))
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .padding(.vertical, 14).padding(.horizontal, 16)
                 .accessibilityElement(children: .combine)

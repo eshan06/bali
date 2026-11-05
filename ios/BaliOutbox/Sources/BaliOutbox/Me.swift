@@ -209,9 +209,6 @@ public struct Leaving: Sendable, Hashable {
 
     public static let consequence = "You'll need the class code to join it again."
 
-    /// D1's line under the classes.
-    public static let recorded = "Leaving a class is recorded, and your teacher sees it."
-
     /// Why a class cannot be left now: it is in session, the phone's knowledge or the server's no.
     public static func inSession(_ row: MeClass) -> String {
         "\(row.name) is in session. You can leave it once class is over."

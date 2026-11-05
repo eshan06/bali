@@ -82,8 +82,6 @@ Lean: the first. It says what happens and to whom, and nothing about control.
 > Bali never reads which apps you use. It quiets every app it can, so there is no list to
 > look at.
 >
-> History shows you the same moments your teacher sees, and nothing more.
->
 > Bali is for students 13 and older.
 
 Notes for the owner:
@@ -92,8 +90,8 @@ Notes for the owner:
   the app say the same thing.
 - "Bali is for students 13 and older" holds only once C7 (the 13+ screen) lands; drop the
   line if submission comes first, and never claim it before it's true.
-- "Lock my apps again" and History's line are the shipped screens' words
-  (`UnlockedView`, `HistoryView`). If those screens change, these lines follow them.
+- "Lock my apps again" is the shipped screen's own words (`UnlockedView`). If that screen
+  changes, this line follows it.
 - No "Delete account" line until C3/C4 land. Once they do, add: "You can delete your
   account in the app, on the Me tab."
 

@@ -33,7 +33,9 @@ struct ScreenTimeView: View {
         ScreenScaffold {
             PageScroll {
                 VStack(spacing: 0) {
-                    // With a lesson the groups sit the board's 24 apart at the least, none above them.
+                    // Each group at its own height, only the spacers giving, as on Screen Time
+                    // off (C4's layout): with a lesson they sit the board's 24 apart at the least,
+                    // none above them.
                     Spacer(minLength: heading == nil ? nil : 0)
                     VStack(spacing: 24) {
                         Image(systemName: "checkmark.shield")
@@ -46,6 +48,7 @@ struct ScreenTimeView: View {
                         }
                     }
                     .frame(maxWidth: .infinity).multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: heading == nil ? nil : 24)
                     if let heading {
                         lesson(heading, card, slide)
@@ -69,10 +72,8 @@ struct ScreenTimeView: View {
                             Text(failure).textStyle(.body)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        Text("You can change this any time in Settings.")
-                            .textStyle(.caption).foregroundStyle(Theme.textTertiary)
-                            .frame(maxWidth: .infinity).multilineTextAlignment(.center)
                     }
+                    .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
@@ -94,12 +95,13 @@ struct ScreenTimeView: View {
                 Text(heading.title).textStyle(.h3)
                 Text(heading.subtitle).textStyle(.caption).foregroundStyle(Theme.textTertiary)
             }
-            .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+            .multilineTextAlignment(.center)
             VStack(spacing: 24) {
                 if let card { AnswerCardView(card: card, phone: phone) }
                 if let slide { SlideView(shown: slide, phone: phone) }
             }
         }
+        .fixedSize(horizontal: false, vertical: true)
     }
 }
 

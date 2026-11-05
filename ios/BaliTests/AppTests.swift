@@ -3968,7 +3968,7 @@ struct AppTests {
     }
 
     @Test(
-        "Unlocked, Screen Time off and Waiting lose the owner's cut lines (2026-11-04; D1's Unlocked, ProtectionOff and Waiting, and the app canvas's Unlocked and ScreenTimeOff boards and PushWaitA), in every state: Unlocked ends at its way back, Lock my apps again or the re-tap's Tap in, with no line under it, and its reason card ends at the three while a pick is open, but for why the last pick didn't go (rule 5), and still says why a pick waits while the unlock is on its way; Screen Time off ends at its way on, or at its steps while the check reads the permission; Waiting's line is the one sentence left"
+        "Unlocked, Screen Time off, Waiting, the Screen Time step, History and Me lose the owner's cut lines (2026-11-04; D1's Unlocked, ProtectionOff, Waiting, History and Me, and the app canvas's Unlocked, ScreenTimeOff and ScreenTimeAsk boards and PushWaitA), in every state: Unlocked ends at its way back, Lock my apps again or the re-tap's Tap in, with no line under it, and its reason card ends at the three while a pick is open, but for why the last pick didn't go (rule 5), and still says why a pick waits while the unlock is on its way; Screen Time off ends at its way on, or at its steps while the check reads the permission; Waiting's line is the one sentence left; the Screen Time step ends at its last way on, or at why the ask failed, the plain step too, which no board draws; History's title has what shows under it at once; Me's classes have no line under them, and During class is its heading alone, the Screen Time row next"
     )
     func cutLinesGone() async throws {
         /// What VoiceOver reads of `name`'s screen, laid out whole, once it reads `title`.
@@ -3980,7 +3980,8 @@ struct AppTests {
         }
         let cut = [
             "Saved on your phone first.", "Your teacher sees the reason you pick.", "It's always your call.",
-            "You tapped your teacher's block before class started.",
+            "You tapped your teacher's block before class started.", "You can change this any time in Settings.",
+            "The same moments your teachers see", "Bali pauses every app.", "Leaving a class is recorded",
         ]
         var pages: [(String, [String])] = []
         // Each Unlocked fixture with the reason card, and what the card says under the three: nil
@@ -4028,6 +4029,45 @@ struct AppTests {
                 page.dropFirst(at + 1).first
                     == "Your phone locks when class starts, as long as Bali is open. No need to tap again.",
                 "\(name): \(page)")
+        }
+        // The Screen Time step, the plain one too: its last way on, the page's last; where the ask
+        // failed, why, under it.
+        let askFailed = Phone(fixture: try #require(PreviewFixtures.all["screenTimeError"])).askFailed
+        let (ask, again) = ("Ask me", "Ask again")
+        for (name, last) in [
+            ("screenTime", ask), ("screenTimeDenied", again), ("screenTimeError", askFailed?.words(.notDetermined)),
+            ("screenTimeQuestion", ask), ("screenTimeQuestionSlide", ask), ("screenTimeSlide", ask),
+            ("screenTimeDeniedQuestion", again),
+        ] {
+            let page = try await read(name, once: "Let Bali pause apps during class")
+            pages.append((name, page))
+            #expect(last != nil && page.last == last, "\(name): \(page)")
+        }
+        // History: its title, then what shows under it, a day first as D1's History draws it.
+        let kept = try #require(PreviewFixtures.all["historyRefreshError"]?.history.notUpdated)
+        for (name, under) in [
+            ("history", "Today"), ("historyScreenTime", "Today"), ("historyEmpty", "No moments yet"),
+            ("historyLoading", "Reading your history…"), ("historyError", History.words(.networkError)),
+            ("historyRefreshError", kept),
+        ] {
+            let page = try await read(name, once: under)
+            pages.append((name, page))
+            let at = try #require(page.firstIndex(of: "History"), "\(name): \(page)")
+            #expect(page.dropFirst(at + 1).first == under, "\(name): \(page)")
+        }
+        // Me: after the last class's Leave, Join a class, or During class where the phone stands
+        // unread, with no line between; During class read alone, the Screen Time row next.
+        for name in [
+            "me", "meEditing", "meNameError", "meSignOutHeld", "meSignOutFailed", "meScreenTimeOff", "meLeaveAsk",
+            "meLeaving", "meLeaveError", "meLeaveInSession", "meDeleteAsk",
+        ] {
+            let page = try await read(name, once: "What your teacher sees")
+            pages.append((name, page))
+            let leave = try #require(page.firstIndex(of: "Leave Period 5 — Chemistry"), "\(name): \(page)")
+            let next = name == "meScreenTimeOff" ? "During class" : "Join a class"
+            #expect(page.dropFirst(leave + 1).first == next, "\(name): \(page)")
+            let during = page.firstIndex(of: "During class").map { page.dropFirst($0 + 1).first }
+            #expect(during??.hasPrefix("Screen Time") == true, "\(name): \(page)")
         }
         for (name, page) in pages {
             #expect(!page.contains { label in cut.contains { label.contains($0) } }, "\(name): \(page)")
@@ -4785,6 +4825,48 @@ struct AppTests {
                     }
                 }
             }
+        }
+    }
+
+    @Test(
+        "The Screen Time step lays every line out at its own height, as Screen Time off does (C4's layout), only its spacers giving where the page fits the phone: the slide's ask, its slide in PDFKit's view, on the XR, the Air and the 15 Plus at the second largest text size before the accessibility ones, reads nothing shorter than when the page scrolls. Squeezed there, it cut the last line of what it says (found by WC5, whose cut moved the page's fit onto the XR and the Air)"
+    )
+    func screenTimeWhole() async throws {
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        /// What VoiceOver reads of the slide's ask at the second largest text size, in a window
+        /// `size` big with its safe areas already off, as `offFocusSlideFits` lays a phone out: each
+        /// element's label and height, read once the screen is up.
+        func read(_ size: CGSize) async throws -> [(label: String, height: CGFloat)] {
+            let phone = Phone(fixture: try #require(PreviewFixtures.all["screenTimeSlide"]))
+            let hosting = UIHostingController(
+                rootView: RootView(phone: phone).environment(\.dynamicTypeSize, .xxLarge))
+            hosting.safeAreaRegions = []
+            let window = UIWindow(windowScene: scene)
+            window.frame = CGRect(origin: .zero, size: size)
+            window.rootViewController = hosting
+            window.isHidden = false
+            defer { window.isHidden = true }
+            try await until {
+                window.layoutIfNeeded()
+                return ((try? voiceOver(in: window)) ?? []).contains {
+                    $0.accessibilityLabel == "Let Bali pause apps during class"
+                }
+            }
+            window.layoutIfNeeded()
+            return try voiceOver(in: window).map { ($0.accessibilityLabel ?? "", $0.accessibilityFrame.height) }
+        }
+        // The three phones' sizes less their safe areas. No more: PDFKit analyses every page a PDF
+        // view shows, still at it seconds later, and a burst of them starves the test host.
+        for phone in [
+            CGSize(width: 414, height: 896 - 48 - 34), CGSize(width: 420, height: 912 - 68 - 34),
+            CGSize(width: 430, height: 932 - 59 - 34),
+        ] {
+            // In a window too short for it the page scrolls: every line at its own height.
+            let whole = try await read(CGSize(width: phone.width, height: 300))
+            let shown = try await read(phone)
+            #expect(shown.map(\.label) == whole.map(\.label), "\(phone)")
+            let short = zip(shown, whole).filter { $0.height < $1.height - 0.5 }
+            #expect(short.isEmpty, "\(phone): \(short.map { $0.0.label })")
         }
     }
 

@@ -18,12 +18,8 @@ struct HistoryView: View {
         ScreenScaffold {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("History").textStyle(.h1).accessibilityAddTraits(.isHeader)
-                        Text("The same moments your teachers see, and nothing more.").textStyle(.body)
-                            .foregroundStyle(Theme.textSecondary)
-                    }
-                    .padding(.bottom, 4)
+                    Text("History").textStyle(.h1).accessibilityAddTraits(.isHeader)
+                        .padding(.bottom, 4)
                     if !history.read {
                         if let failure = history.failure {
                             Retry(words: failure, phone: phone) { await phone.readHistory() }
