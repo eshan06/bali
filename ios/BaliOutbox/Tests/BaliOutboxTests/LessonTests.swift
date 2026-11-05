@@ -81,12 +81,12 @@ struct LessonTests {
     }
 
     @Test(
-        "An open question, as the canvas draws it: nothing picked and Tap an answer; a tap on its way picked and Sending; the answer Bali holds picked and Your answer is in — never a mark of the correct answer, which the API sends only once shown"
+        "An open question, as the canvas draws it: nothing picked and no line under the answers (the owner's cut, 2026-11-04); a tap on its way picked and Sending; the answer Bali holds picked and Your answer is in — never a mark of the correct answer, which the API sends only once shown"
     )
     func open() throws {
         let fresh = card(try question())
         #expect(fresh.open && fresh.looks == Array(repeating: .open(picked: false), count: 4))
-        #expect(fresh.line == "Tap an answer. You can change it until the question closes.")
+        #expect(fresh.line == nil)
         #expect(!fresh.alert && !fresh.offline)
         let sending = card(try question(answer: 0), sending: 1)
         #expect(sending.looks == [.open(picked: false), .open(picked: true), .open(picked: false), .open(picked: false)])
@@ -137,7 +137,7 @@ struct LessonTests {
             #expect(offline.line == "No connection right now, so Bali can't send your answer. It keeps trying.")
         }
         let failed = card(try question(), problem: .rateLimited, said: .failed(held: nil))
-        #expect(!failed.offline && failed.line.hasPrefix("Bali couldn't send your answer."))
+        #expect(!failed.offline && failed.line == "Bali couldn't send your answer. Check your connection and tap it again.")
         let sending = card(try question(), problem: .rateLimited, sending: 0)
         #expect(!sending.offline && sending.line == "Sending your answer…")
         let closed = card(try question(open: false), problem: .rateLimited)

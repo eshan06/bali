@@ -37,18 +37,12 @@ struct AnswerCardView: View {
                         index, option in answer(index, option.0, option.1)
                     }
                 }
-                HStack(alignment: .top, spacing: 8) {
-                    if card.offline { Image(systemName: "wifi.slash").accessibilityHidden(true) }
-                    Text(card.line)
-                }
-                .textStyle(.caption).foregroundStyle(card.alert ? Theme.text : Theme.textTertiary)
-                VStack(alignment: .leading, spacing: 12) {
-                    Rectangle().fill(Theme.border).frame(height: 1)
+                if let line = card.line {
                     HStack(alignment: .top, spacing: 8) {
-                        Image(systemName: "eye.slash").accessibilityHidden(true)
-                        Text("Your teacher sees the class's totals, never which answer is yours.")
+                        if card.offline { Image(systemName: "wifi.slash").accessibilityHidden(true) }
+                        Text(line)
                     }
-                    .textStyle(.caption).foregroundStyle(Theme.textTertiary)
+                    .textStyle(.caption).foregroundStyle(card.alert ? Theme.text : Theme.textTertiary)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

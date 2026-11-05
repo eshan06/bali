@@ -403,9 +403,10 @@ struct AppTests {
         busyStays.signed(in: true, as: "ana", pending: true)
         #expect(busyStays.deleting == .busy)
         // A question on Focus (L8): each fixture's card as its board draws it, open or closed, and
-        // its line; a frozen phone's tap says it didn't send, never nothing.
-        let cards: [(String, Bool, String)] = [
-            ("focusQuestion", true, "Tap an answer."), ("focusAnswered", true, "Your answer is in."),
+        // its line, none with nothing picked and nothing wrong (the owner's cut, 2026-11-04); a
+        // frozen phone's tap says it didn't send, never nothing.
+        let cards: [(String, Bool, String?)] = [
+            ("focusQuestion", true, nil), ("focusAnswered", true, "Your answer is in."),
             ("focusSending", true, "Sending your answer…"), ("focusFailed", true, "Bali couldn't send"),
             ("focusTooLate", false, "This question closed before your answer reached Bali"),
             ("focusClosed", false, "Your teacher closed this question."),
@@ -413,23 +414,24 @@ struct AppTests {
             ("focusRight", false, "Your teacher closed it and showed the answer."),
             ("focusNoAnswer", false, "Your teacher closed it and showed the answer."),
             ("focusQuestionOffline", true, "No connection right now"),
-            ("focusLong", true, "Tap an answer."),
+            ("focusLong", true, nil),
             // The same card off the Focus screen: Unlocked, Screen Time off and Home not tapped in,
             // each also with no connection (intermediate states); and Unlocked's Home, which draws
             // none.
-            ("unlockedQuestion", true, "Tap an answer."), ("protectionOffQuestion", true, "Tap an answer."),
-            ("homeQuestion", true, "Tap an answer."), ("homeFromUnlockedQuestion", true, "Tap an answer."),
+            ("unlockedQuestion", true, nil), ("protectionOffQuestion", true, nil),
+            ("homeQuestion", true, nil), ("homeFromUnlockedQuestion", true, nil),
             ("unlockedQuestionUnsent", true, "No connection right now"),
             ("protectionOffQuestionError", true, "No connection right now"),
             ("homeQuestionError", true, "No connection right now"),
             // With a slide too, and on the Screen Time ask (M8b).
-            ("unlockedSlide", true, "Tap an answer."), ("protectionOffSlideQuestion", true, "Tap an answer."),
-            ("homeSlideQuestion", true, "Tap an answer."), ("screenTimeQuestion", true, "Tap an answer."),
-            ("screenTimeQuestionSlide", true, "Tap an answer."), ("screenTimeDeniedQuestion", true, "Tap an answer."),
+            ("unlockedSlide", true, nil), ("protectionOffSlideQuestion", true, nil),
+            ("homeSlideQuestion", true, nil), ("screenTimeQuestion", true, nil),
+            ("screenTimeQuestionSlide", true, nil), ("screenTimeDeniedQuestion", true, nil),
         ]
         for (name, open, line) in cards {
             let card = Phone(fixture: try #require(PreviewFixtures.all[name])).card
-            #expect(card?.open == open && card?.line.hasPrefix(line) == true, "\(name)")
+            let said = card?.line
+            #expect(card?.open == open && (line.map { said?.hasPrefix($0) == true } ?? (said == nil)), "\(name)")
         }
         // The slide off the Focus screen (M8b): page 4 of the fixture deck, in, on each board's
         // screen; none on the ask's board, which draws the question alone.
@@ -448,7 +450,7 @@ struct AppTests {
         #expect(UnlockedWords(unsent)?.picker == .waiting(nil))
         let frozenLesson = Phone(fixture: try #require(PreviewFixtures.all["focusQuestion"]))
         await frozenLesson.answer(1)
-        #expect(frozenLesson.card?.line.hasPrefix("Bali couldn't send your answer.") == true)
+        #expect(frozenLesson.card?.line == "Bali couldn't send your answer. Check your connection and tap it again.")
     }
 
     @Test(
@@ -3619,7 +3621,7 @@ struct AppTests {
         #expect(phone.card == nil)
         phone.lessonRead(try lessonRead(question: "next"), of: "s")
         #expect(phone.card?.question.id == "next" && phone.card?.open == true)
-        #expect(phone.card?.line == "Tap an answer. You can change it until the question closes.")
+        #expect(phone.card?.line == nil)
     }
 
     @Test(
@@ -3765,7 +3767,7 @@ struct AppTests {
     }
 
     @Test(
-        "A question on Focus (L8) fits the smallest iPhone and the owner's at the default text size, the strip, the card and Emergency Unlock on one screen; past it — a larger text size, or six long answers — the page scrolls over Emergency Unlock, pinned at the bottom and whole at every text size"
+        "A question on Focus (L8) fits the smallest iPhone and the owner's at the default text size, the strip, the card and Emergency Unlock on one screen, and with nothing picked at the largest size before the accessibility ones too, the card's two lines cut (the owner's cut, 2026-11-04); past it — an accessibility text size, or six long answers — the page scrolls over Emergency Unlock, pinned at the bottom and whole at every text size"
     )
     func questionFits() async throws {
         let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
@@ -3794,7 +3796,7 @@ struct AppTests {
                 window.layoutIfNeeded()
                 let scroll = try #require(scrollViews(in: window).first, "\(name)")
                 let (content, shown) = (scroll.contentSize.height, scroll.bounds.height)
-                let fits = size == .large && name != "focusLong"
+                let fits = name != "focusLong" && (size == .large || (name == "focusQuestion" && size == .xxxLarge))
                 #expect((content <= shown + 0.5) == fits, "\(name), \(size), \(frame): \(content) in \(shown)")
                 // Never a pixel wider than the screen: an answer's disc in whole points.
                 #expect(scroll.bounds.width == frame.width, "\(name), \(size): \(scroll.bounds.width)")
@@ -3968,7 +3970,7 @@ struct AppTests {
     }
 
     @Test(
-        "Unlocked, Screen Time off, Waiting, the Screen Time step, History and Me lose the owner's cut lines (2026-11-04; D1's Unlocked, ProtectionOff, Waiting, History and Me, and the app canvas's Unlocked, ScreenTimeOff and ScreenTimeAsk boards and PushWaitA), in every state: Unlocked ends at its way back, Lock my apps again or the re-tap's Tap in, with no line under it, and its reason card ends at the three while a pick is open, but for why the last pick didn't go (rule 5), and still says why a pick waits while the unlock is on its way; Screen Time off ends at its way on, or at its steps while the check reads the permission; Waiting's line is the one sentence left; the Screen Time step ends at its last way on, or at why the ask failed, the plain step too, which no board draws; History's title has what shows under it at once; Me's classes have no line under them, and During class is its heading alone, the Screen Time row next"
+        "Unlocked, Screen Time off, Waiting, the Screen Time step, History, Me and the question card lose the owner's cut lines (2026-11-04; D1's Unlocked, ProtectionOff, Waiting, History and Me, and the app canvas's Card boards, its Focus, Home, Unlocked, ScreenTimeOff and ScreenTimeAsk boards and PushWaitA), in every state: Unlocked ends at its way back, Lock my apps again or the re-tap's Tap in, with no line under it, and its reason card ends at the three while a pick is open, but for why the last pick didn't go (rule 5), and still says why a pick waits while the unlock is on its way; Screen Time off ends at its way on, or at its steps while the check reads the permission; Waiting's line is the one sentence left; the Screen Time step ends at its last way on, or at why the ask failed, the plain step too, which no board draws; History's title has what shows under it at once; Me's classes have no line under them, and During class is its heading alone, the Screen Time row next; the question card, on every screen it shows on, ends at its line, or at its last answer with nothing picked and nothing wrong, with nothing under it on what the teacher sees"
     )
     func cutLinesGone() async throws {
         /// What VoiceOver reads of `name`'s screen, laid out whole, once it reads `title`.
@@ -3982,6 +3984,7 @@ struct AppTests {
             "Saved on your phone first.", "Your teacher sees the reason you pick.", "It's always your call.",
             "You tapped your teacher's block before class started.", "You can change this any time in Settings.",
             "The same moments your teachers see", "Bali pauses every app.", "Leaving a class is recorded",
+            "Tap an answer.", "Your teacher sees the class's totals",
         ]
         var pages: [(String, [String])] = []
         // Each Unlocked fixture with the reason card, and what the card says under the three: nil
@@ -4068,6 +4071,51 @@ struct AppTests {
             #expect(page.dropFirst(leave + 1).first == next, "\(name): \(page)")
             let during = page.firstIndex(of: "During class").map { page.dropFirst($0 + 1).first }
             #expect(during??.hasPrefix("Screen Time") == true, "\(name): \(page)")
+        }
+        // The question card, read alone, on each fixture of every screen it shows on: its last
+        // answer, then its line where it has one, and nothing after, as the app canvas's Card
+        // boards draw it; with nothing picked and nothing wrong, nothing under the answers
+        // (CardLong).
+        let answered = "Your answer is in. You can change it until the question closes."
+        let offline = "No connection right now, so Bali can't send your answer. It keeps trying."
+        let revealed = "Your teacher closed it and showed the answer."
+        let asked: [(String, String?)] = [
+            ("focusQuestion", nil), ("focusAnswered", answered), ("focusRevealed", revealed),
+            ("focusSending", "Sending your answer…"),
+            ("focusFailed", "Bali couldn't send your answer. Check your connection and tap it again."),
+            ("focusTooLate", "This question closed before your answer reached Bali, so it wasn't counted."),
+            ("focusClosed", "Your teacher closed this question."), ("focusRight", revealed),
+            ("focusNoAnswer", revealed), ("focusQuestionOffline", offline), ("focusLong", nil),
+            ("focusSlideQuestion", answered), ("homeQuestion", nil), ("homeQuestionError", offline),
+            ("homeSlideQuestion", nil), ("unlockedQuestion", nil), ("unlockedQuestionUnsent", offline),
+            ("unlockedSlide", nil), ("protectionOffQuestion", nil), ("protectionOffQuestionError", offline),
+            ("protectionOffSlideQuestion", nil), ("screenTimeQuestion", nil), ("screenTimeQuestionSlide", nil),
+            ("screenTimeDeniedQuestion", nil),
+        ]
+        for (name, line) in asked {
+            let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))
+            let card = try #require(phone.card, "\(name)")
+            let (window, read) = try await laidOut(AnswerCardView(card: card, phone: phone)) {
+                $0.contains(card.question.prompt)
+            }
+            window.isHidden = true
+            let page = read.map(\.label)
+            pages.append(("\(name)'s card", page))
+            let letter = String(UnicodeScalar(UInt8(64 + card.question.options.count)))
+            let last = try #require(page.lastIndex { $0.hasPrefix("\(letter), ") }, "\(name): \(page)")
+            #expect(Array(page[(last + 1)...]) == [line].compactMap { $0 }, "\(name): \(page)")
+        }
+        // And Focus and Home with the card, whole, as Unlocked, Screen Time off and the Screen Time
+        // step are above; but not with a slide too: PDFKit analyses every page a PDF view shows,
+        // and a burst of them starves the test host.
+        for name in [
+            "focusQuestion", "focusAnswered", "focusRevealed", "focusSending", "focusFailed", "focusTooLate",
+            "focusClosed", "focusRight", "focusNoAnswer", "focusQuestionOffline", "focusLong", "homeQuestion",
+            "homeQuestionError",
+        ] {
+            let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))
+            let prompt = try #require(phone.card?.question.prompt, "\(name)")
+            pages.append((name, try await read(name, once: prompt)))
         }
         for (name, page) in pages {
             #expect(!page.contains { label in cut.contains { label.contains($0) } }, "\(name): \(page)")
