@@ -14,7 +14,7 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-05 (Central) — AN6b, sign-in itself (#517; `docs/DECISIONS.md`,
+_Last updated: 2026-11-05 (Central) — AN6b, sign-in itself (#518; `docs/DECISIONS.md`,
 2026-11-05): BaliCore's `SignIn` in Kotlin but `deleteUser`, with its tests: the sign-in over the
 browser seam, its code exchanged over the API client's OkHttp in the sign-in's own scope; the token,
 which never throws, held to the 13+ check and the deletion, a renewal's too; one renewal at a time,
@@ -141,7 +141,7 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN5d** The engine's wait for the Start — ✅ (#507; DECISIONS 2026-11-04)
 - **AN5e** Emergency Unlock in the engine — ✅ (#510; DECISIONS 2026-11-04)
 - **AN6a** Sign-in's parts — ✅ (#515; DECISIONS 2026-11-04)
-- **AN6b** Sign-in itself — ✅ (#517; DECISIONS 2026-11-05)
+- **AN6b** Sign-in itself — ✅ (#518; DECISIONS 2026-11-05)
 - **AN6c** Sign-in's app side (twin: `KeychainTokenStore` and C1's browser session): Cognito's
   hosted UI in a Custom Tab, the code grant with PKCE, and the redirect back; tokens sealed by a
   Keystore key, proven on the emulator; the sign-in kept out of a backup and of a transfer to a new

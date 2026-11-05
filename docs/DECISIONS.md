@@ -9,7 +9,7 @@ touching before changing how something works. A pointer of the form
 a real decision? Add a dated entry at the top: what was decided and why.
 
 - **2026-11-05** — **AN6b, sign-in itself: BaliCore's `SignIn` in Kotlin, and the engine's `make` over
-  it (the conductor's calls, awaiting the owner's look; AN6b, #517).** The owner isn't reviewing each
+  it (the conductor's calls, awaiting the owner's look; AN6b, #518).** The owner isn't reviewing each
   step and asked for the recommended option on every question, so each call here is the conductor's,
   for the owner to look at.
 
