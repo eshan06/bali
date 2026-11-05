@@ -6,11 +6,14 @@ included. Run from the repository root, on Linux (no Xcode), this fails when:
   - an application or app-extension target has no ios/<Target>/PrivacyInfo.xcprivacy, or
     project.yml does not copy it in as a resource;
   - a manifest does not parse as a plist, says it tracks, names a tracking domain, or has a
-    malformed entry or a reason code Apple does not document for its category;
+    malformed entry, a purpose Apple does not document, or a reason code Apple does not
+    document for its category;
   - Swift the target compiles in (its folder and the local packages it links, which end up in
     its binary) calls a required-reason API its manifest does not declare;
   - the app's collected data types differ from docs/APP-STORE.md's privacy table, or an
-    extension declares any (none calls the API, so none collects).
+    extension declares any (none calls the API, so none collects);
+  - a type the app collects declares purposes other than App Functionality alone, or App
+    Functionality and Analytics for the types in ANALYTICS.
 The API scan is best effort: regexes for the spellings in USES, not a parse of the Swift, so
 a new required-reason call spelled another way (sysctl's kern.boottime, say) adds a pattern.
 GRDB ships its own manifest in its package, so third-party code is not scanned here.
@@ -42,6 +45,16 @@ USES = {
     "NSPrivacyAccessedAPICategoryActiveKeyboards": r"\bactiveInputModes\b",
 }
 PURPOSE = "NSPrivacyCollectedDataTypePurpose"
+# Apple's documented purposes ("NSPrivacyCollectedDataTypePurposes").
+PURPOSES = {PURPOSE + name for name in (
+    "ThirdPartyAdvertising", "DeveloperAdvertising", "Analytics", "ProductPersonalization",
+    "AppFunctionality", "Other",
+)}
+# The types that serve Analytics beside App Functionality: the server's class totals for
+# PostHog are counted from them (A5; ARCHITECTURE's "Analytics (PostHog)"). Pinned here, not
+# read from docs/APP-STORE.md, whose table says App Functionality alone until the owner edits
+# the label to match (PLAN's Before the pilot, 6).
+ANALYTICS = {"NSPrivacyCollectedDataTypeProductInteraction"}
 
 errors = []
 
@@ -140,12 +153,19 @@ def check(name, kind, block, spec):
             or not str(entry.get("NSPrivacyCollectedDataType", "")).startswith("NSPrivacyCollectedDataType")
             or not isinstance(entry.get("NSPrivacyCollectedDataTypeLinked"), bool)
             or entry.get("NSPrivacyCollectedDataTypeTracking") is not False
+            or not isinstance(purposes, list)
             or not purposes
-            or not all(str(p).startswith(PURPOSE) for p in purposes)
+            or not {str(p) for p in purposes} <= PURPOSES
         ):
             fail(f"{path}: a malformed or tracking collected data type: {entry}")
         else:
-            types.add(entry["NSPrivacyCollectedDataType"])
+            data_type = entry["NSPrivacyCollectedDataType"]
+            types.add(data_type)
+            serves = {PURPOSE + "AppFunctionality"}
+            if data_type in ANALYTICS:
+                serves.add(PURPOSE + "Analytics")
+            if kind == "application" and set(purposes) != serves:
+                fail(f"{path}: {data_type} serves {sorted(set(purposes))}, not {sorted(serves)}")
     if kind == "application" and types != documented_types():
         fail(f"{path}: collected data types {sorted(types)} differ from docs/APP-STORE.md's "
              f"{sorted(documented_types())}")

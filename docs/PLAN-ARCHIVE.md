@@ -10,6 +10,15 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-11-04 (Central) — WC1 (#502; `docs/DECISIONS.md`, 2026-11-04): the first of
+eight steps that cut from the iPhone app and the student web the lines the owner cut on Android,
+from the boards the owner approved: Sign in loses "You only do this once…" and the 13+ question
+"Bali never saves or sends…". Before it, A1, PostHog's rules (#503). Next: WC2, Join and the
+list-changed screen; the owner's two PostHog calls, a class of one and the CSP's origin, then
+A2–A4; a session builds the retire-a-block command; the owner the new build and the sitting; the
+owner's call on GA5's known limit, the smallest iPhones (DECISIONS 2026-11-02); AN5c, Android's
+read loop; AN1's part 2 once the owner has the phones; the audit's polish waits, as ruled._
+
 _Last updated: 2026-11-04 (Central) — A1, PostHog's rules (#503; `docs/DECISIONS.md`, 2026-11-04):
 PostHog on the teacher portal's pages and the server only, never a phone; a class's totals and a
 teacher's actions, nothing about one student; off until the owner sets its keys; no SDK, a plain
@@ -1584,6 +1593,22 @@ why, Open owner items the owner's queue.
   - two tests ✅ (#364; DECISIONS 2026-10-14): only `transitions.ts` writes `participations` and `events` (the one exception, the test-only `backdateLastSeen`, named for the owner to rule on); the matrix's other-school callers, there all along, are named, and a colleague at the owner's school is added; nothing leaked.
 - Who does what: "The Mac session: all UI (`apps/web/src/app`, `apps/web/src/components`, `ios/Bali/UI`,
   `ios/BaliShield`, user-facing strings)."
+
+**In flight, three finished lines as PLAN.md said them until 2026-11-04 (moved for its word cap, A5):**
+- **`next` 15.5.28 (2026-10-22)** ✅ (#435; DECISIONS 2026-10-22): today's critical Next.js
+  advisories, which failed CI's audit on every PR, fixed while the owner is away (the conductor's
+  call, awaiting the owner); the portal used none of their paths. Dependabot's #309 is superseded.
+  Left for the owner: S4's CSP check on the deployed portal (Open owner items).
+- **`zod` 4.6.6 (2026-10-23)** ✅ (#444; DECISIONS 2026-10-23): today's high advisory
+  (GHSA-mrhx-c7xc-m3w5), which failed CI's audit on every PR, fixed (the conductor's call, awaiting
+  the owner). A signed-in teacher could reach it: a question's `options`, at most 6, on three
+  teacher routes, were each parsed before their count, so a 1 MiB body held about 200 MB of the
+  API's memory and was answered with 45 MB; now one line, at once, held by a test in the abuse
+  suite. Left: fastify's low advisory, which doesn't apply.
+- **The database pool's guard (2026-10-22)** ✅ (#439; DECISIONS 2026-10-22), from #336's finding,
+  the conductor's call, awaiting the owner: `createDb` always passes postgres.js a number, 10 unless
+  the load harness names one, so `PGMAX` or a `max` in `DATABASE_URL` is ignored, and the boot says so
+  by name, never with the URL (`docs/DEPLOY.md`). More connections stays not a deploy setting.
 
 **Phase 7, Live lesson: building** (the owner lifted the hold and approved both canvases,
 2026-10-10). The steps with no screen go first, one PR each: M1 ✅ (the storage interface, with

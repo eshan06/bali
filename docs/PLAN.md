@@ -8,14 +8,15 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-04 (Central) — WC1 (#502; `docs/DECISIONS.md`, 2026-11-04): the first of
-eight steps that cut from the iPhone app and the student web the lines the owner cut on Android,
-from the boards the owner approved: Sign in loses "You only do this once…" and the 13+ question
-"Bali never saves or sends…". Before it, A1, PostHog's rules (#503). Next: WC2, Join and the
-list-changed screen; the owner's two PostHog calls, a class of one and the CSP's origin, then
-A2–A4; a session builds the retire-a-block command; the owner the new build and the sitting; the
-owner's call on GA5's known limit, the smallest iPhones (DECISIONS 2026-11-02); AN5c, Android's
-read loop; AN1's part 2 once the owner has the phones; the audit's polish waits, as ruled._
+_Last updated: 2026-11-04 (Central) — A5, the iPhone app's privacy manifest (#505; `docs/DECISIONS.md`,
+2026-11-04): Product Interaction gains the purpose Analytics, pinned by CI's check, and the owner's
+four PostHog rulings: a class's totals always sent; the portal's events through Bali's server, the
+CSP unchanged; a deleted teacher's events kept; the manifest in the next build. Before it, WC1, the
+first of the owner's Android cuts on the iPhone (#502). Next: WC2, Join and the list-changed screen;
+A2–A4; the owner's call on Other Data Types' purpose; a session builds the retire-a-block command;
+the owner the new build, with A5, and the sitting; the owner's call on GA5's known limit, the
+smallest iPhones (DECISIONS 2026-11-02); AN5c, Android's read loop; AN1's part 2 once the owner has
+the phones; the audit's polish waits, as ruled._
 
 ## Now
 
@@ -95,20 +96,9 @@ branch, with no PR, as its README says (#479; `docs/DECISIONS.md`, 2026-11-02).
   its line meanwhile (the conductor's call: it goes, as Register block's); the saves' 10 s (the
   conductor's call), a class's create's too since it carries an `eventId` (2026-10-23); and the
   sign-in's token exchange, which has none (not touched).
-- **`next` 15.5.28 (2026-10-22)** ✅ (#435; DECISIONS 2026-10-22): today's critical Next.js
-  advisories, which failed CI's audit on every PR, fixed while the owner is away (the conductor's
-  call, awaiting the owner); the portal used none of their paths. Dependabot's #309 is superseded.
-  Left for the owner: S4's CSP check on the deployed portal (Open owner items).
-- **`zod` 4.6.6 (2026-10-23)** ✅ (#444; DECISIONS 2026-10-23): today's high advisory
-  (GHSA-mrhx-c7xc-m3w5), which failed CI's audit on every PR, fixed (the conductor's call, awaiting
-  the owner). A signed-in teacher could reach it: a question's `options`, at most 6, on three
-  teacher routes, were each parsed before their count, so a 1 MiB body held about 200 MB of the
-  API's memory and was answered with 45 MB; now one line, at once, held by a test in the abuse
-  suite. Left: fastify's low advisory, which doesn't apply.
-- **The database pool's guard (2026-10-22)** ✅ (#439; DECISIONS 2026-10-22), from #336's finding,
-  the conductor's call, awaiting the owner: `createDb` always passes postgres.js a number, 10 unless
-  the load harness names one, so `PGMAX` or a `max` in `DATABASE_URL` is ignored, and the boot says so
-  by name, never with the URL (`docs/DEPLOY.md`). More connections stays not a deploy setting.
+- **Three fixes, each the conductor's call, awaiting the owner** ✅: `next` 15.5.28 (#435;
+  DECISIONS 2026-10-22), `zod` 4.6.6 (#444; DECISIONS 2026-10-23) and the database pool's guard
+  (#439; DECISIONS 2026-10-22); their full lines in `docs/PLAN-ARCHIVE.md`.
 - **The workflow review's last steps** ✅ (the owner, 2026-10-13; DECISIONS 2026-10-14): the
   migration guard (#369), docs-only PRs skipping the test jobs (#365), moved files (#368) and two
   tests (#364), each in full in `docs/PLAN-ARCHIVE.md`.
@@ -137,7 +127,7 @@ branch, with no PR, as its README says (#479; `docs/DECISIONS.md`, 2026-11-02).
 
 **Before the pilot (the owner, 2026-11-03; DECISIONS 2026-11-03).** Left, in order:
 1. A new prod TestFlight build from `main`: build 11 predates the audit's iOS fixes (GA3, GA5) and the
-   consent list's new lines (#466). The owner's.
+   consent list's new lines (#466), and this one must carry A5's privacy manifest. The owner's.
 2. 📱 The phone sitting on it, whole (`ios/README.md`, "Phase 7's phone sitting, on prod", Parts 1–7):
    C7's first launch, L8's, M8's and M8b's device checks, the exit checks L9, M10 and W6, the consent
    list's new lines, the class-started alert end to end (N6), and every other student flow. The owner's.
@@ -145,20 +135,24 @@ branch, with no PR, as its README says (#479; `docs/DECISIONS.md`, 2026-11-02).
    retires a block; the owner writes the new code, registers it and retires the old one.
 4. PostHog (ARCHITECTURE's "Analytics (PostHog)"; DECISIONS 2026-11-04), one PR each:
    - **A1** Its rules in the docs — ✅ (#503; DECISIONS 2026-11-04)
-   - **A2** The server's class totals, after the owner's call on a class of one
-   - **A3a** The portal's sender, on for teachers only, after the owner's pick: PostHog's shared
-     origin in the CSP, or the API as a relay
-   - **A3b** The portal's teacher events
-   - **A4** `/privacy` names PostHog, before a key is set
-   - Then the owner's keys: `NEXT_PUBLIC_POSTHOG_KEY` in Vercel's `bali-portal`, `POSTHOG_KEY` in
-     Railway's `bali prod`.
+   - **A5** The iPhone app's privacy manifest: Product Interaction gains the purpose Analytics — ✅
+     (#505; DECISIONS 2026-11-04)
+   - **A2** The server's class totals, always sent, whatever the class's size
+   - **A3a** The server's endpoint for the portal's events: teacher-only, checked against the
+     allow-list, forwarded to PostHog with the server's key; additive under `/v1`
+   - **A3b** The portal's teacher events, through it (no CSP change)
+   - **A4** `/privacy` names PostHog and says what stays there once an account is deleted (a
+     teacher's events, a class's totals), before the key is set
+   - Then the owner's key: `POSTHOG_KEY` in Railway's `bali prod` (the portal holds none).
 5. The external TestFlight group `Vanderbilt pilot` and Beta App Review (`docs/APP-STORE.md`, section
    5), which is Apple's answer on §3.3.3(P) (ISSUES #3).
-6. For PostHog, the App Store privacy label (Product Interaction gains the purpose Analytics), the
-   app's privacy manifest to match (it ships inside the build: item 1's, or another), and
+6. For PostHog, the App Store privacy label (Product Interaction gains the purpose Analytics, which
+   the app's privacy manifest declares since A5, so the label must match it) and
    `docs/APP-STORE.md`'s answers and review note ("no third-party analytics…"); until then they say
-   App Functionality only, though item 4's keys turn the totals on. The owner's, later (the owner,
-   2026-11-04: "we can change the wording on privacy stuff on apple later").
+   App Functionality only, though item 4's key turns the totals on. The owner's, later (the owner,
+   2026-11-04: "we can change the wording on privacy stuff on apple later"). Before item 1, the
+   owner's call: does Other Data Types, which the enrolled count comes from, serve Analytics too
+   (DECISIONS 2026-11-04)?
 
 Not needed for the Vanderbilt pilot (the owner, 2026-11-03): production backups (L0b) and the lawyer's
 words (C2); the owner's drafts stand on `/privacy` and `/terms`.

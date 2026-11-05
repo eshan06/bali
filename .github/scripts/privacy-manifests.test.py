@@ -105,9 +105,33 @@ class PrivacyManifests(unittest.TestCase):
         file.write_text(file.read_text() + "\nlet x = URLResourceKey.volumeAvailableCapacityKey\n")
         self.fails("uses NSPrivacyAccessedAPICategoryDiskSpace")
 
+    def test_a_new_call_in_the_app_undeclared(self):
+        # The app's own folder is scanned too, not only the packages it links.
+        file = self.root / "ios/Bali/BlockReader.swift"
+        file.write_text(file.read_text() + "\nlet x = URLResourceKey.volumeAvailableCapacityKey\n")
+        self.fails("BlockReader.swift:")
+        self.fails("uses NSPrivacyAccessedAPICategoryDiskSpace")
+
     def test_data_types_drift_from_the_label(self):
         self.edit("docs/APP-STORE.md", "→ **Device ID**", "→ **Device Model**")
         self.fails("differ from docs/APP-STORE.md")
+
+    def test_product_interaction_without_analytics(self):
+        # A5: the server's class totals for PostHog are counted from Product Interaction.
+        analytics = "<string>NSPrivacyCollectedDataTypePurposeAnalytics</string>"
+        self.edit("ios/Bali/PrivacyInfo.xcprivacy", analytics, "")
+        self.fails("NSPrivacyCollectedDataTypeProductInteraction serves")
+
+    def test_analytics_on_another_type(self):
+        # The first entry, Email Address, serves App Functionality alone.
+        functionality = "<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>"
+        analytics = "<string>NSPrivacyCollectedDataTypePurposeAnalytics</string>"
+        self.edit("ios/Bali/PrivacyInfo.xcprivacy", functionality, functionality + analytics)
+        self.fails("NSPrivacyCollectedDataTypeEmailAddress serves")
+
+    def test_an_undocumented_purpose(self):
+        self.edit("ios/Bali/PrivacyInfo.xcprivacy", "PurposeAnalytics<", "PurposeAnalytic<")
+        self.fails("a malformed or tracking collected data type")
 
     def test_an_extension_collecting_data(self):
         manifest = "ios/BaliShield/PrivacyInfo.xcprivacy"

@@ -918,57 +918,75 @@ Vercel. The old RDS instance should be decommissioned once v2 is fully retired.
 
 ## Analytics (PostHog)
 
-Decided 2026-11-04 (the owner's rulings; `docs/DECISIONS.md`, 2026-11-04): how Bali learns how it
-is used, without learning anything about a student. PostHog, its project "Bali production" on
-PostHog's US cloud, receives counted events from two places, and nothing else of Bali's.
+Decided 2026-11-04 (the owner's rulings; `docs/DECISIONS.md`, 2026-11-04, A1's entry and A5's): how
+Bali learns how it is used, with nothing that names a student. PostHog, its project "Bali
+production" on PostHog's US cloud, receives counted events from Bali's server alone, its own and
+the teacher portal's, which it forwards, and nothing else of Bali's.
 
 - **The teacher portal's pages and the server, never a phone.** The portal sends only for a
-  teacher's account: its `/` serves students too, so the gate is the account read (`home.kind ===
-  'teacher'`), never the route. The API sends its own. The iPhone app and the Android app send
-  PostHog nothing and carry no analytics code: Apple's developer agreement (§3.3.3(P), ISSUES #3)
-  forbids sharing a phone's usage data beyond the individual and their device, and
-  `docs/APP-STORE.md`'s review note promises "no third-party analytics or advertising SDKs in the
-  app". The server's totals are still counted from what the phones send, and that clause's "or
-  otherwise" may reach them: Apple's review stays the answer (ISSUES #3).
+  teacher's account, and only to Bali's API (below): its `/` serves students too, so the gate is
+  the account read (`home.kind === 'teacher'`), never the route. The API sends its own. The iPhone
+  app and the Android app send PostHog nothing and carry no analytics code: Apple's developer
+  agreement (§3.3.3(P), ISSUES #3) forbids sharing a phone's usage data beyond the individual and
+  their device, and `docs/APP-STORE.md`'s review note promises "no third-party analytics or
+  advertising SDKs in the app". The server's totals are still counted from what the phones send,
+  and that clause's "or otherwise" may reach them: Apple's review stays the answer (ISSUES #3).
 - **What it may hold.** From the server, a class's totals only: a session started, ended or
   extended; how many students are enrolled and how many tapped in; the session's length; the
-  class's focus minutes and unlocks, as totals. From the portal, a teacher's own actions only:
-  signed in, created a class, registered a block, started, ended or extended a session, asked a
-  question, showed slides, opened Present, opened a report or the recap. A teacher is known by
-  Bali's internal user id alone. Every event carries `environment`, so a dev key, if one is ever
-  set, files apart. Its known limit: with one student enrolled or tapped in, a class's totals are
-  that student's numbers. Whether the server holds them back below a count, as a question's
-  breakdown waits for 3 answers, is the owner's call before A2.
-- **What it never holds:** a student's name, email or user id, or any event about one student; a
-  teacher's email or name; a URL; free text in any property. Once an account deletion, a disposal
-  or the retention run takes a teacher's name and sign-in off their row, their events there name no
+  class's focus minutes and unlocks, as totals, the unlocks one number, never split by reason
+  ("nurse" may be health data). They are sent whatever the class's size (the owner's pick, "Always
+  send", over holding focus minutes and unlocks back under 3 or 5 students), so with one or two
+  students they are those students' own numbers: that cost, said plainly. From the portal, a
+  teacher's own actions only: signed in, created a class, registered a block, started, ended or
+  extended a session, asked a question, showed slides, opened Present, opened a report or the
+  recap. A teacher is known by Bali's internal user id alone. Every event carries `environment`, so
+  a dev key, if one is ever set, files apart.
+- **What it never holds:** a student's name, email or user id, or any event about one student (a
+  class of one or two's totals are the exception, above); a teacher's email or name; a URL; free
+  text in any property. A teacher's events stay when they delete their account (the owner's pick,
+  "Keep them, say so"): they carry Bali's internal id alone, `/privacy` says they stay (PLAN's
+  A4), and no privacy path calls PostHog, so the server holds no PostHog admin key. A class's
+  totals stay too when a student deletes their account, a class of one or two's being that
+  student's own numbers, and `/privacy` says so as well. Once an account deletion, a disposal or
+  the retention run takes a teacher's name and sign-in off their row, their events there name no
   one by themselves; Bali's own records can still lead back to a teacher who deleted their own
   account, whose removed classes keep their names (#313).
 - **Nothing captured on its own.** No autocapture, no session replay, no heatmaps, no exception
   capture (errors are Sentry's). The project is set to match: session replay, web autocapture and
   exception autocapture off, the client's IP address discarded.
-- **Off until its key is set,** as Sentry and push are: the portal reads `NEXT_PUBLIC_POSTHOG_KEY`,
-  with an optional host (`https://us.i.posthog.com` by default), and the API `POSTHOG_KEY`. The
-  owner sets them, in Vercel's `bali-portal` and Railway's `bali prod`.
-- **No PostHog SDK, a plain POST** (the conductor's call, awaiting the owner). Each side sends its
-  events with a small `fetch` to PostHog's capture endpoint. posthog-js loads more scripts from
-  PostHog's hosts as it runs, and any script on the portal's pages can read the access token, which
-  is why the portal runs no script but its own (S4, `apps/web/src/lib/csp.ts`). A POST needs one
-  `connect-src` origin, PostHog's, listed only while the key is set. On the server, a few lines beat
-  a new dependency. That origin's cost, said plainly: it takes events for every PostHog project, so
-  a script running in the page could send the token through it to a project of its own, where today
-  `connect-src` lets nothing out but to the API, Cognito, Sentry and the deck bucket. The portal's
-  events sent through Bali's API instead would keep that whole: the owner's pick, before A3a.
+- **Off until its key is set,** as Sentry and push are: the API reads `POSTHOG_KEY`, with an
+  optional host (`https://us.i.posthog.com` by default), for its own events and the portal's alike;
+  the portal holds no PostHog key. The owner sets it in Railway's `bali prod`.
+- **No PostHog code in the browser** (the owner's pick, "Through Bali's server"). The portal posts
+  each teacher event to a teacher-only endpoint of Bali's API, additive under `/v1` (PLAN's A3a),
+  which checks the event's name and properties against an allow-list, the actions above with no
+  URL and no free text, and forwards it to PostHog with the server's key. The server builds the
+  event itself: the teacher's id from the signed-in caller, `environment` and the time its own, the
+  name and properties only as the allow-list has them. Nothing else the request carries goes on
+  (no user id, IP address, person property or time of its own), and a refused event is never
+  logged with its body. So the portal's CSP (S4, `apps/web/src/lib/csp.ts`) never lists a PostHog
+  origin: `https://us.i.posthog.com` takes events for every PostHog project, so listing it would
+  let a script running in the page send the access token to a project of its own, where
+  `connect-src` lets nothing out but to the API, Cognito, Sentry and the deck bucket. PostHog sees
+  the server's address, never a teacher's, and an ad blocker can't drop the events. The server
+  sends with a small `fetch` to PostHog's capture endpoint, no SDK: a few lines beat a new
+  dependency (the conductor's call, awaiting the owner).
 - **Never in the way.** A send is fire-and-forget, bounded by a timeout, and made once what it
   counts has happened: on the server, after the commit, as the Start's push is
-  (`apps/api/src/routes/sessions.ts`). A replay changes nothing and sends nothing, so a resent Start
-  counts once. A send never fails or delays a request or a page; a failure is logged with nothing
-  personal in it and never shown, since nothing the user did has failed.
-- **Named before it is on.** The privacy policy names PostHog as a service provider before a key is
-  set (PLAN's A4). The App Store privacy label (Product Interaction used for Analytics), the app's
-  privacy manifest to match, which ships inside the build, and `docs/APP-STORE.md`'s answers and
-  review note are the owner's, later; until then they say Product Interaction serves App
-  Functionality only.
+  (`apps/api/src/routes/sessions.ts`). On the server, a replay changes nothing and sends nothing, so
+  a resent Start counts once. The relay keeps no row, so an event the portal posts twice can count
+  twice, an analytics count off, never a record (A3a's to narrow: PostHog's own dedupe on an
+  event's uuid is best effort). A send never fails or delays a request or a page, the portal's post
+  to the API included; a failure is logged with nothing personal in it and never shown, since
+  nothing the user did has failed.
+- **Named before it is on.** The privacy policy names PostHog as a service provider, and says what
+  stays there once an account is deleted, a teacher's events and a class's totals, before the key
+  is set (PLAN's A4). The iPhone app's privacy manifest (`ios/Bali/PrivacyInfo.xcprivacy`), which
+  ships inside the build, gives Product Interaction, which the totals are counted from, the purpose
+  Analytics beside App Functionality since A5 (the owner's pick, "In the next build", over waiting
+  for the App Store label), and CI's check pins it (`.github/scripts/privacy-manifests.py`). The
+  App Store privacy label, to match, and `docs/APP-STORE.md`'s answers and review note are the
+  owner's, later; until then they say App Functionality only.
 
 ## iOS app structure
 
@@ -1898,13 +1916,12 @@ Each exists because v2 broke it and shipped a real bug
   Compose, iOS's rules ported with their tests, push through FCM, sign-in through Cognito's hosted
   UI, its lock an Accessibility service, with its battery plan, which AN1's part 2 confirms on a
   Pixel and a Samsung before launch (`docs/PLAN-ANDROID.md`, Phases 8–11); analytics (2026-11-04,
-  "Analytics (PostHog)"): PostHog on the teacher portal's pages and the server only, never a phone,
-  a class's totals and a teacher's actions, nothing about one student, off until its key is set.
+  "Analytics (PostHog)"): PostHog fed by the server alone, its class totals, always sent, and the
+  teacher actions the portal posts it, never a phone and no PostHog code in the browser, nothing
+  that names a student, off until its key is set.
 - **Open:** one design question, Phase 6: ISSUES #3's fallback, should Apple's answer
-  call for one (the issue ranks the fallback designs, best fit first). Analytics has two, the
-  owner's before A2 and A3a: a class of one's totals, and PostHog's shared origin in the CSP or the
-  API as a relay ("Analytics (PostHog)"). Next: the build plan (what gets coded
-  first). Items deliberately parked live in each section's "decided later" list.
+  call for one (the issue ranks the fallback designs, best fit first). Next: the build plan (what
+  gets coded first). Items deliberately parked live in each section's "decided later" list.
 - **Deploys:** the portal builds from `main` as the Vercel project `bali-portal`; the demo site,
   www.getbali.app, is the Vercel project `bali-web`, which builds only `demo2`, an orphan branch
   holding the site alone (2026-11-02; `docs/DECISIONS.md`).
