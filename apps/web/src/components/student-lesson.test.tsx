@@ -1361,7 +1361,7 @@ describe('its URL and its reads', () => {
     expect(reads(PRESENTATION)).toBe(0);
   });
 
-  it('says a failed account read as the lesson’s failure, its Try again held until the account’s read answers, and never a bare Loading… while the lesson’s first read follows (StudentRetryStates)', async () => {
+  it('says a failed account read as the lesson’s failure, its Try again held until the account’s read answers, then follows the lesson once the account lists it (StudentRetryStates)', async () => {
     const LINE = "Bali couldn't load this lesson.";
     said.me = account([ours(null)]);
     await openFromHome(() => said.hold.add('/v1/me'));
