@@ -56,9 +56,9 @@ tasks.test {
     systemProperty("bali.contracts", contracts.canonicalPath)
 }
 
-// DIAGNOSTIC (AN5c's CI crash), to come out: the suite five times more, each in a JVM of its own.
+// DIAGNOSTIC (AN5c's CI crash), to come out: the suite ten times more, each in a JVM of its own.
 val again =
-    (1..5).map { n ->
+    (1..10).map { n ->
         tasks.register<Test>("testAgain$n") {
             testClassesDirs = sourceSets.test.get().output.classesDirs
             classpath = sourceSets.test.get().runtimeClasspath
