@@ -18,11 +18,12 @@ java.targetCompatibility = JavaVersion.VERSION_17
 kotlin.compilerOptions.jvmTarget = JvmTarget.JVM_17
 
 dependencies {
-    // Its types are core's own API's: an error's details, every type's serializer.
+    // Its types are core's own API's: an error's details, every type's serializer; and the sign-in's,
+    // the scope its renewal runs in and whether someone is signed in, as a flow (SignIn.kt).
     api(libs.kotlinx.serialization.json)
-    // The API client's transport and its waits, neither in core's own API (ApiClient.kt).
+    api(libs.kotlinx.coroutines.core)
+    // The API client's transport, not in core's own API (ApiClient.kt).
     implementation(libs.okhttp)
-    implementation(libs.kotlinx.coroutines.core)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.mockwebserver)
     // The classes held to Android 10's API, which Android Lint can't do here (README.md).
