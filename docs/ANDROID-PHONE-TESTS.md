@@ -179,16 +179,17 @@ is typed in the Debug readout (AN7d) until AN8 reads a block's sticker:
   in a class, focused, the screen on, Airplane mode off, the service on. The force-stop takes the
   service off the list until the student switches it on, while Android starts and binds it again by
   itself after a kill, as on the emulators. Note which of the two each maker's own buttons do.
-- **Doze over a lesson** (the battery test's R1). *Start:* in a class, focused, the screen off for 50
-  minutes, the phone still, Airplane mode off. One check-in as the screen goes off, none until it comes
-  on, then one at once; the service still bound after; and the network in Doze, as the battery test
-  asks.
+- **Doze over a lesson** (the battery test's R1). *Start:* in a class, focused, the screen on, the phone
+  still, Airplane mode off. The screen then off for 50 minutes: one check-in as it goes off, none until it
+  comes on, then one at once; the service still bound after; and the network in Doze, as the battery
+  test asks.
 - **The makers' battery savers** (the battery test's makers' checks). *Start:* in a class, focused,
   Bali closed, the screen on, Airplane mode off. After each, the service still on the list and bound in
   `dumpsys accessibility`, listening to nothing outside a lesson (`eventTypes=` empty) and to the
   window events in one.
-- **The restricted-settings install path** (Android 13 and later). *Start:* out of a class, Bali
-  installed from a downloaded APK, not `adb install`, its service off. The service switched on in
+- **The restricted-settings install path** (Android 13 and later). *Start:* out of a class, the screen
+  on, Airplane mode off, Bali installed from a downloaded APK, not `adb install`, its service off. The
+  service switched on in
   Settings: what Android shows, and App info's "Allow restricted settings" (AN1 saw "App was denied
   access").
 

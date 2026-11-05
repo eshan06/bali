@@ -110,6 +110,9 @@ class LockServiceTest {
         assertEquals(LockSwitch.Off, switch())
         switchOn()
         assertTrue(bound())
+        // The connect's check and the screen's wake done: the claim on, the wake's read of the truth sent.
+        until { server.waiting.takeIf { "GET /v1/me" in it } }
+        until { enforcer.updates.value.takeIf { it.switch == LockSwitch.On } }
         // A UiAutomation that suppresses accessibility services has Android unbind Bali's, still on its list.
         until { switch(suppressing = true).takeIf { it == LockSwitch.Starting } }
         val dump = shell("dumpsys accessibility", suppressing = true)

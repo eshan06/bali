@@ -137,7 +137,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   WARNs, each taken: the unbind's own check had no test (now the starting switch's); the screen test
   claimed a proof its look at the engine's clock can't give (said plainly above); `BaliApp.check()`
   guarded, as the enforcer's recheck is, so a lock breaking its promise never ends the app; and the AN7
-  phone tests' starting states.
+  phone tests' starting states. Round 2, on the fixes: no blocker. Its WARNs: the starting switch's test
+  now waits for the connect's check and the screen's wake first, so no check under way can stand in for
+  the unbind's, and two phone tests' starting states were made whole (both taken); and no test reaches
+  `BaliApp.check()`'s guard, since only a lock breaking its promise can and `ServiceLock` has no throwing
+  path, the enforcer's side of such a throw being the JVM's (`EnforcerTest`), left as it is.
 
 - **2026-11-05** — **AN7b, rule 3's report: protection off, the lock back on and the launch grace, in the
   enforcer's check (the conductor's calls, awaiting the owner's look; AN7b, #522).** The owner isn't
