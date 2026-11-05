@@ -59,7 +59,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   own lines (`apps/api/scripts/school.ts`) have no test, as no test runs that entry point; the hook,
   `ownerEnds` and the sender are tested together through the commands. The command reads
   `POSTHOG_HOST` unchecked, where the API's boot checks it on the same service. A join's time is the
-  database's clock and a session's end the server's: on one host they agree to the millisecond.
+  database's clock and a session's end the API's, two Railway services whose clocks network time
+  keeps milliseconds apart: a join that close to an end may count on either side of it, in
+  analytics only.
 
   **Santa's review:** two Claude Opus reviewers at max effort (Codex refuses every model on this
   Mac, so context isolation held and model diversity didn't). Round 1: one blocker, fixed. Reviewer
@@ -70,7 +72,13 @@ a real decision? Add a dated entry at the top: what was decided and why.
   command, each failing when the rule is narrowed or dropped. Their WARNs, each fixed: a join after
   the end counted (`created_at` is now checked), the owner command's mapping untested (now
   `ownerEnds`, tested), `ended_by` and the length's split marked as the conductor's calls, and a doc
-  comment put back above its function.
+  comment put back above its function. Round 2, two fresh reviewers on the fixes: no blockers. Both
+  re-ran the mutations, one adding two of its own (`>` for `>=`, and the read's time for the
+  recorded end), each failing the new tests. Their WARNs, each fixed in place: the tests' clock led
+  the machine's by as little as a few milliseconds, so a test begun at a minute's very end could see
+  its seeded student join after its own start (proven by a probe holding the clock there), and now
+  leads by a minute at least; ARCHITECTURE's marker now covers the length's split too; and this
+  entry's clock note no longer says one host.
 
 - **2026-11-04** — **AN6a, sign-in's parts: BaliCore's `SignIn.swift` in Kotlin, from its top
   through `Tokens` (the conductor's calls, awaiting the owner's look; AN6a, #515).** The owner isn't

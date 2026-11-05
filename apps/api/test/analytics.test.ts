@@ -68,8 +68,8 @@ let posted: Posted[];
 let answer: () => Promise<Response>;
 let lines: string[];
 /**
- * The server's clock: a minute's start, so whole minutes count exactly, and just ahead of the
- * machine's, so every row a test writes was made before it.
+ * The server's clock: a minute's start, so whole minutes count exactly, one to two minutes ahead
+ * of the machine's, so every row a test writes (the database stamps it) was made before it.
  */
 let now: Date;
 
@@ -114,7 +114,7 @@ beforeEach(async () => {
   issuer = await makeTestIssuer();
   posted = [];
   answer = () => Promise.resolve(new Response(null, { status: 200 }));
-  now = new Date(Math.floor(Date.now() / MIN) * MIN + MIN);
+  now = new Date(Math.floor(Date.now() / MIN) * MIN + 2 * MIN);
   app = build(on);
 });
 
