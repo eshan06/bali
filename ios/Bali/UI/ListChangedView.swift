@@ -17,15 +17,8 @@ struct ListChangedView: View {
             PageScroll {
                 VStack(spacing: 24) {
                     BaliMark(size: 72).accessibilityHidden(true)
-                    VStack(spacing: 12) {
-                        Text("Your teacher can ask questions now").textStyle(.h1)
-                            .accessibilityAddTraits(.isHeader)
-                        Text(
-                            "During class, you can answer them here on Bali. That adds two lines to the list of what your teacher sees."
-                        )
-                        .textStyle(.bodyLg).foregroundStyle(Theme.textSecondary)
-                    }
-                    .multilineTextAlignment(.center)
+                    Text("Your teacher can ask questions now").textStyle(.h1)
+                        .multilineTextAlignment(.center).accessibilityAddTraits(.isHeader)
                     ConsentCard(
                         title: "Sees", lines: ConsentCard.added(sawAnswers: phone.sawAnswersList))
                     // 12 under the card, as drawn: the column's 24 less 12.
