@@ -2864,8 +2864,22 @@ struct AppTests {
                             return same >= 6
                         }
                     }
-                    try await settled()
                     let said = "\(name), \(size), \(frame)"
+                    // Read once the screen has arrived: its field taken for typing (Join's at once,
+                    // Your name's 300 ms in, once its fade-in is over), which scrolls the page to
+                    // the field. Read sooner, the scroll to the end below could be undone by it, the
+                    // refusal read under the screen's edge (CI, #506 and #516).
+                    if fixture.joining.preview == nil {
+                        let typing = {
+                            window.layoutIfNeeded()
+                            return textFields(in: window).first?.isFirstResponder == true
+                        }
+                        try await until { typing() }
+                        // A field never taken stops the test at its case, not a minute later on each
+                        // of the 120 (santa's review).
+                        try #require(typing(), "\(said)")
+                    }
+                    try await settled()
                     func at(_ label: String) throws -> CGRect {
                         try #require(read.first { $0.accessibilityLabel == label }, "\(said)").accessibilityFrame
                     }
