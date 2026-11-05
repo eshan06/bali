@@ -3,6 +3,7 @@ import {
   type Database,
   formatInviteCode,
   mintTeacherInvite,
+  newUuidV7,
   recordAgreement,
   startSession,
   tapIn,
@@ -440,6 +441,17 @@ describe('the other suites’ app (makeAuthedApp)', () => {
         payload: { code: NO_INVITE, eventId: randomUUID() },
       });
       expect(res.statusCode).toBe(404);
+    }
+    // And past a teacher's 30 portal actions (A3a).
+    const { teacher } = await seedClassroom(db, 'limits-roomy-actions');
+    const counted = await ctx.tokenFor(teacher.cognitoId);
+    for (let i = 0; i <= BUDGETS.portalActions.burst; i += 1) {
+      const res = await authedInject(ctx.app, counted, {
+        method: 'POST',
+        url: '/v1/me/actions',
+        payload: { event: 'portal_report_opened', eventId: newUuidV7() },
+      });
+      expect(res.statusCode).toBe(200);
     }
   });
 });

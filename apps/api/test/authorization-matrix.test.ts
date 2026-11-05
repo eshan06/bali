@@ -108,6 +108,7 @@ const MATRIX = {
   'DELETE /v1/me/push-token':               [401, 401, 200,     200,     403,     403,       403],
   'GET /v1/me/age-check':                   [401, 401, 200,     200,     200,     200,       200],
   'PUT /v1/me/age-check':                   [401, 401, 200,     200,     200,     200,       200],
+  'POST /v1/me/actions':                    [401, 401, 403,     403,     200,     200,       200],
   'POST /v1/taps':                          [401, 401, 200,     200,     200,     200,       200],
   'POST /v1/taps/:eventId/unlock':          [401, 401, 200,     200,     200,     200,       200],
   'PATCH /v1/unlocks/:eventId':             [401, 401, 200,     404,     404,     404,       404],
@@ -239,6 +240,11 @@ const REQUESTS: Record<RouteKey, (w: World) => Sent | Promise<Sent>> = {
   // Anyone's own (C7-server): a teacher's is always passed, and records nothing.
   'GET /v1/me/age-check': () => ({ url: '/v1/me/age-check' }),
   'PUT /v1/me/age-check': () => ({ url: '/v1/me/age-check', body: { eventId: randomUUID() } }),
+  // Any teacher's own action, counted for PostHog (A3a): it names nothing of this world's.
+  'POST /v1/me/actions': () => ({
+    url: '/v1/me/actions',
+    body: { event: 'portal_signed_in', eventId: newUuidV7() },
+  }),
   'POST /v1/taps': (w) => ({ url: '/v1/taps', body: { tagId: w.block.tagId, ...stamped() } }),
   'POST /v1/taps/:eventId/unlock': (w) => ({ url: `/v1/taps/${w.tapId}/unlock`, body: stamped() }),
   'PATCH /v1/unlocks/:eventId': (w) => ({

@@ -1295,3 +1295,33 @@ export interface ActivityResponse {
   /** Newest first, by `occurredAt`; `ACTIVITY_LIMIT` at most. No paging: Home shows these. */
   events: ActivityEvent[];
 }
+
+// POST /v1/me/actions — a teacher's action in the portal, counted for PostHog (A3a, added
+// 2026-11-05; ARCHITECTURE, "Analytics (PostHog)"): the portal posts it to Bali's API, which
+// forwards it with the server's key. Teachers only; of the body, the server reads these two alone.
+/**
+ * The teacher actions the portal counts, and no others: PostHog's event names, set apart from the
+ * server's own (`session_started` and the rest, A2) by their `portal_` prefix, so a Start pressed
+ * in the portal never adds to the sessions the server counts.
+ */
+export const PORTAL_EVENTS = [
+  'portal_signed_in',
+  'portal_class_created',
+  'portal_block_registered',
+  'portal_session_started',
+  'portal_session_ended',
+  'portal_session_extended',
+  'portal_question_asked',
+  'portal_slides_shown',
+  'portal_present_opened',
+  'portal_report_opened',
+  'portal_recap_opened',
+] as const;
+export type PortalEvent = (typeof PORTAL_EVENTS)[number];
+export interface PortalActionRequest {
+  event: PortalEvent;
+  /** Client idempotency key (rule 4), a UUIDv7: the event's `uuid` at PostHog. */
+  eventId: string;
+}
+/** Always empty: the same whether PostHog is on or off, and for a resend. */
+export type PortalActionResponse = Record<string, never>;

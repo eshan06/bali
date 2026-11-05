@@ -1196,6 +1196,55 @@
         }
       }
     },
+    "/v1/me/actions": {
+      "post": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "event": {
+                    "type": "string",
+                    "enum": [
+                      "portal_signed_in",
+                      "portal_class_created",
+                      "portal_block_registered",
+                      "portal_session_started",
+                      "portal_session_ended",
+                      "portal_session_extended",
+                      "portal_question_asked",
+                      "portal_slides_shown",
+                      "portal_present_opened",
+                      "portal_report_opened",
+                      "portal_recap_opened"
+                    ]
+                  },
+                  "eventId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$"
+                  }
+                },
+                "required": [
+                  "event",
+                  "eventId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "default": {
+            "$ref": "#/components/responses/error"
+          }
+        }
+      }
+    },
     "/v1/me/activity": {
       "get": {
         "responses": {
