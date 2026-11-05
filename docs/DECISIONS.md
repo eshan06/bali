@@ -8,6 +8,12 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-05** — **Production backups (L0b) are back before the Vanderbilt pilot (the owner:
+  "we will have those backups before we go live. lets just mark that as somehting to do pre
+  pilot").** Withdraws 2026-11-03's "we dont need hte prod backups" for the pilot. `/privacy`'s
+  sections 4, 6 and 7 promise a daily and a weekly backup, so its words stand and the backups come
+  on to match them, before the pilot's first class: PLAN's "Before the pilot", item 7 (Railway's Pro
+  plan, or the nightly `pg_dump` built ready to enable; runbook 4's restore drill once one exists).
 - **2026-11-05** — **A4, `/privacy` names PostHog (the worker's calls, awaiting the owner; A4,
   #527).** The page's words for ARCHITECTURE's "Analytics (PostHog)" (A1, A5, A2, A3a, A3b), in
   place on the approved page: no new section, layout, component or state, so no board. Section 1's

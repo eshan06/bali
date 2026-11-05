@@ -8,10 +8,9 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-05 (Central) — A4 (#527; `docs/DECISIONS.md`, 2026-11-05): `/privacy` names
-PostHog: what the server counts, what PostHog never gets, the counts as one or two students' own
-when only one or two are in the class or tap in, its 1 year, and what stays after a deletion or a
-disposal. Before it, WC7 (#526). Next: WC8; the owner's PostHog key; a session builds the
+_Last updated: 2026-11-05 (Central) — production backups (L0b) are back before the pilot, item 7
+below (the owner, 2026-11-05; `docs/DECISIONS.md`). Before it, A4 (#527): `/privacy` names PostHog.
+Next: WC8; the owner's PostHog key; a session builds the
 retire-a-block command; the owner the new build, with A5 and A2, and the sitting; the owner's call
 on GA5's known limit, the smallest iPhones (DECISIONS 2026-11-02); AN7e; AN1's part 2 once the
 owner has the phones; the audit's polish waits, as ruled._
@@ -26,8 +25,8 @@ in `docs/PLAN-ARCHIVE.md`), `docs/DECISIONS.md` the why, Open owner items the ow
 `bali-production` (sign-up for `@vanderbilt.edu` only); the sweep every minute in the API, with
 `sweep-cron` its backup and Sentry Cron `api-sweep` its monitor; deck storage on in both
 environments (M0); the portal's sign-in lasting the school day (2026-10-13); the school
-"Vanderbilt" set up, its year end 2026-12-18. **No prod backups**, and none for the Vanderbilt
-pilot (the owner, 2026-11-03; L0b). The details: `docs/DEPLOY.md`, `docs/RUNBOOKS.md`,
+"Vanderbilt" set up, its year end 2026-12-18. **No prod backups yet**: on before the Vanderbilt
+pilot (the owner, 2026-11-05; L0b). The details: `docs/DEPLOY.md`, `docs/RUNBOOKS.md`,
 `docs/PILOT.md`.
 
 **The demo site** (www.getbali.app) is the Vercel project `bali-web`, built only from the orphan
@@ -156,9 +155,12 @@ branch, with no PR, as its README says (#479; `docs/DECISIONS.md`, 2026-11-02).
    match it) and `docs/APP-STORE.md`'s answers and review note ("no third-party analytics…"); until
    then they say App Functionality only, though item 4's key turns the totals on. The owner's, later
    (the owner, 2026-11-04: "we can change the wording on privacy stuff on apple later").
+7. Production backups on (L0b), before the pilot's first class: `/privacy` (sections 4, 6 and 7)
+   already promises a daily and a weekly backup (the owner, 2026-11-05: "we will have those backups
+   before we go live").
 
-Not needed for the Vanderbilt pilot (the owner, 2026-11-03): production backups (L0b) and the lawyer's
-words (C2); the owner's drafts stand on `/privacy` and `/terms`.
+Not needed for the Vanderbilt pilot (the owner, 2026-11-03): the lawyer's words (C2); the owner's
+drafts stand on `/privacy` and `/terms`.
 
 **Who does what.**
 - Cloud sessions: the backend, CI and docs. Never UI, never a console.
@@ -173,8 +175,8 @@ words (C2); the owner's drafts stand on `/privacy` and `/terms`.
 
 **Phase 7, Live lesson: building.** Every step with no screen is done, L3c the last (2026-10-15);
 M0 is done (deck storage on, 2026-10-12); the web screens come after the redesign's PV15 (✅ #388),
-W3 the first (✅ #392), M5 (✅ #400), L7 (✅ #402, #405), W4 (✅ #406, #407, #408, its follow-up #409), L7b (✅ #393, #394, #395, #411), L7c (✅ #412), M6 (✅ #413–#418), W5 (✅ #419), so every web screen of Phase 7 is built, and the phone's L8, M8 and M8b (✅ L8a–L8c, M8, #452, and M8b, #454, their 📱 device checks left). L0b, production backups, is not for the Vanderbilt pilot (the owner,
-2026-11-03).
+W3 the first (✅ #392), M5 (✅ #400), L7 (✅ #402, #405), W4 (✅ #406, #407, #408, its follow-up #409), L7b (✅ #393, #394, #395, #411), L7c (✅ #412), M6 (✅ #413–#418), W5 (✅ #419), so every web screen of Phase 7 is built, and the phone's L8, M8 and M8b (✅ L8a–L8c, M8, #452, and M8b, #454, their 📱 device checks left). L0b, production backups, is on before the Vanderbilt pilot (the owner,
+2026-11-05).
 
 ## Phases
 
@@ -218,7 +220,7 @@ the owner's.
 
 Slice 1 — live questions:
 - **L0** The plan (docs) — ✅ (#230; DECISIONS 2026-10-05)
-- **L0b** 🔧 **Not for the Vanderbilt pilot** (the owner, 2026-11-03: "we dont need hte prod backups"). The owner: production backups on before the first actual pilot, the Vanderbilt pilot's first class (the owner, 2026-10-12: "we will do the backups later before our first actual pilot", and that pilot is the Vanderbilt one, withdrawing the ruling of 2026-10-05 that ran it without them; until then it was before any build that can answer reaches prod, answers being education records, and before any screen, settled and ordered 2026-10-10), holding back no screen: Railway's Pro plan (runbook 1, step 4), or the nightly `pg_dump` to encrypted S3 that is built ready to enable (Open owner items) — validation: runbook 4's restore drill
+- **L0b** 🔧 **Before the Vanderbilt pilot** ("Before the pilot", item 7; the owner, 2026-11-05, withdrawing 2026-11-03's "we dont need hte prod backups"). The owner: production backups on before the first actual pilot, the Vanderbilt pilot's first class (the owner, 2026-10-12: "we will do the backups later before our first actual pilot", and that pilot is the Vanderbilt one, withdrawing the ruling of 2026-10-05 that ran it without them; until then it was before any build that can answer reaches prod, answers being education records, and before any screen, settled and ordered 2026-10-10), holding back no screen: Railway's Pro plan (runbook 1, step 4), or the nightly `pg_dump` to encrypted S3 that is built ready to enable (Open owner items) — validation: runbook 4's restore drill
 - **L1** Database and engine: questions and answers — ✅ (#310; no DECISIONS entry of its own)
 - **L2** Privacy plumbing for answers and questions — ✅ (#311; DECISIONS 2026-10-11)
 - **L3** Teacher API — ✅ as L3a and L3r
