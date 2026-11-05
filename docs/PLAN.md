@@ -8,12 +8,11 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-05 (Central) — A3b (#525; `docs/DECISIONS.md`, 2026-11-05): the portal posts
-each of a teacher's actions to `POST /v1/me/actions` once it has happened, the shell's read of the
-account the gate, an opening once per opening, a failed post never shown. Before it, WC6 (#519).
-Next: WC7; A4; a session builds the retire-a-block command; the owner the new build, with A5 and A2,
-and the sitting; the owner's call on GA5's known limit, the smallest iPhones (DECISIONS 2026-11-02);
-AN7e; AN1's part 2 once the owner has the phones; the audit's polish waits, as ruled._
+_Last updated: 2026-11-05 (Central) — WC7 (#526; `docs/DECISIONS.md`, 2026-11-04): the seventh WC
+step: the student web's card loses its two lines. Before it, A3b (#525). Next: WC8; A4; a session
+builds the retire-a-block command; the owner the new build, with A5 and A2, and the sitting; the
+owner's call on GA5's known limit, the smallest iPhones (DECISIONS 2026-11-02); AN7e; AN1's part 2
+once the owner has the phones; the audit's polish waits, as ruled._
 
 ## Now
 
@@ -47,8 +46,8 @@ branch, with no PR, as its README says (#479; `docs/DECISIONS.md`, 2026-11-02).
   Focus (#452) and M8b's slide off Focus and card on the Screen Time ask (#454); left, their 📱
   device checks, the owner's. C2's legal words (⚖️) go into the portal's pages, on the Windows PC.
 - **The owner's Android cuts on the iPhone and the student web (the owner, 2026-11-04; DECISIONS
-  2026-11-04):** WC1–WC8, one PR each, from the approved boards: WC1–WC6 ✅ (#502, #506, #508,
-  #509, #516, #519), the last the iPhone's answer card; WC7 next, the student web's card.
+  2026-11-04):** WC1–WC8, one PR each, from the approved boards: WC1–WC7 ✅ (#502, #506, #508,
+  #509, #516, #519, #526); WC8 next, the Android canvas's Words board and DESIGN.md's counts.
 - **Android (the owner, 2026-11-02)**: Phases 8–11, the steps in `docs/PLAN-ANDROID.md` (AN0 ✅);
   AN1, the lock spike: parts 1 and 1c on the Android 15–17 emulators ✅ (DECISIONS
   2026-11-03); AN1b ✅ (DECISIONS 2026-11-04): the owner picked (a), the Accessibility service, with
@@ -65,7 +64,7 @@ branch, with no PR, as its README says (#479; `docs/DECISIONS.md`, 2026-11-02).
   (#434; DECISIONS 2026-10-22), jsdom and Testing Library, dev only, opted into per file
   (`docs/WEB.md`, Testing the portal), `try-again.test.tsx` the pattern. Each UI step from now on
   converts the source-text tests it touches and adds none; `src/source-text-tests.test.ts` lists the
-  29 left (New class's converted, 2026-10-23; the policy pages', and the help page's moved to its guards, C2-text; the unlock pop-ups', GA2), a list that only shrinks.
+  28 left (New class's converted, 2026-10-23; the policy pages', and the help page's moved to its guards, C2-text; the unlock pop-ups', GA2; the student lesson's, WC7), a list that only shrinks.
 - **A stuck slide upload stops (the owner, 2026-10-22: "ok fine the 30 s and 25 min outer limit is
   good")** ✅ (#436; DECISIONS 2026-10-22): nothing sent for 30 s stops it as one with no answer, in
   the boards' line with Try again; 2 minutes for the bucket's answer once the whole file is sent (the

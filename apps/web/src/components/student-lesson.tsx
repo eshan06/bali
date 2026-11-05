@@ -1,7 +1,7 @@
 'use client';
 
 import type { StudentQuestion } from '@bali/shared';
-import { Check, CircleCheck, EyeOff, type LucideIcon, Nfc, Smartphone } from 'lucide-react';
+import { Check, CircleCheck, type LucideIcon, Nfc, Smartphone } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { type ReactNode, useCallback, useEffect, useId, useRef, useState } from 'react';
@@ -41,9 +41,6 @@ import { useMe } from './shell';
 import { SlideFull, StudentSlide } from './student-slide';
 import { TryAgain } from './try-again';
 import { CantReach, NOTICE, YourPhone } from './your-phone';
-
-/** The line under every question (StudentLesson), the board's own words. */
-export const PRIVACY = "Your teacher sees the class's totals, never which answer is yours.";
 
 const EMPTY: LessonState = { presentation: null, problem: null, asOf: null };
 
@@ -450,17 +447,18 @@ const RIGHT = 'border-2 border-bar-right bg-option-right px-3.75 py-2.75 text-te
 /** A closed answer's mark under its words (`.s-mark`). */
 const MARK = 'inline-flex items-center gap-1 text-section-label uppercase';
 
-/** The card's line under the answers (StudentLesson, StudentNotIn, StudentClosed; StudentCardStates). */
-function caption(q: StudentQuestion, open: boolean, sending: boolean): string {
+/**
+ * The card's line under the answers (StudentLesson, StudentClosed; StudentCardStates): none on an
+ * open question with nothing picked (StudentNotIn; the owner's cut, 2026-11-04).
+ */
+function caption(q: StudentQuestion, open: boolean, sending: boolean): string | null {
   if (!open) {
     return q.correctOption === null
       ? 'Your teacher closed this question.'
       : 'Your teacher closed it and showed the answer.';
   }
   if (sending) return 'Sending your answer…';
-  return q.answer
-    ? 'Your answer is in. You can change it until the question closes.'
-    : 'Pick an answer. You can change it until the question closes.';
+  return q.answer ? 'Your answer is in. You can change it until the question closes.' : null;
 }
 
 /**
@@ -495,6 +493,7 @@ function QuestionCard({
       : said === 'failed' && open
         ? "Bali couldn't send your answer. Check your connection and pick it again."
         : null;
+  const line = caption(q, open, sending !== null);
   return (
     <section
       aria-labelledby={id}
@@ -572,14 +571,15 @@ function QuestionCard({
           {alert}
         </p>
       ) : (
-        <p aria-live="polite" className="text-caption text-text-tertiary">
-          {caption(q, open, sending !== null)}
+        // With no line, its place is kept for a screen reader, out of the card's flow, so the card
+        // ends at its answers and an answer on its way is still said as it comes.
+        <p
+          aria-live="polite"
+          className={line === null ? 'sr-only' : 'text-caption text-text-tertiary'}
+        >
+          {line}
         </p>
       )}
-      <p className="flex items-start gap-2 border-t border-border-default pt-3 text-caption text-text-tertiary">
-        <EyeOff size={16} aria-hidden="true" className="mt-px shrink-0" />
-        {PRIVACY}
-      </p>
     </section>
   );
 }

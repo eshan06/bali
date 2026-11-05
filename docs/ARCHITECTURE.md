@@ -1798,8 +1798,8 @@ and keeps everything that enforces focus.
 - **What it is.** While a session of their class runs, a student signed in on the portal sees
   the slide beside the question card and answers there: the phone's card (decision 11) in the
   portal's look, under its rules (a tap answers and changes the answer until the close, no
-  Submit, the revealed answer marked and never red, "Your teacher sees the class's totals,
-  never which answer is yours"). Slides and questions only while the session runs (decision
+  Submit, the revealed answer marked and never red, the teacher seeing the class's totals,
+  never which answer is the student's). Slides and questions only while the session runs (decision
   2): after the bell the page says class is over and keeps none of it. Following needs no tap
   in (decision 2), and the page says the student isn't tapped in until they are.
 - **What it is not.** Tapping in, focus, Emergency Unlock and Screen Time stay on the phone: no
