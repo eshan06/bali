@@ -6,12 +6,13 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.bali.core.AppConfig
 import java.net.URI
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
  * The build's values as the app reads them on the phone: what core's AppConfigTest pins in the files,
- * here through aapt, the manifest and Android's reading of it.
+ * here through aapt, the manifest and Android's reading of it; and what the app starts on them.
  */
 @RunWith(AndroidJUnit4::class)
 class BaliAppTest {
@@ -29,5 +30,13 @@ class BaliAppTest {
         assertEquals(app.config == null, app.signIn == null)
         val config = checkNotNull(AppConfig.from(built + (AppConfig.Key.CognitoClientId.key to clientId.ifEmpty { "client" })))
         assertEquals(URI("com.bali.bali:/auth/callback"), config.cognito.redirectUri)
+    }
+
+    // The build's client id stays empty until the owner's (docs/DEPLOY.md): until then, as on iOS, the app
+    // starts no engine, nor an enforcer over the lock. LockServiceTest hands the app engines of its own.
+    @Test
+    fun withSignInNotSetUpTheAppStartsNoEngine() {
+        assertNull(app.signIn)
+        assertNull(app.running.value)
     }
 }

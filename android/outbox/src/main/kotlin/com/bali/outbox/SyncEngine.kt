@@ -68,7 +68,11 @@ interface SyncClock {
     /** The zone the phone is in now, where its days end (iOS's `Calendar.current`): read at each use, as a phone moves. */
     fun zone(): ZoneId
 
-    /** Returns at [until], or throws once its coroutine is cancelled. */
+    /**
+     * Returns at [until], or throws once its coroutine is cancelled. Never waits on the enforcer, its lock
+     * or a call into it: the enforcer's recheck starts its sleep inside a stretch of its own, which such a
+     * wait would never let go of ([Enforcer.check]; #522's review).
+     */
     suspend fun sleep(until: Instant)
 }
 

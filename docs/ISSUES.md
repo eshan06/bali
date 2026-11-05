@@ -260,9 +260,16 @@ both phones, on the build students will install, before Android launches
    opened, it reports nothing either: switching it on starts Bali, whose first check finds it on, and
    Bali keeps no note of the stop, where an iPhone's marker stays gone until Bali writes it again
    (santa's review of AN7b, for the owner). Whether Bali, opened again, says how long it was stopped
-   is the owner's open question, a board first. *Checked:* Bali force-stopped, and the phone booted
-   into Safe Mode and back, each mid-session, the switch then turned on before Bali is opened and
-   after: the grid's tile at each step, and the lock back only once the student switches it on.
+   is the owner's open question, a board first. What the emulators showed with Bali's own service
+   (Android 15, 16 and 17; `docs/DECISIONS.md`, 2026-11-05, AN7c): a force-stop takes it off Android's
+   list of switched-on services at once, unbound, Bali's process gone; a reboot leaves it on the list,
+   and Android starts Bali and binds it again by itself, but only once the phone is unlocked (11 to 32
+   s after the screen came on there), so on a phone with a screen lock nothing of Bali's runs before
+   the student unlocks it; and Bali's process killed, as Android's memory killer kills one, is started
+   and bound again by itself within seconds, the switch reading starting meanwhile, inside the grace.
+   *Checked:* Bali force-stopped, and the phone booted into Safe Mode and back, each mid-session, the
+   switch then turned on before Bali is opened and after: the grid's tile at each step, and the lock
+   back only once the student switches it on; and a plain reboot mid-session, unlocked late.
 2. **Phone makers' battery savers** (Samsung, Xiaomi, OnePlus, Oppo, Motorola) can switch the lock
    off or freeze it, by users' and developers' reports. Samsung's sleeping-app lists are untested.
    *Checked:* the battery test's makers' checks on the Samsung and the Pixel, each mid-session with

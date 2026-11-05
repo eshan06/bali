@@ -2,8 +2,9 @@
 
 The student app, the iPhone app's twin, over two modules of plain Kotlin (`docs/ARCHITECTURE.md`,
 "Android app structure"). Phase 9 builds the engine and Phase 10 the screens
-(`docs/PLAN-ANDROID.md`); until then the app is Bali's name, the outbox's file, sign-in's app side and
-the backup rules that keep them on the phone: no screen, no icon.
+(`docs/PLAN-ANDROID.md`); until then the app is Bali's name, the outbox's file, sign-in's app side, the
+lock's service (in the Debug build alone), the engine and the enforcer it starts, and the backup rules
+that keep them on the phone: no screen, no icon.
 
 | Folder                      | What it is                                                                                                                |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
@@ -39,11 +40,13 @@ You need JDK 21 (Android Studio's own, its JBR, as `JAVA_HOME`) and Android's SD
    in 3: `./gradlew :app:connectedDebugAndroidTest` installs the app and its test app, runs them and
    uninstalls both. They show what the JVM's tests can't: that the app opens the outbox's file on
    Android's Room, writes it through the store at FULL and settles a send's answer there; the
-   sign-in's tokens sealed by the Keystore; and the hosted UI's tab and its answer back, against the
+   sign-in's tokens sealed by the Keystore; the hosted UI's tab and its answer back, against the
    emulator's own Chrome, which stops at its first run: a test closes it with Back and force-stops
-   Chrome after, never accepting its terms, and puts back the font scale it changes. CI builds them
-   but has no emulator to run them, so a step that changes what they reach runs them here and puts
-   the result in its PR.
+   Chrome after, never accepting its terms, and puts back the font scale it changes; and the lock's
+   service, switched on and off as a student would, through the shell of a UiAutomation that leaves
+   accessibility services running (one that doesn't has Android unbind them all), the screen turned
+   off and on, each put back as found. CI builds them but has no emulator to run them, so a step that
+   changes what they reach runs them here and puts the result in its PR.
 
 The build installs nothing: `gradle.properties` turns off the Android plugin's own installs, so a
 missing platform or build tools fails the build by name, and Gradle never downloads a JDK. A step
@@ -104,6 +107,17 @@ transport, the build's config and the sign-in, for the engine and the screens to
 values (`app/build.gradle.kts`, under iOS's settings' names) are string resources the manifest names
 under iOS's Info.plist keys, read into `AppConfig`; `core`'s AppConfigTest pins the three together,
 and the client id stays empty, sign-in not set up, until the owner's (`docs/DEPLOY.md`).
+
+**The lock's service** (`app`'s `ServiceLock.kt`, `LockService.kt` and `BaliApp`'s `start`, AN7c; iOS's
+`PhoneScreenTime` and BaliApp.swift's `start`): Bali's Accessibility service, declared in `app/src/debug`
+alone with a developer's label until AS3 or AS5 declares it in main with AS0's words, and the `Lock`
+over it. Its switch is Android's list of switched-on services and the service's binding; its lock, an
+end kept by the phone's clock, the service listening to nothing outside a lesson and to window events
+in one (`setServiceInfo`), never a window's contents; its file in `no_backup/` keeps the lock for the
+next run, which reads it once as it starts. Its calls run on the main thread. The service hears the
+screen go on and off for the engine's check-ins, and runs rule 3's check as it binds and unbinds;
+`BaliApp`'s `start` runs the engine and the enforcer in place of any run before, with the check as the
+app starts and at each change of the switch, and none while sign-in isn't set up.
 
 **The outbox tables** (`core`'s `UnlockContract.kt` and `OutboxContract.kt`, BaliCore's twins) say
 what the outbox does with a record after each send; no answer ever drops an unlock the server hasn't

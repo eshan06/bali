@@ -60,6 +60,7 @@ dependencies {
     implementation(project(":outbox"))
     implementation(libs.androidx.browser)
     implementation(libs.androidx.activity)
+    implementation(libs.kotlinx.coroutines.android)
     testImplementation(libs.kotlin.test.junit5)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.junit)
