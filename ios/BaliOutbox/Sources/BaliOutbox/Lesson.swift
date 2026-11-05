@@ -63,9 +63,10 @@ public struct AnswerCard: Sendable, Hashable {
     /// Open until a read says it closed, or Bali said the last pick came too late.
     public let open: Bool
     public let looks: [Look]
-    /// The line under the answers; `alert`, in the primary ink: something didn't go; `offline`, the
-    /// poll's no answer, drawn with its icon (CardOffline).
-    public let line: String
+    /// The line under the answers, none on an open question with nothing picked and nothing wrong
+    /// (the owner's cut, 2026-11-04); `alert`, in the primary ink: something didn't go; `offline`,
+    /// the poll's no answer, drawn with its icon (CardOffline).
+    public let line: String?
     public let alert: Bool, offline: Bool
 
     /// `question` as the last read shows it, with `problem`, the last poll's, and the pick on its
@@ -98,7 +99,7 @@ public struct AnswerCard: Sendable, Hashable {
             } else if question.answer != nil {
                 ("Your answer is in. You can change it until the question closes.", false, false)
             } else {
-                ("Tap an answer. You can change it until the question closes.", false, false)
+                (nil, false, false)
             }
     }
 }
