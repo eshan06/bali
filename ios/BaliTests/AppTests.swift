@@ -3968,7 +3968,7 @@ struct AppTests {
     }
 
     @Test(
-        "Unlocked, Screen Time off and Waiting lose the owner's cut lines (2026-11-04; D1's Unlocked, ProtectionOff and Waiting, and the app canvas's Unlocked and ScreenTimeOff boards and PushWaitA), in every state: Unlocked ends at its way back, Lock my apps again or the re-tap's Tap in, with no line under it, and its reason card ends at the three while a pick is open, but for why the last pick didn't go (rule 5), and still says why a pick waits while the unlock is on its way; Screen Time off ends at its way on, or at its steps while the check reads the permission; Waiting's line is the one sentence left"
+        "Unlocked, Screen Time off, Waiting, the Screen Time step, History and Me lose the owner's cut lines (2026-11-04; D1's Unlocked, ProtectionOff, Waiting, History and Me, and the app canvas's Unlocked, ScreenTimeOff and ScreenTimeAsk boards and PushWaitA), in every state: Unlocked ends at its way back, Lock my apps again or the re-tap's Tap in, with no line under it, and its reason card ends at the three while a pick is open, but for why the last pick didn't go (rule 5), and still says why a pick waits while the unlock is on its way; Screen Time off ends at its way on, or at its steps while the check reads the permission; Waiting's line is the one sentence left; the Screen Time step ends at its last way on, or at why the ask failed, the plain step too, which no board draws; History's title has what shows under it at once; Me's classes have no line under them, and During class is its heading alone, the Screen Time row next"
     )
     func cutLinesGone() async throws {
         /// What VoiceOver reads of `name`'s screen, laid out whole, once it reads `title`.
@@ -3980,7 +3980,8 @@ struct AppTests {
         }
         let cut = [
             "Saved on your phone first.", "Your teacher sees the reason you pick.", "It's always your call.",
-            "You tapped your teacher's block before class started.",
+            "You tapped your teacher's block before class started.", "You can change this any time in Settings.",
+            "The same moments your teachers see", "Bali pauses every app.", "Leaving a class is recorded",
         ]
         var pages: [(String, [String])] = []
         // Each Unlocked fixture with the reason card, and what the card says under the three: nil
@@ -4028,6 +4029,45 @@ struct AppTests {
                 page.dropFirst(at + 1).first
                     == "Your phone locks when class starts, as long as Bali is open. No need to tap again.",
                 "\(name): \(page)")
+        }
+        // The Screen Time step, the plain one too: its last way on, the page's last; where the ask
+        // failed, why, under it.
+        let askFailed = Phone(fixture: try #require(PreviewFixtures.all["screenTimeError"])).askFailed
+        let (ask, again) = ("Ask me", "Ask again")
+        for (name, last) in [
+            ("screenTime", ask), ("screenTimeDenied", again), ("screenTimeError", askFailed?.words(.notDetermined)),
+            ("screenTimeQuestion", ask), ("screenTimeQuestionSlide", ask), ("screenTimeSlide", ask),
+            ("screenTimeDeniedQuestion", again),
+        ] {
+            let page = try await read(name, once: "Let Bali pause apps during class")
+            pages.append((name, page))
+            #expect(last != nil && page.last == last, "\(name): \(page)")
+        }
+        // History: its title, then what shows under it, a day first as D1's History draws it.
+        let kept = try #require(PreviewFixtures.all["historyRefreshError"]?.history.notUpdated)
+        for (name, under) in [
+            ("history", "Today"), ("historyScreenTime", "Today"), ("historyEmpty", "No moments yet"),
+            ("historyLoading", "Reading your history…"), ("historyError", History.words(.networkError)),
+            ("historyRefreshError", kept),
+        ] {
+            let page = try await read(name, once: under)
+            pages.append((name, page))
+            let at = try #require(page.firstIndex(of: "History"), "\(name): \(page)")
+            #expect(page.dropFirst(at + 1).first == under, "\(name): \(page)")
+        }
+        // Me: after the last class's Leave, Join a class, or During class where the phone stands
+        // unread, with no line between; During class read alone, the Screen Time row next.
+        for name in [
+            "me", "meEditing", "meNameError", "meSignOutHeld", "meSignOutFailed", "meScreenTimeOff", "meLeaveAsk",
+            "meLeaving", "meLeaveError", "meLeaveInSession", "meDeleteAsk",
+        ] {
+            let page = try await read(name, once: "What your teacher sees")
+            pages.append((name, page))
+            let leave = try #require(page.firstIndex(of: "Leave Period 5 — Chemistry"), "\(name): \(page)")
+            let next = name == "meScreenTimeOff" ? "During class" : "Join a class"
+            #expect(page.dropFirst(leave + 1).first == next, "\(name): \(page)")
+            let during = page.firstIndex(of: "During class").map { page.dropFirst($0 + 1).first }
+            #expect(during??.hasPrefix("Screen Time") == true, "\(name): \(page)")
         }
         for (name, page) in pages {
             #expect(!page.contains { label in cut.contains { label.contains($0) } }, "\(name): \(page)")

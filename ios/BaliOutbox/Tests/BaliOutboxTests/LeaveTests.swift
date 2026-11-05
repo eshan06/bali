@@ -49,15 +49,11 @@ struct LeaveTests {
         let p3 = try row("3", "Period 3 — Algebra II")
         #expect(Leaving.question(p3) == "Leave Period 3 — Algebra II?")
         #expect(Leaving.consequence == "You'll need the class code to join it again.")
-        #expect(Leaving.recorded == "Leaving a class is recorded, and your teacher sees it.")
         #expect(
             Leaving.inSession(p3)
                 == "Period 3 — Algebra II is in session. You can leave it once class is over.")
         let named = try row("5", "Chemistry")
-        let bali = [
-            Leaving.question(named), Leaving.consequence, Leaving.recorded,
-            Leaving.inSession(named), lost,
-        ]
+        let bali = [Leaving.question(named), Leaving.consequence, Leaving.inSession(named), lost]
         for words in bali { #expect(!words.contains("—") && !words.contains("–"), "\(words)") }
     }
 

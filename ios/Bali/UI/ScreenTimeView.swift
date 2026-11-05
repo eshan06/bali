@@ -69,9 +69,6 @@ struct ScreenTimeView: View {
                             Text(failure).textStyle(.body)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        Text("You can change this any time in Settings.")
-                            .textStyle(.caption).foregroundStyle(Theme.textTertiary)
-                            .frame(maxWidth: .infinity).multilineTextAlignment(.center)
                     }
                 }
             }
