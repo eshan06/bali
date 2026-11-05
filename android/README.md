@@ -177,7 +177,12 @@ enforcer follows the engine's state and keeps the lock where it says, through a 
 tap's cap, and stops there by the phone's clock with nothing woken; the enforcer puts it on again as
 the end moves, never over the switch off. Over a standing the file won't give back, the last run's
 lock stays until the phone knows where it stands or the student unlocks. Rule 3's check, at each of the
-engine's wakes, puts back a lock gone behind Bali's back. Swift's actor is a lock each stretch holds, as
+engine's wakes, puts back a lock gone behind Bali's back, and reports the switch found off in a session
+the phone's clock says still runs, with iOS's events (AN7b): a report the outbox couldn't queue is shown
+and tried again at the next check, and the switch on again, the service bound, in the class it was off
+in before its bell, puts the phone back where it stood (#167). A switch starting, on Android's list but
+not bound yet, is off only once that lasts 30 s by the time the phone has run, checked again every
+second meanwhile. Swift's actor is a lock each stretch holds, as
 the engine's, let go at each call into the lock or the engine, so a check lands while a pass waits on the
 lock; each call runs in the enforcer's own scope, so no caller cancelled cuts a pass short. What a screen
 may claim of the lock (`Protection`) is what the last pass found, never the standing alone. Its tests run

@@ -10,6 +10,19 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN7b's on 2026-11-05: _Last updated: 2026-11-05 (Central) — AN7a,
+the lock follows the engine (#521; `docs/DECISIONS.md`,
+2026-11-05): BaliOutbox's enforcer in Kotlin over a seam of the lock's own (`Lock`), with its tests on a
+fake lock: the lock put on until the bell or a tap's cap, an end it keeps by the phone's clock, and
+again as the end moves, never over the switch off; over a standing the file won't give back, the last
+run's lock kept until the phone knows where it stands or the student unlocks; rule 3's check putting it
+back; and the phone check's shorter cap. Swift's actor is a lock each stretch holds, let go at each call
+into the lock, so a check lands while a pass waits. AN7 is six steps now, AN7a–AN7f (the conductor's
+split, awaiting the owner). Before it, AN6c, sign-in's app side. Next: AN7b, rule 3's report; Android's
+Cognito clients, the owner's (Open owner items, 8); Android 17's SDK platform for the owner to OK before
+the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once
+the owner has the phones. Not on the pilot's critical path._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN7a's on 2026-11-05: _Last updated: 2026-11-05 (Central) — AN6c,
 sign-in's app side (#520; `docs/DECISIONS.md`,
 2026-11-05): the tokens sealed by a Keystore key of the app's own, a file that can never be opened
@@ -2299,6 +2312,21 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN7b's line, as it read until it was done (2026-11-05; `docs/DECISIONS.md`, 2026-11-05).
+
+- **AN7b** Rule 3's report: protection off, the lock back on, the launch grace (twin: `Enforcement`'s
+  check, `judged` and `backOn`): rule 3 at every check-in; protection off and on, with iOS's events:
+  the switch found off in a session the phone's clock says still runs, reported once
+  (`Change.ProtectionOff`), shown and tried again where the outbox can't queue it (`unreported`); the
+  lock back on in the class it was off in, before its bell (#167, `Change.ProtectionOn`), once; a
+  switch starting judged off once that lasts the grace, 30 s (DECISIONS 2026-11-05, Q3), measured by
+  uptime, read again every second meanwhile. Tests, over the fake lock, their words AN10's:
+  RevokedWhileRunningTests, LaunchGraceTests, the rest of ProtectionOffTests and BackOnTests, and the
+  check's half of `reportedAgain` and `onlyFocusAgain`. Still for the owner: whether Bali, opened
+  again, reports how long it was stopped; that is new information about a student, so it needs a board
+  and the owner's approval first (ARCHITECTURE, "Android app structure", the rules); until then a
+  force-stop found after the bell reports nothing (Q7) — validation: the rules' JVM tests
 
 AN7a's line, as it read when it was done (2026-11-05; `docs/DECISIONS.md`, 2026-11-05). The conductor
 split AN7's line into AN7a–AN7f that day, every word of it kept in one of them: AN7a's here, AN7b's to

@@ -197,6 +197,27 @@ class EnforcerTest : EngineFiles() {
         }
 
     @Test
+    fun overAStandingNotReadThisRunsLockEndedAtItsCapLeavesNoEndBehindSoTheLastRunsFoundAgainIsNeitherGivenOneNorTakenOff(): Unit =
+        runBlocking {
+            // Claude Review's WARN on #521: `putOn` names only a lock this enforcer holds, forgotten once the
+            // lock holds none, so it can't take the last run's for its own.
+            val (phone, _) = unreadable(held = false)
+            val rig = phone.rig
+            // Offline: a tap the server never answers, its lock ended at the cap by the phone's clock.
+            rig.engine.record(Change.Tap("tag"))
+            phone.until { it.locked && it.until == capped }
+            rig.server.next(tapRoute).reply(null)
+            rig.clock.advance(SyncState.TAP_CAP)
+            phone.until { !it.locked && it.until == null }
+            // The last run's lock found again (the service, say, reading it back as it reconnects).
+            phone.lock.held()
+            phone.enforcer.check()
+            assertTrue(phone.lock.holds)
+            assertNull(phone.lock.until)
+            assertEquals(0, phone.lock.unlocks)
+        }
+
+    @Test
     fun switchedOnInSettingsTheClaimSaysSoAtTheCheckAsBaliComesBack(): Unit =
         runBlocking {
             // requestPermission's twin: Android asks nothing, the student switches the service on. No run

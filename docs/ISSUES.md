@@ -254,9 +254,15 @@ both phones, on the build students will install, before Android launches
 
 1. **A force-stop or Safe Mode switches the lock off** until the student switches it on again;
    Bali can say so, not undo it. The grid shows it, the phone gone quiet and then protection off
-   once Bali is opened, but the phone is free meanwhile. *Checked:* Bali force-stopped, and the
-   phone booted into Safe Mode and back, each mid-session: the grid's tile at each step, and the
-   lock back only once the student switches it on.
+   once Bali is opened, but the phone is free meanwhile. Opened only after the bell, Bali reports
+   nothing, where an iPhone reports it late from its monitor's note: the grid's quiet tile is all
+   the class keeps of it (`docs/DECISIONS.md`, 2026-11-05, Q7). Switched on again before Bali is
+   opened, it reports nothing either: switching it on starts Bali, whose first check finds it on, and
+   Bali keeps no note of the stop, where an iPhone's marker stays gone until Bali writes it again
+   (santa's review of AN7b, for the owner). Whether Bali, opened again, says how long it was stopped
+   is the owner's open question, a board first. *Checked:* Bali force-stopped, and the phone booted
+   into Safe Mode and back, each mid-session, the switch then turned on before Bali is opened and
+   after: the grid's tile at each step, and the lock back only once the student switches it on.
 2. **Phone makers' battery savers** (Samsung, Xiaomi, OnePlus, Oppo, Motorola) can switch the lock
    off or freeze it, by users' and developers' reports. Samsung's sleeping-app lists are untested.
    *Checked:* the battery test's makers' checks on the Samsung and the Pixel, each mid-session with

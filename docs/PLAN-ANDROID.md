@@ -14,17 +14,16 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-05 (Central) — AN7a, the lock follows the engine (#521; `docs/DECISIONS.md`,
-2026-11-05): BaliOutbox's enforcer in Kotlin over a seam of the lock's own (`Lock`), with its tests on a
-fake lock: the lock put on until the bell or a tap's cap, an end it keeps by the phone's clock, and
-again as the end moves, never over the switch off; over a standing the file won't give back, the last
-run's lock kept until the phone knows where it stands or the student unlocks; rule 3's check putting it
-back; and the phone check's shorter cap. Swift's actor is a lock each stretch holds, let go at each call
-into the lock, so a check lands while a pass waits. AN7 is six steps now, AN7a–AN7f (the conductor's
-split, awaiting the owner). Before it, AN6c, sign-in's app side. Next: AN7b, rule 3's report; Android's
-Cognito clients, the owner's (Open owner items, 8); Android 17's SDK platform for the owner to OK before
-the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once
-the owner has the phones. Not on the pilot's critical path._
+_Last updated: 2026-11-05 (Central) — AN7b, rule 3's report (#522; `docs/DECISIONS.md`, 2026-11-05):
+the switch found off in a session the phone's clock says still runs, reported once with iOS's events,
+shown and tried again where the outbox can't queue it; switched on again in the class it was off in,
+before its bell, the phone back where it stood (#167), once, and only once the service is bound; a
+switch starting judged off once that lasts the grace, 30 s by the time the phone has run, checked again
+every second meanwhile; and Claude Review's two WARNs on #521, each decided with a test. A force-stop
+found after the bell reports nothing (Q7). Before it, AN7a, the lock follows the engine. Next: AN7c, the
+service and the app's engine; Android's Cognito clients, the owner's (Open owner items, 8); Android 17's
+SDK platform for the owner to OK before the first step with today's AndroidX, and OkHttp 5.5 with it
+(Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -146,18 +145,8 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN6b** Sign-in itself — ✅ (#518; DECISIONS 2026-11-05)
 - **AN6c** Sign-in's app side — ✅ (#520; DECISIONS 2026-11-05)
 - **AN7a** The lock follows the engine — ✅ (#521; DECISIONS 2026-11-05)
-- **AN7b** Rule 3's report: protection off, the lock back on, the launch grace (twin: `Enforcement`'s
-  check, `judged` and `backOn`): rule 3 at every check-in; protection off and on, with iOS's events:
-  the switch found off in a session the phone's clock says still runs, reported once
-  (`Change.ProtectionOff`), shown and tried again where the outbox can't queue it (`unreported`); the
-  lock back on in the class it was off in, before its bell (#167, `Change.ProtectionOn`), once; a
-  switch starting judged off once that lasts the grace, 30 s (DECISIONS 2026-11-05, Q3), measured by
-  uptime, read again every second meanwhile. Tests, over the fake lock, their words AN10's:
-  RevokedWhileRunningTests, LaunchGraceTests, the rest of ProtectionOffTests and BackOnTests, and the
-  check's half of `reportedAgain` and `onlyFocusAgain`. Still for the owner: whether Bali, opened
-  again, reports how long it was stopped; that is new information about a student, so it needs a board
-  and the owner's approval first (ARCHITECTURE, "Android app structure", the rules); until then a
-  force-stop found after the bell reports nothing (Q7) — validation: the rules' JVM tests
+- **AN7b** Rule 3's report: protection off, the lock back on, the launch grace — ✅ (#522; DECISIONS
+  2026-11-05)
 - **AN7c** The service and the app's engine (twin: `PhoneScreenTime` and BaliApp.swift's engine): the
   Accessibility service, (a), as ARCHITECTURE's battery plan has it (listening only in a lesson, and
   then to window events), declared in the Debug build alone with a developer's label (DECISIONS

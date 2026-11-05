@@ -544,7 +544,8 @@ class ReasonEngineTest : EngineFiles() {
 /**
  * #167: the lock back on in the class the phone was protection off in puts it back where it stood, focused
  * or still unlocked, with no re-tap: the engine's half of BaliOutbox's BackOnTests `once`, `lateUnlocked`,
- * `unlockedSince` and `notKnown`, recorded here as the lock's service will record it (AN7).
+ * `unlockedSince` and `notKnown`, recorded here by hand; the lock's half, through rule 3's check, is
+ * LockBackOnTest's (AN7b).
  */
 class BackOnTest : EngineFiles() {
     /** Tapped into session s, and, [unlocked], out of focus by an Emergency Unlock the server recorded; then protection off, its report answered. */
