@@ -8,6 +8,108 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-05** — **AN6b, sign-in itself: BaliCore's `SignIn` in Kotlin, and the engine's `make` over
+  it (the conductor's calls, awaiting the owner's look; AN6b, #518).** The owner isn't reviewing each
+  step and asked for the recommended option on every question, so each call here is the conductor's,
+  for the owner to look at.
+
+  **Where it lives:** `core`'s `SignIn.kt`, beside AN6a's parts: `SignIn` but `deleteUser` and its
+  helper (AN9's), and `Tokens.DISTANT_PAST`, Foundation's `distantPast`, which a refresh sets as
+  iOS's does; `core`'s `TokenStore.kt`, the protocol, the Keystore store AN6c's; and `outbox`'s
+  `SyncEngine.make`, the client's tokens and a 401's refresh the sign-in's, every token it gets
+  otherwise ringing `retryNow`, its 13+ yes AN9's. `core`'s coroutines are `api` now: the sign-in
+  takes the app's scope and says who is signed in as a flow. Where Kotlin differs, said plainly:
+  - **The actor is the engine's lock** (AN5a's `alone`): each stretch Swift runs between two
+    `await`s holds a `Mutex`, and lets go at the browser, the token endpoint, a renewal waited for
+    and the engine told. A stretch is a block that can't suspend, so nothing interleaves inside one
+    and no cancel cuts one short, and it runs whole for a caller cancelled at the lock
+    (`NonCancellable`). **The store's calls block, as the Keychain's do,** so they're plain
+    functions, never `suspend`, and every stretch runs on `Dispatchers.IO`, never a caller's thread
+    (a screen's on the main thread).
+  - **The shared renewal is one `Deferred` in the sign-in's scope,** the app's under a job of its
+    own, started once it is the one under way and let go of as it ends; every caller awaits it. A
+    caller cancelled stops waiting, and the renewal goes on for the others, its token kept and the
+    engine told, where Swift's first caller can't stop waiting on its task. A renewal that fails, or
+    is cancelled with its scope, gives none, never a throw (AN5b's contract).
+  - **A sign-in's exchange and keep run in the sign-in's scope,** as the engine's calls run in its
+    own (AN5a): a screen cancelled after the browser answered stops waiting, and the sign-in goes
+    on, kept and the engine told. iOS's cancelled caller cancels its exchange, so the code is spent
+    and nothing kept, said as unreachable. The browser itself runs in the caller's coroutine.
+  - **Who is signed in is a `StateFlow`'s,** the store read as `signedIn()` is asked, as iOS's
+    stream reads it: the newest only, as iOS's `bufferingNewest(1)`, but changes alone, where iOS's
+    yields at every adopt (a renewal's `true` again); nothing on iOS keys on a repeat.
+  - **Any failure of a store or a transport reads as Swift's `try?` reads one:** a store that throws
+    anything can't be read right now, never a sign-out; a transport that throws anything is no
+    answer, so `signIn` throws only a `SignInError` (or its caller's own cancel), and the hook the
+    engine gives (`whenTokenArrives`) failing never undoes the token. The token endpoint's answer is
+    read as iOS's `Decodable` reads it: each field a string or none, one of another type no answer.
+  - **The browser seam** takes the hosted UI's `URI` and gives the answer back as text (AN6a).
+
+  **Stricter than iOS, the conductor's call: a renewal's caller is given the tokens it leaves only
+  while they still pass.** iOS's `deletionToken` gives whatever tokens there are once a renewal it
+  waited on returns true, checking nothing again: a sign-in not through the 13+ check landing
+  meanwhile (the renewal's answer then about tokens let go) has its token sent to Bali's API before
+  the check, and `accountDeleted` landing meanwhile has a token go to the API after the deletion
+  (C4), which would make a fresh account. Here the token is held to the deletion and the gate again.
+  Its reach is narrow on both phones (a sign-in or a deletion within one renewal's round trip; a
+  second account on one phone is ruled out for the pilot), and the check costs one line, so it
+  holds ARCHITECTURE's rule outright. iOS's code is another session's: for the owner, whether
+  iOS's should check again too. **And the gate fails closed** (santa's review): `SignIn` is gated
+  unless built with `gated = false`, as only the tests of its tokens alone are, where iOS's is
+  ungated unless the app says, so a sign-in built without the flag gives Bali's API no token rather
+  than one before the check. Pinned by a test.
+
+  **The tests:** SignInTests' `exchange`, `signUp`, `unfinished` and `unkept`; TokenTests' twenty-three
+  but `emailNoDefault` (AN6a's); DeleteUserTests' `mayDelete`; and SignInEngineTests' four over
+  `SyncEngine.make`, Cognito and the API answered by the rig's one server. iOS's `shared` and
+  `sharedFromRefresh` wait 100 ms for the callers to join the renewal; here each waits for its own
+  mark: a caller's check of its token's expiry (the test's clock counts its reads), or the token
+  marked refused in the store. New: a caller cancelled while it waits, the renewal's starter and
+  every caller; never a throw (a store failing another way, a transport throwing what none should,
+  the engine's hook throwing after a renewal and after a sign-in, the renewal cancelled with its
+  scope); a sign-in built without the flag gated; a sign-in whose caller is
+  cancelled once the browser answered; the exchange on the wire over OkHttp against MockWebServer;
+  an answer's field of another type; an odd transport at sign-in; and a renewal's caller given no
+  token once a sign-in not through the check, or the deletion, lands meanwhile.
+
+  Tried, each failing by name, then reverted: a renewal of its own for each caller (3 tests); a
+  waiter's cancel cancelling the shared renewal (2); Cognito's `invalid_grant` not signing out (3);
+  any refusal signing out (`kept`); the late answer's guard dropped, a sign-out undone (2); only an
+  `IOException` caught at the transport (`unkept`, after it passed every other test: the renewal's
+  own guard covers the token, so `signIn` alone needed the case); the 13+ gate dropped (`checked`);
+  the exchange run in the caller's coroutine; `make` without its ring (3), and without its refresh
+  (2); the engine told of its own refresh (2); the store never caught up (2); an unreadable store
+  taken as nobody signed in (`locked`); a renewal never let go of (6); the refused token never
+  marked so (4); the renewal's tokens given unchecked, as iOS's are, and held to the gate alone
+  (the new test, each half); and, for santa's WARNs, the sign-in's own hook unguarded and the gate
+  open by default (each its test). Nothing was added to the PC's SDK: its folders were compared
+  before and after.
+
+  **For AN6c:** the store's three calls block and run on `Dispatchers.IO`; `load` throws only when
+  the store can't be read right now, which the sign-in never takes for a sign-out and asks again, so
+  sealed tokens the phone can never open again (their Keystore key gone) must read as nothing saved,
+  or the student stays neither signed in nor out. The attempt's verifier and state live in memory
+  for the call alone: a process death while the tab is open loses them, and its redirect can only be
+  refused. Give the sign-in and `make` one `OkHttpTransport` and the app's scope, as long-lived as
+  the process, never a screen's, a ViewModel's or a service's: once a scope ends, no renewal starts
+  in it again, and `signIn` throws its cancel (santa's review). Build the app's sign-in gated, as
+  the default is. **For AN9:** `deleteUser`, and the engine's 13+ yes over `make`'s sign-in.
+
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini
+  CLI on this PC, so context isolation holds and model diversity doesn't): 0 blockers. Their WARNs,
+  each taken: the sign-in's own hook throwing pinned by no test, only the renewal's (added); the
+  gate open unless the app said, as iOS's is (now closed unless a test says, above); and a scope
+  that ends leaving every later renewal stillborn, `signIn` then throwing its cancel to a caller
+  still running (the scope's doc and For AN6c, above: the app's lives as long as its process).
+
+  **Claude Review on #518:** PASS, with three WARNs: `refresh` marks the tokens held now as refused,
+  so fresh ones landed between the API's 401 and the call cost one more renewal and lose nothing,
+  as on iOS (left: the engine's refresh names no token); the scope that ends (above); and a sign-out
+  while a sign-in's exchange runs, which that sign-in, the student's own, then overrides, as on iOS
+  (pinned by a test).
+
+  **The proof:** `android/app` is unchanged, so the JVM tests are the proof, and no emulator ran.
+
 - **2026-11-05** — **A3a, the server's endpoint for the portal's teacher actions, `POST
   /v1/me/actions` (the conductor's calls, awaiting the owner; A3a, #517).** The relay the owner
   picked ("Through Bali's server", the entry "PostHog: the owner's four rulings"): the portal posts

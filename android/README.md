@@ -76,13 +76,20 @@ its pooled one turns out closed, as URLSession's does. Its tests run against Moc
 local port. Gradle picks OkHttp's Android build for the app and its JVM build for `core`'s tests.
 Its calls suspend (kotlinx.coroutines), as Swift's are async.
 
-**Sign-in's parts** (`core`'s `SignIn.kt`, BaliCore's `SignIn.swift` from its top through `Tokens`)
-are the hosted UI's address with PKCE, its verifier and state from `SecureRandom`; the code in its
-answer, taken only at the redirect URI and only for its attempt, the answer read with `java.net.URI`,
-since OkHttp's `HttpUrl` reads only http and https; and the tokens, kept in a form of their own that
-reads tokens kept before a field existed, and their claims, read unverified: a token the phone can't
-read gives none, never a crash. No token, code, verifier or state reaches a log line or an error's
-message. `SignIn` itself is AN6b's; its store and browser, the app's, AN6c's.
+**Sign-in** (`core`'s `SignIn.kt` and `TokenStore.kt`, BaliCore's `SignIn.swift` but `deleteUser`,
+AN9's) has its parts (AN6a): the hosted UI's address with PKCE, its verifier and state from
+`SecureRandom`; the code in its answer, taken only at the redirect URI and only for its attempt, the
+answer read with `java.net.URI`, since OkHttp's `HttpUrl` reads only http and https; and the tokens,
+kept in a form of their own that reads tokens kept before a field existed, and their claims, read
+unverified: a token the phone can't read gives none, never a crash. `SignIn` itself (AN6b) keeps the
+tokens: the API client's `TokenProvider`, whose token never throws, and the engine's refresh. Swift's
+actor is a lock each stretch holds, as the engine's, a stretch that can't suspend, on
+`Dispatchers.IO`, since the store's calls block as the Keychain's do. One renewal at a time, in the
+app's scope, which every caller waits for: one cancelled stops waiting, and it goes on for the
+others. Only Cognito refusing the refresh token signs anyone out, and no token reaches Bali's API
+before the 13+ check but the check's own read and a deletion's. The token endpoint is reached over
+the API client's OkHttp. No token, code, verifier or state reaches a log line or an error's message.
+`SyncEngine.make` is the app's engine over it. Its store and browser, the app's, are AN6c's.
 
 **The outbox tables** (`core`'s `UnlockContract.kt` and `OutboxContract.kt`, BaliCore's twins) say
 what the outbox does with a record after each send; no answer ever drops an unlock the server hasn't

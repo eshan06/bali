@@ -1,8 +1,8 @@
 package com.bali.core
 
 import java.net.URI
+import java.net.UnknownHostException
 import java.time.Duration
-import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -10,38 +10,23 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.test.fail
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.first
+import mockwebserver3.MockResponse
+import mockwebserver3.MockWebServer
+import okhttp3.Headers.Companion.headersOf
 
-// B4's parts, SignInTests.swift's that need no `SignIn` (AN6a): PKCE, the hosted UI's address, the
-// code in its answer, and the tokens' kept form and claims. The tests that need `SignIn` itself are
-// AN6b's (docs/PLAN-ANDROID.md).
-
-private val cognito =
-    Cognito(URI("https://bali-dev.auth.us-east-1.amazoncognito.com"), "phone-client", URI("bali://auth/callback"))
-private const val TOKEN_ENDPOINT = "https://bali-dev.auth.us-east-1.amazoncognito.com/oauth2/token"
+// B4, SignInTests.swift: PKCE, the hosted UI's address, the code in its answer and the token endpoint,
+// and the tokens' kept form and claims, read directly where iOS's tests read them through `SignIn`.
 
 /** RFC 7636's own example (appendix B). */
 private const val RFC_VERIFIER = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
 private const val RFC_CHALLENGE = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
 
-/** The phone's clock: 2026, while the tokens' own claims are the server's, in 2001. */
-private val t0 = Instant.ofEpochSecond(1_790_000_000)
-
-/** A token whose payload is [payload], unsigned: the phone never checks the signature. */
-private fun token(payload: String) = "eyJhbGciOiJSUzI1NiJ9.${base64url(payload.encodeToByteArray())}.signature"
-
-/** An access token as Cognito's reads on the phone: a payload with `iat` and `exp`. */
-private fun jwt(name: String, lifetime: Long = 3600) =
-    token("""{"sub":"$name","iat":1000000000,"exp":${1_000_000_000 + lifetime}}""")
-
-/** An access token from a sign-in that asked for the scope DeleteUser needs, its pool's [issuer] (DeleteUserTests' `admin`). */
-private fun admin(name: String, issuer: String = "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_YTloqilwT") =
-    token(
-        """{"sub":"$name","iat":1000000000,"exp":1000003600,""" +
-            """"scope":"openid email profile aws.cognito.signin.user.admin","iss":"$issuer"}""",
-    )
-
-/** Signing in: PKCE, the hosted UI's address and the code in its answer (B4). */
-class SignInTest {
+/** Signing in: PKCE, the hosted UI's address, the code in its answer and the token endpoint (B4). */
+class SignInTest : SignIns() {
     @Test
     fun theS256ChallengeIsRfc7636sOwnExample() {
         assertEquals(RFC_CHALLENGE, Attempt(verifier = RFC_VERIFIER, state = "s").challenge)
@@ -149,6 +134,149 @@ class SignInTest {
             assertEquals(0, error.stackTrace.size, "$error")
         }
     }
+
+    @Test
+    fun aSignInExchangesItsCodeAndVerifierAtTheTokenEndpointNoSecretAndKeepsBothTokens() =
+        inTime {
+            val endpoint = TransportDouble.answering(200, granted(jwt("a1"), refresh = "refresh-1"))
+            val (store, told) = MemoryStore() to Told()
+            val phone = signIn(store, endpoint, told = told)
+            var opened: URI? = null
+            phone.signIn { url ->
+                opened = url
+                signsIn(url)
+            }
+            val sent = endpoint.sent.single()
+            assertEquals(listOf("POST", TOKEN_ENDPOINT), listOf(sent.method, sent.url.toString()))
+            assertEquals(ApiClient.REQUEST_TIMEOUT, sent.timeout) // no answer in time is no answer
+            assertEquals(mapOf("Content-Type" to "application/x-www-form-urlencoded"), sent.headers) // no Authorization
+            val form = fields(sent.body)
+            assertEquals(setOf("grant_type", "client_id", "code", "redirect_uri", "code_verifier"), form.keys)
+            assertEquals(
+                listOf("authorization_code", "phone-client", "the-code", "bali://auth/callback"),
+                listOf(form["grant_type"], form["client_id"], form["code"], form["redirect_uri"]),
+            )
+            // The verifier sent is the one whose challenge the sign-in page was opened with.
+            val page = assertNotNull(opened)
+            assertEquals(query(page, "code_challenge"), Attempt(verifier = assertNotNull(form["code_verifier"]), state = "").challenge)
+            assertEquals(listOf(jwt("a1"), "refresh-1"), store.tokens?.let { listOf(it.access, it.refresh) })
+            assertEquals(jwt("a1"), phone.accessToken())
+            assertTrue(phone.signedIn().first())
+            assertEquals(1, told.count) // the engine sends what waited on the sign-in at once
+        }
+
+    @Test
+    fun aSignUpOpensTheHostedUisSignUpPageAndTheNewAccountItSendsBackIsSignedInAsASignInsIs() =
+        inTime {
+            // The approved Sign in & sign up design: its code and verifier exchanged, both tokens kept, the engine told.
+            val endpoint = TransportDouble.answering(200, granted(jwt("a1"), refresh = "refresh-1"))
+            val (store, told) = MemoryStore() to Told()
+            val phone = signIn(store, endpoint, told = told)
+            var opened: URI? = null
+            phone.signIn(HostedPage.SignUp) { url ->
+                opened = url
+                signsIn(url)
+            }
+            val page = assertNotNull(opened)
+            assertEquals("/signup", page.path)
+            val form = fields(endpoint.sent.single().body)
+            assertEquals(listOf("authorization_code", "the-code"), listOf(form["grant_type"], form["code"]))
+            assertEquals(query(page, "code_challenge"), Attempt(verifier = assertNotNull(form["code_verifier"]), state = "").challenge)
+            assertEquals(listOf(jwt("a1"), "refresh-1"), store.tokens?.let { listOf(it.access, it.refresh) })
+            assertEquals(jwt("a1"), phone.accessToken())
+            assertEquals(1, told.count)
+        }
+
+    @Test
+    fun aSignInThatDoesNotFinishKeepsNothingAndTellsNobodyTheBrowsersOwnWordForWhyPassedOnAsItIs() =
+        inTime {
+            // C1b: the browser's cancel or failure, Cognito's no at the page or the endpoint, no answer, no refresh token.
+            val cases =
+                listOf(
+                    Triple(null, null, SignInError.Cancelled),
+                    Triple(null, null, SignInError.NotOpened("no window to open it in")),
+                    Triple("error=access_denied", null, SignInError.Refused("access_denied")),
+                    Triple(null, 400 to refusal("invalid_grant"), SignInError.Refused("invalid_grant")),
+                    Triple(null, 500 to "oops", SignInError.Unreachable),
+                    Triple(null, 200 to granted(jwt("a1")), SignInError.Refused(null)), // no refresh token: nothing to keep
+                )
+            for ((answer, reply, error) in cases) {
+                val endpoint =
+                    TransportDouble {
+                        val (status, body) = reply ?: fail("$error: nothing should reach the token endpoint")
+                        HttpAnswer(status, emptyMap(), body.encodeToByteArray())
+                    }
+                val (store, told) = MemoryStore() to Told()
+                val phone = signIn(store, endpoint, told = told)
+                val thrown =
+                    assertFailsWith<SignInError>("$error") {
+                        phone.signIn { url ->
+                            if (reply == null && answer == null) throw error
+                            "bali://auth/callback?${answer ?: "code=c"}&state=${query(url, "state")}"
+                        }
+                    }
+                assertEquals(error, thrown)
+                assertNull(thrown.message, "$error") // nothing of the attempt's in what is said of it
+                assertNull(store.data, "$error")
+                assertNull(phone.accessToken(), "$error")
+                assertEquals(0, told.count, "$error")
+            }
+        }
+
+    @Test
+    fun aSignInThatCantReachCognitoOrWhoseTokensTheStoreRefusesKeepsNothing() =
+        inTime {
+            val (store, told) = MemoryStore() to Told()
+            val offline = signIn(store, TransportDouble.throwing(UnknownHostException("bali-dev.auth.us-east-1.amazoncognito.com")), told = told)
+            assertEquals(SignInError.Unreachable, assertFailsWith<SignInError> { offline.signIn(browser = signsIn) })
+            // A transport throwing what none should is no answer too, never a failure the screen can't name.
+            val odd = signIn(store, TransportDouble { throw IllegalStateException("odd") }, told = told)
+            assertEquals(SignInError.Unreachable, assertFailsWith<SignInError> { odd.signIn(browser = signsIn) })
+            store.setLocked(true)
+            val locked = signIn(store, TransportDouble.answering(200, granted(jwt("a1"), refresh = "r")), told = told)
+            assertEquals(SignInError.NotKept, assertFailsWith<SignInError> { locked.signIn(browser = signsIn) })
+            store.setLocked(false)
+            assertNull(store.data)
+            assertNull(locked.accessToken())
+            assertEquals(0, told.count)
+        }
+
+    @Test
+    fun aSignInWhoseCallerIsCancelledOnceTheBrowserAnsweredGoesOnItsTokensKeptAndTheEngineTold() =
+        inTime {
+            // The engine's pattern (AN5a): a screen cancelled stops waiting, and what it set going goes on.
+            val endpoint = HeldEndpoint()
+            val (store, told) = MemoryStore() to Told()
+            val phone = signIn(store, endpoint, told = told)
+            val screen = async { phone.signIn(browser = signsIn) }
+            endpoint.received(1)
+            screen.cancelAndJoin()
+            endpoint.answer(200, granted(jwt("a1"), refresh = "refresh-1"))
+            eventually { told.count == 1 }
+            assertTrue(screen.isCancelled)
+            assertEquals(jwt("a1"), store.tokens?.access)
+            assertEquals(jwt("a1"), phone.accessToken())
+        }
+
+    @Test
+    fun theExchangeGoesOnTheWireOverTheAppsOwnTransportItsFormAndTypeAndNoAuthorizationHeader() =
+        inTime {
+            // The token endpoint over the API client's OkHttp (AN3d), a local server in Cognito's place.
+            MockWebServer().use { server ->
+                server.enqueue(MockResponse(200, headersOf("Content-Type", "application/json"), granted(jwt("a1"), refresh = "refresh-1")))
+                server.start()
+                val local = Cognito(server.url("/").toUri(), "phone-client", URI("bali://auth/callback"))
+                val phone = SignIn(local, MemoryStore(), scope, OkHttpTransport(), Now(), gated = false)
+                phone.signIn(browser = signsIn)
+                val sent = server.takeRequest()
+                assertEquals("POST /oauth2/token HTTP/1.1", sent.requestLine)
+                assertEquals("application/x-www-form-urlencoded", sent.headers["Content-Type"])
+                assertNull(sent.headers["Authorization"])
+                val form = fields(sent.body?.toByteArray())
+                assertEquals(listOf("authorization_code", "the-code"), listOf(form["grant_type"], form["code"]))
+                assertEquals(jwt("a1"), phone.accessToken())
+            }
+        }
 }
 
 /** The tokens: their claims, read unverified, and the form they are kept in (B4). */

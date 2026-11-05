@@ -8,12 +8,15 @@ import com.bali.core.CheckInRequest
 import com.bali.core.CheckInResponse
 import com.bali.core.DisplayState
 import com.bali.core.EventId
+import com.bali.core.HttpTransport
 import com.bali.core.MeResponse
 import com.bali.core.NoAnswer
+import com.bali.core.OkHttpTransport
 import com.bali.core.ParticipationState
 import com.bali.core.ReconcileStamp
 import com.bali.core.SendResult
 import com.bali.core.SessionView
+import com.bali.core.SignIn
 import com.bali.core.StateChangeDisposition
 import com.bali.core.TapDisposition
 import com.bali.core.UnlockDisposition
@@ -21,6 +24,7 @@ import com.bali.core.UnlockReason
 import com.bali.core.UnlockReasonRequest
 import com.bali.core.UnlockReasonResponse
 import com.bali.core.readMayReconcile
+import java.net.URI
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
@@ -994,6 +998,21 @@ class SyncEngine private constructor(
             outbox: Outbox, client: ApiClient, scope: CoroutineScope, clock: SyncClock = SystemClock,
             refresh: suspend () -> Boolean = { false },
         ): SyncEngine = SyncEngine(outbox, client, scope, clock, refresh).apply { lock.withLock { load() } }
+
+        /**
+         * The app's one engine, over the student's sign-in (B4), its client on the API at [api]: the
+         * client's tokens are [signIn]'s, and so is a 401's refresh; every token the sign-in gets
+         * otherwise, a sign-in or a renewal of its own, sends everything again at once ([retryNow]).
+         * BaliOutbox's `SyncEngine.make`, but the 13+ yes the read loop records, AN9's.
+         */
+        suspend fun make(
+            outbox: Outbox, api: URI, signIn: SignIn, scope: CoroutineScope,
+            transport: HttpTransport = OkHttpTransport(), clock: SyncClock = SystemClock,
+        ): SyncEngine {
+            val engine = open(outbox, ApiClient(api, signIn, transport), scope, clock) { signIn.refresh() }
+            signIn.whenTokenArrives { engine.retryNow() }
+            return engine
+        }
     }
 }
 

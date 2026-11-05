@@ -10,6 +10,17 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN6b's on 2026-11-05: _Last updated: 2026-11-04 (Central) —
+AN6a, sign-in's parts (#515; `docs/DECISIONS.md`,
+2026-11-04): BaliCore's `SignIn.swift` in Kotlin from its top through `Tokens`, with its tests: the
+hosted UI's address with PKCE, its secrets from `SecureRandom`; the answer's code only at the
+redirect URI and only for its attempt, read with `java.net.URI`, a `+` kept; and the tokens' kept
+form, which reads tokens kept before a field existed, and their claims, read unverified, a token the
+phone can't read giving none. AN6 is three steps now: AN6a, AN6b (`SignIn` itself), AN6c (the app's
+side). Before it, AN5e, Emergency Unlock in the engine. Next: AN6b; Android 17's SDK platform for
+the owner to OK before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner
+items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
+
 _Last updated: 2026-11-05 (Central) — WC5 (#516; `docs/DECISIONS.md`, 2026-11-04): the fifth of the
 eight WC steps: the Screen Time step, History and Me lose their lines, and the step no longer cuts a
 line short on the big iPhones. Before it, A2 (#514). Next: WC6; A3a, A3b, A4; a session builds the
@@ -2257,6 +2268,20 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN6b's line, as it read until it was done (2026-11-05; `docs/DECISIONS.md`, 2026-11-05).
+
+- **AN6b** Sign-in itself (twin: `SignIn` but `deleteUser`, AN9's, and `TokenStore`'s protocol),
+  JVM-tested with a fake store and a fake browser: the sign-in over the browser seam, the answer
+  handed over as text (AN6a); `accessToken`, which never throws (a throw stops the drain every run);
+  the refresh, one renewal at a time shared by every caller, two calls at once among them (the
+  engine's `renewing`, AN5e, beside the loops' reauth), never throwing; Sign out, `Tokens.checked`
+  (no token to Bali's API before the 13+ check, but the check's own read and a deletion's) and the
+  13+ yes, and the deletion token; only a real `401` signs anyone out; the signed-in stream; the
+  engine's `make` over the sign-in, its tokens and refresh, a token that arrives sending everything
+  again, with SignInEngineTests' `signInSendsAtOnce`, `reauthRenews`, `refusedWaitsForSignIn` and
+  `ownRenewalSendsAtOnce` (AN5's split); SignInTests' `exchange`, `signUp`, `unfinished` and
+  `unkept`, TokenTests' but `emailNoDefault` (AN6a's), and DeleteUserTests' `mayDelete`
 
 AN6a's line, as it read until it was done (2026-11-04; `docs/DECISIONS.md`, 2026-11-04). The
 conductor split AN6's line into AN6a, AN6b and AN6c that day, every word of it kept in one of them:

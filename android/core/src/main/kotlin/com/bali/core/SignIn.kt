@@ -8,8 +8,26 @@ import java.security.SecureRandom
 import java.time.Duration
 import java.time.Instant
 import java.util.Base64
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.roundToLong
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Contextual
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -231,6 +249,9 @@ internal data class Tokens(
         /** No expiry the phone knows: Foundation's `distantFuture`. */
         val DISTANT_FUTURE: Instant = Instant.parse("4001-01-01T00:00:00Z")
 
+        /** A token the API refused, never given again ([SignIn.refresh]): Foundation's `distantPast`. */
+        val DISTANT_PAST: Instant = Instant.parse("0001-01-01T00:00:00Z")
+
         /** The tokens [kept] holds; none when it holds none this build can read: the student signs in again. */
         fun from(kept: ByteArray): Tokens? =
             try {
@@ -303,3 +324,343 @@ internal data class Tokens(
             (get(name) as? JsonPrimitive)?.takeIf { it.isString }?.content
     }
 }
+
+/**
+ * The student's sign-in on this phone, and the tokens it keeps (B4): the API client's [TokenProvider] and
+ * the sync engine's [refresh]. The app has one. Only a real no signs anyone out: Cognito refusing the
+ * refresh token. BaliCore's `SignIn`, but `deleteUser` (AN9's).
+ *
+ * Swift's actor is a lock no stretch takes twice ([alone]), held through each stretch Swift's runs without
+ * an `await`, the store's calls included, and let go at each `await`: the browser, the token endpoint, a
+ * renewal waited for, the engine told. A renewal is one coroutine in the app's [scope], which every caller
+ * waits for ([renew]): a caller cancelled stops waiting, and it goes on for the others.
+ */
+class SignIn(
+    /** Where it signs in: the app's browser catches the answer at its redirect URI (AN6c). */
+    val cognito: Cognito,
+    private val store: TokenStore,
+    /** The app's, as long-lived as the process: one that ends ends every renewal for good. */
+    scope: CoroutineScope,
+    /** The token endpoint's transport: the API client's own, OkHttp's (AN3d). */
+    private val transport: HttpTransport = OkHttpTransport(),
+    private val now: () -> Instant = Instant::now,
+    /** Whether Bali's API waits on the 13+ check (C7, [Tokens.checked]): by default, failing closed, where iOS's isn't. */
+    private val gated: Boolean = true,
+) : TokenProvider {
+    /** The app's scope, under a job of the sign-in's own, so no renewal's failure ends anything else. */
+    private val scope = CoroutineScope(scope.coroutineContext + SupervisorJob(scope.coroutineContext[Job]))
+    private val lock = Mutex()
+
+    /** The tokens, once the store could be read ([loaded]); none when nobody is signed in. */
+    private var tokens: Tokens? = null
+    private var loaded = false
+
+    /**
+     * The store is behind [tokens] (it couldn't take them then, a rotated refresh token kept nowhere else,
+     * or a sign-out), and catches up at the next ask. Ended before then, a refresh token Cognito refused
+     * reads as signed in at the next launch, until its renewal is refused again: no queued record touched.
+     */
+    private var unsaved = false
+
+    /** The renewal under way, which every caller shares. */
+    private var renewing: Deferred<Boolean>? = null
+    private var tokenArrived: (suspend () -> Unit)? = null
+
+    /** Whether someone is signed in, once the store could be read: none until then. */
+    private val known = MutableStateFlow<Boolean?>(null)
+
+    /** Runs [action] after every token but one [refresh] asked for, so the engine sends everything again at once. */
+    suspend fun whenTokenArrives(action: suspend () -> Unit) = alone { tokenArrived = action }
+
+    /**
+     * The access token to send now. None when nobody is signed in, the store can't be read right now, an
+     * expired one couldn't be renewed (never a sign-out, never a token it knows has expired), the API has
+     * deleted the account (C4), or, [gated], the sign-in isn't through the 13+ check: one made around the
+     * question reaches Bali's API with nothing but the check's own read (the owner, 2026-10-06 and
+     * 2026-10-08). It never throws, nor ends on a cancel of its own: the drain asks before every send.
+     */
+    override suspend fun accessToken(): String? = given(gate = gated)
+
+    /** An account deletion's token, and the 13+ check's own read's (C7-server): the check passed or not. */
+    override suspend fun deletionToken(): String? = given(gate = false)
+
+    /**
+     * The engine's refresh, after the API refused the token it sent: never given again, after a relaunch
+     * too, and a renewal tried: true once a fresh one is ready, false when only a sign-in can give one. It
+     * never waits on the student, and never throws.
+     */
+    suspend fun refresh(): Boolean {
+        val renewal =
+            alone {
+                if (current() == null) return@alone null
+                tokens = tokens?.copy(until = Tokens.DISTANT_PAST)
+                unsaved = !keep(tokens)
+                renew(telling = false)
+            }
+        return renewal != null && outcome(renewal)
+    }
+
+    /**
+     * Signs the student in through Cognito's hosted UI, replacing any tokens the phone had. [browser] opens
+     * [page] and returns where the hosted UI sent the student back, as text (AN6c), or throws why not: the
+     * student's close [SignInError.Cancelled], anything else [SignInError.NotOpened]. Its code is exchanged
+     * in the sign-in's scope: a caller cancelled after the browser answered stops waiting, and it goes on.
+     * [yes], a Sign up's 13 or older (C7-server), keeps the tokens through the check with that yes's event
+     * id before anything hears of them, so the account it made is never asked.
+     *
+     * @throws SignInError why it didn't finish; then nothing changed.
+     */
+    suspend fun signIn(page: HostedPage = HostedPage.SignIn, yes: String? = null, browser: suspend (URI) -> String) {
+        val attempt = Attempt()
+        // It can't fail, the domain a URL and the rest escaped; were it to, nothing is sent.
+        val url = cognito.authorizeUrl(attempt, page) ?: throw SignInError.Unreachable
+        val code = cognito.code(browser(url), attempt)
+        scope.async { keepGrant(code, attempt, yes) }.await()
+    }
+
+    /** The tokens [code] and [attempt]'s verifier are exchanged for, kept with [yes]; then the engine told. */
+    private suspend fun keepGrant(code: String, attempt: Attempt, yes: String?) {
+        val fields =
+            listOf(
+                "grant_type" to "authorization_code", "client_id" to cognito.clientId, "code" to code,
+                "redirect_uri" to cognito.redirectUri.toString(), "code_verifier" to attempt.verifier,
+            )
+        val grant = exchange(fields).getOrThrow()
+        val refresh = grant.refresh ?: throw SignInError.Refused(null)
+        val told =
+            alone {
+                val given = Tokens(grant.access, refresh, grant.email, now())
+                val fresh = if (yes == null) given else given.copy(checked = true, yes = yes)
+                if (!keep(fresh)) throw SignInError.NotKept
+                adopt(fresh)
+                tokenArrived
+            }
+        told?.let { hook -> orElse(Unit) { hook() } }
+    }
+
+    /**
+     * The sign-in held now, if [account]'s, is through the 13+ check (C7-server), [recording] the event id
+     * its yes is recorded under; the caller then sends what waited (`SyncEngine.retryNow`).
+     */
+    suspend fun passed(account: String?, recording: String? = null) =
+        alone {
+            val held = current()?.takeIf { Tokens.subject(it.access) == account } ?: return@alone
+            tokens = held.copy(checked = true, yes = recording ?: held.yes)
+            unsaved = !keep(tokens)
+        }
+
+    /** Whether the sign-in kept now is through the 13+ check; false when nobody is signed in or the store can't be read. */
+    suspend fun checked(): Boolean = alone { current()?.checked == true }
+
+    /** The yes Bali's server is still to record for this sign-in's account, by its event id; none when none waits. */
+    suspend fun yes(): String? = alone { current()?.yes }
+
+    /** The yes [eventId] names, settled (recorded, or refused for good), let go, while it is still this sign-in's. */
+    suspend fun recorded(eventId: String) =
+        alone {
+            val held = current()?.takeIf { it.yes == eventId } ?: return@alone
+            tokens = held.copy(yes = null)
+            unsaved = !keep(tokens)
+        }
+
+    /**
+     * Signs the student out of this phone, forgetting the tokens, never a queued record. Throws what the
+     * store threw when it can't forget them right now; then nothing changed, and the screen says so (rule 5).
+     */
+    suspend fun signOut() =
+        alone {
+            store.clear()
+            adopt(null)
+        }
+
+    /** Whether this sign-in can delete its own account (C4, [Tokens.deleteEndpoint]); false: a fresh sign-in first. */
+    suspend fun mayDelete(): Boolean = alone { current()?.let { Tokens.deleteEndpoint(it.access) } != null }
+
+    /**
+     * The API has deleted this sign-in's account (C4): no token goes to the API from now on, a relaunch's
+     * included, until Cognito's DeleteUser (AN9's) or a sign-out; a store that can't take it now, at the next ask.
+     */
+    suspend fun accountDeleted() =
+        alone {
+            val held = current() ?: return@alone
+            tokens = held.copy(deleted = true)
+            unsaved = !keep(tokens)
+        }
+
+    /** Whether the API has deleted this sign-in's account and its Cognito sign-in waits to be (C4). */
+    suspend fun deletionPending(): Boolean = alone { current()?.deleted == true }
+
+    /**
+     * Whether someone is signed in: now, once the store could be read, then at each change, the newest only.
+     * A token that can't be given right now (offline, the store unreadable) is still signed in.
+     */
+    suspend fun signedIn(): Flow<Boolean> {
+        alone { current() }
+        return known.filterNotNull()
+    }
+
+    /** Who is signed in: the tokens' `sub`, read unverified, only ever to tell one student from another (C6b). */
+    suspend fun account(): String? = alone { current()?.let { Tokens.subject(it.access) } }
+
+    /** The account's email, as the tokens name it (#147): whose sign-in this is, which Me says. */
+    suspend fun email(): String? = alone { current()?.email }
+
+    /**
+     * The access token, renewed first when it has expired; none once the API deleted the account or, [gate],
+     * while not through the 13+ check, the tokens a renewal leaves held to that too, where iOS's gives them.
+     */
+    private suspend fun given(gate: Boolean): String? {
+        fun Tokens.given() = deleted != true && (!gate || checked == true)
+        val (token, renewal) =
+            alone {
+                val held = current()?.takeIf { it.given() }
+                when {
+                    held == null -> null to null
+                    now() < held.until -> held.access to null
+                    else -> null to renew(telling = true)
+                }
+            }
+        return when {
+            renewal == null -> token
+            outcome(renewal) -> alone { tokens?.takeIf { it.given() }?.access }
+            else -> null
+        }
+    }
+
+    /**
+     * The tokens, read from the store the first time it can be: one that can't be read right now is read
+     * again next time, never a sign-out. Tokens this build can't read are none: the student signs in again.
+     */
+    private fun current(): Tokens? {
+        if (loaded) {
+            if (unsaved) unsaved = !keep(tokens)
+            return tokens
+        }
+        val stored = try { store.load() } catch (error: Exception) { return null }
+        adopt(stored?.let(Tokens::from))
+        return tokens
+    }
+
+    /** The phone's tokens from now on, none signed out, told to every watcher; [saved] when the store has them too. */
+    private fun adopt(tokens: Tokens?, saved: Boolean = true) {
+        this.tokens = tokens
+        loaded = true
+        unsaved = !saved
+        known.value = tokens != null
+    }
+
+    /** Whether the store now holds [tokens]; none forgets what it had. */
+    private fun keep(tokens: Tokens?): Boolean =
+        try {
+            if (tokens == null) store.clear() else store.save(tokens.kept)
+            true
+        } catch (error: Exception) {
+            false
+        }
+
+    /**
+     * A renewal with the refresh token, one at a time, which every caller shares, [telling] the engine of
+     * its token unless [refresh] asked: started once it is the one under way, in [scope], never a caller's,
+     * and let go of as it ends, the one there is, since none starts while one is.
+     */
+    private fun renew(telling: Boolean): Deferred<Boolean> =
+        renewing ?: scope.async(start = CoroutineStart.LAZY) {
+            try {
+                renewal(telling)
+            } finally {
+                alone { renewing = null }
+            }
+        }.also {
+            renewing = it
+            it.start()
+        }
+
+    private suspend fun renewal(telling: Boolean): Boolean {
+        val refresh = alone { tokens?.refresh } ?: return false
+        val answer = exchange(listOf("grant_type" to "refresh_token", "client_id" to cognito.clientId, "refresh_token" to refresh))
+        val (renewed, told) =
+            alone {
+                // Signed out, or in again, while it ran: the answer is about tokens the phone let go.
+                val held = tokens?.takeIf { it.refresh == refresh } ?: return@alone (tokens != null) to null
+                val grant = answer.getOrNull()
+                when {
+                    // A rotated refresh token replaces the one kept; an answer with no email keeps the
+                    // account's; an account the API deleted stays deleted (C4).
+                    grant != null -> {
+                        val fresh =
+                            Tokens(grant.access, grant.refresh ?: refresh, grant.email ?: held.email, now())
+                                .copy(deleted = held.deleted, checked = held.checked, yes = held.yes)
+                        adopt(fresh, saved = keep(fresh))
+                        true to tokenArrived.takeIf { telling }
+                    }
+                    // The one real no: Cognito refused the refresh token. Signed out, and nothing else: every
+                    // queued record waits for the next sign-in.
+                    answer.exceptionOrNull() == SignInError.Refused("invalid_grant") -> {
+                        adopt(null, saved = keep(null))
+                        false to null
+                    }
+                    // No answer, a server error, another refusal: no no. Kept, for the next request to try.
+                    else -> false to null
+                }
+            }
+        told?.let { hook -> orElse(Unit) { hook() } }
+        return renewed
+    }
+
+    /**
+     * The token endpoint's answer to [fields] (RFC 6749 §4.1.3, §6): the tokens and the ID token's email
+     * (#147) on a 2xx, a refusal with its OAuth error on a 4xx, and no answer otherwise (a 5xx, a redirect).
+     */
+    private suspend fun exchange(fields: List<Pair<String, String>>): Result<Grant> {
+        val unreachable = Result.failure<Grant>(SignInError.Unreachable)
+        val url = try { URI(cognito.endpoint("oauth2/token")) } catch (error: URISyntaxException) { return unreachable }
+        val headers = mapOf("Content-Type" to "application/x-www-form-urlencoded")
+        val request = HttpRequest("POST", url, headers, form(fields).encodeToByteArray(), ApiClient.REQUEST_TIMEOUT)
+        val reply = orElse(null) { transport.send(request) } ?: return unreachable
+        val answer =
+            try {
+                BaliJson.decodeFromString(TokenAnswer.serializer(), reply.body.decodeToString(throwOnInvalidSequence = true))
+            } catch (error: Exception) { // kotlinx's SerializationException, or a CharacterCodingException
+                null
+            }
+        val (access, error) = answer?.accessToken to answer?.error
+        return when {
+            reply.status in 200..299 && access != null -> Result.success(Grant(access, answer?.refreshToken, answer?.idToken?.let(Tokens::email)))
+            reply.status in 400..499 && error != null -> Result.failure(SignInError.Refused(error))
+            else -> unreachable
+        }
+    }
+
+    /** What [renewal] gave, waited for with the sign-in let go: false when it failed, never a throw. */
+    private suspend fun outcome(renewal: Deferred<Boolean>): Boolean = orElse(false) { renewal.await() }
+
+    /** What [block] gives, or [none] when it throws or ends in a cancel of its own, as Swift's `try?`: a caller's own goes on. */
+    private suspend fun <T> orElse(none: T, block: suspend () -> T): T =
+        try {
+            block()
+        } catch (cancelled: CancellationException) {
+            currentCoroutineContext().ensureActive()
+            none
+        } catch (error: Exception) {
+            none
+        }
+
+    /**
+     * Runs [block] with the sign-in to itself, a stretch of Swift's actor: never inside another (the lock is
+     * no reentrant one), on `Dispatchers.IO`, since the store's calls block, and whole however its caller is
+     * cancelled, as the engine's stretches are. It can't suspend, so nothing interleaves inside it.
+     */
+    private suspend fun <T> alone(block: () -> T): T = withContext(NonCancellable + Dispatchers.IO) { lock.withLock { block() } }
+}
+
+/** The token endpoint's grant: the access token, the refresh token when it gave one, and its ID token's email. */
+private class Grant(val access: String, val refresh: String?, val email: String?)
+
+/** What the token endpoint answers, as far as the phone reads it: a field of another type is no answer at all. */
+@Serializable
+private class TokenAnswer(
+    @SerialName("access_token") val accessToken: String?,
+    @SerialName("refresh_token") val refreshToken: String?,
+    @SerialName("id_token") val idToken: String?,
+    val error: String?,
+)
