@@ -8,14 +8,13 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-04 (Central) — WC2 (#506; `docs/DECISIONS.md`, 2026-11-04): the second of
-the eight steps that make the owner's Android cuts on the iPhone and the student web: Join loses its
-two lines on the code, the list-changed screen the line under its title. Before it, A5, the iPhone
-app's privacy manifest (#505). Next: WC3, Focus, Home's hold and the block screen; A2–A4; the
-owner's call on Other Data Types' purpose; a session builds the retire-a-block command; the owner
-the new build, with A5, and the sitting; the owner's call on GA5's known limit, the smallest iPhones
-(DECISIONS 2026-11-02); AN5e, Android's Emergency Unlock; AN1's part 2 once the owner has the
-phones; the audit's polish waits, as ruled._
+_Last updated: 2026-11-04 (Central) — WC3 (#508; `docs/DECISIONS.md`, 2026-11-04): the third of
+eight steps making the owner's Android cuts on the iPhone and the student web: Focus and Home's hold
+lose their lines; the block screen keeps only the owner's. Before it, WC2 (#506). Next: WC4; A2–A4;
+the owner's call on Other Data Types' purpose; a session builds the retire-a-block command; the
+owner the new build, with A5, and the sitting; the owner's call on GA5's known limit, the smallest
+iPhones (DECISIONS 2026-11-02); AN5e, Android's Emergency Unlock; AN1's part 2 once the owner has
+the phones; the audit's polish waits, as ruled._
 
 ## Now
 
@@ -50,8 +49,8 @@ branch, with no PR, as its README says (#479; `docs/DECISIONS.md`, 2026-11-02).
   device checks, the owner's. C2's legal words (⚖️) go into the portal's pages, on the Windows PC.
 - **The owner's Android cuts on the iPhone and the student web (the owner, 2026-11-04; DECISIONS
   2026-11-04):** WC1–WC8, one PR each, from the approved boards: WC1 ✅ (#502), Sign in and the 13+
-  question; WC2 ✅ (#506), Join and the list-changed screen; WC3 next, Focus, Home's hold and the
-  block screen.
+  question; WC2 ✅ (#506), Join and the list-changed screen; WC3 ✅ (#508), Focus, Home's hold and
+  the block screen; WC4 next, Unlocked, its reason card, Screen Time off and Waiting.
 - **Android (the owner, 2026-11-02)**: Phases 8–11, the steps in `docs/PLAN-ANDROID.md` (AN0 ✅);
   AN1, the lock spike: parts 1 and 1c on the Android 15–17 emulators ✅ (DECISIONS
   2026-11-03); AN1b ✅ (DECISIONS 2026-11-04): the owner picked (a), the Accessibility service, with
@@ -130,7 +129,8 @@ branch, with no PR, as its README says (#479; `docs/DECISIONS.md`, 2026-11-02).
    consent list's new lines (#466), and this one must carry A5's privacy manifest. The owner's.
 2. 📱 The phone sitting on it, whole (`ios/README.md`, "Phase 7's phone sitting, on prod", Parts 1–7):
    C7's first launch, L8's, M8's and M8b's device checks, the exit checks L9, M10 and W6, the consent
-   list's new lines, the class-started alert end to end (N6), and every other student flow. The owner's.
+   list's new lines, the shield's new line, the class-started alert end to end (N6), and every other
+   student flow. The owner's.
 3. The block's fresh code (`docs/PILOT.md`, setup step 6): a session builds the owner command that
    retires a block; the owner writes the new code, registers it and retires the old one.
 4. PostHog (ARCHITECTURE's "Analytics (PostHog)"; DECISIONS 2026-11-04), one PR each:
