@@ -3,6 +3,7 @@ import type { Database } from '@bali/db';
 import { API_VERSION, type HealthzResponse } from '@bali/shared';
 import Fastify, { type FastifyInstance, type onRouteHookHandler } from 'fastify';
 
+import { analyticsConfig, createAnalytics } from './analytics.js';
 import { registerAuth } from './auth/plugin.js';
 import { createCognitoVerifier, type TokenVerifier } from './auth/verify.js';
 import { cognitoDeleter } from './cognito/admin.js';
@@ -76,6 +77,8 @@ export interface AppDeps {
    * real fetch; tests answer for Cognito.
    */
   cognitoFetch?: typeof fetch;
+  /** Where PostHog's events go when POSTHOG_KEY is set (A2). Unset, the real fetch; tests fake it. */
+  posthogFetch?: typeof fetch;
   /**
    * Where decks' PDFs are kept (M1): tests and the demo inject `memoryDeckStorage()`. Unset, the
    * S3 bucket `DECK_BUCKET` names, or none while that is unset.
@@ -165,7 +168,17 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
     deps.db,
     apns && createApnsClient(apns, deps.apnsTransport ?? http2Transport()),
   );
-  registerSessionsRoute(app, deps.db, clock, notifyClassStarted);
+  // Said once, at start, as push says it, and never the key.
+  const posthog = analyticsConfig(env);
+  app.log.info(
+    posthog
+      ? 'analytics is on: class totals go to PostHog'
+      : 'analytics is off: POSTHOG_KEY is unset',
+  );
+  const analytics = createAnalytics(posthog, deps.db, app.log, { fetch: deps.posthogFetch, clock });
+  // Hooks close last-registered first, so a sweep in flight at the close has ended by now.
+  app.addHook('onClose', () => analytics.settled());
+  registerSessionsRoute(app, deps.db, clock, notifyClassStarted, analytics);
   // Said once, at start, as push says it; the deck routes read it.
   const deckStorage = deps.deckStorage ?? s3DeckStorage(env);
   app.log.info(
@@ -176,7 +189,11 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
   app.decorate('deckStorage', deckStorage);
   const sweepDecksOn = deckStorage && ((at: Date) => sweepDecks(deps.db, deckStorage, app.log, at));
   // Run every minute by the process entry (server.ts), and by the internal route on the cron's call.
-  app.decorate('sweep', (now?: Date) => sweep(deps.db, now, signIns, sweepDecksOn));
+  app.decorate('sweep', (now?: Date) =>
+    sweep(deps.db, now, signIns, sweepDecksOn, (id) =>
+      analytics.track('session_ended', id, 'bell'),
+    ),
+  );
   registerEnrollmentsRoutes(app, deps.db, clock, limits);
   registerTeacherInvitesRoute(app, deps.db, limits);
   registerClassesRoutes(app, deps.db);

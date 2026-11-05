@@ -122,6 +122,15 @@ class PrivacyManifests(unittest.TestCase):
         self.edit("ios/Bali/PrivacyInfo.xcprivacy", analytics, "")
         self.fails("NSPrivacyCollectedDataTypeProductInteraction serves")
 
+    def test_other_data_types_without_analytics(self):
+        # A2: the class totals' enrolled count is counted from class membership, Other Data Types.
+        file = self.root / "ios/Bali/PrivacyInfo.xcprivacy"
+        head, tail = file.read_text().split("NSPrivacyCollectedDataTypeOtherDataTypes<", 1)
+        analytics = "<string>NSPrivacyCollectedDataTypePurposeAnalytics</string>"
+        self.assertIn(analytics, tail)
+        file.write_text(f"{head}NSPrivacyCollectedDataTypeOtherDataTypes<{tail.replace(analytics, '', 1)}")
+        self.fails("NSPrivacyCollectedDataTypeOtherDataTypes serves")
+
     def test_analytics_on_another_type(self):
         # The first entry, Email Address, serves App Functionality alone.
         functionality = "<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>"

@@ -24,17 +24,20 @@ export const SWEEP_INTERVAL_MS = 60_000;
  * idempotent, so any number may run at once — each API process's own, every
  * minute, and the Railway cron's backup call to `/internal/sweep` (hosting
  * decision 3). By the server's clock; the load gate's timed sweep alone passes
- * its own `now`.
+ * its own `now`. `ended` hears of each session this run ended, once it has
+ * (PostHog's count, A2): only the run that ended one names it.
  */
 export async function sweep(
   db: Database,
   now = new Date(),
   signIns?: SignInDeletions,
   decks?: (now: Date) => Promise<void>,
+  ended?: (sessionId: string) => void,
 ): Promise<{ expired: number; wentSilent: number }> {
   // Expire first: a session ending here also ends its live participations, so
   // the silence pass never opens an episode on a phone that just left.
   const expired = await expireDueSessions(db, now);
+  for (const id of expired) ended?.(id);
   const wentSilent = await markSilentParticipations(db, now);
   // Last: a bell never waits on Cognito or the bucket.
   await signIns?.due(now);

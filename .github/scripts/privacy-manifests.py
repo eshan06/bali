@@ -51,10 +51,14 @@ PURPOSES = {PURPOSE + name for name in (
     "AppFunctionality", "Other",
 )}
 # The types that serve Analytics beside App Functionality: the server's class totals for
-# PostHog are counted from them (A5; ARCHITECTURE's "Analytics (PostHog)"). Pinned here, not
-# read from docs/APP-STORE.md, whose table says App Functionality alone until the owner edits
-# the label to match (PLAN's Before the pilot, 6).
-ANALYTICS = {"NSPrivacyCollectedDataTypeProductInteraction"}
+# PostHog are counted from them (ARCHITECTURE's "Analytics (PostHog)"): the focus records,
+# Product Interaction (A5), and class membership, Other Data Types, the enrolled count (A2).
+# Pinned here, not read from docs/APP-STORE.md, whose table says App Functionality alone until
+# the owner edits the label to match (PLAN's Before the pilot, 6).
+ANALYTICS = {
+    "NSPrivacyCollectedDataTypeProductInteraction",
+    "NSPrivacyCollectedDataTypeOtherDataTypes",
+}
 
 errors = []
 

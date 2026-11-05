@@ -51,6 +51,14 @@ const KEPT_INTEGRATIONS = new Set([
   'Context',
 ]);
 
+/**
+ * The environment Sentry files events under, and every PostHog event carries (A2): `dev`,
+ * `production`. Read from a process's env too, for the owner's commands, so blank is unset.
+ */
+export function environmentOf(env: { SENTRY_ENVIRONMENT?: string; NODE_ENV?: string }): string {
+  return env.SENTRY_ENVIRONMENT || env.NODE_ENV || 'production';
+}
+
 export interface MonitoringOptions {
   /** Tests only: where events go instead of the network. */
   transport?: NodeOptions['transport'];
@@ -61,7 +69,7 @@ export function initMonitoring(env: Env, options: MonitoringOptions = {}): boole
   if (env.SENTRY_DSN === undefined) return false;
   Sentry.init({
     dsn: env.SENTRY_DSN,
-    environment: env.SENTRY_ENVIRONMENT ?? env.NODE_ENV,
+    environment: environmentOf(env),
     // Railway sets the deployed commit; unset (a local run), Sentry tags none.
     release: env.RAILWAY_GIT_COMMIT_SHA,
     // v11's replacement for `sendDefaultPii: false`: collect none of it.

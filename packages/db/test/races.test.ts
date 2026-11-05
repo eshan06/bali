@@ -3101,7 +3101,7 @@ describe.runIf(REAL_PG)('concurrent extends (real Postgres)', () => {
         if (extended.status === 'rejected') throw extended.reason;
         expect(swept.value, first).not.toContain(session.id);
         expect(row.endedAt, first).toBeNull();
-        expect(row.endsAt, first).toEqual(extended.value?.endsAt);
+        expect(row.endsAt, first).toEqual(extended.value?.session.endsAt);
         expect(await eventsOfType(session.id, 'session_expired'), first).toHaveLength(0);
         expect(await liveParticipations(session.id), first).toHaveLength(1);
       } else {

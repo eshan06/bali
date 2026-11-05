@@ -1048,6 +1048,29 @@ export async function getSessionEvents(db: Database, sessionId: string): Promise
 }
 
 /**
+ * A session, its class's teacher, and how many students its class had enrolled at its end, or at
+ * `at` while it runs, whatever the class is since (a disposal removes it and ends each
+ * enrollment as it ends the lesson): what the server's PostHog totals read beside the session's
+ * events (A2). Undefined for no such session.
+ */
+export async function sessionTotalsOf(db: Database, sessionId: string, at: Date) {
+  const then = sql`coalesce(${sessions.endedAt}, ${at.toISOString()}::timestamptz)`;
+  return first(
+    await db
+      .select({
+        session: sessions,
+        teacherId: classes.teacherId,
+        enrolled: sql<number>`(select count(distinct ${enrollments.studentId})::int
+          from ${enrollments} where ${enrollments.classId} = ${sessions.classId}
+          and (${enrollments.removedAt} is null or ${enrollments.removedAt} >= ${then}))`,
+      })
+      .from(sessions)
+      .innerJoin(classes, eq(classes.id, sessions.classId))
+      .where(eq(sessions.id, sessionId)),
+  );
+}
+
+/**
  * A teacher's sessions started at `since` or later, in their live classes, each with its class's
  * name now: Home's Recent activity reads today's (PV3). Unexecuted, as `sessionEvents` is.
  */

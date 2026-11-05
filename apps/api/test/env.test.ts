@@ -241,3 +241,42 @@ describe('DECK_BUCKET*: where decks are kept (Phase 7, M1)', () => {
     ).rejects.toThrow(/DECK_BUCKET_ACCESS_KEY_ID: is an AWS access key id/);
   });
 });
+
+describe('POSTHOG_*: PostHog, off until its key is set (A2)', () => {
+  const key = 'phc_aBcD0123456789';
+
+  async function bootWithPosthog(vars: Record<string, string>) {
+    vi.resetModules();
+    const unset = { POSTHOG_KEY: '', POSTHOG_HOST: '' };
+    for (const [name, value] of Object.entries({ ...testEnvVars, ...unset, ...vars })) {
+      vi.stubEnv(name, value);
+    }
+    return (await import('../src/env.js')).env;
+  }
+
+  it('unset (or blank) is analytics off, and boots', async () => {
+    const env = await bootWithPosthog({});
+    expect([env.POSTHOG_KEY, env.POSTHOG_HOST]).toEqual([undefined, undefined]);
+  });
+
+  it('a project key boots, with a host or without', async () => {
+    expect(await bootWithPosthog({ POSTHOG_KEY: key })).toMatchObject({ POSTHOG_KEY: key });
+    const host = 'https://eu.i.posthog.com';
+    expect(await bootWithPosthog({ POSTHOG_KEY: key, POSTHOG_HOST: host })).toMatchObject({
+      POSTHOG_HOST: host,
+    });
+  });
+
+  it('a personal API key, or a host that is no URL, fails the boot, never echoing the key', async () => {
+    const personal = 'phx_aBcD0123456789';
+    const message = await bootWithPosthog({ POSTHOG_KEY: personal }).then(
+      () => 'booted',
+      (e: Error) => e.message,
+    );
+    expect(message).toMatch(/POSTHOG_KEY: is a PostHog project key/);
+    expect(message).not.toContain(personal);
+    await expect(
+      bootWithPosthog({ POSTHOG_KEY: key, POSTHOG_HOST: 'us.i.posthog.com' }),
+    ).rejects.toThrow(/POSTHOG_HOST/);
+  });
+});

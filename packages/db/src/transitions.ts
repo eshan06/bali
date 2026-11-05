@@ -471,6 +471,8 @@ export interface StartSessionResult {
    * converts nobody, so nothing is sent again.
    */
   convertedStudentIds: string[];
+  /** The class's session this Start ended past its bell (A18), as the sweep would; else null. */
+  expired: string | null;
 }
 
 /**
@@ -784,6 +786,7 @@ export async function startSession(
           .limit(1)
           .for('update'),
       );
+      let expired: string | null = null;
       if (existing) {
         if (sessionRunning(existing, input.startedAt)) {
           return {
@@ -791,9 +794,11 @@ export async function startSession(
             session: existing,
             armedConverted: 0,
             convertedStudentIds: [],
+            expired,
           };
         }
         await endHeldSession(tx, existing, { at: input.startedAt, reason: 'expired' });
+        expired = existing.id;
       }
 
       const session = firstOrUndefined(
@@ -818,6 +823,7 @@ export async function startSession(
         session,
         armedConverted: convertedStudentIds.length,
         convertedStudentIds,
+        expired,
       };
     }),
   );
@@ -1415,9 +1421,17 @@ export interface ExtendSessionInput {
    */
   eventId?: string;
 }
+export interface ExtendSessionResult {
+  /** `replay`: `eventId` is this session's extend already, so nothing changed (rule 4). */
+  outcome: 'extended' | 'replay';
+  session: SessionRow;
+}
 
 /** Move a running session's end time forward (teacher "add time"). */
-export async function extendSession(db: Database, input: ExtendSessionInput): Promise<SessionRow> {
+export async function extendSession(
+  db: Database,
+  input: ExtendSessionInput,
+): Promise<ExtendSessionResult> {
   return db.transaction(async (tx) => {
     const session = await loadSession(tx, input.sessionId, { forUpdate: true });
     if (!session) throw new TransitionError('SESSION_NOT_FOUND', 'no such session');
@@ -1439,7 +1453,9 @@ export async function extendSession(db: Database, input: ExtendSessionInput): Pr
       );
       if (prior) {
         // This session's own extend: a genuine replay, so return current truth.
-        if (prior.type === 'session_extended' && prior.sessionId === session.id) return session;
+        if (prior.type === 'session_extended' && prior.sessionId === session.id) {
+          return { outcome: 'replay', session };
+        }
         // A different event already owns this id. Carrying on would move the
         // end time while insertEvent de-duped the matching event row away,
         // leaving the session and its history disagreeing — the one thing this
@@ -1532,7 +1548,7 @@ export async function extendSession(db: Database, input: ExtendSessionInput): Pr
         newEndsAt: newEndsAt.toISOString(),
       },
     });
-    return updated;
+    return { outcome: 'extended', session: updated };
   });
 }
 
@@ -4954,6 +4970,8 @@ export type DisposeSchoolResult =
       counts: DisposalCounts;
       /** The lessons it ended while they ran, told to (`endLessons`); none otherwise. */
       ended: RunningLesson[];
+      /** The sessions it ended past their bell, not yet swept, as the sweep would. */
+      expired: string[];
     }
   | {
       outcome: 'already_disposed';
@@ -5112,9 +5130,11 @@ async function disposeOnce(tx: Database, input: DisposeSchoolInput): Promise<Dis
   // Nothing is written above this line, so each refusal leaves all as it was.
   // Past its bell, not yet swept: ended as the sweep ends it, so no one is left in it.
   // Still running, told to end it: ended now, as its teacher's End ends it.
+  const expired: string[] = [];
   for (const session of held) {
     const reason = sessionRunning(session, input.at) ? 'ended' : 'expired';
     await endHeldSession(tx, session, { at: input.at, reason });
+    if (reason === 'expired') expired.push(session.id);
   }
 
   const peopleIds = people.map((p) => p.id);
@@ -5193,9 +5213,9 @@ async function disposeOnce(tx: Database, input: DisposeSchoolInput): Promise<Dis
     throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
   }
   if (input.confirmName === undefined) {
-    throw new DisposalPreview({ outcome: 'preview', school, counts, ended: running });
+    throw new DisposalPreview({ outcome: 'preview', school, counts, ended: running, expired });
   }
-  return { outcome: 'disposed', school, counts, ended: running };
+  return { outcome: 'disposed', school, counts, ended: running, expired };
 }
 
 /**

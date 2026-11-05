@@ -152,6 +152,7 @@ describe('startSession', () => {
       outcome: 'existing',
       session: { id: old.id },
       convertedStudentIds: [],
+      expired: null,
     });
 
     const gap = new Date('2026-01-01T09:25:10Z');
@@ -168,6 +169,8 @@ describe('startSession', () => {
       outcome: 'created',
       armedConverted: 1,
       convertedStudentIds: [student.id],
+      // Named, so the route counts its end for PostHog (A2).
+      expired: old.id,
     });
     expect(next.session.id).not.toBe(old.id);
 
@@ -1904,7 +1907,7 @@ describe('a late unlock: the student came back to focus after it (A10)', () => {
       durationMinutes: 5,
       at: at(10),
     });
-    expect(extended.endsAt).toEqual(at(30));
+    expect(extended.session.endsAt).toEqual(at(30));
 
     expect(await unlock(db, move(session, student, at(19)))).toMatchObject({
       outcome: 'recorded',
@@ -3638,7 +3641,7 @@ describe('extendSession', () => {
       durationMinutes: 10,
       at: new Date('2026-01-01T09:20:00Z'),
     });
-    expect(updated.endsAt.toISOString()).toBe(newEnd.toISOString());
+    expect(updated.session.endsAt.toISOString()).toBe(newEnd.toISOString());
     expect((await eventsFor(session.id)).some((e) => e.type === 'session_extended')).toBe(true);
   });
 
@@ -3670,7 +3673,7 @@ describe('extendSession', () => {
       durationMinutes: 10,
       at: early,
     });
-    expect(updated.endsAt).toEqual(new Date(w.endsAt.getTime() + 10 * 60_000));
+    expect(updated.session.endsAt).toEqual(new Date(w.endsAt.getTime() + 10 * 60_000));
   });
 
   it('refuses an extension that would not move the end forward', async () => {
@@ -3767,12 +3770,13 @@ describe('extendSession', () => {
     const { session } = await startSession(db, { classId: klass.id, ...w });
     const newEnd = new Date(w.endsAt.getTime() + 10 * 60_000);
     const eventId = newUuidV7();
-    await extendSession(db, {
+    const first = await extendSession(db, {
       sessionId: session.id,
       durationMinutes: 10,
       at: new Date('2026-01-01T09:20:00Z'),
       eventId,
     });
+    expect(first.outcome).toBe('extended');
     await endSession(db, {
       sessionId: session.id,
       at: new Date('2026-01-01T09:35:00Z'),
@@ -3785,7 +3789,9 @@ describe('extendSession', () => {
       at: new Date('2026-01-01T09:36:00Z'),
       eventId,
     });
-    expect(replay.endsAt.toISOString()).toBe(newEnd.toISOString());
+    // Said a replay, so the route counts nothing for it (A2).
+    expect(replay.outcome).toBe('replay');
+    expect(replay.session.endsAt.toISOString()).toBe(newEnd.toISOString());
     expect((await eventsFor(session.id)).filter((e) => e.type === 'session_extended')).toHaveLength(
       1,
     );
@@ -3837,7 +3843,7 @@ describe('extendSession', () => {
       at: new Date('2026-01-01T16:00:00Z'),
       eventId: newUuidV7(),
     });
-    expect(near.endsAt).toEqual(new Date('2026-01-02T00:55:00Z'));
+    expect(near.session.endsAt).toEqual(new Date('2026-01-02T00:55:00Z'));
 
     const refusedId = newUuidV7();
     for (const [durationMinutes, eventId] of [
@@ -3859,7 +3865,7 @@ describe('extendSession', () => {
 
     // The bell did not move, the session runs, and the history holds no extend that never was.
     const after = one(await db.select().from(sessions).where(eq(sessions.id, session.id)));
-    expect(after.endsAt).toEqual(near.endsAt);
+    expect(after.endsAt).toEqual(near.session.endsAt);
     expect(after.endedAt).toBeNull();
     expect((await eventsFor(session.id)).map((e) => e.type)).toEqual([
       'session_started',
@@ -3882,7 +3888,7 @@ describe('extendSession', () => {
       at: new Date('2026-01-01T16:59:00Z'),
       eventId,
     });
-    expect(exact.endsAt).toEqual(cap);
+    expect(exact).toMatchObject({ outcome: 'extended', session: { endsAt: cap } });
 
     // Its retry after a lost answer is the replay it always was (rule 4), at the bound or not.
     const replay = await extendSession(db, {
@@ -3891,7 +3897,7 @@ describe('extendSession', () => {
       at: new Date('2026-01-02T00:30:00Z'),
       eventId,
     });
-    expect(replay.endsAt).toEqual(cap);
+    expect(replay).toMatchObject({ outcome: 'replay', session: { endsAt: cap } });
 
     // One minute more is past it.
     await expect(
@@ -4033,7 +4039,7 @@ describe('endSession & expiry', () => {
     expect(expiry).toEqual({ ended: false, endedParticipations: 0 });
     const row = one(await db.select().from(sessions).where(eq(sessions.id, session.id)));
     expect(row.endedAt).toBeNull();
-    expect(row.endsAt).toEqual(extended.endsAt);
+    expect(row.endsAt).toEqual(extended.session.endsAt);
     expect((await eventsFor(session.id)).map((e) => e.type)).not.toContain('session_expired');
     const part = one(
       await db.select().from(participations).where(eq(participations.sessionId, session.id)),
@@ -4047,7 +4053,7 @@ describe('endSession & expiry', () => {
       reason: 'expired',
     });
     const over = one(await db.select().from(sessions).where(eq(sessions.id, session.id)));
-    expect(over.endedAt).toEqual(extended.endsAt);
+    expect(over.endedAt).toEqual(extended.session.endsAt);
   });
 
   it('a lesson at 16 hours in all ends at its bell, as any does: time pressed for past it is refused', async () => {

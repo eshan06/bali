@@ -1,5 +1,6 @@
 import { createDb, parseSchoolCommand, SCHOOL_USAGE, type SchoolCommand } from '@bali/db';
 
+import { analyticsConfig, createAnalytics } from '../src/analytics.js';
 import { detailOf } from './demo/cognito.js';
 
 /*
@@ -32,11 +33,25 @@ if (!databaseUrl) {
 }
 
 const db = createDb(databaseUrl);
+// A lesson the owner's command ends is counted for PostHog as the API counts one (A2), with the
+// API service's own POSTHOG_KEY in the shell it runs in; off while that is unset. Its failures go
+// to standard error, never to the output (an export's JSON).
+const analytics = createAnalytics(analyticsConfig(process.env), db, {
+  warn: (details, message) => console.error(`school: ${message}`, details),
+  error: (details, message) => console.error(`school: ${message}`, details),
+});
 try {
-  await command({ db, print: (line) => console.log(line), issuer: process.env.AUTH_ISSUER });
+  await command({
+    db,
+    print: (line) => console.log(line),
+    issuer: process.env.AUTH_ISSUER,
+    ended: (sessionId, reason) =>
+      analytics.track('session_ended', sessionId, reason === 'ended' ? 'owner' : 'bell'),
+  });
 } catch (err) {
   console.error(`school: ${detailOf(err)}`);
   process.exitCode = 1;
 } finally {
+  await analytics.settled();
   await db.$client.end();
 }
