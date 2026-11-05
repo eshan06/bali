@@ -411,7 +411,7 @@ class Watching(
     private val began: () -> Unit = {},
     private val committed: () -> Unit = {},
     private val stepping: (String) -> Unit = {},
-    private val bundled: SQLiteDriver = BundledSQLiteDriver(),
+    private val bundled: SQLiteDriver = GuardDriver(),
 ) : SQLiteDriver by bundled {
     override fun open(fileName: String): SQLiteConnection = Watched(bundled.open(fileName), began, committed, stepping)
 }
