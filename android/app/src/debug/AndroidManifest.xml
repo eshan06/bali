@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Debug build's own, merged over main's: lock (a), Bali's Accessibility service (LockService.kt),
+     declared here alone, with a developer's label and description, until AS3 or AS5 declares it in main
+     with AS0's approved words (docs/DECISIONS.md, 2026-11-05, Q1), so no Release build shows an undrawn
+     word. Only the system can bind it. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <service
+            android:name=".LockService"
+            android:exported="true"
+            android:label="@string/lock_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/lock_service" />
+        </service>
+    </application>
+
+</manifest>

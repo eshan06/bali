@@ -159,6 +159,40 @@ readout starts a sign-in, on both phones, each with its browser and that browser
 - **The phone rotated while the tab is open,** then the sign-in finished: signed in.
 - **Bali relaunched:** still signed in; **reinstalled:** signed out.
 
+## AN7, the lock on the phones
+
+AN7f's device check (`docs/PLAN-ANDROID.md`), on both phones, a Debug build on each, offline before
+AN9 and on dev after it (`docs/DECISIONS.md`, 2026-11-05, Q8). AN7c, AN7d and AN7e each add what the
+emulators couldn't answer, and AN7f adds B5 round 1's steps in Android's terms.
+
+**The service (AN7c),** each part opening with its starting state as the header asks; a session's tap
+is typed in the Debug readout (AN7d) until AN8 reads a block's sticker:
+
+- **Safe Mode.** *Start:* in a class, focused, the screen on, Airplane mode off, the service on. The
+  service off Android's list after it, as AN1 saw on the emulators, and what Bali reports once the
+  student switches it on again and opens Bali (ISSUES #6, gap 1).
+- **A reboot.** *Start:* in a class, focused, the screen on, Airplane mode off, the service on, a screen
+  lock set. Nothing of Bali's runs before the first unlock, since Android starts a service that isn't
+  direct-boot aware only then; after it, how long the service takes to bind, against the 30-s grace
+  (Q3; the Debug readout's Launch line, AN7d).
+- **A force-stop, and the process killed** (`adb shell run-as com.bali.bali kill -9 <pid>`). *Start:*
+  in a class, focused, the screen on, Airplane mode off, the service on. The force-stop takes the
+  service off the list until the student switches it on, while Android starts and binds it again by
+  itself after a kill, as on the emulators. Note which of the two each maker's own buttons do.
+- **Doze over a lesson** (the battery test's R1). *Start:* in a class, focused, the screen on, the phone
+  still, Airplane mode off. The screen then off for 50 minutes: one check-in as it goes off, none until it
+  comes on, then one at once; the service still bound after; and the network in Doze, as the battery
+  test asks.
+- **The makers' battery savers** (the battery test's makers' checks). *Start:* in a class, focused,
+  Bali closed, the screen on, Airplane mode off. After each, the service still on the list and bound in
+  `dumpsys accessibility`, listening to nothing outside a lesson (`eventTypes=` empty) and to the
+  window events in one.
+- **The restricted-settings install path** (Android 13 and later). *Start:* out of a class, the screen
+  on, Airplane mode off, Bali installed from a downloaded APK, not `adb install`, its service off. The
+  service switched on in
+  Settings: what Android shows, and App info's "Allow restricted settings" (AN1 saw "App was denied
+  access").
+
 ## AP3, the device test gate
 
 Before Android launches: a Pixel and a Samsung through the whole loop on dev, as B5 and B6 ran it on

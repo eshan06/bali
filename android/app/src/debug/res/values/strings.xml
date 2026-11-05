@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Developer text, the Debug build's alone, as iOS's Debug readout's (B4c): never a student's
+         word, which AS0's boards hold (docs/DECISIONS.md, 2026-11-05, Q1). -->
+    <string name="lock_service_label">Bali lock (Debug)</string>
+    <string name="lock_service_description">Debug build of Bali\'s lock, for testing on this phone.</string>
+</resources>

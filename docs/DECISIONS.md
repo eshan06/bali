@@ -8,6 +8,149 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-05** — **AN7c, the lock's service and the app's engine: Bali's Accessibility service, the
+  `Lock` over it and `BaliApp` starting the engine and the enforcer, on the emulators (the conductor's
+  calls, awaiting the owner's look; AN7c, #523).** The owner isn't reviewing each step and asked for the
+  recommended option on every question, so each call here is the conductor's, for the owner to look at.
+
+  **Where it lives:** `app`'s `ServiceLock.kt`, the `Lock` over the service (iOS's `PhoneScreenTime`: its
+  `isShielding`, `shield`, `unshield` and `permission`); `LockService.kt`, the service, which has no iOS
+  twin, Android's lock being Bali's own; `BaliApp.kt`'s `start` (BaliApp.swift's `start` but the Debug
+  cap, AN7d's, the 13+ yes, AN9's, and the held read, AN12's); the service declared in `app/src/debug`
+  alone, its manifest, `res/xml/lock_service.xml` and a developer's label and description (Q1); and
+  `SyncClock.sleep`'s doc, from Claude Review's WARN on #522: a sleep never waits on the enforcer, whose
+  recheck starts its sleep inside a stretch of its own. Where Kotlin differs, said plainly:
+  - **The switch** is Android's list of switched-on services (`ENABLED_ACCESSIBILITY_SERVICES`) and the
+    service's binding as Bali's own process sees it, by its connect and its unbind: off the list, off; on
+    it and bound, on; on it and not bound, starting.
+  - **The lock** is an end kept in memory, by the phone's clock, and the service listens as the lock
+    says, through `setServiceInfo`: while none holds, event types 0, flags 0 and Bali's package alone;
+    while one does, the window events alone (`TYPE_WINDOW_STATE_CHANGED`, `TYPE_WINDOWS_CHANGED`), with
+    `FLAG_RETRIEVE_INTERACTIVE_WINDOWS`, from every package; the cache off from Android 13 as it binds; no
+    node read. **`canRetrieveWindowContent` declared now** (the conductor's call): the list of windows and
+    its changes need it, which the cover follows window by window (AN7e), so AN7e keeps the subscription
+    set here. No window's contents is read.
+  - **A lock ended by its end leaves no file and no listening behind it, at the next call into the lock**
+    (the conductor's call): the enforcer's own pass at the end, or the check at the engine's next wake,
+    finds none held, and the file and the service follow. Nothing is woken for it, as ARCHITECTURE's bell
+    has it.
+  - **The last run's lock (Q4)** is a file, `no_backup/lock`, there while a lock holds and read once, as
+    the lock is made with the run (at the app's start or the service's connect, whichever comes first),
+    never again within it, so a reconnect never reads this run's lock back as the last run's
+    (`Lock.locking`'s doc). The brief's "reads it at connect" is read so (the conductor's call): a read at
+    every connect would break that doc. A write the disk refuses is made again at the next call.
+  - **Its calls run on the main thread** (the split's line), where the service's own run, so
+    `setServiceInfo` and the lock's state are one thread's: `kotlinx-coroutines-android` is named for
+    `Dispatchers.Main`, at 1.11.0, the version the build already had through androidx's lifecycle.
+  - **None throws:** a disk that refuses the file, or the system's own process gone as the phone restarts
+    (`setServiceInfo`'s rethrow), leaves the lock as it was, tried again at the next call.
+  - **The screen:** the service registers `ACTION_SCREEN_ON` and `ACTION_SCREEN_OFF` as it binds (only a
+    receiver registered at run time gets them) and reads `isInteractive` there; `BaliApp.screen` holds it,
+    and `start` follows it with one collector for the engine's `setScreenOn`, so two turns in quick
+    succession never land out of order. **Unbound, Bali hears the screen no more, so the engine is told
+    it's off** (the conductor's call): in a session, one check-in as the service goes, rule 3's check
+    before it, then none, as with the screen off; never a check-in every 30 s with the screen off, which
+    the battery plan forbids, nor one Bali can't time. The grid shows that row protection off all the
+    same: the sweep's silence is a focused phone's (data model, decision 7).
+  - **Rule 3's check** runs as the app starts, at each change of the list (a `ContentObserver`), and as
+    the service binds and unbinds, as AN7a and AN7b asked.
+  - **`BaliApp.start(engine, scope)`** runs the enforcer over the lock, both runs, the screen, the
+    observer and the check under a job of its own in the scope it's given, the app's (a test's own in the
+    instrumented tests), **in place of any run before, whose job it ends** (the conductor's call), so a
+    test's start replaces the app's own, which AN7d's Debug engine gives every Debug build. `running` is
+    none once its job ends. As on iOS, the app makes none while sign-in isn't set up; with it set up,
+    `SyncEngine.make(outbox(), config.api, signIn, scope, transport)`, the app's scope and its one
+    transport (AN6c).
+  - **`stoppedAt` is left as it is** (Q7). **A Release build's switch reads off,** the service declared
+    in Debug alone (Q1): harmless while Release has no sign-in, so no engine, and no screens, and AS3 or
+    AS5 declares it in main before either.
+
+  **What the emulators showed** (Android 15, 16 and 17, each cold-booted, so every time is slower than a
+  phone's; ISSUES #6's gap 1 and AN7b's Q7 rest on it):
+  - **A force-stop** (`am force-stop`) takes the service off Android's list at once, the setting emptied,
+    unbound, Bali's process gone: nothing brings it back but the student switching it on, as AN1 found.
+  - **A reboot** (`adb reboot`, the service on) leaves it on the list. Android holds a service that isn't
+    direct-boot aware until the phone is unlocked ("Ignoring non-encryption-aware service"), then starts
+    Bali's process for it, 11.3 s (15), 19.6 s (16) and 32.2 s (17) after the screen came on, and binds it
+    within a second of that. The grace runs from Bali's own first check, so it isn't stretched by that
+    wait; Bali started before the bind for another reason (a push, AN12; Bali opened, Phase 10's) would
+    wait it out, which AN7d's Launch line measures on the phones. On a phone with a screen lock, nothing of
+    Bali's runs before the first unlock.
+  - **Bali's process killed** (`kill -9` by the app's own uid, as Android's memory killer kills) stays on
+    the list, in "Crashed services" for a moment, and is started again a second later and bound by itself,
+    the switch reading starting meanwhile, inside the grace.
+  - A switch put on in the same second as Bali's install was dropped by Android ("disallowed by AppOps"
+    while the install settled, the list then emptied): it reads off, which is honest.
+
+  **The tests,** on `Bali_Spike_API35`, `36` and `37`, a full `connectedDebugAndroidTest` each, 33 of 33
+  (AN6c's 23, `BaliAppTest`'s new one and `LockServiceTest`'s 9): the switch off, on, and starting, a
+  UiAutomation that suppresses accessibility services having Android unbind Bali's, still listed, which
+  only the unbind's own check finds; a service Android unbinds before it ever connects, as it unbinds one
+  switched off while it binds, going quietly (bound by Bali itself, as Android lets the app's own uid,
+  then unbound); the service narrow, widened by a tap and narrow again at Emergency Unlock, read in
+  `dumpsys accessibility` (its event types) and from Android's AccessibilityManager (event types, flags
+  and packages); a lock ended by its end 5 s on, leaving no file and no listening; switched off in a
+  session, protection off queued within a second, the engine's read loop held so only the switch's change
+  and the unbind check; on again, protection on queued, the lock back on to the bell, widened; started in
+  a session with the switch off, reported by the start's own check; the screen off and on through `input
+  keyevent`, one check-in each way, at once, the one as it goes off before the 30-s cadence was due;
+  unbound, the engine's wait gone before it was due; the last run's lock read back by a new `ServiceLock`
+  from `no_backup/`, gone at Emergency Unlock; and, with sign-in not set up, no engine (`BaliAppTest`).
+  Each test runs an engine of its own over its own transport, outbox and clock, handed to the app's start,
+  and ends everything that reads its outbox before closing it (AN5c's teardown). Tried, each failing by
+  name, then reverted: the service never widened (3 tests); the lock's file never written; the file read
+  again at each call (3, a lock never ending once its file was there); the screen's broadcasts unheard
+  (the check-in as it went off came at the 30-s cadence); the unbind leaving the screen heard on (the
+  engine kept its wait); no check at the unbind (the starting switch never found); no check at the
+  switch's change nor at the unbind (nothing in the second), the unbind's alone doing it there; no check
+  as the app starts; the screen not read as the service binds (5); and santa's crash, below, first. **Where
+  only real time does:** "within a second" is real time, a bound on something happening. Each check that
+  something doesn't happen waits for a point the test sees (a wait gone before it was due, every request
+  taken); that no check-in comes however long the screen stays off is AN5c's JVM test, which moves its
+  clock 600 s: here the engine's clock holding no wait once the answer is in is a look, not that proof
+  (santa's review); and `setCacheEnabled(false)` shows in no dump, so nothing here tests it. **AN6c's
+  race, found and closed:** on emulators still loaded from a cold boot, AN6c's
+  `aHostMadeAgainForAChange…StillReachesTheCall` failed in 3 of 6 first runs (Android 16 and 17): the
+  font scale's change reached Bali seconds after the shell set it, the answer had brought the host back
+  as it was by then, and it was never made again (17's logcat: the host back and done at :26, the change
+  arriving at :28). It now waits for Bali to have the change before it answers. The same lag broke the
+  next test twice (`aLinkSentToClearBalisTask…`, on 15 and 17): the last test's change and its undoing
+  reached Bali during it and made its host again under the tab (15's logcat: 1.3, then 1.0, then the host
+  remade, all within a second of its start), so `changed {}` now waits for Bali to have the font scale
+  back before the next test starts. A wait in `changed {}` before its block too moved the race into its
+  other test, whose Back then reached Chrome while Chrome was being made again for the change and was
+  lost, so that wait is in the one test alone. With both, each emulator ran the suite whole cold and warm.
+  Each emulator was left as found: Bali's
+  app and test app uninstalled (AN1's spike apps kept), no accessibility service on,
+  `accessibility_enabled` at 0, the font scale 1.0. Nothing was added to the PC's SDK: its folders were
+  compared before and after.
+
+  **For AN7d:** `BaliApp.running`'s engine and enforcer, and `lock`; Bali's own screen coming to the
+  front calls `setInFront` and `check()`. With the service off the engine hears no screen, so it checks
+  in nowhere: the readout reads the truth as it comes to the front, never a check-in. The Debug engine
+  over no token (Q2), made as the app is created, runs in the instrumented tests' process too, where
+  OutboxFileTest deletes `outbox.sqlite` under it (AN5c's teardown trap): give the tests a file of their
+  own, or end the app's run first; LockServiceTest's starts replace it. **For AN7e:**
+  `onAccessibilityEvent` decides nothing yet, and window events arrive only while a lock holds; the
+  allow-list's `<queries>` go beside the service in the debug manifest; the cover covers while
+  `ServiceLock` holds a lock. **For the PR that sets the client id** (owner item 8): `BaliApp.onCreate`
+  then makes the engine over `outbox.sqlite` in the tests' process, the same trap.
+
+  **Santa's review:** two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so
+  context isolation holds and model diversity doesn't). Round 1, one blocker, from both (B's as a WARN),
+  fixed: **Android unbinds a service switched off while it binds without ever connecting it** (AOSP's
+  `initializeService`), and the unbind unregistered a receiver only the connect registers, so Bali
+  crashed (`Receiver not registered`) before its check could report the switch off; the receiver is now
+  unregistered only where it was registered, and the test above crashed the tests' process first. Its
+  WARNs, each taken: the unbind's own check had no test (now the starting switch's); the screen test
+  claimed a proof its look at the engine's clock can't give (said plainly above); `BaliApp.check()`
+  guarded, as the enforcer's recheck is, so a lock breaking its promise never ends the app; and the AN7
+  phone tests' starting states. Round 2, on the fixes: no blocker. Its WARNs: the starting switch's test
+  now waits for the connect's check and the screen's wake first, so no check under way can stand in for
+  the unbind's, and two phone tests' starting states were made whole (both taken); and no test reaches
+  `BaliApp.check()`'s guard, since only a lock breaking its promise can and `ServiceLock` has no throwing
+  path, the enforcer's side of such a throw being the JVM's (`EnforcerTest`), left as it is.
+
 - **2026-11-05** — **AN7b, rule 3's report: protection off, the lock back on and the launch grace, in the
   enforcer's check (the conductor's calls, awaiting the owner's look; AN7b, #522).** The owner isn't
   reviewing each step and asked for the recommended option on every question, so each call here is the

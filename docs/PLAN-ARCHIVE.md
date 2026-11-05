@@ -10,6 +10,18 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN7c's on 2026-11-05: _Last updated: 2026-11-05 (Central) — AN7b,
+rule 3's report (#522; `docs/DECISIONS.md`, 2026-11-05):
+the switch found off in a session the phone's clock says still runs, reported once with iOS's events,
+shown and tried again where the outbox can't queue it; switched on again in the class it was off in,
+before its bell, the phone back where it stood (#167), once, and only once the service is bound; a
+switch starting judged off once that lasts the grace, 30 s by the time the phone has run, checked again
+every second meanwhile; and Claude Review's two WARNs on #521, each decided with a test. A force-stop
+found after the bell reports nothing (Q7). Before it, AN7a, the lock follows the engine. Next: AN7c, the
+service and the app's engine; Android's Cognito clients, the owner's (Open owner items, 8); Android 17's
+SDK platform for the owner to OK before the first step with today's AndroidX, and OkHttp 5.5 with it
+(Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN7b's on 2026-11-05: _Last updated: 2026-11-05 (Central) — AN7a,
 the lock follows the engine (#521; `docs/DECISIONS.md`,
 2026-11-05): BaliOutbox's enforcer in Kotlin over a seam of the lock's own (`Lock`), with its tests on a
@@ -2312,6 +2324,21 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN7c's line, as it read until it was done (2026-11-05; `docs/DECISIONS.md`, 2026-11-05). Its "but a
+Debug build's, over no token (Q2)" went to AN7d's line, whose readout needs it (the conductor's brief).
+
+- **AN7c** The service and the app's engine (twin: `PhoneScreenTime` and BaliApp.swift's engine): the
+  Accessibility service, (a), as ARCHITECTURE's battery plan has it (listening only in a lesson, and
+  then to window events), declared in the Debug build alone with a developer's label (DECISIONS
+  2026-11-05, Q1): its switch
+  from Android's settings and its binding, the lock narrowed and widened through `setServiceInfo`, the
+  last run's lock kept in `no_backup` (Q4), the screen going on and off (`setScreenOn`), and the check
+  at its connect, its unbind and the switch's change; and `BaliApp`'s engine (`SyncEngine.make`) and
+  enforcer, none while sign-in isn't set up but a Debug build's, over no token (Q2). Its first question
+  is answered (the owner, 2026-11-04): the service checks in every 30 s while the screen is on, once as
+  it goes off and once as it comes on, so an awake phone gone quiet means Bali stopped or lost its
+  network — validation: the instrumented tests on `Bali_Spike_API35`, `36` and `37`
 
 AN7b's line, as it read until it was done (2026-11-05; `docs/DECISIONS.md`, 2026-11-05).
 

@@ -24,6 +24,8 @@ kotlin-test-junit5 = { module = "org.jetbrains.kotlin:kotlin-test-junit5", versi
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
 # Swift's async: the API client's calls suspend, and wait on OkHttp's call, cancellable.
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
+# The main thread as a dispatcher, where the lock's calls run (app's ServiceLock.kt).
+kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinx-coroutines" }
 # The API client's transport (core's OkHttpTransport.kt); 5.5's Android build needs compileSdk 37 (README.md).
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
 # A local HTTP server, for the transport's tests.
