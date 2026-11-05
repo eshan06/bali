@@ -347,6 +347,58 @@ struct UnreadUnlockTests {
         #expect(sent.route == sessionUnlockRoute && sent.eventId == press.eventId)
         await phone.stop()
     }
+
+    @Test("PROOF ONLY, never merged: filedWhenTheFileReads as it stood before #511")
+    func filedWhenTheFileReadsAsBefore() async throws {
+        let (outbox, url) = try makeOutbox()
+        let (phone, kept) = try await unreadable(outbox: outbox)
+        let rig = phone.rig
+        let unlock = try #require(try await rig.engine.emergencyUnlock(reason: .bathroom))
+        await phone.until { !$0.shielded }
+        try outbox.keep(kept)
+        // A relaunch at every commit from here never stands focused beside the unlock.
+        let relaunches = try Relaunches(url)
+        outbox.pool.add(transactionObserver: relaunches, extent: .observerLifetime)
+        try await rig.sleeping([at(60)])
+        rig.clock.advance(by: 60)
+        let sent = try await rig.server.next(sessionUnlockRoute)
+        outbox.pool.remove(transactionObserver: relaunches)
+        #expect(sent.eventId == unlock.eventId)
+        let unlocked = Standing.inSession(session(endsAt: 1200), .unlocked)
+        #expect(await rig.engine.state.standing == unlocked)
+        #expect(try rig.outbox.standing() == unlocked)
+        #expect(!relaunches.engines.isEmpty)
+        for engine in relaunches.engines {
+            #expect(await engine.state.shieldedUntil(at(60)) == nil)
+        }
+        sent.reply(200, Answer.unlocked(session(endsAt: 1200)))
+        await rig.until { $0.queued.isEmpty }
+        #expect(await phone.screenTime.unshields == 1)
+        #expect(await !phone.screenTime.shielding)
+        await phone.stop()
+    }
+
+    @Test("PROOF ONLY, never merged: filedByTheNextAct as it stood before #511")
+    func filedByTheNextActAsBefore() async throws {
+        let (outbox, _) = try makeOutbox()
+        let (phone, kept) = try await unreadable(outbox: outbox)
+        let rig = phone.rig
+        let press = try #require(try await rig.engine.emergencyUnlock())
+        await phone.until { !$0.shielded }
+        // Readable again, but the write that would file the press there is refused.
+        try refuseUpdates(outbox)
+        try outbox.keep(kept)
+        try await rig.sleeping([at(60)])
+        rig.clock.advance(by: 60)
+        await rig.until { $0.standing != .unread }
+        #expect(try current(outbox, press.eventId)?.change == .unlockUnfiled(reason: nil))
+        try refuseUpdates(outbox, false)
+        let refocus = try #require(try await rig.engine.record(.refocus(session: "s")))
+        #expect(refocus.follows == press.eventId)
+        let sent = try await rig.server.next()
+        #expect(sent.route == sessionUnlockRoute && sent.eventId == press.eventId)
+        await phone.stop()
+    }
 }
 
 /// A row this build cannot read, which every read of the queue fails on while it is there: a

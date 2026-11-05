@@ -431,8 +431,8 @@ public actor SyncEngine {
         if case .protectionOn(let session) = change {
             guard case .inSession(let view, .protectionOff?) = state.standing, view.id == session
             else { return nil }
-            offFrom =
-                (stored(outbox.offFrom) ?? nil) ?? (keepsUnlocked(session) ? .unlocked : .focused)
+            // PROOF ONLY, never merged (#511): the unlock guard always says unlocked.
+            offFrom = (stored(outbox.offFrom) ?? nil) ?? .unlocked
         }
         // Where it leaves the phone is kept in the change's own write: killed between two, a
         // relaunch would stand where the phone stood before — shielded over an Emergency Unlock.
@@ -1018,6 +1018,14 @@ public actor SyncEngine {
     /// and at each wake in the foreground while waiting for the Start — or, in the foreground, the
     /// check-in of the session the phone is in; then waits for the next.
     private func read() async {
+        // PROOF ONLY, never merged (#511): the first wake run late. Held back while the file will
+        // not read, 20 s at most, unless the read loop is rung first.
+        let late = Date().addingTimeInterval(20)
+        while state.standing == .unread, !rung.contains(.read), (try? outbox.standing()) == nil,
+            Date() < late, !Task.isCancelled
+        {
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
         while !Task.isCancelled {
             rung.remove(.read)
             readStanding()
