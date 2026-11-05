@@ -71,11 +71,13 @@ struct UnreadUnlockTests {
         let rig = phone.rig
         let unlock = try #require(try await rig.engine.emergencyUnlock(reason: .bathroom))
         await phone.until { !$0.shielded }
+        // The read loop has found the file unreadable, and reads it again in a minute; only then is
+        // it readable, or a first wake run late would read it at once.
+        try await rig.sleeping([at(60)])
         try outbox.keep(kept)
         // A relaunch at every commit from here never stands focused beside the unlock.
         let relaunches = try Relaunches(url)
         outbox.pool.add(transactionObserver: relaunches, extent: .observerLifetime)
-        try await rig.sleeping([at(60)])
         rig.clock.advance(by: 60)
         let sent = try await rig.server.next(sessionUnlockRoute)
         outbox.pool.remove(transactionObserver: relaunches)
@@ -330,10 +332,11 @@ struct UnreadUnlockTests {
         let rig = phone.rig
         let press = try #require(try await rig.engine.emergencyUnlock())
         await phone.until { !$0.shielded }
-        // Readable again, but the write that would file the press there is refused.
+        // Readable again once the read loop has found it unreadable, but the write that would file
+        // the press there is refused.
+        try await rig.sleeping([at(60)])
         try refuseUpdates(outbox)
         try outbox.keep(kept)
-        try await rig.sleeping([at(60)])
         rig.clock.advance(by: 60)
         await rig.until { $0.standing != .unread }
         #expect(try current(outbox, press.eventId)?.change == .unlockUnfiled(reason: nil))
