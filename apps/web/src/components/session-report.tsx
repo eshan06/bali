@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 import { CARD_ALONE } from '@/components/card';
+import { useCountOpened } from '@/components/count';
 import { RecapBody } from '@/components/recap-card';
 import { ReportQuestions } from '@/components/report-questions';
 import { CELL, FIGURE, HEAD, LABEL, TABLE_BOX } from '@/components/reports-list';
@@ -37,6 +38,8 @@ export function SessionReportPage({ classId, sessionId }: { classId: string; ses
   const { me } = useMe();
   const [page, setPage] = useState<SessionPage>({ kind: 'loading' });
   const [questions, setQuestions] = useState<SessionQuestions>({ kind: 'loading' });
+  // Opened once its read is in, a Try again's too (A3b).
+  useCountOpened('portal_report_opened', page.kind === 'ready');
 
   useEffect(() => {
     if (!getAccessToken()) {

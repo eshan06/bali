@@ -10,6 +10,12 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-11-05 (Central) — WC6 (#519; `docs/DECISIONS.md`, 2026-11-04): the sixth of the
+eight WC steps: the iPhone's answer card loses its two lines. Before it, A3a (#517). Next: WC7; A3b,
+A4; a session builds the retire-a-block command; the owner the new build, with A5 and A2, and the
+sitting; the owner's call on GA5's known limit, the smallest iPhones (DECISIONS 2026-11-02); AN6,
+Android's sign-in; AN1's part 2 once the owner has the phones; the audit's polish waits, as ruled._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN7d's on 2026-11-05: _Last updated: 2026-11-05 (Central) — AN7c,
 the service and the app's engine (#523;
 `docs/DECISIONS.md`, 2026-11-05): Bali's Accessibility service, declared in the Debug build alone with

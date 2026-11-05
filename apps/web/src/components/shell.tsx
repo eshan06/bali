@@ -1,6 +1,6 @@
 'use client';
 
-import type { MeResponse } from '@bali/shared';
+import type { MeResponse, PortalEvent } from '@bali/shared';
 import {
   ChartBar,
   CircleQuestionMark,
@@ -24,13 +24,15 @@ import {
   useState,
 } from 'react';
 
+import { countAction } from '@/lib/actions';
 import { type ApiClient, UnauthorizedError } from '@/lib/api-client';
-import { endSession, getAccessToken } from '@/lib/auth';
+import { endSession, getAccessToken, tookSignIn } from '@/lib/auth';
 import { errText } from '@/lib/errors';
 import { type Home, homeFor } from '@/lib/student-web';
 import { useApi } from '@/lib/use-api';
 
 import { CARD_ALONE } from './card';
+import { CountContext } from './count';
 import { Mark } from './mark';
 import { PortalBar } from './portal-bar';
 import { TryAgain } from './try-again';
@@ -488,6 +490,17 @@ export function Shell({ children }: { children: ReactNode }) {
     }
   }, [path, home, error, load, reads, router]);
 
+  // A teacher's actions, counted for PostHog through Bali's API (A3b): only while the account
+  // reads as a teacher's. A sign-in counts once, as its account first does.
+  const teacher = home?.kind === 'teacher';
+  const count = useMemo(
+    () => (teacher ? (event: PortalEvent) => countAction(api, event) : null),
+    [api, teacher],
+  );
+  useEffect(() => {
+    if (count !== null && tookSignIn()) count('portal_signed_in');
+  }, [count]);
+
   // Back here by the back button with the page kept whole: a signed-in page reloads, so it never
   // shows an account that has since left (`reloadOnRestore`), and its Sign out starts afresh.
   useEffect(() => {
@@ -517,29 +530,31 @@ export function Shell({ children }: { children: ReactNode }) {
   );
   return (
     <MeContext value={value}>
-      <PresentingContext value={setPresenting}>
-        <div className={frame.chrome === 'menu' ? SHELL : undefined}>
-          {frame.chrome === 'menu' ? (
-            <SideMenu
-              role={home?.kind === 'student' ? 'student' : 'teacher'}
-              path={path}
-              name={me?.user.displayName?.trim() || null}
-              leaving={leaving}
-              onSignOut={onSignOut}
-            />
-          ) : frame.chrome === 'bar' ? (
-            <PortalBar leaving={leaving} onSignOut={onSignOut} />
-          ) : null}
-          <PagePlace
-            signedOut={SIGNED_OUT_PATHS.test(path)}
-            frame={frame}
-            error={error}
-            onRetry={refresh}
-          >
-            {children}
-          </PagePlace>
-        </div>
-      </PresentingContext>
+      <CountContext value={count}>
+        <PresentingContext value={setPresenting}>
+          <div className={frame.chrome === 'menu' ? SHELL : undefined}>
+            {frame.chrome === 'menu' ? (
+              <SideMenu
+                role={home?.kind === 'student' ? 'student' : 'teacher'}
+                path={path}
+                name={me?.user.displayName?.trim() || null}
+                leaving={leaving}
+                onSignOut={onSignOut}
+              />
+            ) : frame.chrome === 'bar' ? (
+              <PortalBar leaving={leaving} onSignOut={onSignOut} />
+            ) : null}
+            <PagePlace
+              signedOut={SIGNED_OUT_PATHS.test(path)}
+              frame={frame}
+              error={error}
+              onRetry={refresh}
+            >
+              {children}
+            </PagePlace>
+          </div>
+        </PresentingContext>
+      </CountContext>
     </MeContext>
   );
 }

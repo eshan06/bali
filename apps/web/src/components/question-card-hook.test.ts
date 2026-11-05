@@ -72,6 +72,8 @@ const io = vi.hoisted(() => {
   return { open, get, api: { get } };
 });
 vi.mock('../lib/use-api', () => ({ useApi: () => io.api }));
+// The ask's count (A3b) reads the account, which no shell holds here: driven in teacher-actions.
+vi.mock('./count', () => ({ useCount: () => null }));
 vi.mock('../lib/live-question', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../lib/live-question')>()),
   openQuestion: io.open,

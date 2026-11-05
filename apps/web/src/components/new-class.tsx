@@ -10,6 +10,7 @@ import { newEventId } from '@/lib/event-id';
 import { useApi } from '@/lib/use-api';
 
 import { Button } from './button';
+import { useCount } from './count';
 import { Field } from './field';
 import { CODE, DIALOG, useCopy } from './join-code';
 import { TryAgain } from './try-again';
@@ -38,6 +39,7 @@ export const cardId = (classId: string) => `class-${classId}`;
  */
 export function NewClass({ ref, onAnswer }: { ref?: Ref<NewClassHandle>; onAnswer: () => void }) {
   const api = useApi();
+  const count = useCount();
   const id = useId();
   const dialog = useRef<HTMLDialogElement>(null);
   const field = useRef<HTMLInputElement>(null);
@@ -85,8 +87,10 @@ export function NewClass({ ref, onAnswer }: { ref?: Ref<NewClassHandle>; onAnswe
     onAnswer();
     // Said in the dialog, opened again if the browser closed it meanwhile (a second Escape).
     if (dialog.current && !dialog.current.open) dialog.current.showModal();
-    if (answer.kind === 'created') setMade(answer.klass);
-    else setFailed(answer);
+    if (answer.kind === 'created') {
+      count?.('portal_class_created');
+      setMade(answer.klass);
+    } else setFailed(answer);
   }
 
   /** Closed: by Cancel, Escape or Done. The next New class starts afresh, under a new eventId. */

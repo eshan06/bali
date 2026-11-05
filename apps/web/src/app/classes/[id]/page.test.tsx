@@ -78,10 +78,10 @@ const bali = vi.hoisted(() => {
   const sent: { method: string; path: string; body: unknown }[] = [];
   const unexpected: string[] = [];
   /**
-   * Whether the class's session runs yet: none until a Start, when a test says so; and whether a
-   * Start's answer waits for the test to give it (`starts`).
+   * Whether the class's session runs yet: none until a Start, when a test says so; whether a
+   * Start's answer waits for the test to give it (`starts`); and an extend's (`extending`).
    */
-  const now = { running: true, holdStart: false };
+  const now = { running: true, holdStart: false, holdExtend: false };
   const starts: (() => void)[] = [];
   const answer = (method: string, path: string): [number, unknown] => {
     if (method === 'GET' && path === `/v1/classes/${CLASS}`) {
@@ -104,19 +104,31 @@ const bali = vi.hoisted(() => {
     unexpected.push(`${method} ${path}`);
     return [404, { error: { code: 'not_found', message: 'not found' } }];
   };
-  /** Each End on its way, its answer the test's to give, or no answer at all (its time limit). */
+  /**
+   * Each End on its way, and each extend while the test holds them, its answer the test's to give,
+   * or no answer at all (its time limit).
+   */
   const ends: { answer: (res: Response) => void; fail: () => void }[] = [];
-  /** `fetch`, answered at once as Bali would answer it; an End when the test says. */
+  const extending: typeof ends = [];
+  /** `fetch`, answered at once as Bali would answer it; an End, or a held extend, when the test says. */
   const fetch = (url: string | URL | Request, init?: RequestInit) => {
     const method = init?.method ?? 'GET';
     const path = (url as string).replace('http://api', '');
     const body = typeof init?.body === 'string' ? (JSON.parse(init.body) as unknown) : null;
-    if (method === 'POST' && path === `/v1/sessions/${SESSION}/end`) {
+    const waiting =
+      method !== 'POST'
+        ? null
+        : path === `/v1/sessions/${SESSION}/end`
+          ? ends
+          : now.holdExtend && path === `/v1/sessions/${SESSION}/extend`
+            ? extending
+            : null;
+    if (waiting) {
       sent.push({ method, path, body });
       return new Promise<Response>((answer, reject) => {
         const fail = () => reject(new TypeError('Failed to fetch'));
         init?.signal?.addEventListener('abort', fail);
-        ends.push({ answer, fail });
+        waiting.push({ answer, fail });
       });
     }
     const held =
@@ -141,6 +153,7 @@ const bali = vi.hoisted(() => {
     sent,
     unexpected,
     ends,
+    extending,
     fetch,
     /** Each stream the grid opened, its events the test's to bring. */
     streams: [] as { onEvent: (e: FeedEvent) => void }[],
@@ -190,11 +203,13 @@ afterEach(() => {
   sessionStorage.clear();
   bali.now.running = true;
   bali.now.holdStart = false;
+  bali.now.holdExtend = false;
   bali.starts.length = 0;
   bali.sent.length = 0;
   bali.unexpected.length = 0;
   bali.streams.length = 0;
   bali.ends.length = 0;
+  bali.extending.length = 0;
   vi.mocked(captureApiFailure).mockClear();
 });
 
@@ -257,6 +272,121 @@ describe('a class live, time past 16 hours in all (the owner, 2026-10-28)', () =
       expect(bali.unexpected).toEqual([]);
     });
   }
+});
+
+/*
+ * An extend that got no answer (ClassRetryStates): it may have landed, so its line says so with
+ * Try again, which sends the same one again under its id, held, as every control is while any send
+ * is on its way, so focus stays on it; answered, the time added in the line's place, focus on the
+ * class's name; failed again, said again. +5 and +10 send afresh, their line going as they do,
+ * focus kept on their own button, the same minutes resending the one with no answer (rule 4).
+ * Converted from the source text of `app/class-page.test.ts` (A3b).
+ */
+describe('an extend with no answer, and its Try again (ClassRetryStates)', () => {
+  const later = new Date(Date.parse(bali.endsAt) + 5 * 60_000).toISOString();
+  const name = () => screen.getByRole('heading', { level: 1, name: 'Biology, period 3' });
+  const control = (name: string) => screen.getByRole('button', { name });
+
+  /** The page live, its grid read, its extends held. */
+  async function live() {
+    bali.now.holdExtend = true;
+    const user = userEvent.setup();
+    render(
+      <main>
+        <ClassDetailPage />
+      </main>,
+    );
+    await screen.findByText('Ana Rodríguez');
+    return user;
+  }
+  /** The extend on its way now: no answer at all, or the time added; drawn before the next check. */
+  const settle = (how: 'none' | 'added') =>
+    act(async () => {
+      const extend = bali.extending.shift();
+      if (how === 'none') extend?.fail();
+      else {
+        extend?.answer(
+          Response.json({
+            outcome: 'extended',
+            session: { id: bali.SESSION, classId: bali.CLASS, endsAt: later },
+          }),
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+  const pressed = () => extendsSent().map(({ body }) => body as Press);
+
+  it('keeps its line said while Try again sends the same one again, every control held; added, the line goes, focus on the class’s name', async () => {
+    const user = await live();
+    await user.click(control('+5 min'));
+    await settle('none');
+    const line = screen.getByText(CANT_REACH);
+    expect(line.getAttribute('role')).toBe('alert');
+
+    // Sent again, on its way: the line said, Try again held as Loading… with focus on it, and
+    // every control held with it.
+    const again = control('Try again');
+    await user.click(again);
+    expect(screen.getByText(CANT_REACH)).toBe(line);
+    expect(again.textContent).toBe('Loading…');
+    expect(again.getAttribute('aria-busy')).toBe('true');
+    expect(document.activeElement).toBe(again);
+    for (const held of ['+5 min', '+10 min', 'End session']) {
+      expect(control(held).getAttribute('aria-disabled'), held).toBe('true');
+    }
+    // The same one, under its id.
+    expect(pressed()).toHaveLength(2);
+    expect(pressed()[1]).toEqual(pressed()[0]);
+
+    // No answer again: said again, anew, Try again in its place.
+    await settle('none');
+    const anew = screen.getByText(CANT_REACH);
+    expect(anew).not.toBe(line);
+    expect(anew.getAttribute('role')).toBe('alert');
+    expect(control('Try again').getAttribute('aria-busy')).toBe('false');
+
+    // Sent again and added: the line and Try again go, the bell moves, focus on the class's name.
+    await user.click(control('Try again'));
+    expect(pressed()[2]).toEqual(pressed()[0]);
+    await settle('added');
+    expect(screen.queryByText(CANT_REACH)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+    expect(document.querySelector(`time[datetime="${later}"]`)).not.toBeNull();
+    await vi.waitFor(() => expect(document.activeElement).toBe(name()));
+    for (const free of ['+5 min', '+10 min', 'End session']) {
+      expect(control(free).getAttribute('aria-disabled'), free).toBe('false');
+    }
+    expect(bali.unexpected).toEqual([]);
+  });
+
+  it('lets +5 and +10 send afresh, their line going as they do, focus kept on them; the same minutes resend the one with no answer', async () => {
+    const user = await live();
+    await user.click(control('+5 min'));
+    await settle('none');
+    expect(screen.getByText(CANT_REACH).getAttribute('role')).toBe('alert');
+
+    // +10: a fresh one, under a new id, the line going as it is sent; focus stays on +10.
+    const plus10 = control('+10 min');
+    await user.click(plus10);
+    expect(screen.queryByText(CANT_REACH)).toBeNull();
+    expect(document.activeElement).toBe(plus10);
+    await settle('none');
+    expect(screen.getByText(CANT_REACH).getAttribute('role')).toBe('alert');
+
+    // +10 again: the one with no answer, under its own id.
+    await user.click(plus10);
+    expect(screen.queryByText(CANT_REACH)).toBeNull();
+    await settle('added');
+    const [first, second, third] = pressed();
+    expect(first?.durationMinutes).toBe(5);
+    expect(second?.durationMinutes).toBe(10);
+    expect(second?.eventId).toMatch(UUID_V7);
+    expect(second?.eventId).not.toBe(first?.eventId);
+    expect(third).toEqual(second);
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(document.activeElement).toBe(plus10);
+    expect(bali.unexpected).toEqual([]);
+  });
 });
 
 /*

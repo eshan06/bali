@@ -8,11 +8,12 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-05 (Central) — WC6 (#519; `docs/DECISIONS.md`, 2026-11-04): the sixth of the
-eight WC steps: the iPhone's answer card loses its two lines. Before it, A3a (#517). Next: WC7; A3b,
-A4; a session builds the retire-a-block command; the owner the new build, with A5 and A2, and the
-sitting; the owner's call on GA5's known limit, the smallest iPhones (DECISIONS 2026-11-02); AN6,
-Android's sign-in; AN1's part 2 once the owner has the phones; the audit's polish waits, as ruled._
+_Last updated: 2026-11-05 (Central) — A3b (#525; `docs/DECISIONS.md`, 2026-11-05): the portal posts
+each of a teacher's actions to `POST /v1/me/actions` once it has happened, the shell's read of the
+account the gate, an opening once per opening, a failed post never shown. Before it, WC6 (#519).
+Next: WC7; A4; a session builds the retire-a-block command; the owner the new build, with A5 and A2,
+and the sitting; the owner's call on GA5's known limit, the smallest iPhones (DECISIONS 2026-11-02);
+AN7e; AN1's part 2 once the owner has the phones; the audit's polish waits, as ruled._
 
 ## Now
 
@@ -139,7 +140,7 @@ branch, with no PR, as its README says (#479; `docs/DECISIONS.md`, 2026-11-02).
    - **A3a** The server's endpoint for the portal's events, `POST /v1/me/actions`: teacher-only,
      checked against the allow-list, forwarded to PostHog with the server's key; additive under
      `/v1` — ✅ (#517; DECISIONS 2026-11-05)
-   - **A3b** The portal's teacher events, through it (no CSP change)
+   - **A3b** The portal's teacher events, through it (no CSP change) — ✅ (#525; DECISIONS 2026-11-05)
    - **A4** `/privacy` names PostHog and says what stays there once an account is deleted (a
      teacher's events, a class's totals), before the key is set
    - Then the owner's key: `POSTHOG_KEY` in Railway's `bali prod` (the portal holds none).

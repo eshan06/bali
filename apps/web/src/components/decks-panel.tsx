@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Panel } from '@/components/ask-panel';
 import { Button } from '@/components/button';
+import { useCount } from '@/components/count';
 import { SaidLine } from '@/components/slide-card';
 import { CANT_LOAD_SLIDES, type Decks, showLine } from '@/components/slides';
 import { QUIET_LINK } from '@/components/text-link';
@@ -138,6 +139,7 @@ export function DecksPanel({
   onClose: () => void;
 }) {
   const api = useApi();
+  const count = useCount();
   const [decks, setDecks] = useState<Decks>('loading');
   const read = useCallback(async () => {
     const answer = await readDecks(api);
@@ -158,6 +160,8 @@ export function DecksPanel({
   }, []);
   const show = (deck: Deck, again = false) =>
     void lesson.show(deck.id, again).then((shown) => {
+      // Shown, counted however the panel was left meanwhile (A3b).
+      if (shown) count?.('portal_slides_shown');
       if (shown && open.current) onShown();
     });
   return (

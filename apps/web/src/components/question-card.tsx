@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Button } from '@/components/button';
 import { CARD_ALONE } from '@/components/card';
+import { useCount } from '@/components/count';
 import { TryAgain } from '@/components/try-again';
 import {
   closeAttemptFor,
@@ -156,6 +157,7 @@ const IDLE: Opening = { busy: false, failure: null, from: null };
  */
 export function useLiveQuestion(sessionId: string | null) {
   const api = useApi();
+  const count = useCount();
   const [held, setHeld] = useState<Held>({ session: null, question: null });
   const now = useRef<Held>(held);
   // The newest question this session has shown, and the poll reading the one shown.
@@ -301,6 +303,8 @@ export function useLiveQuestion(sessionId: string | null) {
       setOpening((cur) => ({ busy: true, failure: cur.from === from ? cur.failure : null, from }));
       const attempt = openAttemptFor(unansweredOpen.current, session, draft);
       const answer = await openQuestion(api, attempt);
+      // Asked, its replay too: an ask whose answer never came was never counted (A3b).
+      if (answer.kind === 'opened') count?.('portal_question_asked');
       // A session gone meanwhile is the next one's no more: its own ask and attempt stand.
       if (now.current.session !== session) return null;
       unansweredOpen.current = keepUnanswered(attempt, answer);
@@ -318,7 +322,7 @@ export function useLiveQuestion(sessionId: string | null) {
       // Cancelled on its way: the card shows what it asked, and no panel opened since is closed.
       return cancelled ? null : answer;
     },
-    [api, put],
+    [api, count, put],
   );
   // The write form's Cancel: never an ask of one of the teacher's questions, whose failure waits
   // under it in their list however the panel was left meanwhile (santa's review, round 2).

@@ -12,6 +12,7 @@ const VERIFIER_KEY = 'bali.pkce.verifier';
 const STATE_KEY = 'bali.pkce.state';
 const TOKEN_KEY = 'bali.access_token';
 const SIGNED_OUT_KEY = 'bali.signed_out';
+const SIGNED_IN_KEY = 'bali.signed_in';
 
 /** Kick off sign-in: stash a fresh verifier + state, redirect to the hosted UI. */
 export async function startLogin(): Promise<void> {
@@ -59,6 +60,26 @@ export async function completeLogin(query: URLSearchParams): Promise<void> {
   sessionStorage.setItem(TOKEN_KEY, tokens.access_token);
   sessionStorage.removeItem(VERIFIER_KEY);
   sessionStorage.removeItem(STATE_KEY);
+  // For the sign-in's count (A3b, `tookSignIn`), never in the sign-in's way.
+  try {
+    sessionStorage.setItem(SIGNED_IN_KEY, '1');
+  } catch {
+    // sessionStorage refused it: this sign-in goes uncounted
+  }
+}
+
+/**
+ * Whether this tab has signed in since it was last asked, told once (A3b): the shell asks as the
+ * account first reads as a teacher's, so a sign-in counts once, never at a reload or another page.
+ */
+export function tookSignIn(): boolean {
+  try {
+    const signedIn = sessionStorage.getItem(SIGNED_IN_KEY) !== null;
+    sessionStorage.removeItem(SIGNED_IN_KEY);
+    return signedIn;
+  } catch {
+    return false;
+  }
 }
 
 /** The current access token, or null when signed out. Safe in any context. */

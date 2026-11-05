@@ -12,6 +12,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 
 import { buttonClass } from '@/components/button';
 import { CARD_ALONE } from '@/components/card';
+import { useCountOpened } from '@/components/count';
 import { RecapLists } from '@/components/timeline';
 import { TryAgain } from '@/components/try-again';
 import {
@@ -75,6 +76,8 @@ export function RecapCard(props: Props) {
   }, [found, onFound]);
   // Gone (a Start), none: the next session's end never paints with this one's.
   useEffect(() => () => onFound?.(null), [onFound]);
+  // Opened once the card shows it whole, its roster's who didn't join too (A3b).
+  useCountOpened('portal_recap_opened', state.kind === 'ready' && (props.roster ?? null) !== null);
 
   // Nothing until there is a session to recap: a class that never ran one shows no card.
   if (state.kind === 'finding' || state.kind === 'none') return null;
