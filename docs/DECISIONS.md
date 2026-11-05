@@ -8,6 +8,68 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-05** — **A3b, the portal counts a teacher's actions through `POST /v1/me/actions` (the
+  worker's calls, awaiting the owner; A3b, #525).** The portal's half of A3a's relay (the entry "A3a,
+  the server's endpoint for the portal's teacher actions", below): no API, `packages/shared` or CSP
+  change, no PostHog SDK, host or dependency, and nothing visible: no word, state or layout, so no
+  board.
+
+  **The sender** (`apps/web/src/lib/actions.ts`, `countAction`): one POST through the portal's own
+  client, which carries the teacher's token, `{ event, eventId }` under a fresh UUIDv7
+  (`newEventId`), within a save's 10 s, never awaited and never sent again: no retry, as a lost count
+  is an analytics count off and A3a keeps no row. Its failure is swallowed, never said and never
+  thrown into its caller: the count isn't the teacher's action, whose own result and failure the page
+  says as before. Said plainly: through the shared client, a count with no answer or a 5xx still
+  reaches Sentry as any call does (the path's template and the status, never a body), and a `401`
+  signs the tab out as any call's does, on the same token.
+
+  **The gate is the shell's read of the account** (`components/count.ts`): the shell binds the sender
+  to its client and hands it on in `CountContext` only while that read says `home.kind ===
+  'teacher'`; a student, an account the 13+ check never passed, and any page before the account is
+  read get none (`useCount`'s null), whatever the page. Its own module, not the shell's, so the
+  shell's mocks in the tests that still read source text stay whole.
+
+  **Once, after it happens:** each action counts in its own success branch, so a failed one counts
+  nothing and one whose answer never came counts with its resend's: a Start once it answers (an
+  `existing` too: the press went through), an End once it answers (an `already_ended` too), an extend
+  once it answers `extended`, a class once its create answers `created`, a block once the register
+  answers with it (one already the teacher's too), a question once its open answers `opened`
+  (`useLiveQuestion`'s `ask`, for both panels), and slides once their Show's change shows the deck,
+  the panel closed meanwhile too; a page turn and Stop count nothing. Said plainly (santa's review): a
+  Start with no answer whose session the class's read again then finds running, and an End with no
+  answer that the stream then reports over, are never counted, since neither is sent again: an
+  undercount, in analytics alone.
+
+  **An opening** (`useCountOpened`): Present once each time it shows its class (its toggle, Home's
+  Present, a reload in it), a session's report once its read is in, and the recap once the class
+  page's card shows it whole, its roster in too (Home's Open the recap leads there); never at a
+  re-render, and once under React's development double effects (a ref per opening). One shown before
+  the account is read counts as it reads. Said plainly (santa's review): the card shows by itself, so
+  `portal_recap_opened` counts each visit to a class page whose last session is over and each end
+  seen there, not only a teacher choosing to look; the owner may want it counted on Home's Open the
+  recap instead.
+
+  **A sign-in** (`lib/auth.ts`'s `tookSignIn`, the shell): `completeLogin` leaves a one-time mark in the
+  tab's sessionStorage once the token is in, a mark it can't leave never failing the sign-in; the
+  shell takes it as the account first reads as a teacher's and counts `portal_signed_in`, so a reload,
+  another page or a second read counts nothing. Over a read of the account in the callback, which
+  would hold the sign-in up, and a mark in the URL. Said plainly: a new teacher's first sign-in counts
+  once their invite's redeem reads them as a teacher, and a student's mark stays in their tab untaken.
+
+  **Tests** (`app/teacher-actions.test.tsx`, driven in jsdom under the shell and Strict Mode): every
+  event once, its body the name and a UUIDv7 of its own, after its action's answer and never while
+  the Start is on its way; nothing for a failed action; nothing for a student, on their home or on a
+  teacher's page whatever Bali answers; an opening once, and Present again for a second opening; a
+  count with no answer or a 500 changing nothing on screen. Tried, each failing by name, then
+  reverted: the gate dropped, the once guard dropped, every teacher read counted as a sign-in, the
+  Start counted as pressed, the post's failure let out, slides counted only while their panel is
+  open, any answer to an ask counted, Present counted before its class shows, the recap before its
+  roster. **Converted** from source text, as CLAUDE.md asks of a test a step touches: the class page's
+  extend and its Try again (ClassRetryStates) into `app/classes/[id]/page.test.tsx`, and the decks
+  panel's Show into `decks-panel.driven.test.tsx`, each failing on what its regexes pinned (Try again
+  clearing the line, the attempt forgotten, a Show closing a panel already closed, Try again's resend
+  sent as new); both files still read source text, so `source-text-tests.test.ts` lists 29 still.
+
 - **2026-11-05** — **AN7d, the Debug readout: a developer's screen in the Debug build alone, iOS's
   `Readout`'s twin, and a Debug build's engine over no token while sign-in isn't set up (the conductor's
   calls, awaiting the owner's look; AN7d, #524).** The owner isn't reviewing each step and asked for the
