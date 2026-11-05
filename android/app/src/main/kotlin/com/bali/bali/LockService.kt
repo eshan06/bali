@@ -30,20 +30,26 @@ class LockService : AccessibilityService() {
             }
         }
 
+    /** Whether the screen's receiver is registered: only once the service connects, which an unbind can come without. */
+    private var hearing = false
+
     override fun onServiceConnected() {
         // No node is ever read, so no cache to keep, nor the events that would keep one.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) setCacheEnabled(false)
         app.lock.bound(this)
         // Only registered at run time, these two; and the screen as it is now, which none says.
-        registerReceiver(screen, IntentFilter(Intent.ACTION_SCREEN_ON).apply { addAction(Intent.ACTION_SCREEN_OFF) })
+        if (!hearing) registerReceiver(screen, IntentFilter(Intent.ACTION_SCREEN_ON).apply { addAction(Intent.ACTION_SCREEN_OFF) })
+        hearing = true
         app.screen.value = getSystemService(PowerManager::class.java).isInteractive
         app.check()
     }
 
     // Unbound, Bali hears the screen no more, so the engine's check-ins stop with one, as the screen going
-    // off has it: never one every 30 s with the screen off.
+    // off has it: never one every 30 s with the screen off. Android unbinds a service switched off while it
+    // binds without connecting it first, its receiver never registered.
     override fun onUnbind(intent: Intent?): Boolean {
-        unregisterReceiver(screen)
+        if (hearing) unregisterReceiver(screen)
+        hearing = false
         app.screen.value = false
         app.lock.bound(null)
         app.check()

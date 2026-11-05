@@ -2,6 +2,11 @@ package com.bali.bali
 
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.app.UiAutomation
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.ServiceConnection
+import android.os.IBinder
 import android.os.ParcelFileDescriptor
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityManager
@@ -32,6 +37,8 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.time.toKotlinDuration
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -108,8 +115,30 @@ class LockServiceTest {
         val dump = shell("dumpsys accessibility", suppressing = true)
         assertTrue(dump.lineSequence().any { it.trim().startsWith("Enabled services:") && it.contains(SERVICE) })
         assertFalse(bound(suppressing = true))
+        // The list unchanged and the engine's read loop held on its unanswered read, only the unbind's own
+        // check can find it starting, beginning its grace (santa's review).
+        until { enforcer.updates.value.takeIf { it.switch == LockSwitch.Starting } }
         // One that doesn't has it bound again.
         until { switch().takeIf { it == LockSwitch.On } }
+    }
+
+    @Test
+    fun aServiceAndroidUnbindsBeforeItEverConnectsGoesQuietly() {
+        // As Android unbinds one switched off while it binds (santa's review of AN7c): bound by Bali itself, as
+        // Android lets the app's own uid, so the system never connects it; then unbound. Bali runs on, and once
+        // the service is gone the switch reads off.
+        val made = CountDownLatch(1)
+        val connection =
+            object : ServiceConnection {
+                override fun onServiceConnected(name: ComponentName?, service: IBinder?) = made.countDown()
+
+                override fun onServiceDisconnected(name: ComponentName?) = Unit
+            }
+        assertTrue(context.bindService(Intent(context, LockService::class.java), connection, Context.BIND_AUTO_CREATE))
+        assertTrue(made.await(PATIENCE.seconds, TimeUnit.SECONDS))
+        context.unbindService(connection)
+        until { Unit.takeIf { !shell("dumpsys activity services ${context.packageName}").contains(LockService::class.java.name.substringAfterLast('.')) } }
+        assertEquals(LockSwitch.Off, switch())
     }
 
     @Test
@@ -191,8 +220,9 @@ class LockServiceTest {
             tapIn()
             // On: the next check-in 30 s after the screen's read, the engine's one wait.
             val due = until { clock.deadlines.singleOrNull() }
-            // Off: one check-in, at once, before the 30 s are up, rule 3's check before it; then the engine waits
-            // on no time at all, only a ring, which nothing makes while the screen is off.
+            // Off: one check-in, at once, before the 30 s are up, rule 3's check before it, so the screen's turn
+            // off reached the engine; and once its answer is in, the engine's clock holds no wait. That none comes
+            // however long the screen stays off is the engine's to prove (AN5c's JVM test, 600 s on its clock).
             val offAt = now()
             shell("input keyevent KEYCODE_SLEEP")
             val asOff = server.next(CHECK_IN)

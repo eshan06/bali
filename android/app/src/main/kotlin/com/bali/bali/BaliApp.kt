@@ -10,6 +10,7 @@ import com.bali.core.OkHttpTransport
 import com.bali.core.SignIn
 import com.bali.outbox.Enforcer
 import com.bali.outbox.SyncEngine
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -92,9 +93,19 @@ class BaliApp : Application() {
         check()
     }
 
-    /** Rule 3's check, made now, of the run there is: none before the app's start, whose own check stands for it. */
+    /**
+     * Rule 3's check, made now, of the run there is: none before the app's start, whose own check stands for
+     * it. A lock that throws, against its promise, checked nothing, and the next check reads it again: it
+     * never ends the app, as the enforcer's own recheck never does (santa's review).
+     */
     internal fun check() {
         val running = runs.value ?: return
-        scope.launch { running.enforcer.check() }
+        scope.launch {
+            try {
+                running.enforcer.check()
+            } catch (failed: Exception) {
+                if (failed is CancellationException) throw failed
+            }
+        }
     }
 }
