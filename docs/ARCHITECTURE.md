@@ -945,10 +945,12 @@ the teacher portal's, which it forwards, and nothing else of Bali's.
   class of one or two's totals are the exception, above); a teacher's email or name; a URL; free
   text in any property. A teacher's events stay when they delete their account (the owner's pick,
   "Keep them, say so"): they carry Bali's internal id alone, `/privacy` says they stay (PLAN's
-  A4), and no privacy path calls PostHog, so the server holds no PostHog admin key. Once an account
-  deletion, a disposal or the retention run takes a teacher's name and sign-in off their row, their
-  events there name no one by themselves; Bali's own records can still lead back to a teacher who
-  deleted their own account, whose removed classes keep their names (#313).
+  A4), and no privacy path calls PostHog, so the server holds no PostHog admin key. A class's
+  totals stay too when a student deletes their account, a class of one or two's being that
+  student's own numbers, and `/privacy` says so as well. Once an account deletion, a disposal or
+  the retention run takes a teacher's name and sign-in off their row, their events there name no
+  one by themselves; Bali's own records can still lead back to a teacher who deleted their own
+  account, whose removed classes keep their names (#313).
 - **Nothing captured on its own.** No autocapture, no session replay, no heatmaps, no exception
   capture (errors are Sentry's). The project is set to match: session replay, web autocapture and
   exception autocapture off, the client's IP address discarded.
@@ -958,27 +960,33 @@ the teacher portal's, which it forwards, and nothing else of Bali's.
 - **No PostHog code in the browser** (the owner's pick, "Through Bali's server"). The portal posts
   each teacher event to a teacher-only endpoint of Bali's API, additive under `/v1` (PLAN's A3a),
   which checks the event's name and properties against an allow-list, the actions above with no
-  URL and no free text, and forwards it to PostHog with the server's key. So the portal's CSP (S4,
-  `apps/web/src/lib/csp.ts`) never lists a PostHog origin: `https://us.i.posthog.com` takes events
-  for every PostHog project, so listing it would let a script running in the page send the access
-  token to a project of its own, where `connect-src` lets nothing out but to the API, Cognito,
-  Sentry and the deck bucket. PostHog sees the server's address, never a teacher's, and an ad
-  blocker can't drop the events. The server sends with a small `fetch` to PostHog's capture
-  endpoint, no SDK: a few lines beat a new dependency (the conductor's call, awaiting the owner).
+  URL and no free text, and forwards it to PostHog with the server's key. The server builds the
+  event itself: the teacher's id from the signed-in caller, `environment` and the time its own, the
+  name and properties only as the allow-list has them. Nothing else the request carries goes on
+  (no user id, IP address, person property or time of its own), and a refused event is never
+  logged with its body. So the portal's CSP (S4, `apps/web/src/lib/csp.ts`) never lists a PostHog
+  origin: `https://us.i.posthog.com` takes events for every PostHog project, so listing it would
+  let a script running in the page send the access token to a project of its own, where
+  `connect-src` lets nothing out but to the API, Cognito, Sentry and the deck bucket. PostHog sees
+  the server's address, never a teacher's, and an ad blocker can't drop the events. The server
+  sends with a small `fetch` to PostHog's capture endpoint, no SDK: a few lines beat a new
+  dependency (the conductor's call, awaiting the owner).
 - **Never in the way.** A send is fire-and-forget, bounded by a timeout, and made once what it
   counts has happened: on the server, after the commit, as the Start's push is
-  (`apps/api/src/routes/sessions.ts`). A replay changes nothing and sends nothing, so a resent Start
-  counts once. A send never fails or delays a request or a page, the portal's post to the API
-  included; a failure is logged with nothing personal in it and never shown, since nothing the
-  user did has failed.
-- **Named before it is on.** The privacy policy names PostHog as a service provider, and says a
-  deleted teacher's events stay, before the key is set (PLAN's A4). The iPhone app's privacy
-  manifest (`ios/Bali/PrivacyInfo.xcprivacy`), which ships inside the build, gives Product
-  Interaction, which the totals are counted from, the purpose Analytics beside App Functionality
-  since A5 (the owner's pick, "In the next build", over waiting for the App Store label), and CI's
-  check pins it (`.github/scripts/privacy-manifests.py`). The App Store privacy label, to match,
-  and `docs/APP-STORE.md`'s answers and review note are the owner's, later; until then they say
-  App Functionality only.
+  (`apps/api/src/routes/sessions.ts`). On the server, a replay changes nothing and sends nothing, so
+  a resent Start counts once. The relay keeps no row, so an event the portal posts twice can count
+  twice, an analytics count off, never a record (A3a's to narrow: PostHog's own dedupe on an
+  event's uuid is best effort). A send never fails or delays a request or a page, the portal's post
+  to the API included; a failure is logged with nothing personal in it and never shown, since
+  nothing the user did has failed.
+- **Named before it is on.** The privacy policy names PostHog as a service provider, and says what
+  stays there once an account is deleted, a teacher's events and a class's totals, before the key
+  is set (PLAN's A4). The iPhone app's privacy manifest (`ios/Bali/PrivacyInfo.xcprivacy`), which
+  ships inside the build, gives Product Interaction, which the totals are counted from, the purpose
+  Analytics beside App Functionality since A5 (the owner's pick, "In the next build", over waiting
+  for the App Store label), and CI's check pins it (`.github/scripts/privacy-manifests.py`). The
+  App Store privacy label, to match, and `docs/APP-STORE.md`'s answers and review note are the
+  owner's, later; until then they say App Functionality only.
 
 ## iOS app structure
 

@@ -10,8 +10,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
 
 - **2026-11-04** — **PostHog: the owner's four rulings, and the iPhone app's privacy manifest gives
   Product Interaction the purpose Analytics (the owner, in chat with the conductor; A5, #PR).** The
-  owner answered A1's open calls (the entry below) and two more, each with the option quoted; each
-  is now in ARCHITECTURE's "Analytics (PostHog)":
+  owner answered the open calls of A1's entry ("PostHog's rules", below) and two more, each with the
+  option quoted; each is now in ARCHITECTURE's "Analytics (PostHog)":
   1. **A class's totals are always sent, whatever its size** ("Always send", over holding focus
      minutes and unlocks back under 3 students or under 5). The cost, said plainly: with one or two
      students, the totals are those students' own numbers, which "no event about one student"
@@ -55,6 +55,19 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the strict reading that type serves Analytics too. A5 leaves it at App Functionality, as
   ARCHITECTURE named Product Interaction alone: the owner's call, before item 1's build carries the
   manifest. Recommended: declare it too, the safe reading the label already takes for Device ID.
+  And rulings 1 and 3 together keep a student's numbers at PostHog after that student deletes their
+  account: a class of one or two's totals are theirs, and no privacy path calls PostHog. They name
+  no one there, and A4's `/privacy` says they stay, beside a teacher's events.
+
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (Codex refuses
+  every model on this Mac and no Gemini CLI is installed, so context isolation held and model
+  diversity didn't): 0 blockers. Their WARNs, each now written in: the relay builds the event
+  itself, the caller's id and the server's time, and passes on nothing else the request carries
+  (otherwise a teacher could file an event under a student's id read from their roster); the relay
+  keeps no row, so a portal event posted twice can count twice, A3a's to narrow (PostHog's docs
+  call its dedupe on an event's uuid not guaranteed); a small class's totals outliving a student's
+  deletion (above); Other Data Types (above); the rebase onto WC1 (#502), its header archived and
+  the entries named rather than "above" and "below"; and A1's two lines this replaces, marked.
 
 - **2026-11-04** — **The iPhone and the student web make the owner's Android cuts, with three
   exceptions (the owner; WC1, #502).** In a Mac conductor session the owner asked for the iPhone,
@@ -120,7 +133,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   - **Off until its key is set,** as Sentry and push are: the portal reads `NEXT_PUBLIC_POSTHOG_KEY`
     and an optional host (`https://us.i.posthog.com` by default), the API its own `POSTHOG_KEY`. The
     owner sets them in Vercel (`bali-portal`) and Railway (`bali prod`); prod is off-limits to
-    sessions.
+    sessions. (Since replaced, A5's entry: the API's key alone; the portal holds none.)
   - **Named first:** the privacy policy names PostHog as a service provider (A4) before a key is
     set. The App Store privacy label (Product Interaction gains the purpose Analytics) and
     `docs/APP-STORE.md`'s review note are the owner's, later: "we can change the wording on privacy
@@ -131,7 +144,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   with a small `fetch` to PostHog's capture endpoint. posthog-js loads further scripts from
   PostHog's asset hosts, and the portal's CSP (`apps/web/src/lib/csp.ts`) is there so no script runs
   but the portal's own (S4), since any script on its pages can read the access token; a plain POST
-  needs one `connect-src` origin, added only while the key is set. On the server, a few lines beat a
+  needs one `connect-src` origin, added only while the key is set (since replaced, A5's entry: the
+  portal posts to Bali's API, and the CSP lists no PostHog origin). On the server, a few lines beat a
   new dependency (CLAUDE.md, Ponytail). A send is fire-and-forget after the commit, bounded by a
   timeout, never failing or delaying a request, a failure logged without personal data, as the
   Start's push is (`apps/api/src/routes/sessions.ts`). Checked while writing it down: the CSP's
@@ -141,8 +155,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   **The steps** (PLAN's Before the pilot, 4), one PR each: A1, these docs; A2, the server's class
   totals; A3a, the portal's sender, on for teachers only, after the owner's pick between PostHog's
   origin in the CSP and the API as a relay; A3b, the portal's teacher events; A4, `/privacy` names
-  PostHog. Then the owner's keys. Re-listed since by the owner's rulings (the entry above): A5
-  added, and A3a the API's endpoint for the portal's events, the CSP unchanged.
+  PostHog. Then the owner's keys. Re-listed since by the owner's rulings (A5's entry): A5 added,
+  and A3a the API's endpoint for the portal's events, the CSP unchanged.
 
   **Said plainly:** the server's totals are counted from what the phones send, and ISSUES #3 notes
   that §3.3.3(P)'s "or otherwise" may reach what Bali records itself, not only what the framework

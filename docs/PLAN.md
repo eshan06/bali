@@ -96,20 +96,9 @@ branch, with no PR, as its README says (#479; `docs/DECISIONS.md`, 2026-11-02).
   its line meanwhile (the conductor's call: it goes, as Register block's); the saves' 10 s (the
   conductor's call), a class's create's too since it carries an `eventId` (2026-10-23); and the
   sign-in's token exchange, which has none (not touched).
-- **`next` 15.5.28 (2026-10-22)** ✅ (#435; DECISIONS 2026-10-22): today's critical Next.js
-  advisories, which failed CI's audit on every PR, fixed while the owner is away (the conductor's
-  call, awaiting the owner); the portal used none of their paths. Dependabot's #309 is superseded.
-  Left for the owner: S4's CSP check on the deployed portal (Open owner items).
-- **`zod` 4.6.6 (2026-10-23)** ✅ (#444; DECISIONS 2026-10-23): today's high advisory
-  (GHSA-mrhx-c7xc-m3w5), which failed CI's audit on every PR, fixed (the conductor's call, awaiting
-  the owner). A signed-in teacher could reach it: a question's `options`, at most 6, on three
-  teacher routes, were each parsed before their count, so a 1 MiB body held about 200 MB of the
-  API's memory and was answered with 45 MB; now one line, at once, held by a test in the abuse
-  suite. Left: fastify's low advisory, which doesn't apply.
-- **The database pool's guard (2026-10-22)** ✅ (#439; DECISIONS 2026-10-22), from #336's finding,
-  the conductor's call, awaiting the owner: `createDb` always passes postgres.js a number, 10 unless
-  the load harness names one, so `PGMAX` or a `max` in `DATABASE_URL` is ignored, and the boot says so
-  by name, never with the URL (`docs/DEPLOY.md`). More connections stays not a deploy setting.
+- **Three fixes, each the conductor's call, awaiting the owner** ✅: `next` 15.5.28 (#435;
+  DECISIONS 2026-10-22), `zod` 4.6.6 (#444; DECISIONS 2026-10-23) and the database pool's guard
+  (#439; DECISIONS 2026-10-22); their full lines in `docs/PLAN-ARCHIVE.md`.
 - **The workflow review's last steps** ✅ (the owner, 2026-10-13; DECISIONS 2026-10-14): the
   migration guard (#369), docs-only PRs skipping the test jobs (#365), moved files (#368) and two
   tests (#364), each in full in `docs/PLAN-ARCHIVE.md`.
@@ -152,7 +141,8 @@ branch, with no PR, as its README says (#479; `docs/DECISIONS.md`, 2026-11-02).
    - **A3a** The server's endpoint for the portal's events: teacher-only, checked against the
      allow-list, forwarded to PostHog with the server's key; additive under `/v1`
    - **A3b** The portal's teacher events, through it (no CSP change)
-   - **A4** `/privacy` names PostHog and says a deleted teacher's events stay, before the key is set
+   - **A4** `/privacy` names PostHog and says what stays there once an account is deleted (a
+     teacher's events, a class's totals), before the key is set
    - Then the owner's key: `POSTHOG_KEY` in Railway's `bali prod` (the portal holds none).
 5. The external TestFlight group `Vanderbilt pilot` and Beta App Review (`docs/APP-STORE.md`, section
    5), which is Apple's answer on §3.3.3(P) (ISSUES #3).

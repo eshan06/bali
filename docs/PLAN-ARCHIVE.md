@@ -1594,6 +1594,22 @@ why, Open owner items the owner's queue.
 - Who does what: "The Mac session: all UI (`apps/web/src/app`, `apps/web/src/components`, `ios/Bali/UI`,
   `ios/BaliShield`, user-facing strings)."
 
+**In flight, three finished lines as PLAN.md said them until 2026-11-04 (moved for its word cap, A5):**
+- **`next` 15.5.28 (2026-10-22)** ✅ (#435; DECISIONS 2026-10-22): today's critical Next.js
+  advisories, which failed CI's audit on every PR, fixed while the owner is away (the conductor's
+  call, awaiting the owner); the portal used none of their paths. Dependabot's #309 is superseded.
+  Left for the owner: S4's CSP check on the deployed portal (Open owner items).
+- **`zod` 4.6.6 (2026-10-23)** ✅ (#444; DECISIONS 2026-10-23): today's high advisory
+  (GHSA-mrhx-c7xc-m3w5), which failed CI's audit on every PR, fixed (the conductor's call, awaiting
+  the owner). A signed-in teacher could reach it: a question's `options`, at most 6, on three
+  teacher routes, were each parsed before their count, so a 1 MiB body held about 200 MB of the
+  API's memory and was answered with 45 MB; now one line, at once, held by a test in the abuse
+  suite. Left: fastify's low advisory, which doesn't apply.
+- **The database pool's guard (2026-10-22)** ✅ (#439; DECISIONS 2026-10-22), from #336's finding,
+  the conductor's call, awaiting the owner: `createDb` always passes postgres.js a number, 10 unless
+  the load harness names one, so `PGMAX` or a `max` in `DATABASE_URL` is ignored, and the boot says so
+  by name, never with the URL (`docs/DEPLOY.md`). More connections stays not a deploy setting.
+
 **Phase 7, Live lesson: building** (the owner lifted the hold and approved both canvases,
 2026-10-10). The steps with no screen go first, one PR each: M1 ✅ (the storage interface, with
 M0's runbook, runbook 10), then the backend (L1–L4 with L3b, W1, M2–M4; L1 ✅, L2 ✅, L3a ✅, L3r
