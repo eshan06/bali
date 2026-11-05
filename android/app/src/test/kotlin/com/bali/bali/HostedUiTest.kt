@@ -1,5 +1,6 @@
 package com.bali.bali
 
+import androidx.browser.auth.AuthTabIntent
 import com.bali.core.SignInError
 import java.net.URI
 import kotlin.test.Test
@@ -15,7 +16,7 @@ import kotlinx.coroutines.runBlocking
  * The sign-in waiting on the hosted UI, on the JVM: the answers that end it and the ones dropped. A Custom
  * Tab's answer is a link any app on the phone can send Bali, so one for no waiting sign-in, or for another
  * attempt, ends nothing and replaces nothing (#515's reviews); the Auth Tab's answers only the sign-in whose
- * tab it is. The tab, the activities and Android's hop are the emulator's (HostedUiHopTest).
+ * tab it is. The tab, the activities and Android's hop are the emulator's (SignInBrowserTest).
  */
 class HostedUiTest {
     private val pages = HostedUi()
@@ -70,6 +71,24 @@ class HostedUiTest {
         assertTrue(pages.answered(waiting.id, answer("s2")))
         assertEquals(answer("s2"), runBlocking { waiting.answer.await() })
         assertNull(pages.waiting())
+    }
+
+    @Test
+    fun theAuthTabsResultEndsItsSignInItsAnswerItsCloseCancelledAnythingElseNotOpenedInWordsWithNoAddress() {
+        val answered = pages.start(page("s1"))
+        assertFalse(pages.tabEnded("another tab", AuthTabIntent.RESULT_OK, answer("s1")))
+        assertTrue(pages.tabEnded(answered.id, AuthTabIntent.RESULT_OK, answer("s1")))
+        assertEquals(answer("s1"), runBlocking { answered.answer.await() })
+        val closed = pages.start(page("s2"))
+        assertTrue(pages.tabEnded(closed.id, AuthTabIntent.RESULT_CANCELED, null))
+        assertSame(SignInError.Cancelled, assertFailsWith<SignInError.Cancelled> { runBlocking { closed.answer.await() } })
+        val codes = listOf(AuthTabIntent.RESULT_VERIFICATION_FAILED, AuthTabIntent.RESULT_VERIFICATION_TIMED_OUT, AuthTabIntent.RESULT_UNKNOWN_CODE)
+        for ((result, answer) in codes.map { it to null } + (AuthTabIntent.RESULT_OK to null)) {
+            val ended = pages.start(page("s3"))
+            assertTrue(pages.tabEnded(ended.id, result, answer))
+            val why = assertFailsWith<SignInError.NotOpened> { runBlocking { ended.answer.await() } }.why
+            assertEquals("the Auth Tab ended with $result", why)
+        }
     }
 
     @Test

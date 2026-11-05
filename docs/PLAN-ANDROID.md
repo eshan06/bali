@@ -266,9 +266,11 @@ rules); `docs/DESIGN.md` read first, its Android section from AS0; every user-fa
    sets them out (public, no secret; the code grant; iOS's scopes; the callback
    `com.bali.bali:/auth/callback`; the refresh token's 365 days), each id then on that environment's
    `AUTH_AUDIENCE`, or the API refuses Android's tokens with a `401`, which signs the student out. Dev's
-   id then goes into the build in a small PR; until then the app says sign-in isn't set up (AN6c). And
-   the conductor's call awaiting your look: where the phone's browser offers no ephemeral tab, the
-   sign-in's tab shares its cookies (DECISIONS 2026-11-05).
+   id then goes into the build in a small PR; until then the app says sign-in isn't set up (AN6c).
+   **Before that PR, your call** on the conductor's: where the phone's browser offers no ephemeral tab
+   (Chrome before 136), the sign-in's tab shares its cookies, so while Cognito's session lasts there,
+   another app on the phone could sign in as the student without a password. Keep it, fail closed
+   (an error to draw), or end the session after each sign-in (DECISIONS 2026-11-05).
 
 ## How to update this file
 

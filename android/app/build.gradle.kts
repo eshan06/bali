@@ -21,11 +21,10 @@ android {
         versionName = "1.0"
         // The instrumented tests (src/androidTest), on an emulator: README.md, "On the PC".
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        // Where the app signs in and syncs (B4), and the portal it links (C2b): public values under iOS's
-        // settings' names (ios/project.yml), read through the manifest. Dev's API and hosted-UI domain,
-        // production's portal and Android's redirect; the client id empty until the owner makes Android's
-        // dev client (docs/DEPLOY.md), sign-in not set up meanwhile, as iOS's with one empty. Production's
-        // come at release (AP), as testflight.yml sets iOS's. core's AppConfigTest pins them.
+        // Where the app signs in and syncs (B4) and the portal it links (C2b), under iOS's settings' names
+        // (ios/project.yml), read through the manifest: dev's API and hosted-UI domain, production's portal,
+        // Android's redirect, and the client id empty until the owner's (docs/DEPLOY.md), sign-in not set up
+        // meanwhile. Production's come at release (AP). core's AppConfigTest pins them.
         resValue("string", "BALI_API_URL", "https://bali-production-09a2.up.railway.app")
         resValue("string", "BALI_COGNITO_DOMAIN", "https://bali-dev.auth.us-east-1.amazoncognito.com")
         resValue("string", "BALI_COGNITO_CLIENT_ID", "")

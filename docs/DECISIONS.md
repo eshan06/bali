@@ -38,7 +38,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   and the sign-in asks again. Said plainly: Android 12's Keystore gives no key for a lookup it fails,
   its own code (`AndroidKeyStoreSpi.getKeyMetadata`), so such a failure at a launch's first read reads
   as the key gone: shown signed out for that run, the file kept and read again at the next launch,
-  unless a sign-in replaces it. **A save** writes a file of its own, synced to the disk, which then
+  unless a sign-in replaces it. **A key the Keystore lists but refuses** (`InvalidKeyException`, as
+  some phones' keys after an update; santa's review) reads as nothing saved too, and a save deletes it
+  and makes it again, its file about to be replaced anyway (the conductor's call): otherwise every
+  load would throw and every save fail, the student neither signed in nor out until Bali's storage was
+  cleared. Said plainly: a refusal that would have passed reads as signed out for that run, as above.
+  **A save** writes a file of its own, synced to the disk, which then
   takes the file's place with rename(2), so a save cut short leaves the old tokens or the new: not
   `android.util.AtomicFile`, which logs a failed sync or rename where it should throw, so a save could
   say kept when it wasn't (no silent failures). The folder isn't synced after the rename, so a phone
@@ -64,9 +69,19 @@ a real decision? Add a dated entry at the top: what was decided and why.
   Cognito's hosted-UI session stays in that browser until it expires, so for that while a sign-out of
   Bali isn't a sign-out of the hosted UI there and the next sign-in may skip the password, and the
   browser's history keeps the hosted UI's address (its state and challenge, never the verifier or a
-  token). Failing closed instead would leave such a phone unable to sign in at all, behind an error no
-  board draws, for an exposure that needs a second person on the student's phone, which the pilot rules
-  out (phones are never shared). The emulator's Chrome 124 is such a browser: neither category.
+  token). **And another app on the phone can sign in as the student while that session lasts** (santa's
+  review, RFC 8252's client impersonation, 8.6): it opens its own tab at the hosted UI with Bali's public
+  Android client id, Bali's redirect and a PKCE pair of its own; Cognito answers from the cookie without
+  asking anything; and an app that claims `com.bali.bali` too can be handed that code (Chrome gives a
+  tab's redirect to the app that opened it when it handles the scheme), trading it for the student's
+  tokens, the 365-day refresh token among them. PKCE and the state guard nothing there: they are the
+  app's own. It needs such an app installed and a browser without ephemeral tabs (Chrome before 136),
+  inside the session's life. **Failing closed instead** (`CustomTabsClient.isEphemeralBrowsingSupported`
+  before the tab opens) would leave such a phone unable to sign in at all, behind an error no board
+  draws; **or Bali could end the hosted-UI session** in that browser after the sign-in (Cognito's
+  `/logout`, a second page the student sees). Nothing reaches any of this until Android's client id is
+  in the build, so **the owner's call comes before that PR** (`docs/PLAN-ANDROID.md`, Open owner items,
+  8). The emulator's Chrome 124 is such a browser: neither category.
 
   **The host draws nothing:** a see-through activity with no content, one at a time (`singleTask`),
   so the answer's way back finds it over the tab and closes the tab; anything of Bali's around the tab is
@@ -100,9 +115,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   as a close, until the affinity went in). **What each path doesn't guard:** with a Custom Tab, an app
   that claims `com.bali.bali` too can be handed the real answer (Android's chooser, or its pick); its
   code is useless without the verifier (PKCE), and the sign-in waits until the student closes the tab.
-  No app can end or replace a waiting sign-in with an answer of its own, which would need the state, a
-  secret of the tab's. An app can still unsettle Bali's task through an activity Bali exports to every
-  app, as the launcher's will be (Phase 10), as it can any app's.
+  Such an app then holds that attempt's state, so it can end the sign-in with an answer of its own, at
+  worst a failed sign-in, never tokens of its own through it (PKCE); no other app can end or replace a
+  waiting sign-in, which would need the state, a secret of the tab's. An app can still unsettle Bali's
+  task through an activity Bali exports to every app, as the launcher's will be (Phase 10), as it can
+  any app's.
 
   **The rest of AN6b's notes:** the attempt's verifier and state live in the sign-in's call alone, so
   a process ended while the tab is open loses them, and its answer finds no sign-in waiting and is
@@ -133,21 +150,24 @@ a real decision? Add a dated entry at the top: what was decided and why.
   Kotlin picks no JUnit for them. The app now asks for `INTERNET` (the token endpoint, then the API) and
   lists Custom Tabs' service in `<queries>` (Android 11's package visibility).
 
-  **The tests:** on `Bali_Spike_API35`, `KeystoreTokenStoreTest`'s nine (nothing saved; kept, sealed,
-  read back by a new store as at a relaunch and replaced; the key's terms; cleared; a key gone; a file
+  **The tests:** on `Bali_Spike_API35`, `KeystoreTokenStoreTest`'s ten (nothing saved; kept, sealed,
+  read back by a new store as at a relaunch and replaced; the key's terms; cleared; a key gone; a key
+  that refuses AES-GCM, then made again; a file
   sealed by another key, by the name's old key, changed, or too short; a file unreadable right now,
   which throws and reads once it can; a save cut short, and one landing over a file it can't write
   into; the file's place), `SignInBrowserTest`'s eight (the answer's hop from another app, exact; one
   for no sign-in, dropped; one for another attempt; the tab asked of Chrome and the student's Back; a
   host made again for a change, then the answer, then Back; a link sent to clear Bali's task; and a
   whole sign-in through the tab, exchanged, sealed and read back at a relaunch) and `BaliAppTest`, with
-  AN4c's four: 22 tests, 0 failures, the browser's eight three times more. On the JVM: `HostedUiTest`'s
-  eight (the app's first) and AppConfigTest's `agree`. Tried, each failing by name, then reverted: the
+  AN4c's four: 23 tests, 0 failures, the browser's eight three times more. On the JVM: `HostedUiTest`'s
+  nine (the app's first), the Auth Tab's result among them, which the emulator's Chrome can't reach, and
+  AppConfigTest's `agree`. Tried, each failing by name, then reverted: the
   answer activity without its own task (the clearing link ended the sign-in); the host not keeping the
   tab it opened (a second tab, the call never ending); the host's leaving ending nothing; a refused tag
-  thrown; a key gone thrown; a save written into the file; any link ending the waiting sign-in; `forget`
-  letting go of any sign-in; a second sign-in let in; and the pin test's four sides (a key misspelt, a
-  value set twice, the filter's scheme, a value written in the manifest). Never on the emulator: Chrome's
+  thrown; a key gone thrown; a refused key thrown, and kept by a save; a save written into the file; any
+  link ending the waiting sign-in; `forget` letting go of any sign-in; a second sign-in let in; and the
+  pin test's four sides (a key misspelt, a value set twice, the filter's scheme, a value written in the
+  manifest). Never on the emulator: Chrome's
   terms (its first run, closed by Back, Chrome force-stopped after each test); a Google account; the
   Auth Tab and ephemeral tabs, which its Chrome 124 lacks. The font scale was put back as found (1.0), and
   nothing was added to the PC's SDK: its folders were compared before and after.
@@ -157,6 +177,14 @@ a real decision? Add a dated entry at the top: what was decided and why.
   Tab and an ephemeral tab on a current Chrome, and the cookie-sharing fallback where a browser lacks
   it. **For AN7:** `BaliApp`'s `signIn`, `scope` and `transport` for `SyncEngine.make`. **For AN10:**
   the words for sign-in not set up, the three `NotOpened`s and a sign-in whose answer was dropped.
+
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini
+  CLI on this PC, so context isolation holds and model diversity doesn't): 0 blockers. Their WARNs,
+  each taken: the Auth Tab's result mapped by no test (now `HostedUi.tabEnded`, pinned on the JVM); a
+  key the Keystore lists but refuses leaving the student stuck (above, with its test); the cookie-sharing
+  fallback's client impersonation and the owner's call due before the client id (above, and owner item
+  8); the guard's wording, which said no app could end a waiting sign-in; a store test that never reached
+  the tag it named; and a test named in a comment that doesn't exist.
 
 - **2026-11-05** — **AN6b, sign-in itself: BaliCore's `SignIn` in Kotlin, and the engine's `make` over
   it (the conductor's calls, awaiting the owner's look; AN6b, #518).** The owner isn't reviewing each

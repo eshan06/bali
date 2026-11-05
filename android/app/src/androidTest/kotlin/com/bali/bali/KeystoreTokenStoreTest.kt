@@ -1,11 +1,14 @@
 package com.bali.bali
 
+import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyInfo
+import android.security.keystore.KeyProperties
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.File
 import java.io.IOException
 import java.security.KeyStore
+import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.SecretKeyFactory
 import org.junit.After
@@ -97,8 +100,27 @@ class KeystoreTokenStoreTest {
     }
 
     @Test
+    fun aKeyTheKeystoreListsButRefusesReadsAsNothingSavedAndTheNextSaveMakesItAgain() {
+        KeystoreTokenStore(context).save(tokens)
+        // A key by the name that refuses AES-GCM, as a key some phones keep after an update refuses all.
+        keystore().deleteEntry(KeystoreTokenStore.KEY)
+        val purposes = KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
+        KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore").run {
+            init(
+                KeyGenParameterSpec.Builder(KeystoreTokenStore.KEY, purposes).setBlockModes(KeyProperties.BLOCK_MODE_CBC)
+                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_PKCS7).build(),
+            )
+            generateKey()
+        }
+        assertNull(KeystoreTokenStore(context).load())
+        KeystoreTokenStore(context).save(tokens)
+        assertArrayEquals(tokens, KeystoreTokenStore(context).load())
+    }
+
+    @Test
     fun aFileTheKeyCantOpenReadsAsNothingSaved() {
         // Sealed by a key of another name, as a file restored from another phone would be.
+        KeystoreTokenStore(context).save(tokens)
         KeystoreTokenStore(file, OTHER).save(tokens)
         assertNull(KeystoreTokenStore(context).load())
         // Sealed by the key the name had before: the key made again, as by a store elsewhere.

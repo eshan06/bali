@@ -3,6 +3,7 @@ package com.bali.bali
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import androidx.browser.auth.AuthTabIntent
 import com.bali.core.SignIn
 import com.bali.core.SignInError
 import java.net.URI
@@ -54,6 +55,14 @@ internal class HostedUi {
 
     /** [answer], the Auth Tab's for the sign-in [id]: it ends that sign-in, if it still waits. */
     @Synchronized fun answered(id: String, answer: String) = end(id) { it.complete(answer) }
+
+    /** The Auth Tab's [result] for the sign-in [id]: its [answer], the student's close, or else why not. */
+    @Synchronized fun tabEnded(id: String, result: Int, answer: String?) =
+        when {
+            result == AuthTabIntent.RESULT_OK && answer != null -> answered(id, answer)
+            result == AuthTabIntent.RESULT_CANCELED -> ended(id, SignInError.Cancelled)
+            else -> ended(id, SignInError.NotOpened("the Auth Tab ended with $result"))
+        }
 
     /**
      * [answer], a link Bali was sent: it ends the waiting sign-in only with that attempt's state, and is

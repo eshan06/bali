@@ -27,13 +27,7 @@ class HostedUiActivity : ComponentActivity() {
 
     private val authTab =
         AuthTabIntent.registerActivityResultLauncher(this) { result ->
-            val id = opened ?: return@registerActivityResultLauncher
-            val answer = result.resultUri?.toString()
-            when {
-                result.resultCode == AuthTabIntent.RESULT_OK && answer != null -> pages.answered(id, answer)
-                result.resultCode == AuthTabIntent.RESULT_CANCELED -> pages.ended(id, SignInError.Cancelled)
-                else -> pages.ended(id, SignInError.NotOpened("the Auth Tab ended with ${result.resultCode}"))
-            }
+            opened?.let { pages.tabEnded(it, result.resultCode, result.resultUri?.toString()) }
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
