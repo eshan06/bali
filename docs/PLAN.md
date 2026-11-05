@@ -8,7 +8,7 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-04 (Central) — A2 (#PR; `docs/DECISIONS.md`, 2026-11-04): the server sends
+_Last updated: 2026-11-04 (Central) — A2 (#514; `docs/DECISIONS.md`, 2026-11-04): the server sends
 PostHog a class's totals when a session starts, ends or is extended, off until `POSTHOG_KEY` is set;
 the app's manifest gives Other Data Types the purpose Analytics (the owner's pick). Before it, WC4
 (#509). Next: WC5; A3a, A3b, A4; a session builds the retire-a-block command; the owner the new
@@ -138,7 +138,7 @@ branch, with no PR, as its README says (#479; `docs/DECISIONS.md`, 2026-11-02).
    - **A1** Its rules in the docs — ✅ (#503; DECISIONS 2026-11-04)
    - **A5** The iPhone app's privacy manifest: Product Interaction gains the purpose Analytics — ✅
      (#505; DECISIONS 2026-11-04)
-   - **A2** The server's class totals, always sent, whatever the class's size — ✅ (#PR; DECISIONS
+   - **A2** The server's class totals, always sent, whatever the class's size — ✅ (#514; DECISIONS
      2026-11-04)
    - **A3a** The server's endpoint for the portal's events: teacher-only, checked against the
      allow-list, forwarded to PostHog with the server's key; additive under `/v1`

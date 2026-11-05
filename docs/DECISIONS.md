@@ -10,7 +10,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
 
 - **2026-11-04** — **A2, the server sends PostHog a class's totals; and the iPhone app's privacy
   manifest gives Other Data Types the purpose Analytics (the owner's pick, "Yes, add it"; A2,
-  #PR).** The owner answered the call A5's entry ("PostHog: the owner's four rulings", below) left
+  #514).** The owner answered the call A5's entry ("PostHog: the owner's four rulings", below) left
   open: the enrolled count comes from class membership, which the manifest files under Other Data
   Types (`NSPrivacyCollectedDataTypeOtherDataTypes`), and Apple's Analytics purpose covers
   measuring audience size, so that type serves Analytics beside App Functionality, over dropping
