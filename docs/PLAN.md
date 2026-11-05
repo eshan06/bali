@@ -58,7 +58,7 @@ branch, with no PR, as its README says (#479; `docs/DECISIONS.md`, 2026-11-02).
   no VPN for now and a battery plan, so ARCHITECTURE's "Android app structure" is decided; part 2 on
   a Pixel and a Samsung, with its battery test, waits for the owner's Android phones (📱) and still
   runs before launch; AN2–AN5c, the project, CI, the core, the unlock contract, the outbox, the
-  engine's frame, drain and reads, ✅ (#488–#NNN); AN5d next. AS0, the
+  engine's frame, drain and reads, ✅ (#488–#504); AN5d next. AS0, the
   screens' canvas, ✅ approved as it stands
   (#484, #486; DECISIONS 2026-11-04): lock (a) alone, the approved iPhone boards standing for the
   rest. Not on the pilot's critical path.

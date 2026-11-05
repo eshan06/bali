@@ -9,7 +9,7 @@ touching before changing how something works. A pointer of the form
 a real decision? Add a dated entry at the top: what was decided and why.
 
 - **2026-11-04** — **AN5c, the sync engine's read loop: BaliOutbox's `SyncEngine` in Kotlin, its reads
-  (the conductor's calls, awaiting the owner's look; AN5c, #NNN).** The owner isn't reviewing each
+  (the conductor's calls, awaiting the owner's look; AN5c, #504).** The owner isn't reviewing each
   step and asked for the recommended option on every question, so each call here is the conductor's,
   for the owner to look at.
 

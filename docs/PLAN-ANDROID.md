@@ -14,7 +14,7 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-04 (Central) — AN5c, the sync engine's read loop (#NNN; `docs/DECISIONS.md`,
+_Last updated: 2026-11-04 (Central) — AN5c, the sync engine's read loop (#504; `docs/DECISIONS.md`,
 2026-11-04): BaliOutbox's `SyncEngine` in Kotlin, its reads, with their tests: a check-in every 30 s
 while the screen is on and one as it comes on or goes off, out of a session the truth read as it
 comes on, rule 3's check before each; each read applied only as the reconcile says; the unlock guard
@@ -138,7 +138,7 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN4e** The outbox's sending — ✅ (#497; DECISIONS 2026-11-04)
 - **AN5a** The sync engine's frame — ✅ (#499; DECISIONS 2026-11-04)
 - **AN5b** The engine's drain — ✅ (#501; DECISIONS 2026-11-04)
-- **AN5c** The engine's read loop — ✅ (#NNN; DECISIONS 2026-11-04)
+- **AN5c** The engine's read loop — ✅ (#504; DECISIONS 2026-11-04)
 - **AN5d** The engine's wait for the Start (#166; twin: `SyncEngine`'s `armed` and
   `SyncState.waitEnds`): an arming's wait, kept for a relaunch, and its end at the end of the day by
   the phone's clock, a `ZoneId`'s; and the reads while waiting. Tests: AnswerTests' `armed`;
