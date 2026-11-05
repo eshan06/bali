@@ -120,10 +120,16 @@ end whatever its caller, so a cancel landing as it returned would skip the state
 (`docs/DECISIONS.md`, 2026-11-04, AN5a). Its drain (AN5b) sends the queue one record at a time, in
 the order the phone acted, and applies each answer in one step, the queue read again with it. A
 send cancelled with the engine's run makes no answer, so its record stays as it was, due, and goes
-again at the next run under its event id, where iOS counts it an attempt with no answer. Its tests
-run on a rig of their own (`EngineSupport.kt`, BaliOutbox's `EngineSupport.swift`): a clock the
-test moves, since coroutines-test's virtual time can't drive Room's queries, a server answered by
-hand, and the bundled driver watched, which sees each commit as GRDB's `TransactionObserver` does.
+again at the next run under its event id, where iOS counts it an attempt with no answer. Its read
+loop (AN5c) follows the screen, as the lock's service hears it (`setScreenOn`, AN7's): a check-in
+every 30 s while it is on and one as it comes on or goes off, out of a session the truth read as it
+comes on instead, rule 3's check before each, then nothing while it is off. A read applies only as
+the reconcile allows, and never puts the lock back on over an Emergency Unlock the server hasn't
+recorded. A 401 asks the sign-in for a fresh token once per rejection, one refresh at a time, which
+both loops wait on. Its tests run on a rig of their own (`EngineSupport.kt`, BaliOutbox's
+`EngineSupport.swift`): a clock the test moves, since coroutines-test's virtual time can't drive
+Room's queries, a server answered by hand, and the bundled driver watched, which sees each commit as
+GRDB's `TransactionObserver` does, and can refuse a statement as a failing disk would.
 
 ## Android Lint
 

@@ -14,16 +14,16 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-04 (Central) — AN5b, the sync engine's drain (#501; `docs/DECISIONS.md`,
-2026-11-04): BaliOutbox's `SyncEngine` in Kotlin, its drain, with its tests: the outbox sent one
-record at a time in the order the phone acted, each after its backoff and jitter; each answer settled
-and applied, the queue read again and the record no longer on its way in one step, a session's
-answer applied while no later change awaits its own, the other cases named for AN5c–AN5e; no token
-waiting on sign-in; the student's retry; and a send cancelled with the engine's run leaving its
-record due, its attempt uncounted. Before it, CodeQL scanning Android's Kotlin. Next: AN5c, the read
-loop; Android 17's SDK platform for the owner to OK before the first step with today's AndroidX, and
-OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the
-pilot's critical path._
+_Last updated: 2026-11-04 (Central) — AN5c, the sync engine's read loop (#504; `docs/DECISIONS.md`,
+2026-11-04): BaliOutbox's `SyncEngine` in Kotlin, its reads, with their tests: a check-in every 30 s
+while the screen is on and one as it comes on or goes off, out of a session the truth read as it
+comes on, rule 3's check before each; each read applied only as the reconcile says; the unlock guard
+on every read and answer, a failed read of it shown after the step it guards; a 401's refresh, once
+per rejection, shared by both loops; a refused change shown; protection off reported again; and
+`me`, its failure and its reads. Bali's own screen going behind sends a held unlock at once. Before
+it, AN5b, the drain. Next: AN5d, the wait for the Start; Android 17's SDK platform for the owner to
+OK before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's
+part 2 once the owner has the phones. Not on the pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -138,22 +138,7 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN4e** The outbox's sending — ✅ (#497; DECISIONS 2026-11-04)
 - **AN5a** The sync engine's frame — ✅ (#499; DECISIONS 2026-11-04)
 - **AN5b** The engine's drain — ✅ (#501; DECISIONS 2026-11-04)
-- **AN5c** The engine's read loop (twin: `SyncEngine`'s `read`, `reconcile` and `heard`): the
-  30-second check-in while the screen is on (ARCHITECTURE, the battery plan; AN7 drives it from the
-  lock's service: on, a read at once, then every 30 s, rule 3's check at each wake; off, one check-in
-  in a session, then nothing), and the reconcile (`readMayReconcile` and the typed dispositions), all
-  on a fake clock; the unlock guard; the 401 rule (`heard`'s refresh, once per rejection, one at a
-  time) and the refusal shown; `record`'s report again; and `me`, its failure and its reads. Bali's own
-  screen going behind still sends a held unlock at once. With them `checkInInterval`, the screen's
-  and the check's fields and `reauth`, and the rig's `foreground`. Tests: DrainTests' `reauth`,
-  `reauthFails`, `retryNowEndsRejection`, `sharedRefresh` and `dropShown`; AnswerTests'
-  `tapWithoutWindow`, `unlockNoted` and `supersededGoneIsTheAPIs`; ReadTests but `waitingStays`;
-  StaleReadTests' `readBeforeChange`, `readWhileAwaiting`, `unlockGuard` and
-  `refocusAfterStuckUnlock`; ClassesTests' `classes`, `failed`, `outReads`, `classesOverStaleStanding`
-  and `outTakesPastSession`; StandingKeptTests' `unread`, `unreadSettled` and `checkAtEachWake`; the
-  engine's half of ProtectionOffTests' `reportedAgain` and `onlyFocusAgain`; and `cadence` and
-  `checkAtEachWake` set to the screen (its going off sends one check-in, where iOS's going behind
-  sends none), with a new test for it
+- **AN5c** The engine's read loop — ✅ (#504; DECISIONS 2026-11-04)
 - **AN5d** The engine's wait for the Start (#166; twin: `SyncEngine`'s `armed` and
   `SyncState.waitEnds`): an arming's wait, kept for a relaunch, and its end at the end of the day by
   the phone's clock, a `ZoneId`'s; and the reads while waiting. Tests: AnswerTests' `armed`;

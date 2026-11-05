@@ -1,9 +1,12 @@
 package com.bali.outbox
 
+import com.bali.core.ApiErrorReason
+import com.bali.core.MeResponse
+import com.bali.core.SendResult
 import java.time.Instant
 
-// What the sync engine knows, SyncEngine.swift's `SyncState`: its core, AN5a's. Each later AN5 step
-// adds the fields its own rules keep (docs/PLAN-ANDROID.md).
+// What the sync engine knows, SyncEngine.swift's `SyncState`: its core, AN5a's, and the read loop's,
+// AN5c's. Each later AN5 step adds the fields its own rules keep (docs/PLAN-ANDROID.md).
 
 /**
  * What the engine knows, for the screens and the lock ([SyncEngine.updates]). A value, as Swift's
@@ -26,6 +29,11 @@ data class SyncState(
     /** When the outbox sends next; none when nothing is queued or it waits on a ring. */
     val retryAt: Instant? = null,
     /**
+     * The last state change the server refused, dropped and never sent again: shown (rule 5) until the
+     * phone's next change.
+     */
+    val refused: Refusal? = null,
+    /**
      * The session protection off was last reported in, since the phone's last tap or the lock back on
      * (`Outbox.reportedOff`): only those leave it there (A2; #167).
      */
@@ -41,7 +49,25 @@ data class SyncState(
      * so the card offers none (C5c).
      */
     val sending: Set<String> = emptySet(),
+    /**
+     * Who the student is and their classes, as `GET /v1/me` last answered, for Home and the router
+     * (C3); none until a read answers.
+     */
+    val me: MeResponse? = null,
+    /**
+     * Why the last read of `GET /v1/me` gave no answer (none came, or a status with no body this build
+     * reads) until one does: said where its classes would be (rule 5), never read as none.
+     */
+    val meFailed: SendResult? = null,
+    /**
+     * How many reads of `GET /v1/me` have given [me]: a later count is a read the server answered since
+     * (L8c: a lesson refused is followed again once a later read lists its session).
+     */
+    val meReads: Int = 0,
 ) {
+    /** Whether the student is in any class, as [me] says: none until a read answers (C3). */
+    val hasClasses: Boolean? get() = me?.let { it.classes.isNotEmpty() }
+
     /** A tap the server hasn't answered yet: the lock covers apps for it at once, to decision 7's cap (B5). */
     val pendingTap: OutboxRecord? get() = queued.lastOrNull { it.change is Change.Tap && !it.stuck }
 
@@ -66,3 +92,6 @@ enum class Link {
     /** The outbox couldn't be read or written; tried again within a minute. */
     StorageFailed,
 }
+
+/** A state change the server refused: the change, and its answer's status, reason and message. */
+data class Refusal(val change: Change, val status: Int?, val reason: ApiErrorReason?, val message: String?)

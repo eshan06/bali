@@ -17,6 +17,7 @@ import java.io.File
 import java.io.IOException
 import java.time.Duration
 import java.time.Instant
+import java.time.format.DateTimeFormatterBuilder
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -37,12 +38,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.job
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -50,14 +54,17 @@ import kotlinx.serialization.json.jsonPrimitive
 
 // The engine's test rig, BaliOutbox's EngineSupport.swift: a clock the test moves, a server it answers
 // by hand, B4's stand-in for the tokens, and an engine running over them. coroutines-test's virtual
-// time can't stand in for the clock: Room's queries run outside its scheduler. The rig's `foreground`
-// comes with the read loop it waits on (AN5c's), and `Answer`'s engine answers with the tests that
-// send them.
+// time can't stand in for the clock: Room's queries run outside its scheduler. The rig's `screenOn` is
+// iOS's `foreground`, the check-ins following the screen (AN5c), and `Answer`'s engine answers come
+// with the tests that send them.
 
 /** The routes the engine's tests answer, as [Server.Exchange.route] names them: BaliOutbox's tests' own. */
 val tapRoute = "POST /v1/taps"
 val unlockRoute = "POST /v1/sessions/s/unlock"
 val refocusRoute = "POST /v1/sessions/s/refocus"
+val protectionOffRoute = "POST /v1/sessions/s/protection-off"
+val checkInRoute = "POST /v1/sessions/s/checkin"
+val meRoute = "GET /v1/me"
 
 /**
  * How long, in real time, a test waits for the engine before it fails instead of hanging: well past
@@ -65,6 +72,9 @@ val refocusRoute = "POST /v1/sessions/s/refocus"
  * it all.
  */
 val patience = 60.seconds
+
+/** [time] as the API writes one, with its milliseconds: a request's `deviceTime`. BaliOutbox's tests' `iso`. */
+fun wire(time: Instant): String = DateTimeFormatterBuilder().appendInstant(3).toFormatter().format(time)
 
 /** Waits, in real time, for [condition]; never true in time fails the test. */
 suspend fun eventually(condition: suspend () -> Boolean) {
@@ -282,6 +292,22 @@ class Rig(val engine: SyncEngine, val outbox: Outbox, val server: Server, val cl
         until { it.standing == Standing.InSession(view, ParticipationState.Focused) && it.queued.isEmpty() }
     }
 
+    /**
+     * The screen on, the read it makes at once answered: in a session its check-in, with [live]; out of
+     * one, the truth, with [me]. The read loop then waits for its next check-in. BaliOutbox's tests'
+     * `foreground`, whose read of the truth is `GET /v1/me` in a session too.
+     */
+    suspend fun screenOn(me: String = Answer.me(), live: String = Answer.live()) {
+        val standing = engine.updates.value.standing
+        engine.setScreenOn(true)
+        if (standing is Standing.InSession) {
+            server.next("POST /v1/sessions/${standing.session.id}/checkin").reply(200, live)
+        } else {
+            server.next(meRoute).reply(200, me)
+        }
+        eventually { clock.deadlines.contains(clock.now() + SyncEngine.CHECK_IN_INTERVAL) }
+    }
+
     /** Stops the engine: its loops must end. */
     suspend fun stop() {
         running.cancel()
@@ -295,6 +321,7 @@ abstract class EngineFiles : OutboxFiles() {
     /** The scope the app gives its engine, here the test's. */
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val rigs = mutableListOf<Rig>()
+    private val relaunched = mutableListOf<Relaunches>()
 
     /** An engine over [outbox], never run: what a launch starts from. */
     suspend fun engine(outbox: Outbox): SyncEngine = SyncEngine.open(outbox, client(Server()), scope, TestClock())
@@ -308,21 +335,27 @@ abstract class EngineFiles : OutboxFiles() {
 
     /**
      * [file]'s outbox, watched: at each commit to it, [Relaunches] opens the engine the next launch
-     * would, over an outbox of its own, opened here before anything it watches.
+     * would, over an outbox of its own, over [driver], opened here before anything it watches.
      */
-    suspend fun relaunching(file: File): Pair<Outbox, Relaunches> {
-        val relaunches = Relaunches(open(file))
+    suspend fun relaunching(file: File, driver: SQLiteDriver = BundledSQLiteDriver()): Pair<Outbox, Relaunches> {
+        val relaunches = Relaunches(open(file, driver = driver)).also { relaunched += it }
         val outbox = open(file, driver = relaunches.driver)
         outbox.records()
         relaunches.file.records()
         return outbox to relaunches
     }
 
+    /**
+     * Ends everything that reads or writes the test's outboxes before [deleteFiles] closes them
+     * ([TeardownTest]): the relaunches, the engines' loops, and every call an engine still runs, its
+     * caller gone.
+     */
     @AfterTest
     fun stopEngines(): Unit =
         runBlocking {
+            relaunched.forEach { it.watching = false }
             rigs.forEach { it.stop() }
-            scope.cancel()
+            withTimeoutOrNull(patience) { scope.coroutineContext.job.cancelAndJoin() } ?: fail("the engines' calls never ended")
         }
 }
 
@@ -336,16 +369,20 @@ class Relaunches(val file: Outbox) {
     private val started = mutableListOf<SyncEngine>()
     private val scope = CoroutineScope(Job())
 
-    @Volatile var watching = false
+    /**
+     * Turned off, it waits for a relaunch being opened: none reads [file] after. Room's own commits,
+     * on threads of their own, can set one off after the test goes on.
+     */
+    var watching = false
+        set(value) = synchronized(started) { field = value }
 
     val engines: List<SyncEngine> get() = synchronized(started) { started.toList() }
 
     val driver: SQLiteDriver =
         Watching(
             committed = {
-                if (watching) {
-                    val engine = runBlocking { SyncEngine.open(file, client(Server()), scope) }
-                    synchronized(started) { started += engine }
+                synchronized(started) {
+                    if (watching) started += runBlocking { SyncEngine.open(file, client(Server()), scope) }
                 }
             },
         )
@@ -380,27 +417,34 @@ class HeldWrite {
 
 /**
  * The bundled driver, its writes watched on the connection that makes each: [began] runs as a write's
- * transaction begins, and [committed] as it lands, before its write returns.
+ * transaction begins, and [committed] as it lands, before its write returns; [stepping] runs with each
+ * statement's SQL as it steps, and refuses the step by throwing, as a failing disk refuses one read.
+ * (Room keeps each statement it prepares on its connection, so a step, not a prepare, is each use.)
  */
 class Watching(
     private val began: () -> Unit = {},
     private val committed: () -> Unit = {},
+    private val stepping: (String) -> Unit = {},
     private val bundled: SQLiteDriver = BundledSQLiteDriver(),
 ) : SQLiteDriver by bundled {
-    override fun open(fileName: String): SQLiteConnection = Watched(bundled.open(fileName), began, committed)
+    override fun open(fileName: String): SQLiteConnection = Watched(bundled.open(fileName), began, committed, stepping)
 }
 
 /**
  * A connection whose transactions are watched: Room begins a write `IMMEDIATE` (its file's creation
  * `EXCLUSIVE`) and a read `DEFERRED`, so only a write's end is a commit.
  */
-private class Watched(private val connection: SQLiteConnection, private val began: () -> Unit, private val committed: () -> Unit) :
-    SQLiteConnection by connection {
+private class Watched(
+    private val connection: SQLiteConnection,
+    private val began: () -> Unit,
+    private val committed: () -> Unit,
+    private val stepping: (String) -> Unit,
+) : SQLiteConnection by connection {
     private var writing = false
 
     override fun prepare(sql: String): SQLiteStatement {
         val statement = connection.prepare(sql)
-        val stepped: (() -> Unit)? =
+        val stepped: () -> Unit =
             when {
                 sql.startsWith("BEGIN IMMEDIATE") || sql.startsWith("BEGIN EXCLUSIVE") -> {
                     {
@@ -417,15 +461,19 @@ private class Watched(private val connection: SQLiteConnection, private val bega
                     }
                 }
                 sql == "ROLLBACK TRANSACTION" -> ({ writing = false })
-                else -> null
+                else -> ({})
             }
-        return if (stepped == null) statement else Stepped(statement, stepped)
+        return Stepped(statement, { stepping(sql) }, stepped)
     }
 }
 
-/** A statement whose every step runs [stepped] once it has. */
-private class Stepped(private val statement: SQLiteStatement, private val stepped: () -> Unit) : SQLiteStatement by statement {
-    override fun step(): Boolean = statement.step().also { stepped() }
+/** A statement whose every step runs [before] first, which may refuse it, and [stepped] once it has. */
+private class Stepped(private val statement: SQLiteStatement, private val before: () -> Unit, private val stepped: () -> Unit) :
+    SQLiteStatement by statement {
+    override fun step(): Boolean {
+        before()
+        return statement.step().also { stepped() }
+    }
 }
 
 /** The rig's clock: BaliOutbox's tests' TestClockTests. */
@@ -452,6 +500,56 @@ class TestClockTest {
             val ended = withTimeoutOrNull(5.seconds) { sleeper.join() } != null
             if (!ended) clock.releaseWakes()
             assertTrue(ended && threw, "the cancelled sleep ended, throwing")
+        }
+}
+
+/**
+ * The rig's teardown: nothing reads or writes a test's outbox as [OutboxFiles.deleteFiles] closes it.
+ * Room closes a connection still in use, and the bundled SQLite, used from two threads at once,
+ * crashed CI's JVM (#504). No iOS twin.
+ */
+class TeardownTest : EngineFiles() {
+    @Test
+    fun itWaitsForARelaunchBeingOpenedOverTheFileItClosesWhichRoomsOwnCommitsCanSetOffAsTheTestEnds(): Unit =
+        runBlocking {
+            val reading = CompletableDeferred<Unit>()
+            val released = CountDownLatch(1)
+            val holding = AtomicBoolean(false)
+            val hold: (String) -> Unit = {
+                if (holding.compareAndSet(true, false)) {
+                    reading.complete(Unit)
+                    released.await(patience.inWholeMilliseconds, TimeUnit.MILLISECONDS)
+                }
+            }
+            val (outbox, relaunches) = relaunching(temporaryFile(), driver = Watching(stepping = hold))
+            relaunches.watching = true
+            holding.set(true)
+            // The commit opens a relaunch, held reading the file the teardown closes.
+            val write = launch(Dispatchers.IO) { outbox.keep(Standing.Out) }
+            withTimeoutOrNull(patience) { reading.await() } ?: fail("no relaunch read the file")
+            val teardown = launch(Dispatchers.IO) { stopEngines() }
+            delay(200)
+            val waited = teardown.isActive
+            released.countDown()
+            withTimeout(patience) { joinAll(write, teardown) }
+            assertTrue(waited, "the teardown went on while a relaunch read the file it closes")
+        }
+
+    @Test
+    fun itWaitsForAnEngineCallItsCallerLeftWhileItsWriteIsStillUnderWay(): Unit =
+        runBlocking {
+            val held = HeldWrite()
+            val engine = engine(open(temporaryFile(), driver = Watching(began = held.hold)))
+            held.arm()
+            val caller = launch { engine.record(Change.Tap("tag")) }
+            held.began()
+            caller.cancel()
+            val teardown = launch(Dispatchers.IO) { stopEngines() }
+            delay(200)
+            val waited = teardown.isActive
+            held.release()
+            withTimeout(patience) { teardown.join() }
+            assertTrue(waited, "the teardown went on while an engine call wrote the file it closes")
         }
 }
 

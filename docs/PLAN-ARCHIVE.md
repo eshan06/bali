@@ -10,6 +10,17 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN5c's on 2026-11-04: _Last updated: 2026-11-04 (Central) —
+AN5b, the sync engine's drain (#501; `docs/DECISIONS.md`, 2026-11-04): BaliOutbox's `SyncEngine` in
+Kotlin, its drain, with its tests: the outbox sent one record at a time in the order the phone acted,
+each after its backoff and jitter; each answer settled and applied, the queue read again and the
+record no longer on its way in one step, a session's answer applied while no later change awaits its
+own, the other cases named for AN5c–AN5e; no token waiting on sign-in; the student's retry; and a
+send cancelled with the engine's run leaving its record due, its attempt uncounted. Before it, CodeQL
+scanning Android's Kotlin. Next: AN5c, the read loop; Android 17's SDK platform for the owner to OK
+before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's
+part 2 once the owner has the phones. Not on the pilot's critical path._
+
 _Last updated: 2026-11-04 (Central) — WC1 (#502; `docs/DECISIONS.md`, 2026-11-04): the first of
 eight steps that cut from the iPhone app and the student web the lines the owner cut on Android,
 from the boards the owner approved: Sign in loses "You only do this once…" and the 13+ question
@@ -2161,6 +2172,25 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN5c's line, as it read until it was done (2026-11-04; `docs/DECISIONS.md`, 2026-11-04).
+
+- **AN5c** The engine's read loop (twin: `SyncEngine`'s `read`, `reconcile` and `heard`): the
+  30-second check-in while the screen is on (ARCHITECTURE, the battery plan; AN7 drives it from the
+  lock's service: on, a read at once, then every 30 s, rule 3's check at each wake; off, one check-in
+  in a session, then nothing), and the reconcile (`readMayReconcile` and the typed dispositions), all
+  on a fake clock; the unlock guard; the 401 rule (`heard`'s refresh, once per rejection, one at a
+  time) and the refusal shown; `record`'s report again; and `me`, its failure and its reads. Bali's own
+  screen going behind still sends a held unlock at once. With them `checkInInterval`, the screen's
+  and the check's fields and `reauth`, and the rig's `foreground`. Tests: DrainTests' `reauth`,
+  `reauthFails`, `retryNowEndsRejection`, `sharedRefresh` and `dropShown`; AnswerTests'
+  `tapWithoutWindow`, `unlockNoted` and `supersededGoneIsTheAPIs`; ReadTests but `waitingStays`;
+  StaleReadTests' `readBeforeChange`, `readWhileAwaiting`, `unlockGuard` and
+  `refocusAfterStuckUnlock`; ClassesTests' `classes`, `failed`, `outReads`, `classesOverStaleStanding`
+  and `outTakesPastSession`; StandingKeptTests' `unread`, `unreadSettled` and `checkAtEachWake`; the
+  engine's half of ProtectionOffTests' `reportedAgain` and `onlyFocusAgain`; and `cadence` and
+  `checkAtEachWake` set to the screen (its going off sends one check-in, where iOS's going behind
+  sends none), with a new test for it
 
 AN5b's line, as it read until it was done (2026-11-04; `docs/DECISIONS.md`, 2026-11-04).
 
