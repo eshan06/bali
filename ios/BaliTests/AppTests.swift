@@ -3948,6 +3948,26 @@ struct AppTests {
     }
 
     @Test(
+        "What else Focus says shows wherever its state has it, on the ring's page and under a question alike (rule 5): why an unlock gave way (C5a), why nothing reaches the teacher, D1's While offline card for a session and for a tap held, and a wake iOS refused; only with none of them is no room kept for them (the owner's cut, 2026-11-04)"
+    )
+    func focusNotes() async throws {
+        var asking = try #require(PreviewFixtures.all["focusQuestion"])
+        asking.sync?.link = .unreachable
+        let states =
+            try ["focusSuperseded", "focusSignedOut", "focusOffline", "focusTapHeld", "focusUnscheduled"].map {
+                ($0, try #require(PreviewFixtures.all[$0]))
+            } + [("focusQuestion offline", asking)]
+        for (name, state) in states {
+            let phone = Phone(fixture: state)
+            let words = FocusWords(try #require(phone.sync), phone.protection, now: Date(), signedIn: phone.signedIn)
+            let notes = [words.superseded, words.stalled, words.offline, words.unscheduled].compactMap { $0 }
+            #expect(!notes.isEmpty, "\(name)")
+            let read = try await elements(of: RootView(phone: phone), once: "Emergency Unlock. Your teacher will see it.")
+            for note in notes { #expect(read.contains { $0.label == note }, "\(name): \(note)") }
+        }
+    }
+
+    @Test(
         "VoiceOver on a question (L8): the strip's time read as the ring's, and its chip; each answer a button read with its letter and words, the student's own read as Your answer and selected; closed, each answer with its marks, the correct one's and theirs, and Hide read as Hide this question; Emergency Unlock the same button, its label unchanged"
     )
     func questionVoiceOver() async throws {

@@ -55,8 +55,9 @@ struct FocusView: View {
                     heading(focus)
                     Spacer(minLength: 24)
                     middle(focus).fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: focus.hasNotes ? 24 : 0)
-                    notes(focus).fixedSize(horizontal: false, vertical: true)
+                    // Nothing under the ring: the page ends at it (FocusLargestTextEnd).
+                    Spacer(minLength: focus.claim == .paused && !focus.hasNotes ? 0 : 24)
+                    if focus.hasNotes { notes(focus).fixedSize(horizontal: false, vertical: true) }
                 }
                 .multilineTextAlignment(.center)
                 .onGeometryChange(for: Bool.self, of: overflows) { scrolls = $0 }
@@ -244,8 +245,9 @@ extension FocusWords {
             + " left, \(until)"
     }
 
-    /// Whether Focus says anything in `notes`: with nothing, the page ends at the ring or the strip,
-    /// as the app canvas's FocusLargestTextEnd and FocusQuestionLargestTextEnd draw it.
+    /// Whether Focus says anything in `notes`, which shows only then: with nothing, the page ends at
+    /// the ring or the strip, as the app canvas's FocusLargestTextEnd and FocusQuestionLargestTextEnd
+    /// draw it. A note `notes` holds and this misses never shows (`AppTests.focusNotes`).
     fileprivate var hasNotes: Bool {
         superseded != nil || stalled != nil || offline != nil || unscheduled != nil
     }
