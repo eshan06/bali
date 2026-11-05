@@ -14,7 +14,7 @@ two lines on the code, the list-changed screen the line under its title. Before 
 app's privacy manifest (#505). Next: WC3, Focus, Home's hold and the block screen; A2–A4; the
 owner's call on Other Data Types' purpose; a session builds the retire-a-block command; the owner
 the new build, with A5, and the sitting; the owner's call on GA5's known limit, the smallest iPhones
-(DECISIONS 2026-11-02); AN5d, Android's wait for the Start; AN1's part 2 once the owner has the
+(DECISIONS 2026-11-02); AN5e, Android's Emergency Unlock; AN1's part 2 once the owner has the
 phones; the audit's polish waits, as ruled._
 
 ## Now
@@ -57,8 +57,8 @@ branch, with no PR, as its README says (#479; `docs/DECISIONS.md`, 2026-11-02).
   2026-11-03); AN1b ✅ (DECISIONS 2026-11-04): the owner picked (a), the Accessibility service, with
   no VPN for now and a battery plan, so ARCHITECTURE's "Android app structure" is decided; part 2 on
   a Pixel and a Samsung, with its battery test, waits for the owner's Android phones (📱) and still
-  runs before launch; AN2–AN5c, the project, CI, the core, the unlock contract, the outbox, the
-  engine's frame, drain and reads, ✅ (#488–#504); AN5d next. AS0, the
+  runs before launch; AN2–AN5d, the project, CI, the core, the unlock contract, the outbox, the
+  engine's frame, drain, reads and wait, ✅ (#488–#507); AN5e next. AS0, the
   screens' canvas, ✅ approved as it stands
   (#484, #486; DECISIONS 2026-11-04): lock (a) alone, the approved iPhone boards standing for the
   rest. Not on the pilot's critical path.
@@ -189,7 +189,7 @@ One line each. Phases 3–6's step lists, the push's (N1–N6) and this table in
 | 6 | Security and compliance; gates Phase 5's student-facing steps | ✅ cloud steps done; open: C2 (⚖️ the lawyer's words), C7's phone check 📱, S8 (the owner's decision) |
 | 7 | Live lesson: questions and PDF slides in a running session, followed on the phone and the web | building (Phase 7 steps) |
 | 8 | Android: the lock, the candidates measured on the emulators, then (a) on a Pixel and a Samsung (iOS's Phase 0) | building: AN1's parts 1 and 1c on the emulators ✅ (2026-11-03); AN1b, lock (a) decided ✅ (2026-11-04); AN1's part 2 📱 waits for the phones, before launch |
-| 9 | Android: the engine, BaliCore's and BaliOutbox's twin, no screens | building: AN2–AN5c ✅ (2026-11-04); AN5d next |
+| 9 | Android: the engine, BaliCore's and BaliOutbox's twin, no screens | building: AN2–AN5d ✅ (2026-11-04); AN5e next |
 | 10 | Android: the screens, from the approved boards | AS0's canvas approved ✅ (2026-11-04); AS1–AS8 build from it |
 | 11 | Android: on Play, its testing tracks, device gate and exit check | planned |
 

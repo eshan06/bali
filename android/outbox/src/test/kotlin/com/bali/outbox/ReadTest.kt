@@ -16,6 +16,7 @@ import kotlin.test.assertTrue
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -26,7 +27,7 @@ private fun inSession(state: ParticipationState?, endsAt: Long = 3000) = Standin
 private val focused = inSession(ParticipationState.Focused)
 private val unlocked = inSession(ParticipationState.Unlocked)
 
-/** The check-ins and the reads of the truth. BaliOutbox's ReadTests, all but `waitingStays` (AN5d's). */
+/** The check-ins and the reads of the truth. BaliOutbox's ReadTests, every one now (`waitingStays` AN5d's). */
 class ReadTest : EngineFiles() {
     @Test
     fun theCheckInRunsEvery30SecondsWhileTheScreenIsOnOnceAsItGoesOnOrOffAndNeverWhileItIsOff(): Unit =
@@ -332,6 +333,22 @@ class ReadTest : EngineFiles() {
                 rig.stop()
             }
         }
+
+    @Test
+    fun aReadNamingNoSessionLeavesAnArmedPhoneWaitingWhileItSaysATapOfTheirsWaitsOrAnOlderApisSaysNothingOfOne(): Unit =
+        runBlocking {
+            // #166.
+            val rig = rig()
+            rig.engine.record(Change.Tap("tag"))
+            rig.server.next(tapRoute).reply(200, Answer.armed)
+            rig.until { it.standing == Standing.Waiting }
+            rig.screenOn(Answer.me(null))
+            assertEquals(Standing.Waiting, rig.engine.updates.value.standing)
+            rig.clock.advance(30)
+            rig.server.next(meRoute).reply(200, Answer.me(null, armed = true))
+            rig.sleeping(at(60))
+            assertEquals(Standing.Waiting, rig.engine.updates.value.standing)
+        }
 }
 
 /** The reconcile: no read overrides a newer change. BaliOutbox's StaleReadTests, AN5c's part. */
@@ -525,7 +542,7 @@ class UnlockGuardTest : EngineFiles() {
     }
 }
 
-/** The classes, from the read of the truth (C3). BaliOutbox's ClassesTests, AN5c's part. */
+/** The classes, and the wait for the Start (C3). BaliOutbox's ClassesTests, every one now (AN5c's and AN5d's). */
 class ClassesTest : EngineFiles() {
     @Test
     fun theClassesComeWithTheReadOfTheTruthNotKnownUntilOneAnswersNoneIsNoClassesAndSomeTheirTeachersNamedIsInClass(): Unit =
@@ -584,10 +601,12 @@ class ClassesTest : EngineFiles() {
             rig.server.next(meRoute).reply(200, Answer.me(null, classes = listOf(live)))
             val state = rig.until { it.me?.classes?.firstOrNull()?.liveSession != null }
             assertEquals(Standing.Out, state.standing)
+            // Its going off rings a wake that no deadline marks: a moment, in real time, for what it would send
+            // (AN5d's review of this test, which read the server before that wake could).
             rig.engine.setScreenOn(false)
-            rig.clock.advance(30)
             rig.sleeping()
-            rig.clock.advance(600)
+            delay(100)
+            rig.clock.advance(630)
             assertEquals(emptyList(), rig.server.waiting)
             rig.stop()
             val none = rig()
@@ -616,10 +635,70 @@ class ClassesTest : EngineFiles() {
     @Test
     fun outNotWaitingAReadNamingASessionItsClockSaysIsOverStillTakesItTheCheckInFindsItGone(): Unit =
         runBlocking {
-            // Only a waiting phone's wait is kept from it (AN5d's).
+            // Only a waiting phone's wait is kept from it (the wait's own test, below).
             val rig = rig()
             rig.screenOn(Answer.me(session(endsAt = -60)))
             assertEquals(inSession(ParticipationState.Focused, endsAt = -60), rig.engine.updates.value.standing)
+        }
+
+    @Test
+    fun waitingForTheStartTheTruthIsReadAtEachWakeWhileTheScreenIsOnEvery30STheStartFoundPutsThePhoneInTheSessionWithItOffNothing(): Unit =
+        runBlocking {
+            // Decision 6, the owner's ruling, by the screen as the battery plan has it. The lock it puts on, to
+            // the session's end, is AN5e's (`shieldedUntil`).
+            val rig = rig()
+            rig.arm()
+            rig.screenOn(Answer.me(null))
+            assertEquals(Standing.Waiting, rig.engine.updates.value.standing)
+            rig.clock.advance(30)
+            val first = rig.server.next()
+            assertEquals(meRoute, first.route)
+            first.reply(200, Answer.me(null))
+            rig.sleeping(at(60))
+            assertEquals(Standing.Waiting, rig.engine.updates.value.standing)
+            // The screen off: nothing as it goes off, or after, however long. Its going off rings a wake that
+            // no deadline marks, where iOS's going behind rings none: a moment, in real time, for what that
+            // wake would send.
+            rig.engine.setScreenOn(false)
+            rig.sleeping()
+            delay(100)
+            rig.clock.advance(630)
+            assertEquals(emptyList(), rig.server.waiting)
+            rig.screenOn(Answer.me(null))
+            rig.clock.advance(30)
+            rig.server.next(meRoute).reply(200, Answer.me(session(endsAt = 4000)))
+            val state = rig.until { it.standing != Standing.Waiting }
+            assertEquals(inSession(ParticipationState.Focused, endsAt = 4000), state.standing)
+        }
+
+    @Test
+    fun anArmingAnsweredWhileThePhoneStandsInASessionItsClockSaysIsOverIsTheWaitForTheStartReadForAsAny(): Unit =
+        runBlocking {
+            // The sweep running late, so the server armed the tap (santa's round 1): arming ends no session
+            // still running (decision 4), and past its bell the phone is in none.
+            val rig = rig()
+            rig.tapIn(session(endsAt = 60))
+            rig.clock.advance(90)
+            rig.engine.record(Change.Tap("the next class's"))
+            rig.server.next(tapRoute).reply(200, Answer.armed)
+            rig.until { it.standing == Standing.Waiting && it.queued.isEmpty() }
+            rig.screenOn(Answer.me(null))
+            rig.clock.advance(30)
+            rig.server.next(meRoute).reply(200, Answer.me(session("t", endsAt = 4000)))
+            rig.until { it.standing == Standing.InSession(session("t", endsAt = 4000), ParticipationState.Focused) }
+        }
+
+    @Test
+    fun waitingASessionThePhonesOwnClockSaysIsOverIsNotTheStartTheWaitGoesOnAndALiveSessionThenEndsIt(): Unit =
+        runBlocking {
+            // The server's sweep running late (data model, decision 6).
+            val rig = rig()
+            rig.arm()
+            rig.screenOn(Answer.me(session(endsAt = -60)))
+            assertEquals(Standing.Waiting, rig.engine.updates.value.standing)
+            rig.clock.advance(30)
+            rig.server.next(meRoute).reply(200, Answer.me(session("t")))
+            rig.until { it.standing == Standing.InSession(session("t"), ParticipationState.Focused) }
         }
 }
 

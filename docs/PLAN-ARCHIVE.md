@@ -10,6 +10,18 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN5d's on 2026-11-04: _Last updated: 2026-11-04 (Central) —
+AN5c, the sync engine's read loop (#504; `docs/DECISIONS.md`, 2026-11-04): BaliOutbox's `SyncEngine`
+in Kotlin, its reads, with their tests: a check-in every 30 s while the screen is on and one as it
+comes on or goes off, out of a session the truth read as it comes on, rule 3's check before each;
+each read applied only as the reconcile says; the unlock guard on every read and answer, a failed
+read of it shown after the step it guards; a 401's refresh, once per rejection, shared by both loops;
+a refused change shown; protection off reported again; and `me`, its failure and its reads. Bali's
+own screen going behind sends a held unlock at once. Before it, AN5b, the drain. Next: AN5d, the wait
+for the Start; Android 17's SDK platform for the owner to OK before the first step with today's
+AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the owner has the phones.
+Not on the pilot's critical path._
+
 _Last updated: 2026-11-04 (Central) — A5, the iPhone app's privacy manifest (#505; `docs/DECISIONS.md`,
 2026-11-04): Product Interaction gains the purpose Analytics, pinned by CI's check, and the owner's
 four PostHog rulings: a class's totals always sent; the portal's events through Bali's server, the
@@ -2182,6 +2194,16 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN5d's line, as it read until it was done (2026-11-04; `docs/DECISIONS.md`, 2026-11-04).
+
+- **AN5d** The engine's wait for the Start (#166; twin: `SyncEngine`'s `armed` and
+  `SyncState.waitEnds`): an arming's wait, kept for a relaunch, and its end at the end of the day by
+  the phone's clock, a `ZoneId`'s; and the reads while waiting. Tests: AnswerTests' `armed`;
+  ReadTests' `waitingStays`; ClassesTests' `waitingReads`, `armedPastTheBell` and `overIsNoStart`;
+  StandingKeptTests' `kept`, `unreadArmed`, `unreadArmedOut` and `unreadArmedFileBack`; and the
+  engine's half of DroppedWaitTests' seven and WaitingHomeTests' `startFromHome` (their screens'
+  checks are AN10's)
 
 AN5c's line, as it read until it was done (2026-11-04; `docs/DECISIONS.md`, 2026-11-04).
 

@@ -17,6 +17,7 @@ import com.bali.core.UnlockDisposition
 import com.bali.core.readMayReconcile
 import java.time.Duration
 import java.time.Instant
+import java.time.ZoneId
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.toKotlinDuration
 import kotlinx.coroutines.CoroutineScope
@@ -39,11 +40,11 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
-// The sync engine, BaliOutbox's SyncEngine.swift: its frame, AN5a's, its drain, AN5b's, and its read
-// loop, AN5c's. The wait for the Start is AN5d's and Emergency Unlock AN5e's, each on the pattern set
-// here: Swift's actor as a lock each stretch holds (docs/PLAN-ANDROID.md).
+// The sync engine, BaliOutbox's SyncEngine.swift: its frame, AN5a's, its drain, AN5b's, its read loop,
+// AN5c's, and its wait for the Start, AN5d's. Emergency Unlock is AN5e's, on the pattern set here:
+// Swift's actor as a lock each stretch holds (docs/PLAN-ANDROID.md).
 
-/** The engine's clock: the time records are stamped with, and waiting on it: a test's own there. */
+/** The engine's clock: the time records are stamped with, the zone its days end in, and waiting on it: a test's own there. */
 interface SyncClock {
     fun now(): Instant
 
@@ -52,6 +53,9 @@ interface SyncClock {
      * forward or back must neither shrink nor stretch. Only a span between two readings means anything.
      */
     fun uptime(): Duration
+
+    /** The zone the phone is in now, where its days end (iOS's `Calendar.current`): read at each use, as a phone moves. */
+    fun zone(): ZoneId
 
     /** Returns at [until], or throws once its coroutine is cancelled. */
     suspend fun sleep(until: Instant)
@@ -62,6 +66,8 @@ object SystemClock : SyncClock {
     override fun now(): Instant = Instant.now()
 
     override fun uptime(): Duration = Duration.ofNanos(System.nanoTime())
+
+    override fun zone(): ZoneId = ZoneId.systemDefault()
 
     override suspend fun sleep(until: Instant) = delay(Duration.between(Instant.now(), until).toKotlinDuration())
 }
@@ -107,6 +113,13 @@ class SyncEngine private constructor(
      * next change of state.
      */
     private var kept: Standing? = null
+
+    /**
+     * A tap answered armed while where the phone stood was unread, which can't show it: carried until the
+     * standing is known ([update]), onto an out the file gives back, or a read of the truth that names no
+     * session, unless that read says no tap of the student's waits (#166).
+     */
+    private var armed = false
 
     /** `ReconcileStamp.changes`: each change the phone makes, and each answer to one. */
     private var changes = 0
@@ -239,22 +252,44 @@ class SyncEngine private constructor(
         val after = if (record.change.isReturn) record.order?.seq ?: 0 else 0
         val keeps = if (focus != null && focus.state == ParticipationState.Focused) keepsUnlocked(focus.session.id, after) else false
         val lands = if (keeps == false) focus else focus?.copy(state = ParticipationState.Unlocked)
-        // To come: an arming's wait (AN5d), and the unlock recorded, a late one said why (AN5e).
+        // An arming's wait ends where the server drops the tap, the end of its school day (decision 5), by
+        // the phone's clock too, read or not (#166): kept for a relaunch before the step that waits, as iOS
+        // keeps it, so no relaunch finds the wait without it.
+        val arms = effect == Effect.Waits && applies
+        val ends = if (arms) SyncState.waitEnds(clock.now(), clock.zone()) else null
+        val endKept = ends?.let { tried { outbox.keepWaitEnds(it) } }
+        // Arming ends nothing: a session the phone is in stays (decision 4) while it runs by the phone's own
+        // clock (data model, decision 6); past its bell the phone is in none, and waits as from out, the
+        // sweep that ends it on the server may run late (C3a). One it may be in, where it stood unread, is
+        // asked of the server, the arming carried ([armed]).
+        val stood = state.standing
+        val waits =
+            arms &&
+                when (stood) {
+                    is Standing.InSession -> stood.session.endsAt <= clock.now()
+                    Standing.Out, Standing.Waiting -> true
+                    Standing.Unread -> false
+                }
+        if (arms && stood == Standing.Unread) armed = true
+        // To come: the unlock recorded, and a late one said why (AN5e).
         update { now ->
             // Settled, and the queue read again, in one step: no screen sees the record neither on its way
             // nor answered.
-            val next = now.copy(queued = queued, sending = now.sending - record.eventId)
+            val next = now.copy(queued = queued, sending = now.sending - record.eventId, waitEnds = ends ?: now.waitEnds)
             when {
                 lands != null -> next.copy(standing = lands)
+                waits -> next.copy(standing = Standing.Waiting)
                 effect == Effect.Drops ->
                     next.copy(refused = Refusal(record.change, sent.status, sent.error?.error?.reason, sent.error?.error?.message))
                 else -> next
             }
         }
-        // The guard's failed read, shown after that step, never before it: iOS shows it first, and its
-        // step, copied before the failure, hides it again, the phone left unlocked and nothing said.
-        if (keeps == null) failed()
-        if (effect == Effect.Rereads || effect == Effect.Drops || effect == Effect.Lands && live == null) reread()
+        // The guard's failed read, and the wait's end the file refused, shown after that step, never before
+        // it: iOS shows the guard's first, and its step, copied before the failure, hides it again, the
+        // phone left unlocked and nothing said.
+        if (keeps == null || endKept?.isFailure == true) failed()
+        val rereads = effect == Effect.Rereads || effect == Effect.Drops || effect == Effect.Lands && live == null
+        if (rereads || effect == Effect.Waits && stood == Standing.Unread) reread()
         if (effect != Effect.Again) changes += 1
         return refreshing
     }
@@ -270,7 +305,7 @@ class SyncEngine private constructor(
         /** The session a live participation names, applied while no change of the phone's awaits its answer. */
         Lands,
 
-        /** Armed: the wait for the Start, AN5d's; till then it stands. */
+        /** Armed: the wait for the Start and its end, applied as [Lands] is, but never over a session still running. */
         Waits,
 
         /** The truth read again. */
@@ -311,9 +346,10 @@ class SyncEngine private constructor(
 
     /**
      * Reads the truth: where the phone stood, from the file, while that is unread; then a read of the
-     * truth (`GET /v1/me`) when one was asked for, tried again at each wake until one answers, or else the
-     * check-in of the session the phone is in, every 30 seconds while the screen is on and once as it goes
-     * on or off; then waits for the next wake. Each read's answer applies only as the reconcile says.
+     * truth (`GET /v1/me`) when one was asked for, tried again at each wake until one answers, and at each
+     * wake while the screen is on and the phone waits for the Start, or else the check-in of the session
+     * the phone is in, every 30 seconds while the screen is on and once as it goes on or off; then waits
+     * for the next wake. Each read's answer applies only as the reconcile says.
      */
     private suspend fun read(): Nothing {
         while (true) {
@@ -354,20 +390,30 @@ class SyncEngine private constructor(
 
     /**
      * The top of a pass, which answers every ring made before it and takes what each rang for: where the
-     * phone stood, read again while unread; whether the truth is read; and whether it checks in, rule 3's
-     * check first: while the screen is on, in a session or out (C1c), and, in a session, as it goes on or
-     * off. What a ring made after it rang for is the next pass's, so no pass wakes for nothing, an early
-     * check-in, where iOS's can.
+     * phone stood, read again while unread; a wait past its end ended; whether the truth is read; and
+     * whether it checks in, rule 3's check first: while the screen is on, in a session or out (C1c), and,
+     * in a session, as it goes on or off. What a ring made after it rang for is the next pass's, so no pass
+     * wakes for nothing, an early check-in, where iOS's can.
      */
     private suspend fun wake(): Wake {
         readRings.answer()
         readStanding()
+        // Past the end of the day its tap was armed, the server has dropped it (decision 5), which a read
+        // says (`armed`); with none answered, offline, the wait ends there too, at a wake: never Waiting
+        // where no Start would lock the phone (#166).
+        val ends = state.waitEnds
+        if (state.standing == Standing.Waiting && ends != null && ends <= clock.now()) {
+            update { it.copy(standing = Standing.Out) }
+        }
         val inSession = state.standing is Standing.InSession
-        // Out of a session, in a class, the truth is read at each wake while the screen is on, at the
-        // check-in's cadence, so Home says when a class of theirs is in session (C3c); and out of one as the
-        // screen comes on, as iOS's coming back reads it.
+        // Waiting for the teacher's Start, the truth is read at each wake while the screen is on, at the
+        // check-in's cadence, since no answer of the phone's own brings the Start, and no feed does
+        // (decision 6, the owner's ruling, 2026-09-29; C3a). Out of a session, in a class, by the same rule,
+        // so Home says when a class of theirs is in session (C3c); and out of one as the screen comes on, as
+        // iOS's coming back reads it.
+        val waiting = screenOn && state.standing == Standing.Waiting
         val outInClass = screenOn && state.standing == Standing.Out && state.hasClasses == true
-        val reads = rereading || outInClass || screenTurned && screenOn && !inSession
+        val reads = rereading || waiting || outInClass || screenTurned && screenOn && !inSession
         val wake = Wake(reads, checks = screenOn || screenTurned && inSession, screen = screenTurned && inSession)
         rereading = false
         screenTurned = false
@@ -442,17 +488,24 @@ class SyncEngine private constructor(
     private suspend fun readStanding() {
         if (state.standing != Standing.Unread) return
         val standing = stored { outbox.standing() }.getOrNull() ?: return
-        // Written back at once, filing whatever the file holds waiting to be ([keepStanding]).
+        // Written back at once, filing whatever the file holds waiting to be ([keepStanding]); an out an
+        // arming was carried onto waits ([armed]).
         kept = null
-        update { it.copy(standing = standing) }
+        val known = if (armed && standing == Standing.Out) Standing.Waiting else standing
+        update { it.copy(standing = known) }
     }
 
     /**
-     * `GET /v1/me`'s answer, as a standing: its live session, or none. Silence is still focus, and a state
-     * this build doesn't know is never focus. (Waiting for the Start is AN5d's.)
+     * `GET /v1/me`'s answer, as a standing: its live session, or none; waiting, while armed and the read
+     * doesn't say no tap of the student's waits (#166). Silence is still focus, and a state this build
+     * doesn't know is never focus. A session over by the phone's own clock (data model, decision 6) isn't
+     * the Start a waiting phone waits for: the sweep that ends it on the server may run late, and it would
+     * end the wait with no class to be in (C3).
      */
     private fun standing(me: MeResponse): Standing {
-        val session = me.session ?: return Standing.Out
+        val waiting = (state.standing == Standing.Waiting || armed) && me.armed != false
+        val session =
+            me.session?.takeIf { !waiting || it.endsAt > clock.now() } ?: return if (waiting) Standing.Waiting else Standing.Out
         val view = SessionView(session.id, session.classId, session.endsAt)
         return when (session.state.known) {
             DisplayState.Focused, DisplayState.Silent -> Standing.InSession(view, ParticipationState.Focused)
@@ -594,11 +647,13 @@ class SyncEngine private constructor(
      * Changes the state in one step, so no screen, and not the lock, ever sees half of one; then keeps
      * its standing in the file as it changes, so a relaunch starts where the phone stood, locked still,
      * offline too, never while it is unread, which would write over the file's truth from nothing; then
-     * publishes it, if it changed.
+     * publishes it, if it changed. A standing known carries an arming no further ([armed]), as iOS's
+     * `didSet` has it.
      */
     private suspend fun update(change: (SyncState) -> SyncState) {
         val last = state
         state = change(last)
+        if (state.standing != Standing.Unread) armed = false
         if (state.standing != kept && state.standing != Standing.Unread) keepStanding()
         if (state != last) published.value = state
     }
@@ -607,17 +662,20 @@ class SyncEngine private constructor(
      * Where the phone stood, and what it queued, each read on its own: the lock follows this state from
      * the start, so it must never begin from nothing. An unlock not filed yet acts on the standing, and
      * the first change files it ([keepStanding]), as it files whatever the file holds when its queue
-     * couldn't be read.
+     * couldn't be read. A wait's end it can't read is none, unshown as iOS's: a read of the truth then
+     * ends the wait.
      */
     private suspend fun load() {
         val queued = tried { outbox.records() }.getOrNull()
         val reportedOff = tried { outbox.reportedOff() }.getOrNull()
         val lastTap = tried { outbox.lastTap() }.getOrNull()
+        val waitEnds = tried { outbox.waitEnds() }.getOrNull()
         val standing = tried { outbox.standing() }.getOrNull()
         state =
             SyncState(
                 standing = standing ?: Standing.Unread, queued = queued.orEmpty(), reportedOff = reportedOff,
                 lastTap = lastTap, link = Link.StorageFailed.takeIf { queued == null || standing == null },
+                waitEnds = waitEnds,
             )
         if (standing != null && queued != null && !state.holdsUnfiled) kept = standing
         published.value = state

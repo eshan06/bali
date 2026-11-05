@@ -375,7 +375,7 @@ class DrainTest : EngineFiles() {
         }
 }
 
-/** Applying answers: the phone's truth. BaliOutbox's AnswerTests, AN5b's and AN5c's parts. */
+/** Applying answers: the phone's truth. BaliOutbox's AnswerTests, every one now (AN5b's to AN5d's). */
 class AnswerTest : EngineFiles() {
     @Test
     fun aTapIsLockedForAtOnceWhileUnansweredThenThePhoneIsInTheSessionItsAnswerNamesInTheStateItNames(): Unit =
@@ -390,6 +390,35 @@ class AnswerTest : EngineFiles() {
             state = rig.until { it.queued.isEmpty() }
             assertNull(state.pendingTap)
             assertEquals(inSession(ParticipationState.Unlocked), state.standing)
+        }
+
+    @Test
+    fun armedThePhoneWaitsForTheStartButArmingNeverEndsASessionItIsIn(): Unit =
+        runBlocking {
+            val rig = rig()
+            rig.arm()
+            rig.tapIn()
+            rig.engine.record(Change.Tap("another teacher's"))
+            rig.server.next(tapRoute).reply(200, Answer.armed)
+            assertEquals(inSession(ParticipationState.Focused), rig.until { it.queued.isEmpty() }.standing)
+        }
+
+    @Test
+    fun anArmingAnsweredWhileALaterChangeOfThePhonesAwaitsItsAnswerBeginsNoWaitAndKeepsNoEndTheLaterChangeStands(): Unit =
+        runBlocking {
+            // iOS's rule, which no iOS test reaches: an answer applies only while nothing newer awaits its own.
+            val rig = rig()
+            rig.engine.record(Change.Tap("tag"))
+            val first = rig.server.next(tapRoute)
+            rig.engine.record(Change.Tap("another teacher's"))
+            first.reply(200, Answer.armed)
+            // The drain sends the next once the first answer's stretch is done.
+            val second = rig.server.next(tapRoute)
+            val state = rig.engine.updates.value
+            assertEquals(listOf(Standing.Out, null), listOf(state.standing, state.waitEnds))
+            assertNull(rig.outbox.waitEnds())
+            second.reply(200, Answer.joined())
+            rig.until { it.standing == inSession(ParticipationState.Focused) && it.queued.isEmpty() }
         }
 
     @Test
