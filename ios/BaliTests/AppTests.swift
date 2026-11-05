@@ -4829,6 +4829,48 @@ struct AppTests {
     }
 
     @Test(
+        "The Screen Time step lays every line out at its own height, as Screen Time off does (C4's layout), only its spacers giving where the page fits the phone: the slide's ask, its slide in PDFKit's view, on the XR, the Air and the 15 Plus at the second largest text size before the accessibility ones, reads nothing shorter than when the page scrolls. Squeezed there, it cut the last line of what it says (found by WC5, whose cut moved the page's fit onto the XR and the Air)"
+    )
+    func screenTimeWhole() async throws {
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        /// What VoiceOver reads of the slide's ask at the second largest text size, in a window
+        /// `size` big with its safe areas already off, as `offFocusSlideFits` lays a phone out: each
+        /// element's label and height, read once the screen is up.
+        func read(_ size: CGSize) async throws -> [(label: String, height: CGFloat)] {
+            let phone = Phone(fixture: try #require(PreviewFixtures.all["screenTimeSlide"]))
+            let hosting = UIHostingController(
+                rootView: RootView(phone: phone).environment(\.dynamicTypeSize, .xxLarge))
+            hosting.safeAreaRegions = []
+            let window = UIWindow(windowScene: scene)
+            window.frame = CGRect(origin: .zero, size: size)
+            window.rootViewController = hosting
+            window.isHidden = false
+            defer { window.isHidden = true }
+            try await until {
+                window.layoutIfNeeded()
+                return ((try? voiceOver(in: window)) ?? []).contains {
+                    $0.accessibilityLabel == "Let Bali pause apps during class"
+                }
+            }
+            window.layoutIfNeeded()
+            return try voiceOver(in: window).map { ($0.accessibilityLabel ?? "", $0.accessibilityFrame.height) }
+        }
+        // The three phones' sizes less their safe areas. No more: PDFKit analyses every page a PDF
+        // view shows, still at it seconds later, and a burst of them starves the test host.
+        for phone in [
+            CGSize(width: 414, height: 896 - 48 - 34), CGSize(width: 420, height: 912 - 68 - 34),
+            CGSize(width: 430, height: 932 - 59 - 34),
+        ] {
+            // In a window too short for it the page scrolls: every line at its own height.
+            let whole = try await read(CGSize(width: phone.width, height: 300))
+            let shown = try await read(phone)
+            #expect(shown.map(\.label) == whole.map(\.label), "\(phone)")
+            let short = zip(shown, whole).filter { $0.height < $1.height - 0.5 }
+            #expect(short.isEmpty, "\(phone): \(short.map { $0.0.label })")
+        }
+    }
+
+    @Test(
         "The slide off the Focus screen and the card on the Screen Time ask (M8b) show only while the lesson has them and this phone has shown the student the consent list as it stands (the owner's ruling, 2026-10-23): on Unlocked and Screen Time off, which the one-time screen never covers, no slide and no poll before, the question and the slide once the list is seen; on Home and on the ask in its place, the one-time screen until then, then the screen with them; each gone once a read shows neither, the screen staying. The ask never shows a lesson during onboarding, a student in no class following none, nor in Waiting's place, though one is followed"
     )
     func offFocusSlideWaits() async throws {
