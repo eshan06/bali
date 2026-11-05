@@ -8,12 +8,13 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-04 (Central) — WC4 (#509; `docs/DECISIONS.md`, 2026-11-04): the fourth of the
-eight WC steps: Unlocked, its reason card, Screen Time off and Waiting lose their lines. Before it,
-WC3 (#508). Next: WC5; A2–A4; the owner's call on Other Data Types' purpose; a session builds the
-retire-a-block command; the owner the new build, with A5, and the sitting; the owner's call on GA5's
-known limit, the smallest iPhones (DECISIONS 2026-11-02); AN6, Android's sign-in; AN1's
-part 2 once the owner has the phones; the audit's polish waits, as ruled._
+_Last updated: 2026-11-04 (Central) — A2 (#PR; `docs/DECISIONS.md`, 2026-11-04): the server sends
+PostHog a class's totals when a session starts, ends or is extended, off until `POSTHOG_KEY` is set;
+the app's manifest gives Other Data Types the purpose Analytics (the owner's pick). Before it, WC4
+(#509). Next: WC5; A3a, A3b, A4; a session builds the retire-a-block command; the owner the new
+build, with A5 and A2, and the sitting; the owner's call on GA5's known limit, the smallest iPhones
+(DECISIONS 2026-11-02); AN6, Android's sign-in; AN1's part 2 once the owner has the phones; the
+audit's polish waits, as ruled._
 
 ## Now
 
@@ -126,7 +127,7 @@ branch, with no PR, as its README says (#479; `docs/DECISIONS.md`, 2026-11-02).
 
 **Before the pilot (the owner, 2026-11-03; DECISIONS 2026-11-03).** Left, in order:
 1. A new prod TestFlight build from `main`: build 11 predates the audit's iOS fixes (GA3, GA5) and the
-   consent list's new lines (#466), and this one must carry A5's privacy manifest. The owner's.
+   consent list's new lines (#466), and this one must carry A5's and A2's privacy manifest. The owner's.
 2. 📱 The phone sitting on it, whole (`ios/README.md`, "Phase 7's phone sitting, on prod", Parts 1–7):
    C7's first launch, L8's, M8's and M8b's device checks, the exit checks L9, M10 and W6, the consent
    list's new lines, the shield's new line, the class-started alert end to end (N6), and every other
@@ -137,7 +138,8 @@ branch, with no PR, as its README says (#479; `docs/DECISIONS.md`, 2026-11-02).
    - **A1** Its rules in the docs — ✅ (#503; DECISIONS 2026-11-04)
    - **A5** The iPhone app's privacy manifest: Product Interaction gains the purpose Analytics — ✅
      (#505; DECISIONS 2026-11-04)
-   - **A2** The server's class totals, always sent, whatever the class's size
+   - **A2** The server's class totals, always sent, whatever the class's size — ✅ (#PR; DECISIONS
+     2026-11-04)
    - **A3a** The server's endpoint for the portal's events: teacher-only, checked against the
      allow-list, forwarded to PostHog with the server's key; additive under `/v1`
    - **A3b** The portal's teacher events, through it (no CSP change)
@@ -146,13 +148,11 @@ branch, with no PR, as its README says (#479; `docs/DECISIONS.md`, 2026-11-02).
    - Then the owner's key: `POSTHOG_KEY` in Railway's `bali prod` (the portal holds none).
 5. The external TestFlight group `Vanderbilt pilot` and Beta App Review (`docs/APP-STORE.md`, section
    5), which is Apple's answer on §3.3.3(P) (ISSUES #3).
-6. For PostHog, the App Store privacy label (Product Interaction gains the purpose Analytics, which
-   the app's privacy manifest declares since A5, so the label must match it) and
-   `docs/APP-STORE.md`'s answers and review note ("no third-party analytics…"); until then they say
-   App Functionality only, though item 4's key turns the totals on. The owner's, later (the owner,
-   2026-11-04: "we can change the wording on privacy stuff on apple later"). Before item 1, the
-   owner's call: does Other Data Types, which the enrolled count comes from, serve Analytics too
-   (DECISIONS 2026-11-04)?
+6. For PostHog, the App Store privacy label (Product Interaction and Other Data Types gain the
+   purpose Analytics, which the app's privacy manifest declares since A5 and A2, so the label must
+   match it) and `docs/APP-STORE.md`'s answers and review note ("no third-party analytics…"); until
+   then they say App Functionality only, though item 4's key turns the totals on. The owner's, later
+   (the owner, 2026-11-04: "we can change the wording on privacy stuff on apple later").
 
 Not needed for the Vanderbilt pilot (the owner, 2026-11-03): production backups (L0b) and the lawyer's
 words (C2); the owner's drafts stand on `/privacy` and `/terms`.

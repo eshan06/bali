@@ -8,6 +8,53 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-04** — **A2, the server sends PostHog a class's totals; and the iPhone app's privacy
+  manifest gives Other Data Types the purpose Analytics (the owner's pick, "Yes, add it"; A2,
+  #PR).** The owner answered the call A5's entry ("PostHog: the owner's four rulings", below) left
+  open: the enrolled count comes from class membership, which the manifest files under Other Data
+  Types (`NSPrivacyCollectedDataTypeOtherDataTypes`), and Apple's Analytics purpose covers
+  measuring audience size, so that type serves Analytics beside App Functionality, over dropping
+  the count. In `ios/Bali/PrivacyInfo.xcprivacy`, with CI's check pinning it
+  (`.github/scripts/privacy-manifests.py`'s `ANALYTICS`) and a test that fails without it; the App
+  Store label, to match, stays the owner's (PLAN's Before the pilot, 6; `docs/APP-STORE.md`'s check
+  says which rows).
+
+  **The sender** (`apps/api/src/analytics.ts`): a plain `fetch` POST of `{api_key, event,
+  distinct_id, properties, timestamp}` to PostHog's capture endpoint, `/i/v0/e/` on the host
+  (PostHog's docs, read 2026-11-04), no SDK. Off until `POSTHOG_KEY` is set, the boot log saying
+  which once, never the key; `POSTHOG_HOST` optional, PostHog's US cloud by default. The conductor's
+  call, awaiting the owner: the boot refuses any key but a project key (`phc_…`), so a personal API
+  key, PostHog's admin secret, never lands in Bali's server, which holds none. Each send is fired
+  after the commit and never awaited, given up at 5 s, and waited out by `app.close()`, its hook run
+  after Fastify's own and the sweep's (a close runs them last-registered first). PostHog's refusal
+  or failure is logged at warn with the event, the session id and the status or the error's words,
+  the key masked; a failure of Bali's own (reading the totals) at error, and to Sentry.
+
+  **The events,** each from one function over typed inputs (`sessionProperties`), the class's
+  teacher by Bali's id: `session_started`, `session_ended` and `session_extended`, stamped with the
+  server's time (the Start's, the recorded end, the extend's clock), carrying `environment` (Sentry's
+  own, `environmentOf`), `students_enrolled`, `students_tapped_in`, `planned_minutes`,
+  `session_minutes`, `focus_minutes`, `unlocks` (one number) and, on an end, `ended_by` (`teacher`,
+  `bell` or `owner`). The counts are the session report's own (`counted`, R1's function and
+  rounding), to the session's end once it has ended; the enrolled count is the class's at that end,
+  or at the moment while it runs, so a disposal, which ends each enrollment with its lessons, still
+  counts them. A replay sends nothing: a resent Start answers `existing`, and the engine now says an
+  extend's replay (`extendSession`'s `outcome`), while `/v1` answers `extended` as it shipped.
+
+  **Every way a session ends** sends one: the teacher's End (`teacher`); the sweep, only the run
+  that ended it (`bell`); a Start past the bell (A18, `bell`), the engine naming the session it
+  ended (`startSession`'s `expired`); and the owner's commands (#470): `end-session` (`owner`), and
+  a disposal's lessons, those it ended running (`owner`) and those past their bell not yet swept,
+  which it now lists (`bell`). The commands send from `npm run school` itself, in the API service's
+  shell where the owner runs them (runbook 1), with the service's own key, through a hook on the
+  commands (`SchoolCommandIO.ended`), waiting out their sends before the process exits; a failure
+  goes to standard error, never to the output (an export's JSON).
+
+  **Said plainly:** an event names the class's teacher even when the owner ended it. The owner's
+  command's wiring (`apps/api/scripts/school.ts`) has no test of its own; the hook it fills and the
+  sender are each tested. The command reads `POSTHOG_HOST` unchecked, where the API's boot checks it
+  on the same service.
+
 - **2026-11-04** — **AN6a, sign-in's parts: BaliCore's `SignIn.swift` in Kotlin, from its top
   through `Tokens` (the conductor's calls, awaiting the owner's look; AN6a, #515).** The owner isn't
   reviewing each step and asked for the recommended option on every question, so each call here is

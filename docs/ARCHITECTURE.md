@@ -932,7 +932,8 @@ the teacher portal's, which it forwards, and nothing else of Bali's.
   advertising SDKs in the app". The server's totals are still counted from what the phones send,
   and that clause's "or otherwise" may reach them: Apple's review stays the answer (ISSUES #3).
 - **What it may hold.** From the server, a class's totals only: a session started, ended or
-  extended; how many students are enrolled and how many tapped in; the session's length; the
+  extended, and how it ended (its teacher, its bell, or the owner's command); how many students
+  are enrolled and how many tapped in; the session's length, planned and so far; the
   class's focus minutes and unlocks, as totals, the unlocks one number, never split by reason
   ("nurse" may be health data). They are sent whatever the class's size (the owner's pick, "Always
   send", over holding focus minutes and unlocks back under 3 or 5 students), so with one or two
@@ -984,9 +985,11 @@ the teacher portal's, which it forwards, and nothing else of Bali's.
   is set (PLAN's A4). The iPhone app's privacy manifest (`ios/Bali/PrivacyInfo.xcprivacy`), which
   ships inside the build, gives Product Interaction, which the totals are counted from, the purpose
   Analytics beside App Functionality since A5 (the owner's pick, "In the next build", over waiting
-  for the App Store label), and CI's check pins it (`.github/scripts/privacy-manifests.py`). The
-  App Store privacy label, to match, and `docs/APP-STORE.md`'s answers and review note are the
-  owner's, later; until then they say App Functionality only.
+  for the App Store label), and Other Data Types, class membership, which the enrolled count
+  comes from, since A2 (the owner's pick, "Yes, add it", over dropping the count), and CI's check
+  pins both (`.github/scripts/privacy-manifests.py`). The App Store privacy label, to match, and
+  `docs/APP-STORE.md`'s answers and review note are the owner's, later; until then they say App
+  Functionality only.
 
 ## iOS app structure
 

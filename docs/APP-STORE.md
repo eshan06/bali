@@ -217,10 +217,11 @@ data; ⚖️ confirm a server-side error report triggered by an app request is n
   manifest needs no change for it; nor does the 13+ yes (Other Data Types, already declared),
   nor do a live lesson's answers (Other User Content, already declared for the unlock reason).
 - Since A5 (2026-11-04) the manifest gives **Product Interaction** the purpose **Analytics**
-  beside App Functionality, as the server's class totals for PostHog are counted from it, and CI
-  pins each type's purposes. This table still says App Functionality alone, the owner's to change
-  (PLAN's Before the pilot, 6): when the label is edited, its Product Interaction row must say
-  Analytics too, to match the manifest.
+  beside App Functionality, as the server's class totals for PostHog are counted from it, and
+  since A2 (the same day) **Other Data Types** too, as their enrolled count comes from class
+  membership; CI pins each type's purposes. This table still says App Functionality alone, the
+  owner's to change (PLAN's Before the pilot, 6): when the label is edited, its Product
+  Interaction and Other Data Types rows must say Analytics too, to match the manifest.
 - If accounts stop being self-created (Phase 6's open decision on how accounts are made),
   the email row still stands: the school or Cognito still holds it on Bali's behalf.
 - Data kept after an account is deleted follows the owner's retention policy (ISSUES #5,

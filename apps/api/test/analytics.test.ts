@@ -76,11 +76,12 @@ function build(env: Env): FastifyInstance {
       done();
     },
   });
-  const posthogFetch = ((url: string | URL | Request, init?: RequestInit) => {
-    posted.push({ url: String(url), body: JSON.parse(String(init?.body)) as Posted['body'] });
+  // As analytics.ts sends: the endpoint as a string, the event as JSON text.
+  const posthogFetch = ((url: string, init: RequestInit & { body: string }) => {
+    posted.push({ url, body: JSON.parse(init.body) as Posted['body'] });
     // As the real fetch does, a send stops at its signal's abort: its timeout.
     return new Promise<Response>((resolve, reject) => {
-      init?.signal?.addEventListener('abort', () => reject(init.signal?.reason as Error));
+      init.signal?.addEventListener('abort', () => reject(init.signal?.reason as Error));
       answer().then(resolve, reject);
     });
   }) as typeof fetch;
@@ -344,7 +345,7 @@ describe('what an event carries', () => {
       students_enrolled: 2,
       students_tapped_in: 1,
       planned_minutes: 30,
-      session_minutes: expect.any(Number),
+      session_minutes: expect.any(Number) as number,
       focus_minutes: 0,
       // One number, never by reason.
       unlocks: 1,
@@ -501,7 +502,7 @@ describe('never in the way', () => {
         {
           event: 'session_started',
           sessionId: session.id,
-          failure: expect.stringMatching(/timeout/i),
+          failure: expect.stringMatching(/timeout/i) as string,
         },
         'analytics event not sent',
       ],

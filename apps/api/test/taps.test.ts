@@ -570,7 +570,11 @@ describe.runIf(REAL_PG)('POST /v1/taps at the bell (real Postgres, A17)', () => 
     expect(res?.statusCode).toBe(200);
     expect(res?.json()).toEqual({
       outcome: 'joined',
-      session: { id: session.id, classId: session.classId, endsAt: extended.session.endsAt.toISOString() },
+      session: {
+        id: session.id,
+        classId: session.classId,
+        endsAt: extended.session.endsAt.toISOString(),
+      },
       state: 'focused',
     });
   }, 20_000);

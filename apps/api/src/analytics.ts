@@ -13,9 +13,9 @@ import { counted } from './routes/reports.js';
  * at its timeout, and a failure is logged with nothing personal in it.
  */
 
-export const DEFAULT_POSTHOG_HOST = 'https://us.i.posthog.com';
+const DEFAULT_POSTHOG_HOST = 'https://us.i.posthog.com';
 /** How long one send may take: well inside the shutdown's deadline. */
-export const POSTHOG_TIMEOUT_MS = 5_000;
+const POSTHOG_TIMEOUT_MS = 5_000;
 
 export type SessionEvent = 'session_started' | 'session_ended' | 'session_extended';
 /**
@@ -176,8 +176,8 @@ export function createAnalytics(
       log.warn({ event, sessionId, failure }, 'analytics event not sent');
       return;
     }
-    // Nothing in its answer is read, so its connection goes back at once.
-    void response.body?.cancel().catch(() => undefined);
+    // Read to its end, though none of it is used, so its connection goes back at once.
+    await response.arrayBuffer().catch(() => undefined);
     if (!response.ok) {
       log.warn({ event, sessionId, status: response.status }, 'analytics event refused');
     }
