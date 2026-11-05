@@ -1073,12 +1073,16 @@ screen the canvas doesn't draw is built from its approved iPhone board, in this 
 words.
 
 - **The words** are the built iPhone app's, word for word, except where the canvas's Words board,
-  the record of Android's words, says otherwise: 28 lines changed, 14 new, 22 gone. A line changes
-  only where it names something Android lacks (FaceTime, Emergency SOS, Screen Time, iOS, the top
-  of an iPhone) or where the owner cut it, on every Android screen (2026-11-04; the iPhone follows
-  in WC1–WC8, with three exceptions, and WC8 recounts these: DECISIONS 2026-11-04). Of the 22
-  gone, the owner cut 18 and 4 have no Android twin. A line the board marks "not
-  drawn" belongs to a state no board shows, and changes the same way. Settled with the approval:
+  the record of Android's words, says otherwise: 27 lines changed, 14 new, 5 gone (version 55,
+  WC8's recount). A line changes only where it names something Android lacks (FaceTime, Emergency
+  SOS, Screen Time, iOS, the top of an iPhone) or where the owner cut it, on every Android screen
+  (2026-11-04). The iPhone made the same cuts (WC1–WC7; DECISIONS 2026-11-04), with three
+  exceptions: its block screen says "This app is paused for class. Open Bali to Emergency Unlock."
+  ("website" over a website), the lines only Android has don't apply, and the answered card's "Your
+  answer is in. You can change it until the question closes." stays on both. So the board lists
+  only where the two differ: of the 5 gone, the owner cut 1, the block screen's line, and 4 have no
+  Android twin. A line the board marks "not drawn" belongs to a state no board shows, and changes
+  the same way. Settled with the approval:
   "Lock off" and "Lock back on" for the ruled "Screen Time off" and "Screen Time back on"; "Calls,
   texts and emergency calls always work" for "Calls, FaceTime, Messages and Emergency SOS always
   work", on the intro's first page alone; and the new lines as drawn, Open Bali on the block screen
