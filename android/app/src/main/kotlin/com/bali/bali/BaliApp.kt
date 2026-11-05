@@ -9,7 +9,9 @@ import com.bali.core.HttpTransport
 import com.bali.core.OkHttpTransport
 import com.bali.core.SignIn
 import com.bali.outbox.Enforcer
+import com.bali.outbox.Outbox
 import com.bali.outbox.SyncEngine
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -50,19 +52,57 @@ class BaliApp : Application() {
     /** The screen as the lock's service hears it: on while the service is bound and the screen is on. */
     internal val screen = MutableStateFlow(false)
 
+    /** Whether a screen of Bali's own is in front (the Debug readout's, AN7d; Phase 10's), for the engine's `setInFront`. */
+    internal val front = MutableStateFlow(false)
+
+    /** The app's own outbox, opened once, for its life (OutboxFile.kt): no test opens it, each having a file of its own. */
+    private val outboxFile: Outbox by lazy { outbox() }
+
     private val runs = MutableStateFlow<Running?>(null)
 
-    /** The engine and its enforcer while they run: none before [start], and, as on iOS, none while sign-in isn't set up. */
+    /** The engine and its enforcer while they run: none before [start], and, as on iOS, none while sign-in isn't set up but a Debug build's. */
     val running: StateFlow<Running?> = runs.asStateFlow()
+
+    private val failure = MutableStateFlow<Exception?>(null)
+
+    /** Why the app's last start failed, until one doesn't: held for a screen to say with Try again (rule 5; the words AN10's), never swallowed. */
+    val startFailed: StateFlow<Exception?> = failure.asStateFlow()
+
+    /** The app's own start, as it's created ([begin]): a test that starts a run of its own waits for it first, which could replace that run. */
+    internal lateinit var launched: Job
 
     /** The app's one engine, and the enforcer keeping the lock where its truth says. */
     class Running internal constructor(val engine: SyncEngine, val enforcer: Enforcer, internal val job: Job)
 
     override fun onCreate() {
         super.onCreate()
-        val api = config?.api ?: return
-        val signIn = signIn ?: return
-        scope.launch { start(SyncEngine.make(outbox(), api, signIn, scope, transport)) }
+        launched = scope.launch { begin() }
+    }
+
+    /** Whether a start is under way ([begin]), iOS's `starting`. */
+    private val starting = AtomicBoolean(false)
+
+    /**
+     * Makes this build's engine and runs it ([start]), unless one runs or another start is under way:
+     * BaliApp.swift's `start`. Over the sign-in, and the outbox [open] gives, the app's own; none while
+     * sign-in isn't set up, as on iOS, but a Debug build's ([ThisBuild]). A start that fails is held
+     * ([startFailed]) and tried again here.
+     */
+    internal suspend fun begin(open: () -> Outbox = { outboxFile }) {
+        if (!starting.compareAndSet(false, true)) return
+        try {
+            if (runs.value != null) return
+            val signed = config?.let { config -> signIn?.let { SyncEngine.make(open(), config.api, it, scope, transport) } }
+            val engine = signed ?: ThisBuild.unsigned(getString(R.string.BALI_API_URL), transport, scope, open) ?: return
+            ThisBuild.starting(this, engine)
+            start(engine)
+            failure.value = null
+        } catch (failed: Exception) {
+            if (failed is CancellationException) throw failed
+            failure.value = failed
+        } finally {
+            starting.set(false)
+        }
     }
 
     /**
@@ -71,7 +111,8 @@ class BaliApp : Application() {
      * as the service hears it, for its check-ins (AN5c); and rule 3's check now, so a switch starting as the
      * app starts begins its grace, the service's connect ending it, and at each change of Android's list
      * of switched-on services, so a switch turned off and on again between two check-ins is reported
-     * (AN7b). The service's connect and unbind run it too ([check]).
+     * (AN7b). The service's connect and unbind run it too ([check]), and Bali's own screen coming to the
+     * front ([front]), after the truth is asked for, as iOS's coming back has both.
      */
     fun start(engine: SyncEngine, scope: CoroutineScope = this.scope) {
         val job = SupervisorJob(scope.coroutineContext[Job])
@@ -82,8 +123,9 @@ class BaliApp : Application() {
         job.invokeOnCompletion { runs.compareAndSet(running, null) }
         within.launch { engine.run() }
         within.launch { enforcer.run() }
-        // From the screen's first turn on: the engine starts with it off.
+        // From the screen's first turn on: the engine starts with it off. Bali's own screen in front likewise.
         within.launch { screen.dropWhile { !it }.collect { engine.setScreenOn(it) } }
+        within.launch { front.dropWhile { !it }.collect { engine.setInFront(it); if (it) check() } }
         val switch =
             object : ContentObserver(null) {
                 override fun onChange(selfChange: Boolean) = check()

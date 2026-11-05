@@ -7,8 +7,10 @@ import android.provider.Settings
 import android.view.accessibility.AccessibilityEvent
 import com.bali.outbox.Lock
 import com.bali.outbox.LockSwitch
+import com.bali.outbox.SystemClock
 import java.io.File
 import java.io.IOException
+import java.time.Duration
 import java.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -42,20 +44,35 @@ class ServiceLock(private val context: Context) : Lock {
     /** Whether the file is there, as last made or taken away. */
     private var saved = kept
 
-    /** The service, while it is bound. */
-    private var service: LockService? = null
+    // The service, while it is bound, and what it listens to: the windows, as last set, or none, not set since it
+    // bound. The Debug readout shows both (AN7d), on the main thread.
+    internal var service: LockService? = null
+        private set
+    internal var listening: Boolean? = null
+        private set
 
-    /** Whether the service listens to the windows, as last set; none: not set since it bound. */
-    private var listening: Boolean? = null
+    /**
+     * The Debug readout's Launch line (AN7d), iOS's `PhoneScreenTime.timed`: this run's first read of the switch, by
+     * the phone's uptime, the grace's clock; and how long after it a read first said other than starting, and what.
+     */
+    internal var firstRead: Duration? = null
+        private set
+    internal var settled: Pair<Duration, LockSwitch>? = null
+        private set
 
-    /** Off the list, off; on it, on once the service is bound, else starting. */
+    /** Off the list, off; on it, on once the service is bound, else starting. Timed for the readout. */
     override suspend fun switch(): LockSwitch =
         onMain {
-            when {
-                !listed() -> LockSwitch.Off
-                service != null -> LockSwitch.On
-                else -> LockSwitch.Starting
-            }
+            val read =
+                when {
+                    !listed() -> LockSwitch.Off
+                    service != null -> LockSwitch.On
+                    else -> LockSwitch.Starting
+                }
+            val now = SystemClock.uptime()
+            val first = firstRead ?: now.also { firstRead = it }
+            if (settled == null && read != LockSwitch.Starting) settled = now - first to read
+            read
         }
 
     override suspend fun locking(): Boolean = onMain { follow() }
@@ -125,7 +142,7 @@ class ServiceLock(private val context: Context) : Lock {
         }
 
     /** Whether Android's list of switched-on services holds the service: the student's switch, in Settings. */
-    private fun listed(): Boolean =
+    internal fun listed(): Boolean =
         Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
             ?.split(':')?.any { ComponentName.unflattenFromString(it) == mine } == true
 

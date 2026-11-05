@@ -10,6 +10,20 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN7d's on 2026-11-05: _Last updated: 2026-11-05 (Central) — AN7c,
+the service and the app's engine (#523;
+`docs/DECISIONS.md`, 2026-11-05): Bali's Accessibility service, declared in the Debug build alone with
+a developer's label (Q1), and the lock over it (`ServiceLock`): its switch from Android's list and the
+service's binding; listening to nothing outside a lesson and to window events in one; the last run's
+lock kept in `no_backup` and read once as the run starts (Q4); the screen heard for the check-ins; and
+rule 3's check as the app starts, the switch changes and the service binds and unbinds. `BaliApp` starts
+the engine and the enforcer, none while sign-in isn't set up. On the emulators, a force-stop takes the
+service off Android's list, a reboot binds it again once the phone is unlocked. Before it, AN7b, rule 3's
+report. Next: AN7d, the Debug readout; Android's Cognito clients, the owner's (Open owner items, 8);
+Android 17's SDK platform for the owner to OK before the first step with today's AndroidX, and OkHttp 5.5
+with it (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical
+path._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN7c's on 2026-11-05: _Last updated: 2026-11-05 (Central) — AN7b,
 rule 3's report (#522; `docs/DECISIONS.md`, 2026-11-05):
 the switch found off in a session the phone's clock says still runs, reported once with iOS's events,
@@ -2324,6 +2338,16 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN7d's line, as it read until it was done (2026-11-05; `docs/DECISIONS.md`, 2026-11-05).
+
+- **AN7d** The Debug readout (twin: BaliApp.swift's `Readout`): a Debug readout like iOS's for the phone
+  checks, in the Debug build alone, a developer's words and no board, as iOS's (B4c): the link, the
+  sign-in, the standing, the lock's claim, the service and how long it took to start, and the outbox;
+  Open Accessibility settings, a typed tap, Emergency Unlock and the 15-minute cap (`setTapCap`); Bali
+  coming to the front reads the truth and runs the check (`setInFront`); and, while sign-in isn't set
+  up, a Debug build's engine over no token (DECISIONS 2026-11-05, Q2; AN7c's, moved here). Before AN7e,
+  so no Debug build covers apps with no way out — validation: a smoke test on the emulator
 
 AN7c's line, as it read until it was done (2026-11-05; `docs/DECISIONS.md`, 2026-11-05). Its "but a
 Debug build's, over no token (Q2)" went to AN7d's line, whose readout needs it (the conductor's brief).

@@ -14,18 +14,17 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-05 (Central) — AN7c, the service and the app's engine (#523;
-`docs/DECISIONS.md`, 2026-11-05): Bali's Accessibility service, declared in the Debug build alone with
-a developer's label (Q1), and the lock over it (`ServiceLock`): its switch from Android's list and the
-service's binding; listening to nothing outside a lesson and to window events in one; the last run's
-lock kept in `no_backup` and read once as the run starts (Q4); the screen heard for the check-ins; and
-rule 3's check as the app starts, the switch changes and the service binds and unbinds. `BaliApp` starts
-the engine and the enforcer, none while sign-in isn't set up. On the emulators, a force-stop takes the
-service off Android's list, a reboot binds it again once the phone is unlocked. Before it, AN7b, rule 3's
-report. Next: AN7d, the Debug readout; Android's Cognito clients, the owner's (Open owner items, 8);
-Android 17's SDK platform for the owner to OK before the first step with today's AndroidX, and OkHttp 5.5
-with it (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical
-path._
+_Last updated: 2026-11-05 (Central) — AN7d, the Debug readout (#524; `docs/DECISIONS.md`,
+2026-11-05): a developer's screen for the phone checks in the Debug build alone, with a launcher entry
+of its own, iOS's `Readout`'s twin: the link, the sign-in, the standing, the lock's claim, the service and
+how long it took to bind, and the outbox; Open Accessibility settings, a typed tap, Emergency Unlock and
+the 15-minute cap; Bali in front reads the truth and runs the check. While sign-in isn't set up, a Debug
+build's start runs the engine over no token, as a signed-out phone, so a typed tap locks offline to its
+cap (Q2); a Release build's runs none. A start that fails is held, with Try again. Before it, AN7c, the
+service and the app's engine. Next: AN7e, the cover; Android's Cognito clients, the owner's (Open owner
+items, 8); Android 17's SDK platform for the owner to OK before the first step with today's AndroidX, and
+OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's
+critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -150,13 +149,7 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN7b** Rule 3's report: protection off, the lock back on, the launch grace — ✅ (#522; DECISIONS
   2026-11-05)
 - **AN7c** The service and the app's engine — ✅ (#523; DECISIONS 2026-11-05)
-- **AN7d** The Debug readout (twin: BaliApp.swift's `Readout`): a Debug readout like iOS's for the phone
-  checks, in the Debug build alone, a developer's words and no board, as iOS's (B4c): the link, the
-  sign-in, the standing, the lock's claim, the service and how long it took to start, and the outbox;
-  Open Accessibility settings, a typed tap, Emergency Unlock and the 15-minute cap (`setTapCap`); Bali
-  coming to the front reads the truth and runs the check (`setInFront`); and, while sign-in isn't set
-  up, a Debug build's engine over no token (DECISIONS 2026-11-05, Q2; AN7c's, moved here). Before AN7e,
-  so no Debug build covers apps with no way out — validation: a smoke test on the emulator
+- **AN7d** The Debug readout — ✅ (#524; DECISIONS 2026-11-05)
 - **AN7e** The cover (twin: the spike's `AllowList`, `Covers` and `BlockAccessibilityService`): which
   windows are covered, in `outbox` (`Cover`): those of an app the system allow-list (decision 2) doesn't
   hold, while the lock's end is ahead by the phone's clock, never Bali's own nor under the shade; the

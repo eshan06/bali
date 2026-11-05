@@ -1,0 +1,236 @@
+package com.bali.bali
+
+import android.annotation.SuppressLint
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import android.graphics.Typeface
+import android.os.Bundle
+import android.provider.Settings
+import android.text.InputType
+import android.view.View
+import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+import android.widget.Button
+import android.widget.CheckBox
+import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
+import androidx.activity.ComponentActivity
+import androidx.core.content.edit
+import androidx.core.view.isVisible
+import androidx.lifecycle.lifecycleScope
+import com.bali.outbox.Change
+import com.bali.outbox.Enforcer
+import com.bali.outbox.Protection
+import com.bali.outbox.Standing
+import com.bali.outbox.SyncState
+import com.bali.outbox.SystemClock
+import java.time.Duration
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+import java.util.Locale
+import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
+
+/**
+ * The phone checks' readout (docs/ANDROID-PHONE-TESTS.md), BaliApp.swift's `Readout`: the engine's link, the
+ * sign-in, the standing, what rule 3's check found of the lock, the service and how long it took to bind, and
+ * the queue, with the triggers the screens will have. In the Debug build alone, with a launcher entry of its
+ * own, until Phase 10's screens: a developer's words, never a student's, and nothing a teacher sees, as iOS's
+ * (DECISIONS 2026-09-25, B4c; 2026-11-05, AN7d). Plain Views: today's Compose needs compileSdk 37. In front,
+ * it tells the app ([BaliApp.front]), which reads the truth and runs rule 3's check. Not here: Join and
+ * History (AN9's), Scan (AN8's), and iOS's marker, asks and monitor, which have no twin.
+ */
+// Lint's SetTextI18n guards the words a student reads and a translator translates: these are a developer's alone.
+@SuppressLint("SetTextI18n")
+class ReadoutActivity : ComponentActivity() {
+    private val app get() = application as BaliApp
+    internal lateinit var lines: TextView
+    internal lateinit var signIn: Button
+    internal lateinit var blockTag: EditText
+    internal lateinit var tap: Button
+    internal lateinit var unlock: Button
+    internal lateinit var shortCap: CheckBox
+    internal lateinit var tryAgain: Button
+    private var signedIn = "not known yet"
+    private var drawing: Job? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        if (app.signIn == null) signedIn = "sign-in isn't set up in this build"
+        lines = TextView(this).apply { typeface = Typeface.MONOSPACE }
+        signIn = button("Sign in") { signingIn() }
+        val signOut = button("Sign out") { app.signIn?.let { it.signOut(); "signed out" } ?: "sign-in isn't set up in this build: nobody to sign out" }
+        // iOS's Allow Screen Time: Android asks nothing, the student switches the service on there.
+        val settings = Button(this).apply { text = "Open Accessibility settings"; setOnClickListener { accessibility() } }
+        blockTag = EditText(this).apply { hint = "Block tag"; inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS }
+        // The tag read here, on the main thread, before the trigger goes.
+        tap = Button(this).apply { text = "Tap"; setOnClickListener { blockTag.text.toString().trim().let { typed -> act { tapped(typed) } } } }
+        unlock = button("Emergency Unlock") { if (app.running.value?.engine?.emergencyUnlock() == null) "nothing to unlock" else "recorded" }
+        shortCap = CheckBox(this).apply { text = "Cap a tap at 15 min (phone check)"; isChecked = cap(context) != null; setOnCheckedChangeListener { _, on -> capped(on) } }
+        tryAgain = button("Try again") { app.begin(); app.startFailed.value?.let { "start failed again: $it" } ?: "started" }
+        val column = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(PAD, PAD, PAD, PAD) }
+        listOf(lines, row(signIn, signOut), settings, row(blockTag, tap), unlock, shortCap, tryAgain).forEach(column::addView)
+        setContentView(ScrollView(this).apply { fitsSystemWindows = true; addView(column) })
+    }
+
+    // Drawn while it shows: at each note and change of the sign-in, and each second, the service and the launch read
+    // live, as iOS's timeline reads its own.
+    override fun onStart() {
+        super.onStart()
+        drawing =
+            lifecycleScope.launch {
+                launch { note.collect { draw() } }
+                launch { app.signIn?.signedIn()?.collect { signedIn = if (it) "yes" else "no"; draw() } }
+                while (true) {
+                    draw()
+                    delay(REDRAW)
+                }
+            }
+    }
+
+    override fun onStop() {
+        drawing?.cancel()
+        super.onStop()
+    }
+
+    // Bali's own screen in front, and behind: the engine told, its truth read and rule 3's check run as it comes (BaliApp.start).
+    override fun onResume() {
+        super.onResume()
+        app.front.value = true
+    }
+
+    override fun onPause() {
+        app.front.value = false
+        super.onPause()
+    }
+
+    /** The lines as they stand, and the buttons the state offers: Emergency Unlock where it names one, Try again where the start failed. */
+    private fun draw() {
+        val run = app.running.value
+        val state = run?.engine?.updates?.value
+        val queued = state?.queued.orEmpty().joinToString(" · ") { it.change.javaClass.simpleName + if (it.stuck) " (stuck: ${it.lastStatus ?: "no answer"})" else "" }
+        lines.text =
+            listOf(
+                "Debug readout — temporary",
+                "Engine: ${engine(run != null)}",
+                "Link: ${state?.link ?: "no exchange yet"}",
+                "Server last answered: ${state?.heardAt?.let(::time) ?: "never"}",
+                "Signed in: $signedIn",
+                "Standing: ${standing(state)}",
+                "Lock: ${claim(run?.enforcer?.updates?.value)}",
+                "Service: ${service()}",
+                "Launch: ${launch()}",
+                "Outbox: ${queued.ifEmpty { "empty" }}",
+                note.value,
+            ).joinToString("\n")
+        // Filed where decision 11 says: under a tap not yet answered, else the session.
+        unlock.isVisible = state?.emergencyUnlock(null) != null
+        tryAgain.isVisible = run == null && app.startFailed.value != null
+    }
+
+    private fun engine(running: Boolean): String =
+        when {
+            !running -> app.startFailed.value?.let { "start failed: $it" } ?: "not running"
+            app.signIn == null -> "over no token, as a signed-out phone: sign-in isn't set up, so nothing is sent"
+            else -> "over the sign-in"
+        }
+
+    private fun standing(state: SyncState?): String =
+        when (val stood = state?.standing) {
+            is Standing.InSession -> "${stood.state?.wire ?: "unknown"} until ${time(stood.session.endsAt)}"
+            Standing.Waiting -> "waiting for the teacher's Start" + (state.waitEnds?.let { ", until $it" } ?: ", no end kept")
+            Standing.Unread -> "not read from the phone yet — Emergency Unlock still works"
+            Standing.Out -> "in no session"
+            null -> "no engine"
+        }
+
+    /** What rule 3's check found, never the standing alone. */
+    private fun claim(claim: Protection?): String {
+        if (claim == null || !claim.checked) return "not checked yet"
+        val switch = "switch ${claim.switch.name.lowercase()}" + if (claim.switchedOff) ", judged off" else ""
+        val until = claim.until?.let { ", due until ${time(it)}" }.orEmpty()
+        return "$switch · ${if (claim.locked) "locked" else "not locked"}$until" + if (claim.unreported) " · protection off NOT recorded" else ""
+    }
+
+    /** The service as Android has it, and what Bali told it to hear; unbound, Bali hears no screen, so nothing checks in. */
+    private fun service(): String {
+        val listed = if (app.lock.listed()) "on Android's list" else "off Android's list"
+        val hears = mapOf(true to "the windows", false to "nothing")[app.lock.listening] ?: "nothing told yet"
+        return if (app.lock.service != null) "$listed, bound, listening to $hears" else "$listed, not bound: Bali hears no screen, so nothing checks in"
+    }
+
+    /** How long the switch read starting after this run's first read, against the grace (Q3): iOS's `PhoneScreenTime.launch`. */
+    private fun launch(): String {
+        val first = app.lock.firstRead ?: return "not read yet"
+        val (after, read) = app.lock.settled ?: return "starting for ${seconds(SystemClock.uptime() - first)} so far, off at ${seconds(Enforcer.GRACE)}"
+        return if (after.isZero) "${read.name.lowercase()} at the first read" else "starting for ${seconds(after)}, then ${read.name.lowercase()}"
+    }
+
+    /** Signs in as Sign in will, through the hosted UI's tab (AN6c); nothing opens while sign-in isn't set up. */
+    private suspend fun signingIn(): String {
+        val signIn = app.signIn ?: return "sign-in isn't set up in this build (the client id is empty until the owner's): nothing opened"
+        signIn.signIn { hostedUi(it) }
+        return "signed in"
+    }
+
+    private fun accessibility() =
+        try { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) } catch (none: ActivityNotFoundException) { note.value = "not opened: $none" }
+
+    /** A tap of the block [typed], through the engine, as the screens will record one. */
+    private suspend fun tapped(typed: String): String {
+        val engine = app.running.value?.engine ?: return "no engine: nothing recorded"
+        if (typed.isEmpty()) return "type a block's tag first"
+        return if (engine.record(Change.Tap(typed)) == null) "nothing new to send" else "recorded"
+    }
+
+    /** B5b's phone check: a tap not yet answered capped at 15 minutes, not 50, kept for the next start. */
+    private fun capped(on: Boolean) {
+        keep(this, on)
+        act {
+            app.running.value?.engine?.setTapCap(SHORT_CAP.takeIf { on })
+            "a tap not answered yet locks for ${if (on) 15 else 50} min"
+        }
+    }
+
+    /** Runs [trigger] in the app's scope, so a readout made again never cuts it short, and says how it went: iOS's `run`. */
+    private fun act(trigger: suspend () -> String) {
+        app.scope.launch { note.value = try { trigger() } catch (failed: Exception) { if (failed is CancellationException) throw failed else "failed: $failed" } }
+    }
+
+    private fun button(label: String, trigger: suspend () -> String) = Button(this).apply { text = label; setOnClickListener { act(trigger) } }
+
+    private fun row(vararg views: View) = LinearLayout(this).apply { views.forEach { addView(it, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f)) } }
+
+    private fun time(at: Instant): String = TIME.format(at.atZone(ZoneId.systemDefault()))
+
+    private fun seconds(span: Duration): String = String.format(Locale.ROOT, "%.1f s", span.toMillis() / 1000.0)
+
+    internal companion object {
+        /** B5b's phone check's cap on a tap not yet answered: iOS's floor, 15 minutes, not decision 7's 50. */
+        val SHORT_CAP: Duration = Duration.ofMinutes(15)
+
+        /** What the last trigger did: the process's, so a readout made again keeps it. */
+        val note = MutableStateFlow("")
+
+        /** The phone's own way of writing a time, with its seconds. */
+        val TIME: DateTimeFormatter = DateTimeFormatter.ofLocalizedTime(FormatStyle.MEDIUM)
+        private const val CAPPED = "capped"
+        private const val PAD = 32
+        private const val REDRAW = 1000L
+
+        /** The cap kept in the readout's own preferences, read at each start ([ThisBuild.starting]); none: decision 7's. */
+        fun cap(context: Context): Duration? = SHORT_CAP.takeIf { prefs(context).getBoolean(CAPPED, false) }
+
+        /** Keeps the readout's cap, [on] or not, for the next start. */
+        fun keep(context: Context, on: Boolean) = prefs(context).edit { putBoolean(CAPPED, on) }
+
+        private fun prefs(context: Context) = context.getSharedPreferences("readout", Context.MODE_PRIVATE)
+    }
+}

@@ -4,4 +4,5 @@
          word, which AS0's boards hold (docs/DECISIONS.md, 2026-11-05, Q1). -->
     <string name="lock_service_label">Bali lock (Debug)</string>
     <string name="lock_service_description">Debug build of Bali\'s lock, for testing on this phone.</string>
+    <string name="readout_label">Bali readout (Debug)</string>
 </resources>
