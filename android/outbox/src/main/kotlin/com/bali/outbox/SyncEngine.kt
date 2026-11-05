@@ -111,10 +111,7 @@ class SyncEngine private constructor(
     /** `ReconcileStamp.changes`: each change the phone makes, and each answer to one. */
     private var changes = 0
 
-    /**
-     * Whether the truth is to be read again ([reread]): at the read loop's next wake, and at each after
-     * until a read answers.
-     */
+    /** Whether the truth is to be read again ([reread]): at the read loop's next wake, and each after till one answers. */
     private var rereading = false
 
     /** Whether a fresh token was already tried since the last answer that wasn't a 401 ([heard]). */
@@ -123,16 +120,10 @@ class SyncEngine private constructor(
     /** The refresh under way, which every 401 heard while it runs shares: the drain's, a read's. */
     private var reauth: Deferred<Unit>? = null
 
-    /**
-     * Whether the screen is on, as the lock's service says (AN7): the read loop checks in every 30
-     * seconds while it is, and while it is off, never but once, as it goes off ([screenTurned]).
-     */
+    /** Whether the screen is on, as the lock's service says (AN7): the check-ins' 30 s ([setScreenOn]). */
     private var screenOn = false
 
-    /**
-     * Whether the screen went on or off since the read loop's last wake: its next wake checks in at once
-     * in a session, the screen's own check-in, and reads the truth out of one as it comes on.
-     */
+    /** Whether the screen went on or off since the read loop's last wake, whose check-in that is ([setScreenOn]). */
     private var screenTurned = false
 
     /** Rule 3's check of the lock, the lock's service's (AN7): [atEachWake]. */
@@ -332,16 +323,15 @@ class SyncEngine private constructor(
                     // Rule 3, with the engine let go: before the check-in, or the read of the truth in its
                     // place. A protection off it reports is a change, which the read's stamp then counts. One
                     // that throws verified nothing, so this wake claims nothing: no check-in.
-                    val checked =
-                        wake.checks &&
-                            hooked(false) {
-                                check?.invoke()
-                                true
-                            }
-                    when (val read = alone { reading(wake, checked) }) {
-                        null -> null
-                        is Read.Me -> client.me().let { alone { readMe(read.sent, it) } }
-                        is Read.CheckIn -> client.checkIn(read.session, CheckInRequest(read.at)).let { alone { checkedIn(read.sent, it) } }
+                    val checked = wake.checks && hooked(false) {
+                        check?.invoke()
+                        true
+                    }
+                    val read = alone { reading(wake, checked) }
+                    when {
+                        read == null -> null
+                        read.session == null -> client.me().let { alone { readMe(read.sent, it) } }
+                        else -> client.checkIn(read.session, CheckInRequest(read.at)).let { alone { checkedIn(read.sent, it) } }
                     }
                 } catch (cancelled: CancellationException) {
                     // Cancelled with its run, what it took is the next run's: iOS's no answer keeps its read.
@@ -356,28 +346,17 @@ class SyncEngine private constructor(
         }
     }
 
-    /**
-     * What a wake does, taken at its top: whether it reads the truth, whether it checks in, and whether
-     * that check-in is the screen's own, as it goes on or off, which goes before any read.
-     */
+    /** What a wake does, taken at its top: reads the truth, checks in, and whether that is the screen's own check-in. */
     private class Wake(val reads: Boolean, val checks: Boolean, val screen: Boolean)
 
-    /** What a wake sends, under the stamp [sent] of the phone's changes it was sent with (`readMayReconcile`). */
-    private sealed interface Read {
-        val sent: ReconcileStamp
-
-        /** `GET /v1/me`. */
-        class Me(override val sent: ReconcileStamp) : Read
-
-        /** The check-in of [session], made [at]. */
-        class CheckIn(override val sent: ReconcileStamp, val session: String, val at: Instant) : Read
-    }
+    /** A read a wake sends, made [at] under the stamp [sent]: [session]'s check-in, or, none, `GET /v1/me`. */
+    private class Read(val sent: ReconcileStamp, val at: Instant, val session: String? = null)
 
     /**
      * The top of a pass, which answers every ring made before it and takes what each rang for: where the
      * phone stood, read again while unread; whether the truth is read; and whether it checks in, rule 3's
-     * check first: while the screen is on, in a session or out (C1c), and, in a session, as it goes off.
-     * What a ring made after it rang for is the next pass's, so no pass wakes for nothing, an early
+     * check first: while the screen is on, in a session or out (C1c), and, in a session, as it goes on or
+     * off. What a ring made after it rang for is the next pass's, so no pass wakes for nothing, an early
      * check-in, where iOS's can.
      */
     private suspend fun wake(): Wake {
@@ -388,11 +367,8 @@ class SyncEngine private constructor(
         // check-in's cadence, so Home says when a class of theirs is in session (C3c); and out of one as the
         // screen comes on, as iOS's coming back reads it.
         val outInClass = screenOn && state.standing == Standing.Out && state.hasClasses == true
-        val wake =
-            Wake(
-                reads = rereading || outInClass || screenTurned && screenOn && !inSession,
-                checks = screenOn || screenTurned && inSession, screen = screenTurned && inSession,
-            )
+        val reads = rereading || outInClass || screenTurned && screenOn && !inSession
+        val wake = Wake(reads, checks = screenOn || screenTurned && inSession, screen = screenTurned && inSession)
         rereading = false
         screenTurned = false
         return wake
@@ -410,19 +386,18 @@ class SyncEngine private constructor(
             if (wake.reads) rereading = true
             return null
         }
-        val standing = state.standing
+        val session = (state.standing as? Standing.InSession)?.session?.id
         return when {
-            wake.screen && checked && standing is Standing.InSession ->
-                Read.CheckIn(sent, standing.session.id, clock.now()).also { if (wake.reads) reread() }
-            wake.reads -> Read.Me(sent)
-            checked && standing is Standing.InSession -> Read.CheckIn(sent, standing.session.id, clock.now())
+            wake.screen && checked && session != null -> Read(sent, clock.now(), session).also { if (wake.reads) reread() }
+            wake.reads -> Read(sent, clock.now())
+            checked && session != null -> Read(sent, clock.now(), session)
             else -> null
         }
     }
 
     /**
-     * `GET /v1/me`'s answer: the truth reconciled, its classes with it in the same step; none leaves
-     * them as they were, says why (rule 5), and is read again at the next wake.
+     * `GET /v1/me`'s answer: the truth reconciled, its classes in the same step; none says why (rule 5),
+     * and is read again at the next wake.
      */
     private suspend fun readMe(sent: ReconcileStamp, response: ApiResponse<MeResponse>): Deferred<Unit>? {
         val refreshing = heard(response.result, response.noAnswer)
@@ -497,8 +472,9 @@ class SyncEngine private constructor(
     private suspend fun reconcile(sent: ReconcileStamp, read: Standing, also: (SyncState) -> SyncState = { it }) {
         val now = stored { stamp() }.getOrNull()
         val applies = now != null && readMayReconcile(sent, now)
-        val keeps = if (applies && read is Standing.InSession && read.state == ParticipationState.Focused) keepsUnlocked(read.session.id) else false
-        val standing = if (keeps != false && read is Standing.InSession) read.copy(state = ParticipationState.Unlocked) else read
+        val focus = (read as? Standing.InSession)?.takeIf { applies && it.state == ParticipationState.Focused }
+        val keeps = if (focus != null) keepsUnlocked(focus.session.id) else false
+        val standing = if (keeps == false) read else focus?.copy(state = ParticipationState.Unlocked) ?: read
         update { also(if (applies) it.copy(standing = standing) else it) }
         // Shown after that step, as `answered` shows its own.
         if (keeps == null) failed()
@@ -572,11 +548,9 @@ class SyncEngine private constructor(
 
     /**
      * The screen went on, or off, as the lock's service hears it (AN7; ARCHITECTURE, the battery plan):
-     * one check-in at once in a session, rule 3's check before it, or, out of one as it comes on, the
-     * truth read at once. Then, while it is on, a check-in every 30 seconds, the check at each wake;
-     * while it is off, nothing. The drain looks again too, as iOS's coming back has it: a backoff the
-     * phone's sleep stretched may be over. Its caller cancelled, it stops waiting, and goes on all the
-     * same.
+     * a check-in at once in a session, or, out of one as it comes on, the truth read; while it is on, a
+     * check-in every 30 seconds, rule 3's check at each wake; while off, nothing. The drain looks again,
+     * as on iOS: a phone's sleep stretches a backoff. Its caller cancelled, it goes on all the same.
      */
     suspend fun setScreenOn(on: Boolean) =
         call {
@@ -587,9 +561,8 @@ class SyncEngine private constructor(
         }
 
     /**
-     * Bali's own screen came to the front, or went behind. In front, the truth is read at once, as iOS's
-     * coming back reads it; behind, no reason is coming, so an unlock held for one goes now (C5a). Its
-     * caller cancelled, it stops waiting, and goes on all the same.
+     * Bali's own screen came to the front, its truth read at once as iOS's coming back reads it, or went
+     * behind: no reason is coming, so an unlock held for one goes now (C5a). Its caller cancelled, it goes on.
      */
     suspend fun setInFront(front: Boolean) =
         call {
@@ -598,10 +571,9 @@ class SyncEngine private constructor(
         }
 
     /**
-     * Runs [check] at each wake of the read loop while the screen is on, before each check-in and out of
-     * a session too (C1c), and before the check-in its going on or off sends: rule 3's check of the lock,
-     * the lock's service's (AN7), run with the engine let go, so it may record what it finds. It never
-     * throws, as Swift's type promises; one that does checked nothing, so that wake sends no check-in.
+     * Runs [check], rule 3's check of the lock (AN7's), before each check-in, and at each wake while the
+     * screen is on, out of a session too (C1c), with the engine let go, so it may record what it finds. It
+     * never throws, as Swift's type promises; one that does checked nothing: that wake sends no check-in.
      */
     suspend fun atEachWake(check: suspend () -> Unit) = call { this.check = check }
 
@@ -655,10 +627,9 @@ class SyncEngine private constructor(
      * Any answer, or none, for [SyncState.link], and when the server last answered; any status but a 401
      * ends a rejection ([refreshed]). A 401 is sign-in's: once per rejection, [refresh] giving a fresh
      * token sends everything again at once; a fresh token refused too waits out the backoff, or for the
-     * sign-in's [retryNow]; a refresh that gives none is asked again at the next 401, a backoff later.
-     * Returns that refresh, started here or the one under way, which every 401 heard meanwhile shares:
-     * its caller waits for it with the engine let go, as Swift's `heard` waits for it, after a stretch
-     * that has nothing of a 401's to apply.
+     * sign-in's [retryNow]; one that gives none is asked again at the next 401. Returns that refresh,
+     * started here or shared, for its caller to wait for with the engine let go, after a stretch that has
+     * nothing of a 401's to apply, where Swift waits in `heard`.
      */
     private suspend fun heard(result: SendResult, noAnswer: NoAnswer?): Deferred<Unit>? {
         if (result !is SendResult.Status) {
@@ -682,10 +653,9 @@ class SyncEngine private constructor(
     }
 
     /**
-     * What a hook of the app's gives ([refresh], rule 3's check), or [none] when it throws, or ends in a
-     * cancel of its own (a timeout inside it, say), so no hook ends a loop or holds a refresh under way
-     * for good: each promises never to, as Swift's types do, and a phone that waits on sign-in, or claims
-     * nothing it couldn't check, shows it. Its caller's own cancel still ends it.
+     * What a hook of the app's gives ([refresh], rule 3's check), or [none] when it throws or ends in a
+     * cancel of its own (a timeout in it), though each promises not to: no hook ends a loop or leaves a
+     * refresh under way for good. Its caller's own cancel still ends it.
      */
     private suspend fun <T> hooked(none: T, hook: suspend () -> T): T =
         try {

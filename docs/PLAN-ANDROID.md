@@ -16,14 +16,14 @@ structure", decided at AN1b (2026-11-04).
 
 _Last updated: 2026-11-04 (Central) — AN5c, the sync engine's read loop (#NNN; `docs/DECISIONS.md`,
 2026-11-04): BaliOutbox's `SyncEngine` in Kotlin, its reads, with their tests: a check-in every 30 s
-while the screen is on, the truth read as it comes on and one check-in as it goes off, rule 3's check
-before each; each read applied only as the reconcile says; the unlock guard on every read and answer,
-a failed read of it shown after the step it guards; a 401's refresh, once per rejection, shared by
-both loops; a refused change shown; protection off reported again; and `me`, its failure and its
-reads. Bali's own screen going behind sends a held unlock at once. Before it, AN5b, the drain. Next:
-AN5d, the wait for the Start; Android 17's SDK platform for the owner to OK before the first step
-with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the owner has
-the phones. Not on the pilot's critical path._
+while the screen is on and one as it comes on or goes off, out of a session the truth read as it
+comes on, rule 3's check before each; each read applied only as the reconcile says; the unlock guard
+on every read and answer, a failed read of it shown after the step it guards; a 401's refresh, once
+per rejection, shared by both loops; a refused change shown; protection off reported again; and
+`me`, its failure and its reads. Bali's own screen going behind sends a held unlock at once. Before
+it, AN5b, the drain. Next: AN5d, the wait for the Start; Android 17's SDK platform for the owner to
+OK before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's
+part 2 once the owner has the phones. Not on the pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.

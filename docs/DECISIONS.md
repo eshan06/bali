@@ -25,17 +25,23 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `reading`, `readMe`, `checkedIn`, `nextRead`), `readStanding`, `standing(me)` but its wait for the
   Start (AN5d's), `reconcile` over core's `readMayReconcile`, the unlock guard (`keepsUnlocked`) in
   `reconcile` and in `answered`, `stamp`, `heard`'s refresh (`reauth`, `reauthed`), the refusal shown
-  (`Refusal`), `record`'s report again, `setScreenOn`, `setInFront`, `atEachWake` and
-  `CHECK_IN_INTERVAL`; and `SyncState`'s `refused`, `me`, `meFailed`, `meReads` and `hasClasses`.
+  (`Refusal`), `record`'s report again, `setScreenOn`, `setInFront`, `atEachWake`, the app's hooks
+  guarded (`hooked`) and `CHECK_IN_INTERVAL`; and `SyncState`'s `refused`, `me`, `meFailed`, `meReads`
+  and `hasClasses`.
   AN5a's pattern holds: each stretch Swift runs between two `await`s holds the lock, and the sends,
   the refresh and rule 3's check alone let go of it. Where Kotlin differs, said plainly:
-  - **The check-ins follow the screen, not the app** (ARCHITECTURE, the battery plan; AN5c's line).
-    `setScreenOn`, the lock's service's (AN7): on, the truth read at once, then a check-in every 30 s,
-    rule 3's check at each wake, out of a session too (C1c); off, one check-in in a session, rule 3's
-    check before it, since every check-in verifies what it claims (rule 3), then nothing until it is
-    on again; out of a session, nothing at all. The battery plan's "once as it comes on" is that read
-    of the truth, as an iPhone coming to the front reads it, its first check-in 30 s later (the
-    conductor's reading of the line).
+  - **The check-ins follow the screen, not the app** (ARCHITECTURE, the battery plan). `setScreenOn`,
+    the lock's service's (AN7): going on or off, one check-in at once in a session, rule 3's check
+    before it, since every check-in verifies what it claims (rule 3); out of a session, the truth read
+    at once as it comes on, as an iPhone coming to the front reads it, and nothing as it goes off.
+    While it is on, a check-in every 30 s, the check at each wake, out of a session too (C1c); while
+    it is off, nothing. The screen's own check-in goes before a read asked for, which goes at once
+    after it. The battery plan's words, the owner's call ("once as it goes off and once as it comes
+    on"), win where AN5c's line said "a read at once": a check-in is a read of the truth too (the
+    reconcile's), and only a check-in stamps the grid's `last_seen_at`, so a phone woken after 90 s
+    asleep comes back on the grid at once, not 30 s later (santa's review; first built as the read).
+    The drain looks again too as the screen goes on or off, as iOS's coming back has it: on a phone a
+    backoff's wait counts no deep sleep, so a record due by the clock goes at once (santa's review).
   - **Bali's own screen (`setInFront`):** behind, an unlock held for its reason goes at once (C5a), as
     iOS's going behind sends it; in front, the truth is read at once, as iOS's coming back reads it
     (the conductor's call: with the screen already on, nothing else reads `me` out of a class).
@@ -49,8 +55,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
     apply, so the state it leaves is the same. One refresh at a time, which every 401 heard while it
     runs shares, in the engine's scope, so a loop cancelled while it waits leaves it to end for the
     other; its end is a stretch of its own (`reauthed`), which lets go of it, where Swift's lets go in
-    whichever waiter resumes first. A refresh that throws reads as none, the phone shown waiting on
-    sign-in, though `open`'s doc now says it never throws.
+    whichever waiter resumes first. A refresh that throws, or ends in a cancel of its own (a timeout
+    inside it, say), gives no token, the phone shown waiting on sign-in, and its end runs all the
+    same, so none is left under way for every later 401 to wait on, which would end the loops
+    (santa's review). `open`'s doc now says it never throws, as Swift's type promises.
   - **The unlock guard's failed read is shown after the step it guards, never before** (#500's
     worker found the order): in `answered`, iOS shows it, then its state step, copied before the
     failure, hides it again, the phone left unlocked and nothing said. Android takes the step first,
@@ -59,15 +67,21 @@ a real decision? Add a dated entry at the top: what was decided and why.
   - **`answered` asks the guard only of an answer that applies;** Swift asks it of every focus named,
     and uses it only when one applies.
   - **The check (`atEachWake`) is read under the lock and run with it let go;** it never throws, as
-    Swift's type promises.
+    Swift's type promises, and one that throws, or ends in a cancel of its own, checked nothing: that
+    wake sends no check-in (rule 3), and the loop goes on (santa's review).
+  - **A run cancelled mid-pass leaves what the pass took to the next run,** the read asked for and the
+    screen's check-in, as iOS's no answer keeps its read (santa's review).
   - **Seams, as the split has them:** a read's `me` applies even if the phone changed it meanwhile,
     until AN9's `meChanges`; no read hold (AN12); no 13+ yes, `ageAgain`, deletion or `counted` (AN9).
 
   **For AN5d:** a waiting phone's reads join `wake`'s, at the top of the pass, beside the read out of
-  a session in a class; `standing(me)`'s wait and `readStanding`'s arming are yours. **For AN7:**
-  `setScreenOn` and `atEachWake` are the service's hooks; the check runs with the engine let go, so it
-  may record what it finds. **Left as it was: the drain's no-token path,** so AN5b's note for AN5e
-  stands.
+  a session in a class; `standing(me)`'s wait and `readStanding`'s arming are yours. **For AN5e:**
+  `keepsUnlocked` takes a phone focused there already as returned, which holds only while nothing
+  brings focus back past the guard, so `record`'s lock back on must return to `offFrom` or, not known,
+  pass the guard (#167, as iOS's does) before AN7 records one; its doc says so (santa's review).
+  **For AN7:** `setScreenOn` and `atEachWake` are the service's hooks; the check runs with the engine
+  let go, so it may record what it finds. **Left as it was: the drain's no-token path,** so AN5b's
+  note for AN5e stands.
 
   **The tests:** DrainTests' `reauth`, `reauthFails` (AN5b's 401 test, extended),
   `retryNowEndsRejection`, `sharedRefresh` (and nothing sent with the old token, the backoff over,
@@ -76,16 +90,21 @@ a real decision? Add a dated entry at the top: what was decided and why.
   StaleReadTests' `readBeforeChange`, `readWhileAwaiting`, `unlockGuard` and
   `refocusAfterStuckUnlock`; ClassesTests' `classes`, `failed`, `outReads`, `classesOverStaleStanding`
   and `outTakesPastSession`; StandingKeptTests' `unread`, which first pins the engine's own `Unread`
-  check in `update` (AN5a's note), `unreadSettled`, and `checkAtEachWake` set to the screen; and the
+  check in `update` (AN5a's note), `unreadSettled`, and `checkAtEachWake` set to the screen; the rig's
+  `screenOn`, iOS's `foreground`, answering the check-in in a session where iOS's reads the truth; and the
   engine's half of ProtectionOffTests' `reportedAgain` and `onlyFocusAgain`. New: the screen going off
   checking in once in a session, rule 3's check and the report it makes first, then nothing, and out
-  of a session nothing at all; a read asked for while a wake runs, the next wake's, with no early
-  check-in after it; Bali's screen going behind sending a held unlock; the unlock guard, against an
-  answer naming focus and then a read, over an Emergency Unlock the server refused, one stuck after 8
-  answers, and one made where the phone stood unread, which the answer files there; and a failed read
-  inside the guard, the phone unlocked and the failure still showing after the step. The rig's driver
-  watches each statement's step (Room keeps the statements it prepares on their connection, so a
-  step, not a prepare, is each use), and that test refuses the guard's read alone.
+  of a session nothing at all; its own check-in going before a read asked for, the read at once
+  after; its coming on ringing the drain; a read asked for while a wake runs, the next wake's, with
+  no early check-in after it; Bali's screen going behind sending a held unlock; the unlock guard,
+  against an answer naming focus and then a read, over an Emergency Unlock the server refused, one
+  stuck after 8 answers, and one made where the phone stood unread, which the answer files there; a
+  re-tap after a stuck unlock, the student's own return, locking again; a failed read inside the
+  guard, the phone unlocked and the failure still showing after the step; a refresh, and a check,
+  that throws or ends in a cancel of its own; a run cancelled while its read is on its way; and a
+  read asked for while the stamp can't be read. The rig's driver watches each statement's step (Room
+  keeps the statements it prepares on their connection, so a step, not a prepare, is each use), and
+  the failed read's test refuses the guard's read alone.
 
   Tried, each failing by name, then reverted: the guard left out of `answered` (4 tests), and out of
   `reconcile` (4); iOS's order, the failure shown, then hidden by the state copied before it, and the
@@ -98,8 +117,24 @@ a real decision? Add a dated entry at the top: what was decided and why.
   (`outReads`); a check-in's 404 not read again (`checkInGone`); every read applied, stale or not
   (`readWhileAwaiting`, `classesOverStaleStanding`; `readBeforeChange` passes, the guard holding there
   too); a read with no answer not tried again (2), and a read never counted (`failed`); the read
-  taken after rule 3's check, as iOS takes it (the early check-in's test); and going behind sending
-  no held unlock. Nothing was added to the PC's SDK: its folders were compared before and after.
+  taken after rule 3's check, as iOS takes it (the early check-in's test); going behind sending no
+  held unlock; and, for santa's fixes, the screen coming on reading the truth in a session (`cadence`),
+  a read asked for going before the screen's check-in, the drain left be as the screen comes on, a
+  refresh's own cancel left under way, a check left unguarded, a cancelled run's read lost, a read
+  lost when the stamp can't be read, and a return's own order ignored (each its own test). Nothing
+  was added to the PC's SDK: its folders were compared before and after.
+
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini
+  CLI on this PC, so context isolation holds and model diversity doesn't): 0 blockers. Their WARNs:
+  the screen coming on read the truth where the battery plan checks in, so a woken phone's tile
+  stayed silent up to 30 s longer, and a read pending as it went off took its check-in's place (both:
+  fixed, above); a refresh ending in a cancel of its own left under way for good, every later 401
+  then ending the loops, and a check that throws ending them too (both: fixed, `hooked`); a run
+  cancelled mid-pass losing the read it took (both: fixed); the screen coming on leaving the drain be
+  (fixed); no test of a return's own order in the guard (fixed: the re-tap's), nor of the read kept
+  when the stamp can't be read (fixed); `keepsUnlocked`'s focused shortcut needing the lock back on
+  to pass the guard (iOS's caveat now in its doc; For AN5e, above); and the PR's number not yet in
+  the docs (filled in).
 
   **The proof:** `Outbox.open` and `android/app` are unchanged, so the JVM tests are the proof, and no
   emulator ran.
