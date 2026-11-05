@@ -69,6 +69,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   **Said plainly:** the portal's posts spend the teacher's account budget too, beside its polls,
   so A3b posts once per action, never on a timer.
 
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort, Reviewer B as an
+  attacker (Codex refuses every model with this Mac's ChatGPT account, so both were Claude: context
+  isolation held, model diversity didn't): 0 blockers. Their WARNs, each fixed: the limiter's
+  memory note counted six budgets, now seven; and PLAN's lines wanted the PR's number.
+
 - **2026-11-04** — **A2, the server sends PostHog a class's totals; and the iPhone app's privacy
   manifest gives Other Data Types the purpose Analytics (the owner's pick, "Yes, add it"; A2,
   #514).** The owner answered the call A5's entry ("PostHog: the owner's four rulings", below) left

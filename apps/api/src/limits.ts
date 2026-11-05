@@ -87,7 +87,7 @@ export interface Bucket {
 /**
  * The most keys one budget holds at once (Phase 6 S3). Without a cap, a flood of distinct keys —
  * addresses, say — would grow the map until the next sweep, a full refill's time away. A key
- * takes well under a kilobyte, so six budgets at the cap stay within tens of megabytes.
+ * takes well under a kilobyte, so seven budgets at the cap stay within tens of megabytes.
  */
 export const MAX_KEYS = 100_000;
 
