@@ -136,6 +136,24 @@ a real decision? Add a dated entry at the top: what was decided and why.
   to pass the guard (iOS's caveat now in its doc; For AN5e, above); and the PR's number not yet in
   the docs (filled in).
 
+  **CI's crash on #504, the test rig's, not the engine's (the conductor asked for the cause, not a
+  re-run):** the JVM died inside the bundled SQLite (`sqlite3WhereBegin`, a statement being prepared)
+  11 s into the outbox's tests. A driver that reports a connection used by two threads at once, or
+  after its close, caught it on CI's Linux in one of six runs of the suite: as `SyncEngineTest`'s
+  queue-read test ended, the rig's `Relaunches` was still opening a relaunch, reading `reportedOff`
+  (a `SELECT … WHERE` being prepared), while the teardown closed that outbox on the test's thread.
+  Room's `close` closes a connection still in use, and the bundled driver checks for a closed one
+  with a plain flag, no lock, so the two threads met inside SQLite. The relaunch was set off by one of Room's own commits
+  (its invalidation tracker's, on a thread of its own), which the teardown never waited for. Only a
+  test can do this: the app opens the outbox once and never closes it (`OutboxFile.kt`), so the
+  engine is unchanged. The fix is the rig's: turning `watching` off now waits for a relaunch being
+  opened, and the teardown turns every relaunch off, ends the engines' loops, and waits for every
+  call an engine still runs, its caller gone, before the files close. `TeardownTest`'s two tests fail
+  on the old rig (the reporting driver saw the second's write land on a closed connection) and pass
+  on the new; the reporting driver and the repeated runs were the diagnosis's, and are gone. For
+  whichever step first closes the outbox in the app: stop everything that can still read it first,
+  since Room won't wait.
+
   **The proof:** `Outbox.open` and `android/app` are unchanged, so the JVM tests are the proof, and no
   emulator ran.
 

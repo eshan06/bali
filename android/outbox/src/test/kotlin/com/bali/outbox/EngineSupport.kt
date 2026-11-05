@@ -38,12 +38,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.job
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -318,6 +321,7 @@ abstract class EngineFiles : OutboxFiles() {
     /** The scope the app gives its engine, here the test's. */
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val rigs = mutableListOf<Rig>()
+    private val relaunched = mutableListOf<Relaunches>()
 
     /** An engine over [outbox], never run: what a launch starts from. */
     suspend fun engine(outbox: Outbox): SyncEngine = SyncEngine.open(outbox, client(Server()), scope, TestClock())
@@ -331,21 +335,27 @@ abstract class EngineFiles : OutboxFiles() {
 
     /**
      * [file]'s outbox, watched: at each commit to it, [Relaunches] opens the engine the next launch
-     * would, over an outbox of its own, opened here before anything it watches.
+     * would, over an outbox of its own, over [driver], opened here before anything it watches.
      */
-    suspend fun relaunching(file: File): Pair<Outbox, Relaunches> {
-        val relaunches = Relaunches(open(file))
+    suspend fun relaunching(file: File, driver: SQLiteDriver = BundledSQLiteDriver()): Pair<Outbox, Relaunches> {
+        val relaunches = Relaunches(open(file, driver = driver)).also { relaunched += it }
         val outbox = open(file, driver = relaunches.driver)
         outbox.records()
         relaunches.file.records()
         return outbox to relaunches
     }
 
+    /**
+     * Ends everything that reads or writes the test's outboxes before [deleteFiles] closes them
+     * ([TeardownTest]): the relaunches, the engines' loops, and every call an engine still runs, its
+     * caller gone.
+     */
     @AfterTest
     fun stopEngines(): Unit =
         runBlocking {
+            relaunched.forEach { it.watching = false }
             rigs.forEach { it.stop() }
-            scope.cancel()
+            withTimeoutOrNull(patience) { scope.coroutineContext.job.cancelAndJoin() } ?: fail("the engines' calls never ended")
         }
 }
 
@@ -359,16 +369,20 @@ class Relaunches(val file: Outbox) {
     private val started = mutableListOf<SyncEngine>()
     private val scope = CoroutineScope(Job())
 
-    @Volatile var watching = false
+    /**
+     * Turned off, it waits for a relaunch being opened: none reads [file] after. Room's own commits,
+     * on threads of their own, can set one off after the test goes on.
+     */
+    var watching = false
+        set(value) = synchronized(started) { field = value }
 
     val engines: List<SyncEngine> get() = synchronized(started) { started.toList() }
 
     val driver: SQLiteDriver =
         Watching(
             committed = {
-                if (watching) {
-                    val engine = runBlocking { SyncEngine.open(file, client(Server()), scope) }
-                    synchronized(started) { started += engine }
+                synchronized(started) {
+                    if (watching) started += runBlocking { SyncEngine.open(file, client(Server()), scope) }
                 }
             },
         )
@@ -486,6 +500,56 @@ class TestClockTest {
             val ended = withTimeoutOrNull(5.seconds) { sleeper.join() } != null
             if (!ended) clock.releaseWakes()
             assertTrue(ended && threw, "the cancelled sleep ended, throwing")
+        }
+}
+
+/**
+ * The rig's teardown: nothing reads or writes a test's outbox as [OutboxFiles.deleteFiles] closes it.
+ * Room closes a connection still in use, and the bundled SQLite, used from two threads at once,
+ * crashed CI's JVM (#504). No iOS twin.
+ */
+class TeardownTest : EngineFiles() {
+    @Test
+    fun itWaitsForARelaunchBeingOpenedOverTheFileItClosesWhichRoomsOwnCommitsCanSetOffAsTheTestEnds(): Unit =
+        runBlocking {
+            val reading = CompletableDeferred<Unit>()
+            val released = CountDownLatch(1)
+            val holding = AtomicBoolean(false)
+            val hold: (String) -> Unit = {
+                if (holding.compareAndSet(true, false)) {
+                    reading.complete(Unit)
+                    released.await(patience.inWholeMilliseconds, TimeUnit.MILLISECONDS)
+                }
+            }
+            val (outbox, relaunches) = relaunching(temporaryFile(), driver = Watching(stepping = hold))
+            relaunches.watching = true
+            holding.set(true)
+            // The commit opens a relaunch, held reading the file the teardown closes.
+            val write = launch(Dispatchers.IO) { outbox.keep(Standing.Out) }
+            withTimeoutOrNull(patience) { reading.await() } ?: fail("no relaunch read the file")
+            val teardown = launch(Dispatchers.IO) { stopEngines() }
+            delay(200)
+            val waited = teardown.isActive
+            released.countDown()
+            withTimeout(patience) { joinAll(write, teardown) }
+            assertTrue(waited, "the teardown went on while a relaunch read the file it closes")
+        }
+
+    @Test
+    fun itWaitsForAnEngineCallItsCallerLeftWhileItsWriteIsStillUnderWay(): Unit =
+        runBlocking {
+            val held = HeldWrite()
+            val engine = engine(open(temporaryFile(), driver = Watching(began = held.hold)))
+            held.arm()
+            val caller = launch { engine.record(Change.Tap("tag")) }
+            held.began()
+            caller.cancel()
+            val teardown = launch(Dispatchers.IO) { stopEngines() }
+            delay(200)
+            val waited = teardown.isActive
+            held.release()
+            withTimeout(patience) { teardown.join() }
+            assertTrue(waited, "the teardown went on while an engine call wrote the file it closes")
         }
 }
 
