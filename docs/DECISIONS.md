@@ -8,6 +8,84 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-05** — **A4, `/privacy` names PostHog (the worker's calls, awaiting the owner; A4,
+  #527).** The page's words for ARCHITECTURE's "Analytics (PostHog)" (A1, A5, A2, A3a, A3b), in
+  place on the approved page: no new section, layout, component or state, so no board. Section 1's
+  part "Automatically, from the portal and our servers" gains **Usage counts** after Error reports:
+  the server's two kinds of counts, each listed (a session's events and totals, its unlocks one
+  number; the teacher actions of `PORTAL_EVENTS`), every count filed under a teacher's Bali ID,
+  what PostHog never gets, the counts said plainly as one or two students' own numbers when a
+  class has only one or two or only one or two tap in, only the server talking to PostHog (no
+  PostHog script or cookie in the portal, nothing from the iPhone app, never a user's IP
+  address), the 1 year, that a deletion or a disposal doesn't remove them sooner, and each
+  teacher's ID outlasting them. Its first item's "No cookies for tracking, no analytics, no ads."
+  is now "No tracking cookies and no ads.", and the short version's "or use tracking or
+  advertising tools" is "or use advertising tools or tracking cookies": what still holds. Section
+  4 lists PostHog after Sentry. The lines A2–A3b made false or left short now say the counts: the
+  short version's and section 5's "only" uses of class records (section 5's now "apart from the
+  usage counts in section 1"), section 3's uses, section 6's disposal and its last line, section
+  7's student list and teacher paragraph, and section 9's encryption. The date moves to November
+  5, 2026, as section 11 promises of any change. `TEACHER_SEES`, `TEACHER_NEVER_SEES` and
+  `PolicyDraft` needed no change.
+
+  **The retention figure, 1 year:** PostHog's free plan's ("All projects on the Free plan have a
+  1-year retention period", its docs' "Events retention"; its pricing page, 1 year free and 7 years
+  paid; both read 2026-11-05). Which plan the project "Bali production" is on couldn't be read here
+  (PostHog's MCP needs the owner's sign-in, and no doc records it), so the page's 1 year is the
+  owner's to make true before the key: the free plan as it is, or a paid plan with the project's
+  events retention set to 1 year (Settings, Project, Product analytics; paid plans only). Expired
+  events go in batches ("may be deleted at any point", "not automatically deleted as soon as they
+  expire"), so the page says "though not always right away". Over "up to 7 years", which would hold
+  on either plan but say six years more than the free plan keeps.
+
+  **Encryption:** PostHog joins section 9's "encrypt the data they store for us" on a control its
+  Trust Center lists, "Encryption-at-rest" (trust.posthog.com, read 2026-11-05), as Railway's rests
+  on its staff and Trust Center (the lawyer's note 5).
+
+  **Said plainly:**
+  - PostHog's person profiles fall outside its events retention ("kept until deleted", the same
+    page): the server's captures are identified events by default, so each teacher's Bali ID stays
+    at PostHog as a profile with no properties after their events go, and the page says so ("Each
+    teacher's ID stays at PostHog even after their counts are deleted."). Sending
+    `$process_person_profile: false` would stop it, an API change for a later step, if the owner
+    wants it; that sentence then goes.
+  - Section 11 promises that a change that matters, "such as collecting something new", is said in
+    the app and on the portal before it applies. The teacher actions are new: whether to say so
+    before the key is set is the owner's call; this PR says it on `/privacy` alone.
+  - Section 6's "We back up the database every day and every week", section 4's "backups" and
+    section 7's "Backups age out" have been untrue since the owner's ruling of 2026-11-03 (no
+    production backups for the Vanderbilt pilot): not this step's to change, left for the owner.
+  - Section 5's "apart from the usage counts in section 1" is the worker's wording, a FERPA reading
+    for the lawyer (their note 10, with one or two students' totals, a deleted teacher's actions
+    and section 3's "no profiling").
+
+  **Tests** (`app/policy-pages.test.tsx`, driven in jsdom): the short version whole, section 1's
+  leads, Usage counts' words whole, every `PORTAL_EVENTS` name in them (a `Record` of each one's
+  words, so a new event fails to typecheck until the policy names it), PostHog after Sentry among
+  the providers, the changed lines of sections 3, 5, 6, 7 and 9, and no "no analytics" anywhere.
+  Tried, each failing by name, then reverted: the old lead put back, PostHog dropped from the
+  providers, a teacher action dropped from Usage counts, and "until it deletes them" dropped from
+  sections 6 and 7. No source-text test touched: the list stays at 28.
+
+  **Santa's review:** two Claude Opus reviewers at max effort, Reviewer B as an attacker (Codex
+  refuses every model with this Mac's ChatGPT account, so context isolation held and model
+  diversity didn't). Round 1: one blocker, both reviewers, fixed. The draft put the weak spot as "a
+  class of one or two students", but a session's focus minutes and unlocks add up only the students
+  who tapped in (`sessionReport`'s `joined`, the totals A2 sends), so a class of 20 with one
+  student in sends that student's own numbers. Sections 1 and 7 and the lawyer's note 10 now say it
+  by who tapped in, beside a class of one or two (whose enrolled and tapped-in counts show whether
+  each tapped in; round 2's WARN), and ARCHITECTURE's section with them. Their WARNs: the person
+  profile (above), now on the page and in ARCHITECTURE; "already sent" dropped from sections 6
+  and 7, since a session running at a deletion or a disposal still sends its totals at its end
+  (Reviewer A); and three left as they are: the 1 year and section 11, the
+  owner's, and the server's own properties, which no test holds to the page as `SAID` holds
+  `PORTAL_EVENTS` (they live in the API, outside this step; its own tests pin them with `toEqual`).
+  Reviewer B's note that a total of none, or everyone tapped in, also tells about each student
+  holds for any total, so the page doesn't list it. Round 2, two fresh reviewers on the fixes: no
+  blockers, every WARN left holding as one; their WARNs, each fixed in place: a class of one or
+  two put back beside the turnout, ARCHITECTURE's wording by class size matched to the page's,
+  and PLAN's key line naming section 11's notice beside the 1 year.
+
 - **2026-11-05** — **A3b, the portal counts a teacher's actions through `POST /v1/me/actions` (the
   worker's calls, awaiting the owner; A3b, #525).** The portal's half of A3a's relay (the entry "A3a,
   the server's endpoint for the portal's teacher actions", below): no API, `packages/shared` or CSP
