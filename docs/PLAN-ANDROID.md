@@ -14,7 +14,7 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-04 (Central) — AN6a, sign-in's parts (#514; `docs/DECISIONS.md`,
+_Last updated: 2026-11-04 (Central) — AN6a, sign-in's parts (#515; `docs/DECISIONS.md`,
 2026-11-04): BaliCore's `SignIn.swift` in Kotlin from its top through `Tokens`, with its tests: the
 hosted UI's address with PKCE, its secrets from `SecureRandom`; the answer's code only at the
 redirect URI and only for its attempt, read with `java.net.URI`, a `+` kept; and the tokens' kept
@@ -140,7 +140,7 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN5c** The engine's read loop — ✅ (#504; DECISIONS 2026-11-04)
 - **AN5d** The engine's wait for the Start — ✅ (#507; DECISIONS 2026-11-04)
 - **AN5e** Emergency Unlock in the engine — ✅ (#510; DECISIONS 2026-11-04)
-- **AN6a** Sign-in's parts — ✅ (#514; DECISIONS 2026-11-04)
+- **AN6a** Sign-in's parts — ✅ (#515; DECISIONS 2026-11-04)
 - **AN6b** Sign-in itself (twin: `SignIn` but `deleteUser`, AN9's, and `TokenStore`'s protocol),
   JVM-tested with a fake store and a fake browser: the sign-in over the browser seam, the answer
   handed over as text (AN6a); `accessToken`, which never throws (a throw stops the drain every run);

@@ -9,7 +9,7 @@ touching before changing how something works. A pointer of the form
 a real decision? Add a dated entry at the top: what was decided and why.
 
 - **2026-11-04** — **AN6a, sign-in's parts: BaliCore's `SignIn.swift` in Kotlin, from its top
-  through `Tokens` (the conductor's calls, awaiting the owner's look; AN6a, #514).** The owner isn't
+  through `Tokens` (the conductor's calls, awaiting the owner's look; AN6a, #515).** The owner isn't
   reviewing each step and asked for the recommended option on every question, so each call here is
   the conductor's, for the owner to look at.
 
