@@ -172,7 +172,12 @@ class SignInBrowserTest {
         tab()
         val host = host()
         covered(host)
+        val chrome = until { keysGoTo()?.takeIf { CHROME in it } }
         changed {
+            // Chrome makes its window again for the change, a moment after the shell returns, and a Back the input
+            // dispatcher sends the old one meanwhile is lost (logcat: no input channel; on a fresh Android 16 at AN7d,
+            // the race AN7c named): the Back goes once keys go to Chrome's new window.
+            until { keysGoTo()?.takeIf { CHROME in it && it != chrome } }
             shell("input keyevent 4")
             assertSame(SignInError.Cancelled, await(call).exceptionOrNull())
             assertNotSame(host, until { hosts.lastActivity?.takeIf { it !== host } })
@@ -268,6 +273,9 @@ class SignInBrowserTest {
         }
     }
 
+    /** The window the input dispatcher sends keys to now, as `dumpsys input` names it: its own id, then its app and activity. */
+    private fun keysGoTo(): String? = Regex("""FocusedWindows:\s+displayId=0, name='([^']+)'""").find(shell("dumpsys input"))?.groupValues?.get(1)
+
     private fun <T> await(deferred: Deferred<T>): T = runBlocking { withTimeout(PATIENCE) { deferred.await() } }
 
     /** [value]'s first answer, asked until it gives one; a test that never gets one fails, never hangs. */
@@ -288,5 +296,8 @@ class SignInBrowserTest {
 
     private companion object {
         val PATIENCE = 30.seconds.inWholeMilliseconds
+
+        /** Chrome's windows, as the input dispatcher names them. */
+        const val CHROME = " com.android.chrome/"
     }
 }
