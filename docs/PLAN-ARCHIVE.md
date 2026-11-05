@@ -10,6 +10,14 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-11-04 (Central) — WC3 (#508; `docs/DECISIONS.md`, 2026-11-04): the third of
+eight steps making the owner's Android cuts on the iPhone and the student web: Focus and Home's hold
+lose their lines; the block screen keeps only the owner's. Before it, WC2 (#506). Next: WC4; A2–A4;
+the owner's call on Other Data Types' purpose; a session builds the retire-a-block command; the
+owner the new build, with A5, and the sitting; the owner's call on GA5's known limit, the smallest
+iPhones (DECISIONS 2026-11-02); AN5e, Android's Emergency Unlock; AN1's part 2 once the owner has
+the phones; the audit's polish waits, as ruled._
+
 _Last updated: 2026-11-04 (Central) — WC2 (#506; `docs/DECISIONS.md`, 2026-11-04): the second of
 the eight steps that make the owner's Android cuts on the iPhone and the student web: Join loses its
 two lines on the code, the list-changed screen the line under its title. Before it, A5, the iPhone

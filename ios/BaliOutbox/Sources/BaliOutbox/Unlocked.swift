@@ -20,10 +20,12 @@ public struct UnlockedWords: Sendable, Hashable {
             }
         }
 
-        /// What the card says under the three, nothing having gone wrong.
-        public var caption: String {
+        /// What the card says under the three, nothing having gone wrong: while a pick can go,
+        /// nothing (the owner's cut, 2026-11-04); while the unlock is on its way, what a pick
+        /// waits for.
+        public var caption: String? {
             switch self {
-            case .open: "Your teacher sees the reason you pick."
+            case .open: nil
             case .waiting(nil): UnlockedWords.onItsWay
             case .waiting: "Your reason goes with your unlock. You can change it once it arrives."
             }

@@ -37,7 +37,7 @@ struct WaitingView: View {
                             Text(
                                 checking
                                     ? "Your apps lock in a few seconds. No need to tap again."
-                                    : "You tapped your teacher's block before class started. Your phone locks when class starts, as long as Bali is open. No need to tap again."
+                                    : "Your phone locks when class starts, as long as Bali is open. No need to tap again."
                             )
                             .textStyle(.bodyLg).foregroundStyle(Theme.textSecondary)
                         }
