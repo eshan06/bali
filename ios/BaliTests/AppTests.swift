@@ -28,6 +28,7 @@ struct AppTests {
         #expect(config.cognito.redirectURI == URL(string: "bali://auth/callback"))
         #expect(config.api.scheme == "https" && config.cognito.domain.scheme == "https")
     }
+
     @Test(
         "Each hop the scene's phase makes reads the phase as it runs (#90's review): in front, then behind at once, runs no check and leaves the engine behind; in front, one check"
     )
