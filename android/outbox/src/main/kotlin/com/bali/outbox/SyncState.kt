@@ -2,12 +2,16 @@ package com.bali.outbox
 
 import com.bali.core.ApiErrorReason
 import com.bali.core.MeResponse
+import com.bali.core.ParticipationState
 import com.bali.core.SendResult
+import com.bali.core.UnlockReason
+import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 
 // What the sync engine knows, SyncEngine.swift's `SyncState`: its core, AN5a's, the read loop's, AN5c's,
-// and the wait's, AN5d's. Each later AN5 step adds the fields its own rules keep (docs/PLAN-ANDROID.md).
+// the wait's, AN5d's, and Emergency Unlock's, AN5e's, with Enforcement.swift's rule of when the lock is on
+// (`shieldedUntil`), the lock's own (AN7) to follow.
 
 /**
  * What the engine knows, for the screens and the lock ([SyncEngine.updates]). A value, as Swift's
@@ -35,6 +39,12 @@ data class SyncState(
      */
     val refused: Refusal? = null,
     /**
+     * The student's unlock the server recorded late, a return to focus having gone ahead of it (A10,
+     * A12), which put the lock back on with no return of this phone's since: said on Focus (C5a) until
+     * the phone's next change.
+     */
+    val superseded: Superseded? = null,
+    /**
      * The session protection off was last reported in, since the phone's last tap or the lock back on
      * (`Outbox.reportedOff`): only those leave it there (A2; #167).
      */
@@ -45,11 +55,20 @@ data class SyncState(
      */
     val lastTap: String? = null,
     /**
+     * This phone's latest Emergency Unlock the server has recorded in a session, and its reason on
+     * record, the answer's, then each change's (A20): the Unlocked card's check, and what a pick changes
+     * once the record has left the phone (C5c), until the student's next turn: the lock going off or
+     * coming back is none (#167).
+     */
+    val recordedUnlock: RecordedUnlock? = null,
+    /**
      * The records on their way, sent and not settled, or answered in a write the file refused, which
      * the file still counts as never sent: a reason given now wouldn't go with them (santa's review),
      * so the card offers none (C5c).
      */
     val sending: Set<String> = emptySet(),
+    /** How long a tap not yet answered is locked for: decision 7's [TAP_CAP], or a Debug build's shorter one (AN7). */
+    val cap: Duration = TAP_CAP,
     /**
      * Who the student is and their classes, as `GET /v1/me` last answered, for Home and the router
      * (C3); none until a read answers.
@@ -81,7 +100,58 @@ data class SyncState(
     /** Whether an unlock made where the phone stood unread waits to be filed (B6b). */
     internal val holdsUnfiled: Boolean get() = queued.any { it.change.isUnfiled }
 
+    /**
+     * The Emergency Unlock to record now (decision 11): under a tap not yet answered, filed where that
+     * tap lands, else of the session the phone is in; where it stood unread, not filed until the phone
+     * knows where it stands (B6b); none: out or waiting, nothing the phone knows locks.
+     */
+    fun emergencyUnlock(reason: UnlockReason?): Change? {
+        pendingTap?.let { return Change.UnlockUnderTap(it.eventId, reason) }
+        return when (val stood = standing) {
+            is Standing.InSession -> Change.Unlock(stood.session.id, reason)
+            Standing.Unread -> Change.UnlockUnfiled(reason)
+            Standing.Out, Standing.Waiting -> null
+        }
+    }
+
+    /**
+     * When the lock comes off, while the phone's truth keeps it on at [now]; none: off. On while focused
+     * in a session, until its end, and for a tap not yet answered, until its cap ([tapHeldUntil]).
+     * Unlocked, protection off, a state this build doesn't know, waiting or out: off.
+     */
+    fun shieldedUntil(now: Instant): Instant? {
+        val focused = (standing as? Standing.InSession)?.takeIf { it.state == ParticipationState.Focused }
+        return listOfNotNull(focused?.session?.endsAt, tapHeldUntil).filter { it > now }.maxOrNull()
+    }
+
+    /**
+     * Until when a tap not yet answered keeps the lock on: decision 7's cap after it ([cap]), unless the
+     * student unlocked since, which is acted on at once (decision 11). None: none does.
+     */
+    val tapHeldUntil: Instant?
+        get() {
+            val tap = pendingTap ?: return null
+            if (queued.dropWhile { it.eventId != tap.eventId }.any { it.change.isUnlock }) return null
+            return tap.recordedAt + cap
+        }
+
+    /**
+     * The latest Emergency Unlock queued for [session]: that session's own, or one filed under a tap or
+     * not filed yet, which may be any session's (C5b's review). Unlocked.swift's `unlock(in:)`.
+     */
+    internal fun unlockIn(session: String): OutboxRecord? =
+        queued.lastOrNull {
+            when (val change = it.change) {
+                is Change.Unlock -> change.session == session
+                is Change.UnlockUnderTap, is Change.UnlockUnfiled -> true
+                is Change.Tap, is Change.Refocus, is Change.ProtectionOff, is Change.ProtectionOn -> false
+            }
+        }
+
     companion object {
+        /** Decision 7: a tap the server hasn't answered locks at once, and for at most this long. */
+        val TAP_CAP: Duration = Duration.ofMinutes(50)
+
         /**
          * Where a wait armed at [armedAt] ends: the midnight after it in [zone], the phone's, the school's
          * in class, as the server drops an armed tap at the end of its school day, in the school's zone
@@ -113,3 +183,13 @@ enum class Link {
 
 /** A state change the server refused: the change, and its answer's status, reason and message. */
 data class Refusal(val change: Change, val status: Int?, val reason: ApiErrorReason?, val message: String?)
+
+/** An unlock the server recorded in [session]: its event id, [unlock], and its reason on record. */
+data class RecordedUnlock(val session: String, val unlock: String, val reason: UnlockReason?)
+
+/**
+ * A late unlock's session, and whether it went with the phone's order (A12): with one, the return that
+ * went ahead is one the order can't place, another install's or one sent with none; without, the
+ * phone's clock was behind (A10).
+ */
+data class Superseded(val session: String, val ordered: Boolean)

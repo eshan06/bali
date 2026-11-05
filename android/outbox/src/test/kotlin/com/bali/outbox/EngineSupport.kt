@@ -64,6 +64,7 @@ val tapRoute = "POST /v1/taps"
 val unlockRoute = "POST /v1/sessions/s/unlock"
 val refocusRoute = "POST /v1/sessions/s/refocus"
 val protectionOffRoute = "POST /v1/sessions/s/protection-off"
+val protectionOnRoute = "POST /v1/sessions/s/protection-on"
 val checkInRoute = "POST /v1/sessions/s/checkin"
 val meRoute = "GET /v1/me"
 
@@ -179,6 +180,7 @@ class Server : HttpTransport {
         val token: String? = request.headers["Authorization"]
         val eventId: String? get() = field("eventId")
         val deviceTime: String? get() = field("deviceTime")
+        val reason: String? get() = field("reason")
 
         /** Answers with [status] and [body], or with no answer at all when [status] is none. */
         fun reply(status: Int?, body: String = "") {

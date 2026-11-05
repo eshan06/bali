@@ -14,16 +14,16 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-04 (Central) — AN5d, the sync engine's wait for the Start (#507;
-`docs/DECISIONS.md`, 2026-11-04): BaliOutbox's `SyncEngine` in Kotlin, its wait, with its tests: an
-arming's wait and its end, the next midnight in the zone the phone is in as it arms, a day the
-clocks change 23 or 25 hours long, kept for a relaunch, a write the file refuses shown after the
-step; the wait ended at a wake once past it, offline too, or by a read saying no tap waits; the
-truth read at each wake while the screen is on; a session over by the phone's clock never the
-Start; and an arming made where the phone stood unread carried until it is known. Before it, AN5c,
-the read loop. Next: AN5e, Emergency Unlock in the engine; Android 17's SDK platform for the owner
-to OK before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6);
-AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
+_Last updated: 2026-11-04 (Central) — AN5e, Emergency Unlock in the sync engine (#510;
+`docs/DECISIONS.md`, 2026-11-04): BaliOutbox's `SyncEngine` in Kotlin, its unlock, with its tests:
+filed under a tap not yet answered, in the phone's session, or, where it stood unread, once known
+(B6b); its send held 15 s for the reason, never past the bell; the reason sent with it while never
+sent, else a change of it, its token renewed once; the late unlock said; the lock back on returning
+where the phone stood, or past the unlock guard; when the lock is on (`shieldedUntil`); and each
+failure a type, never said as done. Before it, AN5d, the wait. AN5 is done. Next: AN6,
+sign-in; Android 17's SDK platform for the owner to OK before the first step with today's AndroidX,
+and OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the
+pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -140,19 +140,7 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN5b** The engine's drain — ✅ (#501; DECISIONS 2026-11-04)
 - **AN5c** The engine's read loop — ✅ (#504; DECISIONS 2026-11-04)
 - **AN5d** The engine's wait for the Start — ✅ (#507; DECISIONS 2026-11-04)
-- **AN5e** Emergency Unlock in the engine (twin: `SyncEngine`'s `emergencyUnlock`, `pressUnlock`,
-  `explain` and `backToFocus`): where it is filed (under a tap not answered, in its session, or not
-  yet: B6b), its reason, held 15 s for it (`reasonHold`), and the late unlock (`Superseded`,
-  `RecordedUnlock`); `record`'s lock back on and what each change clears; from `Enforcement`, the
-  tap's cap and `shieldedUntil`, from `Unlocked`, `unlock(in:)`, and from `Join`, the renewal on a
-  401, the engine's own until AN9; outcomes as types, the words AN10's; and `unanswered`. Tests:
-  ShieldedUntilTests' three; UnderTapEngineTests' seven; RefiledTests' `refiled`, `joined`, `guards`
-  and `afterThePress`; StaleReadTests' `lateUnlockLands`, `lateAnswerWithNoReturn`,
-  `lateUnlockOverStuckUnlock`, `lateUnlockAfterReturn` and `protectionOffOverStuckUnlock`; the
-  engine's half of BackOnTests' `once`, `lateUnlocked`, `unlockedSince` and `notKnown`;
-  `keptWithItsStanding`'s lock check, which AN5a left; and the tests that reach the outbox's
-  recording through the engine: UnreadUnlockTests' but `filing`, ReasonTests' but `refiledReason`,
-  and UnlockRouteTests' `route` and `endsTheTapsShield`
+- **AN5e** Emergency Unlock in the engine — ✅ (#510; DECISIONS 2026-11-04)
 - **AN6** Sign-in (twin: `SignIn`, `TokenStore`): Cognito's hosted UI in a Custom Tab, the code
   grant with PKCE; tokens sealed by a Keystore key; the refresh, Sign out, `Tokens.checked` (no
   token to Bali's API before the 13+ check, but the check's own read and a deletion's) and the
@@ -170,8 +158,9 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
   and then to window events, the covered app sent to the background); the system allow-list
   (decision 2); rule 3 at every check-in; protection off and on, with iOS's events; the bell, from
   the session's window; and a Debug readout like iOS's for the phone checks. From SyncEngine.swift,
-  `setTapCap`, and the enforcer's suites: EnforcerTests, RevokedWhileRunningTests, LaunchGraceTests,
-  the rest of ProtectionOffTests and BackOnTests, and StandingKeptTests' `unreadCapped` and
+  `setTapCap`, from `Enforcement`, `unlockedLast`, and the enforcer's suites: EnforcerTests,
+  RevokedWhileRunningTests, LaunchGraceTests, the rest of ProtectionOffTests and BackOnTests,
+  UnreadUnlockTests' `leftByTheLastRun`, and StandingKeptTests' `unreadCapped` and
   `unreadCappedOverHeld` (AN5's split). Its first question is
   answered (the owner, 2026-11-04): the service checks in every 30 s while the screen is on, once
   as it goes off and once as it comes on, so an awake phone gone quiet means Bali stopped or lost

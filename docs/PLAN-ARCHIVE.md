@@ -10,6 +10,18 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN5e's on 2026-11-04: _Last updated: 2026-11-04 (Central) —
+AN5d, the sync engine's wait for the Start (#507; `docs/DECISIONS.md`, 2026-11-04): BaliOutbox's
+`SyncEngine` in Kotlin, its wait, with its tests: an arming's wait and its end, the next midnight in
+the zone the phone is in as it arms, a day the clocks change 23 or 25 hours long, kept for a
+relaunch, a write the file refuses shown after the step; the wait ended at a wake once past it,
+offline too, or by a read saying no tap waits; the truth read at each wake while the screen is on; a
+session over by the phone's clock never the Start; and an arming made where the phone stood unread
+carried until it is known. Before it, AN5c, the read loop. Next: AN5e, Emergency Unlock in the
+engine; Android 17's SDK platform for the owner to OK before the first step with today's AndroidX,
+and OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the
+pilot's critical path._
+
 _Last updated: 2026-11-04 (Central) — WC3 (#508; `docs/DECISIONS.md`, 2026-11-04): the third of
 eight steps making the owner's Android cuts on the iPhone and the student web: Focus and Home's hold
 lose their lines; the block screen keeps only the owner's. Before it, WC2 (#506). Next: WC4; A2–A4;
@@ -2211,6 +2223,22 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN5e's line, as it read until it was done (2026-11-04; `docs/DECISIONS.md`, 2026-11-04).
+
+- **AN5e** Emergency Unlock in the engine (twin: `SyncEngine`'s `emergencyUnlock`, `pressUnlock`,
+  `explain` and `backToFocus`): where it is filed (under a tap not answered, in its session, or not
+  yet: B6b), its reason, held 15 s for it (`reasonHold`), and the late unlock (`Superseded`,
+  `RecordedUnlock`); `record`'s lock back on and what each change clears; from `Enforcement`, the
+  tap's cap and `shieldedUntil`, from `Unlocked`, `unlock(in:)`, and from `Join`, the renewal on a
+  401, the engine's own until AN9; outcomes as types, the words AN10's; and `unanswered`. Tests:
+  ShieldedUntilTests' three; UnderTapEngineTests' seven; RefiledTests' `refiled`, `joined`, `guards`
+  and `afterThePress`; StaleReadTests' `lateUnlockLands`, `lateAnswerWithNoReturn`,
+  `lateUnlockOverStuckUnlock`, `lateUnlockAfterReturn` and `protectionOffOverStuckUnlock`; the
+  engine's half of BackOnTests' `once`, `lateUnlocked`, `unlockedSince` and `notKnown`;
+  `keptWithItsStanding`'s lock check, which AN5a left; and the tests that reach the outbox's
+  recording through the engine: UnreadUnlockTests' but `filing`, ReasonTests' but `refiledReason`,
+  and UnlockRouteTests' `route` and `endsTheTapsShield`
 
 AN5d's line, as it read until it was done (2026-11-04; `docs/DECISIONS.md`, 2026-11-04).
 

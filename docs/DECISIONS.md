@@ -8,6 +8,120 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-04** — **AN5e, Emergency Unlock in the sync engine: BaliOutbox's `SyncEngine` in Kotlin,
+  its unlock (the conductor's calls, awaiting the owner's look; AN5e, #510).** The owner isn't
+  reviewing each step and asked for the recommended option on every question, so each call here is
+  the conductor's, for the owner to look at. With it AN5, the engine's five parts, is done.
+
+  **Where it lives:** `outbox`'s `SyncEngine.kt`: `tap`, `emergencyUnlock`, `pressUnlock` and its
+  hold (`REASON_HOLD`), `explain` (its `Pick`, `changed` and `unanswered`), `backToFocus`, the
+  renewal on a 401 (`renewing`, iOS's `Joining.send(renewing:)`, the engine's own until AN9),
+  `record`'s lock back on and what each change clears, and `answered`'s unlock recorded and late
+  unlock; and the outcomes, `UnlockFailure`, `ReasonFailure` and `RefocusFailure`. `SyncState.kt`:
+  `superseded`, `recordedUnlock`, `cap` and `TAP_CAP`, `emergencyUnlock`, `shieldedUntil`,
+  `tapHeldUntil` and `unlockIn` (Unlocked.swift's `unlock(in:)`), with `RecordedUnlock` and
+  `Superseded`. Where Kotlin differs, said plainly:
+  - **Outcomes are types, their words AN10's** (from AS0's boards): `pressUnlock` gives an
+    `UnlockFailure` (`NotStarted`, the app's to give; `NotSaved`; `NothingToUnlock`, iOS's `nothing`,
+    renamed so it never reads as Kotlin's `Nothing`), `explain` a `ReasonFailure` (`NotSaved`,
+    `OnItsWay`, or `NotChanged` with the answer's result and refusal reason, what iOS's words key
+    on), and `backToFocus` a `RefocusFailure`. None is success, and a write the file refused is never
+    said as done.
+  - **`record`'s stretch is `recording`,** so `emergencyUnlock`, `pressUnlock` and `backToFocus` read
+    the state and record in one stretch, as Swift's calls do on its actor: the lock is no reentrant one.
+  - **`explain` runs as two stretches,** its pick and its answer, the change sent between them with the
+    engine let go, as Swift's `await` lets go of its actor, in the engine's scope, so a screen cancelled
+    stops waiting and the change goes on.
+  - **The lock back on's reads are shown after its step** (AN5a's rule): where the phone stood
+    (`offFrom`) unreadable falls to the unlock guard, and a guard that can't read keeps the phone
+    unlocked, each failure shown once the step is done, where iOS's `stored` shows it at once. Said
+    plainly, as iOS has it (santa's review): with `offFrom` unreadable, an unlock the server has
+    recorded, gone from the queue, is out of the guard's sight, so the phone comes back focused, the
+    failure shown, until the back on's answer returns it to unlocked, or, offline, the student's next
+    press. Its reach is doubtful (a read of the file failing just then): left as iOS has it, the
+    conductor's call, the owner's to decide for both phones.
+  - **`unlockedLast` is AN7's,** with the enforcer that reads it: PLAN-ANDROID's line names the tap's
+    cap and `shieldedUntil` alone, where the planning read named it too, and UnreadUnlockTests'
+    `leftByTheLastRun` is the enforcer's half alone, so it goes to AN7 with it.
+
+  **AN5b's note, the conductor's call (the owner away; CLAUDE.md's standing orders).** A send
+  cancelled with the engine's run makes no answer (AN4b), so the file counts it never sent, where iOS
+  counts it; a send with no token after it took it off its way, so a reason given then was said kept,
+  though the cancelled send may have reached the server, which keeps the reason it recorded first
+  (A1): the student's reason kept by no one. Its reach is doubtful (the run cancelled mid-send while
+  the app lives on, then no token). The recommended fix, taken: a record already on its way when the
+  drain picks it again stays on its way through a send with no token, until a send of it settles. Its
+  test failed first and passes now. Smaller than counting the cancel as iOS does, which would undo
+  AN5b's call (the cancelled send uncounted, sent at once by the next run) and its test. Left, said
+  plainly (santa's review): on both phones, a kill mid-send leaves the record counted never sent and
+  not on its way at the next launch, which nothing on the phone can know; on Android alone, so does a
+  kill after a send cut short and before a send of it settles (its token still missing, say), where
+  iOS counted the cut. Either way the replay's answer then shows the reason the server kept, which the
+  student can change (A20).
+
+  **AN5c's note:** the lock back on returns the phone where it stood before protection off, or, not
+  known, passes the unlock guard, so no focus comes back past it (`keepsUnlocked`'s doc). **Found:
+  iOS's BackOnTests' `notKnown` no longer reaches the guard,** since its unlock's own write keeps
+  `offFrom` unlocked (iOS's santa round 2), so its back on returns there. Android's test clears
+  `offFrom`, as a build before #167's left the file, and checks the guard both ways. The iPhone's code
+  is another session's: for the owner, whether iOS's test should clear it too.
+
+  **Claude Review on #499:** `record` leaves its own failed write to its caller, so `pressUnlock` says
+  `NotSaved` for a write the file refuses, never done, the phone still locked, and `emergencyUnlock`
+  throws (rule 5; the unlock contract: nothing is dropped as if kept).
+
+  **The tests:** ShieldedUntilTests' three; UnderTapEngineTests' seven; RefiledTests' `refiled` (its
+  four cases), `joined`, `guards` and `afterThePress`; StaleReadTests' `lateUnlockLands`,
+  `lateAnswerWithNoReturn`, `lateUnlockOverStuckUnlock`, `lateUnlockAfterReturn` and
+  `protectionOffOverStuckUnlock`; the engine's half of BackOnTests' `once`, `lateUnlocked`,
+  `unlockedSince` and `notKnown`; `keptWithItsStanding`'s lock check; UnreadUnlockTests but `filing`
+  and `leftByTheLastRun`, their lock's halves AN7's and iOS's monitor with no Android twin; ReasonTests
+  but `refiledReason`, their words AN10's; and UnlockRouteTests' `route` and `endsTheTapsShield`. New:
+  AN5b's note's; a press the file refuses; the lock back on's two failed reads; the renewal on a 401,
+  once only, and a refresh giving none leaving the 401; a pick while a newer unlock is on its way; and
+  the unlock recorded kept through protection off and back on. RefiledTests' lock check watches every
+  state the engine publishes (`LockWatch`), where iOS counts the shields' unshields. Each check that
+  nothing is sent waits for a point the rig or the state marks (the drain asleep on the hold, an empty
+  queue, `nextDue` idle, a call's end), never a window of real time.
+
+  Tried, each failing by name, then reverted: the lock back on outside protection off; where it stood
+  ignored; the guard's answer ignored; its failure unshown; the unlock recorded never kept, never
+  forgotten, and forgotten by every change; a late unlock said over the phone's own focus, or over its
+  own later tap, never cleared, and always said ordered; the hold past the bell; a change with no
+  answer never sent again under its id, and a late answer taken as the current unlock's; a tap's lock
+  kept over an unlock made after it; an unlock never filed under its tap; a press the file refused said
+  done; a pick sent as a change while a newer unlock waits; the renewal left out; `explain` run in its
+  caller's coroutine; and AN5b's fix reverted. Nothing was added to the PC's SDK: its folders were
+  compared before and after.
+
+  **For AN6:** `renewing` asks the sign-in's `refresh` once per screen call, as iOS's `Joining.send`
+  does, apart from the loops' shared refresh. **For AN7:** `shieldedUntil` is the lock's to follow,
+  `unlockedLast` and `setTapCap` (`cap`) its own; the lock back on is the service's to record
+  (`record(Change.ProtectionOn(…))`), which records only out of protection off. **For AN9:**
+  `renewing` moves to `Joining`. **For AN10:** the words for each failure, the late unlock's
+  (`superseded`) and the Unlocked card's (`recordedUnlock`, `unlockIn`, `sending`).
+
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini
+  CLI on this PC, so context isolation holds and model diversity doesn't): 0 blockers. Their WARNs:
+  `explain` going on with its caller cancelled, pinned by no test (fixed: a screen cancelled
+  mid-change, the answer kept); `unanswered` pinned only after no answer (fixed: the same pick after
+  a refusal goes under a new id); the drain's fix held in memory, so Android's gap is a little wider
+  than a kill mid-send (said above); and `offFrom` unreadable bringing focus back over a recorded
+  unlock where an unreadable guard keeps the phone unlocked (said above, left as iOS has it).
+
+  **CI's failure on #510, the tests' own order (the cause found, never a re-run):** after the rebase
+  onto WC4, `UnreadUnlockTest`'s "the file gives back where the phone stood" failed on CI's Linux, its
+  wait for the read loop's minute never coming. The test made the file readable before the read loop's
+  first wake had found it unreadable, so a first wake run late read it at once, and the minute it
+  waited for never began; its twin, the filing the file refuses, could do the same. Holding the read
+  loop's first wake back 300 ms made both fail on the PC; now each waits for that minute first, and
+  the whole suite passes with the read loop's first wake, or the drain's first pass, held back so. The
+  engine is unchanged: only a test reaches this order. iOS's twins keep it (`filedWhenTheFileReads`,
+  `filedByTheNextAct`): for the owner, whether the iPhone's tests should wait so too.
+
+  **The proof:** `Outbox.open` and `android/app` are unchanged, so the JVM tests are the proof, and no
+  emulator ran.
+
 - **2026-11-04** — **AN5d, the sync engine's wait for the Start: BaliOutbox's `SyncEngine` in Kotlin,
   its wait (the conductor's calls, awaiting the owner's look; AN5d, #507).** The owner isn't
   reviewing each step and asked for the recommended option on every question, so each call here is
@@ -78,7 +192,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   then out once its check-in finds it gone, not waiting, until a read finds the Start. Display only,
   since neither out nor waiting locks anything; iOS's `readStanding` does the same, so a fix would be
   both phones', and its reach is doubtful (a file unreadable at launch, then readable again while a
-  tap waits): left as iOS has it, the conductor's call, the owner's to decide for both.
+  tap waits): left as iOS has it, the conductor's call, the owner's to decide for both. And Claude
+  Review's WARN on #507, on both phones too: an arming answered while a session still runs keeps the
+  phone in that session, the wait's end kept, so once its bell passes the phone stands out and shows
+  Home, not Waiting, until a read finds the Start; display only, the lock untouched, as iOS has it:
+  the conductor's call, the owner's to decide for both phones (AN5e's worker, at the conductor's word).
 
   **For AN5e:** the arming works now, so RefiledTests' scans can be answered armed. `answered`'s step
   takes `waits` between `lands` and a drop: the unlock recorded and a late one said why join the
