@@ -14,16 +14,17 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-05 (Central) — AN6c, sign-in's app side (#520; `docs/DECISIONS.md`,
-2026-11-05): the tokens sealed by a Keystore key of the app's own, a file that can never be opened
-again read as nothing saved; Cognito's hosted UI in the phone's browser, an Auth Tab where it has one,
-else a Custom Tab, ephemeral where it offers that (where not, its cookies shared: the conductor's call,
-awaiting the owner), its answer taken only for the waiting sign-in, with its state; the redirect
-`com.bali.bali:/auth/callback`; and `AppConfig`'s app side, pinned, the client id empty until the
-owner's. AN6 is done. Next: AN7, the lock; Android's Cognito clients, the owner's (Open owner items,
-8); Android 17's SDK platform for the owner to OK before the first step with today's AndroidX, and
-OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the
-pilot's critical path._
+_Last updated: 2026-11-05 (Central) — AN7a, the lock follows the engine (#521; `docs/DECISIONS.md`,
+2026-11-05): BaliOutbox's enforcer in Kotlin over a seam of the lock's own (`Lock`), with its tests on a
+fake lock: the lock put on until the bell or a tap's cap, an end it keeps by the phone's clock, and
+again as the end moves, never over the switch off; over a standing the file won't give back, the last
+run's lock kept until the phone knows where it stands or the student unlocks; rule 3's check putting it
+back; and the phone check's shorter cap. Swift's actor is a lock each stretch holds, let go at each call
+into the lock, so a check lands while a pass waits. AN7 is six steps now, AN7a–AN7f (the conductor's
+split, awaiting the owner). Before it, AN6c, sign-in's app side. Next: AN7b, rule 3's report; Android's
+Cognito clients, the owner's (Open owner items, 8); Android 17's SDK platform for the owner to OK before
+the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once
+the owner has the phones. Not on the pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -144,21 +145,47 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN6a** Sign-in's parts — ✅ (#515; DECISIONS 2026-11-04)
 - **AN6b** Sign-in itself — ✅ (#518; DECISIONS 2026-11-05)
 - **AN6c** Sign-in's app side — ✅ (#520; DECISIONS 2026-11-05)
-- **AN7** 📱 The lock (twin: BaliOutbox's `Enforcement`, `Bell` and `PhoneBell`): the
-  Accessibility service, (a), as ARCHITECTURE's battery plan has it (listening only in a lesson,
-  and then to window events, the covered app sent to the background); the system allow-list
-  (decision 2); rule 3 at every check-in; protection off and on, with iOS's events; the bell, from
-  the session's window; and a Debug readout like iOS's for the phone checks. From SyncEngine.swift,
-  `setTapCap`, from `Enforcement`, `unlockedLast`, and the enforcer's suites: EnforcerTests,
-  RevokedWhileRunningTests, LaunchGraceTests, the rest of ProtectionOffTests and BackOnTests,
-  UnreadUnlockTests' `leftByTheLastRun`, and StandingKeptTests' `unreadCapped` and
-  `unreadCappedOverHeld` (AN5's split). Its first question is
-  answered (the owner, 2026-11-04): the service checks in every 30 s while the screen is on, once
-  as it goes off and once as it comes on, so an awake phone gone quiet means Bali stopped or lost
-  its network. Still for the owner: whether Bali, opened again, reports how long it was stopped;
-  that is new information about a student, so it needs a board and the owner's approval first
-  (ARCHITECTURE, "Android app structure", the rules) — validation: the rules' JVM tests, then the
-  device check on both phones
+- **AN7a** The lock follows the engine — ✅ (#521; DECISIONS 2026-11-05)
+- **AN7b** Rule 3's report: protection off, the lock back on, the launch grace (twin: `Enforcement`'s
+  check, `judged` and `backOn`): rule 3 at every check-in; protection off and on, with iOS's events:
+  the switch found off in a session the phone's clock says still runs, reported once
+  (`Change.ProtectionOff`), shown and tried again where the outbox can't queue it (`unreported`); the
+  lock back on in the class it was off in, before its bell (#167, `Change.ProtectionOn`), once; a
+  switch starting judged off once that lasts the grace, 30 s (DECISIONS 2026-11-05, Q3), measured by
+  uptime, read again every second meanwhile. Tests, over the fake lock, their words AN10's:
+  RevokedWhileRunningTests, LaunchGraceTests, the rest of ProtectionOffTests and BackOnTests, and the
+  check's half of `reportedAgain` and `onlyFocusAgain`. Still for the owner: whether Bali, opened
+  again, reports how long it was stopped; that is new information about a student, so it needs a board
+  and the owner's approval first (ARCHITECTURE, "Android app structure", the rules); until then a
+  force-stop found after the bell reports nothing (Q7) — validation: the rules' JVM tests
+- **AN7c** The service and the app's engine (twin: `PhoneScreenTime` and BaliApp.swift's engine): the
+  Accessibility service, (a), as ARCHITECTURE's battery plan has it (listening only in a lesson, and
+  then to window events), declared in the Debug build alone with a developer's label (DECISIONS
+  2026-11-05, Q1): its switch
+  from Android's settings and its binding, the lock narrowed and widened through `setServiceInfo`, the
+  last run's lock kept in `no_backup` (Q4), the screen going on and off (`setScreenOn`), and the check
+  at its connect, its unbind and the switch's change; and `BaliApp`'s engine (`SyncEngine.make`) and
+  enforcer, none while sign-in isn't set up but a Debug build's, over no token (Q2). Its first question
+  is answered (the owner, 2026-11-04): the service checks in every 30 s while the screen is on, once as
+  it goes off and once as it comes on, so an awake phone gone quiet means Bali stopped or lost its
+  network — validation: the instrumented tests on `Bali_Spike_API35`, `36` and `37`
+- **AN7d** The Debug readout (twin: BaliApp.swift's `Readout`): a Debug readout like iOS's for the phone
+  checks, in the Debug build alone, a developer's words and no board, as iOS's (B4c): the link, the
+  sign-in, the standing, the lock's claim, the service and how long it took to start, and the outbox;
+  Open Accessibility settings, a typed tap, Emergency Unlock and the 15-minute cap (`setTapCap`); Bali
+  coming to the front reads the truth and runs the check (`setInFront`). Before AN7e, so no Debug build
+  covers apps with no way out — validation: a smoke test on the emulator
+- **AN7e** The cover (twin: the spike's `AllowList`, `Covers` and `BlockAccessibilityService`): which
+  windows are covered, in `outbox` (`Cover`): those of an app the system allow-list (decision 2) doesn't
+  hold, while the lock's end is ahead by the phone's clock, never Bali's own nor under the shade; the
+  covered app sent to the background, as Home does (DECISIONS 2026-11-05, Q5), a split half and
+  picture-in-picture covered and left
+  there; the cover plain in Debug (Q1) — validation: the JVM tests, then the emulators', timed against
+  AN1's
+- **AN7f** 📱 The lock on the phones (no code): the device check on both phones, the Pixel and the
+  Samsung (Open owner items, 1), from `docs/ANDROID-PHONE-TESTS.md`'s AN7 checklist, which AN7c–AN7e
+  write: B5 round 1's steps in Android's terms, offline before AN9, on dev after it (DECISIONS
+  2026-11-05, Q8) — validation: every line answered on both phones
 - **AN8** 📱 The tap over NFC (twin: `BlockReader`, B6): reader mode, started from the Debug readout
   until AS4 builds Bali's "hold your phone to the block" screen; the offline tap in under a second;
   the tap's dispositions (`tapDisposition`); and, if AN1 found it works, the block's link opening
@@ -244,7 +271,7 @@ rules); `docs/DESIGN.md` read first, its Android section from AS0; every user-fa
 ## Open owner items
 
 1. **The phones:** which Pixel and which Samsung. AN1 needs both, one of them on Android 17 for
-   Advanced Protection's check (ISSUES #6), and so do AN7, AN8, AP3 and AP5.
+   Advanced Protection's check (ISSUES #6), and so do AN7f, AN8, AP3 and AP5.
 2. **The Play account:** an organization (not under the 12-tester rule; it needs a D-U-N-S number)
    or personal (a closed test of at least 12 testers, opted in 14 days in a row, before production
    access).

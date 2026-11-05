@@ -8,6 +8,140 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-05** — **AN7a, the lock follows the engine: BaliOutbox's enforcer in Kotlin over a seam of the
+  lock's own, and AN7 in six PRs (the conductor's calls, awaiting the owner's look; AN7a, #521).**
+  The owner isn't reviewing each step and asked for the recommended option on every question, so each
+  call here is the conductor's, for the owner to look at.
+
+  **AN7 in six PRs (the conductor's split, awaiting the owner):** AN7a, the lock follows the engine, on
+  the JVM; AN7b, rule 3's report (protection off, the lock back on, the launch grace), on the JVM; AN7c,
+  the service and the app's engine, on the emulators; AN7d, the Debug readout; AN7e, the cover; AN7f 📱,
+  the device check on the phones, no code. Each line in `docs/PLAN-ANDROID.md` names its twin and its
+  tests, every word of AN7's line kept in one of them. The split's eight questions, the conductor's
+  answers, each the recommended option:
+  - **Q1, the cover before AS5, and the release's declaration:** AN7c declares the service in the Debug
+    manifest alone, with a developer's label, and AN7e's cover is plain in Debug, no words or buttons;
+    AS3 or AS5, whichever comes first, declares it in main with AS0's words, AS5's block screen the cover.
+  - **Q2, no engine without sign-in:** in a Debug build alone the engine runs over no token at the
+    build's API, as a signed-out phone, so a typed tap locks offline to its cap; Release keeps iOS's rule.
+  - **Q3, the grace over a switch starting:** 30 s, where iOS's is 10: the emulators bound the service
+    11.5 to 20 s after a reboot's screen came on, and Off, the common case, is judged at once; tuned on
+    the phones from the readout's Launch line.
+  - **Q4, the last run's lock across a restart:** kept, as iOS's store keeps its shields, in `no_backup`
+    with no end of its own, held over a standing not read until it is known or the student unlocks; this
+    run's lock carries its own end.
+  - **Q5, "sent to the background, as Home does":** `GLOBAL_ACTION_HOME` once a full-screen blocked
+    window's cover lands, the cover then going with the window; a split half or a picture-in-picture
+    window stays covered and plays on (AN7f checks the sound); the block screen kept up until its OK is
+    AS5's.
+  - **Q6, a wake lock for the screen-off check-in:** none, the battery plan's pass mark; a timed one, at
+    most 10 s, only if the phones show the check-in lost.
+  - **Q7, iOS's monitor note, which has no twin:** Bali force-stopped in class and opened after the bell
+    reports nothing on Android, where iOS reports it late, the grid having seen the phone go quiet in
+    class; nothing built, said in ISSUES #6 and AN7b's PR; `stoppedAt` waits for the owner's question.
+  - **Q8, the phone check against dev:** after AN9, since a token needs the 13+ check and joining is
+    AN9's, with no 13+ button in the readout; the offline lock checks can run before it.
+
+  **Where it lives:** `outbox`'s `Lock.kt` (`Lock` and `LockSwitch`, iOS's `ScreenTime` and
+  `Permission`) and `Enforcer.kt` (`Protection` and `Enforcer`); `SyncState`'s `unlockedLast`, which
+  AN5e left here; and the engine's `setTapCap`, made in the state's one step (`update`), so the lock
+  follows it at once. Where Kotlin differs, said plainly:
+  - **Swift's actor is a `Mutex`, as the engine's** (AN5a): held through each stretch Swift's runs
+    between two `await`s, let go at each call into the lock or the engine, so a check lands while a pass
+    waits on the lock, as AN7b's `checkDuringPass`, `runKeptOverPass` and `passCrossesGrace` need, and no
+    stretch cut short. One pass at a time, as iOS's `enforcing` and `again` have it: a call made while one
+    runs has it run again, whether to run again and the pass's end being one stretch, so none is lost
+    between. Each call runs in the enforcer's own scope, the app's under a job of its own (`check`, each
+    pass `run` makes for a state, and the pass at the lock's end), so a caller cancelled, the engine's
+    read loop say, stops waiting and its pass goes on, never half made.
+  - **The lock carries its own end** (ARCHITECTURE, "The bell needs no extension"): put on until the bell
+    or a tap's cap, which it keeps by the phone's clock with nothing woken, and put on again as the end
+    moves (a re-tap, its answer, an extension, the phone check's cap). iOS's shields have no end, its
+    monitor taking them off at the bell; the enforcer's pass at the end, iOS's alarm, here changes the
+    claim alone, the lock having stopped there by itself.
+  - **The switch stands for Screen Time's permission and its marker together** (`LockSwitch`): On, on
+    Android's list and bound; Off, not on the list, judged at once; Starting, on the list, not bound yet,
+    locked all the same, so the lock covers as the service binds, and off once that lasts the grace
+    (AN7b's). Never locked over Off, as iOS never shields over the marker gone, and claimed locked only
+    while On, as iOS claims shielded only approved. Read once a pass, before its change, where iOS reads
+    the marker before and the permission after.
+  - **The last run's lock** (Q4): the lock says it holds one, with no end of its own. Over a standing not
+    read the enforcer never gives it one, which would take it off at a tap's cap (#91's review), and only
+    the student's unlock takes it off (`unlockedLast`); once where the phone stood is known, it gets that
+    end, or comes off. `putOn` keeps the end this run put on, where iOS's keeps a flag.
+  - **A lock that throws** breaks its promise (`Lock`'s doc: a failure is the lock's own to handle, as
+    AN7c's service must), and still never leaves the enforcer stuck (AN5c's lesson, the engine's `hooked`;
+    santa's review): a pass it cuts short, throwing or ending in a cancel of its own (a timeout in it), is
+    followed by the one a call made meanwhile asked for, never dropped; the last pass's failure reaches
+    `check()`'s caller, so the engine's read loop sends no check-in for a check that checked nothing; an
+    error (an API the phone lacks, say) or the app's scope ending lets go at once and throws; and a pass the
+    enforcer makes for itself, for a state or at the lock's end, ends there, never the run nor the alarm,
+    and reaches no handler of the app's, so an Emergency Unlock after it still takes the lock off at once.
+    The claim stays what the last pass found until the next one.
+  - **Not here, as split:** the check's report, `unreported`, the grace and its recheck, and `backOn`,
+    AN7b's, so `check()` only puts the lock back; and no `requestPermission`, `authorize`, marker or
+    window, which have no Android twin: Android asks nothing, the student switches the service on in
+    Settings, and the check as Bali comes back claims it.
+  - **Found: Android's lock stops at its end by itself,** so a tap's cap alone can't show the enforcer's
+    own lock coming off over a standing not read, as iOS's `unreadCapped` shows its shields: a test of its
+    own pins it, the tap answered armed.
+
+  **The tests,** on the engine's rig with a fake lock (`LockSupport.kt`: `FakeLock`, iOS's
+  `FakeScreenTime`, its lock stopping at its end by the rig's clock; `Enforced`; and `unreadable`, now
+  shared): EnforcerTests' `checked`, `tapToBell`, `unlockDrops`, `capped`, `unlockOverPendingTap`,
+  `tapWithoutSession` (both cases), `putBack` (its lock back before the check-in is answered, so that
+  answer's pass can't stand in for the check), `claimIsChecked` (the switch off: no lock put on; on again,
+  put back at the check), `relaunch`, and `requestPermission` and `requestPermissionRefused` as "switched
+  on" and "left off", the claim following at the check, no run beside it so the check's pass is the only
+  one; StandingKeptTests' `unreadCapped` and `unreadCappedOverHeld`, and the lock's half of `unread`,
+  `unreadSettled` and `unreadArmed`; UnreadUnlockTests' `leftByTheLastRun`, and the lock's half of the
+  rest but `filing`, the last run's lock off once, at the press, added to the engine's half's own tests;
+  BellTests' `relaunchAndCap`, its cap's half; and new: a check landing while a pass waits on the lock,
+  at once, the pass running again for it; a check whose caller is cancelled, its pass going on; the end
+  moved by a re-tap, its answer and an extension; a switch starting still locking; a lock that throws,
+  at a check (a failure, or an error), in a pass the run makes (the run going on, an Emergency Unlock
+  after it taking the lock off), in the pass at the lock's end (no handler of the app's reached), and in
+  a pass a call made meanwhile then needs (a failure, or a cancel of the lock's own); the enforcer's own
+  lock off over a standing not read; and `unlockedLast` on `SyncState`. None of this step's iOS tests
+  checks words or a screen. Tried,
+  each failing by name, then reverted: the lock held through a call into the lock (the check waited for
+  the pass); a call made during a pass dropped; the last run's lock given a tap's end over a standing not
+  read (2); the lock put on over the switch off; the enforcer's own lock kept over a standing not read;
+  any lock taken off over one (5); the end never moved (7); no pass at the end (2); the cap set outside
+  the state's one step; `unlockedLast` never true (11), and blind to the tap (2); a pass that throws
+  never let go; the check run in its caller's coroutine; a lock claimed while its switch starts; the check
+  never hooked; a lock taken off with none held (4); the switch off never claimed (2); and, for santa's
+  fixes, the run's passes unguarded, the alarm's too, a pass cut short dropping the call made meanwhile,
+  a cancel of the lock's own dropping it, and an error never let go. Each check that something doesn't
+  happen waits for a point the rig, the fake lock, a call's end or the enforcer's jobs ending marks,
+  never a window of real time. Nothing was added to the PC's SDK: its folders were compared before and
+  after.
+
+  **For AN7b:** `check()` is the place: its report reads the switch and the engine's state and records
+  with the enforcer let go; `unreported` joins `Protection`, which a pass copies in its last stretch, so a
+  check made meanwhile keeps what it found; `switchedOff` becomes the grace's judgement, and the pass's
+  switch read is where a run of starting ends. **For AN7c:** `Enforcer(engine, lock, scope)` over the
+  service's `Lock`, its `run` in `BaliApp`'s scope, and `check()` at the service's connect, its unbind and
+  the switch's change; the lock's calls never throw, and its `locking()` counts the last run's lock.
+  **For AN7d:** the claim is `updates`, the cap `setTapCap`.
+
+  **Santa's review:** NICE in two rounds, two Claude Opus reviewers at max effort (no Codex or Gemini CLI
+  on this PC, so context isolation holds and model diversity doesn't). Round 1, one blocker, fixed:
+  `unreadCappedOverHeld`'s twin made the file readable before waiting for the read loop's next minute,
+  so the loop's wake at the cap, run late, could read it there and that minute never come (#510's order;
+  forced with the clock's held wakes, it failed by name first). Its WARNs, each taken: a lock throwing in
+  a pass the run or the alarm made ended the run or reached the app's handler, and dropped a call made
+  meanwhile (both reviewers); and the third relaunch's check of no lock never waited for its enforcer's
+  pass. Round 2, on the fixes: no blocker; its WARNs, each taken: an error of the lock's left the enforcer
+  stuck, a cancel of the lock's own still dropped the call made meanwhile, and the alarm's guard had no
+  test. **For the owner, iOS's (another session's code):** iOS's `unreadCappedOverHeld` keeps the old
+  order, the race #510 found, and its `relaunched` checks the third launch's shields without waiting for
+  that enforcer's pass.
+
+  **The proof:** `android/app` is unchanged, so the JVM tests are the proof and no emulator ran:
+  `./gradlew assemble :app:lint check` green, Android 10's API check with it, and the outbox's suite run
+  several times over.
+
 - **2026-11-05** — **AN6c, sign-in's app side: the tokens sealed by a Keystore key, Cognito's hosted UI
   in the phone's browser and its answer back, and `AppConfig`'s app side (the conductor's calls,
   awaiting the owner's look; AN6c, #520).** The owner isn't reviewing each step and asked for the

@@ -151,7 +151,7 @@ the order the phone acted, and applies each answer in one step, the queue read a
 send cancelled with the engine's run makes no answer, so its record stays as it was, due, and on its
 way until a send of it settles, and goes again at the next run under its event id, where iOS counts
 it an attempt with no answer. Its read
-loop (AN5c) follows the screen, as the lock's service hears it (`setScreenOn`, AN7's): a check-in
+loop (AN5c) follows the screen, as the lock's service hears it (`setScreenOn`, AN7c's): a check-in
 every 30 s while it is on and one as it comes on or goes off, out of a session the truth read as it
 comes on instead, rule 3's check before each, then nothing while it is off. A read applies only as
 the reconcile allows, and never puts the lock back on over an Emergency Unlock the server hasn't
@@ -170,6 +170,18 @@ a rig of their own (`EngineSupport.kt`, BaliOutbox's `EngineSupport.swift`): a c
 in a zone of the test's own, since coroutines-test's virtual time can't drive Room's queries, a
 server answered by hand, and the bundled driver watched, which sees each commit as GRDB's
 `TransactionObserver` does, and can refuse a statement as a failing disk would.
+
+**The lock's rules** (`outbox`'s `Enforcer.kt` and `Lock.kt`, BaliOutbox's `Enforcement`, AN7a): the
+enforcer follows the engine's state and keeps the lock where it says, through a seam of the lock's own
+(`Lock`), which the app's Accessibility service fills (AN7c). The lock carries its end, the bell or a
+tap's cap, and stops there by the phone's clock with nothing woken; the enforcer puts it on again as
+the end moves, never over the switch off. Over a standing the file won't give back, the last run's
+lock stays until the phone knows where it stands or the student unlocks. Rule 3's check, at each of the
+engine's wakes, puts back a lock gone behind Bali's back. Swift's actor is a lock each stretch holds, as
+the engine's, let go at each call into the lock or the engine, so a check lands while a pass waits on the
+lock; each call runs in the enforcer's own scope, so no caller cancelled cuts a pass short. What a screen
+may claim of the lock (`Protection`) is what the last pass found, never the standing alone. Its tests run
+on the engine's rig, with a fake lock (`LockSupport.kt`).
 
 ## Android Lint
 

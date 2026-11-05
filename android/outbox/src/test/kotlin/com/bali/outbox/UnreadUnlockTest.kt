@@ -5,34 +5,32 @@ import com.bali.core.ParticipationState
 import com.bali.core.UnlockReason
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.runBlocking
 
 /**
- * Emergency Unlock over a standing the file won't give back (B6b): the engine's half of BaliOutbox's
- * UnreadUnlockTests but `filing` (StandingTest's). The lock's half, the last run's lock and `unlockedLast`,
- * is AN7's, with `leftByTheLastRun`; iOS's monitor has no Android twin.
+ * Emergency Unlock over a standing the file won't give back (B6b): BaliOutbox's UnreadUnlockTests but
+ * `filing` (StandingTest's), each relaunched over the last run's lock ([unreadable]), which the press takes
+ * off once (`unlockedLast`, AN7a's). iOS's monitor has no Android twin.
  */
 class UnreadUnlockTest : EngineFiles() {
     private val kept = Standing.InSession(session(endsAt = 1200), ParticipationState.Focused)
     private val unlocked = kept.copy(state = ParticipationState.Unlocked)
 
-    /** A rig over [outbox], whose file holds where the phone stood, [kept], in a form this build can't read. */
-    private suspend fun unreadable(outbox: Outbox = makeOutbox().first): Rig {
-        outbox.keep(kept)
-        spoilStanding(outbox)
-        return rig(outbox)
-    }
-
     @Test
-    fun noTapPendingItIsKeptSentNowhereHoldingBackNothingGuardingEverySessionNothingWrittenOverTheFilesStandingUntilThePhoneKnowsWhereItStands(): Unit =
+    fun noTapPendingItTakesTheLastRunsLockOffAtOnceAndIsKeptSentNowhereHoldingBackNothingGuardingEverySessionNothingWrittenOverTheFilesStanding(): Unit =
         runBlocking {
-            val rig = unreadable()
+            val (phone, _) = unreadable()
+            val rig = phone.rig
+            assertTrue(phone.lock.holds)
             val unlock = assertNotNull(rig.engine.emergencyUnlock(UnlockReason.Nurse))
             assertEquals(Change.UnlockUnfiled(UnlockReason.Nurse), unlock.change)
             assertNull(unlock.request)
+            phone.until { !it.locked }
+            assertFalse(phone.lock.holds)
             val state = rig.engine.updates.value
             assertEquals(Standing.Unread, state.standing)
             assertEquals(listOf(unlock.eventId), state.queued.map { it.eventId })
@@ -48,24 +46,43 @@ class UnreadUnlockTest : EngineFiles() {
         }
 
     @Test
-    fun underTheTapNotYetAnsweredAsDecision11FilesItItEndsThatTapsLockToo(): Unit =
+    fun underTheTapNotYetAnsweredAsDecision11FilesItItEndsThatTapsLockAndTakesTheLastRunsOffToo(): Unit =
         runBlocking {
-            val rig = unreadable()
+            val (phone, _) = unreadable()
+            val rig = phone.rig
             val tap = assertNotNull(rig.engine.tap(BlockRead.Block("T7XK2M9QPF")))
             val held = rig.server.next(tapRoute)
             assertNotNull(rig.engine.updates.value.shieldedUntil(t0))
+            assertTrue(phone.lock.holds)
             val unlock = assertNotNull(rig.engine.emergencyUnlock())
             assertEquals(Change.UnlockUnderTap(tap.eventId, null), unlock.change)
             assertNull(rig.engine.updates.value.shieldedUntil(t0))
+            phone.until { !it.locked }
+            assertFalse(phone.lock.holds)
             held.reply(null)
+        }
+
+    @Test
+    fun anUnlockTheLastRunLeftQueuedEndsNothingATapSinceMayHavePutTheLockBackOnSoTheLastRunsStays(): Unit =
+        runBlocking {
+            // UnreadUnlockTests' `leftByTheLastRun`.
+            val (outbox, _) = makeOutbox()
+            val stale = record(outbox, Change.Unlock("s", null))
+            send(outbox, stale, 400, Answer.refused("invalid_request"))
+            val (phone, _) = unreadable(outbox = outbox)
+            assertFalse(phone.rig.engine.updates.value.unlockedLast)
+            assertTrue(phone.lock.holds)
+            assertEquals(0, phone.lock.unlocks)
         }
 
     @Test
     fun onceTheFileGivesBackWhereThePhoneStoodTheUnlockIsFiledThereInTheWriteThatKeepsItAndSentThePhoneUnlockedThereNeverLocked(): Unit =
         runBlocking {
             val (outbox, relaunches) = relaunching(temporaryFile())
-            val rig = unreadable(outbox)
+            val (phone, _) = unreadable(outbox = outbox)
+            val rig = phone.rig
             val unlock = assertNotNull(rig.engine.emergencyUnlock(UnlockReason.Bathroom))
+            phone.until { !it.locked }
             // The read loop has found the file unreadable, and reads it again in a minute; only then is
             // it readable, or its first wake, run late, reads it at once (seen on CI's Linux).
             rig.sleeping(at(60))
@@ -81,21 +98,28 @@ class UnreadUnlockTest : EngineFiles() {
             for (engine in relaunches.engines) assertNull(engine.updates.value.shieldedUntil(at(60)))
             sent.reply(200, Answer.unlocked(session(endsAt = 1200)))
             assertEquals(unlocked, rig.until { it.queued.isEmpty() }.standing)
+            // The last run's lock off once, at the press, and never back on.
+            assertEquals(1, phone.lock.unlocks)
+            assertFalse(phone.lock.holds)
         }
 
     @Test
     fun onceTheServerNamesTheSessionAReadSayingFocusedThereLeavesThePhoneUnlockedAndTheUnlockIsFiledThereAndSent(): Unit =
         runBlocking {
-            val rig = unreadable()
+            val (phone, _) = unreadable()
+            val rig = phone.rig
             val unlock = assertNotNull(rig.engine.emergencyUnlock())
+            phone.until { !it.locked }
             val view = session(endsAt = 4000)
             rig.engine.setInFront(true)
             rig.server.next(meRoute).reply(200, Answer.me(view))
             val sent = rig.server.next(unlockRoute)
             assertEquals(unlock.eventId, sent.eventId)
             assertEquals(Standing.InSession(view, ParticipationState.Unlocked), rig.engine.updates.value.standing)
+            assertFalse(phone.lock.holds)
             sent.reply(200, Answer.unlocked(view))
             assertEquals(Standing.InSession(view, ParticipationState.Unlocked), rig.until { it.queued.isEmpty() }.standing)
+            assertEquals(1, phone.lock.unlocks)
         }
 
     @Test
@@ -104,8 +128,10 @@ class UnreadUnlockTest : EngineFiles() {
             val (outbox, _) = makeOutbox()
             val tap = record(outbox, Change.Tap("T7XK2M9QPF"))
             send(outbox, tap, 200, Answer.joined(session(endsAt = 1200)))
-            val rig = unreadable(outbox)
+            val (phone, _) = unreadable(outbox = outbox)
+            val rig = phone.rig
             val unlock = assertNotNull(rig.engine.emergencyUnlock())
+            phone.until { !it.locked }
             // The class ended while the file couldn't say so: the student is in none.
             rig.engine.setInFront(true)
             rig.server.next(meRoute).reply(200, Answer.me(null))
@@ -113,13 +139,16 @@ class UnreadUnlockTest : EngineFiles() {
             assertEquals(unlock.eventId, sent.eventId)
             sent.reply(200, Answer.unlockAfterEnd(session(endsAt = 1200)))
             assertEquals(Standing.Out, rig.until { it.queued.isEmpty() }.standing)
+            assertFalse(phone.lock.holds)
         }
 
     @Test
     fun withNoTapKnownAndNoSessionNamedItWaitsKeptNeverSentAndALaterTruthNamingOneFilesItThereATapTheStudentMakesAfterIt(): Unit =
         runBlocking {
-            val rig = unreadable()
+            val (phone, _) = unreadable()
+            val rig = phone.rig
             val unlock = assertNotNull(rig.engine.emergencyUnlock())
+            phone.until { !it.locked }
             rig.engine.setInFront(true)
             rig.server.next(meRoute).reply(200, Answer.me(null))
             val out = rig.until { it.standing == Standing.Out }
@@ -135,20 +164,29 @@ class UnreadUnlockTest : EngineFiles() {
         }
 
     @Test
-    fun keptAcrossARelaunchTheFileStillUnreadItStaysAndTheFileReadAgainTheNextLaunchStandsUnlockedWhereThePhoneStoodAndFilesAndSendsIt(): Unit =
+    fun keptAcrossARelaunchTheFileStillUnreadTheLockStaysOffAndItStaysAndTheFileReadAgainTheNextLaunchStandsUnlockedWhereThePhoneStoodNeverLockedAndFilesAndSendsIt(): Unit =
         runBlocking {
             val (outbox, file) = makeOutbox()
-            val first = unreadable(outbox)
-            val unlock = assertNotNull(first.engine.emergencyUnlock())
+            val (first, _) = unreadable(outbox = outbox)
+            val lock = first.lock
+            val unlock = assertNotNull(first.rig.engine.emergencyUnlock())
+            first.until { !it.locked }
             first.stop()
-            val second = rig(open(file))
-            val unread = second.engine.updates.value
+            // The phone's own lock at each relaunch, as the service keeps it.
+            val second = enforced(rig(open(file)), lock)
+            second.until { it.checked }
+            val unread = second.rig.engine.updates.value
             assertEquals(listOf(Standing.Unread, listOf(unlock.eventId)), listOf(unread.standing, unread.queued.map { it.eventId }))
+            assertFalse(lock.holds)
             second.stop()
             outbox.keep(kept)
-            val third = rig(open(file))
-            assertEquals(unlock.eventId, third.server.next(unlockRoute).eventId)
-            assertEquals(unlocked, third.engine.updates.value.standing)
+            val third = enforced(rig(open(file)), lock)
+            assertEquals(unlock.eventId, third.rig.server.next(unlockRoute).eventId)
+            assertEquals(unlocked, third.rig.engine.updates.value.standing)
+            // Its enforcer's pass made, over where the phone stood unlocked: no lock, and none ever put on.
+            third.until { it.checked }
+            assertFalse(lock.holds)
+            assertEquals(0, lock.locks)
         }
 
     @Test
@@ -158,8 +196,10 @@ class UnreadUnlockTest : EngineFiles() {
             val (outbox, _) = makeOutbox()
             val stuck = record(outbox, Change.Unlock("s", null))
             send(outbox, stuck, 400, Answer.refused("invalid_request"))
-            val rig = unreadable(outbox)
+            val (phone, _) = unreadable(outbox = outbox)
+            val rig = phone.rig
             val press = assertNotNull(rig.engine.emergencyUnlock())
+            phone.until { !it.locked }
             eventually { rig.clock.deadlines.contains(at(2)) }
             rig.clock.advance(2)
             val view = session(endsAt = 1200)
@@ -172,6 +212,8 @@ class UnreadUnlockTest : EngineFiles() {
             val state = rig.until { it.queued.size == 1 && it.queued[0].stuck }
             assertEquals(Standing.InSession(view, ParticipationState.Unlocked), state.standing)
             assertNull(state.shieldedUntil(rig.clock.now()))
+            assertFalse(phone.lock.holds)
+            assertEquals(1, phone.lock.unlocks)
         }
 
     @Test
@@ -184,7 +226,7 @@ class UnreadUnlockTest : EngineFiles() {
             val unlock = record(outbox, Change.Unlock("s", null))
             send(outbox, unlock, 200, Answer.unlocked(view))
             assertNull(record(outbox, Change.Refocus("s")).follows)
-            val rig = unreadable(outbox)
+            val rig = unreadable(outbox = outbox).first.rig
             rig.server.next(refocusRoute).reply(200, Answer.refocused(view))
             val state = rig.until { it.standing != Standing.Unread }
             assertEquals(Standing.InSession(view, ParticipationState.Focused), state.standing)
@@ -192,19 +234,24 @@ class UnreadUnlockTest : EngineFiles() {
         }
 
     @Test
-    fun aReadOfTheQueueThatFailsRightAfterThePressTakesNothingFromItAndWhereTheServerThenSaysThePhoneStandsThePressIsFiledAndSent(): Unit =
+    fun aReadOfTheQueueThatFailsRightAfterThePressTakesNothingFromItTheLockOffAtOnceAndWhereTheServerThenSaysThePhoneStandsThePressIsFiledAndSent(): Unit =
         runBlocking {
             // #95's Claude Review.
-            val rig = unreadable()
+            val (phone, _) = unreadable()
+            val rig = phone.rig
             poison(rig.outbox)
             val press = assertNotNull(rig.engine.emergencyUnlock())
-            assertEquals(listOf(press.eventId), rig.engine.updates.value.queued.map { it.eventId })
+            val pressed = rig.engine.updates.value
+            assertEquals(listOf(press.eventId), pressed.queued.map { it.eventId })
+            assertTrue(pressed.unlockedLast)
+            phone.until { !it.locked }
             poison(rig.outbox, false)
             val view = session(endsAt = 4000)
             rig.engine.setInFront(true)
             rig.server.next(meRoute).reply(200, Answer.me(view))
             assertEquals(press.eventId, rig.server.next(unlockRoute).eventId)
             assertEquals(Standing.InSession(view, ParticipationState.Unlocked), rig.engine.updates.value.standing)
+            assertFalse(phone.lock.holds)
         }
 
     @Test
@@ -244,8 +291,10 @@ class UnreadUnlockTest : EngineFiles() {
         runBlocking {
             // #95's Claude Review.
             val (outbox, _) = makeOutbox()
-            val rig = unreadable(outbox)
+            val (phone, _) = unreadable(outbox = outbox)
+            val rig = phone.rig
             val press = assertNotNull(rig.engine.emergencyUnlock())
+            phone.until { !it.locked }
             // Readable again once the read loop has found it unreadable, but the write that would file
             // the press there is refused.
             rig.sleeping(at(60))
