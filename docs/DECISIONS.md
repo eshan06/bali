@@ -102,6 +102,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   that ends leaving every later renewal stillborn, `signIn` then throwing its cancel to a caller
   still running (the scope's doc and For AN6c, above: the app's lives as long as its process).
 
+  **Claude Review on #518:** PASS, with three WARNs: `refresh` marks the tokens held now as refused,
+  so fresh ones landed between the API's 401 and the call cost one more renewal and lose nothing,
+  as on iOS (left: the engine's refresh names no token); the scope that ends (above); and a sign-out
+  while a sign-in's exchange runs, which that sign-in, the student's own, then overrides, as on iOS
+  (pinned by a test).
+
   **The proof:** `android/app` is unchanged, so the JVM tests are the proof, and no emulator ran.
 
 - **2026-11-05** — **A3a, the server's endpoint for the portal's teacher actions, `POST

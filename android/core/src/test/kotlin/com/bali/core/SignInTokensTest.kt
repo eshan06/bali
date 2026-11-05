@@ -445,6 +445,24 @@ class SignInTokensTest : SignIns() {
         }
 
     @Test
+    fun aSignOutWhileASignInsExchangeRunsLeavesTheSignInTheStudentStartedStandingAsIOSsDoes() =
+        inTime {
+            // Claude Review's note on #518: the exchange's answer is the sign-in's own, kept unguarded.
+            val endpoint = HeldEndpoint()
+            val (store, told) = MemoryStore.holding(jwt("a1")) to Told()
+            val phone = signIn(store, endpoint, told = told)
+            val signingIn = async { phone.signIn(browser = signsIn) }
+            endpoint.received(1)
+            phone.signOut()
+            assertNull(store.data)
+            endpoint.answer(200, granted(jwt("b1"), refresh = "refresh-b"))
+            signingIn.await()
+            assertEquals(jwt("b1"), phone.accessToken())
+            assertEquals("refresh-b", store.tokens?.refresh)
+            assertEquals(1, told.count)
+        }
+
+    @Test
     fun aSignInWhileARenewalRunsStandsEvenWhenCognitoRefusesTheRefreshTokenLetGo() =
         inTime {
             val endpoint = HeldEndpoint()
