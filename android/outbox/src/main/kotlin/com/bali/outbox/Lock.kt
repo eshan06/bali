@@ -29,7 +29,8 @@ enum class LockSwitch {
 /**
  * The lock as the phone has it (decision 2). Its end is its own: put on until a time, it stops covering
  * apps there by the phone's clock, with nothing woken, the bell's twin (ARCHITECTURE, "The bell needs no
- * extension"). Its calls never throw, as Swift's protocol's can't: a failure is the lock's own to handle.
+ * extension"). Its calls never throw, nor end in a cancel of their own, as Swift's protocol's can't: a
+ * failure is the lock's own to handle, though the enforcer outlives one all the same.
  */
 interface Lock {
     /** The switch, read now. */
