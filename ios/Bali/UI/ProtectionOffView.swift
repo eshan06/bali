@@ -94,26 +94,25 @@ struct ProtectionOffView: View {
 
     /// D1's primary action, Turn on Screen Time — in Settings, or at iOS's own prompt where it was
     /// never given here, an ask that did not finish said under it — or, once it reads on, the
-    /// block's scan; none while the check has not read it yet. Then D1's line.
+    /// block's scan, a scan that recorded no tap said under it; none while the check has not read
+    /// it yet, so the page ends at the steps.
     @ViewBuilder private func action(_ way: ProtectionOffWords.Way) -> some View {
-        VStack(spacing: 12) {
-            switch way {
-            case .retap: TapIn(phone: phone)
-            case .ask:
+        switch way {
+        case .retap: VStack(spacing: 12) { TapIn(phone: phone) }
+        case .ask:
+            VStack(spacing: 12) {
                 AskScreenTime(phone: phone, label: "Turn on Screen Time")
                     .buttonStyle(PrimaryButtonStyle())
                 if let failure = phone.askFailed?.words(.notDetermined) {
                     Text(failure).textStyle(.body)
                 }
-            case .settings:
-                Button("Turn on Screen Time") {
-                    if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
-                }
-                .buttonStyle(PrimaryButtonStyle())
-            case .checking: EmptyView()
             }
-            Text("It's always your call. Bali only makes sure your teacher sees the truth.")
-                .textStyle(.caption).foregroundStyle(Theme.textTertiary)
+        case .settings:
+            Button("Turn on Screen Time") {
+                if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+            }
+            .buttonStyle(PrimaryButtonStyle())
+        case .checking: EmptyView()
         }
     }
 }

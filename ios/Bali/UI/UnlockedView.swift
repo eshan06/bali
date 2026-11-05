@@ -59,7 +59,8 @@ struct UnlockedView: View {
     }
 
     /// D1's card: why, optional — the three, the check on the reason on record, or on the newest
-    /// picked while a pick is on its way; what a pick does, or why the last did not go.
+    /// picked while a pick is on its way; under them, while the unlock is on its way, what a pick
+    /// waits for, or why the last did not go.
     private func reasons(_ picker: UnlockedWords.Picker) -> some View {
         Card {
             VStack(alignment: .leading, spacing: 12) {
@@ -69,8 +70,10 @@ struct UnlockedView: View {
                     HStack(spacing: 8) { choices(picker) }
                     VStack(spacing: 8) { choices(picker) }
                 }
-                Text(phone.pickFailed ?? picker.caption).textStyle(.caption)
-                    .foregroundStyle(phone.pickFailed == nil ? Theme.textTertiary : Theme.text)
+                if let line = phone.pickFailed ?? picker.caption {
+                    Text(line).textStyle(.caption)
+                        .foregroundStyle(phone.pickFailed == nil ? Theme.textTertiary : Theme.text)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -106,8 +109,7 @@ struct UnlockedView: View {
     private func announce(_ words: String) { AccessibilityNotification.Announcement(words).post() }
 
     /// Home, the primary way on, the apps still open (the owner's ruling); then Lock my apps again
-    /// — or, where protection off was reported here or the refocus was refused, the block's scan —
-    /// and D1's line.
+    /// — or, where protection off was reported here or the refocus was refused, the block's scan.
     private func ways(_ words: UnlockedWords) -> some View {
         VStack(spacing: 12) {
             Button {
@@ -132,12 +134,6 @@ struct UnlockedView: View {
                 .buttonStyle(SecondaryButtonStyle())
                 if let notBack { Text(notBack).textStyle(.body) }
             }
-            HStack(alignment: .top, spacing: 8) {
-                Image(systemName: "checkmark.icloud").accessibilityHidden(true)
-                Text("Saved on your phone first. It reaches your teacher as soon as there's signal.")
-            }
-            .textStyle(.caption).foregroundStyle(Theme.textTertiary).padding(.horizontal, 8)
-            .multilineTextAlignment(.leading)
         }
     }
 }

@@ -78,7 +78,7 @@ struct UnlockedTests {
     }
 
     @Test(
-        "The reason card (C5c): the check on the reason the unlock carries while it is on the phone, a pick open while it has never been sent — waiting, its buttons off, once it is on its way, sent with no answer, or stuck; once the server has it, open at the reason on record (A20); an unlock this run did not make, no card"
+        "The reason card (C5c): the check on the reason the unlock carries while it is on the phone, a pick open while it has never been sent — waiting, its buttons off, once it is on its way, sent with no answer, or stuck; once the server has it, open at the reason on record (A20); an unlock this run did not make, no card. Open, it says nothing under the three (the owner's cut, 2026-11-04); waiting, why a pick can't go yet"
     )
     func picker() async throws {
         let (held, queued) = try pressed(reason: .nurse)
@@ -102,7 +102,8 @@ struct UnlockedTests {
         #expect(words(recorded(try unlocked(), .bathroom))?.unlock == "u")
         #expect(words(recorded(try unlocked(), .bathroom, session: "a"))?.unlock == nil)
         #expect(words(try unlocked())?.unlock == nil)
-        #expect(UnlockedWords.Picker.open(nil).caption == "Your teacher sees the reason you pick.")
+        #expect(UnlockedWords.Picker.open(nil).caption == nil)
+        #expect(UnlockedWords.Picker.open(.nurse).caption == nil)
         #expect(UnlockedWords.Picker.waiting(nil).caption == UnlockedWords.onItsWay)
         #expect(
             UnlockedWords.Picker.waiting(.nurse).caption

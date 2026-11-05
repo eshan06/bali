@@ -3968,6 +3968,73 @@ struct AppTests {
     }
 
     @Test(
+        "Unlocked, Screen Time off and Waiting lose the owner's cut lines (2026-11-04; D1's Unlocked, ProtectionOff and Waiting, and the app canvas's Unlocked and ScreenTimeOff boards and PushWaitA), in every state: Unlocked ends at its way back, Lock my apps again or the re-tap's Tap in, with no line under it, and its reason card ends at the three while a pick is open, but for why the last pick didn't go (rule 5), and still says why a pick waits while the unlock is on its way; Screen Time off ends at its way on, or at its steps while the check reads the permission; Waiting's line is the one sentence left"
+    )
+    func cutLinesGone() async throws {
+        /// What VoiceOver reads of `name`'s screen, laid out whole, once it reads `title`.
+        func read(_ name: String, once title: String) async throws -> [String] {
+            let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))
+            let (window, read) = try await laidOut(RootView(phone: phone)) { $0.contains(title) }
+            window.isHidden = true
+            return read.map(\.label)
+        }
+        let cut = [
+            "Saved on your phone first.", "Your teacher sees the reason you pick.", "It's always your call.",
+            "You tapped your teacher's block before class started.",
+        ]
+        var pages: [(String, [String])] = []
+        // Each Unlocked fixture with the reason card, and what the card says under the three: nil
+        // for nothing, Go to Home next. Its way back, the page's last, is Lock my apps again.
+        let back = "Lock my apps again"
+        let carded: [(String, String?)] = [
+            ("unlocked", nil), ("unlockedReason", nil), ("unlockedChanged", nil), ("unlockedPicking", nil),
+            ("unlockedPickError", UnlockedWords.offline), ("unlockedOnItsWay", UnlockedWords.onItsWay),
+            ("unlockedQuestion", nil), ("unlockedQuestionUnsent", UnlockedWords.onItsWay), ("unlockedSlide", nil),
+            ("unlockedSlideAlone", nil),
+        ]
+        for (name, said) in carded {
+            let page = try await read(name, once: "Go to Home")
+            pages.append((name, page))
+            #expect(page.last == back, "\(name): \(page)")
+            let other = try #require(page.firstIndex(of: "Other"), "\(name): \(page)")
+            let next = [said, "Go to Home"].compactMap { $0 }
+            #expect(Array(page[(other + 1)...].prefix(next.count)) == next, "\(name): \(page)")
+        }
+        // And with none, no unlock of this run's to give a reason for: its way back, the page's last.
+        for (name, way) in [("unlockedRecorded", back), ("unlockedRetap", "Tap in"), ("unlockedRefused", "Tap in")] {
+            let page = try await read(name, once: "Go to Home")
+            pages.append((name, page))
+            #expect(page.last == way && !page.contains("Other"), "\(name): \(page)")
+        }
+        // Each Screen Time off fixture and its way on, the page's last; checking, its last step.
+        let turnOn = "Turn on Screen Time"
+        for (name, way) in [
+            ("protectionOff", turnOn), ("protectionOffAsk", turnOn), ("protectionOffBackOn", "Tap in"),
+            ("protectionOffRefused", turnOn), ("protectionOffUnreported", turnOn), ("protectionOffError", turnOn),
+            ("protectionOffQuestion", turnOn), ("protectionOffQuestionError", turnOn), ("protectionOffSlide", turnOn),
+            ("protectionOffSlideQuestion", turnOn), ("protectionOffChecking", "2, Bali puts you back in class by itself"),
+        ] {
+            let page = try await read(name, once: "Screen Time off")
+            pages.append((name, page))
+            #expect(page.last == way, "\(name): \(page)")
+        }
+        // Waiting: its title, then the line.
+        let title = "Ready, waiting for your teacher"
+        for name in ["waiting", "waitingError", "waitingTapRefused"] {
+            let page = try await read(name, once: title)
+            pages.append((name, page))
+            let at = try #require(page.firstIndex(of: title), "\(name): \(page)")
+            #expect(
+                page.dropFirst(at + 1).first
+                    == "Your phone locks when class starts, as long as Bali is open. No need to tap again.",
+                "\(name): \(page)")
+        }
+        for (name, page) in pages {
+            #expect(!page.contains { label in cut.contains { label.contains($0) } }, "\(name): \(page)")
+        }
+    }
+
+    @Test(
         "VoiceOver on a question (L8): the strip's time read as the ring's, and its chip; each answer a button read with its letter and words, the student's own read as Your answer and selected; closed, each answer with its marks, the correct one's and theirs, and Hide read as Hide this question; Emergency Unlock the same button, its label unchanged"
     )
     func questionVoiceOver() async throws {
