@@ -92,7 +92,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the collector without the check, and without `setInFront` (3); the cap not read at the start; a start's
   failure swallowed (2); a second start let in while one is under way, which first hung its test on an
   unbounded wait, now bounded; the Launch measure never settling at a first read; Emergency Unlock never
-  offered; and Release's `ThisBuild` making an engine (the JVM's). By hand on the emulator: a typed tap
+  offered; and Release's `ThisBuild` making an engine (the JVM's). **AN6c's race again:** on Android 16, a
+  fresh boot, AN6c's `aHostMadeAgainForAChange…TakesTheStudentsBackForAClose…` failed once, its Back reaching
+  Chrome's first-run activity while Chrome remade it for the font scale (logcat: no input channel), the race
+  AN7c named there; nothing of this step's runs by then, and the suite then ran whole. Its Back waiting for
+  Chrome's window to come back is a fix of its own, outside this step. By hand on the emulator: a typed tap
   locked to its 50 minutes, the cap moving it to 15, Emergency Unlock taking it off and the service back
   to listening to nothing; and `uiautomator dump`, a UiAutomation that suppresses accessibility services,
   has Android unbind the service while it runs, which the readout said as it happened (switch starting,
