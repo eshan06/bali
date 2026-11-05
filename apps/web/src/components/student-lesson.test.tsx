@@ -171,20 +171,22 @@ interface Given {
   said?: Said;
   /** The slide's deck as the page first holds it (W5): loading. */
   deck?: DeckState;
+  /** What the slide's Try again asks of the page: the deck loaded again. */
+  onReloadDeck?: () => void;
   held?: boolean;
 }
 
 /** The lesson as its page draws `view`, in the shell's `<main>` (PagePlace). */
 const lesson = (
   view: LessonView,
-  { sending = null, said = null, deck, held = false }: Given = {},
+  { sending = null, said = null, deck, onReloadDeck = () => undefined, held = false }: Given = {},
 ) => (
   <main>
     <StudentLesson
       view={view}
       held={held}
       deck={deck ?? { kind: 'loading' }}
-      onReloadDeck={() => undefined}
+      onReloadDeck={onReloadDeck}
       sending={sending}
       said={said}
       onPick={() => undefined}
@@ -258,6 +260,7 @@ const SLIDE = ['Slide 4 of 12', 'Full screen'];
 const ANSWERED = 'Your answer is in. You can change it until the question closes.';
 const NOTHING = 'Nothing shared yet. Slides and questions from your teacher show up here.';
 const DIDNT = "Bali couldn't send your answer. Check your connection and pick it again.";
+const CANT_REACH = "Can't reach Bali right now, so this page may be behind. It keeps trying.";
 const TOO_LATE = "This question closed before your answer reached Bali, so it wasn't counted.";
 /** The two lines the owner cut (2026-11-04), which no card says any more. */
 const PICK = 'Pick an answer. You can change it until the question closes.';
@@ -981,8 +984,8 @@ describe('the slide in full screen (W5; PV1)', () => {
   });
 
   /** The lesson with `view` drawn, Full screen pressed, the browser's answer in. */
-  async function opened(view: LessonView = live({ slide })) {
-    const shown = show(view);
+  async function opened(view: LessonView = live({ slide }), given: Given = {}) {
+    const shown = show(view, given);
     fireEvent.click(screen.getByRole('button', { name: 'Full screen' }));
     await act(() => Promise.resolve());
     return shown;
@@ -1073,6 +1076,32 @@ describe('the slide in full screen (W5; PV1)', () => {
     expect(dialog()).toBeNull();
     expect(exitFullscreen).not.toHaveBeenCalled();
     expect(document.activeElement).toBe(back());
+  });
+
+  it('lands focus back on Full screen once left, with a question beside the slide', async () => {
+    // The card comes first on the page, so only Full screen's own id brings focus back to it.
+    await opened(live({ question: question({ answer: yours(1) }), slide }));
+    fireEvent.click(screen.getByRole('button', { name: 'Exit full screen' }));
+    expect(dialog()).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Full screen' }));
+  });
+
+  it('says Bali can’t be reached over the slide while reads fail, and the deck as the page holds it, its Try again the page’s own (StudentSlideStates)', async () => {
+    const reload = vi.fn();
+    const failed: DeckState = { kind: 'failed', why: 'unloaded' };
+    const { rerender } = await opened(live({ slide }, true), {
+      deck: failed,
+      onReloadDeck: reload,
+    });
+    const shown = within(screen.getByRole('dialog'));
+    expect(shown.getByRole('status').textContent).toBe(CANT_REACH);
+    expect(shown.getByRole('alert').textContent).toBe("Bali couldn't load the slides.");
+    fireEvent.click(shown.getByRole('button', { name: 'Try again' }));
+    expect(reload).toHaveBeenCalledOnce();
+    // Reached again: the line goes, the slide's own state stays.
+    rerender(lesson(live({ slide }), { deck: failed, onReloadDeck: reload }));
+    expect(within(screen.getByRole('dialog')).queryByText(CANT_REACH)).toBeNull();
+    expect(within(screen.getByRole('dialog')).getByRole('alert')).toBeTruthy();
   });
 
   it('takes the page out of full screen with it once the page goes', async () => {
@@ -1185,6 +1214,31 @@ describe('its URL and its reads', () => {
     await act(() => Promise.resolve(held.answer(...reply)));
     await wait();
   }
+  /** Bali failing a read, as a server that's down answers. */
+  const DOWN = [503, { error: { code: 'unavailable', message: 'down' } }] as const;
+  /**
+   * The shell on the student's home first, its account read and held, then this lesson's page, as a
+   * student arrives from within the portal; `before` runs between the two.
+   */
+  async function openFromHome(before: () => void = () => undefined) {
+    vi.useFakeTimers({ now: NOW });
+    bali.path = '/';
+    const shown = render(
+      <Shell>
+        <p>The student’s home</p>
+      </Shell>,
+    );
+    await wait();
+    before();
+    bali.path = `/lessons/${CLASS}/${SESSION}`;
+    shown.rerender(
+      <Shell>
+        <StudentLessonPage classId={CLASS} sessionId={SESSION} />
+      </Shell>,
+    );
+    await wait();
+    return shown;
+  }
 
   it('is a page for a class and a session each an id the API mints, else none, and afresh for another', async () => {
     const shown = await Route({ params: Promise.resolve({ classId: CLASS, sessionId: SESSION }) });
@@ -1226,7 +1280,14 @@ describe('its URL and its reads', () => {
     teach({ running: false, question: null, slide: null, phone: null });
     await wait(30 * 60_000);
     expect(reads('/v1/me')).toBe(3);
-    expect(screen.getByRole('heading', { name: 'Class is over' })).toBeTruthy();
+    // Over at the bell it kept, which the page can vouch for, so it says when.
+    expect(words(screen.getByRole('region', { name: 'Class is over' }))).toEqual([
+      'Class is over',
+      'This class ended at ',
+      bellTime(later),
+      ". Slides and questions from it aren't available after class.",
+      'Your classes',
+    ]);
     // The page reads nothing of its own but the lesson: the rest is the shell's account.
     expect(new Set(bali.calls.map((c) => `${c.method} ${c.path}`))).toEqual(
       new Set(['GET /v1/me/age-check', 'GET /v1/me', `GET ${PRESENTATION}`]),
@@ -1261,18 +1322,78 @@ describe('its URL and its reads', () => {
     }
   });
 
-  it('stops following once the account no longer lists the class', async () => {
+  it('stops following once the account no longer lists the class, and closes the slide it showed', async () => {
+    teach(running({ slide }));
     open(Date.parse(BELL) - 4_000);
     await wait();
     expect(reads(PRESENTATION)).toBe(1);
+    const close = vi.fn(() => Promise.resolve());
+    await act(() =>
+      Promise.resolve(bali.loads[0]?.end({ kind: 'loaded', deck: { pdf: {}, close } })),
+    );
     // Read again at the bell: removed from the class meanwhile.
     said.me = account([]);
     await wait(4_000);
     expect(reads('/v1/me')).toBe(2);
     expect(screen.getByText("This lesson is for a class you're not in.")).toBeTruthy();
+    // Its slide goes with it: the deck closed, though the last read still showed it.
+    expect(close).toHaveBeenCalledOnce();
     const followed = reads(PRESENTATION);
     await wait(20_000);
     expect(reads(PRESENTATION)).toBe(followed);
+    expect(bali.loads).toHaveLength(1);
+  });
+
+  it('reads the account itself as it opens over the one the shell holds: Loading… until that read answers, then what it says', async () => {
+    // The account the student's home read before this class began: the class, no session.
+    said.me = account([ours(null)]);
+    await openFromHome(() => said.hold.add('/v1/me'));
+    // The home's read, then the page's own, on its way.
+    expect(reads('/v1/me')).toBe(2);
+    expect(screen.getByRole('status').textContent).toBe('Loading…');
+    expect(reads(PRESENTATION)).toBe(0);
+    // It says the class has no session now: over, and the page can't say when.
+    said.hold.clear();
+    await answer('/v1/me', 200, account([ours(null)]));
+    expect(words(screen.getByRole('region', { name: 'Class is over' }))).toContain(
+      "This class has ended. Slides and questions from it aren't available after class.",
+    );
+    expect(reads(PRESENTATION)).toBe(0);
+  });
+
+  it('says a failed account read as the lesson’s failure, its Try again held until the account’s read answers, and never a bare Loading… while the lesson’s first read follows (StudentRetryStates)', async () => {
+    const LINE = "Bali couldn't load this lesson.";
+    said.me = account([ours(null)]);
+    await openFromHome(() => said.hold.add('/v1/me'));
+    await answer('/v1/me', ...DOWN);
+    expect(screen.getByRole('alert').textContent).toBe(LINE);
+    const again = screen.getByRole('button', { name: 'Try again' });
+    again.focus();
+
+    // Pressed: the account read again, Try again held until it answers.
+    fireEvent.click(again);
+    await wait();
+    // The home's read, the page's own that failed, and this one.
+    expect(reads('/v1/me')).toBe(3);
+    expect(again.textContent).toBe('Loading…');
+    expect(again.getAttribute('aria-busy')).toBe('true');
+    expect(screen.getByRole('alert').textContent).toBe(LINE);
+    // It fails again: said again, and Try again free for the next press.
+    await answer('/v1/me', ...DOWN);
+    expect(again.textContent).toBe('Try again');
+    expect(again.getAttribute('aria-busy')).toBe('false');
+    expect(screen.getByRole('alert').textContent).toBe(LINE);
+    expect(document.activeElement).toBe(again);
+
+    // Pressed again: this time the account lists the class in session, so the page follows it, and
+    // shows the lesson once its read answers.
+    fireEvent.click(again);
+    await wait();
+    await answer('/v1/me', 200, account([ours(bell)]));
+    expect(reads(PRESENTATION)).toBe(1);
+    expect(screen.getByText(NOTHING)).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Try again|Loading/ })).toBeNull();
   });
 
   it('reads the lesson afresh on Try again and the account with it, held until the lesson’s read answers (StudentRetryStates)', async () => {

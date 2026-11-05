@@ -195,7 +195,7 @@ describe('the slide in full screen (StudentSlideFull, StudentSlideStates)', () =
       /<Button ref=\{exit\} variant="secondary" size="sm" onClick=\{onLeave\}>/,
     );
     // The page goes full screen on Full screen's own press, never here (a browser allows it only on
-    // a press), and leaves it as the page closes this (student-lesson.test.ts).
+    // a press), and leaves it as the page closes this (student-lesson.test.tsx).
     expect(source).not.toMatch(/requestFullscreen|exitFullscreen/);
   });
 });
