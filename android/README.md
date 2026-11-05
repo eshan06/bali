@@ -76,6 +76,14 @@ its pooled one turns out closed, as URLSession's does. Its tests run against Moc
 local port. Gradle picks OkHttp's Android build for the app and its JVM build for `core`'s tests.
 Its calls suspend (kotlinx.coroutines), as Swift's are async.
 
+**Sign-in's parts** (`core`'s `SignIn.kt`, BaliCore's `SignIn.swift` from its top through `Tokens`)
+are the hosted UI's address with PKCE, its verifier and state from `SecureRandom`; the code in its
+answer, taken only at the redirect URI and only for its attempt, the answer read with `java.net.URI`,
+since OkHttp's `HttpUrl` reads only http and https; and the tokens, kept in a form of their own that
+reads tokens kept before a field existed, and their claims, read unverified: a token the phone can't
+read gives none, never a crash. No token, code, verifier or state reaches a log line or an error's
+message. `SignIn` itself is AN6b's; its store and browser, the app's, AN6c's.
+
 **The outbox tables** (`core`'s `UnlockContract.kt` and `OutboxContract.kt`, BaliCore's twins) say
 what the outbox does with a record after each send; no answer ever drops an unlock the server hasn't
 recorded. `outbox`'s tests run every `contracts/outbox/` case against them, and `core`'s check each
