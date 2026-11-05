@@ -229,6 +229,9 @@ class SignInTest : SignIns() {
             val (store, told) = MemoryStore() to Told()
             val offline = signIn(store, TransportDouble.throwing(UnknownHostException("bali-dev.auth.us-east-1.amazoncognito.com")), told = told)
             assertEquals(SignInError.Unreachable, assertFailsWith<SignInError> { offline.signIn(browser = signsIn) })
+            // A transport throwing what none should is no answer too, never a failure the screen can't name.
+            val odd = signIn(store, TransportDouble { throw IllegalStateException("odd") }, told = told)
+            assertEquals(SignInError.Unreachable, assertFailsWith<SignInError> { odd.signIn(browser = signsIn) })
             store.setLocked(true)
             val locked = signIn(store, TransportDouble.answering(200, granted(jwt("a1"), refresh = "r")), told = told)
             assertEquals(SignInError.NotKept, assertFailsWith<SignInError> { locked.signIn(browser = signsIn) })
