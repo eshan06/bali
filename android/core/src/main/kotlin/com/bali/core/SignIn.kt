@@ -33,7 +33,11 @@ data class Cognito(
     /** The hosted UI: `https://<prefix>.auth.<region>.amazoncognito.com`. */
     val domain: URI,
     val clientId: String,
-    /** Where the hosted UI sends its answer, `bali://auth/callback`, which the app's browser catches. */
+    /**
+     * Where the hosted UI sends its answer, `bali://auth/callback`, which the app's browser catches
+     * (AN6c). Any app on the phone can send a `bali:` link too, where iOS's session catches its own,
+     * so only its state makes an answer this attempt's ([code]).
+     */
     val redirectUri: URI,
 ) {
     /**
@@ -145,9 +149,11 @@ internal fun form(fields: List<Pair<String, String>>): String =
 
 /**
  * Why a sign-in didn't finish, for C1's screen, which says so and offers another try (rule 5); its
- * words are AN10's. BaliCore's `SignInError`.
+ * words are AN10's. BaliCore's `SignInError`. An outcome, not a fault: it keeps no stack trace and
+ * takes no suppressed exception, so the cases with no value, one object each, stay as they were
+ * however often they are thrown.
  */
-sealed class SignInError : Exception() {
+sealed class SignInError : Exception(null, null, false, false) {
     /** The student closed the sign-in page: nothing changed. */
     data object Cancelled : SignInError()
 

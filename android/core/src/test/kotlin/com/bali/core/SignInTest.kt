@@ -103,6 +103,9 @@ class SignInTest {
             "evil://auth/callback?code=c0de&state=st",
             "bali://auth/callback?state=st",
             "bali://auth/callback?code=&state=st",
+            // Another attempt's error, or one with no state: no word of Cognito's, as any app can send one.
+            "bali://auth/callback?error=access_denied&state=another-attempt",
+            "bali://auth/callback?error=access_denied",
         )) {
             val refused = assertFailsWith<SignInError>(other) { cognito.code(other, attempt) }
             assertEquals(SignInError.Refused(null), refused, other)
@@ -135,6 +138,15 @@ class SignInTest {
             "",
         )) {
             assertEquals(SignInError.Refused(null), assertFailsWith<SignInError>(other) { code(other) }, other)
+        }
+    }
+
+    @Test
+    fun aSignInErrorIsAnOutcomeThatKeepsNoStackTraceAndTakesNoSuppressedExceptionThrowOneOftenAsYouLike() {
+        for (error in listOf(SignInError.Cancelled, SignInError.Unreachable, SignInError.NotKept, SignInError.Refused(null))) {
+            repeat(2) { error.addSuppressed(IllegalStateException("another failure")) }
+            assertEquals(0, error.suppressed.size, "$error")
+            assertEquals(0, error.stackTrace.size, "$error")
         }
     }
 }

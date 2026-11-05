@@ -67,13 +67,33 @@ a real decision? Add a dated entry at the top: what was decided and why.
   AN6b:** SignInTests' `exchange`, `signUp`, `unfinished` and `unkept`, TokenTests' other
   twenty-three, DeleteUserTests' `mayDelete` and SignInEngineTests' four, on its line; the store's
   form is `Tokens.kept` and `Tokens.from`, and a refresh moves `until` past through `copy`, as iOS's
-  sets `distantPast`. **For AN9:** `deleteUser`, with DeleteUserTests but `mayDelete`.
+  sets `distantPast`. **For AN9:** `deleteUser`, with DeleteUserTests but `mayDelete`. **For AN6c**
+  (santa's review): Android lets any app on the phone send a `bali:` link, or claim the scheme too,
+  where iOS's session catches its own answer. The state, checked before anything else, holds this
+  part, and a code taken is no use without the verifier; but another app could take the answer, or
+  end an attempt with one of its own, so AN6c takes the answer only from the tab it opened, an Auth
+  Tab where the browser has one, or says why not.
 
   Tried, each failing by name, then reverted: the email given a default; the state check dropped;
-  a `+` read as a space; the query decoded before its split; the fragment dropped; the answer's
-  error ignored; the issuer's host matched in part; no margin; `Tokens`' `toString` the data
-  class's; and a claim's failed read let out. Nothing was added to the PC's SDK: its folders were
-  compared before and after.
+  the error read before the state; a `+` read as a space; the query decoded before its split; the
+  fragment dropped; the answer's error ignored; the issuer's host matched in part; no margin;
+  `Tokens`' `toString` the data class's; a claim's failed read let out; and `SignInError` a plain
+  `Exception()`. Nothing was added to the PC's SDK: its folders were compared before and after.
+
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini
+  CLI on this PC, so context isolation holds and model diversity doesn't): 0 blockers. Their WARNs,
+  each taken: `SignInError`'s cases with no value were one exception object each, so a stack trace
+  went stale and suppressed exceptions could pile on them (now `Exception(null, null, false,
+  false)`: no stack trace, nothing suppressed, pinned by a test); no case sent an error under
+  another attempt's state, or none, so the error read before the state failed no test (both added;
+  iOS's `callback` has the same gap); and the note for AN6c above, with `redirectUri`'s doc saying
+  so.
+
+  **Found on the PC, not this PR's:** in the whole `npm test`, the portal's `tokens.test.ts` case
+  "never set on one icon…", which builds a TypeScript program over `src/`, ran 5.4 and 7.3 s against
+  its 5 s limit and failed twice; alone, and in the portal's suite alone, it passes (3.1 s). It
+  lives in `apps/web`, which this run's orders keep the Android worker out of, so it is the owner's
+  to have raised, its limit or the machine's load.
 
 - **2026-11-04** — **AN5e, Emergency Unlock in the sync engine: BaliOutbox's `SyncEngine` in Kotlin,
   its unlock (the conductor's calls, awaiting the owner's look; AN5e, #510).** The owner isn't
