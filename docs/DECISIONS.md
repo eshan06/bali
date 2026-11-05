@@ -71,11 +71,13 @@ a real decision? Add a dated entry at the top: what was decided and why.
     end, or comes off. `putOn` keeps the end this run put on, where iOS's keeps a flag.
   - **A lock that throws** breaks its promise (`Lock`'s doc: a failure is the lock's own to handle, as
     AN7c's service must), and still never leaves the enforcer stuck (AN5c's lesson, the engine's `hooked`;
-    santa's review): a pass it cuts short is followed by the one a call made meanwhile asked for, never
-    dropped; the last pass's failure reaches `check()`'s caller, so the engine's read loop sends no
-    check-in for a check that checked nothing; and a pass the enforcer makes for itself, for a state or at
-    the lock's end, ends there, never the run or the alarm, so an Emergency Unlock after it still takes the
-    lock off at once. The claim stays what the last pass found until the next one.
+    santa's review): a pass it cuts short, throwing or ending in a cancel of its own (a timeout in it), is
+    followed by the one a call made meanwhile asked for, never dropped; the last pass's failure reaches
+    `check()`'s caller, so the engine's read loop sends no check-in for a check that checked nothing; an
+    error (an API the phone lacks, say) or the app's scope ending lets go at once and throws; and a pass the
+    enforcer makes for itself, for a state or at the lock's end, ends there, never the run nor the alarm,
+    and reaches no handler of the app's, so an Emergency Unlock after it still takes the lock off at once.
+    The claim stays what the last pass found until the next one.
   - **Not here, as split:** the check's report, `unreported`, the grace and its recheck, and `backOn`,
     AN7b's, so `check()` only puts the lock back; and no `requestPermission`, `authorize`, marker or
     window, which have no Android twin: Android asks nothing, the student switches the service on in
@@ -97,9 +99,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   BellTests' `relaunchAndCap`, its cap's half; and new: a check landing while a pass waits on the lock,
   at once, the pass running again for it; a check whose caller is cancelled, its pass going on; the end
   moved by a re-tap, its answer and an extension; a switch starting still locking; a lock that throws,
-  at a check, in a pass the run makes (the run going on, an Emergency Unlock after it taking the lock
-  off) and in a pass a call made meanwhile then needs; the enforcer's own lock off over a standing not
-  read; and `unlockedLast` on `SyncState`. None of this step's iOS tests checks words or a screen. Tried,
+  at a check (a failure, or an error), in a pass the run makes (the run going on, an Emergency Unlock
+  after it taking the lock off), in the pass at the lock's end (no handler of the app's reached), and in
+  a pass a call made meanwhile then needs (a failure, or a cancel of the lock's own); the enforcer's own
+  lock off over a standing not read; and `unlockedLast` on `SyncState`. None of this step's iOS tests
+  checks words or a screen. Tried,
   each failing by name, then reverted: the lock held through a call into the lock (the check waited for
   the pass); a call made during a pass dropped; the last run's lock given a tap's end over a standing not
   read (2); the lock put on over the switch off; the enforcer's own lock kept over a standing not read;
@@ -107,11 +111,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the state's one step; `unlockedLast` never true (11), and blind to the tap (2); a pass that throws
   never let go; the check run in its caller's coroutine; a lock claimed while its switch starts; the check
   never hooked; a lock taken off with none held (4); the switch off never claimed (2); and, for santa's
-  fixes, the run's passes unguarded, and a pass cut short dropping the call made meanwhile. The alarm's
-  pass shares the run's guard (`pass`); no test reaches its own, a failure there reaching only the app's
-  handler. Each check that something doesn't happen waits for a point the rig, the fake lock or a call's
-  end marks, never a window of real time. Nothing was added to the PC's SDK: its folders were compared
-  before and after.
+  fixes, the run's passes unguarded, the alarm's too, a pass cut short dropping the call made meanwhile,
+  a cancel of the lock's own dropping it, and an error never let go. Each check that something doesn't
+  happen waits for a point the rig, the fake lock, a call's end or the enforcer's jobs ending marks,
+  never a window of real time. Nothing was added to the PC's SDK: its folders were compared before and
+  after.
 
   **For AN7b:** `check()` is the place: its report reads the switch and the engine's state and records
   with the enforcer let go; `unreported` joins `Protection`, which a pass copies in its last stretch, so a
@@ -121,7 +125,18 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the switch's change; the lock's calls never throw, and its `locking()` counts the last run's lock.
   **For AN7d:** the claim is `updates`, the cap `setTapCap`.
 
-  **Santa's review:** SANTA-PENDING
+  **Santa's review:** NICE in two rounds, two Claude Opus reviewers at max effort (no Codex or Gemini CLI
+  on this PC, so context isolation holds and model diversity doesn't). Round 1, one blocker, fixed:
+  `unreadCappedOverHeld`'s twin made the file readable before waiting for the read loop's next minute,
+  so the loop's wake at the cap, run late, could read it there and that minute never come (#510's order;
+  forced with the clock's held wakes, it failed by name first). Its WARNs, each taken: a lock throwing in
+  a pass the run or the alarm made ended the run or reached the app's handler, and dropped a call made
+  meanwhile (both reviewers); and the third relaunch's check of no lock never waited for its enforcer's
+  pass. Round 2, on the fixes: no blocker; its WARNs, each taken: an error of the lock's left the enforcer
+  stuck, a cancel of the lock's own still dropped the call made meanwhile, and the alarm's guard had no
+  test. **For the owner, iOS's (another session's code):** iOS's `unreadCappedOverHeld` keeps the old
+  order, the race #510 found, and its `relaunched` checks the third launch's shields without waiting for
+  that enforcer's pass.
 
   **The proof:** `android/app` is unchanged, so the JVM tests are the proof and no emulator ran:
   `./gradlew assemble :app:lint check` green, Android 10's API check with it, and the outbox's suite run

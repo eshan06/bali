@@ -9,6 +9,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -104,8 +105,9 @@ class Enforcer(
 
     /**
      * One pass at a time: a call made while one runs has it run again, on the newest truth. A pass the lock
-     * cuts short by throwing, against its promise, is followed all the same by the one a call made meanwhile
-     * asked for, and the last pass's failure reaches the caller.
+     * cuts short, throwing or ending in a cancel of its own though it promises not to, is followed all the
+     * same by the one a call made meanwhile asked for, and the last pass's failure reaches the caller. An
+     * error, or the app's scope ending, lets go at once.
      */
     private suspend fun enforce() {
         if (alone { enforcing.also { again = true; enforcing = true } }) return
@@ -117,14 +119,20 @@ class Enforcer(
                     apply()
                     null
                 } catch (cancelled: CancellationException) {
-                    // The app's scope ending: let go all the same.
-                    alone { enforcing = false }
-                    throw cancelled
+                    if (currentCoroutineContext().isActive) cancelled else cut(cancelled)
                 } catch (failure: Exception) {
                     failure
+                } catch (error: Throwable) {
+                    cut(error)
                 }
         }
         failed?.let { throw it }
+    }
+
+    /** A pass cut short for good, the app's scope ending or an error of the lock's: let go, so the next call runs one. */
+    private suspend fun cut(failure: Throwable): Nothing {
+        alone { enforcing = false }
+        throw failure
     }
 
     /**

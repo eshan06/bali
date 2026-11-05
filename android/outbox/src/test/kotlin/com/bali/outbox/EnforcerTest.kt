@@ -3,6 +3,8 @@ package com.bali.outbox
 import com.bali.core.ParticipationState
 import com.bali.core.UnlockReason
 import java.time.Duration
+import java.util.Collections
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -11,9 +13,13 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.test.fail
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
@@ -282,16 +288,20 @@ class EnforcerTest : EngineFiles() {
         }
 
     @Test
-    fun aLockThatThrowsAgainstItsPromiseEndsOnlyThatPassItsCallerToldAndTheNextCheckRunsOne(): Unit =
+    fun aLockThatThrowsAgainstItsPromiseAFailureOrAnErrorEndsOnlyThatPassItsCallerToldAndTheNextCheckRunsOne(): Unit =
         runBlocking {
-            val rig = rig()
-            val lock = FakeLock(rig.clock)
-            val enforcer = Enforcer(rig.engine, lock, scope, rig.clock)
-            lock.failNextRead()
-            assertFailsWith<IllegalStateException> { enforcer.check() }
-            assertFalse(enforcer.updates.value.checked)
-            enforcer.check()
-            assertTrue(enforcer.updates.value.checked)
+            // An error as an API the phone lacks raises one (santa's review).
+            for (failure in listOf(IllegalStateException("its own failure"), NotImplementedError("an error"))) {
+                val rig = rig()
+                val lock = FakeLock(rig.clock)
+                val enforcer = Enforcer(rig.engine, lock, scope, rig.clock)
+                lock.failNextRead(failure)
+                assertFailsWith(failure::class) { enforcer.check() }
+                assertFalse(enforcer.updates.value.checked, "$failure")
+                enforcer.check()
+                assertTrue(enforcer.updates.value.checked, "$failure")
+                rig.stop()
+            }
         }
 
     @Test
@@ -314,29 +324,56 @@ class EnforcerTest : EngineFiles() {
         }
 
     @Test
-    fun aPassTheLockCutsShortIsFollowedAllTheSameByTheOneACallMadeMeanwhileAskedForAndOnlyTheLastPassesFailureIsTold(): Unit =
+    fun aPassTheLockCutsShortThrowingOrInACancelOfItsOwnIsFollowedAllTheSameByTheOneACallMadeMeanwhileAskedForAndOnlyTheLastPassesFailureIsTold(): Unit =
         runBlocking {
             // Santa's review: a call made during a pass the lock cuts short is never dropped. No run beside
             // it, so only the checks make passes.
+            for (failure in listOf(IllegalStateException("its own failure"), CancellationException("its own timeout"))) {
+                val rig = rig()
+                rig.tapIn()
+                val lock = FakeLock(rig.clock)
+                val enforcer = Enforcer(rig.engine, lock, scope, rig.clock)
+                enforcer.check()
+                // A pass held at its second read of the lock, which throws once released.
+                lock.hold(after = 1)
+                val held = async { runCatching { enforcer.check() } }
+                eventually { lock.holding }
+                lock.failNextRead(failure)
+                // The lock gone meanwhile, and a check made, which lands at once.
+                lock.drop()
+                withTimeoutOrNull(patience) { enforcer.check() } ?: fail("the check waited for the pass held on the lock")
+                lock.release()
+                // The pass it asked for ran after the one cut short, and put the lock back: no failure told.
+                assertTrue(held.await().isSuccess, "$failure")
+                assertEquals(1, lock.throws, "$failure")
+                assertTrue(lock.holds, "$failure")
+                assertTrue(enforcer.updates.value.locked, "$failure")
+                rig.stop()
+            }
+        }
+
+    @Test
+    fun aLockThatThrowsInThePassAtTheLocksEndReachesNoHandlerOfTheAppsAndTheNextCheckRunsOne(): Unit =
+        runBlocking {
+            // Santa's review: the pass at the lock's end is the enforcer's own, as the run's are, so no
+            // failure of the lock's there reaches the app's handler, which on Android ends the app.
+            val uncaught = Collections.synchronizedList(mutableListOf<Throwable>())
             val rig = rig()
-            rig.tapIn()
+            rig.tapIn(session(endsAt = 1200))
             val lock = FakeLock(rig.clock)
-            val enforcer = Enforcer(rig.engine, lock, scope, rig.clock)
+            // A job of its own under the test's, so its calls and alarms can be seen to end.
+            val own = Job(scope.coroutineContext.job)
+            val handler = CoroutineExceptionHandler { _, failure -> uncaught += failure }
+            val enforcer = Enforcer(rig.engine, lock, CoroutineScope(scope.coroutineContext + own + handler), rig.clock)
             enforcer.check()
-            // A pass held at its second read of the lock, which throws once released.
-            lock.hold(after = 1)
-            val held = async { runCatching { enforcer.check() } }
-            eventually { lock.holding }
+            assertEquals(at(1200), lock.until)
             lock.failNextRead()
-            // The lock gone meanwhile, and a check made, which lands at once.
-            lock.drop()
-            withTimeoutOrNull(patience) { enforcer.check() } ?: fail("the check waited for the pass held on the lock")
-            lock.release()
-            // The pass it asked for ran after the one cut short, and put the lock back: no failure told.
-            assertTrue(held.await().isSuccess)
-            assertEquals(1, lock.throws)
-            assertTrue(lock.holds)
-            assertTrue(enforcer.updates.value.locked)
+            rig.clock.advance(1200)
+            eventually { lock.throws == 1 }
+            eventually { own.children.all { it.children.none() } }
+            assertEquals(emptyList(), uncaught.toList())
+            enforcer.check()
+            assertFalse(enforcer.updates.value.locked)
         }
 }
 
