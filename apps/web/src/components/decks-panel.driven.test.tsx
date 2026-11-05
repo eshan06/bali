@@ -2,6 +2,7 @@
 import type { Deck } from '@bali/shared';
 import { act, cleanup, render, screen, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
+import { StrictMode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { SlideLesson } from '../lib/use-slide';
@@ -137,7 +138,11 @@ describe('Show slides’ panel (LessonDecks)', () => {
 describe('a deck’s Show (LessonDecks)', () => {
   const ready = deck(1, 'Factoring quadratics');
 
-  /** The panel open with one ready deck, each Show's answer the test's to give. */
+  /**
+   * The panel open with one ready deck, each Show's answer the test's to give. In Strict Mode, which
+   * runs each effect twice as the panel opens, as the development build does: the panel is open
+   * after it all the same.
+   */
   async function shows(said: SlideLesson['said'] = null) {
     const answers: ((shown: boolean) => void)[] = [];
     const show = vi.fn<SlideLesson['show']>(
@@ -145,13 +150,17 @@ describe('a deck’s Show (LessonDecks)', () => {
     );
     const onShown = vi.fn();
     const view = render(
-      <DecksPanel
-        id="P"
-        lesson={{ changing: null, said, show }}
-        onShown={onShown}
-        onClose={vi.fn()}
-      />,
+      <StrictMode>
+        <DecksPanel
+          id="P"
+          lesson={{ changing: null, said, show }}
+          onShown={onShown}
+          onClose={vi.fn()}
+        />
+      </StrictMode>,
     );
+    // Each read the panel's effects sent, answered.
+    await answer([ready]);
     await answer([ready]);
     const shown = (ok: boolean) =>
       act(async () => {
