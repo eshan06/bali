@@ -1,7 +1,9 @@
 import {
   type Database,
+  endSession,
   enrollments,
   newUuidV7,
+  parseSchoolCommand,
   renameStudent,
   sessions,
   startSession,
@@ -15,7 +17,7 @@ import type { FastifyInstance } from 'fastify';
 import { Writable } from 'node:stream';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { analyticsConfig, createAnalytics } from '../src/analytics.js';
+import { analyticsConfig, createAnalytics, ownerEnds } from '../src/analytics.js';
 import { buildApp } from '../src/app.js';
 import type { Env } from '../src/env.js';
 import { makeTestDb, seedClassroom } from './helpers/db.js';
@@ -65,8 +67,30 @@ let issuer: TestIssuer;
 let posted: Posted[];
 let answer: () => Promise<Response>;
 let lines: string[];
-/** The server's clock, a minute's start so whole minutes count exactly. */
+/**
+ * The server's clock: a minute's start, so whole minutes count exactly, and just ahead of the
+ * machine's, so every row a test writes was made before it.
+ */
 let now: Date;
+
+// As analytics.ts sends: the endpoint as a string, the event as JSON text.
+const posthogFetch = ((url: string, init: RequestInit & { body: string }) => {
+  posted.push({ url, body: JSON.parse(init.body) as Posted['body'] });
+  // As the real fetch does, a send stops at its signal's abort: its timeout.
+  return new Promise<Response>((resolve, reject) => {
+    init.signal?.addEventListener('abort', () => reject(init.signal?.reason as Error));
+    answer().then(resolve, reject);
+  });
+}) as typeof fetch;
+
+/** The sender alone, on the test's database, fetch and clock. */
+const sender = () =>
+  createAnalytics(
+    analyticsConfig(on),
+    db,
+    { warn: () => undefined, error: () => undefined },
+    { fetch: posthogFetch, clock: () => now },
+  );
 
 function build(env: Env): FastifyInstance {
   lines = [];
@@ -76,15 +100,6 @@ function build(env: Env): FastifyInstance {
       done();
     },
   });
-  // As analytics.ts sends: the endpoint as a string, the event as JSON text.
-  const posthogFetch = ((url: string, init: RequestInit & { body: string }) => {
-    posted.push({ url, body: JSON.parse(init.body) as Posted['body'] });
-    // As the real fetch does, a send stops at its signal's abort: its timeout.
-    return new Promise<Response>((resolve, reject) => {
-      init.signal?.addEventListener('abort', () => reject(init.signal?.reason as Error));
-      answer().then(resolve, reject);
-    });
-  }) as typeof fetch;
   return buildApp(env, {
     db,
     verifyToken: issuer.verifier,
@@ -99,7 +114,7 @@ beforeEach(async () => {
   issuer = await makeTestIssuer();
   posted = [];
   answer = () => Promise.resolve(new Response(null, { status: 200 }));
-  now = new Date(Math.floor(Date.now() / MIN) * MIN);
+  now = new Date(Math.floor(Date.now() / MIN) * MIN + MIN);
   app = build(on);
 });
 
@@ -353,7 +368,7 @@ describe('what an event carries', () => {
     });
   });
 
-  it('counts as the session’s report counts, and its class as enrolled at the end', async () => {
+  it('counts as the session’s report counts', async () => {
     const room = await seedClassroom(db, 'a2-report');
     const at = (minutes: number) => new Date(now.getTime() + minutes * MIN);
     const { session } = await startSession(db, {
@@ -381,11 +396,6 @@ describe('what an event carries', () => {
       headers: { authorization: `Bearer ${teacher}` },
     });
     expect(ended.statusCode).toBe(200);
-    // The student leaves the class after the bell: they were in it when it ended.
-    await db
-      .update(enrollments)
-      .set({ removedAt: at(1) })
-      .where(eq(enrollments.studentId, room.student.id));
     await vi.waitFor(() => expect(posted).toHaveLength(1));
     const report = (
       await app.inject({
@@ -403,6 +413,86 @@ describe('what an event carries', () => {
       unlocks: report.unlocks.length,
       planned_minutes: 25,
     });
+  });
+
+  it('counts the class as enrolled at the session’s end, whatever came after it', async () => {
+    const room = await seedClassroom(db, 'a2-enrolled');
+    const at = (minutes: number) => new Date(now.getTime() + minutes * MIN);
+    const { session } = await startSession(db, {
+      classId: room.klass.id,
+      startedAt: at(-50),
+      endsAt: at(-10),
+    });
+    await endSession(db, { sessionId: session.id, at: at(-20), reason: 'ended' });
+    const enroll = async (sub: string, createdAt: Date, removedAt: Date | null) => {
+      const [student] = await db
+        .insert(users)
+        .values({ cognitoId: sub, role: 'student', schoolId: room.school.id })
+        .returning();
+      await db
+        .insert(enrollments)
+        .values({ classId: room.klass.id, studentId: student!.id, createdAt, removedAt });
+    };
+    // In the class at the end: the seed's student, and one who left after it.
+    await db
+      .update(enrollments)
+      .set({ createdAt: at(-60) })
+      .where(eq(enrollments.studentId, room.student.id));
+    await enroll('a2-left-after', at(-60), at(-15));
+    // Not in it: one who left before the end, and one who joined after it.
+    await enroll('a2-left-before', at(-60), at(-30));
+    await enroll('a2-joined-after', at(-5), null);
+
+    const analytics = sender();
+    analytics.track('session_ended', session.id, 'teacher');
+    await analytics.settled();
+    expect(posted).toMatchObject([
+      { body: { event: 'session_ended', properties: { students_enrolled: 2 } } },
+    ]);
+  });
+
+  it('the owner’s commands count each lesson they end, a disposal’s with the class it ended', async () => {
+    // Two classes of one school: a lesson running in the first, one past its bell in the second.
+    const room = await seedClassroom(db, 'a2-dispose');
+    const next = await seedClassroom(db, 'a2-dispose-2', room.school);
+    const running = await startSession(db, {
+      classId: room.klass.id,
+      startedAt: new Date(now.getTime() - 10 * MIN),
+      endsAt: new Date(now.getTime() + 20 * MIN),
+    });
+    const past = await startSession(db, {
+      classId: next.klass.id,
+      startedAt: new Date(now.getTime() - 50 * MIN),
+      endsAt: new Date(now.getTime() - 10 * MIN),
+    });
+    // Its student joined the second class before that lesson began.
+    await db
+      .update(enrollments)
+      .set({ createdAt: new Date(now.getTime() - 60 * MIN) })
+      .where(eq(enrollments.studentId, next.student.id));
+
+    const analytics = sender();
+    const dispose = ['dispose', room.school.id, '--confirm', room.school.name, '--end-lessons'];
+    await parseSchoolCommand(dispose)!({ db, print: () => undefined, ended: ownerEnds(analytics) });
+    await analytics.settled();
+
+    // The disposal ends each enrollment with the lessons; each still counts the class it ended.
+    const ends = posted.map((p) => p.body).sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+    expect(ends).toMatchObject([
+      {
+        event: 'session_ended',
+        distinct_id: next.teacher.id,
+        timestamp: past.session.endsAt.toISOString(),
+        properties: { ended_by: 'bell', students_enrolled: 1 },
+      },
+      {
+        event: 'session_ended',
+        distinct_id: room.teacher.id,
+        properties: { ended_by: 'owner', students_enrolled: 1 },
+      },
+    ]);
+    const [over] = await db.select().from(sessions).where(eq(sessions.id, running.session.id));
+    expect(ends[1]!.timestamp).toBe(over!.endedAt!.toISOString());
   });
 });
 

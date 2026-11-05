@@ -102,6 +102,16 @@ export interface Analytics {
   settled(): Promise<void>;
 }
 
+/**
+ * What the owner's commands do with each lesson they end (`npm run school`, its
+ * `SchoolCommandIO.ended`): one ended as an End ends it counts as the owner's, one past its bell
+ * as the bell's.
+ */
+export function ownerEnds(analytics: Analytics) {
+  return (sessionId: string, reason: 'ended' | 'expired') =>
+    analytics.track('session_ended', sessionId, reason === 'ended' ? 'owner' : 'bell');
+}
+
 export interface AnalyticsOptions {
   /** Tests send to a fake; unset, the real fetch. */
   fetch?: typeof fetch;

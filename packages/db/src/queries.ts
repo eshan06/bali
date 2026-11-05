@@ -1049,9 +1049,9 @@ export async function getSessionEvents(db: Database, sessionId: string): Promise
 
 /**
  * A session, its class's teacher, and how many students its class had enrolled at its end, or at
- * `at` while it runs, whatever the class is since (a disposal removes it and ends each
- * enrollment as it ends the lesson): what the server's PostHog totals read beside the session's
- * events (A2). Undefined for no such session.
+ * `at` while it runs: joined by then and not gone before, whatever came after (a disposal removes
+ * the class and ends each enrollment as it ends the lesson). What the server's PostHog totals read
+ * beside the session's events (A2). Undefined for no such session.
  */
 export async function sessionTotalsOf(db: Database, sessionId: string, at: Date) {
   const then = sql`coalesce(${sessions.endedAt}, ${at.toISOString()}::timestamptz)`;
@@ -1062,6 +1062,7 @@ export async function sessionTotalsOf(db: Database, sessionId: string, at: Date)
         teacherId: classes.teacherId,
         enrolled: sql<number>`(select count(distinct ${enrollments.studentId})::int
           from ${enrollments} where ${enrollments.classId} = ${sessions.classId}
+          and ${enrollments.createdAt} <= ${then}
           and (${enrollments.removedAt} is null or ${enrollments.removedAt} >= ${then}))`,
       })
       .from(sessions)

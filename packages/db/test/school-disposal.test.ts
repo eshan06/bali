@@ -265,10 +265,10 @@ async function typesIn(sessionId: string) {
   return rows.map((e) => e.type);
 }
 
-/** What the owner's command prints, line by line. */
 /** Each session the last `run` said it ended (A2's hook), with how. */
 let told: [string, 'ended' | 'expired'][] = [];
 
+/** What the owner's command prints, line by line. */
 async function run(argv: string[]) {
   const lines: string[] = [];
   told = [];

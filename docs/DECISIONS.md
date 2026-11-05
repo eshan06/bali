@@ -35,11 +35,16 @@ a real decision? Add a dated entry at the top: what was decided and why.
   server's time (the Start's, the recorded end, the extend's clock), carrying `environment` (Sentry's
   own, `environmentOf`), `students_enrolled`, `students_tapped_in`, `planned_minutes`,
   `session_minutes`, `focus_minutes`, `unlocks` (one number) and, on an end, `ended_by` (`teacher`,
-  `bell` or `owner`). The counts are the session report's own (`counted`, R1's function and
-  rounding), to the session's end once it has ended; the enrolled count is the class's at that end,
-  or at the moment while it runs, so a disposal, which ends each enrollment with its lessons, still
-  counts them. A replay sends nothing: a resent Start answers `existing`, and the engine now says an
-  extend's replay (`extendSession`'s `outcome`), while `/v1` answers `extended` as it shipped.
+  `bell` or `owner`). Two of these are the conductor's calls, awaiting the owner: `ended_by`, and the
+  session's length given twice, planned and so far, where the owner's list says "the session's
+  length"; neither names anyone, though `owner` tells PostHog when the owner's command ended a
+  lesson. The counts are the session report's own (`counted`, R1's function and rounding), to the
+  session's end once it has ended. The enrolled count is the class's at that end, or at the moment
+  while it runs: joined by then and not gone before it, so a disposal, which ends each enrollment
+  with its lessons, still counts them, and a student who joins between a bell and the sweep that
+  marks it doesn't count in that lesson. A replay sends nothing: a resent Start answers `existing`,
+  and the engine now says an extend's replay (`extendSession`'s `outcome`), while `/v1` answers
+  `extended` as it shipped.
 
   **Every way a session ends** sends one: the teacher's End (`teacher`); the sweep, only the run
   that ended it (`bell`); a Start past the bell (A18, `bell`), the engine naming the session it
@@ -47,13 +52,25 @@ a real decision? Add a dated entry at the top: what was decided and why.
   a disposal's lessons, those it ended running (`owner`) and those past their bell not yet swept,
   which it now lists (`bell`). The commands send from `npm run school` itself, in the API service's
   shell where the owner runs them (runbook 1), with the service's own key, through a hook on the
-  commands (`SchoolCommandIO.ended`), waiting out their sends before the process exits; a failure
-  goes to standard error, never to the output (an export's JSON).
+  commands (`SchoolCommandIO.ended`, filled by `ownerEnds`), waiting out their sends before the
+  process exits; a failure goes to standard error, never to the output (an export's JSON).
 
-  **Said plainly:** an event names the class's teacher even when the owner ended it. The owner's
-  command's wiring (`apps/api/scripts/school.ts`) has no test of its own; the hook it fills and the
-  sender are each tested. The command reads `POSTHOG_HOST` unchecked, where the API's boot checks it
-  on the same service.
+  **Said plainly:** an event names the class's teacher even when the owner ended it. The script's
+  own lines (`apps/api/scripts/school.ts`) have no test, as no test runs that entry point; the hook,
+  `ownerEnds` and the sender are tested together through the commands. The command reads
+  `POSTHOG_HOST` unchecked, where the API's boot checks it on the same service. A join's time is the
+  database's clock and a session's end the server's: on one host they agree to the millisecond.
+
+  **Santa's review:** two Claude Opus reviewers at max effort (Codex refuses every model on this
+  Mac, so context isolation held and model diversity didn't). Round 1: one blocker, fixed. Reviewer
+  A proved with a probe that no test could fail the enrolled count's rule, since the End route asks
+  for the totals before it answers and PGlite runs queries in order, so the test's later removal of
+  a student was never seen. Tests now set the class up first and track the end directly: a student
+  who left after the end and one who joined after it, and a disposal's two lessons through the
+  command, each failing when the rule is narrowed or dropped. Their WARNs, each fixed: a join after
+  the end counted (`created_at` is now checked), the owner command's mapping untested (now
+  `ownerEnds`, tested), `ended_by` and the length's split marked as the conductor's calls, and a doc
+  comment put back above its function.
 
 - **2026-11-04** — **AN6a, sign-in's parts: BaliCore's `SignIn.swift` in Kotlin, from its top
   through `Tokens` (the conductor's calls, awaiting the owner's look; AN6a, #515).** The owner isn't

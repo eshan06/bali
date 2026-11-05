@@ -932,8 +932,9 @@ the teacher portal's, which it forwards, and nothing else of Bali's.
   advertising SDKs in the app". The server's totals are still counted from what the phones send,
   and that clause's "or otherwise" may reach them: Apple's review stays the answer (ISSUES #3).
 - **What it may hold.** From the server, a class's totals only: a session started, ended or
-  extended, and how it ended (its teacher, its bell, or the owner's command); how many students
-  are enrolled and how many tapped in; the session's length, planned and so far; the
+  extended, and how it ended (its teacher, its bell, or the owner's command; the conductor's call,
+  awaiting the owner, A2); how many students are enrolled and how many tapped in; the session's
+  length, planned and so far; the
   class's focus minutes and unlocks, as totals, the unlocks one number, never split by reason
   ("nurse" may be health data). They are sent whatever the class's size (the owner's pick, "Always
   send", over holding focus minutes and unlocks back under 3 or 5 students), so with one or two

@@ -1,6 +1,6 @@
 import { createDb, parseSchoolCommand, SCHOOL_USAGE, type SchoolCommand } from '@bali/db';
 
-import { analyticsConfig, createAnalytics } from '../src/analytics.js';
+import { analyticsConfig, createAnalytics, ownerEnds } from '../src/analytics.js';
 import { detailOf } from './demo/cognito.js';
 
 /*
@@ -45,8 +45,7 @@ try {
     db,
     print: (line) => console.log(line),
     issuer: process.env.AUTH_ISSUER,
-    ended: (sessionId, reason) =>
-      analytics.track('session_ended', sessionId, reason === 'ended' ? 'owner' : 'bell'),
+    ended: ownerEnds(analytics),
   });
 } catch (err) {
   console.error(`school: ${detailOf(err)}`);
