@@ -10,6 +10,16 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-11-04 (Central) — A5, the iPhone app's privacy manifest (#505; `docs/DECISIONS.md`,
+2026-11-04): Product Interaction gains the purpose Analytics, pinned by CI's check, and the owner's
+four PostHog rulings: a class's totals always sent; the portal's events through Bali's server, the
+CSP unchanged; a deleted teacher's events kept; the manifest in the next build. Before it, WC1, the
+first of the owner's Android cuts on the iPhone (#502). Next: WC2, Join and the list-changed screen;
+A2–A4; the owner's call on Other Data Types' purpose; a session builds the retire-a-block command;
+the owner the new build, with A5, and the sitting; the owner's call on GA5's known limit, the
+smallest iPhones (DECISIONS 2026-11-02); AN5c, Android's read loop; AN1's part 2 once the owner has
+the phones; the audit's polish waits, as ruled._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN5c's on 2026-11-04: _Last updated: 2026-11-04 (Central) —
 AN5b, the sync engine's drain (#501; `docs/DECISIONS.md`, 2026-11-04): BaliOutbox's `SyncEngine` in
 Kotlin, its drain, with its tests: the outbox sent one record at a time in the order the phone acted,
