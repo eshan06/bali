@@ -611,6 +611,7 @@ describe('the lesson page while the class runs', () => {
     const status = within(phone).getByRole('status');
     expect(status.className).toBe('inline-flex flex-wrap items-center gap-2');
     expect(words(status)).toEqual(['Your phone', 'Focused']);
+    expect(status.firstElementChild?.className).toBe('text-caption text-text-tertiary');
   });
 
   it('says nothing is shared yet while no question or slide shows (StudentWaiting)', () => {
