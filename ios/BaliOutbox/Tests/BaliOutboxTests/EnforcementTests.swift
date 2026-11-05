@@ -1273,17 +1273,22 @@ struct BackOnTests {
     }
 
     @Test(
-        "Where the phone stood before protection off not known — reported by the build before this one — back on passes the unlock guard: an Emergency Unlock still queued there keeps it unlocked (santa's round 1)"
-    )
-    func notKnown() async throws {
+        "Where the phone stood before protection off not known — reported by the build before this one — back on passes the unlock guard: an Emergency Unlock still queued there keeps it unlocked, and with none it is focused again (santa's round 1)",
+        arguments: [true, false])
+    func notKnown(queued: Bool) async throws {
         let (outbox, url) = try makeOutbox()
-        try record(outbox, .unlock(session: "s", reason: nil))
+        if queued { try record(outbox, .unlock(session: "s", reason: nil)) }
         try record(outbox, .protectionOff(session: "s"))
         try outbox.keep(.inSession(session(), .protectionOff))
+        // Not known, as a build before #167's left the file: the unlock's own write keeps it
+        // unlocked, and back on would return there without asking the guard.
+        try await outbox.pool.write { try Outbox.setState($0, Outbox.offFromKey, nil) }
         let rig = try Rig(outbox: try open(url))
         await rig.until { $0.standing == .inSession(session(), .protectionOff) }
         try await rig.engine.record(.protectionOn(session: "s"))
-        #expect(await rig.engine.state.standing == .inSession(session(), .unlocked))
+        let back = Standing.inSession(session(), queued ? .unlocked : .focused)
+        #expect(await rig.engine.state.standing == back)
+        #expect(try rig.outbox.standing() == back)
         await rig.stop()
     }
 
