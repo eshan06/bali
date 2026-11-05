@@ -41,10 +41,6 @@ struct JoinView: View {
                     Text("Join a class").textStyle(.label).textCase(.uppercase)
                         .foregroundStyle(Theme.textTertiary)
                     Text("Enter your class code").textStyle(.h1)
-                    Text(
-                        "Six letters and numbers. Your teacher has it on their screen or the board."
-                    )
-                    .textStyle(.bodyLg).foregroundStyle(Theme.textSecondary)
                 }
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Class code").textStyle(TextStyle(size: 13, line: 18, weight: .semibold))
@@ -72,8 +68,6 @@ struct JoinView: View {
                         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
                             fieldHeight = $0
                         }
-                    Text("Codes never use 0, O, 1, I or L, so there's nothing to mix up.")
-                        .textStyle(.caption).foregroundStyle(Theme.textTertiary)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

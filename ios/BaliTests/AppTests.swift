@@ -28,7 +28,6 @@ struct AppTests {
         #expect(config.cognito.redirectURI == URL(string: "bali://auth/callback"))
         #expect(config.api.scheme == "https" && config.cognito.domain.scheme == "https")
     }
-
     @Test(
         "Each hop the scene's phase makes reads the phase as it runs (#90's review): in front, then behind at once, runs no check and leaves the engine behind; in front, one check"
     )
@@ -2339,7 +2338,7 @@ struct AppTests {
     }
 
     @Test(
-        "Home in no class as the approved Sign in & sign up design draws it: the student greeted, then its card's words — not in a class yet for a new student, in none any more for one removed from their last (#143) — and Join a class, a button, then the tab bar, with no classes list and no Sign out; Join opened from it has Back and no Sign out"
+        "Home in no class as the approved Sign in & sign up design draws it: the student greeted, then its card's words — not in a class yet for a new student, in none any more for one removed from their last (#143) — and Join a class, a button, then the tab bar, with no classes list and no Sign out; Join opened from it, nothing typed or a code refused, has Back and no Sign out, and its title followed at once by the code's field, the field by Continue, with no line under either (the owner's cuts, 2026-11-04)"
     )
     func homeInNoClass() async throws {
         for (name, words) in [
@@ -2360,10 +2359,19 @@ struct AppTests {
             #expect(labels.filter { $0 == "Join a class" }.count == 1, "\(name): \(labels)")
             #expect(!labels.contains("Your classes") && !labels.contains("Sign out"), "\(name)")
         }
-        let join = Phone(fixture: try #require(PreviewFixtures.all["join"]))
-        let opened = try await elements(of: RootView(phone: join), once: "Enter your class code")
-        #expect(opened.contains { $0.label == "Back" && $0.traits.contains(.button) })
-        #expect(!opened.contains { $0.label == "Sign out" || $0.label == "Home" })
+        let title = "Enter your class code"
+        for name in ["join", "joinError"] {
+            let join = Phone(fixture: try #require(PreviewFixtures.all[name]))
+            let opened = try await elements(of: RootView(phone: join), once: title)
+            #expect(opened.contains { $0.label == "Back" && $0.traits.contains(.button) }, "\(name)")
+            #expect(!opened.contains { $0.label == "Sign out" || $0.label == "Home" }, "\(name)")
+            // The code's field is the one element on the screen with no label of its own.
+            let field = "the code's field"
+            let labels = opened.map { $0.label ?? field }
+            #expect(
+                Array(labels.drop { $0 != title }.prefix(3)) == [title, field, "Continue"],
+                "\(name): \(labels)")
+        }
     }
 
     @Test(
@@ -3009,7 +3017,7 @@ struct AppTests {
     }
 
     @Test(
-        "The consent list as the app canvas's Consent board draws it (L8a), with the owner's lines of 2026-10-28: what a teacher sees, a clock set ahead after the phone lines and how many answered after the answers line, and never sees, the line on answers last, narrowed to which answer is yours — one list, so the intro's second page, Me's What your teacher sees and Join's preview each read it whole; the one-time screen reads its title, its line, the lines the list gained since the student saw it here — since L8a's list, a clock set ahead, how many answered and the narrowed line; since neither, the answers line too — and nothing else of it, See the whole list, then Continue, as the ListChanged board draws it, its title a header"
+        "The consent list as the app canvas's Consent board draws it (L8a), with the owner's lines of 2026-10-28: what a teacher sees, a clock set ahead after the phone lines and how many answered after the answers line, and never sees, the line on answers last, narrowed to which answer is yours — one list, so the intro's second page, Me's What your teacher sees and Join's preview each read it whole; the one-time screen reads its title, with no line under it (the owner's cut, 2026-11-04), then the card's Sees and the lines the list gained since the student saw it here — since L8a's list, a clock set ahead, how many answered and the narrowed line; since neither, the answers line too — and nothing else of it, See the whole list, then Continue, as the ListChanged board draws it, its title a header"
     )
     func consentList() async throws {
         let (clock, answers, howMany, yours) = (
@@ -3054,13 +3062,11 @@ struct AppTests {
             #expect(shown.sawAnswersList == (name == "listChanged"), "\(name)")
             let read = try await elements(of: RootView(phone: shown), once: title)
             let labels = read.map { $0.label ?? "" }
-            let order =
-                [
-                    title,
-                    "During class, you can answer them here on Bali. That adds two lines to the list of what your teacher sees.",
-                ] + lines + ["See the whole list", "Continue"]
+            let order = [title] + lines + ["See the whole list", "Continue"]
             let at = order.compactMap { labels.firstIndex(of: $0) }
             #expect(at.count == order.count && at == at.sorted(), "\(name): \(labels)")
+            #expect(
+                Array(labels.drop { $0 != title }.prefix(2)) == [title, "Sees"], "\(name): \(labels)")
             #expect(whole.filter { labels.contains($0) } == lines, "\(name): \(labels)")
             #expect(read.first { $0.label == title }?.traits.contains(.header) == true, "\(name)")
             for button in ["See the whole list", "Continue"] {
