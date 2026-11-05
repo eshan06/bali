@@ -8,6 +8,93 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-05** — **AN7d, the Debug readout: a developer's screen in the Debug build alone, iOS's
+  `Readout`'s twin, and a Debug build's engine over no token while sign-in isn't set up (the conductor's
+  calls, awaiting the owner's look; AN7d, #524).** The owner isn't reviewing each step and asked for the
+  recommended option on every question, so each call here is the conductor's, for the owner to look at.
+
+  **Built with no board, on iOS's terms (B4c, 2026-09-25, "A Debug-only readout, temporary"), every one
+  held:** it lives in `app/src/debug` alone, so no Release build holds it (pinned on the JVM, below); its
+  words are a developer's, never a student's, as plain as iOS's, so no design framework and no
+  `no-ai-slop`; it shows a teacher nothing, and nothing about a student beyond what the phone holds about
+  itself.
+
+  **Where it lives:** `app/src/debug`'s `ReadoutActivity.kt`, plain Views (today's Compose needs
+  compileSdk 37, owner item 6), with a launcher entry of its own, "Bali readout (Debug)", and
+  `ThisBuild.kt`, what a Debug build adds to the app's start; `app/src/release`'s `ThisBuild.kt`, which
+  adds nothing; `BaliApp`'s `begin`, `startFailed`, `front` and `launched`; and `ServiceLock`'s Launch
+  measure and the reads its Service line shows. Its lines: the engine, the link, the server's last
+  answer, signed in, the standing, the lock's claim (the switch and whether it's judged off, locked, due
+  until, and "protection off NOT recorded", `Protection.unreported`), the service (on the list, bound,
+  listening), Launch, the outbox, and what the last button did. Its buttons: Sign in and Sign out, Open
+  Accessibility settings (iOS's Allow Screen Time), a typed tap, Emergency Unlock where
+  `emergencyUnlock(null)` names one, the 15-minute cap, and Try again where the start failed. Not here:
+  Join and History (AN9's), Scan and the block's code (AN8's), iOS's Marker, Asked iOS, iOS, Lose the bell
+  and Monitor (no twin), and no 13+ button (Q8). Where Kotlin differs, said plainly:
+  - **The Debug engine starts with the app, not with the readout** (the brief's trap): where the signed-in
+    engine will, as the app is created, so the phone checks see what a signed-in build will do. A relaunch
+    locks from the file at once, a process Android starts for the service runs the engine and its check,
+    and the Launch line times the bind from the run's first check; an engine the readout started would
+    first read the switch when opened, long after. So **the tests get files of their own:** the app's start
+    now opens `outbox.sqlite` in the tests' process too and never closes it, and Room closes a connection
+    still in use (AN5c), so OutboxFileTest moves to a file of its own (`Context.outbox(name)`), which also
+    closes the trap AN7c named for the PR that sets the client id. BaliAppTest pins the app's own file
+    opened by its start in the tests' process. And **a test that starts a run of its own waits for the
+    app's start first** (`launched`), which, finishing after it, would replace that run: a race only a test
+    has, since the app has one start.
+  - **Q2, as decided:** over no token, at the build's API (`BALI_API_URL`), a signed-out phone:
+    `SyncEngine.open` over a client whose token is always none, so nothing reaches the wire, every send
+    waiting on sign-in (`Link.SignIn`), and a typed tap locks offline to its cap. **A Release build makes
+    none, as iOS's:** its `ThisBuild` gives none and opens nothing, pinned by `ThisBuildTest` on the JVM,
+    which also finds no `ReadoutActivity` in Release's classes. AGP 9 makes JVM tests for the tested build
+    type alone, so `gradle.properties` sets `android.onlyEnableUnitTestForTheTestedBuildType=false` (the
+    conductor's call: one setting; the app's JVM tests run under both build types, a few seconds more).
+  - **A start that fails is held, never swallowed** (Claude Review's WARN on #523): `begin` catches what
+    making or starting the engine throws (the outbox's file, the API not a URL) and holds it in
+    `startFailed` until a start succeeds; the readout says it on its Engine line with Try again, which runs
+    `begin` again; AN10 words it for the screens. An `Error` still ends the app, as the enforcer lets one
+    go. `begin` makes nothing while a run exists, as iOS's `start` guards `engine == nil`.
+  - **Bali in front (`front`):** a flow of the app's that the readout sets as it resumes and pauses (iOS's
+    active and not active, so a dialog over it counts as behind), Phase 10's screens later. `start` follows
+    it with one collector, as it follows the screen, so two turns in quick succession land in order: in
+    front, `setInFront(true)` asks for the truth, then rule 3's check; behind, `setInFront(false)` sends an
+    unlock held for its reason.
+  - **The Launch line is the service's own measure** (AN7b's note), so it is in `ServiceLock`, in every
+    build, two numbers in memory that only the readout shows: the run's first read of the switch, by the
+    phone's uptime, the grace's clock, and how long until a read first said other than starting, and what.
+    It reads "starting for 12.3 s, then on", or "… so far, off at 30.0 s", or "on at the first read", a
+    process Android started for the bind itself, the grace never running.
+  - **The cap** is kept in the readout's own preferences and read at each start by Debug's
+    `ThisBuild.starting` (BaliApp.swift's `#if DEBUG setTapCap`), the signed-in engine's too once sign-in is
+    set up. **The buttons' work runs in the app's scope**, as iOS's `run` runs in a Task, so a readout made
+    again never cuts one short (a sign-in's tab among them); what each did is the process's one note.
+  - **Emergency Unlock stays offered once pressed while its tap waits for an answer,** as iOS's readout's
+    does: `emergencyUnlock(null)` still names an unlock under that tap, and a second press records a
+    second one. It is `emergencyUnlock()`, no reason held, as iOS's. **Sign in and Sign out open nothing
+    while sign-in isn't set up, and say so**; once it is, Sign in runs through AN6c's `hostedUi`, which
+    ANDROID-PHONE-TESTS' AN6c section checks.
+  - **Lint's `SetTextI18n` is suppressed on the readout, its reason beside it:** lint's premise is words a
+    student reads and a translator translates, and these are a developer's, as iOS's readout's are; without
+    it the build fails, tried.
+
+  **The tests,** on `Bali_Spike_API35`: the whole instrumented suite, 41 of 41 (BaliAppTest's 4, three new:
+  the Debug build's start over no token, a start that fails held and tried again, the cap read at each
+  start; LockServiceTest's 11, two new: Bali in front reads the truth and runs the check, which finds the
+  switch off in a session no wake checked, and the Launch measure; ReadoutTest's 4, new, the smoke test:
+  a typed tap queued and locked offline to its cap, the short cap moving its end, Emergency Unlock shown
+  and dropping the lock, never on the wire; Sign in opening nothing while sign-in isn't set up, and saying
+  so; in front the truth asked for, behind an unlock held for its reason sent; a failed start shown with
+  Try again, which starts the app; and AN6c's and AN7c's tests unchanged). On the JVM, `ThisBuildTest`.
+  Tried, each failing by name, then reverted: the readout never telling the app it's in front, or behind;
+  the collector without the check, and without `setInFront` (3); the cap not read at the start; a start's
+  failure swallowed (2); the Launch measure never settling at a first read; Emergency Unlock never
+  offered; and Release's `ThisBuild` making an engine (the JVM's). By hand on the emulator: a typed tap
+  locked to its 50 minutes, the cap moving it to 15, Emergency Unlock taking it off and the service back
+  to listening to nothing; and `uiautomator dump`, a UiAutomation that suppresses accessibility services,
+  has Android unbind the service while it runs, which the readout said as it happened (switch starting,
+  not locked): screenshots by `screencap` alone (GOTCHAS). Nothing was added to the PC's SDK: its folders
+  were compared before and after.
+
 - **2026-11-05** — **AN7c, the lock's service and the app's engine: Bali's Accessibility service, the
   `Lock` over it and `BaliApp` starting the engine and the enforcer, on the emulators (the conductor's
   calls, awaiting the owner's look; AN7c, #523).** The owner isn't reviewing each step and asked for the
