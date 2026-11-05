@@ -10,6 +10,14 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-11-05 (Central) — A3a (#517; `docs/DECISIONS.md`, 2026-11-05): the server's
+endpoint for the portal's teacher actions, `POST /v1/me/actions`: teachers only, the action's name
+from an allow-list apart from the server's own, the event built and sent to PostHog by the server,
+a budget per teacher, off until `POSTHOG_KEY` is set. Before it, WC5 (#516). Next: WC6; A3b, A4; a
+session builds the retire-a-block command; the owner the new build, with A5 and A2, and the
+sitting; the owner's call on GA5's known limit, the smallest iPhones (DECISIONS 2026-11-02); AN6,
+Android's sign-in; AN1's part 2 once the owner has the phones; the audit's polish waits, as ruled._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN6b's on 2026-11-05: _Last updated: 2026-11-04 (Central) —
 AN6a, sign-in's parts (#515; `docs/DECISIONS.md`,
 2026-11-04): BaliCore's `SignIn.swift` in Kotlin from its top through `Tokens`, with its tests: the
