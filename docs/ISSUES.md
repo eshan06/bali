@@ -278,7 +278,12 @@ both phones, on the build students will install, before Android launches
    reports stay reports.
 3. **A blocked app shows for a moment before the cover lands:** on the emulators a median of half
    to three quarters of a second from launch, always after the app's first frame, and longer on a
-   slow first launch. *Checked:* launch to cover, timed on both phones as part 1 timed it.
+   slow first launch. And one already on screen as a lock comes on, beside Bali in split screen or in
+   picture-in-picture, shows until it changes or the student touches it: Bali names a window only from
+   that window's own events, never reading its contents (the battery plan; `docs/DECISIONS.md`,
+   2026-11-05, AN7e). *Checked:* launch to cover, timed on both phones as part 1 timed it; and a video
+   playing in split screen beside Bali, and in picture-in-picture, as a tap locks the phone: how long
+   each shows.
 4. **A blocked app's sound can play on.** Most apps stop once they are sent to the background;
    music apps, a picture-in-picture window and a split-screen half don't. *Checked:* a video app, a
    music app, a picture-in-picture window and a split-screen half, each playing as a lesson starts:

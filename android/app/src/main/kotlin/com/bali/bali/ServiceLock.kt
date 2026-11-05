@@ -101,6 +101,12 @@ class ServiceLock(private val context: Context) : Lock {
     }
 
     /**
+     * Until when the service covers apps (AN7e), told at each call below ([LockService.cover]): this run's lock's end, or
+     * the last run's, which has none of its own, the end of time; none while none holds. On the main thread.
+     */
+    internal val until: Instant? get() = if (kept) Instant.MAX else end
+
+    /**
      * Whether a lock holds now, this run's before its end or the last run's, the file and the service
      * following it: the file there while one does, and the service listening to the windows while one
      * does, to nothing but its own package's nothing while none does. A change that didn't take is made
@@ -109,7 +115,10 @@ class ServiceLock(private val context: Context) : Lock {
     private fun follow(): Boolean {
         val holds = kept || end?.let { it > Instant.now() } == true
         if (saved != holds) saved = save(holds)
-        service?.let { if (listening != holds) listening = listen(it, holds) }
+        service?.let {
+            if (listening != holds) listening = listen(it, holds)
+            it.cover()
+        }
         return holds
     }
 

@@ -8,6 +8,102 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-05** — **AN7e, the cover: which windows the lock covers, on the JVM (`Cover`), the allow-list
+  asked of Android, and the covers drawn over Bali's Accessibility service, on the emulators (the
+  conductor's calls, awaiting the owner's look; AN7e, #PRNUM).** The owner isn't reviewing each step and
+  asked for the recommended option on every question, so each call here is the conductor's, for the owner
+  to look at.
+
+  **Where it lives:** `outbox`'s `Cover.kt`, the rule, on the JVM; `app`'s `AllowList.kt`, what's never
+  covered, asked of Android as a lock comes on, with its `<queries>` beside the service in the Debug
+  manifest (Q1); `Covers.kt`, the covers themselves, accessibility overlays; `LockService`'s window events;
+  and `ServiceLock`'s `until`, each of its calls telling the service. iOS has no twin: its shields cover
+  every app at once. The rule as the split set it out, and where it goes further, each the conductor's call:
+  - **Covered:** a window an app the allow-list doesn't hold has named as its own, by that window's own
+    state event (its package and window id), at its place within the safe area (the screen but its system
+    bars and cutout, so the status bar and the gesture bar stay the student's), while the lock's end is
+    ahead by the phone's clock.
+  - **A window no event has named is never covered** (the conductor's call): no window's contents is read
+    (the battery plan), and a window nothing has named may be the in-call screen. So a blocked app already
+    on screen as the lock comes on, beside Bali in split screen, in picture-in-picture, or as the service
+    binds again, stays bare until it changes or the student touches it, as the emulators showed; and
+    Android's list of windows, asked for as the lock comes on in the middle of split screen's own
+    animation, missed a window until the next change. Said in ISSUES #6's gap 3. One node read as a lock
+    comes on would close it, at the cost the battery plan names: the owner's call, if the phones show it
+    matters.
+  - **A cover hides only its own window** (the conductor's call, in place of the spike's "a system window
+    taller than a third of the screen"): it keeps clear of every window above it that isn't covered itself,
+    System UI's shade and quick settings, a notification, the keyboard, an allowed app's, keeping its
+    largest part beside each. So nothing is covered while the shade fills the screen (the split's rule),
+    and the keyboard risen for the other half of a split screen, and a notification's Answer over a covered
+    half, stay whole: an accessibility overlay sits above every window Android has, so the spike's cover
+    hid both (seen on the emulator). The spike's rule also took a tall overlay of another app's, or a
+    landscape navigation bar, for the shade. Split screen's divider is passed over: its handle sits between
+    the halves, its touch reaching into them.
+  - **A window an app draws over others is covered too** (the conductor's call): Android lists another
+    app's overlay windows as the system's, so a blocked app's floating window would otherwise play on.
+    Never sent home, which moves no such window.
+  - **Sent home** (Q5): a full-screen app, once its cover lands (its first frame drawn), once per cover,
+    and never once the cover has gone with its window, so a student who has moved on is never sent home
+    from there; a split half or a picture-in-picture window stays covered.
+  - **Names last only while a lock holds** (the conductor's call): decision 2's "keeps and sends none of
+    it", so no list of the apps a student opens outlives the lock. Within it a window that comes back keeps
+    its name, so a warm return is covered as it appears, before its own event.
+  - **The lock's end passes with no event:** the service makes its covers again at the end on its own
+    thread, which the lock holds already (no alarm, no wake lock), beside the enforcer's pass there; a
+    phone asleep through it uncovers as the screen comes back. The last run's lock has no end of its own.
+  - **The allow-list:** the split's parts, asked of Android: the dialer and SMS roles, the emergency dialer
+    and the emergency call, Telecom, Settings with its permission and uninstall screens, the home screen
+    (the one chosen, or each offered where none is), the enabled keyboards, System UI, and Bali. Two more,
+    the conductor's: **the system's own dialogs and choosers** (`android`), and **the system's in-call
+    screens** (an `InCallService` flagged as Telecom's in-call UI, from a system app), so a maker's in-call
+    screen apart from its dialer, the Samsung's (AN1), is found before AN7f checks it. **Found on the
+    emulator:** Android names the SMS role's holder only to an app that can see it, so Messages would have
+    been covered without its `<queries>` entry; the test caught it.
+  - **Plain in Debug** (Q1): no words, no buttons, the iPhone shield's background (`#F7F5F2`), taking every
+    touch so the app under it gets none, a touch outside it going to the windows it doesn't cover. The
+    63-px strip of a covered app under the gesture bar shows, as AN1 saw.
+
+  **What the emulators showed** (Android 15, 16 and 17, each cold-booted): launch to cover, Contacts from
+  Home three times, the first cold, on an emulator past its boot, against AN1's medians of 570, 507 and
+  745 ms over five apps: 15, [808, 251, 179] ms; 16, [918, 303, 335]; 17, [1132, 262, 259]; in the run
+  right after a cold boot, slower (16, [2480, 1189, 1435]; 17, [2916, 656, 1085]). A warm launch is
+  faster than AN1's, a window named earlier in the lock covered as it appears; a cold one isn't. Where
+  only real time does: these times, and the lock's end, its cover gone within 2 s of it. Emergency Unlock
+  took the cover off in 47 ms (15), 137 (16) and 49 to 228 (17). The cover followed a picture-in-picture
+  window as it moved (and, by hand, in landscape); the shade and the keyboard stayed whole; a heads-up
+  notification's window, read there (System UI's, the card's own size), is the JVM test's.
+
+  **The tests,** on `Bali_Spike_API35`, `36` and `37`, the whole instrumented suite, 47 of 47 on each
+  (`CoversTest`'s 5 new, on the emulator's own windows): a blocked system app (Contacts) covered and sent
+  home once, the cover gone with its window, timed; Settings, the dialer, the emergency dialer, Messages, a
+  call's in-call screen (to the emulator's own pretend network, its call log put back), the launcher and
+  the readout never covered, none sent home; split screen beside the readout, the blocked half covered
+  where it is within the safe area, the readout bare, never sent home, the keyboard kept clear, nothing
+  covered under the shade, and Emergency Unlock lifting it; a full-screen app sent home into
+  picture-in-picture, covered where it is and followed as it moves; and a lock ending 15 s on, with no
+  enforcer, losing its cover at its end with no event. The covers are read from the service and seen in
+  the screen's pixels (`screencap`), never in a `uiautomator dump`. The blocked app is a system app or the
+  tests' own stand-in (`StandIn.java`, Java since it runs in the test app's own process, which carries no
+  Kotlin). On the JVM, `CoverTest`'s 15. Tried, each failing by name, then reverted: Bali's own windows
+  covered; an unnamed window covered (3); no window above kept clear (2); a picture-in-picture window sent
+  home; names kept past the end; the overlays and the divider kept clear (2); covered at the end's very
+  moment; a window drawn over others sent home; the keyboard covered; and, on the emulator, no app sent
+  home (4) and no cover made again at the end. **AN6c's race closed** (its own commit): SignInBrowserTest's
+  Back over a font-scale change now waits for the input dispatcher to send keys to Chrome's new window,
+  Chrome making its window again for the change (AN7d's "no input channel"); no assertion loosened.
+  Nothing was added to the PC's SDK: its folders were compared before and after.
+
+  **For AN7f:** the phone tests' AN7 section (`docs/ANDROID-PHONE-TESTS.md`): the Samsung's in-call screen,
+  a permission prompt, sound playing on, launch to cover on hardware, a window on screen as the lock comes
+  on, and Advanced Protection through Settings. **For AS5:** the block screen as the cover's content, its
+  OK going home and Open Bali opening Bali; and TalkBack, since an accessibility overlay doesn't take the
+  windows under it out of Android's list of windows, so TalkBack can still reach a covered split half or
+  picture-in-picture window. **For Phase 10:** the service and these `<queries>` declared in the release
+  manifest, with AS0's words.
+
+  **Santa's review:** SANTA.
+
 - **2026-11-05** — **WC8, the Android canvas's Words board recounted, and the WC job done (the
   owner's job of 2026-11-04; WC8, #530).** The iPhone made the owner's Android cuts in WC1–WC7
   (#502, #506, #508, #509, #516, #519, #526; "The iPhone and the student web make the owner's

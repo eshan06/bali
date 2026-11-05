@@ -147,6 +147,11 @@ The PC whose clone is `C:\dev\bali` holds Android's SDK and its test emulators
   accessibility services, so Android unbinds Bali's, still on its list: the Debug readout reads the switch
   starting, not locked, until it binds again. Find a control's place from a dump taken before the step that
   matters, and take the screenshot with `adb exec-out screencap -p` alone.
+- **Uninstalling Bali with its service on leaves dead bindings behind.** `adb uninstall` or a reinstall
+  while the service is switched on leaves Android's own connections to it, marked `DEAD`, in `dumpsys
+  activity services com.bali.bali` until the emulator restarts, and LockServiceTest's
+  `aServiceAndroidUnbinds…` reads them as the service still there. Switch the service off first (`settings
+  delete secure enabled_accessibility_services`); a cold boot clears them.
 - **Git Bash rewrites a device path handed to adb.** `adb shell uiautomator dump /sdcard/ui.xml`
   and `adb exec-out cat /sdcard/ui.xml` reach adb as `C:/Program Files/Git/sdcard/ui.xml`, so the
   dump lands nowhere and the read fails, or reads an old file. Prefix such a command with

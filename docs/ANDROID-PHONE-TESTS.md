@@ -203,6 +203,31 @@ typed:
   locked, to the same end. At the end, with nothing woken: not locked, listening to nothing. Then a tap
   again and Emergency Unlock: not locked at once.
 
+**The cover (AN7e),** what the emulators couldn't answer (`docs/DECISIONS.md`, 2026-11-05, AN7e); each
+lock a typed tap in the readout, as above:
+
+- **The in-call screen.** *Start:* in a class, focused, a blocked app beside the readout in split screen,
+  the screen on, Airplane mode off, the service on. A call coming in, then one placed from the dialer: the
+  in-call screen and the call's notification never covered, never sent home; on the Samsung, its own
+  in-call screen (`com.samsung.android.incallui`) above all, which the allow-list should find as the
+  system's in-call screen. The emergency dialer opened from the lock screen and from the power menu,
+  never dialled: never covered.
+- **A permission prompt.** *Start:* in a class, focused, the screen on, Airplane mode off, the service on,
+  a blocked app never opened. Opened: what shows behind its prompt, and the cover once the prompt is
+  answered (ISSUES #6, gap 6).
+- **Sound playing on.** *Start:* out of a class, a video app and a music app each playing, the screen
+  on, Airplane mode off, the service on. A tap, then each opened: which go quiet once sent home, and a
+  video in a split half and in picture-in-picture, which stay covered (gap 4).
+- **Launch to cover on hardware.** *Start:* in a class, focused, the screen on, Airplane mode off, the
+  service on. Contacts and a video app from Home, three times each, the first cold, against the
+  emulators' times (gap 3).
+- **A window on screen as the lock comes on.** *Start:* out of a class, a video playing beside the
+  readout in split screen, then in picture-in-picture, the screen on, Airplane mode off, the service on.
+  A tap: how long each shows before it changes or is touched (gap 3).
+- **Advanced Protection through Settings.** *Start:* out of a class, the screen on, Airplane mode off,
+  the service on, the Android 17 phone with a screen lock. Advanced Protection switched on in Settings:
+  whether the service stays on and still covers, and whether it can be switched on again (gap 7).
+
 The readout's Launch line, how long the service took to bind, is read in the service's reboot part above.
 What the readout records with no sign-in stays queued on the phone, and a build with sign-in set up
 would send it to dev under the first account signed in: clear Bali's storage, or uninstall it, before
