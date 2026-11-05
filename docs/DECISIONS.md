@@ -9,7 +9,7 @@ touching before changing how something works. A pointer of the form
 a real decision? Add a dated entry at the top: what was decided and why.
 
 - **2026-11-04** — **PostHog: the owner's four rulings, and the iPhone app's privacy manifest gives
-  Product Interaction the purpose Analytics (the owner, in chat with the conductor; A5, #PR).** The
+  Product Interaction the purpose Analytics (the owner, in chat with the conductor; A5, #505).** The
   owner answered the open calls of A1's entry ("PostHog's rules", below) and two more, each with the
   option quoted; each is now in ARCHITECTURE's "Analytics (PostHog)":
   1. **A class's totals are always sent, whatever its size** ("Always send", over holding focus

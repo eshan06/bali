@@ -8,7 +8,7 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-04 (Central) — A5, the iPhone app's privacy manifest (#PR; `docs/DECISIONS.md`,
+_Last updated: 2026-11-04 (Central) — A5, the iPhone app's privacy manifest (#505; `docs/DECISIONS.md`,
 2026-11-04): Product Interaction gains the purpose Analytics, pinned by CI's check, and the owner's
 four PostHog rulings: a class's totals always sent; the portal's events through Bali's server, the
 CSP unchanged; a deleted teacher's events kept; the manifest in the next build. Before it, WC1, the
@@ -136,7 +136,7 @@ branch, with no PR, as its README says (#479; `docs/DECISIONS.md`, 2026-11-02).
 4. PostHog (ARCHITECTURE's "Analytics (PostHog)"; DECISIONS 2026-11-04), one PR each:
    - **A1** Its rules in the docs — ✅ (#503; DECISIONS 2026-11-04)
    - **A5** The iPhone app's privacy manifest: Product Interaction gains the purpose Analytics — ✅
-     (#PR; DECISIONS 2026-11-04)
+     (#505; DECISIONS 2026-11-04)
    - **A2** The server's class totals, always sent, whatever the class's size
    - **A3a** The server's endpoint for the portal's events: teacher-only, checked against the
      allow-list, forwarded to PostHog with the server's key; additive under `/v1`
