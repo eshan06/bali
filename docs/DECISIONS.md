@@ -8,6 +8,24 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-05** — **WC8, the Android canvas's Words board recounted, and the WC job done (the
+  owner's job of 2026-11-04; WC8, #530).** The iPhone made the owner's Android cuts in WC1–WC7
+  (#502, #506, #508, #509, #516, #519, #526; "The iPhone and the student web make the owner's
+  Android cuts", 2026-11-04, below), so the Words board of
+  [Bali Android app screens](https://claude.ai/artifact/SZPLe9WcymZJ1Bvrgj5KoE) now lists only
+  where the two still differ: version 55 (`1793918489-4fd2`), from 54 (`1793918100-1bf9`), with
+  only the board and the canvas note that repeats its counts changed. Off "Gone on Android", the 17
+  lines the iPhone cut too: Focus's three, Sign in's, the 13+ question's, the step's "You can change
+  this any time in Settings.", Join's two, Unlocked's, the reason card's, the lock-off screen's,
+  History's, Me's two, the list-changed screen's and the answer card's two. The block screen's row
+  stays, now with the iPhone's line, "This app is paused for class. Open Bali to Emergency
+  Unlock.", and so do the 4 lines with no Android twin, each still in the iPhone app. Off "Changed",
+  Waiting's row: both now say "Your phone locks when class starts, as long as Bali is open. No need
+  to tap again." Every other row's iPhone line is still the app's (checked against `ios/` on
+  `main`). So 27 lines changed, 14 new, 5 gone (1 cut by the owner, 4 with no Android twin), where
+  they were 28, 14 and 22 (18 and 4); DESIGN.md's Android section says so. The board's frame is
+  2370 px tall, from 2610, to fit what's left; nothing else on the canvas moved. **The job is
+  done:** WC1–WC8, with the `refusalsWhole` flake fix (#528) alongside.
 - **2026-11-05** — **Production backups (L0b) are back before the Vanderbilt pilot (the owner:
   "we will have those backups before we go live. lets just mark that as somehting to do pre
   pilot").** Withdraws 2026-11-03's "we dont need hte prod backups" for the pilot. `/privacy`'s

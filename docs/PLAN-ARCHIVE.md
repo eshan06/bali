@@ -10,6 +10,21 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-11-05 (Central) — production backups (L0b) are back before the pilot, item 7
+below (the owner, 2026-11-05; `docs/DECISIONS.md`). Before it, A4 (#527): `/privacy` names PostHog.
+Next: WC8; the owner's PostHog key; a session builds the
+retire-a-block command; the owner the new build, with A5 and A2, and the sitting; the owner's call
+on GA5's known limit, the smallest iPhones (DECISIONS 2026-11-02); AN7e; AN1's part 2 once the
+owner has the phones; the audit's polish waits, as ruled._
+
+_Last updated: 2026-11-05 (Central) — A4 (#527; `docs/DECISIONS.md`, 2026-11-05): `/privacy` names
+PostHog: what the server counts, what PostHog never gets, the counts as one or two students' own
+when only one or two are in the class or tap in, its 1 year, and what stays after a deletion or a
+disposal. Before it, WC7 (#526). Next: WC8; the owner's PostHog key; a session builds the
+retire-a-block command; the owner the new build, with A5 and A2, and the sitting; the owner's call
+on GA5's known limit, the smallest iPhones (DECISIONS 2026-11-02); AN7e; AN1's part 2 once the
+owner has the phones; the audit's polish waits, as ruled._
+
 _Last updated: 2026-11-05 (Central) — WC7 (#526; `docs/DECISIONS.md`, 2026-11-04): the seventh WC
 step: the student web's card loses its two lines. Before it, A3b (#525). Next: WC8; A4; a session
 builds the retire-a-block command; the owner the new build, with A5 and A2, and the sitting; the
@@ -1805,6 +1820,11 @@ why, Open owner items the owner's queue.
   the conductor's call, awaiting the owner: `createDb` always passes postgres.js a number, 10 unless
   the load harness names one, so `PGMAX` or a `max` in `DATABASE_URL` is ignored, and the boot says so
   by name, never with the URL (`docs/DEPLOY.md`). More connections stays not a deploy setting.
+
+**In flight, the WC line as PLAN.md said it until WC8 (2026-11-05):**
+- **The owner's Android cuts on the iPhone and the student web (the owner, 2026-11-04; DECISIONS
+  2026-11-04):** WC1–WC8, one PR each, from the approved boards: WC1–WC7 ✅ (#502, #506, #508,
+  #509, #516, #519, #526); WC8 next, the Android canvas's Words board and DESIGN.md's counts.
 
 **Phase 7, Live lesson: building** (the owner lifted the hold and approved both canvases,
 2026-10-10). The steps with no screen go first, one PR each: M1 ✅ (the storage interface, with

@@ -8,12 +8,12 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-05 (Central) — production backups (L0b) are back before the pilot, item 7
-below (the owner, 2026-11-05; `docs/DECISIONS.md`). Before it, A4 (#527): `/privacy` names PostHog.
-Next: WC8; the owner's PostHog key; a session builds the
-retire-a-block command; the owner the new build, with A5 and A2, and the sitting; the owner's call
-on GA5's known limit, the smallest iPhones (DECISIONS 2026-11-02); AN7e; AN1's part 2 once the
-owner has the phones; the audit's polish waits, as ruled._
+_Last updated: 2026-11-05 (Central) — WC8 (#530; `docs/DECISIONS.md`, 2026-11-05): the Android
+canvas's Words board lists only where Android's words and the iPhone's differ, so the WC job is
+done. Before it, production backups (L0b) back before the pilot, item 7. Next: the owner's PostHog
+key; a session builds the retire-a-block command; the owner the new build, with A5 and A2, and the
+sitting; the owner's call on GA5's known limit, the smallest iPhones (DECISIONS 2026-11-02); AN7e;
+AN1's part 2 once the owner has the phones; the audit's polish waits, as ruled._
 
 ## Now
 
@@ -46,9 +46,8 @@ branch, with no PR, as its README says (#479; `docs/DECISIONS.md`, 2026-11-02).
   Phase 7 screens are done: L8 (L8a, #443, L8b, #448 and #450, and L8c, #451), M8's slide view on
   Focus (#452) and M8b's slide off Focus and card on the Screen Time ask (#454); left, their 📱
   device checks, the owner's. C2's legal words (⚖️) go into the portal's pages, on the Windows PC.
-- **The owner's Android cuts on the iPhone and the student web (the owner, 2026-11-04; DECISIONS
-  2026-11-04):** WC1–WC8, one PR each, from the approved boards: WC1–WC7 ✅ (#502, #506, #508,
-  #509, #516, #519, #526); WC8 next, the Android canvas's Words board and DESIGN.md's counts.
+- **The owner's Android cuts on the iPhone and the student web (WC1–WC8)** ✅ (#502, #506, #508,
+  #509, #516, #519, #526, #530; DECISIONS 2026-11-04, 2026-11-05).
 - **Android (the owner, 2026-11-02)**: Phases 8–11, the steps in `docs/PLAN-ANDROID.md` (AN0 ✅);
   AN1, the lock spike: parts 1 and 1c on the Android 15–17 emulators ✅ (DECISIONS
   2026-11-03); AN1b ✅ (DECISIONS 2026-11-04): the owner picked (a), the Accessibility service, with
