@@ -8,7 +8,7 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-05 (Central) — WC7 (#PRNUM; `docs/DECISIONS.md`, 2026-11-04): the seventh WC
+_Last updated: 2026-11-05 (Central) — WC7 (#526; `docs/DECISIONS.md`, 2026-11-04): the seventh WC
 step: the student web's card loses its two lines. Before it, A3b (#525). Next: WC8; A4; a session
 builds the retire-a-block command; the owner the new build, with A5 and A2, and the sitting; the
 owner's call on GA5's known limit, the smallest iPhones (DECISIONS 2026-11-02); AN7e; AN1's part 2
@@ -47,7 +47,7 @@ branch, with no PR, as its README says (#479; `docs/DECISIONS.md`, 2026-11-02).
   device checks, the owner's. C2's legal words (⚖️) go into the portal's pages, on the Windows PC.
 - **The owner's Android cuts on the iPhone and the student web (the owner, 2026-11-04; DECISIONS
   2026-11-04):** WC1–WC8, one PR each, from the approved boards: WC1–WC7 ✅ (#502, #506, #508,
-  #509, #516, #519, #PRNUM); WC8 next, the Android canvas's Words board and DESIGN.md's counts.
+  #509, #516, #519, #526); WC8 next, the Android canvas's Words board and DESIGN.md's counts.
 - **Android (the owner, 2026-11-02)**: Phases 8–11, the steps in `docs/PLAN-ANDROID.md` (AN0 ✅);
   AN1, the lock spike: parts 1 and 1c on the Android 15–17 emulators ✅ (DECISIONS
   2026-11-03); AN1b ✅ (DECISIONS 2026-11-04): the owner picked (a), the Accessibility service, with
