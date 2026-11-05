@@ -108,11 +108,19 @@ a real decision? Add a dated entry at the top: what was decided and why.
   something doesn't happen waits for a point the test sees (a wait gone before it was due, every request
   taken); that no check-in comes however long the screen stays off is AN5c's JVM test, which moves its
   clock 600 s: here the engine's clock holding no wait once the answer is in is a look, not that proof
-  (santa's review); and `setCacheEnabled(false)` shows in no dump, so nothing here tests it. **Said
-  plainly:** on Android 16's
-  first run after its cold boot, one of AN6c's tests (`aHostMadeAgainForAChange…StillReachesTheCall`)
-  waited out its 30 s for the host made again, the emulator still loaded (the lock's tests took 40 s
-  there, 11 s after); it passed alone and in both full runs after. Each emulator was left as found: Bali's
+  (santa's review); and `setCacheEnabled(false)` shows in no dump, so nothing here tests it. **AN6c's
+  race, found and closed:** on emulators still loaded from a cold boot, AN6c's
+  `aHostMadeAgainForAChange…StillReachesTheCall` failed in 3 of 6 first runs (Android 16 and 17): the
+  font scale's change reached Bali seconds after the shell set it, the answer had brought the host back
+  as it was by then, and it was never made again (17's logcat: the host back and done at :26, the change
+  arriving at :28). It now waits for Bali to have the change before it answers. The same lag broke the
+  next test twice (`aLinkSentToClearBalisTask…`, on 15 and 17): the last test's change and its undoing
+  reached Bali during it and made its host again under the tab (15's logcat: 1.3, then 1.0, then the host
+  remade, all within a second of its start), so `changed {}` now waits for Bali to have the font scale
+  back before the next test starts. A wait in `changed {}` before its block too moved the race into its
+  other test, whose Back then reached Chrome while Chrome was being made again for the change and was
+  lost, so that wait is in the one test alone. With both, each emulator ran the suite whole cold and warm.
+  Each emulator was left as found: Bali's
   app and test app uninstalled (AN1's spike apps kept), no accessibility service on,
   `accessibility_enabled` at 0, the font scale 1.0. Nothing was added to the PC's SDK: its folders were
   compared before and after.

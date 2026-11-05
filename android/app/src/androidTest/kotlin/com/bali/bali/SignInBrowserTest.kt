@@ -155,6 +155,10 @@ class SignInBrowserTest {
         val host = host()
         covered(host)
         changed {
+            // The change reaches Bali a moment after the shell returns, seconds later on an emulator still loaded
+            // from its cold boot: an answer sent before it brings the host back as it was, never made again (seen
+            // on Android 16 and 17 at AN7c, the host back and done before the change arrived).
+            until { context.resources.configuration.fontScale.takeIf { it == 1.3f } }
             send(answer("s1"))
             assertEquals(answer("s1"), await(call).getOrThrow())
             assertNotSame(host, until { hosts.lastActivity?.takeIf { it !== host } })
@@ -247,7 +251,12 @@ class SignInBrowserTest {
         until { (host as HostedUiActivity).lifecycle.currentState.takeIf { it == Lifecycle.State.CREATED } }
     }
 
-    /** Runs [block] with the phone's font scale changed, a configuration change, then puts it back as found. */
+    /**
+     * Runs [block] with the phone's font scale changed, a configuration change, then puts it back as found,
+     * waiting for Bali to have it back: a change reaches Bali a moment after the shell returns, seconds later
+     * on an emulator still loaded from its cold boot, and one landing in the next test makes its host again
+     * under the tab (seen on Android 15 at AN7c).
+     */
     private fun changed(block: () -> Unit) {
         val scale = shell("settings get system font_scale").trim()
         shell("settings put system font_scale 1.3")
@@ -255,6 +264,7 @@ class SignInBrowserTest {
             block()
         } finally {
             shell(if (scale == "null") "settings delete system font_scale" else "settings put system font_scale $scale")
+            until { context.resources.configuration.fontScale.takeIf { it == (scale.toFloatOrNull() ?: 1f) } }
         }
     }
 
