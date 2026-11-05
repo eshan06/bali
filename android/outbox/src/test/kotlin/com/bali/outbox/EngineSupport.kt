@@ -290,12 +290,18 @@ class Rig(val engine: SyncEngine, val outbox: Outbox, val server: Server, val cl
     }
 
     /**
-     * The screen on, the read of the truth it makes at once answered with [me]; the read loop then waits
-     * for its next check-in. BaliOutbox's tests' `foreground`.
+     * The screen on, the read it makes at once answered: in a session its check-in, with [live]; out of
+     * one, the truth, with [me]. The read loop then waits for its next check-in. BaliOutbox's tests'
+     * `foreground`, whose read of the truth is `GET /v1/me` in a session too.
      */
-    suspend fun screenOn(me: String = Answer.me()) {
+    suspend fun screenOn(me: String = Answer.me(), live: String = Answer.live()) {
+        val standing = engine.updates.value.standing
         engine.setScreenOn(true)
-        server.next(meRoute).reply(200, me)
+        if (standing is Standing.InSession) {
+            server.next("POST /v1/sessions/${standing.session.id}/checkin").reply(200, live)
+        } else {
+            server.next(meRoute).reply(200, me)
+        }
         eventually { clock.deadlines.contains(clock.now() + SyncEngine.CHECK_IN_INTERVAL) }
     }
 

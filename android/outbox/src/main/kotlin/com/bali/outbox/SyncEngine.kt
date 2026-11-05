@@ -27,7 +27,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -123,12 +125,15 @@ class SyncEngine private constructor(
 
     /**
      * Whether the screen is on, as the lock's service says (AN7): the read loop checks in every 30
-     * seconds while it is, and while it is off, never but once, as it goes off ([goingOff]).
+     * seconds while it is, and while it is off, never but once, as it goes off ([screenTurned]).
      */
     private var screenOn = false
 
-    /** The one check-in the screen going off sends, in a session: the read loop's, at its next wake. */
-    private var goingOff = false
+    /**
+     * Whether the screen went on or off since the read loop's last wake: its next wake checks in at once
+     * in a session, the screen's own check-in, and reads the truth out of one as it comes on.
+     */
+    private var screenTurned = false
 
     /** Rule 3's check of the lock, the lock's service's (AN7): [atEachWake]. */
     private var check: (suspend () -> Unit)? = null
@@ -317,27 +322,45 @@ class SyncEngine private constructor(
      * Reads the truth: where the phone stood, from the file, while that is unread; then a read of the
      * truth (`GET /v1/me`) when one was asked for, tried again at each wake until one answers, or else the
      * check-in of the session the phone is in, every 30 seconds while the screen is on and once as it goes
-     * off; then waits for the next wake. Each read's answer applies only as the reconcile says.
+     * on or off; then waits for the next wake. Each read's answer applies only as the reconcile says.
      */
     private suspend fun read(): Nothing {
         while (true) {
             val (wake, check) = alone { wake() to check }
-            // Rule 3, with the engine let go: before the check-in, or the read of the truth in its place.
-            // A protection off it reports is a change, which the read's stamp then counts.
-            if (wake.checks) check?.invoke()
             val refreshing =
-                when (val read = alone { reading(wake) }) {
-                    null -> null
-                    is Read.Me -> client.me().let { alone { readMe(read.sent, it) } }
-                    is Read.CheckIn -> client.checkIn(read.session, CheckInRequest(read.at)).let { alone { checkedIn(read.sent, it) } }
+                try {
+                    // Rule 3, with the engine let go: before the check-in, or the read of the truth in its
+                    // place. A protection off it reports is a change, which the read's stamp then counts. One
+                    // that throws verified nothing, so this wake claims nothing: no check-in.
+                    val checked =
+                        wake.checks &&
+                            hooked(false) {
+                                check?.invoke()
+                                true
+                            }
+                    when (val read = alone { reading(wake, checked) }) {
+                        null -> null
+                        is Read.Me -> client.me().let { alone { readMe(read.sent, it) } }
+                        is Read.CheckIn -> client.checkIn(read.session, CheckInRequest(read.at)).let { alone { checkedIn(read.sent, it) } }
+                    }
+                } catch (cancelled: CancellationException) {
+                    // Cancelled with its run, what it took is the next run's: iOS's no answer keeps its read.
+                    alone {
+                        if (wake.reads) rereading = true
+                        if (wake.screen) screenTurned = true
+                    }
+                    throw cancelled
                 }
             refreshing?.await()
             readRings.pause(alone { nextRead() })
         }
     }
 
-    /** What a wake does, taken at its top: whether it reads the truth, and whether it checks in. */
-    private class Wake(val reads: Boolean, val checks: Boolean)
+    /**
+     * What a wake does, taken at its top: whether it reads the truth, whether it checks in, and whether
+     * that check-in is the screen's own, as it goes on or off, which goes before any read.
+     */
+    private class Wake(val reads: Boolean, val checks: Boolean, val screen: Boolean)
 
     /** What a wake sends, under the stamp [sent] of the phone's changes it was sent with (`readMayReconcile`). */
     private sealed interface Read {
@@ -360,20 +383,28 @@ class SyncEngine private constructor(
     private suspend fun wake(): Wake {
         readRings.answer()
         readStanding()
+        val inSession = state.standing is Standing.InSession
         // Out of a session, in a class, the truth is read at each wake while the screen is on, at the
-        // check-in's cadence, so Home says when a class of theirs is in session (C3c).
+        // check-in's cadence, so Home says when a class of theirs is in session (C3c); and out of one as the
+        // screen comes on, as iOS's coming back reads it.
         val outInClass = screenOn && state.standing == Standing.Out && state.hasClasses == true
-        val wake = Wake(reads = rereading || outInClass, checks = screenOn || goingOff && state.standing is Standing.InSession)
+        val wake =
+            Wake(
+                reads = rereading || outInClass || screenTurned && screenOn && !inSession,
+                checks = screenOn || screenTurned && inSession, screen = screenTurned && inSession,
+            )
         rereading = false
-        goingOff = false
+        screenTurned = false
         return wake
     }
 
     /**
-     * What [wake] sends, under a stamp taken now: the read of the truth, or the check-in, in a session;
-     * none. A stamp the file can't give sends none, and is shown, a read then left to the next wake.
+     * What [wake] sends, under a stamp taken now: the screen's own check-in first, a read asked for then
+     * the next wake's, at once; else the read of the truth; else the check-in, in a session; none. A
+     * check that failed ([checked] false) claims nothing. A stamp the file can't give sends none, and is
+     * shown, a read then left to the next wake.
      */
-    private suspend fun reading(wake: Wake): Read? {
+    private suspend fun reading(wake: Wake, checked: Boolean): Read? {
         val sent = stored { stamp() }.getOrNull()
         if (sent == null) {
             if (wake.reads) rereading = true
@@ -381,8 +412,10 @@ class SyncEngine private constructor(
         }
         val standing = state.standing
         return when {
+            wake.screen && checked && standing is Standing.InSession ->
+                Read.CheckIn(sent, standing.session.id, clock.now()).also { if (wake.reads) reread() }
             wake.reads -> Read.Me(sent)
-            wake.checks && standing is Standing.InSession -> Read.CheckIn(sent, standing.session.id, clock.now())
+            checked && standing is Standing.InSession -> Read.CheckIn(sent, standing.session.id, clock.now())
             else -> null
         }
     }
@@ -477,7 +510,10 @@ class SyncEngine private constructor(
      * (`holdsUnlock`), unless the student has returned there since: the phone stands focused there
      * already, or the answer is to their own return made after it, by the phone's order ([after], that
      * return's place in it). None: the file couldn't say, so it keeps the phone unlocked, its failure for
-     * the caller to show after its state step.
+     * the caller to show after its state step. Focused already means returned since only while every
+     * unlock takes the phone out of focus at once (`Standing.acting`) and nothing brings it back but a
+     * refocus, an answer or a read past this guard, or the lock back on to where the phone stood before
+     * protection off or, not known, past this guard (#167; AN5e's): keep both so.
      */
     private suspend fun keepsUnlocked(session: String, after: Long = 0): Boolean? =
         if (state.standing.isFocused(session)) false else tried { outbox.holdsUnlock(session, after) }.getOrNull()
@@ -535,20 +571,19 @@ class SyncEngine private constructor(
         }
 
     /**
-     * The screen went on, or off, as the lock's service hears it (AN7; ARCHITECTURE, the battery plan).
-     * On, the truth is read at once, then the session checked in to every 30 seconds, rule 3's check at
-     * each wake; off, one check-in in a session, then nothing until it comes on again. Its caller
-     * cancelled, it stops waiting, and goes on all the same.
+     * The screen went on, or off, as the lock's service hears it (AN7; ARCHITECTURE, the battery plan):
+     * one check-in at once in a session, rule 3's check before it, or, out of one as it comes on, the
+     * truth read at once. Then, while it is on, a check-in every 30 seconds, the check at each wake;
+     * while it is off, nothing. The drain looks again too, as iOS's coming back has it: a backoff the
+     * phone's sleep stretched may be over. Its caller cancelled, it stops waiting, and goes on all the
+     * same.
      */
     suspend fun setScreenOn(on: Boolean) =
         call {
             screenOn = on
-            if (on) {
-                reread()
-            } else {
-                goingOff = true
-                readRings.ring()
-            }
+            screenTurned = true
+            readRings.ring()
+            drainRings.ring()
         }
 
     /**
@@ -564,8 +599,9 @@ class SyncEngine private constructor(
 
     /**
      * Runs [check] at each wake of the read loop while the screen is on, before each check-in and out of
-     * a session too (C1c), and before the check-in its going off sends: rule 3's check of the lock, the
-     * lock's service's (AN7). It never throws, as Swift's type promises: the read loop waits on it.
+     * a session too (C1c), and before the check-in its going on or off sends: rule 3's check of the lock,
+     * the lock's service's (AN7), run with the engine let go, so it may record what it finds. It never
+     * throws, as Swift's type promises; one that does checked nothing, so that wake sends no check-in.
      */
     suspend fun atEachWake(check: suspend () -> Unit) = call { this.check = check }
 
@@ -633,10 +669,33 @@ class SyncEngine private constructor(
         if (result.code != 401) refreshed = false
         update { it.copy(heardAt = now, link = if (result.code == 401) Link.SignIn else Link.Reached) }
         if (result.code != 401 || refreshed) return null
-        // In the engine's scope, so a loop cancelled while it waits leaves it to end for the other. A
-        // refresh that throws gives no token: the phone waits on sign-in, as it shows.
-        return reauth ?: scope.async { reauthed(tried { refresh() }.getOrDefault(false)) }.also { reauth = it }
+        // In the engine's scope, so a loop cancelled while it waits leaves it to end for the other; and
+        // ended however it ends, so no refresh is left under way for every later 401 to wait on.
+        return reauth ?: scope.async {
+            var fresh = false
+            try {
+                fresh = hooked(false) { refresh() }
+            } finally {
+                reauthed(fresh)
+            }
+        }.also { reauth = it }
     }
+
+    /**
+     * What a hook of the app's gives ([refresh], rule 3's check), or [none] when it throws, or ends in a
+     * cancel of its own (a timeout inside it, say), so no hook ends a loop or holds a refresh under way
+     * for good: each promises never to, as Swift's types do, and a phone that waits on sign-in, or claims
+     * nothing it couldn't check, shows it. Its caller's own cancel still ends it.
+     */
+    private suspend fun <T> hooked(none: T, hook: suspend () -> T): T =
+        try {
+            hook()
+        } catch (cancelled: CancellationException) {
+            currentCoroutineContext().ensureActive()
+            none
+        } catch (error: Exception) {
+            none
+        }
 
     /** A refresh's end: a fresh token, the first since the rejection, sends everything again at once. */
     private suspend fun reauthed(fresh: Boolean) =
@@ -735,7 +794,7 @@ class SyncEngine private constructor(
          * which outlives every screen. [refresh] is the sign-in's (AN6): refresh the token the API
          * refused, true once a fresh one is ready, asked once per rejection ([heard]). It must return at
          * once, since the loops wait on it: false when only the student can give a token, whose sign-in
-         * then calls [retryNow]. It never throws, as Swift's type promises.
+         * then calls [retryNow]. It never throws, as Swift's type promises; one that does gives no token.
          */
         suspend fun open(
             outbox: Outbox, client: ApiClient, scope: CoroutineScope, clock: SyncClock = SystemClock,

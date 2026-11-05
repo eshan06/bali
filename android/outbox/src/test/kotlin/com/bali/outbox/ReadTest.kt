@@ -13,7 +13,10 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 
@@ -26,11 +29,15 @@ private val unlocked = inSession(ParticipationState.Unlocked)
 /** The check-ins and the reads of the truth. BaliOutbox's ReadTests, all but `waitingStays` (AN5d's). */
 class ReadTest : EngineFiles() {
     @Test
-    fun theCheckInRunsEvery30SecondsWhileTheScreenIsOnOnceAsItGoesOffNeverWhileItIsOffAndComingOnReadsTheTruth(): Unit =
+    fun theCheckInRunsEvery30SecondsWhileTheScreenIsOnOnceAsItGoesOnOrOffAndNeverWhileItIsOff(): Unit =
         runBlocking {
+            // The battery plan: where iOS's coming back reads the truth and its going behind sends nothing.
             val rig = rig()
             rig.tapIn()
-            rig.screenOn()
+            rig.engine.setScreenOn(true)
+            val on = rig.server.next()
+            assertEquals(listOf(checkInRoute, wire(t0)), listOf(on.route, on.deviceTime))
+            on.reply(200, Answer.live())
             rig.sleeping(at(30))
             rig.clock.advance(30)
             val first = rig.server.next()
@@ -40,8 +47,7 @@ class ReadTest : EngineFiles() {
             rig.clock.advance(30)
             rig.server.next(checkInRoute).reply(200, Answer.live())
             rig.sleeping(at(90))
-            // The screen off: one check-in, at once, where iOS's going behind sends none; then nothing,
-            // however long.
+            // The screen off: one check-in, at once; then nothing, however long.
             rig.engine.setScreenOn(false)
             val off = rig.server.next(checkInRoute)
             assertEquals(wire(at(60)), off.deviceTime)
@@ -49,10 +55,44 @@ class ReadTest : EngineFiles() {
             rig.sleeping()
             rig.clock.advance(600)
             assertEquals(emptyList(), rig.server.waiting)
-            // On again: the truth, at once, then the check-ins again.
-            rig.screenOn()
+            // On again: a check-in at once, then every 30 s again.
+            rig.engine.setScreenOn(true)
+            val again = rig.server.next(checkInRoute)
+            assertEquals(wire(at(660)), again.deviceTime)
+            again.reply(200, Answer.live())
             rig.sleeping(at(690))
             assertEquals(emptyList(), rig.server.waiting)
+        }
+
+    @Test
+    fun theScreensOwnCheckInGoesBeforeAReadAskedForAndTheReadAtOnceAfterIt(): Unit =
+        runBlocking {
+            // A read of the truth that got no answer waits for the next wake: the screen going off.
+            val rig = rig()
+            rig.tapIn()
+            rig.screenOn()
+            rig.engine.setInFront(true)
+            rig.server.next(meRoute).reply(null)
+            rig.until { it.meFailed != null }
+            rig.engine.setScreenOn(false)
+            val checkIn = rig.server.next()
+            assertEquals(checkInRoute, checkIn.route)
+            checkIn.reply(200, Answer.live())
+            assertEquals(meRoute, rig.server.next().route)
+        }
+
+    @Test
+    fun theScreenComingOnRingsTheDrainTooARecordDueByThePhonesClockGoesAtOnceThoughItsAlarmRunsLate(): Unit =
+        runBlocking {
+            // As iOS's coming back does: on a phone, the drain's wait counts no deep sleep.
+            val rig = rig()
+            val tap = assertNotNull(rig.engine.record(Change.Tap("tag")))
+            rig.server.next(tapRoute).reply(503)
+            rig.sleeping(at(2))
+            rig.clock.advance(2, holdingWakes = true)
+            rig.engine.setScreenOn(true)
+            assertEquals(tap.eventId, rig.server.next(tapRoute).eventId)
+            rig.clock.releaseWakes()
         }
 
     @Test
@@ -138,6 +178,57 @@ class ReadTest : EngineFiles() {
             read.reply(200, Answer.me())
             rig.sleeping(at(60))
             assertEquals(emptyList(), rig.server.waiting)
+        }
+
+    @Test
+    fun aCheckThatThrowsOrEndsInACancelOfItsOwnCheckedNothingSoThatWakeSendsNoCheckInAndTheLoopGoesOn(): Unit =
+        runBlocking {
+            // Its contract says it never does (`atEachWake`): rule 3, a check-in claims only what was checked.
+            for (fails in listOf<suspend () -> Unit>({ throw CancellationException("its own") }, { error("broken") })) {
+                val failing = AtomicBoolean(false)
+                val rig = rig()
+                rig.engine.atEachWake { if (failing.get()) fails() }
+                rig.tapIn()
+                rig.screenOn()
+                failing.set(true)
+                rig.clock.advance(30)
+                rig.sleeping(at(60))
+                assertEquals(emptyList(), rig.server.waiting)
+                failing.set(false)
+                rig.clock.advance(30)
+                rig.server.next(checkInRoute).reply(200, Answer.live())
+                rig.stop()
+            }
+        }
+
+    @Test
+    fun aRunCancelledWhileItsReadOfTheTruthIsOnItsWayLeavesTheReadToTheNextRunAsIOSsNoAnswerDoes(): Unit =
+        runBlocking {
+            val rig = rig()
+            rig.engine.retryNow()
+            rig.server.next(meRoute)
+            withTimeout(patience) { rig.running.cancelAndJoin() }
+            val again = scope.launch { rig.engine.run() }
+            rig.server.next(meRoute).reply(200, Answer.me(null))
+            rig.until { it.meReads == 1 }
+            withTimeout(patience) { again.cancelAndJoin() }
+        }
+
+    @Test
+    fun aReadOfTheTruthAskedForWhileTheStampCantBeReadGoesAtTheNextWakeOnceItCan(): Unit =
+        runBlocking {
+            val rig = rig()
+            rig.screenOn(Answer.me(null))
+            rig.outbox.execute("ALTER TABLE outbox RENAME TO gone")
+            rig.engine.setInFront(true)
+            rig.until { it.link == Link.StorageFailed }
+            // The read loop's next wake, and the drain's look again within a minute.
+            rig.sleeping(at(30), at(60))
+            assertEquals(emptyList(), rig.server.waiting)
+            rig.outbox.execute("ALTER TABLE gone RENAME TO outbox")
+            rig.clock.advance(30)
+            rig.server.next(meRoute).reply(200, Answer.me(null))
+            rig.until { it.link == Link.Reached }
         }
 
     @Test
@@ -294,7 +385,7 @@ class StaleReadTest : EngineFiles() {
             rig.until { it.queued.firstOrNull()?.stuck == true }
             assertEquals(0, rig.outbox.awaiting())
             // Focused, and extended: the window applies, the focus doesn't.
-            rig.screenOn(Answer.me(session(endsAt = 4000)))
+            rig.screenOn(live = Answer.live(session(endsAt = 4000)))
             assertEquals(inSession(ParticipationState.Unlocked, endsAt = 4000), rig.engine.updates.value.standing)
             // (The stuck unlock goes again as the clock moves, and is left unanswered.)
             rig.clock.advance(30)
@@ -319,7 +410,7 @@ class StaleReadTest : EngineFiles() {
             rig.until { it.queued.firstOrNull()?.stuck == true }
             rig.engine.record(Change.Refocus("s"))
             assertEquals(focused, rig.engine.updates.value.standing)
-            rig.screenOn(Answer.me(session(endsAt = 4000)))
+            rig.screenOn(live = Answer.live(session(endsAt = 4000)))
             assertEquals(inSession(ParticipationState.Focused, endsAt = 4000), rig.engine.updates.value.standing)
         }
 }
@@ -338,6 +429,21 @@ class UnlockGuardTest : EngineFiles() {
             rig.server.next(unlockRoute).reply(400, Answer.refused("invalid_request"))
             rig.until { it.queued.firstOrNull()?.stuck == true }
             focusNamed(rig)
+        }
+
+    @Test
+    fun butAReTapMadeAfterAStuckUnlockIsTheStudentsReturnItsAnswerPutsTheLockBackOnTheUnlockStillQueued(): Unit =
+        runBlocking {
+            // A13: an unlock made before the student's own return, by the phone's order, holds nothing back.
+            val rig = rig()
+            rig.tapIn()
+            rig.engine.record(Change.Unlock("s", null))
+            rig.server.next(unlockRoute).reply(400, Answer.refused("invalid_request"))
+            rig.until { it.queued.firstOrNull()?.stuck == true }
+            rig.engine.record(Change.Tap("tag"))
+            rig.server.next(tapRoute).reply(200, Answer.joined())
+            rig.until { it.standing == focused && it.queued.size == 1 }
+            assertTrue(rig.outbox.holdsUnlock("s"))
         }
 
     @Test
@@ -397,7 +503,7 @@ class UnlockGuardTest : EngineFiles() {
             var state = rig.engine.updates.value
             assertEquals(listOf(unlocked, Link.StorageFailed), listOf(state.standing, state.link))
             // A read's guard, the same: the read's own answer said heard, the failure after it.
-            rig.screenOn(Answer.me())
+            rig.screenOn()
             state = rig.engine.updates.value
             assertEquals(listOf(unlocked, Link.StorageFailed), listOf(state.standing, state.link))
             refusing.set(false)
@@ -408,7 +514,7 @@ class UnlockGuardTest : EngineFiles() {
         rig.engine.record(Change.ProtectionOff("s"))
         rig.server.next(protectionOffRoute).reply(200, Answer.replay(state = "focused"))
         assertEquals(unlocked, rig.until { state -> state.queued.none { it.change is Change.ProtectionOff } }.standing)
-        rig.screenOn(Answer.me())
+        rig.screenOn()
         assertEquals(unlocked, rig.engine.updates.value.standing)
         assertTrue(rig.outbox.holdsUnlock("s"))
     }
@@ -499,7 +605,7 @@ class ClassesTest : EngineFiles() {
             rig.tapIn()
             rig.engine.record(Change.Unlock("s", null))
             val unlock = rig.server.next(unlockRoute)
-            rig.engine.setScreenOn(true)
+            rig.engine.setInFront(true)
             rig.server.next(meRoute).reply(200, Answer.me(session(endsAt = 4000), classes = listOf(Answer.inClass("c"))))
             val state = rig.until { it.me != null }
             assertEquals(listOf<Any?>(true, unlocked), listOf(state.hasClasses, state.standing))

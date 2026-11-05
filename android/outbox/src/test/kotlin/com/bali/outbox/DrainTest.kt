@@ -6,11 +6,13 @@ import com.bali.core.ParticipationState
 import com.bali.core.UnlockReason
 import java.net.URI
 import java.time.Duration
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -185,6 +187,27 @@ class DrainTest : EngineFiles() {
             state = rig.until { it.retryAt == at(6) }
             assertEquals(Link.SignIn, state.link)
             assertEquals(2, rig.tokens.refreshes)
+        }
+
+    @Test
+    fun aRefreshThatThrowsOrEndsInACancelOfItsOwnGivesNoTokenAndTheNext401AsksAgainNoneLeftUnderWayForGood(): Unit =
+        runBlocking {
+            // Its contract says it never does (`open`): a timeout inside the sign-in's refresh, say.
+            for (refresh in listOf<suspend () -> Boolean>({ withTimeout(1) { awaitCancellation() } }, { error("broken") })) {
+                val (outbox, _) = makeOutbox()
+                val (server, clock, tokens) = Triple(Server(), TestClock(), Tokens())
+                val asked = AtomicInteger()
+                val engine = SyncEngine.open(outbox, client(server, tokens), scope, clock) { asked.incrementAndGet().let { refresh() } }
+                val rig = Rig(engine, outbox, server, clock, tokens, scope)
+                rig.engine.record(Change.Tap("tag"))
+                server.next(tapRoute).reply(401)
+                assertEquals(Link.SignIn, rig.until { it.retryAt == at(2) }.link)
+                clock.advance(2)
+                server.next(tapRoute).reply(401)
+                rig.until { it.retryAt == at(6) }
+                assertEquals(2, asked.get())
+                rig.stop()
+            }
         }
 
     @Test
