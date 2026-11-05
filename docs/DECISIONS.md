@@ -96,13 +96,38 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `stoppedAt`, with a board and the owner's approval first.
 
   **For AN7c:** run the check as the app starts too, so a switch starting at a launch begins its grace and
-  the service's connect ends it; leave `stoppedAt` as it is. Read the last run's lock once, as the run
-  starts, never again within it: this run's lock, ended and read back at a reconnect as the last run's,
-  would be kept over a standing not read (WARN 2's test). **For AN7d:** the readout's "protection off NOT
-  recorded" is `Protection.unreported`; its Launch line is the service's own measure, as iOS's
-  `PhoneScreenTime` keeps its own.
+  the service's connect ends it; leave `stoppedAt` as it is. The checks at the switch's change and at the
+  service's unbind are load-bearing: the check reads the switch only as it runs, so without them a switch
+  turned off and on again between two check-ins, Bali running, goes unreported (santa's review). Read the
+  last run's lock once, as the run starts, never again within it (`Lock.locking`'s doc): this run's lock,
+  ended and read back at a reconnect as the last run's, would be kept over a standing not read (WARN 2's
+  test). **For AN7d:** the readout's "protection off NOT recorded" is `Protection.unreported`; its Launch
+  line is the service's own measure, as iOS's `PhoneScreenTime` keeps its own.
 
-  **Santa's review:** SANTA.
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on
+  this PC, so context isolation holds and model diversity doesn't): no blocker. Their WARNs taken: the rule
+  that the last run's lock is read once now in `Lock.locking`'s doc, where AN7c reads it; `stoppedAt`'s
+  doc saying the step that fills it brings `monitorsNote`'s twin; and the gap below named in ISSUES #6.
+  **For the owner, from the review** (each left as built, the conductor's recommendation in brackets):
+  - **A force-stop, or Safe Mode, then the switch turned on before Bali is opened, reports nothing,**
+    in class too: switching it on starts Bali, whose first check finds it on, and Bali keeps no note of
+    the stop, where iOS's marker stays gone until Bali writes it again; the grid saw only the quiet tile.
+    Now in ISSUES #6, gap 1. [Weigh it with Q7: a fix needs the stop noted, `ApplicationExitInfo` from
+    Android 11 (which AN1's table and the battery entry name), and a noted stop counted as off until
+    reported.]
+  - **ApplicationExitInfo could fill `stoppedAt` with the stop's time alone,** reviewer B noted: the same
+    protection-off event, late, no new fact about a student, so perhaps not tied to the "how long was it
+    stopped" question. [Q7 stands until the owner says: never built here.]
+  - **A report the outbox refuses still lets the check-in go,** so the grid stays green while the lock is
+    off, only the student's screen saying so, as on iOS; a check that then reads the switch on forgets
+    it. It needs the file refusing writes (a full disk, say). [Keep iOS's behavior; if the owner wants,
+    a refused report claims nothing, so no check-in goes and the tile goes quiet instead.]
+  - **ARCHITECTURE's two sentences,** "once Bali is opened again it reports protection off" ("A
+    force-stopped app ends the lock") and "at once or when Bali is next opened" ("What's weaker"), read as
+    unconditional, where Q7 and the gap above narrow them. [A one-line fix there, with the owner's yes.]
+  - **The owner's question, how long Bali was stopped,** left PLAN-ANDROID with AN7b's line: it stays open
+    in ARCHITECTURE ("Its second stays open") and ISSUES #6. [No owner item, which would grow PLAN.md
+    past its budget.]
 
   **The proof:** `android/app` is unchanged, so the JVM tests are the proof and no emulator ran:
   `./gradlew assemble :app:lint check` green, Android 10's API check with it, and the outbox's suite run
