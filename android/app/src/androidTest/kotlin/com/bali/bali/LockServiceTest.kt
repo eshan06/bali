@@ -288,10 +288,12 @@ class LockServiceTest {
             tapIn()
             assertEquals(emptyList<String>(), server.waiting)
             // Bali's own screen in front (the Debug readout's, AN7d): the truth read at once, and rule 3's check,
-            // which finds the switch off in the session and reports it.
+            // which finds the switch off in the session and reports it, after the front, no check before it.
+            val inFront = now()
             app.front.value = true
             server.next("GET /v1/me")
-            until { engine.updates.value.queued.firstOrNull { it.change == Change.ProtectionOff("s") } }
+            val off = until { engine.updates.value.queued.firstOrNull { it.change == Change.ProtectionOff("s") } }
+            assertTrue("${off.recordedAt} from $inFront", off.recordedAt >= inFront)
             val claim = until { enforcer.updates.value.takeIf { it.switchedOff } }
             assertFalse(claim.locked)
         }

@@ -53,7 +53,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
     making or starting the engine throws (the outbox's file, the API not a URL) and holds it in
     `startFailed` until a start succeeds; the readout says it on its Engine line with Try again, which runs
     `begin` again; AN10 words it for the screens. An `Error` still ends the app, as the enforcer lets one
-    go. `begin` makes nothing while a run exists, as iOS's `start` guards `engine == nil`.
+    go. `begin` makes nothing while a run exists or another start is under way, as iOS's `start` guards
+    `engine == nil` and `starting` (santa's review: Try again pressed twice would have made two engines, the
+    sign-in's token hook left on the one replaced).
   - **Bali in front (`front`):** a flow of the app's that the readout sets as it resumes and pauses (iOS's
     active and not active, so a dialog over it counts as behind), Phase 10's screens later. `start` follows
     it with one collector, as it follows the screen, so two turns in quick succession land in order: in
@@ -77,23 +79,33 @@ a real decision? Add a dated entry at the top: what was decided and why.
     student reads and a translator translates, and these are a developer's, as iOS's readout's are; without
     it the build fails, tried.
 
-  **The tests,** on `Bali_Spike_API35`: the whole instrumented suite, 41 of 41 (BaliAppTest's 4, three new:
-  the Debug build's start over no token, a start that fails held and tried again, the cap read at each
-  start; LockServiceTest's 11, two new: Bali in front reads the truth and runs the check, which finds the
-  switch off in a session no wake checked, and the Launch measure; ReadoutTest's 4, new, the smoke test:
+  **The tests,** on `Bali_Spike_API35`, `36` and `37`: the whole instrumented suite, 42 of 42 on each
+  (BaliAppTest's 5, four new: the Debug build's start over no token, a start that fails held and tried again,
+  one start at a time, the cap read at each start; LockServiceTest's 11, two new: Bali in front reads the
+  truth and runs the check, which finds the switch off in a session no wake checked, and the Launch measure;
+  ReadoutTest's 4, new, the smoke test:
   a typed tap queued and locked offline to its cap, the short cap moving its end, Emergency Unlock shown
   and dropping the lock, never on the wire; Sign in opening nothing while sign-in isn't set up, and saying
   so; in front the truth asked for, behind an unlock held for its reason sent; a failed start shown with
   Try again, which starts the app; and AN6c's and AN7c's tests unchanged). On the JVM, `ThisBuildTest`.
   Tried, each failing by name, then reverted: the readout never telling the app it's in front, or behind;
   the collector without the check, and without `setInFront` (3); the cap not read at the start; a start's
-  failure swallowed (2); the Launch measure never settling at a first read; Emergency Unlock never
+  failure swallowed (2); a second start let in while one is under way, which first hung its test on an
+  unbounded wait, now bounded; the Launch measure never settling at a first read; Emergency Unlock never
   offered; and Release's `ThisBuild` making an engine (the JVM's). By hand on the emulator: a typed tap
   locked to its 50 minutes, the cap moving it to 15, Emergency Unlock taking it off and the service back
   to listening to nothing; and `uiautomator dump`, a UiAutomation that suppresses accessibility services,
   has Android unbind the service while it runs, which the readout said as it happened (switch starting,
   not locked): screenshots by `screencap` alone (GOTCHAS). Nothing was added to the PC's SDK: its folders
   were compared before and after.
+
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on
+  this PC, so context isolation holds and model diversity doesn't): no blocker. Their WARNs, each taken:
+  `begin` let a second start in while one was under way (both reviewers; the guard above, with its test);
+  the front test's report tied to the front by its time, so the start's own check can't stand in for it;
+  the PR's count of the tests; and, from reviewer B, what the readout records with no sign-in stays queued
+  and would go to dev under the first account a build with sign-in signs in, so the phone tests clear Bali's
+  storage before that build (`docs/ANDROID-PHONE-TESTS.md`, AN7).
 
 - **2026-11-05** — **AN7c, the lock's service and the app's engine: Bali's Accessibility service, the
   `Lock` over it and `BaliApp` starting the engine and the enforcer, on the emulators (the conductor's

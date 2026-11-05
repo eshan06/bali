@@ -204,6 +204,9 @@ typed:
   again and Emergency Unlock: not locked at once.
 
 The readout's Launch line, how long the service took to bind, is read in the service's reboot part above.
+What the readout records with no sign-in stays queued on the phone, and a build with sign-in set up
+would send it to dev under the first account signed in: clear Bali's storage, or uninstall it, before
+installing that build.
 
 ## AP3, the device test gate
 

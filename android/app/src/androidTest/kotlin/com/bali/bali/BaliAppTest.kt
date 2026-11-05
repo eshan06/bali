@@ -8,7 +8,11 @@ import com.bali.outbox.Link
 import com.bali.outbox.SyncState
 import java.io.IOException
 import java.net.URI
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -86,6 +90,42 @@ class BaliAppTest {
             assertNull(app.running.value)
             app.begin()
             checkNotNull(app.running.value)
+            assertNull(app.startFailed.value)
+        }
+
+    // BaliApp.swift's `start` guards both: a start while a run exists, or while another start is under way
+    // (Try again pressed twice), makes nothing and opens nothing, so no second engine replaces the first.
+    @Test
+    fun aStartMakesNothingWhileARunExistsOrAnotherStartIsUnderWay(): Unit =
+        runBlocking {
+            app.begin()
+            val run = checkNotNull(app.running.value)
+            app.begin { error("a start opened the outbox while a run exists") }
+            assertSame(run, app.running.value)
+            assertNull(app.startFailed.value)
+            run.job.cancelAndJoin()
+            // A start held at its outbox: a second one meanwhile returns at once. Held at most 30 s, so a failure
+            // here ends the test rather than hanging it.
+            val entered = CountDownLatch(1)
+            val opening = CountDownLatch(1)
+            val refused = IOException("the disk refused the outbox")
+            val first =
+                launch(Dispatchers.IO) {
+                    app.begin {
+                        entered.countDown()
+                        opening.await(30, TimeUnit.SECONDS)
+                        throw refused
+                    }
+                }
+            assertTrue(entered.await(30, TimeUnit.SECONDS))
+            app.begin { error("a second start opened the outbox") }
+            assertNull(app.startFailed.value)
+            opening.countDown()
+            first.join()
+            assertSame(refused, app.startFailed.value)
+            assertNull(app.running.value)
+            // Tried again, it starts.
+            app.begin()
             assertNull(app.startFailed.value)
         }
 

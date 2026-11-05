@@ -11,6 +11,7 @@ import com.bali.core.SignIn
 import com.bali.outbox.Enforcer
 import com.bali.outbox.Outbox
 import com.bali.outbox.SyncEngine
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -78,14 +79,19 @@ class BaliApp : Application() {
         launched = scope.launch { begin() }
     }
 
+    /** Whether a start is under way ([begin]), iOS's `starting`. */
+    private val starting = AtomicBoolean(false)
+
     /**
-     * Makes this build's engine and runs it ([start]), unless one runs: BaliApp.swift's `start`. Over the
-     * sign-in, and the outbox [open] gives, the app's own; none while sign-in isn't set up, as on iOS, but a
-     * Debug build's ([ThisBuild]). A start that fails is held ([startFailed]) and tried again here.
+     * Makes this build's engine and runs it ([start]), unless one runs or another start is under way:
+     * BaliApp.swift's `start`. Over the sign-in, and the outbox [open] gives, the app's own; none while
+     * sign-in isn't set up, as on iOS, but a Debug build's ([ThisBuild]). A start that fails is held
+     * ([startFailed]) and tried again here.
      */
     internal suspend fun begin(open: () -> Outbox = { outboxFile }) {
-        if (runs.value != null) return
+        if (!starting.compareAndSet(false, true)) return
         try {
+            if (runs.value != null) return
             val signed = config?.let { config -> signIn?.let { SyncEngine.make(open(), config.api, it, scope, transport) } }
             val engine = signed ?: ThisBuild.unsigned(getString(R.string.BALI_API_URL), transport, scope, open) ?: return
             ThisBuild.starting(this, engine)
@@ -94,6 +100,8 @@ class BaliApp : Application() {
         } catch (failed: Exception) {
             if (failed is CancellationException) throw failed
             failure.value = failed
+        } finally {
+            starting.set(false)
         }
     }
 
