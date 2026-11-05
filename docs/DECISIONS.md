@@ -8,6 +8,67 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-05** — **A3a, the server's endpoint for the portal's teacher actions, `POST
+  /v1/me/actions` (the conductor's calls, awaiting the owner; A3a).** The relay the owner picked
+  ("Through Bali's server", the entry "PostHog: the owner's four rulings"): the portal posts `{
+  event, eventId }`, and the server sends the action on to PostHog with its own key, through A2's
+  sender (`Analytics.action` beside `track`, one fetch, timeout and wait), so the browser holds no
+  PostHog key and its CSP lists no PostHog host. A3b, the portal's side, is next.
+
+  **What the server sends:** an event it builds itself, as the review of A5 asked: `distinct_id`
+  the signed-in teacher's Bali id (`requireTeacher`'s row, never the Cognito sub), `timestamp` the
+  server's clock, `environment`, and of the body only the name, one of `PORTAL_EVENTS`
+  (`@bali/shared`), with `eventId` as the event's `uuid`, lower-cased as the server prints ids. No
+  property comes from the client: the owner's list needs none, so the allow-list holds names alone,
+  and no id, URL or text a client writes can reach PostHog. Any other field of the body is dropped
+  (zod's object strips it), never a `400`: a portal that sends more breaks nothing and leaks
+  nothing. A name off the list, the server's own included, or an id that is no UUIDv7 (the house
+  rule for a new route) is a `400` saying which field, never echoing it, and sends nothing.
+
+  **The names:** the owner's list, in A2's `object_verb` style, each prefixed `portal_`:
+  `portal_signed_in`, `portal_class_created`, `portal_block_registered`, `portal_session_started`,
+  `portal_session_ended`, `portal_session_extended`, `portal_question_asked`, `portal_slides_shown`,
+  `portal_present_opened`, `portal_report_opened` and `portal_recap_opened`. The prefix keeps the
+  portal's Start, End and extend apart from the server's `session_started` and the rest: a count
+  of sessions reads the server's events, which a replay never sends, and the portal's say what a
+  teacher pressed. Additive-only, like the other vocab.
+
+  **Who:** teachers only, as the class routes gate: a student, or a sign-in the server has no row
+  for, is `403`; no token, or another app's, `401`. Each sends nothing and makes no row.
+
+  **The answer:** `200` with `{}`, the same whether PostHog is on or off and for a resend, given
+  before the send, which never fails it. Over `204`: every route answers JSON, the API snapshot
+  says `200` for each, and the event-id check reads each answer as JSON; and an empty object tells
+  the portal nothing, not even whether the key is set.
+
+  **A resend, and PostHog's limit, said plainly:** the relay keeps no row (and no table was added),
+  so a resend is answered as the first was and sent again, under the same `uuid`. PostHog keeps one
+  of the two only when they also share the event, the teacher and the UTC day of their timestamp
+  (its events table's sort key: `team_id`, `toDate(timestamp)`, `event`, `distinct_id`'s hash and
+  `uuid`'s), and only once ClickHouse merges the parts holding them, which it never promises: its
+  handbook ("sharded_events", read 2026-11-05) says those merges may never happen and its queries
+  don't account for a repeated uuid, and its docs ("Ingestion warnings") that deduping on a uuid
+  isn't guaranteed. So an action posted twice may still count twice, and one resent on
+  another UTC day, from 6 or 7 PM in Nashville, always does: an analytics count off, never a
+  record. The timestamp stays the server's clock, over the UUIDv7's own time, which would match a
+  resend's day but let a client date its events. A chosen `uuid` reaches nobody else's: the sort
+  key holds the `distinct_id`, always the caller's own.
+
+  **The budget:** the route spends the account's 120 a minute, as every `/v1` route does, and one
+  of its own, `portalActions`, 30 at once and then 10 a minute per teacher, spent only by an
+  action that passed its checks; past it `429` with `Retry-After`, sending nothing. A teacher's
+  actions go at a person's pace: a class's nine at its start, or 25 reports opened in a row, pass
+  (`limits.test.ts`). A loop sends PostHog about 14,400 a day at most, about 430,000 a month,
+  where the account's budget alone allowed 172,800 a day. PostHog's billing limit, in its console,
+  stays the owner's backstop, and the budget, as every budget, is per process.
+
+  **The path:** `/v1/me/actions`, the caller's own, as `/v1/me/activity` is, with no word ad
+  blockers look for (PostHog's proxy guide names `analytics`, `tracking`, `telemetry` and
+  `posthog`), so ARCHITECTURE's "an ad blocker can't drop the events" holds.
+
+  **Said plainly:** the portal's posts spend the teacher's account budget too, beside its polls,
+  so A3b posts once per action, never on a timer.
+
 - **2026-11-04** — **A2, the server sends PostHog a class's totals; and the iPhone app's privacy
   manifest gives Other Data Types the purpose Analytics (the owner's pick, "Yes, add it"; A2,
   #514).** The owner answered the call A5's entry ("PostHog: the owner's four rulings", below) left
