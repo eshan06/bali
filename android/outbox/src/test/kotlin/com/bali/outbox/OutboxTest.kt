@@ -49,7 +49,7 @@ abstract class OutboxFiles {
      * The outbox in [file], opened as the app opens it, through Room's JVM builder, its jitter fixed at
      * [random], over [driver], the bundled one unless a test watches its commits ([Relaunches]).
      */
-    fun open(file: File, random: Double = 0.0, driver: SQLiteDriver = GuardDriver()): Outbox =
+    fun open(file: File, random: Double = 0.0, driver: SQLiteDriver = BundledSQLiteDriver()): Outbox =
         Outbox.open(Room.databaseBuilder<OutboxDatabase>(file.path), { random }, driver).also { opened += it }
 
     fun makeOutbox(random: Double = 0.0): Pair<Outbox, File> = temporaryFile().let { open(it, random) to it }
