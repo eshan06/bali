@@ -11,7 +11,6 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -794,48 +793,5 @@ class ClassesTest : EngineFiles() {
             rig.clock.advance(30)
             rig.server.next(meRoute).reply(200, Answer.me(session("t")))
             rig.until { it.standing == Standing.InSession(session("t"), ParticipationState.Focused) }
-        }
-}
-
-/**
- * Protection off reported again: the engine's half of BaliOutbox's ProtectionOffTests' `reportedAgain`
- * and `onlyFocusAgain`, the check that finds it AN7's, its record made here by hand.
- */
-class ProtectionOffTest : EngineFiles() {
-    /** In a session, the screen on: protection off found and reported, the report landed. */
-    private suspend fun reported(rig: Rig): OutboxRecord {
-        rig.tapIn()
-        rig.screenOn()
-        val report = assertNotNull(rig.engine.record(Change.ProtectionOff("s")))
-        rig.server.next(protectionOffRoute).reply(200, Answer.protectionOff())
-        rig.until { it.queued.isEmpty() && it.standing == inSession(ParticipationState.ProtectionOff) }
-        return report
-    }
-
-    @Test
-    fun reportedThereAReadSayingThePhoneIsFocusedThereAgainAnOlderReTapLandedHasItReportedAgain(): Unit =
-        runBlocking {
-            // A13's rider.
-            val rig = rig()
-            val first = reported(rig)
-            rig.clock.advance(30)
-            rig.server.next(checkInRoute).reply(200, Answer.live())
-            rig.until { it.standing == focused }
-            val again = assertNotNull(rig.engine.record(Change.ProtectionOff("s")))
-            assertNotEquals(first.eventId, again.eventId)
-            assertEquals(again.eventId, rig.server.next(protectionOffRoute).eventId)
-        }
-
-    @Test
-    fun reportedThereOnlyFocusReportsItAgainAnUnlockMadeSinceReportsNothingNewAndKeepsNothingEither(): Unit =
-        runBlocking {
-            val rig = rig()
-            reported(rig)
-            val unlock = assertNotNull(rig.engine.record(Change.Unlock("s", null)))
-            assertEquals(unlocked, rig.engine.updates.value.standing)
-            // Queuing nothing, it keeps nothing either: the file stands where the phone does.
-            assertNull(rig.engine.record(Change.ProtectionOff("s")))
-            assertEquals(unlocked, rig.outbox.standing())
-            assertEquals(listOf(unlock.eventId), rig.outbox.records().map { it.eventId })
         }
 }

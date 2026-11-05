@@ -8,6 +8,106 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-05** — **AN7b, rule 3's report: protection off, the lock back on and the launch grace, in the
+  enforcer's check (the conductor's calls, awaiting the owner's look; AN7b, #522).** The owner isn't
+  reviewing each step and asked for the recommended option on every question, so each call here is the
+  conductor's, for the owner to look at.
+
+  **Where it lives:** `outbox`'s `Enforcer.kt`, its `check()`, `Enforcement`'s twin: the switch found off
+  in a session the phone's own clock says still runs, whose row isn't protection off already, reported
+  through the engine's `record` (`Change.ProtectionOff`), once there and again whenever the phone stands
+  focused there (A13, the engine's); a report the outbox refused shown (`Protection.unreported`) and tried
+  again at the next check, a pass copying it, never writing over it; the switch on and bound in the class
+  it was off in, before its bell, the phone back where it stood (`backOn`, #167, `Change.ProtectionOn`),
+  once; and a switch starting judged off once checks have read it so for `Enforcer.GRACE`, 30 s (Q3), by
+  the phone's uptime (`starting`), the check made again every `RECHECK_AFTER`, 1 s, meanwhile, never
+  waiting on the engine's next wake. `Lock.stoppedAt()`, iOS's `markerLostAt`, is a seam that returns
+  none (Q7). Where Kotlin differs, said plainly:
+  - **The switch judges as iOS's marker and read do:** Off is the marker gone, off at once; On and bound
+    is the marker there, never off; Starting is a launch's not determined with no marker written, off
+    once it lasts the grace. No ask, marker or window: they have no Android twin.
+  - **The lock back on only over a switch on and bound, never one starting** (the conductor's call):
+    starting may never bind, and the grace would then report it off again, the grid showing protection
+    off, then on, then off; the service's connect runs the check as it binds (AN7c). iOS's
+    `markerNotBack` (a marker that doesn't read back proves nothing) has no twin; this is its Android
+    rule, with a test of its own.
+  - **A pass ends a run of starting in a stretch of its own, at its read of the switch** (the conductor's
+    call), where iOS's ends it in the stretch after its permission read: Android's pass reads the switch
+    before its first call into the lock, so ending the run after that call would let a check made while
+    the pass waits there lose its newer read. `runKeptOverPass`'s twin holds the pass at that first call.
+  - **No suspension:** Android has no app group whose file a suspended app is refused, so a refused
+    report is always shown (iOS's `isSuspension` has no twin).
+  - **The recheck is the enforcer's own,** as the pass at the lock's end is (AN7a): a lock that throws in
+    the check it makes reaches no handler of the app's, which on Android ends the app; that check throws
+    before it schedules the next, so the grace waits for the next check (the engine's wake, the service's
+    connect, Bali coming to the front), its run kept, so a report is late, never lost. It is a coroutine's
+    wait, no alarm and no wake lock, so it never wakes a sleeping phone (the battery plan), and it runs
+    only while the switch reads starting, a check a second until the grace runs out. It starts at once
+    (undispatched), so its wait is set before the check returns: a check's end shows whether one is due,
+    which the tests that nothing is read again every second rely on, never a window of real time.
+  - **Claude Review's two WARNs on #521, each decided with a test:**
+    - `check()` returns at once while another pass runs: **kept, as iOS has it.** The check records its
+      report before it calls on the pass, so no check-in goes before the report, and a check-in claims
+      nothing of the lock (`CheckInRequest` carries the phone's time alone); the pass under way runs
+      again on the newest truth. Waiting would hold each check-in up on a call into the lock, and iOS's
+      `checkDuringPass` needs a check to land while a pass waits. The test holds a pass on the lock and
+      sees the wake's check-in go, the report queued first.
+    - `putOn` kept an end the lock had run out of: **cleared** once a pass reads the lock holding none,
+      ended by its end or with the switch, so it names only a lock this enforcer holds. Over a standing
+      not read, a stale end would have the last run's lock, found again, given an end or taken off as
+      this run's; the test finds it again after this run's tap lock ended at its cap, and it stays, with
+      no end.
+  - **ReadTest's report made by hand** for `reportedAgain` and `onlyFocusAgain` (AN5c's) is gone: both run
+    through the check now, the switch found off.
+
+  **The tests,** on the engine's rig with the fake lock (`ProtectionOffTest.kt`): every ProtectionOffTest,
+  starting in a launch's not determined's place (`notDeterminedPassing`, `notDeterminedLasting`,
+  `notDeterminedRunEnds`, whose pass alone reads the switch on, the check's recheck held back,
+  `notDeterminedClockBack` and `notDeterminedClockForward`, at Android's 30 s), `checkOffline` with the
+  screen on and its check-in unanswered; RevokedWhileRunningTests' `revoked`, `behind`, `turnedBackOn`,
+  `turnedBackOnUnread`, `runKeptOverPass` and `markerThere` as on and bound; BackOnTests' `focusedAgain`,
+  `stillUnlocked`, `overOrOut`, `relaunched` and `refusedOrLate`, and the lock's halves of `once` (two
+  checks at once), `lateUnlocked` and `unlockedSince`; LaunchGraceTests' `offWithinGrace`,
+  `passCrossesGrace`, `settles` (both standings, every claim collected as it is set) and `markerAtLaunch` as
+  the switch deciding a launch at once; and new: a check at a wake while a pass waits on the lock (WARN 1),
+  `putOn` forgotten (WARN 2), starting proving nothing for the lock back on, and a lock that throws in the
+  recheck. The words and the screens they check are AN10's: `ProtectionOffWords.way` (`revoked`,
+  `offWithinGrace`), `UnlockedWords`' picker (`stillUnlocked`) and `settles`' `Screen.choose`. No twin:
+  MarkerBookTests; RevokedWhileRunningTests' `monitorsClear` (AN7a's `putBack` covers it), `silentCheck`,
+  `silentCheckBounded`, `oneAskAtATime` and `monitorsNote`; BackOnTests' `markerNotBack` (its Android rule,
+  above). Tried, each failing by name, then reverted: no report at all (27 tests); starting judged off at
+  once, with no grace (9); the grace by the phone's clock (the two clock tests); a pass that never ends a
+  run of starting (`notDeterminedRunEnds`); the run ended after the pass's first call into the lock, and at
+  its end (`runKeptOverPass`, each); no recheck (4); the recheck judged by the grace read again after the
+  pass (`passCrossesGrace`); a recheck past the switch judged off (2), and one over a switch on (3);
+  `unreported` never set (2), and a pass's claim made fresh over it (the same 2); no lock back on (8); the
+  lock back on over a switch starting (its test), and past the bell (`overOrOut`); a report past the
+  session's end (`notAfterTheEnd`), and over a row already off (`nothingToReport`); `putOn` left stale
+  (WARN 2's); a check that waits for the pass under way (WARN 1's, `checkDuringPass` and
+  `runKeptOverPass`); the recheck unguarded (its test); and the claim's off without the grace (4). That
+  waiting check first hung the suite: two tests called the check with a pass held and no time limit; both
+  are limited now, as AN7a's are. Each check that something doesn't happen waits for a point the rig, the
+  fake lock, a call's end or the enforcer's jobs ending marks, never a window of real time. Nothing was
+  added to the PC's SDK: its folders were compared before and after.
+
+  **Q7, said plainly:** a Bali force-stopped in class and opened after the bell reports nothing, where an
+  iPhone reports it late from its monitor's note; the grid saw the phone go quiet in class (ISSUES #6, gap
+  1). The owner's question, whether Bali, opened again, reports how long it was stopped, would fill
+  `stoppedAt`, with a board and the owner's approval first.
+
+  **For AN7c:** run the check as the app starts too, so a switch starting at a launch begins its grace and
+  the service's connect ends it; leave `stoppedAt` as it is. Read the last run's lock once, as the run
+  starts, never again within it: this run's lock, ended and read back at a reconnect as the last run's,
+  would be kept over a standing not read (WARN 2's test). **For AN7d:** the readout's "protection off NOT
+  recorded" is `Protection.unreported`; its Launch line is the service's own measure, as iOS's
+  `PhoneScreenTime` keeps its own.
+
+  **Santa's review:** SANTA.
+
+  **The proof:** `android/app` is unchanged, so the JVM tests are the proof and no emulator ran:
+  `./gradlew assemble :app:lint check` green, Android 10's API check with it, and the outbox's suite run
+  several times over.
+
 - **2026-11-05** — **AN7a, the lock follows the engine: BaliOutbox's enforcer in Kotlin over a seam of the
   lock's own, and AN7 in six PRs (the conductor's calls, awaiting the owner's look; AN7a, #521).**
   The owner isn't reviewing each step and asked for the recommended option on every question, so each

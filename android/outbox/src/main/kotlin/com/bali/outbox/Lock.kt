@@ -21,7 +21,7 @@ enum class LockSwitch {
 
     /**
      * On the list, not bound yet: as Bali starts, or the phone does (the emulators bound it 11.5 to 20 s
-     * after a reboot's screen came on). Off once that lasts the grace (AN7b).
+     * after a reboot's screen came on). Off once that lasts the grace ([Enforcer.GRACE]).
      */
     Starting,
 }
@@ -50,4 +50,13 @@ interface Lock {
 
     /** Takes the lock off, this run's or the last run's. */
     suspend fun unlock()
+
+    /**
+     * When the lock was lost with Bali stopped (a force-stop switches it off), for the run after it; none:
+     * not known. iOS's `markerLostAt`, its monitor's note, which Android has no twin of, so none ever is
+     * (DECISIONS 2026-11-05, Q7): a force-stop found after the bell reports nothing, the grid having seen
+     * the phone go quiet in class. The owner's question, whether Bali reports how long it was stopped,
+     * would fill it, with a board and the owner's approval first.
+     */
+    suspend fun stoppedAt(): Instant? = null
 }
