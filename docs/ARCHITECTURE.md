@@ -1156,7 +1156,7 @@ Android can't keep the iOS way is named here, never bent quietly.
 | BaliCore | `core`, plain Kotlin tested on the JVM |
 | BaliOutbox | `outbox` |
 | The system NFC sheet (`NFCNDEFReaderSession`) | Reader mode, with Bali's own "hold your phone to the block" screen |
-| iOS's sign-in session (`WebAuthenticationSession`) | A Custom Tab, with PKCE as on iOS |
+| iOS's sign-in session (`WebAuthenticationSession`) | An Auth Tab where the browser has one, else a Custom Tab, with PKCE as on iOS |
 | The token store (the Keychain, this device only) | Tokens sealed by a key in the Android Keystore |
 | APNs | Firebase Cloud Messaging (FCM) |
 | PDFKit | `PdfRenderer` |
@@ -1199,7 +1199,7 @@ tested in Kotlin: `core` decodes every `contracts/fixtures/` file and `outbox` r
 **5. The modules: `core`, `outbox` and `app`.** `core` is BaliCore's twin: the wire types, the
 vocabulary, event ids, the API client and `BlockTag`. `outbox` is BaliOutbox's: the outbox, the
 sync engine, the lock's rules and which screen shows when. `app` holds the screens, the lock's
-service, NFC, sign-in's Custom Tab and push. As on iOS, every rule lives where the JVM tests reach
+service, NFC, sign-in's tab and push. As on iOS, every rule lives where the JVM tests reach
 it, never in a screen.
 
 **6. Push through FCM, the server's second sender.** The same doorbell ("Push: a doorbell for
@@ -1209,10 +1209,13 @@ without it is APNs's, so every shipped iPhone calls it as today. FCM's tokens ar
 APNs's, in the same privacy paths, and Google becomes a processor the privacy policy names before
 the first Android build reaches a student.
 
-**7. Sign-in through Cognito's hosted UI**, as on iOS: in a Custom Tab, the code grant with PKCE,
-through app clients of Android's own on each pool, with no secret. Auth's rules hold: only a real
-`401` signs anyone out, and no token reaches Bali's API before the 13+ check but the check's own
-read and a deletion's.
+**7. Sign-in through Cognito's hosted UI**, as on iOS: in an Auth Tab where the phone's browser has
+one, which answers Bali alone, else a Custom Tab, whose answer, a link any app can send, is taken
+only for the waiting sign-in with its state; each ephemeral where the browser offers that, and where
+it doesn't, sharing the browser's cookies (the conductor's call, awaiting the owner; `docs/DECISIONS.md`,
+2026-11-05). The code grant with PKCE, through app clients of Android's own on each pool, with no
+secret, the answer at the app id's own scheme. Auth's rules hold: only a real `401` signs anyone
+out, and no token reaches Bali's API before the 13+ check but the check's own read and a deletion's.
 
 ### Rules that keep the phone honest, where Android's differ
 

@@ -8,6 +8,156 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-05** — **AN6c, sign-in's app side: the tokens sealed by a Keystore key, Cognito's hosted UI
+  in the phone's browser and its answer back, and `AppConfig`'s app side (the conductor's calls,
+  awaiting the owner's look; AN6c, #520).** The owner isn't reviewing each step and asked for the
+  recommended option on every question, so each call here is the conductor's, for the owner to look
+  at. AN6 is done with it.
+
+  **Where it lives:** `app`'s `KeystoreTokenStore.kt`, behind `core`'s `TokenStore` (iOS's
+  `KeychainTokenStore`); `HostedUi.kt`, `SignIn.signIn`'s browser (C1's session) and the sign-in
+  waiting on it, one at a time; `HostedUiActivity.kt`, the activity that hosts the tab and the one a
+  Custom Tab's answer comes back to; and `BaliApp.kt`, the app's process: its scope, one
+  `OkHttpTransport`, the build's config and the sign-in, built gated, which AN7 and AN10 take from
+  there (`SyncEngine.make(outbox, config.api, signIn, scope, transport)`). The build's values are in
+  `app/build.gradle.kts` and the manifest; `core`'s AppConfigTest pins them.
+
+  **The store.** AES-GCM under a 256-bit key of the app's own in the Android Keystore (`sign-in`),
+  which never leaves the phone, as iOS's item is `ThisDeviceOnly`; the file, `no_backup/sign-in.sealed`,
+  is the nonce, the sealed tokens and the tag. **No user authentication, no `setUnlockedDeviceRequired`
+  and no StrongBox** (the conductor's call, from iOS's own reasoning): iOS's class is `WhenUnlocked`
+  because its engine sends only in the foreground, and its comment says a send behind a locked phone
+  would need `AfterFirstUnlock`; Android's check-ins follow the screen, the lock screen included (AN5c),
+  so a key that needs the phone unlocked would leave them without a token there; the emulators and
+  many phones have no StrongBox. Such a key is never invalidated by a lock screen's change (Android's
+  `KeyPermanentlyInvalidatedException` is for keys that ask for the user). **Never again, or not
+  now** (AN6b's note): no file is nothing saved; a file too short to be sealed, a key gone (the
+  Keystore has none by its name) or a tag the key refuses (`AEADBadTagException`: changed, or sealed by
+  another key, as a file restored from another phone is) can never be opened, so it reads as nothing
+  saved, a sign-out, never a throw; anything else throws, the file unreadable or the Keystore failing,
+  and the sign-in asks again. Said plainly: Android 12's Keystore gives no key for a lookup it fails,
+  its own code (`AndroidKeyStoreSpi.getKeyMetadata`), so such a failure at a launch's first read reads
+  as the key gone: shown signed out for that run, the file kept and read again at the next launch,
+  unless a sign-in replaces it. **A save** writes a file of its own, synced to the disk, which then
+  takes the file's place with rename(2), so a save cut short leaves the old tokens or the new: not
+  `android.util.AtomicFile`, which logs a failed sync or rename where it should throw, so a save could
+  say kept when it wasn't (no silent failures). The folder isn't synced after the rename, so a phone
+  losing power just after a save can keep the old tokens, never none.
+
+  **Kept out of a backup and a transfer:** the file is in `no_backup/`, which Android's backup never
+  takes, and AN4c's rules leave every domain out besides; a file restored anyway can't be opened
+  without its key, which no backup carries, so it reads as nothing saved (the store's tests seal one
+  under another key). `KeystoreTokenStoreTest` ties the file to the app's own storage, as
+  `OutboxFile.kt`'s test ties the outbox.
+
+  **The browser, and which tab.** The phone's browser as Custom Tabs name it
+  (`CustomTabsClient.getPackageName`, the default browser where it has Custom Tabs): an **Auth Tab**
+  where that browser declares one (`isAuthTabSupported`; Chrome 137 and later), which returns the
+  answer to the app alone, else a **Custom Tab**; each asks for **ephemeral browsing**
+  (`setEphemeralBrowsingEnabled`, stable since androidx.browser 1.9.0, not experimental as the brief
+  had it), which a browser that has it honours (Chrome 136–137 on) and one that hasn't ignores. With no
+  browser that has Custom Tabs, one that opens the page does, in its own window, as the library has it.
+  The tab sets no colour, title or menu of its own (the hosted UI's look is Cognito's, D2d), and never
+  a WebView, whose page an app can read (RFC 8252; Chrome's guide offers one as ephemeral's fallback).
+  **Where the browser offers no ephemeral tab, the tab shares its cookies (the conductor's call, the
+  brief's fallback, awaiting the owner, since it differs from C1 and touches privacy):** sign-in works;
+  Cognito's hosted-UI session stays in that browser until it expires, so for that while a sign-out of
+  Bali isn't a sign-out of the hosted UI there and the next sign-in may skip the password, and the
+  browser's history keeps the hosted UI's address (its state and challenge, never the verifier or a
+  token). Failing closed instead would leave such a phone unable to sign in at all, behind an error no
+  board draws, for an exposure that needs a second person on the student's phone, which the pilot rules
+  out (phones are never shared). The emulator's Chrome 124 is such a browser: neither category.
+
+  **The host draws nothing:** a see-through activity with no content, one at a time (`singleTask`),
+  so the answer's way back finds it over the tab and closes the tab; anything of Bali's around the tab is
+  a screen, Phase 10's. It opens the waiting sign-in's tab at its first resume. **Back in front with
+  that sign-in still waiting, the tab closed with no answer: the student's close, `Cancelled`, as
+  AppAuth reads it,** and so is the host leaving with its sign-in waiting (its task swiped away). Said
+  plainly: where the tab opens in a task of its own (a browser with no Custom Tabs, or Chrome's first
+  run, seen on the emulator), coming back to Bali before the answer ends the sign-in so. **Made again
+  (a rotation while the tab is open),** it keeps the tab it opened, so it never opens another, and the
+  answer reaches the waiting call through `HostedUi`, the app's; an Auth Tab's result reaches the host
+  made again through androidx's activity results. Found on the emulator: `Activity.recreate()` of a
+  stopped host passes it through `onResume` (Android's own relaunch), which would read as the close;
+  a rotation never does that, a stopped activity being made again only as it comes back, so the tests
+  change a configuration instead (the font scale, put back after).
+
+  **The redirect: `com.bali.bali:/auth/callback`** (the conductor's call): a private-use scheme from the
+  app id, which Play keeps Bali's (RFC 8252, 7.1, its single slash), so no other app claims it by
+  accident as `bali:` could be, where iOS's `bali://auth/callback`, caught by iOS's own session, stays.
+  Cognito takes a callback that is an absolute URI with no fragment, app schemes included (its docs,
+  read 2026-11-05); if the console refuses this one, `com.bali.bali://auth/callback` is one setting
+  and the pin test's line. The answer is handed over as the text it was sent: `Uri.parse` keeps it, and
+  `dataString` and an Auth Tab's `resultUri` give it back whole, so `Cognito.code`'s exact comparison
+  (AN6a) takes it; proven on the emulator with escapes, `+` and `~` in the code, sent by another app.
+
+  **Taken only from the tab Bali opened (#515's reviews).** The Auth Tab answers the app alone, so its
+  answer ends only the sign-in whose tab it is. A Custom Tab's answer comes back through an exported
+  activity any app can send a link to: an answer with no sign-in waiting is dropped, starting nothing,
+  and one without the waiting attempt's state neither ends nor replaces it; the activity reads only the
+  link's text and starts nothing a link names. It has a task of its own (`taskAffinity=""`), so a link
+  sent with `NEW_TASK | CLEAR_TASK` can't clear the task the tab is open in (it did, ending the sign-in
+  as a close, until the affinity went in). **What each path doesn't guard:** with a Custom Tab, an app
+  that claims `com.bali.bali` too can be handed the real answer (Android's chooser, or its pick); its
+  code is useless without the verifier (PKCE), and the sign-in waits until the student closes the tab.
+  No app can end or replace a waiting sign-in with an answer of its own, which would need the state, a
+  secret of the tab's. An app can still unsettle Bali's task through an activity Bali exports to every
+  app, as the launcher's will be (Phase 10), as it can any app's.
+
+  **The rest of AN6b's notes:** the attempt's verifier and state live in the sign-in's call alone, so
+  a process ended while the tab is open loses them, and its answer finds no sign-in waiting and is
+  dropped: **for AN10**, what the student sees then (they sign in again) is AN10's words, from a board.
+  A caller cancelled while the tab is open stops waiting, and a later answer is dropped. A second sign-in
+  while one waits is refused (`NotOpened`); the screen holds its buttons meanwhile, as iOS's does. No
+  `NotOpened` says an address: "another sign-in page is open", "the Auth Tab ended with" its code, "no
+  browser on the phone opens it". The store's calls block on the sign-in's `Dispatchers.IO`.
+
+  **`AppConfig`'s app side.** The build makes the five values as string resources (`resValue`) under
+  iOS's settings' names, and the manifest names them as meta-data under iOS's Info.plist keys, which
+  `BaliApp` reads into `AppConfig.from`: so aapt keeps each value text, where one written in the
+  manifest that aapt can read as a number arrives as one, read as not set. Dev's API and hosted-UI
+  domain, production's portal (C2b) and Android's redirect; **the client id empty until the owner makes
+  Android's dev client** (🔧, `docs/DEPLOY.md`), so the app's config is none, as iOS's with one empty:
+  sign-in isn't set up, its words and screen AN10's and AS's. Production's values are AP's, set at
+  release as `testflight.yml` sets iOS's. **The pin test** (`core`'s AppConfigTest, `agree`'s twin):
+  every key the reader reads is the manifest's, its value a string the build makes once; every Bali key
+  there, and every value the build makes for one, is one it reads; the values make a config once a
+  client id is given and none while it's empty; and the manifest catches a Custom Tab's answer by the
+  redirect's scheme, the app id. It runs on the JVM in both workflows; `BaliAppTest` checks on the
+  emulator that each value arrives as text and that the config is none while the client id is empty.
+
+  **The versions,** each the newest stable on 2026-11-05 and built against compileSdk 36.1 (its AAR
+  metadata check passed), so nothing waits on owner item 6: androidx.browser 1.10.0, and androidx.activity
+  1.13.0, named because the host compiles against it (the browser's own is runtime only), which brings
+  androidx.core 1.18.0. `kotlin-test-junit5` is named for the app's JVM tests: the Android plugin's
+  Kotlin picks no JUnit for them. The app now asks for `INTERNET` (the token endpoint, then the API) and
+  lists Custom Tabs' service in `<queries>` (Android 11's package visibility).
+
+  **The tests:** on `Bali_Spike_API35`, `KeystoreTokenStoreTest`'s nine (nothing saved; kept, sealed,
+  read back by a new store as at a relaunch and replaced; the key's terms; cleared; a key gone; a file
+  sealed by another key, by the name's old key, changed, or too short; a file unreadable right now,
+  which throws and reads once it can; a save cut short, and one landing over a file it can't write
+  into; the file's place), `SignInBrowserTest`'s eight (the answer's hop from another app, exact; one
+  for no sign-in, dropped; one for another attempt; the tab asked of Chrome and the student's Back; a
+  host made again for a change, then the answer, then Back; a link sent to clear Bali's task; and a
+  whole sign-in through the tab, exchanged, sealed and read back at a relaunch) and `BaliAppTest`, with
+  AN4c's four: 22 tests, 0 failures, the browser's eight three times more. On the JVM: `HostedUiTest`'s
+  eight (the app's first) and AppConfigTest's `agree`. Tried, each failing by name, then reverted: the
+  answer activity without its own task (the clearing link ended the sign-in); the host not keeping the
+  tab it opened (a second tab, the call never ending); the host's leaving ending nothing; a refused tag
+  thrown; a key gone thrown; a save written into the file; any link ending the waiting sign-in; `forget`
+  letting go of any sign-in; a second sign-in let in; and the pin test's four sides (a key misspelt, a
+  value set twice, the filter's scheme, a value written in the manifest). Never on the emulator: Chrome's
+  terms (its first run, closed by Back, Chrome force-stopped after each test); a Google account; the
+  Auth Tab and ephemeral tabs, which its Chrome 124 lacks. The font scale was put back as found (1.0), and
+  nothing was added to the PC's SDK: its folders were compared before and after.
+
+  **Waits for the 📱 device check** (`docs/ANDROID-PHONE-TESTS.md`), once the owner makes Android's
+  dev client (🔧) and a screen or AN7's readout starts a sign-in: a real tab and a real sign-in, the Auth
+  Tab and an ephemeral tab on a current Chrome, and the cookie-sharing fallback where a browser lacks
+  it. **For AN7:** `BaliApp`'s `signIn`, `scope` and `transport` for `SyncEngine.make`. **For AN10:**
+  the words for sign-in not set up, the three `NotOpened`s and a sign-in whose answer was dropped.
+
 - **2026-11-05** — **AN6b, sign-in itself: BaliCore's `SignIn` in Kotlin, and the engine's `make` over
   it (the conductor's calls, awaiting the owner's look; AN6b, #518).** The owner isn't reviewing each
   step and asked for the recommended option on every question, so each call here is the conductor's,

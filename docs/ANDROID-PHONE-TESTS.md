@@ -143,6 +143,22 @@ From the same research, on both phones unless a line says otherwise.
   retries with the tunnel unread against answered, how long DNS takes to fail, and what Settings'
   battery screen blames.
 
+## AN6c, sign-in on the phones
+
+What the emulator couldn't show (`docs/DECISIONS.md`, 2026-11-05, AN6c): its Chrome 124 has neither
+the Auth Tab nor ephemeral tabs, and stops at its first run. Once the owner has made Android's dev
+client and its id is in the build (`docs/DEPLOY.md`, "The phone's sign-in"), and a screen or AN7's
+readout starts a sign-in, on both phones, each with its browser and that browser's version noted:
+
+- **Sign up, then sign in**, through the hosted UI: which tab opens (an Auth Tab on Chrome 137 and
+  later), and Bali signed in after.
+- **Sign out, then sign in again:** the password asked again where the tab was ephemeral; where the
+  browser has no ephemeral tab, whether the hosted UI skips it (its cookies kept, the conductor's
+  call).
+- **The tab closed with no sign-in:** nothing said, and Sign in works again.
+- **The phone rotated while the tab is open,** then the sign-in finished: signed in.
+- **Bali relaunched:** still signed in; **reinstalled:** signed out.
+
 ## AP3, the device test gate
 
 Before Android launches: a Pixel and a Samsung through the whole loop on dev, as B5 and B6 ran it on

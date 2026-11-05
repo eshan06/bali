@@ -42,4 +42,9 @@ tasks.test {
     val shared = rootDir.resolve("../packages/shared/src")
     inputs.dir(shared).withPropertyName("shared").withPathSensitivity(PathSensitivity.RELATIVE)
     systemProperty("bali.shared", shared.canonicalPath)
+    // The app's manifest and build, which AppConfigTest pins to AppConfig's keys, as iOS's pins Info.plist.
+    val app = rootDir.resolve("app")
+    inputs.files(app.resolve("src/main/AndroidManifest.xml"), app.resolve("build.gradle.kts"))
+        .withPropertyName("app").withPathSensitivity(PathSensitivity.RELATIVE)
+    systemProperty("bali.app", app.canonicalPath)
 }

@@ -1,20 +1,64 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The app's name and its backup rules, nothing else yet: every screen waits for Phase 10's steps
-     (docs/PLAN-ANDROID.md), and the icon for one drawn and approved, so lint's icon check waits too.
-     Nothing of Bali's leaves the phone in a backup or a transfer to a new phone, so a reinstall
-     starts signed out, with an outbox of its own (ARCHITECTURE, "Android app structure"):
+<!-- The app's name, its backup rules and sign-in's parts, nothing else yet: every screen waits for
+     Phase 10's steps (docs/PLAN-ANDROID.md), and the icon for one drawn and approved, so lint's icon
+     check waits too. Nothing of Bali's leaves the phone in a backup or a transfer to a new phone, so a
+     reinstall starts signed out, with an outbox of its own (ARCHITECTURE, "Android app structure"):
      allowBackup="false" stops a backup, and on Android 10 and 11 a transfer too; from Android 12 a
      transfer ignores it, so dataExtractionRules leaves everything out there; and fullBackupContent
      leaves everything out on Android 10 and 11 as well. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- The sign-in's token endpoint, and Bali's API (AN7). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Which browser opens the hosted UI's tab, and what it offers: hidden from Android 11 without this. -->
+    <queries>
+        <intent>
+            <action android:name="android.support.customtabs.action.CustomTabsService" />
+        </intent>
+    </queries>
+
     <application
+        android:name=".BaliApp"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:label="@string/app_name"
         tools:ignore="MissingApplicationIcon"
-        tools:targetApi="31" />
+        tools:targetApi="31">
+
+        <!-- The build's values (build.gradle.kts) under iOS's Info.plist keys, for core's AppConfig, each a
+             string the build makes, so aapt keeps it text (a number written here would arrive as a number,
+             read as not set). core's AppConfigTest pins the three together, as iOS's pins Info.plist. -->
+        <meta-data android:name="BaliAPIURL" android:value="@string/BALI_API_URL" />
+        <meta-data android:name="BaliCognitoDomain" android:value="@string/BALI_COGNITO_DOMAIN" />
+        <meta-data android:name="BaliCognitoClientID" android:value="@string/BALI_COGNITO_CLIENT_ID" />
+        <meta-data android:name="BaliCognitoRedirectURI" android:value="@string/BALI_COGNITO_REDIRECT_URI" />
+        <meta-data android:name="BaliPortalURL" android:value="@string/BALI_PORTAL_URL" />
+
+        <!-- Hosts the hosted UI's tab and draws nothing; one at a time, so the answer finds it over the tab. -->
+        <activity
+            android:name=".HostedUiActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <!-- A Custom Tab's answer, by the redirect URI's scheme, the app id (RFC 8252, 7.1). Any app can
+             send it a link, so it takes one only for the waiting sign-in, and lands in no task of Bali's,
+             so no link can clear the one the tab is open in (HostedUiActivity.kt). -->
+        <activity
+            android:name=".SignInAnswerActivity"
+            android:exported="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.NoDisplay">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.bali.bali" />
+            </intent-filter>
+        </activity>
+    </application>
 
 </manifest>
