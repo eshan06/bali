@@ -8,11 +8,13 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-05 (Central) — WC7 (#526; `docs/DECISIONS.md`, 2026-11-04): the seventh WC
-step: the student web's card loses its two lines. Before it, A3b (#525). Next: WC8; A4; a session
-builds the retire-a-block command; the owner the new build, with A5 and A2, and the sitting; the
-owner's call on GA5's known limit, the smallest iPhones (DECISIONS 2026-11-02); AN7e; AN1's part 2
-once the owner has the phones; the audit's polish waits, as ruled._
+_Last updated: 2026-11-05 (Central) — A4 (#527; `docs/DECISIONS.md`, 2026-11-05): `/privacy` names
+PostHog: what the server counts, what PostHog never gets, the counts as one or two students' own
+when only one or two are in the class or tap in, its 1 year, and what stays after a deletion or a
+disposal. Before it, WC7 (#526). Next: WC8; the owner's PostHog key; a session builds the
+retire-a-block command; the owner the new build, with A5 and A2, and the sitting; the owner's call
+on GA5's known limit, the smallest iPhones (DECISIONS 2026-11-02); AN7e; AN1's part 2 once the
+owner has the phones; the audit's polish waits, as ruled._
 
 ## Now
 
@@ -141,8 +143,12 @@ branch, with no PR, as its README says (#479; `docs/DECISIONS.md`, 2026-11-02).
      `/v1` — ✅ (#517; DECISIONS 2026-11-05)
    - **A3b** The portal's teacher events, through it (no CSP change) — ✅ (#525; DECISIONS 2026-11-05)
    - **A4** `/privacy` names PostHog and says what stays there once an account is deleted (a
-     teacher's events, a class's totals), before the key is set
-   - Then the owner's key: `POSTHOG_KEY` in Railway's `bali prod` (the portal holds none).
+     teacher's events, a class's totals), before the key is set — ✅ (#527; DECISIONS 2026-11-05)
+   - Next, the owner can set the key: `POSTHOG_KEY` in Railway's `bali prod` (the portal holds
+     none), once PostHog keeps events the 1 year `/privacy` says (the free plan does, a paid plan
+     only with the project's events retention set to 1 year), and after the owner's call on the
+     notice `/privacy`'s section 11 promises before something new is collected (DECISIONS
+     2026-11-05).
 5. The external TestFlight group `Vanderbilt pilot` and Beta App Review (`docs/APP-STORE.md`, section
    5), which is Apple's answer on §3.3.3(P) (ISSUES #3).
 6. For PostHog, the App Store privacy label (Product Interaction and Other Data Types gain the

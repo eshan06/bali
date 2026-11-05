@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { PORTAL_EVENTS, type PortalEvent } from '@bali/shared';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import type { ComponentType } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -17,8 +18,9 @@ import TermsPage, { metadata as termsMetadata } from './terms/page';
  * 2026-10-24 under each title and its date, every section in the draft's order, the sections the
  * owner named at the outline's ids, the privacy draft's table as a list, its section 2's lists the
  * app's and the help page's own (#130), the owner's two later lines (section 1's clock set ahead,
- * section 6's records at another school), Contact's mailto and the footer's links, and nothing of
- * the drafts' notes for the lawyer. Reached from /login and from the
+ * section 6's records at another school), PostHog named wherever its counts change what a line says
+ * (A4), Contact's mailto and the footer's links, and nothing of the drafts' notes for the lawyer.
+ * Reached from /login and from the
  * help page; framed by the shell with no menu, no Sign out and no read; whole in the server's HTML,
  * so the words need no script. That every page renders per request is rendering.test.ts's.
  */
@@ -59,7 +61,7 @@ const POLICIES: Policy[] = [
     Page: PrivacyPage,
     metadata: privacyMetadata,
     title: 'Privacy policy',
-    date: 'Effective October 24, 2026',
+    date: 'Effective November 5, 2026',
     sections: [
       'The short version',
       '1. What Bali collects',
@@ -265,6 +267,121 @@ describe('the privacy policy’s section 6, how long records are kept', () => {
       .map((item) => item.textContent);
     expect(items[1]).toBe(
       "After that day, we remove the names and sign-ins of everyone whose records all fall on or before it, unless they also have records at another school that uses Bali. What's left is counts that name no one, such as “3 unlocks in that session”.",
+    );
+  });
+});
+
+/** Each teacher action the portal counts for PostHog (A3a's `PORTAL_EVENTS`), in the policy's words. */
+const SAID: Record<PortalEvent, string> = {
+  portal_signed_in: 'when they sign in',
+  portal_class_created: 'create a class',
+  portal_block_registered: 'register a block',
+  portal_session_started: 'start, end or extend a session',
+  portal_session_ended: 'start, end or extend a session',
+  portal_session_extended: 'start, end or extend a session',
+  portal_question_asked: 'ask a question',
+  portal_slides_shown: 'show slides',
+  portal_present_opened: 'open Present',
+  portal_report_opened: 'open a report or a recap',
+  portal_recap_opened: 'open a report or a recap',
+};
+
+describe('the privacy policy names PostHog, which Bali’s server sends its counts to (A4)', () => {
+  /** Section 1's part on what is collected automatically: each item its bold lead, then its words. */
+  const automatic = () =>
+    within(
+      screen.getByRole('heading', {
+        level: 3,
+        name: 'Automatically, from the portal and our servers',
+      }).nextElementSibling as HTMLElement,
+    ).getAllByRole('listitem');
+
+  it('no longer says there are no analytics or tracking tools, and still promises no tracking cookies or ads', () => {
+    render(<PrivacyPage />);
+    const words = screen.getByRole('main').textContent ?? '';
+    expect(words).not.toMatch(/no analytics/i);
+    expect(words).not.toMatch(/tracking or advertising tools/i);
+    expect(
+      within(screen.getByRole('region', { name: 'The short version' }))
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual([
+      "Bali quiets a student's iPhone during class and shows the teacher who is focused.",
+      'Bali never sees your screen, your messages, where you are, or which apps you have.',
+      "We don't sell your information, show ads, or use advertising tools or tracking cookies.",
+      'Your school decides to use Bali. We hold class records for the school and use them only to run Bali for that school and to count how Bali is used (section 1).',
+      'You can delete your account from the app at any time.',
+    ]);
+    expect(automatic().map((item) => item.querySelector('strong')?.textContent)).toEqual([
+      'No tracking cookies and no ads.',
+      'Error reports.',
+      'Usage counts.',
+      'Server logs.',
+    ]);
+  });
+
+  it('says what the counts hold, what PostHog never gets, totals when only one or two tap in, and how long they stay', () => {
+    render(<PrivacyPage />);
+    expect(automatic()[2]?.textContent).toBe(
+      "Usage counts. To learn how Bali is used, our server sends counts to PostHog, our analytics provider. For each class session: when it starts, ends or is extended and how it ends, how many students are in the class and how many tapped in, how long it was set to run and how long it ran, the class's total focus minutes, and its Emergency Unlocks as one number, never split by reason. For each teacher: when they sign in, create a class, register a block, start, end or extend a session, ask a question, show slides, open Present, or open a report or a recap. PostHog files every count under a teacher, known to it only by the ID Bali gives their account. It never gets anyone's name or email, a student's ID, a web address, or anything typed into Bali. A session's totals add up the students who tapped in, and they're sent however few that is. When a class has only one or two students, or only one or two tap in, its counts are those students' own numbers. Only our server talks to PostHog. The portal has no PostHog script or cookie, the iPhone app sends PostHog nothing, and PostHog never sees your IP address. PostHog keeps the counts for 1 year, then deletes them, though not always right away. Deleting an account or disposing of a school's data doesn't remove them sooner (sections 6 and 7). Each teacher's ID stays at PostHog even after their counts are deleted.",
+    );
+  });
+
+  it('names every teacher action the portal counts', () => {
+    render(<PrivacyPage />);
+    const usage = automatic()[2]?.textContent ?? '';
+    for (const event of PORTAL_EVENTS) expect(usage, event).toContain(SAID[event]);
+  });
+
+  it('lists PostHog among the service providers, after Sentry', () => {
+    render(<PrivacyPage />);
+    const sharing = screen.getByRole('region', { name: '4. Who we share it with' });
+    const providers = within(within(sharing).getAllByRole('list')[1])
+      .getAllByRole('listitem')
+      .map((item) => item.textContent ?? '');
+    expect(providers.map((item) => item.split(':')[0])).toEqual([
+      'Amazon Web Services',
+      'Railway',
+      'Vercel',
+      'Sentry',
+      'PostHog',
+      'Apple',
+    ]);
+    expect(providers[4]).toBe('PostHog: usage counts that name no one (section 1)');
+  });
+
+  it('says the counts stay at PostHog after a school’s disposal and an account’s deletion, a teacher’s too', () => {
+    render(<PrivacyPage />);
+    const retention = within(screen.getByRole('region', { name: '6. How long records are kept' }))
+      .getAllByRole('listitem')
+      .map((item) => item.textContent);
+    expect(retention[2]).toBe(
+      'A school can ask us in writing to dispose of all its data. We remove names from everyone at the school and delete its classes, blocks and pending invite codes. Usage counts stay at PostHog until it deletes them (section 1).',
+    );
+    expect(retention.at(-1)).toBe(
+      'Error reports, usage counts and server logs are kept as section 1 says.',
+    );
+    const deletion = screen.getByRole('region', { name: '7. Deleting your account' });
+    expect(within(deletion).getAllByRole('listitem')[3]?.textContent).toBe(
+      "Usage counts stay at PostHog until it deletes them (section 1). They never named you, but when a class had only one or two students, or only one or two tapped in, a session's counts are those students' own numbers, yours included.",
+    );
+    expect(deletion.querySelector('ul + p')?.textContent).toBe(
+      "A teacher with a class or a registered block deletes their account through their school, so a class isn't left without its teacher. Email us to start. When a teacher's account is deleted, their usage counts stay at PostHog under the ID Bali gave their account, until PostHog deletes them (section 1).",
+    );
+  });
+
+  it('says what else changed with it: how the records are used, the FERPA section and encryption', () => {
+    render(<PrivacyPage />);
+    expect(screen.getByRole('region', { name: '3. How we use it' }).textContent).toContain(
+      'keep the service working and secure, count how Bali is used (section 1), answer support emails',
+    );
+    expect(
+      screen.getByRole('region', { name: '5. Schools and student records (FERPA)' }).textContent,
+    ).toContain(
+      "use them only for the school's purposes, apart from the usage counts in section 1.",
+    );
+    expect(screen.getByRole('region', { name: '9. Security' }).textContent).toContain(
+      'Railway, Amazon Web Services, Sentry and PostHog encrypt the data they store for us.',
     );
   });
 });

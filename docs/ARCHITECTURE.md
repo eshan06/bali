@@ -941,24 +941,29 @@ the teacher portal's, which it forwards, and nothing else of Bali's.
   class's focus minutes and unlocks, as totals, the unlocks one number, never split by reason
   ("nurse" may be health data). They are sent whatever the class's size (the owner's pick, "Always
   send", over holding focus minutes and unlocks back under 3 or 5 students), so with one or two
-  students they are those students' own numbers: that cost, said plainly. From the portal, a
+  students in the class, or only one or two tapped in (the totals add up who tapped in), they are
+  those students' own numbers: that cost, said plainly. From the portal, a
   teacher's own actions only: signed in, created a class, registered a block, started, ended or
   extended a session, asked a question, showed slides, opened Present, opened a report or the
   recap. A teacher is known by Bali's internal user id alone. Every event carries `environment`, so
   a dev key, if one is ever set, files apart.
 - **What it never holds:** a student's name, email or user id, or any event about one student (a
-  class of one or two's totals are the exception, above); a teacher's email or name; a URL; free
-  text in any property. A teacher's events stay when they delete their account (the owner's pick,
-  "Keep them, say so"): they carry Bali's internal id alone, `/privacy` says they stay (PLAN's
-  A4), and no privacy path calls PostHog, so the server holds no PostHog admin key. A class's
-  totals stay too when a student deletes their account, a class of one or two's being that
-  student's own numbers, and `/privacy` says so as well. Once an account deletion, a disposal or
-  the retention run takes a teacher's name and sign-in off their row, their events there name no
-  one by themselves; Bali's own records can still lead back to a teacher who deleted their own
-  account, whose removed classes keep their names (#313).
+  session's totals with one or two students are the exception, above); a teacher's email or name;
+  a URL; free text in any property. A teacher's events stay when they delete their account (the
+  owner's pick, "Keep them, say so"): they carry Bali's internal id alone, `/privacy` says they
+  stay (PLAN's A4), and no privacy path calls PostHog, so the server holds no PostHog admin key. A
+  class's totals stay too when a student deletes their account, those of a session with one or two
+  students being their own numbers, and `/privacy` says so as well. Once an account deletion, a
+  disposal or the retention run takes a teacher's name and sign-in off their row, their events
+  there name no one by themselves; Bali's own records can still lead back to a teacher who deleted
+  their own account, whose removed classes keep their names (#313).
 - **Nothing captured on its own.** No autocapture, no session replay, no heatmaps, no exception
   capture (errors are Sentry's). The project is set to match: session replay, web autocapture and
-  exception autocapture off, the client's IP address discarded.
+  exception autocapture off, the client's IP address discarded. Its events are kept 1 year, as
+  `/privacy` says (A4; the worker's call, awaiting the owner): PostHog's free plan keeps them that
+  long, and a paid plan up to 7 years unless the project's events retention is set to 1 year. The
+  person profile PostHog makes for each teacher's id, holding nothing else, outlasts them, and
+  `/privacy` says so too.
 - **Off until its key is set,** as Sentry and push are: the API reads `POSTHOG_KEY`, with an
   optional host (`https://us.i.posthog.com` by default), for its own events and the portal's alike;
   the portal holds no PostHog key. The owner sets it in Railway's `bali prod`.

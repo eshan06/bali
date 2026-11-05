@@ -4,11 +4,12 @@ import { PolicyDraft } from '@/components/policy-draft';
 import { TEACHER_NEVER_SEES, TEACHER_SEES } from '@/components/teacher-sees';
 
 /*
- * The privacy policy (Phase 6, C2-text): the owner's drafted words of 2026-10-24, kept here and
- * nowhere else (`docs/legal/privacy-policy.md` holds only the notes for the lawyer, who reviews this
- * page): its effective date under the title, what Bali collects as a list (each row of the draft's
- * table what, then why), and section 2's two lists the app's own, word for word (`teacher-sees.ts`,
- * #130). It stands until the lawyer's version replaces it in place (C2).
+ * The privacy policy (Phase 6, C2-text): the owner's drafted words of 2026-10-24, with PostHog named
+ * since A4 (2026-11-05; ARCHITECTURE, "Analytics (PostHog)"), kept here and nowhere else
+ * (`docs/legal/privacy-policy.md` holds only the notes for the lawyer, who reviews this page): its
+ * effective date under the title, what Bali collects as a list (each row of the draft's table what,
+ * then why), and section 2's two lists the app's own, word for word (`teacher-sees.ts`, #130). It
+ * stands until the lawyer's version replaces it in place (C2).
  */
 
 export const metadata: Metadata = {
@@ -23,7 +24,7 @@ export default function PrivacyPage() {
   return (
     <PolicyDraft
       title="Privacy policy"
-      date="Effective October 24, 2026"
+      date="Effective November 5, 2026"
       intro={
         <>
           <p>
@@ -50,11 +51,12 @@ export default function PrivacyPage() {
                 Bali never sees your screen, your messages, where you are, or which apps you have.
               </li>
               <li>
-                We don&apos;t sell your information, show ads, or use tracking or advertising tools.
+                We don&apos;t sell your information, show ads, or use advertising tools or tracking
+                cookies.
               </li>
               <li>
                 Your school decides to use Bali. We hold class records for the school and use them
-                only to run Bali for that school.
+                only to run Bali for that school and to count how Bali is used (section 1).
               </li>
               <li>You can delete your account from the app at any time.</li>
             </ul>
@@ -151,11 +153,10 @@ export default function PrivacyPage() {
               <h3>Automatically, from the portal and our servers</h3>
               <ul>
                 <li>
-                  <strong>No cookies for tracking, no analytics, no ads.</strong> The portal keeps
-                  your sign-in in your browser tab&apos;s own storage, which is cleared when the tab
-                  closes. It also remembers, on that computer, the session length a teacher last
-                  picked. Amazon Cognito&apos;s sign-in page sets its own cookies, only to keep you
-                  signed in.
+                  <strong>No tracking cookies and no ads.</strong> The portal keeps your sign-in in
+                  your browser tab&apos;s own storage, which is cleared when the tab closes. It also
+                  remembers, on that computer, the session length a teacher last picked. Amazon
+                  Cognito&apos;s sign-in page sets its own cookies, only to keep you signed in.
                 </li>
                 <li>
                   <strong>Error reports.</strong> When something breaks on our servers or in the
@@ -163,6 +164,26 @@ export default function PrivacyPage() {
                   names, emails, unlock reasons, sign-in tokens and codes out of these reports
                   before they leave. The iPhone app sends none. Sentry keeps error reports for up to
                   90 days.
+                </li>
+                <li>
+                  <strong>Usage counts.</strong> To learn how Bali is used, our server sends counts
+                  to PostHog, our analytics provider. For each class session: when it starts, ends
+                  or is extended and how it ends, how many students are in the class and how many
+                  tapped in, how long it was set to run and how long it ran, the class&apos;s total
+                  focus minutes, and its Emergency Unlocks as one number, never split by reason. For
+                  each teacher: when they sign in, create a class, register a block, start, end or
+                  extend a session, ask a question, show slides, open Present, or open a report or a
+                  recap. PostHog files every count under a teacher, known to it only by the ID Bali
+                  gives their account. It never gets anyone&apos;s name or email, a student&apos;s
+                  ID, a web address, or anything typed into Bali. A session&apos;s totals add up the
+                  students who tapped in, and they&apos;re sent however few that is. When a class
+                  has only one or two students, or only one or two tap in, its counts are those
+                  students&apos; own numbers. Only our server talks to PostHog. The portal has no
+                  PostHog script or cookie, the iPhone app sends PostHog nothing, and PostHog never
+                  sees your IP address. PostHog keeps the counts for 1 year, then deletes them,
+                  though not always right away. Deleting an account or disposing of a school&apos;s
+                  data doesn&apos;t remove them sooner (sections 6 and 7). Each teacher&apos;s ID
+                  stays at PostHog even after their counts are deleted.
                 </li>
                 <li>
                   <strong>Server logs.</strong> Our hosting providers record basic request
@@ -216,9 +237,9 @@ export default function PrivacyPage() {
           body: (
             <p>
               Only to run Bali: sign you in, run class sessions, show teachers their class, write
-              reports, keep the service working and secure, answer support emails, and meet our
-              legal duties. We don&apos;t use your information for ads, for profiling, or to train
-              AI models, and we don&apos;t sell or rent it.
+              reports, keep the service working and secure, count how Bali is used (section 1),
+              answer support emails, and meet our legal duties. We don&apos;t use your information
+              for ads, for profiling, or to train AI models, and we don&apos;t sell or rent it.
             </p>
           ),
         },
@@ -240,6 +261,7 @@ export default function PrivacyPage() {
                   <li>Railway: our servers, database and backups</li>
                   <li>Vercel: the portal&apos;s hosting</li>
                   <li>Sentry: error reports, with personal details removed (section 1)</li>
+                  <li>PostHog: usage counts that name no one (section 1)</li>
                   <li>
                     Apple: TestFlight and App Store delivery, Screen Time on your phone, and
                     class-start notifications when they&apos;re on
@@ -266,11 +288,11 @@ export default function PrivacyPage() {
               Bali is used by schools. When a school uses Bali, the class records we hold about its
               students are education records the school controls. We hold them as a “school
               official” under the Family Educational Rights and Privacy Act (FERPA), under our
-              agreement with the school, and use them only for the school&apos;s purposes. If that
-              agreement and this policy disagree, the agreement wins. To see, correct or remove a
-              record, you can ask your school or email us. We&apos;ll give the school a copy of
-              everything we hold about one student. For a school in a state with its own
-              student-privacy law, we follow that law too.
+              agreement with the school, and use them only for the school&apos;s purposes, apart
+              from the usage counts in section 1. If that agreement and this policy disagree, the
+              agreement wins. To see, correct or remove a record, you can ask your school or email
+              us. We&apos;ll give the school a copy of everything we hold about one student. For a
+              school in a state with its own student-privacy law, we follow that law too.
             </p>
           ),
         },
@@ -291,6 +313,7 @@ export default function PrivacyPage() {
               <li>
                 A school can ask us in writing to dispose of all its data. We remove names from
                 everyone at the school and delete its classes, blocks and pending invite codes.
+                Usage counts stay at PostHog until it deletes them (section 1).
               </li>
               <li>
                 <strong>Backups.</strong> We back up the database every day and every week. Daily
@@ -298,7 +321,7 @@ export default function PrivacyPage() {
                 something deleted from Bali can remain in a backup for up to 27 days, where nobody
                 uses it except to recover from a failure.
               </li>
-              <li>Error reports and server logs are kept as section 1 says.</li>
+              <li>Error reports, usage counts and server logs are kept as section 1 says.</li>
             </ul>
           ),
         },
@@ -317,11 +340,18 @@ export default function PrivacyPage() {
                   The class&apos;s records keep their counts but no longer name you. Your answers
                   stay in the class&apos;s totals, attached to no one.
                 </li>
+                <li>
+                  Usage counts stay at PostHog until it deletes them (section 1). They never named
+                  you, but when a class had only one or two students, or only one or two tapped in,
+                  a session&apos;s counts are those students&apos; own numbers, yours included.
+                </li>
                 <li>Backups age out as section 6 says.</li>
               </ul>
               <p>
                 A teacher with a class or a registered block deletes their account through their
-                school, so a class isn&apos;t left without its teacher. Email us to start.
+                school, so a class isn&apos;t left without its teacher. Email us to start. When a
+                teacher&apos;s account is deleted, their usage counts stay at PostHog under the ID
+                Bali gave their account, until PostHog deletes them (section 1).
               </p>
             </>
           ),
@@ -350,8 +380,8 @@ export default function PrivacyPage() {
                   from the internet.
                 </li>
                 <li>
-                  <strong>Stored:</strong> Railway, Amazon Web Services and Sentry encrypt the data
-                  they store for us. Invite codes are stored only in scrambled form.
+                  <strong>Stored:</strong> Railway, Amazon Web Services, Sentry and PostHog encrypt
+                  the data they store for us. Invite codes are stored only in scrambled form.
                 </li>
                 <li>
                   <strong>Access:</strong> only Bali&apos;s team can reach the production systems.
