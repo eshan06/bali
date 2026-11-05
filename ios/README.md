@@ -267,9 +267,8 @@ and layout are iOS's.
 1. **Tapped in: Bali's shield.** `npm run dev:teacher -- start 20`, **Tap** with `DEVICE-CHECK-1`,
    then open any blocked app: Bali's shield, light even with the phone in dark mode, never iOS's own —
    the ring mark (a green arc open at the upper left, on a pale green track), the title
-   `Focused with Bali` with no time, and under it "This app is paused for class. Calls, FaceTime,
-   Messages and Emergency SOS always work. Open Bali to see when class ends. Emergency Unlock is
-   always there." **OK**, white on dark green, closes the app. Then `npm run dev:teacher -- extend 10`:
+   `Focused with Bali` with no time, and under it "This app is paused for class. Open Bali to
+   Emergency Unlock." **OK**, white on dark green, closes the app. Then `npm run dev:teacher -- extend 10`:
    a blocked app says the same — the new bell is Bali's to show.
 2. **After Emergency Unlock: no shield.** **Emergency Unlock**: every app opens, with no shield at
    all, Bali's or iOS's.
@@ -489,7 +488,8 @@ on the newest build, Airplane Mode is off, and the sticker is your prod block.
    **Join a class** → type the code → the preview ("What your teacher sees") → **Join**. Home now lists
    Test class.
 3. **Bali's shield.** Start your class and tap in. Open a blocked app (Instagram, say): Bali's shield
-   "Focused with Bali" covers it.
+   "Focused with Bali" covers it, and under it only "This app is paused for class. Open Bali to
+   Emergency Unlock."
 4. **Emergency Unlock with a reason.** Hold Emergency Unlock for 1 second: Unlocked. Pick **Bathroom**.
    The teacher's grid shows you unlocked, with the reason. **Lock my apps again**: Focused.
 5. **No signal.** Turn on Airplane Mode and hold Emergency Unlock: you're unlocked at once and the

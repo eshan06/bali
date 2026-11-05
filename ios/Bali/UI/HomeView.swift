@@ -54,10 +54,7 @@ struct HomeView: View {
                             phone: phone)
                         // The router keeps Home over the last run's shields: their way out.
                         if phone.protection?.shielded == true {
-                            EmergencyUnlock(
-                                phone: phone,
-                                caption: "Works without Wi-Fi. Letting go early does nothing.",
-                                paused: true, failed: $unlockFailed)
+                            EmergencyUnlock(phone: phone, paused: true, failed: $unlockFailed)
                         }
                     }
                     // In every build, as Emergency Unlock is wherever the shields can be on:

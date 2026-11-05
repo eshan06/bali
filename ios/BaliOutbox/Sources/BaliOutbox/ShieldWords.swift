@@ -14,9 +14,9 @@ public struct ShieldWords: Sendable, Hashable {
     /// The words over `over`.
     public init(over: Over) {
         title = "Focused with Bali"
+        // The owner's words, 2026-11-04.
         subtitle =
-            "This \(over == .app ? "app" : "website") is paused for class. Calls, FaceTime, "
-            + "Messages and Emergency SOS always work. Open Bali to see when class ends. "
-            + "Emergency Unlock is always there."
+            "This \(over == .app ? "app" : "website") is paused for class. "
+            + "Open Bali to Emergency Unlock."
     }
 }

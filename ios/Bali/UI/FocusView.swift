@@ -39,8 +39,8 @@ struct FocusView: View {
     }
 
     /// Past the large text size FocusLargeText draws (AX1) the text crowds the screen, so Focus
-    /// makes room for what matters first (GA3; the app canvas's largest-text boards): the line under
-    /// Emergency Unlock scrolls with the page, and a lesson comes before the class.
+    /// makes room for what matters first (GA3; the app canvas's largest-text boards): a lesson comes
+    /// before the class.
     private var crowded: Bool { textSize >= .accessibility2 }
 
     /// D1's three groups — the class; the state, the ring and the claim; and Emergency Unlock —
@@ -55,13 +55,13 @@ struct FocusView: View {
                     heading(focus)
                     Spacer(minLength: 24)
                     middle(focus).fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: 24)
+                    Spacer(minLength: focus.hasNotes ? 24 : 0)
                     notes(focus).fixedSize(horizontal: false, vertical: true)
                 }
                 .multilineTextAlignment(.center)
                 .onGeometryChange(for: Bool.self, of: overflows) { scrolls = $0 }
             }
-            pinned(focus, gap: 24, paused: focus.claim == .paused)
+            pinned(gap: 24, paused: focus.claim == .paused)
         }
     }
 
@@ -78,22 +78,21 @@ struct FocusView: View {
                     if let card = shown.card { AnswerCardView(card: card, phone: phone) }
                     if let slide = shown.slide { SlideView(shown: slide, phone: phone) }
                     if crowded { top(focus) }
-                    notes(focus).multilineTextAlignment(.center)
+                    if focus.hasNotes { notes(focus).multilineTextAlignment(.center) }
                 }
                 .onGeometryChange(for: Bool.self, of: overflows) { scrolls = $0 }
             }
             .scrollBounceBehavior(.basedOnSize).screenWide()
-            pinned(focus, gap: 16, paused: true)
+            pinned(gap: 16, paused: true)
         }
     }
 
     /// Emergency Unlock pinned under the page, `gap` below it, a hairline marking its edge once the
     /// page scrolls (FocusLargeText's), at its own height whatever the page holds: offered less, its
-    /// pill was squeezed shorter than its words. Crowded, its line scrolls with the page, and only
-    /// why the last press didn't go through stays under it (rule 5).
-    private func pinned(_ focus: FocusWords, gap: CGFloat, paused: Bool) -> some View {
+    /// pill was squeezed shorter than its words.
+    private func pinned(gap: CGFloat, paused: Bool) -> some View {
         EmergencyUnlock(
-            phone: phone, caption: crowded ? nil : focus.caption, paused: paused, failed: $unlockFailed
+            phone: phone, paused: paused, failed: $unlockFailed
         )
         .multilineTextAlignment(.center).padding(.top, gap).frame(maxWidth: .infinity)
         .overlay(alignment: .top) {
@@ -128,11 +127,11 @@ struct FocusView: View {
                 VStack(spacing: 8) { chips(focus) }
             }
             if focus.claim == .paused { Ring(focus: focus) }
-            VStack(spacing: 8) {
-                if focus.final, focus.claim == .paused {
-                    Text("Almost done").textStyle(.h3).foregroundStyle(Theme.brand)
-                }
-                Text(focus.claimWords).textStyle(.body).foregroundStyle(Theme.textSecondary)
+            if focus.final, focus.claim == .paused {
+                Text("Almost done").textStyle(.h3).foregroundStyle(Theme.brand)
+            }
+            if let words = focus.claimWords {
+                Text(words).textStyle(.body).foregroundStyle(Theme.textSecondary)
                     .padding(.horizontal, 12)
             }
             // D1's ProtectionOff draws the way back as the primary action.
@@ -154,8 +153,8 @@ struct FocusView: View {
         if focus.offline != nil { Chip(kind: .notIn, icon: "wifi.slash", text: "No connection") }
     }
 
-    /// Why an unlock gave way (C5a); why nothing reaches the teacher; offline, D1's card; a wake
-    /// iOS refused; and, crowded, the line from under Emergency Unlock.
+    /// Why an unlock gave way (C5a); why nothing reaches the teacher; offline, D1's card; and a wake
+    /// iOS refused.
     private func notes(_ focus: FocusWords) -> some View {
         VStack(spacing: 24) {
             ForEach([focus.superseded, focus.stalled].compactMap { $0 }, id: \.self) { words in
@@ -176,7 +175,6 @@ struct FocusView: View {
             if let note = focus.unscheduled {
                 Text(note).textStyle(.caption).foregroundStyle(Theme.textSecondary)
             }
-            if crowded { Text(focus.caption).textStyle(.caption).foregroundStyle(Theme.textTertiary) }
         }
     }
 }
@@ -245,16 +243,20 @@ extension FocusWords {
         Duration.seconds(secondsLeft).formatted(.units(allowed: [.hours, .minutes, .seconds], width: .wide))
             + " left, \(until)"
     }
+
+    /// Whether Focus says anything in `notes`: with nothing, the page ends at the ring or the strip,
+    /// as the app canvas's FocusLargestTextEnd and FocusQuestionLargestTextEnd draw it.
+    fileprivate var hasNotes: Bool {
+        superseded != nil || stalled != nil || offline != nil || unscheduled != nil
+    }
 }
 
-/// Emergency Unlock and the line under it — or why the last press did not go through, which
-/// VoiceOver, left on the control, is told as well (rule 5): the Focus screen's, and Home's over
-/// the last run's shields where the phone stood unread (B6b). `paused`: the check verified the
-/// shields on, all a failure may say of them.
+/// Emergency Unlock, and under it why the last press did not go through, which VoiceOver, left on
+/// the control, is told as well (rule 5): the Focus screen's, and Home's over the last run's shields
+/// where the phone stood unread (B6b). `paused`: the check verified the shields on, all a failure
+/// may say of them.
 struct EmergencyUnlock: View {
     let phone: Phone
-    /// Nil where the screen says it elsewhere (Focus, crowded): then only a press that failed.
-    let caption: String?
     let paused: Bool
     /// The screen's own, so it outlives a change of the screen's layout.
     @Binding var failed: UnlockFailure?
@@ -270,8 +272,8 @@ struct EmergencyUnlock: View {
                     }
                 }
             }
-            if let line = failed?.words(paused: paused) ?? caption {
-                Text(line).textStyle(.caption).foregroundStyle(failed == nil ? Theme.textTertiary : Theme.text)
+            if let line = failed?.words(paused: paused) {
+                Text(line).textStyle(.caption).foregroundStyle(Theme.text)
             }
         }
         // A press the screen ended mid-hold says nothing more, so a layout never stays held for it.

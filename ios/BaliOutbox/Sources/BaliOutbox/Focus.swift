@@ -15,8 +15,9 @@ public struct FocusWords: Sendable, Hashable {
     public let title: String, subtitle: String
     public let claim: Claim
     /// What the claim says under the ring — while nothing is verified, only that the check runs —
-    /// and, Screen Time off, a report of it the check could not save (C4's review; rule 5).
-    public let claimWords: String
+    /// and, Screen Time off, a report of it the check could not save (C4's review; rule 5); over
+    /// the shields on, nothing (the owner's cut, 2026-11-04).
+    public let claimWords: String?
     /// The time left until the shields come off by the phone's own clock (`shieldedUntil`) — the
     /// bell, or a tap's cap, which is only the latest they can — in whole seconds, rounded up, and
     /// as the digits say it; how full the ring is, until when, and whether these are the last two
@@ -36,8 +37,6 @@ public struct FocusWords: Sendable, Hashable {
     /// session (C5a): a return to focus the phone's order cannot place went ahead of it — or, sent
     /// with no order, its clock was behind (A10, A12); nil when none did.
     public let superseded: String?
-    /// Under Emergency Unlock.
-    public let caption: String
 
     /// The ring is full with this long left or more: the phone knows the bell, not the start.
     public static let ringSpan: TimeInterval = 50 * 60
@@ -71,10 +70,9 @@ public struct FocusWords: Sendable, Hashable {
         claim =
             protection?.shielded == true
             ? .paused : protection?.permissionOff == true ? .screenTimeOff : .unverified
-        let claimed =
+        let claimed: String? =
             switch claim {
-            case .paused:
-                "Every app is paused. Calls, FaceTime, Messages and Emergency SOS always work."
+            case .paused: nil
             case .screenTimeOff:
                 "Screen Time is off for Bali, so no app is paused. Turn it back on in Settings → Screen Time → Apps with Screen Time Access."
             case .unverified: "Checking Screen Time…"
@@ -82,7 +80,7 @@ public struct FocusWords: Sendable, Hashable {
         // Found and not saved: the check tries again while it is off (rule 5).
         claimWords =
             claim == .screenTimeOff && protection?.unreported == true
-            ? claimed + " Bali couldn't tell your teacher yet, and keeps trying." : claimed
+            ? claimed.map { $0 + " Bali couldn't tell your teacher yet, and keeps trying." } : claimed
         stalled =
             switch (signedIn, sync.link) {
             case (false?, _):
@@ -114,10 +112,6 @@ public struct FocusWords: Sendable, Hashable {
             protection?.unscheduled == true || protection?.monitorUnscheduled != nil
             ? "iOS didn't let Bali schedule when focus ends. If your apps are still paused after class, open Bali."
             : nil
-        caption =
-            unreachable
-            ? "Works without Wi-Fi. An unlock is saved on this phone first. Letting go early does nothing."
-            : "Works without Wi-Fi. Letting go early does nothing."
     }
 
 }
