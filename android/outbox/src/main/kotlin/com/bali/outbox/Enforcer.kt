@@ -1,11 +1,14 @@
 package com.bali.outbox
 
 import java.time.Instant
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -84,7 +87,7 @@ class Enforcer(
     suspend fun run() {
         engine.atEachWake { check() }
         try {
-            engine.updates.collect { call { enforce() } }
+            engine.updates.collect { pass() }
         } finally {
             alone { alarm?.cancel() }
         }
@@ -94,23 +97,50 @@ class Enforcer(
      * Rule 3's check, at each wake of the engine's read loop while the screen is on and as Bali comes to
      * the front: the lock goes back on where it should be on and isn't. Its report of the switch off, and
      * the lock back on after it, are AN7b's. Returns once its pass has run, or at once while another runs,
-     * which then runs again.
+     * which then runs again. A lock that throws, against its promise, throws here: the caller checked
+     * nothing, and the engine's read loop sends no check-in for it.
      */
     suspend fun check() = call { enforce() }
 
-    /** One pass at a time: a call made while one runs has it run again, on the newest truth. */
+    /**
+     * One pass at a time: a call made while one runs has it run again, on the newest truth. A pass the lock
+     * cuts short by throwing, against its promise, is followed all the same by the one a call made meanwhile
+     * asked for, and the last pass's failure reaches the caller.
+     */
     private suspend fun enforce() {
         if (alone { enforcing.also { again = true; enforcing = true } }) return
+        var failed: Exception? = null
         // Whether to run again, and the pass's end, are one stretch, so no call made meanwhile is lost.
         while (alone { again.also { again = false; enforcing = it } }) {
-            try {
-                apply()
-            } catch (failed: Throwable) {
-                // Cut short, by the lock breaking its promise or the app's scope ending: let go all the
-                // same, so the next call runs one.
-                alone { enforcing = false }
-                throw failed
-            }
+            failed =
+                try {
+                    apply()
+                    null
+                } catch (cancelled: CancellationException) {
+                    // The app's scope ending: let go all the same.
+                    alone { enforcing = false }
+                    throw cancelled
+                } catch (failure: Exception) {
+                    failure
+                }
+        }
+        failed?.let { throw it }
+    }
+
+    /**
+     * A pass the enforcer makes for itself, for the engine's newest truth or at the lock's end, with no
+     * caller to tell: one the lock cuts short, throwing or ending in a cancel of its own though it promises
+     * not to, ends there, never the run or the alarm, so the next pass runs, an Emergency Unlock's among
+     * them, as the engine's hooks are kept (`SyncEngine.hooked`). Its own caller's cancel still ends it.
+     */
+    private suspend fun pass() {
+        try {
+            call { enforce() }
+        } catch (cancelled: CancellationException) {
+            currentCoroutineContext().ensureActive()
+        } catch (failed: Exception) {
+            // The lock's own failure, which the next pass reads again; the claim stays what the last
+            // pass found.
         }
     }
 
@@ -136,7 +166,7 @@ class Enforcer(
                     locked = held && switch == LockSwitch.On, until = until,
                 )
             alarm?.cancel()
-            alarm = until?.let { end -> scope.launch { clock.sleep(end); call { enforce() } } }
+            alarm = until?.let { end -> scope.launch { clock.sleep(end); pass() } }
         }
     }
 

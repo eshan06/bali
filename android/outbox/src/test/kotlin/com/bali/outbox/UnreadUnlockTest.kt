@@ -183,7 +183,10 @@ class UnreadUnlockTest : EngineFiles() {
             val third = enforced(rig(open(file)), lock)
             assertEquals(unlock.eventId, third.rig.server.next(unlockRoute).eventId)
             assertEquals(unlocked, third.rig.engine.updates.value.standing)
+            // Its enforcer's pass made, over where the phone stood unlocked: no lock, and none ever put on.
+            third.until { it.checked }
             assertFalse(lock.holds)
+            assertEquals(0, lock.locks)
         }
 
     @Test

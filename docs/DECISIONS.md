@@ -70,8 +70,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
     the student's unlock takes it off (`unlockedLast`); once where the phone stood is known, it gets that
     end, or comes off. `putOn` keeps the end this run put on, where iOS's keeps a flag.
   - **A lock that throws** breaks its promise (`Lock`'s doc: a failure is the lock's own to handle, as
-    AN7c's service must): its pass ends there, its caller told, and the enforcer lets go, so the next call
-    runs one, never stuck for good (AN5c's lesson, the engine's `hooked`).
+    AN7c's service must), and still never leaves the enforcer stuck (AN5c's lesson, the engine's `hooked`;
+    santa's review): a pass it cuts short is followed by the one a call made meanwhile asked for, never
+    dropped; the last pass's failure reaches `check()`'s caller, so the engine's read loop sends no
+    check-in for a check that checked nothing; and a pass the enforcer makes for itself, for a state or at
+    the lock's end, ends there, never the run or the alarm, so an Emergency Unlock after it still takes the
+    lock off at once. The claim stays what the last pass found until the next one.
   - **Not here, as split:** the check's report, `unreported`, the grace and its recheck, and `backOn`,
     AN7b's, so `check()` only puts the lock back; and no `requestPermission`, `authorize`, marker or
     window, which have no Android twin: Android asks nothing, the student switches the service on in
@@ -92,18 +96,22 @@ a real decision? Add a dated entry at the top: what was decided and why.
   rest but `filing`, the last run's lock off once, at the press, added to the engine's half's own tests;
   BellTests' `relaunchAndCap`, its cap's half; and new: a check landing while a pass waits on the lock,
   at once, the pass running again for it; a check whose caller is cancelled, its pass going on; the end
-  moved by a re-tap, its answer and an extension; a switch starting still locking; a lock that throws;
-  the enforcer's own lock off over a standing not read; and `unlockedLast` on `SyncState`. None of this
-  step's iOS tests checks words or a screen. Tried, each failing by name, then reverted: the lock held
-  through a call into the lock (the check waited for the pass); a call made during a pass dropped; the
-  last run's lock given a tap's end over a standing not read (2); the lock put on over the switch off; the
-  enforcer's own lock kept over a standing not read; any lock taken off over one (5); the end never moved
-  (7); no pass at the end (2); the cap set outside the state's one step; `unlockedLast` never true (11),
-  and blind to the tap (2); a pass that throws never let go; the check run in its caller's coroutine; a
-  lock claimed while its switch starts; the check never hooked; a lock taken off with none held (4); and
-  the switch off never claimed (2). Each check that something doesn't happen waits for a point the rig,
-  the fake lock or a call's end marks, never a window of real time. Nothing was added to the PC's SDK:
-  its folders were compared before and after.
+  moved by a re-tap, its answer and an extension; a switch starting still locking; a lock that throws,
+  at a check, in a pass the run makes (the run going on, an Emergency Unlock after it taking the lock
+  off) and in a pass a call made meanwhile then needs; the enforcer's own lock off over a standing not
+  read; and `unlockedLast` on `SyncState`. None of this step's iOS tests checks words or a screen. Tried,
+  each failing by name, then reverted: the lock held through a call into the lock (the check waited for
+  the pass); a call made during a pass dropped; the last run's lock given a tap's end over a standing not
+  read (2); the lock put on over the switch off; the enforcer's own lock kept over a standing not read;
+  any lock taken off over one (5); the end never moved (7); no pass at the end (2); the cap set outside
+  the state's one step; `unlockedLast` never true (11), and blind to the tap (2); a pass that throws
+  never let go; the check run in its caller's coroutine; a lock claimed while its switch starts; the check
+  never hooked; a lock taken off with none held (4); the switch off never claimed (2); and, for santa's
+  fixes, the run's passes unguarded, and a pass cut short dropping the call made meanwhile. The alarm's
+  pass shares the run's guard (`pass`); no test reaches its own, a failure there reaching only the app's
+  handler. Each check that something doesn't happen waits for a point the rig, the fake lock or a call's
+  end marks, never a window of real time. Nothing was added to the PC's SDK: its folders were compared
+  before and after.
 
   **For AN7b:** `check()` is the place: its report reads the switch and the engine's state and records
   with the enforcer let go; `unreported` joins `Protection`, which a pass copies in its last stretch, so a

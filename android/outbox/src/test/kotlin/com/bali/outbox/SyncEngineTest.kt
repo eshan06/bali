@@ -422,8 +422,10 @@ class StandingKeptTest : EngineFiles() {
             assertTrue(phone.lock.holds)
             assertEquals(0, phone.lock.unlocks)
             // Read again, the file says the session still runs: its lock stays to its bell, given that end.
-            rig.outbox.keep(kept)
+            // Readable only once the read loop, woken at the cap, has found it unreadable and sleeps a
+            // minute more, or that wake, run late, reads it there (santa's review, as #510 found).
             eventually { rig.clock.deadlines.contains(at(cap + 60)) }
+            rig.outbox.keep(kept)
             rig.clock.advance(60)
             phone.until { it.until == at(cap + 600) && it.locked }
             assertEquals(at(cap + 600), phone.lock.until)

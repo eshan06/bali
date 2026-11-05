@@ -37,21 +37,25 @@ class FakeLock(private val clock: SyncClock, switch: LockSwitch = LockSwitch.On)
     private var through: Int? = null
     private var parked: CompletableDeferred<Unit>? = null
     private var failing = false
+    private var thrown = 0
 
     override suspend fun switch(): LockSwitch = synchronized(sync) { switched }
 
     override suspend fun locking(): Boolean {
         val park =
             synchronized(sync) {
-                if (failing) {
-                    failing = false
-                    throw IllegalStateException("the lock broke its promise")
-                }
                 val left = through
                 through = left?.takeIf { it > 0 }?.minus(1)
                 if (left == 0) CompletableDeferred<Unit>().also { parked = it } else null
             }
         park?.await()
+        synchronized(sync) {
+            if (failing) {
+                failing = false
+                thrown += 1
+                throw IllegalStateException("the lock broke its promise")
+            }
+        }
         return holds
     }
 
@@ -98,8 +102,11 @@ class FakeLock(private val clock: SyncClock, switch: LockSwitch = LockSwitch.On)
     /** It holds the last run's lock already: a relaunch's. */
     fun held() = synchronized(sync) { kept = true }
 
-    /** The next read of the lock throws, as the lock promises never to. */
+    /** The next read of the lock to end throws, as the lock promises never to, a held one too once released. */
     fun failNextRead() = synchronized(sync) { failing = true }
+
+    /** How many reads have thrown so. */
+    val throws: Int get() = synchronized(sync) { thrown }
 
     /** Lets [after] reads of the lock through, then holds the next until [release]: a pass of the enforcer waiting on the lock there. */
     fun hold(after: Int) = synchronized(sync) { through = after }

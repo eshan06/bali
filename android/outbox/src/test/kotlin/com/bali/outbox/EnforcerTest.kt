@@ -293,6 +293,51 @@ class EnforcerTest : EngineFiles() {
             enforcer.check()
             assertTrue(enforcer.updates.value.checked)
         }
+
+    @Test
+    fun aLockThatThrowsInAPassTheRunMakesEndsOnlyThatPassTheRunGoesOnAndAnEmergencyUnlockAfterTakesTheLockOffAtOnce(): Unit =
+        runBlocking {
+            // Santa's review: no failure of the lock's ends the run, whose next pass an unlock needs.
+            val rig = rig()
+            val phone = enforced(rig)
+            rig.tapIn()
+            phone.until { it.locked }
+            phone.lock.failNextRead()
+            // A read of the truth heard a second later changes the state: the run's pass for it meets the throw.
+            rig.clock.advance(1)
+            rig.engine.retryNow()
+            rig.server.next(meRoute).reply(200, Answer.me())
+            eventually { phone.lock.throws == 1 }
+            rig.engine.record(Change.Unlock("s", null))
+            phone.until { !it.locked && it.until == null }
+            assertFalse(phone.lock.holds)
+        }
+
+    @Test
+    fun aPassTheLockCutsShortIsFollowedAllTheSameByTheOneACallMadeMeanwhileAskedForAndOnlyTheLastPassesFailureIsTold(): Unit =
+        runBlocking {
+            // Santa's review: a call made during a pass the lock cuts short is never dropped. No run beside
+            // it, so only the checks make passes.
+            val rig = rig()
+            rig.tapIn()
+            val lock = FakeLock(rig.clock)
+            val enforcer = Enforcer(rig.engine, lock, scope, rig.clock)
+            enforcer.check()
+            // A pass held at its second read of the lock, which throws once released.
+            lock.hold(after = 1)
+            val held = async { runCatching { enforcer.check() } }
+            eventually { lock.holding }
+            lock.failNextRead()
+            // The lock gone meanwhile, and a check made, which lands at once.
+            lock.drop()
+            withTimeoutOrNull(patience) { enforcer.check() } ?: fail("the check waited for the pass held on the lock")
+            lock.release()
+            // The pass it asked for ran after the one cut short, and put the lock back: no failure told.
+            assertTrue(held.await().isSuccess)
+            assertEquals(1, lock.throws)
+            assertTrue(lock.holds)
+            assertTrue(enforcer.updates.value.locked)
+        }
 }
 
 /** The lock carries its own end, the bell's twin (ARCHITECTURE, "The bell needs no extension"): put on with it, and again as it moves. */
