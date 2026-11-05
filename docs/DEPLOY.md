@@ -217,6 +217,28 @@ console → Cognito → that user pool:
   (dev's first client did, found at the device check; the authorize request
   above passes either way, so it proves nothing about the secret).
 
+**Android's app clients — to do** (🔧 the owner's, dev first, then prod;
+`docs/PLAN-ANDROID.md`, Open owner items, 8). The Android app signs in through
+clients of its own in the same pools, made as iOS's are (steps 1–3 above):
+
+- **Type:** Mobile app: a public client, no client secret.
+- **Allowed callback URLs:** `com.bali.bali:/auth/callback`, exactly: the app
+  id's own scheme, with RFC 8252's one slash (iOS's stays `bali://auth/callback`).
+  If the console refuses it, use `com.bali.bali://auth/callback` and have a
+  session change the build and its pin test to match.
+- **Identity providers:** Cognito user pool. **OAuth grant types:** Authorization
+  code grant only (the app sends PKCE, S256).
+- **OpenID Connect scopes:** `openid`, `email`, `profile` and
+  `aws.cognito.signin.user.admin` (Delete account), Profile ticked by hand.
+- **Refresh token expiration:** 365 days.
+- **Then:** append the id to that environment's `AUTH_AUDIENCE`
+  (`<the ids there>,<Android's>`), or the API refuses Android's tokens with a
+  `401`, which signs the student out; and check the client is public with the
+  token-endpoint request above, its `client_id` and `redirect_uri`
+  (`com.bali.bali%3A%2Fauth%2Fcallback`) Android's. Dev's id then goes into
+  `android/app/build.gradle.kts`'s `BALI_COGNITO_CLIENT_ID` in a small PR (until
+  then the app says sign-in isn't set up); prod's into the release build (AP).
+
 ## TestFlight — owner action (needs App Store Connect and GitHub settings)
 
 The **TestFlight** workflow (`.github/workflows/testflight.yml`, Phase 5's P5) archives

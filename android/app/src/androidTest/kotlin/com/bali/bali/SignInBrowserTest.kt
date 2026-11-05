@@ -1,0 +1,282 @@
+package com.bali.bali
+
+import android.app.Activity
+import android.app.Instrumentation
+import android.content.Intent
+import android.os.ParcelFileDescriptor
+import android.view.ViewGroup
+import androidx.browser.auth.AuthTabIntent
+import androidx.browser.customtabs.CustomTabsClient
+import androidx.browser.customtabs.CustomTabsIntent
+import androidx.core.net.toUri
+import androidx.lifecycle.Lifecycle
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import com.bali.core.Cognito
+import com.bali.core.HttpAnswer
+import com.bali.core.HttpRequest
+import com.bali.core.HttpTransport
+import com.bali.core.SignIn
+import com.bali.core.SignInError
+import java.net.URI
+import java.util.Base64
+import java.util.concurrent.CopyOnWriteArrayList
+import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotSame
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+
+/**
+ * The hosted UI's browser on the emulator: Android 15, whose Chrome 124 has Custom Tabs but neither the
+ * Auth Tab nor ephemeral browsing, and stops at its first run (AN1), which no test goes past: a student's
+ * Back closes it, nothing is accepted. What's proven is Bali's side: the tab it asks for, the answer's way
+ * back through Android's hop from another app (the shell) as the text it was sent, the guards on it, the
+ * student's close, and a host recreated while the tab is open. A real tab and a real sign-in are the
+ * owner's device check (📱), once Android's client exists (🔧).
+ */
+@RunWith(AndroidJUnit4::class)
+class SignInBrowserTest {
+    private val instrumentation = InstrumentationRegistry.getInstrumentation()
+    private val context = instrumentation.targetContext
+    private val pages = (context.applicationContext as BaliApp).hostedUi
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    /** Every activity Bali's process asked for: the host, and the tab's intent to the browser. */
+    private val started = CopyOnWriteArrayList<Intent>()
+    private val recorder =
+        object : Instrumentation.ActivityMonitor() {
+            override fun onStartActivity(intent: Intent): Instrumentation.ActivityResult? {
+                started += Intent(intent)
+                return null
+            }
+        }
+    private val hosts = Instrumentation.ActivityMonitor(HostedUiActivity::class.java.name, null, false)
+
+    @Before
+    fun watch() {
+        instrumentation.addMonitor(recorder)
+        instrumentation.addMonitor(hosts)
+    }
+
+    @After
+    fun leave() {
+        instrumentation.removeMonitor(recorder)
+        instrumentation.removeMonitor(hosts)
+        pages.waiting()?.let(pages::forget)
+        scope.cancel()
+        // Chrome's first run, in a task of its own, closed; never accepted.
+        shell("am force-stop com.android.chrome")
+        KeystoreTokenStore(context).clear()
+    }
+
+    @Test
+    fun aCustomTabsAnswerComesBackThroughAndroidsHopFromAnotherAppAsTheTextItWasSent() {
+        val waiting = pages.start(page("s1"))
+        val sent = "com.bali.bali:/auth/callback?code=4f2e-A_b~c%2Bd+e%41&state=s1"
+        send(sent)
+        assertEquals(sent, await(waiting.answer))
+        // Taken, it brings the host back over the tab, which closes the tab: the one thing it starts.
+        assertEquals(listOf(HostedUiActivity::class.java.name), started.map { it.component?.className })
+    }
+
+    @Test
+    fun anAnswerForNoWaitingSignInIsDroppedStartingNothing() {
+        send(answer("s1"))
+        assertNull(pages.waiting())
+        assertEquals(emptyList<Intent>(), started)
+    }
+
+    @Test
+    fun anAnswerForAnotherAttemptNeitherEndsNorReplacesTheWaitingOne() {
+        val waiting = pages.start(page("s1"))
+        send(answer("s2"))
+        assertSame(waiting, pages.waiting())
+        assertFalse(waiting.answer.isCompleted)
+        assertEquals(emptyList<Intent>(), started)
+        send(answer("s1"))
+        assertEquals(answer("s1"), await(waiting.answer))
+    }
+
+    @Test
+    fun theHostOpensTheTabThePhonesBrowserOffersWithItsOwnLookAndTheStudentsBackIsAClose() {
+        val call = scope.async { runCatching { context.hostedUi(page("s1")) } }
+        val tab = tab()
+        // The browser Custom Tabs name: an Auth Tab where it has one, else a Custom Tab, ephemeral asked
+        // either way; Chrome 124 here has neither, so a Custom Tab that shares its cookies.
+        val browser = CustomTabsClient.getPackageName(context, null)
+        assertEquals(browser, tab.`package`)
+        assertEquals(page("s1").toString(), tab.dataString)
+        assertEquals(CustomTabsClient.isAuthTabSupported(context, browser!!), tab.getBooleanExtra(AuthTabIntent.EXTRA_LAUNCH_AUTH_TAB, false))
+        assertTrue(tab.hasExtra(CustomTabsIntent.EXTRA_SESSION))
+        assertTrue(tab.getBooleanExtra(CustomTabsIntent.EXTRA_ENABLE_EPHEMERAL_BROWSING, false))
+        val ours =
+            listOf(
+                CustomTabsIntent.EXTRA_TOOLBAR_COLOR, CustomTabsIntent.EXTRA_COLOR_SCHEME_PARAMS, CustomTabsIntent.EXTRA_TITLE_VISIBILITY_STATE,
+                CustomTabsIntent.EXTRA_MENU_ITEMS, CustomTabsIntent.EXTRA_ACTION_BUTTON_BUNDLE, CustomTabsIntent.EXTRA_TOOLBAR_ITEMS,
+                CustomTabsIntent.EXTRA_CLOSE_BUTTON_ICON,
+            )
+        for (extra in ours) assertFalse(extra, tab.hasExtra(extra))
+        // The host draws nothing: see-through, with no content of its own.
+        val host = host()
+        instrumentation.runOnMainSync {
+            assertEquals(0, host.findViewById<ViewGroup>(android.R.id.content).childCount)
+            val translucent = host.theme.obtainStyledAttributes(intArrayOf(android.R.attr.windowIsTranslucent))
+            assertTrue(translucent.getBoolean(0, false))
+            translucent.recycle()
+        }
+        covered(host)
+        shell("input keyevent 4")
+        assertSame(SignInError.Cancelled, await(call).exceptionOrNull())
+        assertEquals(1, started.count { it.action == Intent.ACTION_VIEW })
+    }
+
+    // A configuration changed while the tab is open, as a rotation changes it, makes the host again as it
+    // comes back (Android leaves a stopped activity as it is until then).
+    @Test
+    fun aHostMadeAgainForAChangeWhileTheTabIsOpenOpensNoOtherTabAndTheAnswerStillReachesTheCall() {
+        val call = scope.async { runCatching { context.hostedUi(page("s1")) } }
+        tab()
+        val host = host()
+        covered(host)
+        changed {
+            send(answer("s1"))
+            assertEquals(answer("s1"), await(call).getOrThrow())
+            assertNotSame(host, until { hosts.lastActivity?.takeIf { it !== host } })
+        }
+        assertEquals(1, started.count { it.action == Intent.ACTION_VIEW })
+    }
+
+    @Test
+    fun aHostMadeAgainForAChangeWhileTheTabIsOpenTakesTheStudentsBackForACloseNotATabToOpenAgain() {
+        val call = scope.async { runCatching { context.hostedUi(page("s1")) } }
+        tab()
+        val host = host()
+        covered(host)
+        changed {
+            shell("input keyevent 4")
+            assertSame(SignInError.Cancelled, await(call).exceptionOrNull())
+            assertNotSame(host, until { hosts.lastActivity?.takeIf { it !== host } })
+        }
+        assertEquals(1, started.count { it.action == Intent.ACTION_VIEW })
+    }
+
+    @Test
+    fun aLinkSentToClearBalisTaskWhileTheTabIsOpenLandsInATaskOfItsOwnAndEndsNothing() {
+        val call = scope.async { runCatching { context.hostedUi(page("s1")) } }
+        tab()
+        covered(host())
+        // FLAG_ACTIVITY_NEW_TASK | FLAG_ACTIVITY_CLEAR_TASK: what an app would send to clear the task the
+        // tab is open in, which would end the sign-in as the student's close.
+        send(answer("s2"), "-f 0x10008000")
+        send(answer("s1"))
+        assertEquals(answer("s1"), await(call).getOrThrow())
+    }
+
+    @Test
+    fun aSignInThroughTheTabIsExchangedKeptSealedAndReadBackAtARelaunch() {
+        val bodies = CopyOnWriteArrayList<String>()
+        val transport =
+            object : HttpTransport {
+                override suspend fun send(request: HttpRequest): HttpAnswer {
+                    bodies += request.body?.decodeToString().orEmpty()
+                    val access = jwt("""{"sub":"student-1","iat":1000000000,"exp":1000003600}""")
+                    val id = jwt("""{"email":"student@school.test"}""")
+                    return HttpAnswer(200, emptyMap(), """{"access_token":"$access","refresh_token":"r","id_token":"$id"}""".encodeToByteArray())
+                }
+            }
+        val cognito = Cognito(URI("https://bali.auth.test"), "the-client", URI("com.bali.bali:/auth/callback"))
+        val signIn = SignIn(cognito, KeystoreTokenStore(context), scope, transport)
+        val call = scope.async { runCatching { signIn.signIn { context.hostedUi(it) } } }
+        // The address Chrome was sent, its state the attempt's own.
+        val state = tab().dataString!!.toUri().getQueryParameter("state")
+        send("com.bali.bali:/auth/callback?code=the-code&state=$state")
+        await(call).getOrThrow()
+        assertTrue(bodies.single(), bodies.single().contains("grant_type=authorization_code&client_id=the-client&code=the-code&"))
+        runBlocking {
+            assertTrue(signIn.signedIn().first())
+            val relaunched = SignIn(cognito, KeystoreTokenStore(context), scope, transport)
+            assertEquals("student-1", relaunched.account())
+            assertEquals("student@school.test", relaunched.email())
+        }
+    }
+
+    /** The hosted UI's address for an attempt whose state is [state], as the sign-in builds one. */
+    private fun page(state: String) =
+        URI("https://bali.auth.test/oauth2/authorize?response_type=code&client_id=c&redirect_uri=com%2Ebali%2Ebali%3A%2Fauth%2Fcallback&state=$state&code_challenge=x")
+
+    private fun answer(state: String) = "com.bali.bali:/auth/callback?code=the-code&state=$state"
+
+    /**
+     * [text] sent to Bali by another app, the shell, as a browser sends a link, with [flags] for `am start`;
+     * back once the answer's activity has read it.
+     */
+    private fun send(text: String, flags: String = "") {
+        val read = instrumentation.addMonitor(SignInAnswerActivity::class.java.name, null, false)
+        try {
+            shell("am start -a android.intent.action.VIEW -c android.intent.category.BROWSABLE $flags -d $text")
+            checkNotNull(read.waitForActivityWithTimeout(PATIENCE)) { "the link never reached Bali" }
+        } finally {
+            instrumentation.removeMonitor(read)
+        }
+    }
+
+    /** The intent the host sent the browser, once it has. */
+    private fun tab(): Intent = until { started.firstOrNull { it.action == Intent.ACTION_VIEW } }
+
+    /** The host last made or brought to the front, once there is one. */
+    private fun host(): Activity = until { hosts.lastActivity }
+
+    /** Waits until the browser covers [host]: the host stopped. */
+    private fun covered(host: Activity) {
+        until { (host as HostedUiActivity).lifecycle.currentState.takeIf { it == Lifecycle.State.CREATED } }
+    }
+
+    /** Runs [block] with the phone's font scale changed, a configuration change, then puts it back as found. */
+    private fun changed(block: () -> Unit) {
+        val scale = shell("settings get system font_scale").trim()
+        shell("settings put system font_scale 1.3")
+        try {
+            block()
+        } finally {
+            shell(if (scale == "null") "settings delete system font_scale" else "settings put system font_scale $scale")
+        }
+    }
+
+    private fun <T> await(deferred: Deferred<T>): T = runBlocking { withTimeout(PATIENCE) { deferred.await() } }
+
+    /** [value]'s first answer, asked until it gives one; a test that never gets one fails, never hangs. */
+    private fun <T : Any> until(value: () -> T?): T {
+        val by = System.currentTimeMillis() + PATIENCE
+        while (System.currentTimeMillis() < by) {
+            value()?.let { return it }
+            Thread.sleep(20)
+        }
+        error("never came")
+    }
+
+    private fun shell(command: String): String =
+        ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand(command)).use { it.readBytes().decodeToString() }
+
+    /** A token whose payload is [payload], unsigned: the phone never checks the signature. */
+    private fun jwt(payload: String) = "eyJhbGciOiJSUzI1NiJ9.${Base64.getUrlEncoder().withoutPadding().encodeToString(payload.encodeToByteArray())}.signature"
+
+    private companion object {
+        val PATIENCE = 30.seconds.inWholeMilliseconds
+    }
+}

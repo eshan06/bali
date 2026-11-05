@@ -21,7 +21,22 @@ android {
         versionName = "1.0"
         // The instrumented tests (src/androidTest), on an emulator: README.md, "On the PC".
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // Where the app signs in and syncs (B4) and the portal it links (C2b), under iOS's settings' names
+        // (ios/project.yml), read through the manifest: dev's API and hosted-UI domain, production's portal,
+        // Android's redirect, and the client id empty until the owner's (docs/DEPLOY.md), sign-in not set up
+        // meanwhile. Production's come at release (AP). core's AppConfigTest pins them.
+        resValue("string", "BALI_API_URL", "https://bali-production-09a2.up.railway.app")
+        resValue("string", "BALI_COGNITO_DOMAIN", "https://bali-dev.auth.us-east-1.amazoncognito.com")
+        resValue("string", "BALI_COGNITO_CLIENT_ID", "")
+        resValue("string", "BALI_COGNITO_REDIRECT_URI", "com.bali.bali:/auth/callback")
+        resValue("string", "BALI_PORTAL_URL", "https://bali-portal.vercel.app")
     }
+
+    // The values above, which AGP makes only when asked.
+    buildFeatures.resValues = true
+
+    // The app's JVM tests (src/test) on JUnit 5, as core's and outbox's.
+    testOptions.unitTests.all { it.useJUnitPlatform() }
 
     // Java 17's bytecode, as core's and outbox's.
     compileOptions {
@@ -43,6 +58,9 @@ android {
 dependencies {
     implementation(project(":core"))
     implementation(project(":outbox"))
+    implementation(libs.androidx.browser)
+    implementation(libs.androidx.activity)
+    testImplementation(libs.kotlin.test.junit5)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.junit)
     // The outbox's file written as SQLite alone, beside Room (OutboxFileTest.kt).

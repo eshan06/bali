@@ -14,15 +14,16 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-05 (Central) — AN6b, sign-in itself (#518; `docs/DECISIONS.md`,
-2026-11-05): BaliCore's `SignIn` in Kotlin but `deleteUser`, with its tests: the sign-in over the
-browser seam, its code exchanged over the API client's OkHttp in the sign-in's own scope; the token,
-which never throws, held to the 13+ check and the deletion, a renewal's too; one renewal at a time,
-shared by every caller, the engine's refresh among them, a caller cancelled while it waits leaving it
-to the others; only Cognito's no signing anyone out; and the engine's `make` over it. Before it,
-AN6a, sign-in's parts. Next: AN6c, sign-in's app side; Android 17's SDK platform for the owner to OK
-before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's
-part 2 once the owner has the phones. Not on the pilot's critical path._
+_Last updated: 2026-11-05 (Central) — AN6c, sign-in's app side (#520; `docs/DECISIONS.md`,
+2026-11-05): the tokens sealed by a Keystore key of the app's own, a file that can never be opened
+again read as nothing saved; Cognito's hosted UI in the phone's browser, an Auth Tab where it has one,
+else a Custom Tab, ephemeral where it offers that (where not, its cookies shared: the conductor's call,
+awaiting the owner), its answer taken only for the waiting sign-in, with its state; the redirect
+`com.bali.bali:/auth/callback`; and `AppConfig`'s app side, pinned, the client id empty until the
+owner's. AN6 is done. Next: AN7, the lock; Android's Cognito clients, the owner's (Open owner items,
+8); Android 17's SDK platform for the owner to OK before the first step with today's AndroidX, and
+OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the
+pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -142,16 +143,7 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN5e** Emergency Unlock in the engine — ✅ (#510; DECISIONS 2026-11-04)
 - **AN6a** Sign-in's parts — ✅ (#515; DECISIONS 2026-11-04)
 - **AN6b** Sign-in itself — ✅ (#518; DECISIONS 2026-11-05)
-- **AN6c** Sign-in's app side (twin: `KeychainTokenStore` and C1's browser session): Cognito's
-  hosted UI in a Custom Tab, the code grant with PKCE, and the redirect back; tokens sealed by a
-  Keystore key, proven on the emulator; the sign-in kept out of a backup and of a transfer to a new
-  phone (ARCHITECTURE, "A reinstall starts signed out"); and `AppConfig`'s app side, which AN3c left
-  here: Android's build setting its values, with a test pinning its keys to both sides, as iOS's
-  pins Info.plist to `project.yml`; until the owner's client ids, the build's client id empty and
-  the app saying sign-in isn't set up, as iOS's build does. 🔧 The owner makes Android's Cognito app
-  clients on dev and prod (no secret; the scopes iOS's client has, `aws.cognito.signin.user.admin`
-  among them for Delete account) and adds their ids to `AUTH_AUDIENCE` on dev's and prod's API, or
-  the API refuses Android's tokens with a `401`, which signs the student out
+- **AN6c** Sign-in's app side — ✅ (#520; DECISIONS 2026-11-05)
 - **AN7** 📱 The lock (twin: BaliOutbox's `Enforcement`, `Bell` and `PhoneBell`): the
   Accessibility service, (a), as ARCHITECTURE's battery plan has it (listening only in a lesson,
   and then to window events, the covered app sent to the background); the system allow-list
@@ -270,6 +262,15 @@ rules); `docs/DESIGN.md` read first, its Android section from AS0; every user-fa
 7. ✅ **CodeQL and Android's Kotlin:** scanned, through CodeQL's advanced setup
    (`.github/workflows/codeql.yml`), beside GitHub Actions and JavaScript/TypeScript; default setup
    switched off by the owner (the owner, 2026-11-04: "Yes, prep it"; DECISIONS 2026-11-04).
+8. 🔧 **Android's Cognito app clients,** dev then prod, as `docs/DEPLOY.md`'s "The phone's sign-in"
+   sets them out (public, no secret; the code grant; iOS's scopes; the callback
+   `com.bali.bali:/auth/callback`; the refresh token's 365 days), each id then on that environment's
+   `AUTH_AUDIENCE`, or the API refuses Android's tokens with a `401`, which signs the student out. Dev's
+   id then goes into the build in a small PR; until then the app says sign-in isn't set up (AN6c).
+   **Before that PR, your call** on the conductor's: where the phone's browser offers no ephemeral tab
+   (Chrome before 136), the sign-in's tab shares its cookies, so while Cognito's session lasts there,
+   another app on the phone could sign in as the student without a password. Keep it, fail closed
+   (an error to draw), or end the session after each sign-in (DECISIONS 2026-11-05).
 
 ## How to update this file
 

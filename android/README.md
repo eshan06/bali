@@ -2,8 +2,8 @@
 
 The student app, the iPhone app's twin, over two modules of plain Kotlin (`docs/ARCHITECTURE.md`,
 "Android app structure"). Phase 9 builds the engine and Phase 10 the screens
-(`docs/PLAN-ANDROID.md`); until then the app is Bali's name, the outbox's file and the backup rules
-that keep it on the phone: no screen, no icon.
+(`docs/PLAN-ANDROID.md`); until then the app is Bali's name, the outbox's file, sign-in's app side and
+the backup rules that keep them on the phone: no screen, no icon.
 
 | Folder                      | What it is                                                                                                                |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
@@ -38,9 +38,12 @@ You need JDK 21 (Android Studio's own, its JBR, as `JAVA_HOME`) and Android's SD
 4. The app's instrumented tests (`app/src/androidTest`) run on one of those emulators, started as
    in 3: `./gradlew :app:connectedDebugAndroidTest` installs the app and its test app, runs them and
    uninstalls both. They show what the JVM's tests can't: that the app opens the outbox's file on
-   Android's Room, writes it through the store at FULL and settles a send's answer there. CI builds
-   them but has no emulator to run them, so a step that changes the file or its writes runs them here
-   and puts the result in its PR.
+   Android's Room, writes it through the store at FULL and settles a send's answer there; the
+   sign-in's tokens sealed by the Keystore; and the hosted UI's tab and its answer back, against the
+   emulator's own Chrome, which stops at its first run: a test closes it with Back and force-stops
+   Chrome after, never accepting its terms, and puts back the font scale it changes. CI builds them
+   but has no emulator to run them, so a step that changes what they reach runs them here and puts
+   the result in its PR.
 
 The build installs nothing: `gradle.properties` turns off the Android plugin's own installs, so a
 missing platform or build tools fails the build by name, and Gradle never downloads a JDK. A step
@@ -89,7 +92,18 @@ app's scope, which every caller waits for: one cancelled stops waiting, and it g
 others. Only Cognito refusing the refresh token signs anyone out, and no token reaches Bali's API
 before the 13+ check but the check's own read and a deletion's. The token endpoint is reached over
 the API client's OkHttp. No token, code, verifier or state reaches a log line or an error's message.
-`SyncEngine.make` is the app's engine over it. Its store and browser, the app's, are AN6c's.
+`SyncEngine.make` is the app's engine over it.
+
+**Sign-in's app side** (`app`'s `KeystoreTokenStore.kt`, `HostedUi.kt`, `HostedUiActivity.kt` and
+`BaliApp.kt`, AN6c): the tokens sealed with AES-GCM under a Keystore key of the app's own, in
+`no_backup/`, a file that can never be opened again read as nothing saved; Cognito's hosted UI in the
+phone's browser, an Auth Tab where it has one, else a Custom Tab, ephemeral where it offers that,
+hosted by an activity that draws nothing; and its answer at `com.bali.bali:/auth/callback`, a Custom
+Tab's taken only for the waiting sign-in with its state. `BaliApp` holds the app's scope, one
+transport, the build's config and the sign-in, for the engine and the screens to take. The build's
+values (`app/build.gradle.kts`, under iOS's settings' names) are string resources the manifest names
+under iOS's Info.plist keys, read into `AppConfig`; `core`'s AppConfigTest pins the three together,
+and the client id stays empty, sign-in not set up, until the owner's (`docs/DEPLOY.md`).
 
 **The outbox tables** (`core`'s `UnlockContract.kt` and `OutboxContract.kt`, BaliCore's twins) say
 what the outbox does with a record after each send; no answer ever drops an unlock the server hasn't
@@ -180,6 +194,9 @@ Lint can keep its last report after a change to the manifest alone:
   kotlinx.serialization's library follows Kotlin: each release names the Kotlin it was built with.
 - **OkHttp** stays on 5.4.0 while compileSdk is 36.1: 5.5's Android build needs compileSdk 37,
   Android 17's platform, the owner's to add (`docs/PLAN-ANDROID.md`, Open owner items, 6).
+- **androidx.browser and androidx.activity:** each the newest stable that builds on compileSdk 36.1;
+  androidx.activity is named because the sign-in's host compiles against it, the browser's own being
+  a runtime dependency.
 - **Room and KSP:** Room's runtime, compiler and Gradle plugin share one version. KSP's version is
   its own since 2.3, not Kotlin's. `androidx.sqlite`'s bundled driver may be newer than the Room it
   serves: Room names the oldest it takes.

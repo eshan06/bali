@@ -10,6 +10,17 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN6c's on 2026-11-05: _Last updated: 2026-11-05 (Central) — AN6b,
+sign-in itself (#518; `docs/DECISIONS.md`,
+2026-11-05): BaliCore's `SignIn` in Kotlin but `deleteUser`, with its tests: the sign-in over the
+browser seam, its code exchanged over the API client's OkHttp in the sign-in's own scope; the token,
+which never throws, held to the 13+ check and the deletion, a renewal's too; one renewal at a time,
+shared by every caller, the engine's refresh among them, a caller cancelled while it waits leaving it
+to the others; only Cognito's no signing anyone out; and the engine's `make` over it. Before it,
+AN6a, sign-in's parts. Next: AN6c, sign-in's app side; Android 17's SDK platform for the owner to OK
+before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's
+part 2 once the owner has the phones. Not on the pilot's critical path._
+
 _Last updated: 2026-11-05 (Central) — A3a (#517; `docs/DECISIONS.md`, 2026-11-05): the server's
 endpoint for the portal's teacher actions, `POST /v1/me/actions`: teachers only, the action's name
 from an allow-list apart from the server's own, the event built and sent to PostHog by the server,
@@ -2276,6 +2287,20 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN6c's line, as it read until it was done (2026-11-05; `docs/DECISIONS.md`, 2026-11-05). Its 🔧, the
+owner's Cognito clients, is Open owner item 8 there now.
+
+- **AN6c** Sign-in's app side (twin: `KeychainTokenStore` and C1's browser session): Cognito's
+  hosted UI in a Custom Tab, the code grant with PKCE, and the redirect back; tokens sealed by a
+  Keystore key, proven on the emulator; the sign-in kept out of a backup and of a transfer to a new
+  phone (ARCHITECTURE, "A reinstall starts signed out"); and `AppConfig`'s app side, which AN3c left
+  here: Android's build setting its values, with a test pinning its keys to both sides, as iOS's
+  pins Info.plist to `project.yml`; until the owner's client ids, the build's client id empty and
+  the app saying sign-in isn't set up, as iOS's build does. 🔧 The owner makes Android's Cognito app
+  clients on dev and prod (no secret; the scopes iOS's client has, `aws.cognito.signin.user.admin`
+  among them for Delete account) and adds their ids to `AUTH_AUDIENCE` on dev's and prod's API, or
+  the API refuses Android's tokens with a `401`, which signs the student out
 
 AN6b's line, as it read until it was done (2026-11-05; `docs/DECISIONS.md`, 2026-11-05).
 
