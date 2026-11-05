@@ -47,6 +47,9 @@ dependencies {
 tasks.test {
     useJUnitPlatform()
     testLogging.exceptionFormat = TestExceptionFormat.FULL
+    // DIAGNOSTIC (AN5c's CI crash), to come out: each test named as it starts, and a crash's report in the log.
+    testLogging.events(org.gradle.api.tasks.testing.logging.TestLogEvent.STARTED)
+    jvmArgs("-XX:OnError=cat hs_err_pid%p.log")
     val contracts = rootDir.resolve("../contracts")
     inputs.dir(contracts).withPropertyName("contracts").withPathSensitivity(PathSensitivity.RELATIVE)
     systemProperty("bali.contracts", contracts.canonicalPath)
