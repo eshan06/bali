@@ -119,6 +119,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   engine is unchanged: only a test reaches this order. iOS's twins keep it (`filedWhenTheFileReads`,
   `filedByTheNextAct`): for the owner, whether the iPhone's tests should wait so too.
 
+  **The iPhone's tests wait too (#511):** `filedWhenTheFileReads` and `filedByTheNextAct` wait for
+  that minute before the file reads, and `notKnown` clears `offFrom` and checks the guard both ways.
+
   **The proof:** `Outbox.open` and `android/app` are unchanged, so the JVM tests are the proof, and no
   emulator ran.
 
