@@ -14,16 +14,15 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-04 (Central) — AN5e, Emergency Unlock in the sync engine (#510;
-`docs/DECISIONS.md`, 2026-11-04): BaliOutbox's `SyncEngine` in Kotlin, its unlock, with its tests:
-filed under a tap not yet answered, in the phone's session, or, where it stood unread, once known
-(B6b); its send held 15 s for the reason, never past the bell; the reason sent with it while never
-sent, else a change of it, its token renewed once; the late unlock said; the lock back on returning
-where the phone stood, or past the unlock guard; when the lock is on (`shieldedUntil`); and each
-failure a type, never said as done. Before it, AN5d, the wait. AN5 is done. Next: AN6,
-sign-in; Android 17's SDK platform for the owner to OK before the first step with today's AndroidX,
-and OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the
-pilot's critical path._
+_Last updated: 2026-11-04 (Central) — AN6a, sign-in's parts (#514; `docs/DECISIONS.md`,
+2026-11-04): BaliCore's `SignIn.swift` in Kotlin from its top through `Tokens`, with its tests: the
+hosted UI's address with PKCE, its secrets from `SecureRandom`; the answer's code only at the
+redirect URI and only for its attempt, read with `java.net.URI`, a `+` kept; and the tokens' kept
+form, which reads tokens kept before a field existed, and their claims, read unverified, a token the
+phone can't read giving none. AN6 is three steps now: AN6a, AN6b (`SignIn` itself), AN6c (the app's
+side). Before it, AN5e, Emergency Unlock in the engine. Next: AN6b; Android 17's SDK platform for
+the owner to OK before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner
+items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -141,18 +140,28 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN5c** The engine's read loop — ✅ (#504; DECISIONS 2026-11-04)
 - **AN5d** The engine's wait for the Start — ✅ (#507; DECISIONS 2026-11-04)
 - **AN5e** Emergency Unlock in the engine — ✅ (#510; DECISIONS 2026-11-04)
-- **AN6** Sign-in (twin: `SignIn`, `TokenStore`): Cognito's hosted UI in a Custom Tab, the code
-  grant with PKCE; tokens sealed by a Keystore key; the refresh, Sign out, `Tokens.checked` (no
-  token to Bali's API before the 13+ check, but the check's own read and a deletion's) and the
-  deletion token; only a real `401` signs anyone out; the engine's `make` over the sign-in, its tokens
-  and refresh, a token that arrives sending everything again, with SignInEngineTests'
-  `signInSendsAtOnce`, `reauthRenews`, `refusedWaitsForSignIn` and `ownRenewalSendsAtOnce` (AN5's
-  split); and `AppConfig`'s app side, which AN3c left
+- **AN6a** Sign-in's parts — ✅ (#514; DECISIONS 2026-11-04)
+- **AN6b** Sign-in itself (twin: `SignIn` but `deleteUser`, AN9's, and `TokenStore`'s protocol),
+  JVM-tested with a fake store and a fake browser: the sign-in over the browser seam, the answer
+  handed over as text (AN6a); `accessToken`, which never throws (a throw stops the drain every run);
+  the refresh, one renewal at a time shared by every caller, two calls at once among them (the
+  engine's `renewing`, AN5e, beside the loops' reauth), never throwing; Sign out, `Tokens.checked`
+  (no token to Bali's API before the 13+ check, but the check's own read and a deletion's) and the
+  13+ yes, and the deletion token; only a real `401` signs anyone out; the signed-in stream; the
+  engine's `make` over the sign-in, its tokens and refresh, a token that arrives sending everything
+  again, with SignInEngineTests' `signInSendsAtOnce`, `reauthRenews`, `refusedWaitsForSignIn` and
+  `ownRenewalSendsAtOnce` (AN5's split); SignInTests' `exchange`, `signUp`, `unfinished` and
+  `unkept`, TokenTests' but `emailNoDefault` (AN6a's), and DeleteUserTests' `mayDelete`
+- **AN6c** Sign-in's app side (twin: `KeychainTokenStore` and C1's browser session): Cognito's
+  hosted UI in a Custom Tab, the code grant with PKCE, and the redirect back; tokens sealed by a
+  Keystore key, proven on the emulator; the sign-in kept out of a backup and of a transfer to a new
+  phone (ARCHITECTURE, "A reinstall starts signed out"); and `AppConfig`'s app side, which AN3c left
   here: Android's build setting its values, with a test pinning its keys to both sides, as iOS's
-  pins Info.plist to `project.yml`. 🔧 The owner makes Android's Cognito app clients on dev and
-  prod (no secret; the scopes iOS's client has, `aws.cognito.signin.user.admin` among them for
-  Delete account) and adds their ids to `AUTH_AUDIENCE` on dev's and prod's API, or the API
-  refuses Android's tokens with a `401`, which signs the student out
+  pins Info.plist to `project.yml`; until the owner's client ids, the build's client id empty and
+  the app saying sign-in isn't set up, as iOS's build does. 🔧 The owner makes Android's Cognito app
+  clients on dev and prod (no secret; the scopes iOS's client has, `aws.cognito.signin.user.admin`
+  among them for Delete account) and adds their ids to `AUTH_AUDIENCE` on dev's and prod's API, or
+  the API refuses Android's tokens with a `401`, which signs the student out
 - **AN7** 📱 The lock (twin: BaliOutbox's `Enforcement`, `Bell` and `PhoneBell`): the
   Accessibility service, (a), as ARCHITECTURE's battery plan has it (listening only in a lesson,
   and then to window events, the covered app sent to the background); the system allow-list
@@ -174,7 +183,8 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
   Bali when it's closed — validation: the JVM tests, then a real block on both phones, offline
 - **AN9** The account's flows (twin: `Join`, `Me`, `History`, `Age`, `Deletion`): Join with the
   consent list, Me, History, the 13+ check (C7, C7-server), Your name, and Delete account (what the
-  phone queued first, every Emergency Unlock first, then `DELETE /v1/me`, then Cognito's DeleteUser);
+  phone queued first, every Emergency Unlock first, then `DELETE /v1/me`, then Cognito's DeleteUser,
+  `SignIn`'s `deleteUser`, with DeleteUserTests but `mayDelete`, AN6's split);
   with SyncEngine.swift's calls for them (`lookUp`, `history`, `ageCheck`, `join`, `rename`, `leave`,
   `unlockUnsent`, `forgetMe`, `deleteAccount`, the 13+ yes at each wake) and their suites:
   JoinEngineTests, LeaveEngineTests, MeEngineTests, HistoryEngineTests, AgeFallbackTests,

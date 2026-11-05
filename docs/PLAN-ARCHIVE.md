@@ -10,6 +10,18 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN6a's on 2026-11-04: _Last updated: 2026-11-04 (Central) —
+AN5e, Emergency Unlock in the sync engine (#510;
+`docs/DECISIONS.md`, 2026-11-04): BaliOutbox's `SyncEngine` in Kotlin, its unlock, with its tests:
+filed under a tap not yet answered, in the phone's session, or, where it stood unread, once known
+(B6b); its send held 15 s for the reason, never past the bell; the reason sent with it while never
+sent, else a change of it, its token renewed once; the late unlock said; the lock back on returning
+where the phone stood, or past the unlock guard; when the lock is on (`shieldedUntil`); and each
+failure a type, never said as done. Before it, AN5d, the wait. AN5 is done. Next: AN6,
+sign-in; Android 17's SDK platform for the owner to OK before the first step with today's AndroidX,
+and OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the
+pilot's critical path._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN5e's on 2026-11-04: _Last updated: 2026-11-04 (Central) —
 AN5d, the sync engine's wait for the Start (#507; `docs/DECISIONS.md`, 2026-11-04): BaliOutbox's
 `SyncEngine` in Kotlin, its wait, with its tests: an arming's wait and its end, the next midnight in
@@ -2223,6 +2235,19 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN6a's line, as it read until it was done (2026-11-04; `docs/DECISIONS.md`, 2026-11-04). The
+conductor split AN6's line into AN6a, AN6b and AN6c that day, every word of it kept in one of them:
+AN6a's here, AN6b's and AN6c's in `docs/PLAN-ANDROID.md`.
+
+- **AN6a** Sign-in's parts (twin: `SignIn.swift` from its top through `Tokens`): Cognito's hosted
+  UI's address, the code grant with PKCE (`Cognito`'s `authorizeURL`, `code(from:for:)` and
+  `endpoint`, `HostedPage`, `Attempt`, `random`, `base64url` and `form`), the answer's code,
+  `SignInError`, and the tokens' kept form and claims (`lifetime`, `subject`, `email`,
+  `deleteEndpoint`), in `core` beside `AppConfig.kt`, whose `Cognito` (AN3c) gains them; with the
+  tests that need no `SignIn`: SignInTests' `challenge`, `redirect`, `fresh`, `authorize` and
+  `callback`, TokenTests' `emailNoDefault`, and the claims TokenTests and DeleteUserTests read
+  through `SignIn`
 
 AN5e's line, as it read until it was done (2026-11-04; `docs/DECISIONS.md`, 2026-11-04).
 

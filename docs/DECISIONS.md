@@ -8,6 +8,73 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-04** — **AN6a, sign-in's parts: BaliCore's `SignIn.swift` in Kotlin, from its top
+  through `Tokens` (the conductor's calls, awaiting the owner's look; AN6a, #514).** The owner isn't
+  reviewing each step and asked for the recommended option on every question, so each call here is
+  the conductor's, for the owner to look at.
+
+  **AN6 in three PRs** (the conductor): AN6a, sign-in's parts; AN6b, `SignIn` itself but
+  `deleteUser`, AN9's, with `TokenStore`'s protocol, the refresh's one shared renewal and the
+  engine's `make`, JVM-tested with a fake store and a fake browser; AN6c, the app's side: the
+  Keystore-sealed store, proven on the emulator, the Custom Tab and the redirect back, the sign-in
+  kept out of a backup and a transfer, and `AppConfig`'s app side with its pin test. Each one PR
+  under ~400 lines (`docs/PLAN-ANDROID.md`).
+
+  **Where it lives:** `core`'s `SignIn.kt`: `Cognito`, moved from `AppConfig.kt` to sit with its
+  sign-in as in iOS's file, with `authorizeUrl`, `code` and `endpoint`; `HostedPage`; `Attempt`;
+  `random`, `base64url` and `form`; `SignInError`; `Tokens`, its kept form and its claims; and,
+  since `SignIn` is AN6b's, iOS's `SignIn.deleteScope` as `DELETE_SCOPE` and `SignIn.margin` as
+  `Tokens.MARGIN`. Where Kotlin differs, said plainly:
+  - **The secrets are `SecureRandom`'s,** never `kotlin.random`, as iOS takes CryptoKit's: 32 bytes
+    for the verifier, 43 characters, 16 for the state, 22. The challenge is `MessageDigest`'s
+    SHA-256, then `java.util.Base64`'s base64url without padding (Android 10 has both).
+  - **The answer is text, read with `java.net.URI`,** where iOS takes a `URL`: OkHttp's `HttpUrl`
+    reads only http and https, and Android hands the redirect back as its own `Uri`, which `core`
+    can't name, so the browser seam (AN6b, AN6c) passes it as text and an answer `java.net.URI` can't
+    read is refused here, where the JVM tests reach it. The answer without its query, its fragment
+    kept, must equal the redirect URI exactly, and its first `state` the attempt's; an `error` is a
+    refusal with Cognito's word, never a code. Each value is percent-decoded after the query is
+    split, a `+` kept, as `URLComponents` reads it (`URLDecoder` makes it a space), and an escape
+    that makes no UTF-8 is no value. Said plainly: an answer with a raw space, which iOS 17's `URL`
+    escapes and reads, is refused here; Cognito sends none, and a browser escapes one.
+  - **`SignInError` is a sealed exception,** its cases data objects and data classes, so the
+    browser seam can throw it as Swift's typed throws do; no case carries a token, code, verifier or
+    state, and its words are AN10's.
+  - **`Tokens`' kept form is Android's own:** JSON through `BaliJson`, a key for each field, `until`
+    as the wire's ISO time to the millisecond, where iOS's Codable writes seconds since 2001. A field
+    with none is left out, and one left out reads as none, so tokens kept before a field existed
+    still read, as iOS's optionals do: `deleted`, `checked` and `yes` stay nullable for that. Tokens
+    it can't read are none: the student signs in again.
+  - **No field has a default** (#159's review): `Tokens`' constructors ask for every field, the
+    email among them, and `copy` carries what the tokens had. iOS's `emailNoDefault` reads
+    `Tokens.init`'s source; here the test reads what was built: Kotlin compiles a constructor with a
+    default into a twin taking a `DefaultConstructorMarker`, and no constructor may take one.
+  - **The claims are read unverified,** as iOS reads them: the payload's JSON object, `iat` and `exp`
+    only as JSON numbers, `sub`, `email`, `scope` and `iss` only as strings. A token the phone can't
+    read gives none, never a crash. The lifetime is to the millisecond and held within what a
+    `Duration` holds, so `until` is always a time the kept form writes and reads back. No
+    `toString` shows a token, code, verifier, state or the email: `Attempt` is no data class, and
+    `Tokens`' leaves out both tokens and the email.
+
+  **The tests:** SignInTests' `challenge`, `redirect`, `fresh`, `authorize` and `callback`;
+  TokenTests' `emailNoDefault`; and the claims TokenTests' `given`, `account`, `email` and
+  `unreadable` and DeleteUserTests' `mayDelete` read through `SignIn`, here read directly. iOS's
+  `redirect` checks the app reads the redirect URI without an actor's hop, which Kotlin has none of,
+  so here it checks the scheme, host and path the app's browser catches the answer by. New: the
+  answer read as `URLComponents` reads it (a `+`, escapes after the split, the first of a name, an
+  empty error, a fragment, a case, a broken escape, a space); the lifetime's ends; the kept form, its
+  keys, read back, read without a later field and unreadable; and no secret in a `toString`. **For
+  AN6b:** SignInTests' `exchange`, `signUp`, `unfinished` and `unkept`, TokenTests' other
+  twenty-three, DeleteUserTests' `mayDelete` and SignInEngineTests' four, on its line; the store's
+  form is `Tokens.kept` and `Tokens.from`, and a refresh moves `until` past through `copy`, as iOS's
+  sets `distantPast`. **For AN9:** `deleteUser`, with DeleteUserTests but `mayDelete`.
+
+  Tried, each failing by name, then reverted: the email given a default; the state check dropped;
+  a `+` read as a space; the query decoded before its split; the fragment dropped; the answer's
+  error ignored; the issuer's host matched in part; no margin; `Tokens`' `toString` the data
+  class's; and a claim's failed read let out. Nothing was added to the PC's SDK: its folders were
+  compared before and after.
+
 - **2026-11-04** — **AN5e, Emergency Unlock in the sync engine: BaliOutbox's `SyncEngine` in Kotlin,
   its unlock (the conductor's calls, awaiting the owner's look; AN5e, #510).** The owner isn't
   reviewing each step and asked for the recommended option on every question, so each call here is

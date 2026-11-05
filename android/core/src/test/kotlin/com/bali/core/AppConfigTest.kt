@@ -8,7 +8,7 @@ import kotlin.test.assertNull
 
 /**
  * The app's config, read: AppConfigTests.swift's `reads`. Its `agree`, which pins the keys to where
- * the build sets them, comes with Android's side, sign-in's (AN6).
+ * the build sets them, comes with Android's side, sign-in's (AN6c).
  */
 class AppConfigTest {
     private val values =

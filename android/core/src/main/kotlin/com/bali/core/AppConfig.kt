@@ -8,7 +8,7 @@ import java.net.URISyntaxException
  * public values, no secret. Read here rather than in the app, so a test can pin these keys to
  * where the build sets them (#84's review), as BaliCore's pins iOS's Info.plist to `project.yml`:
  * a key misspelt on either side would otherwise build green and only say "not set up" on a phone.
- * Android's build sets them with sign-in (AN6). BaliCore's `AppConfig`.
+ * Android's build sets them with sign-in's app side (AN6c). BaliCore's `AppConfig`.
  */
 data class AppConfig(val api: URI, val cognito: Cognito, val portal: URI) {
     /** The keys, iOS's Info.plist keys, [key] each one's spelling. */
@@ -51,12 +51,3 @@ data class AppConfig(val api: URI, val cognito: Cognito, val portal: URI) {
         }
     }
 }
-
-/** The app's own client of Cognito's hosted UI, BaliCore's `Cognito`. Signing in through it is AN6's. */
-data class Cognito(
-    /** The hosted UI: `https://<prefix>.auth.<region>.amazoncognito.com`. */
-    val domain: URI,
-    val clientId: String,
-    /** Where the hosted UI sends its answer. */
-    val redirectUri: URI,
-)
