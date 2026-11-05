@@ -97,15 +97,17 @@ object Answer {
     val gone = """{"status":"gone","state":null,"session":null}"""
 
     /**
-     * `GET /v1/me`'s answer: the live session [view] in [state] (none: none), and [classes], each as
-     * [inClass] writes one.
+     * `GET /v1/me`'s answer: the live session [view] in [state] (none: none), [classes], each as [inClass]
+     * writes one, and whether a tap of the student's waits for a Start, [armed] (none: an older API's,
+     * which says nothing of one).
      */
-    fun me(view: SessionView? = session(), state: String = "focused", classes: List<String> = emptyList()): String {
+    fun me(view: SessionView? = session(), state: String = "focused", classes: List<String> = emptyList(), armed: Boolean? = null): String {
         val live =
             view?.let {
                 BaliJson.encodeToString(MeResponse.Session.serializer(), MeResponse.Session(it.id, it.classId, it.endsAt, OrUnknown.Unknown(state)))
             }
-        return """{"user":{"id":"u","role":"student","displayName":null},"classes":[${classes.joinToString(",")}],"session":$live}"""
+        val waits = armed?.let { ""","armed":$it""" }.orEmpty()
+        return """{"user":{"id":"u","role":"student","displayName":null},"classes":[${classes.joinToString(",")}],"session":$live$waits}"""
     }
 
     /** Class [id] as `GET /v1/me` names it, with its teacher. */

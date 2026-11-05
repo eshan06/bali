@@ -162,8 +162,25 @@ class SyncEngineTest : EngineFiles() {
         }
 }
 
-/** The engine keeps its standing: StandingKeptTests, AN5a's to AN5c's parts (`docs/PLAN-ANDROID.md`). */
+/** The engine keeps its standing: StandingKeptTests, AN5a's to AN5d's parts (`docs/PLAN-ANDROID.md`). */
 class StandingKeptTest : EngineFiles() {
+    @Test
+    fun theStandingIsKeptInTheFileAsItChangesWaitingTooAndAStateThisBuildDoesntKnowKeptAsNone(): Unit =
+        runBlocking {
+            // StandingKeptTests' `kept`.
+            val rig = rig()
+            assertEquals(Standing.Out, rig.outbox.standing())
+            rig.engine.record(Change.Tap("tag"))
+            rig.server.next(tapRoute).reply(200, Answer.armed)
+            rig.until { it.standing == Standing.Waiting }
+            assertEquals(Standing.Waiting, rig.outbox.standing())
+            rig.tapIn()
+            assertEquals(inSession(ParticipationState.Focused), rig.outbox.standing())
+            // In a session the screen coming on checks in, and its answer names a state this build doesn't know.
+            rig.screenOn(live = Answer.live(session(endsAt = 4000), state = "on_a_break"))
+            assertEquals(Standing.InSession(session(endsAt = 4000), null), rig.outbox.standing())
+        }
+
     @Test
     fun thePhonesOwnChangeAndTheStandingItLeavesAreKeptInOneWriteKilledAtAnyMomentAfterAnEmergencyUnlockARelaunchNeverLocksOverIt(): Unit =
         runBlocking {
@@ -292,6 +309,49 @@ class StandingKeptTest : EngineFiles() {
             rig.screenOn(Answer.me(null))
             assertEquals(Standing.Out, rig.engine.updates.value.standing)
             assertEquals(Standing.Out, rig.outbox.standing())
+        }
+
+    @Test
+    fun overAStandingNotReadATapAnsweredArmedAsksTheServerWhereThePhoneStandsArmingEndsNothing(): Unit =
+        runBlocking {
+            // The lock's half, its cover never taken off meanwhile, is AN7's.
+            val (rig, _) = unreadable()
+            rig.engine.record(Change.Tap("another teacher's"))
+            rig.server.next(tapRoute).reply(200, Answer.armed)
+            assertEquals(Standing.Unread, rig.until { it.queued.isEmpty() }.standing)
+            rig.server.next(meRoute).reply(200, Answer.me(session(endsAt = 1200)))
+            rig.until { it.standing == Standing.InSession(session(endsAt = 1200), ParticipationState.Focused) }
+            // Known now, the standing carries the truth itself, as it would have without the gap: a read
+            // naming no session later leaves the phone out.
+            rig.clock.advance(1)
+            rig.engine.retryNow()
+            rig.server.next(meRoute).reply(200, Answer.me(null))
+            rig.until { it.standing == Standing.Out }
+        }
+
+    @Test
+    fun overAStandingNotReadATapAnsweredArmedLeavesThePhoneWaitingWhenTheReadOfTheTruthItAsksForNamesNoSession(): Unit =
+        runBlocking {
+            val (rig, _) = unreadable()
+            rig.engine.record(Change.Tap("tag"))
+            rig.server.next(tapRoute).reply(200, Answer.armed)
+            rig.server.next(meRoute).reply(200, Answer.me(null))
+            assertEquals(Standing.Waiting, rig.until { it.standing != Standing.Unread }.standing)
+            assertEquals(Standing.Waiting, rig.outbox.standing())
+        }
+
+    @Test
+    fun andWhenTheFileGivesBackWhereThePhoneStoodBeforeThatReadComesTheArmingIsCarriedOntoItOutBecomesWaiting(): Unit =
+        runBlocking {
+            val (rig, _) = unreadable()
+            rig.engine.record(Change.Tap("tag"))
+            val tap = rig.server.next(tapRoute)
+            // Readable again: the phone was in no session.
+            rig.outbox.keep(Standing.Out)
+            tap.reply(200, Answer.armed)
+            rig.server.next(meRoute).reply(200, Answer.me(null))
+            rig.until { it.standing == Standing.Waiting }
+            assertEquals(Standing.Waiting, rig.outbox.standing())
         }
 
     @Test

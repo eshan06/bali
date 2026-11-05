@@ -8,6 +8,87 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-04** — **AN5d, the sync engine's wait for the Start: BaliOutbox's `SyncEngine` in Kotlin,
+  its wait (the conductor's calls, awaiting the owner's look; AN5d, #507).** The owner isn't
+  reviewing each step and asked for the recommended option on every question, so each call here is
+  the conductor's, for the owner to look at.
+
+  **Where it lives:** `outbox`'s `SyncEngine.kt`: `armed`, reset in `update` whenever the standing is
+  known, as iOS's `didSet` resets it; `answered`'s arming; `readStanding`'s arming carried onto the
+  file's out; `standing(me)`'s wait; the read loop's end of the wait and its reads while waiting, at
+  the top of the pass (`wake`), beside the read out of a session in a class; and `load`'s read of the
+  kept end. `SyncState.kt`: `waitEnds`, and `SyncState.waitEnds(armedAt, zone)`. The outbox kept the
+  end already (`Outbox.waitEnds`, `keepWaitEnds`, AN4d). Where Kotlin differs, said plainly:
+  - **The zone is the engine's clock's** (`SyncClock.zone`, the conductor's call): the phone's,
+    `ZoneId.systemDefault()`, asked at each arming where iOS asks `Calendar.current`, so a phone taken
+    to another zone ends its next wait at that zone's midnight; a test's own in tests (Central, never
+    the machine's). The clock already stands for the phone's time in every test, as java.time's own
+    `Clock` carries a zone, so no other seam was added. The midnight is java.time's
+    (`LocalDate.atStartOfDay`): a day the clocks change ends at the zone's next midnight, 23 or 25
+    hours on, never 24. java.time is in Android 10's API, and the API check holds.
+  - **The reads while waiting follow the screen,** as AN5c's check-ins do: a read of the truth at each
+    wake while the screen is on, where iOS reads at each wake in the foreground; nothing as it goes
+    off, or while it is off. The end of the wait applies at a wake too, so a screen coming on past it
+    ends the wait at once, the truth read with it.
+  - **A write of the end the file refuses is shown after the answer's step, never before it,** as
+    AN5c's guard: the end is kept before the step, as iOS keeps it (so a relaunch never finds the wait
+    without it), and its refusal shown once the step is done. iOS shows it before it copies the
+    state, which then carries it; Android's step copies nothing it read before.
+  - **`load`'s read of the end isn't shown when it fails,** as iOS's `try?`, and as `load`'s reads of
+    the report and the last tap: a wait whose end isn't known waits until a read ends it.
+
+  **Known, as on iOS (PLAN.md's Phase 3 known edges): a failed save of the wait's end isn't
+  retried.** The refusal is shown and the new end kept in memory, but a relaunch reads the end the file
+  last kept, the day before's say, and ends the wait at its first wake: the phone stands out of a
+  session until a read finds the Start, at each wake while the screen is on in a class, and as it
+  comes on.
+
+  **The tests:** AnswerTests' `armed`; ReadTests' `waitingStays`; ClassesTests' `waitingReads`,
+  `armedPastTheBell` and `overIsNoStart`; StandingKeptTests' `kept`, `unreadArmed`, `unreadArmedOut`
+  and `unreadArmedFileBack`; and the engine's half of DroppedWaitTests' seven and WaitingHomeTests'
+  `startFromHome`: which screen shows is AN10's, and the lock to the session's end (`shieldedUntil`)
+  AN5e's. New: the end on the day the clocks go back (`waitEnds`'s own test has it beside iOS's
+  spring day), and, through the engine, on that day in Chicago, then a phone taken to New York ending
+  its next wait at New York's midnight, in the state and in the file; and an arming answered while a
+  later change awaits its own answer, which begins no wait and keeps no end (iOS's rule, which no iOS
+  test reaches). The rig: `TestClock`'s zone and `travel`, `Rig.arm`, and `Answer.me`'s `armed`.
+
+  **Found in AN5c's tests:** the screen going off rings a wake that no deadline marks, so a test that
+  reads the server for nothing sent can read it before that wake sends anything. ClassesTests'
+  `outReads` passed with the read out of a session in a class made with the screen off too; its check,
+  and `waitingReads`', now give that wake 100 ms in real time first, and fail on that read.
+
+  Tried, each failing by name, then reverted: `armed` never reset, never set, and not carried onto the
+  file's out; a read never leaving the phone waiting, deaf to its `armed: false`, and taking a session
+  over by the phone's clock for the Start; no end at a wake, and one a second late; no reads while
+  waiting, and reads with the screen off; the end never kept, never read at launch, never in the
+  state, its refusal never shown, and iOS's order, shown, then hidden by a step copied before it; the
+  machine's zone in place of the clock's; the day's start plus 24 hours; an arming ending a session
+  still running, and keeping one past its bell; an unread arming asking the server nothing, and
+  waiting at once; and an arming applied over a later change. Nothing was added to the PC's SDK: its
+  folders were compared before and after.
+
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini
+  CLI on this PC, so context isolation holds and model diversity doesn't): 0 blockers. Their WARNs,
+  both left: the 100 ms the screen-off checks wait is a window in real time, not a point the read
+  loop marks, so on a loaded machine a broken rule's read could come after it, while the code as it is
+  never fails it (a mark of the loop's pass would be a hook for tests alone); and, on both phones, an
+  arming made where the phone stood unread is carried only onto an out the file gives back, so a file
+  come back readable with a session past its bell drops it: the phone stands in that session over,
+  then out once its check-in finds it gone, not waiting, until a read finds the Start. Display only,
+  since neither out nor waiting locks anything; iOS's `readStanding` does the same, so a fix would be
+  both phones', and its reach is doubtful (a file unreadable at launch, then readable again while a
+  tap waits): left as iOS has it, the conductor's call, the owner's to decide for both.
+
+  **For AN5e:** the arming works now, so RefiledTests' scans can be answered armed. `answered`'s step
+  takes `waits` between `lands` and a drop: the unlock recorded and a late one said why join the
+  `lands` case, as iOS's join its session's. iOS's `emergencyUnlock` gives none while waiting, and
+  `shieldedUntil` locks nothing for the wait itself, only for a tap not yet answered. AN5c's note for
+  AN5e (`keepsUnlocked`'s focused shortcut) and AN5b's (the drain's no-token path) stand.
+
+  **The proof:** `Outbox.open` and `android/app` are unchanged, so the JVM tests are the proof, and no
+  emulator ran.
+
 - **2026-11-04** — **AN5c, the sync engine's read loop: BaliOutbox's `SyncEngine` in Kotlin, its reads
   (the conductor's calls, awaiting the owner's look; AN5c, #504).** The owner isn't reviewing each
   step and asked for the recommended option on every question, so each call here is the conductor's,

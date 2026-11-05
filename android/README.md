@@ -126,10 +126,14 @@ every 30 s while it is on and one as it comes on or goes off, out of a session t
 comes on instead, rule 3's check before each, then nothing while it is off. A read applies only as
 the reconcile allows, and never puts the lock back on over an Emergency Unlock the server hasn't
 recorded. A 401 asks the sign-in for a fresh token once per rejection, one refresh at a time, which
-both loops wait on. Its tests run on a rig of their own (`EngineSupport.kt`, BaliOutbox's
-`EngineSupport.swift`): a clock the test moves, since coroutines-test's virtual time can't drive
-Room's queries, a server answered by hand, and the bundled driver watched, which sees each commit as
-GRDB's `TransactionObserver` does, and can refuse a statement as a failing disk would.
+both loops wait on. Its wait for the Start (AN5d): a tap answered armed waits until the next
+midnight in the zone the phone is in as it arms, by java.time's calendar, so a day the clocks change
+is 23 or 25 hours long; the end is kept in the file for a relaunch, the truth is read at each wake
+while the screen is on, and offline the wait ends at the first wake past its end. Its tests run on
+a rig of their own (`EngineSupport.kt`, BaliOutbox's `EngineSupport.swift`): a clock the test moves,
+in a zone of the test's own, since coroutines-test's virtual time can't drive Room's queries, a
+server answered by hand, and the bundled driver watched, which sees each commit as GRDB's
+`TransactionObserver` does, and can refuse a statement as a failing disk would.
 
 ## Android Lint
 

@@ -4,9 +4,10 @@ import com.bali.core.ApiErrorReason
 import com.bali.core.MeResponse
 import com.bali.core.SendResult
 import java.time.Instant
+import java.time.ZoneId
 
-// What the sync engine knows, SyncEngine.swift's `SyncState`: its core, AN5a's, and the read loop's,
-// AN5c's. Each later AN5 step adds the fields its own rules keep (docs/PLAN-ANDROID.md).
+// What the sync engine knows, SyncEngine.swift's `SyncState`: its core, AN5a's, the read loop's, AN5c's,
+// and the wait's, AN5d's. Each later AN5 step adds the fields its own rules keep (docs/PLAN-ANDROID.md).
 
 /**
  * What the engine knows, for the screens and the lock ([SyncEngine.updates]). A value, as Swift's
@@ -64,6 +65,12 @@ data class SyncState(
      * (L8c: a lesson refused is followed again once a later read lists its session).
      */
     val meReads: Int = 0,
+    /**
+     * When the wait for the teacher's Start ends by the phone's own clock, offline too (#166): the end of
+     * the day its tap was last answered armed ([waitEnds]'s), kept in the outbox's file for a relaunch;
+     * none when not known (the file keeps none it can read), a wait only a read ends.
+     */
+    val waitEnds: Instant? = null,
 ) {
     /** Whether the student is in any class, as [me] says: none until a read answers (C3). */
     val hasClasses: Boolean? get() = me?.let { it.classes.isNotEmpty() }
@@ -73,6 +80,17 @@ data class SyncState(
 
     /** Whether an unlock made where the phone stood unread waits to be filed (B6b). */
     internal val holdsUnfiled: Boolean get() = queued.any { it.change.isUnfiled }
+
+    companion object {
+        /**
+         * Where a wait armed at [armedAt] ends: the midnight after it in [zone], the phone's, the school's
+         * in class, as the server drops an armed tap at the end of its school day, in the school's zone
+         * (decision 5; Hosting, decision 5). By the zone's own calendar, so a day the clocks change is 23
+         * hours or 25, never 24.
+         */
+        fun waitEnds(armedAt: Instant, zone: ZoneId): Instant =
+            armedAt.atZone(zone).toLocalDate().plusDays(1).atStartOfDay(zone).toInstant()
+    }
 }
 
 /** How the last exchange went. */

@@ -17,6 +17,7 @@ import java.io.File
 import java.io.IOException
 import java.time.Duration
 import java.time.Instant
+import java.time.ZoneId
 import java.time.format.DateTimeFormatterBuilder
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -52,11 +53,11 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-// The engine's test rig, BaliOutbox's EngineSupport.swift: a clock the test moves, a server it answers
-// by hand, B4's stand-in for the tokens, and an engine running over them. coroutines-test's virtual
-// time can't stand in for the clock: Room's queries run outside its scheduler. The rig's `screenOn` is
-// iOS's `foreground`, the check-ins following the screen (AN5c), and `Answer`'s engine answers come
-// with the tests that send them.
+// The engine's test rig, BaliOutbox's EngineSupport.swift: a clock the test moves, in a zone of the
+// test's own, a server it answers by hand, B4's stand-in for the tokens, and an engine running over
+// them. coroutines-test's virtual time can't stand in for the clock: Room's queries run outside its
+// scheduler. The rig's `screenOn` is iOS's `foreground`, the check-ins following the screen (AN5c), and
+// `Answer`'s engine answers come with the tests that send them.
 
 /** The routes the engine's tests answer, as [Server.Exchange.route] names them: BaliOutbox's tests' own. */
 val tapRoute = "POST /v1/taps"
@@ -86,12 +87,16 @@ suspend fun eventually(condition: suspend () -> Boolean) {
     fail("never came true")
 }
 
-/** A clock that moves only when the test moves it: BaliOutbox's tests' `TestClock`. */
-class TestClock(start: Instant = t0) : SyncClock {
+/** The tests' own zone, never the machine's: the school's, Central, as the pilot's at Vanderbilt is. */
+val central: ZoneId = ZoneId.of("America/Chicago")
+
+/** A clock that moves only when the test moves it, in a zone the test sets: BaliOutbox's tests' `TestClock`. */
+class TestClock(start: Instant = t0, zone: ZoneId = central) : SyncClock {
     private class Sleeper(val deadline: Instant, val wake: CancellableContinuation<Unit>)
 
     private val lock = Any()
     private var current = start
+    private var here = zone
 
     /** How long the phone has run: time passing moves it, a change of the clock doesn't. */
     private var running = Duration.ZERO
@@ -103,6 +108,11 @@ class TestClock(start: Instant = t0) : SyncClock {
     override fun now(): Instant = synchronized(lock) { current }
 
     override fun uptime(): Duration = synchronized(lock) { running }
+
+    override fun zone(): ZoneId = synchronized(lock) { here }
+
+    /** The phone taken to another zone, [to]: the time, and how long it has run, unchanged. */
+    fun travel(to: ZoneId) = synchronized(lock) { here = to }
 
     /** The deadlines slept on now, soonest first. */
     val deadlines: List<Instant> get() = synchronized(lock) { sleepers.map { it.deadline }.sorted() }
@@ -290,6 +300,13 @@ class Rig(val engine: SyncEngine, val outbox: Outbox, val server: Server, val cl
         engine.record(Change.Tap("tag"))
         server.next(tapRoute).reply(200, Answer.joined(view))
         until { it.standing == Standing.InSession(view, ParticipationState.Focused) && it.queued.isEmpty() }
+    }
+
+    /** A tap answered armed at the clock's time: the phone waits for the Start. BaliOutbox's tests' `armed`. */
+    suspend fun arm() {
+        engine.record(Change.Tap("tag"))
+        server.next(tapRoute).reply(200, Answer.armed)
+        until { it.standing == Standing.Waiting && it.queued.isEmpty() }
     }
 
     /**

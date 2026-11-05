@@ -14,16 +14,16 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-04 (Central) — AN5c, the sync engine's read loop (#504; `docs/DECISIONS.md`,
-2026-11-04): BaliOutbox's `SyncEngine` in Kotlin, its reads, with their tests: a check-in every 30 s
-while the screen is on and one as it comes on or goes off, out of a session the truth read as it
-comes on, rule 3's check before each; each read applied only as the reconcile says; the unlock guard
-on every read and answer, a failed read of it shown after the step it guards; a 401's refresh, once
-per rejection, shared by both loops; a refused change shown; protection off reported again; and
-`me`, its failure and its reads. Bali's own screen going behind sends a held unlock at once. Before
-it, AN5b, the drain. Next: AN5d, the wait for the Start; Android 17's SDK platform for the owner to
-OK before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's
-part 2 once the owner has the phones. Not on the pilot's critical path._
+_Last updated: 2026-11-04 (Central) — AN5d, the sync engine's wait for the Start (#507;
+`docs/DECISIONS.md`, 2026-11-04): BaliOutbox's `SyncEngine` in Kotlin, its wait, with its tests: an
+arming's wait and its end, the next midnight in the zone the phone is in as it arms, a day the
+clocks change 23 or 25 hours long, kept for a relaunch, a write the file refuses shown after the
+step; the wait ended at a wake once past it, offline too, or by a read saying no tap waits; the
+truth read at each wake while the screen is on; a session over by the phone's clock never the
+Start; and an arming made where the phone stood unread carried until it is known. Before it, AN5c,
+the read loop. Next: AN5e, Emergency Unlock in the engine; Android 17's SDK platform for the owner
+to OK before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6);
+AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -139,13 +139,7 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN5a** The sync engine's frame — ✅ (#499; DECISIONS 2026-11-04)
 - **AN5b** The engine's drain — ✅ (#501; DECISIONS 2026-11-04)
 - **AN5c** The engine's read loop — ✅ (#504; DECISIONS 2026-11-04)
-- **AN5d** The engine's wait for the Start (#166; twin: `SyncEngine`'s `armed` and
-  `SyncState.waitEnds`): an arming's wait, kept for a relaunch, and its end at the end of the day by
-  the phone's clock, a `ZoneId`'s; and the reads while waiting. Tests: AnswerTests' `armed`;
-  ReadTests' `waitingStays`; ClassesTests' `waitingReads`, `armedPastTheBell` and `overIsNoStart`;
-  StandingKeptTests' `kept`, `unreadArmed`, `unreadArmedOut` and `unreadArmedFileBack`; and the
-  engine's half of DroppedWaitTests' seven and WaitingHomeTests' `startFromHome` (their screens'
-  checks are AN10's)
+- **AN5d** The engine's wait for the Start — ✅ (#507; DECISIONS 2026-11-04)
 - **AN5e** Emergency Unlock in the engine (twin: `SyncEngine`'s `emergencyUnlock`, `pressUnlock`,
   `explain` and `backToFocus`): where it is filed (under a tap not answered, in its session, or not
   yet: B6b), its reason, held 15 s for it (`reasonHold`), and the late unlock (`Superseded`,
