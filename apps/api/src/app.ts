@@ -176,7 +176,8 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
       : 'analytics is off: POSTHOG_KEY is unset',
   );
   const analytics = createAnalytics(posthog, deps.db, app.log, { fetch: deps.posthogFetch, clock });
-  // Hooks close last-registered first, so a sweep in flight at the close has ended by now.
+  // The close runs its hooks last-registered first: Fastify's own (every request answered) and the
+  // sweep's (its run waited out, `startSweeping`) before this, so it waits out each send they began.
   app.addHook('onClose', () => analytics.settled());
   registerSessionsRoute(app, deps.db, clock, notifyClassStarted, analytics);
   // Said once, at start, as push says it; the deck routes read it.

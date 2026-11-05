@@ -78,7 +78,11 @@ function build(env: Env): FastifyInstance {
   });
   const posthogFetch = ((url: string | URL | Request, init?: RequestInit) => {
     posted.push({ url: String(url), body: JSON.parse(String(init?.body)) as Posted['body'] });
-    return answer();
+    // As the real fetch does, a send stops at its signal's abort: its timeout.
+    return new Promise<Response>((resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(init.signal?.reason as Error));
+      answer().then(resolve, reject);
+    });
   }) as typeof fetch;
   return buildApp(env, {
     db,

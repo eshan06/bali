@@ -18,7 +18,10 @@ export const DEFAULT_POSTHOG_HOST = 'https://us.i.posthog.com';
 export const POSTHOG_TIMEOUT_MS = 5_000;
 
 export type SessionEvent = 'session_started' | 'session_ended' | 'session_extended';
-/** Who ended a session: its teacher's End, its bell (the sweep, or a Start or disposal past it), the owner's command. */
+/**
+ * Who ended a session: its teacher's End; its bell (the sweep, or a Start or a disposal past it);
+ * or the owner's command (`npm run school`'s end-session, or a disposal ending it while it ran).
+ */
 export type EndedBy = 'teacher' | 'bell' | 'owner';
 
 /** What a server event's properties may hold: these, and nothing else. */
@@ -131,9 +134,12 @@ export function createAnalytics(
     if (!read) throw new Error(`session ${sessionId} vanished before it was counted`);
     const { session, teacherId, enrolled } = read;
     const until = session.endedAt ?? now;
-    const at = { session_started: session.startedAt, session_ended: until, session_extended: now }[
-      event
-    ];
+    const stamps = {
+      session_started: session.startedAt,
+      session_ended: until,
+      session_extended: now,
+    };
+    const at = stamps[event];
     const report = counted(session, await getSessionEvents(db, sessionId), until);
     return {
       api_key: config.key,
@@ -172,8 +178,9 @@ export function createAnalytics(
     }
     // Nothing in its answer is read, so its connection goes back at once.
     void response.body?.cancel().catch(() => undefined);
-    if (!response.ok)
+    if (!response.ok) {
       log.warn({ event, sessionId, status: response.status }, 'analytics event refused');
+    }
   };
 
   return {
