@@ -28,13 +28,10 @@ data class Area(val left: Int, val top: Int, val right: Int, val bottom: Int) {
 enum class WindowKind {
     /** An app's own window: covered where its app is blocked, and sent home where it fills the screen. */
     App,
-
     /** One drawn over others, System UI's or another app's, as Android lists both: covered where its app is blocked, never sent home. */
     Drawn,
-
     /** The keyboard, or a kind the lock doesn't know: never covered, and kept clear. */
     Kept,
-
     /** An accessibility overlay (the covers among them), or split screen's divider, whose touch reaches into the halves: neither. */
     Passed,
 }
@@ -42,8 +39,12 @@ enum class WindowKind {
 /** A window on the screen, as Android lists it to the lock's service: never its contents. */
 data class OnScreen(val id: Int, val kind: WindowKind, val bounds: Area, val pictureInPicture: Boolean = false)
 
-/** A cover over [window], at [area]; [home]: its app fills the screen, so goes to the background once the cover lands (Q5). */
-data class Covering(val window: Int, val area: Area, val home: Boolean)
+/**
+ * A cover over [window], at [area]. [home]: its app fills the screen, so goes to the background once the cover lands (Q5).
+ * [held]: it takes the touches meant for the window; a picture-in-picture window's go through to System UI, which moves,
+ * closes or opens it, so its cover never stays stuck over the dialer or any app the student opens next.
+ */
+data class Covering(val window: Int, val area: Area, val home: Boolean, val held: Boolean)
 
 /**
  * Which windows the lock covers (decision 2): each window an app the allow-list doesn't hold has named as its own, by the
@@ -51,10 +52,9 @@ data class Covering(val window: Int, val area: Area, val home: Boolean)
  * lock's end is ahead by the phone's clock; none once it has passed, nothing woken for it (ARCHITECTURE, "The bell needs
  * no extension"). Never Bali's own, nor a window no event has named: one already on screen as the lock came on stays bare
  * until it changes or the student touches it, since no window's contents is read (the battery plan). A cover hides only
- * its own window, kept clear of each one above it not covered itself (the shade, a notification, the keyboard, an allowed
- * app's), so nothing is covered while the shade fills the screen. A full-screen app goes home once its cover lands
- * (DECISIONS 2026-11-05, Q5); a split-screen half or a picture-in-picture window stays covered. Names last only while a
- * lock holds: the lock keeps no list of the apps a student opens. The service's, on its thread.
+ * its own window, kept clear of each one above it not covered itself (the shade, a notification, the keyboard), so nothing
+ * is covered under the full shade. A full-screen app goes home once its cover lands (DECISIONS 2026-11-05, Q5); a
+ * split-screen half or a picture-in-picture window stays covered. Names last only while a lock holds.
  */
 class Cover(private val mine: String) {
     private val names = HashMap<Int, String>()
@@ -83,7 +83,7 @@ class Cover(private val mine: String) {
                 continue
             }
             val clear = above.fold<Area, Area?>(area) { left, kept -> left?.clearOf(kept) } ?: continue
-            covers += Covering(window.id, clear, window.kind == WindowKind.App && !window.pictureInPicture && area == safe)
+            covers += Covering(window.id, clear, window.kind == WindowKind.App && !window.pictureInPicture && area == safe, !window.pictureInPicture)
         }
         return covers
     }

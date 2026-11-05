@@ -42,7 +42,7 @@ class CoverTest {
     fun aBlockedAppNamedByItsWindowsOwnStateEventIsCoveredWithinTheSafeAreaAndFillingTheScreenIsSentHome() {
         val covers = named(21 to CONTACTS).over(STATUS_BAR, OnScreen(21, WindowKind.App, SCREEN))
         // The status bar and the gesture bar stay the student's: the cover is the safe area, never the whole screen.
-        assertEquals(listOf(Covering(21, SAFE, home = true)), covers)
+        assertEquals(listOf(Covering(21, SAFE, home = true, held = true)), covers)
     }
 
     @Test
@@ -54,7 +54,7 @@ class CoverTest {
         assertNull(rule.app(21))
         // Its own event names it: covered at once.
         rule.named(21, CONTACTS)
-        assertEquals(listOf(Covering(21, SAFE, home = true)), rule.over(window))
+        assertEquals(listOf(Covering(21, SAFE, home = true, held = true)), rule.over(window))
     }
 
     @Test
@@ -70,20 +70,21 @@ class CoverTest {
         // Messages above, a blocked app below: the lower half alone, at its place within the safe area, its app left there.
         val beside = named(18 to MESSAGES, 21 to CONTACTS)
         val split = arrayOf(STATUS_BAR, DIVIDER, OnScreen(18, WindowKind.App, TOP), OnScreen(21, WindowKind.App, BOTTOM))
-        assertEquals(listOf(Covering(21, Area(0, 1213, 1080, 2337), home = false)), beside.over(*split))
+        assertEquals(listOf(Covering(21, Area(0, 1213, 1080, 2337), home = false, held = true)), beside.over(*split))
         // Both halves blocked: each covered at its own place, the divider's handle between them left bare.
         val both = named(18 to VIDEO, 21 to CONTACTS)
         assertEquals(
-            listOf(Covering(18, Area(0, 136, 1080, 1187), home = false), Covering(21, Area(0, 1213, 1080, 2337), home = false)),
+            listOf(Covering(18, Area(0, 136, 1080, 1187), home = false, held = true), Covering(21, Area(0, 1213, 1080, 2337), home = false, held = true)),
             both.over(*split),
         )
     }
 
     @Test
-    fun aPictureInPictureWindowIsCoveredAtItsSmallPlaceNeverSentHomeAndTheAllowedAppUnderItIsNot() {
+    fun aPictureInPictureWindowIsCoveredAtItsSmallPlaceItsTouchesLeftToSystemUiNeverSentHomeAndTheAllowedAppUnderItIsNot() {
+        // Its cover holds no touch, so System UI still moves, closes or opens it: never stuck over the dialer under it.
         val small = Area(440, 1495, 1038, 1831)
         val covers = named(27 to VIDEO, 18 to MESSAGES).over(STATUS_BAR, OnScreen(27, WindowKind.App, small, pictureInPicture = true), OnScreen(18, WindowKind.App, SCREEN))
-        assertEquals(listOf(Covering(27, small, home = false)), covers)
+        assertEquals(listOf(Covering(27, small, home = false, held = false)), covers)
     }
 
     @Test
@@ -95,7 +96,7 @@ class CoverTest {
         // Nor sent home under it: no cover lands.
         assertEquals(emptyList(), named(10 to SYSTEM_UI, 21 to CONTACTS).over(shade, OnScreen(21, WindowKind.App, SCREEN)))
         // Closed again, the app is covered again.
-        assertEquals(listOf(Covering(21, Area(0, 1213, 1080, 2337), home = false)), named(21 to CONTACTS).over(STATUS_BAR, app))
+        assertEquals(listOf(Covering(21, Area(0, 1213, 1080, 2337), home = false, held = true)), named(21 to CONTACTS).over(STATUS_BAR, app))
     }
 
     @Test
@@ -103,14 +104,14 @@ class CoverTest {
         // A notification over a blocked upper half: its answer and its words stay the student's, the cover below it.
         val notification = OnScreen(10, WindowKind.Drawn, Area(42, 0, 1038, 375))
         val upper = named(10 to SYSTEM_UI, 18 to VIDEO).over(notification, STATUS_BAR, OnScreen(18, WindowKind.App, TOP))
-        assertEquals(listOf(Covering(18, Area(0, 375, 1080, 1187), home = false)), upper)
+        assertEquals(listOf(Covering(18, Area(0, 375, 1080, 1187), home = false, held = true)), upper)
         // The keyboard, risen for Messages above, over a blocked lower half: the cover stops where the keyboard starts.
         val keyboard = OnScreen(14, WindowKind.Kept, Area(0, 1517, 1080, 2400))
         val lower = named(18 to MESSAGES, 21 to CONTACTS).over(keyboard, STATUS_BAR, OnScreen(18, WindowKind.App, TOP), OnScreen(21, WindowKind.App, BOTTOM))
-        assertEquals(listOf(Covering(21, Area(0, 1213, 1080, 1517), home = false)), lower)
+        assertEquals(listOf(Covering(21, Area(0, 1213, 1080, 1517), home = false, held = true)), lower)
         // Over a full-screen app, its app is sent home all the same, as the window fills the screen.
         val full = named(21 to CONTACTS).over(keyboard, STATUS_BAR, OnScreen(21, WindowKind.App, SCREEN))
-        assertEquals(listOf(Covering(21, Area(0, 136, 1080, 1517), home = true)), full)
+        assertEquals(listOf(Covering(21, Area(0, 136, 1080, 1517), home = true, held = true)), full)
     }
 
     @Test
@@ -121,21 +122,21 @@ class CoverTest {
     @Test
     fun aWindowABlockedAppDrawsOverOthersIsCoveredButNeverSentHomeWhichMovesNoSuchWindow() {
         val covers = named(30 to VIDEO, 18 to "com.android.settings").over(OnScreen(30, WindowKind.Drawn, SCREEN), OnScreen(18, WindowKind.App, SCREEN))
-        assertEquals(listOf(Covering(30, SAFE, home = false)), covers)
+        assertEquals(listOf(Covering(30, SAFE, home = false, held = true)), covers)
     }
 
     @Test
     fun theCoversAndOtherOverlaysAreNeitherCoveredNorKeptClear() {
         val cover = OnScreen(40, WindowKind.Passed, Area(0, 1213, 1080, 2337))
         val covers = named(40 to BALI, 21 to CONTACTS).over(cover, STATUS_BAR, OnScreen(21, WindowKind.App, BOTTOM))
-        assertEquals(listOf(Covering(21, Area(0, 1213, 1080, 2337), home = false)), covers)
+        assertEquals(listOf(Covering(21, Area(0, 1213, 1080, 2337), home = false, held = true)), covers)
     }
 
     @Test
     fun aBlockedWindowUnderAnotherIsCoveredWholeTheOneAboveCoveredTooAndOnlyTheFullScreenOneSentHome() {
         val dialog = Area(100, 900, 980, 1500)
         val covers = named(25 to CONTACTS, 21 to CONTACTS).over(OnScreen(25, WindowKind.App, dialog), STATUS_BAR, OnScreen(21, WindowKind.App, SCREEN))
-        assertEquals(listOf(Covering(25, dialog, home = false), Covering(21, SAFE, home = true)), covers)
+        assertEquals(listOf(Covering(25, dialog, home = false, held = true), Covering(21, SAFE, home = true, held = true)), covers)
     }
 
     @Test
@@ -153,16 +154,16 @@ class CoverTest {
             assertNull(rule.app(21))
             assertEquals(emptyList(), rule.over(window))
             rule.named(21, CONTACTS)
-            assertEquals(listOf(Covering(21, SAFE, home = true)), rule.over(window))
+            assertEquals(listOf(Covering(21, SAFE, home = true, held = true)), rule.over(window))
         }
         // A second before it, still covered.
-        assertEquals(listOf(Covering(21, SAFE, home = true)), named(21 to CONTACTS).over(window, until = now.plusSeconds(1)))
+        assertEquals(listOf(Covering(21, SAFE, home = true, held = true)), named(21 to CONTACTS).over(window, until = now.plusSeconds(1)))
     }
 
     @Test
     fun theLastRunsLockWhichHasNoEndOfItsOwnCoversAsAnyOtherAndForgetDropsEveryName() {
         val rule = named(21 to CONTACTS)
-        assertEquals(listOf(Covering(21, SAFE, home = true)), rule.over(OnScreen(21, WindowKind.App, SCREEN), until = Instant.MAX))
+        assertEquals(listOf(Covering(21, SAFE, home = true, held = true)), rule.over(OnScreen(21, WindowKind.App, SCREEN), until = Instant.MAX))
         rule.forget()
         assertNull(rule.app(21))
     }

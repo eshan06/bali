@@ -45,24 +45,40 @@ a real decision? Add a dated entry at the top: what was decided and why.
     Never sent home, which moves no such window.
   - **Sent home** (Q5): a full-screen app, once its cover lands (its first frame drawn), once per cover,
     and never once the cover has gone with its window, so a student who has moved on is never sent home
-    from there; a split half or a picture-in-picture window stays covered.
+    from there; a split half or a picture-in-picture window stays covered. Opened full screen again from
+    its picture-in-picture menu, an app is covered afresh and sent home again, the menu over it having
+    taken its cover away.
+  - **A picture-in-picture window's cover holds no touch** (santa's blocker, below): its touches go through
+    to System UI, which moves, closes or opens the window, so it is never stuck, covered, over the dialer or
+    any app the student opens next. A split half's cover holds its touches, so no blocked half is used
+    blind.
   - **Names last only while a lock holds** (the conductor's call): decision 2's "keeps and sends none of
     it", so no list of the apps a student opens outlives the lock. Within it a window that comes back keeps
     its name, so a warm return is covered as it appears, before its own event.
   - **The lock's end passes with no event:** the service makes its covers again at the end on its own
     thread, which the lock holds already (no alarm, no wake lock), beside the enforcer's pass there; a
     phone asleep through it uncovers as the screen comes back. The last run's lock has no end of its own.
-  - **The allow-list:** the split's parts, asked of Android: the dialer and SMS roles, the emergency dialer
-    and the emergency call, Telecom, Settings with its permission and uninstall screens, the home screen
-    (the one chosen, or each offered where none is), the enabled keyboards, System UI, and Bali. Two more,
-    the conductor's: **the system's own dialogs and choosers** (`android`), and **the system's in-call
-    screens** (an `InCallService` flagged as Telecom's in-call UI, from a system app), so a maker's in-call
-    screen apart from its dialer, the Samsung's (AN1), is found before AN7f checks it. **Found on the
-    emulator:** Android names the SMS role's holder only to an app that can see it, so Messages would have
-    been covered without its `<queries>` entry; the test caught it.
-  - **Plain in Debug** (Q1): no words, no buttons, the iPhone shield's background (`#F7F5F2`), taking every
-    touch so the app under it gets none, a touch outside it going to the windows it doesn't cover. The
-    63-px strip of a covered app under the gesture bar shows, as AN1 saw.
+  - **The allow-list,** asked of Android as a lock comes on and kept while it holds (a default changed in
+    Settings mid-lesson counts from the next lock). **The parts the student chooses, whoever holds them**
+    (decision 2): the dialer and SMS roles, the home screen chosen, and the enabled keyboards. **The parts
+    asked by what they do, held only where a system app holds them** (santa's review: any app could
+    otherwise declare Settings' or the call's action and escape the lock): the emergency dialers, both
+    Android's old action and `DIAL_EMERGENCY`, which on the Android 17 image the Pixel's Safety app holds
+    too; the emergency call; emergency information and SOS (`EMERGENCY_ASSISTANCE`, the Safety app there);
+    Telecom; the system's in-call screens (an `InCallService` flagged as Telecom's in-call UI), so a maker's
+    in-call screen apart from its dialer, the Samsung's (AN1), is found before AN7f checks it; emergency
+    alerts (the cell broadcast receiver, so an alert's dialog is never hidden); Settings and its
+    Accessibility, permission and uninstall screens (a maker's Accessibility settings may be a package of
+    their own); the system's chooser (`com.android.intentresolver` from Android 14); and every home screen
+    offered where none is chosen. And System UI, the system's own dialogs (`android`) and Bali, by hand.
+    The emergency ones and the chooser go beyond the split's list: the conductor's calls, on santa's
+    findings. **Found on the emulator:** Android names the SMS role's holder only to an app that can see
+    it, so Messages would have been covered without its `<queries>` entry; the test caught it.
+  - **Plain in Debug** (Q1): no words, no buttons, the iPhone shield's background (`#F7F5F2`), a touch
+    outside it going to the windows it doesn't cover. The 63-px strip of a covered app under the gesture bar
+    shows, as AN1 saw. On Android 10, which measures no insets outside a window, the safe area is the part
+    an app's window fills, so a full-screen app there is sent home too (santa's review; untested, ISSUES #6
+    gap 10).
 
   **What the emulators showed** (Android 15, 16 and 17, each cold-booted): launch to cover, Contacts from
   Home three times, the first cold, on an emulator past its boot, against AN1's medians of 570, 507 and
@@ -76,33 +92,51 @@ a real decision? Add a dated entry at the top: what was decided and why.
 
   **The tests,** on `Bali_Spike_API35`, `36` and `37`, the whole instrumented suite, 47 of 47 on each
   (`CoversTest`'s 5 new, on the emulator's own windows): a blocked system app (Contacts) covered and sent
-  home once, the cover gone with its window, timed; Settings, the dialer, the emergency dialer, Messages, a
-  call's in-call screen (to the emulator's own pretend network, its call log put back), the launcher and
-  the readout never covered, none sent home; split screen beside the readout, the blocked half covered
-  where it is within the safe area, the readout bare, never sent home, the keyboard kept clear, nothing
-  covered under the shade, and Emergency Unlock lifting it; a full-screen app sent home into
-  picture-in-picture, covered where it is and followed as it moves; and a lock ending 15 s on, with no
-  enforcer, losing its cover at its end with no event. The covers are read from the service and seen in
-  the screen's pixels (`screencap`), never in a `uiautomator dump`. The blocked app is a system app or the
-  tests' own stand-in (`StandIn.java`, Java since it runs in the test app's own process, which carries no
-  Kotlin). On the JVM, `CoverTest`'s 15. Tried, each failing by name, then reverted: Bali's own windows
-  covered; an unnamed window covered (3); no window above kept clear (2); a picture-in-picture window sent
-  home; names kept past the end; the overlays and the divider kept clear (2); covered at the end's very
-  moment; a window drawn over others sent home; the keyboard covered; and, on the emulator, no app sent
-  home (4) and no cover made again at the end. **AN6c's race closed** (its own commit): SignInBrowserTest's
+  home once, the cover gone with its window, timed; Settings, its Accessibility settings, Bali's uninstall
+  screen (asked, never confirmed), the dialer, the emergency dialer, Messages, a call's in-call screen (to
+  the emulator's own pretend network, its call log put back), the launcher and the readout never covered,
+  none sent home; split screen beside the readout, the blocked half covered where it is within the safe
+  area, the readout bare, never sent home, the keyboard kept clear, nothing covered under the shade, and
+  Emergency Unlock lifting it; a full-screen app sent home into picture-in-picture, covered where it is,
+  dragged by the student through its cover and followed, then opened full screen from its menu and sent
+  home again; and a lock ending 15 s on, with no enforcer, losing its cover at its end with no event. The
+  covers are read from the service and seen in the screen's pixels (`screencap`), never in a `uiautomator
+  dump`. The blocked app is a system app or the tests' own stand-in (`StandIn.java`, Java since it runs in
+  the test app's own process, which carries no Kotlin). On the JVM, `CoverTest`'s 15. Tried, each failing
+  by name, then reverted: Bali's own windows covered; an unnamed window covered (3); no window above kept
+  clear (2); a picture-in-picture window sent home; names kept past the end; the overlays and the divider
+  kept clear (2); covered at the end's very moment; a window drawn over others sent home; the keyboard
+  covered; and, on the emulator, no app sent home (4), no cover made again at the end, and a
+  picture-in-picture cover holding its touches (the drag). A home sent again for a window come back full
+  screen under the cover it kept was tried and dropped: nothing reached it, the menu or the transition
+  taking the cover away first. **AN6c's race closed** (its own commit): SignInBrowserTest's
   Back over a font-scale change now waits for the input dispatcher to send keys to Chrome's new window,
   Chrome making its window again for the change (AN7d's "no input channel"); no assertion loosened.
   Nothing was added to the PC's SDK: its folders were compared before and after.
 
   **For AN7f:** the phone tests' AN7 section (`docs/ANDROID-PHONE-TESTS.md`): the Samsung's in-call screen,
   a permission prompt, sound playing on, launch to cover on hardware, a window on screen as the lock comes
-  on, and Advanced Protection through Settings. **For AS5:** the block screen as the cover's content, its
-  OK going home and Open Bali opening Bali; and TalkBack, since an accessibility overlay doesn't take the
-  windows under it out of Android's list of windows, so TalkBack can still reach a covered split half or
-  picture-in-picture window. **For Phase 10:** the service and these `<queries>` declared in the release
-  manifest, with AS0's words.
+  on, Bali switched off and its removal asked in Settings, emergency alerts and the Safety app (SOS never
+  triggered), a contact opened from the Phone app (another app's screen in the dialer's task would take
+  the dialer home with it), and Advanced Protection through Settings. **For AS5:** the block screen as the
+  cover's content, its OK going home and Open Bali opening Bali; and TalkBack, since an accessibility
+  overlay doesn't take the windows under it out of Android's list of windows, so TalkBack can still reach
+  a covered split half or picture-in-picture window. **For Phase 10:** the service and these `<queries>`
+  declared in the release manifest, with AS0's words.
 
-  **Santa's review:** SANTA.
+  **Santa's review:** two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so
+  context isolation holds and model diversity doesn't). Round 1, one blocker, from reviewer A, fixed: a
+  picture-in-picture window's cover held every touch, so a covered window could never be moved or closed
+  and sat over the dialer's keys and every app opened next (the cover now lets them through to System UI,
+  and the emulator test drags it, failing by name first). Its WARNs, each taken but one: the Safety app's
+  emergency dialer (`DIAL_EMERGENCY`, confirmed on the Android 17 image), emergency information and SOS,
+  emergency alerts, a maker's Accessibility settings and the chooser, now on the allow-list; any app
+  declaring an asked part's action allowed, now only system apps; a window back full screen from
+  picture-in-picture sent home again (pinned by the test, as above); Android 10's safe area; and the
+  uninstall and Accessibility screens untested (now tested; the permission screen can't be opened from the
+  shell). Left for AN7f: a whole task sent home, the dialer's contact card among them. Reviewer B, no
+  blocker: Android checks an event's package against its sender, so no app can name its window as another
+  (no change); the allow-list is kept while a lock holds (said above). Round 2: ROUND2.
 
 - **2026-11-05** — **WC8, the Android canvas's Words board recounted, and the WC job done (the
   owner's job of 2026-11-04; WC8, #530).** The iPhone made the owner's Android cuts in WC1–WC7

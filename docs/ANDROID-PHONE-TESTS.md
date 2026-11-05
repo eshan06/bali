@@ -212,6 +212,15 @@ lock a typed tap in the readout, as above:
   in-call screen (`com.samsung.android.incallui`) above all, which the allow-list should find as the
   system's in-call screen. The emergency dialer opened from the lock screen and from the power menu,
   never dialled: never covered.
+- **Switching Bali off, and removing it.** *Start:* in a class, focused, the screen on, Airplane mode off,
+  the service on. Bali's switch in Accessibility settings (on the Samsung, its own Accessibility pages),
+  and Bali's uninstall asked and never confirmed: never covered, never sent home (ISSUES #7).
+- **Emergency alerts and the Safety app.** *Start:* in a class, focused, the screen on, Airplane mode off,
+  the service on. An emergency alert's test message, where the phone offers one, and the Safety app's
+  emergency information, opened, SOS never triggered: never covered.
+- **A contact opened from the Phone app.** *Start:* in a class, focused, the screen on, Airplane mode off,
+  the service on. Phone, then a contact: whether the contact's screen is another app's, covered and sent
+  home with the Phone app's own task under it.
 - **A permission prompt.** *Start:* in a class, focused, the screen on, Airplane mode off, the service on,
   a blocked app never opened. Opened: what shows behind its prompt, and the cover once the prompt is
   answered (ISSUES #6, gap 6).

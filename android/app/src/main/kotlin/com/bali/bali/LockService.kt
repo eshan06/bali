@@ -130,21 +130,19 @@ class LockService : AccessibilityService() {
         when (type) {
             AccessibilityWindowInfo.TYPE_APPLICATION -> WindowKind.App
             AccessibilityWindowInfo.TYPE_SYSTEM -> WindowKind.Drawn
-            AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY,
-            AccessibilityWindowInfo.TYPE_MAGNIFICATION_OVERLAY,
-            AccessibilityWindowInfo.TYPE_SPLIT_SCREEN_DIVIDER,
-            -> WindowKind.Passed
+            AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY, AccessibilityWindowInfo.TYPE_MAGNIFICATION_OVERLAY, AccessibilityWindowInfo.TYPE_SPLIT_SCREEN_DIVIDER -> WindowKind.Passed
             else -> WindowKind.Kept
         }
 
     /**
      * The screen but its system bars and its cutout, so the status bar and the gesture bar stay the student's. Android 10
-     * measures no insets outside a window: all of it there (its own way, deprecated since), the bars' windows kept clear.
+     * measures no insets outside a window: there, the part an app's window fills (its own way, deprecated since), the status
+     * bar's window kept clear as any other.
      */
     private fun safe(): Area {
         val manager = getSystemService(WindowManager::class.java)
         @Suppress("DEPRECATION")
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return Point().also { manager.defaultDisplay.getRealSize(it) }.run { Area(0, 0, x, y) }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return Point().also { manager.defaultDisplay.getSize(it) }.run { Area(0, 0, x, y) }
         val metrics = manager.currentWindowMetrics
         val bars = metrics.windowInsets.getInsetsIgnoringVisibility(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
         return metrics.bounds.run { Area(left + bars.left, top + bars.top, right - bars.right, bottom - bars.bottom) }

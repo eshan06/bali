@@ -147,12 +147,13 @@ fails is held (`BaliApp.startFailed`) for a screen to say, never swallowed.
 holds, the service names each window from that window's own state event, never its contents, and covers
 each window of an app the allow-list doesn't hold where it is, within the screen but its bars, with a
 plain overlay of Bali's own, AS5's block screen its content in Phase 10. A full-screen app is sent home
-once its cover lands; a split half and a picture-in-picture window stay covered. A cover keeps clear of
-every window above its own that isn't covered (the shade, a notification, the keyboard), and the covers
-go at the lock's end with no event. The allow-list is asked of Android as a lock comes on, through the
-`<queries>` beside the service in the Debug manifest. A window no event has named is never covered, so one
-already on screen as the lock comes on stays bare until it changes or the student touches it
-(`docs/ISSUES.md` #6).
+once its cover lands; a split half and a picture-in-picture window stay covered, the latter's touches
+going through to System UI, which still moves or closes it. A cover keeps clear of every window above its
+own that isn't covered (the shade, a notification, the keyboard), and the covers go at the lock's end with
+no event. The allow-list is asked of Android as a lock comes on, through the `<queries>` beside the service
+in the Debug manifest: the parts the student chooses whoever holds them, the parts asked by what they do
+only where a system app holds them. A window no event has named is never covered, so one already on screen
+as the lock comes on stays bare until it changes or the student touches it (`docs/ISSUES.md` #6).
 
 **The outbox tables** (`core`'s `UnlockContract.kt` and `OutboxContract.kt`, BaliCore's twins) say
 what the outbox does with a record after each send; no answer ever drops an unlock the server hasn't

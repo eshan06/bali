@@ -22,7 +22,7 @@ internal class Covers(private val service: AccessibilityService) {
     private val up = HashMap<Int, Plain>()
 
     /** Where each cover up is, by the window it covers. */
-    val shown: Map<Int, Area> get() = up.mapValues { it.value.area }
+    val shown: Map<Int, Area> get() = up.mapValues { it.value.want.area }
 
     /** The last cover to land, the window it covers and when (`System.nanoTime`); and how many apps went home: the tests' to read. */
     @Volatile var landed: Pair<Int, Long>? = null
@@ -31,14 +31,14 @@ internal class Covers(private val service: AccessibilityService) {
     @Volatile var homes = 0
         private set
 
-    /** Covers each window [wanted] at its place, every other cover taken away. */
+    /** Covers each window [wanted] as it says, every other cover taken away. */
     fun show(wanted: List<Covering>) {
         val kept = wanted.associateBy { it.window }
         for (window in up.keys - kept.keys) up.remove(window)?.let { tried { windows.removeViewImmediate(it) } }
         for (want in wanted) {
-            val cover = up[want.window] ?: Plain(want.window, want.area).takeIf { tried { windows.addView(it, params(want.area)) } }?.also { up[want.window] = it } ?: continue
-            if (cover.area != want.area && tried { windows.updateViewLayout(cover, params(want.area)) }) cover.area = want.area
-            cover.home = want.home
+            val cover = up[want.window] ?: Plain(want).takeIf { tried { windows.addView(it, params(want)) } }?.also { up[want.window] = it } ?: continue
+            if (cover.want.copy(home = want.home) != want && !tried { windows.updateViewLayout(cover, params(want)) }) continue
+            cover.want = want
             cover.goHome()
         }
     }
@@ -52,28 +52,27 @@ internal class Covers(private val service: AccessibilityService) {
             false
         }
 
-    /** A cover's window at [area]: an accessibility overlay, never the keyboard's, a touch outside it left to the windows under it. */
-    private fun params(area: Area) =
+    /** A cover's window: an accessibility overlay, never the keyboard's, a touch outside it, or on it where it holds none, going under. */
+    private fun params(want: Covering) =
         WindowManager.LayoutParams(
-            area.width,
-            area.height,
+            want.area.width,
+            want.area.height,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                if (want.held) 0 else WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
             PixelFormat.OPAQUE,
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = area.left
-            y = area.top
+            x = want.area.left
+            y = want.area.top
             title = TITLE
             // At its place exactly, whatever the system bars ask of a window.
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) fitInsetsTypes = 0
         }
 
-    /** One cover: plain, and taking every touch, so the app under it gets none. */
-    private inner class Plain(val window: Int, var area: Area) : View(service) {
-        /** Whether its app fills the screen, so goes home once the cover lands. */
-        var home = false
+    /** One cover: plain, and taking every touch it holds, so the app under it gets none. */
+    private inner class Plain(var want: Covering) : View(service) {
         private var drawn = false
         private var sent = false
 
@@ -86,14 +85,14 @@ internal class Covers(private val service: AccessibilityService) {
             super.onDraw(canvas)
             if (drawn) return
             drawn = true
-            landed = window to System.nanoTime()
+            landed = want.window to System.nanoTime()
             // Once this frame is drawn, not inside it.
             post(::goHome)
         }
 
         /** Sends its app home, once, as the cover lands or as the app comes to fill the screen after; never once the cover has gone with its window. */
         fun goHome() {
-            if (!drawn || !home || sent || !isAttachedToWindow) return
+            if (!drawn || !want.home || sent || !isAttachedToWindow) return
             sent = true
             homes += 1
             service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME)

@@ -14,6 +14,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.accessibility.AccessibilityWindowInfo
 import android.widget.ScrollView
+import androidx.core.net.toUri
 import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -132,21 +133,28 @@ class CoversTest {
     }
 
     @Test
-    fun callingForHelpTheStudentsPhoneAndMessagesSettingsTheLauncherAndBalisOwnScreenAreNeverCovered() {
+    fun callingForHelpThePhoneAndMessagesSettingsWithBalisSwitchAndUninstallTheLauncherAndBalisOwnScreenAreNeverCovered() {
         locked()
         val homes = covers { it.homes }
         val dialer = checkNotNull(context.getSystemService(TelecomManager::class.java).defaultDialerPackage)
 
-        /** [open]ed under the lock: its window, once its own state event has named it [app], never covered. */
-        fun never(app: String, open: () -> Unit, besides: Set<Int> = emptySet()): Int {
+        /** [open]ed under the lock: its window, once its own state event has named it [app], never covered; then [leave]. */
+        fun never(app: String, open: () -> Unit, besides: Set<Int> = emptySet(), leave: () -> Unit = ::home): Int {
             open()
             val window = until { seen().firstOrNull { it.app == app && it.id !in besides } }
             assertEquals(app, emptyMap<Int, Area>(), covers { it.shown })
             assertEquals(app, 0, coversOnScreen())
-            home()
+            leave()
             return window.id
         }
         never(holder(Intent(Settings.ACTION_SETTINGS)), { shell("am start -a android.settings.SETTINGS") })
+        // Where the student switches Bali off, and removes it, the removal asked and never confirmed: Back.
+        never(holder(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)), { shell("am start -a android.settings.ACCESSIBILITY_SETTINGS") })
+        val removing = Intent(Intent.ACTION_DELETE, "package:${context.packageName}".toUri())
+        never(holder(removing), { shell("am start -a android.intent.action.DELETE -d package:${context.packageName}") }) {
+            shell("input keyevent KEYCODE_BACK")
+            home()
+        }
         val dialing = never(dialer, { shell("am start -a android.intent.action.DIAL") })
         never(holder(Intent(EMERGENCY_DIALER)), { shell("am start -a $EMERGENCY_DIALER") })
         never(checkNotNull(Telephony.Sms.getDefaultSmsPackage(context)), { shell("am start -a android.intent.action.SENDTO -d smsto:5551234") })
@@ -224,7 +232,7 @@ class CoversTest {
     }
 
     @Test
-    fun aFullScreenAppSentHomeIntoPictureInPictureStaysCoveredWhereItIsAndItsCoverFollowsIt() {
+    fun aFullScreenAppSentHomeIntoPictureInPictureStaysCoveredWhereItIsTheStudentStillMovesItAndFullScreenAgainItGoesHomeAgain() {
         locked()
         val homes = covers { it.homes }
         // As a video app goes: full screen, covered and sent home, it goes into picture-in-picture.
@@ -232,15 +240,19 @@ class CoversTest {
         // Covered where it is, its cover drawn there on the screen, the small window read afresh each time as it moves in.
         val small = until { seen().firstOrNull { it.app == STAND_IN_APP && it.pictureInPicture && it.cover == it.bounds }?.takeIf { pixel(it.bounds.centerX, it.bounds.centerY) == Covers.PLAIN } }
         assertEquals(homes + 1, covers { it.homes })
-        // The readout in front, its keyboard risen: the small window moves out of the keyboard's way, and its cover with
-        // it, never the readout's.
-        shell("am start -n $READOUT")
-        until { Unit.takeIf { READOUT in focused() } }
-        typeIn { true }
+        // Dragged, as a student drags it off whatever is under it: the touch goes through its cover to System UI, which
+        // moves it, and the cover follows.
+        val (x, y) = small.bounds.centerX to small.bounds.centerY
+        shell("input swipe $x $y ${x - 300} ${y - 900} 600")
         val moved = until { seen().firstOrNull { it.id == small.id && it.bounds != small.bounds && it.cover == it.bounds }?.takeIf { pixel(it.bounds.centerX, it.bounds.centerY) == Covers.PLAIN } }
         assertNotEquals(small.bounds, moved.bounds)
-        assertNull(until { seen().firstOrNull { it.app == context.packageName } }.cover)
-        shell("input keyevent KEYCODE_BACK")
+        // Opened full screen again from its own menu, as a student opens it, the menu System UI's own window over it, which
+        // its cover keeps clear of: covered afresh, and sent home again.
+        val (x2, y2) = moved.bounds.centerX to moved.bounds.centerY
+        shell("input tap $x2 $y2")
+        until { seen().firstOrNull { it.type == AccessibilityWindowInfo.TYPE_SYSTEM && (it.bounds meets moved.bounds) != null } }
+        shell("input tap $x2 $y2")
+        until { Unit.takeIf { covers { it.homes } == homes + 2 } }
     }
 
     @Test
