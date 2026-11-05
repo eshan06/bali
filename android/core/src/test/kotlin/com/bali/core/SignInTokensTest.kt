@@ -280,14 +280,20 @@ class SignInTokensTest : SignIns() {
             assertNull(odd.accessToken())
             assertFalse(odd.refresh())
             assertEquals("refresh-1", store.tokens?.refresh)
-            // The engine's hook throwing: the renewal's token is given all the same.
+            // The engine's hook throwing: the renewal's token is given all the same, and a sign-in kept,
+            // never said as failed (it throws only a SignInError).
             val hooked = signIn(MemoryStore.holding(jwt("a1")), TransportDouble.answering(200, granted(jwt("a2"))), now)
             hooked.whenTokenArrives { error("the engine is gone") }
             assertEquals(jwt("a2"), hooked.accessToken())
-            // The renewal cancelled with the sign-in's scope: none for its callers, never a throw.
+            val signingIn = signIn(MemoryStore(), TransportDouble.answering(200, granted(jwt("a3"), refresh = "refresh-3")), now)
+            signingIn.whenTokenArrives { error("the engine is gone") }
+            signingIn.signIn(browser = signsIn)
+            assertEquals(jwt("a3"), signingIn.accessToken())
+            // The renewal cancelled with the sign-in's scope: none for its callers, never a throw; and,
+            // the scope ended, none starts again (the app's scope lives as long as its process).
             val ending = CoroutineScope(SupervisorJob() + Dispatchers.Default)
             val held = HeldEndpoint()
-            val doomed = SignIn(cognito, MemoryStore.holding(jwt("a1")), ending, held, now)
+            val doomed = SignIn(cognito, MemoryStore.holding(jwt("a1")), ending, held, now, gated = false)
             val asking = async { doomed.accessToken() }
             held.received(1)
             ending.cancel()
@@ -535,6 +541,10 @@ class SignInTokensTest : SignIns() {
             nobody.passed(null)
             assertFalse(nobody.checked())
             assertNull(nobody.accessToken())
+            // Gated unless said otherwise, so a sign-in built without the flag fails closed (santa's review).
+            val unsaid = SignIn(cognito, MemoryStore.holding(jwt("a1")), scope, endpoint, Now())
+            assertNull(unsaid.accessToken())
+            assertEquals(jwt("a1"), unsaid.deletionToken())
         }
 
     @Test

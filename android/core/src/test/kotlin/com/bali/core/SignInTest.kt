@@ -266,7 +266,7 @@ class SignInTest : SignIns() {
                 server.enqueue(MockResponse(200, headersOf("Content-Type", "application/json"), granted(jwt("a1"), refresh = "refresh-1")))
                 server.start()
                 val local = Cognito(server.url("/").toUri(), "phone-client", URI("bali://auth/callback"))
-                val phone = SignIn(local, MemoryStore(), scope, OkHttpTransport(), Now())
+                val phone = SignIn(local, MemoryStore(), scope, OkHttpTransport(), Now(), gated = false)
                 phone.signIn(browser = signsIn)
                 val sent = server.takeRequest()
                 assertEquals("POST /oauth2/token HTTP/1.1", sent.requestLine)

@@ -54,7 +54,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   Its reach is narrow on both phones (a sign-in or a deletion within one renewal's round trip; a
   second account on one phone is ruled out for the pilot), and the check costs one line, so it
   holds ARCHITECTURE's rule outright. iOS's code is another session's: for the owner, whether
-  iOS's should check again too.
+  iOS's should check again too. **And the gate fails closed** (santa's review): `SignIn` is gated
+  unless built with `gated = false`, as only the tests of its tokens alone are, where iOS's is
+  ungated unless the app says, so a sign-in built without the flag gives Bali's API no token rather
+  than one before the check. Pinned by a test.
 
   **The tests:** SignInTests' `exchange`, `signUp`, `unfinished` and `unkept`; TokenTests' twenty-three
   but `emailNoDefault` (AN6a's); DeleteUserTests' `mayDelete`; and SignInEngineTests' four over
@@ -63,7 +66,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   mark: a caller's check of its token's expiry (the test's clock counts its reads), or the token
   marked refused in the store. New: a caller cancelled while it waits, the renewal's starter and
   every caller; never a throw (a store failing another way, a transport throwing what none should,
-  the engine's hook throwing, the renewal cancelled with its scope); a sign-in whose caller is
+  the engine's hook throwing after a renewal and after a sign-in, the renewal cancelled with its
+  scope); a sign-in built without the flag gated; a sign-in whose caller is
   cancelled once the browser answered; the exchange on the wire over OkHttp against MockWebServer;
   an answer's field of another type; an odd transport at sign-in; and a renewal's caller given no
   token once a sign-in not through the check, or the deletion, lands meanwhile.
@@ -76,19 +80,27 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the exchange run in the caller's coroutine; `make` without its ring (3), and without its refresh
   (2); the engine told of its own refresh (2); the store never caught up (2); an unreadable store
   taken as nobody signed in (`locked`); a renewal never let go of (6); the refused token never
-  marked so (4); and the renewal's tokens given unchecked, as iOS's are, and held to the gate alone
-  (the new test, each half). Nothing was added to the PC's SDK: its folders were compared before
-  and after.
+  marked so (4); the renewal's tokens given unchecked, as iOS's are, and held to the gate alone
+  (the new test, each half); and, for santa's WARNs, the sign-in's own hook unguarded and the gate
+  open by default (each its test). Nothing was added to the PC's SDK: its folders were compared
+  before and after.
 
   **For AN6c:** the store's three calls block and run on `Dispatchers.IO`; `load` throws only when
   the store can't be read right now, which the sign-in never takes for a sign-out and asks again, so
   sealed tokens the phone can never open again (their Keystore key gone) must read as nothing saved,
   or the student stays neither signed in nor out. The attempt's verifier and state live in memory
   for the call alone: a process death while the tab is open loses them, and its redirect can only be
-  refused. Give the sign-in and `make` one `OkHttpTransport` and the app's scope. **For AN9:**
-  `deleteUser`, and the engine's 13+ yes over `make`'s sign-in.
+  refused. Give the sign-in and `make` one `OkHttpTransport` and the app's scope, as long-lived as
+  the process, never a screen's, a ViewModel's or a service's: once a scope ends, no renewal starts
+  in it again, and `signIn` throws its cancel (santa's review). Build the app's sign-in gated, as
+  the default is. **For AN9:** `deleteUser`, and the engine's 13+ yes over `make`'s sign-in.
 
-  **Santa's review:** SANTA.
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini
+  CLI on this PC, so context isolation holds and model diversity doesn't): 0 blockers. Their WARNs,
+  each taken: the sign-in's own hook throwing pinned by no test, only the renewal's (added); the
+  gate open unless the app said, as iOS's is (now closed unless a test says, above); and a scope
+  that ends leaving every later renewal stillborn, `signIn` then throwing its cancel to a caller
+  still running (the scope's doc and For AN6c, above: the app's lives as long as its process).
 
   **The proof:** `android/app` is unchanged, so the JVM tests are the proof, and no emulator ran.
 

@@ -97,7 +97,8 @@ class SignInEngineTest : EngineFiles() {
         val (server, clock, keychain) = Triple(Server(), TestClock(), MemoryKeychain())
         val outbox = makeOutbox().first
         val cognito = Cognito(URI("https://bali-dev.auth.us-east-1.amazoncognito.com"), "phone-client", URI("bali://auth/callback"))
-        val signIn = SignIn(cognito, keychain, scope, server, clock::now)
+        // Ungated, as iOS's rig is unless a test asks: the 13+ check is the sign-in's own tests' (C7).
+        val signIn = SignIn(cognito, keychain, scope, server, clock::now, gated = false)
         val engine = SyncEngine.make(outbox, URI("https://api.bali.test"), signIn, scope, server, clock)
         return SignedRig(engine, signIn, outbox, server, clock, keychain, scope)
     }

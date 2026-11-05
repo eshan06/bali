@@ -339,12 +339,13 @@ class SignIn(
     /** Where it signs in: the app's browser catches the answer at its redirect URI (AN6c). */
     val cognito: Cognito,
     private val store: TokenStore,
+    /** The app's, as long-lived as the process: one that ends ends every renewal for good. */
     scope: CoroutineScope,
     /** The token endpoint's transport: the API client's own, OkHttp's (AN3d). */
     private val transport: HttpTransport = OkHttpTransport(),
     private val now: () -> Instant = Instant::now,
-    /** Whether Bali's API waits on the 13+ check (C7), as the app's does ([Tokens.checked]). */
-    private val gated: Boolean = false,
+    /** Whether Bali's API waits on the 13+ check (C7, [Tokens.checked]): by default, failing closed, where iOS's isn't. */
+    private val gated: Boolean = true,
 ) : TokenProvider {
     /** The app's scope, under a job of the sign-in's own, so no renewal's failure ends anything else. */
     private val scope = CoroutineScope(scope.coroutineContext + SupervisorJob(scope.coroutineContext[Job]))
