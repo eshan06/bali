@@ -4,7 +4,6 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import type { Analytics } from '../analytics.js';
-import { requireAuth } from '../auth/plugin.js';
 import { requireTeacher } from '../auth/teacher.js';
 import { parseRequest } from '../errors.js';
 import type { Limiter } from '../limits.js';
@@ -35,7 +34,7 @@ export function registerActionsRoute(
     async (request): Promise<PortalActionResponse> => {
       const teacher = await requireTeacher(db, request);
       const { event, eventId } = parseRequest(request, 'body', ActionBody);
-      limits.portalAction(requireAuth(request).sub);
+      limits.portalAction(teacher.id);
       analytics.action(event, teacher.id, eventId);
       return {};
     },

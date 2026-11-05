@@ -55,12 +55,17 @@ a real decision? Add a dated entry at the top: what was decided and why.
   key holds the `distinct_id`, always the caller's own.
 
   **The budget:** the route spends the account's 120 a minute, as every `/v1` route does, and one
-  of its own, `portalActions`, 30 at once and then 10 a minute per teacher, spent only by an
-  action that passed its checks; past it `429` with `Retry-After`, sending nothing. A teacher's
-  actions go at a person's pace: a class's nine at its start, or 25 reports opened in a row, pass
-  (`limits.test.ts`). A loop sends PostHog about 14,400 a day at most, about 430,000 a month,
-  where the account's budget alone allowed 172,800 a day. PostHog's billing limit, in its console,
-  stays the owner's backstop, and the budget, as every budget, is per process.
+  of its own, `portalActions`, 30 at once and then 10 a minute per teacher (keyed by Bali's id for
+  them), spent only by an action that passed its checks; past it `429` with `Retry-After`, sending
+  nothing. A teacher's actions go at a person's pace: a class's nine at its start, or 25 reports
+  opened in a row, pass (`limits.test.ts`). A loop sends PostHog about 14,400 a day at most, about
+  430,000 a month, where the account's budget alone allowed 172,800 a day. PostHog's billing
+  limit, in its console, stays the owner's backstop, and the budget, as every budget, is per
+  process. **CodeQL** (`js/missing-rate-limiting`) flagged the route on its first push as having
+  no rate limit: a false positive, as the alerts dismissed on 2026-10-24 for the other routes
+  were, since CodeQL knows no in-house limiter and reads any call named like `requireAuth` in a
+  handler as authorization. Keyed by the teacher's Bali id (the Claude Review's WARN), the handler
+  calls no such name, so no alert was dismissed.
 
   **The path:** `/v1/me/actions`, the caller's own, as `/v1/me/activity` is, with no word ad
   blockers look for (PostHog's proxy guide names `analytics`, `tracking`, `telemetry` and

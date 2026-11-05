@@ -40,7 +40,10 @@ export interface Budgets {
   inviteTries: Budget;
   /** Each address's misses there (`404 invite_not_found`), whatever the account. */
   inviteMisses: Budget;
-  /** Each teacher's actions the portal counts for PostHog (A3a): what a loop adds to its bill. */
+  /**
+   * Each teacher's actions the portal counts for PostHog (A3a), keyed by Bali's id for them: what a
+   * loop adds to its bill.
+   */
   portalActions: Budget;
 }
 
@@ -151,7 +154,7 @@ export interface Limiter {
   /** A signed-in request: one of the account's budget. */
   signedIn(sub: string): void;
   /** A teacher's action for PostHog (A3a), checked and about to be sent: one of its budget. */
-  portalAction(sub: string): void;
+  portalAction(teacherId: string): void;
   /** A request no one is signed in on: one of its address's budget. */
   unsigned(request: FastifyRequest): void;
   /**
@@ -195,7 +198,8 @@ export function createLimiter({
   const holding = new WeakMap<FastifyRequest, Bucket>();
   return {
     signedIn: (sub) => refuse(account.take(sub), 'too many requests from this account'),
-    portalAction: (sub) => refuse(portalActions.take(sub), 'too many actions from this account'),
+    portalAction: (teacherId) =>
+      refuse(portalActions.take(teacherId), 'too many actions from this account'),
     unsigned: (request) =>
       refuse(unsigned.take(clientAddress(request)), 'too many requests with no sign-in'),
     guess: (request, at) => {
