@@ -55,8 +55,21 @@ object Answer {
     val armed = """{"outcome":"armed","session":null,"state":null}"""
     val replayNoSession = """{"outcome":"replay","session":null,"state":null}"""
 
-    fun unlocked(view: SessionView = session()) =
-        """{"outcome":"applied","recordedAs":null,"state":"unlocked","session":${json(view)},"reason":null}"""
+    /** An unlock applied in [view], with [reason] on record (none: none). */
+    fun unlocked(view: SessionView = session(), reason: String? = null) =
+        """{"outcome":"applied","recordedAs":null,"state":"unlocked","session":${json(view)},"reason":${reason?.let { "\"$it\"" }}}"""
+
+    /** A late unlock (A10): recorded, and the state the student's own later return left, named. */
+    fun unlockSuperseded(view: SessionView = session()) =
+        """{"outcome":"recorded","recordedAs":"superseded","state":"focused","session":${json(view)},"reason":null}"""
+
+    /** An Emergency Unlock under protection off: recorded, never softened (A2). */
+    fun unlockUnderOff(view: SessionView = session()) =
+        """{"outcome":"recorded","recordedAs":"protection_off","state":"protection_off","session":${json(view)},"reason":null}"""
+
+    /** The lock back on (#167) applied, the phone in [state] there. */
+    fun protectionOn(view: SessionView = session(), state: String = "focused") =
+        """{"outcome":"applied","state":"$state","session":${json(view)}}"""
 
     fun refocused(view: SessionView = session()) = """{"outcome":"applied","state":"focused","session":${json(view)}}"""
 

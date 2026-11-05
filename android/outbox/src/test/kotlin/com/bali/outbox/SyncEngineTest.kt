@@ -27,10 +27,14 @@ import kotlinx.coroutines.withTimeoutOrNull
 private fun inSession(state: ParticipationState) = Standing.InSession(session(), state)
 
 /** A row this build can't read, which every read of the queue fails on while it is there: a storage failure that passes. */
-suspend fun poison(outbox: Outbox) =
+suspend fun poison(outbox: Outbox, poisoned: Boolean = true) =
     outbox.execute(
-        "INSERT INTO outbox (eventId, kind, sessionId, recordedAt, nextAttemptAt) " +
-            "VALUES ('poison', 'protection_off', 's', 'garbage', 'garbage')",
+        if (poisoned) {
+            "INSERT INTO outbox (eventId, kind, sessionId, recordedAt, nextAttemptAt) " +
+                "VALUES ('poison', 'protection_off', 's', 'garbage', 'garbage')"
+        } else {
+            "DELETE FROM outbox WHERE eventId = 'poison'"
+        },
     )
 
 /** The standing the file keeps, made unreadable: this build can't decode it. */
@@ -184,7 +188,7 @@ class StandingKeptTest : EngineFiles() {
     @Test
     fun thePhonesOwnChangeAndTheStandingItLeavesAreKeptInOneWriteKilledAtAnyMomentAfterAnEmergencyUnlockARelaunchNeverLocksOverIt(): Unit =
         runBlocking {
-            // StandingKeptTests' `keptWithItsStanding`. Its shieldedUntil check, the lock's, is AN5e's.
+            // StandingKeptTests' `keptWithItsStanding`, its lock check AN5e's.
             val changes =
                 listOf(
                     Change.Unlock("s", null) to ParticipationState.Unlocked,
@@ -200,7 +204,10 @@ class StandingKeptTest : EngineFiles() {
                 val holding =
                     relaunches.engines.map { it.updates.value }.filter { relaunched -> relaunched.queued.any { it.eventId == record.eventId } }
                 assertTrue(holding.isNotEmpty(), "$change")
-                for (relaunched in holding) assertEquals(inSession(state), relaunched.standing, "$change")
+                for (relaunched in holding) {
+                    assertEquals(inSession(state), relaunched.standing, "$change")
+                    assertNull(relaunched.shieldedUntil(t0), "$change")
+                }
                 rig.stop()
             }
         }

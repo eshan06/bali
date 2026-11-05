@@ -119,8 +119,9 @@ while the write goes on: an Emergency Unlock's record is never discarded. Room r
 end whatever its caller, so a cancel landing as it returned would skip the state it leaves
 (`docs/DECISIONS.md`, 2026-11-04, AN5a). Its drain (AN5b) sends the queue one record at a time, in
 the order the phone acted, and applies each answer in one step, the queue read again with it. A
-send cancelled with the engine's run makes no answer, so its record stays as it was, due, and goes
-again at the next run under its event id, where iOS counts it an attempt with no answer. Its read
+send cancelled with the engine's run makes no answer, so its record stays as it was, due, and on its
+way until a send of it settles, and goes again at the next run under its event id, where iOS counts
+it an attempt with no answer. Its read
 loop (AN5c) follows the screen, as the lock's service hears it (`setScreenOn`, AN7's): a check-in
 every 30 s while it is on and one as it comes on or goes off, out of a session the truth read as it
 comes on instead, rule 3's check before each, then nothing while it is off. A read applies only as
@@ -129,7 +130,13 @@ recorded. A 401 asks the sign-in for a fresh token once per rejection, one refre
 both loops wait on. Its wait for the Start (AN5d): a tap answered armed waits until the next
 midnight in the zone the phone is in as it arms, by java.time's calendar, so a day the clocks change
 is 23 or 25 hours long; the end is kept in the file for a relaunch, the truth is read at each wake
-while the screen is on, and offline the wait ends at the first wake past its end. Its tests run on
+while the screen is on, and offline the wait ends at the first wake past its end. Its Emergency
+Unlock (AN5e) is filed under a tap not yet answered, else in the phone's session, or, where it stood
+unread, once that is known (B6b); its send waits 15 s for the student's reason, never past the bell;
+a reason goes with it while it has never been sent, and after, as a change of the one recorded. The
+lock back on returns the phone where it stood before protection off or, not known, past the unlock
+guard. When the lock is on is `SyncState.shieldedUntil`'s, and each call's failure is a type, the
+words the screens' (AN10). Its tests run on
 a rig of their own (`EngineSupport.kt`, BaliOutbox's `EngineSupport.swift`): a clock the test moves,
 in a zone of the test's own, since coroutines-test's virtual time can't drive Room's queries, a
 server answered by hand, and the bundled driver watched, which sees each commit as GRDB's

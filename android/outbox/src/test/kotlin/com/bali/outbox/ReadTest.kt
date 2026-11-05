@@ -1,6 +1,7 @@
 package com.bali.outbox
 
 import androidx.sqlite.SQLiteException
+import com.bali.core.BlockRead
 import com.bali.core.ParticipationState
 import com.bali.core.SendResult
 import com.bali.core.UnlockReason
@@ -9,6 +10,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -351,8 +353,101 @@ class ReadTest : EngineFiles() {
         }
 }
 
-/** The reconcile: no read overrides a newer change. BaliOutbox's StaleReadTests, AN5c's part. */
+/** The reconcile: no read overrides a newer change. BaliOutbox's StaleReadTests, every one now (AN5c's and AN5e's). */
 class StaleReadTest : EngineFiles() {
+    @Test
+    fun aLateUnlockStuckWhileAReTapWentAheadOfItLandsRecordedNotAppliedTheRecordGoneThePhoneInTheFocusItCameBackTo(): Unit =
+        runBlocking {
+            // A10.
+            val rig = rig()
+            rig.tapIn()
+            rig.engine.record(Change.Unlock("s", null))
+            rig.server.next(unlockRoute).reply(400, Answer.refused("invalid_request"))
+            rig.until { it.queued.firstOrNull()?.stuck == true }
+            // A stuck record holds nothing: the re-tap goes, and the phone is back in focus.
+            rig.engine.record(Change.Tap("tag"))
+            rig.server.next(tapRoute).reply(200, Answer.joined())
+            rig.until { it.standing == focused && it.queued.size == 1 }
+            // Retried at the cap, it lands once the server takes it.
+            rig.clock.advance(Outbox.BACKOFF_CAP.multipliedBy(2))
+            rig.server.next(unlockRoute).reply(200, Answer.unlockSuperseded())
+            val state = rig.until { it.queued.isEmpty() }
+            assertEquals(listOf(focused, null), listOf(state.standing, state.superseded))
+            assertFalse(rig.outbox.holdsUnlock("s"))
+        }
+
+    @Test
+    fun anUnlockAnsweredAsLateWithNoChangeOfThePhonesSinceStillAppliesThePhoneLockedToTheFocusTheServerKeptNeverUnlockedUnderAGreenChip(): Unit =
+        runBlocking {
+            // Its clock turned back.
+            val rig = rig()
+            rig.tapIn()
+            rig.engine.record(Change.Unlock("s", null))
+            assertEquals(unlocked, rig.engine.updates.value.standing)
+            rig.server.next(unlockRoute).reply(200, Answer.unlockSuperseded())
+            val state = rig.until { it.queued.isEmpty() }
+            assertEquals(listOf(focused, Superseded("s", ordered = true)), listOf(state.standing, state.superseded))
+            assertEquals(session().endsAt, state.shieldedUntil(rig.clock.now()))
+        }
+
+    @Test
+    fun theUnlockGuardHoldsForEveryAnswerAnUnlockAnsweredLateLocksNothingOverAnotherStillStuckMadeBeforeItOrAfterIt(): Unit =
+        runBlocking {
+            // #95's Claude Review: on main, two stuck unlocks.
+            for (newerLands in listOf(false, true)) {
+                val rig = rig()
+                rig.tapIn()
+                rig.engine.emergencyUnlock()
+                rig.server.next(unlockRoute).reply(400, Answer.refused("invalid_request"))
+                rig.until { it.queued.firstOrNull()?.stuck == true }
+                rig.engine.emergencyUnlock()
+                val newer = rig.server.next(unlockRoute)
+                if (newerLands) {
+                    newer.reply(200, Answer.unlockSuperseded())
+                } else {
+                    newer.reply(400, Answer.refused("invalid_request"))
+                    rig.until { state -> state.queued.size == 2 && state.queued.all { it.stuck } }
+                    rig.clock.advance(2)
+                    rig.server.next(unlockRoute).reply(200, Answer.unlockSuperseded())
+                }
+                val state = rig.until { it.queued.size == 1 }
+                assertEquals(unlocked, state.standing, "newer lands $newerLands")
+                assertNull(state.shieldedUntil(rig.clock.now()), "newer lands $newerLands")
+                rig.stop()
+            }
+        }
+
+    @Test
+    fun butAReTapMadeAfterBothUnlocksIsTheStudentsReturnTheLateAnswerLeavesThePhoneInTheFocusItCameBackToTheOtherUnlockStuckStill(): Unit =
+        runBlocking {
+            val rig = rig()
+            rig.tapIn()
+            for (count in 1..2) {
+                rig.engine.emergencyUnlock()
+                rig.server.next(unlockRoute).reply(400, Answer.refused("invalid_request"))
+                rig.until { state -> state.queued.size == count && state.queued.all { it.stuck } }
+            }
+            rig.engine.tap(BlockRead.Block("T7XK2M9QPF"))
+            rig.server.next(tapRoute).reply(200, Answer.joined())
+            rig.until { it.standing == focused && it.queued.size == 2 }
+            rig.clock.advance(2)
+            rig.server.next(unlockRoute).reply(200, Answer.unlockSuperseded())
+            assertEquals(focused, rig.until { it.queued.size == 1 }.standing)
+        }
+
+    @Test
+    fun protectionOffIsNoReturnItsAnswerNamingFocusLocksNothingOverAnUnlockStillStuck(): Unit =
+        runBlocking {
+            val rig = rig()
+            rig.tapIn()
+            rig.engine.emergencyUnlock()
+            rig.server.next(unlockRoute).reply(400, Answer.refused("invalid_request"))
+            rig.until { it.queued.firstOrNull()?.stuck == true }
+            rig.engine.record(Change.ProtectionOff("s"))
+            rig.server.next(protectionOffRoute).reply(200, Answer.replay(state = "focused"))
+            assertEquals(unlocked, rig.until { it.queued.size == 1 }.standing)
+        }
+
     @Test
     fun theRaceOf56ACheckInReadBeforeAnUnlockAndAnsweredAfterItIsNeverApplied(): Unit =
         runBlocking {

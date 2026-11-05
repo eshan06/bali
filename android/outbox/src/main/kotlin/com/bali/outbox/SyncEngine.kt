@@ -1,10 +1,13 @@
 package com.bali.outbox
 
 import com.bali.core.ApiClient
+import com.bali.core.ApiErrorReason
 import com.bali.core.ApiResponse
+import com.bali.core.BlockRead
 import com.bali.core.CheckInRequest
 import com.bali.core.CheckInResponse
 import com.bali.core.DisplayState
+import com.bali.core.EventId
 import com.bali.core.MeResponse
 import com.bali.core.NoAnswer
 import com.bali.core.ParticipationState
@@ -14,6 +17,9 @@ import com.bali.core.SessionView
 import com.bali.core.StateChangeDisposition
 import com.bali.core.TapDisposition
 import com.bali.core.UnlockDisposition
+import com.bali.core.UnlockReason
+import com.bali.core.UnlockReasonRequest
+import com.bali.core.UnlockReasonResponse
 import com.bali.core.readMayReconcile
 import java.time.Duration
 import java.time.Instant
@@ -41,8 +47,8 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 // The sync engine, BaliOutbox's SyncEngine.swift: its frame, AN5a's, its drain, AN5b's, its read loop,
-// AN5c's, and its wait for the Start, AN5d's. Emergency Unlock is AN5e's, on the pattern set here:
-// Swift's actor as a lock each stretch holds (docs/PLAN-ANDROID.md).
+// AN5c's, its wait for the Start, AN5d's, and Emergency Unlock, AN5e's: where it is filed, its reason
+// and the late unlock. Swift's actor is a lock each stretch holds (docs/PLAN-ANDROID.md).
 
 /** The engine's clock: the time records are stamped with, the zone its days end in, and waiting on it: a test's own there. */
 interface SyncClock {
@@ -133,6 +139,12 @@ class SyncEngine private constructor(
     /** The refresh under way, which every 401 heard while it runs shares: the drain's, a read's. */
     private var reauth: Deferred<Unit>? = null
 
+    /**
+     * The last change of an unlock's reason no answer came to: tried again for the same unlock and
+     * reason, it goes under the same event id (rule 4).
+     */
+    private var unanswered: Pick.Change? = null
+
     /** Whether the screen is on, as the lock's service says (AN7): the check-ins' 30 s ([setScreenOn]). */
     private var screenOn = false
 
@@ -173,9 +185,9 @@ class SyncEngine private constructor(
     /** The outbox, in order: the record due, sent and settled; then the next, or a wait for one. */
     private suspend fun drain(): Nothing {
         while (true) {
-            val found = alone { due() }
+            val (found, onItsWay) = alone { due() }
             // Answered, the next pass goes at once; else the drain waits for what is due, or a ring.
-            val waits = if (found is Outbox.Due.Send) send(found.record) ?: continue else found
+            val waits = if (found is Outbox.Due.Send) send(found.record, onItsWay) ?: continue else found
             val wake = (waits as? Outbox.Due.Wait)?.until
             alone { update { it.copy(retryAt = wake) } }
             drainRings.pause(wake)
@@ -183,26 +195,29 @@ class SyncEngine private constructor(
     }
 
     /**
-     * The top of a pass, which answers every ring made before it: the record due, marked on its way, or
-     * when one is due. A file it can't read is shown, and read again within a minute.
+     * The top of a pass, which answers every ring made before it: the record due, marked on its way, and
+     * whether it was already, a send of it cut short or answered in a write the file refused; or when one
+     * is due. A file it can't read is shown, and read again within a minute.
      */
-    private suspend fun due(): Outbox.Due {
+    private suspend fun due(): Pair<Outbox.Due, Boolean> {
         drainRings.answer()
-        val due = tried { outbox.nextDue(clock.now()) }.getOrElse { return Outbox.Due.Wait(failed()) }
+        val due = tried { outbox.nextDue(clock.now()) }.getOrElse { return Outbox.Due.Wait(failed()) to false }
         // Never an unlock not filed yet (`nextDue`): it has nowhere to go.
-        if (due is Outbox.Due.Send) update { it.copy(sending = it.sending + due.record.eventId) }
-        return due
+        if (due !is Outbox.Due.Send) return due to false
+        val onItsWay = due.record.eventId in state.sending
+        update { it.copy(sending = it.sending + due.record.eventId) }
+        return due to onItsWay
     }
 
     /**
      * Sends [record] with the engine let go of, as Swift's `await` lets go of its actor; then, in one
      * stretch, settles the answer and applies it: none once answered, the next pass going at once, else
      * what the drain waits for. Cancelled with its run, the send makes no [Sent] (AN4b): the record stays
-     * as it was, due, its attempt uncounted, and on its way, since it may have reached the server, until
-     * the next run sends it at once under its event id and settles it. iOS settles it as no answer. A 401's
-     * refresh is waited for, the engine let go, before the next pass ([heard]).
+     * as it was, due, its attempt uncounted, and on its way, since it may have reached the server, until a
+     * send of it settles; the next run sends it at once under its event id. iOS settles it as no answer. A
+     * 401's refresh is waited for, the engine let go, before the next pass ([heard]).
      */
-    private suspend fun send(record: OutboxRecord): Outbox.Due? {
+    private suspend fun send(record: OutboxRecord, onItsWay: Boolean): Outbox.Due? {
         val sent = record.send(client)
         var refreshing: Deferred<Unit>? = null
         val waits = alone {
@@ -213,9 +228,10 @@ class SyncEngine private constructor(
                     Outbox.Due.Idle
                 }
                 // No token: nothing went, so nothing is settled: the record waits on sign-in (a ring), or a
-                // minute. Never a sign-out, never a dropped record.
+                // minute. Never a sign-out, never a dropped record. One on its way already may have reached
+                // the server, so it stays so: a reason kept now would go with a send the server never reads (A1).
                 sent.noAnswer == NoAnswer.NoToken -> {
-                    update { it.copy(sending = it.sending - record.eventId, link = Link.SignIn) }
+                    update { it.copy(sending = if (onItsWay) it.sending else it.sending - record.eventId, link = Link.SignIn) }
                     Outbox.Due.Wait(clock.now() + Outbox.BACKOFF_CAP)
                 }
                 // A settle the file refuses leaves the record on its way: the file counts it never sent.
@@ -271,13 +287,31 @@ class SyncEngine private constructor(
                     Standing.Unread -> false
                 }
         if (arms && stood == Standing.Unread) armed = true
-        // To come: the unlock recorded, and a late one said why (AN5e).
+        // An unlock recorded in a session, not late: its reason on record, the card's check (its own, or the
+        // one the server kept, its first standing: A1), and what a pick changes from now (A20). A newer unlock
+        // of the class still queued is the card's.
+        val recorded =
+            sent.session?.takeIf { disposition == Disposition.Unlock(UnlockDisposition.Recorded) && !sent.superseded }
+                ?.let { RecordedUnlock(it.id, record.eventId, sent.reason) }
+        // A late unlock putting the lock back on with no return of the phone's own since, focused there
+        // already, or a tap or refocus made after it, is said why (C5a).
+        val seq = record.order?.seq ?: 0
+        val late =
+            lands?.takeIf {
+                sent.superseded && it.state == ParticipationState.Focused && !stood.isFocused(it.session.id) &&
+                    queued.none { later -> later.change.isReturn && (later.order?.seq ?: 0) > seq }
+            }
         update { now ->
             // Settled, and the queue read again, in one step: no screen sees the record neither on its way
             // nor answered.
-            val next = now.copy(queued = queued, sending = now.sending - record.eventId, waitEnds = ends ?: now.waitEnds)
+            val next =
+                now.copy(
+                    queued = queued, sending = now.sending - record.eventId, waitEnds = ends ?: now.waitEnds,
+                    recordedUnlock = recorded ?: now.recordedUnlock,
+                )
             when {
-                lands != null -> next.copy(standing = lands)
+                lands != null ->
+                    next.copy(standing = lands, superseded = late?.let { Superseded(it.session.id, record.order != null) } ?: now.superseded)
                 waits -> next.copy(standing = Standing.Waiting)
                 effect == Effect.Drops ->
                     next.copy(refused = Refusal(record.change, sent.status, sent.error?.error?.reason, sent.error?.error?.message))
@@ -542,7 +576,7 @@ class SyncEngine private constructor(
      * the caller to show after its state step. Focused already means returned since only while every
      * unlock takes the phone out of focus at once (`Standing.acting`) and nothing brings it back but a
      * refocus, an answer or a read past this guard, or the lock back on to where the phone stood before
-     * protection off or, not known, past this guard (#167; AN5e's): keep both so.
+     * protection off or, not known, past this guard (#167, [recording]'s): keep both so.
      */
     private suspend fun keepsUnlocked(session: String, after: Long = 0): Boolean? =
         if (state.standing.isFocused(session)) false else tried { outbox.holdsUnlock(session, after) }.getOrNull()
@@ -551,41 +585,155 @@ class SyncEngine private constructor(
 
     /**
      * Queues what the phone just did, acted on at once, and sends it; none when there's nothing to send
-     * (protection off already reported). Throws when it couldn't be written: the caller shows it (rule
-     * 5). The student acting again ends a refusal's showing. [hold] delays the send of an Emergency
-     * Unlock waiting for its reason (C5a). Its caller cancelled, it stops waiting, and the record is
-     * made all the same.
+     * (protection off already reported, or the lock back on where the phone isn't protection off).
+     * Throws when it couldn't be written: the caller shows it (rule 5). The student acting again ends a
+     * refusal's showing, and a late unlock's. An Emergency Unlock goes through [emergencyUnlock] or
+     * [pressUnlock], which file it where decision 11 says; [hold] delays the send of one waiting for its
+     * reason (C5a). Its caller cancelled, it stops waiting, and the record is made all the same.
      */
-    suspend fun record(change: Change, hold: Duration = Duration.ZERO): OutboxRecord? =
-        call {
-            // Standing focused there, the phone's row is focused again (a re-tap older than its last
-            // report can put it back, A13), so protection off found now is reported again.
-            if (change is Change.ProtectionOff && state.standing.isFocused(change.session)) outbox.protectionRestored()
-            // Where it leaves the phone is kept in the change's own write: killed between two, a
-            // relaunch would stand where the phone stood before, locked over an Emergency Unlock. Never
-            // where it stands unread, whose keeping would undo the write, the change with it.
-            val standing = state.standing.acting(change)
-            val keeping = standing.takeIf { it != Standing.Unread }
-            val record = outbox.record(change, clock.now(), keeping, hold) ?: return@call null
-            if (keeping != null) kept = keeping
-            changes += 1
-            // A read that fails keeps the last list, with this record, which the file holds now: the
-            // phone acts on what it just did (an unlock's lock off, a tap's on) whatever the read.
-            val queued = tried { outbox.records() }
-            val reportedOff = tried { outbox.reportedOff() }
-            update { now ->
-                // The file's newest tap now, written with it.
-                val lastTap = if (change is Change.Tap) record.eventId else now.lastTap
-                val off = reportedOff.getOrElse { now.reportedOff }
-                now.copy(
-                    standing = standing, queued = queued.getOrElse { now.queued + record }, reportedOff = off, lastTap = lastTap,
-                    refused = null,
-                )
+    suspend fun record(change: Change, hold: Duration = Duration.ZERO): OutboxRecord? = call { recording(change, hold) }
+
+    /** [record]'s stretch, for a call that records from inside its own. */
+    private suspend fun recording(change: Change, hold: Duration): OutboxRecord? {
+        // Standing focused there, the phone's row is focused again (a re-tap older than its last report can
+        // put it back, A13), so protection off found now is reported again.
+        if (change is Change.ProtectionOff && state.standing.isFocused(change.session)) outbox.protectionRestored()
+        // The lock back on (#167) only out of protection off there: a second, from a check that overlapped
+        // the first, finds the phone back where it stood and records nothing (santa's round 1). It returns
+        // where the phone stood before protection off; not known, past the unlock guard: an Emergency
+        // Unlock still queued there keeps it unlocked, as does a file that can't say, shown after the step.
+        var unread = false
+        val offFrom =
+            if (change !is Change.ProtectionOn) {
+                null
+            } else {
+                val stood = state.standing
+                val off = stood is Standing.InSession && stood.session.id == change.session && stood.state == ParticipationState.ProtectionOff
+                if (!off) return null
+                tried { outbox.offFrom() }.onFailure { unread = true }.getOrNull()
+                    ?: when (keepsUnlocked(change.session)) {
+                        false -> ParticipationState.Focused
+                        true -> ParticipationState.Unlocked
+                        null -> ParticipationState.Unlocked.also { unread = true }
+                    }
             }
-            // Shown after that step, never before it: then the standing this record replaced would be kept again.
-            if (queued.isFailure || reportedOff.isFailure) failed()
+        // Where it leaves the phone is kept in the change's own write: killed between two, a relaunch would
+        // stand where the phone stood before, locked over an Emergency Unlock. Never where it stands unread,
+        // whose keeping would undo the write, the change with it.
+        val standing = state.standing.acting(change, offFrom)
+        val keeping = standing.takeIf { it != Standing.Unread }
+        val record = outbox.record(change, clock.now(), keeping, hold) ?: return null
+        if (keeping != null) kept = keeping
+        changes += 1
+        // A read that fails keeps the last list, with this record, which the file holds now: the phone acts
+        // on what it just did (an unlock's lock off, a tap's on) whatever the read.
+        val queued = tried { outbox.records() }
+        val reportedOff = tried { outbox.reportedOff() }
+        update { now ->
+            // The file's newest tap now, written with it.
+            val lastTap = if (change is Change.Tap) record.eventId else now.lastTap
+            val off = reportedOff.getOrElse { now.reportedOff }
+            // The lock going off or coming back is no turn of the student's (A9): the unlock recorded still
+            // stands, its reason changeable once back on (A20; santa's round 1).
+            val recorded = now.recordedUnlock.takeUnless { change.isUnlock || change.isReturn }
+            now.copy(
+                standing = standing, queued = queued.getOrElse { now.queued + record }, reportedOff = off, lastTap = lastTap,
+                refused = null, superseded = null, recordedUnlock = recorded,
+            )
+        }
+        // Shown after that step, never before it: then the standing this record replaced would be kept again.
+        if (unread || queued.isFailure || reportedOff.isFailure) failed()
+        drainRings.ring()
+        return record
+    }
+
+    /**
+     * A scan of the block (B6): a Bali block's code becomes the tap, recorded and sent; anything else
+     * (another tag, a scan cancelled, a phone that can't read NFC) records nothing.
+     */
+    suspend fun tap(read: BlockRead): OutboxRecord? = (read as? BlockRead.Block)?.let { record(Change.Tap(it.code)) }
+
+    /**
+     * The student's Emergency Unlock, recorded where [SyncState.emergencyUnlock] files it; none when
+     * nothing the phone knows locks. Throws when it couldn't be written, as [record].
+     */
+    suspend fun emergencyUnlock(reason: UnlockReason? = null): OutboxRecord? =
+        call { state.emergencyUnlock(reason)?.let { recording(it, Duration.ZERO) } }
+
+    /**
+     * Emergency Unlock as the screens press it (C4): its send held [REASON_HOLD] where the Unlocked screen
+     * then asks why, in a session (C5a), and never past its bell, so the class's grid shows it live; or
+     * why it didn't go through (rule 5): nothing the phone knows locks any more (#116's review), or the
+     * outbox refused it, never said as done. Its caller cancelled, it goes on all the same.
+     */
+    suspend fun pressUnlock(): UnlockFailure? =
+        call {
+            val unlock = state.emergencyUnlock(null) ?: return@call UnlockFailure.NothingToUnlock
+            val bell = (state.standing as? Standing.InSession)?.session?.endsAt
+            val hold = bell?.let { minOf(REASON_HOLD, maxOf(Duration.ZERO, Duration.between(clock.now(), it))) } ?: Duration.ZERO
+            if (tried { recording(unlock, hold) }.isFailure) UnlockFailure.NotSaved else null
+        }
+
+    /**
+     * The student's reason for their latest Emergency Unlock (C5a): sent with it, at once, while it has
+     * never been sent; once the server has recorded it, a change of it (A20, `PATCH /v1/unlocks/{eventId}`,
+     * its token renewed once on a 401), sent with the engine let go; or why not (rule 5): not saved, on
+     * its way, or why the change didn't go. Its caller cancelled, it goes on all the same.
+     */
+    suspend fun explain(reason: UnlockReason): ReasonFailure? =
+        scope.async {
+            when (val pick = alone { pick(reason) }) {
+                is Pick.Done -> pick.failure
+                is Pick.Change -> renewing { client.changeReason(pick.unlock, pick.request) }.let { alone { changed(pick, it) } }
+            }
+        }.await()
+
+    /** What [explain] does in its first stretch: the reason kept with the unlock, or the change to send. */
+    private suspend fun pick(reason: UnlockReason): Pick {
+        val kept = tried { outbox.explain(reason, clock.now(), state.sending) }.getOrElse { return Pick.Done(ReasonFailure.NotSaved) }
+        if (kept) {
+            refreshQueue()
             drainRings.ring()
-            record
+            return Pick.Done(null)
+        }
+        val here = state.standing.sessionId
+        val recorded =
+            state.recordedUnlock?.takeIf { here != null && it.session == here && state.unlockIn(here) == null }
+                ?: return Pick.Done(ReasonFailure.OnItsWay)
+        val again = unanswered?.takeIf { it.unlock == recorded.unlock && it.request.reason == reason }
+        return again ?: Pick.Change(recorded.unlock, UnlockReasonRequest(reason, EventId.mint(clock.now())))
+    }
+
+    /**
+     * A change of the reason, answered: kept, unless the phone has moved on meanwhile; a change of its own
+     * clears it, and then this answer leaves the next unlock's last change alone (#140, santa's round 2).
+     */
+    private suspend fun changed(pick: Pick.Change, answer: ApiResponse<UnlockReasonResponse>): ReasonFailure? {
+        val current = state.recordedUnlock?.unlock == pick.unlock
+        if (current) unanswered = pick.takeIf { answer.result == SendResult.NetworkError }
+        val kept = answer.answer?.reason?.known ?: return ReasonFailure.NotChanged(answer.result, answer.error?.error?.reason)
+        if (current) update { it.copy(recordedUnlock = it.recordedUnlock?.copy(reason = kept)) }
+        return null
+    }
+
+    /** What [explain] does with a pick, its first stretch done. */
+    private sealed interface Pick {
+        /** Nothing left to send: kept with the unlock (none), or why not. */
+        class Done(val failure: ReasonFailure?) : Pick
+
+        /** A change of the reason the server recorded for [unlock] (A20). */
+        data class Change(val unlock: String, val request: UnlockReasonRequest) : Pick
+    }
+
+    /**
+     * Back to focus (C5a): the refocus of the session the phone stands unlocked in, none where it stands
+     * in none, and another screen shows; or the refocus not saved (rule 5). Its caller cancelled, it goes
+     * on all the same.
+     */
+    suspend fun backToFocus(): RefocusFailure? =
+        call {
+            val stood = (state.standing as? Standing.InSession)?.takeIf { it.state == ParticipationState.Unlocked } ?: return@call null
+            if (tried { recording(Change.Refocus(stood.session.id), Duration.ZERO) }.isFailure) RefocusFailure.NotSaved else null
         }
 
     /**
@@ -725,6 +873,16 @@ class SyncEngine private constructor(
             none
         }
 
+    /**
+     * A screen's own call, [send]: sent once more when the API refused its token and [refresh] renewed it,
+     * as the loops do for their own; a refresh that gives none leaves the 401, said. iOS's
+     * `Joining.send(renewing:)`, the engine's own until AN9 gives it to `Joining`.
+     */
+    private suspend fun <A> renewing(send: suspend () -> ApiResponse<A>): ApiResponse<A> {
+        val answer = send()
+        return if (answer.result == SendResult.Status(401) && hooked(false) { refresh() }) send() else answer
+    }
+
     /** A refresh's end: a fresh token, the first since the rejection, sends everything again at once. */
     private suspend fun reauthed(fresh: Boolean) =
         alone {
@@ -817,6 +975,14 @@ class SyncEngine private constructor(
         val CHECK_IN_INTERVAL: Duration = Duration.ofSeconds(30)
 
         /**
+         * How long an Emergency Unlock's send waits for the reason the Unlocked screen asks (C5a; A1: a
+         * reason is kept once recorded): the unlock itself never waits, the lock off and the record queued
+         * at once, and any change of the phone's, or Bali going behind, sends it sooner. The teacher sees it
+         * at most this late, online.
+         */
+        val REASON_HOLD: Duration = Duration.ofSeconds(15)
+
+        /**
          * The engine over [outbox], starting from its file: what the phone queued and where it stood. A
          * part it can't read is shown, the rest read all the same. Its calls run in [scope], the app's,
          * which outlives every screen. [refresh] is the sign-in's (AN6): refresh the token the API
@@ -830,6 +996,37 @@ class SyncEngine private constructor(
         ): SyncEngine = SyncEngine(outbox, client, scope, clock, refresh).apply { lock.withLock { load() } }
     }
 }
+
+/**
+ * Why an Emergency Unlock didn't go through (rule 5), Focus.swift's `UnlockFailure`: the app's engine
+ * hasn't started, the outbox refused to keep it, or nothing the phone knows locked by the end of the press
+ * (its tap answered meanwhile, say: #116's review). The words are AN10's, from the approved boards.
+ */
+enum class UnlockFailure {
+    /** The app has no engine yet: the app's to say, never the engine's. */
+    NotStarted,
+
+    /** The outbox refused the write, so nothing changed: holding again is the way on. */
+    NotSaved,
+
+    /** Nothing locked, so nothing was recorded: iOS's `nothing`. */
+    NothingToUnlock,
+}
+
+/** Why a reason the student picked didn't take (C5a; rule 5). The words are AN10's, from the approved boards. */
+sealed interface ReasonFailure {
+    /** The outbox refused to keep it with the unlock: another try is the way on. */
+    data object NotSaved : ReasonFailure
+
+    /** The unlock is on its way, or stuck: no pick reaches it until the server has it. */
+    data object OnItsWay : ReasonFailure
+
+    /** The change of the reason the server recorded (A20) didn't go: its answer's [result], and its refusal's [reason]. */
+    data class NotChanged(val result: SendResult, val reason: ApiErrorReason?) : ReasonFailure
+}
+
+/** Why Back to focus didn't go through (C5a; rule 5): the outbox refused to keep the refocus. The words are AN10's. */
+enum class RefocusFailure { NotSaved }
 
 /**
  * A loop's rings, Swift's `ring` and `pause`, as a conflated channel: a ring ends the loop's pause, or,
