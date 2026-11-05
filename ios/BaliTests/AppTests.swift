@@ -3813,7 +3813,7 @@ struct AppTests {
     }
 
     @Test(
-        "At every accessibility text size, on the iPhone 17e and the iPhone 17 Pro, Hold to unlock is pinned whole under the page on Focus's first screen in every Focus state, with a question, a slide or neither (GA3; IOS-018, IOS-017), and with a question its prompt and first answer are on it too, but the longest case's, a question longer than the screen; past the large size FocusLargeText draws, the question comes before the class and the line under Emergency Unlock is the page's last (the app canvas's largest-text boards), while at that size the class comes first and the line stays under it, as drawn"
+        "At every accessibility text size, on the iPhone 17e and the iPhone 17 Pro, Hold to unlock is pinned whole under the page on Focus's first screen in every Focus state, with a question, a slide or neither (GA3; IOS-018, IOS-017), the last thing VoiceOver reads, with no line under it nor at the page's end in its place (the owner's cut, 2026-11-04), and with a question its prompt and first answer are on it too, but the longest case's, a question longer than the screen; past the large size FocusLargeText draws, the question comes before the class (the app canvas's largest-text boards), while at that size the class comes first, as drawn"
     )
     func focusFirstScreen() async throws {
         let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
@@ -3860,11 +3860,11 @@ struct AppTests {
                     let words = UIHostingController(rootView: UnlockWords().environment(\.dynamicTypeSize, size))
                         .sizeThatFits(in: CGSize(width: unlock.width - 88, height: 10_000))
                     #expect(unlock.height >= words.height + 20 - 0.5, "\(said): \(unlock.height) for \(words.height)")
-                    // The line: the page's last, or under Emergency Unlock.
+                    // No line under it, nor at the page's end where it went once crowded: the owner
+                    // cut it (2026-11-04).
                     let crowded = size >= .accessibility2
-                    let line = try at { $0.hasPrefix("Works without Wi-Fi.") }
-                    let end = scroll.convert(CGRect(origin: .zero, size: scroll.contentSize), to: window).maxY
-                    #expect(crowded ? abs(line.maxY - end) <= 1 : line.minY >= unlock.maxY, "\(said): \(line), \(end)")
+                    #expect(read.last?.accessibilityLabel == unlockLabel, "\(said): \(read.map(\.accessibilityLabel))")
+                    #expect(!read.contains { ($0.accessibilityLabel ?? "").hasPrefix("Works without Wi-Fi.") }, "\(said)")
                     // A lesson's card and slide: before the class once crowded, after it at that size.
                     guard phone.card != nil || phone.slideShown != nil else { continue }
                     let title = try at { $0 == "Period 3 — Algebra II" }
@@ -3885,7 +3885,7 @@ struct AppTests {
     }
 
     @Test(
-        "At the largest text size a press that didn't go through says so under Emergency Unlock, whole on the first screen, while the line it replaces is the page's last (GA3; rule 5; the app canvas's FocusLargestTextFailed)"
+        "At the largest text size a press that didn't go through says so under Emergency Unlock, whole on the first screen (GA3; rule 5; the app canvas's FocusLargestTextFailed), and the page ends at the ring, or with a question at the strip's chip, with nothing after it: the owner cut the line that went there (2026-11-04; FocusLargestTextEnd, FocusQuestionLargestTextEnd)"
     )
     func focusFailureCrowded() async throws {
         let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
@@ -3911,10 +3911,59 @@ struct AppTests {
             let unlock = try #require(element("Emergency Unlock. Your teacher will see it.")).accessibilityFrame
             let failure = try #require(element(Joining.notStarted)).accessibilityFrame
             #expect(failure.minY >= unlock.maxY && failure.maxY <= window.bounds.height + 0.5, "\(name): \(failure)")
-            let line = try #require(read().first { ($0.accessibilityLabel ?? "").hasPrefix("Works without Wi-Fi.") })
+            let page = read().prefix { $0.accessibilityLabel != "Emergency Unlock. Your teacher will see it." }
+            let last = try #require(page.last)
+            let label = last.accessibilityLabel ?? ""
+            #expect(name == "focus" ? label.contains(" left, until ") : label == "Focused", "\(name): \(page.map(\.accessibilityLabel))")
+            // Each 6 pt short of the end: the chip's words inside its padding, the ring's stroke
+            // inside its 240-pt frame.
             let scroll = try #require(scrollViews(in: window).first)
             let end = scroll.convert(CGRect(origin: .zero, size: scroll.contentSize), to: window).maxY
-            #expect(abs(line.accessibilityFrame.maxY - end) <= 1, "\(name): \(line.accessibilityFrame), \(end)")
+            #expect(abs(end - last.accessibilityFrame.maxY - 6) <= 1, "\(name): \(last.accessibilityFrame), \(end)")
+        }
+    }
+
+    @Test(
+        "At the default text size Emergency Unlock has no line under it, the owner's cut (2026-11-04): on Focus, in every state, it is the last thing VoiceOver reads, and with nothing more to say the ring comes at once before it, or Almost done in the last two minutes (D1's Focus and FocusFinal), with no line under the ring; on Home over the last run's shields, where the phone stood unread (B6b), Tap in's card comes at once after it"
+    )
+    func unlockAlone() async throws {
+        let unlock = "Emergency Unlock. Your teacher will see it."
+        for name in [
+            "focus", "focusFinal", "focusOffline", "focusTapHeld", "focusNoShields", "focusUnscheduled",
+            "focusSuperseded", "focusSignedOut", "focusQuestion", "focusAnswered", "focusRevealed", "focusSending",
+            "focusFailed", "focusTooLate", "focusClosed", "focusRight", "focusNoAnswer", "focusQuestionOffline",
+            "focusLong", "focusSlide", "focusSlideQuestion", "focusSlideLoading", "focusSlideFailed",
+        ] {
+            let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))
+            let read = try await elements(of: RootView(phone: phone), once: unlock).map { $0.label ?? "" }
+            #expect(read.last == unlock, "\(name): \(read)")
+            guard name == "focus" || name == "focusFinal" else { continue }
+            let page = read.drop { $0 != "Focused" }.map { $0.contains(" left, until ") ? "the ring" : $0 }
+            let drawn = ["Focused", "the ring"] + (name == "focusFinal" ? ["Almost done"] : []) + [unlock]
+            #expect(Array(page) == drawn, "\(name): \(read)")
+        }
+        let home = Phone(fixture: try #require(PreviewFixtures.all["homeUnreadShielded"]))
+        let read = try await elements(of: RootView(phone: home), once: unlock).map { $0.label ?? "" }
+        #expect(Array(read.drop { $0 != unlock }.prefix(2)) == [unlock, "Tap your teacher's block"], "\(read)")
+    }
+
+    @Test(
+        "What else Focus says shows wherever its state has it, on the ring's page and under a question alike (rule 5): why an unlock gave way (C5a), why nothing reaches the teacher, D1's While offline card for a session and for a tap held, and a wake iOS refused; only with none of them is no room kept for them (the owner's cut, 2026-11-04)"
+    )
+    func focusNotes() async throws {
+        var asking = try #require(PreviewFixtures.all["focusQuestion"])
+        asking.sync?.link = .unreachable
+        let states =
+            try ["focusSuperseded", "focusSignedOut", "focusOffline", "focusTapHeld", "focusUnscheduled"].map {
+                ($0, try #require(PreviewFixtures.all[$0]))
+            } + [("focusQuestion offline", asking)]
+        for (name, state) in states {
+            let phone = Phone(fixture: state)
+            let words = FocusWords(try #require(phone.sync), phone.protection, now: Date(), signedIn: phone.signedIn)
+            let notes = [words.superseded, words.stalled, words.offline, words.unscheduled].compactMap { $0 }
+            #expect(!notes.isEmpty, "\(name)")
+            let read = try await elements(of: RootView(phone: phone), once: "Emergency Unlock. Your teacher will see it.")
+            for note in notes { #expect(read.contains { $0.label == note }, "\(name): \(note)") }
         }
     }
 

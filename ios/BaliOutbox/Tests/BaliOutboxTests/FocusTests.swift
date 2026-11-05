@@ -60,7 +60,7 @@ private func heldTap() throws -> [OutboxRecord] {
 @Suite("What the Focus screen says (C4)")
 struct FocusTests {
     @Test(
-        "D1's Focus: the class and its teacher, the countdown to the bell by the phone's clock, the ring as full as the time left, the shields as the check verified them, and Emergency Unlock's line"
+        "D1's Focus: the class and its teacher, the countdown to the bell by the phone's clock, the ring as full as the time left, and the shields as the check verified them, with no line under the ring (the owner's cut, 2026-11-04)"
     )
     func focused() throws {
         let words = focus(try synced(.inSession(bell1042, .focused)))
@@ -68,12 +68,8 @@ struct FocusTests {
         #expect(plain(words.subtitle) == "with Ms. Rivera · ends 10:42 AM")
         #expect(words.countdown == "28:40" && plain(words.until) == "until 10:42 AM")
         #expect(words.fraction == 1720 / FocusWords.ringSpan && !words.final)
-        #expect(words.claim == .paused)
-        #expect(
-            words.claimWords
-                == "Every app is paused. Calls, FaceTime, Messages and Emergency SOS always work.")
+        #expect(words.claim == .paused && words.claimWords == nil)
         #expect(words.offline == nil && words.unscheduled == nil)
-        #expect(words.caption == "Works without Wi-Fi. Letting go early does nothing.")
     }
 
     @Test(
@@ -214,7 +210,7 @@ struct FocusTests {
     }
 
     @Test(
-        "No answer from the server (D1's FocusOffline): the bell still kept by the phone, and an unlock saved on it first; waiting on sign-in, storage refused or no exchange yet is no 'no connection'"
+        "No answer from the server (D1's FocusOffline): the bell still kept by the phone, with no line under the ring (the owner's cut, 2026-11-04); waiting on sign-in, storage refused or no exchange yet is no 'no connection'"
     )
     func offline() throws {
         let words = focus(try synced(.inSession(bell1042, .focused), link: .unreachable))
@@ -222,10 +218,7 @@ struct FocusTests {
             plain(words.offline)
                 == "Focus still ends at 10:42 AM. This phone keeps time without Wi-Fi, and Bali catches up when it's back online. Your teacher sees when this phone last checked in."
         )
-        #expect(
-            words.caption
-                == "Works without Wi-Fi. An unlock is saved on this phone first. Letting go early does nothing."
-        )
+        #expect(words.claim == .paused && words.claimWords == nil)
         for link in [Link.signIn, .storageFailed, nil] {
             #expect(focus(try synced(.inSession(bell1042, .focused), link: link)).offline == nil)
         }
@@ -262,8 +255,8 @@ struct FocusTests {
         var unsaved = checked(shielded: false, off: true)
         unsaved.unreported = true
         let said = focus(try synced(.inSession(bell1042, .focused)), unsaved)
-        #expect(said.claimWords.hasSuffix(" Bali couldn't tell your teacher yet, and keeps trying."))
-        #expect(!focus(try synced(.inSession(bell1042, .focused))).claimWords.contains("teacher"))
+        #expect(said.claimWords?.hasSuffix(" Bali couldn't tell your teacher yet, and keeps trying.") == true)
+        #expect(focus(try synced(.inSession(bell1042, .focused))).claimWords == nil)
     }
 
     @Test(
