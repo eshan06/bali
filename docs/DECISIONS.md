@@ -9,11 +9,11 @@ touching before changing how something works. A pointer of the form
 a real decision? Add a dated entry at the top: what was decided and why.
 
 - **2026-11-05** — **A3a, the server's endpoint for the portal's teacher actions, `POST
-  /v1/me/actions` (the conductor's calls, awaiting the owner; A3a).** The relay the owner picked
-  ("Through Bali's server", the entry "PostHog: the owner's four rulings"): the portal posts `{
-  event, eventId }`, and the server sends the action on to PostHog with its own key, through A2's
-  sender (`Analytics.action` beside `track`, one fetch, timeout and wait), so the browser holds no
-  PostHog key and its CSP lists no PostHog host. A3b, the portal's side, is next.
+  /v1/me/actions` (the conductor's calls, awaiting the owner; A3a, #517).** The relay the owner
+  picked ("Through Bali's server", the entry "PostHog: the owner's four rulings"): the portal posts
+  `{ event, eventId }`, and the server sends the action on to PostHog with its own key, through
+  A2's sender (`Analytics.action` beside `track`, one fetch, timeout and wait), so the browser
+  holds no PostHog key and its CSP lists no PostHog host. A3b, the portal's side, is next.
 
   **What the server sends:** an event it builds itself, as the review of A5 asked: `distinct_id`
   the signed-in teacher's Bali id (`requireTeacher`'s row, never the Cognito sub), `timestamp` the
