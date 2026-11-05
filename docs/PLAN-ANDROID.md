@@ -14,7 +14,7 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-05 (Central) — AN7a, the lock follows the engine (#AN7A-PR; `docs/DECISIONS.md`,
+_Last updated: 2026-11-05 (Central) — AN7a, the lock follows the engine (#521; `docs/DECISIONS.md`,
 2026-11-05): BaliOutbox's enforcer in Kotlin over a seam of the lock's own (`Lock`), with its tests on a
 fake lock: the lock put on until the bell or a tap's cap, an end it keeps by the phone's clock, and
 again as the end moves, never over the switch off; over a standing the file won't give back, the last
@@ -145,7 +145,7 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN6a** Sign-in's parts — ✅ (#515; DECISIONS 2026-11-04)
 - **AN6b** Sign-in itself — ✅ (#518; DECISIONS 2026-11-05)
 - **AN6c** Sign-in's app side — ✅ (#520; DECISIONS 2026-11-05)
-- **AN7a** The lock follows the engine — ✅ (#AN7A-PR; DECISIONS 2026-11-05)
+- **AN7a** The lock follows the engine — ✅ (#521; DECISIONS 2026-11-05)
 - **AN7b** Rule 3's report: protection off, the lock back on, the launch grace (twin: `Enforcement`'s
   check, `judged` and `backOn`): rule 3 at every check-in; protection off and on, with iOS's events:
   the switch found off in a session the phone's clock says still runs, reported once

@@ -9,7 +9,7 @@ touching before changing how something works. A pointer of the form
 a real decision? Add a dated entry at the top: what was decided and why.
 
 - **2026-11-05** — **AN7a, the lock follows the engine: BaliOutbox's enforcer in Kotlin over a seam of the
-  lock's own, and AN7 in six PRs (the conductor's calls, awaiting the owner's look; AN7a, #AN7A-PR).**
+  lock's own, and AN7 in six PRs (the conductor's calls, awaiting the owner's look; AN7a, #521).**
   The owner isn't reviewing each step and asked for the recommended option on every question, so each
   call here is the conductor's, for the owner to look at.
 
