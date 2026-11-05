@@ -459,6 +459,35 @@ class SignInTokensTest : SignIns() {
         }
 
     @Test
+    fun aRenewalsCallerIsGivenATokenOnlyWhileTheSignInStillPassesASignInNotThroughThe13PlusCheckOrADeletionMeanwhileGivesNone() =
+        inTime {
+            // No iOS twin: iOS's gives the tokens there are after a renewal, unchecked (C7-server, C4).
+            val endpoint = HeldEndpoint()
+            val (store, now) = MemoryStore.holding(jwt("a1")) to Now()
+            val phone = signIn(store, endpoint, now, gated = true)
+            phone.passed("a1")
+            now.set(4000)
+            val renewal = async { phone.accessToken() }
+            endpoint.received(1)
+            val signingIn = async { phone.signIn(browser = signsIn) } // another account's, not through the check
+            endpoint.received(2)
+            endpoint.answer(200, granted(jwt("b1"), refresh = "refresh-b"), newestOnly = true)
+            signingIn.await()
+            endpoint.answer(400, refusal("invalid_grant")) // the renewal's, about a1's refresh token
+            assertNull(renewal.await())
+            assertEquals(jwt("b1"), phone.deletionToken()) // the check's own read's
+            // The API deleting the account while a renewal runs: neither token from then on.
+            now.set(8000)
+            val deleting = async { phone.deletionToken() }
+            endpoint.received(3)
+            phone.accountDeleted()
+            endpoint.answer(200, granted(jwt("b2")))
+            assertNull(deleting.await())
+            assertEquals(jwt("b2"), store.tokens?.access)
+            assertEquals(true, store.tokens?.deleted)
+        }
+
+    @Test
     fun aTokenWhoseLifetimeCantBeReadIsGivenUntilTheApiRefusesIt() =
         inTime {
             val now = Now()

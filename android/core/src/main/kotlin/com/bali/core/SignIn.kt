@@ -504,20 +504,24 @@ class SignIn(
     /** The account's email, as the tokens name it (#147): whose sign-in this is, which Me says. */
     suspend fun email(): String? = alone { current()?.email }
 
-    /** The access token, renewed first when it has expired; [gate], none while not through the 13+ check. */
+    /**
+     * The access token, renewed first when it has expired; none once the API deleted the account or, [gate],
+     * while not through the 13+ check, the tokens a renewal leaves held to that too, where iOS's gives them.
+     */
     private suspend fun given(gate: Boolean): String? {
+        fun Tokens.given() = deleted != true && (!gate || checked == true)
         val (token, renewal) =
             alone {
-                val held = current()
+                val held = current()?.takeIf { it.given() }
                 when {
-                    held == null || held.deleted == true || gate && held.checked != true -> null to null
+                    held == null -> null to null
                     now() < held.until -> held.access to null
                     else -> null to renew(telling = true)
                 }
             }
         return when {
             renewal == null -> token
-            outcome(renewal) -> alone { tokens?.access }
+            outcome(renewal) -> alone { tokens?.takeIf { it.given() }?.access }
             else -> null
         }
     }
