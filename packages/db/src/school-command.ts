@@ -76,6 +76,11 @@ export interface SchoolCommandIO {
    * This deploy's Cognito pool, its `AUTH_ISSUER`: where retention queues the sign-ins it removes.
    */
   issuer?: string;
+  /**
+   * Told of each session the command ended, once committed: as an End ends it (`ended`), or past
+   * its bell, as the sweep would (`expired`). The API counts them for PostHog (A2).
+   */
+  ended?: (sessionId: string, reason: 'ended' | 'expired') => void;
 }
 
 /** A command whose arguments are checked, ready to run. */
@@ -376,7 +381,7 @@ const lessons = (running: RunningLesson[]) =>
  * a lesson of the school still running is ended in it, as its teacher's End ends it.
  */
 async function dispose(
-  { db, print }: SchoolCommandIO,
+  { db, print, ended }: SchoolCommandIO,
   schoolId: string,
   confirmName: string | undefined,
   endLessons: boolean,
@@ -439,6 +444,8 @@ async function dispose(
       );
       return;
     case 'disposed':
+      for (const lesson of result.ended) ended?.(lesson.sessionId, 'ended');
+      for (const sessionId of result.expired) ended?.(sessionId, 'expired');
       print(
         `disposed of school ${schoolId} on ${at.toISOString()}: ${tally(result.counts)}` +
           (result.ended.length > 0
@@ -456,7 +463,10 @@ async function dispose(
  * A running lesson ended now, as its teacher's End ends it (the owner's decision
  * of 2026-10-28); one over already is left as it is, and said so.
  */
-async function endSessionNow({ db, print }: SchoolCommandIO, sessionId: string): Promise<void> {
+async function endSessionNow(
+  { db, print, ended }: SchoolCommandIO,
+  sessionId: string,
+): Promise<void> {
   // This machine's clock, the server's inside the API service (runbook 1, step 9).
   const at = new Date();
   const result = await endRunningSession(db, { sessionId, at });
@@ -473,6 +483,7 @@ async function endSessionNow({ db, print }: SchoolCommandIO, sessionId: string):
       );
       return;
     case 'ended':
+      ended?.(sessionId, 'ended');
       print(
         `ended session ${sessionId} on ${at.toISOString()}, as its teacher's End would: ` +
           `${result.endedParticipations} student(s) were in it`,

@@ -265,10 +265,15 @@ async function typesIn(sessionId: string) {
   return rows.map((e) => e.type);
 }
 
+/** Each session the last `run` said it ended (A2's hook), with how. */
+let told: [string, 'ended' | 'expired'][] = [];
+
 /** What the owner's command prints, line by line. */
 async function run(argv: string[]) {
   const lines: string[] = [];
-  await must(parseSchoolCommand(argv) ?? undefined)({ db, print: (l) => lines.push(l) });
+  told = [];
+  const ended = (sessionId: string, reason: 'ended' | 'expired') => told.push([sessionId, reason]);
+  await must(parseSchoolCommand(argv) ?? undefined)({ db, print: (l) => lines.push(l), ended });
   return lines;
 }
 
@@ -383,8 +388,9 @@ describe('disposeSchool (C6a)', () => {
         openInvites: 1,
         armedTaps: 1,
       },
-      // No lesson of it running, none ended.
+      // No lesson of it running, none ended; both past their bell ended as the sweep would.
       ended: [],
+      expired: [s.past.id, s.lesson.id].sort(),
     });
     const after = await rowsOf(s);
     expect(after.school[0]?.removedAt).toEqual(at);
@@ -666,6 +672,7 @@ describe('disposeSchool (C6a)', () => {
           endsAt: s.lesson.endsAt,
         },
       ],
+      expired: [s.past.id],
     });
     const after = await rowsOf(s);
     // The running lesson ended now, as an End ends it: Ana's turn in it with it, its question
@@ -898,6 +905,8 @@ describe('npm run school -- dispose', () => {
     expect(one(await db.select().from(schools).where(eq(schools.id, s.school.id))).removedAt).toBe(
       null,
     );
+    // A preview ends nothing, so it tells of nothing.
+    expect(told).toEqual([]);
 
     const done = await run(['dispose', s.school.id, '--confirm', s.school.name]);
     expect(done).toHaveLength(1);
@@ -907,6 +916,13 @@ describe('npm run school -- dispose', () => {
           'sessions 2, blocks 1, open invites 1, pre-bell taps 0$',
       ),
     );
+    // Both lessons were past their bell: each ended as the sweep would, and told so.
+    expect(told.sort()).toEqual(
+      [
+        [s.past.id, 'expired'],
+        [s.lesson.id, 'expired'],
+      ].sort(),
+    );
     expect(await run(['dispose', s.school.id])).toEqual([
       expect.stringMatching(
         new RegExp(
@@ -915,6 +931,7 @@ describe('npm run school -- dispose', () => {
         ),
       ),
     ]);
+    expect(told).toEqual([]);
   });
 
   it('quotes the name it suggests as one shell word, whatever it holds', () => {
@@ -1031,6 +1048,7 @@ describe('npm run school -- dispose', () => {
       `To go ahead: npm run school -- dispose ${s.school.id} --confirm '${s.school.name}' --end-lessons`,
     );
     expect(one(await running()).endedAt).toBeNull();
+    expect(told).toEqual([]);
 
     const done = await run(['dispose', s.school.id, '--confirm', s.school.name, '--end-lessons']);
     expect(done).toEqual([
@@ -1043,6 +1061,11 @@ describe('npm run school -- dispose', () => {
       ),
     ]);
     expect(one(await running()).endedAt).not.toBeNull();
+    // The running one as an End ends it, the one past its bell as the sweep would.
+    expect(told).toEqual([
+      [s.lesson.id, 'ended'],
+      [s.past.id, 'expired'],
+    ]);
   });
 });
 
@@ -1069,6 +1092,7 @@ describe('npm run school -- end-session', () => {
     );
 
     const said = await run(['end-session', s.lesson.id]);
+    expect(told).toEqual([[s.lesson.id, 'ended']]);
 
     expect(said).toEqual([
       expect.stringMatching(
@@ -1118,16 +1142,18 @@ describe('npm run school -- end-session', () => {
     const total = () => db.$count(events);
     const count = await total();
 
-    // Its teacher ended it.
+    // Its teacher ended it. Not ended here, so not told of either.
     expect(await run(['end-session', s.lesson.id])).toEqual([
       `session ${s.lesson.id} was over already: it ended on ${endedAt?.toISOString()}; ` +
         'nothing changed',
     ]);
+    expect(told).toEqual([]);
     // Past its bell, not yet swept: over by the server's clock (A17), and the sweep's to mark.
     expect(await run(['end-session', s.past.id])).toEqual([
       `session ${s.past.id} was over already: its bell rang at ${s.past.endsAt.toISOString()}, ` +
         'and the sweep marks it so; nothing changed',
     ]);
+    expect(told).toEqual([]);
     expect(await rowsOf(s)).toEqual(before);
     expect(await total()).toBe(count);
   });

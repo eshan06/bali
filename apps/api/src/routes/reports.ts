@@ -59,9 +59,9 @@ const whole = (minutes: number) => Math.round(minutes);
 /**
  * A session's report as both routes give it: `sessionReport` (R1) by the server's clock, each
  * figure whole and rounded from its exact one, so a row of the list never disagrees with its
- * session's report.
+ * session's report, nor PostHog's totals (A2) with either.
  */
-function counted(session: ReportWindow, events: readonly ReportEvent[], now: Date) {
+export function counted(session: ReportWindow, events: readonly ReportEvent[], now: Date) {
   const report = sessionReport(session, events, now);
   return {
     ...report,

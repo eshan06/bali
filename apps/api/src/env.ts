@@ -162,6 +162,18 @@ const envSchema = z
       z.string().regex(AWS_KEY_ID, 'is an AWS access key id').optional(),
     ),
     DECK_BUCKET_SECRET_ACCESS_KEY: blankIsUnset(z.string().min(16).optional()),
+    /*
+     * PostHog (A2, analytics.ts): the project's key, which each event carries, never a personal
+     * API key (the server holds no PostHog admin key). Unset — the default, and always in tests
+     * and dev — the server sends PostHog nothing. The host, unset, is PostHog's US cloud.
+     */
+    POSTHOG_KEY: blankIsUnset(
+      z
+        .string()
+        .regex(/^phc_\w+$/, 'is a PostHog project key (phc_…), never a personal API key')
+        .optional(),
+    ),
+    POSTHOG_HOST: blankIsUnset(z.string().url().optional()),
   })
   .superRefine((env, ctx) => {
     const set = [env.APNS_KEY_P8, env.APNS_KEY_ID, env.APNS_TEAM_ID].filter((v) => v !== undefined);

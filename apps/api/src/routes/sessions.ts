@@ -29,6 +29,7 @@ import { MAX_SESSION_MINUTES, UNLOCK_REASONS } from '@bali/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
+import type { Analytics } from '../analytics.js';
 import { requireAuth } from '../auth/plugin.js';
 import { requireOwnClass, requireSessionOwner, requireTeacher } from '../auth/teacher.js';
 import { parseRequest } from '../errors.js';
@@ -84,13 +85,15 @@ function toUnlockResponse(result: UnlockResult): UnlockResponse {
  * (check-in, unlock, refocus, protection-off and -on) are for the enrolled phone and resolve the caller
  * like a tap — an unlock sent under a tap too, which names its tap, not a session. All are thin
  * wrappers over the transition engine — the engine owns the writes, these just authorize and
- * shape the response.
+ * shape the response. A Start, an End and an extend that changed something are counted for
+ * PostHog once committed (A2); a replay changed nothing and counts nothing.
  */
 export function registerSessionsRoute(
   app: FastifyInstance,
   db: Database,
   clock: () => Date,
   notifyClassStarted: NotifyClassStarted,
+  analytics: Analytics,
 ): void {
   // POST /v1/classes/:id/sessions — start (or return the already-running) session.
   app.post(
@@ -118,6 +121,8 @@ export function registerSessionsRoute(
         startedAt: result.session.startedAt,
         studentIds: result.convertedStudentIds,
       });
+      if (result.expired) analytics.track('session_ended', result.expired, 'bell');
+      if (result.outcome === 'created') analytics.track('session_started', result.session.id);
 
       return {
         outcome: result.outcome,
@@ -142,6 +147,7 @@ export function registerSessionsRoute(
       const result = await mapTransitionError(() =>
         endSession(db, { sessionId: session.id, at: new Date(), reason: 'ended' }),
       );
+      if (result.ended) analytics.track('session_ended', session.id, 'teacher');
       return {
         outcome: result.ended ? 'ended' : 'already_ended',
         endedParticipations: result.endedParticipations,
@@ -163,9 +169,11 @@ export function registerSessionsRoute(
       // The duration goes to the engine, not a computed end time: the
       // arithmetic belongs inside its locked read, or two simultaneous
       // presses compute the same target and the second is refused.
-      const updated = await mapTransitionError(() =>
+      const { outcome, session: updated } = await mapTransitionError(() =>
         extendSession(db, { sessionId: session.id, durationMinutes, at: clock(), eventId }),
       );
+      if (outcome === 'extended') analytics.track('session_extended', session.id);
+      // A replay answers `extended` as it always did: what /v1 shipped (additive-only).
       return { outcome: 'extended', session: toSessionView(updated) };
     },
   );
