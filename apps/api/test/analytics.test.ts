@@ -11,15 +11,22 @@ import {
   unlock,
   users,
 } from '@bali/db';
-import type { SessionReportResponse, StartSessionResponse } from '@bali/shared';
+import { PORTAL_EVENTS, type SessionReportResponse, type StartSessionResponse } from '@bali/shared';
 import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
+import { randomUUID } from 'node:crypto';
 import { Writable } from 'node:stream';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { analyticsConfig, createAnalytics, ownerEnds } from '../src/analytics.js';
+import {
+  analyticsConfig,
+  createAnalytics,
+  ownerEnds,
+  type SessionEvent,
+} from '../src/analytics.js';
 import { buildApp } from '../src/app.js';
 import type { Env } from '../src/env.js';
+import type { LimitOptions } from '../src/limits.js';
 import { makeTestDb, seedClassroom } from './helpers/db.js';
 import { testEnv } from './helpers/env.js';
 import { makeTestIssuer, type TestIssuer } from './helpers/test-issuer.js';
@@ -56,6 +63,8 @@ interface Posted {
     event: string;
     distinct_id: string;
     timestamp: string;
+    /** A portal action's (A3a): its `eventId`. */
+    uuid?: string;
     properties: Record<string, unknown>;
   };
 }
@@ -92,7 +101,7 @@ const sender = () =>
     { fetch: posthogFetch, clock: () => now },
   );
 
-function build(env: Env): FastifyInstance {
+function build(env: Env, limits?: LimitOptions): FastifyInstance {
   lines = [];
   const logStream = new Writable({
     write(chunk: Buffer, _encoding, done) {
@@ -106,6 +115,7 @@ function build(env: Env): FastifyInstance {
     logStream,
     posthogFetch,
     clock: () => now,
+    limits,
   });
 }
 
@@ -597,6 +607,180 @@ describe('never in the way', () => {
         'analytics event not sent',
       ],
     ]);
+  });
+});
+
+describe('the portal’s teacher actions (A3a): POST /v1/me/actions', () => {
+  const ACTIONS = '/v1/me/actions';
+  const action = (event = 'portal_class_created', eventId = newUuidV7()) => ({ event, eventId });
+
+  it('forwards one as the server builds it: the teacher by Bali’s id, its clock, the name, the id as its uuid, and nothing else', async () => {
+    const room = await seedClassroom(db, 'a3a-built');
+    const sent = action();
+    const res = await as(room.teacher.cognitoId, ACTIONS, {
+      ...sent,
+      // What a client never gets to write at PostHog: each dropped, none forwarded.
+      distinct_id: room.student.id,
+      timestamp: '2020-01-01T00:00:00.000Z',
+      uuid: newUuidV7(),
+      api_key: 'phc_someoneElsesProject',
+      properties: { name: 'Ana Ruiz', url: 'https://bali-portal.vercel.app/classes/1' },
+      $set: { email: 'ana.ruiz@vanderbilt.edu' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({});
+    await settle();
+
+    expect(posted).toEqual([
+      {
+        url: 'https://us.i.posthog.com/i/v0/e/',
+        body: {
+          api_key: KEY,
+          event: 'portal_class_created',
+          distinct_id: room.teacher.id,
+          timestamp: now.toISOString(),
+          uuid: sent.eventId,
+          properties: { environment: 'test' },
+        },
+      },
+    ]);
+  });
+
+  it('takes every name on the allow-list, each apart from the server’s own', async () => {
+    const room = await seedClassroom(db, 'a3a-names');
+    for (const event of PORTAL_EVENTS) {
+      const res = await as(room.teacher.cognitoId, ACTIONS, action(event));
+      expect(res.statusCode, event).toBe(200);
+    }
+    await settle();
+    expect(events().sort()).toEqual([...PORTAL_EVENTS].sort());
+    // A Start pressed in the portal never adds to the sessions the server counts (A2).
+    const server: SessionEvent[] = ['session_started', 'session_ended', 'session_extended'];
+    for (const event of PORTAL_EVENTS) {
+      expect(event).toMatch(/^portal_[a-z_]+$/);
+      expect(server).not.toContain(event);
+    }
+  });
+
+  it('refuses a student, no sign-in and an account the server has no row for, makes none, and sends nothing', async () => {
+    const room = await seedClassroom(db, 'a3a-who');
+    expect((await as(room.student.cognitoId, ACTIONS, action())).statusCode).toBe(403);
+    expect((await as('a3a-no-account', ACTIONS, action())).statusCode).toBe(403);
+    const anonymous = await app.inject({ method: 'POST', url: ACTIONS, payload: action() });
+    expect(anonymous.statusCode).toBe(401);
+    await settle();
+
+    expect(posted).toEqual([]);
+    expect(await db.select().from(users).where(eq(users.cognitoId, 'a3a-no-account'))).toEqual([]);
+  });
+
+  it('refuses a name off the allow-list and an id that is no UUIDv7, saying which field, never echoing it, and sends nothing', async () => {
+    const room = await seedClassroom(db, 'a3a-bad');
+    const refused = [
+      { body: action('portal_exported_the_roster'), field: 'event' },
+      // The server's own names are the server's alone.
+      { body: action('session_started'), field: 'event' },
+      { body: { eventId: newUuidV7() }, field: 'event' },
+      { body: { event: 'portal_signed_in' }, field: 'eventId' },
+      { body: action('portal_signed_in', 'not-a-uuid'), field: 'eventId' },
+      // Version 4: every mutation's id is a UUIDv7 (the house rule).
+      { body: action('portal_signed_in', randomUUID()), field: 'eventId' },
+    ];
+    for (const { body, field } of refused) {
+      const res = await as(room.teacher.cognitoId, ACTIONS, body);
+      expect(res.statusCode, JSON.stringify(body)).toBe(400);
+      expect(res.json()).toMatchObject({
+        error: { code: 'bad_input', details: [{ path: field }] },
+      });
+      expect(res.body).not.toContain('portal_exported_the_roster');
+    }
+    const authorization = `Bearer ${await issuer.sign({ sub: room.teacher.cognitoId })}`;
+    const bodiless = await app.inject({ method: 'POST', url: ACTIONS, headers: { authorization } });
+    expect(bodiless.statusCode).toBe(400);
+    await settle();
+
+    expect(posted).toEqual([]);
+    // A refused action is never logged with what it carried (ARCHITECTURE, "Analytics").
+    expect(lines.join('')).not.toContain('portal_exported_the_roster');
+  });
+
+  it('answers a resend as it answered the first, in either case, and sends it again under the same uuid', async () => {
+    const room = await seedClassroom(db, 'a3a-again');
+    const sent = action('portal_report_opened');
+    const first = await as(room.teacher.cognitoId, ACTIONS, sent);
+    const sentAt = now;
+    now = new Date(now.getTime() + MIN);
+    const again = await as(room.teacher.cognitoId, ACTIONS, {
+      ...sent,
+      eventId: sent.eventId.toUpperCase(),
+    });
+    expect([first.statusCode, again.statusCode]).toEqual([200, 200]);
+    expect(again.json()).toEqual(first.json());
+    await settle();
+
+    // PostHog's drop of the second is best effort (analytics.ts): each is sent at the server's time.
+    expect(posted.map((p) => [p.body.uuid, p.body.timestamp])).toEqual([
+      [sent.eventId, sentAt.toISOString()],
+      [sent.eventId, now.toISOString()],
+    ]);
+  });
+
+  it('answers the same while POSTHOG_KEY is unset, and sends nothing', async () => {
+    const room = await seedClassroom(db, 'a3a-off');
+    const whileOn = await as(room.teacher.cognitoId, ACTIONS, action());
+    await app.close();
+    app = build({ ...testEnv, LOG_LEVEL: 'info' });
+    posted = [];
+    const whileOff = await as(room.teacher.cognitoId, ACTIONS, action());
+    await settle();
+
+    expect([whileOff.statusCode, whileOff.json()]).toEqual([whileOn.statusCode, whileOn.json()]);
+    expect(whileOff.statusCode).toBe(200);
+    expect(posted).toEqual([]);
+  });
+
+  it('answers while PostHog hangs, then logs its refusal with nothing personal in it', async () => {
+    const room = await seedClassroom(db, 'a3a-hangs');
+    let release!: () => void;
+    const hung = new Promise<void>((resolve) => (release = resolve));
+    answer = () => hung.then(() => new Response('{"error":"bad"}', { status: 503 }));
+
+    expect((await as(room.teacher.cognitoId, ACTIONS, action())).statusCode).toBe(200);
+    await vi.waitFor(() => expect(posted).toHaveLength(1));
+    // Answered, and the send still waits on PostHog.
+    release();
+    await settle();
+
+    const log = lines.join('');
+    expect(log).toContain('analytics event refused');
+    expect(log).toContain('"event":"portal_class_created"');
+    for (const word of [KEY, room.teacher.id, room.teacher.cognitoId]) {
+      expect(log, word).not.toContain(word);
+    }
+  });
+
+  it('holds a loop to the teacher’s budget: 429 past it, nothing sent for those, a refusal spending none', async () => {
+    let ms = 0;
+    await app.close();
+    app = build(on, { portalActions: { burst: 2, perMinute: 6 }, now: () => ms });
+    const room = await seedClassroom(db, 'a3a-loop');
+    const teacher = room.teacher.cognitoId;
+
+    // A refused name spends none of the budget.
+    expect((await as(teacher, ACTIONS, action('portal_nothing'))).statusCode).toBe(400);
+    expect((await as(teacher, ACTIONS, action())).statusCode).toBe(200);
+    expect((await as(teacher, ACTIONS, action())).statusCode).toBe(200);
+    const over = await as(teacher, ACTIONS, action());
+    expect([over.statusCode, over.headers['retry-after']]).toEqual([429, '10']);
+    expect(over.json()).toEqual({
+      error: { code: 'rate_limited', message: 'too many actions from this account' },
+    });
+    // Ten seconds' refill is one more.
+    ms += 10_000;
+    expect((await as(teacher, ACTIONS, action())).statusCode).toBe(200);
+    await settle();
+
+    expect(posted).toHaveLength(3);
   });
 });
 

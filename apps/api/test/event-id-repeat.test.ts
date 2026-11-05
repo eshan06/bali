@@ -246,6 +246,15 @@ const REPEATS: Record<string, Repeat> = {
     as: 'student',
     sent: () => ({ url: '/v1/me/age-check', body: { eventId: newUuidV7() }, replay: (f) => f }),
   },
+  // The relay keeps no row: a resend is answered as the first was, `{}`, its id PostHog's uuid (A3a).
+  'POST /v1/me/actions': {
+    as: 'owner',
+    sent: () => ({
+      url: '/v1/me/actions',
+      body: { event: 'portal_report_opened', eventId: newUuidV7() },
+      replay: (first) => first,
+    }),
+  },
   // The phone tapped, then unlocked while the tap was unanswered: the unlock, sent under the tap's
   // id, landed first and was kept (decision 11). The tap files it as it lands, so both arrival
   // orders end alike: the student unlocked.

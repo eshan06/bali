@@ -11,9 +11,11 @@ import { ApiError } from './errors.js';
  * (`authenticate` spends it once the token checks out), and only a request no one is signed in on
  * — no token, or one the pool refused — by address, with a budget for a whole school. Guessing a
  * code — a join code, or a teacher invite's (T1b) — gets a tighter budget per account and, as
- * accounts are free while self sign-up is on, a backstop on misses per address. Over a budget is a
- * 429 in the one error shape, `Retry-After` saying when one more passes: a throttle that refills,
- * never a block. The sizes and why: docs/DECISIONS.md, 2026-10-04 (L1, T1b).
+ * accounts are free while self sign-up is on, a backstop on misses per address. A teacher's actions
+ * the portal counts for PostHog (A3a) get a budget per account too, so a loop can't run up PostHog's
+ * bill. Over a budget is a 429 in the one error shape, `Retry-After` saying when one more passes: a
+ * throttle that refills, never a block. The sizes and why: docs/DECISIONS.md, 2026-10-04 (L1,
+ * T1b), 2026-11-05 (A3a).
  *
  * Each budget is a token bucket per key, in this process's memory — no Redis, no new
  * infrastructure: N instances of the API are N times each budget.
@@ -38,6 +40,11 @@ export interface Budgets {
   inviteTries: Budget;
   /** Each address's misses there (`404 invite_not_found`), whatever the account. */
   inviteMisses: Budget;
+  /**
+   * Each teacher's actions the portal counts for PostHog (A3a), keyed by Bali's id for them: what a
+   * loop adds to its bill.
+   */
+  portalActions: Budget;
 }
 
 export const BUDGETS: Budgets = {
@@ -48,6 +55,7 @@ export const BUDGETS: Budgets = {
   joinMisses: { burst: 100, perMinute: 6 },
   inviteTries: { burst: 5, perMinute: 1 },
   inviteMisses: { burst: 20, perMinute: 2 },
+  portalActions: { burst: 30, perMinute: 10 },
 };
 
 /** What a guess is at: a join code (the preview and the join), or a teacher invite (its redeem). */
@@ -82,7 +90,7 @@ export interface Bucket {
 /**
  * The most keys one budget holds at once (Phase 6 S3). Without a cap, a flood of distinct keys —
  * addresses, say — would grow the map until the next sweep, a full refill's time away. A key
- * takes well under a kilobyte, so six budgets at the cap stay within tens of megabytes.
+ * takes well under a kilobyte, so seven budgets at the cap stay within tens of megabytes.
  */
 export const MAX_KEYS = 100_000;
 
@@ -145,6 +153,8 @@ function refuse(seconds: number, message: string): void {
 export interface Limiter {
   /** A signed-in request: one of the account's budget. */
   signedIn(sub: string): void;
+  /** A teacher's action for PostHog (A3a), checked and about to be sent: one of its budget. */
+  portalAction(teacherId: string): void;
   /** A request no one is signed in on: one of its address's budget. */
   unsigned(request: FastifyRequest): void;
   /**
@@ -168,6 +178,7 @@ export function createLimiter({
   const of = (name: keyof Budgets) => bucket(budgets[name] ?? BUDGETS[name], now);
   const account = of('account');
   const unsigned = of('unsigned');
+  const portalActions = of('portalActions');
   const guesses: Record<Guess, { tries: Bucket; misses: Bucket; tried: string; missed: string }> = {
     join: {
       tries: of('joinTries'),
@@ -187,6 +198,8 @@ export function createLimiter({
   const holding = new WeakMap<FastifyRequest, Bucket>();
   return {
     signedIn: (sub) => refuse(account.take(sub), 'too many requests from this account'),
+    portalAction: (teacherId) =>
+      refuse(portalActions.take(teacherId), 'too many actions from this account'),
     unsigned: (request) =>
       refuse(unsigned.take(clientAddress(request)), 'too many requests with no sign-in'),
     guess: (request, at) => {

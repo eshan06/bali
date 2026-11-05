@@ -10,6 +10,13 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-11-05 (Central) — WC5 (#516; `docs/DECISIONS.md`, 2026-11-04): the fifth of the
+eight WC steps: the Screen Time step, History and Me lose their lines, and the step no longer cuts a
+line short on the big iPhones. Before it, A2 (#514). Next: WC6; A3a, A3b, A4; a session builds the
+retire-a-block command; the owner the new build, with A5 and A2, and the sitting; the owner's call on
+GA5's known limit, the smallest iPhones (DECISIONS 2026-11-02); AN6, Android's sign-in; AN1's part 2
+once the owner has the phones; the audit's polish waits, as ruled._
+
 _Last updated: 2026-11-04 (Central) — A2 (#514; `docs/DECISIONS.md`, 2026-11-04): the server sends
 PostHog a class's totals when a session starts, ends or is extended, off until `POSTHOG_KEY` is set;
 the app's manifest gives Other Data Types the purpose Analytics (the owner's pick). Before it, WC4

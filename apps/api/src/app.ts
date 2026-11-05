@@ -17,6 +17,7 @@ import { createLimiter, type LimitOptions } from './limits.js';
 import { apnsConfig, type ApnsTransport, createApnsClient, http2Transport } from './push/apns.js';
 import { classStartedNotifier } from './push/class-started.js';
 import { LOG_REDACT, serializeError } from './redact.js';
+import { registerActionsRoute } from './routes/actions.js';
 import { registerAgeCheckRoutes } from './routes/age-check.js';
 import { registerBlocksRoutes } from './routes/blocks.js';
 import { registerClassesRoutes } from './routes/classes.js';
@@ -172,7 +173,7 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
   const posthog = analyticsConfig(env);
   app.log.info(
     posthog
-      ? 'analytics is on: class totals go to PostHog'
+      ? 'analytics is on: class totals and the portal’s teacher actions go to PostHog'
       : 'analytics is off: POSTHOG_KEY is unset',
   );
   const analytics = createAnalytics(posthog, deps.db, app.log, { fetch: deps.posthogFetch, clock });
@@ -180,6 +181,7 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
   // sweep's (its run waited out, `startSweeping`) before this, so it waits out each send they began.
   app.addHook('onClose', () => analytics.settled());
   registerSessionsRoute(app, deps.db, clock, notifyClassStarted, analytics);
+  registerActionsRoute(app, deps.db, limits, analytics);
   // Said once, at start, as push says it; the deck routes read it.
   const deckStorage = deps.deckStorage ?? s3DeckStorage(env);
   app.log.info(

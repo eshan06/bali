@@ -1,4 +1,5 @@
 import { type Database, getSessionEvents, sessionTotalsOf } from '@bali/db';
+import type { PortalEvent } from '@bali/shared';
 
 import { captureFailure, environmentOf } from './monitoring.js';
 import { counted } from './routes/reports.js';
@@ -10,7 +11,8 @@ import { counted } from './routes/reports.js';
  * id, the server's time, and `sessionProperties`' numbers and one fixed word, so no student's id,
  * name or email, no class or session name, no URL and no free text can go. Sent once what it counts
  * has committed and never awaited: a send never fails or delays a request or the sweep, gives up
- * at its timeout, and a failure is logged with nothing personal in it.
+ * at its timeout, and a failure is logged with nothing personal in it. The portal's teacher
+ * actions (A3a, `POST /v1/me/actions`) go the same way, built here too.
  */
 
 const DEFAULT_POSTHOG_HOST = 'https://us.i.posthog.com';
@@ -98,6 +100,11 @@ export interface AnalyticsLog {
 export interface Analytics {
   /** Counts a session's event in the background, after its commit; nothing while off. */
   track(event: SessionEvent, sessionId: string, endedBy?: EndedBy): void;
+  /**
+   * Counts a teacher's action in the portal (A3a) in the background, as `teacherId` (Bali's id),
+   * at the server's clock now, with `eventId` as its `uuid`; nothing while off.
+   */
+  action(event: PortalEvent, teacherId: string, eventId: string): void;
   /** Waits out every send still on its way: the shutdown's, and the owner's command's. */
   settled(): Promise<void>;
 }
@@ -130,7 +137,9 @@ export function createAnalytics(
     timeoutMs = POSTHOG_TIMEOUT_MS,
   }: AnalyticsOptions = {},
 ): Analytics {
-  if (!config) return { track: () => undefined, settled: () => Promise.resolve() };
+  if (!config) {
+    return { track: () => undefined, action: () => undefined, settled: () => Promise.resolve() };
+  }
   const inFlight = new Set<Promise<void>>();
 
   /**
@@ -167,8 +176,12 @@ export function createAnalytics(
     };
   };
 
-  const capture = async (event: SessionEvent, sessionId: string, endedBy?: EndedBy) => {
-    const body = JSON.stringify(await build(event, sessionId, endedBy));
+  /** What a log line names an event by: never a person, never the key. */
+  type About = { event: string; sessionId?: string };
+
+  /** Posts the event `made` builds. */
+  const capture = async (about: About, made: () => Promise<object> | object) => {
+    const body = JSON.stringify(await made());
     let response: Response;
     try {
       response = await post(config.url, {
@@ -183,28 +196,50 @@ export function createAnalytics(
         config.key,
         '[key]',
       );
-      log.warn({ event, sessionId, failure }, 'analytics event not sent');
+      log.warn({ ...about, failure }, 'analytics event not sent');
       return;
     }
     // Read to its end, though none of it is used, so its connection goes back at once.
     await response.arrayBuffer().catch(() => undefined);
     if (!response.ok) {
-      log.warn({ event, sessionId, status: response.status }, 'analytics event refused');
+      log.warn({ ...about, status: response.status }, 'analytics event refused');
     }
+  };
+
+  /** `capture` in the background, waited out by `settled`. */
+  const send = (about: About, made: () => Promise<object> | object) => {
+    const sending = capture(about, made)
+      .catch((err: unknown) => {
+        // Our own failure (reading the totals), not PostHog's: reported like a 500.
+        log.error({ err, ...about }, 'analytics event failed');
+        captureFailure(err, 'analytics');
+      })
+      .finally(() => {
+        inFlight.delete(sending);
+      });
+    inFlight.add(sending);
   };
 
   return {
     track(event, sessionId, endedBy) {
-      const sending = capture(event, sessionId, endedBy)
-        .catch((err: unknown) => {
-          // Our own failure (reading the totals), not PostHog's: reported like a 500.
-          log.error({ err, event, sessionId }, 'analytics event failed');
-          captureFailure(err, 'analytics');
-        })
-        .finally(() => {
-          inFlight.delete(sending);
-        });
-      inFlight.add(sending);
+      send({ event, sessionId }, () => build(event, sessionId, endedBy));
+    },
+    action(event, teacherId, eventId) {
+      const at = clock();
+      send({ event }, () => ({
+        api_key: config.key,
+        event,
+        distinct_id: teacherId,
+        timestamp: at.toISOString(),
+        // So PostHog can drop a resend, the id lower case as the server prints ids, whatever case
+        // it came in. Only best effort: PostHog keeps one of two events with the same uuid only
+        // when they share the event, the distinct_id and the UTC day of their timestamp too, and
+        // only once ClickHouse merges the parts that hold them, which it never promises (PostHog's
+        // handbook, "sharded_events"). So a resend may still count twice, and one sent on another
+        // UTC day always does.
+        uuid: eventId.toLowerCase(),
+        properties: { environment: config.environment },
+      }));
     },
     async settled() {
       // Until none is left: a request still answering as the close began may add one.

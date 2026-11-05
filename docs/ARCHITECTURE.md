@@ -637,6 +637,9 @@ Teacher app and web portal:
   `403`. Home reads it again every 15 s while it shows it (PV17c-1), so the route reads only those
   three kinds and the reasons' changes of today's sessions, all the report's listing needs: the
   same answer, at a few events a read.
+- `POST /v1/me/actions` — a teacher's action in the portal, counted for PostHog (added 2026-11-05,
+  A3a, additive): `{ event, eventId }`, answered `{}` whether PostHog is on or off; a student or an
+  account with no row `403`. "Analytics (PostHog)" has the rest.
 - `POST /v1/teacher-invites/redeem` — how an account becomes a teacher (T1b): `{ code, eventId }`,
   the code the owner minted for a school (data model, `teacher_invites`), matched as the command
   printed it with its case, spaces and dashes set aside, and looked up by its hash; in the body,
@@ -960,25 +963,30 @@ the teacher portal's, which it forwards, and nothing else of Bali's.
   optional host (`https://us.i.posthog.com` by default), for its own events and the portal's alike;
   the portal holds no PostHog key. The owner sets it in Railway's `bali prod`.
 - **No PostHog code in the browser** (the owner's pick, "Through Bali's server"). The portal posts
-  each teacher event to a teacher-only endpoint of Bali's API, additive under `/v1` (PLAN's A3a),
-  which checks the event's name and properties against an allow-list, the actions above with no
-  URL and no free text, and forwards it to PostHog with the server's key. The server builds the
-  event itself: the teacher's id from the signed-in caller, `environment` and the time its own, the
-  name and properties only as the allow-list has them. Nothing else the request carries goes on
-  (no user id, IP address, person property or time of its own), and a refused event is never
-  logged with its body. So the portal's CSP (S4, `apps/web/src/lib/csp.ts`) never lists a PostHog
+  each teacher event to `POST /v1/me/actions` (A3a), teacher-only, as `{ event, eventId }`: the
+  name, one of an allow-list (`PORTAL_EVENTS`, `@bali/shared`: the actions above, each
+  `portal_`-prefixed apart from the server's own), and a UUIDv7; else a `400`, sent nothing. The
+  server forwards it to PostHog with its key, building the event itself: the teacher's id from the
+  signed-in caller, `environment` and the time its own, and of the body the name alone, with no
+  property. Nothing else the request carries goes on (no user id, IP address, person property or
+  time of its own), and a refused event is never logged with its body. So the portal's CSP (S4,
+  `apps/web/src/lib/csp.ts`) never lists a PostHog
   origin: `https://us.i.posthog.com` takes events for every PostHog project, so listing it would
   let a script running in the page send the access token to a project of its own, where
   `connect-src` lets nothing out but to the API, Cognito, Sentry and the deck bucket. PostHog sees
-  the server's address, never a teacher's, and an ad blocker can't drop the events. The server
+  the server's address, never a teacher's, and an ad blocker can't drop the events: the path holds
+  no word ad blockers look for. Each teacher's actions have a budget of their own (`portalActions`,
+  30 at once, then 10 a minute), so a loop can't run up PostHog's bill. The server
   sends with a small `fetch` to PostHog's capture endpoint, no SDK: a few lines beat a new
   dependency (the conductor's call, awaiting the owner).
 - **Never in the way.** A send is fire-and-forget, bounded by a timeout, and made once what it
   counts has happened: on the server, after the commit, as the Start's push is
   (`apps/api/src/routes/sessions.ts`). On the server, a replay changes nothing and sends nothing, so
-  a resent Start counts once. The relay keeps no row, so an event the portal posts twice can count
-  twice, an analytics count off, never a record (A3a's to narrow: PostHog's own dedupe on an
-  event's uuid is best effort). A send never fails or delays a request or a page, the portal's post
+  a resent Start counts once. The relay keeps no row: a resend is answered as the first was and
+  sent again, its `eventId` as PostHog's `uuid`, which PostHog drops only when both share the
+  event, the teacher and the UTC day, and only once ClickHouse merges them, which it never
+  promises. So an action the portal posts twice can still count twice, an analytics count off,
+  never a record. A send never fails or delays a request or a page, the portal's post
   to the API included; a failure is logged with nothing personal in it and never shown, since
   nothing the user did has failed.
 - **Named before it is on.** The privacy policy names PostHog as a service provider, and says what

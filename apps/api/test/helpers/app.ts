@@ -21,6 +21,7 @@ const ROOMY_LIMITS: LimitOptions = {
   joinMisses: ROOMY,
   inviteTries: ROOMY,
   inviteMisses: ROOMY,
+  portalActions: ROOMY,
 };
 
 export interface AuthedApp {

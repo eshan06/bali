@@ -126,6 +126,19 @@ describe('BUDGETS never refuses an honest client', () => {
     expect(refused()).toBe(0);
   });
 
+  it('a teacher’s day of portal actions: six classes, each with all of them at its start, then 25 reports opened at once', () => {
+    const { clock, count, refused } = driven();
+    count((l) => l.portalAction('teacher'));
+    for (let period = 0; period < 6; period += 1) {
+      clock.ms = period * 55 * MINUTE;
+      // Start, three questions, slides, Present, an extend, End and the recap, in its first minute.
+      for (let i = 0; i < 9; i += 1) count((l) => l.portalAction('teacher'));
+    }
+    clock.ms = 6 * 55 * MINUTE;
+    for (let i = 0; i < 25; i += 1) count((l) => l.portalAction('teacher'));
+    expect(refused()).toBe(0);
+  });
+
   it('a school’s 60 teachers redeeming at a training, from one address in ten minutes, every tenth mistyping a symbol first', () => {
     const { clock, count, refused } = driven();
     for (let i = 0; i < 60; i += 1) {
@@ -152,6 +165,22 @@ describe('BUDGETS holds a flood or a guesser to its budget', () => {
     expect(() => limiter.signedIn('flood')).toThrow(
       expect.objectContaining({ code: 'rate_limited', retryAfter: 1 }),
     );
+  });
+
+  it('a portal looping its actions: an hour of it is the budget’s, apart from the account’s', () => {
+    const { clock, limiter, count } = driven();
+    let sent = 0;
+    // Ten a second for an hour, past the account's 120 a minute.
+    for (clock.ms = 0; clock.ms < HOUR; clock.ms += 100) {
+      if (count((l) => l.portalAction('loop'))) sent += 1;
+    }
+    const { burst, perMinute } = BUDGETS.portalActions;
+    expect(sent).toBeLessThanOrEqual(burst + perMinute * 60);
+    expect(sent).toBeGreaterThan(burst + perMinute * 59);
+    // It spent none of the account's own budget, nor the account's of it.
+    expect(() => limiter.signedIn('loop')).not.toThrow();
+    for (let i = 0; i < BUDGETS.account.burst; i += 1) count((l) => l.signedIn('reader'));
+    expect(() => limiter.portalAction('reader')).not.toThrow();
   });
 
   it('a guesser with a new free account for every guess, at one address: an hour of guessing is the misses’ budget', () => {
