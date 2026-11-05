@@ -66,10 +66,12 @@ class UnreadUnlockTest : EngineFiles() {
             val (outbox, relaunches) = relaunching(temporaryFile())
             val rig = unreadable(outbox)
             val unlock = assertNotNull(rig.engine.emergencyUnlock(UnlockReason.Bathroom))
+            // The read loop has found the file unreadable, and reads it again in a minute; only then is
+            // it readable, or its first wake, run late, reads it at once (seen on CI's Linux).
+            rig.sleeping(at(60))
             outbox.keep(kept)
             // A relaunch at every commit from here never stands focused beside the unlock.
             relaunches.watching = true
-            rig.sleeping(at(60))
             rig.clock.advance(60)
             val sent = rig.server.next(unlockRoute)
             relaunches.watching = false
@@ -244,10 +246,11 @@ class UnreadUnlockTest : EngineFiles() {
             val (outbox, _) = makeOutbox()
             val rig = unreadable(outbox)
             val press = assertNotNull(rig.engine.emergencyUnlock())
-            // Readable again, but the write that would file the press there is refused.
+            // Readable again once the read loop has found it unreadable, but the write that would file
+            // the press there is refused.
+            rig.sleeping(at(60))
             refuseUpdates(outbox)
             outbox.keep(kept)
-            rig.sleeping(at(60))
             rig.clock.advance(60)
             rig.until { it.standing != Standing.Unread }
             assertEquals(Change.UnlockUnfiled(null), current(outbox, press.eventId)?.change)

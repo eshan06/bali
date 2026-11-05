@@ -109,6 +109,16 @@ a real decision? Add a dated entry at the top: what was decided and why.
   than a kill mid-send (said above); and `offFrom` unreadable bringing focus back over a recorded
   unlock where an unreadable guard keeps the phone unlocked (said above, left as iOS has it).
 
+  **CI's failure on #510, the tests' own order (the cause found, never a re-run):** after the rebase
+  onto WC4, `UnreadUnlockTest`'s "the file gives back where the phone stood" failed on CI's Linux, its
+  wait for the read loop's minute never coming. The test made the file readable before the read loop's
+  first wake had found it unreadable, so a first wake run late read it at once, and the minute it
+  waited for never began; its twin, the filing the file refuses, could do the same. Holding the read
+  loop's first wake back 300 ms made both fail on the PC; now each waits for that minute first, and
+  the whole suite passes with the read loop's first wake, or the drain's first pass, held back so. The
+  engine is unchanged: only a test reaches this order. iOS's twins keep it (`filedWhenTheFileReads`,
+  `filedByTheNextAct`): for the owner, whether the iPhone's tests should wait so too.
+
   **The proof:** `Outbox.open` and `android/app` are unchanged, so the JVM tests are the proof, and no
   emulator ran.
 
