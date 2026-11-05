@@ -41,6 +41,8 @@ import org.xmlpull.v1.XmlPullParser
  * the file (Gradle's pick of Room's Android build, the driver's native library, Room's generated code).
  * That the store's writes reach the disk as they commit, on Android's Room as on the JVM's (AN4d), and
  * that a send's answer settles through it (AN4e). And the backup rules that keep the file on the phone.
+ * Over a file of its own: the app's, [OUTBOX_FILE], is its engine's, which a Debug build's start opens in
+ * the tests' process too and never closes (AN7d), so no test deletes or opens it under that engine.
  */
 @RunWith(AndroidJUnit4::class)
 class OutboxFileTest {
@@ -49,17 +51,17 @@ class OutboxFileTest {
     @Before
     @After
     fun deleteTheFile() {
-        context.deleteDatabase(OUTBOX_FILE)
+        context.deleteDatabase(FILE)
     }
 
     @Test
     fun theOutboxIsMadeInTheAppsOwnStorageAndReadsBackWhatItsFileHolds(): Unit =
         runBlocking {
             // Made at its first open by Room's code, with the table's checks and the file's install.
-            val outbox = context.outbox()
+            val outbox = context.outbox(FILE)
             assertEquals(emptyList<OutboxRecord>(), outbox.records())
             outbox.close()
-            val file = context.getDatabasePath(OUTBOX_FILE)
+            val file = context.getDatabasePath(FILE)
             assertTrue(file.path, file.path.startsWith(context.dataDir.path + "/"))
 
             BundledSQLiteDriver().open(file.path).use { sqlite ->
@@ -77,7 +79,7 @@ class OutboxFileTest {
                 assertTrue(refused.message, refused.message.orEmpty().contains("CHECK constraint failed"))
             }
 
-            val reopened = context.outbox()
+            val reopened = context.outbox(FILE)
             val record = reopened.records().single()
             reopened.close()
             assertEquals(Change.UnlockUnderTap("t", UnlockReason.Nurse), record.change)
@@ -94,7 +96,7 @@ class OutboxFileTest {
     fun whatThePhoneDidIsRecordedThroughTheStoreEachWriteSyncedToTheDiskAsItCommitsTheFileKeptInWal(): Unit =
         runBlocking {
             val at = Instant.ofEpochSecond(1_790_000_000)
-            val outbox = context.outbox()
+            val outbox = context.outbox(FILE)
             // Room opens its connections at NORMAL (1); each of the outbox's writes sets FULL (2) first.
             assertEquals(1L, outbox.synchronous())
             val tap = checkNotNull(outbox.record(Change.Tap("04:A2:1B"), at))
@@ -103,11 +105,11 @@ class OutboxFileTest {
             assertEquals(2L, outbox.synchronous())
             assertTrue(outbox.explain(UnlockReason.Nurse, at.plusSeconds(2), emptySet()))
             outbox.close()
-            BundledSQLiteDriver().open(context.getDatabasePath(OUTBOX_FILE).path).use { sqlite ->
+            BundledSQLiteDriver().open(context.getDatabasePath(FILE).path).use { sqlite ->
                 sqlite.prepare("PRAGMA journal_mode").use { assertTrue(it.step()); assertEquals("wal", it.getText(0)) }
             }
 
-            val reopened = context.outbox()
+            val reopened = context.outbox(FILE)
             val records = reopened.records()
             val standing = reopened.standing()
             reopened.close()
@@ -121,11 +123,11 @@ class OutboxFileTest {
     fun aRecordSentIsSettledThroughTheStoreKeptWithItsAnswerAndItsBackoffThenGoneOnceRecorded(): Unit =
         runBlocking {
             val at = Instant.ofEpochSecond(1_790_000_000)
-            val outbox = context.outbox()
+            val outbox = context.outbox(FILE)
             val unlock = checkNotNull(outbox.record(Change.Unlock("s", UnlockReason.Nurse), at))
             outbox.close()
             // Reopened, Room's writer is at NORMAL again, so the settle's own write sets FULL.
-            val sending = context.outbox()
+            val sending = context.outbox(FILE)
             assertEquals(1L, sending.synchronous())
             assertEquals(Outbox.Due.Send(unlock), sending.nextDue(at))
             // No answer: kept, due after 2 s and up to as much again, at random, as the app's jitter.
@@ -134,7 +136,7 @@ class OutboxFileTest {
             assertEquals(2L, sending.synchronous())
             sending.close()
 
-            val reopened = context.outbox()
+            val reopened = context.outbox(FILE)
             val kept = reopened.records().single()
             assertEquals(listOf(1, 0), listOf(kept.attempts, kept.answers))
             assertTrue("${kept.nextAttemptAt}", kept.nextAttemptAt in at.plusSeconds(2)..at.plusSeconds(4))
@@ -144,7 +146,7 @@ class OutboxFileTest {
             val answered = checkNotNull(kept.send(client(200, recorded)))
             assertEquals(Disposition.Unlock(UnlockDisposition.Recorded), reopened.settle(answered, kept.nextAttemptAt))
             reopened.close()
-            val drained = context.outbox()
+            val drained = context.outbox(FILE)
             assertEquals(emptyList<OutboxRecord>(), drained.records())
             assertEquals(Outbox.Due.Idle, drained.nextDue(kept.nextAttemptAt))
             drained.close()
@@ -195,5 +197,9 @@ class OutboxFileTest {
             }
         }
         return sections.filterValues { it.isNotEmpty() }
+    }
+
+    private companion object {
+        const val FILE = "outbox-file-test.sqlite"
     }
 }

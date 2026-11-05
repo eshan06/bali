@@ -4,20 +4,45 @@ import android.content.pm.PackageManager
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.bali.core.AppConfig
+import com.bali.outbox.Link
+import com.bali.outbox.SyncState
+import java.io.IOException
 import java.net.URI
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.runBlocking
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
  * The build's values as the app reads them on the phone: what core's AppConfigTest pins in the files,
- * here through aapt, the manifest and Android's reading of it; and what the app starts on them.
+ * here through aapt, the manifest and Android's reading of it; and what the app starts on them. Each start
+ * here is the app's own, over its own file, which its start opened as the app was created.
  */
 @RunWith(AndroidJUnit4::class)
 class BaliAppTest {
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
     private val app = context.applicationContext as BaliApp
+
+    // After the app's own start, its run ended: each test starts it again, as Try again would.
+    @Before
+    fun end(): Unit =
+        runBlocking {
+            app.launched.join()
+            app.running.value?.job?.cancelAndJoin()
+        }
+
+    @After
+    fun stop(): Unit =
+        runBlocking {
+            app.running.value?.job?.cancelAndJoin()
+            ReadoutActivity.keep(context, false)
+        }
 
     @Test
     fun everyValueArrivesAsTextAndWhileTheClientIdIsEmptySignInIsNotSetUp() {
@@ -32,11 +57,48 @@ class BaliAppTest {
         assertEquals(URI("com.bali.bali:/auth/callback"), config.cognito.redirectUri)
     }
 
-    // The build's client id stays empty until the owner's (docs/DEPLOY.md): until then, as on iOS, the app
-    // starts no engine, nor an enforcer over the lock. LockServiceTest hands the app engines of its own.
+    // The build's client id stays empty until the owner's (docs/DEPLOY.md): until then a Debug build's start
+    // runs an engine all the same, over no token, as a signed-out phone (Q2), where a Release build's makes
+    // none, as on iOS (ThisBuildTest, on the JVM). Its file is the app's own, opened as the app started, in the
+    // tests' process too, which is why each test that opens an outbox opens a file of its own.
     @Test
-    fun withSignInNotSetUpTheAppStartsNoEngine() {
-        assertNull(app.signIn)
-        assertNull(app.running.value)
-    }
+    fun withSignInNotSetUpADebugBuildsStartRunsAnEngineOverNoTokenAsASignedOutPhone(): Unit =
+        runBlocking {
+            assertNull(app.signIn)
+            assertNull(app.startFailed.value)
+            assertTrue(context.getDatabasePath(OUTBOX_FILE).exists())
+            app.begin()
+            val engine = checkNotNull(app.running.value).engine
+            // The truth read, as Bali in front reads it: never sent, for want of a token, so waiting on sign-in.
+            engine.setInFront(true)
+            until { engine.updates.value.takeIf { it.link == Link.SignIn } }
+            assertNull(engine.updates.value.heardAt)
+        }
+
+    // CLAUDE.md's "no silent failures": a start that fails (its outbox, say) is held for a screen to say, the
+    // Debug readout's now (ReadoutTest), never swallowed, and tried again.
+    @Test
+    fun aStartThatFailsIsHeldForTheScreensToSayAndTriedAgain(): Unit =
+        runBlocking {
+            val refused = IOException("the disk refused the outbox")
+            app.begin { throw refused }
+            assertSame(refused, app.startFailed.value)
+            assertNull(app.running.value)
+            app.begin()
+            checkNotNull(app.running.value)
+            assertNull(app.startFailed.value)
+        }
+
+    // B5b's phone check, as BaliApp.swift's start sets it: the readout's cap, kept, is read at each start.
+    @Test
+    fun theReadoutsShortCapIsReadAtEachStart(): Unit =
+        runBlocking {
+            ReadoutActivity.keep(context, true)
+            app.begin()
+            assertEquals(ReadoutActivity.SHORT_CAP, checkNotNull(app.running.value).engine.updates.value.cap)
+            checkNotNull(app.running.value).job.cancelAndJoin()
+            ReadoutActivity.keep(context, false)
+            app.begin()
+            assertEquals(SyncState.TAP_CAP, checkNotNull(app.running.value).engine.updates.value.cap)
+        }
 }

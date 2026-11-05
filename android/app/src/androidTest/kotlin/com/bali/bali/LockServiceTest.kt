@@ -52,6 +52,7 @@ import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -96,6 +97,7 @@ class LockServiceTest {
     fun stop(): Unit =
         runBlocking {
             end()
+            app.front.value = false
             app.lock.unlock()
             put(found.first)
             shell(if (found.second == "null") "settings delete secure accessibility_enabled" else "settings put secure accessibility_enabled ${found.second}")
@@ -278,8 +280,53 @@ class LockServiceTest {
             assertFalse(file.exists())
         }
 
-    /** The app started, as at a launch: an engine of the test's own over the test's outbox, as the last run left it. */
+    @Test
+    fun baliComingToTheFrontReadsTheTruthAndRunsTheCheckWhichFindsTheSwitchOff(): Unit =
+        runBlocking {
+            // In a session, the service never switched on: no screen heard and the list unchanged, so no wake checks
+            // the lock or reads the truth, and the start's own check came before the session. Nothing waits.
+            tapIn()
+            assertEquals(emptyList<String>(), server.waiting)
+            // Bali's own screen in front (the Debug readout's, AN7d): the truth read at once, and rule 3's check,
+            // which finds the switch off in the session and reports it.
+            app.front.value = true
+            server.next("GET /v1/me")
+            until { engine.updates.value.queued.firstOrNull { it.change == Change.ProtectionOff("s") } }
+            val claim = until { enforcer.updates.value.takeIf { it.switchedOff } }
+            assertFalse(claim.locked)
+        }
+
+    @Test
+    fun theLaunchLineTimesTheSwitchFromTheRunsFirstReadToItsFirstReadThatIsntStarting(): Unit =
+        runBlocking {
+            // A run's lock, made as at a launch with the service on Android's list: never bound to it, so starting.
+            switchOn()
+            val lock = ServiceLock(context)
+            assertNull(lock.firstRead)
+            assertEquals(LockSwitch.Starting, lock.switch())
+            val first = checkNotNull(lock.firstRead)
+            assertNull(lock.settled)
+            // Off the list: settled, how long it read starting kept, from the run's first read.
+            put(found.first)
+            until { runBlocking { lock.switch() }.takeIf { it == LockSwitch.Off } }
+            val (after, read) = checkNotNull(lock.settled)
+            assertEquals(LockSwitch.Off, read)
+            assertTrue("$after", after > Duration.ZERO)
+            assertEquals(first, lock.firstRead)
+            assertEquals(LockSwitch.Off, lock.switch())
+            assertEquals(after to LockSwitch.Off, lock.settled)
+            // One whose first read isn't starting settles there, at once.
+            val off = ServiceLock(context)
+            off.switch()
+            assertEquals(Duration.ZERO to LockSwitch.Off, off.settled)
+        }
+
+    /**
+     * The app started, as at a launch: an engine of the test's own over the test's outbox, as the last run left it,
+     * after the app's own start, which a Debug build makes as it's created and which would otherwise replace it.
+     */
     private fun launch() {
+        runBlocking { app.launched.join() }
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         outbox = Outbox.open(Room.databaseBuilder(context, OutboxDatabase::class.java, FILE))
         val token = object : TokenProvider { override suspend fun accessToken() = "token" }
@@ -378,7 +425,7 @@ class LockServiceTest {
 }
 
 /** [value]'s first answer, asked until it gives one; none within [patience] fails the test, never hangs it. */
-private fun <T : Any> until(patience: Duration = Duration.ofSeconds(30), value: () -> T?): T {
+internal fun <T : Any> until(patience: Duration = Duration.ofSeconds(30), value: () -> T?): T {
     val by = System.nanoTime() + patience.toNanos()
     while (System.nanoTime() < by) {
         value()?.let { return it }

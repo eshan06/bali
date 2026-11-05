@@ -3,8 +3,8 @@
 The student app, the iPhone app's twin, over two modules of plain Kotlin (`docs/ARCHITECTURE.md`,
 "Android app structure"). Phase 9 builds the engine and Phase 10 the screens
 (`docs/PLAN-ANDROID.md`); until then the app is Bali's name, the outbox's file, sign-in's app side, the
-lock's service (in the Debug build alone), the engine and the enforcer it starts, and the backup rules
-that keep them on the phone: no screen, no icon.
+lock's service and a readout for the phone checks (both in the Debug build alone), the engine and the
+enforcer it starts, and the backup rules that keep them on the phone: no screen a student sees, no icon.
 
 | Folder                      | What it is                                                                                                                |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
@@ -34,8 +34,9 @@ You need JDK 21 (Android Studio's own, its JBR, as `JAVA_HOME`) and Android's SD
 3. To see the debug build install, start one of the PC's test emulators, `Bali_Spike_API35`, `36` or
    `37` (never the owner's `Pixel_7`, and never signed in to a Google account), then
    `./gradlew :app:installDebug`, and stop it after with `adb -s emulator-5554 emu kill`
-   (`docs/GOTCHAS.md`, "Android's SDK on Windows"). With no screen there's no icon to tap: Settings →
-   Apps lists it as Bali.
+   (`docs/GOTCHAS.md`, "Android's SDK on Windows"). The launcher lists the Debug build's readout as
+   Bali readout (Debug), with Android's own icon; a Release build has no screen: Settings → Apps lists
+   it as Bali.
 4. The app's instrumented tests (`app/src/androidTest`) run on one of those emulators, started as
    in 3: `./gradlew :app:connectedDebugAndroidTest` installs the app and its test app, runs them and
    uninstalls both. They show what the JVM's tests can't: that the app opens the outbox's file on
@@ -45,8 +46,11 @@ You need JDK 21 (Android Studio's own, its JBR, as `JAVA_HOME`) and Android's SD
    Chrome after, never accepting its terms, and puts back the font scale it changes; and the lock's
    service, switched on and off as a student would, through the shell of a UiAutomation that leaves
    accessibility services running (one that doesn't has Android unbind them all), the screen turned
-   off and on, each put back as found. CI builds them but has no emulator to run them, so a step that
-   changes what they reach runs them here and puts the result in its PR.
+   off and on, each put back as found; and the Debug readout, driven as a tester drives it. A Debug
+   build's start opens the app's own outbox, `outbox.sqlite`, in the tests' process too, so each test
+   opens a file of its own, and one that starts a run of its own waits for the app's start first
+   (`BaliApp.launched`). CI builds them but has no emulator to run them, so a step that changes what
+   they reach runs them here and puts the result in its PR.
 
 The build installs nothing: `gradle.properties` turns off the Android plugin's own installs, so a
 missing platform or build tools fails the build by name, and Gradle never downloads a JDK. A step
@@ -117,7 +121,22 @@ in one (`setServiceInfo`), never a window's contents; its file in `no_backup/` k
 next run, which reads it once as it starts. Its calls run on the main thread. The service hears the
 screen go on and off for the engine's check-ins, and runs rule 3's check as it binds and unbinds;
 `BaliApp`'s `start` runs the engine and the enforcer in place of any run before, with the check as the
-app starts and at each change of the switch, and none while sign-in isn't set up.
+app starts and at each change of the switch, and none while sign-in isn't set up but a Debug build's
+(below).
+
+**The Debug readout** (`app/src/debug`'s `ReadoutActivity.kt` and `ThisBuild.kt`, AN7d; iOS's
+`Readout`): a developer's screen for the phone checks, in the Debug build alone with a launcher entry of
+its own, in plain Views, its words a developer's, never a student's, until Phase 10's screens. It shows
+the engine, its link and the server's last answer, the sign-in, the standing, what rule 3's check found
+of the lock, the service and how long it read starting after the run's first check (`ServiceLock`'s own
+measure, against the grace), and the outbox; with Sign in and Sign out, Open Accessibility settings, a
+typed tap, Emergency Unlock, the phone check's 15-minute cap, kept in its own preferences and read at
+each start, and Try again where the start failed. In front, it tells the app (`BaliApp.front`), which
+reads the truth and runs the check. While sign-in isn't set up, a Debug build's start runs the engine
+all the same, over no token at the build's API, as a signed-out phone, so a typed tap locks offline to
+its cap and nothing reaches the network; a Release build's makes none, as on iOS (`app/src/release`'s
+`ThisBuild`, pinned on the JVM by Release's own tests, which `gradle.properties` turns on). A start that
+fails is held (`BaliApp.startFailed`) for a screen to say, never swallowed.
 
 **The outbox tables** (`core`'s `UnlockContract.kt` and `OutboxContract.kt`, BaliCore's twins) say
 what the outbox does with a record after each send; no answer ever drops an unlock the server hasn't

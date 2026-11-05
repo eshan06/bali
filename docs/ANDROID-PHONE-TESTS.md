@@ -193,6 +193,18 @@ is typed in the Debug readout (AN7d) until AN8 reads a block's sticker:
   Settings: what Android shows, and App info's "Allow restricted settings" (AN1 saw "App was denied
   access").
 
+**The readout (AN7d),** the Debug build's launcher entry, Bali readout (Debug): until sign-in is set up
+its engine runs over no token, as a signed-out phone, so these need no server and no sticker, the tag
+typed:
+
+- **A typed tap held offline to its cap.** *Start:* out of a class, unlocked, the readout on screen,
+  Airplane mode on, the service on, Cap a tap at 15 min on. A tag typed and Tap: Lock says locked, due 15
+  minutes on, and Service listening to the windows. Bali swiped away from recents and opened again: still
+  locked, to the same end. At the end, with nothing woken: not locked, listening to nothing. Then a tap
+  again and Emergency Unlock: not locked at once.
+
+The readout's Launch line, how long the service took to bind, is read in the service's reboot part above.
+
 ## AP3, the device test gate
 
 Before Android launches: a Pixel and a Samsung through the whole loop on dev, as B5 and B6 ran it on
