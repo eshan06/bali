@@ -17,6 +17,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { AskPanel, NEW_DRAFT, PickPanel } from '@/components/ask-panel';
 import { Button, buttonClass } from '@/components/button';
 import { CARD_ALONE } from '@/components/card';
+import { useCount, useCountOpened } from '@/components/count';
 import { DecksPanel } from '@/components/decks-panel';
 import { Field } from '@/components/field';
 import { DIALOG, JoinCode } from '@/components/join-code';
@@ -153,6 +154,9 @@ export default function ClassDetailPage() {
   const [present, setPresent] = useState(false);
   // On the projector, no menu: the shell draws none while Present is on.
   usePresenting(present);
+  // A teacher's Start, End, extend and Present, each counted once it has happened (A3b).
+  const count = useCount();
+  useCountOpened('portal_present_opened', present && klass !== null);
   // The toggle moves as it is pressed (beside the counts, into Present's header), so focus follows;
   // to Start where none is left to follow (Present left with no session to show).
   const toggle = useRef<HTMLButtonElement>(null);
@@ -422,6 +426,7 @@ export default function ClassDetailPage() {
           { durationMinutes: minutes },
           SAVE_TIMEOUT_MS,
         );
+        count?.('portal_session_started');
         const lost = lostStart.current;
         lostStart.current = null;
         setGrid({
@@ -474,6 +479,7 @@ export default function ClassDetailPage() {
       try {
         // Within a save's limit: an End sent again after one landed answers `already_ended`.
         await api.post(`/v1/sessions/${ending}/end`, undefined, SAVE_TIMEOUT_MS);
+        count?.('portal_session_ended');
         onEnded(ending);
       } catch (err) {
         // Said in the confirm, opened again if the browser closed it meanwhile (a second Escape);
@@ -493,6 +499,7 @@ export default function ClassDetailPage() {
       const answer = await extendSession(api, session, attempt);
       unanswered.current = keepUnanswered(attempt, answer);
       if (answer.kind === 'extended') {
+        count?.('portal_session_extended');
         setSaid(null);
         onSession({ id: session, classId, endsAt: answer.endsAt });
       } else setSaid(answer);

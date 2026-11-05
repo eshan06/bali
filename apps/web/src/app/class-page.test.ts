@@ -292,22 +292,7 @@ describe('the class page while a session runs (ClassLive)', () => {
     expect(live).not.toMatch(/size=\{present/);
   });
 
-  it('keeps an extend’s failure said while its Try again sends it again, every control held (ClassRetryStates)', () => {
-    // The same one again, under its id; held, as every control is while any send is under way,
-    // so focus stays on it. Answered: the time added or a refusal in the line's place, focus on
-    // the class's name (the page's heading, `then` none); failed again, said again.
-    expect(live).toMatch(
-      /<TryAgain\s+onRetry=\{\(\) => \{\s*const again = unanswered\.current;\s*if \(again\) addTime\(again, true\);\s*\}\}\s+held=\{busy !== null\}\s+then=\{\[\]\}\s*>/,
-    );
-    const add = page.slice(page.indexOf('function addTime('));
-    expect(add).toMatch(
-      /^function addTime\(attempt: ExtendAttempt, again = false\) \{[^]*?void once\('extend', async \(\) => \{\s*if \(!again\) setSaid\(null\);\s*const answer = await extendSession\(api, session, attempt\);\s*unanswered\.current = keepUnanswered\(attempt, answer\);\s*if \(answer\.kind === 'extended'\) \{\s*setSaid\(null\);\s*onSession\(\{ id: session, classId, endsAt: answer\.endsAt \}\);\s*\} else setSaid\(answer\);/,
-    );
-    // +5 and +10 send afresh, their line going as they do: their own buttons keep focus.
-    expect(page).toMatch(
-      /onClick=\{\(\) => addTime\(extendAttemptFor\(unanswered\.current, add\)\)\}/,
-    );
-  });
+  // An extend's Try again (ClassRetryStates) is driven in classes/[id]/page.test.tsx since A3b.
 
   it('keeps the session’s start for the ring, from the Start’s answer or the first snapshot', () => {
     expect(page).toMatch(/startedAt: res\.session\.startedAt,\s*endsAt: res\.session\.endsAt,/);

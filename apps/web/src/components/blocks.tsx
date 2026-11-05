@@ -5,6 +5,7 @@ import { Nfc } from 'lucide-react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 import { CARD_ALONE } from '@/components/card';
+import { useCount } from '@/components/count';
 import { Field } from '@/components/field';
 import { TryAgain } from '@/components/try-again';
 import { blockIdOf, loadProblem, type RegisterAnswer, registerBlock } from '@/lib/blocks';
@@ -28,6 +29,7 @@ const registeredOn = (iso: string) =>
  */
 export function Blocks() {
   const api = useApi();
+  const count = useCount();
   const id = useId();
   const field = useRef<HTMLInputElement>(null);
   // A send under way: a second Enter before the page redraws sends nothing.
@@ -72,6 +74,7 @@ export function Blocks() {
       if (answer.kind === 'refused') field.current?.focus();
       return;
     }
+    count?.('portal_block_registered');
     const { block, already } = answer;
     if (!already) setBlocks([...blocks, block]);
     setTyped('');

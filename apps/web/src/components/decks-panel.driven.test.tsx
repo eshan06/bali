@@ -4,6 +4,7 @@ import { act, cleanup, render, screen, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import type { SlideLesson } from '../lib/use-slide';
 import { DecksPanel } from './decks-panel';
 
 /*
@@ -124,5 +125,68 @@ describe('Show slides’ panel (LessonDecks)', () => {
     expect(close.getAttribute('type')).toBe('button');
     await user.click(close);
     expect(onClose).toHaveBeenCalledOnce();
+  });
+});
+
+/*
+ * A deck's Show (LessonDecks) is the slide's own change (`useSlide`'s `show`): its first page, and
+ * again by its line's Try again; once the class shows it the panel closes (`onShown`), but only
+ * while it is still open, so a Show that lands after a Close, or another panel, moves nothing.
+ * Converted from the source text of `decks-panel.test.ts` (A3b).
+ */
+describe('a deck’s Show (LessonDecks)', () => {
+  const ready = deck(1, 'Factoring quadratics');
+
+  /** The panel open with one ready deck, each Show's answer the test's to give. */
+  async function shows(said: SlideLesson['said'] = null) {
+    const answers: ((shown: boolean) => void)[] = [];
+    const show = vi.fn<SlideLesson['show']>(
+      () => new Promise<boolean>((done) => answers.push(done)),
+    );
+    const onShown = vi.fn();
+    const view = render(
+      <DecksPanel
+        id="P"
+        lesson={{ changing: null, said, show }}
+        onShown={onShown}
+        onClose={vi.fn()}
+      />,
+    );
+    await answer([ready]);
+    const shown = (ok: boolean) =>
+      act(async () => {
+        answers.shift()?.(ok);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+    return { view, show, onShown, shown };
+  }
+
+  it('shows its first page through the slide’s own change, closing the panel once the class shows it', async () => {
+    const user = userEvent.setup();
+    const { show, onShown, shown } = await shows();
+    await user.click(screen.getByRole('button', { name: 'Show' }));
+    expect(show).toHaveBeenCalledWith(ready.id, false);
+    // Not shown (the change didn't go through): the panel stays, to say why.
+    await shown(false);
+    expect(onShown).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Show' }));
+    await shown(true);
+    expect(onShown).toHaveBeenCalledOnce();
+  });
+
+  it('shows it again from its line’s Try again', async () => {
+    const user = userEvent.setup();
+    const { show } = await shows({ why: 'failed', change: { deckId: ready.id, page: 1 } });
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(show).toHaveBeenCalledWith(ready.id, true);
+  });
+
+  it('moves nothing once the panel has closed before the class shows it', async () => {
+    const user = userEvent.setup();
+    const { view, onShown, shown } = await shows();
+    await user.click(screen.getByRole('button', { name: 'Show' }));
+    view.unmount();
+    await shown(true);
+    expect(onShown).not.toHaveBeenCalled();
   });
 });

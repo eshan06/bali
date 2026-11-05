@@ -247,14 +247,7 @@ describe('the panel as Show slides opens it', () => {
     );
   });
 
-  it('shows through the slide’s own change, and closes once shown, only while it is open', () => {
-    expect(source).toMatch(
-      /const show = \(deck: Deck, again = false\) =>\s*void lesson\.show\(deck\.id, again\)\.then\(\(shown\) => \{\s*if \(shown && open\.current\) onShown\(\);\s*\}\);/,
-    );
-    expect(source).toMatch(
-      /useEffect\(\(\) => \{\s*open\.current = true;\s*return \(\) => \{\s*open\.current = false;\s*\};\s*\}, \[\]\);/,
-    );
-  });
+  // A Show, through the slide's own change, is driven in decks-panel.driven.test.tsx since A3b.
 
   it('is opened by Show slides on the card at rest, closed back to it, never in Present', () => {
     expect(page).toMatch(/showing=\{panel === 'decks'\}\s*onShow=\{\(\) => setSide\('decks'\)\}/);
