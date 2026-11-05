@@ -1292,6 +1292,19 @@ struct BackOnTests {
         await rig.stop()
     }
 
+    @Test("PROOF ONLY, never merged: notKnown as it stood before #511")
+    func notKnownAsBefore() async throws {
+        let (outbox, url) = try makeOutbox()
+        try record(outbox, .unlock(session: "s", reason: nil))
+        try record(outbox, .protectionOff(session: "s"))
+        try outbox.keep(.inSession(session(), .protectionOff))
+        let rig = try Rig(outbox: try open(url))
+        await rig.until { $0.standing == .inSession(session(), .protectionOff) }
+        try await rig.engine.record(.protectionOn(session: "s"))
+        #expect(await rig.engine.state.standing == .inSession(session(), .unlocked))
+        await rig.stop()
+    }
+
     @Test(
         "Past the class's bell by the phone's clock, or out of a class, Screen Time back on changes nothing and sends nothing",
         arguments: [true, false])
