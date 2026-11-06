@@ -89,8 +89,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   never stopped; the guard never freed; a refusal to start thrown, and every refusal thrown; a block's code
   never read; a tag with no NDEF read as not a block; a reader that won't stop failing the read; and a
   cancel answered. On `Bali_Spike_API35`, `36` and `37`, which have no NFC, the whole instrumented suite,
-  ReadoutTest's new test among it, never skipped: Scan and Read block code each say the phone can't read
-  NFC, with nothing recorded or locked. Everything a real tag decides is the phone check's. Nothing was
+  49 of 49 on each, ReadoutTest's new test among it, never skipped: Scan and Read block code each say the
+  phone can't read NFC, with nothing recorded or locked. Everything a real tag decides is the phone check's. Nothing was
   added to the PC's SDK: its folders were compared before and after.
 
   **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on
