@@ -393,6 +393,15 @@ class Outbox private constructor(internal val file: OutboxDatabase, private val 
         }
 
     /**
+     * The API has deleted the account (C4): every record queued but an Emergency Unlock is let go, the deleted
+     * account's, which any later send would put under a fresh account, or under whoever signs in next. An
+     * unlock never is: the deletion waits for every one first ([nextBeforeDeletion]).
+     */
+    suspend fun accountDeleted() {
+        write { it.step("DELETE FROM outbox WHERE kind != 'unlock'") }
+    }
+
+    /**
      * `PRAGMA synchronous` on the connection the file's writes go through: FULL (2) once one has, as
      * each sets it first, where Room opens every connection at NORMAL (1). The app's instrumented test
      * reads it, to show it on the phone.

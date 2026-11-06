@@ -14,17 +14,17 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-05 (Central) — AN8's code, the tap over NFC (#532; `docs/DECISIONS.md`,
-2026-11-05): `BlockReader`, Android's reader mode while a screen of Bali's own is in front, one tag a
-scan, its NDEF records handed to `BlockTag` as they come; a phone with no NFC reads as one that can't, as
-on iOS, and NFC switched off, before a scan or during it, as `NfcOff`, a new `BlockRead` for AN10 to word
-and AS4 to draw. The NFC feature isn't required, so Play offers Bali to phones without it: the owner's
-call. The Debug readout's Scan taps a block through the engine and times the lock; Read block code only
-reads one. A block's link opening Bali waits for AN1's part 2 and Phase 10. Before it, AN7e, the cover.
-Next: AN9, the account's flows; AN7f and AN8's 📱 check on the owner's phones; Android's Cognito clients,
-the owner's (Open owner items, 8); Android 17's SDK platform for the owner to OK before the first step with
-today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the owner has the phones.
-Not on the pilot's critical path._
+_Last updated: 2026-11-05 (Central) — AN9a, Delete account's rules (#NNN; `docs/DECISIONS.md`,
+2026-11-05): Cognito's DeleteUser in `core`'s `SignIn`, in Cognito's JSON protocol at the pool's own
+endpoint over the API client's OkHttp, in the sign-in's scope, and only ever for the sign-in it began
+with, before a renewal and after it, where iOS's sends whatever tokens there are (Q4: for the owner, iOS
+has the gap); the outbox's order before a deletion, every Emergency Unlock first, and every record let go
+once the account is deleted but an unlock, which never is; and where a deletion stands (`Deleting`), its
+stops typed, its words AN10's. AN9 is seven steps now, AN9a–AN9g (the conductor's split, awaiting the
+owner). Before it, AN8's code, the tap over NFC. Next: AN9b, the deletion in the engine; AN7f and AN8's 📱
+check on the owner's phones; Android's Cognito clients, the owner's (Open owner items, 8); Android 17's SDK
+platform for the owner to OK before the first step with today's AndroidX, and OkHttp 5.5 with it (Open
+owner items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -159,14 +159,49 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
   block on both phones, offline (`docs/ANDROID-PHONE-TESTS.md`, AN8); and the block's link opening Bali
   when it's closed, not built: it waits for AN1's part 2 to find whether it works, and for Phase 10, since
   the release build has no activity to open until then
-- **AN9** The account's flows (twin: `Join`, `Me`, `History`, `Age`, `Deletion`): Join with the
-  consent list, Me, History, the 13+ check (C7, C7-server), Your name, and Delete account (what the
-  phone queued first, every Emergency Unlock first, then `DELETE /v1/me`, then Cognito's DeleteUser,
-  `SignIn`'s `deleteUser`, with DeleteUserTests but `mayDelete`, AN6's split);
-  with SyncEngine.swift's calls for them (`lookUp`, `history`, `ageCheck`, `join`, `rename`, `leave`,
-  `unlockUnsent`, `forgetMe`, `deleteAccount`, the 13+ yes at each wake) and their suites:
-  JoinEngineTests, LeaveEngineTests, MeEngineTests, HistoryEngineTests, AgeFallbackTests,
-  DeleteAccountTests and DeletionOrderTests (AN5's split)
+- **AN9a** Delete account's rules — ✅ (#NNN; DECISIONS 2026-11-05)
+- **AN9b** The deletion in the engine (twin: SyncEngine.swift's `deleteAccount`, `delete`, `sendAll`,
+  `sendDeletion`, `deleteMe` and `counted`): Delete account, what the phone queued first, then
+  `DELETE /v1/me`, then Cognito's DeleteUser; the loops held, what they have on its way waited out,
+  exactly that and never forever; one deletion in the engine's scope, a second press sharing it; once
+  deleted, the standing out and kept, and the lock follows. Tests: DeleteAccountTests' twelve (AN5's
+  split); new: a run cancelled while its send is out, a deletion then not waiting for it; Delete
+  account's caller cancelled while the deletion goes on; and TeardownTest's third, a deletion held at its
+  `accountDeleted` write as the test ends — validation: the JVM tests
+- **AN9c** The 13+ check (C7, C7-server; twin: `Age`'s `AgeCheck` and `Birth`, and SyncEngine.swift's
+  `ageCheck`, `askAgeAtEachWake` and `record(yes:)`): the server's yes, read under the deletion's
+  token, renewed once; the ask and the 13+ yes at each wake, never during a deletion, the yes counted;
+  the question's rules, counted in the Gregorian calendar by java.time's ISO calendar whatever calendar
+  the phone shows. Tests: AgeFallbackTests' six (AN5's split), and AgeTests' `monthPrecision`,
+  `gregorianWhateverThePhoneShows`, `menus` and `keeps`' first half; new: an ask that throws, or ends
+  in a cancel of its own, ends no loop — validation: the JVM tests
+- **AN9d** Join, Leave, Your name and forget me through the engine, and Join's rules (twin: `Join`'s
+  `Joining`, and SyncEngine.swift's `lookUp`, `join`, `rename`, `leave`, `unlockUnsent`, `forgetMe`
+  and `meChanges`): Join with the consent list beside its preview, the code as codes are written; a
+  read's `me` applied only while unchanged; the engine's `renewing` moved to `Joining`. Tests:
+  JoinEngineTests, LeaveEngineTests and MeEngineTests (AN5's split), and JoinTests, over the contracts'
+  join-codes and enrollments fixtures; new: a join whose caller is cancelled still puts its class in
+  `me` — validation: the JVM tests
+- **AN9e** The account's flows in the app, and the readout's Join and History (twin: BaliApp.swift's
+  `Phone`, its account half, and its `Readout`'s): `Account` in `outbox`, one a run in `BaliApp`
+  (DECISIONS 2026-11-05, Q1); each sign-in that lands said by `SignIn` (Q2); an answer under 13 held in
+  memory for the run (Q5), and the 13+ read asked again at each wake (Q8); the readout's Join with a
+  typed code, History's last five moments, and its Signed in line naming the check (Q3), with no 13+
+  button and no Delete account. AN7f's and AN8's rounds on dev come after it and Open owner items, 8
+  (Q7). Tests: AccountTest on the JVM, and BaliAppTest's and ReadoutTest's on the emulators —
+  validation: the JVM tests, then the instrumented tests on `Bali_Spike_API35`, `36` and `37`
+- **AN9f** Me's rules: Your name, Leave and Sign out's hold (twin: `Me`'s `Naming`, `Leaving` and
+  `SignOutWords.held`): Me's name typed, printable, tidied and saved under one event id while it stays
+  the same, its blank test a table of Unicode's Default_Ignorable_Code_Point, pinned by a test, no ICU4J
+  (Q6); Leave asked, sent and held; Sign out held while an Emergency Unlock is queued. Tests: MeTests'
+  `typing`, `printable`, `saving`, `answers` and `signOutHeld`, and LeaveTests' `asking`, `asks`,
+  `answers` and `held` — validation: the JVM tests
+- **AN9g** History's rules and its call (twin: `History`, and SyncEngine.swift's `history`): History's
+  pages, from the top, Show earlier, each moment once, an unknown cursor read again from the top; its
+  days in the phone's zone, and cards of one class's moments in a row; a moment's kind, reason and note,
+  but no word, day title or time format (AN10's). Tests: HistoryTests' `days`, `cardIds`, `everyKind`,
+  `unknowns`, `pages`, `readAgain` and `failures`, and HistoryEngineTests (AN5's split) — validation:
+  the JVM tests
 - **AN10** The router and the screens' rules (twin: `Screen.swift`, `FocusWords`, `UnlockedWords`,
   `ProtectionOffWords` and `ShieldWords`): which screen shows when, and what Focus, Unlocked,
   Protection off and the block screen say (rule 3: no countdown over nothing locked), their rules

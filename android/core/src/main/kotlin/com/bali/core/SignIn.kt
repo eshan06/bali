@@ -328,7 +328,7 @@ internal data class Tokens(
 /**
  * The student's sign-in on this phone, and the tokens it keeps (B4): the API client's [TokenProvider] and
  * the sync engine's [refresh]. The app has one. Only a real no signs anyone out: Cognito refusing the
- * refresh token. BaliCore's `SignIn`, but `deleteUser` (AN9's).
+ * refresh token. BaliCore's `SignIn`.
  *
  * Swift's actor is a lock no stretch takes twice ([alone]), held through each stretch Swift's runs without
  * an `await`, the store's calls included, and let go at each `await`: the browser, the token endpoint, a
@@ -478,7 +478,7 @@ class SignIn(
 
     /**
      * The API has deleted this sign-in's account (C4): no token goes to the API from now on, a relaunch's
-     * included, until Cognito's DeleteUser (AN9's) or a sign-out; a store that can't take it now, at the next ask.
+     * included, until Cognito's DeleteUser ([deleteUser]) or a sign-out; a store that can't take it now, at the next ask.
      */
     suspend fun accountDeleted() =
         alone {
@@ -489,6 +489,71 @@ class SignIn(
 
     /** Whether the API has deleted this sign-in's account and its Cognito sign-in waits to be (C4). */
     suspend fun deletionPending(): Boolean = alone { current()?.deleted == true }
+
+    /**
+     * Cognito's DeleteUser (C4): the sign-in deletes itself with its own access token at its pool's endpoint
+     * ([Tokens.deleteEndpoint]), no AWS credential, as the API holds none. Deleted, or a user Cognito no longer
+     * has, the tokens are forgotten as a sign-out forgets them, and the answer is none; else what Cognito
+     * answered, the tokens kept to try again. An expired token is renewed first, and so, once, is one Cognito
+     * says it no longer takes: a sign-in it then refuses for good, deleted by a try whose answer never came, is
+     * forgotten by that renewal, and gone too. Only the sign-in it began with is ever sent, by its refresh token,
+     * before a renewal and after it, where iOS's sends whatever tokens there are then: another landed meanwhile
+     * is no answer, its tokens kept (Q4). It runs in the sign-in's scope, as a sign-in's exchange does: a caller
+     * cancelled stops waiting, and it goes on. It never throws, nor ends on a cancel of its own: a scope that has
+     * ended is no answer.
+     */
+    suspend fun deleteUser(): SendResult? = orElse(SendResult.NetworkError) { scope.async { deletion() }.await() }
+
+    private suspend fun deletion(): SendResult? {
+        var own: String? = null // the refresh token of the sign-in it deletes
+        var renewing = false
+        while (true) {
+            val (held, renewal) =
+                alone {
+                    val held = current()?.takeIf { own == null || it.refresh == own }
+                    held to held?.takeIf { renewing || now() >= it.until }?.let { renew(telling = false) }
+                }
+            own = own ?: held?.refresh
+            val access =
+                when {
+                    held == null -> null
+                    renewal == null -> held.access
+                    outcome(renewal) -> alone { tokens?.takeIf { it.refresh == own }?.access }
+                    else -> null
+                }
+            val endpoint = access?.let(Tokens::deleteEndpoint)
+            // Nobody signed in now, a renewal's no among them: nothing left to delete. Else kept, to try again.
+            if (access == null || endpoint == null) return alone { if (loaded && tokens == null) null else SendResult.NetworkError }
+            val (result, type) = deleteUser(access, endpoint)
+            when {
+                (result as? SendResult.Status)?.code in 200..299 || type == "UserNotFoundException" -> {
+                    alone { adopt(null, saved = keep(null)) }
+                    return null
+                }
+                type == "NotAuthorizedException" && !renewing -> renewing = true
+                else -> return result
+            }
+        }
+    }
+
+    /**
+     * One DeleteUser call with [access] at [endpoint], in Cognito's JSON protocol: its status, or no answer, and
+     * its error's type, `__type` read past any namespace.
+     */
+    private suspend fun deleteUser(access: String, endpoint: URI): Pair<SendResult, String?> {
+        val headers = mapOf("Content-Type" to "application/x-amz-json-1.1", "X-Amz-Target" to "AWSCognitoIdentityProviderService.DeleteUser")
+        val body = JsonObject(mapOf("AccessToken" to JsonPrimitive(access))).toString().encodeToByteArray()
+        val request = HttpRequest("POST", endpoint, headers, body, ApiClient.REQUEST_TIMEOUT)
+        val reply = orElse(null) { transport.send(request) } ?: return SendResult.NetworkError to null
+        val failure =
+            try {
+                BaliJson.parseToJsonElement(reply.body.decodeToString(throwOnInvalidSequence = true)) as? JsonObject
+            } catch (error: Exception) { // not UTF-8, or not JSON: no type
+                null
+            }
+        val type = (failure?.get("__type") as? JsonPrimitive)?.takeIf { it.isString }?.content
+        return SendResult.Status(reply.status) to type?.substringAfterLast('#')
+    }
 
     /**
      * Whether someone is signed in: now, once the store could be read, then at each change, the newest only.
