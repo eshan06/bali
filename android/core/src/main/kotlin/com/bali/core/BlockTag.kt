@@ -104,8 +104,8 @@ object BlockTag {
 /**
  * What one scan of the phone's NFC reader found (B6), which the sync engine records only when it is
  * a block (`SyncEngine.tap(_:)`, AN5's): a Bali block's code; a tag with none; a scan the student
- * closed; a phone that can't read NFC; or the reader's error, in the system's words (shown, rule
- * 5). BaliCore's `BlockRead`.
+ * closed; a phone that can't read NFC; one whose NFC is switched off; or the reader's error, in the
+ * system's words (shown, rule 5). BaliCore's `BlockRead`, with [NfcOff], Android's alone.
  */
 sealed interface BlockRead {
     data class Block(val code: String) : BlockRead
@@ -115,6 +115,13 @@ sealed interface BlockRead {
     data object Cancelled : BlockRead
 
     data object Unsupported : BlockRead
+
+    /**
+     * NFC switched off in the phone's settings, before the scan or during it: Android's alone, since
+     * iOS's reader can't be switched off. The screens say it and ask for it on (AN10's words, AS4's
+     * screen); nothing is recorded.
+     */
+    data object NfcOff : BlockRead
 
     data class Failed(val message: String) : BlockRead
 }

@@ -3,6 +3,7 @@ package com.bali.bali
 import android.app.Instrumentation
 import android.app.UiAutomation
 import android.content.Intent
+import android.nfc.NfcAdapter
 import android.os.ParcelFileDescriptor
 import androidx.core.view.isVisible
 import androidx.lifecycle.Lifecycle
@@ -16,6 +17,7 @@ import com.bali.outbox.Link
 import com.bali.outbox.LockSwitch
 import com.bali.outbox.Outbox
 import com.bali.outbox.OutboxDatabase
+import com.bali.outbox.OutboxRecord
 import com.bali.outbox.SyncEngine
 import com.bali.outbox.SyncState
 import java.io.IOException
@@ -36,12 +38,13 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * The Debug readout on the emulator (AN7d), driven as a tester drives it: its buttons pressed, its lines read.
+ * The Debug readout on the emulator (AN7d; its Scan, AN8's), driven as a tester drives it: its buttons pressed, its lines read.
  * Each test runs a Debug build's engine over no token (ThisBuild, Q2), as the app's start makes one while
  * sign-in isn't set up, but over the test's own file and scope, handed to the app's start; the service
  * switched on as a student would, through the shell of a UiAutomation that leaves accessibility services
@@ -155,6 +158,25 @@ class ReadoutTest {
         } finally {
             instrumentation.removeMonitor(recorder)
         }
+    }
+
+    @Test
+    fun scanAndReadBlockCodeOnAPhoneWithNoNfcSaySoAndRecordNothing() {
+        // The emulators have no NFC; a phone with it is the phone check's (docs/ANDROID-PHONE-TESTS.md, AN8).
+        assumeTrue("this phone has NFC", NfcAdapter.getDefaultAdapter(context) == null)
+        switchOn()
+        val readout = open()
+        until { readout.lines().takeIf { "Lock: switch on · not locked" in it } }
+        for (press in listOf<(ReadoutActivity) -> Unit>({ it.scan.performClick() }, { it.readCode.performClick() })) {
+            ReadoutActivity.note.value = ""
+            readout.onActivity { press(it) }
+            // The press's own end, its note: by then anything it recorded is queued.
+            assertEquals("this phone can't read NFC — nothing recorded", until { ReadoutActivity.note.value.takeIf { it.isNotEmpty() } })
+        }
+        assertEquals(emptyList<OutboxRecord>(), engine.updates.value.queued)
+        assertEquals(emptyList<OutboxRecord>(), runBlocking { outbox.records() })
+        assertFalse(enforcer.updates.value.locked)
+        assertTrue("Outbox: empty" in readout.lines())
     }
 
     @Test

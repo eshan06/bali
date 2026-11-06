@@ -248,9 +248,9 @@ class UnderTapEngineTest : EngineFiles() {
         }
 
     @Test
-    fun aScanRecordsATapOnlyForABaliBlockAnotherTagAScanCancelledAPhoneWithNoNfcAReadersErrorNothingRecordedOrLockedNorIsAnUnlockWithNothingToUnlock(): Unit =
+    fun aScanRecordsATapOnlyForABaliBlockAnotherTagAScanCancelledAPhoneWithNoNfcOrItSwitchedOffAReadersErrorNothingRecordedOrLockedNorIsAnUnlockWithNothingToUnlock(): Unit =
         runBlocking {
-            for (read in listOf(BlockRead.NotBali, BlockRead.Cancelled, BlockRead.Unsupported, BlockRead.Failed("Session timeout"))) {
+            for (read in listOf(BlockRead.NotBali, BlockRead.Cancelled, BlockRead.Unsupported, BlockRead.NfcOff, BlockRead.Failed("Session timeout"))) {
                 val rig = rig()
                 assertNull(rig.engine.tap(read), "$read")
                 assertNull(rig.engine.emergencyUnlock(), "$read")

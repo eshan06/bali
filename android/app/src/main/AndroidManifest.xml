@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The app's name, its backup rules and sign-in's parts, nothing else yet: every screen waits for
+<!-- The app's name, its backup rules, sign-in's parts and NFC's, nothing else yet: every screen waits for
      Phase 10's steps (docs/PLAN-ANDROID.md), and the icon for one drawn and approved, so lint's icon
      check waits too. Nothing of Bali's leaves the phone in a backup or a transfer to a new phone, so a
      reinstall starts signed out, with an outbox of its own (ARCHITECTURE, "Android app structure"):
@@ -11,6 +11,14 @@
 
     <!-- The sign-in's token endpoint, and Bali's API (AN7). -->
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- A Bali block read over NFC (BlockReader.kt, AN8). Not required, so a phone with no NFC installs Bali all the
+         same and reads as one that can't tap in, as on iOS; Play then offers Bali to such phones too (the conductor's
+         call, awaiting the owner: docs/DECISIONS.md, 2026-11-05). -->
+    <uses-permission android:name="android.permission.NFC" />
+    <uses-feature
+        android:name="android.hardware.nfc"
+        android:required="false" />
 
     <!-- Which browser opens the hosted UI's tab, and what it offers: hidden from Android 11 without this. -->
     <queries>
