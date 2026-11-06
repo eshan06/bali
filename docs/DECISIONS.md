@@ -8,6 +8,120 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-05** — **AN9a, Delete account's rules: Cognito's DeleteUser in `core`'s `SignIn`, the outbox's
+  order before a deletion, and where a deletion stands, on the JVM; and AN9 in seven PRs (the conductor's
+  calls, awaiting the owner's look; AN9a, #533).** The owner isn't reviewing each step and asked for the
+  recommended option on every question, so each call here is the conductor's, for the owner to look at.
+
+  **AN9 in seven PRs (the conductor's split, awaiting the owner):** AN9a, Delete account's rules; AN9b, the
+  deletion in the engine; AN9c, the 13+ check, the server's yes and the question's rules; AN9d, Join, Leave,
+  Your name and forget me through the engine, and Join's rules; AN9e, the account's flows in the app and the
+  readout's Join and History, on the JVM and the emulators; AN9f, Me's rules (Your name, Leave, Sign out's
+  hold); AN9g, History's rules and its call. Each line in `docs/PLAN-ANDROID.md` names its twin and its
+  tests, every word of AN9's line kept in one of them. The split's eight questions, the conductor's answers,
+  each the recommended option:
+  - **Q1, where iOS's `Phone` account half lives:** plain Kotlin in `outbox` (`Account`), tested on the JVM
+    over the sign-in's rig, one a run in `BaliApp`; `app` only wires it.
+  - **Q2, a sign-in landing over another:** in AN9e, `core`'s `SignIn` says each sign-in that lands (its
+    account and a count, renewals left out), as iOS yields at every sign-in, and AN6b's note that nothing on
+    iOS keys on a repeat is corrected.
+  - **Q3, the 13+ gate before AS2:** the readout's Signed in line names it in a developer's words, with no
+    button.
+  - **Q4, DeleteUser after a renewal:** stricter than iOS, as AN6b's `given` is: only the renewed sign-in's
+    tokens (the same refresh token), else no answer, the tokens kept to try again. **For the owner, iOS's
+    (another session's code):** iOS's DeleteUser has the same gap, the user of a sign-in that landed during
+    its renewal deleted.
+  - **Q5, an answer under 13:** held in memory for the run, as C7 keeps nothing anywhere; Android may end
+    Bali's process in the background, and then asks again. Its line in ARCHITECTURE's Android differences
+    waits for the owner, with AS2.
+  - **Q6, Your name's blank test:** a small table of Unicode's Default_Ignorable_Code_Point ranges in
+    `outbox`, pinned by a test, no ICU4J; the API still refuses whatever slips past, said as its refusal.
+  - **Q7, AN7f's and AN8's rounds on dev before AS2:** signed in as a student account that passed the 13+
+    check on an iPhone, the yes kept per account on the server, as `docs/ANDROID-PHONE-TESTS.md` is to say
+    with AN9e, whose rounds come after it; Delete account's check on dev waits for AS7.
+  - **Q8, the 13+ read asked again:** at each wake while the last ask got no answer and the sign-in isn't
+    through; AN10 adds the screen's condition with the router.
+
+  **Where it lives:** `core`'s `SignIn.kt`, `deleteUser` and its call; `outbox`'s new `Deletion.kt`
+  (`AccountDeletion`, `Deleting`, `refusedForGood` and `nextBeforeDeletion`) and `Outbox.kt`'s
+  `accountDeleted`, which needs the store's one write. Nothing calls them yet: AN9b's engine will, AN10
+  words `Deleting` and AS7 draws it. Where Kotlin differs, said plainly:
+  - **Swift's mutating calls are a value whose every step gives the next** (`Deleting`): `ask`, `cancel`,
+    `answered`, `close` and `signInChanged` return it, as Compose holds a screen's state, and `start`,
+    Swift's `Bool`, gives `Busy` once the deletion may begin, none where it may not. The pattern for the
+    states AN9c, AN9d, AN9f and AN9g port.
+  - **Its stops are typed** (`Deleting.Stop`), where iOS's carry their title and line as text:
+    `SignInFirst`, `TeacherHasClasses`, `UnlockUnsent`, `Unread`, `NotDeleted` with its last answer, and
+    `Unfinished`, the gap's fallback's deletion that couldn't reach Bali; whether Try again can help
+    (`retries`) is the stop's. AN10 gives each its title and line, C4b's rule with them: only a refusal
+    before anything could be sent says the account isn't deleted.
+  - **DeleteUser sends only the sign-in it began with** (Q4), by its refresh token, before a renewal and
+    after it: another sign-in landed during the renewal, or during a try Cognito answered
+    `NotAuthorizedException`, is no answer, its tokens kept, and nothing is renewed for it. Said plainly: a
+    refresh token Cognito rotated in that renewal reads as another sign-in, so that try is no answer and the
+    next sends the rotated tokens; Cognito rotates only for an app client that turns rotation on, so
+    `docs/DEPLOY.md`'s checklist for Android's clients now says to leave it off, Cognito's default (santa's
+    review). Done, the tokens held then are forgotten, whoever's, as on iOS: forgetting deletes nothing.
+  - **It runs in the sign-in's scope,** as a sign-in's exchange does (AN6b), so a caller cancelled stops
+    waiting and the call goes on, its answer kept. A scope that has ended is no answer, never its cancel
+    thrown, and a transport that throws anything is no answer, so it never throws.
+  - **The call is Cognito's JSON protocol over the API client's OkHttp:** the token in its body alone,
+    `Content-Type: application/x-amz-json-1.1` and `X-Amz-Target`, no `Authorization` and no AWS
+    credential, and the error's `__type` read past its namespace (`…#UserNotFoundException`). It answers a
+    `SendResult`, so no token reaches a log line, an error or a `toString`.
+  - **`nextBeforeDeletion` and `refusedForGood` are internal,** as iOS's are, for AN9b's engine;
+    `accountDeleted` is public, as iOS's, one write at FULL.
+
+  **The tests:** DeleteUserTests' `deleted`, `kept` (its four answers, and a transport throwing what none
+  should), `goneAlready`, `expired` and `pending`, beside AN6b's `mayDelete`; DeletionOrderTests' `order`
+  and `letGo`; and DeletingTests' `steps`, `signInChanged` and `underThirteen`'s ways on, their words AN10's.
+  New: DeleteUser on the wire, over OkHttp against MockWebServer, the test's client taking each request from
+  Cognito's https host to the local server and finding every name on this machine, never a real network: its
+  two headers as sent, no `Authorization`, the token in its body, and the answer's `__type` read there; Q4,
+  another sign-in landing during the renewal and during a try; a caller cancelled once DeleteUser is on its
+  way, and a scope that has ended; every kind of Emergency Unlock kept by the deletion as it was, in its
+  session, under its tap, not filed yet, a refiled one's follow-up and one stuck; a refocus waiting for its
+  stuck unlock while a record tried and stuck holds nothing (iOS's `order` never reaches it: the tap ahead
+  always goes first); and which refused records hold a deletion back. Tried, each failing by name, then
+  reverted: the deletion letting go of every record (2 tests), and of an unlock under a tap (the new test
+  alone: iOS's `letGo` passes it); no unlock first; an unlock under a tap still queued sent before its tap; a
+  record tried and pending holding nothing; a refocus sent before its stuck unlock (the new test alone); a
+  record tried and stuck holding the rest; a refused unlock taken as refused for good; Try again at every
+  stop (2); the gap's fallback taking every failure as its own; Q4's check after the renewal, and before it
+  (the other sign-in's tokens renewed); the type read with its namespace (2); `NotAuthorizedException` never
+  renewing (2); an `Authorization` header (2); the tokens kept once deleted (4); the call run in its caller's
+  coroutine; an ended scope's cancel thrown; and, for santa's WARN, a store that can't be read taken as
+  nothing left to delete. Nothing was added to the PC's SDK: its folders were compared before and after.
+
+  **For AN9b:** `deleteAccount` asks `mayDelete` first, then sends each record `nextBeforeDeletion` names
+  under the deletion's token (an unlock left: `UnlockUnsent`; any other left but one `refusedForGood`:
+  `NotDeleted` with the last answer; the file unread: `Unread`), then `DELETE /v1/me`, then
+  `SignIn.accountDeleted` and `Outbox.accountDeleted`, then `SignIn.deleteUser`, `SignInNotDeleted` with its
+  answer or `Deleted`, and `Outbox.accountDeleted` again after it, as iOS's `delete` does. `deleteUser`
+  deletes whichever sign-in is held as it starts, marked deleted or not, as iOS's does: Q4 ties one call to
+  one sign-in, and only `deleteAccount` can tie it to the account `DELETE /v1/me` removed, by holding that
+  account (`SignIn.account`) from its start, as `passed(account)` does (santa's review; unreachable in the
+  pilot, two accounts on one phone ruled out and the deletion's screen over any sign-in). **The outbox
+  file (the split's note):** no step closes or deletes it. Delete account lets go of rows on Room's writer
+  connection, every one but an unlock's; the file, its install and its counter stay (A12). The app opens
+  `outbox.sqlite` once, for its life, and Room closes a connection still in use (AN5c), so nothing may wipe
+  or close the file at Delete account, Sign out or another student's sign-in. In the tests, a deletion and
+  its DeleteUser run past their callers, in the engine's and the sign-in's scopes, the test's own, so the
+  rig's teardown cancels and joins that scope before the files close; AN9b proves it with TeardownTest's
+  third case, a deletion held at its `accountDeleted` write as the test ends.
+
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on
+  this PC, so context isolation holds and model diversity doesn't): 0 blockers. Their WARNs, each taken: the
+  PR's number, a placeholder until it had one; the rotation assumption, pinned in DEPLOY.md's checklist
+  (above); the deletion's local flag named as the sign-in's own `renewing` field (now `refusedOnce`); the
+  unreadable store's exit, pinned by no test (added: no answer, nothing sent); a test's loop to the store's
+  bound, unbounded, so a broken bound would hang the suite (now `BOUND` sends, then stuck); and, for AN9b,
+  tying DeleteUser to the account `DELETE /v1/me` removed (above).
+
+  **The proof:** `android/app` is unchanged, so the JVM tests are the proof and no emulator ran:
+  `./gradlew assemble :app:lint check` green, Android 10's API check with it, and the outbox's suite run
+  several times over.
+
 - **2026-11-05** — **AN8, the tap over NFC: Android's reader mode behind `BlockReader`, NFC switched off
   as a new `BlockRead`, the NFC feature not required, and the readout's Scan and Read block code (the
   conductor's calls, awaiting the owner's look; AN8, #532).** The owner isn't reviewing each step and asked

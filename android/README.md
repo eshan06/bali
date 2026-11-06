@@ -91,8 +91,7 @@ its pooled one turns out closed, as URLSession's does. Its tests run against Moc
 local port. Gradle picks OkHttp's Android build for the app and its JVM build for `core`'s tests.
 Its calls suspend (kotlinx.coroutines), as Swift's are async.
 
-**Sign-in** (`core`'s `SignIn.kt` and `TokenStore.kt`, BaliCore's `SignIn.swift` but `deleteUser`,
-AN9's) has its parts (AN6a): the hosted UI's address with PKCE, its verifier and state from
+**Sign-in** (`core`'s `SignIn.kt` and `TokenStore.kt`, BaliCore's `SignIn.swift`) has its parts (AN6a): the hosted UI's address with PKCE, its verifier and state from
 `SecureRandom`; the code in its answer, taken only at the redirect URI and only for its attempt, the
 answer read with `java.net.URI`, since OkHttp's `HttpUrl` reads only http and https; and the tokens,
 kept in a form of their own that reads tokens kept before a field existed, and their claims, read
@@ -104,7 +103,9 @@ app's scope, which every caller waits for: one cancelled stops waiting, and it g
 others. Only Cognito refusing the refresh token signs anyone out, and no token reaches Bali's API
 before the 13+ check but the check's own read and a deletion's. The token endpoint is reached over
 the API client's OkHttp. No token, code, verifier or state reaches a log line or an error's message.
-`SyncEngine.make` is the app's engine over it.
+`SyncEngine.make` is the app's engine over it. Cognito's DeleteUser (`deleteUser`, AN9a) goes in Cognito's
+JSON protocol to the pool's own endpoint, over the same OkHttp, the token in its body alone, and only ever
+for the sign-in it began with, before a renewal and after it.
 
 **Sign-in's app side** (`app`'s `KeystoreTokenStore.kt`, `HostedUi.kt`, `HostedUiActivity.kt` and
 `BaliApp.kt`, AN6c): the tokens sealed with AES-GCM under a Keystore key of the app's own, in
@@ -206,7 +207,8 @@ leave it unsettled. Each write is one transaction on Room's writer connection, s
 as it commits, and an Emergency Unlock's record outlives the phone losing power right after
 (`docs/DECISIONS.md`, 2026-11-04, AN4d). The file stays in WAL. The SQL is iOS's, run on Room's
 connection, each number bound as a number, never as text, which SQLite ranks above every number
-(AN4e).
+(AN4e). Before an account deletion (`Deletion.kt`, AN9a), every Emergency Unlock goes first, and once the
+account is deleted every record is let go but an unlock, which never is.
 
 **The sync engine** (`outbox`'s `SyncEngine.kt` and `SyncState.kt`, BaliOutbox's `SyncEngine`) is
 the one owner of the phone's server communication, built in five steps from its frame (AN5a); the

@@ -10,6 +10,19 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN9a's on 2026-11-05: _Last updated: 2026-11-05 (Central) — AN8's
+code, the tap over NFC (#532; `docs/DECISIONS.md`,
+2026-11-05): `BlockReader`, Android's reader mode while a screen of Bali's own is in front, one tag a
+scan, its NDEF records handed to `BlockTag` as they come; a phone with no NFC reads as one that can't, as
+on iOS, and NFC switched off, before a scan or during it, as `NfcOff`, a new `BlockRead` for AN10 to word
+and AS4 to draw. The NFC feature isn't required, so Play offers Bali to phones without it: the owner's
+call. The Debug readout's Scan taps a block through the engine and times the lock; Read block code only
+reads one. A block's link opening Bali waits for AN1's part 2 and Phase 10. Before it, AN7e, the cover.
+Next: AN9, the account's flows; AN7f and AN8's 📱 check on the owner's phones; Android's Cognito clients,
+the owner's (Open owner items, 8); Android 17's SDK platform for the owner to OK before the first step with
+today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the owner has the phones.
+Not on the pilot's critical path._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN8's on 2026-11-05: _Last updated: 2026-11-05 (Central) — AN7e,
 the cover (#531; `docs/DECISIONS.md`, 2026-11-05): while a
 lock holds, each window of an app the allow-list doesn't hold, named by that window's own state event and
@@ -2403,6 +2416,20 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN9a's line, as it read when it was done (2026-11-05; `docs/DECISIONS.md`, 2026-11-05). The conductor
+split AN9's line into AN9a–AN9g that day, every word of it kept in one of them: AN9a's here, AN9b's to
+AN9g's in `docs/PLAN-ANDROID.md`.
+
+- **AN9a** Delete account's rules (twin: `Deletion`'s `AccountDeletion`, `Deleting`, `refusedForGood`,
+  `Outbox.nextBeforeDeletion` and `Outbox.accountDeleted`, and `SignIn`'s `deleteUser`): Cognito's
+  DeleteUser, in Cognito's JSON protocol at the pool's own endpoint, the error's `__type` read past its
+  namespace, and after a renewal only the renewed sign-in's tokens (DECISIONS 2026-11-05, Q4); the
+  outbox's order before a deletion, what the phone queued first, every Emergency Unlock first, and never
+  let go; and where a deletion stands, its stops typed. Tests: DeleteUserTests but `mayDelete` (AN6's
+  split), DeletionOrderTests (AN5's split), and DeletingTests' `steps`, `signInChanged` and
+  `underThirteen`'s ways on; new: DeleteUser on the wire, over OkHttp against MockWebServer, and Q4 —
+  validation: the JVM tests
 
 AN8's line, as it read until its code was done (2026-11-05; `docs/DECISIONS.md`, 2026-11-05). Its 📱
 check, and the block's link, stay on its line in `docs/PLAN-ANDROID.md`.
