@@ -10,6 +10,19 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN8's on 2026-11-05: _Last updated: 2026-11-05 (Central) — AN7e,
+the cover (#531; `docs/DECISIONS.md`, 2026-11-05): while a
+lock holds, each window of an app the allow-list doesn't hold, named by that window's own state event and
+never by its contents, is covered where it is, within the screen but its bars, by a plain overlay in Debug
+(Q1); a full-screen app is sent home once its cover lands, a split half and a picture-in-picture window
+stay covered (Q5); a cover keeps clear of the shade, a notification and the keyboard above it; and the
+covers go at the lock's end with no event. The allow-list is asked of Android as a lock comes on, the
+in-call screen above all. A window already on screen as the lock comes on stays bare until it changes or
+is touched (ISSUES #6). Before it, AN7d, the Debug readout. Next: AN7f, the lock on the owner's phones;
+Android's Cognito clients, the owner's (Open owner items, 8); Android 17's SDK platform for the owner to
+OK before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's part
+2 once the owner has the phones. Not on the pilot's critical path._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN7e's on 2026-11-05: _Last updated: 2026-11-05 (Central) — AN7d,
 the Debug readout (#524; `docs/DECISIONS.md`,
 2026-11-05): a developer's screen for the phone checks in the Debug build alone, with a launcher entry
@@ -2390,6 +2403,14 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN8's line, as it read until its code was done (2026-11-05; `docs/DECISIONS.md`, 2026-11-05). Its 📱
+check, and the block's link, stay on its line in `docs/PLAN-ANDROID.md`.
+
+- **AN8** 📱 The tap over NFC (twin: `BlockReader`, B6): reader mode, started from the Debug readout
+  until AS4 builds Bali's "hold your phone to the block" screen; the offline tap in under a second;
+  the tap's dispositions (`tapDisposition`); and, if AN1 found it works, the block's link opening
+  Bali when it's closed — validation: the JVM tests, then a real block on both phones, offline
 
 AN7e's line, as it read until it was done (2026-11-05; `docs/DECISIONS.md`, 2026-11-05).
 

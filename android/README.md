@@ -4,8 +4,8 @@ The student app, the iPhone app's twin, over two modules of plain Kotlin (`docs/
 "Android app structure"). Phase 9 builds the engine and Phase 10 the screens
 (`docs/PLAN-ANDROID.md`); until then the app is Bali's name, the outbox's file, sign-in's app side, the
 lock's service with its cover and a readout for the phone checks (both in the Debug build alone), the
-engine and the enforcer it starts, and the backup rules that keep them on the phone: no screen a student
-sees, no icon.
+NFC reader, the engine and the enforcer it starts, and the backup rules that keep them on the phone: no
+screen a student sees, no icon.
 
 | Folder                      | What it is                                                                                                                |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
@@ -50,7 +50,8 @@ You need JDK 21 (Android Studio's own, its JBR, as `JAVA_HOME`) and Android's SD
    off and on, each put back as found; the Debug readout, driven as a tester drives it; and the cover,
    over Android's own apps and a blocked app of the tests' own (`StandIn.java`, in Java since it runs in
    the test app's process, which has no Kotlin), with split screen made through System UI's shell and a
-   call to the emulator's own pretend network, its call log put back. A Debug
+   call to the emulator's own pretend network, its call log put back; and the readout's Scan on a phone
+   with no NFC, as the emulators are, a real tag being the phone check's. A Debug
    build's start opens the app's own outbox, `outbox.sqlite`, in the tests' process too, so each test
    opens a file of its own, and one that starts a run of its own waits for the app's start first
    (`BaliApp.launched`). CI builds them but has no emulator to run them, so a step that changes what
@@ -133,9 +134,9 @@ app starts and at each change of the switch, and none while sign-in isn't set up
 its own, in plain Views, its words a developer's, never a student's, until Phase 10's screens. It shows
 the engine, its link and the server's last answer, the sign-in, the standing, what rule 3's check found
 of the lock, the service and how long it read starting after the run's first check (`ServiceLock`'s own
-measure, against the grace), and the outbox; with Sign in and Sign out, Open Accessibility settings, a
-typed tap, Emergency Unlock, the phone check's 15-minute cap, kept in its own preferences and read at
-each start, and Try again where the start failed. In front, it tells the app (`BaliApp.front`), which
+measure, against the grace), and the outbox; with Sign in and Sign out, Open Accessibility settings, Scan
+and Read block code (AN8, below), a typed tap, Emergency Unlock, the phone check's 15-minute cap, kept in
+its own preferences and read at each start, and Try again where the start failed. In front, it tells the app (`BaliApp.front`), which
 reads the truth and runs the check. While sign-in isn't set up, a Debug build's start runs the engine
 all the same, over no token at the build's API, as a signed-out phone, so a typed tap locks offline to
 its cap and nothing reaches the network; a Release build's makes none, as on iOS (`app/src/release`'s
@@ -157,6 +158,19 @@ protected broadcast's receiver shows through none, so the emergency alerts app i
 alerts): the parts the student chooses whoever holds them, the parts asked by what they do only where a
 system app holds them. A window no event has named is never covered, so one already on screen
 as the lock comes on stays bare until it changes or the student touches it (`docs/ISSUES.md` #6).
+
+**The tap over NFC** (`app`'s `BlockReader.kt`, AN8; iOS's `BlockReader`): a block read in Android's
+reader mode while a screen of Bali's own is in front, one tag a scan, its NDEF records as Android read
+them when it found the tag handed to `core`'s `BlockTag` as they come, the answer a `BlockRead` for the
+engine's `tap(read)`. In the main source set, since AS4's "hold your phone to the block" screen will use
+it; the Debug readout's Scan until then. A scan ends with the first tag (let go while it stays on the
+phone, so Android hands it to no other app after), Bali's screen leaving the front (cancelled), NFC
+switched off (`NfcOff`, Android's alone, as it starts or during it), or the caller's cancel; one at a
+time; reader mode off at its end however it ends. A phone with no NFC reads as one that can't
+(`Unsupported`), as on iOS: the manifest asks for NFC without requiring it (`docs/DECISIONS.md`,
+2026-11-05, AN8). Its rules (`scan`) run on the JVM over a reader of the tests' own; the emulators have no
+NFC, so a real tag is the phone check's (`docs/ANDROID-PHONE-TESTS.md`, AN8). A block's link doesn't open
+Bali: that waits for AN1's part 2 and Phase 10.
 
 **The outbox tables** (`core`'s `UnlockContract.kt` and `OutboxContract.kt`, BaliCore's twins) say
 what the outbox does with a record after each send; no answer ever drops an unlock the server hasn't

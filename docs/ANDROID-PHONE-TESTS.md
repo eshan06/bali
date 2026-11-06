@@ -166,7 +166,7 @@ AN9 and on dev after it (`docs/DECISIONS.md`, 2026-11-05, Q8). AN7c, AN7d and AN
 emulators couldn't answer, and AN7f adds B5 round 1's steps in Android's terms.
 
 **The service (AN7c),** each part opening with its starting state as the header asks; a session's tap
-is typed in the Debug readout (AN7d) until AN8 reads a block's sticker:
+is typed in the Debug readout (AN7d), or scanned from a block (AN8):
 
 - **Safe Mode.** *Start:* in a class, focused, the screen on, Airplane mode off, the service on. The
   service off Android's list after it, as AN1 saw on the emulators, and what Bali reports once the
@@ -243,6 +243,42 @@ The readout's Launch line, how long the service took to bind, is read in the ser
 What the readout records with no sign-in stays queued on the phone, and a build with sign-in set up
 would send it to dev under the first account signed in: clear Bali's storage, or uninstall it, before
 installing that build.
+
+## AN8, the tap on the phones
+
+AN8's 📱 check (`docs/PLAN-ANDROID.md`), on both phones, a Debug build on each, offline before AN9 and on
+dev after it, as AN7's: the readout's Scan reads a block over NFC and taps it, and Read block code only
+reads one (`docs/DECISIONS.md`, 2026-11-05, AN8). A block is any NFC sticker holding ten letters and digits
+in a Text record, or at the end of a `bali://t/<code>` or `https://<host>/t/<code>` link: `ios/README.md`'s
+round 4 says how to write one. Android plays its own sound as it reads a tag.
+
+- **The block's code.** *Start:* out of a class, the readout on screen, Airplane mode on, NFC on, the
+  sticker written. Read block code, the back of the phone held to the block: `block <CODE>: read only,
+  nothing recorded`, `Outbox: empty`.
+- **A real block, offline, in under a second.** *Start:* out of a class, unlocked, the readout on screen,
+  Airplane mode on, NFC on, the service on, Cap a tap at 15 min off. Scan, the phone held to the block:
+  `block <CODE>: tap recorded, locked <n> ms after the read`, Lock locked and due 50 minutes on, `Outbox:
+  Tap`, and a blocked app opened next covered. From the phone touching the block to the note, under a
+  second: <n> is Bali's part, the rest Android's read. Three times on each phone, each <n> noted.
+- **Held on the block after the read.** *Start:* as above, the phone left on the block for 5 s after the
+  note. Nothing else opens: not the link's browser, nor Android's word that no app reads the tag.
+- **Airplane mode and NFC.** *Start:* out of a class, NFC on, Airplane mode off. Airplane mode on: whether
+  the phone switches NFC off with it, as some makers' do; if so, a scan says NFC is switched off until NFC is
+  switched on again.
+- **Not a Bali block.** *Start:* out of a class, the readout on screen, Airplane mode on, NFC on. Scan with a
+  sticker holding a web link, a blank sticker, and a bank or ID card: `not a Bali block — nothing recorded`
+  each, `Outbox: empty`. Then such a card kept behind the phone in its case, Scan, and the block touched:
+  what the scan says, and whether the block reads at all, since the card's read would end each scan first.
+- **NFC switched off.** *Start:* out of a class, the readout on screen, Airplane mode on, NFC off in
+  Settings. Scan: `NFC is switched off — nothing recorded` at once. Then NFC on, Scan, and NFC switched
+  off from quick settings while the scan waits: the same.
+- **A scan left.** *Start:* out of a class, the readout on screen, Airplane mode on, NFC on, a scan
+  waiting. Home, or the screen turned off: `scan cancelled — nothing recorded`. Back in the readout, Scan
+  reads the block again.
+- **The block's link with Bali closed** (once AN1's part 2 runs). *Start:* out of a class, Bali swiped away
+  from recents, the phone unlocked on the home screen, Airplane mode off, NFC on. The block touched: what
+  opens, if anything (the browser, for an `https://` link). AN8 builds nothing for it: a block's link opening
+  Bali waits for AN1's part 2 and for Phase 10's screens.
 
 ## AP3, the device test gate
 

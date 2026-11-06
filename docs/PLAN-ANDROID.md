@@ -14,17 +14,17 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-05 (Central) — AN7e, the cover (#531; `docs/DECISIONS.md`, 2026-11-05): while a
-lock holds, each window of an app the allow-list doesn't hold, named by that window's own state event and
-never by its contents, is covered where it is, within the screen but its bars, by a plain overlay in Debug
-(Q1); a full-screen app is sent home once its cover lands, a split half and a picture-in-picture window
-stay covered (Q5); a cover keeps clear of the shade, a notification and the keyboard above it; and the
-covers go at the lock's end with no event. The allow-list is asked of Android as a lock comes on, the
-in-call screen above all. A window already on screen as the lock comes on stays bare until it changes or
-is touched (ISSUES #6). Before it, AN7d, the Debug readout. Next: AN7f, the lock on the owner's phones;
-Android's Cognito clients, the owner's (Open owner items, 8); Android 17's SDK platform for the owner to
-OK before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's part
-2 once the owner has the phones. Not on the pilot's critical path._
+_Last updated: 2026-11-05 (Central) — AN8's code, the tap over NFC (#532; `docs/DECISIONS.md`,
+2026-11-05): `BlockReader`, Android's reader mode while a screen of Bali's own is in front, one tag a
+scan, its NDEF records handed to `BlockTag` as they come; a phone with no NFC reads as one that can't, as
+on iOS, and NFC switched off, before a scan or during it, as `NfcOff`, a new `BlockRead` for AN10 to word
+and AS4 to draw. The NFC feature isn't required, so Play offers Bali to phones without it: the owner's
+call. The Debug readout's Scan taps a block through the engine and times the lock; Read block code only
+reads one. A block's link opening Bali waits for AN1's part 2 and Phase 10. Before it, AN7e, the cover.
+Next: AN9, the account's flows; AN7f and AN8's 📱 check on the owner's phones; Android's Cognito clients,
+the owner's (Open owner items, 8); Android 17's SDK platform for the owner to OK before the first step with
+today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the owner has the phones.
+Not on the pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -155,10 +155,10 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
   Samsung (Open owner items, 1), from `docs/ANDROID-PHONE-TESTS.md`'s AN7 checklist, which AN7c–AN7e
   write: B5 round 1's steps in Android's terms, offline before AN9, on dev after it (DECISIONS
   2026-11-05, Q8) — validation: every line answered on both phones
-- **AN8** 📱 The tap over NFC (twin: `BlockReader`, B6): reader mode, started from the Debug readout
-  until AS4 builds Bali's "hold your phone to the block" screen; the offline tap in under a second;
-  the tap's dispositions (`tapDisposition`); and, if AN1 found it works, the block's link opening
-  Bali when it's closed — validation: the JVM tests, then a real block on both phones, offline
+- **AN8** 📱 The tap over NFC — ✅ its code (#532; DECISIONS 2026-11-05); left, its 📱 check, a real
+  block on both phones, offline (`docs/ANDROID-PHONE-TESTS.md`, AN8); and the block's link opening Bali
+  when it's closed, not built: it waits for AN1's part 2 to find whether it works, and for Phase 10, since
+  the release build has no activity to open until then
 - **AN9** The account's flows (twin: `Join`, `Me`, `History`, `Age`, `Deletion`): Join with the
   consent list, Me, History, the 13+ check (C7, C7-server), Your name, and Delete account (what the
   phone queued first, every Emergency Unlock first, then `DELETE /v1/me`, then Cognito's DeleteUser,

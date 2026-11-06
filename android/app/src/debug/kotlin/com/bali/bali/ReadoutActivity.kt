@@ -20,6 +20,7 @@ import androidx.activity.ComponentActivity
 import androidx.core.content.edit
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
+import com.bali.core.BlockRead
 import com.bali.outbox.Change
 import com.bali.outbox.Enforcer
 import com.bali.outbox.Protection
@@ -36,7 +37,9 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * The phone checks' readout (docs/ANDROID-PHONE-TESTS.md), BaliApp.swift's `Readout`: the engine's link, the
@@ -44,8 +47,9 @@ import kotlinx.coroutines.launch
  * the queue, with the triggers the screens will have. In the Debug build alone, with a launcher entry of its
  * own, until Phase 10's screens: a developer's words, never a student's, and nothing a teacher sees, as iOS's
  * (DECISIONS 2026-09-25, B4c; 2026-11-05, AN7d). Plain Views: today's Compose needs compileSdk 37. In front,
- * it tells the app ([BaliApp.front]), which reads the truth and runs rule 3's check. Not here: Join and
- * History (AN9's), Scan (AN8's), and iOS's marker, asks and monitor, which have no twin.
+ * it tells the app ([BaliApp.front]), which reads the truth and runs rule 3's check. Its Scan reads a block over
+ * NFC and taps it, and Read block code only reads one, for registering it (AN8). Not here: Join and History
+ * (AN9's), and iOS's marker, asks and monitor, which have no twin.
  */
 // Lint's SetTextI18n guards the words a student reads and a translator translates: these are a developer's alone.
 @SuppressLint("SetTextI18n")
@@ -53,6 +57,8 @@ class ReadoutActivity : ComponentActivity() {
     private val app get() = application as BaliApp
     internal lateinit var lines: TextView
     internal lateinit var signIn: Button
+    internal lateinit var scan: Button
+    internal lateinit var readCode: Button
     internal lateinit var blockTag: EditText
     internal lateinit var tap: Button
     internal lateinit var unlock: Button
@@ -69,6 +75,9 @@ class ReadoutActivity : ComponentActivity() {
         val signOut = button("Sign out") { app.signIn?.let { it.signOut(); "signed out" } ?: "sign-in isn't set up in this build: nobody to sign out" }
         // iOS's Allow Screen Time: Android asks nothing, the student switches the service on there.
         val settings = Button(this).apply { text = "Open Accessibility settings"; setOnClickListener { accessibility() } }
+        // B6's: the block read over NFC and tapped, or only read, to register it on dev.
+        scan = button("Scan") { scanned() }
+        readCode = button("Read block code") { said(BlockReader(this).read(), "read only, nothing recorded") }
         blockTag = EditText(this).apply { hint = "Block tag"; inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS }
         // The tag read here, on the main thread, before the trigger goes.
         tap = Button(this).apply { text = "Tap"; setOnClickListener { blockTag.text.toString().trim().let { typed -> act { tapped(typed) } } } }
@@ -76,7 +85,7 @@ class ReadoutActivity : ComponentActivity() {
         shortCap = CheckBox(this).apply { text = "Cap a tap at 15 min (phone check)"; isChecked = cap(context) != null; setOnCheckedChangeListener { _, on -> capped(on) } }
         tryAgain = button("Try again") { app.begin(); app.startFailed.value?.let { "start failed again: $it" } ?: "started" }
         val column = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(PAD, PAD, PAD, PAD) }
-        listOf(lines, row(signIn, signOut), settings, row(blockTag, tap), unlock, shortCap, tryAgain).forEach(column::addView)
+        listOf(lines, row(signIn, signOut), settings, row(scan, readCode), row(blockTag, tap), unlock, shortCap, tryAgain).forEach(column::addView)
         setContentView(ScrollView(this).apply { fitsSystemWindows = true; addView(column) })
     }
 
@@ -190,6 +199,30 @@ class ReadoutActivity : ComponentActivity() {
         return if (engine.record(Change.Tap(typed)) == null) "nothing new to send" else "recorded"
     }
 
+    /**
+     * A scan of the block, tapped through the engine as the screens will tap one (iOS's Scan), and how long the lock
+     * took after the read, for the phone check's second (docs/ANDROID-PHONE-TESTS.md, AN8).
+     */
+    private suspend fun scanned(): String {
+        val read = BlockReader(this).read()
+        val at = SystemClock.uptime()
+        val run = app.running.value ?: return said(read, "no engine: nothing recorded")
+        if (run.engine.tap(read) == null) return said(read, "")
+        val locked = withTimeoutOrNull(LOCK_PATIENCE.toMillis()) { run.enforcer.updates.first { it.locked } }
+        return said(read, "tap recorded, " + if (locked == null) "not locked within ${seconds(LOCK_PATIENCE)}" else "locked ${(SystemClock.uptime() - at).toMillis()} ms after the read")
+    }
+
+    /** A scan, in words: a block's code and [then], or why nothing was recorded. */
+    private fun said(read: BlockRead, then: String): String =
+        when (read) {
+            is BlockRead.Block -> "block ${read.code}: $then"
+            BlockRead.NotBali -> "not a Bali block — nothing recorded"
+            BlockRead.Cancelled -> "scan cancelled — nothing recorded"
+            BlockRead.Unsupported -> "this phone can't read NFC — nothing recorded"
+            BlockRead.NfcOff -> "NFC is switched off — nothing recorded"
+            is BlockRead.Failed -> "scan failed: ${read.message} — nothing recorded"
+        }
+
     /** B5b's phone check: a tap not yet answered capped at 15 minutes, not 50, kept for the next start. */
     private fun capped(on: Boolean) {
         keep(this, on)
@@ -215,6 +248,9 @@ class ReadoutActivity : ComponentActivity() {
     internal companion object {
         /** B5b's phone check's cap on a tap not yet answered: iOS's floor, 15 minutes, not decision 7's 50. */
         val SHORT_CAP: Duration = Duration.ofMinutes(15)
+
+        /** How long a scan's note waits for the lock after the tap: far past the second the tap has (AN8). */
+        val LOCK_PATIENCE: Duration = Duration.ofSeconds(5)
 
         /** What the last trigger did: the process's, so a readout made again keeps it. */
         val note = MutableStateFlow("")
