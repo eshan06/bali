@@ -3,8 +3,9 @@
 The student app, the iPhone app's twin, over two modules of plain Kotlin (`docs/ARCHITECTURE.md`,
 "Android app structure"). Phase 9 builds the engine and Phase 10 the screens
 (`docs/PLAN-ANDROID.md`); until then the app is Bali's name, the outbox's file, sign-in's app side, the
-lock's service and a readout for the phone checks (both in the Debug build alone), the engine and the
-enforcer it starts, and the backup rules that keep them on the phone: no screen a student sees, no icon.
+lock's service with its cover and a readout for the phone checks (both in the Debug build alone), the
+engine and the enforcer it starts, and the backup rules that keep them on the phone: no screen a student
+sees, no icon.
 
 | Folder                      | What it is                                                                                                                |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
@@ -46,7 +47,10 @@ You need JDK 21 (Android Studio's own, its JBR, as `JAVA_HOME`) and Android's SD
    Chrome after, never accepting its terms, and puts back the font scale it changes; and the lock's
    service, switched on and off as a student would, through the shell of a UiAutomation that leaves
    accessibility services running (one that doesn't has Android unbind them all), the screen turned
-   off and on, each put back as found; and the Debug readout, driven as a tester drives it. A Debug
+   off and on, each put back as found; the Debug readout, driven as a tester drives it; and the cover,
+   over Android's own apps and a blocked app of the tests' own (`StandIn.java`, in Java since it runs in
+   the test app's process, which has no Kotlin), with split screen made through System UI's shell and a
+   call to the emulator's own pretend network, its call log put back. A Debug
    build's start opens the app's own outbox, `outbox.sqlite`, in the tests' process too, so each test
    opens a file of its own, and one that starts a run of its own waits for the app's start first
    (`BaliApp.launched`). CI builds them but has no emulator to run them, so a step that changes what
@@ -137,6 +141,22 @@ all the same, over no token at the build's API, as a signed-out phone, so a type
 its cap and nothing reaches the network; a Release build's makes none, as on iOS (`app/src/release`'s
 `ThisBuild`, pinned on the JVM by Release's own tests, which `gradle.properties` turns on). A start that
 fails is held (`BaliApp.startFailed`) for a screen to say, never swallowed.
+
+**The cover** (`outbox`'s `Cover.kt`, the rule, on the JVM; `app`'s `AllowList.kt`, `Covers.kt` and
+`LockService`'s window events, AN7e; no iOS twin, the shields covering every app at once): while a lock
+holds, the service names each window from that window's own state event, never its contents, and covers
+each window of an app the allow-list doesn't hold where it is, within the screen but its bars, with a
+plain overlay of Bali's own, AS5's block screen its content in Phase 10. A full-screen app is sent home
+once its cover lands; a split half and a picture-in-picture window stay covered, the latter's touches
+going through to System UI, which still moves or closes it. A cover keeps clear of every window above its
+own that isn't covered (the shade, a notification, the keyboard), but for a picture-in-picture window's own
+menu, and the covers go at the lock's end with no event. Android 10 measures no insets outside a window, so
+there the screen but its bars is worked out from the display's sizes (`safeOnAndroid10`). The allow-list is
+asked of Android as a lock comes on, through the `<queries>` beside the service in the Debug manifest (a
+protected broadcast's receiver shows through none, so the emergency alerts app is seen by its list of
+alerts): the parts the student chooses whoever holds them, the parts asked by what they do only where a
+system app holds them. A window no event has named is never covered, so one already on screen
+as the lock comes on stays bare until it changes or the student touches it (`docs/ISSUES.md` #6).
 
 **The outbox tables** (`core`'s `UnlockContract.kt` and `OutboxContract.kt`, BaliCore's twins) say
 what the outbox does with a record after each send; no answer ever drops an unlock the server hasn't

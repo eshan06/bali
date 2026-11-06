@@ -2,9 +2,31 @@
 <!-- The Debug build's own, merged over main's: lock (a), Bali's Accessibility service (LockService.kt),
      declared here alone, with a developer's label and description, until AS3 or AS5 declares it in main
      with AS0's approved words (docs/DECISIONS.md, 2026-11-05, Q1), so no Release build shows an undrawn
-     word. Only the system can bind it. And the phone checks' readout (ReadoutActivity.kt), with a
-     launcher entry of its own: a developer's words, until Phase 10's screens (AN7d). -->
+     word. Only the system can bind it, and its allow-list's queries come with it (AN7e). And the phone
+     checks' readout (ReadoutActivity.kt), with a launcher entry of its own: a developer's words, until
+     Phase 10's screens (AN7d). -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- What the lock never covers (AllowList.kt), asked of Android as a lock comes on: each part's holders,
+         hidden from Android 11 without these. The SMS role's too, which Android names only to an app that sees it. -->
+    <queries>
+        <intent><action android:name="android.intent.action.SENDTO" /><data android:scheme="smsto" /></intent>
+        <intent><action android:name="com.android.phone.EmergencyDialer.DIAL" /></intent>
+        <intent><action android:name="android.intent.action.DIAL_EMERGENCY" /></intent>
+        <intent><action android:name="android.telephony.action.EMERGENCY_ASSISTANCE" /></intent>
+        <intent><action android:name="android.intent.action.CALL_EMERGENCY" /><data android:scheme="tel" /></intent>
+        <intent><action android:name="android.intent.action.CALL" /><data android:scheme="tel" /></intent>
+        <intent><action android:name="android.telecom.InCallService" /></intent>
+        <!-- The emergency alerts app, by its list of alerts: no query shows a protected broadcast's receiver. -->
+        <intent><action android:name="android.cellbroadcastreceiver.UPDATE_LIST_VIEW" /></intent>
+        <intent><action android:name="android.settings.SETTINGS" /></intent>
+        <intent><action android:name="android.settings.ACCESSIBILITY_SETTINGS" /></intent>
+        <intent><action android:name="android.content.pm.action.REQUEST_PERMISSIONS" /></intent>
+        <intent><action android:name="android.intent.action.CHOOSER" /></intent>
+        <intent><action android:name="android.intent.action.DELETE" /><data android:scheme="package" /></intent>
+        <intent><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.HOME" /></intent>
+        <intent><action android:name="android.view.InputMethod" /></intent>
+    </queries>
 
     <application>
         <service

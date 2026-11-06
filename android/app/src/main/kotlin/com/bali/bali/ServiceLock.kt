@@ -100,6 +100,9 @@ class ServiceLock(private val context: Context) : Lock {
         follow()
     }
 
+    /** Until when the service covers apps ([LockService.cover], AN7e): this run's lock's end; the last run's, which has none, the end of time. */
+    internal val until: Instant? get() = if (kept) Instant.MAX else end
+
     /**
      * Whether a lock holds now, this run's before its end or the last run's, the file and the service
      * following it: the file there while one does, and the service listening to the windows while one
@@ -109,7 +112,10 @@ class ServiceLock(private val context: Context) : Lock {
     private fun follow(): Boolean {
         val holds = kept || end?.let { it > Instant.now() } == true
         if (saved != holds) saved = save(holds)
-        service?.let { if (listening != holds) listening = listen(it, holds) }
+        service?.let {
+            if (listening != holds) listening = listen(it, holds)
+            it.cover()
+        }
         return holds
     }
 

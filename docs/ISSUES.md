@@ -278,7 +278,12 @@ both phones, on the build students will install, before Android launches
    reports stay reports.
 3. **A blocked app shows for a moment before the cover lands:** on the emulators a median of half
    to three quarters of a second from launch, always after the app's first frame, and longer on a
-   slow first launch. *Checked:* launch to cover, timed on both phones as part 1 timed it.
+   slow first launch. And one already on screen as a lock comes on, beside Bali in split screen or in
+   picture-in-picture, shows until it changes or the student touches it: Bali names a window only from
+   that window's own events, never reading its contents (the battery plan; `docs/DECISIONS.md`,
+   2026-11-05, AN7e). *Checked:* launch to cover, timed on both phones as part 1 timed it; and a video
+   playing in split screen beside Bali, and in picture-in-picture, as a tap locks the phone: how long
+   each shows.
 4. **A blocked app's sound can play on.** Most apps stop once they are sent to the background;
    music apps, a picture-in-picture window and a split-screen half don't. *Checked:* a video app, a
    music app, a picture-in-picture window and a split-screen half, each playing as a lesson starts:
@@ -311,9 +316,21 @@ both phones, on the build students will install, before Android launches
 10. **Android 10 to 14 are untested.** Bali runs on Android 10 and later (minSdk 29, AN2), but the
     PC has only Android 15, 16 and 17 emulators, so nothing older has run it. A Java API an older
     phone lacks would fail only there, since Android Lint doesn't check `core`'s and `outbox`'s
-    calls against Android 10 (`docs/DECISIONS.md`, 2026-11-04, AN2). *Checked:* the build students
-    install, through a whole lesson, on Android 10 and on Android 12 or 13, as emulator images the
-    owner adds (each a download the owner OKs) or as phones.
+    calls against Android 10 (`docs/DECISIONS.md`, 2026-11-04, AN2). Android 10 also measures no
+    insets outside a window, so there the cover's safe area is worked out from the display's own sizes
+    (2026-11-05, AN7e). *Checked:* the build students install, through a whole lesson, on Android 10
+    and on Android 12 or 13, as emulator images the owner adds (each a download the owner OKs) or as
+    phones; on Android 10, a screen with a cutout, upright and turned both ways: a full-screen app sent
+    home, a split half covered to its edges.
+11. **What the allow-list lets through.** The parts the student chooses are allowed whoever holds
+    them, each app whole: the phone and messaging apps chosen, the home screen chosen and every keyboard
+    switched on, so an app that is one of these and more besides (a home screen with a feed, a keyboard
+    with games) is never covered. Another app's accessibility overlay is never covered, nor the system's
+    share sheet, which a blocked app can open over itself and show behind it, dimmed, as a permission
+    prompt can (6). A blocked app's floating window, covered, stays where it is until the student closes
+    it from its notification or Settings (`docs/DECISIONS.md`, 2026-11-05, AN7e). *Checked:* on both
+    phones, the keyboards and home screens they ship with, and a share sheet opened over a blocked app:
+    what each lets the student reach under the lock.
 
 **The plan.**
 - Honest, not fought (the mirror rule): what the lock can't stop is never shown as focus. The

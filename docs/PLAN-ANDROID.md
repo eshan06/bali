@@ -14,17 +14,17 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-05 (Central) — AN7d, the Debug readout (#524; `docs/DECISIONS.md`,
-2026-11-05): a developer's screen for the phone checks in the Debug build alone, with a launcher entry
-of its own, iOS's `Readout`'s twin: the link, the sign-in, the standing, the lock's claim, the service and
-how long it took to bind, and the outbox; Open Accessibility settings, a typed tap, Emergency Unlock and
-the 15-minute cap; Bali in front reads the truth and runs the check. While sign-in isn't set up, a Debug
-build's start runs the engine over no token, as a signed-out phone, so a typed tap locks offline to its
-cap (Q2); a Release build's runs none. A start that fails is held, with Try again. Before it, AN7c, the
-service and the app's engine. Next: AN7e, the cover; Android's Cognito clients, the owner's (Open owner
-items, 8); Android 17's SDK platform for the owner to OK before the first step with today's AndroidX, and
-OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's
-critical path._
+_Last updated: 2026-11-05 (Central) — AN7e, the cover (#531; `docs/DECISIONS.md`, 2026-11-05): while a
+lock holds, each window of an app the allow-list doesn't hold, named by that window's own state event and
+never by its contents, is covered where it is, within the screen but its bars, by a plain overlay in Debug
+(Q1); a full-screen app is sent home once its cover lands, a split half and a picture-in-picture window
+stay covered (Q5); a cover keeps clear of the shade, a notification and the keyboard above it; and the
+covers go at the lock's end with no event. The allow-list is asked of Android as a lock comes on, the
+in-call screen above all. A window already on screen as the lock comes on stays bare until it changes or
+is touched (ISSUES #6). Before it, AN7d, the Debug readout. Next: AN7f, the lock on the owner's phones;
+Android's Cognito clients, the owner's (Open owner items, 8); Android 17's SDK platform for the owner to
+OK before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's part
+2 once the owner has the phones. Not on the pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -150,13 +150,7 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
   2026-11-05)
 - **AN7c** The service and the app's engine — ✅ (#523; DECISIONS 2026-11-05)
 - **AN7d** The Debug readout — ✅ (#524; DECISIONS 2026-11-05)
-- **AN7e** The cover (twin: the spike's `AllowList`, `Covers` and `BlockAccessibilityService`): which
-  windows are covered, in `outbox` (`Cover`): those of an app the system allow-list (decision 2) doesn't
-  hold, while the lock's end is ahead by the phone's clock, never Bali's own nor under the shade; the
-  covered app sent to the background, as Home does (DECISIONS 2026-11-05, Q5), a split half and
-  picture-in-picture covered and left
-  there; the cover plain in Debug (Q1) — validation: the JVM tests, then the emulators', timed against
-  AN1's
+- **AN7e** The cover — ✅ (#531; DECISIONS 2026-11-05)
 - **AN7f** 📱 The lock on the phones (no code): the device check on both phones, the Pixel and the
   Samsung (Open owner items, 1), from `docs/ANDROID-PHONE-TESTS.md`'s AN7 checklist, which AN7c–AN7e
   write: B5 round 1's steps in Android's terms, offline before AN9, on dev after it (DECISIONS
