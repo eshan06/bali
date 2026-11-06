@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
+import android.view.Surface
 import android.view.WindowInsets
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
@@ -19,6 +20,7 @@ import com.bali.outbox.Area
 import com.bali.outbox.Cover
 import com.bali.outbox.OnScreen
 import com.bali.outbox.WindowKind
+import com.bali.outbox.safeOnAndroid10
 import java.time.Duration
 import java.time.Instant
 
@@ -134,15 +136,16 @@ class LockService : AccessibilityService() {
             else -> WindowKind.Kept
         }
 
-    /**
-     * The screen but its system bars and its cutout, so the status bar and the gesture bar stay the student's. Android 10
-     * measures no insets outside a window: there, the part an app's window fills (its own way, deprecated since), the status
-     * bar's window kept clear as any other.
-     */
+    /** The screen but its bars and cutout, the status bar and gesture bar the student's; on Android 10, [safeOnAndroid10]. */
+    @Suppress("DEPRECATION")
     private fun safe(): Area {
         val manager = getSystemService(WindowManager::class.java)
-        @Suppress("DEPRECATION")
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return Point().also { manager.defaultDisplay.getSize(it) }.run { Area(0, 0, x, y) }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            val display = manager.defaultDisplay
+            val (whole, app) = Point().also(display::getRealSize) to Point().also(display::getSize)
+            val cut = display.cutout
+            return safeOnAndroid10(whole.x, app.x, app.y, cut?.safeInsetLeft ?: 0, cut?.safeInsetTop ?: 0, cut?.safeInsetRight ?: 0, display.rotation == Surface.ROTATION_270)
+        }
         val metrics = manager.currentWindowMetrics
         val bars = metrics.windowInsets.getInsetsIgnoringVisibility(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
         return metrics.bounds.run { Area(left + bars.left, top + bars.top, right - bars.right, bottom - bars.bottom) }

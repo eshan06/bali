@@ -43,15 +43,21 @@ a real decision? Add a dated entry at the top: what was decided and why.
   - **A window an app draws over others is covered too** (the conductor's call): Android lists another
     app's overlay windows as the system's, so a blocked app's floating window would otherwise play on.
     Never sent home, which moves no such window.
-  - **Sent home** (Q5): a full-screen app, once its cover lands (its first frame drawn), once per cover,
-    and never once the cover has gone with its window, so a student who has moved on is never sent home
-    from there; a split half or a picture-in-picture window stays covered. Opened full screen again from
-    its picture-in-picture menu, an app is covered afresh and sent home again, the menu over it having
-    taken its cover away.
+  - **Sent home** (Q5): a full-screen app, once its cover lands (its first frame drawn), and once each
+    time it comes to fill the screen again under that cover, never once the cover has gone with its
+    window, so a student who has moved on is never sent home from there; a split half or a
+    picture-in-picture window stays covered. So an app opened full screen again from its
+    picture-in-picture menu is sent home again, under the cover it kept: on the Android 16 emulator the
+    window kept its first cover into picture-in-picture, and without the home sent again it stayed full
+    screen, covered (the test failed by name; on 17 the home screen took the first cover away).
   - **A picture-in-picture window's cover holds no touch** (santa's blocker, below): its touches go through
     to System UI, which moves, closes or opens the window, so it is never stuck, covered, over the dialer or
     any app the student opens next. A split half's cover holds its touches, so no blocked half is used
-    blind.
+    blind. **Its menu leaves it covered** (santa's round 2, the conductor's call): the menu, System UI's
+    window at the small window's place, is see-through, so the app would show under it, its own buttons
+    usable, if the cover kept clear of it as of any other window. So the menu is hidden under the cover
+    too, its touches still the menu's: a student's tap there still opens the app full screen, and so sends
+    it home, or closes it, blind.
   - **Names last only while a lock holds** (the conductor's call): decision 2's "keeps and sends none of
     it", so no list of the apps a student opens outlives the lock. Within it a window that comes back keeps
     its name, so a warm return is covered as it appears, before its own event.
@@ -67,58 +73,78 @@ a real decision? Add a dated entry at the top: what was decided and why.
     too; the emergency call; emergency information and SOS (`EMERGENCY_ASSISTANCE`, the Safety app there);
     Telecom; the system's in-call screens (an `InCallService` flagged as Telecom's in-call UI), so a maker's
     in-call screen apart from its dialer, the Samsung's (AN1), is found before AN7f checks it; emergency
-    alerts (the cell broadcast receiver, so an alert's dialog is never hidden); Settings and its
-    Accessibility, permission and uninstall screens (a maker's Accessibility settings may be a package of
-    their own); the system's chooser (`com.android.intentresolver` from Android 14); and every home screen
-    offered where none is chosen. And System UI, the system's own dialogs (`android`) and Bali, by hand.
+    alerts (the cell broadcast receiver, by Android 11's broadcast and Android 10's, so an alert's dialog
+    is never hidden); Settings and its Accessibility, permission and uninstall screens (a maker's
+    Accessibility settings may be a package of their own); the system's chooser
+    (`com.android.intentresolver` from Android 14); and every home screen offered where none is chosen.
+    And System UI, the system's own dialogs (`android`) and Bali, by hand.
     The emergency ones and the chooser go beyond the split's list: the conductor's calls, on santa's
     findings. **Found on the emulator:** Android names the SMS role's holder only to an app that can see
-    it, so Messages would have been covered without its `<queries>` entry; the test caught it.
+    it, so Messages would have been covered without its `<queries>` entry; the test caught it. And no
+    `<queries>` entry shows a protected broadcast's receiver, so round 1's entry for the alerts' broadcast
+    left the alerts app hidden from Bali, and an alert's dialog would have been covered: round 2's test,
+    checking each part against what the shell sees, caught it, and Bali now sees the app by its list of
+    alerts (`android.cellbroadcastreceiver.UPDATE_LIST_VIEW`, Android's own alerts app's; a maker's own may
+    lack it, for AN7f).
   - **Plain in Debug** (Q1): no words, no buttons, the iPhone shield's background (`#F7F5F2`), a touch
     outside it going to the windows it doesn't cover. The 63-px strip of a covered app under the gesture bar
     shows, as AN1 saw. On Android 10, which measures no insets outside a window, the safe area is the part
-    an app's window fills, so a full-screen app there is sent home too (santa's review; untested, ISSUES #6
-    gap 10).
+    an app's window fills, by the display's own sizes, placed where Android 10 places it: past the cutout,
+    and past the navigation bar where it's on the left, turned 270 degrees. So a full-screen app there is
+    sent home too, and a window is covered to its edges (santa's rounds 1 and 2; the placing,
+    `safeOnAndroid10`, on the JVM; the display's sizes untested on a phone, ISSUES #6 gap 10).
 
   **What the emulators showed** (Android 15, 16 and 17, each cold-booted): launch to cover, Contacts from
   Home three times, the first cold, on an emulator past its boot, against AN1's medians of 570, 507 and
   745 ms over five apps: 15, [808, 251, 179] ms; 16, [918, 303, 335]; 17, [1132, 262, 259]; in the run
-  right after a cold boot, slower (16, [2480, 1189, 1435]; 17, [2916, 656, 1085]). A warm launch is
-  faster than AN1's, a window named earlier in the lock covered as it appears; a cold one isn't. Where
-  only real time does: these times, and the lock's end, its cover gone within 2 s of it. Emergency Unlock
-  took the cover off in 47 ms (15), 137 (16) and 49 to 228 (17). The cover followed a picture-in-picture
+  right after a cold boot, slower (16, [2480, 1189, 1435]; 17, [2916, 656, 1085]), as in round 2's
+  runs, each soon after one (on all three, the first launch 1.9 to 3.3 s, the warm ones 0.2 to 1.4 s). A
+  warm launch is faster than AN1's, a window named earlier in the lock covered as it appears; a cold one
+  isn't. Where only real time does: these times, and the lock's end, its cover gone within 2 s of it.
+  Emergency Unlock took the cover off in 47 ms (15), 137 (16) and 49 to 228 (17); in round 2's runs, 40
+  to 93 ms. The cover followed a picture-in-picture
   window as it moved (and, by hand, in landscape); the shade and the keyboard stayed whole; a heads-up
-  notification's window, read there (System UI's, the card's own size), is the JVM test's.
+  notification's window, read there (System UI's, the card's own size), is the JVM test's. The
+  picture-in-picture menu is System UI's window at the small window's very place, listed as in
+  picture-in-picture too; with the cover keeping clear of it, the stand-in's colour showed dimmed under it.
+  A tap on a small window just come to rest can land on the home screen under it, System UI taking its
+  touches only once its input consumer is there (`dumpsys input`), which the test waits for.
 
-  **The tests,** on `Bali_Spike_API35`, `36` and `37`, the whole instrumented suite, 47 of 47 on each
-  (`CoversTest`'s 5 new, on the emulator's own windows): a blocked system app (Contacts) covered and sent
+  **The tests,** on `Bali_Spike_API35`, `36` and `37`, the whole instrumented suite, 48 of 48 on each
+  (`CoversTest`'s 6 new, on the emulator's own windows): a blocked system app (Contacts) covered and sent
   home once, the cover gone with its window, timed; Settings, its Accessibility settings, Bali's uninstall
-  screen (asked, never confirmed), the dialer, the emergency dialer, Messages, a call's in-call screen (to
-  the emulator's own pretend network, its call log put back), the launcher and the readout never covered,
-  none sent home; split screen beside the readout, the blocked half covered where it is within the safe
-  area, the readout bare, never sent home, the keyboard kept clear, nothing covered under the shade, and
-  Emergency Unlock lifting it; a full-screen app sent home into picture-in-picture, covered where it is,
-  dragged by the student through its cover and followed, then opened full screen from its menu and sent
-  home again; and a lock ending 15 s on, with no enforcer, losing its cover at its end with no event. The
-  covers are read from the service and seen in the screen's pixels (`screencap`), never in a `uiautomator
-  dump`. The blocked app is a system app or the tests' own stand-in (`StandIn.java`, Java since it runs in
-  the test app's own process, which carries no Kotlin). On the JVM, `CoverTest`'s 15. Tried, each failing
+  screen (asked, never confirmed), the dialer, the emergency dialer, emergency information (where the image
+  has it), Messages, a call's in-call screen (to the emulator's own pretend network, its call log put
+  back), the launcher and the readout never covered, none sent home; each system app the shell finds for
+  an emergency or Settings part, and for an alert's broadcast, allowed, and the tests' own app, declaring
+  an alert's receiver, never; split screen beside the readout, the blocked half covered where it is within
+  the safe area, the readout bare, never sent home, the keyboard kept clear, nothing covered under the
+  shade, and Emergency Unlock lifting it; a full-screen app sent home into picture-in-picture, covered
+  where it is, dragged by the student through its cover and followed, its menu opened over it with the
+  cover staying, then opened full screen from the menu and sent home again; and a lock ending 15 s on,
+  with no enforcer, losing its cover at its end with no event. The covers are read from the service and
+  seen in the screen's pixels (`screencap`), never in a `uiautomator dump`. The blocked app is a system
+  app or the tests' own stand-in (`StandIn.java`, Java since it runs in the test app's own process, which
+  carries no Kotlin). One run on Android 17 looked for the readout's field before the readout, made again
+  for its half, had laid out: the test now scrolls to it until it shows whole. On the JVM, `CoverTest`'s
+  16. Tried, each failing
   by name, then reverted: Bali's own windows covered; an unnamed window covered (3); no window above kept
   clear (2); a picture-in-picture window sent home; names kept past the end; the overlays and the divider
   kept clear (2); covered at the end's very moment; a window drawn over others sent home; the keyboard
-  covered; and, on the emulator, no app sent home (4), no cover made again at the end, and a
-  picture-in-picture cover holding its touches (the drag). A home sent again for a window come back full
-  screen under the cover it kept was tried and dropped: nothing reached it, the menu or the transition
-  taking the cover away first. **AN6c's race closed** (its own commit): SignInBrowserTest's
-  Back over a font-scale change now waits for the input dispatcher to send keys to Chrome's new window,
-  Chrome making its window again for the change (AN7d's "no input channel"); no assertion loosened.
-  Nothing was added to the PC's SDK: its folders were compared before and after.
+  covered; a picture-in-picture window's menu uncovering it (and on the emulator); Android 10's safe area
+  at the screen's corner; and, on the emulator, no app sent home (4), no cover made again at the end, a
+  picture-in-picture cover holding its touches (the drag), any app declaring an asked part allowed, and
+  no home sent again for an app back full screen under its cover (Android 16). **AN6c's race closed** (its own commit): SignInBrowserTest's Back over a font-scale
+  change now waits for the input dispatcher to send keys to Chrome's new window, Chrome making its window
+  again for the change (AN7d's "no input channel"); no assertion loosened. Nothing was added to the PC's
+  SDK: its folders were compared before and after.
 
   **For AN7f:** the phone tests' AN7 section (`docs/ANDROID-PHONE-TESTS.md`): the Samsung's in-call screen,
   a permission prompt, sound playing on, launch to cover on hardware, a window on screen as the lock comes
-  on, Bali switched off and its removal asked in Settings, emergency alerts and the Safety app (SOS never
-  triggered), a contact opened from the Phone app (another app's screen in the dialer's task would take
-  the dialer home with it), and Advanced Protection through Settings. **For AS5:** the block screen as the
+  on, Bali switched off and its removal asked in Settings, emergency alerts (the Samsung's alerts app may
+  be its own, found only if it keeps Android's list of alerts) and the Safety app (SOS never triggered), a
+  contact opened from the Phone app (another app's screen in the dialer's task would take the dialer home
+  with it), and Advanced Protection through Settings. **For AS5:** the block screen as the
   cover's content, its OK going home and Open Bali opening Bali; and TalkBack, since an accessibility
   overlay doesn't take the windows under it out of Android's list of windows, so TalkBack can still reach
   a covered split half or picture-in-picture window. **For Phase 10:** the service and these `<queries>`
@@ -136,7 +162,20 @@ a real decision? Add a dated entry at the top: what was decided and why.
   uninstall and Accessibility screens untested (now tested; the permission screen can't be opened from the
   shell). Left for AN7f: a whole task sent home, the dialer's contact card among them. Reviewer B, no
   blocker: Android checks an event's package against its sender, so no app can name its window as another
-  (no change); the allow-list is kept while a lock holds (said above). Round 2: ROUND2.
+  (no change); the allow-list is kept while a lock holds (said above). Round 2, on the fixes and the
+  dismissals: two blockers, both fixed. Android 10's safe area, round 1's WARN as taken, sat at the
+  screen's corner, so with a cutout a strip of a window stayed bare and a landscape app was never sent
+  home (both reviewers): now placed as Android 10 places it, on the JVM. And reviewer B's: a tap through a
+  picture-in-picture cover opens System UI's menu, which the cover kept clear of, so the app showed under
+  the menu's glass: the menu now leaves it covered, the emulator test opening the menu and failing by name
+  first. Their WARNs, taken: Android 10's name for the alerts' broadcast; emergency information opened
+  under the lock, and the system-only filter tested, by the new allow-list test, which also found the
+  alerts app hidden (above); ISSUES #6 names what the allow-list lets through (gap 11); and reviewer B's
+  home sent again under a kept cover, which round 1 had dropped as unreachable: with the menu fixed, the
+  Android 16 emulator reached it (above). Not taken, each said: the permission prompt, which the stand-in
+  could ask for, left for AN7f (gap 6); and a blocked app's floating window's cover still holds its
+  touches, so no blocked app gets one, though the window stays where it is until the student closes it
+  from its notification or Settings.
 
 - **2026-11-05** — **WC8, the Android canvas's Words board recounted, and the WC job done (the
   owner's job of 2026-11-04; WC8, #530).** The iPhone made the owner's Android cuts in WC1–WC7

@@ -12,7 +12,7 @@ _Last updated: 2026-11-05 (Central) — WC8 (#530; `docs/DECISIONS.md`, 2026-11-
 canvas's Words board lists only where Android's words and the iPhone's differ, so the WC job is
 done. Before it, production backups (L0b) back before the pilot, item 7. Next: the owner's PostHog
 key; a session builds the retire-a-block command; the owner the new build, with A5 and A2, and the
-sitting; the owner's call on GA5's known limit, the smallest iPhones (DECISIONS 2026-11-02); AN7e;
+sitting; the owner's call on GA5's known limit, the smallest iPhones (DECISIONS 2026-11-02); AN7f;
 AN1's part 2 once the owner has the phones; the audit's polish waits, as ruled._
 
 ## Now

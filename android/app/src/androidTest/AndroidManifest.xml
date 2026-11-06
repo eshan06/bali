@@ -13,6 +13,16 @@
             android:supportsPictureInPicture="true"
             android:taskAffinity="com.bali.bali.test.standin"
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
+        <!-- An emergency alert's receiver, as any app may declare one, which the allow-list holds for system apps alone;
+             only Android's telephony, holding BROADCAST_SMS, may send it one. -->
+        <receiver
+            android:name="com.bali.bali.StandIn$Alert"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter>
+                <action android:name="android.provider.action.SMS_EMERGENCY_CB_RECEIVED" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

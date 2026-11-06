@@ -2,6 +2,8 @@ package com.bali.bali;
 
 import android.app.Activity;
 import android.app.PictureInPictureParams;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
@@ -45,5 +47,14 @@ public class StandIn extends Activity {
     protected void onUserLeaveHint() {
         super.onUserLeaveHint();
         if (pipOnLeave) enterPictureInPictureMode(new PictureInPictureParams.Builder().setAspectRatio(new Rational(16, 9)).build());
+    }
+
+    /**
+     * An emergency alert's receiver, declared as any app may declare one, so the allow-list's test sees that an app no
+     * system app is never allowed for it. Only Android's telephony may send it one; it does nothing with it.
+     */
+    public static class Alert extends BroadcastReceiver {
+        @Override
+        public void onReceive(Context context, Intent intent) {}
     }
 }

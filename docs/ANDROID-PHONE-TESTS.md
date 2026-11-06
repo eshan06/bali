@@ -217,7 +217,9 @@ lock a typed tap in the readout, as above:
   and Bali's uninstall asked and never confirmed: never covered, never sent home (ISSUES #7).
 - **Emergency alerts and the Safety app.** *Start:* in a class, focused, the screen on, Airplane mode off,
   the service on. An emergency alert's test message, where the phone offers one, and the Safety app's
-  emergency information, opened, SOS never triggered: never covered.
+  emergency information, opened, SOS never triggered: never covered. On the Samsung, whose alerts app may
+  be its own, which Bali finds only if it keeps Android's list of alerts: its alerts list opened from
+  Settings, never covered.
 - **A contact opened from the Phone app.** *Start:* in a class, focused, the screen on, Airplane mode off,
   the service on. Phone, then a contact: whether the contact's screen is another app's, covered and sent
   home with the Phone app's own task under it.

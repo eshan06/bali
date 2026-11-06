@@ -17,7 +17,8 @@
         <intent><action android:name="android.intent.action.CALL_EMERGENCY" /><data android:scheme="tel" /></intent>
         <intent><action android:name="android.intent.action.CALL" /><data android:scheme="tel" /></intent>
         <intent><action android:name="android.telecom.InCallService" /></intent>
-        <intent><action android:name="android.provider.action.SMS_EMERGENCY_CB_RECEIVED" /></intent>
+        <!-- The emergency alerts app, by its list of alerts: no query shows a protected broadcast's receiver. -->
+        <intent><action android:name="android.cellbroadcastreceiver.UPDATE_LIST_VIEW" /></intent>
         <intent><action android:name="android.settings.SETTINGS" /></intent>
         <intent><action android:name="android.settings.ACCESSIBILITY_SETTINGS" /></intent>
         <intent><action android:name="android.content.pm.action.REQUEST_PERMISSIONS" /></intent>

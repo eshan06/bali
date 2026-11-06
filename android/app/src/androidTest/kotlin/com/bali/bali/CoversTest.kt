@@ -10,7 +10,6 @@ import android.provider.Settings
 import android.provider.Telephony
 import android.telecom.TelecomManager
 import android.util.Log
-import android.view.View
 import android.view.ViewGroup
 import android.view.accessibility.AccessibilityWindowInfo
 import android.widget.ScrollView
@@ -39,7 +38,6 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -48,8 +46,9 @@ import org.junit.runner.RunWith
 
 /**
  * The cover on the emulator (AN7e), over Android's own windows: a blocked system app covered and sent home, timed against
- * AN1's; what calling for help needs, the student's own apps and Bali's own screen never covered; split screen window by
- * window, the readout bare beside a covered app, the keyboard kept clear and the shade never covered; picture-in-picture;
+ * AN1's; what calling for help needs, the student's own apps and Bali's own screen never covered, and an app that only
+ * declares a part never allowed; split screen window by window, the readout bare beside a covered app, the keyboard kept
+ * clear and the shade never covered; picture-in-picture, its menu over it;
  * Emergency Unlock; and the lock's end, with no event. The blocked app is a system app, or the tests' own stand-in
  * (StandIn.java). Each test runs a Debug build's engine over a file of its own, handed to the app's start, as ReadoutTest
  * does, and switches the service on as a student would, through the shell of a UiAutomation that leaves accessibility
@@ -157,6 +156,8 @@ class CoversTest {
         }
         val dialing = never(dialer, { shell("am start -a android.intent.action.DIAL") })
         never(holder(Intent(EMERGENCY_DIALER)), { shell("am start -a $EMERGENCY_DIALER") })
+        // Emergency information, where the image has a system app for it: the Safety app's own screen on Android 17's.
+        context.packageManager.resolveActivity(Intent(EMERGENCY_ASSISTANCE), 0)?.let { never(it.activityInfo.packageName, { shell("am start -a $EMERGENCY_ASSISTANCE") }) }
         never(checkNotNull(Telephony.Sms.getDefaultSmsPackage(context)), { shell("am start -a android.intent.action.SENDTO -d smsto:5551234") })
         // A call, to the emulator's own pretend network: the in-call screen, a window of the dialer's own.
         val calling = System.currentTimeMillis()
@@ -176,6 +177,22 @@ class CoversTest {
         // None sent home either, and the lock held throughout.
         assertEquals(homes, covers { it.homes })
         assertTrue(enforcer.updates.value.locked)
+    }
+
+    @Test
+    fun eachSystemAppTheShellFindsForAnEmergencyOrSettingsPartIsAllowedAndAnAppThatOnlyDeclaresOneNever() {
+        val allowed = AllowList.of(context)
+        // The shell sees every app; Bali only those its `<queries>` show it. Each system app holding a part is allowed.
+        val system = shell("pm list packages -s").lines().map { it.removePrefix("package:").trim() }.toSet()
+        fun found(query: String) = Regex("""^\s+([\w.]+)/""", RegexOption.MULTILINE).findAll(shell("cmd package $query")).map { it.groupValues[1] }.toList()
+        val asked =
+            listOf(EMERGENCY_DIALER, "android.intent.action.DIAL_EMERGENCY", EMERGENCY_ASSISTANCE, Settings.ACTION_SETTINGS, Settings.ACTION_ACCESSIBILITY_SETTINGS, "android.content.pm.action.REQUEST_PERMISSIONS", Intent.ACTION_CHOOSER)
+        for (action in asked) found("query-activities --brief -a $action").filter { it in system }.let { assertTrue("$action: $it", it.all { app -> app in allowed }) }
+        // Emergency alerts: the system's receiver allowed; the tests' own app declares one too (StandIn.Alert), as any app
+        // may, and is no system app.
+        val alerts = found("query-receivers --brief -a $EMERGENCY_ALERT")
+        assertTrue("$alerts", STAND_IN_APP in alerts && alerts.any { it in system && it in allowed })
+        assertTrue(STAND_IN_APP !in allowed)
     }
 
     @Test
@@ -237,20 +254,31 @@ class CoversTest {
         val homes = covers { it.homes }
         // As a video app goes: full screen, covered and sent home, it goes into picture-in-picture.
         shell("am start -n $STAND_IN --ez ${StandIn.PIP_ON_LEAVE} true")
-        // Covered where it is, its cover drawn there on the screen, the small window read afresh each time as it moves in.
-        val small = until { seen().firstOrNull { it.app == STAND_IN_APP && it.pictureInPicture && it.cover == it.bounds }?.takeIf { pixel(it.bounds.centerX, it.bounds.centerY) == Covers.PLAIN } }
+        // Covered where it is, its cover drawn there on the screen, the small window read afresh each time as it moves in,
+        // and read once at rest, where System UI takes its touches.
+        val small = until { seen().firstOrNull { it.app == STAND_IN_APP && it.pictureInPicture && it.cover == it.bounds && it.bounds == pipTouches() }?.takeIf { pixel(it.bounds.centerX, it.bounds.centerY) == Covers.PLAIN } }
         assertEquals(homes + 1, covers { it.homes })
-        // Dragged, as a student drags it off whatever is under it: the touch goes through its cover to System UI, which
-        // moves it, and the cover follows.
+        // Dragged up or down, as a student drags it off whatever is under it, and let go there, still, so it stays: the touch
+        // goes through its cover to System UI, which moves it, and the cover follows it. Android puts it back where it was
+        // last, so it starts low or high.
         val (x, y) = small.bounds.centerX to small.bounds.centerY
-        shell("input swipe $x $y ${x - 300} ${y - 900} 600")
-        val moved = until { seen().firstOrNull { it.id == small.id && it.bounds != small.bounds && it.cover == it.bounds }?.takeIf { pixel(it.bounds.centerX, it.bounds.centerY) == Covers.PLAIN } }
-        assertNotEquals(small.bounds, moved.bounds)
-        // Opened full screen again from its own menu, as a student opens it, the menu System UI's own window over it, which
-        // its cover keeps clear of: covered afresh, and sent home again.
+        val by = if (y > context.resources.displayMetrics.heightPixels / 2) -300 else 300
+        shell("input motionevent DOWN $x $y")
+        shell("input motionevent MOVE $x ${y + by}")
+        shell("input motionevent MOVE $x ${y + 2 * by}")
+        shell("input motionevent UP $x ${y + 2 * by}")
+        val moved = until { seen().firstOrNull { it.id == small.id && it.bounds != small.bounds && it.cover == it.bounds && it.bounds == pipTouches() }?.takeIf { pixel(it.bounds.centerX, it.bounds.centerY) == Covers.PLAIN } }
+        // Its menu opened, as a student opens it to bring it back full screen: System UI's own window at its place, over it,
+        // the touches the menu's, through the cover, which stays, so the app is never seen under the menu's dimmed glass.
         val (x2, y2) = moved.bounds.centerX to moved.bounds.centerY
         shell("input tap $x2 $y2")
-        until { seen().firstOrNull { it.type == AccessibilityWindowInfo.TYPE_SYSTEM && (it.bounds meets moved.bounds) != null } }
+        until {
+            seen().takeIf { windows ->
+                windows.any { it.type == AccessibilityWindowInfo.TYPE_SYSTEM && (it.bounds meets moved.bounds) != null } && windows.firstOrNull { it.id == small.id }?.cover == moved.bounds
+            }?.takeIf { pixel(x2, y2) == Covers.PLAIN }
+        }
+        // Opened full screen from the menu: sent home again, under the cover it kept, which on Android 16 is the one that
+        // sent it home first.
         shell("input tap $x2 $y2")
         until { Unit.takeIf { covers { it.homes } == homes + 2 } }
     }
@@ -323,22 +351,24 @@ class CoversTest {
 
     /**
      * The student taps the readout's tag field for the keyboard, in the readout on the screen now ([which]): scrolled to
-     * it first, then tapped twice, the first tap giving the readout the focus, which can come after that tap's own ask
-     * for the keyboard. Returns the field's place on the screen.
+     * it first, again until it shows whole, since a readout made again for its half may not have laid out yet; then
+     * tapped twice, the first tap giving the readout the focus, which can come after that tap's own ask for the keyboard.
+     * Returns the field's place on the screen.
      */
     private fun typeIn(which: (ReadoutActivity) -> Boolean): Rect {
-        val blockTag =
+        val field =
             until {
-                var resumed: ReadoutActivity? = null
+                var shown: Rect? = null
                 instrumentation.runOnMainSync {
-                    resumed = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).filterIsInstance<ReadoutActivity>().firstOrNull(which)
+                    val readout = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).filterIsInstance<ReadoutActivity>().firstOrNull(which)
+                    val blockTag = readout?.blockTag ?: return@runOnMainSync
+                    // At once, and moving no focus, which would bring the keyboard up before any tap.
+                    val scroll = blockTag.rootView.findViewById<ViewGroup>(android.R.id.content).getChildAt(0) as ScrollView
+                    scroll.scrollTo(0, scroll.getChildAt(0).height)
+                    shown = Rect().takeIf { blockTag.isLaidOut && blockTag.getGlobalVisibleRect(it) && it.height() == blockTag.height }
                 }
-                resumed
-            }.blockTag
-        instrumentation.runOnMainSync { (blockTag.rootView.findViewById<ViewGroup>(android.R.id.content).getChildAt(0) as ScrollView).fullScroll(View.FOCUS_DOWN) }
-        instrumentation.waitForIdleSync()
-        val field = Rect()
-        instrumentation.runOnMainSync { assertTrue(blockTag.getGlobalVisibleRect(field) && field.height() == blockTag.height) }
+                shown
+            }
         shell("input tap ${field.centerX()} ${field.centerY()}")
         until { Unit.takeIf { READOUT in focused() } }
         shell("input tap ${field.centerX()} ${field.centerY()}")
@@ -364,6 +394,10 @@ class CoversTest {
                 found[1].toInt() to Area(found[2].toInt(), found[3].toInt(), found[4].toInt(), found[5].toInt())
             }
         }
+
+    /** Where System UI takes the picture-in-picture window's touches, as `dumpsys input` places its input consumer. */
+    private fun pipTouches(): Area? =
+        Regex("""name=pip_input_consumer, .*?frame=\[(-?\d+),(-?\d+)]\[(-?\d+),(-?\d+)]""").find(shell("dumpsys input"))?.groupValues?.let { Area(it[1].toInt(), it[2].toInt(), it[3].toInt(), it[4].toInt()) }
 
     /** The app Android answers [intent] with. */
     private fun holder(intent: Intent): String = checkNotNull(context.packageManager.resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY)).activityInfo.packageName
@@ -410,6 +444,8 @@ class CoversTest {
         const val STAND_IN = "com.bali.bali.test/com.bali.bali.StandIn"
         const val STAND_IN_APP = "com.bali.bali.test"
         const val EMERGENCY_DIALER = "com.android.phone.EmergencyDialer.DIAL"
+        const val EMERGENCY_ASSISTANCE = "android.telephony.action.EMERGENCY_ASSISTANCE"
+        const val EMERGENCY_ALERT = "android.provider.action.SMS_EMERGENCY_CB_RECEIVED"
         const val TAG = "BaliCovers"
 
         /** A system app the allow-list never holds, which opens on these emulators with no prompt of its own in front. */

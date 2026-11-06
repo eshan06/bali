@@ -83,8 +83,15 @@ class CoverTest {
     fun aPictureInPictureWindowIsCoveredAtItsSmallPlaceItsTouchesLeftToSystemUiNeverSentHomeAndTheAllowedAppUnderItIsNot() {
         // Its cover holds no touch, so System UI still moves, closes or opens it: never stuck over the dialer under it.
         val small = Area(440, 1495, 1038, 1831)
-        val covers = named(27 to VIDEO, 18 to MESSAGES).over(STATUS_BAR, OnScreen(27, WindowKind.App, small, pictureInPicture = true), OnScreen(18, WindowKind.App, SCREEN))
+        val video = OnScreen(27, WindowKind.App, small, pictureInPicture = true)
+        val covers = named(27 to VIDEO, 18 to MESSAGES).over(STATUS_BAR, video, OnScreen(18, WindowKind.App, SCREEN))
         assertEquals(listOf(Covering(27, small, home = false, held = false)), covers)
+        // Its menu open, System UI's window at its place over it, as Android 17's emulator lists it: still covered, so the
+        // app isn't seen under the menu's dimmed glass; a notification over it still uncovers it where it lies.
+        val menu = OnScreen(29, WindowKind.Drawn, small, pictureInPicture = true)
+        assertEquals(covers, named(29 to SYSTEM_UI, 27 to VIDEO, 18 to MESSAGES).over(STATUS_BAR, menu, video, OnScreen(18, WindowKind.App, SCREEN)))
+        val notification = OnScreen(30, WindowKind.Drawn, Area(0, 136, 1080, 1600))
+        assertEquals(listOf(Covering(27, Area(440, 1600, 1038, 1831), home = false, held = false)), named(30 to SYSTEM_UI, 27 to VIDEO).over(STATUS_BAR, notification, video))
     }
 
     @Test
@@ -182,5 +189,18 @@ class CoverTest {
         // A small one inside it: the largest part left beside it.
         assertEquals(Area(0, 100, 1000, 600), area.clearOf(Area(400, 600, 600, 700)))
         assertNull(area.clearOf(Area(-1, 0, 1001, 1200)))
+    }
+
+    @Test
+    fun androidTensSafeAreaIsThePartAnAppsWindowFillsPlacedPastTheCutoutAndANavigationBarOnTheLeft() {
+        // A 1080 x 2340 phone with an 80 px notch and a 132 px navigation bar, as Android 10 sizes the part an app fills.
+        // Upright: below the notch, above the bar, so a cover never sits over the status bar nor leaves a strip over the bar.
+        assertEquals(Area(0, 80, 1080, 2208), safeOnAndroid10(1080, 1080, 2340 - 80 - 132, 0, 80, 0, turned270 = false))
+        // Turned 90 degrees, the notch on the left and the bar on the right: past the notch, so a full-screen app goes home.
+        assertEquals(Area(80, 0, 2208, 1080), safeOnAndroid10(2340, 2340 - 80 - 132, 1080, 80, 0, 0, turned270 = false))
+        // Turned 270 degrees, the bar on the left and the notch on the right.
+        assertEquals(Area(132, 0, 2260, 1080), safeOnAndroid10(2340, 2340 - 80 - 132, 1080, 0, 0, 80, turned270 = true))
+        // Turned 270 with gesture navigation, its 48 px bar at the bottom: nothing on the left but the screen's edge.
+        assertEquals(Area(0, 0, 2260, 1032), safeOnAndroid10(2340, 2340 - 80, 1080 - 48, 0, 0, 80, turned270 = true))
     }
 }

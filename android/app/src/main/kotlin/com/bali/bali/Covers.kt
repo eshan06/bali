@@ -55,8 +55,7 @@ internal class Covers(private val service: AccessibilityService) {
     /** A cover's window: an accessibility overlay, never the keyboard's, a touch outside it, or on it where it holds none, going under. */
     private fun params(want: Covering) =
         WindowManager.LayoutParams(
-            want.area.width,
-            want.area.height,
+            want.area.width, want.area.height,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
@@ -90,8 +89,9 @@ internal class Covers(private val service: AccessibilityService) {
             post(::goHome)
         }
 
-        /** Sends its app home, once, as the cover lands or as the app comes to fill the screen after; never once the cover has gone with its window. */
+        /** Sends its app home as the cover lands, and once each time the app comes to fill the screen again after; never once the cover has gone with its window. */
         fun goHome() {
+            if (!want.home) sent = false
             if (!drawn || !want.home || sent || !isAttachedToWindow) return
             sent = true
             homes += 1

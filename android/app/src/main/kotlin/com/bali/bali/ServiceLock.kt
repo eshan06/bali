@@ -100,10 +100,7 @@ class ServiceLock(private val context: Context) : Lock {
         follow()
     }
 
-    /**
-     * Until when the service covers apps (AN7e), told at each call below ([LockService.cover]): this run's lock's end, or
-     * the last run's, which has none of its own, the end of time; none while none holds. On the main thread.
-     */
+    /** Until when the service covers apps ([LockService.cover], AN7e): this run's lock's end; the last run's, which has none, the end of time. */
     internal val until: Instant? get() = if (kept) Instant.MAX else end
 
     /**

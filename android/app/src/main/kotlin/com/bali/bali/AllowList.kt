@@ -35,7 +35,7 @@ internal object AllowList {
             ASKED.map(::Intent) + listOfNotNull(home.takeIf { chosen == null }) + listOf(CALL_EMERGENCY, Intent.ACTION_CALL).map { Intent(it, "tel:112".toUri()) } +
                 Intent(Intent.ACTION_DELETE, "package:${context.packageName}".toUri())
         val found =
-            asked.flatMap { packages.activities(it) }.map { it.activityInfo } + packages.receivers(Intent(EMERGENCY_ALERT)).map { it.activityInfo } +
+            asked.flatMap { packages.activities(it) }.map { it.activityInfo } + EMERGENCY_ALERTS.flatMap { packages.receivers(Intent(it)) }.map { it.activityInfo } +
                 packages.services(Intent(InCallService.SERVICE_INTERFACE)).map { it.serviceInfo }.filter { it.metaData?.getBoolean(TelecomManager.METADATA_IN_CALL_SERVICE_UI) == true }
         found.filter { it.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM != 0 }.mapTo(held) { it.packageName }
         return held
@@ -52,13 +52,13 @@ internal object AllowList {
     /** The system itself: its own dialogs, and the chooser it answers with where no app holds a part. */
     private const val SYSTEM = "android"
 
-    // Android's own names for these, not public in its SDK.
+    // Android's own names for these, not public in its SDK; an emergency alert's broadcast by Android 11's name and 10's.
     private const val EMERGENCY_DIALER = "com.android.phone.EmergencyDialer.DIAL"
     private const val DIAL_EMERGENCY = "android.intent.action.DIAL_EMERGENCY"
     private const val EMERGENCY_ASSISTANCE = "android.telephony.action.EMERGENCY_ASSISTANCE"
     private const val CALL_EMERGENCY = "android.intent.action.CALL_EMERGENCY"
     private const val REQUEST_PERMISSIONS = "android.content.pm.action.REQUEST_PERMISSIONS"
-    private const val EMERGENCY_ALERT = "android.provider.action.SMS_EMERGENCY_CB_RECEIVED"
+    private val EMERGENCY_ALERTS = listOf("android.provider.action.SMS_EMERGENCY_CB_RECEIVED", "android.provider.Telephony.SMS_EMERGENCY_CB_RECEIVED")
 
     /** The parts asked by their action alone. */
     private val ASKED =
