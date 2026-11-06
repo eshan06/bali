@@ -14,7 +14,7 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-05 (Central) — AN9a, Delete account's rules (#NNN; `docs/DECISIONS.md`,
+_Last updated: 2026-11-05 (Central) — AN9a, Delete account's rules (#533; `docs/DECISIONS.md`,
 2026-11-05): Cognito's DeleteUser in `core`'s `SignIn`, in Cognito's JSON protocol at the pool's own
 endpoint over the API client's OkHttp, in the sign-in's scope, and only ever for the sign-in it began
 with, before a renewal and after it, where iOS's sends whatever tokens there are (Q4: for the owner, iOS
@@ -159,7 +159,7 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
   block on both phones, offline (`docs/ANDROID-PHONE-TESTS.md`, AN8); and the block's link opening Bali
   when it's closed, not built: it waits for AN1's part 2 to find whether it works, and for Phase 10, since
   the release build has no activity to open until then
-- **AN9a** Delete account's rules — ✅ (#NNN; DECISIONS 2026-11-05)
+- **AN9a** Delete account's rules — ✅ (#533; DECISIONS 2026-11-05)
 - **AN9b** The deletion in the engine (twin: SyncEngine.swift's `deleteAccount`, `delete`, `sendAll`,
   `sendDeletion`, `deleteMe` and `counted`): Delete account, what the phone queued first, then
   `DELETE /v1/me`, then Cognito's DeleteUser; the loops held, what they have on its way waited out,

@@ -10,7 +10,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
 
 - **2026-11-05** — **AN9a, Delete account's rules: Cognito's DeleteUser in `core`'s `SignIn`, the outbox's
   order before a deletion, and where a deletion stands, on the JVM; and AN9 in seven PRs (the conductor's
-  calls, awaiting the owner's look; AN9a, #NNN).** The owner isn't reviewing each step and asked for the
+  calls, awaiting the owner's look; AN9a, #533).** The owner isn't reviewing each step and asked for the
   recommended option on every question, so each call here is the conductor's, for the owner to look at.
 
   **AN9 in seven PRs (the conductor's split, awaiting the owner):** AN9a, Delete account's rules; AN9b, the
