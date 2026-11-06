@@ -10,7 +10,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
 
 - **2026-11-05** — **AN7e, the cover: which windows the lock covers, on the JVM (`Cover`), the allow-list
   asked of Android, and the covers drawn over Bali's Accessibility service, on the emulators (the
-  conductor's calls, awaiting the owner's look; AN7e, #PRNUM).** The owner isn't reviewing each step and
+  conductor's calls, awaiting the owner's look; AN7e, #531).** The owner isn't reviewing each step and
   asked for the recommended option on every question, so each call here is the conductor's, for the owner
   to look at.
 

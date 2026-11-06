@@ -14,7 +14,7 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-05 (Central) — AN7e, the cover (#PRNUM; `docs/DECISIONS.md`, 2026-11-05): while a
+_Last updated: 2026-11-05 (Central) — AN7e, the cover (#531; `docs/DECISIONS.md`, 2026-11-05): while a
 lock holds, each window of an app the allow-list doesn't hold, named by that window's own state event and
 never by its contents, is covered where it is, within the screen but its bars, by a plain overlay in Debug
 (Q1); a full-screen app is sent home once its cover lands, a split half and a picture-in-picture window
@@ -150,7 +150,7 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
   2026-11-05)
 - **AN7c** The service and the app's engine — ✅ (#523; DECISIONS 2026-11-05)
 - **AN7d** The Debug readout — ✅ (#524; DECISIONS 2026-11-05)
-- **AN7e** The cover — ✅ (#PRNUM; DECISIONS 2026-11-05)
+- **AN7e** The cover — ✅ (#531; DECISIONS 2026-11-05)
 - **AN7f** 📱 The lock on the phones (no code): the device check on both phones, the Pixel and the
   Samsung (Open owner items, 1), from `docs/ANDROID-PHONE-TESTS.md`'s AN7 checklist, which AN7c–AN7e
   write: B5 round 1's steps in Android's terms, offline before AN9, on dev after it (DECISIONS

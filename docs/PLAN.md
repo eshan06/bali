@@ -54,7 +54,7 @@ branch, with no PR, as its README says (#479; `docs/DECISIONS.md`, 2026-11-02).
   no VPN for now and a battery plan, so ARCHITECTURE's "Android app structure" is decided; part 2 on
   a Pixel and a Samsung, with its battery test, waits for the owner's phones (📱), still before
   launch; AN2–AN7e, the project, CI, the core, the unlock contract, the outbox, the engine, sign-in,
-  the lock, ✅ (#488–#PRNUM); AN7f next. AS0, the
+  the lock, ✅ (#488–#531); AN7f next. AS0, the
   screens' canvas, ✅ approved as it stands
   (#484, #486; DECISIONS 2026-11-04): lock (a) alone, the approved iPhone boards standing for the
   rest. Not on the pilot's critical path.
