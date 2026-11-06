@@ -107,10 +107,11 @@ class DeletionOrderTest : OutboxFiles() {
             send(outbox, refused, 404, Answer.unknownBlock)
             val unanswered = record(outbox, Change.Tap("tag"))
             var now = t0
-            while (current(outbox, unanswered.eventId)?.stuck == false) {
+            repeat(Outbox.BOUND) {
                 send(outbox, unanswered, 500, at = now)
                 now = assertNotNull(current(outbox, unanswered.eventId)).nextAttemptAt
             }
+            assertTrue(assertNotNull(current(outbox, unanswered.eventId)).stuck) // at the bound
             val unlock = record(outbox, Change.Unlock("s", null))
             send(outbox, unlock, 400, Answer.badInput)
             val held = record(outbox, Change.ProtectionOff("s"))

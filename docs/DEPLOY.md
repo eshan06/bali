@@ -230,7 +230,10 @@ clients of its own in the same pools, made as iOS's are (steps 1–3 above):
   code grant only (the app sends PKCE, S256).
 - **OpenID Connect scopes:** `openid`, `email`, `profile` and
   `aws.cognito.signin.user.admin` (Delete account), Profile ticked by hand.
-- **Refresh token expiration:** 365 days.
+- **Refresh token expiration:** 365 days. **Refresh token rotation:** left off,
+  Cognito's default: Delete account sends only the sign-in it began with, known
+  by its refresh token, so with rotation on it takes a second try after a renewal
+  (`docs/DECISIONS.md`, 2026-11-05, AN9a).
 - **Then:** append the id to that environment's `AUTH_AUDIENCE`
   (`<the ids there>,<Android's>`), or the API refuses Android's tokens with a
   `401`, which signs the student out; and check the client is public with the

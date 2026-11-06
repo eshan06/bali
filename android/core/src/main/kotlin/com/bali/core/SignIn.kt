@@ -506,12 +506,12 @@ class SignIn(
 
     private suspend fun deletion(): SendResult? {
         var own: String? = null // the refresh token of the sign-in it deletes
-        var renewing = false
+        var refusedOnce = false // Cognito no longer took its token: renewed, and tried once more
         while (true) {
             val (held, renewal) =
                 alone {
                     val held = current()?.takeIf { own == null || it.refresh == own }
-                    held to held?.takeIf { renewing || now() >= it.until }?.let { renew(telling = false) }
+                    held to held?.takeIf { refusedOnce || now() >= it.until }?.let { renew(telling = false) }
                 }
             own = own ?: held?.refresh
             val access =
@@ -530,7 +530,7 @@ class SignIn(
                     alone { adopt(null, saved = keep(null)) }
                     return null
                 }
-                type == "NotAuthorizedException" && !renewing -> renewing = true
+                type == "NotAuthorizedException" && !refusedOnce -> refusedOnce = true
                 else -> return result
             }
         }

@@ -110,6 +110,13 @@ class DeleteUserTest : SignIns() {
             val store = MemoryStore.holding(admin("a1"))
             assertEquals(SendResult.NetworkError, signIn(store, TransportDouble { throw IllegalStateException("odd") }).deleteUser())
             assertEquals(admin("a1"), store.tokens?.access)
+            // A store that can't be read right now is no answer, never a deletion done: nothing sent (santa's review).
+            val unread = TransportDouble.answering(200, "{}")
+            val locked = MemoryStore.holding(admin("a1")).apply { setLocked(true) }
+            assertEquals(SendResult.NetworkError, signIn(locked, unread).deleteUser())
+            assertTrue(unread.sent.isEmpty())
+            locked.setLocked(false)
+            assertEquals(admin("a1"), locked.tokens?.access)
         }
 
     @Test

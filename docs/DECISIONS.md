@@ -59,9 +59,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
     after it: another sign-in landed during the renewal, or during a try Cognito answered
     `NotAuthorizedException`, is no answer, its tokens kept, and nothing is renewed for it. Said plainly: a
     refresh token Cognito rotated in that renewal reads as another sign-in, so that try is no answer and the
-    next sends the rotated tokens; Cognito rotates only for an app client that turns rotation on, which
-    `docs/DEPLOY.md`'s settings for the phone's clients don't name. Done, the tokens held then are forgotten,
-    whoever's, as on iOS: forgetting deletes nothing.
+    next sends the rotated tokens; Cognito rotates only for an app client that turns rotation on, so
+    `docs/DEPLOY.md`'s checklist for Android's clients now says to leave it off, Cognito's default (santa's
+    review). Done, the tokens held then are forgotten, whoever's, as on iOS: forgetting deletes nothing.
   - **It runs in the sign-in's scope,** as a sign-in's exchange does (AN6b), so a caller cancelled stops
     waiting and the call goes on, its answer kept. A scope that has ended is no answer, never its cancel
     thrown, and a transport that throws anything is no answer, so it never throws.
@@ -90,14 +90,18 @@ a real decision? Add a dated entry at the top: what was decided and why.
   stop (2); the gap's fallback taking every failure as its own; Q4's check after the renewal, and before it
   (the other sign-in's tokens renewed); the type read with its namespace (2); `NotAuthorizedException` never
   renewing (2); an `Authorization` header (2); the tokens kept once deleted (4); the call run in its caller's
-  coroutine; and an ended scope's cancel thrown. Nothing was added to the PC's SDK: its folders were compared
-  before and after.
+  coroutine; an ended scope's cancel thrown; and, for santa's WARN, a store that can't be read taken as
+  nothing left to delete. Nothing was added to the PC's SDK: its folders were compared before and after.
 
   **For AN9b:** `deleteAccount` asks `mayDelete` first, then sends each record `nextBeforeDeletion` names
   under the deletion's token (an unlock left: `UnlockUnsent`; any other left but one `refusedForGood`:
   `NotDeleted` with the last answer; the file unread: `Unread`), then `DELETE /v1/me`, then
   `SignIn.accountDeleted` and `Outbox.accountDeleted`, then `SignIn.deleteUser`, `SignInNotDeleted` with its
-  answer or `Deleted`, and `Outbox.accountDeleted` again after it, as iOS's `delete` does. **The outbox
+  answer or `Deleted`, and `Outbox.accountDeleted` again after it, as iOS's `delete` does. `deleteUser`
+  deletes whichever sign-in is held as it starts, marked deleted or not, as iOS's does: Q4 ties one call to
+  one sign-in, and only `deleteAccount` can tie it to the account `DELETE /v1/me` removed, by holding that
+  account (`SignIn.account`) from its start, as `passed(account)` does (santa's review; unreachable in the
+  pilot, two accounts on one phone ruled out and the deletion's screen over any sign-in). **The outbox
   file (the split's note):** no step closes or deletes it. Delete account lets go of rows on Room's writer
   connection, every one but an unlock's; the file, its install and its counter stay (A12). The app opens
   `outbox.sqlite` once, for its life, and Room closes a connection still in use (AN5c), so nothing may wipe
@@ -105,6 +109,14 @@ a real decision? Add a dated entry at the top: what was decided and why.
   its DeleteUser run past their callers, in the engine's and the sign-in's scopes, the test's own, so the
   rig's teardown cancels and joins that scope before the files close; AN9b proves it with TeardownTest's
   third case, a deletion held at its `accountDeleted` write as the test ends.
+
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on
+  this PC, so context isolation holds and model diversity doesn't): 0 blockers. Their WARNs, each taken: the
+  PR's number, a placeholder until it had one; the rotation assumption, pinned in DEPLOY.md's checklist
+  (above); the deletion's local flag named as the sign-in's own `renewing` field (now `refusedOnce`); the
+  unreadable store's exit, pinned by no test (added: no answer, nothing sent); a test's loop to the store's
+  bound, unbounded, so a broken bound would hang the suite (now `BOUND` sends, then stuck); and, for AN9b,
+  tying DeleteUser to the account `DELETE /v1/me` removed (above).
 
   **The proof:** `android/app` is unchanged, so the JVM tests are the proof and no emulator ran:
   `./gradlew assemble :app:lint check` green, Android 10's API check with it, and the outbox's suite run
