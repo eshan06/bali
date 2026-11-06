@@ -163,14 +163,16 @@ as the lock comes on stays bare until it changes or the student touches it (`doc
 reader mode while a screen of Bali's own is in front, one tag a scan, its NDEF records as Android read
 them when it found the tag handed to `core`'s `BlockTag` as they come, the answer a `BlockRead` for the
 engine's `tap(read)`. In the main source set, since AS4's "hold your phone to the block" screen will use
-it; the Debug readout's Scan until then. A scan ends with the first tag (let go while it stays on the
-phone, so Android hands it to no other app after), Bali's screen leaving the front (cancelled), NFC
-switched off (`NfcOff`, Android's alone, as it starts or during it), or the caller's cancel; one at a
-time; reader mode off at its end however it ends. A phone with no NFC reads as one that can't
-(`Unsupported`), as on iOS: the manifest asks for NFC without requiring it (`docs/DECISIONS.md`,
-2026-11-05, AN8). Its rules (`scan`) run on the JVM over a reader of the tests' own; the emulators have no
-NFC, so a real tag is the phone check's (`docs/ANDROID-PHONE-TESTS.md`, AN8). A block's link doesn't open
-Bali: that waits for AN1's part 2 and Phase 10.
+it; the Debug readout's Scan until then. A scan ends with the first tag that holds NDEF, a tag with none
+(a bank card, say) passed over as iOS's NDEF session passes it, each let go while it stays on the phone so
+Android hands it to no other app after; or with Bali's screen leaving the front (cancelled), NFC switched
+off (`NfcOff`, Android's alone, as it starts or during it), or the caller's cancel. One at a time, reader
+mode off at its end however it ends, and Android's refusals answered as `Failed`, never thrown. A phone
+with no NFC reads as one that can't (`Unsupported`), as on iOS: the manifest asks for NFC without
+requiring it (`docs/DECISIONS.md`, 2026-11-05, AN8). Its rules (`scan`) run on the JVM over a reader of
+the tests' own; the emulators have no NFC, so a real tag is the phone check's
+(`docs/ANDROID-PHONE-TESTS.md`, AN8). A block's link doesn't open Bali: that waits for AN1's part 2 and
+Phase 10.
 
 **The outbox tables** (`core`'s `UnlockContract.kt` and `OutboxContract.kt`, BaliCore's twins) say
 what the outbox does with a record after each send; no answer ever drops an unlock the server hasn't

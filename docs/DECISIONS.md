@@ -29,26 +29,31 @@ a real decision? Add a dated entry at the top: what was decided and why.
     call, the screen off), the student's close as iOS's Cancel. Reader mode goes off at the scan's end
     however it ends, the caller's cancel among them, but on a screen gone, which took it with it and which
     Android refuses.
-  - **One tag a scan,** as iOS's: the first tag found ends it, its NDEF records as Android read them when it
-    found the tag (Android's own NDEF check on, no read of Bali's), handed to `BlockTag.code` as they come.
-    A tag with no block's code is `NotBali`: an empty one, as on iOS, and one with no NDEF on it, a bank card
-    say. So a card kept in the phone's case would end each scan at once, as not a block: the phones show
-    whether it does (`docs/ANDROID-PHONE-TESTS.md`, AN8), and if so, passing over a tag with no NDEF, as
-    iOS's NDEF session does, is the fix.
+  - **One tag a scan,** as iOS's: the first tag that holds NDEF ends it, its records as Android read them
+    when it found the tag (Android's own NDEF check on, no read of Bali's), handed to `BlockTag.code` as they
+    come. A tag with no block's code is `NotBali`, an empty one as on iOS. **A tag with no NDEF on it is
+    passed over** (santa's review; it first ended the scan as not a block), as iOS's NDEF session passes it
+    over: so a bank or ID card kept in the phone's case ends no scan before the block is touched.
   - **Each tag found is let go while it stays on the phone** (`NfcAdapter.ignore`, until it has been away
-    1 s), so Android hands a block just read to no other app once reader mode is off: its link's browser,
-    say. Read again at once, while still held, the same block isn't heard until it has been lifted away.
+    1 s), once its read is handed on: so Android hands a block just read to no other app once reader mode is
+    off (its link's browser, say), and a card passed over leaves the reader free for the block. Read again at
+    once, while still held, the same block isn't heard until it has been lifted away. A card whose id changes
+    at each read may be heard again and again, Android's sound each time: the phones show it.
   - **The tags polled:** NFC-A, B, F and V, every NFC Forum type that holds NDEF, as iOS's session reads.
     Android's own sound on a read is kept, the student's cue as iOS's sheet's is; AS4 may change it.
   - **No time limit of its own:** iOS's sheet gives up after a minute, the system's rule, not Bali's, and
     Android's reader mode has none, so a scan lasts until a tag, the screen leaving the front, NFC switched
     off or the caller's cancel. Whether AS4's screen gives up is its board's.
   - **One scan at a time,** for the phone's one reader, whichever screen asks: another asked meanwhile is
-    `Failed("A scan is under way.")`, iOS's words, and the first goes on. A reader Android refuses to start
-    is `Failed` in the system's words, never thrown.
+    `Failed("A scan is under way.")`, iOS's words, and the first goes on. **Android's refusals are answered,
+    never thrown:** a reader that won't start, or a switch that can't be read (Android's NFC service gone),
+    is `Failed` in the system's words; one that won't stop leaves the scan's answer standing, a block read
+    among them, and frees the next scan (santa's review: the guard stayed taken, every later scan "under
+    way").
 
   **What iOS has no twin for, typed, never worded:**
-  - **A phone with no NFC** reads `Unsupported`, as on iOS: Android gives it no adapter.
+  - **A phone with no NFC** reads `Unsupported`, as on iOS: Android gives it no adapter, or one with no NFC
+    feature, for card emulation or NFC charging alone, whose reader mode refuses to start (santa's review).
   - **NFC switched off,** Android's alone (iOS's reader can't be switched off), is a new case of core's
     `BlockRead`, `NfcOff`, none renamed or removed: before a scan, read from the adapter; during one, heard
     from Android's broadcast of NFC's state, and read again once the reader listens, so a switch turned off
@@ -72,19 +77,27 @@ a real decision? Add a dated entry at the top: what was decided and why.
   check's second; Read block code only reads one, to register it on dev; each says what was read, and that
   nothing was recorded otherwise, in iOS's words and `NfcOff`'s.
 
-  **The tests:** on the JVM, `BlockReaderTest`'s 6, each bounded so a scan that never answers fails by
+  **The tests:** on the JVM, `BlockReaderTest`'s 8, each bounded so a scan that never answers fails by
   name: no NFC, NFC off and Bali behind, each beginning nothing; a block's code the answer, the reader
-  stopped, and what it hears after dropped; a tag with no code, an empty one among them, not a block; Bali
-  leaving the front, and NFC switched off during a scan and as the reader starts; one at a time; and the
-  caller's cancel, and a reader that won't start. UnderTapEngineTests' scan that records nothing gains
-  `NfcOff`. Tried, each failing by name, then reverted: no check of a phone with no NFC, of NFC off, or of
-  Bali in front (which first hung its test, now bounded); no guard of one at a time; no second read of the
-  switch; the screen's leaving read as NFC off, and NFC off as cancelled; the reader never stopped; the
-  guard never freed; a refusal to start thrown; and a block's code never read. On `Bali_Spike_API35`, `36`
-  and `37`, which have no NFC, the whole instrumented suite, ReadoutTest's new test among it: Scan and Read
-  block code each say the phone can't read NFC, with nothing recorded or locked. Everything a real tag
-  decides is the phone check's. Nothing was added to the PC's SDK: its folders were compared before and
-  after.
+  stopped, and what it hears after dropped; a tag with no code, an empty one among them, not a block; one
+  with no NDEF passed over, and the block after it read; Bali leaving the front, and NFC switched off during
+  a scan and as the reader starts; one at a time; the caller's cancel staying a cancel, and a reader that
+  won't start; and a reader that won't stop, or whose switch can't be read. UnderTapEngineTests' scan that
+  records nothing gains `NfcOff`. Tried, each failing by name, then reverted: no check of a phone with no
+  NFC, of NFC off, or of Bali in front (which first hung its test, now bounded); no guard of one at a time;
+  no second read of the switch; the screen's leaving read as NFC off, and NFC off as cancelled; the reader
+  never stopped; the guard never freed; a refusal to start thrown, and every refusal thrown; a block's code
+  never read; a tag with no NDEF read as not a block; a reader that won't stop failing the read; and a
+  cancel answered. On `Bali_Spike_API35`, `36` and `37`, which have no NFC, the whole instrumented suite,
+  ReadoutTest's new test among it, never skipped: Scan and Read block code each say the phone can't read
+  NFC, with nothing recorded or locked. Everything a real tag decides is the phone check's. Nothing was
+  added to the PC's SDK: its folders were compared before and after.
+
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on
+  this PC, so context isolation holds and model diversity doesn't): no blocker. Their WARNs, each taken: the
+  guard left taken when the reader won't stop (both), and an adapter with no NFC feature (both), above; a
+  tag with no NDEF ending the scan, where iOS's session passes it over (both), now passed over; and, from
+  reviewer A, the phone tests' starting states made whole, and the emulators' runs shown never skipped.
 
 - **2026-11-05** — **AN7e, the cover: which windows the lock covers, on the JVM (`Cover`), the allow-list
   asked of Android, and the covers drawn over Bali's Accessibility service, on the emulators (the

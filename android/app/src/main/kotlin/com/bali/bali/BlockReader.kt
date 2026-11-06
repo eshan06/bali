@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.nfc.NfcAdapter
 import android.nfc.Tag
 import android.nfc.tech.Ndef
@@ -14,6 +15,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.bali.core.BlockRead
 import com.bali.core.BlockTag
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -38,11 +40,12 @@ class BlockReader(private val screen: ComponentActivity) {
         private val app: Context = screen.applicationContext
         private var heard: Pair<LifecycleEventObserver, BroadcastReceiver>? = null
 
-        override val present get() = nfc != null
+        // An adapter for card emulation or NFC charging alone has no reader: its reader mode refuses to start.
+        override val present get() = nfc != null && screen.packageManager.hasSystemFeature(PackageManager.FEATURE_NFC)
         override val on get() = nfc?.isEnabled == true
         override val inFront get() = screen.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
 
-        override fun start(tag: (List<BlockTag.Record>) -> Unit, left: () -> Unit, off: () -> Unit) {
+        override fun start(tag: (List<BlockTag.Record>?) -> Unit, left: () -> Unit, off: () -> Unit) {
             val nfc = checkNotNull(nfc)
             val switched =
                 object : BroadcastReceiver() {
@@ -60,11 +63,10 @@ class BlockReader(private val screen: ComponentActivity) {
             nfc.enableReaderMode(
                 screen,
                 { found ->
-                    val records = records(found)
-                    // Done with the tag while it stays on the phone, so Android hands it to no app after the scan: a
-                    // block's link, say.
+                    tag(records(found))
+                    // Then done with the tag while it stays on the phone: so Android hands a block read to no app
+                    // after the scan, its link's browser say, and a card passed over leaves the reader free.
                     nfc.ignore(found, DEBOUNCE, null, null)
-                    tag(records)
                 },
                 TAGS,
                 null,
@@ -93,24 +95,24 @@ class BlockReader(private val screen: ComponentActivity) {
 
         /**
          * [tag]'s NDEF records as Android read them when it found the tag, handed to `BlockTag` as they come (AN3c):
-         * none for an empty tag or one with no NDEF on it.
+         * none for an empty tag, and no list for one with no NDEF on it.
          */
-        fun records(tag: Tag): List<BlockTag.Record> =
-            Ndef.get(tag)?.cachedNdefMessage?.records.orEmpty().map { BlockTag.Record(it.tnf, it.type, it.payload) }
+        fun records(tag: Tag): List<BlockTag.Record>? =
+            Ndef.get(tag)?.let { ndef -> ndef.cachedNdefMessage?.records.orEmpty().map { BlockTag.Record(it.tnf, it.type, it.payload) } }
     }
 }
 
 /**
  * The phone's reader as [scan] uses it, [BlockReader]'s Android or the JVM tests' own: whether the phone has one,
  * whether it's switched on, and whether Bali's screen is in front; then reading, each tag's NDEF records heard as
- * they come, Bali's screen leaving the front and NFC switched off; and reading stopped.
+ * they come (no list: no NDEF on it), Bali's screen leaving the front and NFC switched off; and reading stopped.
  */
 internal interface Reader {
     val present: Boolean
     val on: Boolean
     val inFront: Boolean
 
-    fun start(tag: (List<BlockTag.Record>) -> Unit, left: () -> Unit, off: () -> Unit)
+    fun start(tag: (List<BlockTag.Record>?) -> Unit, left: () -> Unit, off: () -> Unit)
 
     fun stop()
 }
@@ -123,31 +125,38 @@ private val scanning = AtomicBoolean(false)
  * nothing until it's on, Android's alone; and none begins behind another app or while one is under way. Its answer
  * is the first of a tag's read, Bali's screen leaving the front (the student's close, as iOS's Cancel) and NFC
  * switched off, the switch read again once the reader listens, so one turned off as it started counts; anything
- * after the first is dropped. The reader stops however the scan ends, the caller's cancel among them, and one that
- * won't start is the system's error.
+ * after the first is dropped. A tag with no NDEF on it is passed over, as iOS's NDEF session passes it over, so a
+ * card kept in the phone's case ends no scan. The reader stops however the scan ends, the caller's cancel among
+ * them, and Android's refusals are the system's error, never thrown.
  */
-internal suspend fun scan(reader: Reader): BlockRead {
+internal suspend fun scan(reader: Reader): BlockRead =
+    try {
+        scanned(reader)
+    } catch (refused: RuntimeException) {
+        if (refused is CancellationException) throw refused
+        BlockRead.Failed(refused.toString())
+    }
+
+private suspend fun scanned(reader: Reader): BlockRead {
     if (!reader.present) return BlockRead.Unsupported
     if (!reader.on) return BlockRead.NfcOff
     if (!reader.inFront) return BlockRead.Cancelled
     if (!scanning.compareAndSet(false, true)) return BlockRead.Failed("A scan is under way.")
-    val answer = CompletableDeferred<BlockRead>()
     try {
-        try {
-            reader.start({ answer.complete(readOf(it)) }, { answer.complete(BlockRead.Cancelled) }, { answer.complete(BlockRead.NfcOff) })
-        } catch (refused: RuntimeException) {
-            return BlockRead.Failed(refused.toString())
-        }
+        val answer = CompletableDeferred<BlockRead>()
+        reader.start({ records -> records?.let { answer.complete(readOf(it)) } }, { answer.complete(BlockRead.Cancelled) }, { answer.complete(BlockRead.NfcOff) })
         if (!reader.on) answer.complete(BlockRead.NfcOff)
         return answer.await()
     } finally {
-        reader.stop()
-        scanning.set(false)
+        try {
+            reader.stop()
+        } catch (gone: RuntimeException) {
+            // Android's NFC service gone takes reader mode with it: the scan's answer stands, a block read among them.
+        } finally {
+            scanning.set(false)
+        }
     }
 }
 
-/**
- * What a tag's NDEF [records] hold: a Bali block's code; else no Bali block, a tag with none, an empty one and one
- * with no NDEF on it, a bank card say, among them, as a blank tag is on iOS.
- */
+/** What a tag's NDEF [records] hold: a Bali block's code; else no Bali block, an empty tag among them, as on iOS. */
 internal fun readOf(records: List<BlockTag.Record>): BlockRead = BlockTag.code(records)?.let(BlockRead::Block) ?: BlockRead.NotBali
