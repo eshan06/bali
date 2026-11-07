@@ -2341,7 +2341,7 @@ struct AppTests {
     }
 
     @Test(
-        "Home in no class as the approved Sign in & sign up design draws it: the student greeted, then its card's words — not in a class yet for a new student, in none any more for one removed from their last (#143) — and Join a class, a button, then the tab bar, with no classes list and no Sign out; Join opened from it, nothing typed or a code refused, has Back and no Sign out, and its title followed at once by the code's field, the field by Continue, with no line under either (the owner's cuts, 2026-11-04)"
+        "Home in no class as the approved Sign in & sign up design draws it: the student greeted, then its card's words — not in a class yet for a new student, in none any more for one removed from their last (#143) — and Join a class, a button, then the tab bar, with no classes list and no Sign out; Join opened from it, nothing typed or a code refused, has Back and no Sign out, and its title followed at once by the code's field, read as Class code and as a text field, the field by Continue, with no line under either (the owner's cuts, 2026-11-04)"
     )
     func homeInNoClass() async throws {
         for (name, words) in [
@@ -2368,12 +2368,16 @@ struct AppTests {
             let opened = try await elements(of: RootView(phone: join), once: title)
             #expect(opened.contains { $0.label == "Back" && $0.traits.contains(.button) }, "\(name)")
             #expect(!opened.contains { $0.label == "Sign out" || $0.label == "Home" }, "\(name)")
-            // The code's field is the one element on the screen with no label of its own.
-            let field = "the code's field"
-            let labels = opened.map { $0.label ?? field }
+            // The field named once, by the words over it: they are hidden from VoiceOver.
+            let labels = opened.map { $0.label ?? "" }
             #expect(
-                Array(labels.drop { $0 != title }.prefix(3)) == [title, field, "Continue"],
+                Array(labels.drop { $0 != title }.prefix(3)) == [title, "Class code", "Continue"],
                 "\(name): \(labels)")
+            // A text field to VoiceOver: the trait UIKit's own text field carries, which UIKit
+            // keeps private.
+            let field = opened.first { $0.label == "Class code" }
+            let textField = UITextField().accessibilityTraits
+            #expect(!textField.isEmpty && field?.traits.contains(textField) == true, "\(name)")
         }
     }
 

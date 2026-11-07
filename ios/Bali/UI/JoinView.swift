@@ -45,7 +45,10 @@ struct JoinView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Class code").textStyle(TextStyle(size: 13, line: 18, weight: .semibold))
                         .foregroundStyle(Theme.textSecondary).accessibilityHidden(true)
+                    // Read as "Class code" by VoiceOver, the label over it hidden from it: an
+                    // empty prompt leaves the field no label of its own.
                     TextField("Class code", text: $text, prompt: Text(""))
+                        .accessibilityLabel("Class code")
                         .font(.system(.title, design: .monospaced, weight: .medium)).tracking(10)
                         .multilineTextAlignment(.center).foregroundStyle(Theme.text)
                         .textInputAutocapitalization(.characters).autocorrectionDisabled()
