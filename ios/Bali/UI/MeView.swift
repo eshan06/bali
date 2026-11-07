@@ -89,7 +89,10 @@ struct MeView: View {
         let naming = phone.naming
         return VStack(alignment: .leading, spacing: 8) {
             label.accessibilityHidden(true)
+            // Read as "Name" by VoiceOver, the label over it hidden from it: an empty prompt
+            // leaves the field no label of its own.
             TextField("Name", text: $text, prompt: Text(""))
+                .accessibilityLabel("Name")
                 .textStyle(.bodyLg).textContentType(.name).textInputAutocapitalization(.words)
                 .autocorrectionDisabled().submitLabel(.done).tint(Theme.brand)
                 // Fixed while its save is under way.
