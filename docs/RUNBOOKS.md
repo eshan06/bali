@@ -396,7 +396,8 @@ and the portal on its free Vercel address, `https://<project>.vercel.app` (e.g.
    3. **Configuration → Environment variables → Edit → Add:**
       `ALLOWED_EMAIL_DOMAINS` = `vanderbilt.edu,gmail.com` → Save (prod's since
       2026-11-07; `vanderbilt.edu` alone before it). `gmail.com` is for the owner's
-      testing and for pilot students with no Vanderbilt address. Comma-separated for more
+      testing and for pilot students with no Vanderbilt address, though it lets anyone
+      with a Gmail address sign up. Comma-separated for more
       than one; exact match only (`mc.vanderbilt.edu` must be listed itself). Unset
       or empty refuses every sign-up.
    4. Cognito → the pool → **Extensions** → **Add Lambda trigger** *(wording

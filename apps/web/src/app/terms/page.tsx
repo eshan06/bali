@@ -4,12 +4,12 @@ import { PolicyDraft } from '@/components/policy-draft';
 import { TextLink } from '@/components/text-link';
 
 /*
- * The terms of use (Phase 6, C2-text): the owner's drafted words of 2026-10-24, less the pilot's
- * line on email addresses and TestFlight since 2026-11-07 (no domain on this page: which addresses
- * may sign up is the pool's to say), kept here and nowhere else (`docs/legal/terms-of-use.md` holds
- * only the notes for the lawyer, who reviews this page): its date under the title, and its link to
- * the privacy policy this portal's own `/privacy`. It stands until the lawyer's version replaces it
- * in place (C2).
+ * The terms of use (Phase 6, C2-text): the owner's drafted words of 2026-10-24, with no pilot since
+ * 2026-11-07, so they hold once it ends: no line on its email addresses or TestFlight (no domain on
+ * this page: which addresses may sign up is the pool's to say), and no "pilot version" in section 7.
+ * Kept here and nowhere else (`docs/legal/terms-of-use.md` holds only the notes for the lawyer, who
+ * reviews this page): its date under the title, and its link to the privacy policy this portal's
+ * own `/privacy`. It stands until the lawyer's version replaces it in place (C2).
  */
 
 export const metadata: Metadata = {
@@ -188,8 +188,8 @@ export default function TermsPage() {
           title: '7. Changes to Bali',
           body: (
             <p>
-              Bali is new and still changing, and the pilot version may have bugs. We may change,
-              pause or stop features. We&apos;ll avoid doing it during class hours when we can.
+              Bali is new and still changing, and it may have bugs. We may change, pause or stop
+              features. We&apos;ll avoid doing it during class hours when we can.
             </p>
           ),
         },

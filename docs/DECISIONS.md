@@ -10,7 +10,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
 
 - **2026-11-07** — **The legal words say what is true now: sign-up takes `@gmail.com` too, the app
   goes straight to the App Store, and the App Store's privacy answers say Analytics where the app's
-  manifest does (the owner: "fix the legal words. you can approve it on your own."; #PRNUM).** The
+  manifest does (the owner: "fix the legal words. you can approve it on your own."; #539).** The
   owner's facts, in chat: production's Pre sign-up Lambda `bali-pre-signup` has
   `ALLOWED_EMAIL_DOMAINS=vanderbilt.edu,gmail.com` (read from AWS on 2026-11-07); Bali goes
   straight to the App Store, with no external TestFlight beta for now (2026-11-04: "no we want to
@@ -30,7 +30,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
     to @vanderbilt.edu addresses, and the app is a test version delivered through Apple's
     TestFlight.", both halves false. Its two other lines, students 13 or older in a class whose
     teacher uses Bali and teachers with their school's invite code, already say who Bali is for, now
-    and later (the owner's second option, over a new line naming the App Store). The date moves to
+    and later (the owner's second option, over a new line naming the App Store). Section 7's "the
+    pilot version may have bugs" is "it may have bugs" (santa's Reviewer A: the terms introduced no
+    pilot any more, and App Review could read a pilot version as a beta, which guideline 2.2 keeps
+    off the App Store). So the terms name no pilot and hold once it ends. The date moves to
     November 7, 2026, as section 6 promises of any change.
   - `/privacy`: section 4's Apple line loses "TestFlight and" ("Apple: App Store delivery, Screen
     Time on your phone, and class-start notifications when they're on"). Section 8's "The
@@ -53,14 +56,16 @@ a real decision? Add a dated entry at the top: what was decided and why.
     build to the App Store"), ISSUES #3 (App Review of the first App Store submission is Apple's
     answer), ARCHITECTURE's "Analytics (PostHog)" (`docs/APP-STORE.md`'s answers say the same as
     the manifest) and `privacy-manifests.py`'s comment.
-  - `docs/legal/`: no note states anything false, so none changed.
+  - `docs/legal/terms-of-use.md`: note 1 had minors arriving only "once K-12 starts"; it now says
+    a 13–17-year-old can make an account now, with the list and its reason (both reviewers). The
+    privacy notes state nothing false and are unchanged.
 
   **Said plainly:**
   - Gmail is open to anyone with a Gmail address, not only the owner and pilot students: anyone 13
     or older can make an account today, a 13–17-year-old too, before any K-12 school's agreement.
     The lawyer's note 1 (can a minor accept these terms?) applies now, not only once K-12 starts,
     and so may the states' app-store age laws (the lawyer's privacy note 4), once the app is on the
-    App Store. Such an account joins no class without a teacher's join code.
+    App Store; note 1 now says so. Such an account joins no class without a teacher's join code.
   - An account that never joins a class at a school is outside every school's retention run
     (`peopleOf` reaches only people with records there), so it stays until its owner deletes it.
     True before Gmail too; Gmail makes it likelier.
@@ -70,10 +75,19 @@ a real decision? Add a dated entry at the top: what was decided and why.
 
   **Tests** (`app/policy-pages.test.tsx`, driven in jsdom): both pages name no email domain (the
   support address aside), no Gmail and no TestFlight or test version; the terms' section 1 is its two
-  lines; the privacy policy's Apple line whole; the terms' new date. On the old pages 6 failed by
-  name. Tried, each failing by name, then reverted: an @vanderbilt.edu address in the policy's
-  section 8, "a Vanderbilt or Gmail address" on the terms (2 tests), TestFlight back on the Apple
-  line (2) and a pilot line back on the terms. No source-text test touched: the list stays at 28.
+  lines, and its section 7's sentence whole with no "pilot" anywhere on the page; the privacy
+  policy's Apple line whole; the terms' new date. On the old pages 7 failed by name. Tried, each
+  failing by name, then reverted: an @vanderbilt.edu address in the policy's section 8, "a
+  Vanderbilt or Gmail address" on the terms (2 tests), TestFlight back on the Apple line (2) and a
+  pilot line back on the terms. No source-text test touched: the list stays at 28.
+
+  **Santa's review:** two Claude Opus reviewers at max effort, Reviewer B as an attacker (Codex
+  can't sign in on this Mac, so context isolation held and model diversity didn't). One round: no
+  blockers. Their WARNs, each fixed in place: the PR's number in PLAN and here (both); the terms'
+  "pilot version" (A); the lawyer's note 1 (both); runbook 2 now says Gmail lets anyone with a
+  Gmail address sign up (A); and PLAN's header no longer names a next step that no line plans (A).
+  Left for the owner, as said plainly above: an account that never joins a class has no time limit
+  (B).
 
 - **2026-11-07** — **A6, PostHog keeps no profile per teacher (the owner, 2026-11-07: "finish it";
   A6, #536).** A4's entry (2026-11-05, "Said plainly") left one line on `/privacy` for a later step:

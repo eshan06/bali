@@ -9,8 +9,11 @@
 
 ## Notes for the lawyer
 
-1. **Minors.** Students may be 13–17 once K-12 starts. Can a minor accept these terms, or do
-   we need a parent's or the school's consent instead? The Vanderbilt pilot is adults only.
+1. **Minors.** Students may be 13–17 once K-12 starts, and a 13–17-year-old can make an account
+   now: since 2026-11-07, sign-up takes `@gmail.com` addresses as well as `@vanderbilt.edu` ones
+   (for the owner's testing and for pilot students with no Vanderbilt address). Can a minor
+   accept these terms, or do we need a parent's or the school's consent instead? The Vanderbilt
+   pilot is adults only.
 2. **Arbitration** was left out on purpose (section 11): forcing students into arbitration
    can hurt a school's trust, and some school agreements forbid it. The template's version
    (binding individual arbitration, class-action and jury-trial waivers) can be added back.

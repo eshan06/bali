@@ -460,6 +460,15 @@ describe('the pages say what is true now: no pilot rule on email addresses, and 
     ]);
   });
 
+  it('has the terms name no pilot, so they stay true once it ends: section 7 says Bali may have bugs', () => {
+    render(<TermsPage />);
+    const changes = screen.getByRole('region', { name: '7. Changes to Bali' });
+    expect(changes.querySelector('p')?.textContent).toBe(
+      "Bali is new and still changing, and it may have bugs. We may change, pause or stop features. We'll avoid doing it during class hours when we can.",
+    );
+    expect(screen.getByRole('main').textContent).not.toMatch(/pilot/i);
+  });
+
   it('has the privacy policy name Apple for the App Store, not TestFlight', () => {
     render(<PrivacyPage />);
     const sharing = screen.getByRole('region', { name: '4. Who we share it with' });

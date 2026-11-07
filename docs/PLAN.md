@@ -8,10 +8,10 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-07 (Central) — the legal words say what is true now (#PRNUM; DECISIONS
+_Last updated: 2026-11-07 (Central) — the legal words say what is true now (#539; DECISIONS
 2026-11-07): `/terms` and `/privacy` name no email domain and no TestFlight, the app goes straight to
 the App Store (item 5), and `docs/APP-STORE.md` §3 says Analytics where the manifest does (item 6).
-Next: the portal's move to app.getbali.app; the notice section 11 promises, the owner's; a session
+Next: the notice section 11 promises, the owner's; a session
 builds the retire-a-block command; the owner the new build, the sitting, then the App Store
 submission; GA5's known limit, the owner's call (DECISIONS 2026-11-02); AN9b; AN1's part 2 on the
 owner's phones; the audit's polish waits._
