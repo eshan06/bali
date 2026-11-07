@@ -5,7 +5,7 @@ the product lives on `main`. It replaces `demo2`, the one-page demo.
 
 The design is the Claude Design canvas "Bali website"
 (https://claude.ai/artifact/5Aohc3RHe7j69mVgXwyZhj). `canvas/` is a copy of the files the site uses
-(canvas version 35, 2026-11-06). Change the design on the canvas first, then copy the changed files
+(canvas version 36, 2026-11-06). Change the design on the canvas first, then copy the changed files
 in here.
 
 | Path | Page | Board |
@@ -27,23 +27,30 @@ in here.
   in `static/`, and writes one small HTML page per path.
 - `src/runtime.js`: draws a page from `boards.js` in the browser, as the canvas does: holes,
   `sc-for`, `sc-if`, `dc-import`, the helmet styles, and each board's component (`renderVals`,
-  `setState`, `componentDidMount`). Nothing is evaluated from strings, so the security policy
-  (`script-src 'self'`) holds.
+  `setState`, `componentDidMount`). A redraw changes only what the drawing changed and keeps the
+  elements, so what a component set up on them (observers, animations) stays. Nothing is evaluated
+  from strings, so the security policy (`script-src 'self'`) holds.
 - `tools/check.mjs`: quick checks on `dist/`: every page, link and asset resolves, no canvas link,
   upload path, Google Fonts link or inline script is left, and `boards.js` stays under 900 KB.
 - `tools/serve.mjs`: serves `dist/` with the same headers Vercel sends (`npm run serve`, port 4173),
   so a page the security policy would break breaks here first.
+- `tests/site.spec.mjs`: browser tests in Chrome and Safari's engine, at laptop and phone sizes:
+  every page draws, nothing scrolls sideways, every link and old address goes somewhere real, the
+  copy buttons, Reduce Motion, the message when a page can't draw, accessibility and the security
+  policy.
 - `static/`: the self-hosted fonts (OFL), the icon, and the Android screen picture.
 - `vercel.json`: Vercel runs `node tools/build.mjs && node tools/check.mjs` and serves `dist/` with
   the security headers. A failed build never takes the site down: Vercel keeps the last good version.
 
 ## Shipping a change
 
-1. `npm run build`: builds and runs the quick checks. Both must pass.
-2. `npm run serve` and open every page at laptop and phone widths: no console errors, the
-   animations play, the links go where they say.
-3. The santa-loop review (two independent reviewers, as on `main`): only proven problems block.
-4. Push to `demo3`.
+1. `npm ci && npx playwright install --only-shell chromium webkit` (once).
+2. `npm test`: builds, runs the quick checks, then the browser tests. All must pass.
+3. `npm run serve` and open every page at laptop and phone widths: the animations play and the
+   pages look as they do on the canvas.
+4. The santa-loop review (two independent reviewers, as on `main`): only proven problems block.
+5. Push to `demo3`.
+6. Check the live site: `BASE_URL=https://www.getbali.app npx playwright test`.
 
 ## Vercel
 

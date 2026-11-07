@@ -120,7 +120,8 @@ class Component extends DCLogic {
     };
     fit();
     if (window.ResizeObserver) {
-      this.ro = new ResizeObserver(fit);
+      // Fitting changes the size being watched, so it waits a frame: no resize loop.
+      this.ro = new ResizeObserver(() => { cancelAnimationFrame(this.fitRaf); this.fitRaf = requestAnimationFrame(fit); });
       this.ro.observe(root);
     } else {
       this.onResize = fit;
@@ -147,6 +148,7 @@ class Component extends DCLogic {
   }
   componentWillUnmount() {
     if (this.ro) this.ro.disconnect();
+    cancelAnimationFrame(this.fitRaf);
     if (this.onResize) window.removeEventListener('resize', this.onResize);
     if (this.io) this.io.disconnect();
     (this.anims || []).forEach((a) => a.cancel());

@@ -49,12 +49,14 @@ class Component extends DCLogic {
     };
     fit();
     if (window.ResizeObserver) {
-      this.ro = new ResizeObserver(fit);
+      // Fitting changes the size being watched, so it waits a frame: no resize loop.
+      this.ro = new ResizeObserver(() => { cancelAnimationFrame(this.fitRaf); this.fitRaf = requestAnimationFrame(fit); });
       this.ro.observe(root);
     }
   }
   componentWillUnmount() {
     if (this.ro) this.ro.disconnect();
+    cancelAnimationFrame(this.fitRaf);
   }
   renderVals() {
     if (!this.uid) this.uid = 'bb' + Math.random().toString(36).slice(2, 9);
