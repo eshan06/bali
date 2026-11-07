@@ -30,7 +30,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   URLs on `bali-web` stay until no build in use links the old address, and the redirect keeps old
   links working meanwhile. Build 12, on the owner's phone for the sitting, links the old address;
   build 13, the App Store submission's and the first made after this PR, links the new one. Runbook 3,
-  step 4 now records the move and its order for the next one.
+  step 4 now records the move and its order for the next one. The website (`demo3`) still sends its
+  Sign in, Privacy and Terms links to the old address (its `vercel.json` and its pages), so the
+  redirect also stays until the website's own process changes them.
 
   **The repo (#540):** `ios/project.yml`'s `BALI_PORTAL_URL`, one value for every configuration
   (production's, since the policy pages live only there, so there was no dev value to keep), and
@@ -44,6 +46,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   (`android/app/build.gradle.kts`), Android's to change, which the redirect covers meanwhile.
 
   **Said plainly:**
+  - No build signs in through the old CORS origin or Cognito URLs: the app signs in with its own
+    client and `bali://` callback, and its policy links need only the redirect. They serve tabs
+    opened at the old address before the move, while their sign-in lasts (12 hours), and those tabs'
+    Sign out. They must go before the name `bali-portal.vercel.app` could ever be released (the
+    project renamed or deleted): whoever took it would have a callback prod's public portal client
+    allows (santa's Reviewer B).
   - A teacher signed in at the old address signs in once more: the portal keeps its sign-in in the
     tab's storage, which belongs to one address, so the new address starts signed out.
   - `NEXT_PUBLIC_REDIRECT_URI` is on Preview too, where runbook 3, step 5 gives previews none of
@@ -62,10 +70,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
     the app target only (the extensions need none), so device builds alone carry it. Found while
     building it: the iOS Simulator refuses to launch an app that requires NFC ("Application failed
     preflight checks"), which would stop every hosted app test, here and in CI, so a hosted test
-    can't pin it. `ios.yml`'s plist check does: a device build's setting must be `nfc` alone and a
-    simulator build's nothing; with the line removed it failed (tried). A Release device build's
-    Info.plist reads `arm64`, `nfc`: Xcode adds `arm64` to every device bundle itself, the extensions'
-    too, which Apple's page asks of 64-bit apps, so nothing else belongs in the list.
+    can't pin it. `ios.yml`'s plist check does, on every iOS PR: a device build's setting must be
+    `nfc` alone and a simulator build's nothing; with the line removed it failed (tried). And the
+    TestFlight workflow's release guard checks the archive Apple reads (both reviewers' suggestion):
+    `nfc`, with nothing but `arm64` beside it. A Release device build's Info.plist reads `arm64`,
+    `nfc`: Xcode adds `arm64` to every device bundle itself, the extensions' too, which Apple's page
+    asks of 64-bit apps, so nothing else belongs in the list.
   - **What stays:** Tap in's line for a phone that can't read NFC ("This iPhone can't read Bali
     blocks, so it can't tap in. Ask your teacher.") covers an iPhone whose NFC is unavailable.
     `docs/APP-STORE.md` §2's guideline 2.4.1 paragraph says Bali requires NFC and is reviewed on an

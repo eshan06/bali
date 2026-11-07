@@ -589,7 +589,9 @@ your Vercel projects; step 1 tells you which case you're in.
    step 2); (2) add its callback and sign-out URLs to the `bali-web` client (runbook 2, step 8),
    keeping the old ones; (3) redirect the old address to the new one (**Settings → Domains**);
    (4) set `NEXT_PUBLIC_REDIRECT_URI` to the new callback, then **Redeploy**. The old origin and
-   the old URLs stay in CORS and Cognito until no build in use links the old address.
+   the old URLs stay in CORS and Cognito until no build in use links the old address, and go
+   before that address's name could ever be released: whoever held it then would have a sign-in
+   callback the portal's public client allows.
    **Check:** `https://<portal domain>` loads with a valid certificate. Then make
    these three agree, byte for byte, for the new address: Vercel's `NEXT_PUBLIC_REDIRECT_URI`,
    the `bali-web` client's callback and sign-out URLs (runbook 2, step 8), and Railway's

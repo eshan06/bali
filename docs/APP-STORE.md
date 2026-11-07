@@ -172,9 +172,9 @@ accounts and the video link once the review path (section 4) is chosen.
 >   location, nor which answer is the student's.
 >
 > CONTENT IN BALI (GUIDELINE 1.2)
-> - Teachers post the only content students see in the app: a class's name, slides, and
->   questions with the answer choices the teacher sets. A teacher account needs an invite code
->   we make for that teacher's school. Every other account is a student account.
+> - Teachers post the only content students see in the app: a class's name, the teacher's own
+>   name, slides, and questions with the answer choices the teacher sets. A teacher account needs
+>   an invite code we make for that teacher's school. Every other account is a student account.
 > - A student answers a question only by picking one of the teacher's choices, and the teacher
 >   sees the class's totals, never who picked what. The only text a student enters that anyone
 >   else sees is their name. Their teacher sees it beside their status, and so does the class if

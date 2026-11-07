@@ -140,8 +140,8 @@ own pool (hosting decision 2). None of these is secret:
   `https://app.getbali.app` since 2026-11-07, built with prod's values (2026-10-05). Its old
   address, `https://bali-portal.vercel.app`, redirects there (307, the path and query kept), so
   old links and the app's builds 12 and older still land; prod's `CORS_ORIGINS` is
-  `https://bali-portal.vercel.app,https://app.getbali.app`, the old origin kept for tabs and
-  builds that still go through it (runbook 3, step 4).
+  `https://bali-portal.vercel.app,https://app.getbali.app`, the old origin kept for tabs opened
+  there before the move (runbook 3, step 4).
 - **The pool:** `bali-production`, id `us-east-1_C55e0fhX8`; `AUTH_ISSUER`
   `https://cognito-idp.us-east-1.amazonaws.com/us-east-1_C55e0fhX8`. Deletion
   protection on; MFA optional (TOTP); self sign-up gated by the Pre sign-up Lambda
