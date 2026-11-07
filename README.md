@@ -5,8 +5,15 @@ the product lives on `main`. It replaces `demo2`, the one-page demo.
 
 The design is the Claude Design canvas "Bali website"
 (https://claude.ai/artifact/5Aohc3RHe7j69mVgXwyZhj). `canvas/` is a copy of the files the site uses
-(canvas version 36, 2026-11-06). Change the design on the canvas first, then copy the changed files
-in here.
+(canvas version 38, 2026-11-06). The owner approved the site as drawn and asked for it to go live on
+2026-11-06 (version 35). Version 36 fixes what the browser tests found (the phone-law map's contrast,
+the comparison table's keyboard reach, the pictures' resize loop in Safari); versions 37 and 38 add
+`SiteStates.dc.html`, the two intermediate states: a page that didn't load, and JavaScript off.
+
+A design change is drawn on the canvas and approved by the owner first, then the changed files are
+copied in here. An intermediate state of an approved page (an error line, a narrow width) is drawn
+on that page's canvas first, labelled as one, and needs no approval; anything new shown about a
+student always waits for the owner's.
 
 | Path | Page | Board |
 |---|---|---|
@@ -24,20 +31,24 @@ in here.
 - `tools/build.mjs`: builds `dist/` with no dependencies. It bundles every board a page needs into
   `dist/boards.js` (each board's template, styles and component), rewrites links between boards to
   the paths above, swaps the canvas's Google Fonts for the self-hosted ones and its uploads for files
-  in `static/`, and writes one small HTML page per path.
+  in `static/`, and writes one small HTML page per path: its stylesheets, its link-preview tags, and
+  the two states from `SiteStates.dc.html`.
 - `src/runtime.js`: draws a page from `boards.js` in the browser, as the canvas does: holes,
   `sc-for`, `sc-if`, `dc-import`, the helmet styles, and each board's component (`renderVals`,
-  `setState`, `componentDidMount`). A redraw changes only what the drawing changed and keeps the
-  elements, so what a component set up on them (observers, animations) stays. Nothing is evaluated
-  from strings, so the security policy (`script-src 'self'`) holds.
-- `tools/check.mjs`: quick checks on `dist/`: every page, link and asset resolves, no canvas link,
-  upload path, Google Fonts link or inline script is left, and `boards.js` stays under 900 KB.
+  `setState`, `componentDidMount`, `componentWillUnmount`). A redraw changes only what the drawing
+  changed and keeps the elements, so what a component set up on them (observers, animations, a count
+  it writes) stays. Nothing is evaluated from strings, so the security policy (`script-src 'self'`)
+  holds. A page that can't be drawn shows the didn't-load state from its own HTML.
+- `tools/check.mjs`: quick checks on `dist/`, on every Vercel build: every page, link, stylesheet
+  and asset resolves; each page has both states; no canvas link, upload path, Google Fonts link or
+  inline script is left; each page turns off iPhone Safari's text enlarging and nothing scales with
+  CSS `zoom` (the screen pictures' text piled up on the owner's iPhone, 2026-11-02); the security
+  policy keeps `script-src 'self'`; and each file stays inside its size budget.
 - `tools/serve.mjs`: serves `dist/` with the same headers Vercel sends (`npm run serve`, port 4173),
   so a page the security policy would break breaks here first.
 - `tests/site.spec.mjs`: browser tests in Chrome and Safari's engine, at laptop and phone sizes:
   every page draws, nothing scrolls sideways, every link and old address goes somewhere real, the
-  copy buttons, Reduce Motion, the message when a page can't draw, accessibility and the security
-  policy.
+  copy buttons, a redraw, Reduce Motion, the two states, accessibility and the security policy.
 - `static/`: the self-hosted fonts (OFL), the icon, and the Android screen picture.
 - `vercel.json`: Vercel runs `node tools/build.mjs && node tools/check.mjs` and serves `dist/` with
   the security headers. A failed build never takes the site down: Vercel keeps the last good version.

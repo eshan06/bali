@@ -1,7 +1,8 @@
 // Draws a page from the canvas boards that tools/build.mjs bundles into boards.js: {{holes}},
 // sc-for, sc-if, dc-import, each board's <helmet> styles, and its component (DCLogic, renderVals,
-// setState, componentDidMount). Nothing is evaluated from strings, so the site's security policy
-// (script-src 'self') holds.
+// setState, componentDidMount, componentWillUnmount). Nothing is evaluated from strings, so the site's
+// security policy (script-src 'self') holds. A page that can't be drawn shows the state the canvas's
+// SiteStates board draws, from the page's own HTML (#dc-error).
 (function () {
   const B = window.DCB || {};
   const parsed = {};
@@ -12,6 +13,10 @@
   // board its name and props. A redraw (setState) changes only these and keeps the elements, so what
   // a component set up on them after drawing (observers, animations, data-in, a --k scale) stays.
   const drawn = new WeakMap();
+  // The text the drawing put in each of its text nodes; a text node a component made itself isn't here.
+  const drawnText = new WeakMap();
+  // Each imported board's component, by its host, so a redraw that removes the board can stop it.
+  const insts = new WeakMap();
 
   class DCLogic {
     constructor(props) { this.props = props || {}; this.state = null; }
@@ -69,7 +74,12 @@
     Array.prototype.slice.call(src.childNodes).forEach((n) => node(n, out, scope, ctx));
   }
   function node(n, out, scope, ctx) {
-    if (n.nodeType === 3) { out.appendChild(document.createTextNode(interp(n.nodeValue, scope))); return; }
+    if (n.nodeType === 3) {
+      const t = document.createTextNode(interp(n.nodeValue, scope));
+      drawnText.set(t, t.nodeValue);
+      out.appendChild(t);
+      return;
+    }
     if (n.nodeType !== 1) return;
     const tag = n.localName;
     if (tag === 'sc-for') {
@@ -151,26 +161,52 @@
     drawn.set(el, now);
   }
 
+  // A board a redraw removes or replaces stops, and so do the boards it imports.
+  function unmount(node) {
+    if (node.nodeType !== 1) return;
+    const hosts = node.localName === 'dc-host' ? [node] : [];
+    hosts.push(...node.querySelectorAll('dc-host'));
+    hosts.forEach((h) => {
+      const inst = insts.get(h);
+      if (!inst) return;
+      insts.delete(h);
+      inst._draw = null;
+      if (inst.componentWillUnmount) inst.componentWillUnmount();
+    });
+  }
+
   // Brings live's children in line with next's, a fresh drawing of the same board, keeping each node
   // that is still the same kind of node in the same place. An imported board that stays keeps its own
-  // drawing, as it does in the canvas.
+  // drawing, as it does in the canvas. Nodes are paired by position: a list that changes length moves
+  // what components set on its elements, which no board here does.
   function patch(live, next) {
     const have = Array.prototype.slice.call(live.childNodes);
     const want = Array.prototype.slice.call(next.childNodes);
     want.forEach((w, i) => {
       const n = have[i];
       if (!n) live.appendChild(w);
-      else if (!alike(n, w)) live.replaceChild(w, n);
-      else if (w.nodeType === 3) { if (n.nodeValue !== w.nodeValue) n.nodeValue = w.nodeValue; }
+      else if (!alike(n, w)) {
+        unmount(n);
+        live.replaceChild(w, n);
+      } else if (w.nodeType === 3) {
+        // Text a component wrote itself (a count, say) stays; drawn text changes when the drawing does.
+        if (!drawnText.has(n)) return;
+        if (drawnText.get(n) !== drawnText.get(w)) n.nodeValue = drawnText.get(w);
+        drawnText.set(n, drawnText.get(w));
+      }
       else if (w.localName !== 'dc-host') { update(n, w); patch(n, w); }
     });
-    for (let i = want.length; i < have.length; i++) live.removeChild(have[i]);
+    for (let i = want.length; i < have.length; i++) {
+      unmount(have[i]);
+      live.removeChild(have[i]);
+    }
   }
 
   function mount(name, props, host) {
     const P = parse(name);
     inject(name, P);
     const inst = new P.Cls(props);
+    insts.set(host, inst);
     let first = true;
     const draw = () => {
       const scope = Object.assign({}, inst.renderVals ? inst.renderVals() : {});
@@ -195,7 +231,9 @@
     mount(app.getAttribute('data-board'), {}, app);
     document.documentElement.classList.add('is-drawn');
   } catch (e) {
-    app.innerHTML = '<p style="font:16px/1.5 system-ui,sans-serif;padding:40px 24px">This page didn\'t load. Refresh to try again, or email eshan.shah@vanderbilt.edu.</p>';
+    const state = document.getElementById('dc-error');
+    if (state) app.replaceChildren(state.content.cloneNode(true));
+    else app.textContent = 'This page didn’t load. Refresh to try again.';
     throw e;
   }
   // The page is drawn after the browser looks for #anchor, so go to it now.

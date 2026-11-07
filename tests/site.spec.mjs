@@ -74,6 +74,11 @@ test('an address with a section opens at that section, from any page', async ({ 
   await expect(page.locator('#mission')).toBeInViewport();
 });
 
+test('an address with a malformed #section still opens the page', async ({ page }) => {
+  await open(page, '/#%E0%A4%A');
+  await expect(page.getByRole('heading', { level: 1, name: 'Lock the phone. Train the mind.' })).toBeVisible();
+});
+
 test('every link goes somewhere real', async ({ page }) => {
   test.setTimeout(90_000);
   const ids = {};
@@ -87,11 +92,11 @@ test('every link goes somewhere real', async ({ page }) => {
   for (const [path, hrefs] of Object.entries(links)) {
     expect(hrefs.length, path).toBeGreaterThan(10);
     for (const href of hrefs) {
-      if (href.startsWith('#')) expect(ids[path], `${path}: ${href}`).toContain(href.slice(1));
+      if (href.startsWith('#')) expect(ids[path].filter((id) => id === href.slice(1)), `${path}: ${href}`).toHaveLength(1);
       else if (href.startsWith('/')) {
         const [to, hash] = href.split('#');
         expect(PATHS, `${path}: ${href}`).toContain(to);
-        if (hash !== undefined) expect(ids[to], `${path}: ${href}`).toContain(hash);
+        if (hash !== undefined) expect(ids[to].filter((id) => id === hash), `${path}: ${href}`).toHaveLength(1);
       } else expect(href, path).toMatch(/^https:\/\/[a-z0-9.-]+\/|^mailto:(eshan\.shah|jonathan\.n\.bani-esraili)@vanderbilt\.edu$/);
     }
   }
@@ -176,14 +181,71 @@ test('with Reduce Motion nothing moves and every block shows', async ({ page }) 
   }
 });
 
-// The page is drawn by a script; if that can't run, the page says so and how to reach us.
-base('a page whose drawing fails to load says so', async ({ page }) => {
+// A page that can't be drawn shows the state the canvas's SiteStates board draws, and Refresh tries again.
+base('a page that didn’t load says so, and Refresh tries again', async ({ page }) => {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.route('**/boards.js', (route) => route.fulfill({ status: 200, contentType: 'text/javascript', body: 'window.DCB = {};' }));
   await page.goto('/');
-  await expect(page.locator('#app')).toHaveText("This page didn't load. Refresh to try again, or email eshan.shah@vanderbilt.edu.");
+  await expect(page.getByRole('heading', { level: 1, name: 'This page didn’t load.' })).toBeVisible();
+  await expect(page.locator('#app')).toContainText('Refresh to try again. If it still doesn’t load, email eshan.shah@vanderbilt.edu.');
+  await expect(page.getByRole('link', { name: EMAIL })).toHaveAttribute('href', `mailto:${EMAIL}`);
   expect(errors).toEqual(['No board Main.dc.html']);
+  await page.unroute('**/boards.js');
+  await page.getByRole('link', { name: 'Refresh', exact: true }).click();
+  await expect(page.locator('html')).toHaveClass(/is-drawn/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Lock the phone. Train the mind.' })).toBeVisible();
+});
+
+test.describe('with JavaScript off', () => {
+  test.use({ javaScriptEnabled: false });
+  test('each page says it needs JavaScript, and how to reach us', async ({ page }) => {
+    for (const path of PATHS) {
+      await page.goto(path);
+      await expect(page.getByRole('heading', { level: 1, name: 'This page needs JavaScript.' }), path).toBeVisible();
+      await expect(page.getByRole('link', { name: EMAIL }), path).toHaveAttribute('href', `mailto:${EMAIL}`);
+    }
+  });
+});
+
+// The runtime on its own, with two small boards in place of the site's.
+const PROBE = [
+  'window.DCB = {};',
+  'window.DCB["Main.dc.html"] = { tpl: ' + JSON.stringify('<p class="p" data-x="{{x}}">{{label}}</p><span class="n">0</span><button type="button" data-dc-on-click="{{go}}">Go</button><dc-import name="Kid" n="{{n}}"></dc-import>') + ', helmet: "", heads: [], make: function (DCLogic) {',
+  '  class Component extends DCLogic {',
+  '    renderVals() { const s = this.state || {}; return { x: s.x || "a", label: s.label || "one", n: s.n || "1", go: () => { window.clicks = (window.clicks || 0) + 1; this.setState({ x: "b", label: "two", n: "2" }); } }; }',
+  '  }',
+  '  return Component;',
+  '} };',
+  'window.DCB["Kid.dc.html"] = { tpl: "<i>{{n}}</i>", helmet: "", heads: [], make: function (DCLogic) {',
+  '  class Component extends DCLogic {',
+  '    renderVals() { return { n: this.props.n }; }',
+  '    componentDidMount() { (window.seen = window.seen || []).push("mount " + this.props.n); }',
+  '    componentWillUnmount() { window.seen.push("unmount " + this.props.n); }',
+  '  }',
+  '  return Component;',
+  '} };',
+].join('\n');
+
+test('a redraw keeps what components set, changes what the drawing changed, and remounts a board only for new props', async ({ page }) => {
+  await page.route('**/boards.js', (route) => route.fulfill({ status: 200, contentType: 'text/javascript', body: PROBE }));
+  await open(page, '/');
+  // What a component sets after drawing: a property, an attribute, and a count it writes itself.
+  await page.evaluate(() => {
+    const p = document.querySelector('p.p');
+    p.kept = true;
+    p.dataset.in = '1';
+    document.querySelector('span.n').textContent = '42';
+  });
+  await page.getByRole('button', { name: 'Go' }).click();
+  await expect(page.locator('p.p')).toHaveText('two');
+  await expect(page.locator('p.p')).toHaveAttribute('data-x', 'b');
+  const after = () => page.evaluate(() => ({ kept: document.querySelector('p.p').kept, in: document.querySelector('p.p').dataset.in, count: document.querySelector('span.n').textContent, kid: document.querySelector('i').textContent, seen: window.seen, clicks: window.clicks }));
+  expect(await after()).toEqual({ kept: true, in: '1', count: '42', kid: '2', seen: ['mount 1', 'unmount 1', 'mount 2'], clicks: 1 });
+  // The same props again: the imported board stays, and the button's handler was swapped, not added.
+  await page.getByRole('button', { name: 'Go' }).click();
+  await expect.poll(() => page.evaluate(() => window.clicks)).toBe(2);
+  expect(await after()).toEqual({ kept: true, in: '1', count: '42', kid: '2', seen: ['mount 1', 'unmount 1', 'mount 2'], clicks: 2 });
 });
 
 test('no serious accessibility problems', async ({ page }) => {

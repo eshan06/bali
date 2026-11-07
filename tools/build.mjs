@@ -13,8 +13,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const canvas = join(root, 'canvas');
 const out = join(root, 'dist');
 const read = (path) => readFileSync(path, 'utf8');
-
-
+const SITE = 'https://www.getbali.app';
 
 const between = (text, start, end, from = 0) => {
   const i = text.indexOf(start, from);
@@ -69,6 +68,20 @@ while (queue.length) {
   queue.push(...parts[name].imports);
 }
 
+// Each page's stylesheets, in the order its boards ask for them. They go in the page's HTML, so it never
+// paints before its styles arrive; the runtime skips a stylesheet that is already there.
+const sheets = (name, seen = new Set()) => {
+  if (seen.has(name)) return [];
+  seen.add(name);
+  return [...parts[name].heads, ...parts[name].imports.flatMap((i) => sheets(i, seen))];
+};
+
+// What a page shows when it can't be drawn (a page that didn't load, JavaScript off), as the canvas's
+// SiteStates board draws them.
+const states = read(join(canvas, 'SiteStates.dc.html'));
+const failed = between(states, '<!-- state:error -->', '<!-- /state:error -->').trim();
+const noScript = between(states, '<!-- state:noscript -->', '<!-- /state:noscript -->').trim();
+
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
 
@@ -94,22 +107,32 @@ cpSync(join(root, 'static'), out, { recursive: true });
 
 for (const [name, path] of Object.entries(ROUTES)) {
   const p = parts[name];
-  const title = name === 'Main.dc.html' ? 'Bali: Lock the phone. Train the mind.' : `${p.title} · Bali`;
+  const title = escapeHtml(name === 'Main.dc.html' ? 'Bali: Lock the phone. Train the mind.' : `${p.title} · Bali`);
+  const description = escapeHtml(DESCRIPTIONS[name]);
+  const links = [...new Set(sheets(name))].map((href) => `<link rel="stylesheet" href="${href}" data-src="${href}">`).join('\n');
   const html = `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escapeHtml(title)}</title>
-<meta name="description" content="${escapeHtml(DESCRIPTIONS[name])}">
+<title>${title}</title>
+<meta name="description" content="${description}">
+<link rel="canonical" href="${SITE}${path}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Bali">
+<meta property="og:url" content="${SITE}${path}">
+<meta property="og:title" content="${title}">
+<meta property="og:description" content="${description}">
 <meta name="theme-color" content="#F7F5F2">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preload" href="/fonts/instrument-sans-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/css/fonts.css">
+${links}
 </head>
 <body>
 <div id="app" data-board="${name}"></div>
-<noscript><p style="font:16px/1.5 system-ui,sans-serif;padding:40px 24px">Bali's site needs JavaScript to show this page. Turn it on and refresh, or email eshan.shah@vanderbilt.edu.</p></noscript>
+<template id="dc-error">${failed}</template>
+<noscript>${noScript}</noscript>
 <script src="/boards.js"></script>
 <script src="/runtime.js"></script>
 </body>
