@@ -65,15 +65,16 @@ student always waits for the owner's.
 
 ## Vercel
 
-Project `bali-web` (www.getbali.app). For this branch to be the live site, in the project's settings:
+Project `bali-web` (www.getbali.app, team `evc123`). Since 2026-11-06 it builds this branch, with these
+settings in the dashboard:
 
-- **Git → Production Branch:** `demo3` (it was `demo2`).
-- **Build and Deployment → Ignored Build Step:** `[ "$VERCEL_GIT_COMMIT_REF" != "demo3" ]` (it was
-  `!= "demo2"`), so only this branch builds. It lives in the dashboard, not in `vercel.json`, because
-  `bali-portal` builds from the same repository and would read it too.
-- **Root Directory:** blank (the repository root).
+- **Environments → Production → Branch Tracking:** `demo3` (it was `demo2`).
+- **Build and Deployment → Ignored Build Step:** Custom, `[ "$VERCEL_GIT_COMMIT_REF" != "demo3" ]` (it
+  was `!= "demo2"`), so only this branch builds. It lives in the dashboard, not in `vercel.json`,
+  because `bali-portal` builds from the same repository and would read it too.
+- **Build and Deployment → Root Directory:** blank (the repository root).
 
-Then redeploy, or push to `demo3`. `demo2` stays as it was, so switching the production branch back
-is the way to roll back.
+A push to `demo3` deploys it. `demo2` stays as it was: setting both back to `demo2` and redeploying
+its last deployment rolls the site back.
 
 Commits carry the owner's identity only, with no Claude attribution of any kind.
