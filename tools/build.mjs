@@ -1,116 +1,123 @@
-// Builds the site in dist/ from the approved canvas files in canvas/. No dependencies: Vercel runs it as is.
-import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+// Builds the site in dist/ from the canvas files in canvas/. No dependencies: Vercel runs it as is.
+//
+// Each page is a canvas board drawn in the browser by src/runtime.js. This script bundles every board
+// a page needs into dist/boards.js (template, helmet styles, component class) so nothing is evaluated
+// from strings, swaps the canvas-only pieces for the site's own (self-hosted fonts, real page paths,
+// the Android picture), and writes one small HTML page per route.
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ASSETS, DESCRIPTIONS, ROUTES } from './routes.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const canvas = join(root, 'canvas');
 const out = join(root, 'dist');
 const read = (path) => readFileSync(path, 'utf8');
 
-const between = (text, start, end) => {
-  const i = text.indexOf(start);
+
+
+const between = (text, start, end, from = 0) => {
+  const i = text.indexOf(start, from);
   const j = i < 0 ? -1 : text.indexOf(end, i + start.length);
   if (j < 0) throw new Error(`build: "${start}" … "${end}" not found`);
   return text.slice(i + start.length, j);
 };
-// Each canvas-only piece is swapped out exactly once; a canvas change that moves one fails the build loudly.
-const swap = (text, from, to, times = 1) => {
-  const found = text.split(from).length - 1;
-  if (found !== times) throw new Error(`build: expected ${times} of "${from.slice(0, 70)}", found ${found}`);
-  return text.split(from).join(to);
-};
 const escapeHtml = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-// A board's markup, as the canvas draws it inside the page. Its links point at other canvas boards or
-// nowhere; the screens are inert pictures, so they lose them.
-const board = (name) =>
-  between(read(join(canvas, `${name}.dc.html`)), '</helmet>', '</x-dc>').trim().replace(/ href="[^"]*"/g, '');
+// Links between boards become the site's paths; any other board link (inside a portal or app
+// picture, which is inert) is dropped.
+const relink = (html) =>
+  html.replace(/ href="([A-Za-z0-9]+\.dc\.html)(#[^"]*)?"/g, (m, board, hash) => {
+    const path = ROUTES[board];
+    if (!path) return '';
+    if (board === 'Main.dc.html' && hash) return ` href="/${hash}"`;
+    return ` href="${path}${hash || ''}"`;
+  });
 
-const main = read(join(canvas, 'Main.dc.html'));
-let css = between(main, '<style>', '</style>');
-let page = between(main, '</helmet>', '</x-dc>').trim();
-const logic = between(main, 'data-dc-script', '</script>');
+function boardParts(name) {
+  const src = read(join(canvas, name));
+  const head = between(src, '<head>', '</head>');
+  const title = (head.match(/<title>([\s\S]*?)<\/title>/) || [])[1] || 'Bali';
+  const heads = [...head.matchAll(/<link rel="stylesheet" href="([^"]+)">/g)].map((m) => '/css/' + m[1]);
+  const xdc = between(src, '<x-dc>', '</x-dc>');
+  let helmet = '';
+  let tpl = xdc;
+  if (xdc.includes('<helmet>')) {
+    helmet = between(xdc, '<helmet>', '</helmet>');
+    tpl = xdc.slice(xdc.indexOf('</helmet>') + '</helmet>'.length);
+  }
+  // The canvas loads its fonts from Google; the site serves them itself (fonts.css).
+  helmet = helmet.replace(/<link rel="stylesheet" href="https:\/\/fonts\.googleapis\.com[^"]*">\s*/g, '');
+  tpl = relink(tpl.trim());
+  // Event bindings become data attributes the runtime binds, so no inline handler reaches the browser.
+  tpl = tpl.replace(/ on([A-Za-z]+)="(\{\{[^"]+\}\})"/g, (m, ev, hole) => ` data-dc-on-${ev.toLowerCase()}="${hole}"`);
+  for (const [from, to] of Object.entries(ASSETS)) tpl = tpl.split(from).join(to);
+  const script = src.match(/<script type="text\/x-dc" data-dc-script[^>]*>([\s\S]*?)<\/script>/);
+  const code = script ? script[1].trim() : 'class Component extends DCLogic { renderVals() { return {}; } }';
+  const imports = [...tpl.matchAll(/<dc-import name="([A-Za-z0-9]+)"/g)].map((m) => m[1] + '.dc.html');
+  return { title, heads, helmet: helmet.trim(), tpl, code, imports };
+}
 
-// The canvas-only rules (the mid-scroll board's frozen pose) don't ship.
-css = css.split('\n').filter((line) => !line.startsWith('.pose')).join('\n').trim();
-// On a phone the stage is the visible height (svh): at 100vh, Safari's toolbar would cover the scroll prompt.
-css = swap(css, '.is-live .b-stage{position:sticky;top:0;height:100vh;overflow:hidden}', '.is-live .b-stage{position:sticky;top:0;height:100vh;height:100svh;overflow:hidden}');
-css = `@font-face{font-family:'Instrument Sans';src:url(/fonts/instrument-sans-latin-wght-normal.woff2) format('woff2');font-weight:400 700;font-style:normal;font-display:swap}
-@font-face{font-family:'JetBrains Mono';src:url(/fonts/jetbrains-mono-latin-wght-normal.woff2) format('woff2');font-weight:100 800;font-style:normal;font-display:swap}
-${css}
-.b-player{cursor:auto;background:#161513}
-.b-player iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
-.b-ch.b-off .zoom,.b-ch.b-off .b-emblem{visibility:hidden}
-`;
+// Every board a page needs: the pages and, through their imports, everything they draw.
+const parts = {};
+const queue = Object.keys(ROUTES);
+while (queue.length) {
+  const name = queue.shift();
+  if (parts[name]) continue;
+  if (!existsSync(join(canvas, name))) throw new Error(`build: ${name} is imported but missing from canvas/`);
+  parts[name] = boardParts(name);
+  queue.push(...parts[name].imports);
+}
 
-// The grid's 28 tiles, laid out as the canvas's renderVals lays them out.
-const list = (name) => JSON.parse(between(logic, `const ${name} = `, ';').replace(/'([^']*)'/g, (m, s) => JSON.stringify(s)));
-const names = list('names');
-const order = list('order');
-const loop = page.match(/<sc-for list="\{\{tiles\}\}" as="t" hint-placeholder-count="28">\s*([\s\S]*?)\s*<\/sc-for>/);
-if (!loop || names.length !== 28) throw new Error('build: the grid tiles changed shape');
-const tiles = names.map((name, i) => {
-  const rank = order.indexOf(i);
-  return loop[1]
-    .split('{{t.i}}').join(String(Math.max(rank, 0)))
-    .split('{{t.name}}').join(escapeHtml(name))
-    .split('{{t.topCls}}').join('tile t-focused b-top' + (rank < 0 ? ' hd-hide' : ''));
-});
-page = page.slice(0, loop.index) + tiles.join('\n') + page.slice(loop.index + loop[0].length);
+rmSync(out, { recursive: true, force: true });
+mkdirSync(out, { recursive: true });
 
-// Each imported screen goes in where the canvas imports it, in the wrapper the canvas draws it in.
-page = page.replace(/<dc-import name="(\w+)" hint-size="[^"]*"><\/dc-import>/g, (m, name) => `<div class="sc-host">${board(name)}</div>`);
+const bundle = [
+  '// Built by tools/build.mjs from canvas/. Do not edit: change the canvas, copy the file in, rebuild.',
+  'window.DCB = {};',
+  ...Object.entries(parts).map(([name, p]) =>
+    `window.DCB[${JSON.stringify(name)}] = { tpl: ${JSON.stringify(p.tpl)}, helmet: ${JSON.stringify(p.helmet)}, heads: ${JSON.stringify(p.heads)}, make: function (DCLogic) {\n${p.code}\nreturn Component;\n} };`),
+  '',
+].join('\n');
+writeFileSync(join(out, 'boards.js'), bundle);
+cpSync(join(root, 'src', 'runtime.js'), join(out, 'runtime.js'));
 
-// The canvas's live state becomes plain markup that src/site.js drives.
-page = swap(page, '<div class="{{rootCls}}">', '<div class="bw"><script src="/live.js"></script>');
-page = page.replace(/ onClick="\{\{(goDetails|goContact|goWatch|copy1|copy2)\}\}"/g, '');
-page = page.replace(/<path class="b-slingp" d="\{\{sl\.d\d\}\}" style="[^"]*"><\/path>/g, '<path class="b-slingp"></path>');
-page = swap(page, '<sc-if value="{{landing}}" hint-placeholder-val="{{ false }}"><div class="b-veil" aria-hidden="true"></div></sc-if>', '<div class="b-veil" aria-hidden="true" hidden></div>');
-page = swap(page, '{{copyLabel1}}', '<span class="b-copytext">Copy address</span>');
-page = swap(page, '{{copyLabel2}}', '<span class="b-copytext">Copy address</span>');
-page = swap(page, '<span class="sr-only" aria-live="polite">{{copyMsg}}</span>', '<span class="sr-only b-copymsg" aria-live="polite"></span>');
-// The canvas can't hold a player, so its poster opens YouTube; here src/site.js plays the video in place
-// (the canvas's VideoPlaying board), and without the script the poster still opens YouTube, as it says.
-page = swap(page, 'aria-label="Play the Bali classroom demo (YouTube, opens in a new tab)">', 'aria-label="Play the Bali classroom demo (YouTube, opens in a new tab)" data-video="iLtbApxTNTA">');
+mkdirSync(join(out, 'css'), { recursive: true });
+for (const f of readdirSync(canvas).filter((f) => f.endsWith('.css'))) cpSync(join(canvas, f), join(out, 'css', f));
+writeFileSync(join(out, 'css', 'fonts.css'), [
+  "@font-face{font-family:'Instrument Sans';src:url(/fonts/instrument-sans-latin-wght-normal.woff2) format('woff2');font-weight:400 700;font-style:normal;font-display:swap}",
+  "@font-face{font-family:'JetBrains Mono';src:url(/fonts/jetbrains-mono-latin-wght-normal.woff2) format('woff2');font-weight:100 800;font-style:normal;font-display:swap}",
+  'html,body{margin:0;background:#F7F5F2}',
+  '',
+].join('\n'));
+cpSync(join(root, 'static'), out, { recursive: true });
 
-const left = ['{{', 'dc-import', 'sc-for', 'sc-if', '.dc.html', 'onClick'].filter((s) => page.includes(s));
-if (left.length) throw new Error(`build: canvas-only markup left over: ${left.join(', ')}`);
-if ((page.match(/class="b-slingp"/g) || []).length !== 7) throw new Error('build: each chapter needs its slingshot path');
-
-const title = 'Bali: focus for the whole class';
-const description = "Students hold their phone to the teacher's Bali block, and their apps pause until the bell. Teachers see the whole room live, and Emergency Unlock always works.";
-const html = `<!doctype html>
+for (const [name, path] of Object.entries(ROUTES)) {
+  const p = parts[name];
+  const title = name === 'Main.dc.html' ? 'Bali: Lock the phone. Train the mind.' : `${p.title} · Bali`;
+  const html = `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${title}</title>
-<meta name="description" content="${escapeHtml(description)}">
-<link rel="canonical" href="https://www.getbali.app/">
-<meta property="og:type" content="website">
-<meta property="og:url" content="https://www.getbali.app/">
-<meta property="og:title" content="${title}">
-<meta property="og:description" content="${escapeHtml(description)}">
+<title>${escapeHtml(title)}</title>
+<meta name="description" content="${escapeHtml(DESCRIPTIONS[name])}">
 <meta name="theme-color" content="#F7F5F2">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preload" href="/fonts/instrument-sans-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/v2.css">
-<link rel="stylesheet" href="/site.css">
-<script src="/site.js" defer></script>
+<link rel="stylesheet" href="/css/fonts.css">
 </head>
 <body>
-${page}
+<div id="app" data-board="${name}"></div>
+<noscript><p style="font:16px/1.5 system-ui,sans-serif;padding:40px 24px">Bali's site needs JavaScript to show this page. Turn it on and refresh, or email eshan.shah@vanderbilt.edu.</p></noscript>
+<script src="/boards.js"></script>
+<script src="/runtime.js"></script>
 </body>
 </html>
 `;
+  const dir = join(out, path);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'index.html'), html);
+}
 
-rmSync(out, { recursive: true, force: true });
-mkdirSync(out, { recursive: true });
-writeFileSync(join(out, 'index.html'), html);
-writeFileSync(join(out, 'site.css'), css);
-cpSync(join(canvas, 'v2.css'), join(out, 'v2.css'));
-cpSync(join(root, 'src', 'site.js'), join(out, 'site.js'));
-cpSync(join(root, 'src', 'live.js'), join(out, 'live.js'));
-cpSync(join(root, 'static'), out, { recursive: true });
-console.log(`built dist/: index.html ${Math.round(html.length / 1024)} KB, site.css ${Math.round(css.length / 1024)} KB`);
+console.log(`build: ${Object.keys(ROUTES).length} pages from ${Object.keys(parts).length} boards, boards.js ${Math.round(bundle.length / 1024)} KB`);

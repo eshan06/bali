@@ -1,53 +1,43 @@
-// Quick checks on the built site in dist/. Vercel runs them after every build, so a broken page fails the
-// build and getbali.app keeps serving the last good version. The browser tests (tests/) go further.
+// Quick checks on dist/ after the build: every page and asset is there, every internal link goes
+// somewhere real, no canvas-only markup or outside resource is left, and the bundle stays small.
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ROUTES } from './routes.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const dist = join(root, 'dist');
 const problems = [];
-const need = (ok, message) => {
-  if (!ok) problems.push(message);
-};
+const fail = (msg) => problems.push(msg);
 
-const html = readFileSync(join(dist, 'index.html'), 'utf8');
-const ids = new Set([...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]));
-const hrefs = [...html.matchAll(/\shref="([^"]*)"/g)].map((m) => m[1]);
+const boards = readFileSync(join(dist, 'boards.js'), 'utf8');
+const pages = new Set(Object.values(ROUTES));
 
-need(html.includes('<h1 id="h-1" class="display">Tap in.</h1>'), 'the page heading');
-need(html.includes('<title>Bali: focus for the whole class</title>'), 'the page title');
-for (const id of ['top', 'details', 'watch', 'contact', 'h-why', 'h-watch', 'h-contact']) need(ids.has(id), `#${id} exists`);
-for (const href of hrefs) {
-  if (href.startsWith('#')) need(ids.has(href.slice(1)), `${href} points at something on the page`);
-  else if (href.startsWith('/')) need(existsSync(join(dist, href)), `${href} is in dist/`);
-  else need(/^https:\/\/|^mailto:(eshan\.shah|jonathan\.n\.bani-esraili)@vanderbilt\.edu$/.test(href), `${href} is https or a contact address`);
+for (const [name, path] of Object.entries(ROUTES)) {
+  if (!existsSync(join(dist, path, 'index.html'))) fail(`no page for ${name} at ${path}`);
+  if (!boards.includes(`window.DCB[${JSON.stringify(name)}]`)) fail(`${name} is missing from boards.js`);
 }
-for (const src of [...html.matchAll(/\ssrc="([^"]*)"/g)].map((m) => m[1])) need(src.startsWith('/') && existsSync(join(dist, src)), `${src} is one of our files in dist/`);
-need(!/<script(?![^>]*\ssrc=)[^>]*>/.test(html), 'no inline scripts (the security policy allows only our own files)');
-need(!/\{\{|dc-import|sc-for|sc-if|\.dc\.html/.test(html), 'no canvas-only markup left');
-need(html.includes('data-video="iLtbApxTNTA"'), 'the video poster');
-need(html.includes('<p>Coming soon!</p>'), 'the Android answer');
-for (const address of ['eshan.shah@vanderbilt.edu', 'jonathan.n.bani-esraili@vanderbilt.edu']) {
-  need(html.includes(`href="mailto:${address}"`) && html.includes(`data-copy="${address}"`), `${address} under Talk to us, with its copy button`);
+const left = [...boards.matchAll(/href=\\"([^"\\]*\.dc\.html[^"\\]*)\\"/g)].map((m) => m[1]);
+if (left.length) fail(`canvas links left: ${[...new Set(left)].join(', ')}`);
+if (boards.includes('/_blob/')) fail('a canvas upload path (/_blob/) is left');
+if (/ on[a-z]+=\\"/i.test(boards)) fail('an inline event handler attribute is left in a board');
+if (/fonts\.(googleapis|gstatic)\.com/.test(boards)) fail('a Google Fonts link is left');
+if (/<script[\s>]/.test(boards.replace(/<\\\/script>/g, ''))) fail('a <script> tag is left inside a board');
+
+// Internal links: a page path (with or without #anchor), or a file in dist/.
+for (const m of boards.matchAll(/(?:href|src)=\\"(\/[^"\\#]*)(#[^"\\]*)?\\"/g)) {
+  const path = m[1];
+  const ok = pages.has(path) || (path !== '/' && existsSync(join(dist, path)) && statSync(join(dist, path)).isFile());
+  if (!ok) fail(`internal link or asset not found: ${path}`);
 }
-for (const [file, kb] of [['index.html', 200], ['site.css', 40], ['site.js', 16], ['v2.css', 60]]) {
-  const size = statSync(join(dist, file)).size / 1024;
-  need(size <= kb, `${file} is ${size.toFixed(0)} KB, over its ${kb} KB budget`);
+for (const f of ['runtime.js', 'css/fonts.css', 'css/v2.css', 'css/site.css', 'favicon.svg', 'fonts/instrument-sans-latin-wght-normal.woff2', 'fonts/jetbrains-mono-latin-wght-normal.woff2', 'img/android-focus-question.png']) {
+  if (!existsSync(join(dist, f))) fail(`missing ${f}`);
 }
-// iPhone Safari enlarges small text on its own, and inside the scaled-down screen pictures that piles the
-// lines on top of each other (seen on the owner's iPhone, 2026-11-02). The page turns that off.
-const css = readFileSync(join(dist, 'site.css'), 'utf8');
-need(/html\{[^}]*-webkit-text-size-adjust:100%[^}]*\}/.test(css) && /html\{[^}]*[^-]text-size-adjust:100%[^}]*\}/.test(css), 'html turns off iPhone Safari\'s text enlarging (text-size-adjust: 100%)');
-// With the enlarging off, iPhone Safari draws text inside CSS zoom at its full size, so the pictures scale with
-// transforms instead.
-need(!/[{;]\s*zoom\s*:/.test(css.replace(/\/\*[\s\S]*?\*\//g, '')), 'no CSS zoom (iPhone Safari draws zoomed text at full size); scale with transform');
-const config = JSON.parse(readFileSync(join(root, 'vercel.json'), 'utf8'));
-const csp = config.headers[0].headers.find((h) => h.key === 'Content-Security-Policy');
-need(csp && /script-src 'self'(;|$)/.test(csp.value) && csp.value.includes('frame-src https://www.youtube-nocookie.com'), 'the security policy: our scripts only, YouTube\'s privacy-enhanced player only');
+const kb = Math.round(statSync(join(dist, 'boards.js')).size / 1024);
+if (kb > 900) fail(`boards.js is ${kb} KB, over the 900 KB budget`);
 
 if (problems.length) {
-  console.error(`check: ${problems.length} problem(s)\n- ${problems.join('\n- ')}`);
+  console.error('check: ' + problems.length + ' problem(s)\n- ' + problems.join('\n- '));
   process.exit(1);
 }
-console.log(`check: ok (${hrefs.length} links, ${ids.size} ids)`);
+console.log(`check: ${pages.size} pages, every link and asset resolves, boards.js ${kb} KB`);

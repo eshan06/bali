@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>The Bali block</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+.bb{--k:1;position:relative;width:100%;max-width:560px}
+.bb-box{position:relative;width:calc(560px * var(--k));height:calc(355px * var(--k))}
+.bb-stage{position:absolute;left:0;top:0;width:560px;height:355px;transform:scale(var(--k));transform-origin:0 0}
+.bb-rim{position:absolute;inset:0;border-radius:28px;background:linear-gradient(180deg,#FFFFFF 0%,#FAF9F7 100%);box-shadow:inset 0 1px 0 #FFFFFF,inset 0 -2px 5px rgba(33,28,21,0.04),0 0 0 1px rgba(33,28,21,0.05),0 22px 46px rgba(33,28,21,0.14),0 4px 10px rgba(33,28,21,0.07)}
+.bb-face{position:absolute;left:16px;top:15px;right:16px;bottom:17px;overflow:hidden;border-radius:19px;background:#FFFFFF;box-shadow:inset 0 0 0 1px rgba(33,28,21,0.05),inset 0 1px 3px rgba(33,28,21,0.06)}
+.bb-dot{position:absolute;left:162px;top:28px;width:204px;height:204px;border-radius:50%;background:linear-gradient(180deg,#2A4A3A 0%,#3A6650 52%,#477D62 100%);display:flex;align-items:center;justify-content:center;text-align:center;box-shadow:0 1px 0 rgba(255,255,255,0.35)}
+.bb-dot span{font-family:'Times New Roman',Times,Georgia,serif;font-size:25px;line-height:31px;color:#E6E2DA;letter-spacing:0.005em}
+.bb-ring{position:absolute;left:162px;top:28px;width:204px;height:204px;border-radius:50%;box-shadow:0 0 0 2px rgba(71,125,98,0.55);opacity:0;pointer-events:none}
+.bb-tag{position:absolute;left:37px;top:244px;margin:0;font-family:'Times New Roman',Times,Georgia,serif;font-style:italic;font-size:15px;line-height:20px;color:#7A766F}
+.bb-co{position:absolute;left:37px;top:279px;margin:0;font-family:Arial,'Helvetica Neue',Helvetica,sans-serif;font-size:12.5px;line-height:16px;font-weight:700;letter-spacing:0.17em;color:#3F7A5E;white-space:nowrap}
+.bb-co span{margin:0 0.55em}
+</style>
+</helmet>
+<div class="bb" data-bb="{{uid}}" role="img" aria-label="The Bali block: a white card with a green circle that says Tap your phone here, and below it Focus is the new superpower, and Your school x Bali.">
+<div class="bb-box"><div class="bb-stage">
+<div class="bb-rim"></div>
+<div class="bb-face">
+<span class="bb-ring" aria-hidden="true"></span>
+<span class="bb-ring" aria-hidden="true"></span>
+<div class="bb-dot" aria-hidden="true"><span>Tap your<br>phone here</span></div>
+<p class="bb-tag" aria-hidden="true">Focus is the new superpower.</p>
+<p class="bb-co" aria-hidden="true">YOUR SCHOOL<span>X</span>BALI</p>
+</div>
+</div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"pulse":{"editor":null},"$preview":{"width":560,"height":355}}'>
+class Component extends DCLogic {
+  componentDidMount() {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+    const root = document.querySelector('[data-bb="' + this.uid + '"]');
+    if (!root) return;
+    // Scale the 560 × 355 block to the width it is given.
+    const fit = () => {
+      const w = root.clientWidth;
+      if (w > 0) root.style.setProperty('--k', Math.min(1, w / 560).toFixed(4));
+    };
+    fit();
+    if (window.ResizeObserver) {
+      this.ro = new ResizeObserver(fit);
+      this.ro.observe(root);
+    }
+  }
+  componentWillUnmount() {
+    if (this.ro) this.ro.disconnect();
+  }
+  renderVals() {
+    if (!this.uid) this.uid = 'bb' + Math.random().toString(36).slice(2, 9);
+    return { uid: this.uid };
+  }
+}
+</script>
+</body>
+</html>

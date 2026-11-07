@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>A phone taps the Bali block</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+.bt{--k:1;position:relative;width:100%;max-width:720px}
+.bt-box{position:relative;width:calc(720px * var(--k));height:calc(520px * var(--k))}
+.bt-stage{position:absolute;left:0;top:0;width:720px;height:520px;transform:scale(var(--k));transform-origin:0 0}
+.bt-block{position:absolute;left:0;top:70px;width:560px}
+.bt-block > *{width:100%;min-width:0}
+.bt-phone{position:absolute;left:530px;top:108px;width:171px;height:360px;transform-origin:85px 8px}
+.bt-bezel{position:absolute;left:0;top:0;width:426px;padding:12px;box-sizing:border-box;border-radius:67px;background:#26241F;transform:scale(0.4);transform-origin:0 0;box-shadow:0 50px 100px rgba(33,28,21,0.28),0 10px 24px rgba(33,28,21,0.14)}
+.bt-screen{position:relative;width:402px;height:874px;border-radius:55px;overflow:hidden;background:#F7F5F2}
+.bt-screen > div{position:absolute;inset:0}
+.bt-island{position:absolute;top:26px;left:50%;width:125px;height:37px;margin-left:-62.5px;border-radius:999px;background:#161513}
+.bt-home{opacity:0}
+</style>
+</helmet>
+<div class="bt" data-bt="{{uid}}" role="img" aria-label="A student holds the top of their phone near the Bali block. The block ripples, and the phone switches from Home to the Focus screen.">
+<div class="bt-box"><div class="bt-stage" aria-hidden="true">
+<div class="bt-block"><dc-import name="BaliBlock" hint-size="560px,355px"></dc-import></div>
+<div class="bt-phone">
+<div class="bt-bezel"><div class="bt-screen">
+<div class="bt-focus"><dc-import name="AppFocus" hint-size="402px,874px"></dc-import></div>
+<div class="bt-home"><dc-import name="AppHome" hint-size="402px,874px"></dc-import></div>
+</div><span class="bt-island"></span></div>
+</div>
+</div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"at":{"editor":null},"$preview":{"width":720,"height":520}}'>
+class Component extends DCLogic {
+  componentDidMount() {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+    const root = document.querySelector('[data-bt="' + this.uid + '"]');
+    if (!root) return;
+    const fit = () => {
+      const w = root.clientWidth;
+      if (w > 0) root.style.setProperty('--k', Math.min(1, w / 720).toFixed(4));
+    };
+    fit();
+    if (window.ResizeObserver) {
+      this.ro = new ResizeObserver(fit);
+      this.ro.observe(root);
+    }
+    const at = this.props.at;
+    const pinned = at !== undefined && at !== null && at !== '';
+    const still = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    if (!root.animate || (still && !pinned)) return;
+    // The imported block draws itself after this board, so wait a beat for its rings.
+    this.t0 = setTimeout(() => {
+      this.anims = this.build(root);
+      if (pinned) {
+        const t = Number(at) || 0;
+        this.anims.forEach((a) => { a.currentTime = t; a.pause(); });
+        return;
+      }
+      if (window.IntersectionObserver) {
+        this.io = new IntersectionObserver((es) => {
+          const on = es[es.length - 1].isIntersecting;
+          this.anims.forEach((a) => (on ? a.play() : a.pause()));
+        });
+        this.io.observe(root);
+      }
+    }, 60);
+  }
+  componentWillUnmount() {
+    clearTimeout(this.t0);
+    if (this.ro) this.ro.disconnect();
+    if (this.io) this.io.disconnect();
+    (this.anims || []).forEach((a) => a.cancel());
+  }
+  build(root) {
+    // One 9-second tap: the phone comes to the block, the block ripples, the apps lock.
+    const T = 9000;
+    const E = 'cubic-bezier(0.3, 0, 0.2, 1)';
+    const out = [];
+    const run = (el, frames) => {
+      if (!el) return;
+      const fr = frames.map((f) => Object.assign({ offset: f[0] / T, easing: f[2] || E }, f[1]));
+      out.push(el.animate(fr, { duration: T, iterations: Infinity, fill: 'both' }));
+    };
+    const q = (s) => root.querySelector(s);
+    const rest = 'translate(0px, 0px) rotate(0deg)';
+    const tap = 'translate(-312px, 84px) rotate(-22deg)';
+    run(q('.bt-phone'), [[0, { transform: rest }], [800, { transform: rest }], [1900, { transform: tap }], [2600, { transform: tap }], [3700, { transform: rest }], [T, { transform: rest }]]);
+    run(q('.bt-home'), [[0, { opacity: 1 }], [2050, { opacity: 1 }], [2350, { opacity: 0 }], [8200, { opacity: 0 }], [8800, { opacity: 1 }], [T, { opacity: 1 }]]);
+    Array.prototype.forEach.call(root.querySelectorAll('.bb-ring'), (el, i) => {
+      const s = 1950 + i * 230;
+      run(el, [[0, { opacity: 0, transform: 'scale(1)' }], [s, { opacity: 0, transform: 'scale(1)' }], [s + 60, { opacity: 0.8, transform: 'scale(1.02)' }], [s + 1000, { opacity: 0, transform: 'scale(1.5)' }], [T, { opacity: 0, transform: 'scale(1.5)' }]]);
+    });
+    return out;
+  }
+  renderVals() {
+    if (!this.uid) this.uid = 'bt' + Math.random().toString(36).slice(2, 9);
+    return { uid: this.uid };
+  }
+}
+</script>
+</body>
+</html>

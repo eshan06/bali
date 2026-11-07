@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phone laws by state</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="v2.css">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap">
+<style>
+body{margin:0;background:#F7F5F2}
+.pg-hero{padding:64px 0 88px}
+.pg-hero .bs-wrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:56px;align-items:center}
+.pg-eyebrow{font-size:13px;line-height:18px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--brand)}
+.pg-h1{margin-top:14px;font-size:clamp(40px,2.4vw + 28px,64px);line-height:1.05;font-weight:600;letter-spacing:-0.03em;text-wrap:balance}
+.pg-lead{margin-top:20px;max-width:30em;font-size:20px;line-height:31px;color:var(--ink2);text-wrap:pretty}
+.pg-art{min-width:0}
+.pg-art > *{width:100%;min-width:0}
+@media (max-width:959px){.pg-hero{padding:40px 0 64px}.pg-hero .bs-wrap{grid-template-columns:minmax(0,1fr);gap:36px}}
+@media (max-width:639px){.pg-lead{font-size:18px;line-height:28px}}
+.pg-h2{font-size:clamp(30px,1.6vw + 22px,44px);line-height:1.1;font-weight:600;letter-spacing:-0.025em;text-wrap:balance;max-width:20em}
+.pg-sub{margin-top:14px;max-width:36em;font-size:18px;line-height:28px;color:var(--ink2);text-wrap:pretty}
+
+.pg-src{display:inline-flex;align-items:center;gap:6px;margin-top:14px;font-size:14px;line-height:20px;font-weight:600;text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px}
+.pg-tag{display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:999px;background:#F0F7F3;color:#245A43;font-size:12px;line-height:16px;font-weight:600}
+.pg-tag.is-grey{background:#EFECE7;color:#524E47}
+.pg-meta{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:14px;font-size:14px;line-height:20px;color:var(--ink3)}
+.pg-note{margin-top:28px;max-width:44em;font-size:15px;line-height:24px;color:var(--ink3)}
+
+.pg-hero.pg-solo .bs-wrap{grid-template-columns:minmax(0,1fr)}
+.pg-map-wrap{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:48px;align-items:start;margin-top:8px}
+.pg-map{display:grid;grid-template-columns:repeat(11,minmax(0,1fr));gap:6px;max-width:820px}
+.pg-st{position:relative;aspect-ratio:1 / 1;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:14px;line-height:18px;font-weight:600;letter-spacing:0.02em}
+.pg-st sup{position:absolute;top:5px;right:7px;font-size:12px;line-height:12px}
+.is-bell{background:#245A43;color:#FFFFFF}
+.is-class{background:#62A483;color:#FFFFFF}
+.is-open{background:#BCDCCA;color:#18392B}
+.is-none{background:#EFECE7;color:#6B665D;box-shadow:inset 0 0 0 1px #E3DFD8}
+.pg-key{display:flex;flex-direction:column;gap:14px}
+.pg-key li{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:12px;align-items:start}
+.pg-key i{width:22px;height:22px;border-radius:6px;margin-top:1px}
+.pg-key b{display:block;font-size:16px;line-height:22px;font-weight:600}
+.pg-key span{display:block;margin-top:2px;font-size:14px;line-height:20px;color:var(--ink3)}
+.pg-key em{font-style:normal;font-size:16px;line-height:22px;font-weight:600;font-variant-numeric:tabular-nums}
+@media (max-width:1079px){.pg-map-wrap{grid-template-columns:minmax(0,1fr)}.pg-map{max-width:none}}
+@media (max-width:639px){.pg-map{gap:3px}.pg-st{border-radius:6px;font-size:10px}.pg-st sup{top:2px;right:3px;font-size:9px}}
+.pg-three{margin-top:40px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.pg-three > div{padding:26px 28px 26px;border-radius:20px;background:#FFFFFF;box-shadow:inset 0 0 0 1px var(--line)}
+.pg-three b{display:block;font-size:44px;line-height:48px;font-weight:600;letter-spacing:-0.03em;color:var(--brand)}
+.pg-three p{margin-top:10px;font-size:16px;line-height:25px;color:var(--ink2);text-wrap:pretty}
+@media (max-width:899px){.pg-three{grid-template-columns:minmax(0,1fr)}}
+.pg-grew{margin-top:36px;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;border-top:2px solid #DCEDE3}
+.pg-grew li{position:relative;padding:20px 16px 0 0}
+.pg-grew li::before{content:"";position:absolute;left:0;top:-7px;width:12px;height:12px;border-radius:999px;background:#245A43;box-shadow:0 0 0 4px #F7F5F2}
+.pg-grew b{display:block;font-size:30px;line-height:34px;font-weight:600;letter-spacing:-0.02em}
+.pg-grew span{display:block;margin-top:6px;font-size:14px;line-height:20px;color:var(--ink3)}
+@media (max-width:899px){.pg-grew{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:28px}}
+</style>
+</helmet>
+<div class="bs" id="top" data-bs="{{uid}}">
+<a class="bs-skip" href="#main">Skip to content</a>
+<header class="bs-top">
+<div class="bs-wrap">
+<a class="bs-brand" href="Main.dc.html" translate="no" aria-label="Bali, home"><svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="24" fill="none" stroke="#BCDCCA" stroke-width="10"></circle><path d="M26.6 8.61A24 24 0 1 1 8.61 26.6" fill="none" stroke="#2C6F51" stroke-width="10" stroke-linecap="round"></path></svg><span>Bali</span></a>
+<nav class="bs-nav" aria-label="Sections"><a href="Main.dc.html#how">How it works</a><a href="Main.dc.html#teachers">For teachers</a><a href="Main.dc.html#students">For students</a><a href="Main.dc.html#privacy">Privacy</a><a href="Main.dc.html#faq">Questions</a><a href="GuideFirstClass.dc.html">Guides</a></nav>
+<div class="bs-end"><a class="bs-btn bs-btn-s" href="https://bali-portal.vercel.app/login">Sign in</a><a class="bs-btn bs-btn-p" href="Main.dc.html#contact">Talk to us</a></div>
+</div>
+</header>
+<main id="main">
+<section class="pg-hero pg-solo" aria-labelledby="h-page" style="padding-bottom: 40px;">
+<div class="bs-wrap">
+<div>
+<p class="pg-eyebrow">Resources</p>
+<h1 id="h-page" class="pg-h1">Phone laws by state.</h1>
+<p class="pg-lead">At least 40 states and D.C. now require schools to restrict student phone use, and 30 of those states and D.C. require it from bell to bell.</p>
+</div>
+</div>
+</section>
+<section class="bs-sec" style="padding-top: 0;" aria-labelledby="h-map">
+<div class="bs-wrap">
+<h2 id="h-map" class="bs-sr">Every state, by what its law requires</h2>
+<div class="pg-map-wrap">
+<ul class="pg-map"><li class="pg-st is-none" style="grid-column: 1; grid-row: 1;" title="Alaska: no restriction required"><span aria-hidden="true">AK</span><span class="bs-sr">Alaska: no restriction required</span></li><li class="pg-st is-bell" style="grid-column: 11; grid-row: 1;" title="Maine: bell to bell"><span aria-hidden="true">ME</span><span class="bs-sr">Maine: bell to bell</span></li><li class="pg-st is-bell" style="grid-column: 10; grid-row: 2;" title="Vermont: bell to bell"><span aria-hidden="true">VT</span><span class="bs-sr">Vermont: bell to bell</span></li><li class="pg-st is-bell" style="grid-column: 11; grid-row: 2;" title="New Hampshire: bell to bell"><span aria-hidden="true">NH</span><span class="bs-sr">New Hampshire: bell to bell</span></li><li class="pg-st is-none" style="grid-column: 1; grid-row: 3;" title="Washington: no restriction required"><span aria-hidden="true">WA</span><span class="bs-sr">Washington: no restriction required</span></li><li class="pg-st is-bell" style="grid-column: 2; grid-row: 3;" title="Idaho: bell to bell"><span aria-hidden="true">ID</span><span class="bs-sr">Idaho: bell to bell</span></li><li class="pg-st is-none" style="grid-column: 3; grid-row: 3;" title="Montana: no restriction required"><span aria-hidden="true">MT</span><span class="bs-sr">Montana: no restriction required</span></li><li class="pg-st is-bell" style="grid-column: 4; grid-row: 3;" title="North Dakota: bell to bell"><span aria-hidden="true">ND</span><span class="bs-sr">North Dakota: bell to bell</span></li><li class="pg-st is-open" style="grid-column: 5; grid-row: 3;" title="Minnesota: restriction required, timing not set"><span aria-hidden="true">MN</span><span class="bs-sr">Minnesota: restriction required, timing not set</span></li><li class="pg-st is-bell" style="grid-column: 6; grid-row: 3;" title="Illinois: bell to bell (K-8 only)"><span aria-hidden="true">IL</span><sup aria-hidden="true">*</sup><span class="bs-sr">Illinois: bell to bell (K-8 only)</span></li><li class="pg-st is-class" style="grid-column: 7; grid-row: 3;" title="Wisconsin: class time only"><span aria-hidden="true">WI</span><span class="bs-sr">Wisconsin: class time only</span></li><li class="pg-st is-class" style="grid-column: 8; grid-row: 3;" title="Michigan: class time only"><span aria-hidden="true">MI</span><span class="bs-sr">Michigan: class time only</span></li><li class="pg-st is-bell" style="grid-column: 9; grid-row: 3;" title="New York: bell to bell"><span aria-hidden="true">NY</span><span class="bs-sr">New York: bell to bell</span></li><li class="pg-st is-bell" style="grid-column: 10; grid-row: 3;" title="Rhode Island: bell to bell"><span aria-hidden="true">RI</span><span class="bs-sr">Rhode Island: bell to bell</span></li><li class="pg-st is-none" style="grid-column: 11; grid-row: 3;" title="Massachusetts: no restriction required"><span aria-hidden="true">MA</span><span class="bs-sr">Massachusetts: no restriction required</span></li><li class="pg-st is-bell" style="grid-column: 1; grid-row: 4;" title="Oregon: bell to bell"><span aria-hidden="true">OR</span><span class="bs-sr">Oregon: bell to bell</span></li><li class="pg-st is-class" style="grid-column: 2; grid-row: 4;" title="Nevada: class time only"><span aria-hidden="true">NV</span><span class="bs-sr">Nevada: class time only</span></li><li class="pg-st is-none" style="grid-column: 3; grid-row: 4;" title="Wyoming: no restriction required"><span aria-hidden="true">WY</span><span class="bs-sr">Wyoming: no restriction required</span></li><li class="pg-st is-none" style="grid-column: 4; grid-row: 4;" title="South Dakota: no restriction required"><span aria-hidden="true">SD</span><span class="bs-sr">South Dakota: no restriction required</span></li><li class="pg-st is-class" style="grid-column: 5; grid-row: 4;" title="Iowa: class time only"><span aria-hidden="true">IA</span><span class="bs-sr">Iowa: class time only</span></li><li class="pg-st is-bell" style="grid-column: 6; grid-row: 4;" title="Indiana: bell to bell"><span aria-hidden="true">IN</span><span class="bs-sr">Indiana: bell to bell</span></li><li class="pg-st is-bell" style="grid-column: 7; grid-row: 4;" title="Ohio: bell to bell"><span aria-hidden="true">OH</span><span class="bs-sr">Ohio: bell to bell</span></li><li class="pg-st is-bell" style="grid-column: 8; grid-row: 4;" title="Pennsylvania: bell to bell"><span aria-hidden="true">PA</span><span class="bs-sr">Pennsylvania: bell to bell</span></li><li class="pg-st is-bell" style="grid-column: 9; grid-row: 4;" title="New Jersey: bell to bell"><span aria-hidden="true">NJ</span><span class="bs-sr">New Jersey: bell to bell</span></li><li class="pg-st is-none" style="grid-column: 10; grid-row: 4;" title="Connecticut: no restriction required"><span aria-hidden="true">CT</span><span class="bs-sr">Connecticut: no restriction required</span></li><li class="pg-st is-bell" style="grid-column: 1; grid-row: 5;" title="California: bell to bell"><span aria-hidden="true">CA</span><span class="bs-sr">California: bell to bell</span></li><li class="pg-st is-bell" style="grid-column: 2; grid-row: 5;" title="Utah: bell to bell"><span aria-hidden="true">UT</span><span class="bs-sr">Utah: bell to bell</span></li><li class="pg-st is-none" style="grid-column: 3; grid-row: 5;" title="Colorado: no restriction required"><span aria-hidden="true">CO</span><span class="bs-sr">Colorado: no restriction required</span></li><li class="pg-st is-bell" style="grid-column: 4; grid-row: 5;" title="Nebraska: bell to bell"><span aria-hidden="true">NE</span><span class="bs-sr">Nebraska: bell to bell</span></li><li class="pg-st is-bell" style="grid-column: 5; grid-row: 5;" title="Missouri: bell to bell"><span aria-hidden="true">MO</span><span class="bs-sr">Missouri: bell to bell</span></li><li class="pg-st is-class" style="grid-column: 6; grid-row: 5;" title="Kentucky: class time only"><span aria-hidden="true">KY</span><span class="bs-sr">Kentucky: class time only</span></li><li class="pg-st is-open" style="grid-column: 7; grid-row: 5;" title="West Virginia: restriction required, timing not set"><span aria-hidden="true">WV</span><span class="bs-sr">West Virginia: restriction required, timing not set</span></li><li class="pg-st is-bell" style="grid-column: 8; grid-row: 5;" title="Virginia: bell to bell"><span aria-hidden="true">VA</span><span class="bs-sr">Virginia: bell to bell</span></li><li class="pg-st is-bell" style="grid-column: 9; grid-row: 5;" title="Maryland: bell to bell"><span aria-hidden="true">MD</span><span class="bs-sr">Maryland: bell to bell</span></li><li class="pg-st is-class" style="grid-column: 10; grid-row: 5;" title="Delaware: class time only"><span aria-hidden="true">DE</span><span class="bs-sr">Delaware: class time only</span></li><li class="pg-st is-bell" style="grid-column: 2; grid-row: 6;" title="Arizona: bell to bell"><span aria-hidden="true">AZ</span><span class="bs-sr">Arizona: bell to bell</span></li><li class="pg-st is-none" style="grid-column: 3; grid-row: 6;" title="New Mexico: no restriction required"><span aria-hidden="true">NM</span><span class="bs-sr">New Mexico: no restriction required</span></li><li class="pg-st is-bell" style="grid-column: 4; grid-row: 6;" title="Kansas: bell to bell"><span aria-hidden="true">KS</span><span class="bs-sr">Kansas: bell to bell</span></li><li class="pg-st is-bell" style="grid-column: 5; grid-row: 6;" title="Arkansas: bell to bell"><span aria-hidden="true">AR</span><span class="bs-sr">Arkansas: bell to bell</span></li><li class="pg-st is-class" style="grid-column: 6; grid-row: 6;" title="Tennessee: class time only"><span aria-hidden="true">TN</span><span class="bs-sr">Tennessee: class time only</span></li><li class="pg-st is-class" style="grid-column: 7; grid-row: 6;" title="North Carolina: class time only"><span aria-hidden="true">NC</span><span class="bs-sr">North Carolina: class time only</span></li><li class="pg-st is-bell" style="grid-column: 8; grid-row: 6;" title="South Carolina: bell to bell"><span aria-hidden="true">SC</span><span class="bs-sr">South Carolina: bell to bell</span></li><li class="pg-st is-bell" style="grid-column: 9; grid-row: 6;" title="District of Columbia: bell to bell"><span aria-hidden="true">DC</span><span class="bs-sr">District of Columbia: bell to bell</span></li><li class="pg-st is-bell" style="grid-column: 4; grid-row: 7;" title="Oklahoma: bell to bell"><span aria-hidden="true">OK</span><span class="bs-sr">Oklahoma: bell to bell</span></li><li class="pg-st is-bell" style="grid-column: 5; grid-row: 7;" title="Louisiana: bell to bell"><span aria-hidden="true">LA</span><span class="bs-sr">Louisiana: bell to bell</span></li><li class="pg-st is-none" style="grid-column: 6; grid-row: 7;" title="Mississippi: no restriction required"><span aria-hidden="true">MS</span><span class="bs-sr">Mississippi: no restriction required</span></li><li class="pg-st is-bell" style="grid-column: 7; grid-row: 7;" title="Alabama: bell to bell"><span aria-hidden="true">AL</span><span class="bs-sr">Alabama: bell to bell</span></li><li class="pg-st is-bell" style="grid-column: 8; grid-row: 7;" title="Georgia: bell to bell"><span aria-hidden="true">GA</span><span class="bs-sr">Georgia: bell to bell</span></li><li class="pg-st is-bell" style="grid-column: 1; grid-row: 8;" title="Hawaii: bell to bell (K-8 only)"><span aria-hidden="true">HI</span><sup aria-hidden="true">*</sup><span class="bs-sr">Hawaii: bell to bell (K-8 only)</span></li><li class="pg-st is-bell" style="grid-column: 4; grid-row: 8;" title="Texas: bell to bell"><span aria-hidden="true">TX</span><span class="bs-sr">Texas: bell to bell</span></li><li class="pg-st is-bell" style="grid-column: 9; grid-row: 8;" title="Florida: bell to bell (K-8 only)"><span aria-hidden="true">FL</span><sup aria-hidden="true">*</sup><span class="bs-sr">Florida: bell to bell (K-8 only)</span></li></ul>
+<div><ul class="pg-key"><li><i class="is-bell" aria-hidden="true"></i><span><b>Bell to bell</b><span>No phone use for the whole school day</span></span><em>31</em></li><li><i class="is-class" aria-hidden="true"></i><span><b>Class time only</b><span>No phone use during instruction</span></span><em>8</em></li><li><i class="is-open" aria-hidden="true"></i><span><b>Restriction required, timing not set</b></span><em>2</em></li><li><i class="is-none" aria-hidden="true"></i><span><b>No restriction required</b><span>Some of these require a general phone policy</span></span><em>10</em></li></ul><p class="pg-note" style="margin-top: 22px;">* Florida, Hawaii and Illinois require it bell to bell in kindergarten through grade 8. Counts include D.C. Source: Education Week, updated October 26, 2026.</p><a class="pg-src" href="https://www.edweek.org/technology/which-states-ban-or-restrict-cellphones-in-schools/2024/06" target="_blank" rel="noopener">Education Week's tracker<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h10v10"></path><path d="M7 17 17 7"></path></svg><span class="bs-sr"> (opens in a new tab)</span></a></div>
+</div>
+</div>
+</section>
+<section class="bs-sec bs-band" aria-labelledby="h-three">
+<div class="bs-wrap">
+<h2 id="h-three" class="pg-h2">Three trackers, three counts</h2>
+<p class="pg-sub">They count different things, so the numbers differ. Each one is dated.</p>
+<div class="pg-three"><div><b>40+ and D.C.</b><p>states require districts to ban or restrict student phone use.</p><div class="pg-meta"><span>Education Week, Oct 26, 2026</span></div><a class="pg-src" href="https://www.edweek.org/technology/which-states-ban-or-restrict-cellphones-in-schools/2024/06" target="_blank" rel="noopener">See the tracker<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h10v10"></path><path d="M7 17 17 7"></path></svg><span class="bs-sr"> (opens in a new tab)</span></a></div><div><b>46</b><p>states have a law or policy on phones in K-12 schools. 37 of them ban or limit phones in class.</p><div class="pg-meta"><span>Ballotpedia, Oct 29, 2026</span></div><a class="pg-src" href="https://ballotpedia.org/State_policies_on_cellphone_use_in_K-12_public_schools" target="_blank" rel="noopener">See the tracker<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h10v10"></path><path d="M7 17 17 7"></path></svg><span class="bs-sr"> (opens in a new tab)</span></a></div><div><b>39</b><p>states, by UNESCO's count: 15 with statewide bans and 24 that require districts to adopt one.</p><div class="pg-meta"><span>UNESCO, Sept 18, 2026</span></div><a class="pg-src" href="https://www.unesco.org/gem-report/en/articles/phone-bans-schools-are-spreading-worldwide-policy-debate-rages" target="_blank" rel="noopener">Read the article<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h10v10"></path><path d="M7 17 17 7"></path></svg><span class="bs-sr"> (opens in a new tab)</span></a></div></div>
+</div>
+</section>
+<section class="bs-sec" aria-labelledby="h-grew">
+<div class="bs-wrap">
+<h2 id="h-grew" class="pg-h2">How fast it happened</h2>
+<ol class="pg-grew"><li><b>1</b><span>May 2023: Florida passes the first state law</span></li><li><b>20</b><span>Early 2025, by UNESCO's count</span></li><li><b>29</b><span>June 2025, by Ballotpedia's count</span></li><li><b>39</b><span>March to September 2026, by UNESCO's count</span></li><li><b>40+</b><span>October 2026, plus D.C., by Education Week's count</span></li></ol>
+<p class="pg-note">The trackers count in different ways, so the steps above compare roughly, not exactly. Laws change month to month: check a state's latest law before relying on it.</p>
+</div>
+</section>
+</main>
+<footer class="bs-foot">
+<div class="bs-wrap bs-foot-grid">
+<div class="bs-foot-brand"><a class="bs-brand" href="Main.dc.html#top" translate="no" aria-label="Bali, home"><svg width="30" height="30" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="24" fill="none" stroke="#BCDCCA" stroke-width="10"></circle><path d="M26.6 8.61A24 24 0 1 1 8.61 26.6" fill="none" stroke="#2C6F51" stroke-width="10" stroke-linecap="round"></path></svg><span>Bali</span></a></div>
+<nav aria-labelledby="f-about"><h2 id="f-about">About</h2><ul><li><a href="Main.dc.html#top">Home</a></li><li><a href="Main.dc.html#mission">Our mission</a></li><li><a href="Main.dc.html#how">How it works</a></li><li><a href="Main.dc.html#faq">Questions</a></li><li><a href="Main.dc.html#contact">Talk to us</a></li></ul></nav>
+<nav aria-labelledby="f-resources"><h2 id="f-resources">Resources</h2><ul><li><a href="Research.dc.html">Research</a></li><li><a href="Compare.dc.html">Compare</a></li><li><a href="PhoneLaws.dc.html">Phone laws by state</a></li><li><a href="https://bali-portal.vercel.app/support">Help</a></li></ul></nav>
+<nav aria-labelledby="f-guides"><h2 id="f-guides">Guides</h2><ul><li><a href="GuideFirstClass.dc.html">Run your first class</a></li><li><a href="GuideUnlock.dc.html">Emergency Unlock, explained</a></li><li><a href="GuideFamilies.dc.html">A note for families</a></li></ul></nav>
+<nav aria-labelledby="f-legal"><h2 id="f-legal">Legal</h2><ul><li><a href="https://bali-portal.vercel.app/privacy">Privacy policy</a></li><li><a href="https://bali-portal.vercel.app/terms">Terms of use</a></li><li><a href="Main.dc.html#privacy">Privacy at Bali</a></li></ul></nav>
+</div>
+<div class="bs-foot-bar"><div class="bs-wrap"><span translate="no">© 2026 Bali</span></div></div>
+</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2542}}'>
+class Component extends DCLogic {
+  renderVals() {
+    if (!this.uid) this.uid = 'pg' + Math.random().toString(36).slice(2, 9);
+    return { uid: this.uid };
+  }
+}
+</script>
+</body>
+</html>

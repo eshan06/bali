@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>A sample class taps in</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap">
+<style>
+body{margin:0}
+.hs{--k:1;position:relative;width:100%;max-width:620px;font-family:'Instrument Sans',-apple-system,'Segoe UI',sans-serif;color:#211F1B;-webkit-font-smoothing:antialiased}
+.hs *{box-sizing:border-box}
+.hs :where(p,ul,li){margin:0;padding:0}
+.hs ul{list-style:none}
+.hs-box{position:relative;width:calc(620px * var(--k));height:calc(560px * var(--k))}
+.hs-stage{position:absolute;left:0;top:0;width:620px;height:560px;transform:scale(var(--k));transform-origin:0 0}
+.hs-rings{position:absolute;left:-300px;top:-200px;pointer-events:none;-webkit-mask-image:radial-gradient(circle at 418px 294px,#000 150px,rgba(0,0,0,0) 360px);mask-image:radial-gradient(circle at 418px 294px,#000 150px,rgba(0,0,0,0) 360px)}
+.hs-block{position:absolute;left:70px;top:46px;width:96px;height:96px;border-radius:28px;background:#FFFFFF;box-shadow:0 0 0 1px #E3DFD8,0 14px 32px rgba(33,28,21,0.10),0 2px 6px rgba(33,28,21,0.06);display:flex;align-items:center;justify-content:center}
+.hs-ripple{position:absolute;left:70px;top:46px;width:96px;height:96px;border-radius:999px;border:2px solid #62A483;opacity:0;pointer-events:none}
+.hs-card{position:absolute;left:236px;top:46px;width:372px;height:384px;border-radius:18px;background:#FFFFFF;box-shadow:0 0 0 1px #E3DFD8,0 28px 64px rgba(33,28,21,0.12),0 4px 12px rgba(33,28,21,0.06)}
+.hs-head{position:absolute;left:16px;right:16px;top:16px;height:40px;display:flex;align-items:center;gap:10px}
+.hs-head svg{flex:none}
+.hs-title{flex:1;min-width:0;display:flex;flex-direction:column}
+.hs-cname{font-size:15px;line-height:20px;font-weight:600;white-space:nowrap}
+.hs-meta{display:grid;font-size:12.5px;line-height:17px;color:#6B665D;white-space:nowrap}
+.hs-meta > span{grid-area:1/1}
+.hs-livew{color:#245A43;font-weight:600}
+.hs-ended{opacity:0}
+.hs-count{font-family:ui-rounded,'SF Pro Rounded',-apple-system,'Instrument Sans',sans-serif;font-size:26px;line-height:30px;font-weight:600;letter-spacing:-0.01em;font-variant-numeric:tabular-nums}
+.hs-grid{position:absolute;left:16px;top:72px;display:grid;grid-template-columns:repeat(3,108px);gap:8px}
+.hs-tile{position:relative;width:108px;height:68px;border-radius:10px}
+.hs-t{position:absolute;inset:0;display:flex;align-items:flex-start;gap:6px;padding:9px 9px 9px 10px;border-radius:10px}
+.hs-t svg{flex:none;margin-top:1px}
+.hs-tx{display:flex;flex-direction:column;min-width:0}
+.hs-nm{font-size:13px;line-height:17px;font-weight:600;color:#211F1B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hs-st,.hs-dt{font-size:12px;line-height:16px;white-space:nowrap}
+.hs-t-not{background:#EFECE7;color:#524E47;box-shadow:inset 0 0 0 1px rgba(82,78,71,0.10)}
+.hs-t-on{background:#DCEDE3;color:#245A43;box-shadow:inset 0 0 0 1px rgba(36,90,67,0.16)}
+.hs-t-unl{background:#F7E6D2;color:#6F3F1B;box-shadow:inset 0 0 0 1px rgba(111,63,27,0.18)}
+.hs .is-off{opacity:0}
+.hs-sig{position:absolute;left:0;top:0;opacity:0;pointer-events:none}
+.hs-dot{position:absolute;left:0;top:0;width:10px;height:10px;border-radius:999px;background:#2C6F51;box-shadow:0 0 0 4px rgba(44,111,81,0.18);offset-path:path("M 184 216 C 226 216 256 172 300 150");offset-rotate:0deg;opacity:0;pointer-events:none}
+.hs-phone{position:absolute;left:37px;top:176px;width:162px;height:342px;transform-origin:50% 40%}
+.hs-pz{position:absolute;left:0;top:0;width:426px;transform:scale(0.38);transform-origin:0 0}
+.hs-bezel{position:relative;width:426px;padding:12px;border-radius:67px;background:#26241F;box-shadow:0 64px 120px rgba(33,28,21,0.24),0 14px 34px rgba(33,28,21,0.14)}
+.hs-screen{position:relative;width:402px;height:874px;border-radius:55px;overflow:hidden;background:#F7F5F2}
+.hs-scr{position:absolute;left:0;top:0;width:402px;height:874px}
+.hs-scr-home,.hs-scr-over{opacity:0}
+.hs-island{position:absolute;top:26px;left:50%;width:125px;height:37px;margin-left:-62.5px;border-radius:999px;background:#161513}
+.hs-pop{position:absolute;left:376px;top:420px;width:236px;display:flex;align-items:flex-start;gap:10px;padding:12px;border-radius:14px;background:#FFFFFF;box-shadow:0 0 0 1px #E3DFD8,0 10px 28px rgba(33,28,21,0.14),0 2px 6px rgba(33,28,21,0.06)}
+.hs-pop-ic{flex:none;width:32px;height:32px;border-radius:10px;background:#F7E6D2;color:#6F3F1B;display:flex;align-items:center;justify-content:center}
+.hs-pop-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.hs-pop-nm{font-size:13.5px;line-height:18px;font-weight:600}
+.hs-pop-mt{font-size:12.5px;line-height:17px;color:#5B564E}
+.hs-pop-act{margin-top:4px;font-size:12.5px;line-height:17px;font-weight:600;color:#8C4F1E}
+.hs-pop-x{flex:none;margin-top:1px;color:#6B665D}
+.hs-arrow{position:absolute;left:196px;top:410px;overflow:visible}
+.hs-locked{position:absolute;left:246px;top:446px;height:30px;display:inline-flex;align-items:center;gap:7px;padding:0 12px 0 10px;border-radius:999px;background:#DCEDE3;color:#18392B;font-size:12.5px;line-height:16px;font-weight:600;white-space:nowrap;box-shadow:0 0 0 1px #BCDCCA,0 6px 16px rgba(33,28,21,0.10)}
+.hs-locked svg{flex:none;color:#245A43}
+.hs-lab{position:absolute;top:8px;height:26px;display:inline-flex;align-items:center;padding:0 11px;border-radius:999px;background:#FFFFFF;box-shadow:0 0 0 1px #E3DFD8,0 1px 2px rgba(33,28,21,0.06);font-size:12px;line-height:16px;font-weight:600;color:#5B564E;white-space:nowrap}
+.hs-lab-block{left:118px;transform:translateX(-50%)}
+.hs-lab-card{left:236px}
+.hs-lab-phone{left:118px;top:528px;transform:translateX(-50%)}
+</style>
+</helmet>
+<div class="hs" data-hs="{{uid}}" role="img" aria-label="A sample class with Bali. A student taps their iPhone on the Bali block and their apps lock. On the teacher's screen each student's tile turns from Not here to Focused. One student uses Emergency Unlock, and at the bell the phone says class is over.">
+<div class="hs-box"><div class="hs-stage">
+
+<svg class="hs-rings" width="1220" height="960" viewBox="0 0 1220 960" aria-hidden="true"><g fill="none" stroke="#E3DFD8" stroke-width="1.5"><circle cx="418" cy="294" r="120"></circle><circle cx="418" cy="294" r="200"></circle><circle cx="418" cy="294" r="280"></circle><circle cx="418" cy="294" r="360"></circle></g></svg>
+
+<span class="hs-ripple hs-r1" aria-hidden="true"></span>
+<span class="hs-ripple hs-r2" aria-hidden="true"></span>
+<div class="hs-block" aria-hidden="true"><svg width="46" height="46" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="24" fill="none" stroke="#BCDCCA" stroke-width="10"></circle><path d="M26.6 8.61A24 24 0 1 1 8.61 26.6" fill="none" stroke="#2C6F51" stroke-width="10" stroke-linecap="round"></path></svg></div>
+
+<div class="hs-card" aria-hidden="true">
+<div class="hs-head"><svg width="34" height="34" viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="19.5" fill="none" stroke="#E3DFD8" stroke-width="5"></circle><circle cx="22" cy="22" r="19.5" fill="none" stroke="#2C6F51" stroke-width="5" stroke-linecap="round" stroke-dasharray="65 122.5" transform="rotate(-90 22 22)"></circle></svg><span class="hs-title"><span class="hs-cname">Algebra II, period 3</span><span class="hs-meta"><span class="hs-live"><b class="hs-livew">Live</b> · ends 10:45 AM</span><span class="hs-ended">Ended at 10:45 AM</span></span></span><span class="hs-count">26:41</span></div>
+<ul class="hs-grid">
+<sc-for list="{{tiles}}" as="t" hint-placeholder-count="12">
+<li class="hs-tile" data-i="{{t.i}}">
+<span class="hs-t hs-t-not"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle></svg><span class="hs-tx"><span class="hs-nm">{{t.name}}</span><span class="hs-st">Not here</span></span></span>
+<span class="{{t.onCls}}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg><span class="hs-tx"><span class="hs-nm">{{t.name}}</span><span class="hs-st">Focused</span></span></span>
+<sc-if value="{{t.unl}}" hint-placeholder-val="{{ false }}"><span class="hs-t hs-t-unl"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg><span class="hs-tx"><span class="hs-nm">{{t.name}}</span><span class="hs-st">Unlocked</span><span class="hs-dt">Bathroom</span></span></span></sc-if>
+</li>
+</sc-for>
+</ul>
+</div>
+
+<svg class="hs-sig" width="620" height="560" viewBox="0 0 620 560" aria-hidden="true"><path d="M 184 216 C 226 216 256 172 300 150" fill="none" stroke="#92C3A9" stroke-width="2" stroke-dasharray="3 5" stroke-linecap="round"></path></svg>
+<span class="hs-dot" aria-hidden="true"></span>
+
+<div class="hs-phone" aria-hidden="true"><div class="hs-pz"><div class="hs-bezel"><div class="hs-screen">
+<div class="hs-scr hs-scr-home"><dc-import name="AppHome" hint-size="402px,874px"></dc-import></div>
+<div class="hs-scr hs-scr-focus"><dc-import name="AppFocus" hint-size="402px,874px"></dc-import></div>
+<div class="hs-scr hs-scr-over"><dc-import name="AppSessionOver" hint-size="402px,874px"></dc-import></div>
+</div><span class="hs-island"></span></div></div></div>
+
+<div class="hs-pop" aria-hidden="true"><span class="hs-pop-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg></span><span class="hs-pop-tx"><span class="hs-pop-nm">Keisha T. used Emergency Unlock</span><span class="hs-pop-mt">Bathroom · 10:19 AM</span><span class="hs-pop-act">Open student</span></span><span class="hs-pop-x"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></span></div>
+
+<svg class="hs-arrow" width="56" height="60" viewBox="0 0 56 60" aria-hidden="true"><path class="hs-arrow-p" d="M50 51 C30 52 14 40 8 20" fill="none" stroke="#245A43" stroke-width="2.2" stroke-linecap="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="0"></path><path class="hs-arrow-h" d="M5.5 27.6 L8 20 L14.3 25" fill="none" stroke="#245A43" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg><span class="hs-locked" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>Ana's apps are locked</span>
+<span class="hs-lab hs-lab-block" aria-hidden="true">Bali block</span>
+<span class="hs-lab hs-lab-card" aria-hidden="true">The teacher's screen</span>
+<span class="hs-lab hs-lab-phone" aria-hidden="true">A student's iPhone</span>
+
+</div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"at":{"editor":null},"$preview":{"width":620,"height":560}}'>
+class Component extends DCLogic {
+  componentDidMount() {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+    const root = document.querySelector('[data-hs="' + this.uid + '"]');
+    if (!root) return;
+    // Scale the 620 × 560 scene to the width it is given.
+    const fit = () => {
+      const w = root.clientWidth;
+      if (w > 0) root.style.setProperty('--k', Math.min(1, w / 620).toFixed(4));
+    };
+    fit();
+    if (window.ResizeObserver) {
+      this.ro = new ResizeObserver(fit);
+      this.ro.observe(root);
+    } else {
+      this.onResize = fit;
+      window.addEventListener('resize', fit);
+    }
+    const at = this.props.at;
+    const pinned = at !== undefined && at !== null && at !== '';
+    const still = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    if (!root.animate || (still && !pinned)) return;
+    this.anims = this.build(root);
+    if (pinned) {
+      const t = Number(at) || 0;
+      this.anims.forEach((a) => { a.currentTime = t; a.pause(); });
+      return;
+    }
+    // Play only while the scene is on screen.
+    if (window.IntersectionObserver) {
+      this.io = new IntersectionObserver((es) => {
+        const on = es[es.length - 1].isIntersecting;
+        this.anims.forEach((a) => (on ? a.play() : a.pause()));
+      });
+      this.io.observe(root);
+    }
+  }
+  componentWillUnmount() {
+    if (this.ro) this.ro.disconnect();
+    if (this.onResize) window.removeEventListener('resize', this.onResize);
+    if (this.io) this.io.disconnect();
+    (this.anims || []).forEach((a) => a.cancel());
+  }
+  build(root) {
+    // One 16-second class: the tap at 1.2 s, the room fills in by 5.9 s, an unlock at 7.5 s, the bell at 12 s.
+    const T = 16000;
+    const E = 'cubic-bezier(0.2, 0, 0, 1)';
+    const out = [];
+    const run = (el, frames) => {
+      if (!el) return;
+      const fr = frames.map((f) => Object.assign({ offset: f[0] / T, easing: f[2] || E }, f[1]));
+      out.push(el.animate(fr, { duration: T, iterations: Infinity, fill: 'both' }));
+    };
+    const fade = (el, pts) => run(el, pts.map((p) => [p[0], { opacity: p[1] }]));
+    const q = (s) => root.querySelector(s);
+    const rest = 'translate(0px, 0px) rotate(0deg)';
+    const up = 'translate(4px, -34px) rotate(-5deg)';
+    run(q('.hs-phone'), [[0, { transform: rest }], [700, { transform: rest }], [1150, { transform: up }], [1500, { transform: up }], [1950, { transform: rest }], [T, { transform: rest }]]);
+    run(q('.hs-block'), [[0, { transform: 'scale(1)' }], [1120, { transform: 'scale(1)' }], [1240, { transform: 'scale(0.95)' }], [1480, { transform: 'scale(1)' }], [T, { transform: 'scale(1)' }]]);
+    const ripple = (el, d) => run(el, [[0, { transform: 'scale(1)', opacity: 0 }], [1150 + d, { transform: 'scale(1)', opacity: 0 }], [1210 + d, { transform: 'scale(1.06)', opacity: 0.85 }], [2350 + d, { transform: 'scale(2.9)', opacity: 0 }], [T, { transform: 'scale(2.9)', opacity: 0 }]]);
+    ripple(q('.hs-r1'), 0);
+    ripple(q('.hs-r2'), 240);
+    fade(q('.hs-scr-home'), [[0, 1], [1550, 1], [1850, 0], [14600, 0], [15100, 1], [T, 1]]);
+    fade(q('.hs-scr-focus'), [[0, 0], [1550, 0], [1850, 1], [12000, 1], [12300, 0], [T, 0]]);
+    // Right after the tap: an arrow and a pill point at Ana's phone, now locked.
+    run(q('.hs-arrow-p'), [[0, { strokeDashoffset: 1 }], [1950, { strokeDashoffset: 1 }], [2350, { strokeDashoffset: 0 }], [6800, { strokeDashoffset: 0 }], [7200, { strokeDashoffset: 0 }], [T, { strokeDashoffset: 1 }]]);
+    fade(q('.hs-arrow'), [[0, 1], [6800, 1], [7200, 0], [T - 1, 0], [T, 1]]);
+    fade(q('.hs-arrow-h'), [[0, 0], [2250, 0], [2350, 1], [6800, 1], [7200, 0], [T, 0]]);
+    run(q('.hs-locked'), [[0, { opacity: 0, transform: 'translateX(8px)' }], [2100, { opacity: 0, transform: 'translateX(8px)' }], [2400, { opacity: 1, transform: 'translateX(0px)' }], [6800, { opacity: 1, transform: 'translateX(0px)' }], [7200, { opacity: 0, transform: 'translateX(0px)' }], [T, { opacity: 0, transform: 'translateX(8px)' }]]);
+    fade(q('.hs-scr-over'), [[0, 0], [12000, 0], [12300, 1], [14600, 1], [15000, 0], [T, 0]]);
+    fade(q('.hs-sig'), [[0, 0], [1800, 0], [1950, 1], [2450, 1], [2750, 0], [T, 0]]);
+    const dot = q('.hs-dot');
+    if (dot && window.CSS && CSS.supports && CSS.supports('offset-path', 'path("M 0 0 L 10 10")')) {
+      run(dot, [[0, { offsetDistance: '0%', opacity: 0 }], [1820, { offsetDistance: '0%', opacity: 0 }], [1880, { offsetDistance: '0%', opacity: 1 }], [2520, { offsetDistance: '100%', opacity: 1 }], [2620, { offsetDistance: '100%', opacity: 0 }], [T, { offsetDistance: '100%', opacity: 0 }]]);
+    }
+    // Ana taps in first (her phone is the one shown), then ten more; Diego never does.
+    const at = { 0: 2600 };
+    [4, 9, 1, 7, 2, 10, 6, 3, 8, 5].forEach((idx, j) => { at[idx] = 3000 + j * 300; });
+    Array.prototype.slice.call(root.querySelectorAll('.hs-tile')).forEach((tile) => {
+      const t = at[Number(tile.getAttribute('data-i'))];
+      if (t === undefined) return;
+      fade(tile.querySelector('.hs-t-on'), [[0, 0], [t, 0], [t + 150, 1], [14600, 1], [15100, 0], [T, 0]]);
+      run(tile, [[0, { transform: 'scale(1)' }], [t, { transform: 'scale(1)' }], [t + 90, { transform: 'scale(0.94)' }], [t + 320, { transform: 'scale(1)' }], [T, { transform: 'scale(1)' }]]);
+    });
+    const k = q('.hs-tile[data-i="6"]');
+    if (k) {
+      fade(k.querySelector('.hs-t-unl'), [[0, 0], [7500, 0], [7650, 1], [14600, 1], [15100, 0], [T, 0]]);
+      // bali-softpulse: the glow ring swells and fades, 1.2 s, exactly twice.
+      const g0 = '0 0 0 0px rgba(219, 147, 71, 0)';
+      const g1 = '0 0 0 6px rgba(219, 147, 71, 0.35)';
+      run(k, [[0, { boxShadow: g0 }], [7650, { boxShadow: g0 }], [8250, { boxShadow: g1 }], [8850, { boxShadow: g0 }], [9450, { boxShadow: g1 }], [10050, { boxShadow: g0 }], [T, { boxShadow: g0 }]]);
+    }
+    run(q('.hs-pop'), [[0, { opacity: 0, transform: 'translateY(10px)' }], [7700, { opacity: 0, transform: 'translateY(10px)' }], [8000, { opacity: 1, transform: 'translateY(0px)' }], [11800, { opacity: 1, transform: 'translateY(0px)' }], [12100, { opacity: 0, transform: 'translateY(0px)' }], [T, { opacity: 0, transform: 'translateY(10px)' }]]);
+    fade(q('.hs-grid'), [[0, 1], [12000, 1], [12300, 0.45], [14600, 0.45], [15100, 1], [T, 1]]);
+    fade(q('.hs-live'), [[0, 1], [12000, 1], [12300, 0], [14600, 0], [15100, 1], [T, 1]]);
+    fade(q('.hs-ended'), [[0, 0], [12000, 0], [12300, 1], [14600, 1], [15100, 0], [T, 0]]);
+    fade(q('.hs-count'), [[0, 1], [12000, 1], [12300, 0], [14600, 0], [15100, 1], [T, 1]]);
+    return out;
+  }
+  renderVals() {
+    if (!this.uid) this.uid = 'hs' + Math.random().toString(36).slice(2, 9);
+    const names = ['Ana R.', 'Marcus B.', 'Priya N.', 'Jaylen B.', 'Sofia M.', 'Tomás H.', 'Keisha T.', 'Wei Z.', 'Amara O.', 'Liam O.', 'Fatima A.', 'Diego R.'];
+    return {
+      uid: this.uid,
+      tiles: names.map((name, i) => ({ i: i, name: name, onCls: 'hs-t hs-t-on' + (i === 11 ? ' is-off' : ''), unl: i === 6 })),
+    };
+  }
+}
+</script>
+</body>
+</html>

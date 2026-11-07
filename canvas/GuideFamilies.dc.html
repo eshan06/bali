@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A note for families</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="v2.css">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap">
+<style>
+body{margin:0;background:#F7F5F2}
+.pg-hero{padding:64px 0 88px}
+.pg-hero .bs-wrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:56px;align-items:center}
+.pg-eyebrow{font-size:13px;line-height:18px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--brand)}
+.pg-h1{margin-top:14px;font-size:clamp(40px,2.4vw + 28px,64px);line-height:1.05;font-weight:600;letter-spacing:-0.03em;text-wrap:balance}
+.pg-lead{margin-top:20px;max-width:30em;font-size:20px;line-height:31px;color:var(--ink2);text-wrap:pretty}
+.pg-art{min-width:0}
+.pg-art > *{width:100%;min-width:0}
+@media (max-width:959px){.pg-hero{padding:40px 0 64px}.pg-hero .bs-wrap{grid-template-columns:minmax(0,1fr);gap:36px}}
+@media (max-width:639px){.pg-lead{font-size:18px;line-height:28px}}
+.pg-h2{font-size:clamp(30px,1.6vw + 22px,44px);line-height:1.1;font-weight:600;letter-spacing:-0.025em;text-wrap:balance;max-width:20em}
+.pg-sub{margin-top:14px;max-width:36em;font-size:18px;line-height:28px;color:var(--ink2);text-wrap:pretty}
+
+.pg-steps{margin-top:56px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:56px 56px}
+.pg-step-n{display:block;margin-left:-4px;font-size:120px;line-height:0.76;font-weight:600;letter-spacing:-0.06em;color:#DCEDE3;font-variant-numeric:tabular-nums;user-select:none}
+.pg-step h3{margin-top:20px;font-size:24px;line-height:30px;font-weight:600;letter-spacing:-0.02em}
+.pg-step p{margin-top:10px;max-width:24em;font-size:17px;line-height:27px;color:var(--ink2);text-wrap:pretty}
+@media (max-width:959px){.pg-steps{grid-template-columns:minmax(0,1fr);gap:44px}.pg-step-n{font-size:92px}}
+.pg-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;margin-top:40px}
+.pg-card{padding:30px 30px 32px;border-radius:20px;background:#FFFFFF;box-shadow:inset 0 0 0 1px var(--line)}
+.pg-card h3{font-size:22px;line-height:28px;font-weight:600;letter-spacing:-0.015em}
+.pg-card p{margin-top:10px;font-size:17px;line-height:27px;color:var(--ink2);text-wrap:pretty}
+.pg-ic{width:44px;height:44px;margin-bottom:18px;border-radius:12px;background:#F0F7F3;color:var(--brand);display:flex;align-items:center;justify-content:center}
+@media (max-width:899px){.pg-pair{grid-template-columns:minmax(0,1fr)}}
+.pg-phone{position:relative;width:298px;height:629px;margin:0 auto}
+.pg-phone > .bs-bezel{position:absolute;left:0;top:0;transform:scale(0.7);transform-origin:0 0}
+@media (max-width:639px){.pg-phone{width:234px;height:494px}.pg-phone > .bs-bezel{transform:scale(0.55)}}
+
+.pg-letter-grid{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:48px;align-items:start}
+.pg-letter{padding:44px 48px 46px;border-radius:22px;background:#FFFFFF;box-shadow:0 0 0 1px rgba(33,28,21,0.06),0 30px 70px rgba(33,28,21,0.08),0 6px 16px rgba(33,28,21,0.04)}
+.pg-letter p{font-size:18px;line-height:30px;color:var(--ink);text-wrap:pretty}
+.pg-letter p + p{margin-top:18px}
+.pg-fill{display:inline-block;padding:0 8px;border-radius:6px;background:#F0F7F3;color:var(--brand);font-weight:600}
+.pg-faq{display:flex;flex-direction:column;gap:16px}
+.pg-faq h3{font-size:18px;line-height:26px;font-weight:600}
+.pg-faq p{margin-top:6px;font-size:16px;line-height:25px;color:var(--ink2)}
+.pg-faq > div{padding:24px 26px 26px;border-radius:18px;background:#FFFFFF;box-shadow:inset 0 0 0 1px var(--line)}
+.pg-kicker{font-size:13px;line-height:18px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink3)}
+@media (max-width:959px){.pg-letter-grid{grid-template-columns:minmax(0,1fr)}.pg-letter{padding:32px 26px 34px}}
+</style>
+</helmet>
+<div class="bs" id="top" data-bs="{{uid}}">
+<a class="bs-skip" href="#main">Skip to content</a>
+<header class="bs-top">
+<div class="bs-wrap">
+<a class="bs-brand" href="Main.dc.html" translate="no" aria-label="Bali, home"><svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="24" fill="none" stroke="#BCDCCA" stroke-width="10"></circle><path d="M26.6 8.61A24 24 0 1 1 8.61 26.6" fill="none" stroke="#2C6F51" stroke-width="10" stroke-linecap="round"></path></svg><span>Bali</span></a>
+<nav class="bs-nav" aria-label="Sections"><a href="Main.dc.html#how">How it works</a><a href="Main.dc.html#teachers">For teachers</a><a href="Main.dc.html#students">For students</a><a href="Main.dc.html#privacy">Privacy</a><a href="Main.dc.html#faq">Questions</a><a href="GuideFirstClass.dc.html">Guides</a></nav>
+<div class="bs-end"><a class="bs-btn bs-btn-s" href="https://bali-portal.vercel.app/login">Sign in</a><a class="bs-btn bs-btn-p" href="Main.dc.html#contact">Talk to us</a></div>
+</div>
+</header>
+<main id="main">
+<section class="pg-hero" aria-labelledby="h-page" style="padding-bottom: 56px;">
+<div class="bs-wrap" style="grid-template-columns: minmax(0,1fr);">
+<div>
+<p class="pg-eyebrow">Guide</p>
+<h1 id="h-page" class="pg-h1">A note for families.</h1>
+<p class="pg-lead">A short letter a teacher can send home before the first class with Bali. The highlighted parts are the ones to fill in.</p>
+</div>
+</div>
+</section>
+<section class="bs-sec" style="padding-top: 0;" aria-label="The letter">
+<div class="bs-wrap pg-letter-grid">
+<article class="pg-letter"><p>Dear families,</p><p>This term, <span class="pg-fill">the class</span> uses Bali during class time. When class starts, each student taps their phone on the Bali block in the classroom, and their apps lock until the bell. Students keep their phones the whole time.</p><p>Calls, texts and emergency calls always work. A student can open their apps at any time with Emergency Unlock: they hold one button for one second, and saying why is optional. The teacher sees that the unlock happened, and when.</p><p>Bali never sees a student's screen, messages, location or apps. During class, the teacher sees who is focused, when each student taps in or unlocks, and the reason if they share one. Answers to class questions only count toward the class's totals.</p><p>When the bell rings, every app comes back on its own.</p><p>Families with questions can reply to this note.</p><p><span class="pg-fill">The teacher's name</span></p></article>
+<aside class="pg-faq" aria-labelledby="h-asks"><p id="h-asks" class="pg-kicker">What families often ask</p><div><h3>Can a student reach home during class?</h3><p>Yes. Calls and texts always work, and Emergency Unlock opens every app in one second.</p></div><div><h3>Does Bali see a student's location?</h3><p>No. Bali never sees a student's location, screen, messages or apps.</p></div><div><h3>What does the teacher see?</h3><p>Who is focused, when each student taps in or unlocks, and the reason if they share one.</p></div></aside>
+</div>
+</section>
+</main>
+<footer class="bs-foot">
+<div class="bs-wrap bs-foot-grid">
+<div class="bs-foot-brand"><a class="bs-brand" href="Main.dc.html#top" translate="no" aria-label="Bali, home"><svg width="30" height="30" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="24" fill="none" stroke="#BCDCCA" stroke-width="10"></circle><path d="M26.6 8.61A24 24 0 1 1 8.61 26.6" fill="none" stroke="#2C6F51" stroke-width="10" stroke-linecap="round"></path></svg><span>Bali</span></a></div>
+<nav aria-labelledby="f-about"><h2 id="f-about">About</h2><ul><li><a href="Main.dc.html#top">Home</a></li><li><a href="Main.dc.html#mission">Our mission</a></li><li><a href="Main.dc.html#how">How it works</a></li><li><a href="Main.dc.html#faq">Questions</a></li><li><a href="Main.dc.html#contact">Talk to us</a></li></ul></nav>
+<nav aria-labelledby="f-resources"><h2 id="f-resources">Resources</h2><ul><li><a href="Research.dc.html">Research</a></li><li><a href="Compare.dc.html">Compare</a></li><li><a href="PhoneLaws.dc.html">Phone laws by state</a></li><li><a href="https://bali-portal.vercel.app/support">Help</a></li></ul></nav>
+<nav aria-labelledby="f-guides"><h2 id="f-guides">Guides</h2><ul><li><a href="GuideFirstClass.dc.html">Run your first class</a></li><li><a href="GuideUnlock.dc.html">Emergency Unlock, explained</a></li><li><a href="GuideFamilies.dc.html">A note for families</a></li></ul></nav>
+<nav aria-labelledby="f-legal"><h2 id="f-legal">Legal</h2><ul><li><a href="https://bali-portal.vercel.app/privacy">Privacy policy</a></li><li><a href="https://bali-portal.vercel.app/terms">Terms of use</a></li><li><a href="Main.dc.html#privacy">Privacy at Bali</a></li></ul></nav>
+</div>
+<div class="bs-foot-bar"><div class="bs-wrap"><span translate="no">© 2026 Bali</span></div></div>
+</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2200}}'>
+class Component extends DCLogic {
+  renderVals() {
+    if (!this.uid) this.uid = 'pg' + Math.random().toString(36).slice(2, 9);
+    return { uid: this.uid };
+  }
+}
+</script>
+</body>
+</html>

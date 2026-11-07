@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>How a class starts, step by step</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap">
+<style>
+body{margin:0}
+.st{--k:1;position:relative;width:100%;max-width:1160px;font-family:'Instrument Sans',-apple-system,'Segoe UI',sans-serif;color:#211F1B;-webkit-font-smoothing:antialiased}
+.st *{box-sizing:border-box}
+.st :where(p,ol,ul,li,h3){margin:0;padding:0}
+.st-box{position:relative;width:calc(1160px * var(--k));height:calc(450px * var(--k))}
+.st-stage{position:absolute;left:0;top:0;width:1160px;height:450px;transform:scale(var(--k));transform-origin:0 0}
+.st-win{position:absolute;left:0;top:14px;width:600px;height:420px;border-radius:22px;background:#FFFFFF;overflow:hidden;box-shadow:0 0 0 1px rgba(33,28,21,0.06),0 34px 80px rgba(33,28,21,0.14),0 6px 16px rgba(33,28,21,0.06)}
+.st-head{display:flex;align-items:center;gap:14px;padding:22px 26px 18px;border-bottom:1px solid #EFECE7}
+.st-head .t{font-size:19px;line-height:24px;font-weight:600}
+.st-head .s{font-size:14px;line-height:20px;color:#6B665D}
+.st-head .r{margin-left:auto;text-align:right}
+.st-time{font-size:28px;line-height:30px;font-weight:600;letter-spacing:-0.02em;font-variant-numeric:tabular-nums}
+.st-view{position:absolute;left:0;right:0;top:90px;bottom:0}
+.st-start{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;opacity:0}
+.st-start p{font-size:16px;line-height:24px;color:#5B564E}
+.st-go{display:inline-flex;align-items:center;justify-content:center;gap:10px;height:56px;padding:0 30px;border-radius:12px;background:#245A43;color:#FFFFFF;font-size:18px;line-height:24px;font-weight:600}
+.st-grid{position:absolute;left:24px;right:24px;top:18px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;list-style:none}
+.st-tile{position:relative;height:64px;border-radius:10px}
+.st-tile > span{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;gap:2px;padding:0 12px 0 34px;border-radius:10px}
+.st-tile b{font-size:14px;line-height:18px;font-weight:600;white-space:nowrap}
+.st-tile i{font-style:normal;font-size:12px;line-height:16px}
+.st-tile svg{position:absolute;left:11px;top:50%;margin-top:-8px}
+.st-off{background:#EFECE7;color:#6B665D}
+.st-off b{color:#524E47}
+.st-on{background:#DCEDE3;color:#245A43}
+.st-on b{color:#18392B}
+.st-new{opacity:1}
+.st-cursor{position:absolute;left:0;top:0;width:26px;height:26px;transform:translate(470px, 380px);filter:drop-shadow(0 2px 3px rgba(0,0,0,0.25))}
+.st-block{position:absolute;left:636px;top:150px;width:290px}
+.st-block > *{width:100%;min-width:0}
+.st-phone{position:absolute;left:968px;top:40px;width:166px;height:350px;transform-origin:83px 8px}
+.st-bezel{position:absolute;left:0;top:0;width:426px;padding:12px;border-radius:67px;background:#26241F;transform:scale(0.39);transform-origin:0 0;box-shadow:0 50px 100px rgba(33,28,21,0.28),0 10px 24px rgba(33,28,21,0.14)}
+.st-screen{position:relative;width:402px;height:874px;border-radius:55px;overflow:hidden;background:#F7F5F2}
+.st-screen > div{position:absolute;inset:0}
+.st-home{opacity:0}
+.st-island{position:absolute;top:26px;left:50%;width:125px;height:37px;margin-left:-62.5px;border-radius:999px;background:#161513}
+.st-steps{margin-top:22px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;list-style:none}
+.st-step{display:flex;gap:12px;align-items:flex-start;padding:16px 16px 18px;border-radius:16px;background:#FFFFFF;box-shadow:inset 0 0 0 1px #E3DFD8;opacity:0.45}
+.st-n{flex:none;width:30px;height:30px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:14px;line-height:20px;font-weight:600;background:#EFECE7;color:#5B564E}
+.st-step b{display:block;font-size:16px;line-height:22px;font-weight:600}
+.st-step .st-d{display:block;margin-top:3px;font-size:14px;line-height:20px;color:#5B564E}
+@media (max-width:759px){.st-steps{grid-template-columns:minmax(0,1fr)}}
+</style>
+</helmet>
+<div class="st" data-st="{{uid}}">
+<div class="st-box" role="img" aria-label="How a class starts: the teacher presses Start class in the portal, a student holds the top of their phone near the Bali block, and every tile on the teacher's grid turns to Focused.">
+<div class="st-stage" aria-hidden="true">
+<div class="st-win">
+<div class="st-head"><svg width="34" height="34" viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="19.5" fill="none" stroke="#E3DFD8" stroke-width="5"></circle><circle cx="22" cy="22" r="19.5" fill="none" stroke="#2C6F51" stroke-width="5" stroke-linecap="round" stroke-dasharray="110 122.5" transform="rotate(-90 22 22)"></circle></svg><div><p class="t">Algebra II, period 3</p><p class="s">Ms. Rivera</p></div><div class="r"><p class="st-time">30:00</p></div></div>
+<div class="st-view st-live">
+<ul class="st-grid">
+<sc-for list="{{tiles}}" as="t" hint-placeholder-count="12">
+<li class="st-tile" data-i="{{t.i}}"><span class="st-off"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle></svg><b>{{t.name}}</b><i>Not here</i></span><span class="st-on"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg><b>{{t.name}}</b><i>Focused</i></span></li>
+</sc-for>
+</ul>
+</div>
+<div class="st-view st-start"><p>28 students in this class</p><span class="st-go"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"></path></svg>Start class</span></div>
+<svg class="st-cursor" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3l14 7.5-6.2 1.6L10 18.5z" fill="#211F1B" stroke="#FFFFFF" stroke-width="1.6" stroke-linejoin="round"></path></svg>
+</div>
+<div class="st-block"><dc-import name="BaliBlock" hint-size="560px,355px"></dc-import></div>
+<div class="st-phone">
+<div class="st-bezel"><div class="st-screen">
+<div class="st-focus"><dc-import name="AppFocus" hint-size="402px,874px"></dc-import></div>
+<div class="st-home"><dc-import name="AppHome" hint-size="402px,874px"></dc-import></div>
+</div><span class="st-island"></span></div>
+</div>
+</div>
+</div>
+<ol class="st-steps">
+<li class="st-step"><span class="st-n" aria-hidden="true">1</span><span><b>Start class</b><span class="st-d">The teacher starts the session in the portal.</span></span></li>
+<li class="st-step"><span class="st-n" aria-hidden="true">2</span><span><b>Tap the block</b><span class="st-d">Each student holds the top of their phone near the Bali block.</span></span></li>
+<li class="st-step"><span class="st-n" aria-hidden="true">3</span><span><b>The room fills in</b><span class="st-d">Apps lock, and every tile turns to Focused.</span></span></li>
+</ol>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"at":{"editor":null},"$preview":{"width":1160,"height":580}}'>
+class Component extends DCLogic {
+  componentDidMount() {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+    const root = document.querySelector('[data-st="' + this.uid + '"]');
+    if (!root) return;
+    const fit = () => {
+      const w = root.clientWidth;
+      if (w > 0) root.style.setProperty('--k', Math.min(1, w / 1160).toFixed(4));
+    };
+    fit();
+    if (window.ResizeObserver) {
+      this.ro = new ResizeObserver(fit);
+      this.ro.observe(root);
+    }
+    const at = this.props.at;
+    const pinned = at !== undefined && at !== null && at !== '';
+    const still = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    if (!root.animate || (still && !pinned)) {
+      Array.prototype.forEach.call(root.querySelectorAll('.st-step'), (el) => { el.style.opacity = '1'; });
+      return;
+    }
+    this.t0 = setTimeout(() => {
+      this.anims = this.build(root);
+      if (pinned) {
+        const t = Number(at) || 0;
+        this.anims.forEach((a) => { a.currentTime = t; a.pause(); });
+        return;
+      }
+      if (window.IntersectionObserver) {
+        this.io = new IntersectionObserver((es) => {
+          const on = es[es.length - 1].isIntersecting;
+          this.anims.forEach((a) => (on ? a.play() : a.pause()));
+        });
+        this.io.observe(root);
+      }
+    }, 60);
+  }
+  componentWillUnmount() {
+    clearTimeout(this.t0);
+    if (this.ro) this.ro.disconnect();
+    if (this.io) this.io.disconnect();
+    (this.anims || []).forEach((a) => a.cancel());
+  }
+  build(root) {
+    // One 11-second start: the teacher starts class, a student taps in, and the room fills in.
+    const T = 11000;
+    const E = 'cubic-bezier(0.3, 0, 0.2, 1)';
+    const out = [];
+    const run = (el, frames) => {
+      if (!el) return;
+      const fr = frames.map((f) => Object.assign({ offset: f[0] / T, easing: f[2] || E }, f[1]));
+      out.push(el.animate(fr, { duration: T, iterations: Infinity, fill: 'both' }));
+    };
+    const q = (s) => root.querySelector(s);
+    const all = (s) => Array.prototype.slice.call(root.querySelectorAll(s));
+    const fade = (el, pts) => run(el, pts.map((p) => [p[0], { opacity: p[1] }]));
+    // Step 1: the cursor presses Start class, and the live grid opens with every tile Not here.
+    run(q('.st-cursor'), [[0, { transform: 'translate(470px, 380px) scale(1)', opacity: 0 }], [200, { transform: 'translate(470px, 380px) scale(1)', opacity: 1 }], [1300, { transform: 'translate(318px, 262px) scale(1)', opacity: 1 }], [1420, { transform: 'translate(318px, 262px) scale(0.86)', opacity: 1 }], [1560, { transform: 'translate(318px, 262px) scale(1)', opacity: 1 }], [2100, { transform: 'translate(318px, 262px) scale(1)', opacity: 0 }], [T, { transform: 'translate(318px, 262px) scale(1)', opacity: 0 }]]);
+    run(q('.st-go'), [[0, { transform: 'scale(1)' }], [1400, { transform: 'scale(1)' }], [1480, { transform: 'scale(0.96)' }], [1600, { transform: 'scale(1)' }], [T, { transform: 'scale(1)' }]]);
+    fade(q('.st-start'), [[0, 1], [1600, 1], [1900, 0], [10300, 0], [10700, 1], [T, 1]]);
+    fade(q('.st-live'), [[0, 0], [1600, 0], [1900, 1], [10300, 1], [10700, 0], [T, 0]]);
+    // Step 2: a student's phone, on the app's Home screen, taps the block and locks.
+    const rest = 'translate(0px, 0px) rotate(0deg)';
+    const away = 'translate(40px, 0px) rotate(0deg)';
+    const tap = 'translate(-266px, 128px) rotate(-20deg)';
+    run(q('.st-phone'), [[0, { opacity: 0, transform: away }], [2200, { opacity: 0, transform: away }], [2700, { opacity: 1, transform: rest }], [3400, { opacity: 1, transform: rest }], [4400, { opacity: 1, transform: tap }], [5000, { opacity: 1, transform: tap }], [6000, { opacity: 1, transform: rest }], [9800, { opacity: 1, transform: rest }], [10300, { opacity: 0, transform: away }], [T, { opacity: 0, transform: away }]]);
+    fade(q('.st-home'), [[0, 1], [4550, 1], [4850, 0], [10300, 0], [10500, 1], [T, 1]]);
+    // The block ripples at the tap, then again as the rest of the class taps in.
+    const pulses = [4450, 6000, 7100, 8200];
+    all('.bb-ring').forEach((el, i) => {
+      const fr = [[0, { opacity: 0, transform: 'scale(1)' }]];
+      pulses.forEach((p) => {
+        const t = p + i * 230;
+        fr.push([t, { opacity: 0, transform: 'scale(1)' }], [t + 60, { opacity: 0.8, transform: 'scale(1.02)' }], [t + 950, { opacity: 0, transform: 'scale(1.5)' }], [t + 960, { opacity: 0, transform: 'scale(1)' }]);
+      });
+      fr.push([T, { opacity: 0, transform: 'scale(1)' }]);
+      run(el, fr);
+    });
+    // Step 3: the room fills in, one tap at a time.
+    all('.st-tile').forEach((el, i) => {
+      const t = i === 0 ? 4700 : 6000 + (i - 1) * 300;
+      fade(el.querySelector('.st-on'), [[0, 0], [t, 0], [t + 160, 1], [10300, 1], [10700, 0], [T, 0]]);
+    });
+    // The three steps light up in turn.
+    const win = [[0, 2300], [2300, 5900], [5900, 10200]];
+    all('.st-step').forEach((el, i) => {
+      const [a, b] = win[i];
+      const pts = [[0, { opacity: i === 0 ? 1 : 0.45 }]];
+      if (a > 0) pts.push([a - 1, { opacity: 0.45 }], [a + 200, { opacity: 1 }]);
+      pts.push([b, { opacity: 1 }], [b + 200, { opacity: 0.45 }]);
+      if (i === 0) pts.push([T - 300, { opacity: 0.45 }]);
+      pts.push([T, { opacity: i === 0 ? 1 : 0.45 }]);
+      run(el, pts.filter((p, k, arr) => k === 0 || p[0] > arr[k - 1][0]));
+      const n = el.querySelector('.st-n');
+      const on = { backgroundColor: '#245A43', color: '#FFFFFF' };
+      const off = { backgroundColor: '#EFECE7', color: '#5B564E' };
+      const npts = [[0, i === 0 ? on : off]];
+      if (a > 0) npts.push([a - 1, off], [a + 200, on]);
+      npts.push([b, on], [b + 200, off]);
+      if (i === 0) npts.push([T - 300, off]);
+      npts.push([T, i === 0 ? on : off]);
+      run(n, npts.filter((p, k, arr) => k === 0 || p[0] > arr[k - 1][0]));
+    });
+    return out;
+  }
+  renderVals() {
+    if (!this.uid) this.uid = 'st' + Math.random().toString(36).slice(2, 9);
+    const names = ['Ana R.', 'Marcus B.', 'Priya N.', 'Jaylen B.', 'Sofia M.', 'Tomás H.', 'Keisha T.', 'Wei Z.', 'Amara O.', 'Liam O.', 'Fatima A.', 'Diego R.'];
+    return { uid: this.uid, tiles: names.map((name, i) => ({ i: i, name: name })) };
+  }
+}
+</script>
+</body>
+</html>

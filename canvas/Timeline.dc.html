@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>How it works: one class, start to bell</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap">
+<style>
+body{margin:0}
+.tl{width:100%;font-family:'Instrument Sans',-apple-system,'Segoe UI',sans-serif;color:#211F1B;-webkit-font-smoothing:antialiased}
+.tl *{box-sizing:border-box}
+.tl :where(p,h3,ol,li){margin:0;padding:0}
+.tl ol{list-style:none}
+.tl-card{border-radius:28px;background:#FFFFFF;box-shadow:inset 0 0 0 1px #E3DFD8,0 30px 70px rgba(33,28,21,0.07),0 2px 6px rgba(33,28,21,0.04);padding:36px 40px 40px}
+.tl-chart{display:grid;grid-template-columns:104px minmax(0,1fr);column-gap:20px}
+.tl-names{display:flex;flex-direction:column;padding-top:34px}
+.tl-name{height:34px;display:flex;align-items:center;font-size:13.5px;line-height:18px;font-weight:600;color:#5B564E;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tl-plot{position:relative;min-width:0}
+.tl-pins{position:relative;height:34px}
+.tl-pin{position:absolute;top:2px;width:26px;height:26px;margin-left:-13px;border-radius:999px;background:#FFFFFF;color:#245A43;box-shadow:inset 0 0 0 1.5px #245A43;font-size:12.5px;line-height:26px;font-weight:600;text-align:center;font-variant-numeric:tabular-nums}
+.tl-row{position:relative;height:34px}
+.tl-seg{position:absolute;top:16px;height:2px;border-radius:2px}
+.tl-on{background:#2C6F51}
+.tl-unl{top:15px;height:4px;background:#DB9347}
+.tl-not{height:0;border-top:2px dashed #D2CCC2;border-radius:0}
+.tl-dot{position:absolute;top:12px;width:10px;height:10px;margin-left:-5px;border-radius:999px;background:#2C6F51;box-shadow:0 0 0 3px #FFFFFF}
+.tl-ring{position:absolute;top:10px;width:14px;height:14px;margin-left:-7px;border-radius:999px;background:#FFFFFF}
+.tl-ring-o{box-shadow:inset 0 0 0 3px #C97A2D}
+.tl-ring-g{box-shadow:inset 0 0 0 3px #2C6F51}
+.tl-axis{position:relative;height:30px;margin-top:6px}
+.tl-axis span{position:absolute;top:8px;transform:translateX(-50%);font-size:12px;line-height:16px;color:#6B665D;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tl-edge{position:absolute;top:34px;bottom:36px;width:1px;margin-left:-0.5px;background:#D2CCC2}
+.tl-clip{position:absolute;left:0;right:0;top:34px;bottom:36px;overflow:hidden;pointer-events:none}
+.tl-veil{position:absolute;left:0;top:0;bottom:0;width:100%;background:rgba(255,255,255,0.84);opacity:0}
+.tl-head{position:absolute;left:0;top:30px;bottom:36px;width:100%;opacity:0;pointer-events:none}
+.tl-line{position:absolute;left:-1px;top:0;bottom:0;width:2px;border-radius:2px;background:#245A43}
+.tl-knob{position:absolute;left:-5px;top:-4px;width:10px;height:10px;border-radius:999px;background:#245A43}
+.tl-legend{margin-top:14px;padding-left:124px;display:flex;flex-wrap:wrap;gap:8px 22px;font-size:13px;line-height:18px;color:#5B564E}
+.tl-key{display:inline-flex;align-items:center;gap:8px}
+.tl-key i{display:inline-block;width:22px;height:0;border-top:2px solid #2C6F51}
+.tl-key i.k-unl{border-top:4px solid #DB9347;border-radius:2px}
+.tl-key i.k-not{border-top:2px dashed #D2CCC2}
+.tl-moments{margin-top:28px;padding-top:28px;border-top:1px solid #E3DFD8;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:28px}
+.tl-m{display:flex;flex-direction:column;gap:6px;margin:-14px -16px;padding:14px 16px;border-radius:16px}
+.tl-mh{display:flex;align-items:center;gap:10px}
+.tl-num{flex:none;width:24px;height:24px;border-radius:999px;background:#DCEDE3;color:#245A43;font-size:12.5px;line-height:24px;font-weight:600;text-align:center}
+.tl-when{font-size:13px;line-height:18px;font-weight:600;color:#6B665D;font-variant-numeric:tabular-nums}
+.tl-mt{margin-top:6px;font-size:17px;line-height:24px;font-weight:600;letter-spacing:-0.005em}
+.tl-mx{font-size:15px;line-height:23px;color:#5B564E;text-wrap:pretty}
+@media (max-width:899px){.tl-card{padding:28px 24px 32px}.tl-moments{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:32px}.tl-legend{padding-left:0}}
+@media (max-width:599px){.tl-card{padding:22px 16px 26px;border-radius:22px}.tl-chart{grid-template-columns:58px minmax(0,1fr);column-gap:12px}.tl-name{font-size:12px}.tl-axis span.tl-minor{display:none}.tl-pin{width:22px;height:22px;margin-left:-11px;font-size:11.5px;line-height:22px}.tl-pin1{margin-left:-21px}.tl-pin2{margin-left:1px}.tl-moments{grid-template-columns:minmax(0,1fr);row-gap:24px}}
+</style>
+</helmet>
+<div class="tl" data-tl="{{uid}}">
+<div class="tl-card">
+
+<div class="tl-chart" role="img" aria-label="A sample 30-minute class, 10:15 to 10:45 AM. Six students tap in between 10:15 and 10:22. One unlocks at 10:31 and locks again at 10:35. At 10:45 every app opens.">
+<div class="tl-names" aria-hidden="true"><span class="tl-name">Ana R.</span><span class="tl-name">Marcus B.</span><span class="tl-name">Priya N.</span><span class="tl-name">Jaylen B.</span><span class="tl-name">Sofia M.</span><span class="tl-name">Wei Z.</span></div>
+<div class="tl-plot" aria-hidden="true">
+<div class="tl-pins"><span class="tl-pin tl-pin1" style="left: 0%;">1</span><span class="tl-pin tl-pin2" style="left: 5%;">2</span><span class="tl-pin tl-pin3" style="left: 53.333%;">3</span><span class="tl-pin tl-pin4" style="left: 100%;">4</span></div>
+<span class="tl-edge" style="left: 0%;"></span><span class="tl-edge" style="left: 100%;"></span>
+<div class="tl-rows">
+<div class="tl-row"><span class="tl-seg tl-not" style="left: 0%; width: 3.333%;"></span><span class="tl-seg tl-on" style="left: 3.333%; width: 96.667%;"></span><span class="tl-dot" style="left: 3.333%;"></span></div>
+<div class="tl-row"><span class="tl-seg tl-not" style="left: 0%; width: 1.667%;"></span><span class="tl-seg tl-on" style="left: 1.667%; width: 51.666%;"></span><span class="tl-seg tl-unl" style="left: 53.333%; width: 13.334%;"></span><span class="tl-seg tl-on" style="left: 66.667%; width: 33.333%;"></span><span class="tl-dot" style="left: 1.667%;"></span><span class="tl-ring tl-ring-o" style="left: 53.333%;"></span><span class="tl-ring tl-ring-g" style="left: 66.667%;"></span></div>
+<div class="tl-row"><span class="tl-seg tl-not" style="left: 0%; width: 5%;"></span><span class="tl-seg tl-on" style="left: 5%; width: 95%;"></span><span class="tl-dot" style="left: 5%;"></span></div>
+<div class="tl-row"><span class="tl-seg tl-not" style="left: 0%; width: 23.333%;"></span><span class="tl-seg tl-on" style="left: 23.333%; width: 76.667%;"></span><span class="tl-dot" style="left: 23.333%;"></span></div>
+<div class="tl-row"><span class="tl-seg tl-not" style="left: 0%; width: 6.667%;"></span><span class="tl-seg tl-on" style="left: 6.667%; width: 93.333%;"></span><span class="tl-dot" style="left: 6.667%;"></span></div>
+<div class="tl-row"><span class="tl-seg tl-not" style="left: 0%; width: 1.667%;"></span><span class="tl-seg tl-on" style="left: 1.667%; width: 98.333%;"></span><span class="tl-dot" style="left: 1.667%;"></span></div>
+</div>
+<div class="tl-axis"><span style="left: 0%;">10:15</span><span class="tl-minor" style="left: 16.667%;">10:20</span><span class="tl-minor" style="left: 33.333%;">10:25</span><span style="left: 50%;">10:30</span><span class="tl-minor" style="left: 66.667%;">10:35</span><span class="tl-minor" style="left: 83.333%;">10:40</span><span style="left: 100%;">10:45</span></div>
+<div class="tl-clip"><div class="tl-veil"></div></div>
+<div class="tl-head"><span class="tl-line"></span><span class="tl-knob"></span></div>
+</div>
+</div>
+
+<div class="tl-legend" aria-hidden="true"><span class="tl-key"><i></i>Focused</span><span class="tl-key"><i class="k-unl"></i>Unlocked</span><span class="tl-key"><i class="k-not"></i>Not here</span></div>
+
+<ol class="tl-moments">
+<li class="tl-m tl-m1"><div class="tl-mh"><span class="tl-num" aria-hidden="true">1</span><p class="tl-when">10:15 AM</p></div><h3 class="tl-mt">The teacher starts class</h3><p class="tl-mx">The session starts from any browser. New students join once with the class code.</p></li>
+<li class="tl-m tl-m2"><div class="tl-mh"><span class="tl-num" aria-hidden="true">2</span><p class="tl-when">10:16 AM</p></div><h3 class="tl-mt">Students tap in</h3><p class="tl-mx">Each student holds their phone to the teacher's Bali block. Their apps lock on the spot, even without Wi-Fi.</p></li>
+<li class="tl-m tl-m3"><div class="tl-mh"><span class="tl-num" aria-hidden="true">3</span><p class="tl-when">10:31 AM</p></div><h3 class="tl-mt">A student unlocks</h3><p class="tl-mx">They hold for one second and their apps open. The teacher's grid shows it, with the reason if they give one.</p></li>
+<li class="tl-m tl-m4"><div class="tl-mh"><span class="tl-num" aria-hidden="true">4</span><p class="tl-when">10:45 AM</p></div><h3 class="tl-mt">The bell rings</h3><p class="tl-mx">Everything comes back on its own when class ends, and the teacher gets a recap of the class.</p></li>
+</ol>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"at":{"editor":null},"$preview":{"width":1160,"height":640}}'>
+class Component extends DCLogic {
+  componentDidMount() {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+    const root = document.querySelector('[data-tl="' + this.uid + '"]');
+    if (!root || !root.animate) return;
+    const at = this.props.at;
+    const pinned = at !== undefined && at !== null && at !== '';
+    const still = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    if (still && !pinned) return;
+    this.anims = this.build(root);
+    if (pinned) {
+      const t = Number(at) || 0;
+      this.anims.forEach((a) => { a.currentTime = t; a.pause(); });
+      return;
+    }
+    // Play only while the class is on screen.
+    if (window.IntersectionObserver) {
+      this.io = new IntersectionObserver((es) => {
+        const on = es[es.length - 1].isIntersecting;
+        this.anims.forEach((a) => (on ? a.play() : a.pause()));
+      }, { threshold: 0.2 });
+      this.io.observe(root);
+    }
+  }
+  componentWillUnmount() {
+    if (this.io) this.io.disconnect();
+    (this.anims || []).forEach((a) => a.cancel());
+  }
+  build(root) {
+    // 10.4 seconds: the playhead glides to each moment and waits there while it is marked.
+    const T = 10400;
+    const E = 'cubic-bezier(0.2, 0, 0, 1)';
+    const out = [];
+    const run = (el, frames) => {
+      if (!el) return;
+      const fr = frames.map((f) => Object.assign({ offset: f[0] / T, easing: f[2] || E }, f[1]));
+      out.push(el.animate(fr, { duration: T, iterations: Infinity, fill: 'both' }));
+    };
+    const q = (s) => root.querySelector(s);
+    const x = (p) => ({ transform: 'translateX(' + p + '%)' });
+    const glide = [[0, x(0)], [1100, x(0)], [1600, x(5)], [3400, x(5)], [5000, x(53.333)], [6900, x(53.333)], [7900, x(100)], [9700, x(100)], [9800, x(0)], [T, x(0)]];
+    run(q('.tl-head'), glide);
+    run(q('.tl-head'), [[0, { opacity: 1 }], [9450, { opacity: 1 }], [9650, { opacity: 0 }], [9900, { opacity: 0 }], [10200, { opacity: 1 }], [T, { opacity: 1 }]]);
+    run(q('.tl-veil'), glide);
+    run(q('.tl-veil'), [[0, { opacity: 1 }], [9550, { opacity: 1 }], [9650, { opacity: 0 }], [9850, { opacity: 0 }], [10300, { opacity: 1 }], [T, { opacity: 1 }]]);
+    const on = { backgroundColor: 'rgba(240, 247, 243, 1)' };
+    const off = { backgroundColor: 'rgba(240, 247, 243, 0)' };
+    const pinOn = { backgroundColor: '#245A43', color: '#FFFFFF', transform: 'scale(1.12)' };
+    const pinOff = { backgroundColor: '#FFFFFF', color: '#245A43', transform: 'scale(1)' };
+    const numOn = { backgroundColor: '#245A43', color: '#FFFFFF' };
+    const numOff = { backgroundColor: '#DCEDE3', color: '#245A43' };
+    // Each moment's window, in ms: marked from a to b.
+    const windows = [[1, 0, 1100, true], [2, 1600, 3400], [3, 5000, 6900], [4, 7900, 9450]];
+    windows.forEach((w) => {
+      const n = w[0], a = w[1], b = w[2];
+      const frames = (onS, offS) => w[3]
+        ? [[0, onS], [b, onS], [b + 250, offS], [T - 350, offS], [T - 50, onS], [T, onS]]
+        : [[0, offS], [a - 100, offS], [a + 150, onS], [b, onS], [b + 250, offS], [T, offS]];
+      run(q('.tl-m' + n), frames(on, off));
+      run(q('.tl-m' + n + ' .tl-num'), frames(numOn, numOff));
+      run(q('.tl-pin' + n), frames(pinOn, pinOff));
+    });
+    return out;
+  }
+  renderVals() {
+    if (!this.uid) this.uid = 'tl' + Math.random().toString(36).slice(2, 9);
+    return { uid: this.uid };
+  }
+}
+</script>
+</body>
+</html>
