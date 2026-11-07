@@ -3483,6 +3483,29 @@ struct AppTests {
     }
 
     @Test(
+        "Me's name as VoiceOver reads it while it is edited, and once its save is refused: Me's title, then the field, read once, as Name — the words over it hidden from VoiceOver — and as a text field, its value the name typed, then the help under it, as Your name's field is read (#292)"
+    )
+    func meNameField() async throws {
+        let help = "Your teachers see this name."
+        for (name, typed) in [("meEditing", "Ana R."), ("meNameError", "Bea Ortiz")] {
+            let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))
+            let (window, _) = try await laidOut(RootView(phone: phone)) { $0.contains(help) }
+            defer { window.isHidden = true }
+            let read = try voiceOver(in: window)
+            let labels = read.map { $0.accessibilityLabel ?? "" }
+            #expect(
+                Array(labels.drop { $0 != "Me" }.prefix(3)) == ["Me", "Name", help],
+                "\(name): \(labels)")
+            // A text field to VoiceOver: the trait UIKit's own text field carries, which UIKit
+            // keeps private.
+            let field = read.first { $0.accessibilityLabel == "Name" }
+            let textField = UITextField().accessibilityTraits
+            #expect(!textField.isEmpty && field?.accessibilityTraits.contains(textField) == true, "\(name)")
+            #expect(field?.accessibilityValue == typed, "\(name)")
+        }
+    }
+
+    @Test(
         "A card's shadow is D1's shadow-1 at its edge alone (#139): drawn once, on the card's shape — never on each line, chip or button inside it, which History redrew line by line as it scrolled — so inside, the card is its own white, and under it, its shadow"
     )
     func cardShadow() throws {
