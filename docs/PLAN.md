@@ -8,12 +8,12 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-07 (Central) — A6 (#536; `docs/DECISIONS.md`, 2026-11-07): every PostHog
-event is personless, so PostHog keeps no profile per teacher, and `/privacy` no longer says a
-teacher's ID stays there. Before it, the website on `demo3` (#534). Next: the owner's PostHog key;
-a session builds the retire-a-block command; the owner the new build, with A5 and A2, and the
-sitting; the owner's call on GA5's known limit, the smallest iPhones (DECISIONS 2026-11-02); AN9b;
-AN1's part 2 once the owner has the phones; the audit's polish waits, as ruled._
+_Last updated: 2026-11-07 (Central) — PostHog is on: the owner set `POSTHOG_KEY` on `bali prod`,
+and its boot log says "analytics is on" (item 4). Before it, A6 (#536). Next: the notice
+`/privacy`'s section 11 promises, the owner's; a session builds the retire-a-block command; the
+owner the new build, with A5 and A2, and the sitting; the owner's call on GA5's known limit, the
+smallest iPhones (DECISIONS 2026-11-02); AN9b; AN1's part 2 once the owner has the phones; the
+audit's polish waits, as ruled._
 
 ## Now
 
@@ -145,11 +145,10 @@ reviewed by santa and pushed straight to the branch, with no PR, as its README s
      teacher's events, a class's totals), before the key is set — ✅ (#527; DECISIONS 2026-11-05)
    - **A6** PostHog keeps no profile per teacher: every event personless, and `/privacy`'s line on a
      teacher's ID gone — ✅ (#536; DECISIONS 2026-11-07)
-   - Next, the owner can set the key: `POSTHOG_KEY` in Railway's `bali prod` (the portal holds
-     none), once PostHog keeps events the 1 year `/privacy` says (the free plan does, a paid plan
-     only with the project's events retention set to 1 year), and after the owner's call on the
-     notice `/privacy`'s section 11 promises before something new is collected (DECISIONS
-     2026-11-05).
+   - The owner's key: `POSTHOG_KEY` on Railway's `bali prod` (the portal holds none) — ✅
+     2026-11-07, the project on PostHog's free plan (1 year, as `/privacy` says) and no events
+     before it, its boot log "analytics is on". Left, the owner's: the notice `/privacy`'s section
+     11 promises before something new is collected (DECISIONS 2026-11-05).
 5. The external TestFlight group `Vanderbilt pilot` and Beta App Review (`docs/APP-STORE.md`, section
    5), which is Apple's answer on §3.3.3(P) (ISSUES #3).
 6. For PostHog, the App Store privacy label (Product Interaction and Other Data Types gain the
