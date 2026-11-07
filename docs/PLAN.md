@@ -8,7 +8,7 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-07 (Central) — A6 (#535; `docs/DECISIONS.md`, 2026-11-07): every PostHog
+_Last updated: 2026-11-07 (Central) — A6 (#536; `docs/DECISIONS.md`, 2026-11-07): every PostHog
 event is personless, so PostHog keeps no profile per teacher, and `/privacy` no longer says a
 teacher's ID stays there. Before it, the website on `demo3` (#534). Next: the owner's PostHog key;
 a session builds the retire-a-block command; the owner the new build, with A5 and A2, and the
@@ -144,7 +144,7 @@ reviewed by santa and pushed straight to the branch, with no PR, as its README s
    - **A4** `/privacy` names PostHog and says what stays there once an account is deleted (a
      teacher's events, a class's totals), before the key is set — ✅ (#527; DECISIONS 2026-11-05)
    - **A6** PostHog keeps no profile per teacher: every event personless, and `/privacy`'s line on a
-     teacher's ID gone — ✅ (#535; DECISIONS 2026-11-07)
+     teacher's ID gone — ✅ (#536; DECISIONS 2026-11-07)
    - Next, the owner can set the key: `POSTHOG_KEY` in Railway's `bali prod` (the portal holds
      none), once PostHog keeps events the 1 year `/privacy` says (the free plan does, a paid plan
      only with the project's events retention set to 1 year), and after the owner's call on the

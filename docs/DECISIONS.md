@@ -9,7 +9,7 @@ touching before changing how something works. A pointer of the form
 a real decision? Add a dated entry at the top: what was decided and why.
 
 - **2026-11-07** — **A6, PostHog keeps no profile per teacher (the owner, 2026-11-07: "finish it";
-  A6, #535).** A4's entry (2026-11-05, "Said plainly") left one line on `/privacy` for a later step:
+  A6, #536).** A4's entry (2026-11-05, "Said plainly") left one line on `/privacy` for a later step:
   the server's events were identified, so PostHog made a person profile for each teacher's Bali ID
   that outlasted their events, and the page said "Each teacher's ID stays at PostHog even after
   their counts are deleted." Sending `$process_person_profile: false` would stop it, that entry
@@ -72,6 +72,14 @@ a real decision? Add a dated entry at the top: what was decided and why.
   each failing by name, then reverted: the flag dropped (4 tests), sent as the string "false" (4),
   dropped on the relay's path alone (2), on the owner's command's alone (1) and on the sweep's alone
   (1); the line put back (2). No source-text test touched: the list stays at 28.
+
+  **Santa's review:** two Claude Opus reviewers at max effort, Reviewer B as an attacker (Codex
+  refuses every model with this Mac's ChatGPT account, so context isolation held and model
+  diversity didn't). One round: no blockers. Reviewer B's one WARN, fixed: this entry and PLAN named
+  the PR #535, a number another PR took first. The design check: `no-ai-slop` found nothing in the
+  changed words; `web-design-guidelines` noted the hard-coded date (its rule: dates through
+  `Intl.DateTimeFormat`), left as it is: a policy's effective date is its own fixed words, as the
+  date before it was, not a value formatted as the page renders.
 
 - **2026-11-06** — **The website on `demo3` (the owner).** www.getbali.app shows the Bali website:
   seven pages drawn on the Claude Design canvas "Bali website"
