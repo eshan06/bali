@@ -47,7 +47,7 @@ uses values the one before it produced:
 - **Runbook 3, the Vercel flip — done** (2026-10-05): the project `bali-portal`, rooted at
   `apps/web`, at `https://bali-portal.vercel.app`, Node.js 22.x, prod's values; the API's
   CORS preflight from it answers `204`. The old project `bali-web` (the v2 demo) wasn't
-  connected to the repo then, so step 2 wasn't needed; it now builds the demo site from the orphan branch `demo2` alone (2026-11-02). Step 6 done (2026-10-06): `vercel.json` deleted. `bali-portal` hadn't been deploying `main` by itself (the owner deployed by hand); check the next push to `main` deploys it.
+  connected to the repo then, so step 2 wasn't needed; it now builds the website from the orphan branch `demo3` alone (2026-11-06; `demo2` before, from 2026-11-02). Step 6 done (2026-10-06): `vercel.json` deleted. `bali-portal` hadn't been deploying `main` by itself (the owner deployed by hand); check the next push to `main` deploys it.
 - **Runbook 4, the restore drill — on hold** until prod's first backup (runbook 1, step 4). Its half A, a
   `pg_dump` into a scratch database, works without them (skip its step 1).
 - **Runbook 5, GitHub:** the load gate is a required check (7); CodeQL runs on its advanced setup,
@@ -512,8 +512,10 @@ What it makes: a new Vercel project that builds the portal (`apps/web`) from `ma
 **Done 2026-10-05** (the status list at the top). The v2 demo site was then the older Vercel
 project `bali-web`, which turned out **not connected to the repo**: no push reached it,
 so steps 1–2 weren't needed. They stay below for a rebuild where a demo project is
-connected, as `bali-web` now is: since 2026-11-02 it builds the demo site from the orphan branch
-`demo2` alone, so read `demo2` for `v2-archive` there (`docs/DECISIONS.md`, 2026-11-02). Left to
+connected, as `bali-web` now is: since 2026-11-06 it builds the website from the orphan branch
+`demo3` alone (`demo2` before, from 2026-11-02), so read `demo3` for `v2-archive` there; its
+production branch is under Settings → Environments → Production → Branch Tracking
+(`docs/DECISIONS.md`, 2026-11-06). Left to
 do: step 6.
 
 **What the repo says about `vercel.json`:** the file at the repo root only turns off

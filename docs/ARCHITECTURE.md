@@ -1942,6 +1942,6 @@ Each exists because v2 broke it and shipped a real bug
 - **Open:** one design question, Phase 6: ISSUES #3's fallback, should Apple's answer
   call for one (the issue ranks the fallback designs, best fit first). Next: the build plan (what
   gets coded first). Items deliberately parked live in each section's "decided later" list.
-- **Deploys:** the portal builds from `main` as the Vercel project `bali-portal`; the demo site,
-  www.getbali.app, is the Vercel project `bali-web`, which builds only `demo2`, an orphan branch
-  holding the site alone (2026-11-02; `docs/DECISIONS.md`).
+- **Deploys:** the portal builds from `main` as the Vercel project `bali-portal`; the website,
+  www.getbali.app, is the Vercel project `bali-web`, which builds only `demo3`, an orphan branch
+  holding the site alone (2026-11-06, replacing `demo2` of 2026-11-02; `docs/DECISIONS.md`).

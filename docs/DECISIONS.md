@@ -8,6 +8,29 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-06** — **The website on `demo3` (the owner).** www.getbali.app shows the Bali website:
+  seven pages drawn on the Claude Design canvas "Bali website"
+  (https://claude.ai/artifact/5Aohc3RHe7j69mVgXwyZhj), the home page, three guides (the first class,
+  Emergency Unlock, families) and three resource pages (research, compare, phone laws). The owner
+  approved the site as drawn and asked for it to go live on 2026-11-06 (canvas version 35); version
+  36 fixes what the browser tests found (the phone-law map's contrast, the comparison table's
+  keyboard reach, a resize loop in Safari). It replaces `demo2`'s one-page demo and deploys from
+  `demo3`, a branch cut from `demo2`: production branch `demo3`, ignored build step
+  `[ "$VERCEL_GIT_COMMIT_REF" != "demo3" ]`. `demo2` stays as it was: setting the production
+  branch and the ignored build step back to `demo2` and redeploying its last deployment is the
+  rollback.
+  `canvas/` holds the canvas's files (version 38), with the two intermediate states on the board
+  `SiteStates` (a page that didn't load, JavaScript off); `tools/build.mjs` bundles each page's
+  boards into `dist/boards.js`, and `src/runtime.js` draws them in the browser as the canvas does,
+  with nothing evaluated from strings, so the security policy keeps `script-src 'self'`.
+  `tools/check.mjs` runs on every Vercel build and keeps `demo2`'s guards: each page turns off
+  iPhone Safari's text enlarging and nothing scales with CSS `zoom` (2026-11-02), the security
+  policy, size budgets. The trade-off, named: the pages are drawn by script, so a crawler or a link
+  preview that runs none sees each page's title and description but not its text; prerendering the
+  pages is the fix if search needs it. `tests/site.spec.mjs` holds 21 Playwright tests in Chromium
+  and WebKit at laptop and phone sizes (84 runs, WebKit skipping the clipboard case). `demo2`'s
+  process holds (2026-11-02): `npm test` and the santa-loop review, then a push straight to the
+  branch, with no PR; after the deploy, `BASE_URL=https://www.getbali.app npx playwright test`.
 - **2026-11-05** — **AN9a, Delete account's rules: Cognito's DeleteUser in `core`'s `SignIn`, the outbox's
   order before a deletion, and where a deletion stands, on the JVM; and AN9 in seven PRs (the conductor's
   calls, awaiting the owner's look; AN9a, #533).** The owner isn't reviewing each step and asked for the
