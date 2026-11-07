@@ -12,7 +12,8 @@ import { counted } from './routes/reports.js';
  * name or email, no class or session name, no URL and no free text can go. Sent once what it counts
  * has committed and never awaited: a send never fails or delays a request or the sweep, gives up
  * at its timeout, and a failure is logged with nothing personal in it. The portal's teacher
- * actions (A3a, `POST /v1/me/actions`) go the same way, built here too.
+ * actions (A3a, `POST /v1/me/actions`) go the same way, built here too. Every event is personless,
+ * so PostHog keeps no profile per teacher (A6, `capture`).
  */
 
 const DEFAULT_POSTHOG_HOST = 'https://us.i.posthog.com';
@@ -26,7 +27,7 @@ export type SessionEvent = 'session_started' | 'session_ended' | 'session_extend
  */
 export type EndedBy = 'teacher' | 'bell' | 'owner';
 
-/** What a server event's properties may hold: these, and nothing else. */
+/** What a server event's properties may hold: these, and nothing else but `capture`'s flag (A6). */
 export interface SessionProperties {
   environment: string;
   students_enrolled: number;
@@ -161,7 +162,6 @@ export function createAnalytics(
     const at = stamps[event];
     const report = counted(session, await getSessionEvents(db, sessionId), until);
     return {
-      api_key: config.key,
       event,
       distinct_id: teacherId,
       timestamp: at.toISOString(),
@@ -179,9 +179,41 @@ export function createAnalytics(
   /** What a log line names an event by: never a person, never the key. */
   type About = { event: string; sessionId?: string };
 
-  /** Posts the event `made` builds. */
-  const capture = async (about: About, made: () => Promise<object> | object) => {
-    const body = JSON.stringify(await made());
+  /** An event as `build` and `action` make it, without what every event carries. */
+  type Made = {
+    event: string;
+    distinct_id: string;
+    timestamp: string;
+    uuid?: string;
+    properties: object;
+  };
+
+  /**
+   * Posts the event `made` builds, with what every event carries, added here because every send
+   * comes through here: the project's key, and `$process_person_profile: false`, so PostHog keeps
+   * no profile per teacher (A6, the owner, 2026-11-07). PostHog calls such an event personless
+   * ("anonymous" in its docs). What its docs and its ingestion code say it does (read 2026-11-07):
+   * - No person profile is made or updated: no person row, so none outlasts a teacher's events.
+   *   Without it, an event sent to the capture endpoint is identified and makes one.
+   * - The event keeps its `distinct_id`, the teacher's Bali id, and gets a person id made from that
+   *   id alone (a UUIDv5 of the project and the id), so a teacher's events still share one: unique
+   *   teachers, trends and funnels count them by teacher, as before. Lifecycle insights leave such
+   *   events out, and cohorts, person properties and groups don't apply; Bali uses none of them.
+   * - Nothing else changes: `$set`, `$set_once` and `$unset` are dropped, and Bali sends none.
+   * - Only the boolean `false` counts; any other value is read as `true`, with a warning. A
+   *   `distinct_id` that already has a profile stays linked to it: the flag stops new profiles and
+   *   deletes none.
+   * - PostHog's handbook still says each such id is also noted in a table of its own
+   *   (`posthog_personlessdistinctid`); its ingestion stopped writing that table on 2026-08-11
+   *   (PostHog's #80861), and the table is to be dropped.
+   */
+  const capture = async (about: About, made: () => Promise<Made> | Made) => {
+    const { properties, ...event } = await made();
+    const body = JSON.stringify({
+      api_key: config.key,
+      ...event,
+      properties: { ...properties, $process_person_profile: false },
+    });
     let response: Response;
     try {
       response = await post(config.url, {
@@ -207,7 +239,7 @@ export function createAnalytics(
   };
 
   /** `capture` in the background, waited out by `settled`. */
-  const send = (about: About, made: () => Promise<object> | object) => {
+  const send = (about: About, made: () => Promise<Made> | Made) => {
     const sending = capture(about, made)
       .catch((err: unknown) => {
         // Our own failure (reading the totals), not PostHog's: reported like a 500.
@@ -227,7 +259,6 @@ export function createAnalytics(
     action(event, teacherId, eventId) {
       const at = clock();
       send({ event }, () => ({
-        api_key: config.key,
         event,
         distinct_id: teacherId,
         timestamp: at.toISOString(),

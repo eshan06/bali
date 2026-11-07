@@ -19,7 +19,8 @@ import TermsPage, { metadata as termsMetadata } from './terms/page';
  * owner named at the outline's ids, the privacy draft's table as a list, its section 2's lists the
  * app's and the help page's own (#130), the owner's two later lines (section 1's clock set ahead,
  * section 6's records at another school), PostHog named wherever its counts change what a line says
- * (A4), Contact's mailto and the footer's links, and nothing of the drafts' notes for the lawyer.
+ * (A4) and no line keeping a teacher's ID there once their counts go (A6), Contact's mailto and the
+ * footer's links, and nothing of the drafts' notes for the lawyer.
  * Reached from /login and from the
  * help page; framed by the shell with no menu, no Sign out and no read; whole in the server's HTML,
  * so the words need no script. That every page renders per request is rendering.test.ts's.
@@ -61,7 +62,7 @@ const POLICIES: Policy[] = [
     Page: PrivacyPage,
     metadata: privacyMetadata,
     title: 'Privacy policy',
-    date: 'Effective November 5, 2026',
+    date: 'Effective November 7, 2026',
     sections: [
       'The short version',
       '1. What Bali collects',
@@ -323,8 +324,16 @@ describe('the privacy policy names PostHog, which Bali’s server sends its coun
   it('says what the counts hold, what PostHog never gets, totals when only one or two tap in, and how long they stay', () => {
     render(<PrivacyPage />);
     expect(automatic()[2]?.textContent).toBe(
-      "Usage counts. To learn how Bali is used, our server sends counts to PostHog, our analytics provider. For each class session: when it starts, ends or is extended and how it ends, how many students are in the class and how many tapped in, how long it was set to run and how long it ran, the class's total focus minutes, and its Emergency Unlocks as one number, never split by reason. For each teacher: when they sign in, create a class, register a block, start, end or extend a session, ask a question, show slides, open Present, or open a report or a recap. PostHog files every count under a teacher, known to it only by the ID Bali gives their account. It never gets anyone's name or email, a student's ID, a web address, or anything typed into Bali. A session's totals add up the students who tapped in, and they're sent however few that is. When a class has only one or two students, or only one or two tap in, its counts are those students' own numbers. Only our server talks to PostHog. The portal has no PostHog script or cookie, the iPhone app sends PostHog nothing, and PostHog never sees your IP address. PostHog keeps the counts for 1 year, then deletes them, though not always right away. Deleting an account or disposing of a school's data doesn't remove them sooner (sections 6 and 7). Each teacher's ID stays at PostHog even after their counts are deleted.",
+      "Usage counts. To learn how Bali is used, our server sends counts to PostHog, our analytics provider. For each class session: when it starts, ends or is extended and how it ends, how many students are in the class and how many tapped in, how long it was set to run and how long it ran, the class's total focus minutes, and its Emergency Unlocks as one number, never split by reason. For each teacher: when they sign in, create a class, register a block, start, end or extend a session, ask a question, show slides, open Present, or open a report or a recap. PostHog files every count under a teacher, known to it only by the ID Bali gives their account. It never gets anyone's name or email, a student's ID, a web address, or anything typed into Bali. A session's totals add up the students who tapped in, and they're sent however few that is. When a class has only one or two students, or only one or two tap in, its counts are those students' own numbers. Only our server talks to PostHog. The portal has no PostHog script or cookie, the iPhone app sends PostHog nothing, and PostHog never sees your IP address. PostHog keeps the counts for 1 year, then deletes them, though not always right away. Deleting an account or disposing of a school's data doesn't remove them sooner (sections 6 and 7).",
     );
+  });
+
+  it('no longer says each teacher’s ID stays at PostHog after their counts go: PostHog keeps no profile of them (A6)', () => {
+    render(<PrivacyPage />);
+    const words = screen.getByRole('main').textContent ?? '';
+    expect(words).not.toContain('ID stays');
+    expect(words).not.toContain('even after their counts are deleted');
+    expect(words).not.toMatch(/outlast/i);
   });
 
   it('names every teacher action the portal counts', () => {
