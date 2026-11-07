@@ -157,8 +157,8 @@ consultations.
 question as sent is in `docs/APP-STORE.md`, section 5.6.
 
 **Answered** (the owner, 2026-11-03): Apple said to submit the app for review; App Review can't say
-before it sees the build. So Beta App Review of the first external build is the answer, and the
-fallbacks above stay ready if it refuses.
+before it sees the build. So App Review of the first App Store submission is the answer, with no
+external beta for now (the owner, 2026-11-04), and the fallbacks above stay ready if it refuses.
 
 **Done when:** Apple's answer is on record, and the design matches it.
 

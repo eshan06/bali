@@ -142,8 +142,9 @@ own pool (hosting decision 2). None of these is secret:
 - **The pool:** `bali-production`, id `us-east-1_C55e0fhX8`; `AUTH_ISSUER`
   `https://cognito-idp.us-east-1.amazonaws.com/us-east-1_C55e0fhX8`. Deletion
   protection on; MFA optional (TOTP); self sign-up gated by the Pre sign-up Lambda
-  `bali-pre-signup` with `ALLOWED_EMAIL_DOMAINS=vanderbilt.edu` (checked: a gmail
-  sign-up is refused). The API's `TZ` is `America/Chicago`.
+  `bali-pre-signup` with `ALLOWED_EMAIL_DOMAINS=vanderbilt.edu,gmail.com` (since 2026-11-07,
+  read from AWS that day; `gmail.com` for the owner's testing and for pilot students with no
+  Vanderbilt address). The API's `TZ` is `America/Chicago`.
 - **Hosted-UI domain:** `https://us-east-1c55e0fhx8.auth.us-east-1.amazoncognito.com`
   (Hosted UI classic). Password policy: minimum 12 characters.
 - **The portal's app client:** `bali-web`, id `36meb9r9h0cdrt2a1schcv9abs` — a
@@ -272,11 +273,11 @@ by their build number: each run's name in the Actions list, `TestFlight (prod)`,
 summary say which environment its number was built for, so note it before handing a build
 to testers.
 
-**Keep the pilot's testers on prod builds only.** A TestFlight group is offered every
-build added to it, so once the pilot has a prod build, put its testers in an external
-group that gets prod builds and nothing else. Dev builds go to an internal group (the
-owner's own testers) and never to the pilot's group: a dev build there would point a
-classroom's phones at dev.
+**Submit only a prod build to the App Store.** The pilot's students get Bali from the App
+Store, with no external TestFlight group for now (the owner, 2026-11-04), so the build an App
+Store version is submitted with must be a prod one: check its number against its run's. A dev
+build there would point every student's phone at dev. TestFlight's internal group (the owner's
+own testers) still gets builds of both kinds.
 
 What a run checks and needs:
 

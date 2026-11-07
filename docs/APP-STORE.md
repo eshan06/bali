@@ -180,8 +180,12 @@ Notes for the owner:
 ### App Privacy ("nutrition label")
 
 Read from the code and the data model as of 2026-10-04; the push token added 2026-10-06 (N6), the
-13+ yes 2026-10-08 (C7-server), a live lesson's answers 2026-10-11 (L2). Purpose for every row: **App
-Functionality**. Nothing is used for **Analytics**, **Product Personalization**,
+13+ yes 2026-10-08 (C7-server), a live lesson's answers 2026-10-11 (L2); the purposes read again
+from the app's privacy manifest (`ios/Bali/PrivacyInfo.xcprivacy`) on 2026-11-07, as A5 and A2
+left it. Purpose for every row: **App Functionality**. **Product Interaction** and **Other Data
+Types** also serve **Analytics**: Bali's server counts a class's totals for PostHog from them (the
+focus records, and class membership for how many students are enrolled), and the app itself sends
+PostHog nothing. No other row is used for Analytics, and none for **Product Personalization**,
 **Developer's Advertising**, **Third-Party Advertising** or **Other Purposes**. Every row
 is **linked to the user** (it sits in a row keyed by their account). **Tracking: No** for
 every row.
@@ -192,9 +196,9 @@ every row.
 | Contact Info → **Name** | Display name the student picks or the account carries (`users.display_name`) | Bali's database | Seen by the teacher on the grid and reports |
 | Identifiers → **User ID** | Bali's user id and the Cognito user id (`users.id`, `users.cognito_id`) | Bali's database | |
 | Identifiers → **Device ID** | The install id: a random UUID the app mints for its outbox (`events.order_install`, `armed_taps.order_install`), used to order a phone's own records; emptied from them when the account is deleted or de-identified (2026-10-29). A student's APNs device token, with its environment (`device_tokens`, N3), used only to send the "class started" alert | Bali's database | ⚖️ Not a hardware or advertising id; it is per install and resets on reinstall. Apple's "Device ID" covers "other device-level ID"; declaring it is the safe reading. Confirm. The push token rides this row: App Functionality, linked (stored with the student's account, deleted with it, in C5's export), not tracking; never logged, never sent to anyone but Apple's push service |
-| Usage Data → **Product Interaction** | Focus-state events: tap in, unlock, refocus, Screen Time off, going silent and coming back, leaving a class or session; the ~30 s check-in's last-seen time; device timestamps of each, clamped to the session by the server | Bali's database (`events`, `participations`, `armed_taps`) | The core of the product. Bali never collects which apps are used |
+| Usage Data → **Product Interaction** | Focus-state events: tap in, unlock, refocus, Screen Time off, going silent and coming back, leaving a class or session; the ~30 s check-in's last-seen time; device timestamps of each, clamped to the session by the server | Bali's database (`events`, `participations`, `armed_taps`) | The core of the product. Bali never collects which apps are used. App Functionality and **Analytics** (A5): the server's class totals for PostHog are counted from these records |
 | User Content → **Other User Content** | The unlock reason, when given: one of bathroom, nurse, other (`UNLOCK_REASONS`). A live lesson's answers (Phase 7): the option the student picked for each class question, and when the server received it | Bali's database (event payload; `responses`) | ⚖️ A fixed choice, not free text. "Nurse" hints at a health visit: confirm it isn't **Health & Fitness → Health** data, and who should see it (Phase 6's open decision: who sees unlock reasons). Answers: education records, counted only in the class's totals (the teacher never sees whose); in C5's export; kept under the account, named by no one, when it is deleted or de-identified |
-| Other Data → **Other Data Types** | Class membership: which classes the student joined, with which teacher, when they left. And that the account confirmed it is 13 or older (C7-server, once the app's half sends it): never a birth date or an age, nothing under 13 | Bali's database (`enrollments`, `age_checks`) | ⚖️ Could equally ride under Product Interaction; listing it separately is the more open answer. ⚖️ The 13+ yes: Apple lists no age type, so it rides here; confirm, and that a self-declared "13 or older" is not **Sensitive Info** |
+| Other Data → **Other Data Types** | Class membership: which classes the student joined, with which teacher, when they left. And that the account confirmed it is 13 or older (C7-server, once the app's half sends it): never a birth date or an age, nothing under 13 | Bali's database (`enrollments`, `age_checks`) | ⚖️ Could equally ride under Product Interaction; listing it separately is the more open answer. ⚖️ The 13+ yes: Apple lists no age type, so it rides here; confirm, and that a self-declared "13 or older" is not **Sensitive Info**. App Functionality and **Analytics** (A2): the class totals' count of enrolled students comes from class membership |
 
 **Not collected:** location, contacts, photos, browsing or search history, purchases,
 health data (subject to the ⚖️ above), sensitive info, audio, the list of apps, any
@@ -217,9 +221,9 @@ data; ⚖️ confirm a server-side error report triggered by an app request is n
 - Since A5 (2026-11-04) the manifest gives **Product Interaction** the purpose **Analytics**
   beside App Functionality, as the server's class totals for PostHog are counted from it, and
   since A2 (the same day) **Other Data Types** too, as their enrolled count comes from class
-  membership; CI pins each type's purposes. This table still says App Functionality alone, the
-  owner's to change (PLAN's Before the pilot, 6): when the label is edited, its Product
-  Interaction and Other Data Types rows must say Analytics too, to match the manifest.
+  membership. These answers say the same since 2026-11-07, for the owner to paste (PLAN's Before
+  the pilot, 6). CI pins the manifest's purposes, not this section's: a purpose changed in one is
+  changed in the other by hand.
 - If accounts stop being self-created (Phase 6's open decision on how accounts are made),
   the email row still stands: the school or Cognito still holds it on Bali's behalf.
 - Data kept after an account is deleted follows the owner's retention policy (ISSUES #5,
@@ -330,6 +334,10 @@ block?" costs nothing to ask.
 
 ## 5. TestFlight external beta (the Vanderbilt pilot)
 
+**Set aside** (the owner, 2026-11-04: "no we want to just go to app store tbh no testflight for
+now"): Bali goes straight to the App Store, internal TestFlight still carries builds to the owner's
+phone, and 5.4's review accounts serve App Review (sections 2 and 4) too.
+
 The pilot's students install Bali through TestFlight's **external** testing, and Apple's
 **Beta App Review** checks the first build offered to an external group (later builds of
 the same version usually go straight through). It reads the same §3.3.3(P) rules as App
@@ -383,8 +391,8 @@ when what to try changes.
 > Thanks for trying Bali in class this term.
 >
 > What to try:
-> - Sign up with your @vanderbilt.edu email, give Bali Screen Time access, and join your
->   class with the code your professor gives you.
+> - Sign up, give Bali Screen Time access, and join your class with the code your professor
+>   gives you.
 > - When class starts, hold your iPhone to the Bali block. Your apps lock until the class
 >   ends. Calls, FaceTime, Messages and Emergency SOS still work.
 > - If you need your phone, hold Emergency Unlock. It works without a signal. Your
@@ -397,9 +405,10 @@ when what to try changes.
 
 ### 5.4 Review and demo accounts
 
-Prod's pool only lets `@vanderbilt.edu` addresses sign up: the Pre sign-up Lambda
-(`infra/cognito/pre-signup.mjs`) refuses any other on the hosted page. It lets an account
-the owner makes in the console through (Cognito's `AdminCreateUser`, trigger source
+Prod's pool lets only `@vanderbilt.edu` and `@gmail.com` addresses sign up (`gmail.com` since
+2026-11-07, for the owner's testing and for a pilot student with no Vanderbilt address): the Pre
+sign-up Lambda (`infra/cognito/pre-signup.mjs`) refuses any other on the hosted page. It lets an
+account the owner makes in the console through (Cognito's `AdminCreateUser`, trigger source
 `PreSignUp_AdminCreateUser`: only someone with AWS access to the pool can make one), so
 review accounts are made there:
 

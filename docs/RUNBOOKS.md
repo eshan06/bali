@@ -26,7 +26,9 @@ uses values the one before it produced:
 - **Runbook 2, Cognito — done:** root MFA on the AWS account (step 1); the pool
   `bali-production` with deletion protection (3); sign-up gated to `vanderbilt.edu` by
   `bali-pre-signup` ([`infra/cognito/pre-signup.mjs`](../infra/cognito/pre-signup.mjs)),
-  a gmail sign-up checked refused (4); the password policy, minimum 12 (5); MFA optional,
+  and to `gmail.com` too since 2026-11-07 (`ALLOWED_EMAIL_DOMAINS=vanderbilt.edu,gmail.com`,
+  read from AWS that day: Gmail for the owner's testing and for pilot students with no
+  Vanderbilt address) (4); the password policy, minimum 12 (5); MFA optional,
   TOTP (6); both app clients, SRP and refresh only, the phone's with the 365-day refresh
   token and the `aws.cognito.signin.user.admin` scope C4 needs (8); the hosted-UI domain,
   its branding set to Hosted UI (classic) (9); the values handed to Railway, Vercel and
@@ -354,7 +356,9 @@ What it makes: a new user pool for production only, hardened per Phase 6's list,
 two app clients (the portal's and the phone's) and nothing else.
 
 **Decided** (the owner, 2026-10-04, for the Vanderbilt pilot on production): self
-sign-up **gated** to `@vanderbilt.edu` (step 4), MFA **Optional** with TOTP (step 6),
+sign-up **gated** to `@vanderbilt.edu` (step 4), and to `@gmail.com` too since 2026-11-07 (the
+owner: for the owner's testing and for pilot students with no Vanderbilt address), MFA
+**Optional** with TOTP (step 6),
 and the portal on its free Vercel address, `https://<project>.vercel.app` (e.g.
 `bali-portal.vercel.app`), until a custom domain is chosen. Wherever these runbooks say
 `<portal domain>`, that is `<project>.vercel.app` for now.
@@ -379,7 +383,7 @@ and the portal on its free Vercel address, `https://<project>.vercel.app` (e.g.
    issuer is `https://cognito-idp.<region>.amazonaws.com/<pool id>`;
    `curl -sS <issuer>/.well-known/jwks.json` returns a `keys` list. These are
    `AUTH_ISSUER` and `AUTH_JWKS_URI` (runbook 1).
-4. **Self sign-up, gated to the school's domain.** Cognito has no domain allow-list
+4. **Self sign-up, gated to the listed domains.** Cognito has no domain allow-list
    setting, so a **Pre sign-up Lambda** refuses every other email:
    [`infra/cognito/pre-signup.mjs`](../infra/cognito/pre-signup.mjs). Attach it
    **before** turning sign-up on (open sign-up is what dev runs; never on prod).
@@ -390,7 +394,9 @@ and the portal on its free Vercel address, `https://<project>.vercel.app` (e.g.
       `infra/cognito/pre-signup.mjs` from `main` → **Deploy**. The handler stays
       `index.handler`.
    3. **Configuration → Environment variables → Edit → Add:**
-      `ALLOWED_EMAIL_DOMAINS` = `vanderbilt.edu` → Save. Comma-separated for more
+      `ALLOWED_EMAIL_DOMAINS` = `vanderbilt.edu,gmail.com` → Save (prod's since
+      2026-11-07; `vanderbilt.edu` alone before it). `gmail.com` is for the owner's
+      testing and for pilot students with no Vanderbilt address. Comma-separated for more
       than one; exact match only (`mc.vanderbilt.edu` must be listed itself). Unset
       or empty refuses every sign-up.
    4. Cognito → the pool → **Extensions** → **Add Lambda trigger** *(wording
@@ -402,16 +408,16 @@ and the portal on its free Vercel address, `https://<project>.vercel.app` (e.g.
    6. Leave **email** writable on both app clients (step 8). Cognito won't take
       write away from a required attribute, and hosted **Sign up** needs it to set
       the address at all. The guard is the check itself: it runs only at sign-up,
-      so an account can only start from a school address, and Cognito sends a
+      so an account can only start from a listed domain's address, and Cognito sends a
       changed email a code before it counts as verified.
    Accounts you make yourself under **Users → Create user** skip the check (e.g.
    App Review's demo account). A first sign-in through Apple or Google is checked
    like a sign-up, so a hidden Apple email is refused.
-   **Check:** on the hosted page (step 9) → **Sign up**: a `@gmail.com` address is
-   refused with "PreSignUp failed with error Use your @vanderbilt.edu email address
-   to sign up." (Cognito puts its own prefix before the Lambda's message and its own
+   **Check:** on the hosted page (step 9) → **Sign up**: an `@outlook.com` address is
+   refused with "PreSignUp failed with error Use your @vanderbilt.edu or @gmail.com email
+   address to sign up." (Cognito puts its own prefix before the Lambda's message and its own
    period after it, so the Lambda's message ends without one); a
-   `@vanderbilt.edu` one is sent a code.
+   `@vanderbilt.edu` or `@gmail.com` one is sent a code.
 5. **Password policy.** Pool → **Authentication** → **Sign-in** → **Password policy**
    → **Custom**: minimum length 12 or more, temporary passwords valid 7 days or less.
    **Check:** the page shows the new minimum.

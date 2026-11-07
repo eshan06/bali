@@ -8,6 +8,73 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-07** — **The legal words say what is true now: sign-up takes `@gmail.com` too, the app
+  goes straight to the App Store, and the App Store's privacy answers say Analytics where the app's
+  manifest does (the owner: "fix the legal words. you can approve it on your own."; #PRNUM).** The
+  owner's facts, in chat: production's Pre sign-up Lambda `bali-pre-signup` has
+  `ALLOWED_EMAIL_DOMAINS=vanderbilt.edu,gmail.com` (read from AWS on 2026-11-07); Bali goes
+  straight to the App Store, with no external TestFlight beta for now (2026-11-04: "no we want to
+  just go to app store tbh no testflight for now"), internal TestFlight still carrying builds to
+  the owner's phone; PostHog is on (#537). Then the owner's rule for the words: the pilot stays
+  Vanderbilt's, one university class of adult students (`docs/PILOT.md`), and Gmail is on only for
+  the owner's testing and for a pilot student with no Vanderbilt address. Sign-up won't stay
+  Vanderbilt-only for long, and the owner doesn't want Apple to read Bali as a one-school app, so
+  **no page and nothing pasted to Apple names an email domain**, while the internal docs give the
+  exact list, `vanderbilt.edu,gmail.com`, and its reason. A teacher's account still needs their
+  school's invite code. The owner delegated the words' approval, so they need no sign-off; each
+  changed string was written in DESIGN.md's voice and through `no-ai-slop`. Nothing about what Bali
+  collects changes.
+
+  **What changed, file by file:**
+  - `/terms`: section 1 loses its pilot line, "During the Vanderbilt pilot, accounts are open only
+    to @vanderbilt.edu addresses, and the app is a test version delivered through Apple's
+    TestFlight.", both halves false. Its two other lines, students 13 or older in a class whose
+    teacher uses Bali and teachers with their school's invite code, already say who Bali is for, now
+    and later (the owner's second option, over a new line naming the App Store). The date moves to
+    November 7, 2026, as section 6 promises of any change.
+  - `/privacy`: section 4's Apple line loses "TestFlight and" ("Apple: App Store delivery, Screen
+    Time on your phone, and class-start notifications when they're on"). Section 8's "The
+    Vanderbilt pilot is for adult students only." stays, plainly true of the pilot. The date was
+    November 7, 2026 already (A6, the same day). No other line named a domain or TestFlight; the
+    PostHog paragraphs and section 11 stay as written.
+  - `docs/APP-STORE.md` §3: Product Interaction and Other Data Types serve Analytics beside App
+    Functionality, linked to the user and Tracking No, as `ios/Bali/PrivacyInfo.xcprivacy` says
+    (A5, A2); "Nothing is used for Analytics" goes, the "Read from the code" line is dated, and the
+    check before pasting says CI pins the manifest's purposes, not these answers. §2's review notes
+    are unchanged: no line there says no analytics or names a domain, "no third-party analytics or
+    advertising SDKs in the app" holds (the app sends PostHog nothing), and a reviewer gets in with
+    the review accounts. §1 named no domain. §5 is marked set aside at its top, 5.4's review
+    accounts still serving App Review; its "What to Test" drops "with your @vanderbilt.edu email",
+    and 5.4 gives the pool's list and its reason.
+  - The internal docs: PLAN (Now's pool, items 5 and 6, Phase 6's owner list, the header), PILOT
+    (what runs where, setup steps 7 and 8, Support), RUNBOOKS (runbook 2's status, its decision,
+    step 4's variable and its check, with the Lambda's real message for the two domains), DEPLOY
+    (the pool; and the TestFlight section's rule for the pilot's testers, now "Submit only a prod
+    build to the App Store"), ISSUES #3 (App Review of the first App Store submission is Apple's
+    answer), ARCHITECTURE's "Analytics (PostHog)" (`docs/APP-STORE.md`'s answers say the same as
+    the manifest) and `privacy-manifests.py`'s comment.
+  - `docs/legal/`: no note states anything false, so none changed.
+
+  **Said plainly:**
+  - Gmail is open to anyone with a Gmail address, not only the owner and pilot students: anyone 13
+    or older can make an account today, a 13–17-year-old too, before any K-12 school's agreement.
+    The lawyer's note 1 (can a minor accept these terms?) applies now, not only once K-12 starts,
+    and so may the states' app-store age laws (the lawyer's privacy note 4), once the app is on the
+    App Store. Such an account joins no class without a teacher's join code.
+  - An account that never joins a class at a school is outside every school's retention run
+    (`peopleOf` reaches only people with records there), so it stays until its owner deletes it.
+    True before Gmail too; Gmail makes it likelier.
+  - Neither page's change came with a notice in the app or on the portal. Each takes a claim away
+    and collects nothing new; whether it is a change that matters (the terms' section 6, the
+    policy's section 11) is the conductor's question with the owner.
+
+  **Tests** (`app/policy-pages.test.tsx`, driven in jsdom): both pages name no email domain (the
+  support address aside), no Gmail and no TestFlight or test version; the terms' section 1 is its two
+  lines; the privacy policy's Apple line whole; the terms' new date. On the old pages 6 failed by
+  name. Tried, each failing by name, then reverted: an @vanderbilt.edu address in the policy's
+  section 8, "a Vanderbilt or Gmail address" on the terms (2 tests), TestFlight back on the Apple
+  line (2) and a pilot line back on the terms. No source-text test touched: the list stays at 28.
+
 - **2026-11-07** — **A6, PostHog keeps no profile per teacher (the owner, 2026-11-07: "finish it";
   A6, #536).** A4's entry (2026-11-05, "Said plainly") left one line on `/privacy` for a later step:
   the server's events were identified, so PostHog made a person profile for each teacher's Bali ID

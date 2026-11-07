@@ -1002,9 +1002,8 @@ the teacher portal's, which it forwards, and nothing else of Bali's.
   Analytics beside App Functionality since A5 (the owner's pick, "In the next build", over waiting
   for the App Store label), and Other Data Types, class membership, which the enrolled count
   comes from, since A2 (the owner's pick, "Yes, add it", over dropping the count), and CI's check
-  pins both (`.github/scripts/privacy-manifests.py`). The App Store privacy label, to match, and
-  `docs/APP-STORE.md`'s answers and review note are the owner's, later; until then they say App
-  Functionality only.
+  pins both (`.github/scripts/privacy-manifests.py`). `docs/APP-STORE.md`'s answers say the same
+  since 2026-11-07, and the App Store privacy label, pasted from them, is the owner's.
 
 ## iOS app structure
 
