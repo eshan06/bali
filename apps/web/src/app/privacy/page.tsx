@@ -8,8 +8,10 @@ import { TEACHER_NEVER_SEES, TEACHER_SEES } from '@/components/teacher-sees';
  * since A4 (2026-11-05; ARCHITECTURE, "Analytics (PostHog)"), kept here and nowhere else
  * (`docs/legal/privacy-policy.md` holds only the notes for the lawyer, who reviews this page): its
  * effective date under the title, what Bali collects as a list (each row of the draft's table what,
- * then why), and section 2's two lists the app's own, word for word (`teacher-sees.ts`, #130). It
- * stands until the lawyer's version replaces it in place (C2).
+ * then why), and section 2's two lists the app's own, word for word (`teacher-sees.ts`, #130). No
+ * email domain on this page, and no TestFlight since 2026-11-07: which addresses may sign up is the
+ * pool's to say, and the app comes from the App Store. It stands until the lawyer's version
+ * replaces it in place (C2).
  */
 
 export const metadata: Metadata = {
@@ -262,8 +264,8 @@ export default function PrivacyPage() {
                   <li>Sentry: error reports, with personal details removed (section 1)</li>
                   <li>PostHog: usage counts that name no one (section 1)</li>
                   <li>
-                    Apple: TestFlight and App Store delivery, Screen Time on your phone, and
-                    class-start notifications when they&apos;re on
+                    Apple: App Store delivery, Screen Time on your phone, and class-start
+                    notifications when they&apos;re on
                   </li>
                 </ul>
               </li>

@@ -19,7 +19,8 @@ import TermsPage, { metadata as termsMetadata } from './terms/page';
  * owner named at the outline's ids, the privacy draft's table as a list, its section 2's lists the
  * app's and the help page's own (#130), the owner's two later lines (section 1's clock set ahead,
  * section 6's records at another school), PostHog named wherever its counts change what a line says
- * (A4) and no line keeping a teacher's ID there once their counts go (A6), Contact's mailto and the
+ * (A4) and no line keeping a teacher's ID there once their counts go (A6), no email domain and no
+ * TestFlight, since the app comes from the App Store (2026-11-07), Contact's mailto and the
  * footer's links, and nothing of the drafts' notes for the lawyer.
  * Reached from /login and from the
  * help page; framed by the shell with no menu, no Sign out and no read; whole in the server's HTML,
@@ -98,7 +99,7 @@ const POLICIES: Policy[] = [
     Page: TermsPage,
     metadata: termsMetadata,
     title: 'Terms of use',
-    date: 'Last updated October 24, 2026',
+    date: 'Last updated November 7, 2026',
     sections: [
       '1. Who Bali is for',
       '2. Your account',
@@ -185,6 +186,15 @@ describe.each(POLICIES)('$path, the owner’s drafted words', (policy) => {
     expect(words).not.toMatch(/[—–]/);
     expect(document.querySelector('table')).toBeNull();
     expect(screen.queryAllByRole('button')).toEqual([]);
+  });
+
+  it('names no email domain and no TestFlight: which addresses may sign up is the pool’s to say, and the app comes from the App Store (2026-11-07)', () => {
+    render(<policy.Page />);
+    // The support address is Contact's, not a rule about who may sign up.
+    const words = (screen.getByRole('main').textContent ?? '').replaceAll(SUPPORT_EMAIL, '');
+    expect(words).not.toMatch(/@\w/);
+    expect(words).not.toMatch(/gmail|vanderbilt\.edu/i);
+    expect(words).not.toMatch(/testflight|test version/i);
   });
 
   it('is titled without "(draft)" and still kept out of search results until the lawyer’s version', () => {
@@ -432,6 +442,32 @@ describe('the terms link the privacy policy as this portal’s own page', () => 
     render(<TermsPage />);
     expect(screen.getByRole('link', { name: 'privacy policy' }).getAttribute('href')).toBe(
       '/privacy',
+    );
+  });
+});
+
+describe('the pages say what is true now: no pilot rule on email addresses, and the App Store (2026-11-07)', () => {
+  it('has the terms say who Bali is for in two lines, students and teachers, with no pilot line', () => {
+    render(<TermsPage />);
+    const who = screen.getByRole('region', { name: '1. Who Bali is for' });
+    expect(
+      within(who)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual([
+      'Students 13 or older, in a class whose teacher uses Bali.',
+      'Teachers at a school that has an agreement with us. A teacher account needs an invite code we make for that school.',
+    ]);
+  });
+
+  it('has the privacy policy name Apple for the App Store, not TestFlight', () => {
+    render(<PrivacyPage />);
+    const sharing = screen.getByRole('region', { name: '4. Who we share it with' });
+    const providers = within(within(sharing).getAllByRole('list')[1])
+      .getAllByRole('listitem')
+      .map((item) => item.textContent);
+    expect(providers.at(-1)).toBe(
+      "Apple: App Store delivery, Screen Time on your phone, and class-start notifications when they're on",
     );
   });
 });

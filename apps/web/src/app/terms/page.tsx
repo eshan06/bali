@@ -4,10 +4,12 @@ import { PolicyDraft } from '@/components/policy-draft';
 import { TextLink } from '@/components/text-link';
 
 /*
- * The terms of use (Phase 6, C2-text): the owner's drafted words of 2026-10-24, kept here and
- * nowhere else (`docs/legal/terms-of-use.md` holds only the notes for the lawyer, who reviews this
- * page): its date under the title, and its link to the privacy policy this portal's own `/privacy`.
- * It stands until the lawyer's version replaces it in place (C2).
+ * The terms of use (Phase 6, C2-text): the owner's drafted words of 2026-10-24, less the pilot's
+ * line on email addresses and TestFlight since 2026-11-07 (no domain on this page: which addresses
+ * may sign up is the pool's to say), kept here and nowhere else (`docs/legal/terms-of-use.md` holds
+ * only the notes for the lawyer, who reviews this page): its date under the title, and its link to
+ * the privacy policy this portal's own `/privacy`. It stands until the lawyer's version replaces it
+ * in place (C2).
  */
 
 export const metadata: Metadata = {
@@ -22,7 +24,7 @@ export default function TermsPage() {
   return (
     <PolicyDraft
       title="Terms of use"
-      date="Last updated October 24, 2026"
+      date="Last updated November 7, 2026"
       intro={
         <p>
           These terms are an agreement between you and Eshan Shah and Jonathan Bani, who run Bali
@@ -45,11 +47,6 @@ export default function TermsPage() {
                 <li>
                   <strong>Teachers</strong> at a school that has an agreement with us. A teacher
                   account needs an invite code we make for that school.
-                </li>
-                <li>
-                  <strong>During the Vanderbilt pilot</strong>, accounts are open only to
-                  @vanderbilt.edu addresses, and the app is a test version delivered through
-                  Apple&apos;s TestFlight.
                 </li>
               </ul>
               <p>
