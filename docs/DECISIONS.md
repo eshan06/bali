@@ -8,6 +8,79 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-07** — **A6, PostHog keeps no profile per teacher (the owner, 2026-11-07: "finish it";
+  A6, #536).** A4's entry (2026-11-05, "Said plainly") left one line on `/privacy` for a later step:
+  the server's events were identified, so PostHog made a person profile for each teacher's Bali ID
+  that outlasted their events, and the page said "Each teacher's ID stays at PostHog even after
+  their counts are deleted." Sending `$process_person_profile: false` would stop it, that entry
+  said, and the line would then go. The owner asked for that step: "finish it".
+
+  **The change:** every event the server sends PostHog carries `$process_person_profile: false` in
+  its properties, added in `capture` (`apps/api/src/analytics.ts`), the one place every send goes
+  through, with the project's key, which moved there from the two builders. So no path can miss it:
+  the API's Starts, extends and Ends, the sweep's ends and a Start's past its bell, the owner's
+  `npm run school` (`ownerEnds`: `end-session` and a disposal) and the relay (`POST /v1/me/actions`).
+  `/privacy` loses that line, and its date moves to November 7, 2026, as section 11 promises of any
+  change. Section 11's notice in the app and on the portal is for a change that matters, "such as
+  collecting something new", and this one keeps less, so it gets none (the worker's reading). No
+  other line leaned on it: section 1's "PostHog files every count under a teacher" and section 7's
+  teacher line, their counts kept under their account's ID until PostHog deletes them, still hold.
+  The lawyer's note 10 never named the profile and is unchanged. ARCHITECTURE's "Analytics
+  (PostHog)" says the events are personless.
+
+  **What PostHog says the flag does** (its docs, and its ingestion code on GitHub, read 2026-11-07;
+  each said in Bali's words, the pages named):
+  - **No profile:** an identified event makes a person profile and an anonymous one doesn't (the
+    docs' "Anonymous vs identified events", where a personless event is called anonymous), and no
+    person row is written for it (the handbook's "Person processing in PostHog"). Without the flag,
+    an event sent to the capture API is identified (the capture API's docs).
+  - **Still counted by teacher:** the event keeps its `distinct_id`, which the capture API needs on
+    every event, and is given a person id made from that id alone (the handbook; a UUIDv5 of the
+    project and the id in `process-personless-step.ts`), so a teacher's events share one person id.
+    Trends' unique users include them (PostHog's #71883, on why Lifecycle doesn't), and trends,
+    funnels and SQL insights run on them (the docs). Lifecycle insights leave them out, and cohorts,
+    person properties, flag targeting by them and group analytics don't apply. Bali uses none of
+    those.
+  - **Nothing else changes for what Bali sends:** `$set`, `$set_once` and `$unset` are stripped from
+    such an event (`normalizeProcessPerson`); Bali sends none, and the relay drops a client's (its
+    test sends a `$set`). Only the boolean `false` counts: any other value, the string "false" too,
+    is read as true with an ingestion warning (`decideProcessPerson`), so the tests hold it with
+    `toBe(false)`.
+  - **No table of its own:** the handbook still says each personless id is written to
+    `posthog_personlessdistinctid`; PostHog's ingestion stopped writing that table on 2026-08-11
+    (#80861), its model went on 2026-08-18 (#84369), and the table is to be dropped. The code read
+    here keeps nothing for a personless event but the event.
+  - **Billing:** anonymous events cost less than identified ones (up to four times less, the docs
+    say), the first million a month free either way.
+
+  **Said plainly:**
+  - The flag stops new profiles and deletes none: an id already used in an identified event stays
+    identified (the capture API's docs). PLAN's item 4 has the key not yet set on `bali prod`, so no
+    profile exists. If it was set before this deploys, each teacher with an event since then has a
+    profile, kept until it is deleted in PostHog (Persons, Delete person), and `/privacy` isn't true
+    of them until then: the owner's check.
+  - An insight broken down by a person property, or one on a cohort, shows nothing of these events;
+    Bali has neither.
+
+  **Tests:** `apps/api/test/analytics.test.ts`: the flag in the exact bodies (a Start's, a teacher's
+  End's properties, the relay's), the allow-list check holding it apart from the counts as the
+  boolean `false`, and a new test that drives every path in one run (a Start, an extend and an End
+  through the API, the sweep, `end-session` through `ownerEnds` as `school.ts` wires it, a relayed
+  action) and checks each event's flag and its teacher's `distinct_id`.
+  `apps/web/src/app/policy-pages.test.tsx`: the date, Usage counts whole without the line, and none
+  of "ID stays", "even after their counts are deleted" or "outlast" anywhere on the page. Tried,
+  each failing by name, then reverted: the flag dropped (4 tests), sent as the string "false" (4),
+  dropped on the relay's path alone (2), on the owner's command's alone (1) and on the sweep's alone
+  (1); the line put back (2). No source-text test touched: the list stays at 28.
+
+  **Santa's review:** two Claude Opus reviewers at max effort, Reviewer B as an attacker (Codex
+  refuses every model with this Mac's ChatGPT account, so context isolation held and model
+  diversity didn't). One round: no blockers. Reviewer B's one WARN, fixed: this entry and PLAN named
+  the PR #535, a number another PR took first. The design check: `no-ai-slop` found nothing in the
+  changed words; `web-design-guidelines` noted the hard-coded date (its rule: dates through
+  `Intl.DateTimeFormat`), left as it is: a policy's effective date is its own fixed words, as the
+  date before it was, not a value formatted as the page renders.
+
 - **2026-11-06** — **The website on `demo3` (the owner).** www.getbali.app shows the Bali website:
   seven pages drawn on the Claude Design canvas "Bali website"
   (https://claude.ai/artifact/5Aohc3RHe7j69mVgXwyZhj), the home page, three guides (the first class,

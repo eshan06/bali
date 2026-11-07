@@ -961,9 +961,10 @@ the teacher portal's, which it forwards, and nothing else of Bali's.
   capture (errors are Sentry's). The project is set to match: session replay, web autocapture and
   exception autocapture off, the client's IP address discarded. Its events are kept 1 year, as
   `/privacy` says (A4; the worker's call, awaiting the owner): PostHog's free plan keeps them that
-  long, and a paid plan up to 7 years unless the project's events retention is set to 1 year. The
-  person profile PostHog makes for each teacher's id, holding nothing else, outlasts them, and
-  `/privacy` says so too.
+  long, and a paid plan up to 7 years unless the project's events retention is set to 1 year. Every
+  event is personless (A6, the owner, 2026-11-07): `$process_person_profile: false`, added where
+  every send goes (`capture`, `apps/api/src/analytics.ts`), so PostHog keeps no profile per teacher
+  to outlast their events, while each event keeps the teacher's id and still counts by teacher.
 - **Off until its key is set,** as Sentry and push are: the API reads `POSTHOG_KEY`, with an
   optional host (`https://us.i.posthog.com` by default), for its own events and the portal's alike;
   the portal holds no PostHog key. The owner sets it in Railway's `bali prod`.

@@ -43,7 +43,7 @@ const MIN = 60_000;
 /**
  * What a server event's properties may hold, pinned here apart from the code that builds them: a
  * property added there fails these tests until it is added here, on purpose (ARCHITECTURE,
- * "Analytics (PostHog)").
+ * "Analytics (PostHog)"). Beside them, every event carries PostHog's flag for no profile (A6).
  */
 const ALLOWED = [
   'environment',
@@ -204,6 +204,7 @@ describe('one event each, as the teacher, at the server’s clock', () => {
         session_minutes: 0,
         focus_minutes: 0,
         unlocks: 0,
+        $process_person_profile: false,
       },
     });
     // The resent Start finds its session running: nothing changed, nothing counted.
@@ -358,8 +359,10 @@ describe('what an event carries', () => {
         'timestamp',
       ]);
       expect(body.distinct_id).toBe(room.teacher.id);
-      for (const key of Object.keys(body.properties)) expect(ALLOWED, key).toContain(key);
-      for (const value of Object.values(body.properties)) {
+      const { $process_person_profile: personless, ...counts } = body.properties;
+      expect(personless, body.event).toBe(false);
+      for (const key of Object.keys(counts)) expect(ALLOWED, key).toContain(key);
+      for (const value of Object.values(counts)) {
         expect(['number', 'string'], String(value)).toContain(typeof value);
       }
       const text = JSON.stringify(body);
@@ -375,6 +378,7 @@ describe('what an event carries', () => {
       // One number, never by reason.
       unlocks: 1,
       ended_by: 'teacher',
+      $process_person_profile: false,
     });
   });
 
@@ -503,6 +507,59 @@ describe('what an event carries', () => {
     ]);
     const [over] = await db.select().from(sessions).where(eq(sessions.id, running.session.id));
     expect(ends[1]!.timestamp).toBe(over!.endedAt!.toISOString());
+  });
+});
+
+describe('no profile per teacher at PostHog (A6)', () => {
+  it('marks every event personless on every path: the API’s sessions, the sweep, the owner’s command and the relay', async () => {
+    const room = await seedClassroom(db, 'a6-paths');
+    const teacher = room.teacher.cognitoId;
+    const started = await start(teacher, room.klass.id);
+    const session = `/v1/sessions/${started.session.id}`;
+    const extend = { durationMinutes: 5, eventId: newUuidV7() };
+    expect((await as(teacher, `${session}/extend`, extend)).statusCode).toBe(200);
+    expect((await as(teacher, `${session}/end`)).statusCode).toBe(200);
+    await startSession(db, {
+      classId: room.klass.id,
+      startedAt: new Date(now.getTime() - 30 * MIN),
+      endsAt: new Date(now.getTime() - 5 * MIN),
+    });
+    expect((await app.sweep(now)).expired).toBe(1);
+    // `npm run school -- end-session`, with the hook school.ts gives it.
+    const running = await startSession(db, {
+      classId: room.klass.id,
+      startedAt: new Date(now.getTime() - 10 * MIN),
+      endsAt: new Date(now.getTime() + 20 * MIN),
+    });
+    const owner = sender();
+    await parseSchoolCommand(['end-session', running.session.id])!({
+      db,
+      print: () => undefined,
+      ended: ownerEnds(owner),
+    });
+    await owner.settled();
+    const action = { event: 'portal_signed_in', eventId: newUuidV7() };
+    expect((await as(teacher, '/v1/me/actions', action)).statusCode).toBe(200);
+    await settle();
+
+    const named = ({ body }: Posted) => {
+      const by = body.properties.ended_by as string | undefined;
+      return by ? `${body.event} by ${by}` : body.event;
+    };
+    expect(posted.map(named).sort()).toEqual([
+      'portal_signed_in',
+      'session_ended by bell',
+      'session_ended by owner',
+      'session_ended by teacher',
+      'session_extended',
+      'session_started',
+    ]);
+    for (const sent of posted) {
+      // The boolean alone: PostHog reads any other value, the string "false" too, as true.
+      expect(sent.body.properties.$process_person_profile, named(sent)).toBe(false);
+      // Still filed under the teacher, so unique teachers and funnels count by them.
+      expect(sent.body.distinct_id, named(sent)).toBe(room.teacher.id);
+    }
   });
 });
 
@@ -640,7 +697,7 @@ describe('the portal’s teacher actions (A3a): POST /v1/me/actions', () => {
           distinct_id: room.teacher.id,
           timestamp: now.toISOString(),
           uuid: sent.eventId,
-          properties: { environment: 'test' },
+          properties: { environment: 'test', $process_person_profile: false },
         },
       },
     ]);

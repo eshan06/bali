@@ -24,7 +24,7 @@ export default function PrivacyPage() {
   return (
     <PolicyDraft
       title="Privacy policy"
-      date="Effective November 5, 2026"
+      date="Effective November 7, 2026"
       intro={
         <>
           <p>
@@ -182,8 +182,7 @@ export default function PrivacyPage() {
                   PostHog script or cookie, the iPhone app sends PostHog nothing, and PostHog never
                   sees your IP address. PostHog keeps the counts for 1 year, then deletes them,
                   though not always right away. Deleting an account or disposing of a school&apos;s
-                  data doesn&apos;t remove them sooner (sections 6 and 7). Each teacher&apos;s ID
-                  stays at PostHog even after their counts are deleted.
+                  data doesn&apos;t remove them sooner (sections 6 and 7).
                 </li>
                 <li>
                   <strong>Server logs.</strong> Our hosting providers record basic request
