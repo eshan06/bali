@@ -122,13 +122,11 @@ test('Copy address copies it, says so, and leaves the rest of the page as it was
   test.skip(browserName !== 'chromium', 'only Chromium lets a test grant clipboard access');
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await open(page, '/');
-  // Scroll down the page once, so every block has risen in and each picture has its size.
-  await page.evaluate(async () => {
-    for (let y = 0; y < document.documentElement.scrollHeight; y += innerHeight / 2) {
-      scrollTo(0, y);
-      await new Promise((r) => setTimeout(r, 80));
-    }
-  });
+  // Bring each block into view until it has risen in, so every one has, and each picture has its size.
+  for (const block of await page.locator('[data-reveal]').all()) {
+    await block.scrollIntoViewIfNeeded();
+    await expect(block).toHaveAttribute('data-in', '1');
+  }
   await expect(page.locator('[data-reveal]:not([data-in])')).toHaveCount(0);
   await page.evaluate(() => { document.querySelector('.bs-hero-art').kept = true; });
   for (const address of [EMAIL, JONATHAN]) {
