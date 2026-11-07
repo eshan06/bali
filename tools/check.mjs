@@ -13,8 +13,9 @@ const fail = (msg) => problems.push(msg);
 const uncomment = (css) => css.replace(/\/\*[\s\S]*?\*\//g, '');
 
 // The bundle's boards, read without running any of them: each one's template, styles and stylesheets.
+const bundle = readFileSync(join(dist, 'boards.js'), 'utf8');
 const sandbox = { window: {} };
-runInNewContext(readFileSync(join(dist, 'boards.js'), 'utf8'), sandbox);
+runInNewContext(bundle, sandbox);
 const DCB = sandbox.window.DCB || {};
 const imports = (name) => [...(DCB[name]?.tpl || '').matchAll(/<dc-import name="([A-Za-z0-9]+)"/g)].map((m) => m[1] + '.dc.html');
 const closure = (name, seen = new Set()) => {
@@ -25,6 +26,7 @@ const closure = (name, seen = new Set()) => {
 };
 const css = Object.fromEntries(readdirSync(join(dist, 'css')).filter((f) => f.endsWith('.css')).map((f) => [`/css/${f}`, readFileSync(join(dist, 'css', f), 'utf8')]));
 const pages = new Set(Object.values(ROUTES));
+const htmls = [];
 
 for (const [name, path] of Object.entries(ROUTES)) {
   const file = join(dist, path, 'index.html');
@@ -35,6 +37,7 @@ for (const [name, path] of Object.entries(ROUTES)) {
   if (!DCB[name]) fail(`${name} is missing from boards.js`);
   for (const board of closure(name)) if (!DCB[board]) fail(`${board}, which ${name} imports, is missing from boards.js`);
   const html = readFileSync(file, 'utf8');
+  htmls.push(html);
   // Each page links every stylesheet its boards use in its HTML, so it never paints unstyled.
   const linked = [...html.matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((m) => m[1]);
   for (const board of closure(name)) for (const href of DCB[board]?.heads || []) if (!linked.includes(href)) fail(`${path} doesn't link ${href} in its HTML`);
@@ -50,15 +53,16 @@ for (const [name, path] of Object.entries(ROUTES)) {
 }
 
 const tpls = Object.values(DCB).map((b) => b.tpl).join('\n');
+const helmets = Object.values(DCB).map((b) => b.helmet).join('\n');
 const left = [...tpls.matchAll(/href="([^"]*\.dc\.html[^"]*)"/g)].map((m) => m[1]);
 if (left.length) fail(`canvas links left: ${[...new Set(left)].join(', ')}`);
-if (tpls.includes('/_blob/')) fail('a canvas upload path (/_blob/) is left');
-if (/ on[a-z]+="/i.test(tpls)) fail('an inline event handler attribute is left in a board');
-if (/fonts\.(googleapis|gstatic)\.com/.test(tpls + Object.values(DCB).map((b) => b.helmet).join('\n'))) fail('a Google Fonts link is left');
-if (/<script[\s>]/.test(tpls + Object.values(DCB).map((b) => b.helmet).join('\n'))) fail('a <script> tag is left inside a board');
+if (bundle.includes('/_blob/')) fail('a canvas upload path (/_blob/) is left');
+if (/ on[a-z]+="/i.test(tpls + helmets)) fail('an inline event handler attribute is left in a board');
+if (/fonts\.(googleapis|gstatic)\.com/.test(bundle)) fail('a Google Fonts link is left');
+if (/<script[\s>]/.test(bundle)) fail('a <script> tag is left inside a board');
 // With the enlarging off, iPhone Safari draws text inside CSS zoom at its full size, so the pictures scale
 // with transform instead: no zoom in a stylesheet, a board's styles or an inline style.
-const styles = uncomment([...Object.values(css), ...Object.values(DCB).flatMap((b) => [b.helmet, b.tpl])].join('\n'));
+const styles = uncomment([...Object.values(css), ...Object.values(DCB).flatMap((b) => [b.helmet, b.tpl]), ...htmls].join('\n'));
 if (/[{;"]\s*zoom\s*:/.test(styles)) fail('a CSS zoom is left (iPhone Safari draws zoomed text at full size); scale with transform');
 
 // Internal links: a page path (with or without #anchor), or a file in dist/.

@@ -50,11 +50,12 @@ function boardParts(name) {
   tpl = relink(tpl.trim());
   // Event bindings become data attributes the runtime binds, so no inline handler reaches the browser.
   tpl = tpl.replace(/ on([A-Za-z]+)="(\{\{[^"]+\}\})"/g, (m, ev, hole) => ` data-dc-on-${ev.toLowerCase()}="${hole}"`);
-  for (const [from, to] of Object.entries(ASSETS)) tpl = tpl.split(from).join(to);
+  // Canvas uploads become the site's files wherever a board names them: markup, styles or code.
+  const swap = (text) => Object.entries(ASSETS).reduce((t, [from, to]) => t.split(from).join(to), text);
   const script = src.match(/<script type="text\/x-dc" data-dc-script[^>]*>([\s\S]*?)<\/script>/);
   const code = script ? script[1].trim() : 'class Component extends DCLogic { renderVals() { return {}; } }';
   const imports = [...tpl.matchAll(/<dc-import name="([A-Za-z0-9]+)"/g)].map((m) => m[1] + '.dc.html');
-  return { title, heads, helmet: helmet.trim(), tpl, code, imports };
+  return { title, heads, helmet: swap(helmet.trim()), tpl: swap(tpl), code: swap(code), imports };
 }
 
 // Every board a page needs: the pages and, through their imports, everything they draw.

@@ -231,9 +231,14 @@
     mount(app.getAttribute('data-board'), {}, app);
     document.documentElement.classList.add('is-drawn');
   } catch (e) {
+    // Every page carries this state (tools/check.mjs fails a build without it). Refresh reloads the
+    // address as it was asked for, #section and all.
     const state = document.getElementById('dc-error');
-    if (state) app.replaceChildren(state.content.cloneNode(true));
-    else app.textContent = 'This page didn’t load. Refresh to try again.';
+    if (state) {
+      app.replaceChildren(state.content.cloneNode(true));
+      const again = app.querySelector('a[href=""]');
+      if (again) again.addEventListener('click', (ev) => { ev.preventDefault(); location.reload(); });
+    }
     throw e;
   }
   // The page is drawn after the browser looks for #anchor, so go to it now.

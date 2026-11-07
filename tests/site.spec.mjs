@@ -186,7 +186,7 @@ base('a page that didn’t load says so, and Refresh tries again', async ({ page
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.route('**/boards.js', (route) => route.fulfill({ status: 200, contentType: 'text/javascript', body: 'window.DCB = {};' }));
-  await page.goto('/');
+  await page.goto('/#contact');
   await expect(page.getByRole('heading', { level: 1, name: 'This page didn’t load.' })).toBeVisible();
   await expect(page.locator('#app')).toContainText('Refresh to try again. If it still doesn’t load, email eshan.shah@vanderbilt.edu.');
   await expect(page.getByRole('link', { name: EMAIL })).toHaveAttribute('href', `mailto:${EMAIL}`);
@@ -194,7 +194,9 @@ base('a page that didn’t load says so, and Refresh tries again', async ({ page
   await page.unroute('**/boards.js');
   await page.getByRole('link', { name: 'Refresh', exact: true }).click();
   await expect(page.locator('html')).toHaveClass(/is-drawn/);
-  await expect(page.getByRole('heading', { level: 1, name: 'Lock the phone. Train the mind.' })).toBeVisible();
+  // The same address again, its #section and all.
+  await expect(page).toHaveURL(/\/#contact$/);
+  await expect(page.locator('#contact')).toBeInViewport();
 });
 
 test.describe('with JavaScript off', () => {
