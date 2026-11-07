@@ -29,9 +29,10 @@ environments (M0); the portal's sign-in lasting the school day (2026-10-13); the
 pilot (the owner, 2026-11-05; L0b). The details: `docs/DEPLOY.md`, `docs/RUNBOOKS.md`,
 `docs/PILOT.md`.
 
-**The demo site** (www.getbali.app) is the Vercel project `bali-web`, built only from the orphan
-branch `demo2`, never `main`: a change there is tested, reviewed by santa and pushed straight to the
-branch, with no PR, as its README says (#479; `docs/DECISIONS.md`, 2026-11-02).
+**The website** (www.getbali.app) is the Vercel project `bali-web`, built only from the orphan
+branch `demo3`, never `main`: seven pages from the canvas "Bali website". A change there is tested,
+reviewed by santa and pushed straight to the branch, with no PR, as its README says
+(`docs/DECISIONS.md`, 2026-11-06). `demo2`, the one-page demo it replaced, is kept for a rollback.
 
 **In flight.**
 - **The conductor on the Windows PC (the owner, 2026-10-14):** an always-on PC runs the conductor,
