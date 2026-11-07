@@ -47,7 +47,7 @@ The labels are AWS's, from its developer guide ("Customizing hosted UI (classic)
 The same steps in `bali-production` (`us-east-1_C55e0fhX8`; domain
 `us-east-1c55e0fhx8.auth.us-east-1.amazoncognito.com`), with `logo-prod.png` and the same
 `hosted-ui.css`. Its clients are `bali-web` and `bali-ios`. Look at
-`https://us-east-1c55e0fhx8.auth.us-east-1.amazoncognito.com/login?client_id=36meb9r9h0cdrt2a1schcv9abs&response_type=code&scope=openid+email+profile&redirect_uri=https%3A%2F%2Fbali-portal.vercel.app%2Fauth%2Fcallback`.
+`https://us-east-1c55e0fhx8.auth.us-east-1.amazoncognito.com/login?client_id=36meb9r9h0cdrt2a1schcv9abs&response_type=code&scope=openid+email+profile&redirect_uri=https%3A%2F%2Fapp.getbali.app%2Fauth%2Fcallback`.
 
 ## What classic can't change
 

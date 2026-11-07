@@ -237,6 +237,16 @@ describe.each(POLICIES)('$path, the owner’s drafted words', (policy) => {
   });
 });
 
+describe('the privacy policy’s portal', () => {
+  it('names the portal at its address, app.getbali.app, and never the old vercel.app one (2026-11-07)', () => {
+    render(<PrivacyPage />);
+    expect(screen.getByText(/^This policy covers/).textContent).toBe(
+      'This policy covers the Bali iPhone app and the Bali portal at https://app.getbali.app (together, “Bali”).',
+    );
+    expect(document.body.textContent).not.toMatch(/vercel\.app/);
+  });
+});
+
 describe('the privacy policy’s table of what Bali collects, as a list', () => {
   it('lists each row as one item: what, in bold, then why', () => {
     render(<PrivacyPage />);

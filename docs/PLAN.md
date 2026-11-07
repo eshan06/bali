@@ -8,13 +8,14 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-07 (Central) — the legal words say what is true now (#539; DECISIONS
-2026-11-07): `/terms` and `/privacy` name no email domain and no TestFlight, the app goes straight to
-the App Store (item 5), and `docs/APP-STORE.md` §3 says Analytics where the manifest does (item 6).
-Next: the notice section 11 promises, the owner's; a session
-builds the retire-a-block command; the owner the new build, the sitting, then the App Store
-submission; GA5's known limit, the owner's call (DECISIONS 2026-11-02); AN9b; AN1's part 2 on the
-owner's phones; the audit's polish waits._
+_Last updated: 2026-11-07 (Central) — the portal is at `https://app.getbali.app` (#540; DECISIONS
+2026-11-07): the app's policy links from build 13, `/privacy` and the docs, the old address
+redirecting; the app requires NFC, so iPhone only (the owner); `docs/APP-STORE.md`'s review notes
+gain guidelines 1.2 and 2.4.1, and its checks the age rating's social media questions and 2.3.7.
+Section 11's notice was owed to no one yet: every prod account is the team's (the owner; DECISIONS
+2026-11-07). Next: a session builds the retire-a-block command; the owner the sitting on build 12,
+then build 13 and the App Store submission; GA5's known limit, the owner's call (DECISIONS
+2026-11-02); AN9b; AN1's part 2 on the owner's phones; the audit's polish waits._
 
 ## Now
 
@@ -22,7 +23,7 @@ A short handoff. The step lines are the record (the open ones below, the finishe
 in `docs/PLAN-ARCHIVE.md`), `docs/DECISIONS.md` the why, Open owner items the owner's queue.
 
 **Production is live (2026-10-05):** the API `https://bali-prod-production.up.railway.app`
-(Railway `bali prod`), the portal `https://bali-portal.vercel.app`, the Cognito pool
+(Railway `bali prod`), the portal `https://app.getbali.app` (below), the Cognito pool
 `bali-production` (sign-up for `vanderbilt.edu,gmail.com` only, Gmail for the owner's testing and
 students with no Vanderbilt address); the sweep every minute in the API, with
 `sweep-cron` its backup and Sentry Cron `api-sweep` its monitor; deck storage on in both
@@ -35,6 +36,10 @@ pilot (the owner, 2026-11-05; L0b). The details: `docs/DEPLOY.md`, `docs/RUNBOOK
 branch `demo3`, never `main`: seven pages from the canvas "Bali website". A change there is tested,
 reviewed by santa and pushed straight to the branch, with no PR, as its README says
 (`docs/DECISIONS.md`, 2026-11-06). `demo2`, the one-page demo it replaced, is kept for a rollback.
+
+**The portal's address** ✅ (#540; DECISIONS 2026-11-07): `https://app.getbali.app` since
+2026-11-07; the old `https://bali-portal.vercel.app` redirects there, and Cognito and the API's
+CORS keep it until no build in use links it. The app links the new address from build 13.
 
 **In flight.**
 - **The conductor on the Windows PC (the owner, 2026-10-14):** an always-on PC runs the conductor,
@@ -49,8 +54,6 @@ reviewed by santa and pushed straight to the branch, with no PR, as its README s
   Phase 7 screens are done: L8 (L8a, #443, L8b, #448 and #450, and L8c, #451), M8's slide view on
   Focus (#452) and M8b's slide off Focus and card on the Screen Time ask (#454); left, their 📱
   device checks, the owner's. C2's legal words (⚖️) go into the portal's pages, on the Windows PC.
-- **The owner's Android cuts on the iPhone and the student web (WC1–WC8)** ✅ (#502, #506, #508,
-  #509, #516, #519, #526, #530; DECISIONS 2026-11-04, 2026-11-05).
 - **Android (the owner, 2026-11-02)**: Phases 8–11, the steps in `docs/PLAN-ANDROID.md` (AN0 ✅);
   AN1, the lock spike: parts 1 and 1c on the Android 15–17 emulators ✅ (DECISIONS
   2026-11-03); AN1b ✅ (DECISIONS 2026-11-04): the owner picked (a), the Accessibility service, with
@@ -61,8 +64,6 @@ reviewed by santa and pushed straight to the branch, with no PR, as its README s
   screens' canvas, ✅ approved as it stands
   (#484, #486; DECISIONS 2026-11-04): lock (a) alone, the approved iPhone boards standing for the
   rest. Not on the pilot's critical path.
-- **The portal redesign in v2's look (PV0–PV17, the owner, 2026-10-12)** ✅ (2026-10-16): every step
-  done, with PV3b, PV4b, PV4c and PV5b; the last, PV17c-2, Home's Last session (#425).
 - **The portal's tests drive the page (the owner, 2026-10-22: "Yes, go gradually")**: the setup ✅
   (#434; DECISIONS 2026-10-22), jsdom and Testing Library, dev only, opted into per file
   (`docs/WEB.md`, Testing the portal), `try-again.test.tsx` the pattern. Each UI step from now on
@@ -98,9 +99,6 @@ reviewed by santa and pushed straight to the branch, with no PR, as its README s
 - **Three fixes, each the conductor's call, awaiting the owner** ✅: `next` 15.5.28 (#435;
   DECISIONS 2026-10-22), `zod` 4.6.6 (#444; DECISIONS 2026-10-23) and the database pool's guard
   (#439; DECISIONS 2026-10-22); their full lines in `docs/PLAN-ARCHIVE.md`.
-- **The workflow review's last steps** ✅ (the owner, 2026-10-13; DECISIONS 2026-10-14): the
-  migration guard (#369), docs-only PRs skipping the test jobs (#365), moved files (#368) and two
-  tests (#364), each in full in `docs/PLAN-ARCHIVE.md`.
 
 - **The "class started" push (N1–N6, decided 2026-10-06):** a visible alert to the students
   whose waiting tap a Start converts; a doorbell, never the truth. N1 (the docs), N2 (CI) and N3 (the
@@ -125,8 +123,8 @@ reviewed by santa and pushed straight to the branch, with no PR, as its README s
 - **Worker and reviewer effort (the owner, 2026-10-14 and 2026-10-24):** a worker that only builds an approved portal screen runs at `xhigh`, every other worker at `max`; santa's reviewers run at `xhigh` on a screen step and at `max` on every other (`.claude/commands/plan.md`, `santa-loop.md`); the first 3–5 `xhigh` steps' blockers and times decide whether each stays (DECISIONS 2026-10-14, 2026-10-24).
 
 **Before the pilot (the owner, 2026-11-03; DECISIONS 2026-11-03).** Left, in order:
-1. A new prod TestFlight build from `main`: build 11 predates the audit's iOS fixes (GA3, GA5) and the
-   consent list's new lines (#466), and this one must carry A5's and A2's privacy manifest. The owner's.
+1. A new prod TestFlight build from `main` — ✅ build 12 (2026-11-07, from #538), on the owner's phone
+   for the sitting; it links the old portal address, which redirects.
 2. 📱 The phone sitting on it, whole (`ios/README.md`, "Phase 7's phone sitting, on prod", Parts 1–7):
    C7's first launch, L8's, M8's and M8b's device checks, the exit checks L9, M10 and W6, the consent
    list's new lines, the shield's new line, the class-started alert end to end (N6), and every other
@@ -149,11 +147,15 @@ reviewed by santa and pushed straight to the branch, with no PR, as its README s
      teacher's ID gone — ✅ (#536; DECISIONS 2026-11-07)
    - The owner's key: `POSTHOG_KEY` on Railway's `bali prod` (the portal holds none) — ✅
      2026-11-07, the project on PostHog's free plan (1 year, as `/privacy` says) and no events
-     before it, its boot log "analytics is on". Left, the owner's: the notice `/privacy`'s section
-     11 promises before something new is collected (DECISIONS 2026-11-05).
+     before it, its boot log "analytics is on". The notice `/privacy`'s section 11 promises: owed
+     to no one yet, every prod account being the team's, and due for any change that matters from
+     the first pilot user on (the owner; DECISIONS 2026-11-07).
 5. The App Store submission, the owner's, from `docs/APP-STORE.md`'s sections 1–4 (5.4: the
    review accounts): App Review is Apple's answer on §3.3.3(P) (ISSUES #3). No external beta for
-   now (the owner, 2026-11-04).
+   now (the owner, 2026-11-04). Its build is build 13, the next prod build after #540 and the first
+   to link `app.getbali.app` and to require NFC, so the App Store offers Bali on iPhone only (the
+   owner, 2026-11-07: "Yes, require NFC"; DECISIONS 2026-11-07). Build 12 is on the owner's phone
+   for the sitting.
 6. The App Store privacy label: answers ready in `docs/APP-STORE.md` §3 (Product Interaction and
    Other Data Types serve Analytics too, as the manifest says since A5 and A2), for the owner to
    paste with item 5.
@@ -339,7 +341,7 @@ Researched 2026-10-05; findings in [`docs/ROADMAP-RESEARCH.md`](ROADMAP-RESEARCH
 - 🚨 Apple's §3.3.3(P) (ISSUES #3): ask App Review whether a teacher-started session and the teacher's grid are allowed, and settle a fallback design if not — **gate**, and the first thing to do — asked by the owner 2026-10-13, case 102994872143 (`docs/APP-STORE.md` §5.6, as sent); **answered** (the owner, 2026-11-03): submit it for review, since App Review decides only once it sees the build, so App Review is the answer
 - Confirm the later K-12 pilot's state (likely Los Angeles or New Jersey) and the school's phone policy (ISSUES #4); the first, preliminary pilot is adults at Vanderbilt, on their own phones
 - ⚖️ The privacy policy and terms; the school's data agreement (FERPA's school-official terms, the state's law or the SDPC NDPA); a breach plan; opinions on the state's phone-ban and app-store age laws
-- Decision: who sees unlock reasons. (How accounts are made: decided 2026-10-04, self sign-up gated to `@vanderbilt.edu`, S11, and `@gmail.com` since 2026-11-07 (Now); MFA Optional with TOTP; the portal on `<project>.vercel.app` for now)
+- Decision: who sees unlock reasons. (How accounts are made: decided 2026-10-04, self sign-up gated to `@vanderbilt.edu`, S11, and `@gmail.com` since 2026-11-07 (Now); MFA Optional with TOTP; the portal on `app.getbali.app` since 2026-11-07)
 - 🔧 Cognito for prod: self sign-up gated (S11's Lambda) ✅, a password policy ✅, MFA Optional (TOTP) ✅, MFA on the AWS root ✅; to check: no password-auth clients, unused clients deleted, user-existence errors off; skipped for the pilot: threat protection, CloudTrail — runbook: `docs/RUNBOOKS.md`, 2 (its status list). In dev's pool, the candidate to delete: the old `bali-ios-dev` (`33qr62dl4ee4inigneidmfe2s9`, made with a secret); the clients in use are `bali-ios-dev-public`, `bali-web-dev`, and `bali-ios` (`6qcvcp0ubqmb8gunkt1d6dpkeo`), the demo's password sign-ins, on dev's `AUTH_AUDIENCE` (found 2026-10-14; `docs/DEPLOY.md`)
 - 🔧 Railway for prod: the database on the private network only ✅, `CORS_ORIGINS` set exactly ✅, a long `INTERNAL_API_KEY` ✅; 2FA deferred by the owner; **no backups yet, so no restore drill**: backups before the Vanderbilt pilot's first class (L0b; the owner, 2026-10-12, withdrawing the ruling of 2026-10-05), the drill once a backup exists — runbooks: `docs/RUNBOOKS.md`, 1 and 4
 - 🔧 GitHub: a ruleset and CODEOWNERS so no PR changes `.github/**`, the `Dockerfile` or `.railway/` without the owner; secret scanning with push protection; private vulnerability reporting; CodeQL ✅ (advanced setup, 2026-11-04: JavaScript/TypeScript, GitHub Actions, Kotlin; Swift not yet; blocks merges on high-or-worse security alerts and errors via `protect-main`'s code-scanning rule since 2026-10-14); 2FA — runbook: `docs/RUNBOOKS.md`, 5

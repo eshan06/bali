@@ -273,7 +273,7 @@ describe('the in-memory stand-in', () => {
 });
 
 describe('the runbook’s check (runbook 10)', () => {
-  const PORTAL = ['https://bali-portal.vercel.app', 'http://localhost:3000'];
+  const PORTAL = ['https://app.getbali.app', 'http://localhost:3000'];
 
   /** The stand-in, its preflights answered as a bucket whose CORS allows `allowed` answers them. */
   function bucket(allowed: readonly string[]) {

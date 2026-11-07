@@ -109,8 +109,22 @@ the Kids category brings its own rules (guideline 1.3) for under-13 apps.
 
 ### URLs 🔧
 
-- Support URL: P4's support page.
-- Privacy policy URL: C2's privacy policy page. Required before submission. ⚖️ its words.
+- Support URL: P4's support page, `https://app.getbali.app/support`.
+- Privacy policy URL: C2's privacy policy page, `https://app.getbali.app/privacy`. Required before
+  submission. ⚖️ its words.
+
+### Checks before submitting 🔧
+
+- **The age rating's social media questions** (App Store Connect added them on 2026-07-09, and
+  answers are required from September 2026): **No**. Bali has no social feed or anything like one,
+  nothing that spreads, likes, comments on or shares what users post. Section 3's questionnaire
+  has the row, and its other answers agree (checked 2026-11-07).
+- **No pricing words** (guideline 2.3.7): nothing like "Free" in the name, subtitle, keywords or
+  screenshots, the words inside the app's own screens that a screenshot captures included. None of
+  section 1's drafts or the app's screens has one (checked 2026-11-07).
+- **iPhone only** (App Store Connect → Pricing and Availability): Bali shows for iPhone only, since
+  it requires NFC (section 2, guideline 2.4.1). If the page still offers Mac or Apple Vision Pro
+  availability, turn it off.
 
 ---
 
@@ -157,6 +171,24 @@ accounts and the video link once the review path (section 4) is chosen.
 >   answered, which can show whether the student did. Never the screen, apps, messages or
 >   location, nor which answer is the student's.
 >
+> CONTENT IN BALI (GUIDELINE 1.2)
+> - Teachers post the only content students see in the app: a class's name, slides, and
+>   questions with the answer choices the teacher sets. A teacher account needs an invite code
+>   we make for that teacher's school. Every other account is a student account.
+> - A student answers a question only by picking one of the teacher's choices, and the teacher
+>   sees the class's totals, never who picked what. The only text a student enters that anyone
+>   else sees is their name. Their teacher sees it beside their status, and so does the class if
+>   the teacher shows the class page on a classroom screen. Students can't message each other.
+>
+> IPHONE ONLY (GUIDELINE 2.4.1)
+> - To tap in, the student taps their iPhone on the teacher's Bali block, which the iPhone reads
+>   over NFC. iPads and Macs have no NFC reader, so Bali requires NFC
+>   (`UIRequiredDeviceCapabilities` lists `nfc`). The App Store doesn't offer it on iPad or Mac,
+>   and App Review can try it only on an iPhone. Every iPhone that runs iOS 17, Bali's minimum,
+>   has NFC.
+> - The tap also needs the teacher's block, so the screen recording under HOW TO TRY IT shows a
+>   tap on an iPhone.
+>
 > HOW TO TRY IT
 > [🔧 From section 4, the chosen option: the accounts, the class code, the video link,
 > and what the reviewer can do without a Bali block.]
@@ -172,6 +204,15 @@ Notes for the owner:
   top, with the date and the case number.
 - The notes name APIs on purpose: a reviewer checking §3.3.3(P) looks for `.individual`
   and for whether app usage leaves the device.
+- App Review tests an app offered on iPad on an iPad too (an iPad Air 11-inch (M3)). Requiring NFC
+  (the owner, 2026-11-07; `ios/project.yml`, device builds only) keeps Bali off iPad, Mac and
+  Apple Vision Pro, so it is reviewed on an iPhone.
+- The guideline 1.2 paragraph was checked against the code on 2026-11-07: only a class's teacher
+  opens a question or shows a slide, an answer is an option's index, a student's reads carry no
+  totals and no other student, and Present's tiles, the classroom screen's, show each student's
+  name and state, never an unlock's reason.
+- With those two paragraphs, everything above HOW TO TRY IT is about 3,500 characters, so what
+  fills HOW TO TRY IT has about 500 of App Store Connect's 4,000.
 
 ---
 
@@ -232,7 +273,8 @@ data; ⚖️ confirm a server-side error report triggered by an app request is n
 ### Age rating questionnaire
 
 App Store Connect's 2025 questionnaire, answered for Bali as it is. 🔧 check the wording
-against the form when filling it in: Apple revised it in 2025 and may again.
+against the form when filling it in: Apple revised it in 2025, added its social media questions
+on 2026-07-09 (answers required from September 2026), and may again.
 
 | Question | Answer |
 |---|---|
@@ -240,12 +282,13 @@ against the form when filling it in: Apple revised it in 2025 and may again.
 | Alcohol, tobacco, drug use or references | None |
 | Medical or treatment information; health or wellness topics | None ⚖️ (the "nurse" reason is a label, not medical content) |
 | Gambling, simulated gambling, contests | None |
-| Unrestricted web access | No. Sign-in opens the account page in a system sign-in sheet (`ASWebAuthenticationSession`), not a browser |
-| User-generated content shared with other users | No. The only text a student gives is a display name and an optional fixed-choice reason, seen by their teacher; no student sees another student's |
+| Unrestricted web access | No. Sign-in opens the account page in a system sign-in sheet (`ASWebAuthenticationSession`), not a browser; the privacy policy and terms open in Safari's in-app view (`SFSafariViewController`), where no address can be typed and every link stays on Bali's own pages and its sign-in |
+| User-generated content shared with other users | No: nothing is broadly distributed, Apple's test. A teacher's slides and questions reach their own class during a lesson, and a student's name reaches their teacher, and the class if the teacher shows the class page on a classroom screen (section 2, guideline 1.2). A student's other answers are choices, never text: an unlock's reason reaches their teacher, and a question's option counts only in the class's totals |
+| Social media (a social feed or similar discovery method; since 2026-07-09) | No. No feed, and nothing that spreads, likes, comments on or shares what users post |
 | Messaging or chat | No |
 | Advertising | No |
 | Parental controls | No. Bali is not a parental-control app, and saying yes would contradict section 2's `.individual` framing |
-| Age assurance | No, until C7. Once C7 ships its 13+ screen, ⚖️ ask the lawyer whether a self-declared age screen counts |
+| Age assurance | ⚖️ Ask the lawyer. C7's 13+ screen is built: Sign up asks the birth month and year and takes the answer as given, the date never kept. Does a self-declared age screen count? Apple's examples are the Declared Age Range API, age estimation and an ID check |
 | Made for Kids | No |
 
 The questionnaire alone likely rates Bali 4+. ⚖️ **Raise the rating to 13+**, if App Store
@@ -367,7 +410,7 @@ by the owner in App Store Connect → the app → **TestFlight**. How builds are
   feedback (a screenshot from TestFlight) reaches App Store Connect → TestFlight →
   Feedback.
 - **Marketing URL / Privacy policy URL:** the support page
-  `https://bali-portal.vercel.app/support`, and C2's policy page once it exists. ⚖️ Test
+  `https://app.getbali.app/support`, and C2's policy page once it exists. ⚖️ Test
   Information asks for a privacy policy URL, and C2 is a Phase 6 gate item for the
   student-facing steps anyway: its page (the lawyer's words) comes before the first
   external build.

@@ -4,7 +4,7 @@
 > 2026-10-24 (adapted from General Legal's "Privacy Policy (U.S. Only)" template, CC0,
 > https://github.com/General-Legal/legal-templates, and filled in from what Bali does), live only
 > in `apps/web/src/app/privacy/page.tsx`, served at `/privacy`
-> (https://bali-portal.vercel.app/privacy). The lawyer reviews that live page, and their words
+> (https://app.getbali.app/privacy). The lawyer reviews that live page, and their words
 > replace it there (C2). This file keeps only the questions for the lawyer, which no page shows.
 > Not legal advice.
 

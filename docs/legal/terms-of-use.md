@@ -3,7 +3,7 @@
 > **The live text is the page, not this file.** The terms' words, the owner's draft of 2026-10-24
 > (adapted from General Legal's "Terms of Use" template, CC0,
 > https://github.com/General-Legal/legal-templates, and filled in from what Bali does), live only
-> in `apps/web/src/app/terms/page.tsx`, served at `/terms` (https://bali-portal.vercel.app/terms).
+> in `apps/web/src/app/terms/page.tsx`, served at `/terms` (https://app.getbali.app/terms).
 > The lawyer reviews that live page, and their words replace it there (C2). This file keeps only
 > the questions for the lawyer, which no page shows. Not legal advice.
 

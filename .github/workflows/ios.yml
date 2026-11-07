@@ -127,6 +127,20 @@ jobs:
             name=$(/usr/libexec/PlistBuddy -c "Print :CFBundleDisplayName" "$app/PlugIns/$appex.appex/Info.plist" 2>/dev/null || true)
             [ -n "$name" ] || { echo "::error::$appex.appex has no CFBundleDisplayName: App Store Connect refuses the upload."; exit 1; }
           done
+          # The App Store offers Bali only to devices with NFC (the owner, 2026-11-07): a device
+          # build's setting is `nfc` alone (Xcode adds `arm64` itself), and an update can only keep
+          # or relax that. A simulator build requires nothing, or the Simulator, which has no NFC,
+          # won't launch it.
+          caps() {
+            xcodebuild -showBuildSettings -project Bali.xcodeproj -target Bali -configuration Release -sdk "$1" 2>/dev/null \
+              | awk -F' = ' '$1 ~ /^ *INFOPLIST_KEY_UIRequiredDeviceCapabilities$/ { print $2 }'
+          }
+          device=$(caps iphoneos)
+          simulator=$(caps iphonesimulator)
+          if [ "$device" != nfc ] || [ -n "$simulator" ]; then
+            echo "::error::UIRequiredDeviceCapabilities must be nfc alone on a device and nothing on the simulator (project.yml): device \"$device\", simulator \"$simulator\"."
+            exit 1
+          fi
 
       # The app target's own tests (BaliTests), hosted in the app.
       - name: The app's tests on the simulator, signing off

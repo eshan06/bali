@@ -342,7 +342,7 @@ deletes Bali and installs it fresh, then Parts 2–4, 6 and 7.
 **Before you start, once:**
 
 - Have the newest prod build ready in the TestFlight app once Apple has processed it.
-- On a laptop, keep two windows open on `https://bali-portal.vercel.app`: your prod teacher account in
+- On a laptop, keep two windows open on `https://app.getbali.app`: your prod teacher account in
   one, and your prod student account in a second browser profile for W6.
 - Upload a real lesson deck on the portal's **Your slides**: a PDF exported with photos, 10–25 MB and
   200 pages at most. Prod's deck bucket is already in the portal's security header, so the browser

@@ -11,7 +11,8 @@ redesigned (D2), so their wording and layout will change under it. Production's 
 `docs/RUNBOOKS.md`.
 
 **What runs where:** the API `https://bali-prod-production.up.railway.app`, the portal
-`https://bali-portal.vercel.app`, the Cognito pool `bali-production` (sign-up only with a
+`https://app.getbali.app` (since 2026-11-07; the old `https://bali-portal.vercel.app` redirects
+there), the Cognito pool `bali-production` (sign-up only with a
 `@vanderbilt.edu` or `@gmail.com` address, since 2026-11-07: Gmail for the owner's testing and
 for a student with no Vanderbilt address), the student app from the App Store (the owner,
 2026-11-04: no external TestFlight beta for now). Prod's **database backups go on before the
@@ -128,7 +129,7 @@ At the end:
 ## 3. Support
 
 - **Support email:** eshan.shah@vanderbilt.edu, for students and the professor. The
-  public help page is `https://bali-portal.vercel.app/support`.
+  public help page is `https://app.getbali.app/support`.
 - **A student is stuck locked:** Emergency Unlock, always. It works offline and is never
   refused. If the app itself won't open, the shields still come off at the bell, and a
   tap that never reached the server comes off by itself after 50 minutes. Last resort:
