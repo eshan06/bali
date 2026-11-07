@@ -10,6 +10,13 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-11-07 (Central) — PostHog is on: the owner set `POSTHOG_KEY` on `bali prod`,
+and its boot log says "analytics is on" (item 4). Before it, A6 (#536). Next: the notice
+`/privacy`'s section 11 promises, the owner's; a session builds the retire-a-block command; the
+owner the new build, with A5 and A2, and the sitting; the owner's call on GA5's known limit, the
+smallest iPhones (DECISIONS 2026-11-02); AN9b; AN1's part 2 once the owner has the phones; the
+audit's polish waits, as ruled._
+
 _Last updated: 2026-11-07 (Central) — A6 (#536; `docs/DECISIONS.md`, 2026-11-07): every PostHog
 event is personless, so PostHog keeps no profile per teacher, and `/privacy` no longer says a
 teacher's ID stays there. Before it, the website on `demo3` (#534). Next: the owner's PostHog key;

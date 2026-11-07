@@ -12,8 +12,10 @@ redesigned (D2), so their wording and layout will change under it. Production's 
 
 **What runs where:** the API `https://bali-prod-production.up.railway.app`, the portal
 `https://bali-portal.vercel.app`, the Cognito pool `bali-production` (sign-up only with a
-`@vanderbilt.edu` address), the student app through TestFlight. Prod's **database backups
-go on before the first class** (PLAN's L0b; the owner, 2026-10-12, withdrawing the ruling of
+`@vanderbilt.edu` or `@gmail.com` address, since 2026-11-07: Gmail for the owner's testing and
+for a student with no Vanderbilt address), the student app from the App Store (the owner,
+2026-11-04: no external TestFlight beta for now). Prod's **database backups go on before the
+first class** (PLAN's L0b; the owner, 2026-10-12, withdrawing the ruling of
 2026-10-05 that ran this pilot without them; `docs/RUNBOOKS.md`, runbook 1, step 4).
 
 ## 1. Setup, in order
@@ -64,19 +66,14 @@ Steps 1–3 are done for the owner's own class (2026-10-05); for another profess
    tag and register it on the portal. The old code stays valid until its block row is
    retired (`blocks.removed_at` set), and no screen or command does that yet: ask a
    session for an owner command that retires a block, and run it on the old code.
-7. **The students' app**, through TestFlight's **external** group for the pilot, which
-   gets prod builds only (`docs/DEPLOY.md`, "TestFlight"; dev builds go to an internal
-   group, never this one). The owner adds each student's email to that group (or shares
-   the group's public link); each student installs TestFlight, accepts, and installs Bali.
-   Apple's rules, not this repo's: a TestFlight build expires 90 days after upload (the
-   one dispatched 2026-10-05 lasts to about 2027-01-03, past the term's end), and the first
-   build offered to an external group waits for Apple's Beta App Review (what to send it:
-   `docs/APP-STORE.md`, section 5). A fix is a new
-   prod dispatch (`docs/DEPLOY.md`, "TestFlight").
+7. **The students' app**, from the App Store, once App Review approves a prod build (what to
+   send it: `docs/APP-STORE.md`, sections 1–4; the build: `docs/DEPLOY.md`, "TestFlight").
+   Each student installs Bali from the App Store. A fix is a new prod build, submitted for
+   review again.
 8. **Each student, once:** opens Bali, reads the privacy pages, signs up with their
-   `@vanderbilt.edu` address, gives Bali Screen Time permission, enters the class's join
-   code, sees what the professor will and won't see, and joins. A student can do this
-   before the first class; it takes a few minutes.
+   `@vanderbilt.edu` address (or, with none, a `@gmail.com` one), gives Bali Screen Time
+   permission, enters the class's join code, sees what the professor will and won't see, and
+   joins. A student can do this before the first class; it takes a few minutes.
 
 ## 2. The day of class — the professor's checklist
 
@@ -136,13 +133,13 @@ At the end:
   refused. If the app itself won't open, the shields still come off at the bell, and a
   tap that never reached the server comes off by itself after 50 minutes. Last resort:
   Settings → Screen Time → turn it off, or delete the app; both take the shields off.
-- **A student can't sign up:** the address must end `@vanderbilt.edu` exactly (a
-  subdomain such as `mc.vanderbilt.edu` is refused unless added to the Pre sign-up
+- **A student can't sign up:** the address must end `@vanderbilt.edu` or `@gmail.com`
+  exactly (a subdomain such as `mc.vanderbilt.edu` is refused unless added to the Pre sign-up
   Lambda's list, `docs/RUNBOOKS.md`, runbook 2, step 4), and they must enter the code
   Cognito emails them.
 - **A student can't join:** check the code they typed against the class page (it has no
-  `0`, `O`, `1`, `I` or `L`), and that they're signed in with their `@vanderbilt.edu`
-  account. A join needs a connection.
+  `0`, `O`, `1`, `I` or `L`), and that they're signed in with the account they signed up
+  with. A join needs a connection.
 - **The scan says it isn't a Bali block:** the tag holds something else, or the code on
   it isn't the one registered; rewrite it (step 6).
 - **The API is down:** taps still lock phones at once and are kept on the phone, sent when
@@ -151,7 +148,7 @@ At the end:
   stops: the portal (Start, the grid, reports) and joining a class. Nothing a phone
   recorded is lost. Check `/healthz` (below) and Railway's deploy log for `bali prod`.
 - **A sign-in is stuck** (a forgotten password): the hosted sign-in page's reset flow
-  emails a code to the `@vanderbilt.edu` address. The owner can also find the user in the
+  emails a code to the account's address. The owner can also find the user in the
   production pool's **Users** list and check it is confirmed.
 
 ## 4. Where to look

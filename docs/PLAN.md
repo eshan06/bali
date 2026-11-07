@@ -8,12 +8,13 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-07 (Central) — PostHog is on: the owner set `POSTHOG_KEY` on `bali prod`,
-and its boot log says "analytics is on" (item 4). Before it, A6 (#536). Next: the notice
-`/privacy`'s section 11 promises, the owner's; a session builds the retire-a-block command; the
-owner the new build, with A5 and A2, and the sitting; the owner's call on GA5's known limit, the
-smallest iPhones (DECISIONS 2026-11-02); AN9b; AN1's part 2 once the owner has the phones; the
-audit's polish waits, as ruled._
+_Last updated: 2026-11-07 (Central) — the legal words say what is true now (#539; DECISIONS
+2026-11-07): `/terms` and `/privacy` name no email domain and no TestFlight, the app goes straight to
+the App Store (item 5), and `docs/APP-STORE.md` §3 says Analytics where the manifest does (item 6).
+Next: the notice section 11 promises, the owner's; a session
+builds the retire-a-block command; the owner the new build, the sitting, then the App Store
+submission; GA5's known limit, the owner's call (DECISIONS 2026-11-02); AN9b; AN1's part 2 on the
+owner's phones; the audit's polish waits._
 
 ## Now
 
@@ -22,7 +23,8 @@ in `docs/PLAN-ARCHIVE.md`), `docs/DECISIONS.md` the why, Open owner items the ow
 
 **Production is live (2026-10-05):** the API `https://bali-prod-production.up.railway.app`
 (Railway `bali prod`), the portal `https://bali-portal.vercel.app`, the Cognito pool
-`bali-production` (sign-up for `@vanderbilt.edu` only); the sweep every minute in the API, with
+`bali-production` (sign-up for `vanderbilt.edu,gmail.com` only, Gmail for the owner's testing and
+students with no Vanderbilt address); the sweep every minute in the API, with
 `sweep-cron` its backup and Sentry Cron `api-sweep` its monitor; deck storage on in both
 environments (M0); the portal's sign-in lasting the school day (2026-10-13); the school
 "Vanderbilt" set up, its year end 2026-12-18. **No prod backups yet**: on before the Vanderbilt
@@ -149,13 +151,12 @@ reviewed by santa and pushed straight to the branch, with no PR, as its README s
      2026-11-07, the project on PostHog's free plan (1 year, as `/privacy` says) and no events
      before it, its boot log "analytics is on". Left, the owner's: the notice `/privacy`'s section
      11 promises before something new is collected (DECISIONS 2026-11-05).
-5. The external TestFlight group `Vanderbilt pilot` and Beta App Review (`docs/APP-STORE.md`, section
-   5), which is Apple's answer on §3.3.3(P) (ISSUES #3).
-6. For PostHog, the App Store privacy label (Product Interaction and Other Data Types gain the
-   purpose Analytics, which the app's privacy manifest declares since A5 and A2, so the label must
-   match it) and `docs/APP-STORE.md`'s answers and review note ("no third-party analytics…"); until
-   then they say App Functionality only, though item 4's key turns the totals on. The owner's, later
-   (the owner, 2026-11-04: "we can change the wording on privacy stuff on apple later").
+5. The App Store submission, the owner's, from `docs/APP-STORE.md`'s sections 1–4 (5.4: the
+   review accounts): App Review is Apple's answer on §3.3.3(P) (ISSUES #3). No external beta for
+   now (the owner, 2026-11-04).
+6. The App Store privacy label: answers ready in `docs/APP-STORE.md` §3 (Product Interaction and
+   Other Data Types serve Analytics too, as the manifest says since A5 and A2), for the owner to
+   paste with item 5.
 7. Production backups on (L0b), before the pilot's first class: `/privacy` (sections 4, 6 and 7)
    already promises a daily and a weekly backup (the owner, 2026-11-05: "we will have those backups
    before we go live").
@@ -335,10 +336,10 @@ Researched 2026-10-05; findings in [`docs/ROADMAP-RESEARCH.md`](ROADMAP-RESEARCH
 
 **Phase 6's owner list** (not PRs — the owner, the lawyer and the school):
 
-- 🚨 Apple's §3.3.3(P) (ISSUES #3): ask App Review whether a teacher-started session and the teacher's grid are allowed, and settle a fallback design if not — **gate**, and the first thing to do — asked by the owner 2026-10-13, case 102994872143 (`docs/APP-STORE.md` §5.6, as sent); **answered** (the owner, 2026-11-03): submit it for review, since App Review decides only once it sees the build, so Beta App Review is the answer
+- 🚨 Apple's §3.3.3(P) (ISSUES #3): ask App Review whether a teacher-started session and the teacher's grid are allowed, and settle a fallback design if not — **gate**, and the first thing to do — asked by the owner 2026-10-13, case 102994872143 (`docs/APP-STORE.md` §5.6, as sent); **answered** (the owner, 2026-11-03): submit it for review, since App Review decides only once it sees the build, so App Review is the answer
 - Confirm the later K-12 pilot's state (likely Los Angeles or New Jersey) and the school's phone policy (ISSUES #4); the first, preliminary pilot is adults at Vanderbilt, on their own phones
 - ⚖️ The privacy policy and terms; the school's data agreement (FERPA's school-official terms, the state's law or the SDPC NDPA); a breach plan; opinions on the state's phone-ban and app-store age laws
-- Decision: who sees unlock reasons. (How accounts are made: decided 2026-10-04, self sign-up gated to `@vanderbilt.edu`, S11; MFA Optional with TOTP; the portal on `<project>.vercel.app` for now)
+- Decision: who sees unlock reasons. (How accounts are made: decided 2026-10-04, self sign-up gated to `@vanderbilt.edu`, S11, and `@gmail.com` since 2026-11-07 (Now); MFA Optional with TOTP; the portal on `<project>.vercel.app` for now)
 - 🔧 Cognito for prod: self sign-up gated (S11's Lambda) ✅, a password policy ✅, MFA Optional (TOTP) ✅, MFA on the AWS root ✅; to check: no password-auth clients, unused clients deleted, user-existence errors off; skipped for the pilot: threat protection, CloudTrail — runbook: `docs/RUNBOOKS.md`, 2 (its status list). In dev's pool, the candidate to delete: the old `bali-ios-dev` (`33qr62dl4ee4inigneidmfe2s9`, made with a secret); the clients in use are `bali-ios-dev-public`, `bali-web-dev`, and `bali-ios` (`6qcvcp0ubqmb8gunkt1d6dpkeo`), the demo's password sign-ins, on dev's `AUTH_AUDIENCE` (found 2026-10-14; `docs/DEPLOY.md`)
 - 🔧 Railway for prod: the database on the private network only ✅, `CORS_ORIGINS` set exactly ✅, a long `INTERNAL_API_KEY` ✅; 2FA deferred by the owner; **no backups yet, so no restore drill**: backups before the Vanderbilt pilot's first class (L0b; the owner, 2026-10-12, withdrawing the ruling of 2026-10-05), the drill once a backup exists — runbooks: `docs/RUNBOOKS.md`, 1 and 4
 - 🔧 GitHub: a ruleset and CODEOWNERS so no PR changes `.github/**`, the `Dockerfile` or `.railway/` without the owner; secret scanning with push protection; private vulnerability reporting; CodeQL ✅ (advanced setup, 2026-11-04: JavaScript/TypeScript, GitHub Actions, Kotlin; Swift not yet; blocks merges on high-or-worse security alerts and errors via `protect-main`'s code-scanning rule since 2026-10-14); 2FA — runbook: `docs/RUNBOOKS.md`, 5
