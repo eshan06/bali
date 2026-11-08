@@ -336,6 +336,12 @@ list's new lines, Part 6 the class-started alert end to end (N6), and Part 7 eve
 Together they are every phone check left before the pilot (the owner, 2026-11-03). Everything happens on
 prod: the answers you give are real records there, so use your own accounts and your own class.
 
+**Run on prod on 2026-11-08,** on the owner's iPhone 15 Pro: build 12 from Part 1 to Part 7's step 7,
+then build 13 for Part 7's steps 1, 2 and 8–10. Every check passed. Not run: Part 2's step 6 (the
+battery), Part 3's tap on a link in the PDF (no deck had one) and its second iPhone. Seen in Part 7's
+step 6: iOS took about 30 seconds to show its Screen Time prompt, with Bali's button saying **Asking…**
+the whole time, so the wait was iOS's own.
+
 **The order:** Part 5 first, as an update over the build on the phone now (10 or 11). Then Part 1, which
 deletes Bali and installs it fresh, then Parts 2–4, 6 and 7.
 

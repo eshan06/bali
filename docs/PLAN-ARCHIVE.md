@@ -10,6 +10,13 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-11-07 (Central) — a TestFlight run revokes the Apple Development certificate
+its signing made (#542; DECISIONS 2026-11-07), so they no longer pile up to Apple's limit; build
+13's run is its live check. Before it, a teacher's account on the iPhone (#541). Next: a session
+builds the retire-a-block command; the owner the sitting on build 12, then build 13 and the App
+Store submission; GA5's known limit, the owner's call (DECISIONS 2026-11-02); AN9b; AN1's part 2
+on the owner's phones; the audit's polish waits._
+
 _Last updated: 2026-11-07 (Central) — the portal is at `https://app.getbali.app` (#540; DECISIONS
 2026-11-07): the app's policy links from build 13, `/privacy` and the docs, the old address
 redirecting; the app requires NFC, so iPhone only (the owner); `docs/APP-STORE.md`'s review notes
@@ -1914,6 +1921,71 @@ done lines of In flight, Before the pilot's item 1, and item 4's last sentence.
 Item 4's last sentence: "Left, the owner's: the notice `/privacy`'s section 11 promises before
 something new is collected (DECISIONS 2026-11-05)."
 
+**As PLAN.md said them until the prod phone sitting (2026-11-08, #545):** two lines of In flight and
+the push's last sentence; Before the pilot's items 1, 2 and 4 and item 5's last sentence; the Phase 7
+status's words on the phone's screens; Phase 6's row; M8's and M8b's lines; C7's and the push's app
+half's under Still open in earlier phases; the overnight investigation's item 6; the push's owner
+item; and Go-live features' onboarding row. L8's full line is under Phase 7 steps.
+- **The owner's Mac session (Xcode and the iPhone):** the app's Sign in & sign up is built; the app
+  keeps D1's look until the owner approves a new one (its redesign rolled back, 2026-10-06). Left:
+  TestFlight build 9 for C7's phone test (📱); the push's app half is done (#456). The phone's
+  Phase 7 screens are done: L8 (L8a, #443, L8b, #448 and #450, and L8c, #451), M8's slide view on
+  Focus (#452) and M8b's slide off Focus and card on the Screen Time ask (#454); left, their 📱
+  device checks, the owner's. C2's legal words (⚖️) go into the portal's pages, on the Windows PC.
+- **A TestFlight run leaves no certificate behind** ✅ (#542; DECISIONS 2026-11-07): it revokes the
+  Apple Development certificate its signing made, never one from before the run; build 13's run is
+  the live check, the team's certificate count the same after it as before.
+
+The push's last sentence: "Left: dev's step 4, and N6's end-to-end check before the pilot (the owner, 2026-11-03: "check this notifications stuff before we pilot"), Bali reinstalled first (the sitting's Part 6)."
+
+1. A new prod TestFlight build from `main` — ✅ build 12 (2026-11-07, from #538), on the owner's phone
+   for the sitting; it links the old portal address, which redirects.
+2. 📱 The phone sitting on it, whole (`ios/README.md`, "Phase 7's phone sitting, on prod", Parts 1–7):
+   C7's first launch, L8's, M8's and M8b's device checks, the exit checks L9, M10 and W6, the consent
+   list's new lines, the shield's new line, the class-started alert end to end (N6), and every other
+   student flow. The owner's.
+
+Before the pilot's item 4, in full:
+
+4. PostHog (ARCHITECTURE's "Analytics (PostHog)"; DECISIONS 2026-11-04), one PR each:
+   - **A1** Its rules in the docs — ✅ (#503; DECISIONS 2026-11-04)
+   - **A5** The iPhone app's privacy manifest: Product Interaction gains the purpose Analytics — ✅
+     (#505; DECISIONS 2026-11-04)
+   - **A2** The server's class totals, always sent, whatever the class's size — ✅ (#514; DECISIONS
+     2026-11-04)
+   - **A3a** The server's endpoint for the portal's events, `POST /v1/me/actions`: teacher-only,
+     checked against the allow-list, forwarded to PostHog with the server's key; additive under
+     `/v1` — ✅ (#517; DECISIONS 2026-11-05)
+   - **A3b** The portal's teacher events, through it (no CSP change) — ✅ (#525; DECISIONS 2026-11-05)
+   - **A4** `/privacy` names PostHog and says what stays there once an account is deleted (a
+     teacher's events, a class's totals), before the key is set — ✅ (#527; DECISIONS 2026-11-05)
+   - **A6** PostHog keeps no profile per teacher: every event personless, and `/privacy`'s line on a
+     teacher's ID gone — ✅ (#536; DECISIONS 2026-11-07)
+   - The owner's key: `POSTHOG_KEY` on Railway's `bali prod` (the portal holds none) — ✅
+     2026-11-07, the project on PostHog's free plan (1 year, as `/privacy` says) and no events
+     before it, its boot log "analytics is on". The notice `/privacy`'s section 11 promises: owed
+     to no one yet, every prod account being the team's, and due for any change that matters from
+     the first pilot user on (the owner; DECISIONS 2026-11-07).
+
+Item 5's last sentence: "Build 12 is on the owner's phone for the sitting."
+
+The Phase 7 status, on the phone's screens: "(✅ L8a–L8c, M8, #452, and M8b, #454, their 📱 device checks left)".
+
+Phase 6's row: | 6 | Security and compliance; gates Phase 5's student-facing steps | ✅ cloud steps done; open: C2 (⚖️ the lawyer's words), C7's phone check 📱, S8 (the owner's decision) |
+
+- **M8** 👀📱 iOS slide view to the app canvas — ✅ (#452; DECISIONS 2026-10-24): the slide on Focus only, over shields the check verified; left, its 📱 device check on a shielded phone, the owner's (Part 3 of `ios/README.md`'s "Phase 7's phone sitting, on prod"); the slide off Focus is M8b's; its CI failure, `AppTests.ageAgainInClass`'s own wait, fixed in the same PR (DECISIONS 2026-10-24)
+- **M8b** 👀📱 The slide on Unlocked, Screen Time off and Home, and the question card on the Screen Time ask — ✅ (#454; DECISIONS 2026-10-24); left, its 📱 device check with M8's (Part 3 of `ios/README.md`'s "Phase 7's phone sitting, on prod")
+- **C7** 📱 The 13+ screen (Phase 6, **gate**): built, C7-server with it; left, the owner's first-launch check on the next TestFlight build
+- **The push's app half** — ✅ (#456; DECISIONS 2026-10-24); left, runbook 7 (Push Notifications on `com.bali.Bali` before the next TestFlight build) and N6's end-to-end check, the owner's, Bali reinstalled first (an install whose Screen Time step was done before this build is never asked)
+
+6. Vercel `bali-portal`: an Ignored Build Step `[ "$VERCEL_GIT_COMMIT_REF" != "main" ]`, so PR previews (which fail without env, by design) stop building.
+
+- 🔧 Push: runbook 7 (`docs/RUNBOOKS.md`) — the APNs key, Push Notifications on the App ID (before
+  the next TestFlight build: the app half asks for `aps-environment`, #456), the three `APNS_*`
+  variables on dev and prod; its end-to-end check once the app half lands (N6).
+
+The onboarding row: | Onboarding: Sign up or sign in → Sign up's 13+ check and intro → sign-up → your name → Screen Time grant → Home | 3 | ✅ built (B4, B5a, C1a–C1c, C7 and C7-server, the approved Sign in & sign up design), no allow-list step; 📱 C7's first-launch check on the next TestFlight build |
+
 **In flight, the WC line as PLAN.md said it until WC8 (2026-11-05):**
 - **The owner's Android cuts on the iPhone and the student web (the owner, 2026-11-04; DECISIONS
   2026-11-04):** WC1–WC8, one PR each, from the approved boards: WC1–WC7 ✅ (#502, #506, #508,
@@ -2132,6 +2204,7 @@ Slice 1 — live questions:
 - **L7** 👀 Portal UI to v2's canvas (LessonClass, LessonWrite, LessonWaiting, LessonLive, LessonClosed, LessonStates' L7 lines; PresentQuestion, PresentAnswer), on the redesign's shell (PV5) and class page (PV6–PV11): the class page's "Questions and slides" card, Ask in the side panel (prompt, 2–6 options, the correct one optional), the live results with "N of M answered" and the guard's wording, close and reveal, and Present showing the question in place of the live grid, the counts per option only once it closes (L6's poller already reads the results once more after a close); the three of its sentences the canvas drops are not built (DESIGN.md §1, The words); two PRs (the class page's, then Present's); after PV15 (M0 ✅; the canvas approved 2026-10-12) — validation: `/santa-loop` with `web-design-guidelines` and `no-ai-slop`, screenshots for the owner. **Part 1, the class page** — ✅ as L7-1a, the card and its results (#389), and L7-1b, asking in the side panel (#390; DECISIONS 2026-10-15). Part 2, Present's, after them — ✅ part 2 (#402) `components/present-question.tsx`, in Present the live question in the grid's place as PresentQuestion and PresentAnswer draw it, the grid kept underneath with its stream (`LiveGrid`'s `tiles` off), its counts' bar gone as the boards draw none: "N of M answered" while it is open, each answer's count once it is closed and Bali's last read after the close is in (L6's `final`), never under the server's guard (`counts` null, "Too few answers to show a breakdown."), the correct answer only once shown, every bar grey otherwise; its intermediate states drawn on the canvas first (PresentQuestionStates, PresentQuestionPhone; the canvas's version 41) and built from them. On dev from the owner's tab: the demo class's four answering through the API, two and then four while open, closed with the answer shown, closed under 3 answers, closed without it, Present after Done, and 390 px. Why: `docs/DECISIONS.md` (2026-10-15, L7-2)
 - **L7b** 👀 Portal saved questions to v2's canvas (Questions, QuestionsEdit, LessonAsk's drafts, LessonStates' L7b lines): the questions page in the menu (write, edit and remove a draft; its empty state), the side panel's drafts with a one-click Ask and "Write a new question"; the classes home's "Questions and slides" card gives way to the menu's Questions and Slides (confirmed by the owner, 2026-10-12); each save's `eventId` minted after the draft's own, a reply under another `eventId` treated as not saved (#318); "Your questions" oldest first, as the canvas lists them, sorted in the portal (the API answers newest first); two PRs (the page, then the panel's drafts) — validation: `/santa-loop` with the UI skills, screenshots. **Part 1, the page, in three** (the conductor, 2026-10-15: 844 lines; DECISIONS 2026-10-15) — ✅ as part 1a, the save logic (#393), part 1b, the list and Remove (#394), and part 1c, writing, editing and the menu's Questions (#395). Part 2, the panel's drafts, after them — **Part 2** ✅ (2026-10-16, #411) to LessonAsk, and LessonAskStates drawn first as intermediate states (versions 56 to 58): Ask a question and Ask another question open the side panel on the teacher's questions (`PickPanel`, `components/ask-panel.tsx`), 372 px, read from Bali each time it opens (`readDrafts`, oldest first; Loading…, Your questions' line with Try again, or LessonStates' "No saved questions yet."), each with its answers counted and the correct one named (`pickLine`: "4 answers · B marked correct") and Ask, then Write a new question (LessonWrite's 460 px form, what is written kept until it is asked or cancelled) and Your questions; an Ask sends the question's words through the live question's own ask (`useLiveQuestion`'s `ask`, its `from` naming the question asked), one at a time as Ask the class sends, every Ask and Write a new question held meanwhile, a failure said under its question with Try again, kept there however the panel is left (the write form's Cancel forgets only an ask of what is written, `forgetAsk`); never in Present (`panel = asking && !present`, both views, pinned by `present.test.ts`). The write form checks and says what Bali refuses through Your questions' `refusalsOf` and `refusalSaid`, the portal's one copy (#390's review), pinned by `lib/saved-questions.test.ts`. The classes home's "Questions and slides" card was never built in v3, so nothing gave way. Tests: `apps/web/src/components/ask-panel.test.ts`, `question-card.test.ts`, `app/present.test.ts`, `lib/saved-questions.test.ts`. Why: `docs/DECISIONS.md` (2026-10-16, L7b's part 2)
 - **L7c** 👀 A session's Questions to v2's canvas (ReportOpened's Questions card, PV14's page; LessonStates' L7c lines): each question asked with its totals through L3c's read, the guard applied ("Too few answers to show a breakdown"); on the report page only, not under the class page's recap (the owner, 2026-10-12) — validation: vitest, `/santa-loop`, screenshots — ✅ (2026-10-16, #412) to ReportOpened's Questions card and LessonStates' two lines for it, and ReportQuestionsStates drawn first as intermediate states (version 59: the card loading and not loaded, none asked, a question with no correct answer, the card at 390 px): `ReportQuestions` (`components/report-questions.tsx`), the page's last part after the Unlocks table, "Questions" over "N asked in this session", each question in the order the server gives it with when it was asked ("Answer shown" or "Answer not shown" only when it has a correct answer), its words, "Too few answers to show a breakdown." while `counts` is null, its options and "N of M answered" through the class page's card's own `Options` and `answeredLine` (`components/question-card.tsx`, moved out of `QuestionCard`, which renders as before); its own read, `readSessionQuestions` (`lib/reports.ts`), started with the page's, its failure said in the card with Try again, the report standing, the page's Try again reading it too; none asked, no card. The guard is the server's alone: the card keys on `counts`, never on N, and a test fails if either file's code compares N, or anything with 2 or 3, either way round. Tests: `apps/web/src/components/report-questions.test.ts`, `session-report.test.ts`, `lib/reports.test.ts`. Why: `docs/DECISIONS.md` (2026-10-16, L7c)
+- **L8** 👀📱 iOS answer card to the app canvas: while a question or a slide shows, the Focus screen's ring as a strip and Emergency Unlock pinned at the bottom; a tap answers and changes it until the close; the revealed answer marked, never red; a closed question's Hide; the same card on Unlocked, Screen Time off and Home; the consent list's two new lines and the one-time screen for a student who saw the old list (`no-ai-slop`); M0 ✅ (the canvas approved 2026-10-10; L0b, before the first actual pilot since 2026-10-12, holds back no screen). **No build that can answer ships (TestFlight included) before L2's documents and this wording have landed** — validation: XCTest, then the device check on the owner's iPhone: a shielded phone answers, the battery cost of the 2 s poll over a lesson, VoiceOver (written as Part 2 of `ios/README.md`'s "Phase 7's phone sitting, on prod", 2026-10-24). **L8a**, the consent list's two new lines and the one-time screen — ✅ (#443; DECISIONS 2026-10-23). **L8b**, the lesson followed and the card on Focus — ✅ as L8b-1, the lesson followed and the card's words, the card waiting for the list and Delete account taking the phone's notes (the owner's rulings; #448), and L8b-2, the card on Focus, the ring as the strip and Emergency Unlock pinned, a poll refused 403 or 404 ending the lesson (#450); DECISIONS 2026-10-23. **L8c**, the same card on Unlocked, Screen Time off and Home, with the owner's three riders — ✅ (#451; DECISIONS 2026-10-23). L8's screens are done; left, its 📱 device check on the owner's iPhone
 
 Slice 2 — slides:
 - **M0** 🔧 The owner: a private bucket per environment (AWS S3, settled 2026-10-10), its CORS for the portal's origins, an IAM identity for that bucket only, its keys as Railway secrets — the runbook: `docs/RUNBOOKS.md`, runbook 10 (written with M1), dev first — validation: the runbook's check, `railway ssh --service bali -- npm run --silent deck-bucket:check` (a presigned PUT and GET from dev, the bucket's refusals and CORS, the API's read and delete), ending `PASS` — ✅ (2026-10-12, both environments) the owner's: dev's bucket `bali-decks-dev-eshshah` and prod's `bali-decks-prod-eshshah`, the check `PASS` through `railway ssh` on `bali` and on `bali prod`; deck storage is on in both
