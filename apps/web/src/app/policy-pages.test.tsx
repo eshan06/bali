@@ -331,7 +331,7 @@ describe('the privacy policy names PostHog, which Bali’s server sends its coun
       'Bali never sees your screen, your messages, where you are, or which apps you have.',
       "We don't sell your information, show ads, or use advertising tools or tracking cookies.",
       'Your school decides to use Bali. We hold class records for the school and use them only to run Bali for that school and to count how Bali is used (section 1).',
-      'You can delete your account from the app at any time.',
+      'Students can delete their account in the app at any time. Teachers delete theirs through their school (section 7).',
     ]);
     expect(automatic().map((item) => item.querySelector('strong')?.textContent)).toEqual([
       'No tracking cookies and no ads.',
@@ -395,7 +395,7 @@ describe('the privacy policy names PostHog, which Bali’s server sends its coun
       "Usage counts stay at PostHog until it deletes them (section 1). They never named you, but when a class had only one or two students, or only one or two tapped in, a session's counts are those students' own numbers, yours included.",
     );
     expect(deletion.querySelector('ul + p')?.textContent).toBe(
-      "A teacher with a class or a registered block deletes their account through their school, so a class isn't left without its teacher. Email us to start. When a teacher's account is deleted, their usage counts stay at PostHog under the ID Bali gave their account, until PostHog deletes them (section 1).",
+      "A teacher deletes their account through their school, so a class isn't left without its teacher. Email us to start. When a teacher's account is deleted, their usage counts stay at PostHog under the ID Bali gave their account, until PostHog deletes them (section 1).",
     );
   });
 

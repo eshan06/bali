@@ -8,6 +8,23 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-07** — **Every teacher deletes their account through their school, by email; students
+  delete in the app (the owner).** Since #541 a teacher's account sees only the teacher screen on the
+  iPhone, so a teacher with no class or block, who could delete on Me before, no longer can there.
+  The owner, verbatim: "well I think we can do it by email since teachers shouldnt even have an
+  account on the mobile app. what do you think? I just want to be compliant with apple". `/privacy`'s
+  short version now says students delete in the app and teachers through their school (section 7),
+  and section 7 says every teacher does, not only one with a class or a block.
+
+  **Apple (guideline 5.1.1(v)).** Accounts made in the app are students', and a student deletes in
+  the app (Me → Delete account). An account becomes a teacher's only on the portal, through a
+  school's invite, and its records belong to the school, which is why its deletion goes through the
+  school. **The weak spot:** Apple's guidance says email-only deletion is for highly regulated
+  industries, and a teacher's account may have started as a student's made in the app. Judged a low
+  review risk, since App Review uses the student account in the app. If Apple flags it, the
+  follow-up is Delete account on the teacher screen for a teacher with no class or block, which
+  `DELETE /v1/me` already allows (409 `teacher_has_classes` otherwise). The server is unchanged.
+
 - **2026-11-07** — **A TestFlight run revokes the Apple Development certificate its signing made,
   and no other (#542).** **What happened:** each run of `testflight.yml` archives on a fresh GitHub
   runner, whose keychain is empty, so Xcode's automatic signing (the App Store Connect key,
