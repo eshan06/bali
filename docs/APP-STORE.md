@@ -196,6 +196,8 @@ accounts and the video link once the review path (section 4) is chosen.
 > Student review account: [🔧 email] / [🔧 password]
 > Teacher portal (optional, to watch the live grid): [🔧 URL], [🔧 email] / [🔧 password]
 > Class code: [🔧]
+>
+> The iPhone app is for students. The teacher review account is for the portal: signed in on the iPhone, it shows a screen that points there.
 
 Notes for the owner:
 - "Nothing can turn it off" is true of the code today (the unlock is local-first, ISSUES

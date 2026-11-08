@@ -8,6 +8,56 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-07** — **A teacher's account can't use the iPhone app: one screen says the app is for
+  students and points to the portal (the owner).** The owner, verbatim: "bruh why is a teacher even
+  allowed to sign in. make it so they cant (if thats compliant with apple)." Then: "create a screen in
+  claude design for if a teacher trys to use the student app. the one with the link to
+  app.getbali.app. and open the pr". Found on the owner's phone, signed in with their teacher
+  account: Home listed the class they teach, Me offered a name editor whose Save failed (`PATCH
+  /v1/me` 403, said in `Naming.words`' fallback, which stays), and a teacher's taps and unlocks count
+  for nothing.
+
+  **What it does.** Once a read of `GET /v1/me` names the account a teacher's (`MeResponse.user.role`),
+  the router (`Screen.choose`) shows `teacher` and nothing else, with no tab bar: "You're signed in as
+  a teacher", "This app is for students. Teachers run their classes on the portal.", Open the portal
+  (a link to the build's `BaliPortalURL`, opened in Safari, its host said under it, never a host
+  written in) and Me's Sign out, held while an Emergency Unlock is unsent as Me's is (#125), so a
+  student made a teacher on the portal never loses one (`TeacherAccountView`). It is drawn on the Sign
+  in & sign up canvas's Teacher row as intermediate states of sign-in (the screen, the largest text
+  size top and end, Sign out held, a Sign out that couldn't finish), then built from it without the
+  owner's approval, as CLAUDE.md has it for a refusal at sign-in. It shows where Your name would:
+  after the 13+ check, so a sign-in made this run holds the starting mark until that read, and a phone
+  signed in from the last run (an update, a relaunch, an account an invite made a teacher's while
+  signed in here) at its next read; never over Focus, a session's screens or the home a standing not
+  read keeps, which hold Emergency Unlock. It arrives as Your name does, a fade after the mark. The
+  engine never sends the device token for an account a read names a teacher's.
+
+  **The boot order, traced.** Sign in, then `GET /v1/me/age-check` (a teacher's always reads passed),
+  then the sign-in let through: iOS asked for a device token where notifications are allowed (iOS's
+  own, no Bali call), then `GET /v1/me`, the mark meanwhile, then the teacher screen. So no consent
+  list, no Screen Time or notifications ask, no Home, Me, History, Join or Tap in, no history read
+  (student-only already) and no token sent. Known limits: a sign-in kept from the last run shows what
+  it did (Home, say) until its first read answers, as Your name has it (the owner's ruling,
+  2026-10-07), so on a phone whose Screen Time step was done with Home never shown since, Home's
+  notifications ask could come first; a read that fails right after a sign-in lets the screens go on
+  until one answers; and in front, a teacher with classes is read every 30 s, as Home reads a
+  student's (`outInClass`). The outbox still drains, so nothing queued before is dropped.
+
+  **The server needs no change** (checked): a join answers `not_a_student`, `PATCH /v1/me`, `GET
+  /v1/me/history` and the push token refuse a teacher, and `DELETE /v1/me` refuses one with a class
+  or a block. A teacher's tap arms a row that never converts (`armTap` checks no role, but a Start
+  converts only students enrolled in the class) and expires at the day's end, so nothing reaches a
+  grid; the app sends none now.
+
+  **Apple (the owner's "if thats compliant with apple").** Guideline 5.1.1(v): accounts made in the
+  app are students', and students delete theirs in the app (Me → Delete account). An account becomes
+  a teacher's only on the portal, through an invite, and teachers already delete through their school
+  by email, per `/privacy` section 7, which this doesn't change; a teacher's account with no class and
+  no block, which Me could delete before, emails too now. An app may serve one audience: the review
+  notes (`docs/APP-STORE.md` §2) say the iPhone app is for students and the teacher review account is
+  the portal's. `/privacy`, `/terms`, the help page and the docs say nowhere that teachers use the
+  iPhone app. Android needs the same screen and rule, from this canvas's board, in its own steps.
+
 - **2026-11-07** — **The portal's address is `https://app.getbali.app` (the owner; #540).** The owner
   bought `getbali.app` on Vercel, which holds its DNS: `www.getbali.app` is the website (the Vercel
   project `bali-web`, unchanged) and `app.getbali.app` the teacher portal (the project `bali-portal`,

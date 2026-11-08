@@ -189,6 +189,28 @@ struct PushTests {
     }
 
     @Test(
+        "Never for a teacher's account (the owner, 2026-11-07: the app is the students'): once a read of `GET /v1/me` names the account a teacher's, a device token given goes nowhere, at that wake or the next"
+    )
+    func notForATeacher() async throws {
+        let teacher =
+            #"{"user":{"id":"t","role":"teacher","displayName":"Ms. Rivera"},"classes":[],"session":null,"armed":false}"#
+        let rig = try Rig()
+        await rig.engine.setForeground(true)
+        try await rig.server.next(meRoute).reply(200, teacher)
+        await rig.until { $0.me?.user.role.known == .teacher }
+        try await rig.sleeping([at(30)])
+        // A moment on, so the wake the token rings sleeps to a deadline of its own.
+        rig.clock.advance(by: 1)
+        await rig.engine.registerPushToken(deviceToken, environment: .production)
+        try await rig.sleeping([at(31)])
+        #expect(await rig.server.waiting.isEmpty)
+        rig.clock.advance(by: 30)
+        try await rig.sleeping([at(61)])
+        #expect(await rig.server.waiting.isEmpty)
+        await rig.stop()
+    }
+
+    @Test(
         "Sign out's removal goes at once, under the student's token: the token as lower-case hex, under a fresh lower-case UUIDv7"
     )
     func removes() async throws {

@@ -2595,7 +2595,7 @@ struct AppTests {
     }
 
     @Test(
-        "Your name, routed (the owner's decision, 2026-10-07): with Bali not reached yet on a sign-in kept from the last run, Screen Time as before; once a read names a student's account with no name, Your name in its place, no tab bar, Sign out its other way on; named, the router moves on, to Screen Time, then Home in no class, never a Join of its own; a teacher's account never gets it"
+        "Your name, routed (the owner's decision, 2026-10-07): with Bali not reached yet on a sign-in kept from the last run, Screen Time as before; once a read names a student's account with no name, Your name in its place, no tab bar, Sign out its other way on; named, the router moves on, to Screen Time, then Home in no class, never a Join of its own; a teacher's account never gets it, but its own screen (2026-11-07)"
     )
     func nameRouted() throws {
         /// `GET /v1/me`'s answer: an account of `role` named `name` — JSON's, null for none — in
@@ -2623,7 +2623,45 @@ struct AppTests {
         #expect(inNone.shown == (.home, true))
         state.me = try user("null", "teacher")
         inNone.synced(state)
-        #expect(inNone.shown == (.home, true))
+        #expect(inNone.shown == (.teacher, false))
+    }
+
+    @Test(
+        "A teacher's account, routed (the owner, 2026-11-07: the app is the students'): a sign-in kept from the last run shows the screens until a read says whose account it is, a student's going on as before; read as a teacher's, at that read or a later one (an invite redeemed on the portal while signed in here), the teacher screen in Screen Time's place or Home's, with no tab bar and a tab chosen never shown, Sign out its other way on; a sign-in made this run holds the starting mark until that read"
+    )
+    func teacherRouted() throws {
+        /// `GET /v1/me`'s answer: account `ana` of `role`, named, in Period 3.
+        func user(_ role: String) throws -> MeResponse {
+            try BaliJSON.makeDecoder().decode(
+                MeResponse.self,
+                from: Data(
+                    #"{"user":{"id":"ana","role":"\#(role)","displayName":"Ana"},"classes":[{"id":"p3","name":"Period 3"}],"session":null}"#
+                        .utf8))
+        }
+        var protection = Protection()
+        (protection.checked, protection.permission) = (true, .notDetermined)
+        var state = SyncState()
+        let phone = Phone(fixture: PreviewFixtures.State(protection: protection, sync: state))
+        #expect(phone.shown == (.screenTime, false) && !phone.offersSignOut)
+        state.me = try user("student")
+        phone.synced(state)
+        #expect(phone.shown == (.screenTime, false))
+        state.me = try user("teacher")
+        phone.synced(state)
+        #expect(phone.shown == (.teacher, false) && phone.offersSignOut)
+        protection.permission = .approved
+        let approved = Phone(fixture: PreviewFixtures.State(protection: protection, sync: state))
+        #expect(approved.shown == (.teacher, false))
+        approved.select(.me)
+        #expect(approved.shown == (.teacher, false))
+        // Signed in this run: the mark until the read names the account.
+        let signingIn = Phone(
+            fixture: PreviewFixtures.State(signedIn: false, protection: protection, sync: SyncState()))
+        #expect(signingIn.shown == (.signIn, false))
+        signingIn.signed(in: true, as: "ana")
+        #expect(signingIn.shown == (.starting, false))
+        signingIn.synced(state)
+        #expect(signingIn.shown == (.teacher, false))
     }
 
     @Test(
@@ -2728,6 +2766,196 @@ struct AppTests {
             let signOut = try #require(read.first { $0.label == "Sign out" }, "\(name)").traits
             #expect(signOut.contains(.notEnabled) == (name == "nameSaving"), "\(name)")
         }
+    }
+
+    @Test(
+        "A teacher's account's screen as the canvas's Teacher boards draw it, read by VoiceOver: the mark, its title as a heading, its line, Open the portal — a link — and under it the address of this build's portal, never one written in, then Sign out, a button; held while an Emergency Unlock is not sent yet, the hold said over it with Try again and Sign out not enabled; a Sign out that couldn't finish said under it"
+    )
+    func teacherScreen() async throws {
+        let title = "You're signed in as a teacher"
+        let address = try #require(PolicyLinks.portal?.host())
+        let cases: [(String, [String], [String])] = [
+            ("teacher", [], []), ("teacherSignOutHeld", [SignOutWords.unsent, "Try again"], []),
+            ("teacherSignOutFailed", [], [SignOutWords.failed]),
+        ]
+        for (name, over, under) in cases {
+            let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))
+            #expect(phone.shown == (.teacher, false) && phone.offersSignOut, "\(name)")
+            let read = try await elements(of: RootView(phone: phone), once: title)
+            let labels = read.map { $0.label ?? "" }
+            let order =
+                [
+                    "Bali", title, "This app is for students. Teachers run their classes on the portal.",
+                    "Open the portal", address,
+                ] + over + ["Sign out"] + under
+            let at = order.compactMap { labels.firstIndex(of: $0) }
+            #expect(at.count == order.count && at == at.sorted(), "\(name): \(labels)")
+            #expect(try #require(read.first { $0.label == title }).traits.contains(.header))
+            let open = try #require(read.first { $0.label == "Open the portal" }, "\(name)").traits
+            #expect(open.contains(.link) && !open.contains(.notEnabled), "\(name)")
+            let signOut = try #require(read.first { $0.label == "Sign out" }, "\(name)").traits
+            #expect(signOut.contains(.button), "\(name)")
+            #expect(signOut.contains(.notEnabled) == (name == "teacherSignOutHeld"), "\(name)")
+        }
+    }
+
+    @Test(
+        "A teacher's account's screen whole at the default text size and the accessibility ones, on the iPhone SE and the iPhone 17 Pro, its Sign out held too, as its largest-text boards draw it: scrolling once its text outgrows the phone, never a pixel wider, and nothing VoiceOver reads there past its sides"
+    )
+    func teacherFits() async throws {
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let phones = [CGSize(width: 375, height: 667 - 20), CGSize(width: 402, height: 874 - 62 - 34)]
+        for name in ["teacher", "teacherSignOutHeld"] {
+            for size in [DynamicTypeSize.large, .accessibility1, .accessibility5] {
+                for frame in phones {
+                    let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))
+                    let hosting = UIHostingController(
+                        rootView: RootView(phone: phone).environment(\.dynamicTypeSize, size))
+                    hosting.safeAreaRegions = []
+                    let window = UIWindow(windowScene: scene)
+                    window.frame = CGRect(origin: .zero, size: frame)
+                    window.rootViewController = hosting
+                    window.isHidden = false
+                    defer { window.isHidden = true }
+                    window.layoutIfNeeded()
+                    let at = "\(name), \(size), \(frame)"
+                    let scroll = try #require(scrollViews(in: window).first, "\(at)")
+                    #expect(scroll.contentSize.width <= frame.width + 0.5, "\(at): \(scroll.contentSize)")
+                    if size == .accessibility5 {
+                        #expect(scroll.contentSize.height > scroll.bounds.height + 0.5, "\(at)")
+                    }
+                    var read: [NSObject] = []
+                    try await until {
+                        read = (try? voiceOver(in: window)) ?? []
+                        return read.contains { $0.accessibilityLabel == "Sign out" }
+                    }
+                    let outside = read.filter {
+                        $0.accessibilityFrame.minX < -0.5 || $0.accessibilityFrame.maxX > frame.width + 0.5
+                    }
+                    #expect(outside.isEmpty, "\(at): \(outside.map { $0.accessibilityLabel ?? "" })")
+                }
+            }
+        }
+    }
+
+    @Test(
+        "A teacher's account through the phone's own sign-in and engine, its screens in a window as the app shows them (the owner, 2026-11-07): after Sign in and Bali's 13+ yes, the starting mark holds while `GET /v1/me` is on its way; once it names the account a teacher's, the teacher screen and none of a student's, before or after it: neither the Screen Time ask nor Home, so iOS is never asked to notify, nor the history read, and a device token iOS gives is never sent; its Sign out signs out, Sign in next. A student's account the same way lands where it did, on Screen Time or Home, Home asking iOS to notify and the token sent",
+        .timeLimit(.minutes(3)))
+    func teacherWiring() async throws {
+        let defaults = UserDefaults.standard
+        let keys = [Phone.everApprovedKey, Phone.notifyDueKey]
+        let before = keys.map { ($0, defaults.object(forKey: $0)) }
+        defer { for (key, value) in before { defaults.set(value, forKey: key) } }
+        let token = Data((0..<32).map { UInt8($0 * 8 + 7) })
+        /// Each screen the router picked as the engine's states came.
+        @MainActor final class Seen { var screens: [Screen] = [] }
+        // Each account, where its sign-in lands, and what VoiceOver reads there.
+        let cases: [(String, Permission, Screen, String)] = [
+            ("teacher", .notDetermined, .teacher, "You're signed in as a teacher"),
+            ("teacher", .approved, .teacher, "You're signed in as a teacher"),
+            ("student", .notDetermined, .screenTime, "Ask me"), ("student", .approved, .home, "Hi, Ana"),
+        ]
+        for (role, permission, lands, shown) in cases {
+            let at = "\(role), \(permission)"
+            // iOS's prompt to notify due as Home shows; the Screen Time step done or not, as read.
+            defaults.set(true, forKey: Phone.notifyDueKey)
+            defaults.set(permission == .approved, forKey: Phone.everApprovedKey)
+            var protection = Protection()
+            (protection.checked, protection.permission) = (true, permission)
+            let server = Teaching(role: role)
+            let keychain = Keychain(account: nil)
+            let (phone, engine) = try await gatedStandIn(
+                server, keychain: keychain, protection: protection)
+            let asked = Asked()
+            phone.notifications = asked.notifications
+            let signIn = try #require(phone.signIn)
+            let seen = Seen()
+            let running = [
+                Task { await engine.run() }, Task { await phone.follow(signIn) },
+                Task {
+                    for await state in await engine.updates() {
+                        phone.synced(state)
+                        seen.screens.append(phone.shown.screen)
+                    }
+                },
+            ]
+            let (window, _) = try await laidOut(RootView(phone: phone)) {
+                $0.contains("Sign\u{A0}up or sign\u{A0}in")
+            }
+            defer {
+                for task in running { task.cancel() }
+                window.isHidden = true
+            }
+            let pages = Pages()
+            pages.signsIn = true
+            await phone.signIn(through: pages.browser)
+            try await until { await server.holding }
+            #expect(phone.shown == (.starting, false), "\(at)")
+            // iOS gives its device token while the read is on its way.
+            phone.registered(token: token)
+            seen.screens = []
+            await server.letGo()
+            try await until { phone.shown.screen == lands }
+            try await until {
+                window.layoutIfNeeded()
+                return ((try? voiceOver(in: window)) ?? []).contains { $0.accessibilityLabel == shown }
+            }
+            if lands == .home { try await until { asked.asks == 1 } }
+            // What a wrong turn would have sent by now: settled.
+            try await Task.sleep(for: .milliseconds(300))
+            let sent = await server.asked
+            if role == "teacher" {
+                // The mark while the read lands, then the teacher screen: no other.
+                let screens = seen.screens
+                #expect(
+                    screens.contains(.teacher) && screens.allSatisfy { [.starting, .teacher].contains($0) },
+                    "\(at): \(screens)")
+                #expect(asked.asks == 0, "\(at)")
+                #expect(!sent.contains("PUT /v1/me/push-token") && !sent.contains("GET /v1/me/history"))
+                await phone.signOut()
+                try await until { phone.shown == (.signIn, false) }
+                #expect(keychain.empty && phone.signOutFailed == nil, "\(at)")
+            } else {
+                #expect(!seen.screens.contains(.teacher), "\(at): \(seen.screens)")
+                #expect(asked.asks == (lands == .home ? 1 : 0), "\(at)")
+                #expect(sent.contains("PUT /v1/me/push-token"), "\(at): \(sent)")
+            }
+        }
+    }
+
+    @Test(
+        "A teacher's account's Sign out held while an Emergency Unlock is not sent yet, through the phone's own sign-in and outbox, as Me's is (#125): nothing tried, the teacher screen still shown; once the unlock is recorded, Sign out signs out — a student made a teacher on the portal never loses one"
+    )
+    func teacherSignOutHeld() async throws {
+        let rivera = try BaliJSON.makeDecoder().decode(
+            MeResponse.self,
+            from: Data(
+                #"{"user":{"id":"rivera","role":"teacher","displayName":"Ms. Rivera"},"classes":[],"session":null}"#
+                    .utf8))
+        var approved = Protection()
+        (approved.checked, approved.permission) = (true, .approved)
+        let server = Teaching(role: "teacher")
+        let keychain = Keychain(account: "rivera")
+        let (phone, engine) = try standIn(server, keychain: keychain, protection: approved)
+        phone.signed(in: true, as: "rivera", checked: true)
+        try await engine.record(.unlock(session: "s", reason: nil))
+        var state = await engine.state
+        state.me = rivera
+        phone.synced(state)
+        #expect(phone.shown == (.teacher, false))
+        #expect(phone.sync.flatMap(SignOutWords.held) == SignOutWords.unsent)
+        await phone.signOut()
+        #expect(!keychain.empty && phone.shown == (.teacher, false))
+        let running = Task { await engine.run() }
+        defer { running.cancel() }
+        try await until { await engine.unlockUnsent() == false }
+        state = await engine.state
+        state.me = rivera
+        phone.synced(state)
+        #expect(phone.sync.flatMap(SignOutWords.held) == nil)
+        await phone.signOut()
+        #expect(keychain.empty && phone.signOutFailed == nil)
+        #expect(await server.asked.contains("POST /v1/sessions/s/unlock"))
     }
 
     @Test(
@@ -5804,6 +6032,64 @@ private actor AgeServer: HTTPTransport {
         guard
             let response = HTTPURLResponse(
                 url: url, statusCode: 200, httpVersion: nil, headerFields: nil)
+        else { throw URLError(.badURL) }
+        return (Data(body.utf8), response)
+    }
+}
+
+/// Bali's API and Cognito as a stand-in answers an account of `role` on the phone (a teacher's: the
+/// owner, 2026-11-07), each request kept as its method and path: Cognito's token endpoint with
+/// `account`'s sign-in; Bali's 13+ yes; `GET /v1/me` naming the account, in no class, the first
+/// read held until the test lets it go; an Emergency Unlock recorded with no session, as the API
+/// records one from an account in none; and the device token's register and removal, refused for a
+/// teacher's account as the API refuses it. Anything else gets no answer.
+private actor Teaching: HTTPTransport {
+    private(set) var asked: [String] = []
+    private let (account, role): (String, String)
+    private var holds = true
+    private var held: CheckedContinuation<Void, Never>?
+
+    init(_ account: String = "rivera", role: String) { (self.account, self.role) = (account, role) }
+
+    /// Whether a read of `GET /v1/me` waits for `letGo`.
+    var holding: Bool { held != nil }
+
+    /// The read held, answered now, and none held from now on.
+    func letGo() {
+        holds = false
+        held?.resume()
+        held = nil
+    }
+
+    func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        guard let url = request.url else { throw URLError(.badURL) }
+        let route = "\(request.httpMethod ?? "") \(url.path())"
+        asked.append(route)
+        let student = role == "student"
+        var (status, body) = (200, "")
+        switch route {
+        case "POST /oauth2/token":
+            body = #"{"access_token":"\#(token(naming: account))","refresh_token":"r"}"#
+        case "GET /v1/me/age-check": body = #"{"passed":true}"#
+        case "GET /v1/me":
+            if holds { await withCheckedContinuation { held = $0 } }
+            body =
+                #"{"user":{"id":"\#(account)","role":"\#(role)","displayName":"Ana"},"classes":[],"session":null,"armed":false}"#
+        case "POST /v1/sessions/s/unlock":
+            body =
+                #"{"outcome":"recorded","recordedAs":"no_live_participation","state":null,"session":null,"reason":null}"#
+        case "PUT /v1/me/push-token" where student:
+            body = #"{"outcome":"registered","environment":"sandbox"}"#
+        case "PUT /v1/me/push-token", "DELETE /v1/me/push-token":
+            (status, body) = (
+                403,
+                #"{"error":{"code":"forbidden","message":"only a student registers a device for notifications"}}"#
+            )
+        default: throw URLError(.notConnectedToInternet)
+        }
+        guard
+            let response = HTTPURLResponse(
+                url: url, statusCode: status, httpVersion: nil, headerFields: nil)
         else { throw URLError(.badURL) }
         return (Data(body.utf8), response)
     }

@@ -234,11 +234,12 @@ struct ScreenTests {
         #expect(screen(standing: .waiting, me: none) == .name)
         #expect(screen(me: none, opened: [.join], tab: .me) == .name)
         #expect(screen(standing: rung, me: none, sessionOverClosed: session(), now: ended) == .name)
-        // Named, a teacher's account, a role not known: the screens as before.
-        for other in [try user("Ana"), try user(nil, "teacher"), try user(nil, "admin")] {
+        // Named, a role not known: the screens as before; a teacher's account its own (`teacher`).
+        for other in [try user("Ana"), try user(nil, "admin")] {
             #expect(screen(permission: .notDetermined, me: other) == .screenTime)
             #expect(screen(me: other) == .home)
         }
+        #expect(screen(me: try user(nil, "teacher")) == .teacher)
         // A sign-in kept from the last run, Bali not reached yet: no read to say, so the screens go
         // on (`nameHeld`: one made this run holds the starting screen).
         #expect(screen(permission: .notDetermined) == .screenTime)
@@ -299,7 +300,7 @@ struct ScreenTests {
         #expect(
             screen(signedInThisRun: true, permission: .notDetermined, me: try user(#""Ana""#))
                 == .screenTime)
-        #expect(screen(signedInThisRun: true, me: try user("null", "teacher")) == .home)
+        #expect(screen(signedInThisRun: true, me: try user("null", "teacher")) == .teacher)
         // A read failed — offline at once, or no answer in the request's time: the screens go on.
         #expect(
             screen(signedInThisRun: true, permission: .notDetermined, meFailed: .networkError)
@@ -375,10 +376,11 @@ struct ScreenTests {
         #expect(screen(me: inClass) == .home)
         #expect(screen(permission: .notDetermined, me: inClass) == .screenTime)
         #expect(screen(standing: .waiting, me: inClass) == .waiting)
-        // In no class, a teacher's account, a role not known, or nothing read yet: never.
-        for other in [try user(classes: []), try user(role: "teacher"), try user(role: "admin")] {
+        // In no class, a role not known, or nothing read yet: never; a teacher's account its own.
+        for other in [try user(classes: []), try user(role: "admin")] {
             #expect(screen(me: other, listSeenBy: nil) == .home)
         }
+        #expect(screen(me: try user(role: "teacher"), listSeenBy: nil) == .teacher)
         #expect(screen(listSeenBy: nil) == .home)
         // A sign-in made this run: the starting screen until its read answers, then the list.
         #expect(screen(signedInThisRun: true, listSeenBy: nil) == .starting)
@@ -414,6 +416,72 @@ struct ScreenTests {
             signedInThisRun: false, protection: protection, everApproved: false, sync: out,
             listSeenBy: nil, sessionOverClosed: nil, opened: [], tab: .history, now: t0)
         #expect(shown.screen == .listChanged && !shown.tabbed)
+    }
+
+    @Test(
+        "A teacher's account (the owner, 2026-11-07: the app is the students'): signed in, an account `GET /v1/me` names a teacher's gets the teacher screen and nothing else, with no tab bar — in Home's place, Screen Time's and Waiting's, over a Join or a tab opened, after the bell once Session over is closed; named or not, teaching a class or none, the consent list seen or not, kept from the last run or signed in this run, whose mark holds until that read; a student's account never gets it. After the 13+ check, and never over a session's screens: the shields' Focus, Unlocked, Protection off, Session over not closed, nor the home a standing not read keeps, which hold Emergency Unlock and keep their own ways on; Delete account's screen, a start that failed and Sign in come first"
+    )
+    func teacher() throws {
+        let (outbox, _) = try makeOutbox()
+        try record(outbox, .tap(tagId: "tag"))
+        let held = try outbox.records()
+        /// `GET /v1/me`'s answer: account `u` of `role`, named `name` or nothing, with `classes`.
+        func user(
+            _ role: String = "teacher", name: String? = "Ms. Rivera",
+            classes: [String] = [Answer.inClass("c")]
+        ) throws -> MeResponse {
+            let named = name.map { #""\#($0)""# } ?? "null"
+            return try me(
+                #"{"user":{"id":"u","role":"\#(role)","displayName":\#(named)},"classes":[\#(classes.joined(separator: ","))],"session":null}"#
+            )
+        }
+        let teacher = try user()
+        let (rung, ended) = (Standing.inSession(session(), .focused), at(3000))
+        for other in [teacher, try user(name: nil), try user(classes: [])] {
+            #expect(screen(me: other) == .teacher)
+            #expect(screen(me: other, listSeenBy: nil) == .teacher)
+            #expect(screen(permission: .notDetermined, me: other) == .teacher)
+            #expect(screen(permission: .denied, me: other) == .teacher)
+            #expect(screen(standing: .waiting, me: other) == .teacher)
+            #expect(screen(me: other, opened: [.join], tab: .me) == .teacher)
+            #expect(screen(me: other, tab: .history) == .teacher)
+            #expect(
+                screen(standing: rung, me: other, sessionOverClosed: session(), now: ended)
+                    == .teacher)
+            #expect(screen(signedInThisRun: true, me: other) == .teacher)
+        }
+        // Signed in this run, the mark until a read names the account; a student's, as before.
+        #expect(screen(signedInThisRun: true) == .starting)
+        #expect(screen(me: try user("student")) == .home)
+        #expect(screen(me: try user("student", name: nil)) == .name)
+        #expect(screen(me: try user("admin")) == .home)
+        // The 13+ check first.
+        #expect(screen(age: .checking, me: teacher) == .starting)
+        #expect(screen(age: .unanswered, me: teacher) == .age)
+        #expect(screen(age: .tooYoung, me: teacher) == .tooYoung)
+        // Never over a session's screens, the shields' or the last run's: Emergency Unlock's.
+        #expect(screen(standing: rung, me: teacher) == .focus)
+        #expect(screen(queued: held, me: teacher) == .focus)
+        #expect(screen(shielded: true, standing: .unread, me: teacher) == .home)
+        #expect(screen(standing: .unread, me: teacher) == .home)
+        let unlocked = Standing.inSession(session(), .unlocked)
+        #expect(screen(standing: unlocked, me: teacher) == .unlocked)
+        #expect(screen(standing: unlocked, me: teacher, opened: [.home], tab: .me) == .me)
+        let off = Standing.inSession(session(), .protectionOff)
+        #expect(screen(permission: .denied, standing: off, me: teacher) == .protectionOff)
+        #expect(screen(standing: rung, me: teacher, now: ended) == .sessionOver)
+        #expect(screen(deleting: true, me: teacher) == .deleting)
+        #expect(screen(problem: "why", me: teacher) == .storage("why"))
+        #expect(screen(signedIn: false, me: teacher) == .signIn)
+        #expect(screen(signedIn: nil, me: teacher) == .starting)
+        var (protection, out) = (Protection(), SyncState())
+        (protection.checked, protection.permission) = (true, .approved)
+        (out.standing, out.me) = (.out, teacher)
+        let shown = Screen.choose(
+            problem: nil, deleting: false, age: .passed, intro: false, signedIn: true,
+            signedInThisRun: false, protection: protection, everApproved: false, sync: out,
+            listSeenBy: "u", sessionOverClosed: nil, opened: [], tab: .history, now: t0)
+        #expect(shown.screen == .teacher && !shown.tabbed)
     }
 
     @Test("The app could not start: storage, with why, over everything else")
@@ -1257,7 +1325,10 @@ struct MoveTests {
             #expect(move(shown, .name, signedIn: true) == .arrive, "\(shown)")
             let home = move(shown, .home, tabbed: (false, true), signedIn: true)
             #expect(home == .arrive, "\(shown)")
+            // A teacher's account: its screen arrives as Your name does (the owner, 2026-11-07).
+            #expect(move(shown, .teacher, signedIn: true) == .arrive, "\(shown)")
         }
+        #expect(move(.home, .teacher, tabbed: (true, false), signedIn: true) == .arrive)
         #expect(move(.signIn, .screenTime, signedIn: true) == .arrive)
         #expect(move(.age, .tooYoung) == .arrive)
         #expect(move(.age, .deleting, signedIn: true) == .arrive)
@@ -1272,7 +1343,7 @@ struct MoveTests {
     func cuts() {
         let path: [(Screen, Bool)] = [
             (.starting, false), (.signIn, false), (.age, false), (.intro, false), (.name, false),
-            (.screenTime, false), (.home, true),
+            (.screenTime, false), (.home, true), (.teacher, false),
         ]
         let held: [(Screen, Bool)] = [
             (.focus, false), (.unlocked, false), (.protectionOff, false), (.sessionOver, false),
@@ -1296,7 +1367,7 @@ struct MoveTests {
             }
             #expect(move(screen, screen, tabbed: (tabbed, tabbed)) == .cut, "\(screen)")
         }
-        #expect(move(.name, .signIn) == .cut)
+        #expect(move(.name, .signIn) == .cut && move(.teacher, .signIn) == .cut)
         #expect(move(.home, .home, tabbed: (true, false)) == .cut)
     }
 

@@ -737,9 +737,9 @@ final class Phone {
 
     /// Whether the screen shown offers Sign out (C6b): Me — every student in no class lands on Home
     /// with its tab bar, so Me is the wrong account's way out (the approved Sign in & sign up
-    /// design), where a Join of the router's own once offered it — and Your name, whose only other
-    /// way on is a name.
-    var offersSignOut: Bool { screen == .me || screen == .name }
+    /// design), where a Join of the router's own once offered it — Your name, whose only other way
+    /// on is a name, and a teacher's account's screen, whose other way on is the portal.
+    var offersSignOut: Bool { [.me, .name, .teacher].contains(screen) }
 
     /// Back from the screen opened last, the one under it fading back in (#150) — the keyboard let
     /// go at once, so it goes down with the screen it was up for, never left over the next: Join
