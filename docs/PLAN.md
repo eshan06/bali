@@ -8,12 +8,13 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-07 (Central) — a TestFlight run revokes the Apple Development certificate
-its signing made (#542; DECISIONS 2026-11-07), so they no longer pile up to Apple's limit; build
-13's run is its live check. Before it, a teacher's account on the iPhone (#541). Next: a session
-builds the retire-a-block command; the owner the sitting on build 12, then build 13 and the App
-Store submission; GA5's known limit, the owner's call (DECISIONS 2026-11-02); AN9b; AN1's part 2
-on the owner's phones; the audit's polish waits._
+_Last updated: 2026-11-08 (Central) — the prod phone sitting passed (Before the pilot, item 2;
+#545): builds 12 and 13 on the owner's iPhone 15 Pro, the conductor the teacher on
+`app.getbali.app`; not run: L8's battery half hour, a deck's link and a second iPhone (M8). Its
+findings are on Open owner items. Before it, build 13 (from #542), whose run revoked the
+certificate its signing made. Next: a session builds the retire-a-block command; the owner the App
+Store submission on build 13 and the findings' calls; GA5's known limit, the owner's call
+(DECISIONS 2026-11-02); AN9b; AN1's part 2 on the owner's phones; the audit's polish waits._
 
 ## Now
 
@@ -36,8 +37,10 @@ reviewed by santa and pushed straight to the branch, with no PR, as its README s
 (`docs/DECISIONS.md`, 2026-11-06). `demo2`, the one-page demo it replaced, is kept for a rollback.
 
 **The portal's address** ✅ (#540; DECISIONS 2026-11-07): `https://app.getbali.app` since
-2026-11-07; the old `https://bali-portal.vercel.app` redirects there, and Cognito and the API's
-CORS keep it until no build in use links it. The app links the new address from build 13.
+2026-11-07, its sign-in round trip passing at the sitting (2026-11-08); the old
+`https://bali-portal.vercel.app` redirects there, and Cognito and the API's CORS keep it until no
+build in use links it. The app links the new address from build 13; Android's
+(`android/app/build.gradle.kts`) is Android's to change.
 
 **In flight.**
 - **The conductor on the Windows PC (the owner, 2026-10-14):** an always-on PC runs the conductor,
@@ -47,17 +50,19 @@ CORS keep it until no build in use links it. The app links the new address from 
   boot test's SIGINT-then-SIGTERM case is skipped there alone (Windows has no POSIX signals); CI's
   runs unchanged, and `npm test` passes whole on the PC.
 - **The owner's Mac session (Xcode and the iPhone):** the app's Sign in & sign up is built; the app
-  keeps D1's look until the owner approves a new one (its redesign rolled back, 2026-10-06). Left:
-  TestFlight build 9 for C7's phone test (📱); the push's app half is done (#456). The phone's
-  Phase 7 screens are done: L8 (L8a, #443, L8b, #448 and #450, and L8c, #451), M8's slide view on
-  Focus (#452) and M8b's slide off Focus and card on the Screen Time ask (#454); left, their 📱
-  device checks, the owner's. C2's legal words (⚖️) go into the portal's pages, on the Windows PC.
+  keeps D1's look until the owner approves a new one (its redesign rolled back, 2026-10-06). The
+  push's app half is done (#456), and the phone's Phase 7 screens: L8 (L8a, #443, L8b, #448 and
+  #450, and L8c, #451), M8's slide view on Focus (#452) and M8b's slide off Focus and card on the
+  Screen Time ask (#454). Their 📱 device checks and C7's passed at the sitting (2026-11-08); left,
+  the owner's, the three steps it didn't run (Before the pilot, item 2). C2's legal words (⚖️) go
+  into the portal's pages, on the Windows PC.
 - **A teacher's account on the iPhone (the owner, 2026-11-07)** ✅ (#541; DECISIONS 2026-11-07):
   once `GET /v1/me` names a teacher's account, one screen, the app is for students, with Open the
   portal and Sign out, and no device token registered; the server unchanged. Left: Android's twin.
 - **A TestFlight run leaves no certificate behind** ✅ (#542; DECISIONS 2026-11-07): it revokes the
-  Apple Development certificate its signing made, never one from before the run; build 13's run is
-  the live check, the team's certificate count the same after it as before.
+  Apple Development certificate its signing made, never one from before the run; build 13's run
+  passed its live check (2026-11-07): 3 certificates before signing, 4 after the run, 3 after the
+  revoke.
 - **Android (the owner, 2026-11-02)**: Phases 8–11, the steps in `docs/PLAN-ANDROID.md` (AN0 ✅);
   AN1, the lock spike: parts 1 and 1c on the Android 15–17 emulators ✅ (DECISIONS
   2026-11-03); AN1b ✅ (DECISIONS 2026-11-04): the owner picked (a), the Accessibility service, with
@@ -110,9 +115,8 @@ CORS keep it until no build in use links it. The app links the new address from 
   (N4–N6 ✅, 2026-10-06). The app half ✅ (#456; DECISIONS 2026-10-24), #336's fix in it (the random
   wait, approved 2026-10-23), the prompt right after onboarding's Screen Time step (the owner,
   2026-10-24). Runbook 7 is done on prod, and build 11 carries the app half (the owner, 2026-10-24,
-  as #458 records). Left: dev's step 4, and N6's end-to-end check before the pilot (the owner,
-  2026-11-03: "check this notifications stuff before we pilot"), Bali reinstalled first (the sitting's
-  Part 6).
+  as #458 records). N6's end-to-end check passed on prod at the sitting (Part 6, 2026-11-08): the
+  alert named only the class, and prod's log showed no APNs refusal. Left: dev's step 4.
 
 - **Deleted accounts' Cognito sign-ins (C3-cognito, 2026-10-09):** the server queues and deletes
   them; until the owner's runbook 9 sets each environment's key, dev and prod only queue (the
@@ -127,39 +131,25 @@ CORS keep it until no build in use links it. The app links the new address from 
 - **Worker and reviewer effort (the owner, 2026-10-14 and 2026-10-24):** a worker that only builds an approved portal screen runs at `xhigh`, every other worker at `max`; santa's reviewers run at `xhigh` on a screen step and at `max` on every other (`.claude/commands/plan.md`, `santa-loop.md`); the first 3–5 `xhigh` steps' blockers and times decide whether each stays (DECISIONS 2026-10-14, 2026-10-24).
 
 **Before the pilot (the owner, 2026-11-03; DECISIONS 2026-11-03).** Left, in order:
-1. A new prod TestFlight build from `main` — ✅ build 12 (2026-11-07, from #538), on the owner's phone
-   for the sitting; it links the old portal address, which redirects.
-2. 📱 The phone sitting on it, whole (`ios/README.md`, "Phase 7's phone sitting, on prod", Parts 1–7):
-   C7's first launch, L8's, M8's and M8b's device checks, the exit checks L9, M10 and W6, the consent
-   list's new lines, the shield's new line, the class-started alert end to end (N6), and every other
-   student flow. The owner's.
+1. A new prod TestFlight build from `main` — ✅ build 12 (2026-11-07, from #538), linking the old
+   portal address, which redirects, and build 13 (2026-11-07, from #542), the first linking
+   `app.getbali.app`.
+2. 📱 The phone sitting, whole (`ios/README.md`, "Phase 7's phone sitting, on prod") — ✅ 2026-11-08
+   (as #545 records): every check passed, on build 12 from Part 1 to Part 7's step 7, then build 13
+   for Part 7's steps 1, 2 and 8–10. Not run, left for the owner: Part 2's battery half hour, and
+   Part 3's tap on a deck's link (no deck had one) and its second iPhone.
 3. The block's fresh code (`docs/PILOT.md`, setup step 6): a session builds the owner command that
    retires a block; the owner writes the new code, registers it and retires the old one.
-4. PostHog (ARCHITECTURE's "Analytics (PostHog)"; DECISIONS 2026-11-04), one PR each:
-   - **A1** Its rules in the docs — ✅ (#503; DECISIONS 2026-11-04)
-   - **A5** The iPhone app's privacy manifest: Product Interaction gains the purpose Analytics — ✅
-     (#505; DECISIONS 2026-11-04)
-   - **A2** The server's class totals, always sent, whatever the class's size — ✅ (#514; DECISIONS
-     2026-11-04)
-   - **A3a** The server's endpoint for the portal's events, `POST /v1/me/actions`: teacher-only,
-     checked against the allow-list, forwarded to PostHog with the server's key; additive under
-     `/v1` — ✅ (#517; DECISIONS 2026-11-05)
-   - **A3b** The portal's teacher events, through it (no CSP change) — ✅ (#525; DECISIONS 2026-11-05)
-   - **A4** `/privacy` names PostHog and says what stays there once an account is deleted (a
-     teacher's events, a class's totals), before the key is set — ✅ (#527; DECISIONS 2026-11-05)
-   - **A6** PostHog keeps no profile per teacher: every event personless, and `/privacy`'s line on a
-     teacher's ID gone — ✅ (#536; DECISIONS 2026-11-07)
-   - The owner's key: `POSTHOG_KEY` on Railway's `bali prod` (the portal holds none) — ✅
-     2026-11-07, the project on PostHog's free plan (1 year, as `/privacy` says) and no events
-     before it, its boot log "analytics is on". The notice `/privacy`'s section 11 promises: owed
-     to no one yet, every prod account being the team's, and due for any change that matters from
-     the first pilot user on (the owner; DECISIONS 2026-11-07).
+4. PostHog (ARCHITECTURE's "Analytics (PostHog)"; DECISIONS 2026-11-04) — ✅: A1–A6, one PR each
+   (#503, #505, #514, #517, #525, #527, #536), and the owner's key on `bali prod` (2026-11-07),
+   their lines in full in `docs/PLAN-ARCHIVE.md`. The notice `/privacy`'s section 11 promises: owed
+   to no one yet, every prod account being the team's, and due for any change that matters from
+   the first pilot user on (the owner; DECISIONS 2026-11-07).
 5. The App Store submission, the owner's, from `docs/APP-STORE.md`'s sections 1–4 (5.4: the
    review accounts): App Review is Apple's answer on §3.3.3(P) (ISSUES #3). No external beta for
    now (the owner, 2026-11-04). Its build is build 13, the next prod build after #540 and the first
    to link `app.getbali.app` and to require NFC, so the App Store offers Bali on iPhone only (the
-   owner, 2026-11-07: "Yes, require NFC"; DECISIONS 2026-11-07). Build 12 is on the owner's phone
-   for the sitting.
+   owner, 2026-11-07: "Yes, require NFC"; DECISIONS 2026-11-07).
 6. The App Store privacy label: answers ready in `docs/APP-STORE.md` §3 (Product Interaction and
    Other Data Types serve Analytics too, as the manifest says since A5 and A2), for the owner to
    paste with item 5.
@@ -183,7 +173,7 @@ drafts stand on `/privacy` and `/terms`.
 
 **Phase 7, Live lesson: building.** Every step with no screen is done, L3c the last (2026-10-15);
 M0 is done (deck storage on, 2026-10-12); the web screens come after the redesign's PV15 (✅ #388),
-W3 the first (✅ #392), M5 (✅ #400), L7 (✅ #402, #405), W4 (✅ #406, #407, #408, its follow-up #409), L7b (✅ #393, #394, #395, #411), L7c (✅ #412), M6 (✅ #413–#418), W5 (✅ #419), so every web screen of Phase 7 is built, and the phone's L8, M8 and M8b (✅ L8a–L8c, M8, #452, and M8b, #454, their 📱 device checks left). L0b, production backups, is on before the Vanderbilt pilot (the owner,
+W3 the first (✅ #392), M5 (✅ #400), L7 (✅ #402, #405), W4 (✅ #406, #407, #408, its follow-up #409), L7b (✅ #393, #394, #395, #411), L7c (✅ #412), M6 (✅ #413–#418), W5 (✅ #419), so every web screen of Phase 7 is built, and the phone's L8, M8 and M8b (✅ L8a–L8c, M8, #452, and M8b, #454; their 📱 device checks passed on prod, 2026-11-08, but for three steps not run); the exit checks L9, M10 and W6 passed with one student (2026-11-08). L0b, production backups, is on before the Vanderbilt pilot (the owner,
 2026-11-05).
 
 ## Phases
@@ -199,7 +189,7 @@ One line each. Phases 3–6's step lists, the push's (N1–N6) and this table in
 | 3 | iOS student app: BaliCore, outbox + sync, enforcement, sign-in, screens, device test gate | ✅ **complete** (2026-10-03) |
 | 4 | Reports + recap, rate limits, the one-address load gate, the OpenAPI check, the authorization matrix | ✅ **complete** (2026-10-05); the sweep's per-row retry left unbounded at this size: bound it if the sweep grows (L3) |
 | 5 | Pilot readiness: prod, Sentry, TestFlight, App Store, runbooks | ✅ cloud steps done; **prod live 2026-10-05**; open: the owner's items |
-| 6 | Security and compliance; gates Phase 5's student-facing steps | ✅ cloud steps done; open: C2 (⚖️ the lawyer's words), C7's phone check 📱, S8 (the owner's decision) |
+| 6 | Security and compliance; gates Phase 5's student-facing steps | ✅ cloud steps done; open: C2 (⚖️ the lawyer's words), S8 (the owner's decision) |
 | 7 | Live lesson: questions and PDF slides in a running session, followed on the phone and the web | building (Phase 7 steps) |
 | 8 | Android: the lock, the candidates measured on the emulators, then (a) on a Pixel and a Samsung (iOS's Phase 0) | building: AN1's parts 1 and 1c on the emulators ✅ (2026-11-03); AN1b, lock (a) decided ✅ (2026-11-04); AN1's part 2 📱 waits for the phones, before launch |
 | 9 | Android: the engine, BaliCore's and BaliOutbox's twin, no screens | building: AN2–AN9a's code ✅ (2026-11-05); AN9b next |
@@ -246,8 +236,8 @@ Slice 1 — live questions:
 - **L7** 👀 Portal UI to v2's canvas: the class page's question and Present's — ✅ as L7-1a (#389), L7-1b (#390), L7-2 (#402) and L7-3, Close and Done on Present, Done in every window of the browser (#405); DECISIONS 2026-10-15
 - **L7b** 👀 Portal saved questions to v2's canvas — ✅ as part 1a (#393), part 1b (#394), part 1c (#395) and part 2, the panel's drafts (#411); DECISIONS 2026-10-15, 2026-10-16
 - **L7c** 👀 A session's Questions to v2's canvas — ✅ (#412; DECISIONS 2026-10-16)
-- **L8** 👀📱 iOS answer card to the app canvas: while a question or a slide shows, the Focus screen's ring as a strip and Emergency Unlock pinned at the bottom; a tap answers and changes it until the close; the revealed answer marked, never red; a closed question's Hide; the same card on Unlocked, Screen Time off and Home; the consent list's two new lines and the one-time screen for a student who saw the old list (`no-ai-slop`); M0 ✅ (the canvas approved 2026-10-10; L0b, before the first actual pilot since 2026-10-12, holds back no screen). **No build that can answer ships (TestFlight included) before L2's documents and this wording have landed** — validation: XCTest, then the device check on the owner's iPhone: a shielded phone answers, the battery cost of the 2 s poll over a lesson, VoiceOver (written as Part 2 of `ios/README.md`'s "Phase 7's phone sitting, on prod", 2026-10-24). **L8a**, the consent list's two new lines and the one-time screen — ✅ (#443; DECISIONS 2026-10-23). **L8b**, the lesson followed and the card on Focus — ✅ as L8b-1, the lesson followed and the card's words, the card waiting for the list and Delete account taking the phone's notes (the owner's rulings; #448), and L8b-2, the card on Focus, the ring as the strip and Emergency Unlock pinned, a poll refused 403 or 404 ending the lesson (#450); DECISIONS 2026-10-23. **L8c**, the same card on Unlocked, Screen Time off and Home, with the owner's three riders — ✅ (#451; DECISIONS 2026-10-23). L8's screens are done; left, its 📱 device check on the owner's iPhone
-- **L9** 📱 Exit check: a real class on prod asks and answers, the recap and the stream show the lifecycle, no screen names an answer
+- **L8** 👀📱 iOS answer card to the app canvas — ✅ as L8a (#443), L8b (#448, #450) and L8c (#451); DECISIONS 2026-10-23; its 📱 device check passed on prod (2026-11-08) but for the battery's half hour (`ios/README.md`'s sitting, Part 2, step 6), not run
+- **L9** 📱 Exit check: a real class on prod asks and answers, the recap and the stream show the lifecycle, no screen names an answer — passed with one student on prod (2026-11-08); a class of several, the pilot's own, is the full check
 
 Slice 2 — slides:
 - **M0** 🔧 The owner: an S3 bucket per environment — ✅ (2026-10-12; DECISIONS 2026-10-12)
@@ -264,10 +254,10 @@ Slice 2 — slides:
 - **M5** 👀 The slides page and upload — ✅ as M5a (#396), M5b part 1 (#397) and M5b part 2 (#400); DECISIONS 2026-10-15
 - **M6** 👀 Portal presenter to v2's canvas — ✅ as part 1 (#413), 2a (#414), 2b-1 (#415), 2b-2 (#416), 2c (#417) and 2d (#418); DECISIONS 2026-10-16; the panel line back (#457; DECISIONS 2026-10-24)
 - **M7** BaliCore's deck download and cache (for M8) — ✅ (#331; DECISIONS 2026-10-12)
-- **M8** 👀📱 iOS slide view to the app canvas — ✅ (#452; DECISIONS 2026-10-24): the slide on Focus only, over shields the check verified; left, its 📱 device check on a shielded phone, the owner's (Part 3 of `ios/README.md`'s "Phase 7's phone sitting, on prod"); the slide off Focus is M8b's; its CI failure, `AppTests.ageAgainInClass`'s own wait, fixed in the same PR (DECISIONS 2026-10-24)
-- **M8b** 👀📱 The slide on Unlocked, Screen Time off and Home, and the question card on the Screen Time ask — ✅ (#454; DECISIONS 2026-10-24); left, its 📱 device check with M8's (Part 3 of `ios/README.md`'s "Phase 7's phone sitting, on prod")
+- **M8** 👀📱 iOS slide view to the app canvas — ✅ (#452; DECISIONS 2026-10-24); its 📱 device check passed on prod (2026-11-08) but for a tap on a deck's link (no deck had one) and a second iPhone (`ios/README.md`'s sitting, Part 3), not run
+- **M8b** 👀📱 The slide on Unlocked, Screen Time off and Home, and the question card on the Screen Time ask — ✅ (#454; DECISIONS 2026-10-24); its 📱 device check passed with M8's (2026-11-08)
 - **M9** Load and demo with a deck — ✅ (#335; DECISIONS 2026-10-12)
-- **M10** 📱 Exit check: a real class on prod follows a deck
+- **M10** 📱 Exit check: a real class on prod follows a deck — passed with one student on prod (2026-11-08); a class of several, the pilot's own, is the full check
 
 Slice 3 — students on the web (added 2026-10-10; ARCHITECTURE, "Live lesson", decision 13; built web first, each step after the steps it reads):
 - **W1** The phone's state in the presentation read — ✅ (#322; DECISIONS 2026-10-11)
@@ -276,7 +266,7 @@ Slice 3 — students on the web (added 2026-10-10; ARCHITECTURE, "Live lesson", 
 - **W4** 👀 The lesson page to v2's canvas — ✅ as part 1a (#406), part 1b (#407) and part 2 (#408); DECISIONS 2026-10-15; left for the owner: the same check with a real iPhone once the app's card (L8) can answer (📱)
 - **W4 follow-up** 👀 The home's chip says Bali can't be reached before its lesson's first read answers, an answer that landed after 10 s is in once a read shows it, and the home reads the account every 30 s while in view with no class in session (the owner, 2026-10-16) — ✅ (#409; DECISIONS 2026-10-15, 2026-10-16)
 - **W5** 👀 Slides on the student web to v2's canvas — ✅ (#419; DECISIONS 2026-10-16)
-- **W6** 📱 Exit check: a real class on prod follows a lesson on laptops and phones at once; each student's chip agrees with the teacher's grid
+- **W6** 📱 Exit check: a real class on prod follows a lesson on laptops and phones at once; each student's chip agrees with the teacher's grid — passed with one student on prod (2026-11-08); a class of several, the pilot's own, is the full check
 
 **The open design questions are settled** (the owner, 2026-10-10, each as recommended;
 ARCHITECTURE's "Live lesson", "Settled"): `event_id` refused both ways (L1, L3b), the guard
@@ -303,10 +293,9 @@ One line each; each step's full notes are on its line in `docs/PLAN-ARCHIVE.md`.
 - **C2** 👀 ⚖️ The privacy policy and terms (Phase 6, **gate**): the portal's pages and the app's links are built, the pages holding the owner's drafts (C2-text), the one copy of the words (`docs/legal/` keeps the notes for the lawyer), which the lawyer's words replace in place; not needed before the Vanderbilt pilot (the owner, 2026-11-03)
   - **C2-drafts** The owner's drafts, for Apple's external beta review (the owner, 2026-10-24) — ✅ (#460): `docs/legal/privacy-policy.md` and `terms-of-use.md`, from General Legal's CC0 templates, every fact filled; the lawyer's questions at each file's end (DECISIONS 2026-10-24). The lawyer's review is not needed before the Vanderbilt pilot (the owner, 2026-11-03)
   - **C2-text** The drafts' words on `/privacy` and `/terms` — ✅ (#461; DECISIONS 2026-10-24)
-- **C7** 📱 The 13+ screen (Phase 6, **gate**): built, C7-server with it; left, the owner's first-launch check on the next TestFlight build
 - **S8** 🔧 Least-privilege database roles (Phase 6): the owner's decision (Open owner items, 1)
 - **D2k** ⏸ The shield's new look (Phase 3): waits for a design the owner approves in Claude Design
-- **The push's app half** — ✅ (#456; DECISIONS 2026-10-24); left, runbook 7 (Push Notifications on `com.bali.Bali` before the next TestFlight build) and N6's end-to-end check, the owner's, Bali reinstalled first (an install whose Screen Time step was done before this build is never asked)
+- **The push's app half** — ✅ (#456; DECISIONS 2026-10-24); N6's end-to-end check passed on prod (2026-11-08); left, runbook 7's step 4, dev's `APNS_*` variables, the owner's
 
 ### Phase 3: known edges, carried forward
 
@@ -338,7 +327,7 @@ Researched 2026-10-05; findings in [`docs/ROADMAP-RESEARCH.md`](ROADMAP-RESEARCH
 3. ✅ P8, Railway's config-as-code migration: both environments applied from `.railway/railway.ts` (2026-10-06), `railway.json` deleted.
 4. A nightly `pg_dump` to an encrypted S3 bucket, built ready to enable (needs a bucket and an IAM user); the owner declined backups for the pilot (2026-10-05), then put them before the first actual pilot, the Vanderbilt pilot (L0b, 2026-10-12).
 5. Sentry alert rules and an external uptime monitor on `/healthz` (the owner, in the consoles): runbook 6 (`docs/RUNBOOKS.md`), P9.
-6. Vercel `bali-portal`: an Ignored Build Step `[ "$VERCEL_GIT_COMMIT_REF" != "main" ]`, so PR previews (which fail without env, by design) stop building.
+6. Vercel `bali-portal`: an Ignored Build Step `[ "$VERCEL_GIT_COMMIT_REF" != "main" ]`, so PR previews stop building. They build today (#544's did): the Preview scope holds prod's `NEXT_PUBLIC_*` values (the API, Cognito's domain and client, Sentry, and since 2026-11-07 the redirect URI; seen 2026-11-08), where runbook 3, step 5 allows dev's or none, a preview being unreviewed code. Whether to take them off is the owner's call.
 
 **Phase 6's owner list** (not PRs — the owner, the lawyer and the school):
 
@@ -357,6 +346,18 @@ Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect acc
 
 **The rest of the owner's queue:**
 
+- **The prod sitting's findings (2026-11-08):**
+  - 👀 A student with no name shows as their account id's first 8 characters ("01a11334" on the
+    grid, the recap's Didn't join and a session's report): `displayName ?? id.slice(0, 8)`, `nameOf`
+    in `apps/web/src/lib/recap.ts`, written again in `live-grid.tsx`, `student-panel.tsx`,
+    `unlock-popups.tsx`, `home.tsx` and the class page's roster. Ids are UUIDv7s, so those 8
+    characters are when the account was made, shared by accounts made in the same 65-second window:
+    this one was made on 2026-10-06, the day before the app's Your name (DECISIONS 2026-10-07). The
+    student web never asks for a name. What a nameless student should show is the owner's design call.
+  - The student web's tab reads "Bali teacher portal": the root layout's one title
+    (`apps/web/src/app/layout.tsx`), on every page but `/privacy`, `/terms` and `/support`. A UI
+    step's fix, its words through `no-ai-slop`.
+  - 🔧 Vercel's previews carry prod's values: the overnight investigation's item 6, above.
 - Android's five still open (the phones, the Play account, the timing, the SDK for what comes next: Android 17's platform, 64 MB, before today's AndroidX; 🔧 the Cognito clients, AN6c's; AS0's canvas, the lock and CodeQL settled, 2026-11-04): `docs/PLAN-ANDROID.md`, Open owner items.
 - 🔧 Sentry: confirm monitor `api-sweep`'s `production` environment is active and alerting (dev checks in to the same slug, #239's review; runbook 6, step 2).
 - ✅ Apple's developer agreement §3.3.3(P) on Family Controls (ISSUES #3): asked by the owner on 2026-10-13, **case 102994872143** (`docs/APP-STORE.md` §5.6 holds the question as sent); Apple's answer, submit it for review (the owner, 2026-11-03), recorded in ISSUES #3.
@@ -383,9 +384,8 @@ Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect acc
   allowing only `AdminGetUser` and `AdminDeleteUser` on its own pool, a user and its access key,
   the two `COGNITO_DELETER_*` variables on dev's `bali` and prod's `bali prod`; the end-to-end
   check on dev (C3-cognito).
-- 🔧 Push: runbook 7 (`docs/RUNBOOKS.md`) — the APNs key, Push Notifications on the App ID (before
-  the next TestFlight build: the app half asks for `aps-environment`, #456), the three `APNS_*`
-  variables on dev and prod; its end-to-end check once the app half lands (N6).
+- 🔧 Push: runbook 7's step 4 (`docs/RUNBOOKS.md`), the three `APNS_*` variables on dev; prod's
+  steps are done, and its end-to-end check (N6) passed at the sitting (2026-11-08).
 - 🔧 Dev's Cognito pool (`us-east-1_YTloqilwT`): turn on email as the attribute to verify, so a sign-up on its hosted page can be confirmed; today it ends on Cognito's error page with the account unconfirmed (found 2026-10-12; `docs/GOTCHAS.md`). The demo accounts sign in as they are.
 - 🔧 Delete dev's unused phone client `bali-ios-dev` (`33qr62dl4ee4inigneidmfe2s9`) in the dev pool; keep `bali-ios`, the demo's (2026-10-14).
 - 🔧 S4a's Sign out: check dev's web app client lists `http://localhost:3000/login` under Allowed sign-out URLs, and add it if not (`docs/WEB.md`).
@@ -402,7 +402,7 @@ One line each; every row's full notes, as they stood on 2026-10-13, are in `docs
 | Core loop: tap→shield offline, armed taps, live grid, unlock always-recorded, refocus, join codes, roster, removal, self-expiry | 1–2 | ✅ built: leaving a class never in session (A19), self-expiry to the minute (A15), the tap over NFC offline (B6a), an unlock before the tap's answer filed under it (B6b) |
 | 30s check-in that verifies shields before claiming them | 3 | rule 3 · ✅ (A2, A2c, B3b-2, B5a) |
 | Shields survive force-quit; bell frees phone via extension | 3 | ✅ confirmed on the owner's iPhone (B5b's round 2, 2026-09-27) |
-| Onboarding: Sign up or sign in → Sign up's 13+ check and intro → sign-up → your name → Screen Time grant → Home | 3 | ✅ built (B4, B5a, C1a–C1c, C7 and C7-server, the approved Sign in & sign up design), no allow-list step; 📱 C7's first-launch check on the next TestFlight build |
+| Onboarding: Sign up or sign in → Sign up's 13+ check and intro → sign-up → your name → Screen Time grant → Home | 3 | ✅ built (B4, B5a, C1a–C1c, C7 and C7-server, the approved Sign in & sign up design), no allow-list step; C7's first-launch check passed on build 12 (2026-11-08) |
 | Consent preview before joining a class | 3 | ✅ (A6, C2b) |
 | Unlock with optional, skippable reason (bathroom/nurse/other) | 3 | replaces full "passes" at launch · ✅ (A1, A9, C5a) |
 | Custom shield screen ("Focused with Bali") | 3 | ✅ (B5c, B5c-2): Bali's own shield, no time, nothing read |
