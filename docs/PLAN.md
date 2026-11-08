@@ -56,7 +56,7 @@ CORS keep it until no build in use links it. The app links the new address from 
   device checks, the owner's. C2's legal words (⚖️) go into the portal's pages, on the Windows PC.
 - **A teacher's account on the iPhone (the owner, 2026-11-07)** ✅ (#PRNUMBER; DECISIONS 2026-11-07):
   once `GET /v1/me` names a teacher's account, one screen, the app is for students, with Open the
-  portal and Sign out, and no device token sent; the server unchanged. Left: Android's twin.
+  portal and Sign out, and no device token registered; the server unchanged. Left: Android's twin.
 - **Android (the owner, 2026-11-02)**: Phases 8–11, the steps in `docs/PLAN-ANDROID.md` (AN0 ✅);
   AN1, the lock spike: parts 1 and 1c on the Android 15–17 emulators ✅ (DECISIONS
   2026-11-03); AN1b ✅ (DECISIONS 2026-11-04): the owner picked (a), the Accessibility service, with

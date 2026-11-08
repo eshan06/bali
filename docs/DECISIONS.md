@@ -30,13 +30,15 @@ a real decision? Add a dated entry at the top: what was decided and why.
   signed in from the last run (an update, a relaunch, an account an invite made a teacher's while
   signed in here) at its next read; never over Focus, a session's screens or the home a standing not
   read keeps, which hold Emergency Unlock. It arrives as Your name does, a fade after the mark. The
-  engine never sends the device token for an account a read names a teacher's.
+  engine never registers the device token for an account a read names a teacher's (`PUT
+  /v1/me/push-token`); Sign out's removal of a token iOS gave still goes, and the API refuses it,
+  at most `pushRemoval`'s 3 s.
 
   **The boot order, traced.** Sign in, then `GET /v1/me/age-check` (a teacher's always reads passed),
   then the sign-in let through: iOS asked for a device token where notifications are allowed (iOS's
   own, no Bali call), then `GET /v1/me`, the mark meanwhile, then the teacher screen. So no consent
   list, no Screen Time or notifications ask, no Home, Me, History, Join or Tap in, no history read
-  (student-only already) and no token sent. Known limits: a sign-in kept from the last run shows what
+  (student-only already) and no token registered. Known limits: a sign-in kept from the last run shows what
   it did (Home, say) until its first read answers, as Your name has it (the owner's ruling,
   2026-10-07), so on a phone whose Screen Time step was done with Home never shown since, Home's
   notifications ask could come first; a read that fails right after a sign-in lets the screens go on

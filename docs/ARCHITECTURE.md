@@ -1108,7 +1108,8 @@ never covers or delays Emergency Unlock, and its answers never enter the outbox.
 - **A teacher's account sees one screen** (the owner, 2026-11-07: the app is the students'). Once
   `GET /v1/me` names the account a teacher's, the router shows the teacher screen where Your name
   would, held the same way after a sign-in, and nothing else: no consent list, no Screen Time or
-  notifications ask, no Home, History, Me, Join or tap, and the engine sends no device token for it.
+  notifications ask, no Home, History, Me, Join or tap, and the engine registers no device token
+  for it.
   It offers the portal and Sign out, which an unsent Emergency Unlock holds as on Me. Focus, a
   session's screens and the home a standing not read keeps come before it, holding Emergency Unlock.
 - **A changed phone clock is detected, not prevented.** iOS scheduling follows wall-clock
