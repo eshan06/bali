@@ -8,6 +8,91 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-07** — **The portal's address is `https://app.getbali.app` (the owner; #540).** The owner
+  bought `getbali.app` on Vercel, which holds its DNS: `www.getbali.app` is the website (the Vercel
+  project `bali-web`, unchanged) and `app.getbali.app` the teacher portal (the project `bali-portal`,
+  built from `main`), which had lived at the project's free address, `https://bali-portal.vercel.app`,
+  since 2026-10-05 (ruled 2026-10-04 "for now"). Done in the consoles on 2026-11-07, prod only (dev
+  is unchanged), in an order that kept sign-in working throughout, since each origin and URL was
+  allowed before anything sent a browser to it:
+  1. **CORS:** Railway's `bali prod` has `CORS_ORIGINS=https://bali-portal.vercel.app,https://app.getbali.app`,
+     and the deck bucket `bali-decks-prod-eshshah`'s CORS `AllowedOrigins` gained the new origin.
+  2. **Cognito:** prod's `bali-web` client (pool `us-east-1_C55e0fhX8`) gained the callback
+     `https://app.getbali.app/auth/callback` and the sign-out URL `https://app.getbali.app/login`,
+     the old ones kept.
+  3. **The redirect:** `bali-portal.vercel.app` 307-redirects to `app.getbali.app`, the path and
+     query kept, so old links and the app's builds 12 and older, which link the old address's
+     `/privacy` and `/terms`, still land.
+  4. **The portal's callback:** `NEXT_PUBLIC_REDIRECT_URI` on `bali-portal` is
+     `https://app.getbali.app/auth/callback` (Production and Preview), and the portal was redeployed.
+
+  **What stays, until when:** the old origin in both CORS lists and the old callback and sign-out
+  URLs on `bali-web` stay until no build in use links the old address, and the redirect keeps old
+  links working meanwhile. Build 12, on the owner's phone for the sitting, links the old address;
+  build 13, the App Store submission's and the first made after this PR, links the new one. Runbook 3,
+  step 4 now records the move and its order for the next one. The website (`demo3`) still sends its
+  Sign in, Privacy and Terms links to the old address (its `vercel.json` and its pages), so the
+  redirect also stays until the website's own process changes them.
+
+  **The repo (#540):** `ios/project.yml`'s `BALI_PORTAL_URL`, one value for every configuration
+  (production's, since the policy pages live only there, so there was no dev value to keep), and
+  `AppTests.policyLinks`, which pins the links; `/privacy`'s intro, its words otherwise unchanged
+  (through `no-ai-slop`) and its date standing, November 7, 2026 already, with a test that failed on
+  the old page; the API tests' sample origins; the hosted UI's look URL
+  (`infra/cognito/hosted-ui/README.md`); the docs: DEPLOY, RUNBOOKS, PILOT, WEB, APP-STORE (its
+  listing's Support and Privacy Policy URLs), PLAN, ARCHITECTURE's Deploys line, `docs/legal/`'s
+  notes and `ios/README.md`'s sitting. Left on the old address on purpose: CORS and Cognito (above),
+  dated history (this file, PLAN-ARCHIVE), and Android's `BALI_PORTAL_URL`
+  (`android/app/build.gradle.kts`), Android's to change, which the redirect covers meanwhile.
+
+  **Said plainly:**
+  - No build signs in through the old CORS origin or Cognito URLs: the app signs in with its own
+    client and `bali://` callback, and its policy links need only the redirect. They serve tabs
+    opened at the old address before the move, while their sign-in lasts (12 hours), and those tabs'
+    Sign out. They must go before the name `bali-portal.vercel.app` could ever be released (the
+    project renamed or deleted): whoever took it would have a callback prod's public portal client
+    allows (santa's Reviewer B).
+  - A teacher signed in at the old address signs in once more: the portal keeps its sign-in in the
+    tab's storage, which belongs to one address, so the new address starts signed out.
+  - `NEXT_PUBLIC_REDIRECT_URI` is on Preview too, where runbook 3, step 5 gives previews none of
+    prod's values. Alone it is harmless, a preview's sign-in failing as previews' do; whether to take
+    it off Preview is the owner's call.
+
+- **2026-11-07** — **The iPhone app requires NFC, so the App Store offers Bali on iPhone only (the
+  owner: "Yes, require NFC"; #540).** App Review tests an app offered on iPad on an iPad too (an iPad
+  Air 11-inch (M3)), where Bali ran in iPhone compatibility mode and could never tap in: iPads have no
+  NFC reader, and neither have the Macs and Apple Vision Pro that run iPhone apps. So the app now
+  requires `nfc` (`UIRequiredDeviceCapabilities`), and the App Store offers Bali only to devices that
+  can tap in. Every iPhone iOS 17 runs on has NFC, so no iPhone is dropped. It ships before the first
+  release because Apple's page on the key says that for app updates "you can only maintain or relax
+  capability requirements": added in an update, it would drop devices people already use.
+  - **How:** `INFOPLIST_KEY_UIRequiredDeviceCapabilities[sdk=iphoneos*]: nfc` in `ios/project.yml`,
+    the app target only (the extensions need none), so device builds alone carry it. Found while
+    building it: the iOS Simulator refuses to launch an app that requires NFC ("Application failed
+    preflight checks"), which would stop every hosted app test, here and in CI, so a hosted test
+    can't pin it. `ios.yml`'s plist check does, on every iOS PR: a device build's setting must be
+    `nfc` alone and a simulator build's nothing; with the line removed it failed (tried). And the
+    TestFlight workflow's release guard checks the archive Apple reads (both reviewers' suggestion):
+    `nfc`, with nothing but `arm64` beside it. A Release device build's Info.plist reads `arm64`,
+    `nfc`: Xcode adds `arm64` to every device bundle itself, the extensions' too, which Apple's page
+    asks of 64-bit apps, so nothing else belongs in the list.
+  - **What stays:** Tap in's line for a phone that can't read NFC ("This iPhone can't read Bali
+    blocks, so it can't tap in. Ask your teacher.") covers an iPhone whose NFC is unavailable.
+    `docs/APP-STORE.md` §2's guideline 2.4.1 paragraph says Bali requires NFC and is reviewed on an
+    iPhone, and §1's checks gain the owner's look at Pricing and Availability: iPhone only, with Mac
+    and Vision Pro availability off if the page still offers them.
+  - Android's manifest doesn't require NFC (AN8: the conductor's call, the owner's to confirm before
+    the Play drafts), so Play would offer Bali to phones with no NFC; this ruling may bear on that one.
+
+- **2026-11-07** — **Section 11's notice was owed to no one yet (the owner).** The only prod
+  accounts are the team's own: the owner's, and the cofounder's teacher account and app, the cofounder
+  working in marketing and not using Bali. So PostHog's arrival (#537) and #539's page edits came
+  with no notice in the app or on the portal, as no user outside the team exists yet. That answers
+  #539's question (were its edits changes that matter?) and closes PLAN's item 4, the notice A4's
+  entry left for the owner (2026-11-05). From the first pilot user on, `/privacy`'s section 11
+  applies to any change that matters: it is announced in the app and on the portal before it
+  applies, as the terms' section 6 also promises.
+
 - **2026-11-07** — **The legal words say what is true now: sign-up takes `@gmail.com` too, the app
   goes straight to the App Store, and the App Store's privacy answers say Analytics where the app's
   manifest does (the owner: "fix the legal words. you can approve it on your own."; #539).** The

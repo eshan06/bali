@@ -7,8 +7,9 @@ with the same Cognito user pool over a **public PKCE** client (no client secret 
 the browser).
 
 Locally it runs against the Railway **dev** API. Production's portal is the Vercel
-project `bali-portal` at `https://bali-portal.vercel.app`, built from `main` with prod's
-values (`docs/RUNBOOKS.md`, runbook 3; since 2026-10-05).
+project `bali-portal` at `https://app.getbali.app` (since 2026-11-07; its old address,
+`https://bali-portal.vercel.app`, redirects there, and Cognito and the API's CORS still list it),
+built from `main` with prod's values (`docs/RUNBOOKS.md`, runbook 3; since 2026-10-05).
 
 ## Run it locally
 

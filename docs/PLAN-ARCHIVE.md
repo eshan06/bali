@@ -10,6 +10,14 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-11-07 (Central) — the legal words say what is true now (#539; DECISIONS
+2026-11-07): `/terms` and `/privacy` name no email domain and no TestFlight, the app goes straight to
+the App Store (item 5), and `docs/APP-STORE.md` §3 says Analytics where the manifest does (item 6).
+Next: the notice section 11 promises, the owner's; a session
+builds the retire-a-block command; the owner the new build, the sitting, then the App Store
+submission; GA5's known limit, the owner's call (DECISIONS 2026-11-02); AN9b; AN1's part 2 on the
+owner's phones; the audit's polish waits._
+
 _Last updated: 2026-11-07 (Central) — PostHog is on: the owner set `POSTHOG_KEY` on `bali prod`,
 and its boot log says "analytics is on" (item 4). Before it, A6 (#536). Next: the notice
 `/privacy`'s section 11 promises, the owner's; a session builds the retire-a-block command; the
@@ -1880,6 +1888,22 @@ why, Open owner items the owner's queue.
   the conductor's call, awaiting the owner: `createDb` always passes postgres.js a number, 10 unless
   the load harness names one, so `PGMAX` or a `max` in `DATABASE_URL` is ignored, and the boot says so
   by name, never with the URL (`docs/DEPLOY.md`). More connections stays not a deploy setting.
+
+**As PLAN.md said them until the portal's move to `app.getbali.app` (#540, 2026-11-07):** three
+done lines of In flight, Before the pilot's item 1, and item 4's last sentence.
+- **The owner's Android cuts on the iPhone and the student web (WC1–WC8)** ✅ (#502, #506, #508,
+  #509, #516, #519, #526, #530; DECISIONS 2026-11-04, 2026-11-05).
+- **The portal redesign in v2's look (PV0–PV17, the owner, 2026-10-12)** ✅ (2026-10-16): every step
+  done, with PV3b, PV4b, PV4c and PV5b; the last, PV17c-2, Home's Last session (#425).
+- **The workflow review's last steps** ✅ (the owner, 2026-10-13; DECISIONS 2026-10-14): the
+  migration guard (#369), docs-only PRs skipping the test jobs (#365), moved files (#368) and two
+  tests (#364), each in full in `docs/PLAN-ARCHIVE.md`.
+
+1. A new prod TestFlight build from `main`: build 11 predates the audit's iOS fixes (GA3, GA5) and the
+   consent list's new lines (#466), and this one must carry A5's and A2's privacy manifest. The owner's.
+
+Item 4's last sentence: "Left, the owner's: the notice `/privacy`'s section 11 promises before
+something new is collected (DECISIONS 2026-11-05)."
 
 **In flight, the WC line as PLAN.md said it until WC8 (2026-11-05):**
 - **The owner's Android cuts on the iPhone and the student web (the owner, 2026-11-04; DECISIONS

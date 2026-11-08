@@ -34,8 +34,8 @@ export default function PrivacyPage() {
             “us”).
           </p>
           <p>
-            This policy covers the Bali iPhone app and the Bali portal at
-            https://bali-portal.vercel.app (together, “Bali”).
+            This policy covers the Bali iPhone app and the Bali portal at https://app.getbali.app
+            (together, “Bali”).
           </p>
         </>
       }

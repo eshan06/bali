@@ -47,6 +47,13 @@ targets:
         INFOPLIST_FILE: Bali/Info.plist
         CODE_SIGN_ENTITLEMENTS: Bali/Bali.entitlements
         TARGETED_DEVICE_FAMILY: '1'
+        # The app requires NFC (UIRequiredDeviceCapabilities, beside the `arm64` Xcode adds to a
+        # device build; the owner, 2026-11-07), so the App Store offers Bali only to devices that
+        # can tap in: no iPad, Mac or Vision Pro. An update can only keep or relax the list (Apple's
+        # rule). Device builds only: the Simulator has no NFC and refuses to launch an app that
+        # requires it ("Application failed preflight checks"). ios.yml checks what a device build
+        # resolves it to.
+        'INFOPLIST_KEY_UIRequiredDeviceCapabilities[sdk=iphoneos*]': nfc
         # The home-screen icon: Bali/Assets.xcassets's AppIcon, one 1024 image (Xcode makes every
         # size), the mark on its stone-50 tile. Named here, the build writes CFBundleIcons'
         # CFBundlePrimaryIcon.CFBundleIconName, which ios.yml and the TestFlight guard check.
@@ -67,7 +74,7 @@ targets:
         # The portal whose privacy policy and terms the app links (C2b): production's for every
         # configuration, since the policy pages live only there — no Release override, and the
         # TestFlight release guard, which checks the sign-in's keys, needs none for it.
-        BALI_PORTAL_URL: https://bali-portal.vercel.app
+        BALI_PORTAL_URL: https://app.getbali.app
     dependencies:
       - package: BaliCore
       - package: BaliOutbox

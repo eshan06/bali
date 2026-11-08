@@ -3395,7 +3395,7 @@ struct AppTests {
         #expect(PolicyLinks.Page.allCases.map(\.title) == ["Privacy policy", "Terms"])
         #expect(
             PolicyLinks.Page.allCases.map { $0.url(on: portal).absoluteString }
-                == ["https://bali-portal.vercel.app/privacy", "https://bali-portal.vercel.app/terms"])
+                == ["https://app.getbali.app/privacy", "https://app.getbali.app/terms"])
         let me = Phone(fixture: try #require(PreviewFixtures.all["me"]))
         for (name, screen) in [
             ("intro", String(reflecting: type(of: IntroView(phone: me).body))),

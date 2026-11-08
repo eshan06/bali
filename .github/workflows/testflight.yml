@@ -142,8 +142,8 @@ jobs:
       # Release guard on what was built: the sign-in's settings are there, over HTTPS; the build
       # number is the run's; an icon exists (App Store Connect refuses a build without one); and
       # no binary holds text that only `#if DEBUG` code has — the readout's title and the
-      # monitor's lost-bell check; each bundle carries its privacy manifest; the signed NFC
-      # formats entitlement is TAG alone; and each extension has a display name.
+      # monitor's lost-bell check; the app requires NFC; each bundle carries its privacy manifest;
+      # the signed NFC formats entitlement is TAG alone; and each extension has a display name.
       - name: 'Release guard: the archived app'
         run: |
           app="$ARCHIVE/Products/Applications/Bali.app"
@@ -174,6 +174,15 @@ jobs:
           # (macOS's place): ios.yml checks the same key on every iOS PR.
           [ -n "$(plist CFBundleIcons:CFBundlePrimaryIcon:CFBundleIconName)" ] \
             || { echo "::error::The app has no icon (CFBundleIcons.CFBundlePrimaryIcon.CFBundleIconName): App Store Connect refuses the upload. Add an AppIcon asset catalog to the Bali target."; fail=1; }
+          # The App Store offers Bali only to devices with NFC (the owner, 2026-11-07), and an update
+          # can never add a requirement back: the archive requires `nfc`, beside the `arm64` Xcode
+          # adds, and nothing else (ios.yml checks the setting on every iOS PR).
+          caps=$(plist UIRequiredDeviceCapabilities | grep -E '^ +[[:alnum:]-]+$' | tr -d ' ' | sort | paste -sd, - || true)
+          echo "UIRequiredDeviceCapabilities = $caps"
+          case "$caps" in
+            nfc | arm64,nfc) ;;
+            *) echo "::error::The app must require nfc and nothing but arm64 beside it (UIRequiredDeviceCapabilities): \"$caps\"."; fail=1 ;;
+          esac
           # binary | the source that has the text | the text. A text no longer in its source
           # fails too, so a rename can't leave this check finding nothing.
           for marker in "Bali|ios/Bali/BaliApp.swift|Debug readout" \

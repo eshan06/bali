@@ -40,15 +40,17 @@ uses values the one before it produced:
 - **Runbook 1, Railway — done:** the `production` environment (step 2), its database
   `postgres prod` with no public TCP proxy (3, checked 2026-10-05), the API service
   `bali prod` with its variables, `TZ` `America/Chicago` and `CORS_ORIGINS`
-  `https://bali-portal.vercel.app` (5–6), the sweep cron `sweep-cron` (7; its first run
+  `https://bali-portal.vercel.app,https://app.getbali.app` (5–6; the second since 2026-11-07,
+  runbook 3, step 4), the sweep cron `sweep-cron` (7; its first run
   logged `expired 0`, `wentSilent 0`), and `/healthz` answering ok (8).
 - **Runbook 1 — not done yet:** backups (4), before the Vanderbilt pilot's first class (PLAN's
   L0b; the owner, 2026-10-12, withdrawing the ruling of 2026-10-05 that ran the pilot without
   them). Railway's backups need its **Pro** plan; the account is on **Hobby** (upgraded
   2026-10-05). Railway's 2FA (1) is deferred by the owner.
 - **Runbook 3, the Vercel flip — done** (2026-10-05): the project `bali-portal`, rooted at
-  `apps/web`, at `https://bali-portal.vercel.app`, Node.js 22.x, prod's values; the API's
-  CORS preflight from it answers `204`. The old project `bali-web` (the v2 demo) wasn't
+  `apps/web`, at `https://app.getbali.app` since 2026-11-07 (step 4; at
+  `https://bali-portal.vercel.app` before, which now redirects there), Node.js 22.x, prod's
+  values; the API's CORS preflight from it answers `204`. The old project `bali-web` (the v2 demo) wasn't
   connected to the repo then, so step 2 wasn't needed; it now builds the website from the orphan branch `demo3` alone (2026-11-06; `demo2` before, from 2026-11-02). Step 6 done (2026-10-06): `vercel.json` deleted. `bali-portal` hadn't been deploying `main` by itself (the owner deployed by hand); check the next push to `main` deploys it.
 - **Runbook 4, the restore drill — on hold** until prod's first backup (runbook 1, step 4). Its half A, a
   `pg_dump` into a scratch database, works without them (skip its step 1).
@@ -158,7 +160,7 @@ project for the API (its DSN).
    AUTH_AUDIENCE=<prod web client id>,<prod phone client id>
    INTERNAL_API_KEY=<64 hex characters, generated below>
    TZ=<the school's zone, e.g. America/Chicago>
-   CORS_ORIGINS=<the portal's origin: https://<project>.vercel.app for now (runbook 2)>
+   CORS_ORIGINS=<the portal's origin: https://app.getbali.app (runbook 3, step 4)>
    LOG_LEVEL=info
    SENTRY_DSN=<the API's Sentry project DSN>
    SENTRY_ENVIRONMENT=production
@@ -175,7 +177,9 @@ project for the API (its DSN).
    - `TZ`: an IANA zone name for the school (`America/Chicago`,
      `America/New_York`, …). Unset, Railway runs UTC and every bell time is wrong.
    - `CORS_ORIGINS`: exactly the portal's origin — `https://`, the host, no path, no
-     trailing slash, no `*`. Not dev's portal, not `localhost`. Until the portal has
+     trailing slash, no `*`; while its address moves, the old origin and the new,
+     comma-separated, as production's are since 2026-11-07 (runbook 3, step 4). Not dev's
+     portal, not `localhost`. Until the portal has
      its domain (runbook 3), leave it unset: the API then sends no CORS headers and
      the portal can't call it, which is the safe failure.
    - `SENTRY_*`: from the API's Sentry project → **Settings → Client Keys (DSN)**.
@@ -360,8 +364,8 @@ sign-up **gated** to `@vanderbilt.edu` (step 4), and to `@gmail.com` too since 2
 owner: for the owner's testing and for pilot students with no Vanderbilt address), MFA
 **Optional** with TOTP (step 6),
 and the portal on its free Vercel address, `https://<project>.vercel.app` (e.g.
-`bali-portal.vercel.app`), until a custom domain is chosen. Wherever these runbooks say
-`<portal domain>`, that is `<project>.vercel.app` for now.
+`bali-portal.vercel.app`), until a custom domain is chosen: `app.getbali.app`, since 2026-11-07
+(runbook 3, step 4). Wherever these runbooks say `<portal domain>`, that is `app.getbali.app`.
 
 1. **MFA on the AWS root user.** Sign in as root → account menu (top right) →
    **Security credentials** → **Multi-factor authentication (MFA)** → **Assign MFA
@@ -439,7 +443,9 @@ and the portal on its free Vercel address, `https://<project>.vercel.app` (e.g.
    - **The portal's:** type **Single-page application** (public, **no client
      secret**). Name `bali-web`.
      **Login pages** → **Allowed callback URLs:** `https://<portal domain>/auth/callback`
-     only. **Allowed sign-out URLs:** `https://<portal domain>/login` only. No
+     only. **Allowed sign-out URLs:** `https://<portal domain>/login` only. Production's
+     also keep the old address's two, `bali-portal.vercel.app`'s, until no build in use links
+     it (runbook 3, step 4). No
      `localhost`, no preview URLs, no dev URLs. **App client information → Edit →
      Token expiration:** access and ID tokens **12 hours** (720 minutes): the portal
      keeps no refresh token, so this is how long a teacher stays signed in (`docs/WEB.md`,
@@ -572,13 +578,23 @@ your Vercel projects; step 1 tells you which case you're in.
      then **Redeploy**.
    - **Deploy.** **Check:** the deployment's build log finishes, and its
      `*.vercel.app` URL shows the portal's sign-in page.
-4. **The domain.** For now (ruled 2026-10-04) it is the project's free address,
-   `https://<project>.vercel.app` (e.g. `bali-portal.vercel.app`): no DNS. A custom
-   domain later: **Settings → Domains** → add it and create the DNS record Vercel
-   shows, then repeat this step's three URLs with it.
+4. **The domain:** `https://app.getbali.app` since 2026-11-07 (`docs/DECISIONS.md`, 2026-11-07).
+   `getbali.app` was bought on Vercel and its DNS is Vercel's, so adding the domain under
+   **Settings → Domains** needed no record by hand. The project's free address,
+   `https://bali-portal.vercel.app`, the portal's from 2026-10-05 (ruled 2026-10-04), now
+   307-redirects there, keeping the path and query, so old links and the app's builds 12 and
+   older still land.
+   **A move to a new address goes in this order, so sign-in works throughout:** (1) add the new
+   origin to Railway's `CORS_ORIGINS` (runbook 1) and to the deck bucket's CORS (runbook 10,
+   step 2); (2) add its callback and sign-out URLs to the `bali-web` client (runbook 2, step 8),
+   keeping the old ones; (3) redirect the old address to the new one (**Settings → Domains**);
+   (4) set `NEXT_PUBLIC_REDIRECT_URI` to the new callback, then **Redeploy**. The old origin and
+   the old URLs stay in CORS and Cognito until no build in use links the old address, and go
+   before that address's name could ever be released: whoever held it then would have a sign-in
+   callback the portal's public client allows.
    **Check:** `https://<portal domain>` loads with a valid certificate. Then make
-   these three agree, byte for byte: Vercel's `NEXT_PUBLIC_REDIRECT_URI`, the
-   `bali-web` client's callback and sign-out URLs (runbook 2, step 8), and Railway's
+   these three agree, byte for byte, for the new address: Vercel's `NEXT_PUBLIC_REDIRECT_URI`,
+   the `bali-web` client's callback and sign-out URLs (runbook 2, step 8), and Railway's
    `CORS_ORIGINS` (runbook 1). Redeploy the portal after any change.
 5. **Previews: protected, and never pointed at prod.**
    - **Settings → Deployment Protection → Vercel Authentication:** on, for
@@ -1053,8 +1069,8 @@ leaked dev key can't touch production's decks.
 manage S3 and IAM (never root; runbook 2, step 1), in the account that holds the Cognito pools; the
 Railway CLI, linked from your clone of the repo (runbook 8, "Before you start"); and each
 environment's `CORS_ORIGINS`, copied from Railway → the environment → the API service →
-**Variables** (production's is `https://bali-portal.vercel.app`; dev's is the portal you run
-locally, `http://localhost:3000`, unless you added more).
+**Variables** (production's is `https://bali-portal.vercel.app,https://app.getbali.app` since
+2026-11-07; dev's is the portal you run locally, `http://localhost:3000`, unless you added more).
 
 1. **The dev bucket.** AWS console → **S3** → **Create bucket**:
    - **AWS Region:** US East (N. Virginia) `us-east-1`, the pools' region.
@@ -1160,8 +1176,9 @@ locally, `http://localhost:3000`, unless you added more).
    - `FAIL: deck storage is off`: step 5's variables are not on this deploy.
 7. **Production.** Steps 1 to 5 again, never with dev's bucket, user or key: the bucket
    `bali-decks-prod-<a suffix>`, its CORS with production's `CORS_ORIGINS`
-   (`https://bali-portal.vercel.app`), the policy and the user `bali-decks-prod` with production's
-   bucket in the policy, the key described `Railway production bali prod`, and the four variables
+   (`https://bali-portal.vercel.app` and, since 2026-11-07, `https://app.getbali.app`), the policy
+   and the user `bali-decks-prod` with production's bucket in the policy, the key described
+   `Railway production bali prod`, and the four variables
    on environment `production`, service `bali prod`. Deploy.
    **Check:** prod's deploy log says `deck storage is on`, and the check run there, `railway link`
    (environment `production`) then `railway ssh --service "bali prod" -- npm run --silent

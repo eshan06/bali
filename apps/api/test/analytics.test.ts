@@ -681,7 +681,7 @@ describe('the portal’s teacher actions (A3a): POST /v1/me/actions', () => {
       timestamp: '2020-01-01T00:00:00.000Z',
       uuid: newUuidV7(),
       api_key: 'phc_someoneElsesProject',
-      properties: { name: 'Ana Ruiz', url: 'https://bali-portal.vercel.app/classes/1' },
+      properties: { name: 'Ana Ruiz', url: 'https://app.getbali.app/classes/1' },
       $set: { email: 'ana.ruiz@vanderbilt.edu' },
     });
     expect(res.statusCode).toBe(200);

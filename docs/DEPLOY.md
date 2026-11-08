@@ -137,8 +137,11 @@ own pool (hosting decision 2). None of these is secret:
   No backups yet: they go on before the Vanderbilt pilot's first class (PLAN's L0b;
   `docs/RUNBOOKS.md`, runbook 1, step 4).
 - **The portal:** the Vercel project `bali-portal` (root `apps/web`, Node.js 22.x) at
-  `https://bali-portal.vercel.app`, built with prod's values (2026-10-05); prod's
-  `CORS_ORIGINS` is that origin.
+  `https://app.getbali.app` since 2026-11-07, built with prod's values (2026-10-05). Its old
+  address, `https://bali-portal.vercel.app`, redirects there (307, the path and query kept), so
+  old links and the app's builds 12 and older still land; prod's `CORS_ORIGINS` is
+  `https://bali-portal.vercel.app,https://app.getbali.app`, the old origin kept for tabs opened
+  there before the move (runbook 3, step 4).
 - **The pool:** `bali-production`, id `us-east-1_C55e0fhX8`; `AUTH_ISSUER`
   `https://cognito-idp.us-east-1.amazonaws.com/us-east-1_C55e0fhX8`. Deletion
   protection on; MFA optional (TOTP); self sign-up gated by the Pre sign-up Lambda
@@ -149,8 +152,9 @@ own pool (hosting decision 2). None of these is secret:
   (Hosted UI classic). Password policy: minimum 12 characters.
 - **The portal's app client:** `bali-web`, id `36meb9r9h0cdrt2a1schcv9abs` — a
   public SPA client, PKCE, SRP and refresh only; callback
-  `https://bali-portal.vercel.app/auth/callback`, sign-out
-  `https://bali-portal.vercel.app/login`, the Vercel project's own address; access and
+  `https://app.getbali.app/auth/callback`, sign-out `https://app.getbali.app/login`, with the
+  old address's two (`https://bali-portal.vercel.app/auth/callback` and `/login`) kept beside
+  them since the move (2026-11-07) until no build in use links it; access and
   ID tokens 12 hours, so a sign-in lasts the school day (the owner, 2026-10-13; `docs/WEB.md`,
   "Known gap — token renewal").
 - **The phone's app client:** `bali-ios`, id `5dr74i0iqnth9p4c4k594r27aj` — public,
@@ -198,8 +202,9 @@ console → Cognito → that user pool:
   overrides, whose `BALI_API_URL` must never be dev's URL (its release guard
   checks). A build with any of them empty says sign-in is not set up.
 - **The portal the app links (C2b):** `BALI_PORTAL_URL`, production's portal
-  (`https://bali-portal.vercel.app`) for every build, since the privacy policy and
-  terms live only there: set once in `ios/project.yml` (`AppConfigTests.agree` fails
+  (`https://app.getbali.app` from build 13; builds 12 and older link
+  `https://bali-portal.vercel.app`, which redirects there) for every build, since the privacy
+  policy and terms live only there: set once in `ios/project.yml` (`AppConfigTests.agree` fails
   on a second there), and the TestFlight workflow overrides it for no environment. A
   build without it fails its start as one without the sign-in's settings does, in the
   same words.
