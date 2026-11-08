@@ -12,6 +12,9 @@ public enum Screen: Sendable, Hashable {
     /// Your name (the approved Sign in & sign up design; the owner's decision, 2026-10-07): a
     /// student's account with no name names itself, so a teacher always sees a real one.
     case name
+    /// A teacher's account (the owner, 2026-11-07; the Sign in & sign up canvas's Teacher boards):
+    /// the app is the students', so it says so and points to the portal, Sign out its other way on.
+    case teacher
     /// Once, after an update (L8a; the app canvas's ListChanged board): the consent list gained
     /// lines — two with a live lesson's questions (L8a), then how many answered and a clock set
     /// ahead (2026-10-28) — and it promises it "never grows without asking you again", so a student
@@ -46,7 +49,8 @@ public enum Screen: Sendable, Hashable {
     /// Family Controls can read not determined for a moment after a launch (B5a-2), and with this
     /// set such a read routes as approved, while denied never does; `sync`, the engine's truth,
     /// nil until it runs — its `me` naming a student's account with no name, Your name where the
-    /// question would show; in no class, never in one or removed from their last, the student
+    /// question would show, and a teacher's account, the teacher's screen there and nothing after
+    /// it (the owner, 2026-11-07); in no class, never in one or removed from their last, the student
     /// lands on Home and its empty state, never a Join of its own (the owner's ruling, 2026-10-07);
     /// `listSeenBy`, the student who has seen the consent list as it stands on this phone, by their
     /// id: a student `me` lists in a class who is not that one gets what the list gained, once,
@@ -120,6 +124,9 @@ public enum Screen: Sendable, Hashable {
             if signedInThisRun, sync.me == nil, sync.meFailed == nil, sync.link != .storageFailed {
                 return (.starting, false)
             }
+            // The app is the students' (the owner, 2026-11-07): a teacher's account sees its screen
+            // and none of a student's.
+            if sync.me?.user.role.known == .teacher { return (.teacher, false) }
             if let user = sync.me?.user, user.role.known == .student, user.displayName == nil {
                 return (.name, false)
             }
@@ -226,8 +233,10 @@ extension Screen {
                 self = .forward
             case (.age, .signIn), (.intro, .signIn): self = .back
             case (_, .starting): self = .mark
-            // App open, and after a sign-in: Your name, the question, Screen Time, Home.
-            case (.starting, .signIn), (_, .name), (_, .age), (_, .screenTime), (_, .home):
+            // App open, and after a sign-in: Your name, the question, Screen Time, Home, and a
+            // teacher's account's screen.
+            case (.starting, .signIn), (_, .name), (_, .age), (_, .screenTime), (_, .home),
+                (_, .teacher):
                 self = .arrive
             default: self = .cut
             }
@@ -237,7 +246,7 @@ extension Screen {
         /// standing not read keeps, with Emergency Unlock, has none.
         private static func onPath(_ shown: (screen: Screen, tabbed: Bool)) -> Bool {
             switch shown.screen {
-            case .starting, .signIn, .age, .intro, .name, .screenTime: true
+            case .starting, .signIn, .age, .intro, .name, .screenTime, .teacher: true
             case .home: shown.tabbed
             default: false
             }

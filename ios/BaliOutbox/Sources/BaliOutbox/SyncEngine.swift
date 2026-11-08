@@ -1088,7 +1088,11 @@ public actor SyncEngine {
             if let yes = await signIn?.yes(), !deleting { await record(yes: yes) }
             // The phone's device token, after the read: a read the class-started alert held holds
             // it too, so a school's phones it opened never register at once. Counted, as the yes.
-            if let push = unregistered, readHold == nil, !deleting {
+            // Never for an account a read names a teacher's: the app is the students' (the owner,
+            // 2026-11-07), and the API registers a student's alone.
+            if let push = unregistered, readHold == nil, !deleting,
+                state.me?.user.role.known != .teacher
+            {
                 unregistered = nil
                 let request = RegisterPushTokenRequest(
                     token: Self.hex(push.token), environment: push.environment,

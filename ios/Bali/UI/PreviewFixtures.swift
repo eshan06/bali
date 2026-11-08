@@ -127,6 +127,14 @@
             "nameCantSave": State(
                 sync: standing(.out, me: nameless),
                 naming: naming(anaTyped, failure: Naming.words(.networkError, nil))),
+            // A teacher's account (the owner, 2026-11-07; the Sign in & sign up canvas's Teacher
+            // boards): Ms. Rivera, signed in on a student's app; Sign out held while an Emergency
+            // Unlock the phone made is not sent yet; and a Sign out that couldn't finish.
+            "teacher": State(sync: standing(.out, me: rivera)),
+            "teacherSignOutHeld": State(
+                sync: queued(standing(.out, me: rivera), .unlock(session: "session", reason: nil))),
+            "teacherSignOutFailed": State(
+                sync: standing(.out, me: rivera), signOutFailed: SignOutWords.failed),
             // Once, after the update (L8a; the app canvas's ListChanged board): Ana, in Period 3 and
             // Period 5, has not seen the consent list as it stands on this phone, only L8a's, so its
             // lines since (2026-10-28); and, having seen neither, the lines of both.
@@ -904,6 +912,13 @@
             if let failed { (state.meFailed, state.link) = (failed, .unreachable) }
             return state
         }
+
+        /// Ms. Rivera, a teacher, as `GET /v1/me` answers her: Period 3, which she teaches.
+        private static let rivera = try? BaliJSON.makeDecoder().decode(
+            MeResponse.self,
+            from: Data(
+                #"{"user":{"id":"rivera","role":"teacher","displayName":"Ms. Rivera"},"classes":[{"id":"p3","name":"Period 3 — Algebra II","teacher":{"displayName":"Ms. Rivera"},"enrollmentId":null,"liveSession":null}],"session":null,"armed":false}"#
+                    .utf8))
 
         /// Ana as D1's Me names her.
         private static let anaRodriguez = ana(name: "Ana Rodríguez")
