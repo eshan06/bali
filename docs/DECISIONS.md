@@ -8,6 +8,51 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-07** — **A TestFlight run revokes the Apple Development certificate its signing made,
+  and no other (#542).** **What happened:** each run of `testflight.yml` archives on a fresh GitHub
+  runner, whose keychain is empty, so Xcode's automatic signing (the App Store Connect key,
+  `-allowProvisioningUpdates`) made a new Apple Development certificate, "Created via API", every
+  run, until Apple refused one more: "Your account has reached the maximum number of
+  certificates". Runs 2–11 made the ten the conductor revoked in the developer portal, with the
+  owner's yes (run 1 stopped before signing); build 12's run, after that, made one more, which
+  this change leaves alone. Kept, never to be touched: the owner's own Development certificate (to
+  2027-06-01), the cloud-managed Distribution Managed one (2027-08-18) and the Distribution one
+  (2027-09-20).
+
+  **Making none at all was the first choice, and the key alone can't.** Apple documents its
+  cloud-managed certificates for distribution only (the developer account's help, "Cloud-managed
+  certificates"), and an archive as "a developer-signed release build" (WWDC21, "Distribute apps
+  in Xcode with cloud signing"): archiving needs a development identity, certificate and private
+  key, on the machine, and a fresh runner has none. Keeping one across runs would put a
+  certificate and its key in secrets, which P5 ruled out (2026-10-04, below: "no certificate or
+  profile in secrets"); archiving unsigned is no path Apple documents, and the export could lose
+  the entitlements the release guard reads. So the second choice: the run deletes only what it made.
+
+  **How.** `.github/scripts/testflight-certs.py`, stdlib Python and `openssl` for the ES256 token,
+  with the workflow's key (no key or token printed): `list` saves `GET /v1/certificates` before
+  the Archive step; `clean`, an `always()` step after the upload, lists again and revokes
+  (`DELETE /v1/certificates/{id}`) the certificate new since, when there is exactly one and it is
+  `DEVELOPMENT`. Anything else revokes nothing, with a warning naming what it saw: a list that
+  failed, had a next page or held an id not Apple's shape; more than one new certificate; a new
+  one of another kind. Neither step can fail the run (`continue-on-error`, and the script exits
+  0). Whatever predates the run is in its first list, so the kept certificates and any earlier
+  leftover can't be chosen: `testflight-certs.test.py` pins it, in CI's "Typecheck · lint ·
+  build". A certificate is named by its type, expiry and id, and by its name only when that is
+  the API's own, "Created via API": a person's certificate carries their name, and the repo's run
+  logs are public. **One new, not two** (the step allowed either): a run makes one (ten runs, ten
+  certificates), and a certificate someone else made during the run, beside the run's own, then
+  revokes nothing rather than theirs. **Its known limit, the owner's call:** a run whose signing
+  made none, and a development certificate someone else made in the same minutes, would revoke
+  theirs; only the owner makes certificates, and the Mac has its own until 2027-06-01. Santa's
+  reviewers offered two ways to close it: also require the name "Created via API", or match the
+  identity in the runner's keychain. Each rests on something only a real run shows (the name
+  Apple's API gives, what the runner's keychain lists), and a wrong guess would leave every run's
+  certificate behind again, if with a warning, so neither is built before build 13's run is seen.
+
+  **The live check is build 13's run** (prod, the next the owner asks for): its summary reads
+  "Certificates on the team: N before signing, N+1 after the run, N after the revoke", and the
+  developer account lists the same certificates after it as before.
+
 - **2026-11-07** — **A teacher's account can't use the iPhone app: one screen says the app is for
   students and points to the portal (the owner; #541).** The owner, verbatim: "bruh why is a teacher even
   allowed to sign in. make it so they cant (if thats compliant with apple)." Then: "create a screen in

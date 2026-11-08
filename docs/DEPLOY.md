@@ -295,13 +295,27 @@ What a run checks and needs:
   build). The icon is `ios/Bali/Assets.xcassets`'s `AppIcon`, named by
   `ASSETCATALOG_COMPILER_APPICON_NAME` in `ios/project.yml`.
 - **Signing:** `-allowProvisioningUpdates` with the key, so Xcode makes or fetches
-  the certificate and the App Store profiles for the app and both extensions itself.
-  If it says the key may not create a certificate or use cloud-managed distribution
-  certificates, the key's role is too narrow for that: generate one with **Admin**
-  access and replace the three secrets. A GitHub runner keeps no keychain, so a run
-  may leave a new Apple Development certificate on the team each time: revoke old
-  ones in the developer account if they pile up toward Apple's limit. Each extension's Family Controls
-  (Distribution) entitlement must be approved on its own bundle ID too.
+  the certificates and the App Store profiles for the app and both extensions itself:
+  the archive is signed for development, and the export signs it again for the App Store
+  with a cloud-managed distribution certificate. If it says the key may not create a
+  certificate or use cloud-managed distribution certificates, the key's role is too
+  narrow for that: generate one with **Admin** access and replace the three secrets.
+  Each extension's Family Controls (Distribution) entitlement must be approved on its
+  own bundle ID too.
+- **The run revokes the certificate its signing made** (2026-11-07). A GitHub runner
+  starts with an empty keychain, so signing the archive makes a new Apple Development
+  certificate, "Created via API", every run; they piled up until Apple refused one
+  more. So the run lists the team's certificates before signing and again at its end,
+  after a failure too, and revokes the one certificate new since, when it is a
+  development one (`.github/scripts/testflight-certs.py`). Anything else revokes
+  nothing and says what it saw in a warning that names the certificates: a list that
+  failed, more than one new certificate, or a new one of another kind. Revoke a
+  leftover yourself in the developer account (Certificates, Identifiers & Profiles →
+  Certificates): a run's own is a Development one that expires a year after the run.
+  A warning that the revoke was refused (HTTP 403) means the key's role may not revoke
+  certificates: revoke by hand, or generate a key with **Admin** access. The cleanup
+  never fails the run, and the run's summary gives the team's count before signing and
+  after, the same once the revoke went through.
 - **The build number** is the run's number; the version stays `MARKETING_VERSION`.
   Apple refuses a number already uploaded, so re-running a run that got as far as the
   upload fails: dispatch a new run.

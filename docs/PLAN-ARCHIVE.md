@@ -10,6 +10,15 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-11-07 (Central) — the portal is at `https://app.getbali.app` (#540; DECISIONS
+2026-11-07): the app's policy links from build 13, `/privacy` and the docs, the old address
+redirecting; the app requires NFC, so iPhone only (the owner); `docs/APP-STORE.md`'s review notes
+gain guidelines 1.2 and 2.4.1, and its checks the age rating's social media questions and 2.3.7.
+Section 11's notice was owed to no one yet: every prod account is the team's (the owner; DECISIONS
+2026-11-07). Next: a session builds the retire-a-block command; the owner the sitting on build 12,
+then build 13 and the App Store submission; GA5's known limit, the owner's call (DECISIONS
+2026-11-02); AN9b; AN1's part 2 on the owner's phones; the audit's polish waits._
+
 _Last updated: 2026-11-07 (Central) — the legal words say what is true now (#539; DECISIONS
 2026-11-07): `/terms` and `/privacy` name no email domain and no TestFlight, the app goes straight to
 the App Store (item 5), and `docs/APP-STORE.md` §3 says Analytics where the manifest does (item 6).

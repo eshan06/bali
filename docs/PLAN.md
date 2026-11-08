@@ -8,14 +8,12 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-07 (Central) — the portal is at `https://app.getbali.app` (#540; DECISIONS
-2026-11-07): the app's policy links from build 13, `/privacy` and the docs, the old address
-redirecting; the app requires NFC, so iPhone only (the owner); `docs/APP-STORE.md`'s review notes
-gain guidelines 1.2 and 2.4.1, and its checks the age rating's social media questions and 2.3.7.
-Section 11's notice was owed to no one yet: every prod account is the team's (the owner; DECISIONS
-2026-11-07). Next: a session builds the retire-a-block command; the owner the sitting on build 12,
-then build 13 and the App Store submission; GA5's known limit, the owner's call (DECISIONS
-2026-11-02); AN9b; AN1's part 2 on the owner's phones; the audit's polish waits._
+_Last updated: 2026-11-07 (Central) — a TestFlight run revokes the Apple Development certificate
+its signing made (#542; DECISIONS 2026-11-07), so they no longer pile up to Apple's limit; build
+13's run is its live check. Before it, a teacher's account on the iPhone (#541). Next: a session
+builds the retire-a-block command; the owner the sitting on build 12, then build 13 and the App
+Store submission; GA5's known limit, the owner's call (DECISIONS 2026-11-02); AN9b; AN1's part 2
+on the owner's phones; the audit's polish waits._
 
 ## Now
 
@@ -57,6 +55,9 @@ CORS keep it until no build in use links it. The app links the new address from 
 - **A teacher's account on the iPhone (the owner, 2026-11-07)** ✅ (#541; DECISIONS 2026-11-07):
   once `GET /v1/me` names a teacher's account, one screen, the app is for students, with Open the
   portal and Sign out, and no device token registered; the server unchanged. Left: Android's twin.
+- **A TestFlight run leaves no certificate behind** ✅ (#542; DECISIONS 2026-11-07): it revokes the
+  Apple Development certificate its signing made, never one from before the run; build 13's run is
+  the live check, the team's certificate count the same after it as before.
 - **Android (the owner, 2026-11-02)**: Phases 8–11, the steps in `docs/PLAN-ANDROID.md` (AN0 ✅);
   AN1, the lock spike: parts 1 and 1c on the Android 15–17 emulators ✅ (DECISIONS
   2026-11-03); AN1b ✅ (DECISIONS 2026-11-04): the owner picked (a), the Accessibility service, with
