@@ -82,18 +82,19 @@ Lean: the first. It says what happens and to whom, and nothing about control.
 > Bali never reads which apps you use. It quiets every app it can, so there is no list to
 > look at.
 >
+> You can delete your account in the app, on the Me tab.
+>
 > Bali is for students 13 and older.
 
 Notes for the owner:
 - The two lists are the app's own `ConsentCard` words (the colons replace the app's em
   dash). Keep them identical to the app: #130 asks that the store, the privacy labels and
   the app say the same thing.
-- "Bali is for students 13 and older" holds only once C7 (the 13+ screen) lands; drop the
-  line if submission comes first, and never claim it before it's true.
 - "Lock my apps again" is the shipped screen's own words (`UnlockedView`). If that screen
   changes, this line follows it.
-- No "Delete account" line until C3/C4 land. Once they do, add: "You can delete your
-  account in the app, on the Me tab."
+- The 13+ line and the Delete account line are true of the app as built: every Sign up asks
+  the 13+ question (C7), and Me's Delete account deletes the account (C3, C4). If either
+  changes, its line follows it.
 
 ### Keywords (100)
 
@@ -181,13 +182,10 @@ accounts and the video link once the review path (section 4) is chosen.
 >   the teacher shows the class page on a classroom screen. Students can't message each other.
 >
 > IPHONE ONLY (GUIDELINE 2.4.1)
-> - To tap in, the student taps their iPhone on the teacher's Bali block, which the iPhone reads
->   over NFC. iPads and Macs have no NFC reader, so Bali requires NFC
->   (`UIRequiredDeviceCapabilities` lists `nfc`). The App Store doesn't offer it on iPad or Mac,
->   and App Review can try it only on an iPhone. Every iPhone that runs iOS 17, Bali's minimum,
->   has NFC.
-> - The tap also needs the teacher's block, so the screen recording under HOW TO TRY IT shows a
->   tap on an iPhone.
+> - The tap reads the teacher's block over NFC, which iPads and Macs don't have, so Bali requires
+>   NFC (`UIRequiredDeviceCapabilities` lists `nfc`). The App Store doesn't offer it on iPad or
+>   Mac, and App Review can try it only on an iPhone. Every iPhone that runs iOS 17, Bali's
+>   minimum, has NFC.
 >
 > HOW TO TRY IT
 > [🔧 From section 4, the chosen option: the accounts, the class code, the video link,
@@ -197,7 +195,7 @@ accounts and the video link once the review path (section 4) is chosen.
 > Teacher portal (optional, to watch the live grid): [🔧 URL], [🔧 email] / [🔧 password]
 > Class code: [🔧]
 >
-> The iPhone app is for students. The teacher review account is for the portal: signed in on the iPhone, it shows a screen that points there.
+> The iPhone app is for students. On it, the teacher account sees only a screen pointing to the portal.
 
 Notes for the owner:
 - "Nothing can turn it off" is true of the code today (the unlock is local-first, ISSUES
@@ -213,8 +211,10 @@ Notes for the owner:
   opens a question or shows a slide, an answer is an option's index, a student's reads carry no
   totals and no other student, and Present's tiles, the classroom screen's, show each student's
   name and state, never an unlock's reason.
-- With those two paragraphs, everything above HOW TO TRY IT is about 3,500 characters, so what
-  fills HOW TO TRY IT has about 500 of App Store Connect's 4,000.
+- Everything above HOW TO TRY IT is about 3,330 characters (counted 2026-11-07, the guideline 2.4.1
+  paragraph trimmed: the line saying the recording shows a tap went, which HOW TO TRY IT's video
+  link says), so HOW TO TRY IT has about 670 of App Store Connect's 4,000, its last line, for the
+  teacher account, about 100 of them.
 
 ---
 
