@@ -112,6 +112,15 @@ jobs:
           KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
         run: (umask 077; printf '%s\n' "$KEY_P8" > "$KEY_PATH")
 
+      # The runner's keychain is empty, so signing the archive makes a new Apple Development
+      # certificate; left on the team, they piled up until Apple refused another (2026-11-07).
+      # The team's certificates, listed before anything is signed: the step that revokes this
+      # run's one, after the upload, revokes only what is new since. It never fails the run.
+      - name: List the team's certificates before signing
+        id: certificates
+        continue-on-error: true
+        run: python3 .github/scripts/testflight-certs.py list "$RUNNER_TEMP/certificates.json"
+
       # Signed through the key: Xcode makes or fetches the certificate and profiles itself. The
       # build number is the run's, the same in the app and both extensions.
       - name: Archive
@@ -287,6 +296,15 @@ jobs:
             -allowProvisioningUpdates -authenticationKeyPath "$KEY_PATH" \
             -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER_ID"
           echo "Uploaded build $GITHUB_RUN_NUMBER ($ENVIRONMENT). It shows in App Store Connect → TestFlight once Apple has processed it." >> "$GITHUB_STEP_SUMMARY"
+
+      # Whatever the steps above did, once their signing is over: the one certificate new since the
+      # list before signing is revoked when it is a development one. Anything else revokes nothing
+      # and names what it saw in a warning (the script says when). It never fails the run, and
+      # the summary gives the team's count before signing and after.
+      - name: Revoke the certificate this run's signing made
+        if: always() && steps.certificates.outcome != 'skipped'
+        continue-on-error: true
+        run: python3 .github/scripts/testflight-certs.py clean "$RUNNER_TEMP/certificates.json"
 
       - name: Remove the API key
         if: always()
