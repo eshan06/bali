@@ -211,6 +211,10 @@ final class Phone {
     /// History's days as last drawn (`historyDays`), with the history and the day they were drawn
     /// for.
     @ObservationIgnored private var drawn: (history: History, day: Date, days: [History.Day])?
+    /// The clock History's days are drawn by (`historyDays`): the phone's own, but a fixture's,
+    /// stopped at the fixtures' clock (`PreviewFixtures.now`), so its moments' Today is still Today
+    /// however late a test draws them (#540's CI run, past midnight, drew Yesterday).
+    @ObservationIgnored private var historyClock: () -> Date = { Date() }
     /// Whether the app has gone behind since it was last in front: coming back from there with
     /// History shown reads it again (`setForeground`).
     private var wentBehind = false
@@ -331,6 +335,7 @@ final class Phone {
             inClass = fixture.everInClass ? fixture.sync?.me?.user.id : nil
             (listSeenBy, answersListSeenBy) = (fixture.listSeenBy, fixture.answersListSeenBy)
             (opened, tab, history) = (fixture.opened, fixture.tab, fixture.history)
+            historyClock = { PreviewFixtures.now }
             (naming, signOutFailed, email) = (fixture.naming, fixture.signOutFailed, fixture.email)
             (leaving, picking, pickFailed) = (fixture.leaving, fixture.picking, fixture.pickFailed)
             deleting = fixture.deleting
@@ -414,11 +419,11 @@ final class Phone {
     }
 
     /// History's days and cards as its screen draws them (`History.days`): drawn once per change
-    /// of the history, or of the day (F5's review) — a visit's first pass over a history unchanged
-    /// since the last costs nothing — and anew with each read, so a clock or locale changed
-    /// meanwhile shows at the next.
+    /// of the history, or of the day by its clock (`historyClock`; F5's review) — a visit's first
+    /// pass over a history unchanged since the last costs nothing — and anew with each read, so a
+    /// clock or locale changed meanwhile shows at the next.
     var historyDays: [History.Day] {
-        let now = Date()
+        let now = historyClock()
         let day = Calendar.current.startOfDay(for: now)
         if let drawn, drawn.history == history, drawn.day == day { return drawn.days }
         let days = history.days(now: now)

@@ -633,18 +633,24 @@
             return history
         }
 
-        /// D1's History: Ana's moments today and yesterday at D1's times by this phone's clock,
-        /// newest first as `GET /v1/me/history` answers — and an older page left: Show earlier —
-        /// kept, where reading them again from the top failed: `failed` (#141), and, `reading`,
-        /// read again from the top since. `screenTime`: in today's class, Screen Time off, an
-        /// Emergency Unlock under it, then back on (#167).
+        /// The fixtures' clock: the instant History's moments are made around (`anaHistory`), and
+        /// the one a fixture's phone draws their days by (`Phone.historyDays`) — a second before the
+        /// midnight that began the day of the first read, so every draw comes after a midnight, as
+        /// #540's CI run's did, and still says Today, then Yesterday.
+        static let now = Calendar.current.startOfDay(for: Date()) - 1
+
+        /// D1's History: Ana's moments today and yesterday at D1's times by the fixtures' clock
+        /// (`now`), newest first as `GET /v1/me/history` answers — and an older page left: Show
+        /// earlier — kept, where reading them again from the top failed: `failed` (#141), and,
+        /// `reading`, read again from the top since. `screenTime`: in today's class, Screen Time
+        /// off, an Emergency Unlock under it, then back on (#167).
         private static func anaHistory(
             failed: String? = nil, reading: Bool = false, screenTime: Bool = false
         ) -> History {
-            /// `hour`:`minute`, `daysAgo` days back, as the API writes a time.
+            /// `hour`:`minute`, `daysAgo` days back from the fixtures' day, as the API writes a time.
             func at(_ hour: Int, _ minute: Int, _ daysAgo: Int = 0) -> String {
                 let calendar = Calendar.current
-                let day = calendar.date(byAdding: .day, value: -daysAgo, to: Date()) ?? Date()
+                let day = calendar.date(byAdding: .day, value: -daysAgo, to: now) ?? now
                 let time = calendar.date(bySettingHour: hour, minute: minute, second: 0, of: day)
                 return (time ?? day).formatted(Date.ISO8601FormatStyle())
             }

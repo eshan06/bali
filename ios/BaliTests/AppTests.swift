@@ -196,11 +196,11 @@ struct AppTests {
         }
         let home = Phone(fixture: try #require(PreviewFixtures.all["home"]))
         #expect(unlocked.bell != nil && home.bell == nil)
-        // History (C6a): D1's days and cards, each state's fixture its own — the moments kept with
-        // their read again failed among them (#141); a frozen phone's read says it has not
-        // started, and its screen's own read as it shows leaves the fixture as made.
+        // History (C6a): D1's days and cards by the fixtures' clock, each state's fixture its own —
+        // the moments kept with their read again failed among them (#141); a frozen phone's read
+        // says it has not started, and its screen's own read as it shows leaves the fixture as made.
         let history = try #require(PreviewFixtures.all["history"]?.history)
-        let days = history.days(now: Date())
+        let days = history.days(now: PreviewFixtures.now)
         #expect(days.map(\.title) == ["Today", "Yesterday"] && history.nextBefore != nil)
         #expect(days.flatMap(\.cards).map(\.moments.count) == [4, 2, 1])
         #expect(history.notUpdated == nil && history.failure == nil)
@@ -668,7 +668,7 @@ struct AppTests {
     )
     func historyDays() async throws {
         let phone = Phone(fixture: try #require(PreviewFixtures.all["history"]))
-        #expect(phone.historyDays == phone.history.days(now: Date()))
+        #expect(phone.historyDays == phone.history.days(now: PreviewFixtures.now))
         #expect(phone.historyDays.flatMap(\.cards).map(\.moments.count) == [4, 2, 1])
         await phone.readHistory()
         #expect(phone.history.notUpdated != nil)
@@ -676,8 +676,29 @@ struct AppTests {
         let top = #"{"events":[{"eventId":"m0","type":"tap_in","occurredAt":"2026-09-01T13:00:00Z","class":{"id":"p3","name":"Period 3 — Algebra II"},"teacher":{"displayName":"Ms. Rivera"},"session":null,"reason":null,"recordedAs":null,"countedIn":null}],"nextBefore":null}"#
         await phone.historyRead(await client(200, top).history(), for: phone.reads)
         #expect(phone.history.events.map(\.eventId) == ["m0"])
-        #expect(phone.historyDays == phone.history.days(now: Date()))
+        #expect(phone.historyDays == phone.history.days(now: PreviewFixtures.now))
         #expect(phone.historyDays.flatMap(\.cards).map(\.moments.count) == [1])
+    }
+
+    @Test(
+        "A fixture's History says its own day however late a test draws it (#540's CI run made the fixtures before midnight and drew them after, its Today read as Yesterday): its moments and its phone's clock are one instant, a second before a midnight already past, so each fixture with moments reads Today, then Yesterday; and a moment at that instant is Today on a fixture's phone, while one not a fixture's draws it by its own clock, a day on at least"
+    )
+    func historyPastMidnight() async throws {
+        let midnight = PreviewFixtures.now + 1
+        #expect(Calendar.current.startOfDay(for: midnight) == midnight && midnight <= Date())
+        for name in [
+            "history", "historyScreenTime", "historyRefreshError", "historyRefreshReading", "historyRefreshSignIn",
+        ] {
+            let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))
+            #expect(phone.historyDays.map(\.title) == ["Today", "Yesterday"], "\(name)")
+        }
+        let at = PreviewFixtures.now.formatted(Date.ISO8601FormatStyle())
+        let page = #"{"events":[{"eventId":"m0","type":"tap_in","occurredAt":"\#(at)","class":{"id":"p3","name":"Period 3 — Algebra II"},"teacher":{"displayName":"Ms. Rivera"},"session":null,"reason":null,"recordedAs":null,"countedIn":null}],"nextBefore":null}"#
+        for (phone, fixture) in [(Phone(fixture: PreviewFixtures.State(tab: .history)), true), (try standIn(StandIn()).0, false)] {
+            await phone.historyRead(await client(200, page).history(), for: phone.reads)
+            let titles = phone.historyDays.map(\.title)
+            #expect(titles.count == 1 && (titles == ["Today"]) == fixture, "\(fixture): \(titles)")
+        }
     }
 
     @Test(
