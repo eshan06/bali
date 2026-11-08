@@ -9,7 +9,7 @@ touching before changing how something works. A pointer of the form
 a real decision? Add a dated entry at the top: what was decided and why.
 
 - **2026-11-07** — **A teacher's account can't use the iPhone app: one screen says the app is for
-  students and points to the portal (the owner).** The owner, verbatim: "bruh why is a teacher even
+  students and points to the portal (the owner; #541).** The owner, verbatim: "bruh why is a teacher even
   allowed to sign in. make it so they cant (if thats compliant with apple)." Then: "create a screen in
   claude design for if a teacher trys to use the student app. the one with the link to
   app.getbali.app. and open the pr". Found on the owner's phone, signed in with their teacher
