@@ -5,10 +5,12 @@ the product lives on `main`. It replaces `demo2`, the one-page demo.
 
 The design is the Claude Design canvas "Bali website"
 (https://claude.ai/artifact/5Aohc3RHe7j69mVgXwyZhj). `canvas/` is a copy of the files the site uses
-(canvas version 38, 2026-11-06). The owner approved the site as drawn and asked for it to go live on
+(canvas version 40, 2026-11-09). The owner approved the site as drawn and asked for it to go live on
 2026-11-06 (version 35). Version 36 fixes what the browser tests found (the phone-law map's contrast,
 the comparison table's keyboard reach, the pictures' resize loop in Safari); versions 37 and 38 add
-`SiteStates.dc.html`, the two intermediate states: a page that didn't load, and JavaScript off.
+`SiteStates.dc.html`, the two intermediate states: a page that didn't load, and JavaScript off. Version 40 is
+the owner's changes of 2026-11-09: team@getbali.app as the one contact address, a math class on
+every screen, and no rings around the hero's Bali block on phones.
 
 A design change is drawn on the canvas and approved by the owner first, then the changed files are
 copied in here. An intermediate state of an approved page (an error line, a narrow width) is drawn
@@ -48,7 +50,8 @@ student always waits for the owner's.
   so a page the security policy would break breaks here first.
 - `tests/site.spec.mjs`: browser tests in Chrome and Safari's engine, at laptop and phone sizes:
   every page draws, nothing scrolls sideways, every link and old address goes somewhere real, the
-  copy buttons, a redraw, Reduce Motion, the two states, accessibility and the security policy.
+  copy button, a redraw, the hero's rings on phones, Reduce Motion, the two states, accessibility
+  and the security policy.
 - `static/`: the self-hosted fonts (OFL), the icon, and the Android screen picture.
 - `vercel.json`: Vercel runs `node tools/build.mjs && node tools/check.mjs` and serves `dist/` with
   the security headers. A failed build never takes the site down: Vercel keeps the last good version.

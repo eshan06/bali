@@ -47,8 +47,8 @@ for (const [name, path] of Object.entries(ROUTES)) {
   const pageCss = uncomment(linked.map((href) => css[href] || '').join('\n') + (DCB[name]?.helmet || ''));
   if (!/html\{[^}]*-webkit-text-size-adjust:100%[^}]*\}/.test(pageCss) || !/html\{[^}]*[^-]text-size-adjust:100%[^}]*\}/.test(pageCss)) fail(`${path} doesn't turn off iPhone Safari's text enlarging (html text-size-adjust: 100%)`);
   // The two states the canvas's SiteStates board draws: a page that didn't load, and JavaScript off.
-  if (!/<template id="dc-error">[\s\S]*href="mailto:eshan\.shah@vanderbilt\.edu"[\s\S]*<\/template>/.test(html)) fail(`${path} is missing the state for a page that didn't load`);
-  if (!/<noscript>[\s\S]*href="mailto:eshan\.shah@vanderbilt\.edu"[\s\S]*<\/noscript>/.test(html)) fail(`${path} is missing the state for JavaScript off`);
+  if (!/<template id="dc-error">[\s\S]*href="mailto:team@getbali\.app"[\s\S]*<\/template>/.test(html)) fail(`${path} is missing the state for a page that didn't load`);
+  if (!/<noscript>[\s\S]*href="mailto:team@getbali\.app"[\s\S]*<\/noscript>/.test(html)) fail(`${path} is missing the state for JavaScript off`);
   if (/<script(?![^>]*\ssrc=)[^>]*>/.test(html)) fail(`${path} has an inline script (the security policy allows only our own files)`);
 }
 

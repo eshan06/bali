@@ -2,8 +2,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { test as base, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 
-const EMAIL = 'eshan.shah@vanderbilt.edu';
-const JONATHAN = 'jonathan.n.bani-esraili@vanderbilt.edu';
+const EMAIL = 'team@getbali.app';
 // Each page: its path, its title and its heading.
 const PAGES = [
   ['/', 'Bali: Lock the phone. Train the mind.', 'Lock the phone. Train the mind.'],
@@ -97,11 +96,13 @@ test('every link goes somewhere real', async ({ page }) => {
         const [to, hash] = href.split('#');
         expect(PATHS, `${path}: ${href}`).toContain(to);
         if (hash !== undefined) expect(ids[to].filter((id) => id === hash), `${path}: ${href}`).toHaveLength(1);
-      } else expect(href, path).toMatch(/^https:\/\/[a-z0-9.-]+\/|^mailto:(eshan\.shah|jonathan\.n\.bani-esraili)@vanderbilt\.edu$/);
+      } else expect(href, path).toMatch(/^https:\/\/[a-z0-9.-]+\/|^mailto:team@getbali\.app$/);
     }
   }
   await open(page, '/');
-  for (const address of [EMAIL, JONATHAN]) await expect(page.getByRole('link', { name: address })).toHaveAttribute('href', `mailto:${address}`);
+  // One address to write to, the team's.
+  await expect(page.locator('a[href^="mailto:"]')).toHaveCount(1);
+  await expect(page.getByRole('link', { name: EMAIL })).toHaveAttribute('href', `mailto:${EMAIL}`);
 });
 
 test('the old addresses lead to real pages', async ({ page }) => {
@@ -129,20 +130,18 @@ test('Copy address copies it, says so, and leaves the rest of the page as it was
   }
   await expect(page.locator('[data-reveal]:not([data-in])')).toHaveCount(0);
   await page.evaluate(() => { document.querySelector('.bs-hero-art').kept = true; });
-  for (const address of [EMAIL, JONATHAN]) {
-    const button = page.getByRole('button', { name: `Copy address ${address}` });
-    await button.scrollIntoViewIfNeeded();
-    await button.click();
-    await expect(page.getByRole('button', { name: `Copied ${address}` })).toBeVisible();
-    await expect(page.locator('.bs-contact [aria-live]')).toHaveText('Email address copied.');
-    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(address);
-  }
+  const button = page.getByRole('button', { name: `Copy address ${EMAIL}` });
+  await button.scrollIntoViewIfNeeded();
+  await button.click();
+  await expect(page.getByRole('button', { name: `Copied ${EMAIL}` })).toBeVisible();
+  await expect(page.locator('.bs-contact [aria-live]')).toHaveText('Email address copied.');
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(EMAIL);
   // Saying so redraws the page: what was on screen before stays, risen in and at its size.
   await expect(page.locator('[data-reveal]:not([data-in])')).toHaveCount(0);
   expect(await page.evaluate(() => document.querySelector('.bs-hero-art').kept)).toBe(true);
   for (const fit of await page.locator('.bs-fit').all()) await expect(fit).toHaveAttribute('style', /--k:/);
   // And the button says Copy address again.
-  await expect(page.getByRole('button', { name: `Copy address ${JONATHAN}` })).toBeVisible({ timeout: 5000 });
+  await expect(page.getByRole('button', { name: `Copy address ${EMAIL}` })).toBeVisible({ timeout: 5000 });
   await expect(page.locator('.bs-contact [aria-live]')).toHaveText('');
 });
 
@@ -151,12 +150,19 @@ test('a copy that fails says so, and the address stays on screen', async ({ page
     Object.defineProperty(navigator, 'clipboard', { value: { writeText: () => Promise.reject(new Error('blocked')) } }),
   );
   await open(page, '/');
-  const button = page.getByRole('button', { name: `Copy address ${JONATHAN}` });
+  const button = page.getByRole('button', { name: `Copy address ${EMAIL}` });
   await button.scrollIntoViewIfNeeded();
   await button.click();
-  await expect(page.getByRole('button', { name: `Couldn’t copy ${JONATHAN}` })).toBeVisible();
+  await expect(page.getByRole('button', { name: `Couldn’t copy ${EMAIL}` })).toBeVisible();
   await expect(page.locator('.bs-contact [aria-live]')).toHaveText('Couldn’t copy. The address is shown above.');
-  await expect(page.getByRole('link', { name: JONATHAN })).toBeVisible();
+  await expect(page.getByRole('link', { name: EMAIL })).toBeVisible();
+});
+
+test('the rings around the hero’s Bali block show on wide screens and are left out on phones', async ({ page }) => {
+  await open(page, '/');
+  const rings = page.locator('.hs-rings');
+  if (page.viewportSize().width < 600) await expect(rings).toBeHidden();
+  else await expect(rings).toBeVisible();
 });
 
 test('the questions open', async ({ page }) => {
@@ -186,7 +192,7 @@ base('a page that didn’t load says so, and Refresh tries again', async ({ page
   await page.route('**/boards.js', (route) => route.fulfill({ status: 200, contentType: 'text/javascript', body: 'window.DCB = {};' }));
   await page.goto('/#contact');
   await expect(page.getByRole('heading', { level: 1, name: 'This page didn’t load.' })).toBeVisible();
-  await expect(page.locator('#app')).toContainText('Refresh to try again. If it still doesn’t load, email eshan.shah@vanderbilt.edu.');
+  await expect(page.locator('#app')).toContainText('Refresh to try again. If it still doesn’t load, email team@getbali.app.');
   await expect(page.getByRole('link', { name: EMAIL })).toHaveAttribute('href', `mailto:${EMAIL}`);
   expect(errors).toEqual(['No board Main.dc.html']);
   await page.unroute('**/boards.js');
