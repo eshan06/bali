@@ -10,6 +10,13 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-11-08 (Central) — every session's bell is on a whole minute (#546; DECISIONS
+2026-11-08), so a closed app's phone is freed at the bell, not up to a minute after; the server's
+change alone, on prod with the merge's deploy. Before it, the prod phone sitting passed (#545); its
+findings are on Open owner items. Next: a session builds the retire-a-block command; the owner the
+App Store submission on build 13 and the findings' calls; GA5's known limit, the owner's call
+(DECISIONS 2026-11-02); AN9b; AN1's part 2 on the owner's phones; the audit's polish waits._
+
 _Last updated: 2026-11-08 (Central) — the prod phone sitting passed (Before the pilot, item 2;
 #545): builds 12 and 13 on the owner's iPhone 15 Pro, the conductor the teacher on
 `app.getbali.app`; not run: L8's battery half hour, a deck's link and a second iPhone (M8). Its
@@ -1993,6 +2000,24 @@ Phase 6's row: | 6 | Security and compliance; gates Phase 5's student-facing ste
   variables on dev and prod; its end-to-end check once the app half lands (N6).
 
 The onboarding row: | Onboarding: Sign up or sign in → Sign up's 13+ check and intro → sign-up → your name → Screen Time grant → Home | 3 | ✅ built (B4, B5a, C1a–C1c, C7 and C7-server, the approved Sign in & sign up design), no allow-list step; 📱 C7's first-launch check on the next TestFlight build |
+
+**As PLAN.md said them until the App Store submission (2026-11-09, #548):** Before the pilot's
+items 5 and 6; Phase 6's owner list's §3.3.3(P) line and the rest of the owner's queue's; and P7's
+words among the left items on finished steps' lines.
+
+5. The App Store submission, the owner's, from `docs/APP-STORE.md`'s sections 1–4 (5.4: the
+   review accounts): App Review is Apple's answer on §3.3.3(P) (ISSUES #3). No external beta for
+   now (the owner, 2026-11-04). Its build is build 13, the next prod build after #540 and the first
+   to link `app.getbali.app` and to require NFC, so the App Store offers Bali on iPhone only (the
+   owner, 2026-11-07: "Yes, require NFC"; DECISIONS 2026-11-07).
+6. The App Store privacy label: answers ready in `docs/APP-STORE.md` §3 (Product Interaction and
+   Other Data Types serve Analytics too, as the manifest says since A5 and A2), for the owner to
+   paste with item 5.
+
+- 🚨 Apple's §3.3.3(P) (ISSUES #3): ask App Review whether a teacher-started session and the teacher's grid are allowed, and settle a fallback design if not — **gate**, and the first thing to do — asked by the owner 2026-10-13, case 102994872143 (`docs/APP-STORE.md` §5.6, as sent); **answered** (the owner, 2026-11-03): submit it for review, since App Review decides only once it sees the build, so App Review is the answer
+- ✅ Apple's developer agreement §3.3.3(P) on Family Controls (ISSUES #3): asked by the owner on 2026-10-13, **case 102994872143** (`docs/APP-STORE.md` §5.6 holds the question as sent); Apple's answer, submit it for review (the owner, 2026-11-03), recorded in ISSUES #3.
+
+P7's words among the left items: "P7's App Review path (decide its section 4, then fill the accounts and paste);"
 
 **In flight, the WC line as PLAN.md said it until WC8 (2026-11-05):**
 - **The owner's Android cuts on the iPhone and the student web (the owner, 2026-11-04; DECISIONS

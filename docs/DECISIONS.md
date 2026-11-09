@@ -8,6 +8,42 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-09** — **Bali 1.0 goes to App Review on build 13, its listing branded around focus (the
+  owner; #548).** The conductor filled App Store Connect in from `docs/APP-STORE.md`, and the owner
+  checked it and submitted it on 2026-11-09; it reads "Waiting for Review". **The store copy:** the
+  owner wanted Bali, verbatim, "branded around focus. not taking phones away", so the subtitle is
+  "Focus for every class", replacing the draft's "Your phone, quiet for class", and the promotional
+  text is the owner's own. The description is one paragraph without every feature (the owner's
+  ask), so the store no longer carries the "What your teacher sees" and "never sees" lists: they
+  stay in the app, before a student joins a class, and in `/privacy`'s section 2, and the privacy
+  label, published the same day, says what Bali collects. #130's ask that the store and the app
+  say the same thing now reads: nothing in the description contradicts the app's list.
+
+  **The submission's choices:**
+  - **Free, in the United States only, on iPhone only:** Mac (Apple silicon) and Apple Vision Pro
+    availability off, as requiring NFC already makes it (2026-11-07); Public distribution.
+  - **Rated 13+:** every content answer None or No, the social media questions included, computes
+    4+; the override raises it to 13+ to match the 13+ sign-up (C7). App Store Connect shows 13+ in
+    172 countries and 12+ in Vietnam and the Republic of Korea. Age Assurance is answered No, the
+    lawyer's question on a self-declared age screen still open (`docs/APP-STORE.md` §3).
+  - **Released by hand:** an approval doesn't put Bali on the store until the owner releases it.
+  - **No teacher review account:** a reviewer can't tap a block anyway, and the attached recording
+    of a real tap (§4's option A) shows the teacher's side. The student review account, in a class
+    named "Demo" under the owner's teacher account, covers the screens around the tap. Its email,
+    its password and the class's code stay out of this public repo.
+  - **The 6.3" screenshot slot:** App Store Connect's required slot is now "iPhone with Dynamic
+    Island (medium display)", which takes only 1179×2556 or 1206×2622; it refused the 6.9" captures
+    (1320×2868), so the six were scaled to 1206×2622 (§1, Screenshots).
+  - **Content Rights:** yes, Bali shows third-party content, a teacher's slides and questions, with
+    `/terms`' sections 3 and 8 as the rights to it.
+
+  **The weak spots,** on PLAN's Open owner items: the review account's Gmail inbox isn't the
+  owner's, so whoever holds it could reset the password (the account is to be disabled in Cognito
+  after review); App Review's verdict is the §3.3.3(P) answer still owed (ISSUES #3, case
+  102994872143); and App Review may ask for a tap the reviewer can try (§4's options B and C),
+  about students' names on Present (guideline 1.2), or about a teacher's deletion by email
+  (2026-11-07).
+
 - **2026-11-08** — **Every session's bell lands on a whole minute (the owner; #546).** Asked
   whether class end times should snap to whole minutes so the closed-app unlock lands right at the
   bell, the owner, verbatim: "Yes, snap them". **What was measured** (the owner's iPhone, prod
