@@ -39,7 +39,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-const SUPPORT_EMAIL = 'eshan.shah@vanderbilt.edu';
+const SUPPORT_EMAIL = 'team@getbali.app';
 
 interface Policy {
   path: string;
@@ -63,7 +63,7 @@ const POLICIES: Policy[] = [
     Page: PrivacyPage,
     metadata: privacyMetadata,
     title: 'Privacy policy',
-    date: 'Effective November 7, 2026',
+    date: 'Effective November 9, 2026',
     sections: [
       'The short version',
       '1. What Bali collects',
@@ -99,7 +99,7 @@ const POLICIES: Policy[] = [
     Page: TermsPage,
     metadata: termsMetadata,
     title: 'Terms of use',
-    date: 'Last updated November 7, 2026',
+    date: 'Last updated November 9, 2026',
     sections: [
       '1. Who Bali is for',
       '2. Your account',
@@ -372,11 +372,21 @@ describe('the privacy policy names PostHog, which Bali’s server sends its coun
       'Amazon Web Services',
       'Railway',
       'Vercel',
+      'Google',
       'Sentry',
       'PostHog',
       'Apple',
     ]);
-    expect(providers[4]).toBe('PostHog: usage counts that name no one (section 1)');
+    expect(providers[5]).toBe('PostHog: usage counts that name no one (section 1)');
+  });
+
+  it('names Google, which holds our email, among the service providers', () => {
+    render(<PrivacyPage />);
+    const sharing = screen.getByRole('region', { name: '4. Who we share it with' });
+    const providers = within(within(sharing).getAllByRole('list')[1])
+      .getAllByRole('listitem')
+      .map((item) => item.textContent ?? '');
+    expect(providers[3]).toBe(`Google: our email (${SUPPORT_EMAIL})`);
   });
 
   it('says the counts stay at PostHog after a school’s disposal and an account’s deletion, a teacher’s too', () => {
@@ -410,7 +420,7 @@ describe('the privacy policy names PostHog, which Bali’s server sends its coun
       "use them only for the school's purposes, apart from the usage counts in section 1.",
     );
     expect(screen.getByRole('region', { name: '9. Security' }).textContent).toContain(
-      'Railway, Amazon Web Services, Sentry and PostHog encrypt the data they store for us.',
+      'Railway, Amazon Web Services, Google, Sentry and PostHog encrypt the data they store for us.',
     );
   });
 });

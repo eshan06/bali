@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 
-import { PolicyDraft } from '@/components/policy-draft';
+import { PolicyDraft, SUPPORT_EMAIL } from '@/components/policy-draft';
 import { TEACHER_NEVER_SEES, TEACHER_SEES } from '@/components/teacher-sees';
 
 /*
@@ -26,7 +26,7 @@ export default function PrivacyPage() {
   return (
     <PolicyDraft
       title="Privacy policy"
-      date="Effective November 7, 2026"
+      date="Effective November 9, 2026"
       intro={
         <>
           <p>
@@ -264,6 +264,7 @@ export default function PrivacyPage() {
                   </li>
                   <li>Railway: our servers, database and backups</li>
                   <li>Vercel: the portal&apos;s hosting</li>
+                  <li>Google: our email ({SUPPORT_EMAIL})</li>
                   <li>Sentry: error reports, with personal details removed (section 1)</li>
                   <li>PostHog: usage counts that name no one (section 1)</li>
                   <li>
@@ -384,8 +385,9 @@ export default function PrivacyPage() {
                   from the internet.
                 </li>
                 <li>
-                  <strong>Stored:</strong> Railway, Amazon Web Services, Sentry and PostHog encrypt
-                  the data they store for us. Invite codes are stored only in scrambled form.
+                  <strong>Stored:</strong> Railway, Amazon Web Services, Google, Sentry and PostHog
+                  encrypt the data they store for us. Invite codes are stored only in scrambled
+                  form.
                 </li>
                 <li>
                   <strong>Access:</strong> only Bali&apos;s team can reach the production systems.

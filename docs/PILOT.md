@@ -128,7 +128,7 @@ At the end:
 
 ## 3. Support
 
-- **Support email:** eshan.shah@vanderbilt.edu, for students and the professor. The
+- **Support email:** team@getbali.app (since 2026-11-09), for students and the professor. The
   public help page is `https://app.getbali.app/support`.
 - **A student is stuck locked:** Emergency Unlock, always. It works offline and is never
   refused. If the app itself won't open, the shields still come off at the bell, and a

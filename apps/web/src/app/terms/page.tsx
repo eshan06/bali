@@ -24,7 +24,7 @@ export default function TermsPage() {
   return (
     <PolicyDraft
       title="Terms of use"
-      date="Last updated November 7, 2026"
+      date="Last updated November 9, 2026"
       intro={
         <p>
           These terms are an agreement between you and Eshan Shah and Jonathan Bani, who run Bali
