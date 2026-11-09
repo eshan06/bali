@@ -1012,8 +1012,9 @@ describe('GET /v1/me', () => {
 
   it('judges every class at one instant of the server’s clock, read once a request (PV2’s review)', async () => {
     // A clock that moves on every read. Read per class, a session whose bell falls between two
-    // reads would run in one class of the answer and be over in the next.
-    const at = new Date(Date.UTC(2026, 9, 12, 9, 0));
+    // reads would run in one class of the answer and be over in the next. A millisecond before a
+    // whole minute, so the bell a millisecond on is one the engine keeps (2026-11-08).
+    const at = new Date(Date.UTC(2026, 9, 12, 9, 1) - 1);
     let reads = 0;
     const timed = await makeAuthedApp(db, () => new Date(at.getTime() + reads++));
     onTestFinished(() => timed.close());
