@@ -8,6 +8,13 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-09** — **The public contact address is team@getbali.app (the owner).** The owner
+  registered `team@getbali.app` (getbali.app's mail is Google's) and made it the one address the
+  public sees: the website's Talk to us and its two drawn states (`demo3`, canvas version 40), and
+  the portal's Help page (`app/support/page.tsx`) and the privacy policy and terms
+  (`components/policy-draft.tsx`), in place of `eshan.shah@vanderbilt.edu` (the policies' contact
+  since 2026-10-24). App Store Connect still names the old address in TestFlight's feedback email
+  and its What to Test text (`docs/APP-STORE.md`); those are the owner's to change there.
 - **2026-11-09** — **Bali 1.0 goes to App Review on build 13, its listing branded around focus (the
   owner; #548).** The conductor filled App Store Connect in from `docs/APP-STORE.md`, and the owner
   checked it and submitted it on 2026-11-09; it reads "Waiting for Review". **The store copy:** the

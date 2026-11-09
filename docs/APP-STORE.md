@@ -417,7 +417,8 @@ by the owner in App Store Connect → the app → **TestFlight**. How builds are
 ### 5.2 Test Information (TestFlight → Test Information)
 
 - **Beta App Description:** the store listing's promotional text (section 1) is enough.
-- **Feedback email:** `eshan.shah@vanderbilt.edu` (P4's support address). Testers' in-app
+- **Feedback email:** `eshan.shah@vanderbilt.edu` (P4's support address until 2026-11-09, when the
+  support page moved to `team@getbali.app`; this field is App Store Connect's). Testers' in-app
   feedback (a screenshot from TestFlight) reaches App Store Connect → TestFlight →
   Feedback.
 - **Marketing URL / Privacy policy URL:** the support page

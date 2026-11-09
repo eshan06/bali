@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   description: 'How Bali works for students and teachers, and how to reach us.',
 };
 
-const SUPPORT_EMAIL = 'eshan.shah@vanderbilt.edu';
+const SUPPORT_EMAIL = 'team@getbali.app';
 
 /** A list of what a teacher sees, in a calm grey box (SupportPage), two side by side. */
 const SEEN =

@@ -39,7 +39,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-const SUPPORT_EMAIL = 'eshan.shah@vanderbilt.edu';
+const SUPPORT_EMAIL = 'team@getbali.app';
 
 interface Policy {
   path: string;
