@@ -126,8 +126,10 @@ export const STREAM_HEARTBEAT_MS = 20_000;
 export const MAX_SESSION_MINUTES = 480;
 
 /**
- * The longest a session runs in all, from its start to its bell, its Start and
- * every extend together: 16 hours (the owner, 2026-10-28). A Start through
+ * The longest a session runs in all, its Start and every extend together: 16
+ * hours of minutes picked (the owner, 2026-10-28), its bell on the whole minute
+ * at or after them (the owner, 2026-11-08), so less than a minute past 16 hours
+ * from its start. A Start through
  * `/v1` is at most `MAX_SESSION_MINUTES`, so only an extend can pass it, and
  * `extendSession` refuses one that would (`session_too_long`, a 409),
  * recording nothing. An extend landing exactly on it is taken. So a lesson

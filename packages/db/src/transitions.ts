@@ -368,6 +368,16 @@ export function sessionRunning(
   return session.endedAt === null && session.endsAt > now;
 }
 
+/**
+ * The bell for an end: the first whole minute at or after it (the owner, 2026-11-08). With the app
+ * closed, the phone is freed when iOS wakes its monitor at the end of the window it registered, a
+ * whole minute (`Bell.window`), so a bell between two let a class go up to a minute late. Up,
+ * never down, so no lesson runs shorter than its teacher picked.
+ */
+function onTheMinute(end: Date): Date {
+  return new Date(Math.ceil(end.getTime() / 60_000) * 60_000);
+}
+
 async function loadParticipation(
   tx: Database,
   sessionId: string,
@@ -457,6 +467,7 @@ async function endParticipationsElsewhere(
 export interface StartSessionInput {
   classId: string;
   startedAt: Date;
+  /** Its bell rings at the first whole minute at or after this (`onTheMinute`). */
   endsAt: Date;
 }
 export interface StartSessionResult {
@@ -804,7 +815,11 @@ export async function startSession(
       const session = firstOrUndefined(
         await tx
           .insert(sessions)
-          .values({ classId: input.classId, startedAt: input.startedAt, endsAt: input.endsAt })
+          .values({
+            classId: input.classId,
+            startedAt: input.startedAt,
+            endsAt: onTheMinute(input.endsAt),
+          })
           .returning(),
       );
       if (!session) throw new Error('startSession: insert returned no row');
@@ -1495,12 +1510,15 @@ export async function extendSession(
       );
     }
 
-    // Added to the current end, which is still ahead (above). Computed HERE,
-    // under the same FOR UPDATE that loaded the session, so a concurrent
-    // extend has either already committed and is included, or is waiting
-    // behind this one. Never earlier than the end it had: `returnedSince`
-    // relies on it.
-    const newEndsAt = new Date(session.endsAt.getTime() + input.durationMinutes * 60_000);
+    // Added to the current end, which is still ahead (above), and rung on the
+    // whole minute at or after it, as a Start's bell is (`onTheMinute`).
+    // Computed HERE, under the same FOR UPDATE that loaded the session, so a
+    // concurrent extend has either already committed and is included, or is
+    // waiting behind this one. Never earlier than the end it had:
+    // `returnedSince` relies on it.
+    const newEndsAt = onTheMinute(
+      new Date(session.endsAt.getTime() + input.durationMinutes * 60_000),
+    );
     // Kept even though MAX_SESSION_MINUTES now forecloses the way this used to
     // be reached (1e15 minutes): the end comes from the stored session, so a row
     // whose end is already near the Date boundary still overflows on a
@@ -1519,9 +1537,12 @@ export async function extendSession(
     // lesson ends within MAX_SESSION_TOTAL_MINUTES of its start, so the sweep ends it within a
     // day, as it ends any. Judged on the end read under this lock, like the arithmetic above, so
     // of two presses racing at the bound the second judges the first's bell, never both land.
-    // Landing exactly on it is taken. Refused, nothing is written: the bell stands, and the id
-    // stays unspent, so the same press sent again is refused again, never answered as a replay.
-    if (newEndsAt.getTime() - session.startedAt.getTime() > MAX_SESSION_TOTAL_MINUTES * 60_000) {
+    // The bound is the bell 16 hours of minutes picked ring at, the whole minute at or after 16
+    // hours from the start, so a start off the minute loses none of them; landing exactly on it is
+    // taken. Refused, nothing is written: the bell stands, and the id stays unspent, so the same
+    // press sent again is refused again, never answered as a replay.
+    const bound = new Date(session.startedAt.getTime() + MAX_SESSION_TOTAL_MINUTES * 60_000);
+    if (newEndsAt > onTheMinute(bound)) {
       throw new TransitionError(
         'SESSION_TOO_LONG',
         `a session runs at most ${MAX_SESSION_TOTAL_MINUTES} minutes in all`,

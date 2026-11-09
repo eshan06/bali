@@ -168,6 +168,10 @@ async function studentJoins(
   return { token, call };
 }
 
+/** The bell `minutes` from `start`: the whole minute at or after them (the owner, 2026-11-08). */
+const bellAfter = (start: Date, minutes: number) =>
+  new Date(Math.ceil((start.getTime() + minutes * 60_000) / 60_000) * 60_000);
+
 async function theSession(): Promise<typeof sessions.$inferSelect> {
   const rows = await db.select().from(sessions);
   expect(rows).toHaveLength(1);
@@ -192,7 +196,7 @@ describe('npm run dev:teacher', { timeout: 30_000 }, () => {
 
     const started = await run('start');
     const session = await theSession();
-    expect(session.endsAt.getTime() - session.startedAt.getTime()).toBe(20 * 60_000);
+    expect(session.endsAt).toEqual(bellAfter(session.startedAt, 20));
     expect(started).toEqual([
       `session ${session.id} started in "Device check"; it ends at ${local(session.endsAt)}`,
     ]);
@@ -242,7 +246,7 @@ describe('npm run dev:teacher', { timeout: 30_000 }, () => {
 
     const started = await run('start', '45', '--class', 'Period 2');
     const session = await theSession();
-    expect(session.endsAt.getTime() - session.startedAt.getTime()).toBe(45 * 60_000);
+    expect(session.endsAt).toEqual(bellAfter(session.startedAt, 45));
     expect(started[0]).toBe(
       `session ${session.id} started in "Period 2"; it ends at ${local(session.endsAt)}`,
     );

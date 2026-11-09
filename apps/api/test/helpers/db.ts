@@ -88,3 +88,12 @@ export async function seedClassroom(
   );
   return { school, teacher, student, klass, block };
 }
+
+/**
+ * A session's window past its bell, not yet swept: a bell rings on a whole minute (the owner,
+ * 2026-11-08), so the last one, at or before now, and its start a minute before it.
+ */
+export function pastBell() {
+  const endsAt = new Date(Math.floor(Date.now() / 60_000) * 60_000);
+  return { startedAt: new Date(endsAt.getTime() - 60_000), endsAt };
+}

@@ -8,12 +8,11 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-08 (Central) — the prod phone sitting passed (Before the pilot, item 2;
-#545): builds 12 and 13 on the owner's iPhone 15 Pro, the conductor the teacher on
-`app.getbali.app`; not run: L8's battery half hour, a deck's link and a second iPhone (M8). Its
-findings are on Open owner items. Before it, build 13 (from #542), whose run revoked the
-certificate its signing made. Next: a session builds the retire-a-block command; the owner the App
-Store submission on build 13 and the findings' calls; GA5's known limit, the owner's call
+_Last updated: 2026-11-08 (Central) — every session's bell is on a whole minute (#546; DECISIONS
+2026-11-08), so a closed app's phone is freed at the bell, not up to a minute after; the server's
+change alone, on prod with the merge's deploy. Before it, the prod phone sitting passed (#545); its
+findings are on Open owner items. Next: a session builds the retire-a-block command; the owner the
+App Store submission on build 13 and the findings' calls; GA5's known limit, the owner's call
 (DECISIONS 2026-11-02); AN9b; AN1's part 2 on the owner's phones; the audit's polish waits._
 
 ## Now
@@ -63,6 +62,10 @@ build in use links it. The app links the new address from build 13; Android's
   Apple Development certificate its signing made, never one from before the run; build 13's run
   passed its live check (2026-11-07): 3 certificates before signing, 4 after the run, 3 after the
   revoke.
+- **A session's bell on a whole minute (the owner, 2026-11-08: "Yes, snap them")** ✅ (#546;
+  DECISIONS 2026-11-08): a Start's end and an extend's go up to the next whole minute, where iOS
+  frees a closed app's phone; the 16 hours and PostHog's `planned_minutes` count the minutes picked.
+  No new app build.
 - **Android (the owner, 2026-11-02)**: Phases 8–11, the steps in `docs/PLAN-ANDROID.md` (AN0 ✅);
   AN1, the lock spike: parts 1 and 1c on the Android 15–17 emulators ✅ (DECISIONS
   2026-11-03); AN1b ✅ (DECISIONS 2026-11-04): the owner picked (a), the Accessibility service, with

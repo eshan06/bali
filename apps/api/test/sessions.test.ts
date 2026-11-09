@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { authedInject, makeAuthedApp, type AuthedApp } from './helpers/app.js';
-import { makeTestDb, seedClassroom } from './helpers/db.js';
+import { makeTestDb, pastBell, seedClassroom } from './helpers/db.js';
 
 let db: Database;
 let closeDb: () => Promise<void>;
@@ -81,11 +81,7 @@ describe('POST /v1/classes/:id/sessions', () => {
   it('past the bell of a session the sweep has not reached, ends it and starts the next (A18)', async () => {
     // Back-to-back classes: the teacher need not wait out the sweep's minute.
     const { teacher, klass } = await seedClassroom(db, 'start-past-bell');
-    const { session: old } = await startSession(db, {
-      classId: klass.id,
-      startedAt: new Date(Date.now() - 60_000),
-      endsAt: new Date(Date.now() - 1_000),
-    });
+    const { session: old } = await startSession(db, { classId: klass.id, ...pastBell() });
     const { status, body } = await start(await ctx.tokenFor(teacher.cognitoId), klass.id);
     expect(status).toBe(200);
     expect(body.outcome).toBe('created');

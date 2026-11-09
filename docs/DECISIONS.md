@@ -8,6 +8,36 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-08** — **Every session's bell lands on a whole minute (the owner; #546).** Asked
+  whether class end times should snap to whole minutes so the closed-app unlock lands right at the
+  bell, the owner, verbatim: "Yes, snap them". **What was measured** (the owner's iPhone, prod
+  build 13, 2026-11-08): with Bali force-quit, the shields come off when iOS wakes the
+  DeviceActivity monitor at the end of the window the phone registered, and iOS schedules on whole
+  minutes, so `Bell.window(until:)` ends that window at the first whole minute at or after the
+  bell. A 1-minute class whose bell was about 22:36:0x had its monitor woken at 22:37:02 (the device
+  log: "bali did end", then "Successfully cleared all settings"): the block came off almost a
+  minute after the bell, and the owner thought it was broken.
+
+  **The rule.** The engine puts every end on a whole minute: `startSession` rounds the end it is
+  given, and `extendSession` the end it computes, up to the first whole minute at or after it
+  (`onTheMinute`, `packages/db/src/transitions.ts`), never down, so no class runs shorter than its
+  teacher picked: a 1-minute class started at :59 rings 61 s later, not 1 s. An end on a whole
+  minute already stays exact, and an extend adds whole minutes to a whole-minute bell. A lesson
+  running at the deploy keeps its bell until its next extend puts it on the minute after; no
+  migration rewrites one. Nothing else sets an end: `npm run school`'s `end-session` ends a lesson
+  as an End does and leaves its bell alone. The server alone: the phone's window already ends at
+  the first whole minute at or after `endsAt`, which is `endsAt` itself now (`BellTests`' "ends"
+  pins a whole-minute bell to its own end), so no new app build, and no `/v1` field changes.
+
+  **What reads it.** The 16 hours count the minutes picked: their bound is the whole minute at or
+  after 16 hours from the start, so a start off the minute loses none. PostHog's `planned_minutes`
+  are the minutes picked, the window rounded down, the bell being less than a minute past them.
+  Everything else counts to the real bell, the one the phones keep: the countdown, the bell shown
+  ("ends 9:26 AM"), the ring, `session_minutes`, and every report's focus and silent minutes and
+  its bar's length, so a 25-minute class started 20 s into a minute runs 25 min 40 s and can read
+  26. The portal's check of a lost Start's resend (`saysAlreadyRunning`) reads the window's whole
+  minutes too, or its own resend would read as another tab's session.
+
 - **2026-11-07** — **Every teacher deletes their account through their school, by email; students
   delete in the app (the owner).** Since #541 a teacher's account sees only the teacher screen on the
   iPhone, so a teacher with no class or block, who could delete on Me before, no longer can there.
