@@ -458,6 +458,9 @@ when what to try changes.
 > isn't true, or if Bali gets in your way. Send feedback from TestFlight with a
 > screenshot, or write to eshan.shah@vanderbilt.edu.
 
+That is build 13's text as submitted. From the next build, its last line names `team@getbali.app`,
+the support address since 2026-11-09.
+
 ### 5.4 Review and demo accounts
 
 Prod's pool lets only `@vanderbilt.edu` and `@gmail.com` addresses sign up (`gmail.com` since

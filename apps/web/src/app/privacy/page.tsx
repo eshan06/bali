@@ -26,7 +26,7 @@ export default function PrivacyPage() {
   return (
     <PolicyDraft
       title="Privacy policy"
-      date="Effective November 7, 2026"
+      date="Effective November 9, 2026"
       intro={
         <>
           <p>

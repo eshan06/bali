@@ -63,7 +63,7 @@ const POLICIES: Policy[] = [
     Page: PrivacyPage,
     metadata: privacyMetadata,
     title: 'Privacy policy',
-    date: 'Effective November 7, 2026',
+    date: 'Effective November 9, 2026',
     sections: [
       'The short version',
       '1. What Bali collects',
@@ -99,7 +99,7 @@ const POLICIES: Policy[] = [
     Page: TermsPage,
     metadata: termsMetadata,
     title: 'Terms of use',
-    date: 'Last updated November 7, 2026',
+    date: 'Last updated November 9, 2026',
     sections: [
       '1. Who Bali is for',
       '2. Your account',

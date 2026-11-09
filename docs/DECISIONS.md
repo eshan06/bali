@@ -13,8 +13,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   public sees: the website's Talk to us and its two drawn states (`demo3`, canvas version 40), and
   the portal's Help page (`app/support/page.tsx`) and the privacy policy and terms
   (`components/policy-draft.tsx`), in place of `eshan.shah@vanderbilt.edu` (the policies' contact
-  since 2026-10-24). App Store Connect still names the old address in TestFlight's feedback email
-  and its What to Test text (`docs/APP-STORE.md`); those are the owner's to change there.
+  since 2026-10-24); both pages' dates move to November 9, 2026, as the privacy policy's section 11
+  and the terms' section 6 promise of any change. App Store Connect still names the old address in
+  TestFlight's feedback email and its What to Test text (`docs/APP-STORE.md`); those are the owner's
+  to change there.
 - **2026-11-09** — **Bali 1.0 goes to App Review on build 13, its listing branded around focus (the
   owner; #548).** The conductor filled App Store Connect in from `docs/APP-STORE.md`, and the owner
   checked it and submitted it on 2026-11-09; it reads "Waiting for Review". **The store copy:** the

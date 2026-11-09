@@ -50,9 +50,7 @@ describe('the help page says what the app says', () => {
   });
 
   it('the support address is a mailto link', () => {
-    expect(html).toMatch(
-      /<a href="mailto:team@getbali\.app"[^>]*>team@getbali\.app<\/a>/,
-    );
+    expect(html).toMatch(/<a href="mailto:team@getbali\.app"[^>]*>team@getbali\.app<\/a>/);
   });
 
   it('no new em dash in its words', () => {
