@@ -44,6 +44,18 @@ describe('POST /v1/classes/:id/sessions', () => {
     expect(body.armedConverted).toBe(0);
   });
 
+  it('answers with its bell on the next whole minute, its start as the server clocked it (the owner, 2026-11-08)', async () => {
+    await ctx.close();
+    ctx = await makeAuthedApp(db, () => new Date('2026-11-08T22:35:59.250Z'));
+    const { teacher, klass } = await seedClassroom(db, 'start-whole-minute');
+    const { status, body } = await start(await ctx.tokenFor(teacher.cognitoId), klass.id, 1);
+    expect(status).toBe(200);
+    expect(body.session).toMatchObject({
+      startedAt: '2026-11-08T22:35:59.250Z',
+      endsAt: '2026-11-08T22:37:00.000Z',
+    });
+  });
+
   it('converts a waiting armed tap into a participation at start (decision 5)', async () => {
     const { teacher, student, klass } = await seedClassroom(db, 'start-armed');
     await armTap(db, {

@@ -264,6 +264,23 @@ describe('one event each, as the teacher, at the server’s clock', () => {
     expect(events()).toEqual(['session_started', 'session_ended']);
   });
 
+  it('planned_minutes are the minutes picked, with the bell on the next whole minute (the owner, 2026-11-08)', async () => {
+    // Started 20 s into a minute, 25 minutes rings at the 26th: it runs 25 min 40 s.
+    now = new Date(now.getTime() + 20_000);
+    const room = await seedClassroom(db, 'a2-whole-minute');
+    const started = await start(room.teacher.cognitoId, room.klass.id);
+    const bell = new Date(now.getTime() + 25 * MIN + 40_000);
+    expect(started.session.endsAt).toBe(bell.toISOString());
+    await vi.waitFor(() => expect(posted).toHaveLength(1));
+
+    expect((await app.sweep(new Date(bell.getTime() + MIN))).expired).toBe(1);
+    await vi.waitFor(() => expect(posted).toHaveLength(2));
+    expect(posted.map((p) => p.body.properties)).toMatchObject([
+      { planned_minutes: 25, session_minutes: 0 },
+      { ended_by: 'bell', planned_minutes: 25, session_minutes: 26 },
+    ]);
+  });
+
   it('a Start past the bell counts the old session’s end, by the bell, and its own start (A18)', async () => {
     const room = await seedClassroom(db, 'a2-past-bell');
     const old = await startSession(db, {
