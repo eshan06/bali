@@ -15,7 +15,7 @@ import { TEXT_LINK, TextLink } from '@/components/text-link';
  * hairlines, each section's words in paragraphs and lists, its own headings in the body's size.
  */
 
-const SUPPORT_EMAIL = 'team@getbali.app';
+export const SUPPORT_EMAIL = 'team@getbali.app';
 
 export interface PolicySection {
   id: string;
