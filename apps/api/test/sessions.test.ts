@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { authedInject, makeAuthedApp, type AuthedApp } from './helpers/app.js';
-import { makeTestDb, seedClassroom } from './helpers/db.js';
+import { makeTestDb, pastBell, seedClassroom } from './helpers/db.js';
 
 let db: Database;
 let closeDb: () => Promise<void>;
@@ -44,6 +44,18 @@ describe('POST /v1/classes/:id/sessions', () => {
     expect(body.armedConverted).toBe(0);
   });
 
+  it('answers with its bell on the next whole minute, its start as the server clocked it (the owner, 2026-11-08)', async () => {
+    await ctx.close();
+    ctx = await makeAuthedApp(db, () => new Date('2026-11-08T22:35:59.250Z'));
+    const { teacher, klass } = await seedClassroom(db, 'start-whole-minute');
+    const { status, body } = await start(await ctx.tokenFor(teacher.cognitoId), klass.id, 1);
+    expect(status).toBe(200);
+    expect(body.session).toMatchObject({
+      startedAt: '2026-11-08T22:35:59.250Z',
+      endsAt: '2026-11-08T22:37:00.000Z',
+    });
+  });
+
   it('converts a waiting armed tap into a participation at start (decision 5)', async () => {
     const { teacher, student, klass } = await seedClassroom(db, 'start-armed');
     await armTap(db, {
@@ -69,11 +81,7 @@ describe('POST /v1/classes/:id/sessions', () => {
   it('past the bell of a session the sweep has not reached, ends it and starts the next (A18)', async () => {
     // Back-to-back classes: the teacher need not wait out the sweep's minute.
     const { teacher, klass } = await seedClassroom(db, 'start-past-bell');
-    const { session: old } = await startSession(db, {
-      classId: klass.id,
-      startedAt: new Date(Date.now() - 60_000),
-      endsAt: new Date(Date.now() - 1_000),
-    });
+    const { session: old } = await startSession(db, { classId: klass.id, ...pastBell() });
     const { status, body } = await start(await ctx.tokenFor(teacher.cognitoId), klass.id);
     expect(status).toBe(200);
     expect(body.outcome).toBe('created');

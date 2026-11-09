@@ -35,7 +35,7 @@ import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { authedInject, makeAuthedApp, type AuthedApp } from './helpers/app.js';
-import { makeTestDb, seedClassroom } from './helpers/db.js';
+import { makeTestDb, pastBell, seedClassroom } from './helpers/db.js';
 
 let db: Database;
 let closeDb: () => Promise<void>;
@@ -257,11 +257,7 @@ describe('POST /v1/sessions/:id/extend', () => {
     // server's clock the class is over, swept or not, so it gets a swept
     // session's answer. It used to be a 200 with a fresh window.
     const { klass, teacher } = await seedClassroom(db, 'extend-past-bell');
-    const { session } = await startSession(db, {
-      classId: klass.id,
-      startedAt: new Date(Date.now() - 60_000),
-      endsAt: new Date(Date.now() - 1_000),
-    });
+    const { session } = await startSession(db, { classId: klass.id, ...pastBell() });
     const res = await post(
       await ctx.tokenFor(teacher.cognitoId),
       `/v1/sessions/${session.id}/extend`,
@@ -285,7 +281,10 @@ describe('POST /v1/sessions/:id/extend', () => {
     const token = await ctx.tokenFor(teacher.cognitoId);
     const extend = (durationMinutes: number, eventId: string) =>
       post(token, `/v1/sessions/${session.id}/extend`, { durationMinutes, eventId });
-    const cap = new Date(startedAt.getTime() + MAX_SESSION_TOTAL_MINUTES * 60_000).toISOString();
+    // 16 hours of minutes picked ring at the whole minute at or after them (2026-11-08).
+    const cap = new Date(
+      Math.ceil((startedAt.getTime() + MAX_SESSION_TOTAL_MINUTES * 60_000) / 60_000) * 60_000,
+    ).toISOString();
 
     // The longest extend lands exactly on 16 hours: taken.
     const landedId = randomUUID();
@@ -1652,12 +1651,9 @@ describe('POST /v1/sessions/:id/protection-on', () => {
     const early = await off('on-ended');
     await post(await ctx.tokenFor(early.teacher.cognitoId), `/v1/sessions/${early.session.id}/end`);
     const { student, klass } = await seedClassroom(db, 'on-past-bell');
-    const { session } = await startSession(db, {
-      classId: klass.id,
-      startedAt: new Date(Date.now() - 60_000),
-      endsAt: new Date(Date.now() - 1_000),
-    });
-    const before = new Date(Date.now() - 30_000);
+    const rung = pastBell();
+    const { session } = await startSession(db, { classId: klass.id, ...rung });
+    const before = new Date(rung.endsAt.getTime() - 30_000);
     await tapIn(db, {
       sessionId: session.id,
       studentId: student.id,
@@ -1931,12 +1927,9 @@ describe('POST /v1/sessions/:id/refocus', () => {
     // show green over a phone its bell unshielded. What the phone reports
     // keeps its own rules there (A2c, A10, A11).
     const { student, klass } = await seedClassroom(db, 'refocus-past-bell');
-    const { session } = await startSession(db, {
-      classId: klass.id,
-      startedAt: new Date(Date.now() - 60_000),
-      endsAt: new Date(Date.now() - 1_000),
-    });
-    const before = new Date(Date.now() - 30_000);
+    const rung = pastBell();
+    const { session } = await startSession(db, { classId: klass.id, ...rung });
+    const before = new Date(rung.endsAt.getTime() - 30_000);
     await tapIn(db, {
       sessionId: session.id,
       studentId: student.id,

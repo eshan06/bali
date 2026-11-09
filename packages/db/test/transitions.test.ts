@@ -129,6 +129,29 @@ describe('startSession', () => {
     expect(again.session.id).toBe(first.session.id);
   });
 
+  it('rings its bell on a whole minute, its end rounded up, never down (the owner, 2026-11-08)', async () => {
+    // A closed app's phone is freed when iOS wakes its monitor, at the first whole minute at or
+    // after the bell (`Bell.window`): a bell between two let a 1-minute class go almost a minute
+    // late on the owner's iPhone. So the bell is that minute; up, so no class runs shorter than
+    // picked, and its start stays as the server clocked it.
+    const cases = [
+      ['2026-01-01T09:00:12.345Z', 50, '2026-01-01T09:51:00.000Z'],
+      // On a whole minute already: exact.
+      ['2026-01-01T09:00:00.000Z', 25, '2026-01-01T09:25:00.000Z'],
+      // A 1-minute class started at :59 runs 61 s, never 1 s.
+      ['2026-01-01T09:00:59.000Z', 1, '2026-01-01T09:02:00.000Z'],
+    ] as const;
+    for (const [i, [from, minutes, bell]] of cases.entries()) {
+      const { klass } = await seedClass(`start-whole-minute-${i}`);
+      const { session } = await startSession(db, { classId: klass.id, ...window(from, minutes) });
+      expect(session.startedAt.toISOString()).toBe(from);
+      expect(session.endsAt.toISOString()).toBe(bell);
+      const stored = one(await db.select().from(sessions).where(eq(sessions.id, session.id)));
+      expect(stored.endsAt.toISOString()).toBe(bell);
+    }
+    expect(Date.parse(cases[2][2]) - Date.parse(cases[2][0])).toBe(61_000);
+  });
+
   it('ends a session past its bell the sweep has not reached, as the sweep would, and starts the next (A18)', async () => {
     // Back-to-back classes, the owner's ruling (2026-09-30): past its bell by
     // the server's clock the class is over, swept or not (decision 12), so a
@@ -3645,6 +3668,36 @@ describe('extendSession', () => {
     expect((await eventsFor(session.id)).some((e) => e.type === 'session_extended')).toBe(true);
   });
 
+  it('keeps the bell on a whole minute, and puts one off it on the next (the owner, 2026-11-08)', async () => {
+    const { klass } = await seedClass('extend-whole-minute');
+    const { session } = await startSession(db, {
+      classId: klass.id,
+      ...window('2026-01-01T09:00:30Z'),
+    });
+    expect(session.endsAt).toEqual(new Date('2026-01-01T09:26:00Z'));
+    const plus = (durationMinutes: number) =>
+      extendSession(db, {
+        sessionId: session.id,
+        durationMinutes,
+        at: new Date('2026-01-01T09:10:00Z'),
+        eventId: newUuidV7(),
+      });
+    expect((await plus(5)).session.endsAt).toEqual(new Date('2026-01-01T09:31:00Z'));
+    expect((await plus(10)).session.endsAt).toEqual(new Date('2026-01-01T09:41:00Z'));
+
+    // A bell off the minute, as a lesson started before the rule has: up to the next one.
+    await db
+      .update(sessions)
+      .set({ endsAt: new Date('2026-01-01T09:41:30Z') })
+      .where(eq(sessions.id, session.id));
+    expect((await plus(5)).session.endsAt).toEqual(new Date('2026-01-01T09:47:00Z'));
+    const last = (await eventsFor(session.id)).filter((e) => e.type === 'session_extended').at(-1);
+    expect(last?.payload).toEqual({
+      previousEndsAt: '2026-01-01T09:41:30.000Z',
+      newEndsAt: '2026-01-01T09:47:00.000Z',
+    });
+  });
+
   it('refuses a session past its bell that the sweep has not ended yet (decision 12)', async () => {
     // The owner's ruling (2026-09-30): past its bell by the server's clock
     // the class is over, swept or not. Every phone let go at the bell by its
@@ -3913,6 +3966,32 @@ describe('extendSession', () => {
     expect((await eventsFor(session.id)).filter((e) => e.type === 'session_extended')).toHaveLength(
       1,
     );
+  });
+
+  it('holds 16 hours of minutes picked when the start is off the minute (the owner, 2026-11-08)', async () => {
+    // The longest Start from 09:00:30 rings at 17:01, and the longest extend after it at 01:01,
+    // the first whole minute after 16 hours from the start: 16 hours picked in all, taken.
+    const { klass } = await seedClass('extend-total-off-minute');
+    const w = window('2026-01-01T09:00:30Z', MAX_SESSION_MINUTES);
+    const { session } = await startSession(db, { classId: klass.id, ...w });
+    expect(session.endsAt).toEqual(new Date('2026-01-01T17:01:00Z'));
+    const landed = await extendSession(db, {
+      sessionId: session.id,
+      durationMinutes: MAX_SESSION_MINUTES,
+      at: new Date('2026-01-01T17:00:00Z'),
+      eventId: newUuidV7(),
+    });
+    expect(landed.session.endsAt).toEqual(new Date('2026-01-02T01:01:00Z'));
+
+    // One minute more is past them.
+    await expect(
+      extendSession(db, {
+        sessionId: session.id,
+        durationMinutes: 1,
+        at: new Date('2026-01-02T01:00:00Z'),
+        eventId: newUuidV7(),
+      }),
+    ).rejects.toMatchObject({ code: 'SESSION_TOO_LONG' });
   });
 });
 

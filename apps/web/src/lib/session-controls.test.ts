@@ -574,6 +574,22 @@ describe('saysAlreadyRunning: a Start’s answer, whether it says a session was 
     expect(saysAlreadyRunning(answer('existing', max), max, max)).toBe(false);
   });
 
+  it('reads its length as the minutes picked, the bell on the next whole minute (the owner, 2026-11-08)', () => {
+    // Started 20 s into a minute, 50 minutes rings at the 51st: 50 min 40 s, its own still.
+    const offMinute = {
+      outcome: 'existing' as const,
+      session: {
+        id: SESSION,
+        classId: CLASS,
+        startedAt: '2026-10-22T14:05:20.000Z',
+        endsAt: '2026-10-22T14:56:00.000Z',
+      },
+    };
+    expect(saysAlreadyRunning(offMinute, 50, 50)).toBe(false);
+    expect(saysAlreadyRunning(offMinute, 51, 51)).toBe(true);
+    expect(saysAlreadyRunning(offMinute, 50, null)).toBe(true);
+  });
+
   it('says it once the pick or the session’s length isn’t that lost Start’s', () => {
     // The pick changed since: the lost Start's session, of its length, isn't this pick's.
     expect(saysAlreadyRunning(answer('existing', 25), 50, 25)).toBe(true);

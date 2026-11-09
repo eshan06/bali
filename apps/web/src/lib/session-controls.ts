@@ -263,7 +263,8 @@ export async function sessionRunning(
  * answered `existing`, its pick set nothing and the bell shown is that session's (another tab's,
  * a phone's). Never of this page's own last Start that got no answer (`lost`, its minutes), sent
  * again: a session of its length, picked again, is the one it made, its length used (#432's Left).
- * The length as the Start route makes it, from the start to the bell.
+ * The length as the Start route makes it, the whole minutes from the start to the bell: the server
+ * rings the bell on the whole minute at or after the minutes picked (2026-11-08), less than one more.
  */
 export function saysAlreadyRunning(
   res: Pick<StartSessionResponse, 'outcome' | 'session'>,
@@ -272,7 +273,7 @@ export function saysAlreadyRunning(
 ): boolean {
   if (res.outcome !== 'existing') return false;
   const length = Date.parse(res.session.endsAt) - Date.parse(res.session.startedAt);
-  return lost !== minutes || length !== minutes * 60_000;
+  return lost !== minutes || Math.floor(length / 60_000) !== minutes;
 }
 
 /**

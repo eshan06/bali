@@ -44,7 +44,9 @@ const minutes = (from: Date, to: Date) => Math.round((to.getTime() - from.getTim
 
 /**
  * A class's totals as an event's properties, the one place they are made: the report's own
- * counts (`counted`, R1), its bell's and its length so far in whole minutes.
+ * counts (`counted`, R1), its bell's and its length so far in whole minutes. The bell's are the
+ * whole minutes picked, its Start's and every extend's: the bell rings on the whole minute at or
+ * after them (the owner, 2026-11-08), less than one more, so they are its length rounded down.
  */
 export function sessionProperties(totals: {
   environment: string;
@@ -60,7 +62,7 @@ export function sessionProperties(totals: {
     environment: totals.environment,
     students_enrolled: totals.enrolled,
     students_tapped_in: report.joined.length,
-    planned_minutes: minutes(session.startedAt, session.endsAt),
+    planned_minutes: Math.floor((session.endsAt.getTime() - session.startedAt.getTime()) / 60_000),
     session_minutes: minutes(session.startedAt, totals.at),
     focus_minutes: report.focusMinutes,
     unlocks: report.unlocks.length,

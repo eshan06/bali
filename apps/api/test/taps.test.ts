@@ -19,7 +19,7 @@ import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, onTestFinished } from 'vitest';
 
 import { authedInject, makeAuthedApp, type AuthedApp } from './helpers/app.js';
-import { makeTestDb, seedClassroom } from './helpers/db.js';
+import { makeTestDb, pastBell, seedClassroom } from './helpers/db.js';
 
 let db: Database;
 let closeDb: () => Promise<void>;
@@ -91,14 +91,11 @@ describe('POST /v1/taps', () => {
     // green on the grid over an unshielded phone until the sweep ran. The
     // phone's claim says it tapped before the bell; the server's clock decides.
     const { student, klass, block } = await seedClassroom(db, 'tap-past-bell');
-    const { session } = await startSession(db, {
-      classId: klass.id,
-      startedAt: new Date(Date.now() - 60_000),
-      endsAt: new Date(Date.now() - 1_000),
-    });
+    const rung = pastBell();
+    const { session } = await startSession(db, { classId: klass.id, ...rung });
     const { status, body } = await tap(await ctx.tokenFor(student.cognitoId), {
       tagId: block.tagId,
-      deviceTime: new Date(Date.now() - 30_000).toISOString(),
+      deviceTime: new Date(rung.endsAt.getTime() - 30_000).toISOString(),
     });
     expect(status).toBe(200);
     expect(body).toEqual({ outcome: 'armed', session: null, state: null });
@@ -138,11 +135,7 @@ describe('POST /v1/taps', () => {
       startedAt: new Date(Date.now() - 120_000),
       endsAt: new Date(Date.now() + 25 * 60_000),
     });
-    await startSession(db, {
-      classId: second.id,
-      startedAt: new Date(Date.now() - 60_000),
-      endsAt: new Date(Date.now() - 1_000),
-    });
+    await startSession(db, { classId: second.id, ...pastBell() });
 
     const { status, body } = await tap(await ctx.tokenFor(student.cognitoId), {
       tagId: block.tagId,

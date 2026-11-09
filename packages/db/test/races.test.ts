@@ -170,11 +170,16 @@ function aTap(
   return { sessionId, studentId, eventId: newUuidV7(), deviceTime, order };
 }
 
-/** Open a session on the class. `due` puts its window in the past so the sweep ends it. */
+/**
+ * Open a session on the class. `due` puts its bell in the past so the sweep ends it: the last
+ * whole minute, at or before now, since a bell rings on one (the owner, 2026-11-08).
+ */
 async function openSession(classId: string, opts: { due?: boolean } = {}) {
   const now = Date.now();
   const startedAt = new Date(now - 60_000);
-  const endsAt = opts.due ? new Date(now - 30_000) : new Date(now + 25 * 60_000);
+  const endsAt = opts.due
+    ? new Date(Math.floor(now / 60_000) * 60_000)
+    : new Date(now + 25 * 60_000);
   const result = await startSession(db, { classId, startedAt, endsAt });
   return result.session;
 }
@@ -3142,7 +3147,10 @@ describe.runIf(REAL_PG)('concurrent extends (real Postgres)', () => {
         at: new Date(),
         eventId: newUuidV7(),
       });
-      const cap = new Date(startedAt.getTime() + MAX_SESSION_TOTAL_MINUTES * 60_000);
+      // 16 hours of minutes picked ring at the whole minute at or after them (2026-11-08).
+      const cap = new Date(
+        Math.ceil((startedAt.getTime() + MAX_SESSION_TOTAL_MINUTES * 60_000) / 60_000) * 60_000,
+      );
 
       const release = await holdSession(session.id);
       const presses: ReturnType<typeof extendSession>[] = [];
