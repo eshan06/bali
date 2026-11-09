@@ -160,6 +160,9 @@ question as sent is in `docs/APP-STORE.md`, section 5.6.
 before it sees the build. So App Review of the first App Store submission is the answer, with no
 external beta for now (the owner, 2026-11-04), and the fallbacks above stay ready if it refuses.
 
+**Submitted** 2026-11-09 (the owner): Bali 1.0, build 13, "Waiting for Review" (`docs/APP-STORE.md`).
+Record App Review's verdict here, with its date, when it comes.
+
 **Done when:** Apple's answer is on record, and the design matches it.
 
 ## 4. Phone bans at school

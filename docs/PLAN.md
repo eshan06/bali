@@ -8,12 +8,13 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-08 (Central) — every session's bell is on a whole minute (#546; DECISIONS
-2026-11-08), so a closed app's phone is freed at the bell, not up to a minute after; the server's
-change alone, on prod with the merge's deploy. Before it, the prod phone sitting passed (#545); its
-findings are on Open owner items. Next: a session builds the retire-a-block command; the owner the
-App Store submission on build 13 and the findings' calls; GA5's known limit, the owner's call
-(DECISIONS 2026-11-02); AN9b; AN1's part 2 on the owner's phones; the audit's polish waits._
+_Last updated: 2026-11-09 (Central) — Bali 1.0, build 13, is submitted to the App Store, "Waiting
+for Review" (Before the pilot, items 5 and 6; #548; DECISIONS 2026-11-09): the listing branded
+around focus, the privacy label published, rated 13+, the United States only, released by hand.
+Before it, every session's bell on a whole minute (#546). Next: App Review's verdict, the
+§3.3.3(P) answer (Open owner items); a session builds the retire-a-block command; the owner the
+sitting's findings' calls; GA5's known limit, the owner's call (DECISIONS 2026-11-02); AN9b; AN1's
+part 2 on the owner's phones; the audit's polish waits._
 
 ## Now
 
@@ -148,14 +149,12 @@ build in use links it. The app links the new address from build 13; Android's
    their lines in full in `docs/PLAN-ARCHIVE.md`. The notice `/privacy`'s section 11 promises: owed
    to no one yet, every prod account being the team's, and due for any change that matters from
    the first pilot user on (the owner; DECISIONS 2026-11-07).
-5. The App Store submission, the owner's, from `docs/APP-STORE.md`'s sections 1–4 (5.4: the
-   review accounts): App Review is Apple's answer on §3.3.3(P) (ISSUES #3). No external beta for
-   now (the owner, 2026-11-04). Its build is build 13, the next prod build after #540 and the first
-   to link `app.getbali.app` and to require NFC, so the App Store offers Bali on iPhone only (the
-   owner, 2026-11-07: "Yes, require NFC"; DECISIONS 2026-11-07).
-6. The App Store privacy label: answers ready in `docs/APP-STORE.md` §3 (Product Interaction and
-   Other Data Types serve Analytics too, as the manifest says since A5 and A2), for the owner to
-   paste with item 5.
+5. The App Store submission — ✅ the owner's, 2026-11-09 (#548; DECISIONS 2026-11-09): Bali 1.0,
+   build 13, "Waiting for Review", as `docs/APP-STORE.md`'s sections 1–4 record it; released by
+   hand once approved. App Review's verdict is Apple's answer on §3.3.3(P) (ISSUES #3). No external
+   beta for now (the owner, 2026-11-04).
+6. The App Store privacy label — ✅ published 2026-11-09, `docs/APP-STORE.md` §3's answers: seven
+   types, all linked, none tracking, the policy `https://app.getbali.app/privacy`.
 7. Production backups on (L0b), before the pilot's first class: `/privacy` (sections 4, 6 and 7)
    already promises a daily and a weekly backup (the owner, 2026-11-05: "we will have those backups
    before we go live").
@@ -334,7 +333,7 @@ Researched 2026-10-05; findings in [`docs/ROADMAP-RESEARCH.md`](ROADMAP-RESEARCH
 
 **Phase 6's owner list** (not PRs — the owner, the lawyer and the school):
 
-- 🚨 Apple's §3.3.3(P) (ISSUES #3): ask App Review whether a teacher-started session and the teacher's grid are allowed, and settle a fallback design if not — **gate**, and the first thing to do — asked by the owner 2026-10-13, case 102994872143 (`docs/APP-STORE.md` §5.6, as sent); **answered** (the owner, 2026-11-03): submit it for review, since App Review decides only once it sees the build, so App Review is the answer
+- 🚨 Apple's §3.3.3(P) (ISSUES #3): ask App Review whether a teacher-started session and the teacher's grid are allowed, and settle a fallback design if not — **gate**, and the first thing to do — asked by the owner 2026-10-13, case 102994872143 (`docs/APP-STORE.md` §5.6, as sent); **answered** (the owner, 2026-11-03): submit it for review, since App Review decides only once it sees the build, so App Review is the answer; submitted 2026-11-09, its verdict pending
 - Confirm the later K-12 pilot's state (likely Los Angeles or New Jersey) and the school's phone policy (ISSUES #4); the first, preliminary pilot is adults at Vanderbilt, on their own phones
 - ⚖️ The privacy policy and terms; the school's data agreement (FERPA's school-official terms, the state's law or the SDPC NDPA); a breach plan; opinions on the state's phone-ban and app-store age laws
 - Decision: who sees unlock reasons. (How accounts are made: decided 2026-10-04, self sign-up gated to `@vanderbilt.edu`, S11, and `@gmail.com` since 2026-11-07 (Now); MFA Optional with TOTP; the portal on `app.getbali.app` since 2026-11-07)
@@ -361,9 +360,17 @@ Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect acc
     (`apps/web/src/app/layout.tsx`), on every page but `/privacy`, `/terms` and `/support`. A UI
     step's fix, its words through `no-ai-slop`.
   - 🔧 Vercel's previews carry prod's values: the overnight investigation's item 6, above.
+- **The App Store review (submitted 2026-11-09; `docs/APP-STORE.md`):**
+  - Apple's §3.3.3(P) answer (ISSUES #3, case 102994872143) is still open: App Review's verdict
+    gives it. Record it in ISSUES #3 when it comes.
+  - The student review account is a Gmail address the owner made and confirmed in the AWS console,
+    whose inbox the owner can't open, so whoever holds that inbox could reset its password. After
+    review, disable it in Cognito (`docs/APP-STORE.md` §5.4, step 6) and re-enable it for the next
+    review; a forgotten password is reset through AWS.
+  - App Review may ask for a tap the reviewer can try (§4's options B and C), about students' names
+    on Present (guideline 1.2), or about a teacher's deletion by email (DECISIONS 2026-11-07).
 - Android's five still open (the phones, the Play account, the timing, the SDK for what comes next: Android 17's platform, 64 MB, before today's AndroidX; 🔧 the Cognito clients, AN6c's; AS0's canvas, the lock and CodeQL settled, 2026-11-04): `docs/PLAN-ANDROID.md`, Open owner items.
 - 🔧 Sentry: confirm monitor `api-sweep`'s `production` environment is active and alerting (dev checks in to the same slug, #239's review; runbook 6, step 2).
-- ✅ Apple's developer agreement §3.3.3(P) on Family Controls (ISSUES #3): asked by the owner on 2026-10-13, **case 102994872143** (`docs/APP-STORE.md` §5.6 holds the question as sent); Apple's answer, submit it for review (the owner, 2026-11-03), recorded in ISSUES #3.
 - #165 the Me page: D2j's redesign was rolled back (2026-10-06), so a better Me waits for a design the owner approves; the issue, closed by #266, is the owner's to reopen.
 - #130 App Store readiness.
 - #175 Screen Time turned back on in Settings, noticed by Bali itself.
@@ -375,7 +382,7 @@ Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect acc
 - 👀 After the next deploy of `bali` and `bali prod` (P8's follow-up): the deploy log shows the migrations, then `Server listening`; a later redeploy's log for the old deployment shows `shutting down` with `signal: SIGTERM`.
 - Phase 7: **to decide**, #313 (what a teacher's own deletion, and the retention run, do with their words), kept as today for now (the owner's ruling, 2026-10-12); **tracked fixes**, #319 ✅ (#437, saved questions' id case), #326 (a slow upload outliving its deck; M5 aborts it at 25 minutes, and a stuck one once nothing is sent for 30 s, #436), #334 ✅ (#403, a timeout on the portal's polls; #432, on every other read and save but a deck's check and a class's create, which has one since 2026-10-23), #336 measured (#438; DECISIONS 2026-10-22), its fix, a random wait of up to 10 s before the phone's first read after a push, approved by the owner (2026-10-23) and built in the push's app half (#456); and a bell past the gate's 600 phones is over the Starts' 1 s with no push (1,200: 0.9–1.2 s), a later step's before a school that size; L0b is the owner's (Railway, above). The calls confirmed on 2026-10-12: this line in full in `docs/PLAN-ARCHIVE.md`.
 - #380: Present after the bell has no Start, so starting the next class from a projected tab shows the last recap's unlock reasons (the owner, 2026-10-14: tracked, not now); PresentEnded's line, "the session ended at 9:55 AM", waits with it (PV12b kept Present's "no session running")
-- Left for the owner on finished steps' lines (in full in `docs/PLAN-ARCHIVE.md`): P7's App Review path (decide its section 4, then fill the accounts and paste); P6's restore drill, its result recorded once a backup exists; S4's CSP check on the deployed portal after each Next upgrade (due now, for 15.5.28, #435); ⚖️ whether C7-server's yes rides Other Data Types; device rounds still marked pending (B5b's round 2, steps 7 and 9; B5c's round 3, steps 1 and 3; round 4, B6a and B6b); smaller calls on F (a refused tap's end-of-day drop or dismiss button; the waiting card's Tap in), B6c-2 (`.keep`/`.retry`), B5b (a rule for a replaced window, a code step to schedule) and D2 (Present's key per class).
+- Left for the owner on finished steps' lines (in full in `docs/PLAN-ARCHIVE.md`): P6's restore drill, its result recorded once a backup exists; S4's CSP check on the deployed portal after each Next upgrade (due now, for 15.5.28, #435); ⚖️ whether C7-server's yes rides Other Data Types; device rounds still marked pending (B5b's round 2, steps 7 and 9; B5c's round 3, steps 1 and 3; round 4, B6a and B6b); smaller calls on F (a refused tap's end-of-day drop or dismiss button; the waiting card's Tap in), B6c-2 (`.keep`/`.retry`), B5b (a rule for a replaced window, a code step to schedule) and D2 (Present's key per class).
 - ✅ **Answered** (the owner, 2026-10-14; DECISIONS 2026-10-14): PV5b's whole-page error kept; its review notes folded into PV15 and PV17a; PV4c's two test limits left.
 - 🔧 Before the pilot's first class: the owner's prod block gets a fresh code (its first reached the repo's history in #228), and a session builds an owner command that retires a block, to retire the old code (`docs/PILOT.md`, setup step 6). The portal's three class-page controls are built (P10, P11).
 - **Before the pilot's first class, four steps for sessions** (the owner's workflow review, 2026-10-13; one PR each; after the redesign's PV17c, the owner, 2026-10-14); the event-id check done (the owner's go, 2026-10-23), the other three wait for the owner's word:

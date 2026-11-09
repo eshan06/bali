@@ -1,11 +1,15 @@
 # App Store drafts
 
-Drafts for App Store Connect that the owner edits and pastes in (Phase 5, P7; issue #130).
-Nothing here is submitted by a session. Sources: ARCHITECTURE "What Bali is", ISSUES #3
+The words and answers for App Store Connect (Phase 5, P7; issue #130). A session may fill them
+in there; only the owner submits. Sources: ARCHITECTURE "What Bali is", ISSUES #3
 and #5, DESIGN.md's voice, the student app's "what your teacher sees" list
 (`ConsentCard` in `ios/Bali/UI/JoinView.swift`) and the data model
 (`packages/db/src/schema.ts`). Read as of 2026-10-04: if the code changes what Bali
 collects or what a teacher sees, this file changes in the same PR.
+
+**Submitted 2026-11-09:** Bali 1.0, build 13 (prod; TestFlight run 13, from `abf1f3dd`), "Waiting
+for Review" in App Store Connect. The conductor filled it in from sections 1–4, and the owner
+checked it and submitted. ✅ with that date marks what App Store Connect holds.
 
 **The framing rule (ISSUES #3).** Apple's developer agreement §3.3.3(P) allows Family
 Controls for "individuals the ability to manage their devices to enable focus and
@@ -14,107 +18,87 @@ every word here describes what Bali really is: the student installs it, approves
 Time for themselves, taps in, and holds the exit. Never "schools stay in control",
 "classroom management", "enforce", "monitor students" or "device policy". The teacher
 appears as who starts class and what they see, never as who controls the phone. This
-wording is not a substitute for asking App Review (ISSUES #3's consultation), which still
-comes first; if Apple's answer changes the design, these drafts change with it.
+wording is not a substitute for Apple's answer (ISSUES #3), which App Review's verdict on the
+submission gives; if it changes the design, these words change with it.
 
-⚖️ marks what the lawyer confirms before submission. 🔧 marks what the owner fills in.
+⚖️ marks what the lawyer confirms, each still open at the submission. 🔧 marks what the owner
+fills in.
 
 ---
 
 ## 1. Store listing
 
 Written in DESIGN.md's voice (short, warm, second person, never alarm, no exclamation
-marks) and edited with `no-ai-slop`. No em dashes. Character limits are App Store
-Connect's.
+marks). No em dashes. Character limits are App Store Connect's. The owner branded it around
+focus, "not taking phones away" (2026-11-09; DECISIONS 2026-11-09).
 
-### Name (30)
+### Name (30) ✅ 2026-11-09
 
-`Bali: Focus for Class` 🔧 (or plain `Bali` if the name is free; the subtitle carries the
-rest)
+`Bali: Focus for Class` (21)
 
-### Subtitle (30), pick one
+### Subtitle (30) ✅ 2026-11-09
 
-- `Your phone, quiet for class` (27)
-- `Focus for class, back at the bell` is 34, too long; `Tap in for class` (16) if the name carries "focus"
-- `Focus in class, exit any time` (29)
+`Focus for every class` (21), the owner's pick over the draft's lean, `Your phone, quiet for
+class` (27).
 
-Lean: the first. It says what happens and to whom, and nothing about control.
+### Promotional text (170) ✅ 2026-11-09
 
-### Promotional text (170)
+> Stay focused in class from the first minute to the bell. Tap in, and Bali keeps distractions
+> quiet.
 
-> Tap in when class starts and get your phone back at the bell. Emergency Unlock is always
-> one hold away, and calls and Messages keep working.
+The owner's words (99).
 
-### Description (4,000)
+### Description (4,000) ✅ 2026-11-09
 
-> Bali puts your phone away for class and gives it back at the bell.
->
-> You set it up yourself. Install Bali, sign in, and let it use Screen Time on your
-> iPhone. You approve that on your own phone. You can turn it off in Settings any time,
-> and your teacher sees Screen Time off when you do.
-> Then join your class with the code your teacher gives you.
->
-> When class starts, hold your iPhone to your teacher's Bali block. Your apps go quiet
-> until the bell. At the bell they come back on their own, even if Bali is closed.
->
-> You can always leave. Hold Emergency Unlock and your phone opens right away, no one's
-> permission needed. Pick a reason if you want to: bathroom, nurse, or something else.
-> Your teacher sees that you unlocked, and the reason only if you pick one. Ready to
-> focus again before the bell? Tap Lock my apps again.
->
-> Calls, FaceTime, Messages and Emergency SOS keep working the whole time.
->
-> What your teacher sees:
-> • Your focus status: focused, unlocked, or Screen Time off
-> • If Bali stops hearing from your phone during class, and when it last did
-> • If your phone's clock is set ahead
-> • When you tap in, and when class ends for you
-> • When you unlock, and the reason if you share one
-> • If you leave this class
-> • Your answers to questions, counted only in the class's totals
-> • How many answered, which can show whether you did
->
-> What your teacher never sees:
-> • Your screen, your apps, or what's in them
-> • Your messages or where you are
-> • Which answer is yours
->
-> Bali never reads which apps you use. It quiets every app it can, so there is no list to
-> look at.
->
-> You can delete your account in the app, on the Me tab.
->
-> Bali is for students 13 and older.
+> Bali helps you focus in class. When class starts, tap your iPhone on your teacher's Bali block
+> and your apps go quiet until the bell. They come back on their own, even if you've closed Bali.
+> If you need your phone sooner, hold Emergency Unlock and it opens right away. Calls and Messages
+> work the whole time, and Bali never sees which apps you use. For students 13 and older.
 
-Notes for the owner:
-- The two lists are the app's own `ConsentCard` words (the colons replace the app's em
-  dash). Keep them identical to the app: #130 asks that the store, the privacy labels and
-  the app say the same thing.
-- "Lock my apps again" is the shipped screen's own words (`UnlockedView`). If that screen
-  changes, this line follows it.
-- The 13+ line and the Delete account line are true of the app as built: every Sign up asks
-  the 13+ question (C7), and Me's Delete account deletes the account (C3, C4). If either
-  changes, its line follows it.
+One paragraph (375), not every feature (the owner's ask). Notes for the owner:
+- The store no longer carries the "What your teacher sees" and "never sees" lists. They stay in
+  the app (`ConsentCard`, before a student joins a class) and in `/privacy`'s section 2, which must
+  keep matching it (section 3's checks). Nothing in the description may contradict them.
+- Each sentence is true of the app as built: the shields come off at the bell with Bali closed
+  (section 2's DeviceActivity monitor), Emergency Unlock opens the phone at once, and every Sign up
+  asks the 13+ question (C7). If one stops being true, its sentence changes.
 
-### Keywords (100)
+### Keywords (100) ✅ 2026-11-09
 
 `focus,study,class,school,distraction,phone,lock,students,concentrate,homework,bell`
 
 No "Screen Time", "iPhone" or other Apple trademarks: keywords with them can be rejected
 (guideline 2.3.7). ⚖️ none needed.
 
-### Category
+### Category ✅ 2026-11-09
 
 Primary **Education**, secondary **Productivity**. Not the Kids category: Bali is 13+, and
 the Kids category brings its own rules (guideline 1.3) for under-13 apps.
 
-### URLs 🔧
+### URLs, copyright and content rights ✅ 2026-11-09
 
 - Support URL: P4's support page, `https://app.getbali.app/support`.
-- Privacy policy URL: C2's privacy policy page, `https://app.getbali.app/privacy`. Required before
-  submission. ⚖️ its words.
+- Marketing URL: the website, `https://www.getbali.app`.
+- Privacy policy URL: C2's privacy policy page, `https://app.getbali.app/privacy`, given with the
+  App Privacy answers (section 3). ⚖️ its words.
+- Copyright: `2026 Eshan Shah`.
+- Content Rights: "Yes, it contains, shows, or accesses third-party content, and I have the
+  necessary rights": a teacher's slides and questions. `/terms` has teachers upload only what they
+  have the right to share (section 3), and give Bali permission to show it to their class
+  (section 8).
 
-### Checks before submitting 🔧
+### Screenshots ✅ 2026-11-09
+
+Six, in this order: Focus; a slide with a question; the answer shown; Unlocked, with its reason;
+What your teacher sees (the join preview); History.
+- **The slot:** App Store Connect's required one is now "iPhone with Dynamic Island (medium
+  display)", 6.1" or 6.3", which takes only 1179×2556 or 1206×2622. It refused 6.9" captures
+  (1320×2868) as invalid dimensions, so these were scaled to 1206×2622.
+- **How they were made:** the Debug app's `-bali-screen` fixtures (`ios/README.md`) on the iPhone
+  17 Pro Max Simulator, the status bar overridden to 9:41. The iPhone 17 Pro Simulator's screen is
+  1206×2622 already, so a refresh made there needs no scaling.
+
+### Checks before submitting ✅ 2026-11-09
 
 - **The age rating's social media questions** (App Store Connect added them on 2026-07-09, and
   answers are required from September 2026): **No**. Bali has no social feed or anything like one,
@@ -122,17 +106,29 @@ the Kids category brings its own rules (guideline 1.3) for under-13 apps.
   has the row, and its other answers agree (checked 2026-11-07).
 - **No pricing words** (guideline 2.3.7): nothing like "Free" in the name, subtitle, keywords or
   screenshots, the words inside the app's own screens that a screenshot captures included. None of
-  section 1's drafts or the app's screens has one (checked 2026-11-07).
-- **iPhone only** (App Store Connect → Pricing and Availability): Bali shows for iPhone only, since
-  it requires NFC (section 2, guideline 2.4.1). If the page still offers Mac or Apple Vision Pro
-  availability, turn it off.
+  section 1's words or the app's screens has one (checked 2026-11-07, the submitted copy again
+  2026-11-09).
+- **Pricing and Availability:** free, the **United States only**, Public distribution, and Mac
+  (Apple silicon) and Apple Vision Pro availability off, so Bali shows for iPhone only, as requiring
+  NFC makes it (section 2, guideline 2.4.1).
 
 ---
 
 ## 2. Review notes (App Review Information → Notes)
 
-Plain English for a reviewer, under App Store Connect's 4,000 characters. 🔧 fills in the
-accounts and the video link once the review path (section 4) is chosen.
+Plain English for a reviewer, under App Store Connect's 4,000 characters. ✅ Submitted
+2026-11-09 as below, the class code typed in App Store Connect alone: no join code, password or
+review account's email goes in this public repo.
+
+**App Review Information** ✅ 2026-11-09:
+- **Sign-in required,** with one student review account in Sign-In Information: a Gmail address
+  the owner made and confirmed in the AWS console (5.4), whose inbox the owner can't open (its weak
+  spot, on PLAN's Open owner items). It is in a class named "Demo" under the owner's teacher
+  account.
+- **No teacher review account:** a reviewer can't tap a block anyway, and the recording shows the
+  teacher's side.
+- **Contact:** the owner. **Release:** manual. **Attachment:** the owner's screen recording of a
+  real tap (section 4, option A).
 
 > Bali helps a student keep their own iPhone out of the way during class. The student
 > installs Bali, approves Screen Time access for themselves, joins their class with a
@@ -188,20 +184,25 @@ accounts and the video link once the review path (section 4) is chosen.
 >   minimum, has NFC.
 >
 > HOW TO TRY IT
-> [🔧 From section 4, the chosen option: the accounts, the class code, the video link,
-> and what the reviewer can do without a Bali block.]
 >
-> Student review account: [🔧 email] / [🔧 password]
-> Teacher portal (optional, to watch the live grid): [🔧 URL], [🔧 email] / [🔧 password]
-> Class code: [🔧]
+> The tap needs a teacher's Bali block, so the attached screen recording shows it on a real
+> iPhone: the teacher's Start, the tap, the shield on an app, a call and Messages still working,
+> Emergency Unlock with a reason, and the bell.
 >
-> The iPhone app is for students. On it, the teacher account sees only a screen pointing to the portal.
+> Without a block, sign in with the student account in Sign-In Information to see its class, What
+> your teacher sees, History and Me.
+>
+> Class code: [the Demo class's code] (the "Demo" class)
+>
+> The iPhone app is for students. Teachers start class and watch the grid on the web portal at
+> https://app.getbali.app (the recording shows it); a teacher's account signed in on the iPhone
+> sees only a screen pointing there.
 
 Notes for the owner:
 - "Nothing can turn it off" is true of the code today (the unlock is local-first, ISSUES
   #2). Keep it true: if anything ever gates Emergency Unlock, this line goes.
-- If App Review's consultation (ISSUES #3) has answered by then, say so in one line at the
-  top, with the date and the case number.
+- No line on App Review's consultation (ISSUES #3) went in at the top: its answer was to submit
+  the app for review.
 - The notes name APIs on purpose: a reviewer checking §3.3.3(P) looks for `.individual`
   and for whether app usage leaves the device.
 - App Review tests an app offered on iPad on an iPad too (an iPad Air 11-inch (M3)). Requiring NFC
@@ -211,16 +212,18 @@ Notes for the owner:
   opens a question or shows a slide, an answer is an option's index, a student's reads carry no
   totals and no other student, and Present's tiles, the classroom screen's, show each student's
   name and state, never an unlock's reason.
-- Everything above HOW TO TRY IT is about 3,330 characters (counted 2026-11-07, the guideline 2.4.1
-  paragraph trimmed: the line saying the recording shows a tap went, which HOW TO TRY IT's video
-  link says), so HOW TO TRY IT has about 670 of App Store Connect's 4,000, its last line, for the
-  teacher account, about 100 of them.
+- As submitted, the notes are about 3,920 of App Store Connect's 4,000 characters, HOW TO TRY IT
+  about 640 of them (counted 2026-11-09, a 6-character class code in the placeholder's place): a
+  line added later needs another cut.
 
 ---
 
 ## 3. Privacy answers
 
 ### App Privacy ("nutrition label")
+
+✅ **Published 2026-11-09** as this table says, with the privacy policy
+`https://app.getbali.app/privacy`: seven types, all linked to the user, none used for tracking.
 
 Read from the code and the data model as of 2026-10-04; the push token added 2026-10-06 (N6), the
 13+ yes 2026-10-08 (C7-server), a live lesson's answers 2026-10-11 (L2); the purposes read again
@@ -255,7 +258,8 @@ data; ⚖️ confirm a server-side error report triggered by an app request is n
   agree (#130). They do as of this draft, a live lesson's answers included: the list's two lines
   on them came with L8a, before any build could answer, and the store listing's with L8b-2. How
   many answered, a clock set ahead and the never-sees line on answers (the owner, 2026-10-28)
-  changed the app's list, the policy's section 2, which shows it, and the listing together.
+  changed the app's list, the policy's section 2, which shows it, and the listing together. The
+  listing has carried no list since 2026-11-09 (section 1).
 - The app's privacy manifest (`ios/Bali/PrivacyInfo.xcprivacy`, C1) lists the same data
   types; CI fails when this table's types and the manifest's differ. The push token adds no type
   (it is a Device ID, already declared linked, App Functionality, not tracking), so the
@@ -264,9 +268,9 @@ data; ⚖️ confirm a server-side error report triggered by an app request is n
 - Since A5 (2026-11-04) the manifest gives **Product Interaction** the purpose **Analytics**
   beside App Functionality, as the server's class totals for PostHog are counted from it, and
   since A2 (the same day) **Other Data Types** too, as their enrolled count comes from class
-  membership. These answers say the same since 2026-11-07, for the owner to paste (PLAN's Before
-  the pilot, 6). CI pins the manifest's purposes, not this section's: a purpose changed in one is
-  changed in the other by hand.
+  membership. These answers say the same since 2026-11-07, and the label published on 2026-11-09
+  says them (PLAN's Before the pilot, 6). CI pins the manifest's purposes, not this section's or
+  the label's: a purpose changed in one is changed in the others by hand.
 - If accounts stop being self-created (Phase 6's open decision on how accounts are made),
   the email row still stands: the school or Cognito still holds it on Bali's behalf.
 - Data kept after an account is deleted follows the owner's retention policy (ISSUES #5,
@@ -274,9 +278,10 @@ data; ⚖️ confirm a server-side error report triggered by an app request is n
 
 ### Age rating questionnaire
 
-App Store Connect's 2025 questionnaire, answered for Bali as it is. 🔧 check the wording
-against the form when filling it in: Apple revised it in 2025, added its social media questions
-on 2026-07-09 (answers required from September 2026), and may again.
+App Store Connect's 2025 questionnaire, answered for Bali as it is: ✅ 2026-11-09, every content
+question None or No, the social media questions included. Check the wording against the form
+when answering again: Apple revised it in 2025, added its social media questions on 2026-07-09
+(answers required from September 2026), and may again.
 
 | Question | Answer |
 |---|---|
@@ -290,13 +295,14 @@ on 2026-07-09 (answers required from September 2026), and may again.
 | Messaging or chat | No |
 | Advertising | No |
 | Parental controls | No. Bali is not a parental-control app, and saying yes would contradict section 2's `.individual` framing |
-| Age assurance | ⚖️ Ask the lawyer. C7's 13+ screen is built: Sign up asks the birth month and year and takes the answer as given, the date never kept. Does a self-declared age screen count? Apple's examples are the Declared Age Range API, age estimation and an ID check |
+| Age assurance | **No** (2026-11-09). ⚖️ The lawyer's question stands. C7's 13+ screen is built: Sign up asks the birth month and year and takes the answer as given, the date never kept. Does a self-declared age screen count? Apple's examples are the Declared Age Range API, age estimation and an ID check |
 | Made for Kids | No |
 
-The questionnaire alone likely rates Bali 4+. ⚖️ **Raise the rating to 13+**, if App Store
-Connect offers a higher rating than the computed one (🔧 check the form), to match the 13+ promise (Phase 6, C7)
-and keep the app outside COPPA's "directed to children": confirm with the lawyer, and
-confirm the state's app-store age law (Phase 6's owner items) doesn't change the answer.
+**Rated 13+** ✅ 2026-11-09: the questionnaire computed 4+, and the override raised it to 13+ to
+match the 13+ sign-up (Phase 6, C7) and keep the app outside COPPA's "directed to
+children". App Store Connect shows 13+ in 172 countries, and 12+ in Vietnam and the Republic of
+Korea. ⚖️ Still for the lawyer: the override, and whether the state's app-store age law (Phase 6's
+owner items) changes the answer.
 
 ---
 
@@ -308,7 +314,10 @@ can't exercise. Everything short of the tap works for a reviewer today: sign in,
 intro, approving Screen Time, joining a class by its code and seeing what the teacher
 sees, Me and History. The open question is the tap, the shield and Emergency Unlock.
 
-This is the owner's decision. Nothing below is built.
+**Option A, chosen** ✅ 2026-11-09: the owner's screen recording of a real tap is attached in App
+Review Information, the student review account covers the screens around it (section 2), and
+there is no teacher review account. Nothing below is built: B and C wait for App Review to ask for
+more (PLAN's Open owner items).
 
 ### Option A: a recorded tap, plus review accounts (recommended)
 
@@ -479,7 +488,8 @@ review accounts are made there:
    reports, export and retention run; a separate demo school keeps them apart, but
    `npm run school` mints its invite only once an agreement day is recorded for it, and
    that record should be true. Either way, name the class "Demo" so it's never mistaken for
-   a real one.
+   a real one. The review of 2026-11-09 has no teacher review account: the student account's
+   class is "Demo", under the owner's own teacher account (section 2).
 6. **After review,** set a new password on both, or disable them (**Users** → the user →
    **Disable**), and re-enable them for the next review. A retention run that de-identifies
    them (their school has a year end, and they have no record after it) deletes their
