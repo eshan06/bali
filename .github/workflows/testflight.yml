@@ -287,6 +287,33 @@ jobs:
             echo "aps-environment: none (the app does not ask for push)"
           fi
 
+      # Screen Time (2026-11-10): App Review's automated scan refused build 13 as "not submitted
+      # with the Family Controls entitlement". The app and both extensions use Screen Time, so each
+      # bundle of the copy exported above must be signed with it; each one's value is printed, and
+      # in the run's summary. codesign's own failure is said as itself, as in the guards above.
+      - name: 'Release guard: every Screen Time bundle carries Family Controls'
+        run: |
+          app="$RUNNER_TEMP/check/ipa/Payload/Bali.app"
+          fail=0
+          echo "### Family Controls in the exported build" >> "$GITHUB_STEP_SUMMARY"
+          for bundle in "$app" "$app/PlugIns/BaliMonitor.appex" "$app/PlugIns/BaliShield.appex"; do
+            name=$(basename "$bundle")
+            plist="$RUNNER_TEMP/check/$name.entitlements.plist"
+            if ! codesign -d --entitlements - --xml "$bundle" > "$plist" 2> "$RUNNER_TEMP/check/codesign.err"; then
+              echo "::error::codesign could not read $name's entitlements: $(cat "$RUNNER_TEMP/check/codesign.err")"
+              fail=1
+              continue
+            fi
+            plutil -lint -s "$plist" \
+              || { echo "::error::$name's entitlements are not a sound plist."; fail=1; continue; }
+            value=$(/usr/libexec/PlistBuddy -c "Print :com.apple.developer.family-controls" "$plist" 2>/dev/null || echo missing)
+            echo "$name: com.apple.developer.family-controls = $value"
+            echo "- $name: \`$value\`" >> "$GITHUB_STEP_SUMMARY"
+            [ "$value" = true ] \
+              || { echo "::error::$name is signed without the Family Controls entitlement ($value): App Review refuses the build."; fail=1; }
+          done
+          exit "$fail"
+
       # Signed for App Store Connect and uploaded in one step: `destination: upload` sends the build
       # with the same key, so no other uploader is needed.
       - name: Export and upload to TestFlight
