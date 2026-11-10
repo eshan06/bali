@@ -23,7 +23,8 @@ import okhttp3.Headers.Companion.headersOf
 
 // C4: the sign-in deleting itself, DeleteUserTests.swift whole: the scope Cognito's DeleteUser needs, the call
 // at the pool's own endpoint, and no token for the API once the API has deleted the account. And new: the
-// call on the wire over OkHttp, and only the sign-in it began with deleted (Q4).
+// call on the wire over OkHttp, only the sign-in it began with deleted (Q4), and only the account its caller
+// names (AN9b).
 
 /** Where [admin]'s token deletes itself: its pool's own endpoint. */
 const val DELETE_USER_ENDPOINT = "https://cognito-idp.us-east-1.amazonaws.com/"
@@ -72,7 +73,7 @@ class DeleteUserTest : SignIns() {
             val endpoint = TransportDouble.answering(200, "{}")
             val store = MemoryStore.holding(admin("a1"))
             val phone = signIn(store, endpoint)
-            assertNull(phone.deleteUser())
+            assertNull(phone.deleteUser("a1"))
             val sent = endpoint.sent.single()
             assertEquals(listOf("POST", DELETE_USER_ENDPOINT), listOf(sent.method, sent.url.toString()))
             // Cognito's two headers alone: no Authorization header, no AWS credential.
@@ -98,22 +99,22 @@ class DeleteUserTest : SignIns() {
                 val endpoint = cognitoDouble(tokens = Answers(null).endpoint(), deletes = deletes.endpoint())
                 val store = MemoryStore.holding(admin("a1"))
                 val phone = signIn(store, endpoint)
-                assertEquals(reply?.let { SendResult.Status(it.first) } ?: SendResult.NetworkError, phone.deleteUser(), "$reply")
+                assertEquals(reply?.let { SendResult.Status(it.first) } ?: SendResult.NetworkError, phone.deleteUser("a1"), "$reply")
                 assertEquals(admin("a1"), store.tokens?.access, "$reply")
                 assertTrue(phone.signedIn().first(), "$reply")
                 deletes.set(200 to "{}")
-                assertNull(phone.deleteUser(), "$reply")
+                assertNull(phone.deleteUser("a1"), "$reply")
                 assertNull(store.data, "$reply")
                 assertEquals(listOf(admin("a1"), admin("a1")), deletesSent(endpoint), "$reply")
             }
             // A transport throwing what none should is no answer too, never a throw.
             val store = MemoryStore.holding(admin("a1"))
-            assertEquals(SendResult.NetworkError, signIn(store, TransportDouble { throw IllegalStateException("odd") }).deleteUser())
+            assertEquals(SendResult.NetworkError, signIn(store, TransportDouble { throw IllegalStateException("odd") }).deleteUser("a1"))
             assertEquals(admin("a1"), store.tokens?.access)
             // A store that can't be read right now is no answer, never a deletion done: nothing sent (santa's review).
             val unread = TransportDouble.answering(200, "{}")
             val locked = MemoryStore.holding(admin("a1")).apply { setLocked(true) }
-            assertEquals(SendResult.NetworkError, signIn(locked, unread).deleteUser())
+            assertEquals(SendResult.NetworkError, signIn(locked, unread).deleteUser("a1"))
             assertTrue(unread.sent.isEmpty())
             locked.setLocked(false)
             assertEquals(admin("a1"), locked.tokens?.access)
@@ -125,23 +126,23 @@ class DeleteUserTest : SignIns() {
             // Its type read past any namespace, as Cognito's JSON protocol allows.
             val type = "com.amazonaws.cognito.identity.idp.model#UserNotFoundException"
             val gone = MemoryStore.holding(admin("a1"))
-            assertNull(signIn(gone, cognitoDouble(Answers(null).endpoint(), Answers(400 to cognitoError(type)).endpoint())).deleteUser())
+            assertNull(signIn(gone, cognitoDouble(Answers(null).endpoint(), Answers(400 to cognitoError(type)).endpoint())).deleteUser("a1"))
             assertNull(gone.data)
 
             val tokens = Answers(200 to granted(admin("a2")))
             val endpoint = cognitoDouble(tokens.endpoint(), Answers(400 to cognitoError("NotAuthorizedException")).endpoint())
             val renewed = MemoryStore.holding(admin("a1"))
             val phone = signIn(renewed, endpoint)
-            assertEquals(SendResult.Status(400), phone.deleteUser()) // refused again, renewed: said
+            assertEquals(SendResult.Status(400), phone.deleteUser("a1")) // refused again, renewed: said
             assertEquals(listOf(admin("a1"), admin("a2")), deletesSent(endpoint))
             assertEquals(admin("a2"), renewed.tokens?.access)
 
             tokens.set(null) // Cognito out of reach: kept to try again
-            assertEquals(SendResult.NetworkError, phone.deleteUser())
+            assertEquals(SendResult.NetworkError, phone.deleteUser("a2"))
             assertEquals(admin("a2"), renewed.tokens?.access)
 
             tokens.set(400 to refusal("invalid_grant")) // the sign-in itself is gone
-            assertNull(phone.deleteUser())
+            assertNull(phone.deleteUser("a2"))
             assertNull(renewed.data)
             assertFalse(phone.signedIn().first())
         }
@@ -153,7 +154,7 @@ class DeleteUserTest : SignIns() {
             val now = Now()
             val phone = signIn(MemoryStore.holding(admin("a1")), endpoint, now)
             now.set(4000)
-            assertNull(phone.deleteUser())
+            assertNull(phone.deleteUser("a1"))
             assertEquals(listOf(admin("a2")), deletesSent(endpoint))
         }
 
@@ -167,7 +168,7 @@ class DeleteUserTest : SignIns() {
             assertFalse(phone.deletionPending())
             assertEquals(admin("a1"), phone.accessToken()) // read while the store can be
             store.setLocked(true)
-            phone.accountDeleted()
+            phone.accountDeleted("a1")
             assertNull(phone.accessToken())
             assertNull(store.tokens?.deleted) // locked: not taken yet
             store.setLocked(false)
@@ -182,11 +183,34 @@ class DeleteUserTest : SignIns() {
             assertTrue(relaunched.deletionPending())
             assertNull(relaunched.accessToken())
             assertTrue(relaunched.signedIn().first())
-            assertEquals(SendResult.Status(500), relaunched.deleteUser())
+            assertEquals(SendResult.Status(500), relaunched.deleteUser("a2"))
             assertEquals(listOf(admin("a2")), deletesSent(endpoint))
 
             relaunched.signOut()
             assertFalse(relaunched.deletionPending())
+            assertNull(store.data)
+        }
+
+    @Test
+    fun theDeletionsMarkAndDeleteUserGoOnlyToTheAccountTheirCallerNamesAnotherAccountsSignInMarkedNothingSentNothingItsTokensKept() =
+        inTime {
+            // No iOS twin (AN9b): the engine holds the account `DELETE /v1/me` removed from its press on, and
+            // another's sign-in landed since leaves nothing of that account here to delete.
+            val endpoint = TransportDouble.answering(200, "{}")
+            val store = MemoryStore.holding(admin("b1"))
+            val phone = signIn(store, endpoint)
+            phone.accountDeleted("a1")
+            assertFalse(phone.deletionPending())
+            assertEquals(admin("b1"), phone.accessToken())
+            assertNull(phone.deleteUser("a1"))
+            assertTrue(endpoint.sent.isEmpty())
+            assertEquals(admin("b1"), store.tokens?.access)
+            assertTrue(phone.signedIn().first())
+            // Its own account's, each as before.
+            phone.accountDeleted("b1")
+            assertTrue(phone.deletionPending())
+            assertNull(phone.deleteUser("b1"))
+            assertEquals(listOf(admin("b1")), deletesSent(endpoint))
             assertNull(store.data)
         }
 
@@ -197,7 +221,7 @@ class DeleteUserTest : SignIns() {
             val endpoint = HeldEndpoint()
             val store = MemoryStore.holding(admin("a1"))
             val phone = signIn(store, endpoint)
-            val caller = async { phone.deleteUser() }
+            val caller = async { phone.deleteUser("a1") }
             endpoint.received(1)
             caller.cancelAndJoin()
             endpoint.answer(200, "{}")
@@ -207,7 +231,7 @@ class DeleteUserTest : SignIns() {
             // The app's scope ended: no answer, never its cancel thrown, and nothing sent.
             val ended = MemoryStore.holding(admin("b1"))
             val stopped = SignIn(cognito, ended, CoroutineScope(Job().apply { cancel() }), endpoint, Now(), gated = false)
-            assertEquals(SendResult.NetworkError, stopped.deleteUser())
+            assertEquals(SendResult.NetworkError, stopped.deleteUser("b1"))
             assertEquals(admin("b1"), ended.tokens?.access)
             assertEquals(1, endpoint.sent)
         }
@@ -234,7 +258,7 @@ class DeleteUserTest : SignIns() {
                         .build()
                 for (name in listOf("a1", "b1")) {
                     val store = MemoryStore.holding(admin(name))
-                    assertNull(SignIn(cognito, store, scope, OkHttpTransport(client), Now(), gated = false).deleteUser(), name)
+                    assertNull(SignIn(cognito, store, scope, OkHttpTransport(client), Now(), gated = false).deleteUser(name), name)
                     assertNull(store.data, name) // deleted, and then a user Cognito no longer has
                 }
                 assertEquals(listOf(DELETE_USER_ENDPOINT, DELETE_USER_ENDPOINT), asked)
@@ -257,7 +281,7 @@ class DeleteUserTest : SignIns() {
             val (store, now) = MemoryStore.holding(admin("a1")) to Now()
             val phone = signIn(store, cognitoDouble(tokens, deletes), now)
             now.set(4000) // a1 has expired
-            val deleting = async { phone.deleteUser() }
+            val deleting = async { phone.deleteUser("a1") }
             tokens.received(1) // its renewal, on its way
             val signingIn = async { phone.signIn(browser = signsIn) } // another account's
             tokens.received(2)
@@ -281,7 +305,7 @@ class DeleteUserTest : SignIns() {
             val granting = TransportDouble.answering(200, granted(admin("b1"), refresh = "refresh-b"))
             val other = MemoryStore.holding(admin("a1"))
             val second = signIn(other, cognitoDouble(granting, held))
-            val trying = async { second.deleteUser() }
+            val trying = async { second.deleteUser("a1") }
             arrived.await()
             second.signIn(browser = signsIn)
             answer.complete(Unit)

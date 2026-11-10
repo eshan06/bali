@@ -10,6 +10,19 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN9b's on 2026-11-10: _Last updated: 2026-11-05 (Central) — AN9a,
+Delete account's rules (#533; `docs/DECISIONS.md`,
+2026-11-05): Cognito's DeleteUser in `core`'s `SignIn`, in Cognito's JSON protocol at the pool's own
+endpoint over the API client's OkHttp, in the sign-in's scope, and only ever for the sign-in it began
+with, before a renewal and after it, where iOS's sends whatever tokens there are (Q4: for the owner, iOS
+has the gap); the outbox's order before a deletion, every Emergency Unlock first, and every record let go
+once the account is deleted but an unlock, which never is; and where a deletion stands (`Deleting`), its
+stops typed, its words AN10's. AN9 is seven steps now, AN9a–AN9g (the conductor's split, awaiting the
+owner). Before it, AN8's code, the tap over NFC. Next: AN9b, the deletion in the engine; AN7f and AN8's 📱
+check on the owner's phones; Android's Cognito clients, the owner's (Open owner items, 8); Android 17's SDK
+platform for the owner to OK before the first step with today's AndroidX, and OkHttp 5.5 with it (Open
+owner items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
+
 _Last updated: 2026-11-08 (Central) — every session's bell is on a whole minute (#546; DECISIONS
 2026-11-08), so a closed app's phone is freed at the bell, not up to a minute after; the server's
 change alone, on prod with the merge's deploy. Before it, the prod phone sitting passed (#545); its
@@ -2576,6 +2589,17 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN9b's line, as it read when it was done (2026-11-10; `docs/DECISIONS.md`, 2026-11-10).
+
+- **AN9b** The deletion in the engine (twin: SyncEngine.swift's `deleteAccount`, `delete`, `sendAll`,
+  `sendDeletion`, `deleteMe` and `counted`): Delete account, what the phone queued first, then
+  `DELETE /v1/me`, then Cognito's DeleteUser; the loops held, what they have on its way waited out,
+  exactly that and never forever; one deletion in the engine's scope, a second press sharing it; once
+  deleted, the standing out and kept, and the lock follows. Tests: DeleteAccountTests' twelve (AN5's
+  split); new: a run cancelled while its send is out, a deletion then not waiting for it; Delete
+  account's caller cancelled while the deletion goes on; and TeardownTest's third, a deletion held at its
+  `accountDeleted` write as the test ends — validation: the JVM tests
 
 AN9a's line, as it read when it was done (2026-11-05; `docs/DECISIONS.md`, 2026-11-05). The conductor
 split AN9's line into AN9a–AN9g that day, every word of it kept in one of them: AN9a's here, AN9b's to

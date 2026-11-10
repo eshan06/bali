@@ -105,7 +105,8 @@ before the 13+ check but the check's own read and a deletion's. The token endpoi
 the API client's OkHttp. No token, code, verifier or state reaches a log line or an error's message.
 `SyncEngine.make` is the app's engine over it. Cognito's DeleteUser (`deleteUser`, AN9a) goes in Cognito's
 JSON protocol to the pool's own endpoint, over the same OkHttp, the token in its body alone, and only ever
-for the sign-in it began with, before a renewal and after it.
+for the sign-in it began with, before a renewal and after it, and only for the account its caller names
+(AN9b), as the deletion's mark is.
 
 **Sign-in's app side** (`app`'s `KeystoreTokenStore.kt`, `HostedUi.kt`, `HostedUiActivity.kt` and
 `BaliApp.kt`, AN6c): the tokens sealed with AES-GCM under a Keystore key of the app's own, in
@@ -236,7 +237,12 @@ unread, once that is known (B6b); its send waits 15 s for the student's reason, 
 a reason goes with it while it has never been sent, and after, as a change of the one recorded. The
 lock back on returns the phone where it stood before protection off or, not known, past the unlock
 guard. When the lock is on is `SyncState.shieldedUntil`'s, and each call's failure is a type, the
-words the screens' (AN10). Its tests run on
+words the screens' (AN10). Its Delete account (AN9b, `deleteAccount`) holds both loops and waits out
+exactly what they have on its way, each of their requests counted from the stretch that decides it until
+it lands, however it ends; then it sends the outbox, every Emergency Unlock first, any unlock still queued
+holding it back, then `DELETE /v1/me`, then Cognito's DeleteUser for the account it began with, each send
+and each call into the sign-in with the engine let go; one deletion at a time, in the engine's scope, a
+second press sharing it; deleted, the phone stands out of any session, kept so. Its tests run on
 a rig of their own (`EngineSupport.kt`, BaliOutbox's `EngineSupport.swift`): a clock the test moves,
 in a zone of the test's own, since coroutines-test's virtual time can't drive Room's queries, a
 server answered by hand, and the bundled driver watched, which sees each commit as GRDB's

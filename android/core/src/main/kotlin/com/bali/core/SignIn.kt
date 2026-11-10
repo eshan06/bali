@@ -477,12 +477,13 @@ class SignIn(
     suspend fun mayDelete(): Boolean = alone { current()?.let { Tokens.deleteEndpoint(it.access) } != null }
 
     /**
-     * The API has deleted this sign-in's account (C4): no token goes to the API from now on, a relaunch's
-     * included, until Cognito's DeleteUser ([deleteUser]) or a sign-out; a store that can't take it now, at the next ask.
+     * The API has deleted [account]'s account (C4), its `sub` as [account] read it: while the sign-in held is
+     * that account's, no token goes to the API from now on, a relaunch's included, until Cognito's DeleteUser
+     * ([deleteUser]) or a sign-out; a store that can't take it now, at the next ask. Another's is left as it is.
      */
-    suspend fun accountDeleted() =
+    suspend fun accountDeleted(account: String?) =
         alone {
-            val held = current() ?: return@alone
+            val held = current()?.takeIf { Tokens.subject(it.access) == account } ?: return@alone
             tokens = held.copy(deleted = true)
             unsaved = !keep(tokens)
         }
@@ -491,26 +492,28 @@ class SignIn(
     suspend fun deletionPending(): Boolean = alone { current()?.deleted == true }
 
     /**
-     * Cognito's DeleteUser (C4): the sign-in deletes itself with its own access token at its pool's endpoint
-     * ([Tokens.deleteEndpoint]), no AWS credential, as the API holds none. Deleted, or a user Cognito no longer
-     * has, the tokens are forgotten as a sign-out forgets them, and the answer is none; else what Cognito
-     * answered, the tokens kept to try again. An expired token is renewed first, and so, once, is one Cognito
-     * says it no longer takes: a sign-in it then refuses for good, deleted by a try whose answer never came, is
-     * forgotten by that renewal, and gone too. Only the sign-in it began with is ever sent, by its refresh token,
-     * before a renewal and after it, where iOS's sends whatever tokens there are then: another landed meanwhile
-     * is no answer, its tokens kept (Q4). It runs in the sign-in's scope, as a sign-in's exchange does: a caller
-     * cancelled stops waiting, and it goes on. It never throws, nor ends on a cancel of its own: a scope that has
-     * ended is no answer.
+     * Cognito's DeleteUser (C4) for [account], its `sub` as [account] read it: the sign-in deletes itself with
+     * its own access token at its pool's endpoint ([Tokens.deleteEndpoint]), no AWS credential, as the API holds
+     * none. Deleted, or a user Cognito no longer has, the tokens are forgotten as a sign-out forgets them, and
+     * the answer is none; else what Cognito answered, the tokens kept to try again. An expired token is renewed
+     * first, and so, once, is one Cognito says it no longer takes: a sign-in it then refuses for good, deleted by
+     * a try whose answer never came, is forgotten by that renewal, and gone too. Only [account]'s sign-in, held as
+     * it begins, is ever sent, by its refresh token from then on, before a renewal and after it, where iOS's sends
+     * whatever tokens there are then: none of [account]'s held as it begins, nothing of it is left here to
+     * delete, what Cognito keeps of it the server's (C3-cognito), and the answer is none; another landed
+     * meanwhile is no answer, its tokens kept (Q4). It runs in the sign-in's scope, as a sign-in's exchange does:
+     * a caller cancelled stops waiting, and it goes on. It never throws, nor ends on a cancel of its own: a scope
+     * that has ended is no answer.
      */
-    suspend fun deleteUser(): SendResult? = orElse(SendResult.NetworkError) { scope.async { deletion() }.await() }
+    suspend fun deleteUser(account: String?): SendResult? = orElse(SendResult.NetworkError) { scope.async { deletion(account) }.await() }
 
-    private suspend fun deletion(): SendResult? {
-        var own: String? = null // the refresh token of the sign-in it deletes
+    private suspend fun deletion(account: String?): SendResult? {
+        var own: String? = null // the refresh token of the sign-in it deletes, [account]'s as it began
         var refusedOnce = false // Cognito no longer took its token: renewed, and tried once more
         while (true) {
             val (held, renewal) =
                 alone {
-                    val held = current()?.takeIf { own == null || it.refresh == own }
+                    val held = current()?.takeIf { if (own == null) Tokens.subject(it.access) == account else it.refresh == own }
                     held to held?.takeIf { refusedOnce || now() >= it.until }?.let { renew(telling = false) }
                 }
             own = own ?: held?.refresh
@@ -522,8 +525,9 @@ class SignIn(
                     else -> null
                 }
             val endpoint = access?.let(Tokens::deleteEndpoint)
-            // Nobody signed in now, a renewal's no among them: nothing left to delete. Else kept, to try again.
-            if (access == null || endpoint == null) return alone { if (loaded && tokens == null) null else SendResult.NetworkError }
+            // None of [account]'s held as it began, or nobody signed in now, a renewal's no among them: nothing
+            // left here to delete. Else kept, to try again.
+            if (access == null || endpoint == null) return alone { if (loaded && (own == null || tokens == null)) null else SendResult.NetworkError }
             val (result, type) = deleteUser(access, endpoint)
             when {
                 (result as? SendResult.Status)?.code in 200..299 || type == "UserNotFoundException" -> {
