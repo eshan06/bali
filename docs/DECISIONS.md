@@ -8,6 +8,17 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-10** — **Bali 1.0 is resubmitted on build 14 after an automated Family Controls refusal,
+  with designed screenshots and a header (the owner).** App Review's scan refused build 13 as "not
+  submitted with the Family Controls entitlement" although every App ID held the entitlement since
+  2026-09-20; the owner filed the account-level request too, and Apple assigned it the same minute
+  (ISSUES #3). Build 15's run then read the App-Store-signed copy, and the app and both extensions
+  carry it, so build 14, signed after the grant and identical in code, went back unchanged rather
+  than waiting on 15's processing; `testflight.yml` now fails any build missing it. **The listing:**
+  the owner asked for screenshots "like" other apps' (a headline over a drawing of the app, not a
+  raw capture), on the light background rather than Bali green, with the questions feature among
+  them; and for the new product page header, with the timer and no FOCUSED chip, but no search
+  results asset (`docs/APP-STORE.md`, section 1).
 - **2026-11-09** — **The public contact address is team@getbali.app (the owner).** The owner
   registered `team@getbali.app` (getbali.app's mail is Google's) and made it the one address the
   public sees: the website's Talk to us and its two drawn states (`demo3`, canvas version 40), and
