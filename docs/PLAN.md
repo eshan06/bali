@@ -152,7 +152,9 @@ build in use links it. The app links the new address from build 13; Android's
 5. The App Store submission — ✅ the owner's, 2026-11-09 (#548; DECISIONS 2026-11-09): Bali 1.0,
    build 13, "Waiting for Review", as `docs/APP-STORE.md`'s sections 1–4 record it; released by
    hand once approved. App Review's verdict is Apple's answer on §3.3.3(P) (ISSUES #3). No external
-   beta for now (the owner, 2026-11-04).
+   beta for now (the owner, 2026-11-04). App Review's automated scan refused build 13 on 2026-11-10
+   ("not submitted with the Family Controls entitlement"); `testflight.yml` now fails a build whose
+   exported app or either extension is signed without it (#551).
 6. The App Store privacy label — ✅ published 2026-11-09, `docs/APP-STORE.md` §3's answers: seven
    types, all linked, none tracking, the policy `https://app.getbali.app/privacy`.
 7. Production backups on (L0b), before the pilot's first class: `/privacy` (sections 4, 6 and 7)
