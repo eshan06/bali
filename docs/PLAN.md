@@ -8,10 +8,13 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-09 (Central) — Bali 1.0, build 13, is submitted to the App Store, "Waiting
-for Review" (Before the pilot, items 5 and 6; #548; DECISIONS 2026-11-09): the listing branded
-around focus, the privacy label published, rated 13+, the United States only, released by hand.
-Before it, every session's bell on a whole minute (#546). Next: App Review's verdict, the
+_Last updated: 2026-11-10 (Central) — Bali 1.0 is resubmitted to the App Store on build 14,
+"Waiting for Review" (Before the pilot, items 5 and 6; #550; DECISIONS 2026-11-10), after App
+Review's automated scan refused build 13 for the Family Controls entitlement, which the account
+now holds as well as each App ID (ISSUES #3); TestFlight checks it on every build (#551). The
+listing is branded around focus, with designed screenshots and a header; the privacy label
+published, rated 13+, the United States only, released by hand. Before it, every session's bell
+on a whole minute (#546). Next: App Review's verdict, the
 §3.3.3(P) answer (Open owner items); a session builds the retire-a-block command; the owner the
 sitting's findings' calls; GA5's known limit, the owner's call (DECISIONS 2026-11-02); AN9b; AN1's
 part 2 on the owner's phones; the audit's polish waits._
@@ -149,12 +152,13 @@ build in use links it. The app links the new address from build 13; Android's
    their lines in full in `docs/PLAN-ARCHIVE.md`. The notice `/privacy`'s section 11 promises: owed
    to no one yet, every prod account being the team's, and due for any change that matters from
    the first pilot user on (the owner; DECISIONS 2026-11-07).
-5. The App Store submission — ✅ the owner's, 2026-11-09 (#548; DECISIONS 2026-11-09): Bali 1.0,
-   build 13, "Waiting for Review", as `docs/APP-STORE.md`'s sections 1–4 record it; released by
-   hand once approved. App Review's verdict is Apple's answer on §3.3.3(P) (ISSUES #3). No external
-   beta for now (the owner, 2026-11-04). App Review's automated scan refused build 13 on 2026-11-10
-   ("not submitted with the Family Controls entitlement"); `testflight.yml` now fails a build whose
-   exported app or either extension is signed without it (#551).
+5. The App Store submission — ✅ the owner's, 2026-11-09 (#548; DECISIONS 2026-11-09), resubmitted
+   2026-11-10 on build 14 (#550; DECISIONS 2026-11-10), "Waiting for Review", as
+   `docs/APP-STORE.md`'s sections 1–4 record it; released by hand once approved. App Review's
+   verdict is Apple's answer on §3.3.3(P) (ISSUES #3). No external beta for now (the owner,
+   2026-11-04). App Review's automated scan refused build 13 on 2026-11-10 ("not submitted with the
+   Family Controls entitlement"); `testflight.yml` now fails a build whose exported app or either
+   extension is signed without it (#551).
 6. The App Store privacy label — ✅ published 2026-11-09, `docs/APP-STORE.md` §3's answers: seven
    types, all linked, none tracking, the policy `https://app.getbali.app/privacy`.
 7. Production backups on (L0b), before the pilot's first class: `/privacy` (sections 4, 6 and 7)
