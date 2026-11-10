@@ -45,14 +45,23 @@ a real decision? Add a dated entry at the top: what was decided and why.
     `nextBeforeDeletion` passes over, and one not filed yet included, as iOS's `sendAll` refuses.
   - **DeleteUser only for the account `DELETE /v1/me` removed:** the deletion reads `SignIn.account` as it
     starts, and `accountDeleted(account)` and `deleteUser(account)` act only while the sign-in held is that
-    account's, read in the sign-in's own stretch, as `passed(account)` reads it. Another account's sign-in
-    landed meanwhile is neither marked deleted nor deleted from Cognito, its tokens kept. **The conductor's
-    call: the deletion then answers `Deleted`.** That account's sign-in has left the phone, so no try of the
-    phone's could delete it, and the server's deleter has it, queued in the deletion's transaction
-    (C3-cognito); `SignInNotDeleted` would put Try again over the other account's sign-in, a press of which
-    would start a deletion of that account. Q4's case, another sign-in landing during DeleteUser's own renewal
-    or try, stays as AN9a set it: no answer, its tokens kept, a rotated refresh token reading the same.
-    Unreachable in the pilot: two accounts on one phone are ruled out, and C4b's screen covers any sign-in.
+    account's, read in the sign-in's own stretch, as `passed(account)` reads it; none to be read then is
+    `SignInFirst`, as `mayDelete`'s none is, so a store that answers a moment later never leaves the mark to
+    miss (santa's review). Another account's sign-in landed meanwhile is neither marked deleted nor deleted
+    from Cognito, its tokens kept. **The conductor's call: the deletion then answers `Deleted`.** That account's
+    sign-in has left the phone, so no try of the phone's could delete it, and the server's deleter has it,
+    queued in the deletion's transaction (C3-cognito); `SignInNotDeleted` would put Try again over the other
+    account's sign-in, a press of which would start a deletion of that account. Q4's case, another sign-in
+    landing during DeleteUser's own renewal or try, stays as AN9a set it: no answer, its tokens kept, a rotated
+    refresh token reading the same. Unreachable in the pilot: two accounts on one phone are ruled out, and
+    C4b's screen covers any sign-in. **For the owner, said plainly (both of santa's reviewers; a privacy
+    point, so not dropped):** only the mark and DeleteUser hold to that account. The outbox's sends and
+    `DELETE /v1/me` go under whatever sign-in is held as each is sent, as on iOS, so another account's sign-in
+    landing after the press and before `DELETE /v1/me` goes would have that account deleted on the server,
+    unmarked, its next read making it afresh, while the account that pressed stays as it was and is told
+    `Deleted`. Holding those to the account too takes a token for one account alone through
+    `ApiClient.forDeletion`, a change to `core`'s token provider that AN9c's 13+ read shares: left, unreachable
+    in the pilot, for the owner's look.
   - **NotAuthorized, then `invalid_grant`, reads as deleted, with no stop of its own (the conductor's
     call):** iOS's C4a limit, kept. Cognito has refused that sign-in's refresh token for good, so the phone
     holds nothing that could delete the user, and a stop would offer a Try again that can't help; the
@@ -77,29 +86,39 @@ a real decision? Add a dated entry at the top: what was decided and why.
   marks. New: any unlock still queued, one tried and stuck and one not filed; a run cancelled while its read
   and its record are out, then a deletion that waits for neither; the caller cancelled, the deletion going on
   and a press meanwhile sharing it; another account's sign-in landing while `DELETE /v1/me` is out;
-  NotAuthorized then `invalid_grant`; a token renewed for the deletion, the renewal telling the engine; and
-  TeardownTest's third; in `core`, the mark and DeleteUser for the account named alone. `refusedTap` now ends
-  checking that nothing is left on its way. Tried, each failing by name, then reverted: the drain's send left
-  uncounted (the drain's test); the read left uncounted (the read's and the check-in's); a request cut short
-  never landed (the cancelled run's); `DELETE /v1/me` sent with the engine held (3: the renewed token's, the
-  two waiting on each other for good, another account's sign-in and the drain's); DeleteUser called with the
-  engine held (`deleted`, a screen's call waiting on it); no refusal while an unlock waits (2); DeleteUser, and
-  the deletion's mark, for whoever is signed in (another account's test each, and `core`'s); NotAuthorized
-  then `invalid_grant` as a stop of its own (its test); the deletion outside the engine's scope (TeardownTest's
-  third), and in its caller's coroutine, unshared (3: `pressedTwice`, the cancelled caller's and TeardownTest's
-  third); the drain not held (the drain's), and the read loop not held (2: `refusedTap` and the renewed
-  token's); `deleting` ended after DeleteUser (`deleted`); a held pass dropping the read it took (2); the
-  standing left as it was (`sessionEnded`); and nothing let go once DeleteUser answers (`deleted`). Found
-  while trying them: with the loops still running, TeardownTest's third passed a deletion outside the engine's
-  scope, since the loops' own stretches, waiting on the engine held at the write, held the teardown back; it
-  ends the loops first now. Not shown by a test: a request counted in a stretch of its own after the one that
-  decides it, a window no test holds open without a real-time wait; and `sendAll` not waiting for a 401's
-  refresh, which the sign-in covers, the next send's token waiting on the same renewal.
+  NotAuthorized then `invalid_grant`; a token renewed for the deletion, the renewal telling the engine; and,
+  from santa's review, a 401 to the deletion's own sends (the rest of the outbox under the renewed token,
+  `DELETE /v1/me` once more under its event id), the drain and the read loop each held while `DELETE /v1/me`
+  is out, at a point their held pass marks (the backoff the drain showed ending, the read loop's next wake),
+  and a sign-in that can't be read as the deletion starts; and TeardownTest's third; in `core`, the mark and
+  DeleteUser for the account named alone. `refusedTap` now ends checking that nothing is left on its way.
+  Tried, each failing by name, then reverted: the drain's send left uncounted (the drain's test); the read
+  left uncounted (the read's and the check-in's); a request cut short never landed (the cancelled run's);
+  `DELETE /v1/me` sent with the engine held (3: the renewed token's, the two waiting on each other for good,
+  another account's sign-in and the drain's); DeleteUser called with the engine held (`deleted`, a screen's
+  call waiting on it); no refusal while an unlock waits (2); DeleteUser, and the deletion's mark, for whoever
+  is signed in (another account's test each, and `core`'s); NotAuthorized then `invalid_grant` as a stop of its
+  own (its test); the deletion outside the engine's scope (TeardownTest's third), and in its caller's coroutine,
+  unshared (3: `pressedTwice`, the cancelled caller's and TeardownTest's third); the drain not held (the
+  drain's held test, every run, and the drain's), and the read loop not held (the read loop's held test,
+  `refusedTap` and the renewed token's); `deleting` ended after DeleteUser (`deleted`); a held pass dropping the
+  read it took (2); the standing left as it was (`sessionEnded`); nothing let go once DeleteUser answers
+  (`deleted`); and an unreadable account taken as one (its test). Found while trying them: with the loops
+  still running, TeardownTest's third passed a deletion outside the engine's scope, since the loops' own
+  stretches, waiting on the engine held at the write, held the teardown back; it ends the loops first now. Not
+  shown by a test: a request counted in a stretch of its own after the one that decides it, a window no test
+  holds open without a real-time wait; and `sendAll` not waiting for a 401's refresh, which the sign-in covers,
+  the next send's token waiting on the same renewal.
 
-  **Santa's review:** SANTA
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on
+  this PC, so context isolation holds and model diversity doesn't): 0 blockers. Their WARNs: the outbox's
+  sends and `DELETE /v1/me` not held to the account (both; for the owner, above); an account none could read
+  as the deletion starts (taken: `SignInFirst`, with its test); no 401 through the deletion's own sends (taken:
+  its test); the drain's hold caught by `drainHeld` most runs, not every one (taken: the held tests); and
+  placeholders in this entry (filled).
 
   **The proof:** `android/app` is unchanged, so the JVM tests are the proof and no emulator ran: `./gradlew
-  assemble :app:lint check` green, Android 10's API check with it, and the outbox's suite run RUNS times
+  assemble :app:lint check` green, Android 10's API check with it, and the outbox's suite run five times
   over. Nothing was added to the PC's SDK: its folders were compared before and after.
 
 - **2026-11-10** — **Android requires NFC, as the iPhone does (the owner: "Yes, require NFC").** The

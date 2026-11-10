@@ -4,6 +4,8 @@ import androidx.sqlite.SQLiteException
 import com.bali.core.ParticipationState
 import com.bali.core.SendResult
 import com.bali.core.SignIn
+import com.bali.core.TokenStore
+import java.io.IOException
 import java.util.Base64
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.test.Test
@@ -34,10 +36,10 @@ val deleteMeRoute = "DELETE /v1/me"
 val deleteUserRoute = "POST /"
 val deletedAnswer = """{"outcome":"deleted"}"""
 
-/** An access token from a sign-in that asked for the scope DeleteUser needs, its pool named. */
-fun scoped(name: String): String {
+/** An access token from a sign-in that asked for the scope DeleteUser needs, its pool named, issued [issued] seconds after 1970. */
+fun scoped(name: String, issued: Long = 1_000_000_000): String {
     val payload =
-        """{"sub":"$name","iat":1000000000,"exp":1000003600,"scope":"openid email profile aws.cognito.signin.user.admin",""" +
+        """{"sub":"$name","iat":$issued,"exp":${issued + 3600},"scope":"openid email profile aws.cognito.signin.user.admin",""" +
             """"iss":"https://cognito-idp.us-east-1.amazonaws.com/us-east-1_YTloqilwT"}"""
     return "eyJhbGciOiJSUzI1NiJ9.${Base64.getUrlEncoder().withoutPadding().encodeToString(payload.encodeToByteArray())}.signature"
 }
@@ -494,6 +496,113 @@ class DeleteAccountTest : EngineFiles() {
             delete.reply(200, deletedAnswer)
             rig.server.next(deleteUserRoute).reply(200, "{}")
             assertEquals(AccountDeletion.Deleted, deletion.answer())
+            rig.stop()
+        }
+
+    @Test
+    fun a401ToTheDeletionsOwnSendsRenewsTheTokenTheRestOfTheOutboxGoesUnderTheRenewedOneAndDeleteMeOnceMoreUnderItsEventId(): Unit =
+        runBlocking {
+            // Santa's review: the deletion's refresh waited for, and `DELETE /v1/me` renewed once (rule 4).
+            val rig = signedRig()
+            rig.signedIn()
+            rig.engine.record(Change.Tap("tag"))
+            rig.server.next(tapRoute).reply(404, Answer.unknownBlock) // refused for good: stuck, holding nothing back
+            rig.server.next(meRoute).reply(200, Answer.me(null)) // the refusal's re-read
+            rig.until { it.queued.firstOrNull()?.stuck == true }
+            val off = assertNotNull(rig.engine.record(Change.ProtectionOff("s")))
+            rig.server.next(protectionOffRoute).reply(null)
+            rig.until { it.queued.size == 2 && it.sending.isEmpty() }
+
+            val deletion = rig.deleting()
+            rig.server.next(tapRoute).reply(401)
+            val renewed = scoped("a1", issued = 1_000_000_100)
+            rig.server.next(tokenRoute).reply(200, grant(renewed))
+            val report = rig.server.next()
+            assertEquals(listOf(protectionOffRoute, off.eventId, "Bearer $renewed"), listOf(report.route, report.eventId, report.token))
+            report.reply(200, Answer.protectionOff())
+            val delete = rig.server.next(deleteMeRoute)
+            assertEquals("Bearer $renewed", delete.token)
+            delete.reply(401)
+            val again = scoped("a1", issued = 1_000_000_200)
+            rig.server.next(tokenRoute).reply(200, grant(again))
+            val resent = rig.server.next(deleteMeRoute)
+            assertEquals(listOf(delete.eventId, "Bearer $again"), listOf(resent.eventId, resent.token))
+            resent.reply(200, deletedAnswer)
+            rig.server.next(deleteUserRoute).reply(200, "{}")
+            assertEquals(AccountDeletion.Deleted, deletion.answer())
+            assertTrue(rig.keychain.isEmpty)
+            rig.stop()
+        }
+
+    @Test
+    fun theDrainSendsNothingWhileTheDeletionRunsARecordMadeWhileDeleteMeIsOutWaitsNeverSentAndGoesWithTheAccount(): Unit =
+        runBlocking {
+            // The point its held pass marks (santa's review): the backoff it showed ends, the drain then waiting on a ring.
+            val rig = signedRig()
+            rig.signedIn()
+            rig.engine.record(Change.ProtectionOff("s"))
+            rig.server.next(protectionOffRoute).reply(null)
+            rig.until { it.retryAt == at(2) }
+            val deletion = rig.deleting()
+            rig.server.next(protectionOffRoute).reply(200, Answer.protectionOff())
+            val delete = rig.server.next(deleteMeRoute)
+            assertEquals(at(2), rig.engine.updates.value.retryAt) // the drain asleep since, unrung
+            withTimeout(patience) { rig.engine.record(Change.Tap("tag")) }
+            rig.until { it.retryAt == null && it.queued.size == 1 }
+            assertEquals(emptyList(), rig.server.waiting)
+            delete.reply(200, deletedAnswer)
+            rig.server.next(deleteUserRoute).reply(200, "{}")
+            assertEquals(AccountDeletion.Deleted, deletion.answer())
+            assertEquals(emptyList(), rig.outbox.records())
+            assertEquals(emptyList(), rig.server.waiting)
+            rig.stop()
+        }
+
+    @Test
+    fun theReadLoopSendsNothingWhileTheDeletionRunsACheckInDueWhileDeleteMeIsOutWaitsForItsEndNeverSentUnderTheDeletedAccount(): Unit =
+        runBlocking {
+            // The point its held pass marks (santa's review): its next wake, 30 s on, slept on as ever.
+            val rig = signedRig()
+            rig.signedIn(me = Answer.me())
+            rig.until { it.standing == Standing.InSession(session(), ParticipationState.Focused) }
+            rig.engine.setScreenOn(true)
+            rig.server.next(checkInRoute).reply(200, Answer.live()) // the screen's own, at once
+            eventually { rig.clock.deadlines.contains(at(30)) }
+            val deletion = rig.deleting()
+            val delete = rig.server.next(deleteMeRoute)
+            rig.clock.advance(30) // a check-in due
+            eventually { rig.clock.deadlines.contains(at(60)) }
+            assertEquals(emptyList(), rig.server.waiting)
+            delete.reply(200, deletedAnswer)
+            rig.server.next(deleteUserRoute).reply(200, "{}")
+            assertEquals(AccountDeletion.Deleted, deletion.answer())
+            assertEquals(emptyList(), rig.server.waiting)
+            rig.stop()
+        }
+
+    @Test
+    fun aSignInThatCantBeReadAsTheDeletionStartsSignsInAgainFirstNothingSentThoughAMomentLaterItCanBe(): Unit =
+        runBlocking {
+            // Santa's review: the account it holds to read as none would leave the mark to miss, so none is as
+            // `mayDelete`'s none. A relaunch's sign-in over the same keychain, its first read failing (the Keystore
+            // busy, say), then reading.
+            val rig = signedRig()
+            rig.signedIn()
+            val store =
+                object : TokenStore {
+                    private val failed = AtomicBoolean(false)
+
+                    override fun load(): ByteArray? = if (failed.compareAndSet(false, true)) throw IOException("busy") else rig.keychain.load()
+
+                    override fun save(tokens: ByteArray) = rig.keychain.save(tokens)
+
+                    override fun clear() = rig.keychain.clear()
+                }
+            val relaunched = SignIn(rig.signIn.cognito, store, scope, rig.server, rig.clock::now, gated = false)
+            assertEquals(AccountDeletion.SignInFirst, scope.async { rig.engine.deleteAccount(relaunched) }.answer())
+            assertEquals(emptyList(), rig.server.waiting)
+            assertTrue(relaunched.mayDelete()) // readable now: the next press goes
+            assertFalse(relaunched.deletionPending())
             rig.stop()
         }
 

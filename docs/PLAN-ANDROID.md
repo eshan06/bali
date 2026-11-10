@@ -186,8 +186,8 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
   address's redirect covering it till then; and the manifest's NFC feature required (the owner,
   2026-11-10: "Yes, require NFC"), so Play offers Bali to phones with NFC alone, as the App Store offers
   it to iPhones (DECISIONS 2026-11-07, 2026-11-10). AN7f's and AN8's rounds on dev come after it and
-  Open owner items, 8 (Q7). Tests: AccountTest on the JVM, and BaliAppTest's and ReadoutTest's on the emulators —
-  validation: the JVM tests, then the instrumented tests on `Bali_Spike_API35`, `36` and `37`
+  Open owner items, 8 (Q7). Tests: AccountTest on the JVM, and BaliAppTest's and ReadoutTest's on the
+  emulators — validation: the JVM tests, then the instrumented tests on `Bali_Spike_API35`, `36` and `37`
 - **AN9f** Me's rules: Your name, Leave and Sign out's hold (twin: `Me`'s `Naming`, `Leaving` and
   `SignOutWords.held`): Me's name typed, printable, tidied and saved under one event id while it stays
   the same, its blank test a table of Unicode's Default_Ignorable_Code_Point, pinned by a test, no ICU4J

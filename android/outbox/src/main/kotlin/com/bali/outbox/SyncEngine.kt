@@ -821,7 +821,9 @@ class SyncEngine private constructor(
         alone { deletion?.takeIf { it.isActive } ?: scope.async { delete(signIn) }.also { deletion = it } }.await()
 
     private suspend fun delete(signIn: SignIn): AccountDeletion {
-        val account = signIn.account()
+        // The account it is for, which its mark and DeleteUser hold to; none to be read now is as `mayDelete`'s
+        // none, a sign-in first, so a mark never misses for a store that answered a moment later.
+        val account = signIn.account() ?: return AccountDeletion.SignInFirst
         if (!signIn.deletionPending()) {
             if (!signIn.mayDelete()) return AccountDeletion.SignInFirst
             alone { deleting = true }
