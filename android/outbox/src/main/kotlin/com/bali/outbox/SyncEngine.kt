@@ -6,6 +6,8 @@ import com.bali.core.ApiResponse
 import com.bali.core.BlockRead
 import com.bali.core.CheckInRequest
 import com.bali.core.CheckInResponse
+import com.bali.core.DeleteMeRequest
+import com.bali.core.DeleteMeResponse
 import com.bali.core.DisplayState
 import com.bali.core.EventId
 import com.bali.core.HttpTransport
@@ -30,6 +32,7 @@ import java.time.Instant
 import java.time.ZoneId
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.toKotlinDuration
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
@@ -52,8 +55,8 @@ import kotlinx.coroutines.withContext
 
 // The sync engine, BaliOutbox's SyncEngine.swift: its frame, AN5a's, its drain, AN5b's, its read loop,
 // AN5c's, its wait for the Start, AN5d's, Emergency Unlock, AN5e's: where it is filed, its reason and the
-// late unlock, and the phone check's cap, AN7a's. Swift's actor is a lock each stretch holds
-// (docs/PLAN-ANDROID.md).
+// late unlock, the phone check's cap, AN7a's, and Delete account, AN9b's. Swift's actor is a lock each
+// stretch holds (docs/PLAN-ANDROID.md).
 
 /** The engine's clock: the time records are stamped with, the zone its days end in, and waiting on it: a test's own there. */
 interface SyncClock {
@@ -167,6 +170,25 @@ class SyncEngine private constructor(
     private val readRings = Rings(clock)
 
     /**
+     * An account deletion under way (C4): the loops send nothing meanwhile, since a record or a read landing
+     * after its `DELETE /v1/me` would make a fresh account, and it waits out what they have on its way.
+     */
+    private var deleting = false
+
+    /** How many requests of the loops' are on their way ([Counted]); [landed] wakes a deletion as the last lands. */
+    private var underway = 0
+    private var landed: CompletableDeferred<Unit>? = null
+
+    /** The last deletion sent that no answer settled: tried again under the same event id (rule 4). */
+    private var deletionId: String? = null
+
+    /**
+     * The account deletion under way, whose answer a second press shares: never two at once, one of which would
+     * let the loops go while the other's `DELETE /v1/me` is on its way. One that has ended is shared no more.
+     */
+    private var deletion: Deferred<AccountDeletion>? = null
+
+    /**
      * Drains the outbox and reads the truth, until cancelled: one run at a time, and a run cancelled can
      * run again.
      */
@@ -194,9 +216,12 @@ class SyncEngine private constructor(
     /** The outbox, in order: the record due, sent and settled; then the next, or a wait for one. */
     private suspend fun drain(): Nothing {
         while (true) {
-            val (found, onItsWay) = alone { due() }
             // Answered, the next pass goes at once; else the drain waits for what is due, or a ring.
-            val waits = if (found is Outbox.Due.Send) send(found.record, onItsWay) ?: continue else found
+            val waits =
+                counted { request ->
+                    val (found, onItsWay) = alone { due(request) }
+                    if (found is Outbox.Due.Send) send(found.record, onItsWay, request) else found
+                } ?: continue
             val wake = (waits as? Outbox.Due.Wait)?.until
             alone { update { it.copy(retryAt = wake) } }
             drainRings.pause(wake)
@@ -204,32 +229,36 @@ class SyncEngine private constructor(
     }
 
     /**
-     * The top of a pass, which answers every ring made before it: the record due, marked on its way, and
-     * whether it was already, a send of it cut short or answered in a write the file refused; or when one
-     * is due. A file it can't read is shown, and read again within a minute.
+     * The top of a pass, which answers every ring made before it: the record due, marked on its way and
+     * counted so ([request]), and whether it was already, a send of it cut short or answered in a write the
+     * file refused; or when one is due. A file it can't read is shown, and read again within a minute. An
+     * account deletion sends the outbox itself (C4): nothing goes from here till its end rings.
      */
-    private suspend fun due(): Pair<Outbox.Due, Boolean> {
+    private suspend fun due(request: Counted): Pair<Outbox.Due, Boolean> {
         drainRings.answer()
+        if (deleting) return Outbox.Due.Idle to false
         val due = tried { outbox.nextDue(clock.now()) }.getOrElse { return Outbox.Due.Wait(failed()) to false }
         // Never an unlock not filed yet (`nextDue`): it has nowhere to go.
         if (due !is Outbox.Due.Send) return due to false
         val onItsWay = due.record.eventId in state.sending
+        request.count()
         update { it.copy(sending = it.sending + due.record.eventId) }
         return due to onItsWay
     }
 
     /**
      * Sends [record] with the engine let go of, as Swift's `await` lets go of its actor; then, in one
-     * stretch, settles the answer and applies it: none once answered, the next pass going at once, else
-     * what the drain waits for. Cancelled with its run, the send makes no [Sent] (AN4b): the record stays
-     * as it was, due, its attempt uncounted, and on its way, since it may have reached the server, until a
-     * send of it settles; the next run sends it at once under its event id. iOS settles it as no answer. A
-     * 401's refresh is waited for, the engine let go, before the next pass ([heard]).
+     * stretch, lands it ([request]), settles the answer and applies it: none once answered, the next pass
+     * going at once, else what the drain waits for. Cancelled with its run, the send makes no [Sent] (AN4b):
+     * the record stays as it was, due, its attempt uncounted, and on its way, since it may have reached the
+     * server, until a send of it settles; the next run sends it at once under its event id. iOS settles it as
+     * no answer. A 401's refresh is waited for, the engine let go, before the next pass ([heard]).
      */
-    private suspend fun send(record: OutboxRecord, onItsWay: Boolean): Outbox.Due? {
+    private suspend fun send(record: OutboxRecord, onItsWay: Boolean, request: Counted): Outbox.Due? {
         val sent = record.send(client)
         var refreshing: Deferred<Unit>? = null
         val waits = alone {
+            request.land()
             when {
                 // An unlock not filed yet sends nothing, and `nextDue` never names one.
                 sent == null -> {
@@ -406,11 +435,26 @@ class SyncEngine private constructor(
                         check?.invoke()
                         true
                     }
-                    val read = alone { reading(wake, checked) }
-                    when {
-                        read == null -> null
-                        read.session == null -> client.me().let { alone { readMe(read.sent, it) } }
-                        else -> client.checkIn(read.session, CheckInRequest(read.at)).let { alone { checkedIn(read.sent, it) } }
+                    // Its read counted on its way, from the stretch that decides it to the one that lands it.
+                    counted { request ->
+                        val read = alone { reading(wake, checked, request) }
+                        when {
+                            read == null -> null
+                            read.session == null -> {
+                                val me = client.me()
+                                alone {
+                                    request.land()
+                                    readMe(read.sent, me)
+                                }
+                            }
+                            else -> {
+                                val live = client.checkIn(read.session, CheckInRequest(read.at))
+                                alone {
+                                    request.land()
+                                    checkedIn(read.sent, live)
+                                }
+                            }
+                        }
                     }
                 } catch (cancelled: CancellationException) {
                     // Cancelled with its run, what it took is the next run's: iOS's no answer keeps its read.
@@ -464,12 +508,19 @@ class SyncEngine private constructor(
     }
 
     /**
-     * What [wake] sends, under a stamp taken now: the screen's own check-in first, a read asked for then
-     * the next wake's, at once; else the read of the truth; else the check-in, in a session; none. A
-     * check that failed ([checked] false) claims nothing. A stamp the file can't give sends none, and is
-     * shown, a read then left to the next wake.
+     * What [wake] sends, counted so ([request]), under a stamp taken now: the screen's own check-in first, a
+     * read asked for then the next wake's, at once; else the read of the truth; else the check-in, in a
+     * session; none. A check that failed ([checked] false) claims nothing. A stamp the file can't give sends
+     * none, and is shown, a read then left to the next wake. An account deletion sends none (C4), since `GET
+     * /v1/me` would make a fresh account, and leaves what the wake took to the pass its end rings, as a run
+     * cancelled leaves it to the next.
      */
-    private suspend fun reading(wake: Wake, checked: Boolean): Read? {
+    private suspend fun reading(wake: Wake, checked: Boolean, request: Counted): Read? {
+        if (deleting) {
+            if (wake.reads) rereading = true
+            if (wake.screen) screenTurned = true
+            return null
+        }
         val sent = stored { stamp() }.getOrNull()
         if (sent == null) {
             if (wake.reads) rereading = true
@@ -481,7 +532,7 @@ class SyncEngine private constructor(
             wake.reads -> Read(sent, clock.now())
             checked && session != null -> Read(sent, clock.now(), session)
             else -> null
-        }
+        }?.also { request.count() }
     }
 
     /**
@@ -746,6 +797,147 @@ class SyncEngine private constructor(
         }
 
     /**
+     * Me's Delete account (C4): the one call the screen makes, answered with where the deletion stands, a press
+     * while one is under way sharing its answer. Each step only once the last is done:
+     * - [signIn] can delete itself, its token carrying the scope Cognito's DeleteUser needs, or a fresh sign-in
+     *   comes first, before anything is sent: no one is deleted here but left in Cognito;
+     * - the loops hold, what they have on its way lands, and the outbox goes ([sendAll]), every Emergency Unlock
+     *   first: one the server hasn't recorded holds the deletion back;
+     * - `DELETE /v1/me` ([sendDeletion]);
+     * - deleted, the sign-in gives the API no token any more (`SignIn.accountDeleted`), what the account still
+     *   had queued is let go, never an unlock, and none is left, and the phone stands in no session, its lock
+     *   off, with no Emergency Unlock recorded (the owner's ruling): one sent now would land under a fresh account;
+     * - Cognito's DeleteUser, which the next call tries again, alone, until it is done; done, the sign-in is
+     *   forgotten, as Sign out forgets it.
+     *
+     * Only for the account signed in as it starts ([SignIn.account]): another's sign-in landed meanwhile is
+     * neither marked deleted nor deleted from Cognito. What the student does while it runs, or while DeleteUser
+     * waits (a tap, Back to focus, a join, a rename), is C4b's to keep from happening. Everything it sends goes
+     * under the sign-in's deletion token ([ApiClient.forDeletion]), whether or not its 13+ check has passed:
+     * the gap's fallback (C7) deletes its account by these same steps. It runs in the engine's scope, each send
+     * and each call into the sign-in with the engine let go: its caller cancelled stops waiting, and it goes on.
+     */
+    suspend fun deleteAccount(signIn: SignIn): AccountDeletion =
+        alone { deletion?.takeIf { it.isActive } ?: scope.async { delete(signIn) }.also { deletion = it } }.await()
+
+    private suspend fun delete(signIn: SignIn): AccountDeletion {
+        val account = signIn.account()
+        if (!signIn.deletionPending()) {
+            if (!signIn.mayDelete()) return AccountDeletion.SignInFirst
+            alone { deleting = true }
+            try {
+                waitOut()
+                sendAll()?.let { return it }
+                val answer = sendDeletion()
+                when (answer.answer?.outcome?.known) {
+                    DeleteMeResponse.Outcome.Deleted, DeleteMeResponse.Outcome.AlreadyDeleted -> alone { deletionId = null }
+                    null ->
+                        return if (answer.error?.error?.reason == ApiErrorReason.TeacherHasClasses) {
+                            AccountDeletion.TeacherHasClasses
+                        } else {
+                            AccountDeletion.NotDeleted(answer.result)
+                        }
+                }
+                signIn.accountDeleted(account)
+            } finally {
+                // The loops go again once the sign-in holds the deletion, which gives the API no token from then on.
+                alone {
+                    deleting = false
+                    drainRings.ring()
+                    readRings.ring()
+                }
+            }
+        }
+        // Again on a later press: the file may not have taken it, nor let go of a record since. Out of any
+        // session, kept so, the lock follows.
+        alone {
+            letGo()
+            update { it.copy(standing = Standing.Out) }
+        }
+        val failed = signIn.deleteUser(account)
+        // And once more as DeleteUser answers: what came meanwhile, or a write the file refused, never waits for
+        // the next sign-in.
+        alone { letGo() }
+        return failed?.let(AccountDeletion::SignInNotDeleted) ?: AccountDeletion.Deleted
+    }
+
+    /**
+     * What the loops have on its way, waited out ([underway]): exactly that, since they count nothing more
+     * while [deleting], and never forever, since each lands however its send ends ([Counted]).
+     */
+    private suspend fun waitOut() {
+        while (true) {
+            val landing = alone { if (underway == 0) null else landed ?: CompletableDeferred<Unit>().also { landed = it } } ?: return
+            landing.await()
+        }
+    }
+
+    /**
+     * The outbox sent before an account deletion (C4), each record once, in the order [nextBeforeDeletion]
+     * gives, every Emergency Unlock first, under the deletion's token with the engine let go, each answer
+     * settled and applied as the drain's is, a 401's refresh waited for; then what holds the deletion back, if
+     * anything: an unlock still queued, one tried and stuck included, which the deleted account could never
+     * send, never let go; else a record no answer settled, with the last answer; or the file unread. A tap the
+     * server refused holds nothing back.
+     */
+    private suspend fun sendAll(): AccountDeletion? {
+        val tried = mutableSetOf<String>()
+        var last: SendResult = SendResult.NetworkError
+        while (true) {
+            val (record, onItsWay) = alone { stored { nextToSend(tried) } }.getOrElse { return AccountDeletion.Unread } ?: break
+            tried += record.eventId
+            val sent = record.send(client.forDeletion)
+            // No token: nothing went, so nothing is settled (the drain's rule), said as no answer.
+            if (sent == null || sent.noAnswer == NoAnswer.NoToken) {
+                alone { if (!onItsWay) update { it.copy(sending = it.sending - record.eventId) } }
+                break
+            }
+            val settled = alone { stored { outbox.settle(sent, clock.now()) }.map { answered(record, sent, it) to (it?.keeps == true) } }
+            val (refreshing, keeps) = settled.getOrElse { return AccountDeletion.Unread }
+            if (keeps) last = sent.result
+            refreshing?.await()
+        }
+        val left = alone { stored { outbox.records() } }.getOrElse { return AccountDeletion.Unread }
+        if (left.any { it.change.isUnlock }) return AccountDeletion.UnlockUnsent
+        return if (left.all { it.refusedForGood }) null else AccountDeletion.NotDeleted(last)
+    }
+
+    /** The next record [sendAll] sends, none of [tried], marked on its way, and whether it was already; none: none left. */
+    private suspend fun nextToSend(tried: Set<String>): Pair<OutboxRecord, Boolean>? {
+        val record = outbox.nextBeforeDeletion(tried) ?: return null
+        val onItsWay = record.eventId in state.sending
+        update { it.copy(sending = it.sending + record.eventId) }
+        return record to onItsWay
+    }
+
+    /**
+     * `DELETE /v1/me` (C3), its token renewed once on a 401, and once more under a fresh event id when the server
+     * says another event holds it: a boot call racing a deletion can make the account it makes look older than
+     * the deletion, whose retry then reads as another's.
+     */
+    private suspend fun sendDeletion(): ApiResponse<DeleteMeResponse> {
+        val answer = deleteMe()
+        if (answer.error?.error?.reason != ApiErrorReason.EventIdConflict) return answer
+        alone { deletionId = null }
+        return deleteMe()
+    }
+
+    /** One `DELETE /v1/me`, under the last one's event id while no answer settled it (rule 4), the engine let go. */
+    private suspend fun deleteMe(): ApiResponse<DeleteMeResponse> {
+        val eventId = alone { deletionId ?: EventId.mint(clock.now()).also { deletionId = it } }
+        return renewing { client.forDeletion.deleteMe(DeleteMeRequest(eventId)) }
+    }
+
+    /** What the deleted account still had queued let go, but every Emergency Unlock ([Outbox.accountDeleted]), and the queue read again. */
+    private suspend fun letGo() {
+        stored { outbox.accountDeleted() }
+        refreshQueue()
+    }
+
+    /** Whether a deletion waits out a request of the loops' now ([waitOut]): the point its tests wait for, which nothing else reads. */
+    internal suspend fun waitingOut(): Boolean = alone { landed != null }
+
+    /**
      * Everything queued goes now, and the truth is read again: the student's retry (rule 5), and the
      * sign-in's once it gives a token (AN6). Its caller cancelled, it stops waiting, and goes on all the
      * same.
@@ -807,6 +999,43 @@ class SyncEngine private constructor(
      * lands after it. Never from inside another: the lock is no reentrant one.
      */
     private suspend fun <T> alone(block: suspend () -> T): T = withContext(NonCancellable) { lock.withLock { block() } }
+
+    /**
+     * A request of the loops' on its way ([underway]): counted in the stretch that decides it, and landed once,
+     * in the stretch that applies its answer or, however else it ends, a cancel of its run between the two
+     * included, in one of its own ([counted]). So a deletion waits out exactly what is on its way, and never
+     * forever. Swift's `counted`.
+     */
+    private inner class Counted {
+        var pending = false
+            private set
+
+        /** On its way: in the stretch that decides it. */
+        fun count() {
+            underway += 1
+            pending = true
+        }
+
+        /** Landed, in a stretch, once: the last on its way wakes a deletion waiting them out. */
+        fun land() {
+            if (!pending) return
+            pending = false
+            underway -= 1
+            if (underway > 0) return
+            landed?.complete(Unit)
+            landed = null
+        }
+    }
+
+    /** Runs a loop's [pass] with a request of its own ([Counted]), landed however the pass ends. */
+    private suspend fun <T> counted(pass: suspend (Counted) -> T): T {
+        val request = Counted()
+        try {
+            return pass(request)
+        } finally {
+            if (request.pending) alone { request.land() }
+        }
+    }
 
     /**
      * Changes the state in one step, so no screen, and not the lock, ever sees half of one; then keeps

@@ -504,7 +504,7 @@ class SignInTokensTest : SignIns() {
             now.set(8000)
             val deleting = async { phone.deletionToken() }
             endpoint.received(3)
-            phone.accountDeleted()
+            phone.accountDeleted("b1")
             endpoint.answer(200, granted(jwt("b2")))
             assertNull(deleting.await())
             assertEquals(jwt("b2"), store.tokens?.access)
@@ -551,7 +551,7 @@ class SignInTokensTest : SignIns() {
             val relaunched = signIn(store, endpoint, now, gated = true)
             assertTrue(relaunched.checked())
             assertEquals(jwt("a2"), relaunched.accessToken())
-            phone.accountDeleted()
+            phone.accountDeleted("a2")
             assertNull(phone.deletionToken())
             assertNull(phone.accessToken())
             // Nobody signed in: nothing to let through.

@@ -14,17 +14,18 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-05 (Central) — AN9a, Delete account's rules (#533; `docs/DECISIONS.md`,
-2026-11-05): Cognito's DeleteUser in `core`'s `SignIn`, in Cognito's JSON protocol at the pool's own
-endpoint over the API client's OkHttp, in the sign-in's scope, and only ever for the sign-in it began
-with, before a renewal and after it, where iOS's sends whatever tokens there are (Q4: for the owner, iOS
-has the gap); the outbox's order before a deletion, every Emergency Unlock first, and every record let go
-once the account is deleted but an unlock, which never is; and where a deletion stands (`Deleting`), its
-stops typed, its words AN10's. AN9 is seven steps now, AN9a–AN9g (the conductor's split, awaiting the
-owner). Before it, AN8's code, the tap over NFC. Next: AN9b, the deletion in the engine; AN7f and AN8's 📱
-check on the owner's phones; Android's Cognito clients, the owner's (Open owner items, 8); Android 17's SDK
-platform for the owner to OK before the first step with today's AndroidX, and OkHttp 5.5 with it (Open
-owner items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
+_Last updated: 2026-11-10 (Central) — AN9b, the deletion in the engine (#553; `docs/DECISIONS.md`,
+2026-11-10): Delete account through the sync engine, its loops held and exactly what they have on its way
+waited out, each of their requests counted from the stretch that decides it until it lands, however it
+ends; the outbox first, every Emergency Unlock first and any unlock still queued holding the deletion back,
+then `DELETE /v1/me`, then Cognito's DeleteUser for the account the deletion began with alone, each with the
+engine let go; one deletion in the engine's scope, a second press sharing it, its caller's cancel never
+stopping it. The owner's rulings since AN9a are on AN9e's and AN10's lines: the portal's new address and
+NFC required, and a teacher's one screen. Before it, AN9a, Delete account's rules. Next: AN9c, the 13+
+check; AN7f and AN8's 📱 check on the owner's phones; Android's Cognito clients, the owner's (Open owner
+items, 8); Android 17's SDK platform for the owner to OK before the first step with today's AndroidX, and
+OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's
+critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -160,14 +161,7 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
   when it's closed, not built: it waits for AN1's part 2 to find whether it works, and for Phase 10, since
   the release build has no activity to open until then
 - **AN9a** Delete account's rules — ✅ (#533; DECISIONS 2026-11-05)
-- **AN9b** The deletion in the engine (twin: SyncEngine.swift's `deleteAccount`, `delete`, `sendAll`,
-  `sendDeletion`, `deleteMe` and `counted`): Delete account, what the phone queued first, then
-  `DELETE /v1/me`, then Cognito's DeleteUser; the loops held, what they have on its way waited out,
-  exactly that and never forever; one deletion in the engine's scope, a second press sharing it; once
-  deleted, the standing out and kept, and the lock follows. Tests: DeleteAccountTests' twelve (AN5's
-  split); new: a run cancelled while its send is out, a deletion then not waiting for it; Delete
-  account's caller cancelled while the deletion goes on; and TeardownTest's third, a deletion held at its
-  `accountDeleted` write as the test ends — validation: the JVM tests
+- **AN9b** The deletion in the engine — ✅ (#553; DECISIONS 2026-11-10)
 - **AN9c** The 13+ check (C7, C7-server; twin: `Age`'s `AgeCheck` and `Birth`, and SyncEngine.swift's
   `ageCheck`, `askAgeAtEachWake` and `record(yes:)`): the server's yes, read under the deletion's
   token, renewed once; the ask and the 13+ yes at each wake, never during a deletion, the yes counted;
@@ -187,8 +181,12 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
   (DECISIONS 2026-11-05, Q1); each sign-in that lands said by `SignIn` (Q2); an answer under 13 held in
   memory for the run (Q5), and the 13+ read asked again at each wake (Q8); the readout's Join with a
   typed code, History's last five moments, and its Signed in line naming the check (Q3), with no 13+
-  button and no Delete account. AN7f's and AN8's rounds on dev come after it and Open owner items, 8
-  (Q7). Tests: AccountTest on the JVM, and BaliAppTest's and ReadoutTest's on the emulators —
+  button and no Delete account. In `android/app` too, the owner's rulings since AN9a: `BALI_PORTAL_URL`
+  (`app/build.gradle.kts`) becomes `https://app.getbali.app` (the owner, 2026-11-07, #540), the old
+  address's redirect covering it till then; and the manifest's NFC feature required (the owner,
+  2026-11-10: "Yes, require NFC"), so Play offers Bali to phones with NFC alone, as the App Store offers
+  it to iPhones (DECISIONS 2026-11-07, 2026-11-10). AN7f's and AN8's rounds on dev come after it and
+  Open owner items, 8 (Q7). Tests: AccountTest on the JVM, and BaliAppTest's and ReadoutTest's on the emulators —
   validation: the JVM tests, then the instrumented tests on `Bali_Spike_API35`, `36` and `37`
 - **AN9f** Me's rules: Your name, Leave and Sign out's hold (twin: `Me`'s `Naming`, `Leaving` and
   `SignOutWords.held`): Me's name typed, printable, tidied and saved under one event id while it stays
@@ -205,7 +203,10 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN10** The router and the screens' rules (twin: `Screen.swift`, `FocusWords`, `UnlockedWords`,
   `ProtectionOffWords` and `ShieldWords`): which screen shows when, and what Focus, Unlocked,
   Protection off and the block screen say (rule 3: no countdown over nothing locked), their rules
-  and tests ported; from SyncEngine.swift, Home's Tap in (`tapIn`) and every word the engine says,
+  and tests ported; a teacher's account seeing one screen and nothing else once a read of `GET /v1/me`
+  names it a teacher's (`MeResponse.user.role`; the owner, 2026-11-07, #541; DECISIONS 2026-11-07),
+  the screen Phase 10's from the approved iPhone board (Open owner items, 5), and AN12 registering no
+  device token for it; from SyncEngine.swift, Home's Tap in (`tapIn`) and every word the engine says,
   with TapInTests, BellRedrawTests and UnlockedTests (AN5's split); the words from AS0's approved
   boards, so AN10 follows AS0
 - **AN11** The API's push (cloud; twin: `apps/api/src/push/apns.ts`): an FCM sender beside APNs,

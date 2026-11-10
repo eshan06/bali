@@ -366,8 +366,8 @@ abstract class EngineFiles : OutboxFiles() {
 
     /**
      * Ends everything that reads or writes the test's outboxes before [deleteFiles] closes them
-     * ([TeardownTest]): the relaunches, the engines' loops, and every call an engine still runs, its
-     * caller gone.
+     * ([TeardownTest]): the relaunches, the engines' loops, and every call an engine or a sign-in still
+     * runs, its caller gone, an account deletion and its DeleteUser among them.
      */
     @AfterTest
     fun stopEngines(): Unit =
@@ -569,6 +569,30 @@ class TeardownTest : EngineFiles() {
             held.release()
             withTimeout(patience) { teardown.join() }
             assertTrue(waited, "the teardown went on while an engine call wrote the file it closes")
+        }
+
+    @Test
+    fun itWaitsForADeletionItsCallerLeftHeldAtItsAccountDeletedWriteWhichRunsInTheEnginesScopeAsTheTestEnds(): Unit =
+        runBlocking {
+            // A deletion and its DeleteUser run past their callers, in the engine's and the sign-in's scopes, the
+            // test's own (AN9b): the teardown cancels and joins them before the files close.
+            val held = HeldWrite()
+            val rig = signedRig(open(temporaryFile(), driver = Watching(began = held.hold)))
+            rig.signedIn()
+            // The loops ended first, so nothing but the deletion holds the engine as the teardown starts.
+            withTimeout(patience) { rig.running.cancelAndJoin() }
+            val caller = launch { rig.engine.deleteAccount(rig.signIn) }
+            val delete = rig.server.next(deleteMeRoute)
+            held.arm()
+            delete.reply(200, deletedAnswer)
+            held.began() // the record the account still had, let go: its write, held
+            caller.cancel()
+            val teardown = launch(Dispatchers.IO) { stopEngines() }
+            delay(200)
+            val waited = teardown.isActive
+            held.release()
+            withTimeout(patience) { teardown.join() }
+            assertTrue(waited, "the teardown went on while a deletion wrote the file it closes")
         }
 }
 

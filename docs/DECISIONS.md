@@ -8,6 +8,107 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-10** — **AN9b, the deletion in the engine: Delete account through the sync engine, its loops held
+  and exactly what they have on its way waited out, on the JVM over the real sign-in (the conductor's calls,
+  awaiting the owner's look; AN9b, #553).** The owner isn't reviewing each step and asked for the recommended
+  option on every question, so each call here is the conductor's, for the owner to look at.
+
+  **Where it lives:** `outbox`'s `SyncEngine.kt`: `deleteAccount` and its `delete`, `waitOut`, `sendAll`,
+  `sendDeletion`, `deleteMe` and `letGo`; `deleting`, which holds the drain (`due`) and the read loop
+  (`reading`); each loop's request counted (`Counted`, `counted`, `underway`, `landed`); `deletionId`; and the
+  shared `deletion`. `core`'s `SignIn.accountDeleted` and `deleteUser` now name the account they are for.
+  Nothing calls `deleteAccount` yet: AN9e wires it, and AS7's Delete account and AS2's answer under 13 press it.
+  Where Kotlin differs, said plainly:
+  - **A loop's request is counted in the stretch that decides it** (`due`, `reading`, which read `deleting`
+    there), and lands once: in the stretch that applies its answer, or, however else its pass ends, a cancel
+    of its run between the two stretches included, in one of its own (`counted`'s `finally`). Swift's
+    `counted` counts as its send starts, in the actor stretch that decided it; here a cancel can land as the
+    deciding stretch returns, its count made, so the landing hangs on the pass, not the send. A deletion so
+    waits out exactly what is on its way, and never forever.
+  - **The deletion is a `Deferred` in the engine's scope,** which a second press shares while it runs, as
+    `reauth` is shared; one that has ended is shared no more. Its caller cancelled stops waiting and the
+    deletion goes on, where Swift's caller can't stop waiting on its task. Each of its sends, and each of its
+    calls into the sign-in, is made with the engine let go: a renewal tells the engine through `retryNow`,
+    which waits for the engine, so a send made under the engine's lock would wait for good.
+  - **`deleting` ends once the sign-in holds the deletion** (`accountDeleted`), before DeleteUser, as Swift's
+    `defer` in its block; a pass the deletion holds keeps the read it took, and the screen's check-in, for the
+    pass its end rings, as a cancelled run leaves them to the next.
+  - **`sendAll` waits for a 401's refresh** after the stretch that applies its answer, as the drain's `send`
+    does.
+  - **One seam for the tests, `waitingOut`:** whether a deletion waits on a request of the loops' now. Nothing
+    else marks that point, and a check that nothing goes meanwhile needs one, never a window of real time
+    (iOS's tests sleep 200 ms there). Only the tests read it, as only the instrumented test reads
+    `Outbox.synchronous`.
+
+  **AN9a's notes for AN9b, each taken:**
+  - **Any unlock queued holds the deletion back** (`UnlockUnsent`): one tried and stuck, which
+    `nextBeforeDeletion` passes over, and one not filed yet included, as iOS's `sendAll` refuses.
+  - **DeleteUser only for the account `DELETE /v1/me` removed:** the deletion reads `SignIn.account` as it
+    starts, and `accountDeleted(account)` and `deleteUser(account)` act only while the sign-in held is that
+    account's, read in the sign-in's own stretch, as `passed(account)` reads it. Another account's sign-in
+    landed meanwhile is neither marked deleted nor deleted from Cognito, its tokens kept. **The conductor's
+    call: the deletion then answers `Deleted`.** That account's sign-in has left the phone, so no try of the
+    phone's could delete it, and the server's deleter has it, queued in the deletion's transaction
+    (C3-cognito); `SignInNotDeleted` would put Try again over the other account's sign-in, a press of which
+    would start a deletion of that account. Q4's case, another sign-in landing during DeleteUser's own renewal
+    or try, stays as AN9a set it: no answer, its tokens kept, a rotated refresh token reading the same.
+    Unreachable in the pilot: two accounts on one phone are ruled out, and C4b's screen covers any sign-in.
+  - **NotAuthorized, then `invalid_grant`, reads as deleted, with no stop of its own (the conductor's
+    call):** iOS's C4a limit, kept. Cognito has refused that sign-in's refresh token for good, so the phone
+    holds nothing that could delete the user, and a stop would offer a Try again that can't help; the
+    server's deleter, queued in the deletion's transaction, deletes the user and its email. **For the
+    owner:** until runbook 9 sets each environment's key, the server only queues (PLAN's Cognito sign-in
+    deleter), so such a user stays in Cognito till then. Tested through the engine.
+  - **A shared renewal may be telling during DeleteUser's retry:** left as it is, harmless: it fires only the
+    engine's `tokenArrived` hook (`retryNow`), whose rings the deletion's hold answers.
+  - **The rig's teardown waits out a deletion:** the deletion runs in the engine's scope and its DeleteUser
+    in the sign-in's, both the test's own, which the teardown cancels and joins before the files close,
+    every stretch whole. TeardownTest's third case holds a deletion at its `accountDeleted` write as the test
+    ends, the loops ended first, so nothing else holds the teardown.
+
+  **The owner's rulings since AN9a, on Android's lines in `docs/PLAN-ANDROID.md`:** a teacher's account sees
+  one screen (2026-11-07, #541), AN10's rule with the router, the screen Phase 10's from the approved iPhone
+  board (Open owner items, 5); the portal's address (2026-11-07, #540): `BALI_PORTAL_URL`
+  (`android/app/build.gradle.kts`) changes in AN9e, the next step that touches `android/app`, the old
+  address's redirect covering it till then; and NFC required (the next entry), AN9e's too.
+
+  **The tests:** DeleteAccountTests' twelve, `sessionEnded` over the enforcer and its fake lock and `unread`
+  over a statement the watched driver refuses, their 200 ms waits replaced by `waitingOut` or a point the state
+  marks. New: any unlock still queued, one tried and stuck and one not filed; a run cancelled while its read
+  and its record are out, then a deletion that waits for neither; the caller cancelled, the deletion going on
+  and a press meanwhile sharing it; another account's sign-in landing while `DELETE /v1/me` is out;
+  NotAuthorized then `invalid_grant`; a token renewed for the deletion, the renewal telling the engine; and
+  TeardownTest's third; in `core`, the mark and DeleteUser for the account named alone. `refusedTap` now ends
+  checking that nothing is left on its way. Tried, each failing by name, then reverted: the drain's send left
+  uncounted (the drain's test); the read left uncounted (the read's and the check-in's); a request cut short
+  never landed (the cancelled run's); `DELETE /v1/me` sent with the engine held (3: the renewed token's, the
+  two waiting on each other for good, another account's sign-in and the drain's); DeleteUser called with the
+  engine held (`deleted`, a screen's call waiting on it); no refusal while an unlock waits (2); DeleteUser, and
+  the deletion's mark, for whoever is signed in (another account's test each, and `core`'s); NotAuthorized
+  then `invalid_grant` as a stop of its own (its test); the deletion outside the engine's scope (TeardownTest's
+  third), and in its caller's coroutine, unshared (3: `pressedTwice`, the cancelled caller's and TeardownTest's
+  third); the drain not held (the drain's), and the read loop not held (2: `refusedTap` and the renewed
+  token's); `deleting` ended after DeleteUser (`deleted`); a held pass dropping the read it took (2); the
+  standing left as it was (`sessionEnded`); and nothing let go once DeleteUser answers (`deleted`). Found
+  while trying them: with the loops still running, TeardownTest's third passed a deletion outside the engine's
+  scope, since the loops' own stretches, waiting on the engine held at the write, held the teardown back; it
+  ends the loops first now. Not shown by a test: a request counted in a stretch of its own after the one that
+  decides it, a window no test holds open without a real-time wait; and `sendAll` not waiting for a 401's
+  refresh, which the sign-in covers, the next send's token waiting on the same renewal.
+
+  **Santa's review:** SANTA
+
+  **The proof:** `android/app` is unchanged, so the JVM tests are the proof and no emulator ran: `./gradlew
+  assemble :app:lint check` green, Android 10's API check with it, and the outbox's suite run RUNS times
+  over. Nothing was added to the PC's SDK: its folders were compared before and after.
+
+- **2026-11-10** — **Android requires NFC, as the iPhone does (the owner: "Yes, require NFC").** The
+  owner's answer to AN8's call (the conductor's, awaiting the owner; 2026-11-05): the manifest's NFC feature
+  becomes `required="true"`, so Play offers Bali to phones with NFC alone, as the App Store offers it to
+  iPhones since the ruling of 2026-11-07 (#540). It replaces AN8's `required="false"`, and answers that
+  entry's note for the owner. The manifest changes in AN9e, the next step that touches `android/app`, with its
+  own emulator runs; until then it is as AN8 left it.
+
 - **2026-11-10** — **Bali 1.0 is resubmitted on build 14 after an automated Family Controls refusal,
   with designed screenshots and a header (the owner).** App Review's scan refused build 13 as "not
   submitted with the Family Controls entitlement" although every App ID held the entitlement since

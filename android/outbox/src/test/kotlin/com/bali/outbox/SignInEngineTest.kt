@@ -65,7 +65,8 @@ class SignedRig(
     val server: Server,
     val clock: TestClock,
     val keychain: MemoryKeychain,
-    scope: CoroutineScope,
+    /** The test's, the app's in its place: the engine's and the sign-in's, which their calls run in. */
+    val scope: CoroutineScope,
 ) {
     /** The engine's run, started at once: its first stretch holds the engine before any call the test makes. */
     val running: Job = scope.launch(start = CoroutineStart.UNDISPATCHED) { engine.run() }
@@ -90,19 +91,21 @@ class SignedRig(
     }
 }
 
+/**
+ * The engine the app makes over its sign-in (`SyncEngine.make`), over [outbox], a fresh one by default, one server
+ * answering Cognito and the API. BaliOutbox's tests' `SignedRig()`.
+ */
+suspend fun EngineFiles.signedRig(outbox: Outbox = makeOutbox().first): SignedRig {
+    val (server, clock, keychain) = Triple(Server(), TestClock(), MemoryKeychain())
+    val cognito = Cognito(URI("https://bali-dev.auth.us-east-1.amazoncognito.com"), "phone-client", URI("bali://auth/callback"))
+    // Ungated, as iOS's rig is unless a test asks: the 13+ check is the sign-in's own tests' (C7).
+    val signIn = SignIn(cognito, keychain, scope, server, clock::now, gated = false)
+    val engine = SyncEngine.make(outbox, URI("https://api.bali.test"), signIn, scope, server, clock)
+    return SignedRig(engine, signIn, outbox, server, clock, keychain, scope)
+}
+
 /** B4's contract with the engine, over the real sign-in. BaliOutbox's SignInEngineTests. */
 class SignInEngineTest : EngineFiles() {
-    /** The engine the app makes over its sign-in (`SyncEngine.make`), over a fresh outbox, one server answering Cognito and the API. */
-    private suspend fun signedRig(): SignedRig {
-        val (server, clock, keychain) = Triple(Server(), TestClock(), MemoryKeychain())
-        val outbox = makeOutbox().first
-        val cognito = Cognito(URI("https://bali-dev.auth.us-east-1.amazoncognito.com"), "phone-client", URI("bali://auth/callback"))
-        // Ungated, as iOS's rig is unless a test asks: the 13+ check is the sign-in's own tests' (C7).
-        val signIn = SignIn(cognito, keychain, scope, server, clock::now, gated = false)
-        val engine = SyncEngine.make(outbox, URI("https://api.bali.test"), signIn, scope, server, clock)
-        return SignedRig(engine, signIn, outbox, server, clock, keychain, scope)
-    }
-
     @Test
     fun signedOutARecordWaitsOnSignInNeverDroppedTheSignInSendsItAtOnce(): Unit =
         runBlocking {
