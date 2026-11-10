@@ -11,6 +11,10 @@ collects or what a teacher sees, this file changes in the same PR.
 for Review" in App Store Connect. The conductor filled it in from sections 1–4, and the owner
 checked it and submitted. ✅ with that date marks what App Store Connect holds.
 
+**Resubmitted 2026-11-10:** build 14 (TestFlight run 14), after an automated scan refused build 13
+for the Family Controls entitlement (ISSUES #3), with new screenshots and a header (section 1).
+"Waiting for Review".
+
 **The framing rule (ISSUES #3).** Apple's developer agreement §3.3.3(P) allows Family
 Controls for "individuals the ability to manage their devices to enable focus and
 productivity", and says the framework "may not be used … in organizational settings". So
@@ -87,16 +91,34 @@ the Kids category brings its own rules (guideline 1.3) for under-13 apps.
   have the right to share (section 3), and give Bali permission to show it to their class
   (section 8).
 
-### Screenshots ✅ 2026-11-09
+### Screenshots ✅ 2026-11-10
 
-Six, in this order: Focus; a slide with a question; the answer shown; Unlocked, with its reason;
-What your teacher sees (the join preview); History.
+Six designed screenshots replaced the six screen captures of 2026-11-09 (the owner, who wanted
+them like other apps': a headline over a drawing of the app, not a raw capture, on the light
+background). In this order, headline first:
+1. "Focus for every class." Tap in, and your apps go quiet until the bell. (the focus timer)
+2. "One tap to start." Hold the top of your iPhone to your teacher's Bali block.
+3. "Answer without unlocking." Your teacher's questions show up on your focus screen. They see the
+   class's totals, never your answer.
+4. "Back at the bell." Your apps come back on their own, even with Bali closed. (the shield's own
+   words, then the bell)
+5. "Your phone, any time you need it." Hold Emergency Unlock and it opens right away.
+6. "Calls and Messages stay on." Bali never sees your screen, your apps or your messages. (calls,
+   FaceTime, Messages and Emergency SOS, as `PhoneScreenTime.swift` says, and the join preview's
+   "never sees" lines)
+- **Where they live:** the canvas "Bali App Store screenshots"
+  (https://claude.ai/artifact/AWVWZQdBpW53mQzWi9sj5J), built on the Bali Design System, each
+  artboard rendered to a 1206×2622 PNG. Every drawn UI is an approved screen's, with its words.
 - **The slot:** App Store Connect's required one is now "iPhone with Dynamic Island (medium
-  display)", 6.1" or 6.3", which takes only 1179×2556 or 1206×2622. It refused 6.9" captures
-  (1320×2868) as invalid dimensions, so these were scaled to 1206×2622.
-- **How they were made:** the Debug app's `-bali-screen` fixtures (`ios/README.md`) on the iPhone
-  17 Pro Max Simulator, the status bar overridden to 9:41. The iPhone 17 Pro Simulator's screen is
-  1206×2622 already, so a refresh made there needs no scaling.
+  display)", 6.1" or 6.3", which takes only 1179×2556 or 1206×2622 (it refused 6.9" captures,
+  1320×2868, on 2026-11-09).
+
+### Header ✅ 2026-11-10
+
+App Store Connect's new product page header (3840×1646 or 5244×2950): the focus timer, 26:57,
+beside "Quiet until the bell." An iPhone shows only the middle of it, under the back and share
+buttons, so everything sits in the centre 2,200 px, checked in App Store Connect's Device Preview.
+No search results asset (the owner): search shows the screenshots.
 
 ### Checks before submitting ✅ 2026-11-09
 

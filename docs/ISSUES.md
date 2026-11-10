@@ -161,7 +161,20 @@ before it sees the build. So App Review of the first App Store submission is the
 external beta for now (the owner, 2026-11-04), and the fallbacks above stay ready if it refuses.
 
 **Submitted** 2026-11-09 (the owner): Bali 1.0, build 13, "Waiting for Review" (`docs/APP-STORE.md`).
-Record App Review's verdict here, with its date, when it comes.
+
+**Refused by an automated scan** 2026-11-10 (guideline 2.5.1), before any reviewer read it: "the app
+uses one or more Screen Time APIs but the app has not been submitted with the Family Controls
+entitlement". Not a §3.3.3(P) verdict. Each App ID (`com.bali.Bali`, `.BaliMonitor`, `.BaliShield`)
+had held Family Controls (Distribution), "Assigned" and enabled, since 2026-09-20. The owner then
+filed the account-level form (developer.apple.com/contact/request/family-controls-distribution,
+request YUN9YN3547), and Apple's email the same minute said the entitlement "has been assigned to
+your account": most likely the piece the scan reads. TestFlight run 42904088436 (build 15) read the
+App-Store-signed copy, and all three bundles carry `com.apple.developer.family-controls = true`;
+`testflight.yml` now checks that on every build.
+
+**Resubmitted** 2026-11-10 (the owner): build 14, signed after the account-level grant, the same app
+as 13, with a reply to App Review naming the entitlement on all three bundle IDs. "Waiting for
+Review". Record App Review's verdict here, with its date, when it comes.
 
 **Done when:** Apple's answer is on record, and the design matches it.
 
