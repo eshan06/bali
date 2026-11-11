@@ -1,5 +1,6 @@
 package com.bali.outbox
 
+import com.bali.core.AgeCheckResponse
 import com.bali.core.ApiClient
 import com.bali.core.ApiErrorReason
 import com.bali.core.ApiResponse
@@ -16,6 +17,7 @@ import com.bali.core.NoAnswer
 import com.bali.core.OkHttpTransport
 import com.bali.core.ParticipationState
 import com.bali.core.ReconcileStamp
+import com.bali.core.RecordAgeCheckRequest
 import com.bali.core.SendResult
 import com.bali.core.SessionView
 import com.bali.core.SignIn
@@ -55,8 +57,8 @@ import kotlinx.coroutines.withContext
 
 // The sync engine, BaliOutbox's SyncEngine.swift: its frame, AN5a's, its drain, AN5b's, its read loop,
 // AN5c's, its wait for the Start, AN5d's, Emergency Unlock, AN5e's: where it is filed, its reason and the
-// late unlock, the phone check's cap, AN7a's, and Delete account, AN9b's. Swift's actor is a lock each
-// stretch holds (docs/PLAN-ANDROID.md).
+// late unlock, the phone check's cap, AN7a's, Delete account, AN9b's, and the 13+ check's read, ask and yes,
+// AN9c's. Swift's actor is a lock each stretch holds (docs/PLAN-ANDROID.md).
 
 /** The engine's clock: the time records are stamped with, the zone its days end in, and waiting on it: a test's own there. */
 interface SyncClock {
@@ -114,6 +116,8 @@ class SyncEngine private constructor(
     private val clock: SyncClock,
     /** The sign-in's (AN6), for a refused token: [open] says what it owes. */
     private val refresh: suspend () -> Boolean,
+    /** The sign-in whose account's 13+ yes the read loop records on Bali's server (C7-server): [make]'s; none in an engine opened without one. */
+    private val signIn: SignIn?,
 ) {
     /** The app's scope, under a job of the engine's own, so no call's failure ends the others. */
     private val scope = CoroutineScope(scope.coroutineContext + SupervisorJob(scope.coroutineContext[Job]))
@@ -165,6 +169,9 @@ class SyncEngine private constructor(
 
     /** Rule 3's check of the lock, the enforcer's: [atEachWake]. */
     private var check: (suspend () -> Unit)? = null
+
+    /** The app's own ask of Bali for its sign-in's 13+ yes, again, at each wake (C7-server): [askAgeAtEachWake]. */
+    private var ageAgain: (suspend () -> Unit)? = null
     private var running = false
     private val drainRings = Rings(clock)
     private val readRings = Rings(clock)
@@ -421,7 +428,8 @@ class SyncEngine private constructor(
      * truth (`GET /v1/me`) when one was asked for, tried again at each wake until one answers, and at each
      * wake while the screen is on and the phone waits for the Start, or else the check-in of the session
      * the phone is in, every 30 seconds while the screen is on and once as it goes on or off; then waits
-     * for the next wake. Each read's answer applies only as the reconcile says.
+     * for the next wake. Each read's answer applies only as the reconcile says. At each wake too, the app's
+     * ask of the 13+ check ([askAgeAtEachWake]), and the 13+ yes its sign-in keeps ([record]).
      */
     private suspend fun read(): Nothing {
         while (true) {
@@ -435,6 +443,10 @@ class SyncEngine private constructor(
                         check?.invoke()
                         true
                     }
+                    // The app's ask of Bali for its sign-in's 13+ yes, again (C7-server; #300's review), with the
+                    // engine let go: a yes lets the sign-in through, and the ring it makes sends what that held at
+                    // once. Never during an account deletion, as nothing of the loops' goes then.
+                    alone { ageAgain.takeUnless { deleting } }?.let { ask -> hooked(Unit) { ask() } }
                     // Its read counted on its way, from the stretch that decides it to the one that lands it.
                     counted { request ->
                         val read = alone { reading(wake, checked, request) }
@@ -465,8 +477,32 @@ class SyncEngine private constructor(
                     throw cancelled
                 }
             refreshing?.await()
+            // The account's 13+ yes, kept with its sign-in until Bali's server has it (C7-server).
+            signIn?.yes()?.let { record(yes = it) }
             readRings.pause(alone { nextRead() })
         }
+    }
+
+    /**
+     * The account's 13+ yes, sent (`PUT /v1/me/age-check`) under its event id [yes], its token renewed once on a 401,
+     * and counted in the stretch that reads [deleting]: never during an account deletion, since landing after its
+     * `DELETE /v1/me` it would make a fresh account, and a deletion waits out one on its way ([Counted]). Sent, and
+     * settled with the sign-in, with the engine let go. Recorded, or refused for good (a 4xx but 401, 408 and 429,
+     * which only a deletion meanwhile or a spent id can earn), the sign-in lets it go: at worst the account is asked
+     * once more, at a sign-in where Bali's server has no yes for it. Else kept for the next wake.
+     */
+    private suspend fun record(yes: String) {
+        val answer =
+            counted { request ->
+                val held =
+                    alone {
+                        if (!deleting) request.count()
+                        deleting
+                    }
+                if (held) null else renewing { client.recordAgeCheck(RecordAgeCheckRequest(yes)) }.also { alone { request.land() } }
+            } ?: return
+        val code = (answer.result as? SendResult.Status)?.code ?: return
+        if (code in 200..499 && code != 401 && code != 408 && code != 429) signIn?.recorded(yes)
     }
 
     /** What a wake does, taken at its top: reads the truth, checks in, and whether that is the screen's own check-in. */
@@ -797,6 +833,16 @@ class SyncEngine private constructor(
         }
 
     /**
+     * Whether Bali's server holds the 13+ yes of the account signed in (`GET /v1/me/age-check`, C7-server): the one
+     * call a sign-in makes before its age is settled, which makes no account, so under the token the sign-in gives
+     * whatever the check ([ApiClient.forDeletion]), renewed once on a 401. The app's own call, right after a sign-in not
+     * yet through the check and at the wakes [askAgeAtEachWake] asks it at, with the engine let go, since a renewal it
+     * starts tells the engine. Uncounted, as on iOS: landing after a deletion's `DELETE /v1/me`, a read that makes no
+     * account reads `false`.
+     */
+    suspend fun ageCheck(): ApiResponse<AgeCheckResponse> = renewing { client.forDeletion.ageCheck() }
+
+    /**
      * Me's Delete account (C4): the one call the screen makes, answered with where the deletion stands, a press
      * while one is under way sharing its answer. Each step only once the last is done:
      * - [signIn] can delete itself, its token carrying the scope Cognito's DeleteUser needs, or a fresh sign-in
@@ -981,6 +1027,16 @@ class SyncEngine private constructor(
      * wake sends no check-in.
      */
     suspend fun atEachWake(check: suspend () -> Unit) = call { this.check = check }
+
+    /**
+     * Runs [ask] at each wake of the read loop, the screen on or off (its first, a sign-in's token, a Try again, Bali's
+     * screen to the front, each check-in's 30 s), after rule 3's check and before the read, never while an account
+     * deletion runs (C4): the app's own ask of Bali for its sign-in's 13+ yes, again, while the last couldn't reach
+     * Bali and the question can't show (C7-server; #300's review). One at a time, each wake's, so it never runs in a
+     * loop of its own, and with the engine let go, so it may call the engine. One that throws or ends in a cancel of
+     * its own asked nothing, and the loop goes on. Its caller cancelled, it goes on all the same.
+     */
+    suspend fun askAgeAtEachWake(ask: suspend () -> Unit) = call { ageAgain = ask }
 
     /**
      * A shorter cap than decision 7's on a tap not yet answered, none: decision 7's, for the phone check
@@ -1237,23 +1293,24 @@ class SyncEngine private constructor(
          * refused, true once a fresh one is ready, asked once per rejection ([heard]). It must return at
          * once, since the loops wait on it: false when only the student can give a token, whose sign-in
          * then calls [retryNow]. It never throws, as Swift's type promises; one that does gives no token.
+         * [signIn] keeps the 13+ yes the read loop records (C7-server): [make]'s.
          */
         suspend fun open(
             outbox: Outbox, client: ApiClient, scope: CoroutineScope, clock: SyncClock = SystemClock,
-            refresh: suspend () -> Boolean = { false },
-        ): SyncEngine = SyncEngine(outbox, client, scope, clock, refresh).apply { lock.withLock { load() } }
+            signIn: SignIn? = null, refresh: suspend () -> Boolean = { false },
+        ): SyncEngine = SyncEngine(outbox, client, scope, clock, refresh, signIn).apply { lock.withLock { load() } }
 
         /**
          * The app's one engine, over the student's sign-in (B4), its client on the API at [api]: the
-         * client's tokens are [signIn]'s, and so is a 401's refresh; every token the sign-in gets
-         * otherwise, a sign-in or a renewal of its own, sends everything again at once ([retryNow]).
-         * BaliOutbox's `SyncEngine.make`, but the 13+ yes the read loop records, AN9's.
+         * client's tokens are [signIn]'s, and so are a 401's refresh and the 13+ yes the read loop
+         * records; every token the sign-in gets otherwise, a sign-in or a renewal of its own, sends
+         * everything again at once ([retryNow]). BaliOutbox's `SyncEngine.make`.
          */
         suspend fun make(
             outbox: Outbox, api: URI, signIn: SignIn, scope: CoroutineScope,
             transport: HttpTransport = OkHttpTransport(), clock: SyncClock = SystemClock,
         ): SyncEngine {
-            val engine = open(outbox, ApiClient(api, signIn, transport), scope, clock) { signIn.refresh() }
+            val engine = open(outbox, ApiClient(api, signIn, transport), scope, clock, signIn) { signIn.refresh() }
             signIn.whenTokenArrives { engine.retryNow() }
             return engine
         }

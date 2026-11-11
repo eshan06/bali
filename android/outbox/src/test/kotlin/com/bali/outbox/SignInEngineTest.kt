@@ -1,6 +1,7 @@
 package com.bali.outbox
 
 import com.bali.core.Cognito
+import com.bali.core.HostedPage
 import com.bali.core.SignIn
 import com.bali.core.TokenStore
 import java.net.URI
@@ -71,10 +72,10 @@ class SignedRig(
     /** The engine's run, started at once: its first stretch holds the engine before any call the test makes. */
     val running: Job = scope.launch(start = CoroutineStart.UNDISPATCHED) { engine.run() }
 
-    /** The student signs in, Cognito answering with [access] and [refresh]. */
-    suspend fun signStudentIn(access: String, refresh: String = "refresh-1") =
+    /** The student signs in, Cognito answering with [access] and [refresh]; through Sign up's page with [yes], its 13+ answer's (C7-server). */
+    suspend fun signStudentIn(access: String, refresh: String = "refresh-1", yes: String? = null) =
         coroutineScope {
-            val signingIn = async { signIn.signIn(browser = hostedUi) }
+            val signingIn = async { signIn.signIn(if (yes == null) HostedPage.SignIn else HostedPage.SignUp, yes, hostedUi) }
             server.next(tokenRoute).reply(200, grant(access, refresh))
             signingIn.await()
         }
@@ -93,14 +94,17 @@ class SignedRig(
 
 /**
  * The engine the app makes over its sign-in (`SyncEngine.make`), over [outbox], a fresh one by default, one server
- * answering Cognito and the API. BaliOutbox's tests' `SignedRig()`.
+ * answering Cognito and the API. [gated], the sign-in's: whether Bali's API waits on the 13+ check, as the app's does
+ * (C7); [age], the app's ask of that check again, run at each wake of the read loop from its first. BaliOutbox's
+ * tests' `SignedRig(gated:age:)`.
  */
-suspend fun EngineFiles.signedRig(outbox: Outbox = makeOutbox().first): SignedRig {
+suspend fun EngineFiles.signedRig(outbox: Outbox = makeOutbox().first, gated: Boolean = false, age: (suspend () -> Unit)? = null): SignedRig {
     val (server, clock, keychain) = Triple(Server(), TestClock(), MemoryKeychain())
     val cognito = Cognito(URI("https://bali-dev.auth.us-east-1.amazoncognito.com"), "phone-client", URI("bali://auth/callback"))
-    // Ungated, as iOS's rig is unless a test asks: the 13+ check is the sign-in's own tests' (C7).
-    val signIn = SignIn(cognito, keychain, scope, server, clock::now, gated = false)
+    // Ungated unless a test asks, as iOS's rig is: the 13+ check is the sign-in's own tests' and AgeFallbackTest's.
+    val signIn = SignIn(cognito, keychain, scope, server, clock::now, gated)
     val engine = SyncEngine.make(outbox, URI("https://api.bali.test"), signIn, scope, server, clock)
+    age?.let { engine.askAgeAtEachWake(it) }
     return SignedRig(engine, signIn, outbox, server, clock, keychain, scope)
 }
 
