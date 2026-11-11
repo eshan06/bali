@@ -29,7 +29,7 @@ android {
         resValue("string", "BALI_COGNITO_DOMAIN", "https://bali-dev.auth.us-east-1.amazoncognito.com")
         resValue("string", "BALI_COGNITO_CLIENT_ID", "")
         resValue("string", "BALI_COGNITO_REDIRECT_URI", "com.bali.bali:/auth/callback")
-        resValue("string", "BALI_PORTAL_URL", "https://bali-portal.vercel.app")
+        resValue("string", "BALI_PORTAL_URL", "https://app.getbali.app")
     }
 
     // The values above, which AGP makes only when asked.
