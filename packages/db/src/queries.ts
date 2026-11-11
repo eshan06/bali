@@ -115,9 +115,11 @@ export async function findOrCreateStudent(
   displayName?: string,
 ): Promise<UserRow | undefined> {
   const cognitoId = signedIn.sub;
+  // BROKEN ON PURPOSE (C3d's race rule), reverted in the next commit: the mark read first.
+  const marked = await signInDeleted(db, signedIn);
   const existing = await findUserByCognitoId(db, cognitoId);
   if (existing) return fillMissingDisplayName(db, existing, displayName);
-  if (await signInDeleted(db, signedIn)) return undefined;
+  if (marked) return undefined;
 
   await db
     .insert(users)
