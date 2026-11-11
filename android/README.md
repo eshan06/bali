@@ -101,7 +101,10 @@ actor is a lock each stretch holds, as the engine's, a stretch that can't suspen
 `Dispatchers.IO`, since the store's calls block as the Keychain's do. One renewal at a time, in the
 app's scope, which every caller waits for: one cancelled stops waiting, and it goes on for the
 others. Only Cognito refusing the refresh token signs anyone out, and no token reaches Bali's API
-before the 13+ check but the check's own read and a deletion's. The token endpoint is reached over
+before the 13+ check but the check's own read and a deletion's. Those, and the check's yes, go under the
+token of the account they are for alone, by its `sub`, checked before a renewal and after it, none of
+another account's ever given or renewed for them (`ApiClient.forDeletion(account)`, `forAccount(account)`;
+AN9h). The token endpoint is reached over
 the API client's OkHttp. No token, code, verifier or state reaches a log line or an error's message.
 `SyncEngine.make` is the app's engine over it. Cognito's DeleteUser (`deleteUser`, AN9a) goes in Cognito's
 JSON protocol to the pool's own endpoint, over the same OkHttp, the token in its body alone, and only ever
@@ -242,9 +245,12 @@ exactly what they have on its way, each of their requests counted from the stret
 it lands, however it ends; then it sends the outbox, every Emergency Unlock first, any unlock still queued
 holding it back, then `DELETE /v1/me`, then Cognito's DeleteUser for the account it began with, each send
 and each call into the sign-in with the engine let go; one deletion at a time, in the engine's scope, a
-second press sharing it; deleted, the phone stands out of any session, kept so. Its 13+ check (AN9c) reads
-the server's yes under the deletion's token (`ageCheck`), and runs the app's ask (`askAgeAtEachWake`) and
-sends the yes its sign-in keeps (`PUT /v1/me/age-check`) at each wake, neither during a deletion, the yes
+second press sharing it; deleted, the phone stands out of any session, kept so. Each send, each renewal
+too, goes under the token of the account it began with alone, and a sign-in changed before `DELETE /v1/me`
+is answered deleted stops it (`SignInChanged`, AN9h), every record kept. Its 13+ check (AN9c) reads the
+server's yes of the account the app names, under that account's deletion token (`ageCheck`), and runs the
+app's ask (`askAgeAtEachWake`) and sends the yes its sign-in keeps (`PUT /v1/me/age-check`), under its own
+account's token, at each wake, neither during a deletion, the yes
 counted as the loops' requests are; each with the engine let go, so none holds an Emergency Unlock back.
 Its tests run on a rig of their own (`EngineSupport.kt`, BaliOutbox's `EngineSupport.swift`): a clock the test moves,
 in a zone of the test's own, since coroutines-test's virtual time can't drive Room's queries, a

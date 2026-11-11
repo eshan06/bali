@@ -10,6 +10,19 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN9h's on 2026-11-10: _Last updated: 2026-11-11 (Central) — AN9c, the
+13+ check (#554; `docs/DECISIONS.md`, 2026-11-11): the
+server's yes read under the deletion's token, renewed once; the app's ask and the yes its sign-in keeps,
+each at every wake of the read loop and never during a deletion, the yes counted so a deletion waits out
+exactly the one on its way; each with the engine let go, so none holds an Emergency Unlock back; and the
+question's rules, counted by java.time's ISO calendar whatever calendar the phone's locale asks for. The
+owner ruled to close AN9b's wrong-account gap (2026-11-10: "Close it now"): AN9h. Before it, AN9b, the
+deletion in the engine. Next: AN9h, one account's token for Delete account and the 13+ check, then AN9d;
+AN7f and AN8's 📱 check on the owner's phones; Android's Cognito clients, the owner's (Open owner items, 8);
+Android 17's SDK platform for the owner to OK before the first step with today's AndroidX, and OkHttp 5.5
+with it (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical
+path._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN9c's on 2026-11-11: _Last updated: 2026-11-10 (Central) — AN9b,
 the deletion in the engine (#553; `docs/DECISIONS.md`,
 2026-11-10): Delete account through the sync engine, its loops held and exactly what they have on its way
@@ -2603,6 +2616,13 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN9h's line, as it read when it was done (2026-11-10; `docs/DECISIONS.md`, 2026-11-10).
+
+- **AN9h** One account's token for Delete account and the 13+ check (the owner, 2026-11-10: "Close it
+  now"; DECISIONS 2026-11-10): every request a deletion sends, and the 13+ read and yes, go under the
+  account they are for alone; a sign-in that changed meanwhile has nothing sent for it; the iPhone's
+  twin is C4c — validation: the JVM tests
 
 AN9c's line, as it read when it was done (2026-11-11; `docs/DECISIONS.md`, 2026-11-11).
 

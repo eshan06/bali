@@ -1096,7 +1096,10 @@ never covers or delays Emergency Unlock, and its answers never enter the outbox.
   opens on Sign in. The sign-in gives Bali's API no token until it is through the check (`SignIn`'s
   `Tokens.checked`: the server's yes read, or 13 or older answered), but the check's own read and
   an account deletion's (`deletionToken`): Delete account's steps, the outbox and then `DELETE
-  /v1/me`, go whether or not it is.
+  /v1/me`, go whether or not it is. Each, the check's yes too, goes under the token of the account it
+  is for alone, never another sign-in's, and a sign-in that changes before `DELETE /v1/me` is answered
+  deleted stops the deletion, nothing more sent (the owner, 2026-11-10: "Close it now"; on both
+  phones, Android's since AN9h, the iPhone's code in C4c).
   The check counts in the Gregorian calendar whatever calendar the phone shows its dates in.
 - **A teacher always sees a real name** (the owner's decision, 2026-10-07; the approved Sign in &
   sign up design's Your name). A student's account `GET /v1/me` names with no name, as
