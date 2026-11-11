@@ -14,17 +14,15 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-11 (Central) — AN9g, History's rules and its call (#561; `docs/DECISIONS.md`, 2026-11-11),
-AN9's last step: `outbox`'s `History.kt`, every failure and day title a type: the pages as they came, from the top or
-Show earlier's, each moment once, which read may start and the cursor it sends, and Show earlier's cursor the server
-doesn't hold read again from the top; days in the phone's zone, whole at a daylight-saving change, today, yesterday or a date, in cards
-of one class's moments in a row, each card's id kept as moments join it; a kind this build doesn't know kept in the
-page and left out of the days. The engine's `history(before)` is a read that applies nothing. Before it, AN9f, Me's
-rules. Next: AN10, the router and the screens' rules; the cover test's SMS step waiting out Google Messages, a step
-of its own (`docs/DECISIONS.md`, 2026-11-11, AN9i's entry); AN7f and AN8's 📱 check on the owner's phones, signed in
-on dev as an account that passed the 13+ check on an iPhone (Q7); Android's Cognito clients, the owner's (Open owner
-items, 8); Android 17's SDK platform for the owner to OK before the first step with today's AndroidX, and OkHttp 5.5
-with it (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
+_Last updated: 2026-11-11 (Central) — AN7g, the cover test's SMS step waiting out Google Messages (#562;
+`docs/DECISIONS.md`, 2026-11-11), test-only, Bali's code unchanged: AN7e's CoversTest now calls at once after the SMS
+step, as a student who has texted for help calls, once Android has resumed the last activity Messages opens for the
+number's link, a main screen made anew, so nothing of the link comes up later over the in-call screen; its
+failing test first, Android 16's race provoked. Before it, AN9g, History's rules and its call, AN9's last step. Next:
+AN10, the router and the screens' rules; AN7f and AN8's 📱 check on the owner's phones, signed in on dev as an account
+that passed the 13+ check on an iPhone (Q7); Android's Cognito clients, the owner's (Open owner items, 8); Android
+17's SDK platform for the owner to OK before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner
+items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -155,6 +153,7 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
   Samsung (Open owner items, 1), from `docs/ANDROID-PHONE-TESTS.md`'s AN7 checklist, which AN7c–AN7e
   write: B5 round 1's steps in Android's terms, offline before AN9, on dev after it (DECISIONS
   2026-11-05, Q8) — validation: every line answered on both phones
+- **AN7g** The cover test's SMS step waiting out Google Messages — ✅ (#562; DECISIONS 2026-11-11)
 - **AN8** 📱 The tap over NFC — ✅ its code (#532; DECISIONS 2026-11-05); left, its 📱 check, a real
   block on both phones, offline (`docs/ANDROID-PHONE-TESTS.md`, AN8); and the block's link opening Bali
   when it's closed, not built: it waits for AN1's part 2 to find whether it works, and for Phase 10, since
