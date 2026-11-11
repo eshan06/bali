@@ -158,7 +158,8 @@ class CoversTest {
         never(holder(Intent(EMERGENCY_DIALER)), { shell("am start -a $EMERGENCY_DIALER") })
         // Emergency information, where the image has a system app for it: the Safety app's own screen on Android 17's.
         context.packageManager.resolveActivity(Intent(EMERGENCY_ASSISTANCE), 0)?.let { never(it.activityInfo.packageName, { shell("am start -a $EMERGENCY_ASSISTANCE") }) }
-        never(checkNotNull(Telephony.Sms.getDefaultSmsPackage(context)), { shell("am start -a android.intent.action.SENDTO -d smsto:5551234") })
+        // Then the call at once, from Messages, as a student who has texted for help calls (AN7g).
+        never(checkNotNull(Telephony.Sms.getDefaultSmsPackage(context)), { shell("am start -a android.intent.action.SENDTO -d smsto:5551234") }) {}
         // A call, to the emulator's own pretend network: the in-call screen, a window of the dialer's own.
         val calling = System.currentTimeMillis()
         try {
