@@ -10,6 +10,18 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN9f's on 2026-11-11: _Last updated: 2026-11-11 (Central) — AN9i, the account's flows in the app, and the readout's Join and History
+(#559; `docs/DECISIONS.md`, 2026-11-11): `BaliApp`'s `start` makes one `Account` a run over the engine's sign-in and
+runs it in the run's job, the 13+ check's ask hooked at each wake and each sign-in followed; the Debug readout's Join
+with the code typed, a fresh event id at each press, History's last five moments in the wire's names, newest first,
+and its Signed in line naming the check as the run's account has it, with no 13+ button and no Delete account; NFC
+required in the manifest and the portal at `https://app.getbali.app`, the owner's rulings. Before it, AN9e, the
+account's flows in the engine. Next: AN9f, Me's rules, and AN9g, History's rules and its call; AN7f and AN8's 📱 check
+on the owner's phones, signed in on dev as an account that passed the 13+ check on an iPhone (Q7); Android's Cognito
+clients, the owner's (Open owner items, 8); Android 17's SDK platform for the owner to OK before the first step with
+today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the
+pilot's critical path._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN9i's on 2026-11-11: _Last updated: 2026-11-11 (Central) — AN9e, the account's flows in the engine (#557; `docs/DECISIONS.md`,
 2026-11-11): `Account`, BaliApp.swift's `Phone`'s account half in `outbox`, which follows the sign-in as each
 sign-in lands (`SignIn.landings`, a renewal never one), asks Bali for the 13+ yes of the account it names and
@@ -2654,6 +2666,20 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN9f's line, as it read when it was done (2026-11-11; `docs/DECISIONS.md`, 2026-11-11).
+
+- **AN9f** Me's rules: Your name, Leave and Sign out's hold (twin: `Me`'s `Naming`, `Leaving` and
+  `SignOutWords.held`): Me's name typed, printable, tidied and saved under one event id while it stays
+  the same, its blank test a table of Unicode's Default_Ignorable_Code_Point, pinned by a test, no ICU4J
+  (Q6); Leave asked, sent and held; Sign out held while an Emergency Unlock is queued. Tests: MeTests'
+  `typing`, `printable`, `saving`, `answers` and `signOutHeld`, and LeaveTests' `asking`, `asks`,
+  `answers` and `held` — validation: the JVM tests
+
+`docs/PLAN.md`'s Now, its Android line's finished detail, moved here word for word for room (2026-11-11, AN9f):
+after "AN1b ✅ (DECISIONS 2026-11-04)", ": the owner picked (a), the Accessibility service, with no VPN for now and a
+battery plan, so ARCHITECTURE's "Android app structure" is decided"; and after AS0's "(#484, #486; DECISIONS
+2026-11-04)", ": lock (a) alone, the approved iPhone boards standing for the rest".
 
 AN9i's line, as it read when it was done (2026-11-11; `docs/DECISIONS.md`, 2026-11-11).
 

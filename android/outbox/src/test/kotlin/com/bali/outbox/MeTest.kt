@@ -1,14 +1,20 @@
 package com.bali.outbox
 
 import androidx.sqlite.SQLiteException
+import com.bali.core.ApiClient
 import com.bali.core.ApiErrorReason
 import com.bali.core.EventId
 import com.bali.core.MeClass
 import com.bali.core.ParticipationState
+import com.bali.core.SendResult
 import com.bali.core.UpdateMeRequest
+import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertIs
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -17,13 +23,195 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
-// The name and the sign-in through the engine (C6b): BaliOutbox's MeEngineTests, and new: Sign out's rule reading the file
-// itself, and a file that can't be read now; a forget that leaves where the phone stands and its queue as they are, an
-// Emergency Unlock among them; a rename whose caller is cancelled, and one answered after the next student's `me` was
-// read. Me's own rules (`Naming`) are AN9f's.
+// The Me screen's rules (C6b), over A8's fixtures: BaliOutbox's MeTests, each check of a word AN10's with the words, and
+// `signedInAs` with them. New: whole characters beyond the twin's skin tone (a combining accent, a keycap, a ZWJ sequence,
+// a flag); one name from each of Default_Ignorable's ranges (Q6); a lone surrogate half; a save one at a time, and of
+// nothing; a deleted sign-in's 409 (C3d); and an unlock tried, stuck or not. And the name and the sign-in through the engine
+// (C6b): MeEngineTests, and new: Sign out's rule reading the file itself, its hold at the press, and a file that can't be
+// read now; a forget that leaves where the phone stands and its queue as they are, an Emergency Unlock among them; a rename
+// whose caller is cancelled, and one answered after the next student's `me` was read.
 
 private val renameRoute = "PATCH /v1/me"
 private val request = UpdateMeRequest("Eve Park", EventId.mint(t0))
+
+/** The file or folder the test task names in [property] (android/README.md): `bali.shared`'s folder, `bali.names`'s file. */
+private fun inRepo(property: String) = File(checkNotNull(System.getProperty(property)) { "$property is unset: run the tests through Gradle (android/README.md)" })
+
+/** `PATCH /v1/me` as [client] answers it. */
+private suspend fun renamed(client: ApiClient) = client.updateMe(request)
+
+private val taken = Naming.Failure.NotSaved(SendResult.Status(409), ApiErrorReason.DisplayNameTaken)
+
+/** The Me screen's rules (C6b): BaliOutbox's MeTests. */
+class MeTest : OutboxFiles() {
+    @Test
+    fun aNameIsKeptToTheWholeCharactersWithinDisplayNameMaxLengthCodePointsNoEmojiOrAccentCutInTwoABlankOneIsNothingToSaveTypingClearsWhatWentWrongBefore() {
+        val ana = Naming().edit("Ana")
+        assertEquals(listOf<Any>(true, "Ana", true), listOf(ana.editing, ana.name, ana.complete))
+        assertFalse(ana.type(" \n ").complete)
+        // A thumbs-up with its skin tone is two code points: at 63 + 2 it doesn't fit, whole.
+        val a = "a".repeat(63)
+        assertEquals(a, ana.type("$a\ud83d\udc4d\ud83c\udffdb").name)
+        val accents = ana.type("\u00e9".repeat(70)).name
+        assertEquals(Naming.MAX_LENGTH, accents.codePointCount(0, accents.length))
+        // Swift's whole characters, a BreakIterator's grapheme clusters: a letter and its combining accent, a keycap, a ZWJ
+        // sequence (a woman, a joiner and a graduation cap) and a flag (two regional indicators) fit whole or not at all.
+        for (whole in listOf("e\u0301", "1\ufe0f\u20e3", "\ud83d\udc69\u200d\ud83c\udf93", "\ud83c\uddfa\ud83c\uddf8")) {
+            val fits = "a".repeat(Naming.MAX_LENGTH - whole.codePointCount(0, whole.length))
+            assertEquals(fits + whole, ana.type(fits + whole + "b").name, whole)
+            assertEquals(fits + "a", ana.type(fits + "a" + whole).name, whole)
+        }
+        // What went wrong before goes: here, a blank name saved.
+        val failed = ana.type(" ").save(t0).first
+        assertIs<Naming.Failure.Blank>(failed.failure)
+        val typed = failed.type("Ana R.")
+        assertEquals(listOf<Any?>(null, "Ana R."), listOf(typed.failure, typed.name))
+        assertTrue("export const DISPLAY_NAME_MAX_LENGTH = ${Naming.MAX_LENGTH};" in inRepo("bali.shared").resolve("index.ts").readText())
+    }
+
+    @Test
+    fun aNameGoesAsTheApiWouldStoreItATabOrLineBreakTheSpaceItLooksLikeWhatANameNeverCarriesLeftOutTheJoinersNamesNeedKeptBlankSpaceTidiedAndOneOfNothingAReaderWouldSeeIsNothingToSave() {
+        // So nothing unseen is sent and refused (C6b-1's review). The API's rules as this mirrors them: a change there fails
+        // here until the phone follows.
+        val rules = inRepo("bali.names").readText()
+        val pins =
+            listOf(
+                """export const UNPRINTABLE = /[\p{Cc}\p{Cs}\p{Zl}\p{Zp}]|(?![\u200c\u200d])\p{Cf}/gu;""",
+                """export const INVISIBLE = /^[\p{White_Space}\p{Default_Ignorable_Code_Point}\u2800\u{1D159}]*$/u;""",
+            )
+        for (pin in pins) assertTrue(pin in rules, pin)
+        assertTrue("return name.replace(/[\\s\u2800\\u{1D159}]+/gu, ' ').trim();" in inRepo("bali.shared").resolve("index.ts").readText())
+        val naming = Naming().edit(null)
+        // A zero-width space, a direction override and a bell left out, as typed.
+        assertEquals("Ana R. ", naming.type("Ana\tR.\n\u200b\u202e\u0007").name)
+        val joined = "\u0645\u200c\u06cc \ud83d\udc69\u200d\ud83c\udf93"
+        assertEquals(joined, naming.type(joined).name)
+        val spaced = naming.type("  Ana \u2800\u2028 Rodr\u00edguez ")
+        assertTrue(spaced.complete)
+        assertEquals("Ana Rodr\u00edguez", spaced.save(t0).second?.displayName)
+        for (unseen in listOf("\u3164", "\ufe0f\u200d", "\u2800 \ud834\udd59", "\ufeff")) {
+            assertFalse(Naming().edit(null).type(unseen).complete, unseen.codePoints().toArray().joinToString())
+        }
+        // No iOS twin: a lone surrogate half, which a Kotlin string can hold and a Swift one can't, left out as the API refuses it.
+        assertEquals("Ana", naming.type("An\uD800a").name)
+    }
+
+    @Test
+    fun aNameOfNothingButWhatDrawsNothingIsNothingToSaveTheFirstAndLastOfEachOfUnicodesDefaultIgnorableRangesAloneOrInBlankSpaceAndBesideALetterEachIsAName() {
+        // No iOS twin (Q6): Swift reads Default_Ignorable_Code_Point itself; here it is a table, which the API's own test holds,
+        // range by range, to its regex (apps/api/test/display-name.test.ts). Each set as the name, since typing leaves the
+        // format characters among them out.
+        val ends =
+            listOf(
+                0xAD, 0x34F, 0x61C, 0x115F, 0x1160, 0x17B4, 0x17B5, 0x180B, 0x180F, 0x200B, 0x200F, 0x202A, 0x202E, 0x2060, 0x206F,
+                0x3164, 0xFE00, 0xFE0F, 0xFEFF, 0xFFA0, 0xFFF0, 0xFFF8, 0x1BCA0, 0x1BCA3, 0x1D173, 0x1D17A, 0xE0000, 0xE0FFF,
+            )
+        for (codePoint in ends) {
+            val unseen = String(Character.toChars(codePoint))
+            val said = "U+%X".format(codePoint)
+            assertFalse(Naming(name = unseen).complete, said)
+            assertFalse(Naming(name = " $unseen\u2800").complete, said)
+            assertTrue(Naming(name = "a$unseen").complete, said)
+        }
+    }
+
+    @Test
+    fun aSaveGoesUnderOneEventIdWhileTheNameIsTheOneItSentARetryAfterNoAnswerIsItsReplayANameTypedSinceIsANewOneOneAtATimeTheNameFixedWhileItRunsAnAnswerToASaveThisEditingDidntSendIsDropped(): Unit =
+        runBlocking {
+            val none = renamed(client(Canned(null)))
+            val applied = renamed(fixture("name/applied.json"))
+            val (sending, sent) = Naming().edit("Ana").type("Ana R.").save(t0)
+            val first = assertNotNull(sent)
+            assertEquals(listOf<Any?>(true, "Ana R."), listOf(sending.busy, first.displayName))
+            // No iOS twin: a second save while one runs sends nothing, as iOS's app holds it (BaliApp.swift's `saveName`).
+            assertEquals(sending to null, sending.save(at(1)))
+            assertEquals("Ana R.", sending.type("Bea").name)
+            val (unanswered, saved) = sending.saved(none, first)
+            assertFalse(saved)
+            val failure = Naming.Failure.NotSaved(SendResult.NetworkError, null)
+            assertEquals(listOf<Any?>(false, true, failure), listOf(unanswered.busy, unanswered.editing, unanswered.failure))
+            // The retry, the same name typed again too: its replay, under the same event id (rule 4), the last try's words gone.
+            val (retrying, retried) = unanswered.type("Ana R.").save(at(5))
+            val retry = assertNotNull(retried)
+            assertEquals(listOf<Any?>(first.eventId, null), listOf(retry.eventId, retrying.failure))
+            val (changed, changedSent) = retrying.saved(none, retry).first.type("Ana Ro.").save(at(9))
+            val other = assertNotNull(changedSent)
+            assertNotEquals(first.eventId, other.eventId)
+            // Its answer comes for the first: dropped, the save under way still waiting.
+            assertEquals(changed to false, changed.saved(applied, first))
+            assertEquals(Naming() to true, changed.saved(applied, other))
+            // Not editing, nothing sent: an answer changes nothing.
+            assertEquals(Naming() to false, Naming().saved(applied, other))
+            // No iOS twin: a name changed and typed back is a new save all the same, and one of nothing sends nothing, said.
+            val (again, backSent) = changed.saved(none, other).first.type("Ana R").type("Ana Ro.").save(at(12))
+            val back = assertNotNull(backSent)
+            assertNotEquals(other.eventId, back.eventId)
+            val (blank, nothing) = again.saved(none, back).first.type(" \u3164 ").save(at(15))
+            assertEquals(listOf<Any?>(null, Naming.Failure.Blank, false), listOf(nothing, blank.failure, blank.busy))
+        }
+
+    @Test
+    fun aSaveAsTheApiAnswersItSetAppliedOrAReplaysNameNowEditingEndsRefusedTakenInvalidATeachersTheSignInAClientsBugADeletedSignInsOrNoAnswer429OrAServerErrorEachItsResultAndReasonTheNameKeptToTryAgain(): Unit =
+        runBlocking {
+            // A8's fixtures. The words for each are AN10's.
+            for (name in listOf("applied", "replay")) {
+                val (sending, sent) = Naming().edit("Eve").save(t0)
+                assertEquals(Naming() to true, sending.saved(renamed(fixture("name/$name.json")), assertNotNull(sent)), name)
+            }
+            val refusals =
+                listOf(
+                    fixture("name/409-display-name-taken.json") to taken,
+                    fixture("name/400-display-name-invalid.json") to
+                        Naming.Failure.NotSaved(SendResult.Status(400), ApiErrorReason.DisplayNameInvalid),
+                    fixture("name/403-teacher.json") to Naming.Failure.NotSaved(SendResult.Status(403), null),
+                    fixture("name/401-unauthorized.json") to Naming.Failure.NotSaved(SendResult.Status(401), null),
+                    fixture("name/400-invalid-request.json") to Naming.Failure.NotSaved(SendResult.Status(400), ApiErrorReason.InvalidRequest),
+                    // No iOS twin: an account deleted from another phone, its sign-in's old token refused (C3d, #558).
+                    client(Canned(409, Answer.refused("account_deleted"))) to
+                        Naming.Failure.NotSaved(SendResult.Status(409), ApiErrorReason.AccountDeleted),
+                    client(Canned(null)) to Naming.Failure.NotSaved(SendResult.NetworkError, null),
+                    client(Canned(429)) to Naming.Failure.NotSaved(SendResult.Status(429), null),
+                    client(Canned(500)) to Naming.Failure.NotSaved(SendResult.Status(500), null),
+                )
+            for ((answer, failure) in refusals) {
+                val (sending, sent) = Naming().edit("Eve").save(t0)
+                val (after, saved) = sending.saved(renamed(answer), assertNotNull(sent))
+                assertEquals(listOf<Any?>(false, failure, true, "Eve", false), listOf(saved, after.failure, after.editing, after.name, after.busy), "$failure")
+            }
+        }
+
+    @Test
+    fun signOutWaitsWhileAnEmergencyUnlockIsUnsentASessionsOneUnderATapOneNotFiledYetOneTriedStuckOrNotAndForNothingElseThePhoneHasQueued(): Unit =
+        runBlocking {
+            // Signed out, the unlock would go under whoever signs in next.
+            assertNull(SignOutHold.held(SyncState()))
+            val (outbox, _) = makeOutbox()
+            record(outbox, Change.Tap("tag"))
+            record(outbox, Change.Refocus("s"))
+            record(outbox, Change.ProtectionOff("s"))
+            val queued = outbox.records()
+            assertEquals(3, queued.size)
+            assertNull(SignOutHold.held(SyncState(queued = queued)))
+            for (unlock in listOf(Change.Unlock("s", null), Change.UnlockUnderTap("t", null), Change.UnlockUnfiled(null))) {
+                val (one, _) = makeOutbox()
+                record(one, unlock)
+                assertEquals(SignOutHold.UnlockUnsent, SignOutHold.held(SyncState(queued = one.records())), "$unlock")
+            }
+            // No iOS twin: one tried and stuck, refused, and one tried and still pending, with no answer.
+            for ((status, body) in listOf(400 to Answer.badInput, null to "")) {
+                val (tried, _) = makeOutbox()
+                send(tried, record(tried, Change.Unlock("s", null)), status, body)
+                val unlock = tried.records().single()
+                assertEquals(listOf<Any>(1, status != null), listOf(unlock.attempts, unlock.stuck))
+                assertEquals(SignOutHold.UnlockUnsent, SignOutHold.held(SyncState(queued = listOf(unlock))), "$status")
+            }
+            // And a tap the server refused, kept for good (B3a), holds nothing: it would hold Sign out for ever (C6b-1).
+            val (refused, _) = makeOutbox()
+            send(refused, record(refused, Change.Tap("tag")), 404, Answer.unknownBlock)
+            assertTrue(refused.records().single().stuck)
+            assertNull(SignOutHold.held(SyncState(queued = refused.records())))
+        }
+}
 
 /** `PATCH /v1/me`'s answer: the student named [name] now. */
 private fun named(name: String) = """{"outcome":"applied","user":{"id":"u","role":"student","displayName":"$name"}}"""
@@ -72,15 +260,16 @@ class MeEngineTest : EngineFiles() {
     @Test
     fun signOutsRuleAsksTheOutboxFileWhetherAnEmergencyUnlockWaitsUnsentNoneThenOnePressedAndQueuedThenNoneOnceTheServerHasRecordedIt(): Unit =
         runBlocking {
+            // Sign out's hold at the press says each (`SignOutHold.asked`).
             val rig = rig()
-            assertEquals(false, rig.engine.unlockUnsent())
+            assertEquals(listOf<Any?>(false, null), listOf(rig.engine.unlockUnsent(), SignOutHold.asked(rig.engine)))
             rig.tapIn()
             assertEquals(false, rig.engine.unlockUnsent())
             rig.engine.emergencyUnlock()
-            assertEquals(true, rig.engine.unlockUnsent())
+            assertEquals(listOf<Any?>(true, SignOutHold.UnlockUnsent), listOf(rig.engine.unlockUnsent(), SignOutHold.asked(rig.engine)))
             rig.server.next(unlockRoute).reply(200, Answer.unlocked())
             rig.until { it.queued.isEmpty() }
-            assertEquals(false, rig.engine.unlockUnsent())
+            assertEquals(listOf<Any?>(false, null), listOf(rig.engine.unlockUnsent(), SignOutHold.asked(rig.engine)))
             rig.stop()
         }
 
@@ -94,9 +283,12 @@ class MeEngineTest : EngineFiles() {
             val engine = engine(open(file, driver = Watching(stepping = { if (refusing.get() && RECORDS in it) throw SQLiteException("refused") })))
             assertEquals(listOf<Any?>(emptyList<OutboxRecord>(), Link.StorageFailed), listOf(engine.updates.value.queued, engine.updates.value.link))
             assertNull(engine.unlockUnsent())
+            assertEquals(SignOutHold.Unread, SignOutHold.asked(engine))
             refusing.set(false)
             assertEquals(true, engine.unlockUnsent())
             assertEquals(emptyList(), engine.updates.value.queued)
+            // The state shows no hold where the file holds an unlock: the press asks the file (`SignOutHold.asked`).
+            assertEquals(listOf<Any?>(null, SignOutHold.UnlockUnsent), listOf(SignOutHold.held(engine.updates.value), SignOutHold.asked(engine)))
         }
 
     @Test

@@ -45,9 +45,7 @@ data class Joining(
      */
     fun type(text: String): Joining {
         if (busy) return this
-        val breaks = BreakIterator.getCharacterInstance(Locale.ROOT).apply { setText(text) }
-        val characters = generateSequence(breaks.first()) { breaks.next().takeIf { it != BreakIterator.DONE } }.zipWithNext(text::substring)
-        val kept = characters.filter { it.length == 1 && (it[0] in 'A'..'Z' || it[0] in 'a'..'z' || it[0] in '0'..'9') }
+        val kept = characters(text).filter { it.length == 1 && (it[0] in 'A'..'Z' || it[0] in 'a'..'z' || it[0] in '0'..'9') }
         return copy(code = kept.joinToString("").uppercase().take(CODE_LENGTH), failure = null)
     }
 
@@ -92,3 +90,15 @@ data class Joining(
 
 /** Why an answer gave no class, as [Joining.Failure] keeps it. */
 private val ApiResponse<*>.failure: Joining.Failure get() = Joining.Failure(result, error?.error?.reason)
+
+/**
+ * [text]'s whole characters, as Swift's `Character`s are: a BreakIterator's grapheme clusters, by the rules of the phone's own
+ * Unicode, so a combining mark, a variation selector or a skin tone joins the character before it and an emoji sequence is
+ * one (`docs/DECISIONS.md`, AN9f's entry, says what an older Android's rules change). Read once: the BreakIterator under it
+ * moves as it is read, so a second read throws rather than giving nothing.
+ */
+internal fun characters(text: String): Sequence<String> {
+    val breaks = BreakIterator.getCharacterInstance(Locale.ROOT).apply { setText(text) }
+    return generateSequence(breaks.first()) { breaks.next().takeIf { it != BreakIterator.DONE } }.zipWithNext(text::substring)
+        .constrainOnce()
+}

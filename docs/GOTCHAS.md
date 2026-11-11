@@ -102,6 +102,11 @@ the clone is `C:\Users\Eshan Shah\Downloads\github\bali`. Its path has a space: 
   the clone sets `core.autocrlf=input` (its worktrees share it). A clone made before the setting
   keeps CRLF files on disk though `git status` is clean: check `git ls-files --eol`, and re-checkout
   (`git rm -rq --cached . && git reset --hard`) when it shows `w/crlf`.
+- **Claude Code's Write and Edit tools turn a typed `\uXXXX` escape into its character.** A Kotlin, Swift or
+  TypeScript escape for a printable character lands in the file as the character itself, an invisible one too (a
+  zero-width space, a direction override, a byte-order mark), with no error; `\\uXXXX` stays as typed, two backslashes,
+  and the Bash tool's text makes `\\u` one. Write such escapes from a script that builds the backslash (Python's
+  `chr(92)`), then check the file for non-ASCII characters (AN9f, 2026-11-11).
 - **Headless Chrome lays a page out 500 px wide at least.** `--window-size=390,…` renders at 500 and
   crops the shot to 390, a layout no phone has, with no error. For a phone-width shot, emulate the
   width over DevTools: start it with `--remote-debugging-port`, then `Emulation.setDeviceMetricsOverride`
@@ -124,6 +129,10 @@ The PC whose clone is `C:\dev\bali` holds Android's SDK and its test emulators
   system-images/android-36/google_apis/x86_64`, with slashes. Make an AVD through the JBR's `java`
   with `-classpath <cmdline-tools>/lib/avdmanager-classpath.jar com.android.sdklib.tool.AvdManagerCli
   create avd …`, where a quoted argument keeps its semicolons.
+- **A worktree has no `android/local.properties`.** It is gitignored, so a fresh worktree's
+  `./gradlew assemble` stops at "SDK location not found" (`:core:test` and `:outbox:test` run
+  without it). Export `ANDROID_HOME` as the SDK's folder (Android Studio's SDK Manager shows it)
+  with `JAVA_HOME`, rather than copying the main checkout's file.
 - **`android emulator start` never ends behind a pipe.** It returns once the emulator has booted,
   but the emulator keeps the command's output open, so `android emulator start … | tail` waits
   until the emulator stops (the Bash tool's 10 minutes, then the background). Send its output to a
