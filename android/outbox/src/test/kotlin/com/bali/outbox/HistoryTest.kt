@@ -48,7 +48,7 @@ private fun History.page(response: ApiResponse<HistoryPage>): History = answered
 
 /** The screen with [moments] read from the top, newest first as the server gives them, and nothing after: HistoryTests' `read`. */
 private suspend fun read(vararg moments: String): History =
-    History().reading(more = false).page(client(Canned(200, """{"events":[${moments.joinToString(",")}],"nextBefore":null}""")).history())
+    History().reading(more = false)!!.page(client(Canned(200, """{"events":[${moments.joinToString(",")}],"nextBefore":null}""")).history())
 
 /**
  * What the screen will draw, as types: each day's title; each card's class and teacher; and each moment's time on the phone's
@@ -256,13 +256,20 @@ class HistoryTest {
         runBlocking {
             var history = History()
             assertEquals(listOf<Any?>(false, emptyList<History.Day>(), true), listOf(history.read, history.days(t0, ny), history.fromTop))
-            history = history.reading(more = false)
+            // Show earlier with no page after those read starts nothing, and one read at a time.
+            assertNull(history.reading(more = true))
+            history = history.reading(more = false)!!
             assertEquals(listOf<Any?>(true, true, null), listOf(history.busy, history.fromTop, history.before))
+            assertEquals(listOf(null, null), listOf(history.reading(more = false), history.reading(more = true)))
             history = history.page(fixture("history/first-page.json").history())
             assertEquals(listOf<Any?>(true, false, 3), listOf(history.read, history.busy, history.events.size))
             assertEquals("00000000-0000-7000-8000-000000000006", history.nextBefore)
-            history = history.reading(more = true)
+            history = history.reading(more = true)!!
             assertEquals(listOf<Any?>(true, false, "00000000-0000-7000-8000-000000000006"), listOf(history.busy, history.fromTop, history.before))
+            // Beside Show earlier's under way, a read from the top goes ahead of it (#141), and nothing else goes.
+            assertNull(history.reading(more = true))
+            val ahead = history.reading(more = false)
+            assertEquals(listOf<Any?>(true, true, null, 3), listOf(ahead?.busy, ahead?.fromTop, ahead?.before, ahead?.events?.size))
             history = history.page(fixture("history/first-page.json").history())
             assertEquals(3, history.events.size)
             history = history.page(client(Canned(null)).history(history.before))
@@ -274,6 +281,8 @@ class HistoryTest {
             assertEquals(listOf<Any?>(null, "00000000-0000-7000-8000-000000000008"), listOf(history.failure, history.nextBefore))
             history = history.page(fixture("history/empty.json").history())
             assertEquals(listOf<Any?>(6, null), listOf(history.events.size, history.nextBefore))
+            // At the end: Show earlier sends nothing, where a read with no cursor would put the newest page after the oldest.
+            assertNull(history.reading(more = true))
         }
 
     @Test
@@ -281,27 +290,27 @@ class HistoryTest {
         runBlocking {
             // #141; F4's review: the card's Try again saying it is reading, beside the words, is AN10's and AS7's.
             var history = History().page(fixture("history/first-page.json").history())
-            history = history.reading(more = true).page(fixture("history/next-page.json").history())
+            history = history.reading(more = true)!!.page(fixture("history/next-page.json").history())
             assertEquals(listOf<Any?>(6, null), listOf(history.events.size, history.notUpdated))
-            history = history.reading(more = false)
+            history = history.reading(more = false)!!
             assertEquals(listOf<Any?>(6, true, true, null), listOf(history.events.size, history.read, history.busy, history.before))
             history = history.page(client(Canned(null)).history())
             assertEquals(listOf<Any?>(6, true, false), listOf(history.events.size, history.read, history.busy))
             assertEquals("00000000-0000-7000-8000-000000000008", history.nextBefore)
             assertEquals(listOf<Any?>(unreachable, null), listOf(history.notUpdated, history.failure))
             // Show earlier meanwhile: its own failure in its place, and the newest still not read.
-            history = history.reading(more = true)
+            history = history.reading(more = true)!!
             history = history.page(client(Canned(null)).history(history.before))
             assertEquals(listOf<Any?>(unreachable, unreachable), listOf(history.notUpdated, history.failure))
-            history = history.reading(more = true).page(fixture("history/empty.json").history())
+            history = history.reading(more = true)!!.page(fixture("history/empty.json").history())
             assertEquals(listOf<Any?>(unreachable, null, null), listOf(history.notUpdated, history.failure, history.nextBefore))
             // Try again from the top: what went wrong stays said while it reads, then why this one didn't finish.
-            history = history.reading(more = false)
+            history = history.reading(more = false)!!
             assertEquals(listOf<Any?>(unreachable, true, true, 6), listOf(history.notUpdated, history.busy, history.fromTop, history.events.size))
             history = history.page(fixture("history/401-unauthorized.json").history())
             assertEquals(listOf<Any?>(History.Failure(SendResult.Status(401), null), false, 6), listOf(history.notUpdated, history.busy, history.events.size))
             // Again: its page leaves none.
-            history = history.reading(more = false).page(fixture("history/first-page.json").history())
+            history = history.reading(more = false)!!.page(fixture("history/first-page.json").history())
             assertEquals(listOf<Any?>(3, null, null, true), listOf(history.events.size, history.failure, history.notUpdated, history.read))
             assertEquals("00000000-0000-7000-8000-000000000006", history.nextBefore)
         }
@@ -320,7 +329,7 @@ class HistoryTest {
             assertEquals<Any?>(History.Failure(SendResult.Status(409), ApiErrorReason.AccountDeleted), history.failure)
             history = history.page(fixture("history/400-bad-limit.json").history())
             assertEquals<Any?>(History.Failure(SendResult.Status(400), ApiErrorReason.InvalidRequest), history.failure)
-            history = history.page(fixture("history/first-page.json").history()).reading(more = true)
+            history = history.page(fixture("history/first-page.json").history()).reading(more = true)!!
             val (unknown, readAgain) = history.answered(fixture("history/400-bad-cursor.json").history())
             assertTrue(readAgain)
             assertEquals(listOf<Any?>(3, true, false, null, null), listOf(unknown.events.size, unknown.read, unknown.busy, unknown.failure, unknown.notUpdated))
@@ -330,9 +339,9 @@ class HistoryTest {
             // A read from the top, no cursor sent, answered so is said, never read again: that would be refused again, forever
             // (C6a-2's review), over the moments read or over nothing.
             val cursor = History.Failure(SendResult.Status(400), ApiErrorReason.UnknownCursor)
-            val top = unknown.reading(more = false).page(fixture("history/400-bad-cursor.json").history())
+            val top = unknown.reading(more = false)!!.page(fixture("history/400-bad-cursor.json").history())
             assertEquals(listOf<Any?>(3, cursor, null, false), listOf(top.events.size, top.notUpdated, top.failure, top.busy))
-            val none = History().reading(more = false).page(fixture("history/400-bad-cursor.json").history())
+            val none = History().reading(more = false)!!.page(fixture("history/400-bad-cursor.json").history())
             assertEquals(listOf<Any?>(cursor, false, false, null), listOf(none.failure, none.read, none.busy, none.notUpdated))
         }
 }

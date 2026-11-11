@@ -51,16 +51,24 @@ data class History(
     data class Failure(val result: SendResult, val reason: ApiErrorReason?)
 
     /**
-     * The cursor the read [reading] started sends: none from the top, the next page's for Show earlier, which the screen offers
-     * only while there is one. BaliApp.swift's `readHistory` picks it there; here, so it is tested.
+     * The cursor the read [reading] started sends: none from the top, the next page's for Show earlier, which starts only while
+     * there is one. BaliApp.swift's `readHistory` picks it there; here, so it is tested.
      */
     val before: String? get() = if (fromTop) null else nextBefore
 
     /**
-     * A read starts: from the top, or [more], Show earlier's page. The last one's failure goes, but not [notUpdated], which
-     * stays until a read from the top answers.
+     * A read starts, from the top or [more], Show earlier's page: the next, busy until its answer comes, the last one's failure
+     * gone but not [notUpdated], which stays until a read from the top answers. None, nothing to send, for Show earlier with
+     * no page after those read, nor while a read is under way, but for one from the top, which goes ahead of Show earlier's
+     * (#141): BaliApp.swift's `readHistory` checks both before its `reading`, and drops the answer to a read no longer the
+     * latest, one sent before who is signed in changed among them (`reads`, AS7's).
      */
-    fun reading(more: Boolean): History = copy(fromTop = !more, busy = true, failure = null)
+    fun reading(more: Boolean): History? =
+        when {
+            more && nextBefore == null -> null
+            busy && (more || fromTop) -> null
+            else -> copy(fromTop = !more, busy = true, failure = null)
+        }
 
     /**
      * A page came back: the next, and true when the history must be read again from the top. One from the top takes the

@@ -281,8 +281,9 @@ ASCII letters and digits in upper case, each whole character a BreakIterator's g
 dropped; and why a look or a join gave no class, as its result and reason, the words AN10's.
 
 **History's rules** (`outbox`'s `History.kt`, BaliOutbox's `History.swift`, AN9g): the pages as they came, from
-the top or Show earlier's, each moment once, and the cursor each read sends; Show earlier's cursor the server doesn't
-hold read again from the top; days in the phone's zone, whole at a daylight-saving change, in cards of one class's
+the top or Show earlier's, each moment once; which read may start, Show earlier only while a page follows those read
+and one read at a time, but one from the top ahead of Show earlier's, and the cursor it sends; Show earlier's cursor
+the server doesn't hold read again from the top; days in the phone's zone, whole at a daylight-saving change, in cards of one class's
 moments in a row, each card's id kept as moments join it; a kind this build doesn't know left out of the days and kept
 in the page. Every failure and day title is a type; the words, the date and time formats are AN10's.
 

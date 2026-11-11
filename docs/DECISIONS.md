@@ -24,7 +24,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   - **Every failure a type, never words:** `Failure` is the answer's result and its error's reason, as `Joining.Failure`
     is, in `failure` and in `notUpdated`, where iOS keeps its words (`History.words`, `notUpdated(_:)`). A read refused
     `409 account_deleted` (C3d) is one, its reason with it, tested. iOS's public `failed` is gone: a phone whose engine
-    hasn't started (`Joining.notStarted`) is AN10's to say, as for Join (AN9f).
+    hasn't started (`Joining.notStarted`) is AN10's to say, as for Join (AN9d), Naming and Leaving (AN9f). So only an
+    answer clears `busy` here, and AS7 asks for the engine before `reading`, as `Phone.saveName` does before `save`,
+    where iOS's `readHistory` calls `reading` first, then `failed(Joining.notStarted)` (santa's round 1, reviewer A).
   - **A day's title is a type:** `Title.Today`, `Yesterday` or `On(date)`, its date in the phone's zone; its text, with
     its year once that isn't this one by the phone's calendar, is AN10's, as each moment's time format is. A `Moment`
     carries its time as a `ZonedDateTime` in the zone its day was drawn in, so its time and its day can't disagree.
@@ -45,11 +47,14 @@ a real decision? Add a dated entry at the top: what was decided and why.
     is answered whole; the days leave it out, its card with it where it was alone, as the twin's test and A7 have it, so
     the cards and their ids are iOS's. An unknown reason or note stays a moment, typed as unknown in the page and none in
     its line. The other reading, a `Moment` of an unknown kind for AN10 to skip, would split a card iOS keeps whole.
-  - **The cursor a read sends is History's (`before`):** BaliApp.swift's `readHistory` picks it (`more ?
-    history.nextBefore : nil`); here `before` gives it after `reading`, so a read from the top sending a cursor, or Show
-    earlier sending none, fails a test by name. `readHistory`'s guards stay the app's, AS7's to port with `Phone`'s
-    history half: Show earlier only while there is a next page, one read at a time but a read from the top going ahead of
-    Show earlier's, whose answer `reads` drops, and the history forgotten when who is signed in changes.
+  - **A read's guards and its cursor are History's (`reading`, `before`), as AN9f's `save` holds its own:**
+    BaliApp.swift's `readHistory` checks, before its `reading`, that Show earlier has a page after those read and that no
+    read is under way, but for one from the top, which goes ahead of Show earlier's; then it picks the cursor (`more ?
+    history.nextBefore : nil`). Here `reading` gives none, nothing to send, where those checks would stop, and `before`
+    gives the cursor, so a read from the top sending a cursor, or Show earlier sending none, its page from the top then
+    landing after the oldest under a second Today of the same card ids (santa's round 1, reviewer B), fails a test by
+    name. Dropping the answer to a read no longer the latest, one sent before who is signed in changed among them, stays
+    the app's (`reads`), AS7's to port with `Phone`'s history half, as forgetting the history at that change is.
   - **A moment's reason and class counted in are carried as the server sent them:** iOS's words show a reason on an
     unlock alone and a class on a declined tap alone; the server names neither elsewhere (A7), and AN10's words keep
     iOS's rule.
@@ -59,21 +64,25 @@ a real decision? Add a dated entry at the top: what was decided and why.
   moment (iOS's `History.Moment` words, and Android's own for "Screen Time off" and "back on" from AS0's Words board),
   each note, each day title's text and each time's format in the phone's locale, and a phone whose engine hasn't
   started. AS7 draws History from its board and ports `Phone`'s history half (`refreshHistory`, `readHistory` and
-  `reads`, `historyRead`, `forgetHistory`, `historyDays`' cache), sending `engine.history(history.before)` after
-  `reading`, and reading again from the top when `answered` says so.
+  `reads`, `historyRead`, `forgetHistory`, `historyDays`' cache): it asks for the engine first, sends
+  `engine.history(next.before)` for each `reading` that starts, drops each answer to a read no longer the latest
+  (`reads`), so no student is shown another's, and reads again from the top when `answered` says so.
 
   **The tests:** HistoryTests' `days`, `cardIds`, `everyKind`, `unknowns`, `pages`, `readAgain` and `failures`, over A7's
   fixtures, each check of a word, a day title's text or a time's format AN10's; and HistoryEngineTests'
   `throughTheEngine`. New: New York's daylight-saving changes on a fixed clock and zone, falling back (Sunday, November
   1, 2026: 1:30 AM twice, a 25-hour day) and springing forward (Sunday, March 8: a 23-hour day); Ms. Rivera's second
-  class right after her first, a card of its own; the cursor each read sends; each kind `HISTORY_EVENT_TYPES` lists a
-  moment of its own, and each reason `UNLOCK_REASONS` lists an unlock's, read from `@bali/shared` (`bali.shared`); an
-  unlock kept with no class, no note; C3d's 409; Show earlier's other failures in its place; and a page from the top
-  through the engine, the engine's state, its outbox and its read loop's next wake as they were. Tried, each failing by
-  name, then reverted: a moment shown twice across two pages (`pages`'); Show earlier reading from the top (`pages`',
-  `readAgain`'s, `failures`'); a read from the top sending the known cursor (`readAgain`'s), any failure of Show earlier's
-  read again from the top (`pages`', `readAgain`'s, `failures`'), and a read from the top answered `unknown_cursor` read
-  again, forever (`failures`'); an unknown cursor not read again from the top (`failures`'); days in UTC (`days`', the
+  class right after her first, a card of its own; the cursor each read sends, and no read starting for Show earlier with
+  no page after those read nor beside a read under way, but one from the top ahead of Show earlier's; each kind
+  `HISTORY_EVENT_TYPES` lists a moment of its own, and each reason `UNLOCK_REASONS` lists an unlock's, read from
+  `@bali/shared` (`bali.shared`); an unlock kept with no class, no note; C3d's 409; Show earlier's other failures in its
+  place; and a page from the top through the engine, the engine's state, its outbox and its read loop's next wake as
+  they were. Tried, each failing by name, then reverted: a moment shown twice across two pages (`pages`'); Show earlier
+  reading from the top (`pages`', `readAgain`'s, `failures`'); a read from the top sending the known cursor
+  (`readAgain`'s), any failure of Show earlier's read again from the top (`pages`', `readAgain`'s, `failures`'), and a
+  read from the top answered `unknown_cursor` read again, forever (`failures`'); Show earlier starting with no page
+  after those read, a read starting beside one under way, and a read from the top held behind Show earlier's (`pages`',
+  each); an unknown cursor not read again from the top (`failures`'); days in UTC (`days`', the
   daylight-saving test's, `everyKind`'s, `unknowns`'), and yesterday 24 hours back, and days 24 hours long (the
   daylight-saving test's, each); two classes' moments in one card, by teacher (`days`', once Period 4 was in it: with
   every test class a teacher of its own, it passed at first) and one card a day (`days`', `cardIds`', `everyKind`'s); an
@@ -82,7 +91,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   failure's reason dropped (`failures`'); and the engine's call asking a read (`throughTheEngine`'s). The checks a type
   change could break compare as `Any?`, so a string's break fails by name rather than at compile.
 
-  **Santa's review:** to fill once it has run.
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so
+  context isolation holds and model diversity doesn't): 0 blockers. Their WARNs, each taken: Show earlier at the end
+  sending no cursor, its page from the top landing after the oldest, two Todays of the same card ids, which a lazy list
+  keyed by id refuses (reviewer B; taken: `reading` holds iOS's two checks, above); and iOS's `failed` gone, so a
+  phone whose engine hasn't started stays busy unless the engine is asked for before `reading`, with this entry citing
+  AN9f for Join's not-started (reviewer A; taken: said for AS7 above, and AN9d cited).
 
   **The proof:** to fill once it has run.
 
