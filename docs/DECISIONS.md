@@ -8,6 +8,76 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-11** — **AN9i, the account's flows in the app, and the readout's Join and History: `BaliApp`'s one
+  `Account` a run, and the Debug readout's Join, History and Signed in line, on the emulators (AN9e's app half; this
+  step's calls marked, awaiting the owner's look; AN9i, #559).** The conductor split AN9e for its size; this PR is its
+  app half, from the start AN9e's worker pushed (`b38458c3`, cherry-picked onto main and reviewed whole).
+
+  **Where it lives:** `app`'s `BaliApp.kt`: `Running.account`, and `start`, which makes `Account.of(engine, within)`
+  and runs it in the run's job, so a run's end ends its account; the account's own run hooks the 13+ check's ask at
+  each wake (AN9e), then follows each sign-in. None over an engine with no sign-in, a Debug build's while sign-in isn't
+  set up. `app/src/debug`'s `ReadoutActivity.kt`, iOS's `Readout`'s twin: Join, the engine's join alone with the code
+  typed and a fresh UUIDv7 at each press, answering "joined <class>" or "not joined: <result> <message>" (the look-up
+  and the consent preview are AS4's); History, `engine.client.history(limit = 5)`, each moment its wire type and time,
+  newest first as the server gives them, or "history not read: <result>" (the engine's `history(before:)` and
+  History's rules are AN9g's); and the Signed in line, read from the run's account, naming the 13+ check where it
+  stands (Q3): through, asking Bali, not through, or answered under 13 this run, with no button for it before AS2 and
+  no Delete account (AS7's). The manifest requires NFC (the owner, 2026-11-10, above), and `BALI_PORTAL_URL` is
+  `https://app.getbali.app` (the owner, 2026-11-07, #540). Where Kotlin differs, said plainly:
+  - **The ask is hooked by the account's own run, not by the app,** where iOS's `Phone.start` hooks it: Q1 put the
+    account half in `outbox`, and its run hooks the ask before it follows the sign-in, so no ask goes unanswered
+    before a wake can ask again.
+  - **The readout's Join trims the code typed, as its Tap trims a tag;** iOS's sends it as typed. The server ignores
+    case and surrounding whitespace either way (`JoinCode`), so only a code of spaces alone differs: it says "type a
+    join code first" instead of reaching the server. An empty page of History says so, where iOS's shows nothing.
+
+  **This step's calls, each awaiting the owner's look:**
+  - **Lint's `UnnecessaryRequiredFeature` is waived on the NFC feature alone** (`tools:ignore` on its element, the
+    reason beside it): an error under `warningsAsErrors`, which the start had never run lint to meet, asking whether
+    NFC must be required, which the owner's ruling answers. Every other check stays, as with the missing icon's waiver.
+  - **The readout's Engine line reads the run's account,** as its Signed in line does, not the app's sign-in, which a
+    run over a sign-in of a test's own read as "over no token".
+  - **The readout's buttons are pinned by name** (ReadoutTest), so a 13+ button or Delete account can't be added
+    without changing the test; both wait on AS2's and AS7's boards.
+
+  **Docs:** ARCHITECTURE's "Under 13" amendment now agrees with the data model's `cognito_deletions` line, as C3d left
+  it (Claude Review's WARN on #558; C3d's "For the owner"): `DELETE /v1/me` keeps its sign-in's deletion while queued
+  and for 24 hours once its try finishes. It rides this Android step as the first docs change after C3d, by the
+  conductor's brief. PLAN's C4c line points to AN9e's two iOS gaps (`signed`, `answerAge`; above, AN9e's entry). And
+  `docs/ANDROID-PHONE-TESTS.md` gains Q7's line: AN7f's and AN8's rounds on dev sign in as a student account that
+  passed the 13+ check on an iPhone.
+
+  **For AN9f, AN9g and AN10:** `LockServiceTest`'s `Server` is internal now, and `TestSignIn.kt` makes a sign-in of a
+  test's own, for any instrumented test that needs a signed-in run. AN9g's `history(before:)` can leave the readout on
+  the client, as iOS's reads it. AN10's router reads `running.account.state`, and finds no account over a Debug
+  build's engine while sign-in isn't set up.
+
+  **The tests,** on `Bali_Spike_API35`, `36` and `37`, the whole instrumented suite, 54 of 54 on each, never skipped:
+  BaliAppTest's start running its account, which follows each sign-in (nobody, a student, signed out, another
+  student), asks Bali under each student's own account, and asks again at the engine's next wake after Bali went
+  unanswered, a yes letting the sign-in through to Bali's API; an engine with no sign-in has none; the installed
+  manifest requires NFC, and the build links the portal at its new address. ReadoutTest's Join (the code typed, its
+  lower case kept, each press under its own UUIDv7; joined, and not joined with its status and message), History
+  (`limit=5`, five moments newest first, each its wire name and the phone's time; not read, with its status) and the
+  Signed in line (no, asking Bali, not through, no, through), its buttons pinned. Each signs in over a sign-in of the
+  test's own, LockServiceTest's `Server` answering Cognito's token endpoint and Bali's API, the tokens in memory, the
+  outbox a file of its own. Tried on Android 15, each failing by name, then reverted: `Account` not run in `start`
+  (4: BaliAppTest's, and ReadoutTest's three, the account's state never coming); the ask not hooked at a wake
+  (BaliAppTest's, at the ask the wake should have made); the Join's code changed from the one typed (the Join's:
+  `6BVZA5` sent for `6bvza5`) and its event id kept across presses (the Join's, the second press's id the first's);
+  History reversed (History's, oldest first) and asking six (History's: `limit=6`); and the Signed in line without
+  the check (its own, at "asking Bali").
+
+  **The proof:** `./gradlew assemble :app:assembleDebugAndroidTest :app:lint check` green, from scratch too
+  (`--rerun-tasks`), Android 10's API check with it; the core and outbox suites run five times once the code was final,
+  each green, AN9h's AgeFallbackTest `aYesForOneAccountTakenAtAWake…` among them every time; `npm run typecheck && npm
+  run lint && npm test` green, the portal's suite whole. Nothing was added to the PC's SDK: its folders were compared
+  before and after. Each emulator after its runs: Bali and its test app uninstalled, AN1's spike apps kept, every
+  setting as found, stopped. A restart of Claude Code cut Android 15's first run short mid-test, Bali's service
+  switched on: switched off as found before the suite ran again, whole.
+
+  **Santa's review:** SANTA
+
 - **2026-11-11** — **C3d, deleted sign-ins refused on the server: no account is made again under a deleted
   sign-in's old token, on any device (the owner, 2026-11-11: "Now, on the server"; C3d, #558).** The owner's
   answer to the conductor's question "When should the server stop deleted accounts from coming back?" (the other

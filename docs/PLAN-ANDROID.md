@@ -14,16 +14,17 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-11 (Central) — AN9e, the account's flows in the engine (#557; `docs/DECISIONS.md`,
-2026-11-11): `Account`, BaliApp.swift's `Phone`'s account half in `outbox`, which follows the sign-in as each
-sign-in lands (`SignIn.landings`, a renewal never one), asks Bali for the 13+ yes of the account it names and
-again at each wake while unanswered, holds an answer under 13 for the run alone, has the engine forget another
-student's `me`, and takes a deletion's stop answered once another account's sign-in landed as `SignInChanged`.
-AN9e was split, its app half now AN9i. Before it, AN9d, Join, Leave, Your name and forget me through the engine. Next:
-AN9i, the account's flows in the app and the readout's Join and History; AN7f and AN8's 📱 check on the
-owner's phones; Android's Cognito clients, the owner's (Open owner items, 8); Android 17's SDK platform for the
-owner to OK before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's
-part 2 once the owner has the phones. Not on the pilot's critical path._
+_Last updated: 2026-11-11 (Central) — AN9i, the account's flows in the app, and the readout's Join and History
+(#559; `docs/DECISIONS.md`, 2026-11-11): `BaliApp`'s `start` makes one `Account` a run over the engine's sign-in and
+runs it in the run's job, the 13+ check's ask hooked at each wake and each sign-in followed; the Debug readout's Join
+with the code typed, a fresh event id at each press, History's last five moments in the wire's names, newest first,
+and its Signed in line naming the check as the run's account has it, with no 13+ button and no Delete account; NFC
+required in the manifest and the portal at `https://app.getbali.app`, the owner's rulings. Before it, AN9e, the
+account's flows in the engine. Next: AN9f, Me's rules, and AN9g, History's rules and its call; AN7f and AN8's 📱 check
+on the owner's phones, signed in on dev as an account that passed the 13+ check on an iPhone (Q7); Android's Cognito
+clients, the owner's (Open owner items, 8); Android 17's SDK platform for the owner to OK before the first step with
+today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the
+pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -166,17 +167,8 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
   DECISIONS 2026-11-10)
 - **AN9e** The account's flows in the engine: `Account`, and each sign-in that lands said by `SignIn` — ✅
   (#557; DECISIONS 2026-11-11)
-- **AN9i** The account's flows in the app, and the readout's Join and History (AN9e's app half, split off,
-  its start on the branch `feat/an9i-android-app-half`; twin: BaliApp.swift's `Phone`, its wiring, and its
-  `Readout`'s): one `Account` a run in `BaliApp` (DECISIONS 2026-11-05, Q1); the readout's Join with a typed
-  code, History's last five moments, and its Signed in line naming the check (Q3), with no 13+ button and no
-  Delete account. In `android/app` too, the owner's rulings since AN9a: `BALI_PORTAL_URL`
-  (`app/build.gradle.kts`) becomes `https://app.getbali.app` (the owner, 2026-11-07, #540), the old
-  address's redirect covering it till then; and the manifest's NFC feature required (the owner,
-  2026-11-10: "Yes, require NFC"), so Play offers Bali to phones with NFC alone, as the App Store offers
-  it to iPhones (DECISIONS 2026-11-07, 2026-11-10). AN7f's and AN8's rounds on dev come after it and
-  Open owner items, 8 (Q7). Tests: BaliAppTest's and ReadoutTest's on the emulators — validation: the JVM
-  tests, then the instrumented tests on `Bali_Spike_API35`, `36` and `37`
+- **AN9i** The account's flows in the app, and the readout's Join and History — ✅ (#559; DECISIONS
+  2026-11-11)
 - **AN9f** Me's rules: Your name, Leave and Sign out's hold (twin: `Me`'s `Naming`, `Leaving` and
   `SignOutWords.held`): Me's name typed, printable, tidied and saved under one event id while it stays
   the same, its blank test a table of Unicode's Default_Ignorable_Code_Point, pinned by a test, no ICU4J
