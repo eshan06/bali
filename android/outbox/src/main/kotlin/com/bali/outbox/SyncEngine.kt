@@ -125,8 +125,11 @@ class SyncEngine private constructor(
     private val clock: SyncClock,
     /** The sign-in's (AN6), for a refused token: [open] says what it owes. */
     private val refresh: suspend () -> Boolean,
-    /** The sign-in whose account's 13+ yes the read loop records on Bali's server (C7-server): [make]'s; none in an engine opened without one. */
-    private val signIn: SignIn?,
+    /**
+     * The sign-in whose account's 13+ yes the read loop records on Bali's server (C7-server): [make]'s, which the app's
+     * [Account] follows; none in an engine opened without one.
+     */
+    internal val signIn: SignIn?,
 ) {
     /** The app's scope, under a job of the engine's own, so no call's failure ends the others. */
     private val scope = CoroutineScope(scope.coroutineContext + SupervisorJob(scope.coroutineContext[Job]))
