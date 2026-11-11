@@ -31,10 +31,11 @@ import { z } from 'zod';
 
 import type { Analytics } from '../analytics.js';
 import { requireAuth } from '../auth/plugin.js';
+import { accountOf, asUnlocker, signedInOf } from '../auth/student.js';
 import { requireOwnClass, requireSessionOwner, requireTeacher } from '../auth/teacher.js';
 import { parseRequest } from '../errors.js';
 import type { NotifyClassStarted } from '../push/class-started.js';
-import { mapTransitionError } from './errors.js';
+import { mapTransitionError, refusal } from './errors.js';
 import { DeviceTime, Order } from './schemas.js';
 
 const ClassParams = z.object({ id: z.string().uuid() });
@@ -190,7 +191,7 @@ export function registerSessionsRoute(
       const { id: sessionId } = parseRequest(request, 'params', SessionParams);
       // Checked as /v1 ships it; the phone's deviceTime stamps nothing (rule 1, decision 7).
       parseRequest(request, 'body', CheckInBody);
-      const student = await findOrCreateStudent(db, identity.sub);
+      const student = await accountOf(db, identity);
       const result = await mapTransitionError(() =>
         checkIn(db, { sessionId, studentId: student.id, now: clock() }),
       );
@@ -206,7 +207,8 @@ export function registerSessionsRoute(
 
   // POST /v1/sessions/:id/unlock — emergency unlock. NOT gated on a live
   // participation (step 2 / ISSUES #2): it is always recorded, even for a
-  // removed student or an unknown session id, so no response can mean "discard".
+  // removed student or an unknown session id, so no response can mean "discard";
+  // under a deleted sign-in's old token, as one from no account (C3d, `asUnlocker`).
   app.post(
     '/v1/sessions/:id/unlock',
     {
@@ -217,21 +219,22 @@ export function registerSessionsRoute(
       const identity = requireAuth(request);
       const { id: sessionId } = parseRequest(request, 'params', SessionParams);
       const body = parseRequest(request, 'body', UnlockBody);
-      const student = await findOrCreateStudent(db, identity.sub);
       // Wrapped even though unlock is built never to refuse: it can still raise
       // EVENT_ID_CONFLICT when the client reuses an id that already belongs to
       // a different event. That must reach the phone as a 409 — which the
       // unlock contract reads as "keep the record, retry, and surface" — rather
       // than an unmapped 500.
       const result = await mapTransitionError(() =>
-        unlock(db, {
-          sessionId,
-          studentId: student.id,
-          eventId: body.eventId,
-          deviceTime: new Date(body.deviceTime),
-          reason: body.reason ?? null,
-          order: body.order ?? null,
-        }),
+        asUnlocker(db, identity, { eventId: body.eventId, at: clock() }, (on, studentId) =>
+          unlock(on, {
+            sessionId,
+            studentId,
+            eventId: body.eventId,
+            deviceTime: new Date(body.deviceTime),
+            reason: body.reason ?? null,
+            order: body.order ?? null,
+          }),
+        ),
       );
       return toUnlockResponse(result);
     },
@@ -248,16 +251,17 @@ export function registerSessionsRoute(
       const identity = requireAuth(request);
       const { eventId: tapEventId } = parseRequest(request, 'params', TapParams);
       const body = parseRequest(request, 'body', UnlockBody);
-      const student = await findOrCreateStudent(db, identity.sub);
       const result = await mapTransitionError(() =>
-        unlockUnderTap(db, {
-          tapEventId,
-          studentId: student.id,
-          eventId: body.eventId,
-          deviceTime: new Date(body.deviceTime),
-          reason: body.reason ?? null,
-          order: body.order ?? null,
-        }),
+        asUnlocker(db, identity, { eventId: body.eventId, at: clock() }, (on, studentId) =>
+          unlockUnderTap(on, {
+            tapEventId,
+            studentId,
+            eventId: body.eventId,
+            deviceTime: new Date(body.deviceTime),
+            reason: body.reason ?? null,
+            order: body.order ?? null,
+          }),
+        ),
       );
       return toUnlockResponse(result);
     },
@@ -272,7 +276,10 @@ export function registerSessionsRoute(
       const identity = requireAuth(request);
       const { eventId: unlockEventId } = parseRequest(request, 'params', TapParams);
       const body = parseRequest(request, 'body', ReasonBody);
-      const student = await findOrCreateStudent(db, identity.sub);
+      // Under a deleted sign-in's old token no account is the caller's, so no unlock is, and
+      // none is made (C3d): the 404 a caller with no unlock gets, never `account_deleted`.
+      const student = await findOrCreateStudent(db, signedInOf(identity));
+      if (!student) throw refusal('UNLOCK_NOT_FOUND');
       const { outcome, reason } = await mapTransitionError(() =>
         changeUnlockReason(db, {
           unlockEventId,
@@ -302,7 +309,7 @@ export function registerSessionsRoute(
       const identity = requireAuth(request);
       const { id: sessionId } = parseRequest(request, 'params', SessionParams);
       const body = parseRequest(request, 'body', StateChangeBody);
-      const student = await findOrCreateStudent(db, identity.sub);
+      const student = await accountOf(db, identity);
       const result = await mapTransitionError(() =>
         protectionOff(db, {
           sessionId,
@@ -336,7 +343,7 @@ export function registerSessionsRoute(
       const identity = requireAuth(request);
       const { id: sessionId } = parseRequest(request, 'params', SessionParams);
       const body = parseRequest(request, 'body', StateChangeBody);
-      const student = await findOrCreateStudent(db, identity.sub);
+      const student = await accountOf(db, identity);
       const result = await mapTransitionError(() =>
         refocus(db, {
           sessionId,
@@ -369,7 +376,7 @@ export function registerSessionsRoute(
       const identity = requireAuth(request);
       const { id: sessionId } = parseRequest(request, 'params', SessionParams);
       const body = parseRequest(request, 'body', StateChangeBody);
-      const student = await findOrCreateStudent(db, identity.sub);
+      const student = await accountOf(db, identity);
       const result = await mapTransitionError(() =>
         protectionOn(db, {
           sessionId,

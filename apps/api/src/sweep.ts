@@ -1,4 +1,9 @@
-import { type Database, expireDueSessions, markSilentParticipations } from '@bali/db';
+import {
+  type Database,
+  expireDueSessions,
+  forgetFinishedCognitoDeletions,
+  markSilentParticipations,
+} from '@bali/db';
 import type { FastifyInstance } from 'fastify';
 
 import type { SignInDeletions } from './cognito/sign-in-deletion.js';
@@ -18,7 +23,8 @@ export const SWEEP_INTERVAL_MS = 60_000;
  * The sweep, the minute-tick that keeps derived truth honest: it ends every
  * session past its end time (decision 6), then opens a silence episode for
  * every focused phone gone quiet (decision 7), then tries each deleted
- * account's Cognito sign-in that is due (`signIns`, 2026-10-09), then, while
+ * account's Cognito sign-in that is due (`signIns`, 2026-10-09) and forgets each
+ * one finished a day ago, its mark no longer needed (C3d), then, while
  * decks' storage is on, rejects the decks left pending and deletes the objects
  * no upload can write any more (`decks`, M2b2). Each duty is
  * idempotent, so any number may run at once — each API process's own, every
@@ -41,6 +47,7 @@ export async function sweep(
   const wentSilent = await markSilentParticipations(db, now);
   // Last: a bell never waits on Cognito or the bucket.
   await signIns?.due(now);
+  await forgetFinishedCognitoDeletions(db, now);
   await decks?.(now);
   return { expired: expired.length, wentSilent };
 }

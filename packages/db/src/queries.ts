@@ -14,6 +14,7 @@ import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lte, or, sql }
 import type { SQLWrapper } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 
+import { type SignedIn, signInDeleted } from './cognito-deletions.js';
 import {
   armedTaps,
   blocks,
@@ -101,14 +102,22 @@ async function fillMissingDisplayName(
  * A row that already exists still gets a missing display name filled in, so the
  * fix for "no name on the token" reaches an account already provisioned, once its
  * token carries a usable name, without anybody re-creating accounts.
+ *
+ * None, and no row made, under a deleted sign-in's old token (C3d; the owner,
+ * 2026-11-11: "Now, on the server"): a sign-in made after the deletion makes one.
+ * Asked only once the lookup misses: a deletion takes the subject off the row and
+ * marks the sign-in in one transaction, so a lookup that misses the row is always
+ * followed by a read that finds the mark, a deletion committing meanwhile too.
  */
 export async function findOrCreateStudent(
   db: Database,
-  cognitoId: string,
+  signedIn: SignedIn,
   displayName?: string,
-): Promise<UserRow> {
+): Promise<UserRow | undefined> {
+  const cognitoId = signedIn.sub;
   const existing = await findUserByCognitoId(db, cognitoId);
   if (existing) return fillMissingDisplayName(db, existing, displayName);
+  if (await signInDeleted(db, signedIn)) return undefined;
 
   await db
     .insert(users)

@@ -86,6 +86,12 @@ function one<T>(rows: T[]): T {
   return row;
 }
 
+/** The sign-in `sub`'s next call, as the boot call makes it: a disposal deletes no sign-in. */
+async function provision(sub: string, displayName?: string) {
+  const signedIn = { issuer: 'https://cognito-idp.test/c6a', sub, at: undefined };
+  return must(await findOrCreateStudent(db, signedIn, displayName));
+}
+
 /**
  * A school whose teacher came by an invite, with a block, a second invite still
  * open, two classes, Ana (renamed) and Ben in a lesson that is over, Ana's
@@ -796,7 +802,7 @@ describe('after a disposal', () => {
     const open = await mintTeacherInvite(db, { schoolId: s.school.id });
     if (open.outcome !== 'minted') throw new Error('mint');
     await db.update(schools).set({ removedAt: new Date() }).where(eq(schools.id, s.school.id));
-    const newcomer = await findOrCreateStudent(db, newUuidV7(), 'Newcomer');
+    const newcomer = await provision(newUuidV7(), 'Newcomer');
 
     expect(
       await redeemTeacherInvite(db, { userId: newcomer.id, code: open.code, eventId: newUuidV7() }),
@@ -833,7 +839,7 @@ describe('after a disposal', () => {
 
     // Her sign-in now matches no account: the next call makes a fresh one, whose unlock is kept,
     // its order with it.
-    const reborn = await findOrCreateStudent(db, s.ana.cognitoId);
+    const reborn = await provision(s.ana.cognitoId);
     expect(reborn.id).not.toBe(s.ana.id);
     const orphanId = newUuidV7();
     const orphan = await unlock(db, {
@@ -865,7 +871,7 @@ describe('after a disposal', () => {
     await expect(
       startSession(db, { classId: s.first.id, startedAt: new Date(), endsAt: fromNow(40 * MIN) }),
     ).rejects.toMatchObject({ code: 'CLASS_NOT_FOUND' });
-    const stranger = await findOrCreateStudent(db, newUuidV7());
+    const stranger = await provision(newUuidV7());
     await expect(
       joinClassByCode(db, {
         studentId: stranger.id,

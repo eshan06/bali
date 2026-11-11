@@ -86,6 +86,8 @@ const SCENARIOS: Record<string, string> = {
   'me/armed-expired':
     'The same boot call once that tap’s school day has ended: it waits no more (#166).',
   'me/in-session': 'The boot call of a student live in a running session.',
+  'me/409-account-deleted':
+    'The boot call under the token of a sign-in whose account was deleted, still valid (C3d): no account is made.',
   'taps/armed': 'A tap while none of the teacher’s sessions runs: saved, waiting for Start.',
   'taps/already-armed': 'Another tap of the same block while the first still waits.',
   'taps/already-armed-retry':
@@ -1017,6 +1019,8 @@ async function captureAll() {
   const deletion = del(eve, '/v1/me');
   await capture('account/deleted', deletion, 200, { outcome: 'deleted' });
   await capture('account/already-deleted', deletion, 200, { outcome: 'already_deleted' });
+  const deleted = { reason: 'account_deleted' };
+  await capture('me/409-account-deleted', get(eve, '/v1/me'), 409, deleted);
   const teacherLeaves = del(await token(naming.teacher.cognitoId), '/v1/me');
   await capture('account/409-teacher-has-classes', teacherLeaves, 409, {
     reason: 'teacher_has_classes',
@@ -1183,10 +1187,8 @@ describe('the contract fixtures (contracts/fixtures)', () => {
       'page_out_of_range',
       'deck_in_use',
     ]);
-    // Only a race reaches it: a join, rename, tap or answer whose route found the
-    // account just before its deletion (C3); in sequence, the sign-in is a new account.
-    const raceOnly = new Set<string>(['account_deleted']);
-    const phones = API_ERROR_REASONS.filter((r) => !portal.has(r) && !raceOnly.has(r));
+    // `account_deleted` too, since C3d: in sequence, a deleted sign-in's old token is refused.
+    const phones = API_ERROR_REASONS.filter((r) => !portal.has(r));
     expect(new Set(reasons)).toEqual(new Set(phones));
   });
 

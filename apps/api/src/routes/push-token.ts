@@ -1,10 +1,4 @@
-import {
-  type Database,
-  findOrCreateStudent,
-  findUserByCognitoId,
-  registerPushToken,
-  removePushToken,
-} from '@bali/db';
+import { type Database, findUserByCognitoId, registerPushToken, removePushToken } from '@bali/db';
 import {
   PUSH_ENVIRONMENTS,
   PUSH_TOKEN_MAX_LENGTH,
@@ -15,6 +9,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import { requireAuth } from '../auth/plugin.js';
+import { accountOf } from '../auth/student.js';
 import { ApiError, parseRequest } from '../errors.js';
 import { refusal } from './errors.js';
 
@@ -59,7 +54,7 @@ export function registerPushTokenRoutes(app: FastifyInstance, db: Database): voi
     async (request): Promise<RegisterPushTokenResponse> => {
       const identity = requireAuth(request);
       const body = parseRequest(request, 'body', RegisterBody);
-      const caller = await findOrCreateStudent(db, identity.sub);
+      const caller = await accountOf(db, identity);
       const result = await registerPushToken(db, { userId: caller.id, ...body });
       switch (result.outcome) {
         case 'registered':

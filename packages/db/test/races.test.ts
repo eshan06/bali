@@ -3,7 +3,11 @@ import { and, asc, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { recordAgeCheck, type RecordAgeCheckResult } from '../src/age-checks.js';
-import { claimCognitoDeletions, queueCognitoDeletion } from '../src/cognito-deletions.js';
+import {
+  claimCognitoDeletions,
+  type CognitoSignIn,
+  queueCognitoDeletion,
+} from '../src/cognito-deletions.js';
 import { registerPushToken } from '../src/device-tokens.js';
 import { newUuidV7 } from '../src/ids.js';
 import { createBlock, createClass } from '../src/management.js';
@@ -78,6 +82,7 @@ import {
   startSession,
   tapIn,
   unlock,
+  unlockAsNoOne,
   unlockUnderTap,
 } from '../src/transitions.js';
 import type { Database } from '../src/types.js';
@@ -111,6 +116,13 @@ afterAll(async () => {
 function one<T>(rows: T[]): T {
   const row = rows[0];
   if (rows.length !== 1 || row === undefined) throw new Error('expected exactly one row');
+  return row;
+}
+
+/** The sign-in `sub`'s first call, as the boot call makes it: of a sign-in never deleted here. */
+async function provision(sub: string, displayName?: string) {
+  const row = await findOrCreateStudent(db, { issuer: POOL, sub, at: undefined }, displayName);
+  if (!row) throw new Error(`no account made for ${sub}`);
   return row;
 }
 
@@ -2068,9 +2080,13 @@ describe.runIf(REAL_PG)('account deletion under contention (real Postgres, C3)',
 /**
  * Run `deleteAccount` for `userId` in a transaction held open until the
  * returned `release` is called, then committed: what a call racing a deletion
- * meets mid-flight (C3).
+ * meets mid-flight (C3). With `signIn`, the sign-in is marked too (C3d); with
+ * `lockUsers`, the users table is then held, so any read of it waits for the commit.
  */
-async function heldDeletion(userId: string) {
+async function heldDeletion(
+  userId: string,
+  { signIn, lockUsers = false }: { signIn?: CognitoSignIn; lockUsers?: boolean } = {},
+) {
   let release!: () => void;
   const held = new Promise<void>((resolve) => {
     release = resolve;
@@ -2080,13 +2096,113 @@ async function heldDeletion(userId: string) {
     ran = resolve;
   });
   const committed = db.transaction(async (tx) => {
-    await deleteAccount(tx, { userId, eventId: newUuidV7(), at: new Date() });
+    await deleteAccount(tx, { userId, eventId: newUuidV7(), at: new Date(), signIn });
+    if (lockUsers) await tx.execute(sql`lock table users in access exclusive mode`);
     ran();
     await held;
   });
   await deleted;
   return { release, committed };
 }
+
+describe.runIf(REAL_PG)(
+  'a deleted sign-in’s old token under contention (real Postgres, C3d)',
+  () => {
+    beforeAll(async () => {
+      await Promise.all(Array.from({ length: 5 }, () => db.execute(sql`select 1`)));
+    });
+
+    /** `seed(tag)`'s student's sign-in, and a token of it signed in a minute before now. */
+    const signInOf = (tag: string): CognitoSignIn => {
+      const sub = `student-${tag}`;
+      return { issuer: POOL, username: sub, sub };
+    };
+    const oldToken = (tag: string) => ({
+      issuer: POOL,
+      sub: `student-${tag}`,
+      at: new Date(Date.now() - 60_000),
+    });
+    const holding = (tag: string) =>
+      db
+        .select()
+        .from(users)
+        .where(eq(users.cognitoId, `student-${tag}`));
+
+    it('a lookup that waits out the deletion’s commit misses the row, then reads the mark: no account', async () => {
+      // The deletion takes the subject off the row and marks the sign-in in one transaction, held
+      // here with the users table locked, so the request's lookup waits for the commit and then
+      // misses the row. The mark, read after that miss, is always there; read before it, it would
+      // not be yet, and the miss would make an account.
+      const tag = 'race-c3d-wait';
+      const { studentId } = await seed(tag);
+      const { release, committed } = await heldDeletion(studentId, {
+        signIn: signInOf(tag),
+        lockUsers: true,
+      });
+      const request = findOrCreateStudent(db, oldToken(tag));
+      request.catch(() => undefined);
+      try {
+        expect(await waitForLockWaiter('"cognito_id"')).toBe(true);
+      } finally {
+        release();
+        await committed;
+      }
+
+      expect(await request).toBeUndefined();
+      expect(await holding(tag)).toEqual([]);
+    });
+
+    it('a lookup that lands before the deletion’s commit finds the account, a request on its way: none is made', async () => {
+      const tag = 'race-c3d-before';
+      const { studentId } = await seed(tag);
+      const { release, committed } = await heldDeletion(studentId, { signIn: signInOf(tag) });
+      const found = await findOrCreateStudent(db, oldToken(tag));
+      release();
+      await committed;
+
+      expect(found?.id).toBe(studentId);
+      expect(await holding(tag)).toEqual([]);
+    });
+
+    it('a deletion racing requests and an Emergency Unlock under its old token: no account, the unlock recorded once', async () => {
+      for (let round = 0; round < 15; round += 1) {
+        const tag = `race-c3d-${round}`;
+        const { studentId } = await seed(tag);
+        const unlockId = newUuidV7();
+        const at = new Date();
+        const record = (on: Database, id: string) =>
+          unlock(on, { sessionId: newUuidV7(), studentId: id, eventId: unlockId, deviceTime: at });
+        // The unlock routes' path: the caller's account, or a row born removed.
+        const unlocking = async () => {
+          const account = await findOrCreateStudent(db, oldToken(tag));
+          return account
+            ? record(db, account.id)
+            : unlockAsNoOne(db, { eventId: unlockId, at }, record);
+        };
+        const deletion = () =>
+          deleteAccount(db, { userId: studentId, eventId: newUuidV7(), at, signIn: signInOf(tag) });
+
+        const [deleted, first, second, unlocked] = await Promise.allSettled([
+          round % 2 === 1
+            ? new Promise((resolve) => setTimeout(resolve, 5)).then(deletion)
+            : deletion(),
+          findOrCreateStudent(db, oldToken(tag)),
+          findOrCreateStudent(db, oldToken(tag)),
+          unlocking(),
+        ]);
+
+        for (const settled of [deleted, first, second, unlocked]) {
+          if (settled.status === 'rejected') throw settled.reason;
+        }
+        for (const found of [first, second]) {
+          if (found.status === 'fulfilled' && found.value) expect(found.value.id).toBe(studentId);
+        }
+        expect(await holding(tag)).toEqual([]);
+        expect(await db.select().from(events).where(eq(events.eventId, unlockId))).toHaveLength(1);
+      }
+    }, 60_000);
+  },
+);
 
 describe.runIf(REAL_PG)('a deletion staged against an arm and a create (real Postgres, C3)', () => {
   it('a tap reaching the arm path behind a deletion is refused, and arms nothing', async () => {
@@ -2175,11 +2291,11 @@ describe.runIf(REAL_PG)('school disposal under contention (real Postgres, C6a)',
         order: { install, seq: 1 },
       });
       await endSession(db, { sessionId: lesson.id, at: new Date(), reason: 'ended' });
-      const stranger = await findOrCreateStudent(db, `stranger-${tag}`, `Stranger ${round}`);
+      const stranger = await provision(`stranger-${tag}`, `Stranger ${round}`);
       await recordAgreement(db, { schoolId, signedOn: '2026-09-01' });
       const invite = await mintTeacherInvite(db, { schoolId });
       if (invite.outcome !== 'minted') throw new Error('mint');
-      const newcomer = await findOrCreateStudent(db, `newcomer-${tag}`, `Newcomer ${round}`);
+      const newcomer = await provision(`newcomer-${tag}`, `Newcomer ${round}`);
       const unlockId = newUuidV7();
       const disposal = () =>
         disposeSchool(db, { schoolId, at: new Date(), confirmName: `School ${tag}` });
@@ -2403,7 +2519,7 @@ describe.runIf(REAL_PG)('school disposal under contention (real Postgres, C6a)',
       await recordAgreement(db, { schoolId, signedOn: '2026-09-01' });
       const invite = await mintTeacherInvite(db, { schoolId });
       if (invite.outcome !== 'minted') throw new Error('mint');
-      const newcomer = await findOrCreateStudent(db, `newcomer-${tag}`, `Newcomer ${tag}`);
+      const newcomer = await provision(`newcomer-${tag}`, `Newcomer ${tag}`);
       const redeem = (on: Database) =>
         redeemTeacherInvite(on, { userId: newcomer.id, code: invite.code, eventId: newUuidV7() });
       const dispose = (on: Database) =>
@@ -2811,12 +2927,12 @@ describe.runIf(REAL_PG)('provisioning concurrency (real Postgres)', () => {
     // its /v1/me would answer no name for a row that now has one.
     for (let round = 0; round < 15; round += 1) {
       const cognitoId = `race-fill-${round}-${newUuidV7()}`;
-      const created = await findOrCreateStudent(db, cognitoId);
+      const created = await provision(cognitoId);
       expect(created.displayName).toBeNull();
 
       const [a, b] = await Promise.all([
-        findOrCreateStudent(db, cognitoId, 'Ana Reyes'),
-        findOrCreateStudent(db, cognitoId, 'demo-ana@example.test'),
+        provision(cognitoId, 'Ana Reyes'),
+        provision(cognitoId, 'demo-ana@example.test'),
       ]);
 
       const rows = await db.select().from(users).where(eq(users.cognitoId, cognitoId));
@@ -2839,8 +2955,8 @@ describe.runIf(REAL_PG)('provisioning concurrency (real Postgres)', () => {
       const cognitoId = `race-first-${round}-${newUuidV7()}`;
 
       const [, named] = await Promise.all([
-        findOrCreateStudent(db, cognitoId),
-        findOrCreateStudent(db, cognitoId, 'Ana Reyes'),
+        provision(cognitoId),
+        provision(cognitoId, 'Ana Reyes'),
       ]);
 
       expect(named.displayName).toBe('Ana Reyes');
@@ -2853,8 +2969,8 @@ describe.runIf(REAL_PG)('provisioning concurrency (real Postgres)', () => {
       const cognitoId = `race-provision-${round}-${newUuidV7()}`;
 
       const [a, b] = await Promise.all([
-        findOrCreateStudent(db, cognitoId, 'Ana Reyes'),
-        findOrCreateStudent(db, cognitoId, 'Ana Reyes'),
+        provision(cognitoId, 'Ana Reyes'),
+        provision(cognitoId, 'Ana Reyes'),
       ]);
 
       expect(await db.select().from(users).where(eq(users.cognitoId, cognitoId))).toHaveLength(1);
@@ -2867,11 +2983,11 @@ describe.runIf(REAL_PG)('provisioning concurrency (real Postgres)', () => {
   it('a name arriving beside one already stored never replaces it', async () => {
     for (let round = 0; round < 15; round += 1) {
       const cognitoId = `race-keep-${round}-${newUuidV7()}`;
-      await findOrCreateStudent(db, cognitoId, 'Ana Reyes');
+      await provision(cognitoId, 'Ana Reyes');
 
       await Promise.all([
-        findOrCreateStudent(db, cognitoId, 'demo-ana@example.test'),
-        findOrCreateStudent(db, cognitoId, 'demo-other@example.test'),
+        provision(cognitoId, 'demo-ana@example.test'),
+        provision(cognitoId, 'demo-other@example.test'),
       ]);
 
       expect((await findUserByCognitoId(db, cognitoId))?.displayName).toBe('Ana Reyes');
@@ -4485,11 +4601,11 @@ describe.runIf(REAL_PG)('display names under contention (real Postgres)', () => 
   it('a sign-in’s fill racing a rename never overwrites the name the student set', async () => {
     for (let round = 0; round < 15; round += 1) {
       const cognitoId = `race-fill-rename-${round}-${newUuidV7()}`;
-      const created = await findOrCreateStudent(db, cognitoId);
+      const created = await provision(cognitoId);
       expect(created.displayName).toBeNull();
 
       await Promise.all([
-        findOrCreateStudent(db, cognitoId, 'demo-ana@example.test'),
+        provision(cognitoId, 'demo-ana@example.test'),
         renameStudent(db, { studentId: created.id, displayName: 'Ana', eventId: newUuidV7() }),
       ]);
 

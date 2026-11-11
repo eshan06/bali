@@ -1,7 +1,6 @@
 import {
   armTap,
   type Database,
-  findOrCreateStudent,
   resolveTapTarget,
   sessionRunning,
   tapIn,
@@ -12,6 +11,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import { requireAuth } from '../auth/plugin.js';
+import { accountOf } from '../auth/student.js';
 import { ApiError, parseRequest } from '../errors.js';
 import { mapTransitionError } from './errors.js';
 import { DeviceTime, Order, TAG_ID_MAX_LENGTH } from './schemas.js';
@@ -49,7 +49,7 @@ export function registerTapsRoute(app: FastifyInstance, db: Database, clock: () 
     const body = parseRequest(request, 'body', TapBody);
     const deviceTime = new Date(body.deviceTime);
 
-    const student = await findOrCreateStudent(db, identity.sub);
+    const student = await accountOf(db, identity);
     const join = async () => {
       const target = await resolveTapTarget(db, body.tagId, student.id);
       if (!target) throw ApiError.notFound('unknown block');

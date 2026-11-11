@@ -1,6 +1,6 @@
 import {
   claimCognitoDeletions,
-  type CognitoDeletion,
+  type ClaimedDeletion,
   type Database,
   findUserByCognitoId,
   finishCognitoDeletion,
@@ -14,7 +14,8 @@ import type { DeleteSignIn, Outcome } from './admin.js';
  * A deleted account's Cognito sign-in, deleted by the API (2026-10-09): queued with the deletion,
  * tried by a pass at once after the commit, then by each sweep while due (`claimCognitoDeletions`).
  * A retention run's (2026-10-28), queued by the owner's command, waits for the next pass: a
- * sweep's, or one a deletion starts, each taking the oldest due rows first.
+ * sweep's, or one a deletion starts, each taking the oldest due rows first. A finished row stays a
+ * day as the sign-in's mark, which refuses its old tokens (C3d), then the sweep forgets it.
  * The phone's own DeleteUser (C4) stays a first try. A log line names a row by its id, never the person.
  */
 
@@ -49,13 +50,13 @@ export function signInDeletions(
   app.log.info('Cognito sign-in deletion is on: a deleted account’s sign-in is deleted');
 
   /** One claimed row, tried. A failure of Cognito's is said here; one of ours rejects. */
-  const attempt = async (row: CognitoDeletion): Promise<void> => {
+  const attempt = async (row: ClaimedDeletion): Promise<void> => {
     let outcome: Outcome | 'came_back' = 'came_back';
     // Its person came back (the owner's ruling, 2026-10-09): a live account holds the sign-in
-    // again, made by its first call since, so the sign-in is theirs to keep. Asked at every try,
-    // before Cognito is called. ponytail: read, then deleted: a sign-in whose first call lands
-    // between this read and AdminDeleteUser (milliseconds apart) still loses it; closing that
-    // would take a lock a sign-in's first call never takes.
+    // again, made by the first call of a sign-in made since (C3d), so the sign-in is theirs to
+    // keep. Asked at every try, before Cognito is called. ponytail: read, then deleted: a sign-in
+    // whose first call lands between this read and AdminDeleteUser (milliseconds apart) still
+    // loses it; closing that would take a lock a sign-in's first call never takes.
     if (!(await findUserByCognitoId(db, row.sub))) {
       try {
         outcome = await deleteSignIn(row, AbortSignal.timeout(SIGN_IN_DELETION_TIMEOUT_MS));
@@ -70,7 +71,7 @@ export function signInDeletions(
         return;
       }
     }
-    await finishCognitoDeletion(db, row.id);
+    await finishCognitoDeletion(db, row, clock());
     const done = { deletion: row.id, attempts: row.attempts, outcome };
     app.log.info(done, 'Cognito sign-in deletion done');
   };
