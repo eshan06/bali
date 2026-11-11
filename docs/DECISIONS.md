@@ -8,6 +8,84 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-11** — **AN9g, History's rules and its call: BaliOutbox's `History` and SyncEngine.swift's `history(before:)`
+  in Kotlin, on the JVM, every failure and day title a type (the conductor's calls, those in the step's brief and this
+  step's own, marked, each awaiting the owner's look; AN9g, #561).** The rules AS7's History will follow, with no screen
+  and no word. AN9's last step: AN9a to AN9i are all done.
+
+  **Where it lives:** `outbox`'s new `History.kt`: `History` (`reading`, `before`, `answered`, `days`) and its `Failure`,
+  `Day`, `Title`, `Card`, `Moment` and `Note`; and `SyncEngine.kt`'s `history(before)`, through `Joining.send` by the
+  engine's own `refresh`, in its caller's coroutine, as `lookUp` goes (AN9d's note). Nothing calls them yet: AS7's History
+  and AN10's words will; the Debug readout still reads `engine.client.history(limit = 5)` itself, as iOS's does (AN9i).
+  History holds what the server answers and writes nothing, to the engine's state or the outbox. Where Kotlin differs,
+  said plainly:
+  - **A value whose every step gives the next,** as `Joining` is: `reading` gives the next, `answered` the next and
+    whether to read again from the top (Swift's `Bool`).
+  - **Every failure a type, never words:** `Failure` is the answer's result and its error's reason, as `Joining.Failure`
+    is, in `failure` and in `notUpdated`, where iOS keeps its words (`History.words`, `notUpdated(_:)`). A read refused
+    `409 account_deleted` (C3d) is one, its reason with it, tested. iOS's public `failed` is gone: a phone whose engine
+    hasn't started (`Joining.notStarted`) is AN10's to say, as for Join (AN9f).
+  - **A day's title is a type:** `Title.Today`, `Yesterday` or `On(date)`, its date in the phone's zone; its text, with
+    its year once that isn't this one by the phone's calendar, is AN10's, as each moment's time format is. A `Moment`
+    carries its time as a `ZonedDateTime` in the zone its day was drawn in, so its time and its day can't disagree.
+  - **Days by java.time, in the zone the caller names:** `days(now, zone)` has no default, so no test reads the PC's. A
+    day is its date there, whole whatever its length (23 or 25 hours at a daylight-saving change), and yesterday the
+    calendar's day before, never 24 hours back, as Foundation's `startOfDay` and `date(byAdding: .day)` give them; a day
+    starts at the same moment in every calendar a locale can pick, so the ISO date serves. A card's id is iOS's: its
+    day's start in epoch seconds, its class, and how many of that class's cards come after it that day.
+  - **A moment, typed:** its `kind` (a known `HistoryEventType`, for its icon and its words), `at`, `reason` (an
+    `UnlockReason`, or none), `countedIn` (the class's name, or none: "another class" in iOS's words), and `note`, one of
+    the four iOS says (`Note`: after the class ended, late, after the student left, Screen Time off) or none, as iOS's
+    `default: nil`: an unlock kept with no class is never in a class's history, and a note this build doesn't know says
+    nothing.
+
+  **This step's calls, each awaiting the owner's look:**
+  - **A kind this build doesn't know** (the brief: "stay a moment, typed as unknown, never a crash or a dropped page";
+    "follow the twin's `unknowns` test"): the page keeps it as it came, its `type` an `OrUnknown.Unknown` in `events`, and
+    is answered whole; the days leave it out, its card with it where it was alone, as the twin's test and A7 have it, so
+    the cards and their ids are iOS's. An unknown reason or note stays a moment, typed as unknown in the page and none in
+    its line. The other reading, a `Moment` of an unknown kind for AN10 to skip, would split a card iOS keeps whole.
+  - **The cursor a read sends is History's (`before`):** BaliApp.swift's `readHistory` picks it (`more ?
+    history.nextBefore : nil`); here `before` gives it after `reading`, so a read from the top sending a cursor, or Show
+    earlier sending none, fails a test by name. `readHistory`'s guards stay the app's, AS7's to port with `Phone`'s
+    history half: Show earlier only while there is a next page, one read at a time but a read from the top going ahead of
+    Show earlier's, whose answer `reads` drops, and the history forgotten when who is signed in changes.
+  - **A moment's reason and class counted in are carried as the server sent them:** iOS's words show a reason on an
+    unlock alone and a class on a declined tap alone; the server names neither elsewhere (A7), and AN10's words keep
+    iOS's rule.
+
+  **For AN10 and AS7:** AN10 words each failure (iOS's `History.words`: a teacher's account's own line on a 403, Join's
+  words for the rest, keyed on the status; `notUpdated`'s sentence, a sign-in Bali couldn't check said in one), each
+  moment (iOS's `History.Moment` words, and Android's own for "Screen Time off" and "back on" from AS0's Words board),
+  each note, each day title's text and each time's format in the phone's locale, and a phone whose engine hasn't
+  started. AS7 draws History from its board and ports `Phone`'s history half (`refreshHistory`, `readHistory` and
+  `reads`, `historyRead`, `forgetHistory`, `historyDays`' cache), sending `engine.history(history.before)` after
+  `reading`, and reading again from the top when `answered` says so.
+
+  **The tests:** HistoryTests' `days`, `cardIds`, `everyKind`, `unknowns`, `pages`, `readAgain` and `failures`, over A7's
+  fixtures, each check of a word, a day title's text or a time's format AN10's; and HistoryEngineTests'
+  `throughTheEngine`. New: New York's daylight-saving changes on a fixed clock and zone, falling back (Sunday, November
+  1, 2026: 1:30 AM twice, a 25-hour day) and springing forward (Sunday, March 8: a 23-hour day); Ms. Rivera's second
+  class right after her first, a card of its own; the cursor each read sends; each kind `HISTORY_EVENT_TYPES` lists a
+  moment of its own, and each reason `UNLOCK_REASONS` lists an unlock's, read from `@bali/shared` (`bali.shared`); an
+  unlock kept with no class, no note; C3d's 409; Show earlier's other failures in its place; and a page from the top
+  through the engine, the engine's state, its outbox and its read loop's next wake as they were. Tried, each failing by
+  name, then reverted: a moment shown twice across two pages (`pages`'); Show earlier reading from the top (`pages`',
+  `readAgain`'s, `failures`'); a read from the top sending the known cursor (`readAgain`'s), any failure of Show earlier's
+  read again from the top (`pages`', `readAgain`'s, `failures`'), and a read from the top answered `unknown_cursor` read
+  again, forever (`failures`'); an unknown cursor not read again from the top (`failures`'); days in UTC (`days`', the
+  daylight-saving test's, `everyKind`'s, `unknowns`'), and yesterday 24 hours back, and days 24 hours long (the
+  daylight-saving test's, each); two classes' moments in one card, by teacher (`days`', once Period 4 was in it: with
+  every test class a teacher of its own, it passed at first) and one card a day (`days`', `cardIds`', `everyKind`'s); an
+  unknown kind dropped from the page, and one crashing (`unknowns`', each); a failure kept as a string, the server's
+  message (`pages`', `readAgain`'s, `failures`'), `notUpdated` kept as words (`readAgain`'s, `failures`'), and a
+  failure's reason dropped (`failures`'); and the engine's call asking a read (`throughTheEngine`'s). The checks a type
+  change could break compare as `Any?`, so a string's break fails by name rather than at compile.
+
+  **Santa's review:** to fill once it has run.
+
+  **The proof:** to fill once it has run.
+
 - **2026-11-11** — **AN9f, Me's rules: Your name, Leave and Sign out's hold: BaliOutbox's `Naming`, `Leaving` and
   `SignOutWords.held` in Kotlin, on the JVM, every failure a type (the conductor's calls, those in the step's brief and
   this step's own, marked, each awaiting the owner's look; AN9f, #560).** The rules
