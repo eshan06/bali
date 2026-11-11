@@ -34,7 +34,7 @@ import kotlinx.serialization.json.jsonPrimitive
 // that throws or ends in a cancel of its own, and a join whose caller is cancelled.
 
 /** The real client, answering every request with `contracts/fixtures/[path]`'s status and body: BaliOutbox's JoinTests' `fixture`. */
-private fun fixture(path: String): ApiClient {
+fun fixture(path: String): ApiClient {
     val answer = BaliJson.parseToJsonElement(OutboxCases.directory.resolveSibling("fixtures").resolve(path).readText()).jsonObject
     return client(Canned(answer.getValue("status").jsonPrimitive.int, answer.getValue("body").toString()))
 }
