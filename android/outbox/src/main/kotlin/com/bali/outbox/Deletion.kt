@@ -43,11 +43,11 @@ sealed interface AccountDeletion {
     data class SignInNotDeleted(val result: SendResult) : AccountDeletion
 
     /**
-     * Who is signed in changed before `DELETE /v1/me` was answered deleted (the owner, 2026-11-10: "Close it now"):
-     * nothing more of the deletion sent, every record kept, and nothing sent for the sign-in now held. Nothing deleted
-     * that the phone knows of, though a `DELETE /v1/me` with no answer may have landed for the account that pressed,
-     * which its own next deletion settles (C3). Never [Deleted], nor a stop whose Try again would delete the account
-     * signed in now.
+     * Another account's sign-in landed before `DELETE /v1/me` was answered deleted (the owner, 2026-11-10: "Close it
+     * now"): nothing more of the deletion sent, every record kept, and nothing sent for the sign-in now held. Nothing
+     * deleted that the phone knows of, though a `DELETE /v1/me` with no answer may have landed for the account that
+     * pressed, which its own next deletion settles (C3). Never [Deleted], nor a stop whose Try again would delete the
+     * account signed in now.
      */
     data object SignInChanged : AccountDeletion
 }
@@ -109,12 +109,12 @@ sealed interface Deleting {
          */
         data object Unfinished : Stop
 
-        /** Who is signed in changed before the deletion was done ([AccountDeletion.SignInChanged]): nothing more sent. */
+        /** Another account's sign-in landed before the deletion was done ([AccountDeletion.SignInChanged]): nothing more sent. */
         data object SignInChanged : Stop
 
         /**
          * Whether another try can help, so Try again shows: never for a sign-in from before the scope, nor a teacher's, nor
-         * once the sign-in changed, when it would delete the account signed in now.
+         * once another account's sign-in landed, when it would delete that account.
          */
         val retries: Boolean
             get() =

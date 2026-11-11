@@ -505,9 +505,10 @@ class SignInTokensTest : SignIns() {
             val deleting = async { phone.deletionToken("b1") }
             endpoint.received(3)
             phone.accountDeleted("b1")
-            endpoint.answer(200, granted(jwt("b2")))
+            val renewed = jwt("b1", lifetime = 7200) // a renewal keeps the account its sign-in is
+            endpoint.answer(200, granted(renewed))
             assertNull(deleting.await())
-            assertEquals(jwt("b2"), store.tokens?.access)
+            assertEquals(renewed, store.tokens?.access)
             assertEquals(true, store.tokens?.deleted)
         }
 

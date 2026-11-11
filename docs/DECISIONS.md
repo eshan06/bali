@@ -33,20 +33,22 @@ a real decision? Add a dated entry at the top: what was decided and why.
     to the 13+ read or to the yes renews that account's sign-in alone (`SignIn.refresh(account)`), true only once a
     fresh token of that account's is held, so a renewal answered after another sign-in landed sends nothing again.
     The loops' own refresh is unchanged.
-  - **Answer 1 (the conductor's):** a sign-in changed before `DELETE /v1/me` went stops the deletion: nobody
-    deleted, nothing more of it sent, every record kept, every Emergency Unlock among them, and the answer is
-    `AccountDeletion.SignInChanged`, never `Deleted`, `NotDeleted` or `SignInNotDeleted`. Its stop has no Try again,
-    which would start a deletion of the account now signed in; Back closes it, and a sign-in that changes again
-    takes it away, as it takes any stop.
+  - **Answer 1 (the conductor's):** another account's sign-in landed before `DELETE /v1/me` went stops the
+    deletion: nobody deleted, nothing more of it sent, every record kept, every Emergency Unlock among them, and the
+    answer is `AccountDeletion.SignInChanged`, never `Deleted`, `NotDeleted` or `SignInNotDeleted`. Its stop has no
+    Try again, which would start a deletion of the account now signed in; Back closes it, and a sign-in that changes
+    again takes it away, as it takes any stop.
   - **Answer 2 (AN9b's call, which stands):** a sign-in changed while `DELETE /v1/me` was out, or after, that
     `DELETE` answered deleted: `Deleted`, the mark and DeleteUser for the account that pressed alone, its Cognito
     user the server's deleter's (C3-cognito).
   - **The conductor's call, awaiting the owner (this step's; no answer names the case):** a `DELETE /v1/me` sent
-    for the account that pressed and answered anything but deleted once the sign-in changed (no answer, a 401, a
-    5xx, a teacher's classes) is `SignInChanged` too, as is any stop the deletion would answer while the sign-in held
-    is another's, or none (`stopped`): each one's Try again would start a deletion of the account signed in now,
+    for the account that pressed and answered anything but deleted once another account's sign-in landed (no answer,
+    a 401, a 5xx, a teacher's classes) is `SignInChanged` too, as is any stop the deletion would answer while another
+    account's sign-in is held (`stopped`): each one's Try again would start a deletion of the account signed in now,
     answer 1's own reason. One with no answer may have landed for the account that pressed; that account's own next
     deletion settles it (C3: a retry is `already_deleted`, and one reaching an account a read made since deletes it).
+    Nobody signed in, Cognito having refused the sign-in for good meanwhile, the stop stays AN9b's: no account is
+    there to delete, so its Try again asks for a sign-in first (santa's review).
   - **Answer 3 (the conductor's), the 13+ check:** the read goes under the account the app names
     (`ageCheck(account)`, as iOS's `Phone.askAge` reads the account before it asks), and the yes under its own
     account's token, gated as before (`forAccount`); while another account's sign-in is held, neither is sent
@@ -80,20 +82,30 @@ a real decision? Add a dated entry at the top: what was decided and why.
   sign-in's own token (a guard, which passed before too); a yes taken at a wake, its token renewed as another sign-in
   lands; `core`'s one account's tokens, before a renewal and after it, its refresh and its yes; a plain provider's
   token for its own account alone, so ApiClientTest's token that names no account now goes to no deletion; and the
-  new stop with no Try again. Three fixtures, AN9c's two and `core`'s gated case, renewed a1's sign-in into tokens
-  naming a2 and a3, which Cognito never does (a renewal keeps the `sub`); they name a1 now. Tried, each failing by
-  name, then reverted: the deletion's token for whoever is signed in (4 tests); the yes's (2, the yes at a wake among
-  them); a 401's renewal of whoever is signed in (5); `refresh(account)` true once a renewal leaves another's sign-in
-  held (2); the drain's 401 renewal during a deletion the engine's own (the drain's test), `DELETE /v1/me`'s (its
-  test), the 13+ read's (the read's) and the yes's (the yes's); no new answer for a changed sign-in (4); no account
-  check after a renewal (3); a stopped deletion letting go of the records (2); a plain provider's token for any
-  account (ApiClientTest's); `yes(account)` for whoever (`core`'s); Try again on the new stop (2); and a deletion
-  that never renews its own account's token (8, AN9b's and AN9c's renewal tests among them). Not shown by a test: a
-  sign-in landing after the deletion's last read of it (For AN9e, above).
+  new stop with no Try again; and, from santa's review, a sign-in Cognito refuses for good before `DELETE /v1/me`
+  goes, its stop AN9b's (it failed first as `SignInChanged`). Four fixtures, AN9c's two and two of `core`'s, renewed
+  a sign-in into tokens naming another account (a2, a3, b2), which Cognito never does (a renewal keeps the `sub`);
+  each names its own account now, so the deleted-during-a-renewal case pins the mark again, not the account check.
+  Tried, each failing by name, then reverted: the deletion's token for whoever is signed in (4 tests); the yes's (2,
+  the yes at a wake among them); a 401's renewal of whoever is signed in (5); `refresh(account)` true once a renewal
+  leaves another's sign-in held (2); the drain's 401 renewal during a deletion the engine's own (the drain's test),
+  `DELETE /v1/me`'s (its test), the 13+ read's (the read's) and the yes's (the yes's); no new answer for another
+  account's sign-in (4); no account check after a renewal (3); a stopped deletion letting go of the records (2); a
+  plain provider's token for any account (ApiClientTest's); `yes(account)` for whoever (`core`'s); Try again on the
+  new stop (2); and a deletion that never renews its own account's token (8, AN9b's and AN9c's renewal tests among
+  them). Not shown by a test: a sign-in landing after the deletion's last read of it (For AN9e, above).
+
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this
+  PC, so context isolation holds and model diversity doesn't): 0 blockers. Their WARNs, each taken: `core`'s
+  deleted-during-a-renewal case renewed b1 into tokens naming b2, so its no-token assertion passed on the account
+  check alone (both; the fixture names b1 now); `stopped` answered `SignInChanged` with nobody signed in too, a case
+  no test drove (both; narrowed to another account's sign-in, with the test above); and ARCHITECTURE's new sentence
+  wrote this step's call awaiting the owner into the law (now the token rule alone, the stop in this entry).
 
   **The proof:** `android/app` is unchanged, so the JVM tests are the proof and no emulator ran: `./gradlew assemble
-  :app:lint check` green, Android 10's API check with it, and the core and outbox suites run five times more after
-  `check`'s own run, each green. Nothing was added to the PC's SDK: its folders were compared before and after.
+  :app:lint check` green, Android 10's API check with it, and the core and outbox suites run seven times more beside
+  `check`'s own runs, each green, the last two after the review's fixes. Nothing was added to the PC's SDK: its
+  folders were compared before and after.
 
   **For C4c, the iPhone's twin (the owner's Mac session; nothing in `ios/` changed here):** the same rule (the owner,
   2026-11-10: "Close it now"): every request an account deletion sends, and the 13+ read and yes, go under the token
@@ -114,12 +126,13 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `signIn.account()` first, none being `.signInFirst`; `sendAll` sends each record through
   `client.forDeletion(account)`, its 401's renewal `signIn.refresh(for: account)`; `deleteMe` sends
   `client.forDeletion(account)` in `Joining.send(renewing:)` with that renewal; any stop it would answer while
-  `signIn.account()` is no longer `account` answers a new `AccountDeletion.signInChanged`, every record kept and
-  nothing more sent, never `.deleted`, `.notDeleted` or `.signInNotDeleted`, and `Deleting` takes it as a stop with
-  no Try again; AN9b's call for a `DELETE /v1/me` answered deleted stands. `ageCheck()` becomes `ageCheck(for
+  another account's sign-in is held (`signIn.account()` neither `account` nor nil; nil keeps the stop, its Try again
+  a sign-in first) answers a new `AccountDeletion.signInChanged`, every record kept and nothing more sent, never
+  `.deleted`, `.notDeleted` or `.signInNotDeleted`, and `Deleting` takes it as a stop with no Try again; AN9b's call
+  for a `DELETE /v1/me` answered deleted stands. `ageCheck()` becomes `ageCheck(for
   account:)` under `client.forDeletion(account)`, renewed for that account alone, `Phone.askAge` passing the account
   it already reads; the read loop reads `signIn.account()`, then `yes(for:)`, and sends `record(yes:)` through
-  `client.forAccount(account)`, renewed for that account alone. Port the tests with it: DeleteAccountTest.kt's five
+  `client.forAccount(account)`, renewed for that account alone. Port the tests with it: DeleteAccountTest.kt's six
   AN9h cases, AgeFallbackTest.kt's three, SignInTokensTest.kt's `oneAccountsTokens…`, and DeleteUserTest.kt's Q4
   case. **The screen:** the iPhone's Delete account screen gets no new line for the new answer unless it is first
   drawn on its board's canvas as an intermediate state, then built from that drawing, its words through `no-ai-slop`

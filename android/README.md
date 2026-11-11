@@ -246,8 +246,8 @@ it lands, however it ends; then it sends the outbox, every Emergency Unlock firs
 holding it back, then `DELETE /v1/me`, then Cognito's DeleteUser for the account it began with, each send
 and each call into the sign-in with the engine let go; one deletion at a time, in the engine's scope, a
 second press sharing it; deleted, the phone stands out of any session, kept so. Each send, each renewal
-too, goes under the token of the account it began with alone, and a sign-in changed before `DELETE /v1/me`
-is answered deleted stops it (`SignInChanged`, AN9h), every record kept. Its 13+ check (AN9c) reads the
+too, goes under the token of the account it began with alone, and another account's sign-in landing before
+`DELETE /v1/me` is answered deleted stops it (`SignInChanged`, AN9h), every record kept. Its 13+ check (AN9c) reads the
 server's yes of the account the app names, under that account's deletion token (`ageCheck`), and runs the
 app's ask (`askAgeAtEachWake`) and sends the yes its sign-in keeps (`PUT /v1/me/age-check`), under its own
 account's token, at each wake, neither during a deletion, the yes

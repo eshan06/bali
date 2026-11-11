@@ -733,6 +733,30 @@ class DeleteAccountTest : EngineFiles() {
             rig.stop()
         }
 
+    @Test
+    fun aSignInCognitoRefusesForGoodBeforeDeleteMeGoesLeavesNobodySignedInAndTheStopAsAN9bHadItItsTryAgainASignInFirstTheRecordKept(): Unit =
+        runBlocking {
+            // AN9h (santa's review): the new answer is for another account's sign-in alone. Cognito refusing a1's refresh
+            // token for good as the report's token is renewed signs a1 out: nobody's account can be deleted now, so the stop
+            // is AN9b's, whose Try again asks for a sign-in first, and the report stays.
+            val rig = signedRig()
+            rig.signedIn()
+            val off = assertNotNull(rig.engine.record(Change.ProtectionOff("s")))
+            rig.server.next(protectionOffRoute).reply(null)
+            rig.until { it.retryAt == at(2) }
+            withTimeout(patience) { rig.running.cancelAndJoin() }
+            rig.clock.advance(3600) // a1 has expired: renewed for the report first
+            val deletion = rig.deleting()
+            rig.server.next(tokenRoute).reply(400, """{"error":"invalid_grant"}""")
+            assertEquals(AccountDeletion.NotDeleted(SendResult.NetworkError), rig.answerSendingNothing(deletion))
+            assertNull(rig.signIn.account())
+            assertTrue(rig.keychain.isEmpty)
+            assertEquals(listOf(off.eventId), rig.outbox.records().map { it.eventId })
+            assertEquals(AccountDeletion.SignInFirst, rig.deleting().answer())
+            assertTrue(rig.server.sent.none { it.route == deleteMeRoute || it.route == deleteUserRoute })
+            rig.stop()
+        }
+
     private companion object {
         /** The outbox's read of everything queued, as Room's DAO prepares it. */
         const val RECORDS = "ORDER BY COALESCE(orderSeq, seq), seq"

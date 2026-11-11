@@ -17,8 +17,9 @@ structure", decided at AN1b (2026-11-04).
 _Last updated: 2026-11-10 (Central) — AN9h, one account's token for Delete account and the 13+ check
 (#555; `docs/DECISIONS.md`, 2026-11-10; the owner, 2026-11-10: "Close it now"): every request a deletion
 sends, and the 13+ read and yes, under the token of the account they are for alone, by its `sub`, each
-renewal that account's own; a sign-in changed before `DELETE /v1/me` is answered deleted stops the deletion
-with an answer of its own (`SignInChanged`), every record kept, nothing more sent and no Try again. The
+renewal that account's own; another account's sign-in landing before `DELETE /v1/me` is answered deleted
+stops the deletion with an answer of its own (`SignInChanged`), every record kept, nothing more sent and no
+Try again. The
 iPhone's twin is C4c, the Mac's. Before it, AN9c, the 13+ check. Next: AN9d, Join, Leave, Your name and
 forget me through the engine; AN7f and AN8's 📱 check on the owner's phones; Android's Cognito clients, the
 owner's (Open owner items, 8); Android 17's SDK platform for the owner to OK before the first step with

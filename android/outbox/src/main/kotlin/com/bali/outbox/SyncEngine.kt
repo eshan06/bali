@@ -922,12 +922,13 @@ class SyncEngine private constructor(
     }
 
     /**
-     * Where the deletion for [account] stopped, [stop], unless the sign-in held is no longer [account]'s: then who is
-     * signed in changed before `DELETE /v1/me` was answered deleted ([AccountDeletion.SignInChanged]), and no stop offers
-     * a Try again that would delete the account signed in now.
+     * Where the deletion for [account] stopped, [stop], unless another account's sign-in is held now: then who is signed in
+     * changed before `DELETE /v1/me` was answered deleted ([AccountDeletion.SignInChanged]), and no stop offers a Try again
+     * that would delete the account signed in now. Nobody signed in (Cognito refused the sign-in meanwhile), [stop] stands:
+     * its Try again asks for a sign-in first.
      */
     private suspend fun stopped(signIn: SignIn, account: String, stop: AccountDeletion): AccountDeletion =
-        if (signIn.account() == account) stop else AccountDeletion.SignInChanged
+        if (signIn.account().let { it == null || it == account }) stop else AccountDeletion.SignInChanged
 
     /**
      * What the loops have on its way, waited out ([underway]): exactly that, since they count nothing more
