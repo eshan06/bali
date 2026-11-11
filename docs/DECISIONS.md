@@ -49,6 +49,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
     it follows the flow before its first read of the clock, as iOS registers its observer first, and throws once
     cancelled, where iOS's returns. Its test's clock sleeps by the time that passes, as the phone's does: the rig's
     `TestClock` wakes a sleep its clock is turned past, which would hide a change never looked at.
+  - **`bell` aims its sleep afresh at each look** (this step's call, found in the port): iOS's sleeps out the span it
+    began with, so a clock set forward short of the bell asks the router again late by the change, until then showing
+    the class's screen (Unlocked, say) past the bell by the phone's clock. Android's, at each time-set signal, sleeps
+    toward the bell as the clock reads then, so the router is asked again at the bell by the phone's clock, as the rule
+    says. For the owner, the iPhone's twin has that gap, the Mac's change: it needs a student to set the clock forward in
+    class, and only the screen is late, never the lock, which keeps its own end.
   - **`offersSignOut` is the screen's** (iOS's is `Phone`'s, of the screen shown): Me, Your name and the teacher's screen.
     **The router's answer is `Screen.Shown`**, iOS's tuple of the screen and its tab bar.
 
@@ -59,12 +65,14 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `pendingTap` and `everApproved` (with Q3's case), and the router halves of `homeWaiting` and `inNoClass`; AppTests'
   `nameAndSignOut`, its `offersSignOut` half, over every screen; the screen halves of WaitingHomeTests' `startFromHome` and
   DroppedWaitTests (`dropped`, `startAfterExpiry`, `takenAndOver`, `offlineAtTheEnd` and `relaunched`; the first two read
-  a student named Ana, as iOS's do, so the rig's `Answer.me` takes a name); BellRedrawTests' `timeSet`; and
-  LaunchGraceTests' `settles`, each claim it collects routed to Home or Focus, never the permission step. No twin:
+  a student named Ana, as iOS's do, so the rig's `Answer.me` takes a name); BellRedrawTests' `timeSet`, and new, a clock
+  set forward short of the bell slept toward afresh, ending at the bell by the clock, and one set back slept on to it;
+  and LaunchGraceTests' `settles`, each claim it collects routed to Home or Focus, never the permission step. No twin:
   `waitingWords` and `ridersWiring`, which read iOS's views. Every word and card (Home's, Waiting's) is AN10d's to AN10h's.
   Tried, each failing by name, then reverted: the home a standing not read keeps not shown over the last run's lock (4
   tests); Focus by the standing and a tap alone, a countdown over nothing locked past the bell or the cap (13); the bell
-  not looked at again at a time-set signal, and never ended by its sleep (`timeSet`, each); a teacher's account shown a
+  not looked at again at a time-set signal, and never ended by its sleep (both bell tests, each), and iOS's sleep kept on
+  its first span (the new one); a teacher's account shown a
   student's screens (4); "approved" claimed after `switchedOff` (Q3's case); a problem said as a string (`storage`), and
   every problem flattened into one (8); starting never routed as on once read on (2, `settles` among them); `rings` to the
   millisecond (2); `keepsOpened` blind to a tap; and Home offering Sign out.

@@ -223,27 +223,25 @@ sealed interface Screen {
         /**
          * Returns at [bell] by the phone's own clock, [clock], where the router chooses again (C5a), or throws once its coroutine
          * is cancelled: slept towards, and looked at again at each of [changes], Android saying the time was set. A sleep counts
-         * only the time that passes ([SystemClock]'s): with the clock set forward past the bell, it would wait out the time left
-         * (C5a's review). [changes] is followed before the clock is first read, so a hot flow misses no change made after it.
+         * only the time that passes ([SystemClock]'s), so each look aims it afresh at the bell as the clock reads now: a clock set
+         * forward past the bell ends the wait at once, where the sleep would wait out the time left (C5a's review), and one set
+         * forward short of it, or back, is slept towards anew. [changes] is followed before the clock is first read, so a hot
+         * flow misses no change made after it.
          */
         suspend fun bell(bell: Instant, changes: Flow<Unit>, clock: SyncClock = SystemClock): Unit =
             coroutineScope {
                 val looks = Channel<Unit>(Channel.CONFLATED)
                 val watching = launch(start = CoroutineStart.UNDISPATCHED) { changes.collect { looks.send(Unit) } }
-                val sleeping =
-                    launch {
-                        // Again while the clock, set back meanwhile, puts the bell still ahead.
-                        do {
+                while (clock.now() < bell) {
+                    val sleeping =
+                        launch {
                             clock.sleep(bell)
                             looks.send(Unit)
-                        } while (clock.now() < bell)
-                    }
-                while (true) {
+                        }
                     looks.receive()
-                    if (clock.now() >= bell) break
+                    sleeping.cancel()
                 }
                 watching.cancel()
-                sleeping.cancel()
             }
     }
 }
