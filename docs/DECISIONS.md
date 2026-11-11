@@ -54,7 +54,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   (the phone's locale asking for the Islamic, Japanese, Buddhist and Chinese calendars, java.util's Calendar and
   java.time's chronology shown to take them on this JVM), `menus`, and `keeps`' first half (an answer holds
   nothing but itself). New: the check's own read refused with a 401, renewed once, and an expired token renewed
-  first, the renewal telling the engine; a yes's 401 renewed once, and a 401, a 408 and a 429 keeping it; a yes
+  first, the renewal telling the engine; a yes's 401 renewed once, and a 401, a 3xx, a 408 and a 429 keeping it; a yes
   kept going nowhere at a wake while `DELETE /v1/me` is out; a run cancelled while its yes is out, then a deletion
   that doesn't wait for it; an ask that throws, or ends in a cancel of its own, both ways; and the check never
   between a student and Emergency Unlock: the ask held and the check's read out, then the yes out, the lock off at
@@ -71,9 +71,16 @@ a real decision? Add a dated entry at the top: what was decided and why.
   real-time wait (AN9b's same note); and `SignIn.yes` or `recorded` called with the engine held, which waits on
   nothing of the engine's.
 
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this
+  PC, so context isolation holds and model diversity doesn't): 0 blockers. Their WARNs: a 3xx to the yes's PUT let
+  the yes go, where iOS's `record(yes:)` and its own doc keep it (both; taken: kept now, the 401's test answering a
+  307 too, which failed before the fix); and C4c, the iPhone's half of the ruling, on none of PLAN.md's lines (left:
+  the conductor's to plan with the Mac session after AN9h, this step holding PLAN.md's words net zero).
+
   **The proof:** `android/app` is unchanged, so the JVM tests are the proof and no emulator ran: `./gradlew assemble
-  :app:lint check` green, Android 10's API check with it, and the outbox's suite run five times over. Nothing was
-  added to the PC's SDK: its folders were compared before and after.
+  :app:lint check` green, Android 10's API check with it, and the outbox's suite run five times over before the
+  review's fix and once more in `check` after it. Nothing was added to the PC's SDK: its folders were compared
+  before and after.
 
 - **2026-11-10** — **AN9b, the deletion in the engine: Delete account through the sync engine, its loops held
   and exactly what they have on its way waited out, on the JVM over the real sign-in (the conductor's calls,

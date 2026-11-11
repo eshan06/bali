@@ -169,9 +169,10 @@ class AgeFallbackTest : EngineFiles() {
         }
 
     @Test
-    fun aYesRefusedWith401IsRenewedOnceAndSentAgainUnderTheRenewedTokenA401ThenA408OrA429KeepsItForTheNextWakeUnderTheSameEventId(): Unit =
+    fun aYesRefusedWith401IsRenewedOnceAndSentAgainUnderTheRenewedTokenA401ThenA3xxA408OrA429KeepsItForTheNextWakeUnderTheSameEventId(): Unit =
         runBlocking {
-            // iOS's `record(yes:)`, which no iOS test reaches: none of the three refuses it for good.
+            // iOS's `record(yes:)`, which no iOS test reaches: none of them refuses it for good, nor records it (a 3xx,
+            // which the transport never follows; santa's review).
             val rig = signedRig(gated = true)
             rig.signStudentIn(accessToken("a1"), yes = "y1")
             yesOnItsWay(rig).reply(401)
@@ -180,8 +181,8 @@ class AgeFallbackTest : EngineFiles() {
             assertEquals(listOf("y1", "Bearer ${accessToken("a2")}"), listOf(renewed.eventId, renewed.token))
             renewed.reply(401)
             rig.engine.retryNow()
-            val again = yesSent(rig, listOf(408 to "", 429 to "", 200 to ageCheckPassed))
-            assertEquals(listOf("y1", "y1", "y1"), again.map { it.eventId })
+            val again = yesSent(rig, listOf(307 to "", 408 to "", 429 to "", 200 to ageCheckPassed))
+            assertEquals(listOf("y1", "y1", "y1", "y1"), again.map { it.eventId })
             assertTrue(again.all { it.token == "Bearer ${accessToken("a2")}" })
             eventually { rig.signIn.yes() == null }
             rig.stop()

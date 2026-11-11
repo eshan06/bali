@@ -502,7 +502,7 @@ class SyncEngine private constructor(
                 if (held) null else renewing { client.recordAgeCheck(RecordAgeCheckRequest(yes)) }.also { alone { request.land() } }
             } ?: return
         val code = (answer.result as? SendResult.Status)?.code ?: return
-        if (code in 200..499 && code != 401 && code != 408 && code != 429) signIn?.recorded(yes)
+        if (code in 200..299 || code in 400..499 && code != 401 && code != 408 && code != 429) signIn?.recorded(yes)
     }
 
     /** What a wake does, taken at its top: reads the truth, checks in, and whether that is the screen's own check-in. */
