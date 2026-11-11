@@ -7,8 +7,8 @@ import {
   schools,
   users,
 } from '@bali/db';
-import type { DeleteMeResponse, MeResponse } from '@bali/shared';
-import { eq } from 'drizzle-orm';
+import type { ApiErrorBody, DeleteMeResponse, MeResponse } from '@bali/shared';
+import { and, eq, isNull } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { Writable } from 'node:stream';
@@ -18,7 +18,7 @@ import { buildApp } from '../src/app.js';
 import { createVerifier } from '../src/auth/verify.js';
 import type { Env } from '../src/env.js';
 import { captureFailure } from '../src/monitoring.js';
-import { makeTestDb, seedClassroom } from './helpers/db.js';
+import { joinCodeFor, makeTestDb, seedClassroom } from './helpers/db.js';
 import { testEnv } from './helpers/env.js';
 import { makeTestIssuer, TEST_AUDIENCE, type TestIssuer } from './helpers/test-issuer.js';
 
@@ -123,6 +123,8 @@ async function settle(next: Env = deleterOn, clock?: () => Date) {
 }
 
 const queue = () => db.select().from(cognitoDeletions);
+/** An `auth_time` just after now: a sign-in made after anything this test did so far (C3d). */
+const secondsAfterNow = () => Math.floor(Date.now() / 1000) + 1;
 const log = () => lines.join('');
 const logged = (msg: string) =>
   lines.map((line) => JSON.parse(line) as Record<string, unknown>).filter((l) => l.msg === msg);
@@ -215,12 +217,12 @@ describe('a deleted account’s Cognito sign-in (2026-10-09)', () => {
     await settle(deleterOff);
     expect(await queue()).toHaveLength(1);
 
-    // The phone's own DeleteUser never landed (a reinstall): the same sign-in comes back, and its
-    // first call makes it a new account.
+    // The phone's own DeleteUser never landed (a reinstall): the same sign-in comes back, signed in
+    // after the deletion (C3d), and its first call makes it a new account.
     const token = await issuer.sign({
       sub: student.cognitoId,
       issuer: POOL,
-      extraClaims: { username: 'Google_9009' },
+      extraClaims: { username: 'Google_9009', auth_time: secondsAfterNow() },
     });
     const me = await app.inject({
       method: 'GET',
@@ -252,6 +254,80 @@ describe('a deleted account’s Cognito sign-in (2026-10-09)', () => {
   });
 });
 
+describe('a deleted sign-in’s old token, refused on the server (C3d; the owner, 2026-11-11: “Now, on the server”)', () => {
+  // Deleted on prod's terms: the key unset, so the sign-in waits in the queue, its tokens still
+  // valid. The tokens here were signed in a minute before the deletion: a second phone's, or the
+  // student web left open.
+  const at = new Date('2026-10-09T17:00:00Z');
+  const signedInBefore = Math.floor(at.getTime() / 1000) - 60;
+  const as = (token: string) => ({ authorization: `Bearer ${token}` });
+
+  /** A student of the class `tag`, deleted at `at` under a token of theirs: that token, kept. */
+  async function deleted(tag: string, username: string) {
+    await settle(deleterOff, () => at);
+    const seeded = await seedClassroom(db, tag);
+    pool.set(username, seeded.student.cognitoId);
+    const old = await issuer.sign({
+      sub: seeded.student.cognitoId,
+      issuer: POOL,
+      extraClaims: { username, auth_time: signedInBefore },
+    });
+    const deletion = await app.inject({
+      method: 'DELETE',
+      url: '/v1/me',
+      headers: as(old),
+      payload: { eventId: randomUUID() },
+    });
+    expect(deletion.json<DeleteMeResponse>()).toEqual({ outcome: 'deleted' });
+    return { ...seeded, old, users: await db.select().from(users) };
+  }
+
+  it('GET /v1/me makes no account under it, so nothing is named from its claims: 409 account_deleted', async () => {
+    const { old, users: before } = await deleted('old-me', 'demo-ana@example.test');
+
+    const res = await app.inject({ method: 'GET', url: '/v1/me', headers: as(old) });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json<ApiErrorBody>().error).toMatchObject({
+      code: 'conflict',
+      reason: 'account_deleted',
+    });
+    expect(await db.select().from(users)).toEqual(before);
+  });
+
+  it('a join makes no account under it, and the class’s roster names no one new: 409 account_deleted', async () => {
+    const { old, klass, users: before } = await deleted('old-join', 'Google_1102');
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/enrollments',
+      headers: as(old),
+      payload: { joinCode: joinCodeFor('old-join'), eventId: randomUUID(), deviceTime: at },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json<ApiErrorBody>().error).toMatchObject({ reason: 'account_deleted' });
+    expect(await db.select().from(users)).toEqual(before);
+    const roster = await db
+      .select()
+      .from(enrollments)
+      .where(and(eq(enrollments.classId, klass.id), isNull(enrollments.removedAt)));
+    expect(roster).toEqual([]);
+  });
+
+  it('its sign-in goes at the sweep, never kept as come back: no account holds it', async () => {
+    const { old } = await deleted('old-sweep', 'Google_1103');
+    await app.inject({ method: 'GET', url: '/v1/me', headers: as(old) });
+
+    // The key set, the queued deletion runs.
+    await settle(deleterOn, () => at);
+    await app.sweep(at);
+
+    expect(pool.has('Google_1103')).toBe(false);
+    expect(logged('Cognito sign-in deletion done')).toMatchObject([{ outcome: 'deleted' }]);
+  });
+});
+
 describe('the sign-ins a retention run de-identifies (2026-10-28)', () => {
   it('are deleted by the sweep, each by the sub it held, but one whose person came back since; a kept one is never touched', async () => {
     // A school whose year ended in 2020: each teacher, with a live class and block, stays named;
@@ -278,9 +354,13 @@ describe('the sign-ins a retention run de-identifies (2026-10-28)', () => {
     const run = parseSchoolCommand(['retention', ana.school.id, '--confirm', ana.school.name]);
     await run!({ db, print: () => undefined, issuer: POOL });
 
-    // Ben signs in again before the sweep: his first call makes him a new account, so the sign-in
-    // is his to keep.
-    const token = await issuer.sign({ sub: ben.student.cognitoId, issuer: POOL });
+    // Ben signs in again before the sweep, after the run (C3d): his first call makes him a new
+    // account, so the sign-in is his to keep.
+    const token = await issuer.sign({
+      sub: ben.student.cognitoId,
+      issuer: POOL,
+      extraClaims: { auth_time: secondsAfterNow() },
+    });
     const me = await app.inject({
       method: 'GET',
       url: '/v1/me',

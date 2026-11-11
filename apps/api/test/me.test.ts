@@ -1565,7 +1565,8 @@ describe('DELETE /v1/me (C3)', () => {
     const token = await ctx.tokenFor(student.cognitoId);
     const eventId = randomUUID();
     await deleteAs(token, eventId);
-    const { body } = await me(token);
+    // A sign-in made after the deletion (C3d): only its token makes an account under the sign-in.
+    const { body } = await me(await signedInAfter(student.cognitoId));
     expect(body.user.id).not.toBe(student.id);
 
     const res = await deleteAs(token, eventId);
@@ -1634,10 +1635,11 @@ describe('DELETE /v1/me (C3)', () => {
     expect((await rowOf(student.id)).removedAt).toBeNull();
   });
 
-  it('never names the deleted row again: its sign-in, still valid, is a stranger now', async () => {
+  it('never names the deleted row again, and makes no account under its sign-in’s old token (C3d)', async () => {
     const { student } = await seedClassroom(db, 'del-after');
     const token = await ctx.tokenFor(student.cognitoId);
     await deleteAs(token);
+    const before = await db.select().from(users);
 
     const res = await ctx.app.inject({
       method: 'PATCH',
@@ -1646,9 +1648,15 @@ describe('DELETE /v1/me (C3)', () => {
       payload: { displayName: 'Ana', eventId: randomUUID() },
     });
 
-    // Until the phone deletes the sign-in too (C4), it is a new, empty account.
-    expect(res.statusCode).toBe(200);
-    expect(res.json<UpdateMeResponse>().user.id).not.toBe(student.id);
+    // Its token still valid, its sign-in maybe not yet gone from Cognito: refused all the same.
+    expect(res.statusCode).toBe(409);
+    expect(res.json<ApiErrorBody>().error).toMatchObject({ reason: 'account_deleted' });
+    expect(await db.select().from(users)).toEqual(before);
     expect((await rowOf(student.id)).displayName).toBeNull();
   });
 });
+
+/** A token of the sign-in `sub` signed in after now, by Cognito's `auth_time` (C3d). */
+function signedInAfter(sub: string): Promise<string> {
+  return ctx.issuer.sign({ sub, extraClaims: { auth_time: Math.floor(Date.now() / 1000) + 1 } });
+}
