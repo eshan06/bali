@@ -14,7 +14,7 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-11 (Central) — AN9e, the account's flows in the engine (#NNN; `docs/DECISIONS.md`,
+_Last updated: 2026-11-11 (Central) — AN9e, the account's flows in the engine (#557; `docs/DECISIONS.md`,
 2026-11-11): `Account`, BaliApp.swift's `Phone`'s account half in `outbox`, which follows the sign-in as each
 sign-in lands (`SignIn.landings`, a renewal never one), asks Bali for the 13+ yes of the account it names and
 again at each wake while unanswered, holds an answer under 13 for the run alone, has the engine forget another
@@ -165,7 +165,7 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN9d** Join, Leave, Your name and forget me through the engine, and Join's rules — ✅ (#556;
   DECISIONS 2026-11-10)
 - **AN9e** The account's flows in the engine: `Account`, and each sign-in that lands said by `SignIn` — ✅
-  (#NNN; DECISIONS 2026-11-11)
+  (#557; DECISIONS 2026-11-11)
 - **AN9i** The account's flows in the app, and the readout's Join and History (AN9e's app half, split off,
   its start on the branch `feat/an9i-android-app-half`; twin: BaliApp.swift's `Phone`, its wiring, and its
   `Readout`'s): one `Account` a run in `BaliApp` (DECISIONS 2026-11-05, Q1); the readout's Join with a typed

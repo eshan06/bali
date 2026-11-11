@@ -10,7 +10,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
 
 - **2026-11-11** — **AN9e, the account's flows in the engine: BaliApp.swift's `Phone`'s account half as `outbox`'s
   `Account`, and each sign-in that lands said by `core`'s `SignIn`, on the JVM over the real sign-in (the
-  conductor's calls in the step's brief, and this step's own, marked, awaiting the owner's look; AN9e, #NNN).** The
+  conductor's calls in the step's brief, and this step's own, marked, awaiting the owner's look; AN9e, #557).** The
   step came to about 450 changed lines without its tests, so the conductor split it: this PR is its engine half. Its
   app half (`BaliApp`'s one `Account` a run, the readout's Join, History and Signed in line, the manifest's NFC
   feature required, the portal's address, Q7's line in `docs/ANDROID-PHONE-TESTS.md` and the emulator suite) is
@@ -107,8 +107,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   (said so above, the followed sign-in checked too); the same account's own sign-in read as another's (now not); and
   the state claiming a pass for a moment while another's sign-in lands (now `passed` says whether it took).
 
-  **The proof:** `android/app` is unchanged here, so the JVM tests are the proof and no emulator ran: PROOF. Nothing
-  was added to the PC's SDK: its folders were compared before and after.
+  **The proof:** `android/app` is unchanged here, so the JVM tests are the proof and no emulator ran: `./gradlew
+  assemble :app:assembleDebugAndroidTest :app:lint check` green, Android 10's API check with it, and the core and
+  outbox suites run nine times more, six before santa's fixes and three after, each green, AN9h's AgeFallbackTest
+  `aYesForOneAccountTakenAtAWake…` among them every time; `npm run typecheck && npm run lint && npm test` green, the
+  portal's suite whole. Nothing was added to the PC's SDK: its folders were compared before and after.
 
 - **2026-11-10** — **AN9d, Join, Leave, Your name and forget me through the engine, and Join's rules: BaliOutbox's
   `Joining` and the engine's account calls in Kotlin, on the JVM (AN9d, #556).** Ported as iOS has it, under the

@@ -34,8 +34,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 // The phone's account half (AN9e), over the engine as the app makes it, its sign-in gated as the app's is, and the API and
 // Cognito answered by hand: AppTests' ageFromServer, ageAgainInClass, forgetsAnother and deleteAccountWiring, their engine
 // halves, the screens and their words AN10's and Phase 10's. And new: each sign-in that lands counted, a renewal never (Q2);
-// a deletion's stop answered once another sign-in landed (AN9h's window); an answer under 13 held for the run alone (Q5);
-// the check asked again at each wake while unanswered (Q8); and an Emergency Unlock queued across another's sign-in.
+// a deletion answered once another account's sign-in landed (AN9h's window); an answer under 13 held for the run alone
+// (Q5); the check asked again at each wake while unanswered (Q8); and an Emergency Unlock queued across another's sign-in.
 
 val notPassed = """{"passed":false}"""
 
