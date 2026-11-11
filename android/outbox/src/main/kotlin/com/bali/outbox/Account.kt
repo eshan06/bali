@@ -116,25 +116,24 @@ class Account internal constructor(
     /**
      * The 13+ question answered with [month] and [year] (C7), AS2's screen's call: held in memory alone, for this run (Q5).
      * Signed in, the sign-in not through the check (the gap's fallback): 13 or older lets it through, its yes kept with the
-     * sign-in for Bali's server ([SignIn.passed]) and sent at the engine's next wake; under 13 deletes its account as Delete
-     * account does. Signed out, Sign up's question, held for its page (AS2's). Nothing once answered under 13 this run, nor
-     * signed in while the question isn't due.
+     * sign-in of the account the question was for ([SignIn.passed]), never another's landed since, and sent at the engine's
+     * next wake; under 13 deletes its account as Delete account does. Signed out, Sign up's question, held for its page
+     * (AS2's). Nothing once answered under 13 this run, nor signed in while the question isn't due.
      */
     suspend fun answerAge(month: Int, year: Int): Unit =
         call {
-            val (answer, changesThen) =
+            val (answer, changesThen, asked) =
                 alone {
                     if (age.answer == AgeCheck.Answer.TooYoung || signedIn == true && cleared != false) return@alone null
                     age = age.answered(month, year, clock.now(), clock.zone())
                     publish()
-                    (age.answer to changes).takeIf { signedIn == true }
+                    Triple(age.answer, changes, account).takeIf { signedIn == true }
                 } ?: return@call
             if (answer == AgeCheck.Answer.TooYoung) {
                 alone { deleting = deleting.ask() }
                 return@call delete()
             }
-            val account = signIn.account()
-            signIn.passed(account, recording = EventId.mint(clock.now()))
+            signIn.passed(asked, recording = EventId.mint(clock.now()))
             letThrough(changesThen)
         }
 
