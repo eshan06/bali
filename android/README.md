@@ -66,11 +66,11 @@ that needs a new SDK package names it, its source and its size for the owner fir
 ## `core` and `outbox`
 
 Both are plain Kotlin, so their tests run on a JDK alone, as BaliCore's and BaliOutbox's run on
-Linux. Their tests read the repo's `contracts/` in place, never a copy, and `core`'s read
-`@bali/shared`'s lists (`packages/shared/src/`) so too: Gradle names each folder in a system
-property (`bali.contracts`, `bali.shared`) and makes it an input of the test task, so a changed
-fixture or list runs them again. Run outside Gradle, the properties are unset and they fail, never
-passing on nothing. They compile to Java 17's bytecode, which the app's build turns into Android's.
+Linux. Their tests read the repo's `contracts/` in place, never a copy, and `@bali/shared`'s lists
+(`packages/shared/src/`) so too, and `outbox`'s the API's name rules (`apps/api/src/display-name.ts`):
+Gradle names each in a system property (`bali.contracts`, `bali.shared`, `bali.names`) and makes it
+an input of the test task, so a changed fixture, list or rule runs them again. Run outside Gradle,
+the properties are unset and they fail, never passing on nothing. They compile to Java 17's bytecode, which the app's build turns into Android's.
 Every body is coded with kotlinx.serialization, its compiler plugin Kotlin's own (`core`'s
 `Json.kt`).
 
