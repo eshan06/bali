@@ -239,6 +239,8 @@ class ReadoutTest {
         val signIn = signed()
         val readout = open()
         until { readout.lines().takeIf { "Signed in: no\n" in it } }
+        // The Engine line reads the run too: this one's engine is over a sign-in, the app's own not set up.
+        until { readout.lines().takeIf { "Engine: over the sign-in\n" in it } }
         server.signStudentIn(signIn, scope, "student-1")
         val asked = server.next(AGE_CHECK)
         until { readout.lines().takeIf { "Signed in: yes · 13+ check: asking Bali for this account's yes\n" in it } }
@@ -263,6 +265,14 @@ class ReadoutTest {
     fun joinSendsTheCodeTypedUnderAFreshEventIdAtEachPressAndSaysJoinedOrNotJoinedWithItsAnswer() {
         through(signed())
         val readout = open()
+        // A code of spaces alone, trimmed as the Tap trims a tag: said so at once, by the press's own end nothing sent.
+        ReadoutActivity.note.value = ""
+        readout.onActivity {
+            it.joinCode.setText("   ")
+            it.join.performClick()
+        }
+        assertEquals("type a join code first", said())
+        assertFalse("POST /v1/enrollments" in server.waiting)
         val joined = join(readout, "6bvza5")
         joined.reply(200, """{"outcome":"joined","enrollmentId":"e","class":{"id":"c","name":"Period 3"}}""")
         assertEquals("joined Period 3", said())
@@ -294,6 +304,11 @@ class ReadoutTest {
         readout.onActivity { it.history.performClick() }
         server.next(HISTORY).reply(503, "")
         assertEquals("history not read: Status(code=503)", said())
+        // No moments yet: said so, where iOS's shows nothing.
+        ReadoutActivity.note.value = ""
+        readout.onActivity { it.history.performClick() }
+        server.next(HISTORY).reply(200, page(emptyList()))
+        assertEquals("history: no moments yet", said())
     }
 
     /**

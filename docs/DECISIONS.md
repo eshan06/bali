@@ -56,10 +56,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   BaliAppTest's start running its account, which follows each sign-in (nobody, a student, signed out, another
   student), asks Bali under each student's own account, and asks again at the engine's next wake after Bali went
   unanswered, a yes letting the sign-in through to Bali's API; an engine with no sign-in has none; the installed
-  manifest requires NFC, and the build links the portal at its new address. ReadoutTest's Join (the code typed, its
-  lower case kept, each press under its own UUIDv7; joined, and not joined with its status and message), History
-  (`limit=5`, five moments newest first, each its wire name and the phone's time; not read, with its status) and the
-  Signed in line (no, asking Bali, not through, no, through), its buttons pinned. Each signs in over a sign-in of the
+  manifest requires NFC, and the build links the portal at its new address. ReadoutTest's Join (a code of spaces said
+  at once, nothing sent; the code typed, its lower case kept, each press under its own UUIDv7; joined, and not joined
+  with its status and message), History (`limit=5`, five moments newest first, each its wire name and the phone's
+  time; not read, with its status; an empty page said so) and the Signed in line (no, asking Bali, not through, no,
+  through), the Engine line over the sign-in, the buttons pinned. Each signs in over a sign-in of the
   test's own, LockServiceTest's `Server` answering Cognito's token endpoint and Bali's API, the tokens in memory, the
   outbox a file of its own. Tried on Android 15, each failing by name, then reverted: `Account` not run in `start`
   (4: BaliAppTest's, and ReadoutTest's three, the account's state never coming); the ask not hooked at a wake
@@ -76,7 +77,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   setting as found, stopped. A restart of Claude Code cut Android 15's first run short mid-test, Bali's service
   switched on: switched off as found before the suite ran again, whole.
 
-  **Santa's review:** SANTA
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC,
+  so context isolation holds and model diversity doesn't): 0 blockers. Their WARNs, each taken: this line left a
+  placeholder (both; filled); the Engine line over a sign-in untested (reviewer A; the Signed in line's test reads it
+  now); a code of spaces and an empty page of History untested (reviewer B; the Join's and History's tests say each
+  now). The suite ran whole again on the three emulators after them.
 
 - **2026-11-11** — **C3d, deleted sign-ins refused on the server: no account is made again under a deleted
   sign-in's old token, on any device (the owner, 2026-11-11: "Now, on the server"; C3d, #558).** The owner's
