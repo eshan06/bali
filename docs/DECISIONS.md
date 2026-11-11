@@ -8,6 +8,103 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-10** — **AN9d, Join, Leave, Your name and forget me through the engine, and Join's rules: BaliOutbox's
+  `Joining` and the engine's account calls in Kotlin, on the JVM (AN9d, #556).** Ported as iOS has it, under the
+  two calls the conductor made in the step's brief (below); this step's own calls are marked, awaiting the owner's
+  look.
+
+  **Where it lives:** `outbox`'s new `Join.kt`: `Joining` (the code as codes are written, `complete`, `looked`,
+  `joined`, `back`, `busy`) and `Joining.send`, where the engine's `renewing` moved (AN5e's "For AN9");
+  `outbox`'s `SyncEngine.kt`: `lookUp`, `join`, `rename`, `leave`, `unlockUnsent`, `forgetMe` and `meChanges`,
+  a read's `me` applied only while `meChanges` is what it was when the read was sent, which closes AN5c's seam
+  ("Seams"), and `hooked`, the module's now; and `SyncState.kt`'s `forgets`. Nothing calls them yet: AN9e's
+  readout's Join and its `forgetMe` at each sign-in that lands (Q2), AN9f's `Naming`, `Leaving` and Sign out's
+  hold, AS4's Join and AS7's Me. Where Kotlin differs, said plainly:
+  - **`Joining` is a value whose every step gives the next,** as AN9a's `Deleting` is: `type`, `looked` and
+    `back` give the next, `joined` the next and whether the student is in (Swift's `Bool`), and the app sets
+    `busy` with `copy`, as iOS's app sets the field. Its failures are typed (`Joining.Failure`: the answer's
+    result and its error's reason), never strings; `words` and `notStarted` are AN10's.
+  - **A code's characters are a BreakIterator's grapheme clusters,** as Swift's `Character`s are, so a letter
+    with a combining accent, or a digit made a keycap, is neither and goes, where a filter by `Char` would keep
+    its base. Android 10's BreakIterator is older than the JDK's, but both join a combining mark or a variation
+    selector to the character before it, which is all this rule asks of them.
+  - **`Joining.send` names its renewal, with no default:** the engine's own `refresh` for a screen's own call
+    (`lookUp`, `join`, `rename`, `leave`, a reason's change), an account's own sign-in for a call held to one
+    account (`ageCheck(account)`, `record(account, yes)`, `deleteMe`; AN9h), each as it was. A renewal that
+    throws, or ends in a cancel of its own, renewed nothing (`hooked`), its caller's own cancel still ending it.
+    The engine's private `renewing` defaulted to the engine's `refresh`, so a call held to one account could have
+    fallen back to it by leaving its renewal out; none can now.
+  - **`meChanges` under the engine's lock:** the read takes it in the stretch that decides to send it
+    (`reading`) and compares it in the stretch that applies its answer (`readMe`); a join, a rename, a leave and
+    `forgetMe` move it in the stretch that applies their own answer. So a read sent before any of them never
+    applies its `me` and counts as no read (`meReads`), its standing still reconciled as the stamp allows, as on
+    iOS.
+  - **A join, a rename and a leave run in the engine's scope,** each answer applied in a stretch of its own
+    however its caller ends, as `explain`'s is: a screen gone never loses a class the server joined, nor leaves a
+    class left or an old name showing until the next read. The join's is the split's; the rename's and the
+    leave's are this step's call, awaiting the owner, one rule for the three. Swift's run in their caller's task,
+    which iOS's buttons never cancel. The rig's teardown waits each out: the engine's scope is the test's, which
+    it cancels and joins before the files close. A look-up applies nothing, so it runs in its caller's coroutine,
+    as `ageCheck` does.
+  - **`unlockUnsent` reads the file itself** (`Outbox.records`), unshown, as Swift's `try?`: none when the file
+    can't be read now, for Sign out's caller to say (C6b).
+  - **`forgetMe` changes `me`, `meFailed` and `forgets` alone,** and asks for the read: where the phone stands
+    and its queue are the phone's (B4), and nothing closes or empties the outbox's file, so an Emergency Unlock
+    queued stays and goes.
+
+  **The conductor's two calls (the brief), and where this step bears on them:**
+  - **The account calls go under whoever is signed in, as on iOS,** a join's and a leave's guard `forgets`, a
+    rename's `meChanges`. In one line: a 401's second send goes under whoever is signed in too, so a join one
+    account pressed, answered 401 as another account signs in, renews that sign-in and joins that account to the
+    class, now also once the join's screen has gone (the engine's scope); ruled out for the pilot with two accounts
+    on one phone, the owner's to re-check before K-12.
+  - **During a deletion the engine holds none of them, as on iOS. For the owner, a privacy point (never dropped;
+    not fixed here):** a join or a rename pressed before Delete account whose send is answered 401 while `DELETE
+    /v1/me` is on its way is sent again once its renewal gives a token, with no press behind it. After `DELETE
+    /v1/me` is answered, that can happen only in the instant before the deletion marks the sign-in deleted
+    (`accountDeleted`), after which it gets no token. But sent while `DELETE /v1/me` is out, it can land after the
+    deletion commits, and the server then makes a fresh account under the same sign-in (`findOrCreateStudent`;
+    ARCHITECTURE's "any request would make a fresh account"), holding the class joined or the name typed: only a
+    request whose caller the server read before the commit is `409 account_deleted`. The same goes for a join's or
+    a rename's own first send, pressed just before Delete account. A leave and a look-up make no account
+    (`unknown_user`; a read). How likely: very low, a press just before Delete account, a 401 to it, and its
+    renewal ending inside the deletion's own round trip; C4b's screen keeps any press from being made once the
+    deletion runs, and iOS's `Joining.send` has the same path.
+
+  **For AN9e:** call `forgetMe` at each sign-in that lands (Q2), and drop a state counting fewer `forgets` than the
+  app asked for (F11a-1); the readout's Join sends `lookUp` and `join`, the app setting `busy` with `copy` and
+  taking `joined`'s pair. **For AN9f:** `rename`, `leave` and `unlockUnsent` are the calls `Naming`, `Leaving`
+  and Sign out's hold make; `Joining.Failure` is a typed failure's shape; outbox's tests read `@bali/shared` now
+  (`bali.shared`), for `DISPLAY_NAME_MAX_LENGTH`. **For AN9g:** `history(before:)` goes through
+  `Joining.send(refresh)`, in its caller's coroutine, as `lookUp` does: it applies nothing.
+
+  **The tests:** JoinTests' `typing`, `looked`, `busy`, `stale`, `joined` and `renewing`, over the contracts'
+  `join-codes` and `enrollments` fixtures, each check of a word AN10's; JoinEngineTests' `joined`, `staleRead`,
+  `joinedAcrossSignIn`, `refused` and `lookUp`; LeaveEngineTests' `left`, `staleRead` and `leftAcrossSignIn`;
+  MeEngineTests' `renamed`, `unlockUnsent`, `staleRead` and `forgetMe`. New: a join, a leave and a rename whose
+  caller is cancelled, each answer applied; a code's whole characters (a combining accent, a keycap); a renewal
+  that throws or ends in a cancel of its own, and the caller's own cancel; Sign out's rule reading the file
+  itself, an unlock the engine's failed read left out of its queue counting, a file that can't be read now giving
+  none; a forget with a report and an Emergency Unlock queued, both kept and sent, where the phone stands kept;
+  and a rename answered after another student's `me` was read, which keeps their name (iOS's forget test answers
+  its rename while `me` is still forgotten, where no guard is needed). `renamed`'s and `refused`'s check that no
+  read was asked for waits for the loop's next wake in no class, which reads nothing unless asked, so a broken
+  rule keeps it from sleeping on (iOS's waits for a sleep a ring could cut short). Outbox's test task reads
+  `@bali/shared` now, for `JOIN_CODE_LENGTH`, as core's does. Tried, each failing by name, then reverted: a stale
+  read applying its `me` (4: the join's, the leave's and the rename's stale reads, and the forget's); the join's
+  and the leave's `forgets` guard left out (each its across-a-sign-in test), and the rename's `meChanges` guard
+  (the new rename's); a join run in its caller's coroutine (the cancelled join's), and a rename and a leave
+  (theirs); `forgetMe` letting go of every record but an unlock's, and emptying the queue with where the phone
+  stood (the forget's queue test, each); `unlockUnsent` reading the engine's queue (the file-itself test);
+  `Joining.send` unhooked (`renewing`'s); a code judged `Char` by `Char` (`typing`'s); and, for the calls held to
+  one account, the 13+ read renewed by the engine's `refresh` (AgeFallbackTest's read for one account), the yes
+  (its yes for one account) and `DELETE /v1/me` (DeleteAccountTest's `DELETE /v1/me` out as another account signs
+  in). AN9c's and AN9h's tests pass unchanged.
+
+  **Santa's review:** TODO
+
+  **The proof:** TODO
+
 - **2026-11-10** — **AN9h, one account's token for Delete account and the 13+ check: every request a deletion
   sends, and the 13+ read and yes, under the token of the account they are for alone (the owner, 2026-11-10:
   "Close it now"; AN9h, #555).** The owner's answer to the conductor's question, "When should both apps close the

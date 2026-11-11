@@ -10,6 +10,19 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN9d's on 2026-11-10: _Last updated: 2026-11-10 (Central) — AN9h, one
+account's token for Delete account and the 13+ check
+(#555; `docs/DECISIONS.md`, 2026-11-10; the owner, 2026-11-10: "Close it now"): every request a deletion
+sends, and the 13+ read and yes, under the token of the account they are for alone, by its `sub`, each
+renewal that account's own; another account's sign-in landing before `DELETE /v1/me` is answered deleted
+stops the deletion with an answer of its own (`SignInChanged`), every record kept, nothing more sent and no
+Try again. The
+iPhone's twin is C4c, the Mac's. Before it, AN9c, the 13+ check. Next: AN9d, Join, Leave, Your name and
+forget me through the engine; AN7f and AN8's 📱 check on the owner's phones; Android's Cognito clients, the
+owner's (Open owner items, 8); Android 17's SDK platform for the owner to OK before the first step with
+today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the owner has the phones.
+Not on the pilot's critical path._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN9h's on 2026-11-10: _Last updated: 2026-11-11 (Central) — AN9c, the
 13+ check (#554; `docs/DECISIONS.md`, 2026-11-11): the
 server's yes read under the deletion's token, renewed once; the app's ask and the yes its sign-in keeps,
@@ -2616,6 +2629,16 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN9d's line, as it read when it was done (2026-11-10; `docs/DECISIONS.md`, 2026-11-10).
+
+- **AN9d** Join, Leave, Your name and forget me through the engine, and Join's rules (twin: `Join`'s
+  `Joining`, and SyncEngine.swift's `lookUp`, `join`, `rename`, `leave`, `unlockUnsent`, `forgetMe`
+  and `meChanges`): Join with the consent list beside its preview, the code as codes are written; a
+  read's `me` applied only while unchanged; the engine's `renewing` moved to `Joining`. Tests:
+  JoinEngineTests, LeaveEngineTests and MeEngineTests (AN5's split), and JoinTests, over the contracts'
+  join-codes and enrollments fixtures; new: a join whose caller is cancelled still puts its class in
+  `me` — validation: the JVM tests
 
 AN9h's line, as it read when it was done (2026-11-10; `docs/DECISIONS.md`, 2026-11-10).
 

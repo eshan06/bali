@@ -123,8 +123,14 @@ object Answer {
         return """{"user":{"id":"u","role":"student","displayName":null},"classes":[${classes.joinToString(",")}],"session":$live$waits}"""
     }
 
-    /** Class [id] as `GET /v1/me` names it, with its teacher. */
-    fun inClass(id: String) = """{"id":"$id","name":"Class $id","teacher":{"displayName":"Ms. Rivera"}}"""
+    /** Class [id] as `GET /v1/me` names it, with its teacher, and the enrollment [enrollment] leaving it ends (none: none). */
+    fun inClass(id: String, enrollment: String? = null): String {
+        val leaves = enrollment?.let { ""","enrollmentId":"$it"""" }.orEmpty()
+        return """{"id":"$id","name":"Class $id","teacher":{"displayName":"Ms. Rivera"}$leaves}"""
+    }
+
+    /** The join of class [id], as `POST /v1/enrollments` answers it, its [outcome]: a class named with no teacher. */
+    fun joinedClass(id: String, outcome: String = "joined") = """{"outcome":"$outcome","enrollmentId":"e","class":{"id":"$id","name":"Class $id"}}"""
 
     private fun json(view: SessionView) = BaliJson.encodeToString(SessionView.serializer(), view)
 }
