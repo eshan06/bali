@@ -75,7 +75,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   run lint && npm test` green, the portal's suite whole. Nothing was added to the PC's SDK: its folders were compared
   before and after. Each emulator after its runs: Bali and its test app uninstalled, AN1's spike apps kept, every
   setting as found, stopped. A restart of Claude Code cut Android 15's first run short mid-test, Bali's service
-  switched on: switched off as found before the suite ran again, whole.
+  switched on: switched off as found before the suite ran again, whole. And on Android 16, after santa's WARNs, AN7e's
+  CoversTest `callingForHelp…` failed once at its call, a race of the emulator's own: Google Messages, opened by the
+  SMS step before it, resolved that step's deep link a moment later and started its conversation and main activities
+  by itself, the last over the call's in-call screen (logcat: the in-call activity paused as Messages' main activity
+  came up, seconds after the test had gone home). Nothing of this step's runs there; the suite then ran whole. The fix, the
+  SMS step waiting out Messages before the call, is a step of its own.
 
   **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC,
   so context isolation holds and model diversity doesn't): 0 blockers. Their WARNs, each taken: this line left a
