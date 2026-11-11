@@ -158,11 +158,10 @@ test('a copy that fails says so, and the address stays on screen', async ({ page
   await expect(page.getByRole('link', { name: EMAIL })).toBeVisible();
 });
 
-test('the rings around the hero’s Bali block show on wide screens and are left out on phones', async ({ page }) => {
+test('the hero’s Bali block has no rings around it, at any width', async ({ page }) => {
   await open(page, '/');
-  const rings = page.locator('.hs-rings');
-  if (page.viewportSize().width < 600) await expect(rings).toBeHidden();
-  else await expect(rings).toBeVisible();
+  await expect(page.locator('.hs-block')).toBeVisible();
+  await expect(page.locator('.hs-rings')).toHaveCount(0);
 });
 
 test('the questions open', async ({ page }) => {

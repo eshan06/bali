@@ -17,9 +17,6 @@ body{margin:0}
 .hs ul{list-style:none}
 .hs-box{position:relative;width:calc(620px * var(--k));height:calc(560px * var(--k))}
 .hs-stage{position:absolute;left:0;top:0;width:620px;height:560px;transform:scale(var(--k));transform-origin:0 0}
-.hs-rings{position:absolute;left:-300px;top:-200px;pointer-events:none;-webkit-mask-image:radial-gradient(circle at 418px 294px,#000 150px,rgba(0,0,0,0) 360px);mask-image:radial-gradient(circle at 418px 294px,#000 150px,rgba(0,0,0,0) 360px)}
-/* On phones the rings crowd the small picture, so they are left out. */
-@media (max-width:599px){.hs-rings{display:none}}
 .hs-block{position:absolute;left:70px;top:46px;width:96px;height:96px;border-radius:28px;background:#FFFFFF;box-shadow:0 0 0 1px #E3DFD8,0 14px 32px rgba(33,28,21,0.10),0 2px 6px rgba(33,28,21,0.06);display:flex;align-items:center;justify-content:center}
 .hs-ripple{position:absolute;left:70px;top:46px;width:96px;height:96px;border-radius:999px;border:2px solid #62A483;opacity:0;pointer-events:none}
 .hs-card{position:absolute;left:236px;top:46px;width:372px;height:384px;border-radius:18px;background:#FFFFFF;box-shadow:0 0 0 1px #E3DFD8,0 28px 64px rgba(33,28,21,0.12),0 4px 12px rgba(33,28,21,0.06)}
@@ -70,8 +67,6 @@ body{margin:0}
 </helmet>
 <div class="hs" data-hs="{{uid}}" role="img" aria-label="A sample class with Bali. A student taps their iPhone on the Bali block and their apps lock. On the teacher's screen each student's tile turns from Not here to Focused. One student uses Emergency Unlock, and at the bell the phone says class is over.">
 <div class="hs-box"><div class="hs-stage">
-
-<svg class="hs-rings" width="1220" height="960" viewBox="0 0 1220 960" aria-hidden="true"><g fill="none" stroke="#E3DFD8" stroke-width="1.5"><circle cx="418" cy="294" r="120"></circle><circle cx="418" cy="294" r="200"></circle><circle cx="418" cy="294" r="280"></circle><circle cx="418" cy="294" r="360"></circle></g></svg>
 
 <span class="hs-ripple hs-r1" aria-hidden="true"></span>
 <span class="hs-ripple hs-r2" aria-hidden="true"></span>
