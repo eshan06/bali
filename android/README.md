@@ -242,11 +242,20 @@ exactly what they have on its way, each of their requests counted from the stret
 it lands, however it ends; then it sends the outbox, every Emergency Unlock first, any unlock still queued
 holding it back, then `DELETE /v1/me`, then Cognito's DeleteUser for the account it began with, each send
 and each call into the sign-in with the engine let go; one deletion at a time, in the engine's scope, a
-second press sharing it; deleted, the phone stands out of any session, kept so. Its tests run on
-a rig of their own (`EngineSupport.kt`, BaliOutbox's `EngineSupport.swift`): a clock the test moves,
+second press sharing it; deleted, the phone stands out of any session, kept so. Its 13+ check (AN9c) reads
+the server's yes under the deletion's token (`ageCheck`), and runs the app's ask (`askAgeAtEachWake`) and
+sends the yes its sign-in keeps (`PUT /v1/me/age-check`) at each wake, neither during a deletion, the yes
+counted as the loops' requests are; each with the engine let go, so none holds an Emergency Unlock back.
+Its tests run on a rig of their own (`EngineSupport.kt`, BaliOutbox's `EngineSupport.swift`): a clock the test moves,
 in a zone of the test's own, since coroutines-test's virtual time can't drive Room's queries, a
 server answered by hand, and the bundled driver watched, which sees each commit as GRDB's
 `TransactionObserver` does, and can refuse a statement as a failing disk would.
+
+**The 13+ check's rules** (`outbox`'s `Age.kt`, BaliOutbox's `Age.swift`, AN9c): the question's answers
+(`AgeCheck`), whether a birth month and year pass at month precision, and what the age screen's menus offer
+(`Birth`), counted by java.time's ISO calendar in the phone's zone whatever calendar its locale asks for,
+the month names in its language. An answer is a value kept nowhere: the phone keeps that the account
+passed, with its sign-in, never the date or an age (C7).
 
 **The lock's rules** (`outbox`'s `Enforcer.kt` and `Lock.kt`, BaliOutbox's `Enforcement`, AN7a): the
 enforcer follows the engine's state and keeps the lock where it says, through a seam of the lock's own

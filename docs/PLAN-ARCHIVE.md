@@ -10,6 +10,20 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN9c's on 2026-11-11: _Last updated: 2026-11-10 (Central) — AN9b,
+the deletion in the engine (#553; `docs/DECISIONS.md`,
+2026-11-10): Delete account through the sync engine, its loops held and exactly what they have on its way
+waited out, each of their requests counted from the stretch that decides it until it lands, however it
+ends; the outbox first, every Emergency Unlock first and any unlock still queued holding the deletion back,
+then `DELETE /v1/me`, then Cognito's DeleteUser for the account the deletion began with alone, each with the
+engine let go; one deletion in the engine's scope, a second press sharing it, its caller's cancel never
+stopping it. The owner's rulings since AN9a are on AN9e's and AN10's lines: the portal's new address and
+NFC required, and a teacher's one screen. Before it, AN9a, Delete account's rules. Next: AN9c, the 13+
+check; AN7f and AN8's 📱 check on the owner's phones; Android's Cognito clients, the owner's (Open owner
+items, 8); Android 17's SDK platform for the owner to OK before the first step with today's AndroidX, and
+OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's
+critical path._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN9b's on 2026-11-10: _Last updated: 2026-11-05 (Central) — AN9a,
 Delete account's rules (#533; `docs/DECISIONS.md`,
 2026-11-05): Cognito's DeleteUser in `core`'s `SignIn`, in Cognito's JSON protocol at the pool's own
@@ -2589,6 +2603,16 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN9c's line, as it read when it was done (2026-11-11; `docs/DECISIONS.md`, 2026-11-11).
+
+- **AN9c** The 13+ check (C7, C7-server; twin: `Age`'s `AgeCheck` and `Birth`, and SyncEngine.swift's
+  `ageCheck`, `askAgeAtEachWake` and `record(yes:)`): the server's yes, read under the deletion's
+  token, renewed once; the ask and the 13+ yes at each wake, never during a deletion, the yes counted;
+  the question's rules, counted in the Gregorian calendar by java.time's ISO calendar whatever calendar
+  the phone shows. Tests: AgeFallbackTests' six (AN5's split), and AgeTests' `monthPrecision`,
+  `gregorianWhateverThePhoneShows`, `menus` and `keeps`' first half; new: an ask that throws, or ends
+  in a cancel of its own, ends no loop — validation: the JVM tests
 
 AN9b's line, as it read when it was done (2026-11-10; `docs/DECISIONS.md`, 2026-11-10).
 
