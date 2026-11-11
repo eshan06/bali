@@ -16,8 +16,8 @@ structure", decided at AN1b (2026-11-04).
 
 _Last updated: 2026-11-11 (Central) — AN9g, History's rules and its call (#561; `docs/DECISIONS.md`, 2026-11-11),
 AN9's last step: `outbox`'s `History.kt`, every failure and day title a type: the pages as they came, from the top or
-Show earlier's, each moment once, the cursor each read sends, and Show earlier's cursor the server doesn't hold read
-again from the top; days in the phone's zone, whole at a daylight-saving change, today, yesterday or a date, in cards
+Show earlier's, each moment once, which read may start and the cursor it sends, and Show earlier's cursor the server
+doesn't hold read again from the top; days in the phone's zone, whole at a daylight-saving change, today, yesterday or a date, in cards
 of one class's moments in a row, each card's id kept as moments join it; a kind this build doesn't know kept in the
 page and left out of the days. The engine's `history(before)` is a read that applies nothing. Before it, AN9f, Me's
 rules. Next: AN10, the router and the screens' rules; the cover test's SMS step waiting out Google Messages, a step
