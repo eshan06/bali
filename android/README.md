@@ -279,7 +279,8 @@ engine's sign-in (`Account.of`), its state what AN10's router will read. It foll
 lands; asks Bali's server for the 13+ yes of the account it names, and again at each wake while Bali couldn't be
 reached and the sign-in isn't through; holds an answer under 13 in memory for the run alone; has the engine forget
 another student's `me`, a state counting fewer forgets shown without it; and runs Delete account through the engine,
-a stop answered once another sign-in landed since the press taken as `SignInChanged`. The app runs none yet (AN9i).
+a stop answered once another account's sign-in landed since the press taken as `SignInChanged`. The app runs none yet
+(AN9i).
 
 **The lock's rules** (`outbox`'s `Enforcer.kt` and `Lock.kt`, BaliOutbox's `Enforcement`, AN7a): the
 enforcer follows the engine's state and keeps the lock where it says, through a seam of the lock's own

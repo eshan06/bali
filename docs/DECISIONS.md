@@ -34,14 +34,19 @@ a real decision? Add a dated entry at the top: what was decided and why.
     makes it a change: the check is asked again, an ask on its way and Delete account's question or stop go, and
     `me` stays, the student the same. For the owner: iOS's twin has the gap, reached from its Debug readout alone,
     a change for the Mac.
-  - **AN9h's window, closed (its "For AN9e"):** the press takes the count of sign-ins the account has followed, and
-    the answer reads the sign-in's own; moved since, any stop is `SignInChanged`, and the account deleted on the
+  - **AN9h's window, narrowed to an instant (its "For AN9e"):** the press takes the sign-in the account has followed,
+    its count and its account, and the answer is taken against both the sign-in's own, read as the answer comes, and
+    what the account has followed since. Another account's sign-in landed since (the count moved and the account
+    isn't the press's; this step's call, from santa's review: the same account's own sign-in again leaves the
+    answer as it is, its Try again that account's): any stop is `SignInChanged`, and the account deleted on the
     server but not its Cognito sign-in (`SignInNotDeleted`) is `Deleted` (this step's call): Pending's Try again
     would run a deletion for the account signed in now, while the account that pressed has its sign-in gone from
     the phone and its Cognito user is the server's deleter's (C3-cognito), AN9b's call for DeleteUser after another
-    sign-in landed. Left, as humanly impossible timing: a sign-in landing in the instant between the press and the
-    deletion's own read of the account as it starts, which the deletion then acts on. Closing that takes the
-    engine's deletion naming its account, AN9h's area, so it isn't here.
+    sign-in landed. Left, as humanly impossible timing: a sign-in landing in the instant between the sign-in's read
+    and the account following it, a stop then cleared as the account follows it but Pending kept, as iOS keeps it;
+    and one landing between the press and the deletion's own read of the account as it starts, which the deletion
+    then acts on, the gap's fallback's under 13 too. Closing those takes the engine's deletion naming its account,
+    AN9h's area, so it isn't here.
   - **`answerAge`'s engine half is here (this step's call):** AN9c's seams named it AS2's, but Q5's rule needs an
     answer to hold. Signed in, the gap's fallback's: 13 or older, the yes kept with the sign-in and the sign-in let
     through; under 13, the account deleted as Delete account deletes one. Signed out, Sign up's question: the
@@ -58,24 +63,34 @@ a real decision? Add a dated entry at the top: what was decided and why.
     pass, with the engine let go. **`deleting`** takes `Deleting`'s own steps, the screens' question, Cancel, Back
     and OK, as iOS's settable `deleting`.
   - **A state counting fewer forgets than the account asked for shows without its `me`** (`shown`), from the
-    stretch that asks the forget on, which also stands for iOS's `forgetMe` clearing `sync.me` at once.
+    stretch that asks the forget on, which also stands for iOS's `forgetMe` clearing `sync.me` at once. **The
+    account deleted on the server, its `me` goes too**, as iOS's `deleteAccount` forgets it through `forgetNotes`,
+    whose notes are AN10's (santa's review).
+  - **The state never claims a pass the sign-in doesn't hold:** `SignIn.passed` now says whether it took (a
+    `Boolean`, which every caller before may leave unread), and the sign-in is let through only then (santa's
+    review); iOS's `askAge` and `answerAge` set `cleared` regardless, for a moment, as another's sign-in lands.
 
   **For AN9i:** `BaliApp.start` makes `Account.of(engine, within)` and runs it in the run's job; the readout's Signed
   in line reads `running.account`, so a test's own sign-in, made into its engine by `SyncEngine.make`, gives the run
   an account; `LockServiceTest`'s `Server` can serve the new instrumented tests. **For AN10:** the router reads
   `Account.state`; the screens' words are AN10's.
 
-  **The tests:** AccountTest's 13, over a gated SignedRig: ageFromServer's engine half (passed; no yes, then 13 or
+  **The tests:** AccountTest's 15, over a gated SignedRig: ageFromServer's engine half (passed; no yes, then 13 or
   older, its yes under one UUIDv7; under 13, the account deleted, no yes sent), ageAgainInClass's (Bali not reached,
   asked again at each wake, a yes letting the sign-in through before the bell and the Emergency Unlock made meanwhile
   sent at once; no yes, asked no more over two wakes, rule 3's check their mark), forgetsAnother's and
   nothingOfTheLast's, and deleteAccountWiring's (its screen until the answer, DeleteUser unanswered leaving it
-  Pending, a relaunch over the same keychain landing there at once, Try again finishing it, Done until OK). New:
-  Q2's count, through a 401's renewal; AN9h's window, the account's own thread held between the deletion's answer
-  and its taking of it, so another sign-in lands there for certain; Q5, signed out and signed in, a relaunch
-  asking again; each sign-in's check read under its own account; an answer's yes kept for its own account alone,
-  the regression test first (it failed as b1 went through on a1's answer); and an Emergency Unlock queued across
-  another student's sign-in, still queued in the state and the file, then sent. Tried, each failing by name, then
+  Pending, the deleted account's `me` gone, a relaunch over the same keychain landing there at once, Try again
+  finishing it, Done until OK). New: Q2's count, through a 401's renewal; AN9h's window, the account's own thread
+  held between the deletion's answer and its taking of it, so a sign-in lands there for certain, followed by then
+  or not yet, its stop `SignInChanged`, and, the deletion done on the server but not DeleteUser, Done for another
+  account's sign-in and Pending for the same account's own; Q5, signed out and signed in, a relaunch asking again;
+  an answer while the question isn't due changing nothing; each sign-in's check read under its own account; an
+  answer's yes kept for its own account alone, no pass claimed meanwhile, the regression test first (it failed as
+  b1 went through on a1's answer); and an Emergency Unlock queued across another student's sign-in, still queued in
+  the state and the file, then sent under b1's token, as every queued record goes under whoever is signed in, which
+  the owner's re-check before K-12 changes with the rule. Santa's WARNs came with their tests first too, each
+  failing until its fix. Tried, each failing by name, then
   reverted: the ask not hooked at a wake (2: the asks again at each wake, and no more once answered); a renewal
   counted as a sign-in (Q2's); `forgetMe` not called at a sign-in (7, the forget's among them); a state counting
   fewer forgets shown with its `me` (the forget's); the answer under 13 kept with the sign-in (Q5's: the keychain
@@ -84,7 +99,13 @@ a real decision? Add a dated entry at the top: what was decided and why.
   each sign-in's own among them); and the forget at a sign-in letting go of every record, the unlock too (4, the
   queued unlock's among them).
 
-  **Santa's review:** SANTA.
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this
+  PC, so context isolation holds and model diversity doesn't): 0 blockers. Their WARNs, each taken: two of this
+  step's calls with no test (the not-due guard and `SignInNotDeleted` read `Deleted`; each tested now); the
+  deleted account's `me` kept, where iOS forgets it (both reviewers; forgotten now); the queued unlock's send under
+  b1's token, a rule the K-12 re-check changes (said in the test and here); the window only narrowed, not closed
+  (said so above, the followed sign-in checked too); the same account's own sign-in read as another's (now not); and
+  the state claiming a pass for a moment while another's sign-in lands (now `passed` says whether it took).
 
   **The proof:** `android/app` is unchanged here, so the JVM tests are the proof and no emulator ran: PROOF. Nothing
   was added to the PC's SDK: its folders were compared before and after.

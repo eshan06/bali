@@ -18,8 +18,8 @@ _Last updated: 2026-11-11 (Central) — AN9e, the account's flows in the engine 
 2026-11-11): `Account`, BaliApp.swift's `Phone`'s account half in `outbox`, which follows the sign-in as each
 sign-in lands (`SignIn.landings`, a renewal never one), asks Bali for the 13+ yes of the account it names and
 again at each wake while unanswered, holds an answer under 13 for the run alone, has the engine forget another
-student's `me`, and takes a deletion's stop answered once another sign-in landed as `SignInChanged`. AN9e was
-split, its app half now AN9i. Before it, AN9d, Join, Leave, Your name and forget me through the engine. Next:
+student's `me`, and takes a deletion's stop answered once another account's sign-in landed as `SignInChanged`.
+AN9e was split, its app half now AN9i. Before it, AN9d, Join, Leave, Your name and forget me through the engine. Next:
 AN9i, the account's flows in the app and the readout's Join and History; AN7f and AN8's 📱 check on the
 owner's phones; Android's Cognito clients, the owner's (Open owner items, 8); Android 17's SDK platform for the
 owner to OK before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's

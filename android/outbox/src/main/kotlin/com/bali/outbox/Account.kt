@@ -133,8 +133,7 @@ class Account internal constructor(
                 alone { deleting = deleting.ask() }
                 return@call delete()
             }
-            signIn.passed(asked, recording = EventId.mint(clock.now()))
-            letThrough(changesThen)
+            if (signIn.passed(asked, recording = EventId.mint(clock.now()))) letThrough(changesThen)
         }
 
     /** Me's Delete account asked, its Cancel, or Back or OK on its screen: [step] one of Deleting's own (`ask`, `cancel`, `close`). */
@@ -147,32 +146,42 @@ class Account internal constructor(
     /**
      * Me's Delete account, confirmed, or the screen's Try again (C4b): the one engine call ([SyncEngine.deleteAccount]), its
      * screen showing meanwhile and its answer kept ([Deleting.answered]); nothing where no try can help, nor while one
-     * runs. After an answer under 13 this run it is the gap's fallback's. Another sign-in landed since the press (Q2), after
-     * the deletion's own last read of it too (AN9h's window), leaves nothing whose Try again would act on it: any stop is
-     * [AccountDeletion.SignInChanged], and the account deleted on the server but not its sign-in is deleted, that sign-in
-     * gone from the phone and its Cognito user the server's deleter's (C3-cognito; AN9b's call).
+     * runs. After an answer under 13 this run it is the gap's fallback's. Another account's sign-in landed since the press
+     * (Q2), after the deletion's own last read of it too (AN9h's window), leaves nothing whose Try again would act on it: any
+     * stop is [AccountDeletion.SignInChanged], and the account deleted on the server but not its sign-in is deleted, that
+     * sign-in gone from the phone and its Cognito user the server's deleter's (C3-cognito; AN9b's call). The account deleted
+     * on the server, its `me` goes too, as iOS's `forgetNotes` forgets it.
      */
     suspend fun deleteAccount(): Unit = call { delete() }
 
     private suspend fun delete() {
-        val (young, press) =
+        // The sign-in the press was for, as the account followed it: how many had landed, and whose.
+        val (young, count, holder) =
             alone {
                 deleting = deleting.start() ?: return@alone null
                 publish()
-                (age.answer == AgeCheck.Answer.TooYoung) to landed
+                Triple(age.answer == AgeCheck.Answer.TooYoung, landed, account)
             } ?: return
         val answer = engine.deleteAccount(signIn)
-        val since = signIn.landings().first().count != press
-        val kept =
-            when {
-                !since || answer == AccountDeletion.Deleted -> answer
-                answer is AccountDeletion.SignInNotDeleted -> AccountDeletion.Deleted
-                else -> AccountDeletion.SignInChanged
+        val now = signIn.landings().first()
+        val forget =
+            alone {
+                // Another account's sign-in landed since: read from the sign-in as the answer came, or followed since.
+                fun another(landings: Int, of: String?) = landings != count && of != holder
+                val since = another(now.count, now.account) || another(landed, account)
+                val kept =
+                    when {
+                        !since || answer == AccountDeletion.Deleted -> answer
+                        answer is AccountDeletion.SignInNotDeleted -> AccountDeletion.Deleted
+                        else -> AccountDeletion.SignInChanged
+                    }
+                deleting = deleting.answered(kept, young)
+                val gone = kept == AccountDeletion.Deleted || kept is AccountDeletion.SignInNotDeleted
+                if (gone) forgot()
+                publish()
+                gone
             }
-        alone {
-            deleting = deleting.answered(kept, young)
-            publish()
-        }
+        if (forget) engine.forgetMe()
     }
 
     /**
@@ -229,9 +238,7 @@ class Account internal constructor(
                 publish()
                 answer?.passed == true
             }
-        if (!passed) return
-        signIn.passed(account)
-        letThrough(changesThen)
+        if (passed && signIn.passed(account)) letThrough(changesThen)
     }
 
     /**

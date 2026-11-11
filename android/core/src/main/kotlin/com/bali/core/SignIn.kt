@@ -472,13 +472,15 @@ class SignIn(
 
     /**
      * The sign-in held now, if [account]'s, is through the 13+ check (C7-server), [recording] the event id
-     * its yes is recorded under; the caller then sends what waited (`SyncEngine.retryNow`).
+     * its yes is recorded under; the caller then sends what waited (`SyncEngine.retryNow`). True once it is;
+     * false while the sign-in held is another's, or none.
      */
-    suspend fun passed(account: String?, recording: String? = null) =
+    suspend fun passed(account: String?, recording: String? = null): Boolean =
         alone {
-            val held = current()?.takeIf { Tokens.subject(it.access) == account } ?: return@alone
+            val held = current()?.takeIf { Tokens.subject(it.access) == account } ?: return@alone false
             tokens = held.copy(checked = true, yes = recording ?: held.yes)
             unsaved = !keep(tokens)
+            true
         }
 
     /** Whether the sign-in kept now is through the 13+ check; false when nobody is signed in or the store can't be read. */
