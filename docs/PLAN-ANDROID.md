@@ -21,10 +21,10 @@ again from the top; days in the phone's zone, whole at a daylight-saving change,
 of one class's moments in a row, each card's id kept as moments join it; a kind this build doesn't know kept in the
 page and left out of the days. The engine's `history(before)` is a read that applies nothing. Before it, AN9f, Me's
 rules. Next: AN10, the router and the screens' rules; the cover test's SMS step waiting out Google Messages, a step
-of its own (`docs/DECISIONS.md`, 2026-11-11, AN9i's entry); AN7f and AN8's 📱 check on the owner's phones, signed in on dev as an account that passed the 13+ check on an iPhone
-(Q7); Android's Cognito clients, the owner's (Open owner items, 8); Android 17's SDK platform for the owner to OK
-before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the owner
-has the phones. Not on the pilot's critical path._
+of its own (`docs/DECISIONS.md`, 2026-11-11, AN9i's entry); AN7f and AN8's 📱 check on the owner's phones, signed in
+on dev as an account that passed the 13+ check on an iPhone (Q7); Android's Cognito clients, the owner's (Open owner
+items, 8); Android 17's SDK platform for the owner to OK before the first step with today's AndroidX, and OkHttp 5.5
+with it (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.

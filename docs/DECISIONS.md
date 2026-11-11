@@ -82,14 +82,15 @@ a real decision? Add a dated entry at the top: what was decided and why.
   (`readAgain`'s), any failure of Show earlier's read again from the top (`pages`', `readAgain`'s, `failures`'), and a
   read from the top answered `unknown_cursor` read again, forever (`failures`'); Show earlier starting with no page
   after those read, a read starting beside one under way, and a read from the top held behind Show earlier's (`pages`',
-  each); an unknown cursor not read again from the top (`failures`'); days in UTC (`days`', the
-  daylight-saving test's, `everyKind`'s, `unknowns`'), and yesterday 24 hours back, and days 24 hours long (the
-  daylight-saving test's, each); two classes' moments in one card, by teacher (`days`', once Period 4 was in it: with
-  every test class a teacher of its own, it passed at first) and one card a day (`days`', `cardIds`', `everyKind`'s); an
-  unknown kind dropped from the page, and one crashing (`unknowns`', each); a failure kept as a string, the server's
-  message (`pages`', `readAgain`'s, `failures`'), `notUpdated` kept as words (`readAgain`'s, `failures`'), and a
-  failure's reason dropped (`failures`'); and the engine's call asking a read (`throughTheEngine`'s). The checks a type
-  change could break compare as `Any?`, so a string's break fails by name rather than at compile.
+  each); an unknown cursor not read again from the top (`failures`'); days in UTC (`days`', the daylight-saving test's,
+  `everyKind`'s, `unknowns`'), and yesterday 24 hours back, and days 24 hours long (the daylight-saving test's, each);
+  two classes' moments in one card, by teacher (`days`', once Period 4 was in it: with every test class a teacher of its
+  own, it passed at first) and one card a day (`days`', `cardIds`', `everyKind`'s); an unknown kind dropped from the
+  page, and one crashing (`unknowns`', each); a failure kept as a string, the server's message (`pages`', `readAgain`'s,
+  `failures`'), `notUpdated` kept as words (`readAgain`'s, `failures`'), and a failure's reason dropped (`failures`');
+  and the engine's call asking a read (`throughTheEngine`'s). The checks a type change could break compare as `Any?`, so
+  a string's break fails by name rather than at compile. A test named past about 235 characters failed to compile, as
+  "Permission denied" on this PC: GOTCHAS has it.
 
   **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so
   context isolation holds and model diversity doesn't): 0 blockers. Their WARNs, each taken: Show earlier at the end
@@ -98,7 +99,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   phone whose engine hasn't started stays busy unless the engine is asked for before `reading`, with this entry citing
   AN9f for Join's not-started (reviewer A; taken: said for AS7 above, and AN9d cited).
 
-  **The proof:** to fill once it has run.
+  **The proof:** `android/app` is unchanged, so the JVM tests are the proof and no emulator ran: `./gradlew assemble
+  :app:lint check` green on the final code, Android 10's API check with it and no compiler warning from this step's
+  code; the core and outbox suites run five times more on the final code (`--rerun`), their 554 tests green every time,
+  AN9h's AgeFallbackTest `aYesForOneAccountTakenAtAWake…` among them; `npm run typecheck && npm run lint && npm test`
+  green, the portal's suite whole. Nothing was added to the PC's SDK: its folders were compared before and after.
 
 - **2026-11-11** — **AN9f, Me's rules: Your name, Leave and Sign out's hold: BaliOutbox's `Naming`, `Leaving` and
   `SignOutWords.held` in Kotlin, on the JVM, every failure a type (the conductor's calls, those in the step's brief and
