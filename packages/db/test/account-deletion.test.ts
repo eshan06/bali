@@ -8,7 +8,7 @@ import { registerPushToken } from '../src/device-tokens.js';
 import { newUuidV7 } from '../src/ids.js';
 import { createBlock, createClass } from '../src/management.js';
 import { mintTeacherInvite, recordAgreement, redeemTeacherInvite } from '../src/schools.js';
-import { getSessionEvents, getSessionRoster } from '../src/queries.js';
+import { findOrCreateStudent, getSessionEvents, getSessionRoster } from '../src/queries.js';
 import * as schema from '../src/schema.js';
 import {
   ageChecks,
@@ -46,6 +46,7 @@ import {
   startSession,
   tapIn,
   unlock,
+  unlockAsNoOne,
   unlockUnderTap,
 } from '../src/transitions.js';
 import type { Database } from '../src/types.js';
@@ -806,6 +807,91 @@ describe('a deleted teacher (C3)', () => {
       }),
     ).rejects.toMatchObject({ code: 'ACCOUNT_DELETED' });
     expect(await db.select().from(decks).where(eq(decks.teacherId, teacher!.id))).toHaveLength(2);
+  });
+});
+
+describe('a deleted sign-in (C3d; the owner, 2026-11-11: “Now, on the server”)', () => {
+  const POOL = 'https://cognito-idp.test/c3d';
+  const signedIn = (sub: string, at: Date | undefined) => ({ issuer: POOL, sub, at });
+  async function deleted(tag: string) {
+    const seeded = await seed(tag);
+    const { ana } = seeded;
+    const at = new Date();
+    const signIn = { issuer: POOL, username: ana.cognitoId, sub: ana.cognitoId };
+    await deleteAccount(db, { userId: ana.id, eventId: newUuidV7(), at, signIn });
+    return {
+      ...seeded,
+      at,
+      before: new Date(at.getTime() - MIN),
+      after: new Date(at.getTime() + MIN),
+    };
+  }
+
+  it('makes no account under a token signed in before the deletion, or saying no time; a sign-in made after it makes one', async () => {
+    const { ana, before, after } = await deleted('c3d-old');
+    const users0 = await db.select().from(users);
+
+    expect(await findOrCreateStudent(db, signedIn(ana.cognitoId, before), 'Ana')).toBeUndefined();
+    expect(await findOrCreateStudent(db, signedIn(ana.cognitoId, undefined))).toBeUndefined();
+    expect(await db.select().from(users)).toEqual(users0);
+
+    const back = await findOrCreateStudent(db, signedIn(ana.cognitoId, after), 'Ana');
+    expect(back).toMatchObject({ cognitoId: ana.cognitoId, displayName: 'Ana', removedAt: null });
+    expect(back?.id).not.toBe(ana.id);
+    // Once an account holds the sign-in again, it is the one every token of it reads.
+    expect((await findOrCreateStudent(db, signedIn(ana.cognitoId, before)))?.id).toBe(back?.id);
+  });
+
+  it('records an unlock with no account under a row born removed, in no class: its retry a replay there, a refusal leaving no row', async () => {
+    const { ana, ben, first, at } = await deleted('c3d-unlock');
+    const { session } = await startSession(db, {
+      classId: first.id,
+      startedAt: fromNow(-10 * MIN),
+      endsAt: fromNow(30 * MIN),
+    });
+    const benTap = newUuidV7();
+    await tapIn(db, { sessionId: session.id, studentId: ben.id, eventId: benTap, deviceTime: at });
+    const eventId = newUuidV7();
+    const send = (id = eventId) =>
+      unlockAsNoOne(db, { eventId: id, at }, (tx, studentId) =>
+        unlock(tx, {
+          sessionId: session.id,
+          studentId,
+          eventId: id,
+          deviceTime: at,
+          reason: 'nurse',
+        }),
+      );
+    const users0 = await db.select().from(users);
+
+    expect(await send()).toMatchObject({
+      outcome: 'recorded',
+      recordedAs: 'not_enrolled',
+      state: null,
+      session: null,
+      reason: 'nurse',
+    });
+    const recorded = one(await db.select().from(events).where(eq(events.eventId, eventId)));
+    expect(recorded).toMatchObject({ type: 'unlock', sessionId: null, classId: null });
+    const born = one(await db.select().from(users).where(eq(users.id, recorded.userId!)));
+    // Born removed: nothing of it names anyone, and nothing ties it to Ana's row.
+    expect(born).toEqual({
+      id: born.id,
+      cognitoId: deletedCognitoId(born.id),
+      role: 'student',
+      schoolId: null,
+      displayName: null,
+      createdAt: at,
+      removedAt: at,
+    });
+    expect(born.id).not.toBe(ana.id);
+
+    expect(await send()).toMatchObject({ outcome: 'replay', reason: 'nurse' });
+    expect(await db.select().from(users)).toHaveLength(users0.length + 1);
+
+    // An id another event holds, Ben's tap: refused, and no row born for it.
+    await expect(send(benTap)).rejects.toMatchObject({ code: 'EVENT_ID_CONFLICT' });
+    expect(await db.select().from(users)).toHaveLength(users0.length + 1);
   });
 });
 

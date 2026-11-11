@@ -3,7 +3,6 @@ import {
   endEnrollment,
   findClassById,
   findEnrollmentById,
-  findOrCreateStudent,
   findUserByCognitoId,
   joinClassByCode,
   previewJoinCode,
@@ -17,6 +16,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import { requireAuth } from '../auth/plugin.js';
+import { accountOf } from '../auth/student.js';
 import { ApiError, parseRequest } from '../errors.js';
 import { guessing, type Limiter } from '../limits.js';
 import { mapTransitionError, refusal } from './errors.js';
@@ -98,7 +98,7 @@ export function registerEnrollmentsRoutes(
       const identity = requireAuth(request);
       const body = parseRequest(request, 'body', JoinBody);
 
-      const caller = await findOrCreateStudent(db, identity.sub);
+      const caller = await accountOf(db, identity);
       const result = await mapTransitionError(() =>
         joinClassByCode(db, {
           studentId: caller.id,

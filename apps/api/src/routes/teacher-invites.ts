@@ -1,6 +1,5 @@
 import {
   type Database,
-  findOrCreateStudent,
   INVITE_CODE_PATTERN,
   inviteCodeSymbols,
   type RedeemInviteResult,
@@ -11,6 +10,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import { requireAuth } from '../auth/plugin.js';
+import { accountOf } from '../auth/student.js';
 import { displayNameFromClaims } from '../auth/verify.js';
 import { ApiError, parse, parseRequest } from '../errors.js';
 import { guessing, type Limiter } from '../limits.js';
@@ -70,11 +70,7 @@ export function registerTeacherInvitesRoute(
       const body = parseRequest(request, 'body', RedeemBody, 'invalid_request');
       const { code } = parse(Code, body, 'invite_code_invalid');
 
-      const caller = await findOrCreateStudent(
-        db,
-        identity.sub,
-        displayNameFromClaims(identity.claims),
-      );
+      const caller = await accountOf(db, identity, displayNameFromClaims(identity.claims));
       const result = await redeemTeacherInvite(db, {
         userId: caller.id,
         code,

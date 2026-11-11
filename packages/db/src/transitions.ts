@@ -4715,6 +4715,44 @@ function renameOnce(db: Database, input: RenameInput): Promise<RenameResult> {
 export const deletedCognitoId = (userId: string) => `deleted:${userId}`;
 
 /**
+ * An Emergency Unlock under a deleted sign-in's old token (C3d), which has no account to be filed
+ * under: recorded, never refused (ISSUES #2), under a student row born removed, as a deletion
+ * leaves one (no name, no Cognito subject, removed as it is made: its `removed_at` its
+ * `created_at`), so it makes no account, sets off no "came back" and links nothing to the account
+ * deleted. `record` files it there, by `unlock`'s or `unlockUnderTap`'s rules, as one from a
+ * student in no class, in this transaction, so a refusal (an id another event holds) leaves no
+ * row behind. Its retry, its id recorded already under such a row, is filed under that row: a
+ * replay.
+ */
+export function unlockAsNoOne<T>(
+  db: Database,
+  unlock: { eventId: string; at: Date },
+  record: (tx: Database, studentId: string) => Promise<T>,
+): Promise<T> {
+  return db.transaction(async (tx) => {
+    const [filed] = await tx
+      .select({ id: users.id })
+      .from(events)
+      .innerJoin(users, eq(users.id, events.userId))
+      .where(
+        and(
+          eq(events.eventId, unlock.eventId),
+          eq(events.type, 'unlock'),
+          eq(users.removedAt, users.createdAt),
+        ),
+      )
+      .limit(1);
+    if (filed) return record(tx, filed.id);
+    const id = newUuidV7();
+    const bornRemoved = { createdAt: unlock.at, removedAt: unlock.at };
+    await tx
+      .insert(users)
+      .values({ id, cognitoId: deletedCognitoId(id), role: 'student', ...bornRemoved });
+    return record(tx, id);
+  });
+}
+
+/**
  * Where each foreign key to `users` stands in an account's deletion (C3): what
  * `deleteAccount` does with the rows of the account it deletes. A test holds
  * this to the schema, so a new table or column keyed to a person fails CI until

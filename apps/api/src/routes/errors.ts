@@ -57,7 +57,8 @@ const REFUSALS: Record<
     'teacher_has_classes',
     'a teacher with a class or a block: ask the school to delete the account',
   ],
-  // A join or a rename that reached an account deleted on its way. Nothing was recorded.
+  // A join or a rename that reached an account deleted on its way, or any request that would make
+  // an account under a deleted sign-in's old token (C3d). Nothing was recorded.
   ACCOUNT_DELETED: ['conflict', 'account_deleted', 'this account was deleted'],
   // An extend that would run the session past MAX_SESSION_TOTAL_MINUTES from its start: the
   // duration is a good one, the session has no room for it. Nothing was recorded.

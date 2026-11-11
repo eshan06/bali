@@ -452,8 +452,10 @@ export const ageChecks = pgTable('age_checks', {
  * decision, 2026-10-09): queued by `deleteAccount` in its own transaction, by the retention run in
  * its own for each person it de-identifies (2026-10-28), or by `DELETE /v1/me` for a sign-in with
  * no account here, and written beside the engine (`cognito-deletions.ts`). Keyed to
- * the Cognito user, not to a `users` row, since a sign-in the server never saw is queued too; really
- * deleted once its sign-in is gone. Its three ids are personal data: never logged, not exported (C5).
+ * the Cognito user, not to a `users` row, since a sign-in the server never saw is queued too. Since
+ * C3d (2026-11-11) it is also the mark by which the server refuses that sign-in's old tokens: kept
+ * once its try finishes, its username dropped, for 24 hours, then really deleted. Its ids are
+ * personal data: never logged, not exported (C5).
  */
 export const cognitoDeletions = pgTable(
   'cognito_deletions',
@@ -461,8 +463,11 @@ export const cognitoDeletions = pgTable(
     id: id(),
     /** The access token's `iss`: the pool. Only rows of this deploy's `AUTH_ISSUER` are tried. */
     issuer: text('issuer').notNull(),
-    /** The access token's `username`: the name AdminGetUser and AdminDeleteUser take. */
-    username: text('username').notNull(),
+    /**
+     * The access token's `username`: the name AdminGetUser and AdminDeleteUser take. Dropped once
+     * the try finishes (C3d): nothing needs it then.
+     */
+    username: text('username'),
     /** The access token's `sub`: the user is deleted only while `username` still names it. */
     sub: text('sub').notNull(),
     /** Tries claimed so far. */
@@ -470,6 +475,14 @@ export const cognitoDeletions = pgTable(
     /** When it may be tried next: when queued, then later after each claim (a backoff). */
     nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }).notNull(),
     createdAt: createdAt(),
+    /**
+     * When the sign-in was deleted, its newest deletion's, by the server's clock (C3d): a token it
+     * issued before then is the deleted sign-in's. Null on a row queued before C3d, whose
+     * `created_at` says it.
+     */
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+    /** When its try finished, whatever the outcome; null while it is queued (C3d). */
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
   },
   // One per sign-in: a deletion's retry queues nothing more.
   (t) => [uniqueIndex('cognito_deletions_sign_in_unique').on(t.issuer, t.sub)],

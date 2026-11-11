@@ -2,7 +2,6 @@ import {
   type CognitoSignIn,
   type Database,
   deleteAccount,
-  findOrCreateStudent,
   findUserByCognitoId,
   getEnrolledClasses,
   getLiveParticipation,
@@ -24,6 +23,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import { requireAuth } from '../auth/plugin.js';
+import { accountOf } from '../auth/student.js';
 import { type AuthedIdentity, displayNameFromClaims } from '../auth/verify.js';
 import type { SignInDeletions } from '../cognito/sign-in-deletion.js';
 import { DisplayName } from '../display-name.js';
@@ -67,7 +67,8 @@ function signInOf({ sub, claims: { iss, username } }: AuthedIdentity): CognitoSi
  * GET /v1/me — the boot call: who am I, my classes, my live session, and
  * whether a tap of mine waits for a Start (#166). The first-ever call quietly
  * creates the caller's student row (a teacher's row is provisioned elsewhere;
- * an existing row keeps its real role).
+ * an existing row keeps its real role); under a deleted sign-in's old token
+ * none is made: `409 account_deleted` (C3d).
  *
  * PATCH /v1/me — a student sets their own display name (A8), unique within
  * each class they are in (owner decision 8; `renameStudent`). Idempotent on
@@ -88,11 +89,7 @@ export function registerMeRoute(
 ): void {
   app.get('/v1/me', { preHandler: app.authenticate }, async (request): Promise<MeResponse> => {
     const identity = requireAuth(request);
-    const user = await findOrCreateStudent(
-      db,
-      identity.sub,
-      displayNameFromClaims(identity.claims),
-    );
+    const user = await accountOf(db, identity, displayNameFromClaims(identity.claims));
 
     // The server's clock, read once, so a tap still waiting and every class are judged at one
     // instant (PV2's review).
@@ -173,7 +170,7 @@ export function registerMeRoute(
       const body = parseRequest(request, 'body', UpdateBody, 'invalid_request');
       const { displayName } = parse(NewName, body, 'display_name_invalid');
 
-      const caller = await findOrCreateStudent(db, identity.sub);
+      const caller = await accountOf(db, identity);
       if (caller.role === 'teacher') {
         throw ApiError.forbidden('only a student sets their own name here');
       }
@@ -195,7 +192,11 @@ export function registerMeRoute(
       // (`deleteAccount` takes its subject away), so its retry is told the
       // truth, that there is no account, and never makes a new one. Its
       // sign-in is queued all the same — a retry's, or one the server never
-      // saw (C7's under-13 fallback) — since that is the caller's to delete.
+      // saw (C7's under-13 fallback) — since that is the caller's to delete,
+      // and its tokens issued so far are refused from then on (C3d).
+      // ponytail: another device's first call that reads no mark just before
+      // this queues one, and makes its account just after this lookup misses
+      // it (milliseconds apart), still makes one; humanly impossible timing.
       const user = await findUserByCognitoId(db, identity.sub);
       let answer: DeleteMeResponse = { outcome: 'already_deleted' };
       if (user) {

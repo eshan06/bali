@@ -1,0 +1,16 @@
+{
+  "endpoint": "GET /v1/me",
+  "scenario": "The boot call under the token of a sign-in whose account was deleted, still valid (C3d): no account is made.",
+  "request": {
+    "path": "/v1/me"
+  },
+  "status": 409,
+  "type": "ApiErrorBody",
+  "body": {
+    "error": {
+      "code": "conflict",
+      "reason": "account_deleted",
+      "message": "this account was deleted"
+    }
+  }
+}

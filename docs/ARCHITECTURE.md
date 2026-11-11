@@ -110,9 +110,12 @@ never stored here, no screen can ever show it.
   (C3, C6a, C6b), and is in the student's export (C5).
 - `cognito_deletions` — one row per deleted account's Cognito sign-in waiting for the API to delete
   it from the pool (2026-10-09; decision 3's amendment), and per sign-in of someone the retention
-  run de-identified (2026-10-28): the issuer, username and `sub`, how many tries, and when the next
-  is due. Keyed to the Cognito user, not to a `users` row;
-  deleted once the sign-in is gone, never exported. Not an engine table: written by the deletion's
+  run de-identified (2026-10-28): the issuer, username and `sub`, when it was deleted, how many
+  tries, and when the next is due. Keyed to the Cognito user, not to a `users` row; never exported.
+  It is also the mark by which the server refuses the sign-in's old tokens (C3d, `DELETE /v1/me`):
+  kept while queued, and for 24 hours once its try finishes, whatever it found, 24 hours being
+  Cognito's longest access-token life; its username dropped at the finish, then deleted by the
+  sweep. Nothing more of the person, and no user id. Not an engine table: written by the deletion's
   and the retention run's transactions and beside the engine.
 - `questions`, `responses`, `saved_questions`, `decks`, `session_presentations` — a live lesson's
   questions, each student's answer now, a teacher's drafts of questions, the teacher's PDF decks and
@@ -459,7 +462,9 @@ get designed; edits land here as they're decided.
 Student app:
 - `GET /v1/me` — boot call: who am I, my classes, my live session if any. The first-ever
   call quietly creates the student's `users` row; a later call fills in a display name
-  the row was created without, and never changes one it has. Each class carries its
+  the row was created without, and never changes one it has. Under a token a deleted sign-in
+  issued before its deletion it makes none and is `409 account_deleted` (C3d, added 2026-11-11,
+  additive; `DELETE /v1/me`). Each class carries its
   teacher (`teacher.displayName`, null when their account has none — the preview's and
   the history's shape; added 2026-09-26, C2a, additive): what Home and Me show under a
   class, and Focus says "with". And the caller's enrollment in it (`enrollmentId`, null on
@@ -487,10 +492,20 @@ Student app:
   Its key is an IAM user's of its own per environment, allowed only `AdminGetUser` and
   `AdminDeleteUser` on that environment's pool, which `AUTH_ISSUER` names; unset, the queue waits.
   The phone's own `DeleteUser` with its access token (C4) stays a first try: whichever lands second
-  finds the sign-in gone. A sign-in a live account holds again is kept: its person came back. A
-  refused deletion queues nothing. From that answer the phone sends the API
-  nothing more — any request would make a fresh account under the same sign-in — and leaves its
-  session with no Emergency Unlock (the owner's ruling).
+  finds the sign-in gone. A sign-in a live account holds again is kept, its person come back, and
+  only a sign-in made after the deletion can come back (below). A refused deletion queues nothing.
+  From that answer the phone sends the API nothing more, and leaves its session with no Emergency
+  Unlock (the owner's ruling).
+  *Amended 2026-11-11 (C3d, the owner's ruling: "Now, on the server"):* the server refuses the
+  deleted sign-in, on every device, for as long as any token of it can still work. A token it
+  issued before the deletion, by its `auth_time` against the server's clock at the deletion (a
+  refresh keeps `auth_time`; a token with none counts as before), makes no account: a request that
+  would make one is `409 account_deleted`, nothing made. An Emergency Unlock is still recorded,
+  under a student row born removed (no name, no Cognito subject, removed as it is made), which links
+  nothing to the deleted account; a change of its reason is `404 unlock_not_found`; the reads that
+  make nothing keep their answers (`GET /v1/me/age-check` is `false`). A sign-in made after the
+  deletion is its person coming back: its first call makes an account, as any first call does. The
+  mark is the sign-in's `cognito_deletions` row (data model).
 - `PATCH /v1/me` — the student sets their own display name (A8): `{ displayName, eventId }`,
   stored trimmed with each run of spaces made one, answered with the user as `/v1/me`
   gives it. Unique within each class (owner decision 8): a name another student in any

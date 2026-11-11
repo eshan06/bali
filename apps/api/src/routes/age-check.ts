@@ -1,9 +1,10 @@
-import { ageCheckPassed, type Database, findOrCreateStudent, recordAgeCheck } from '@bali/db';
+import { ageCheckPassed, type Database, recordAgeCheck } from '@bali/db';
 import type { AgeCheckResponse } from '@bali/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import { requireAuth } from '../auth/plugin.js';
+import { accountOf } from '../auth/student.js';
 import { parseRequest } from '../errors.js';
 import { refusal } from './errors.js';
 
@@ -35,7 +36,7 @@ export function registerAgeCheckRoutes(app: FastifyInstance, db: Database): void
     async (request): Promise<AgeCheckResponse> => {
       const identity = requireAuth(request);
       const { eventId } = parseRequest(request, 'body', RecordBody);
-      const caller = await findOrCreateStudent(db, identity.sub);
+      const caller = await accountOf(db, identity);
       switch (await recordAgeCheck(db, { userId: caller.id, eventId })) {
         case 'passed':
           return { passed: true };

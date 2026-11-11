@@ -43,6 +43,13 @@ afterEach(async () => {
   await closeDb();
 });
 
+/** The sign-in `sub`'s first call, as the boot call makes it: of a sign-in never deleted here. */
+async function provision(on: Database, sub: string) {
+  const row = await findOrCreateStudent(on, { issuer: 'test-pool', sub, at: undefined });
+  if (!row) throw new Error(`no account made for ${sub}`);
+  return row;
+}
+
 async function activeEnrollmentId(classId: string, studentId: string): Promise<string> {
   const rows = await db
     .select()
@@ -572,7 +579,7 @@ describe.runIf(REAL_PG)('a join racing the same account’s redeem (real Postgre
     await recordAgreement(db, { schoolId: school.id, signedOn: '2026-09-30' });
     const minted = await mintTeacherInvite(db, { schoolId: school.id });
     if (minted.outcome !== 'minted') throw new Error(`no invite: ${minted.outcome}`);
-    const account = await findOrCreateStudent(db, `t1c-${tag}`);
+    const account = await provision(db, `t1c-${tag}`);
     const token = await ctx.tokenFor(account.cognitoId);
     return {
       account,

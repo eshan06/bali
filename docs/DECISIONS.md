@@ -8,6 +8,136 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-11** — **C3d, deleted sign-ins refused on the server: no account is made again under a deleted
+  sign-in's old token, on any device (the owner, 2026-11-11: "Now, on the server"; C3d, #558).** The owner's
+  answer to the conductor's question "When should the server stop deleted accounts from coming back?" (the other
+  choice: "Before K-12"), the privacy point AN9d's entry names, closed for both phones and the student web at once,
+  with no app change. **The hole:** once `DELETE /v1/me` committed, the deleted row held no subject, so
+  `findOrCreateStudent` made a fresh account for any request still carrying the sign-in's token, valid until it
+  expires: `GET /v1/me` named it from the token's claims, a join put it in a class, a rename named it; and the
+  deleter then found a live account holding the sign-in and kept it (`came_back`). The regression tests came first
+  and failed so on the code before the fix: 200 where 409 is due, three times, and the sign-in kept.
+
+  **The conductor's calls, made in the step's brief, each awaiting the owner's look:**
+  1. A token whose `auth_time` is before the sign-in's deletion, by the server's clock at the deletion, is the
+     deleted sign-in's. A refresh keeps `auth_time` (AWS's step-up guide: "Refreshing a token doesn't reset the
+     `auth_time` claim", checked), so a refreshed token is too; one with none counts as before. A sign-in made after
+     the deletion is its person coming back on purpose (the owner's ruling of 2026-10-09): served as any first call
+     is, the deleter's `came_back` kept.
+  2. No account is made for the deleted sign-in, races included: every caller of `findOrCreateStudent` answers
+     `409 account_deleted` under such a token, never a 401, nothing made. `GET /v1/me` gains that answer, additive.
+  3. `DELETE /v1/me`'s retry stays `already_deleted`; the reads that make nothing keep their answers
+     (`GET /v1/me/age-check`'s `false`); an Emergency Unlock is recorded, never refused, under a student row born
+     removed (no name, no Cognito subject, removed as it is made), making no account, setting off no `came_back`
+     and linking nothing to the deleted account.
+  4. The sign-in's `cognito_deletions` row is the mark: kept while queued and for 24 hours after its try finishes,
+     whatever the outcome, its username dropped at the finish, then deleted by the sweep. No user id, and nothing
+     more of the person.
+  5. No client change and no new words; how each client takes the new answers is below.
+
+  **Where it lives:** `packages/db/src/cognito-deletions.ts`: `SignedIn`, `signInDeleted`, `SIGN_IN_MARK_MS`,
+  `forgetFinishedCognitoDeletions`, the queue's upsert, the claim of queued rows alone and the finish that keeps the
+  row; migration 0030, additive (`deleted_at` and `finished_at`, both nullable, and `username` nullable);
+  `queries.ts`'s `findOrCreateStudent`, which takes the token's sign-in and makes none for a deleted one's old
+  token, asked only once its lookup misses: a deletion takes the subject off the row and marks the sign-in in one
+  transaction, so a lookup that misses the row is always followed by a read that finds the mark, even with the
+  deletion committing between them. `transitions.ts`'s `unlockAsNoOne`; `apps/api/src/auth/student.ts`
+  (`signedInOf`, `accountOf`, `asUnlocker`), which every caller goes through; the sweep's
+  `forgetFinishedCognitoDeletions`.
+
+  **This step's own calls, awaiting the owner's look:**
+  - **The mark's time is a column of its own** (`deleted_at`, the server's clock at the deletion), the newest
+    deletion's. A row queued before C3d has none and is read by its `created_at`, when its deletion queued it, so
+    nobody deleted before this deploy is refused for longer than their own deletion says.
+  - **A deletion of a sign-in already marked moves the mark to it.** A queued row keeps its tries and their
+    backoff. A row whose try had finished is queued anew, its username taken back from the token: a person who came
+    back (a sign-in made since, the Cognito user kept) and then deleted that account too would otherwise keep the
+    sign-in, and its tokens would make accounts again. A `DELETE /v1/me` retry under the old token moves the mark
+    too, which refuses a sign-in made since that has no account yet, as the retry would delete one it had (C3's
+    rule, left as is).
+  - **A try's finish leaves the row queued when a deletion was queued since its claim** (its `deleted_at` moved): a
+    try that kept the sign-in, its person come back, would otherwise finish over that account's own deletion and
+    lose it.
+  - **A change of an unlock's reason under an old token is `404 unlock_not_found`, nothing made:** no unlock is the
+    caller's when no account is (A20: it is no unlock record), and a row born removed only to be refused would hold
+    nothing.
+  - **An unlock's retry under an old token**, its id recorded already under a row born removed, is filed there, a
+    replay, so the phone settles. One recorded under the deleted account before the deletion stays `409
+    event_id_conflict`, as it was before C3d: answering it as a replay would read that account's record back to a
+    caller the server cannot prove is its person. The row and its unlock are written in one transaction, so a
+    refusal (an id another event holds, which the outbox sends again and again) leaves no row.
+  - **A retention run's queued sign-ins are marks too**, the same rows: a person it de-identified makes no account
+    under a token from before the run; their next sign-in makes one, as the run's entry of 2026-10-28 has it.
+  - The contract gains `me/409-account-deleted`, and the fixtures' coverage no longer counts `account_deleted` as
+    reachable only in a race.
+
+  **Dropped, ruled impossible (humanly impossible timing):** a first call from another device that reads no mark
+  just before a `DELETE /v1/me` from a sign-in with no account queues one (C7's under-13 fallback), and makes its
+  account just after that request's lookup, milliseconds apart (named in a `ponytail:` comment); and `GET /v1/me`
+  with a name to fill whose lookup lands just before the deletion's commit, answered 500 once, as before C3d, its
+  retry then 409.
+
+  **How each client takes it (read, none changed):**
+  - **The iPhone:** the phone that deleted sends nothing more (`accountDeleted`). A second iPhone on the account:
+    `GET /v1/me`'s 409 is a failed read, Home saying "Something went wrong at Bali. Try again in a moment."
+    (`Joining.words`, which keys on no reason there), the read asked again every 30 s in the foreground; a check-in
+    answers 409 every 30 s in a session; a tap's 409 is kept, retried at its backoff and shown, as any refused tap
+    is; a state change's is dropped and the truth read again; the 13+ yes and the device token are let go; an
+    unlock is recorded. No crash, and no sign-in without a press: only a 401 signs out. Nothing says the account was
+    deleted: a screen that does would be its own step, drawn first. **One real change, said plainly (both santa
+    reviewers):** that second iPhone, shielded in a running lesson as the account is deleted on the first, now keeps
+    its shields to the bell. Before, its next check-in made the hole's fresh account, was answered `gone`, and the
+    read after it let the phone go; now the check-in's 409 re-reads nothing (it re-reads on a 404 alone) and the read
+    would fail too. Emergency Unlock still frees it, recorded. No server-only fix exists short of a made-up account;
+    the way out is a client step that reads `account_deleted` as signed out (this step's call, awaiting the owner:
+    keep it; reached only by one account on two iPhones, deleted mid-lesson).
+  - **Android:** the engine is iOS's port and has no screens yet: a failed read asked again at each wake, a
+    check-in's 409 every 30 s with the screen on, the yes let go, no sign-out but on a 401.
+  - **The student web:** it never sends `GET /v1/me` under such a token. Its read asks the 13+ check first
+    (`homeFor`), `false` for a sign-in no account holds, and goes to the invite page, as the student home's 30 s
+    read does too. A redeem there is `409 account_deleted`: "This account was deleted, so nothing changed. Sign
+    out, then sign in again." (its words since C3), a press, no loop.
+
+  **For the owner:**
+  - Until runbook 9 sets the deleter's key, no row finishes, so the marks never expire, and a surviving Cognito user
+    lets an old device refresh its tokens with the old `auth_time`: a deleted account's other device, and a person a
+    retention run de-identified while still signed in, see "Something went wrong at Bali" until they sign out and in
+    again. Before C3d each quietly got a fresh account. The way to say it honestly is the client step above.
+  - Not tried against a live pool (dev needs a real sign-in, prod is off-limits, so the tests are the proof):
+    whether Cognito's hosted page, signing a person in again by its one-hour cookie, keeps the first sign-in's
+    `auth_time`. Both phones' sign-ins are ephemeral, with no cookie; the portal's is not. If it does, such a sign-in
+    reads as the deleted one and is refused until its person signs in afresh, the safe side, and only while the
+    Cognito user survives.
+  - ARCHITECTURE's "Under 13" amendment (2026-10-07) still says `DELETE /v1/me` "keeps only its sign-in's deletion
+    until Cognito's user is gone"; the data-model line, changed here, says a day after its try finishes. Left, as the
+    brief kept this step's ARCHITECTURE changes to three places.
+
+  **The tests:** the regression first, its own commit, failing on the code before the fix (`GET /v1/me`, a join and
+  a rename under the old token answered 200 where 409 is due; the sign-in kept as come back). `deleted-sign-in.test.ts`
+  (new): each account-making route under an old token and a refreshed one, a sign-in made after, a classmate, its
+  400s, replays from before the deletion, the two unlocks and their retries, the reason's change and the reads.
+  `sign-in-deletion.test.ts`: the regression, an unlock after which the sign-in still goes, the day-long mark, a
+  person come back and deleted again, a retention run's mark. `cognito-deletions.test.ts` and
+  `account-deletion.test.ts`: the queue, the finish, the forget, `signInDeleted`, `findOrCreateStudent` against the
+  mark, `unlockAsNoOne`. `races.test.ts`, on real Postgres: a lookup made to wait out the deletion's commit (the
+  users table held), which then reads the mark; one landing before the commit; and 15 contended rounds of a
+  deletion, two requests and an Emergency Unlock under the old token, never an account made and the unlock recorded
+  once. Tried, each failing by name, then reverted: no mark read (23: the regression's three, each route's refusal,
+  the replays, both unlocks, the reason's 404, the mark's day, the re-deletion, the retention run's); a token with no
+  `auth_time` read as signed in after (5: `me.test.ts`'s rename, the came-back test's old token, the retention run's
+  mark, and `signInDeleted`'s and `findOrCreateStudent`'s "no time"); the comparison turned round (37: every route
+  both ways, `signInDeleted`'s three); an unlock refused (both unlock tests); its row left live (both "born removed"
+  checks); the finish deleting the row (6), keeping the username (3), or ignoring a re-queue (the guard's own test); a
+  finished row left finished at a new deletion (both re-queue tests); the sweep not forgetting (the mark's day); and
+  the mark read before the lookup, on CI's real-Postgres lane in a commit reverted after it (the staged race test,
+  its lookup made to wait out the commit, got back the fresh account the hole makes: a new row holding the sub).
+
+  **The proof:** `npm run typecheck && npm run lint && npm test` green, the portal's suite whole; `npm run demo`
+  green; the real-Postgres suite on CI's lane (this PC runs no Postgres). Santa: NICE in one round, two Claude Opus
+  reviewers at max effort (no Codex or Gemini CLI here: context isolation holds, model diversity doesn't), 0
+  blockers; their WARNs are above (the second iPhone's shields, the words, the lasting 409 while the deleter is off,
+  the stale Auth sentence) and in the PR's review notes.
+
 - **2026-11-11** — **AN9e, the account's flows in the engine: BaliApp.swift's `Phone`'s account half as `outbox`'s
   `Account`, and each sign-in that lands said by `core`'s `SignIn`, on the JVM over the real sign-in (the
   conductor's calls in the step's brief, and this step's own, marked, awaiting the owner's look; AN9e, #557).** The
