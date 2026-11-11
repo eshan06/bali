@@ -106,7 +106,8 @@ token of the account they are for alone, by its `sub`, checked before a renewal 
 another account's ever given or renewed for them (`ApiClient.forDeletion(account)`, `forAccount(account)`;
 AN9h). The token endpoint is reached over
 the API client's OkHttp. No token, code, verifier or state reaches a log line or an error's message.
-`SyncEngine.make` is the app's engine over it. Cognito's DeleteUser (`deleteUser`, AN9a) goes in Cognito's
+`SyncEngine.make` is the app's engine over it. Who is signed in is said at each change (`signedIn`), and as
+each sign-in lands (`landings`), with its account and a count no renewal moves (AN9e). Cognito's DeleteUser (`deleteUser`, AN9a) goes in Cognito's
 JSON protocol to the pool's own endpoint, over the same OkHttp, the token in its body alone, and only ever
 for the sign-in it began with, before a renewal and after it, and only for the account its caller names
 (AN9b), as the deletion's mark is.
@@ -272,6 +273,13 @@ passed, with its sign-in, never the date or an age (C7).
 ASCII letters and digits in upper case, each whole character a BreakIterator's grapheme cluster as Swift's
 `Character` is; what it opens, for the preview the consent list sits beside; an answer for a code typed over
 dropped; and why a look or a join gave no class, as its result and reason, the words AN10's.
+
+**The account** (`outbox`'s `Account.kt`, BaliApp.swift's `Phone`'s account half, AN9e): one a run over the
+engine's sign-in (`Account.of`), its state what AN10's router will read. It follows the sign-in as each sign-in
+lands; asks Bali's server for the 13+ yes of the account it names, and again at each wake while Bali couldn't be
+reached and the sign-in isn't through; holds an answer under 13 in memory for the run alone; has the engine forget
+another student's `me`, a state counting fewer forgets shown without it; and runs Delete account through the engine,
+a stop answered once another sign-in landed since the press taken as `SignInChanged`. The app runs none yet (AN9i).
 
 **The lock's rules** (`outbox`'s `Enforcer.kt` and `Lock.kt`, BaliOutbox's `Enforcement`, AN7a): the
 enforcer follows the engine's state and keeps the lock where it says, through a seam of the lock's own

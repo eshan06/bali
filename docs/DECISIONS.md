@@ -8,6 +8,87 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-11** — **AN9e, the account's flows in the engine: BaliApp.swift's `Phone`'s account half as `outbox`'s
+  `Account`, and each sign-in that lands said by `core`'s `SignIn`, on the JVM over the real sign-in (the
+  conductor's calls in the step's brief, and this step's own, marked, awaiting the owner's look; AN9e, #NNN).** The
+  step came to about 450 changed lines without its tests, so the conductor split it: this PR is its engine half. Its
+  app half (`BaliApp`'s one `Account` a run, the readout's Join, History and Signed in line, the manifest's NFC
+  feature required, the portal's address, Q7's line in `docs/ANDROID-PHONE-TESTS.md` and the emulator suite) is
+  AN9i, its start pushed to the branch `feat/an9i-android-app-half`.
+
+  **Where it lives:** `outbox`'s new `Account.kt`: `Account.State`, what AN10's router will read (who is signed in,
+  `signedInThisRun`, the 13+ check as the router reads it, `deleting`, and the engine's state as the app may show
+  it); `run`, which hooks the ask at each wake and follows the engine's state and the sign-in; `answerAge`,
+  `deleting` and `deleteAccount`; and `of`, over the engine's own sign-in (`SyncEngine.signIn`, internal now).
+  `core`'s `SignIn.kt`: `landings` and `Landing`. Nothing in the app runs it yet: AN9i wires it, AS2 answers the
+  question through it, AS7 presses Delete account. Where Kotlin differs, said plainly:
+  - **Each sign-in that lands is said (Q2):** `landings`, beside `signedIn`: whether someone is signed in, their
+    account, and how many sign-ins have landed, set in the stretch that adopts the tokens, never by a renewal; a
+    sign-out says nobody, the count kept. It corrects AN6b's note ("nothing on iOS keys on a repeat"): iOS's
+    `Phone` reads the account at each yield, which is how it knows a sign-in over another account's with no
+    sign-out between, and `signedIn`'s flow, which says changes alone, lets that one go by.
+  - **Every landing is a change, the same account's again too (this step's call):** iOS's `signed` keys on another
+    account, or a sign-in after a sign-out. So a sign-in of the same account over its own, with no sign-out between
+    (the Debug readout's Sign in pressed while signed in), leaves the check where it was, while a Sign in's fresh
+    tokens aren't through it: the gated sign-in then gives Bali's API no token and nothing asks Bali. Here the count
+    makes it a change: the check is asked again, an ask on its way and Delete account's question or stop go, and
+    `me` stays, the student the same. For the owner: iOS's twin has the gap, reached from its Debug readout alone,
+    a change for the Mac.
+  - **AN9h's window, closed (its "For AN9e"):** the press takes the count of sign-ins the account has followed, and
+    the answer reads the sign-in's own; moved since, any stop is `SignInChanged`, and the account deleted on the
+    server but not its Cognito sign-in (`SignInNotDeleted`) is `Deleted` (this step's call): Pending's Try again
+    would run a deletion for the account signed in now, while the account that pressed has its sign-in gone from
+    the phone and its Cognito user is the server's deleter's (C3-cognito), AN9b's call for DeleteUser after another
+    sign-in landed. Left, as humanly impossible timing: a sign-in landing in the instant between the press and the
+    deletion's own read of the account as it starts, which the deletion then acts on. Closing that takes the
+    engine's deletion naming its account, AN9h's area, so it isn't here.
+  - **`answerAge`'s engine half is here (this step's call):** AN9c's seams named it AS2's, but Q5's rule needs an
+    answer to hold. Signed in, the gap's fallback's: 13 or older, the yes kept with the sign-in and the sign-in let
+    through; under 13, the account deleted as Delete account deletes one. Signed out, Sign up's question: the
+    answer held, its page and the intro AS2's. Two guards iOS leaves to its router: nothing after an answer under
+    13 this run (no way back to the question until the app opens again), and, signed in, nothing while the
+    question isn't due, so no screen's call deletes an account that's through. **The yes names the account the
+    question was for**, the one the account followed, where iOS's `answerAge` names whoever the sign-in holds as
+    the yes is kept: a sign-in landing as the question is answered would take that yes, through the check unasked.
+    For the owner, iOS's twin has that gap too, a change for the Mac; humanly impossible timing there, as the
+    question covers Sign in.
+  - **The account follows the engine's own sign-in** (`of`), the one its client sends under; none over an engine
+    opened without one. **Its calls run in its own scope**, so a screen cancelled never leaves Delete account busy;
+    the ask after a sign-in runs in a coroutine of its own, iOS's `Task`, and the ask at each wake in the wake's own
+    pass, with the engine let go. **`deleting`** takes `Deleting`'s own steps, the screens' question, Cancel, Back
+    and OK, as iOS's settable `deleting`.
+  - **A state counting fewer forgets than the account asked for shows without its `me`** (`shown`), from the
+    stretch that asks the forget on, which also stands for iOS's `forgetMe` clearing `sync.me` at once.
+
+  **For AN9i:** `BaliApp.start` makes `Account.of(engine, within)` and runs it in the run's job; the readout's Signed
+  in line reads `running.account`, so a test's own sign-in, made into its engine by `SyncEngine.make`, gives the run
+  an account; `LockServiceTest`'s `Server` can serve the new instrumented tests. **For AN10:** the router reads
+  `Account.state`; the screens' words are AN10's.
+
+  **The tests:** AccountTest's 13, over a gated SignedRig: ageFromServer's engine half (passed; no yes, then 13 or
+  older, its yes under one UUIDv7; under 13, the account deleted, no yes sent), ageAgainInClass's (Bali not reached,
+  asked again at each wake, a yes letting the sign-in through before the bell and the Emergency Unlock made meanwhile
+  sent at once; no yes, asked no more over two wakes, rule 3's check their mark), forgetsAnother's and
+  nothingOfTheLast's, and deleteAccountWiring's (its screen until the answer, DeleteUser unanswered leaving it
+  Pending, a relaunch over the same keychain landing there at once, Try again finishing it, Done until OK). New:
+  Q2's count, through a 401's renewal; AN9h's window, the account's own thread held between the deletion's answer
+  and its taking of it, so another sign-in lands there for certain; Q5, signed out and signed in, a relaunch
+  asking again; each sign-in's check read under its own account; an answer's yes kept for its own account alone,
+  the regression test first (it failed as b1 went through on a1's answer); and an Emergency Unlock queued across
+  another student's sign-in, still queued in the state and the file, then sent. Tried, each failing by name, then
+  reverted: the ask not hooked at a wake (2: the asks again at each wake, and no more once answered); a renewal
+  counted as a sign-in (Q2's); `forgetMe` not called at a sign-in (7, the forget's among them); a state counting
+  fewer forgets shown with its `me` (the forget's); the answer under 13 kept with the sign-in (Q5's: the keychain
+  changed); a stop answered after another sign-in landed kept with its Try again (the window's: `UnlockUnsent`, its
+  Try again a deletion for b1); the check read under an account the ask cached, not the one the sign-in holds (3,
+  each sign-in's own among them); and the forget at a sign-in letting go of every record, the unlock too (4, the
+  queued unlock's among them).
+
+  **Santa's review:** SANTA.
+
+  **The proof:** `android/app` is unchanged here, so the JVM tests are the proof and no emulator ran: PROOF. Nothing
+  was added to the PC's SDK: its folders were compared before and after.
+
 - **2026-11-10** — **AN9d, Join, Leave, Your name and forget me through the engine, and Join's rules: BaliOutbox's
   `Joining` and the engine's account calls in Kotlin, on the JVM (AN9d, #556).** Ported as iOS has it, under the
   two calls the conductor made in the step's brief (below); this step's own calls are marked, awaiting the owner's

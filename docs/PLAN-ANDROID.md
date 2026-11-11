@@ -14,18 +14,16 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-10 (Central) — AN9d, Join, Leave, Your name and forget me through the engine
-(#556; `docs/DECISIONS.md`, 2026-11-10): Join's rules (`Joining`), the code as codes are written, its
-failures typed; the engine's look-up, join, rename and leave, under whoever is signed in, each renewed once
-on a 401 through `Joining.send`, where the engine's `renewing` moved, every caller's renewal as it was; a
-join, a rename or a leave applied however its caller ends; a read's `me` applied only while unchanged
-(`meChanges`); Sign out's read of the outbox's file itself; and forget me, which forgets `me` alone. For the
-owner, a privacy point: a join or a rename landing after a deletion commits makes a fresh account
-(DECISIONS). Before it, AN9h, one account's token for Delete account and the 13+ check. Next: AN9e, the
-account's flows in the app and the readout's Join and History; AN7f and AN8's 📱 check on the owner's
-phones; Android's Cognito clients, the owner's (Open owner items, 8); Android 17's SDK platform for the
-owner to OK before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6);
-AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
+_Last updated: 2026-11-11 (Central) — AN9e, the account's flows in the engine (#NNN; `docs/DECISIONS.md`,
+2026-11-11): `Account`, BaliApp.swift's `Phone`'s account half in `outbox`, which follows the sign-in as each
+sign-in lands (`SignIn.landings`, a renewal never one), asks Bali for the 13+ yes of the account it names and
+again at each wake while unanswered, holds an answer under 13 for the run alone, has the engine forget another
+student's `me`, and takes a deletion's stop answered once another sign-in landed as `SignInChanged`. AN9e was
+split, its app half now AN9i. Before it, AN9d, Join, Leave, Your name and forget me through the engine. Next:
+AN9i, the account's flows in the app and the readout's Join and History; AN7f and AN8's 📱 check on the
+owner's phones; Android's Cognito clients, the owner's (Open owner items, 8); Android 17's SDK platform for the
+owner to OK before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's
+part 2 once the owner has the phones. Not on the pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -166,18 +164,19 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN9h** One account's token for Delete account and the 13+ check — ✅ (#555; DECISIONS 2026-11-10)
 - **AN9d** Join, Leave, Your name and forget me through the engine, and Join's rules — ✅ (#556;
   DECISIONS 2026-11-10)
-- **AN9e** The account's flows in the app, and the readout's Join and History (twin: BaliApp.swift's
-  `Phone`, its account half, and its `Readout`'s): `Account` in `outbox`, one a run in `BaliApp`
-  (DECISIONS 2026-11-05, Q1); each sign-in that lands said by `SignIn` (Q2); an answer under 13 held in
-  memory for the run (Q5), and the 13+ read asked again at each wake (Q8); the readout's Join with a
-  typed code, History's last five moments, and its Signed in line naming the check (Q3), with no 13+
-  button and no Delete account. In `android/app` too, the owner's rulings since AN9a: `BALI_PORTAL_URL`
+- **AN9e** The account's flows in the engine: `Account`, and each sign-in that lands said by `SignIn` — ✅
+  (#NNN; DECISIONS 2026-11-11)
+- **AN9i** The account's flows in the app, and the readout's Join and History (AN9e's app half, split off,
+  its start on the branch `feat/an9i-android-app-half`; twin: BaliApp.swift's `Phone`, its wiring, and its
+  `Readout`'s): one `Account` a run in `BaliApp` (DECISIONS 2026-11-05, Q1); the readout's Join with a typed
+  code, History's last five moments, and its Signed in line naming the check (Q3), with no 13+ button and no
+  Delete account. In `android/app` too, the owner's rulings since AN9a: `BALI_PORTAL_URL`
   (`app/build.gradle.kts`) becomes `https://app.getbali.app` (the owner, 2026-11-07, #540), the old
   address's redirect covering it till then; and the manifest's NFC feature required (the owner,
   2026-11-10: "Yes, require NFC"), so Play offers Bali to phones with NFC alone, as the App Store offers
   it to iPhones (DECISIONS 2026-11-07, 2026-11-10). AN7f's and AN8's rounds on dev come after it and
-  Open owner items, 8 (Q7). Tests: AccountTest on the JVM, and BaliAppTest's and ReadoutTest's on the
-  emulators — validation: the JVM tests, then the instrumented tests on `Bali_Spike_API35`, `36` and `37`
+  Open owner items, 8 (Q7). Tests: BaliAppTest's and ReadoutTest's on the emulators — validation: the JVM
+  tests, then the instrumented tests on `Bali_Spike_API35`, `36` and `37`
 - **AN9f** Me's rules: Your name, Leave and Sign out's hold (twin: `Me`'s `Naming`, `Leaving` and
   `SignOutWords.held`): Me's name typed, printable, tidied and saved under one event id while it stays
   the same, its blank test a table of Unicode's Default_Ignorable_Code_Point, pinned by a test, no ICU4J
