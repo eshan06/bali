@@ -10,6 +10,18 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN7g's on 2026-11-11: _Last updated: 2026-11-11 (Central) — AN9g, History's rules and its call (#561; `docs/DECISIONS.md`, 2026-11-11),
+AN9's last step: `outbox`'s `History.kt`, every failure and day title a type: the pages as they came, from the top or
+Show earlier's, each moment once, which read may start and the cursor it sends, and Show earlier's cursor the server
+doesn't hold read again from the top; days in the phone's zone, whole at a daylight-saving change, today, yesterday or a date, in cards
+of one class's moments in a row, each card's id kept as moments join it; a kind this build doesn't know kept in the
+page and left out of the days. The engine's `history(before)` is a read that applies nothing. Before it, AN9f, Me's
+rules. Next: AN10, the router and the screens' rules; the cover test's SMS step waiting out Google Messages, a step
+of its own (`docs/DECISIONS.md`, 2026-11-11, AN9i's entry); AN7f and AN8's 📱 check on the owner's phones, signed in
+on dev as an account that passed the 13+ check on an iPhone (Q7); Android's Cognito clients, the owner's (Open owner
+items, 8); Android 17's SDK platform for the owner to OK before the first step with today's AndroidX, and OkHttp 5.5
+with it (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN9g's on 2026-11-11: _Last updated: 2026-11-11 (Central) — AN9f, Me's rules: Your name, Leave and Sign out's hold (#560;
 `docs/DECISIONS.md`, 2026-11-11): `outbox`'s `Me.kt`, each failure a type: `Naming`, the name typed as the API takes
 it, kept to whole characters within 64 code points, tidied as the API stores it, and saved under one event id while

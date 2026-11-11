@@ -8,6 +8,66 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-11** — **AN7g, the cover test's SMS step waits out Google Messages before its call: AN7e's CoversTest,
+  test-only, the race AN9i's run met once on Android 16 made impossible (the conductor's calls, marked, each awaiting
+  the owner's look; AN7g, #562).** Bali's own code is unchanged.
+
+  **The race:** Google Messages, the emulators' SMS app, answers the SMS step's link (`smsto:5551234`) through
+  activities of its own, each starting the next, then finishing. On Android 16's and 17's images (Messages of 2025-03-11
+  and 2026-03-06): `LaunchConversationActivity`; `OpenRbmDeepLinkActivity`, which asks Google's servers whether the
+  number is a business's (`rbm.goog`: a 404 for this one, its timeout 11 s); `LaunchConversationActivity` again; then
+  `MainActivity`, the conversation. On Android 15's (2024-05-28), `LaunchConversationActivity`, then `MainActivity`. The
+  step went home at Messages' first window, then called, and in AN9i's run the link's last activities still came up,
+  seconds after the test had gone home: once, `MainActivity` came up after the in-call screen had started and before the
+  service had named its window, so the call's check waited for a window it never saw.
+
+  **The fix:** the SMS step's check stands, then the step waits until Android has resumed the link's last activity,
+  Messages' `MainActivity` (`com.google.android.apps.messaging/.main.MainActivity`), as `dumpsys activity activities`
+  names the resumed one (`ResumedActivity:`), and a record the link made, never one an earlier run left in Messages'
+  task: the link finishes that one as it makes its own, on all three images. Each activity of the link starts the next
+  before it finishes (the events log's `wm_create_activity` before each `wm_finish_activity`), and an earlier
+  `MainActivity` is never resumed on the way (the events log's `wm_set_resumed_activity`, and `dumpsys` read over and
+  over through the link), so once the link's own is resumed nothing of the link is left to start. Then the call, at
+  once, from the conversation, as a student who has texted for help calls: the failing test's provocation, kept (the
+  conductor's call too, awaiting the owner's look; before, the call started from the home screen).
+
+  **Why this way (the conductor's call, awaiting the owner's look):** it is the brief's recommended way: a point Android
+  marks, never a stretch of time, and nothing on the emulator changed. Messages stopped after its check (`am
+  force-stop`) would close the race as surely, but it also drops Messages' alarms and jobs and marks it stopped until it
+  next opens, a change beyond the test. The call before the SMS step would move the race onto the launcher's and the
+  readout's checks after it, and into the next test. The cost: the wait names Google Messages' own activity, as
+  `BLOCKED` names Contacts, so on another SMS app the step fails by name ("never came"), never passes unchecked.
+
+  **What the test proves is unchanged:** Settings, its Accessibility settings, Bali's uninstall screen, the dialer, the
+  emergency dialer, emergency information, Messages, the in-call screen, the launcher and the readout each never
+  covered, none sent home, and the lock held throughout. The SMS step's check is the one it had, on Messages' first
+  window; only the call's start moves, from the home screen to the conversation.
+
+  **The failing test first** (its own commit, `test(android): …`): the call at once after the SMS step's check, with no
+  Home between. On `Bali_Spike_API36`, where AN9i's run raced, it failed by name twice of two at the call, as the flake
+  had: the service saw the status bar and Messages' window. The log, as AN9i's: the in-call activity resumed and paused
+  38 ms later as the link's `MainActivity`, started by its `LaunchConversationActivity` while Messages' window was still
+  on screen (`BAL_ALLOW_VISIBLE_WINDOW`), came up over it. On `_API37` it failed once of two, the same way: Android 17's
+  Telecom starts the in-call screen one hop later (`com.google.android.telecomui`'s `UserCallActivity`), so Messages
+  sometimes ends first. On `_API35` it passed both times: Messages is done there within 0.2 s, before the call starts.
+  With the fix, the same provocation passes on all three (the proof, below).
+
+  **For AN10 and Phase 10:** Android's regular expressions are ICU's, not the JVM's: an unescaped `}`, which the JVM
+  reads as itself, fails on Android as a `PatternSyntaxException` (this step's first try met it, on the emulator alone),
+  so a `Regex` in `core` or `outbox` can pass its JVM tests and throw on a phone. The one there today, `SignIn`'s, is
+  fine on both. And `docs/PLAN.md` is at 7,965 of its 8,000 words by the plan check's count, so its next change frees
+  room first; this step carries `[no-plan]` and leaves it as it is.
+
+  **The proof:** the test alone, 10 times in a row on `Bali_Spike_API36`, each green (12 to 22 s a run); then the whole
+  instrumented suite on `_API35`, `_API36` and `_API37`, 54 of 54 on each, never skipped (on 15 and 17 before the fix's
+  comment was reworded: the test app's code byte for byte the same). `./gradlew assemble :app:assembleDebugAndroidTest
+  :app:lint check` green, Android 10's API check with it; `npm run typecheck && npm run lint && npm test` green. Nothing
+  was added to the PC's SDK: its folders were compared before and after. Each emulator after its runs: Bali and its
+  test app uninstalled, AN1's spike apps kept, every setting and the call log as found, stopped.
+
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so
+  context isolation holds and model diversity doesn't): 0 blockers, 0 WARNs.
+
 - **2026-11-11** — **AN9g, History's rules and its call: BaliOutbox's `History` and SyncEngine.swift's `history(before:)`
   in Kotlin, on the JVM, every failure and day title a type (the conductor's calls, those in the step's brief and this
   step's own, marked, each awaiting the owner's look; AN9g, #561).** The rules AS7's History will follow, with no screen
