@@ -149,6 +149,8 @@ class DeletingTest {
             AccountDeletion.UnlockUnsent to true, AccountDeletion.Unread to true,
             AccountDeletion.NotDeleted(SendResult.NetworkError) to true,
             AccountDeletion.SignInFirst to false, AccountDeletion.TeacherHasClasses to false,
+            // Who is signed in changed meanwhile (AN9h): its Try again would delete the account signed in now.
+            AccountDeletion.SignInChanged to false,
         )) {
             val stopped = Deleting.Busy.answered(answer)
             assertTrue(stopped.shows, "$answer")
@@ -195,10 +197,11 @@ class DeletingTest {
             AccountDeletion.UnlockUnsent, AccountDeletion.Unread, AccountDeletion.SignInFirst,
             AccountDeletion.TeacherHasClasses, AccountDeletion.SignInNotDeleted(SendResult.NetworkError),
             AccountDeletion.NotDeleted(SendResult.Status(500)), AccountDeletion.NotDeleted(SendResult.Status(429)),
+            AccountDeletion.SignInChanged,
         )) {
             assertEquals(answered(answer, young = false), answered(answer, young = true), "$answer")
         }
-        for (answer in listOf(AccountDeletion.SignInFirst, AccountDeletion.TeacherHasClasses)) {
+        for (answer in listOf(AccountDeletion.SignInFirst, AccountDeletion.TeacherHasClasses, AccountDeletion.SignInChanged)) {
             assertNull(answered(answer, young = true).start(), "$answer")
         }
         assertEquals(Deleting.Done, answered(AccountDeletion.Deleted, young = true))

@@ -321,15 +321,15 @@ class ApiClientTest {
         }
 
     @Test
-    fun anAccountDeletionsClientSendsEveryRequestUnderTheDeletionsOwnTokenThePlainClientUnderTheAccessToken(): Unit =
+    fun anAccountDeletionsClientSendsEveryRequestUnderTheDeletionsOwnTokenOfThatAccountAloneThePlainClientUnderTheAccessToken(): Unit =
         runBlocking {
             // A provider giving only the deletion's token sends nothing but through forDeletion, a
-            // queued record and DELETE /v1/me alike (C7's fallback).
+            // queued record and DELETE /v1/me alike (C7's fallback), for the account it names alone (AN9h).
             val deletionOnly =
                 object : TokenProvider {
                     override suspend fun accessToken(): String? = null
 
-                    override suspend fun deletionToken() = "deletion"
+                    override suspend fun deletionToken(account: String?) = "deletion".takeIf { account == "a1" }
                 }
             val transport = TransportDouble.answering(200, """{"outcome":"already_deleted"}""")
             val client = ApiClient(base, deletionOnly, transport)
@@ -337,16 +337,27 @@ class ApiClientTest {
             assertEquals(NoAnswer.NoToken, client.me().noAnswer)
             assertEquals(NoAnswer.NoToken, client.tap(tap).noAnswer)
             assertEquals(NoAnswer.NoToken, client.deleteMe(DeleteMeRequest("e2")).noAnswer)
+            assertEquals(NoAnswer.NoToken, client.forDeletion("b1").deleteMe(DeleteMeRequest("e2")).noAnswer)
+            assertEquals(NoAnswer.NoToken, client.forAccount("a1").tap(tap).noAnswer)
             assertTrue(transport.sent.isEmpty())
-            client.forDeletion.tap(tap)
-            val deleted = client.forDeletion.deleteMe(DeleteMeRequest("e2"))
+            client.forDeletion("a1").tap(tap)
+            val deleted = client.forDeletion("a1").deleteMe(DeleteMeRequest("e2"))
             assertEquals(DeleteMeResponse.Outcome.AlreadyDeleted, deleted.answer?.outcome?.known)
             assertEquals(listOf("POST", "DELETE"), transport.sent.map { it.method })
             assertEquals(listOf("Bearer deletion", "Bearer deletion"), transport.sent.map { it.headers["Authorization"] })
-            // A provider of one token gives it to a deletion too.
+            // A provider of one token gives it for its own account alone, its `sub`, to a deletion and to the
+            // account's own calls: never for another, nor for none, and a token that names no account for none.
             val plain = TransportDouble.answering(200, """{"outcome":"deleted"}""")
-            ApiClient(base, FixedToken("t"), plain).forDeletion.deleteMe(DeleteMeRequest("e3"))
-            assertEquals("Bearer t", plain.sent.single().headers["Authorization"])
+            val one = ApiClient(base, FixedToken(jwt("a1")), plain)
+            one.forDeletion("a1").deleteMe(DeleteMeRequest("e3"))
+            one.forAccount("a1").me()
+            assertEquals(listOf("Bearer ${jwt("a1")}", "Bearer ${jwt("a1")}"), plain.sent.map { it.headers["Authorization"] })
+            for (account in listOf("b1", null)) {
+                assertEquals(NoAnswer.NoToken, one.forDeletion(account).deleteMe(DeleteMeRequest("e4")).noAnswer, "$account")
+                assertEquals(NoAnswer.NoToken, one.forAccount(account).me().noAnswer, "$account")
+            }
+            assertEquals(NoAnswer.NoToken, ApiClient(base, FixedToken("t"), plain).forDeletion("a1").deleteMe(DeleteMeRequest("e5")).noAnswer)
+            assertEquals(2, plain.sent.size)
         }
 
     @Test

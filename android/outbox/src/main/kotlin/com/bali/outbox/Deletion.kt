@@ -41,6 +41,15 @@ sealed interface AccountDeletion {
      * sign-in is kept to try again, and gives the API no token meanwhile.
      */
     data class SignInNotDeleted(val result: SendResult) : AccountDeletion
+
+    /**
+     * Who is signed in changed before `DELETE /v1/me` was answered deleted (the owner, 2026-11-10: "Close it now"):
+     * nothing more of the deletion sent, every record kept, and nothing sent for the sign-in now held. Nothing deleted
+     * that the phone knows of, though a `DELETE /v1/me` with no answer may have landed for the account that pressed,
+     * which its own next deletion settles (C3). Never [Deleted], nor a stop whose Try again would delete the account
+     * signed in now.
+     */
+    data object SignInChanged : AccountDeletion
 }
 
 /**
@@ -100,11 +109,17 @@ sealed interface Deleting {
          */
         data object Unfinished : Stop
 
-        /** Whether another try can help, so Try again shows: never for a sign-in from before the scope, nor a teacher's. */
+        /** Who is signed in changed before the deletion was done ([AccountDeletion.SignInChanged]): nothing more sent. */
+        data object SignInChanged : Stop
+
+        /**
+         * Whether another try can help, so Try again shows: never for a sign-in from before the scope, nor a teacher's, nor
+         * once the sign-in changed, when it would delete the account signed in now.
+         */
         val retries: Boolean
             get() =
                 when (this) {
-                    SignInFirst, TeacherHasClasses -> false
+                    SignInFirst, TeacherHasClasses, SignInChanged -> false
                     UnlockUnsent, Unread, is NotDeleted, Unfinished -> true
                 }
     }
@@ -147,6 +162,7 @@ sealed interface Deleting {
             AccountDeletion.TeacherHasClasses -> Stopped(Stop.TeacherHasClasses)
             AccountDeletion.UnlockUnsent -> Stopped(Stop.UnlockUnsent)
             AccountDeletion.Unread -> Stopped(Stop.Unread)
+            AccountDeletion.SignInChanged -> Stopped(Stop.SignInChanged)
             is AccountDeletion.NotDeleted ->
                 Stopped(if (underThirteen && answer.result == SendResult.NetworkError) Stop.Unfinished else Stop.NotDeleted(answer.result))
         }

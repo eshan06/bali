@@ -633,7 +633,7 @@ class DeleteAccountTest : EngineFiles() {
                 assertEquals(listOf(unlock.eventId, "Bearer ${scoped("a1")}"), listOf(sent.eventId, sent.token), "$status")
                 withTimeout(patience) { rig.signStudentIn(scoped("b1"), refresh = "refresh-b") }
                 sent.reply(status)
-                assertEquals("SignInChanged", "${rig.answerSendingNothing(deletion)}", "$status")
+                assertEquals(AccountDeletion.SignInChanged, rig.answerSendingNothing(deletion), "$status")
                 rig.nobodyDeleted("$status")
                 assertEquals(setOf(off.eventId, unlock.eventId), rig.outbox.records().map { it.eventId }.toSet(), "$status")
                 rig.stop()
@@ -652,7 +652,7 @@ class DeleteAccountTest : EngineFiles() {
             assertTrue("refresh_token=refresh-1" in renewal.request.body?.decodeToString().orEmpty())
             withTimeout(patience) { rig.signStudentIn(scoped("b1"), refresh = "refresh-b") }
             renewal.reply(200, grant(scoped("a1", issued = 1_000_000_100)))
-            assertEquals("SignInChanged", "${rig.answerSendingNothing(deletion)}")
+            assertEquals(AccountDeletion.SignInChanged, rig.answerSendingNothing(deletion))
             rig.nobodyDeleted("the renewal out")
             assertEquals(setOf(off.eventId, unlock.eventId), rig.outbox.records().map { it.eventId }.toSet())
             rig.stop()
@@ -671,7 +671,7 @@ class DeleteAccountTest : EngineFiles() {
             val renewal = rig.server.next(tokenRoute)
             withTimeout(patience) { rig.signStudentIn(scoped("b1"), refresh = "refresh-b") }
             renewal.reply(200, grant(scoped("a1", issued = 1_000_003_600)))
-            assertEquals("SignInChanged", "${rig.answerSendingNothing(deletion)}")
+            assertEquals(AccountDeletion.SignInChanged, rig.answerSendingNothing(deletion))
             rig.nobodyDeleted("the token renewed")
             assertTrue(rig.server.sent.none { it.route == deleteMeRoute })
             rig.stop()
@@ -691,7 +691,7 @@ class DeleteAccountTest : EngineFiles() {
                 assertEquals("Bearer ${scoped("a1")}", delete.token, "$status")
                 withTimeout(patience) { rig.signStudentIn(scoped("b1"), refresh = "refresh-b") }
                 delete.reply(status)
-                assertEquals("SignInChanged", "${rig.answerSendingNothing(deletion)}", "$status")
+                assertEquals(AccountDeletion.SignInChanged, rig.answerSendingNothing(deletion), "$status")
                 rig.nobodyDeleted("$status")
                 rig.stop()
             }
