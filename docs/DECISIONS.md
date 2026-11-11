@@ -8,6 +8,80 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-11** — **AN9c, the 13+ check: the server's yes, read and recorded through the sync engine, and the
+  question's rules, on the JVM over the real sign-in (AN9c, #554).** Ported as iOS has it, the yes counted by
+  AN9b's pattern: no question here needed a call of the conductor's, and the one open point it touches, the
+  wrong-account gap, the owner has ruled on (below).
+
+  **Where it lives:** `outbox`'s `SyncEngine.kt`: the engine's `signIn` (set at `open` and in `make`), `ageCheck`,
+  `askAgeAtEachWake` and its `ageAgain`, the ask and the yes at each wake of the read loop, and `record(yes)`; and
+  `outbox`'s new `Age.kt`: `AgeCheck` (its answers, `passes`, `answered`) and `Birth` (its picks, `complete`, the
+  menus' `months` and `years`, and `monthName`). Nothing calls them yet: AN9e asks after a sign-in and hooks the
+  ask, AS2 draws the question, and AN10 says every word. Where Kotlin differs, said plainly:
+  - **The yes is counted as AN9b counts a loop's request:** in the stretch that reads `deleting` and decides to
+    send it, and landed once, in the stretch after its PUT or, however else its pass ends, a cancel of its run
+    included, in `counted`'s own. A deletion so waits out exactly the yes on its way, and never forever; a run
+    cancelled while its yes is out leaves the yes with the sign-in, sent by the next run under its event id.
+  - **The read, the ask and the yes go with the engine let go,** and so does every call into the sign-in: a
+    renewal the read or the PUT starts tells the engine (`retryNow`), which waits for the engine, and the app's
+    ask calls the engine itself. So none can hold an Emergency Unlock back or make one wait (C7).
+  - **The ask runs in the read loop's pass, after rule 3's check,** through `hooked` as the check does: one that
+    throws or ends in a cancel of its own asked nothing, and the loop goes on. A pass takes what it reads at its
+    top (AN5c), so a yes the ask finds sends what it held at the next wake, at once, where iOS's same pass reads
+    after its ask.
+  - **A yes can go ahead of the read a sign-in rings for:** a sign-in landing while a pass has taken its wake has
+    that pass send the yes first, as on iOS, whose tests take the two in either order; so do these.
+  - **`ageCheck` is uncounted and runs in its caller's coroutine:** it applies nothing, so a cancelled caller
+    stops it and nothing else, and a deletion never waits for it, since a read that makes no account lands
+    harmless after `DELETE /v1/me`, as on iOS.
+  - **The calendar is java.time's ISO calendar throughout:** the rule, the menus and the month names never take a
+    calendar from the locale, as Swift's `Calendar` would hand one in; only the zone (`passes`, `months`, `years`)
+    and the language (`monthName`) are the phone's. The names are in their format form, iOS's `monthSymbols`'s:
+    in Russian or Polish a menu reads better in the standalone form, on iOS too, which is AS2's to weigh.
+  - **`AgeCheck` is a value whose every step gives the next** (`answered` returns the answer), as AN9a's
+    `Deleting` is. Build 8's age notes (`notes`, `forgetNotes`) have no twin: no Android build kept one.
+
+  **The wrong-account gap, ruled (the owner, 2026-11-10: "Close it now"):** AN9c ports iOS as it is, the 13+ read
+  under `ApiClient.forDeletion` and the yes under the sign-in's own token, each under whatever sign-in is held as
+  it is sent. So another account's sign-in landing between the read loop taking the yes and its PUT going would
+  record that yes for the other account, which was never asked, and a read sent after such a landing reads the
+  other account's yes. Unreachable in the pilot, two accounts on one phone ruled out. AN9h closes it in one place,
+  for the deletion's sends and for the 13+ read and yes, each under the token of the account it is for alone; C4c
+  is the iPhone's twin.
+
+  **The tests:** AgeFallbackTests' six, their 200 ms waits replaced by a point the rig or the state marks (a pass's
+  end slept on, the loop's next read, `waitingOut`); AgeTests' `monthPrecision`, `gregorianWhateverThePhoneShows`
+  (the phone's locale asking for the Islamic, Japanese, Buddhist and Chinese calendars, java.util's Calendar and
+  java.time's chronology shown to take them on this JVM), `menus`, and `keeps`' first half (an answer holds
+  nothing but itself). New: the check's own read refused with a 401, renewed once, and an expired token renewed
+  first, the renewal telling the engine; a yes's 401 renewed once, and a 401, a 3xx, a 408 and a 429 keeping it; a yes
+  kept going nowhere at a wake while `DELETE /v1/me` is out; a run cancelled while its yes is out, then a deletion
+  that doesn't wait for it; an ask that throws, or ends in a cancel of its own, both ways; and the check never
+  between a student and Emergency Unlock: the ask held and the check's read out, then the yes out, the lock off at
+  once and each unlock sent. `SignedRig` gains `gated`, `age` and `yes`. Tried, each failing by name, then
+  reverted: the yes uncounted (the yes before the deletion's); a yes cut short never landed (the cancelled run's);
+  the yes during a deletion (the kept yes's); the ask during a deletion (`askAgeAtEachWake`'s); the ask unhooked
+  (the throwing ask's); a 401 taken as settled (the 401's); a refusal for good kept (`yesRefused`'s); the ask with
+  the engine held (the unlock's); the PUT with the engine held (the unlock's); `ageCheck` with the engine held (the
+  unlock's and the renewal's); `ageCheck` under the gated client (`nothingBeforeTheAnswer`'s); its 401 unrenewed
+  (the renewal's); the rule by java.util's Calendar (the calendars'); the names by the locale's calendar (the
+  calendars'); a field beside the answer (`keeps`'); an unlock still queued let through the under-13 deletion
+  (`deletedUnderThirteen`'s); and `make` without its sign-in (`yesRecorded`'s). Not shown by a test: the yes
+  counted in a stretch of its own after the one that reads `deleting`, a window no test holds open without a
+  real-time wait (AN9b's same note); and `SignIn.yes` or `recorded` called with the engine held, which waits on
+  nothing of the engine's.
+
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this
+  PC, so context isolation holds and model diversity doesn't): 0 blockers. Their WARNs: a 3xx to the yes's PUT let
+  the yes go, where iOS's `record(yes:)` and its own doc keep it (both; taken: kept now, the 401's test answering a
+  307 too, which failed before the fix); and C4c, the iPhone's half of the ruling, on none of PLAN.md's lines (left:
+  the conductor's to plan with the Mac session after AN9h, this step holding PLAN.md's words net zero).
+
+  **The proof:** `android/app` is unchanged, so the JVM tests are the proof and no emulator ran: `./gradlew assemble
+  :app:lint check` green, Android 10's API check with it, and the outbox's suite run five times over before the
+  review's fix and once more in `check` after it. Nothing was added to the PC's SDK: its folders were compared
+  before and after.
+
 - **2026-11-10** — **AN9b, the deletion in the engine: Delete account through the sync engine, its loops held
   and exactly what they have on its way waited out, on the JVM over the real sign-in (the conductor's calls,
   awaiting the owner's look; AN9b, #553).** The owner isn't reviewing each step and asked for the recommended
@@ -61,7 +135,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
     unmarked, its next read making it afresh, while the account that pressed stays as it was and is told
     `Deleted`. Holding those to the account too takes a token for one account alone through
     `ApiClient.forDeletion`, a change to `core`'s token provider that AN9c's 13+ read shares: left, unreachable
-    in the pilot, for the owner's look.
+    in the pilot, for the owner's look. Ruled since (the owner, 2026-11-10: "Close it now"): AN9h closes it, and
+    C4c on the iPhone (AN9c's entry above).
   - **NotAuthorized, then `invalid_grant`, reads as deleted, with no stop of its own (the conductor's
     call):** iOS's C4a limit, kept. Cognito has refused that sign-in's refresh token for good, so the phone
     holds nothing that could delete the user, and a stop would offer a Try again that can't help; the
