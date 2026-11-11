@@ -19,7 +19,8 @@ import kotlinx.coroutines.runBlocking
 
 // The name and the sign-in through the engine (C6b): BaliOutbox's MeEngineTests, and new: Sign out's rule reading the file
 // itself, and a file that can't be read now; a forget that leaves where the phone stands and its queue as they are, an
-// Emergency Unlock among them; and a rename whose caller is cancelled. Me's own rules (`Naming`) are AN9f's.
+// Emergency Unlock among them; a rename whose caller is cancelled, and one answered after the next student's `me` was
+// read. Me's own rules (`Naming`) are AN9f's.
 
 private val renameRoute = "PATCH /v1/me"
 private val request = UpdateMeRequest("Eve Park", EventId.mint(t0))

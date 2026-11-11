@@ -181,9 +181,11 @@ class JoinTest {
                 val failed = run(listOf(refused, found), renewal)
                 assertEquals(listOf<Any>(SendResult.Status(401), 1, 1), listOf(failed.first.result, failed.second, failed.third))
             }
-            // Its caller's own cancel still ends it, sending nothing more.
+            // Its caller's own cancel still ends it, sending nothing more and answering nothing: one swallowed would return
+            // the 401 to the caller as if the renewal had given none.
             val renewing = CompletableDeferred<Unit>()
             var sends = 0
+            var answered = false
             val caller =
                 launch {
                     Joining.send({
@@ -193,11 +195,11 @@ class JoinTest {
                         sends += 1
                         refused.previewJoinCode("6BVZA5")
                     }
+                    answered = true
                 }
             withTimeout(patience) { renewing.await() }
             caller.cancelAndJoin()
-            assertTrue(caller.isCancelled)
-            assertEquals(1, sends)
+            assertEquals(listOf<Any>(1, false), listOf(sends, answered))
         }
 }
 

@@ -914,12 +914,12 @@ class SyncEngine private constructor(
      */
     suspend fun rename(request: UpdateMeRequest): ApiResponse<UpdateMeResponse> =
         scope.async {
-            val changes = alone { meChanges }
+            val changesThen = alone { meChanges }
             Joining.send(refresh) { client.updateMe(request) }.also { answer ->
                 val user = answer.answer?.user ?: return@also
                 alone {
                     val me = state.me
-                    if (meChanges == changes && me != null) update { it.copy(me = MeResponse(user, me.classes, me.session)) }
+                    if (meChanges == changesThen && me != null) update { it.copy(me = MeResponse(user, me.classes, me.session)) }
                     meChanges += 1
                     reread()
                 }

@@ -240,7 +240,7 @@ class Enforcer(
      * A pass, or a check within the grace, that the enforcer makes for itself, with no caller to tell: one
      * the lock cuts short, throwing or ending in a cancel of its own though it promises not to, ends there,
      * never the run, the alarm or the recheck, so the next pass runs, an Emergency Unlock's among them, as
-     * the engine's hooks are kept (`SyncEngine.hooked`). Its own caller's cancel still ends it.
+     * the engine's hooks are kept ([hooked]). Its own caller's cancel still ends it.
      */
     private suspend fun own(made: suspend () -> Unit) {
         try {

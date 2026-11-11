@@ -59,17 +59,19 @@ a real decision? Add a dated entry at the top: what was decided and why.
     class, now also once the join's screen has gone (the engine's scope); ruled out for the pilot with two accounts
     on one phone, the owner's to re-check before K-12.
   - **During a deletion the engine holds none of them, as on iOS. For the owner, a privacy point (never dropped;
-    not fixed here):** a join or a rename pressed before Delete account whose send is answered 401 while `DELETE
-    /v1/me` is on its way is sent again once its renewal gives a token, with no press behind it. After `DELETE
-    /v1/me` is answered, that can happen only in the instant before the deletion marks the sign-in deleted
-    (`accountDeleted`), after which it gets no token. But sent while `DELETE /v1/me` is out, it can land after the
-    deletion commits, and the server then makes a fresh account under the same sign-in (`findOrCreateStudent`;
-    ARCHITECTURE's "any request would make a fresh account"), holding the class joined or the name typed: only a
-    request whose caller the server read before the commit is `409 account_deleted`. The same goes for a join's or
-    a rename's own first send, pressed just before Delete account. A leave and a look-up make no account
-    (`unknown_user`; a read). How likely: very low, a press just before Delete account, a 401 to it, and its
-    renewal ending inside the deletion's own round trip; C4b's screen keeps any press from being made once the
-    deletion runs, and iOS's `Joining.send` has the same path.
+    not fixed here):** a join or a rename still on its way when `DELETE /v1/me` commits makes, as it lands, a fresh
+    account under the same sign-in (`findOrCreateStudent`; ARCHITECTURE's "any request would make a fresh
+    account"), holding the class joined or the name typed; only a request whose caller the server read before the
+    commit is `409 account_deleted`, and once DeleteUser has run nobody can sign in to delete that account. Two
+    ways, both on iOS too: a press just before Delete account (a name saved on Me, then Delete account at once)
+    whose send outlasts the whole deletion, which waits out the loops' requests alone; or such a press answered 401
+    while `DELETE /v1/me` is out, sent again with no press behind it once its renewal gives a token (after `DELETE
+    /v1/me` is answered, only in the instant before the deletion marks the sign-in deleted, `accountDeleted`, which
+    then gives it none). A leave and a look-up make no account (`unknown_user`; a read). How likely: very low, a
+    send outlasting the deletion's own round trips, or a 401 timed inside one; C4b's screen keeps any press from
+    being made once the deletion runs. To close it on Android, if the owner wants: count a join's and a rename's
+    sends, the 401's second send included, as the loops' requests are (`counted`), and refuse them while
+    `deleting`, so the deletion waits them out; iOS's twin would be the Mac's.
 
   **For AN9e:** call `forgetMe` at each sign-in that lands (Q2), and drop a state counting fewer `forgets` than the
   app asked for (F11a-1); the readout's Join sends `lookUp` and `join`, the app setting `busy` with `copy` and
@@ -83,27 +85,43 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `joinedAcrossSignIn`, `refused` and `lookUp`; LeaveEngineTests' `left`, `staleRead` and `leftAcrossSignIn`;
   MeEngineTests' `renamed`, `unlockUnsent`, `staleRead` and `forgetMe`. New: a join, a leave and a rename whose
   caller is cancelled, each answer applied; a code's whole characters (a combining accent, a keycap); a renewal
-  that throws or ends in a cancel of its own, and the caller's own cancel; Sign out's rule reading the file
-  itself, an unlock the engine's failed read left out of its queue counting, a file that can't be read now giving
-  none; a forget with a report and an Emergency Unlock queued, both kept and sent, where the phone stands kept;
-  and a rename answered after another student's `me` was read, which keeps their name (iOS's forget test answers
-  its rename while `me` is still forgotten, where no guard is needed). `renamed`'s and `refused`'s check that no
-  read was asked for waits for the loop's next wake in no class, which reads nothing unless asked, so a broken
-  rule keeps it from sleeping on (iOS's waits for a sleep a ring could cut short). Outbox's test task reads
-  `@bali/shared` now, for `JOIN_CODE_LENGTH`, as core's does. Tried, each failing by name, then reverted: a stale
-  read applying its `me` (4: the join's, the leave's and the rename's stale reads, and the forget's); the join's
-  and the leave's `forgets` guard left out (each its across-a-sign-in test), and the rename's `meChanges` guard
-  (the new rename's); a join run in its caller's coroutine (the cancelled join's), and a rename and a leave
+  that throws or ends in a cancel of its own, and the caller's own cancel, which answers nothing; Sign out's rule
+  reading the file itself, an unlock the engine's failed read left out of its queue counting, a file that can't be
+  read now giving none; a forget with a report and an Emergency Unlock queued, both kept and sent, where the phone
+  stands kept; and a rename answered after another student's `me` was read, which keeps their name (iOS's forget
+  test answers its rename while `me` is still forgotten, where no guard is needed). `renamed`'s and `refused`'s
+  check that no read was asked for waits for the loop's next wake in no class, which reads nothing unless asked,
+  so a broken rule keeps it from sleeping on (iOS's waits for a sleep a ring could cut short). Outbox's test task
+  reads `@bali/shared` now, for `JOIN_CODE_LENGTH`, as core's does. Tried, each failing by name, then reverted: a
+  stale read applying its `me` (4: the join's, the leave's and the rename's stale reads, and the forget's); the
+  join's and the leave's `forgets` guard left out (each its across-a-sign-in test), and the rename's `meChanges`
+  guard (the new rename's); a join run in its caller's coroutine (the cancelled join's), and a rename and a leave
   (theirs); `forgetMe` letting go of every record but an unlock's, and emptying the queue with where the phone
   stood (the forget's queue test, each); `unlockUnsent` reading the engine's queue (the file-itself test);
-  `Joining.send` unhooked (`renewing`'s); a code judged `Char` by `Char` (`typing`'s); and, for the calls held to
-  one account, the 13+ read renewed by the engine's `refresh` (AgeFallbackTest's read for one account), the yes
-  (its yes for one account) and `DELETE /v1/me` (DeleteAccountTest's `DELETE /v1/me` out as another account signs
-  in). AN9c's and AN9h's tests pass unchanged.
+  `Joining.send` unhooked, and `hooked` swallowing its caller's own cancel (`renewing`'s, each); a code judged
+  `Char` by `Char` (`typing`'s); and, for the calls held to one account, the 13+ read renewed by the engine's
+  `refresh` (AgeFallbackTest's read for one account), the yes (its yes for one account) and `DELETE /v1/me`
+  (DeleteAccountTest's `DELETE /v1/me` out as another account signs in). AN9c's and AN9h's tests pass unchanged.
 
-  **Santa's review:** TODO
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this
+  PC, so context isolation holds and model diversity doesn't): 0 blockers. Their WARNs: the privacy point above,
+  which both checked against the server (taken: its first-send path, a name saved then Delete account, and the way
+  to close it); `rename`'s snapshot named `changes` beside the engine's own stamp counter (taken: `changesThen`,
+  Swift's name); Enforcer.kt's doc still naming `SyncEngine.hooked` (taken); the caller's own cancel in
+  `renewing`'s test, which a swallowed cancel would also pass (taken: it checks that no answer came back, and fails
+  so with `hooked`'s `ensureActive` left out); and this entry's placeholders (filled).
 
-  **The proof:** TODO
+  **The proof:** `android/app` is unchanged, so the JVM tests are the proof and no emulator ran: `./gradlew assemble
+  :app:lint check` green from scratch (`--rerun-tasks`), Android 10's API check with it, and the core and outbox
+  suites run ten times more, every one green but the first, where AN9h's AgeFallbackTest
+  `aYesForOneAccountTakenAtAWake…` waited out its 60 s for the read loop's sleep at 30 s. It did so once more, in a
+  run of its class under one of the breaks above whose path it never reaches, both times right after a compile, and
+  never in the twenty-odd runs since, most with its two waits instrumented to say which one hangs. Its engine path is
+  unchanged here (the read loop's yes, through `Joining.send` as it went through `renewing`), so the test is left as
+  AN9h wrote it, for whoever sees it again; its likeliest cause, unconfirmed: it waits on the clock's sleeps, and a
+  pause a ring ends at once registers its sleep for an instant first, so a wait can be met before the pass it waits
+  for has run. `npm run typecheck && npm run lint && npm test` green, the portal's suite whole. Nothing was added to
+  the PC's SDK: its folders were compared before and after.
 
 - **2026-11-10** — **AN9h, one account's token for Delete account and the 13+ check: every request a deletion
   sends, and the 13+ read and yes, under the token of the account they are for alone (the owner, 2026-11-10:
