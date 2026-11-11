@@ -7,6 +7,7 @@ import com.bali.core.SignIn
 import java.io.File
 import java.net.URI
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -18,6 +19,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.test.fail
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.async
@@ -37,9 +39,9 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 val notPassed = """{"passed":false}"""
 
-/** The app's account half over [rig]'s engine and sign-in, its calls in [over], run as the app runs it: back once it knows who is signed in. */
-private suspend fun EngineFiles.account(rig: SignedRig, over: CoroutineScope = scope): Account {
-    val account = checkNotNull(Account.of(rig.engine, over, rig.clock))
+/** The app's account half over [rig]'s engine and sign-in, run as the app runs it: back once it knows who is signed in. */
+private suspend fun EngineFiles.account(rig: SignedRig): Account {
+    val account = checkNotNull(Account.of(rig.engine, scope, rig.clock))
     scope.launch { account.run() }
     account.until { it.signedIn != null }
     return account
@@ -160,6 +162,8 @@ class AccountTest : EngineFiles() {
             assertEquals("b1", rig.signIn.account())
             assertFalse(rig.signIn.checked())
             assertNull(rig.signIn.yes())
+            // Nor does the account claim a pass the sign-in doesn't hold.
+            assertEquals(AgeCheck.Answer.Unanswered, account.state.value.age)
             rig.stop()
         }
 
@@ -390,6 +394,8 @@ class AccountTest : EngineFiles() {
             assertEquals(listOf(unlock.eventId), rig.engine.updates.value.queued.map { it.eventId })
             assertEquals(listOf(unlock.eventId), rig.outbox.records().map { it.eventId })
             asked.reply(200, ageCheckPassed)
+            // Under b1's token, as every queued record goes under whoever is signed in (AN9h's entry): two accounts on one
+            // phone are ruled out for the pilot, so this changes with that rule at the owner's re-check before K-12.
             val sent = rig.server.next(unlockRoute)
             assertEquals(listOf(unlock.eventId, "Bearer ${accessToken("b1")}"), listOf(sent.eventId, sent.token))
             sent.reply(200, Answer.unlocked())
@@ -419,6 +425,9 @@ class AccountTest : EngineFiles() {
             assertEquals(Deleting.Pending, account.state.value.deleting)
             assertTrue(rig.signIn.deletionPending())
             assertFalse(rig.keychain.isEmpty)
+            // The deleted account's `me` goes, as iOS's `forgetNotes` forgets it: shown at once, the engine's after.
+            assertNull(account.state.value.sync?.me)
+            rig.until { it.me == null }
 
             // A relaunch over the same keychain: the deletion's screen at once, before any press; Try again finishes it.
             val relaunch = relaunched(rig, file)
@@ -436,47 +445,124 @@ class AccountTest : EngineFiles() {
         }
 
     @Test
-    fun aStopAnsweredOnceAnotherSignInLandedAfterTheDeletionsLastReadOfItIsSignInChangedWithNoTryAgainForTheNewSignIn(): Unit =
+    fun aStopAnsweredOnceAnotherAccountsSignInLandedAfterTheDeletionsLastReadOfItIsSignInChangedWithNoTryAgainForIt(): Unit =
         runBlocking {
             // AN9h's window (DECISIONS 2026-11-10, "For AN9e"): b1 lands after the deletion's last read of the sign-in and
-            // before the app takes its answer. The account's own thread held between the two, so b1 lands there for certain.
-            val pool = Executors.newSingleThreadExecutor()
-            val held = CoroutineScope(SupervisorJob(scope.coroutineContext.job) + pool.asCoroutineDispatcher())
-            val letGo = CountDownLatch(1)
-            try {
+            // before the account takes its answer, followed by then or not yet.
+            for (followed in listOf(true, false)) {
                 val rig = signedRig(gated = true)
-                val account = account(rig, held)
-                rig.through(account, scoped("a1"))
-                val unlock = assertNotNull(rig.engine.record(Change.Unlock("s", null)))
-                rig.server.next(unlockRoute).reply(null)
-                rig.until { it.retryAt == at(2) }
-                account.deleting { it.ask() }
-                val pressed = scope.async { account.deleteAccount() }
-                val sent = rig.pastReads(unlockRoute)
-                assertEquals(unlock.eventId, sent.eventId)
-                val deletion = rig.deleting() // the press's own, shared while it runs
-                pool.execute { letGo.await(patience.inWholeMilliseconds, TimeUnit.MILLISECONDS) }
-                sent.reply(null)
-                assertEquals(AccountDeletion.UnlockUnsent, deletion.answer()) // its last read of the sign-in: a1's
-                rig.signStudentIn(scoped("b1"), refresh = "refresh-b")
-                account.until { it.age == AgeCheck.Answer.Checking } // b1 followed, the deletion's screen held
-                letGo.countDown()
-                withTimeout(patience) { pressed.await() }
-                val stopped = account.state.value.deleting
-                assertEquals(Deleting.Stopped(Deleting.Stop.SignInChanged), stopped)
-                // No Try again: a press starts nothing for b1.
-                account.deleteAccount()
-                assertEquals(stopped, account.state.value.deleting)
-                assertTrue(rig.server.sent.none { it.route == deleteMeRoute || it.route == deleteUserRoute })
-                assertTrue(rig.server.sent.none { it.route == unlockRoute && it.token == "Bearer ${scoped("b1")}" })
-                assertFalse(rig.signIn.deletionPending())
-                assertEquals("b1", rig.signIn.account())
-                assertEquals(listOf(unlock.eventId), rig.outbox.records().map { it.eventId })
-                rig.stop()
-            } finally {
-                letGo.countDown()
-                withTimeout(patience) { held.coroutineContext.job.cancelAndJoin() }
-                pool.shutdown()
+                onAHeldThread(rig) { account, pool, following ->
+                    rig.through(account, scoped("a1"))
+                    val unlock = assertNotNull(rig.engine.record(Change.Unlock("s", null)))
+                    rig.server.next(unlockRoute).reply(null)
+                    rig.until { it.retryAt == at(2) }
+                    val stopped =
+                        rig.pressedAcrossASignIn(account, pool, following, followed, unlockRoute, AccountDeletion.UnlockUnsent) { sent ->
+                            assertEquals(unlock.eventId, sent.eventId)
+                            sent.reply(null)
+                        }
+                    assertEquals(Deleting.Stopped(Deleting.Stop.SignInChanged), stopped, "$followed")
+                    // No Try again: a press starts nothing for b1.
+                    account.deleteAccount()
+                    assertEquals(stopped, account.state.value.deleting, "$followed")
+                    assertTrue(rig.server.sent.none { it.route == deleteMeRoute || it.route == deleteUserRoute }, "$followed")
+                    assertTrue(rig.server.sent.none { it.route == unlockRoute && it.token == "Bearer ${scoped("b1")}" }, "$followed")
+                    assertFalse(rig.signIn.deletionPending(), "$followed")
+                    assertEquals("b1", rig.signIn.account(), "$followed")
+                    assertEquals(listOf(unlock.eventId), rig.outbox.records().map { it.eventId }, "$followed")
+                    rig.stop()
+                }
             }
         }
+
+    @Test
+    fun deletedOnTheServerItsSignInNotYetOnceAnotherAccountsSignInLandedIsDoneTheSameAccountsOwnSignInKeepsPendingAndItsTryAgain(): Unit =
+        runBlocking {
+            // AN9h's window, a deletion done on the server, DeleteUser unanswered: b1's sign-in has the last one's tokens gone
+            // from the phone, so Pending's Try again would delete b1; a1's own sign-in again leaves Try again a1's.
+            for (another in listOf(true, false)) {
+                val rig = signedRig(gated = true)
+                onAHeldThread(rig) { account, pool, following ->
+                    rig.through(account, scoped("a1"))
+                    val after =
+                        rig.pressedAcrossASignIn(
+                            account, pool, following, followed = true, deleteMeRoute, AccountDeletion.SignInNotDeleted(SendResult.NetworkError),
+                            another,
+                        ) { delete ->
+                            delete.reply(200, deletedAnswer)
+                            rig.server.next(deleteUserRoute).reply(null)
+                        }
+                    assertEquals(if (another) Deleting.Done else Deleting.Pending, after, "$another")
+                    assertEquals(1, rig.server.sent.count { it.route == deleteMeRoute }, "$another")
+                    rig.stop()
+                }
+            }
+        }
+
+    @Test
+    fun anAnswerWhileTheQuestionIsntDueChangesNothingSoNoCallDeletesAnAccountBeingAskedOrThrough(): Unit =
+        runBlocking {
+            // This step's guard (DECISIONS 2026-11-11), which iOS leaves to its router: while Bali is asked, and once through.
+            val rig = signedRig(gated = true)
+            val account = account(rig)
+            rig.signStudentIn(scoped("a1"))
+            val read = rig.server.next(ageCheckRoute)
+            account.until { it.age == AgeCheck.Answer.Checking }
+            val (month, year) = rig.thisMonth()
+            withTimeout(patience) { account.answerAge(month, year) }
+            assertEquals(AgeCheck.Answer.Checking, account.state.value.age)
+            read.reply(200, ageCheckPassed)
+            rig.readsAnswered { account.state.value.let { it.age == AgeCheck.Answer.Passed && it.sync?.me != null } }
+            withTimeout(patience) { account.answerAge(month, year) }
+            val through = account.state.value
+            assertEquals(AgeCheck.Answer.Passed, through.age)
+            assertEquals(Deleting.None, through.deleting)
+            assertTrue(rig.server.sent.none { it.route == deleteMeRoute || it.route == deleteUserRoute })
+            assertTrue(rig.signIn.checked())
+            rig.stop()
+        }
+}
+
+/** [test] over an account of [rig]'s whose own calls run on [ExecutorService]'s one thread, which the test can hold, and its follow's job. */
+private suspend fun EngineFiles.onAHeldThread(rig: SignedRig, test: suspend (Account, ExecutorService, Job) -> Unit) {
+    val pool = Executors.newSingleThreadExecutor()
+    val held = CoroutineScope(SupervisorJob(scope.coroutineContext.job) + pool.asCoroutineDispatcher())
+    try {
+        val account = checkNotNull(Account.of(rig.engine, held, rig.clock))
+        val following = scope.launch { account.run() }
+        account.until { it.signedIn != null }
+        test(account, pool, following)
+    } finally {
+        withTimeout(patience) { held.coroutineContext.job.cancelAndJoin() }
+        pool.shutdown()
+    }
+}
+
+/**
+ * Delete account pressed on [account], whose calls run on [pool], the deletion's [first] request answered by [answering]
+ * and the engine's own answer [expected], its last read of the sign-in a1's; then a sign-in lands, b1's, [another], or
+ * a1's own again, before the account takes the answer, its thread held between the two so the sign-in lands there for
+ * certain (AN9h's window), and [followed] by then or, its follow ended, not: what Delete account shows once it has.
+ */
+private suspend fun SignedRig.pressedAcrossASignIn(
+    account: Account, pool: ExecutorService, following: Job, followed: Boolean, first: String, expected: AccountDeletion,
+    another: Boolean = true, answering: suspend (Server.Exchange) -> Unit,
+): Deleting {
+    account.deleting { it.ask() }
+    val pressed = scope.async { account.deleteAccount() }
+    val sent = pastReads(first)
+    val deletion = deleting() // the press's own, shared while it runs
+    val letGo = CountDownLatch(1)
+    pool.execute { letGo.await(patience.inWholeMilliseconds, TimeUnit.MILLISECONDS) }
+    try {
+        answering(sent)
+        assertEquals(expected, deletion.answer())
+        if (!followed) withTimeout(patience) { following.cancelAndJoin() }
+        signStudentIn(scoped(if (another) "b1" else "a1"), refresh = "refresh-2")
+        if (followed) account.until { it.age == AgeCheck.Answer.Checking } // the deletion's screen held meanwhile
+    } finally {
+        letGo.countDown()
+    }
+    withTimeout(patience) { pressed.await() }
+    return account.state.value.deleting
 }
