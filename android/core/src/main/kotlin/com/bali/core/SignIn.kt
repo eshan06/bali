@@ -141,6 +141,13 @@ private fun decoded(raw: String): String? {
 enum class HostedPage { SignIn, SignUp }
 
 /**
+ * Who is signed in, as [SignIn.landings] says it (Q2): whether someone [signedIn] is, and their [account], the tokens'
+ * `sub`; and [count], how many sign-ins have landed in the sign-in's life, a renewal never one, so each sign-in is told
+ * from the last, the same account's again included.
+ */
+data class Landing(val signedIn: Boolean, val account: String?, val count: Int)
+
+/**
  * One sign-in attempt's secrets (RFC 7636): the verifier, which leaves the phone only for the token
  * endpoint, and the state, which binds the hosted UI's answer to this attempt. Not a data class, so
  * its `toString` shows neither. BaliCore's `Attempt`.
@@ -372,6 +379,12 @@ class SignIn(
     /** Whether someone is signed in, once the store could be read: none until then. */
     private val known = MutableStateFlow<Boolean?>(null)
 
+    /** Who is signed in, as each sign-in lands ([landings]): none until the store could be read. */
+    private val landing = MutableStateFlow<Landing?>(null)
+
+    /** How many sign-ins have landed in this sign-in's life ([Landing.count]): a renewal is never one. */
+    private var landed = 0
+
     /** Runs [action] after every token but one [refresh] asked for, so the engine sends everything again at once. */
     suspend fun whenTokenArrives(action: suspend () -> Unit) = alone { tokenArrived = action }
 
@@ -451,7 +464,7 @@ class SignIn(
                 val given = Tokens(grant.access, refresh, grant.email, now())
                 val fresh = if (yes == null) given else given.copy(checked = true, yes = yes)
                 if (!keep(fresh)) throw SignInError.NotKept
-                adopt(fresh)
+                adopt(fresh, lands = true)
                 tokenArrived
             }
         told?.let { hook -> orElse(Unit) { hook() } }
@@ -583,11 +596,24 @@ class SignIn(
 
     /**
      * Whether someone is signed in: now, once the store could be read, then at each change, the newest only.
-     * A token that can't be given right now (offline, the store unreadable) is still signed in.
+     * A token that can't be given right now (offline, the store unreadable) is still signed in. A sign-in landing
+     * over another changes nothing here: [landings] says each.
      */
     suspend fun signedIn(): Flow<Boolean> {
         alone { current() }
         return known.filterNotNull()
+    }
+
+    /**
+     * Who is signed in, said as each sign-in lands (Q2): now, once the store could be read, then at each change, the
+     * newest only: a sign-in that lands, over another account's or its own, a sign-out, and the sign-in gone (deleted
+     * from Cognito, or its refresh token refused for good); never a renewal, which keeps the account and the count.
+     * iOS's stream yields at every sign-in, which its `Phone` reads the account at; [signedIn]'s, which says changes
+     * alone, would let a sign-in over another go by.
+     */
+    suspend fun landings(): Flow<Landing> {
+        alone { current() }
+        return landing.filterNotNull()
     }
 
     /** Who is signed in: the tokens' `sub`, read unverified, only ever to tell one student from another (C6b). */
@@ -633,12 +659,17 @@ class SignIn(
         return tokens
     }
 
-    /** The phone's tokens from now on, none signed out, told to every watcher; [saved] when the store has them too. */
-    private fun adopt(tokens: Tokens?, saved: Boolean = true) {
+    /**
+     * The phone's tokens from now on, none signed out, told to every watcher; [saved] when the store has them too, and
+     * [lands] when they are a sign-in's that just landed, never a renewal's ([Landing.count]).
+     */
+    private fun adopt(tokens: Tokens?, saved: Boolean = true, lands: Boolean = false) {
         this.tokens = tokens
         loaded = true
         unsaved = !saved
         known.value = tokens != null
+        if (lands) landed += 1
+        landing.value = Landing(tokens != null, tokens?.let { Tokens.subject(it.access) }, landed)
     }
 
     /** Whether the store now holds [tokens]; none forgets what it had. */
