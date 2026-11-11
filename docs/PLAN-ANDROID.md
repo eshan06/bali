@@ -14,17 +14,18 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-10 (Central) — AN9h, one account's token for Delete account and the 13+ check
-(#555; `docs/DECISIONS.md`, 2026-11-10; the owner, 2026-11-10: "Close it now"): every request a deletion
-sends, and the 13+ read and yes, under the token of the account they are for alone, by its `sub`, each
-renewal that account's own; another account's sign-in landing before `DELETE /v1/me` is answered deleted
-stops the deletion with an answer of its own (`SignInChanged`), every record kept, nothing more sent and no
-Try again. The
-iPhone's twin is C4c, the Mac's. Before it, AN9c, the 13+ check. Next: AN9d, Join, Leave, Your name and
-forget me through the engine; AN7f and AN8's 📱 check on the owner's phones; Android's Cognito clients, the
-owner's (Open owner items, 8); Android 17's SDK platform for the owner to OK before the first step with
-today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the owner has the phones.
-Not on the pilot's critical path._
+_Last updated: 2026-11-10 (Central) — AN9d, Join, Leave, Your name and forget me through the engine
+(#556; `docs/DECISIONS.md`, 2026-11-10): Join's rules (`Joining`), the code as codes are written, its
+failures typed; the engine's look-up, join, rename and leave, under whoever is signed in, each renewed once
+on a 401 through `Joining.send`, where the engine's `renewing` moved, every caller's renewal as it was; a
+join, a rename or a leave applied however its caller ends; a read's `me` applied only while unchanged
+(`meChanges`); Sign out's read of the outbox's file itself; and forget me, which forgets `me` alone. For the
+owner, a privacy point: a join or a rename landing after a deletion commits makes a fresh account
+(DECISIONS). Before it, AN9h, one account's token for Delete account and the 13+ check. Next: AN9e, the
+account's flows in the app and the readout's Join and History; AN7f and AN8's 📱 check on the owner's
+phones; Android's Cognito clients, the owner's (Open owner items, 8); Android 17's SDK platform for the
+owner to OK before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6);
+AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -163,13 +164,8 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN9b** The deletion in the engine — ✅ (#553; DECISIONS 2026-11-10)
 - **AN9c** The 13+ check — ✅ (#554; DECISIONS 2026-11-11)
 - **AN9h** One account's token for Delete account and the 13+ check — ✅ (#555; DECISIONS 2026-11-10)
-- **AN9d** Join, Leave, Your name and forget me through the engine, and Join's rules (twin: `Join`'s
-  `Joining`, and SyncEngine.swift's `lookUp`, `join`, `rename`, `leave`, `unlockUnsent`, `forgetMe`
-  and `meChanges`): Join with the consent list beside its preview, the code as codes are written; a
-  read's `me` applied only while unchanged; the engine's `renewing` moved to `Joining`. Tests:
-  JoinEngineTests, LeaveEngineTests and MeEngineTests (AN5's split), and JoinTests, over the contracts'
-  join-codes and enrollments fixtures; new: a join whose caller is cancelled still puts its class in
-  `me` — validation: the JVM tests
+- **AN9d** Join, Leave, Your name and forget me through the engine, and Join's rules — ✅ (#556;
+  DECISIONS 2026-11-10)
 - **AN9e** The account's flows in the app, and the readout's Join and History (twin: BaliApp.swift's
   `Phone`, its account half, and its `Readout`'s): `Account` in `outbox`, one a run in `BaliApp`
   (DECISIONS 2026-11-05, Q1); each sign-in that lands said by `SignIn` (Q2); an answer under 13 held in

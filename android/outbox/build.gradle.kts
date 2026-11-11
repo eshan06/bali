@@ -42,12 +42,16 @@ dependencies {
     signature(libs.gummy.bears.api29) { artifact { type = "signature" } }
 }
 
-// The tests read the repo's contracts/ in place, never a copy (decision 4): an input of the task,
-// so a changed table runs them again; and a failure's whole message in the log, where CI shows it.
+// The tests read the repo's contracts/ and @bali/shared's constants in place, never a copy (decision
+// 4): inputs of the task, so a changed table or constant runs them again; and a failure's whole
+// message in the log, where CI shows it.
 tasks.test {
     useJUnitPlatform()
     testLogging.exceptionFormat = TestExceptionFormat.FULL
     val contracts = rootDir.resolve("../contracts")
     inputs.dir(contracts).withPropertyName("contracts").withPathSensitivity(PathSensitivity.RELATIVE)
     systemProperty("bali.contracts", contracts.canonicalPath)
+    val shared = rootDir.resolve("../packages/shared/src")
+    inputs.dir(shared).withPropertyName("shared").withPathSensitivity(PathSensitivity.RELATIVE)
+    systemProperty("bali.shared", shared.canonicalPath)
 }

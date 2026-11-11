@@ -10,9 +10,9 @@ import java.time.Instant
 import java.time.ZoneId
 
 // What the sync engine knows, SyncEngine.swift's `SyncState`: its core, AN5a's, the read loop's, AN5c's,
-// the wait's, AN5d's, and Emergency Unlock's, AN5e's, with Enforcement.swift's rules of when the lock is on
-// (`shieldedUntil`) and when the student's unlock takes the last run's off (`unlockedLast`, AN7a's), which
-// the enforcer follows (Enforcer.kt).
+// the wait's, AN5d's, Emergency Unlock's, AN5e's, and the sign-ins that forgot `me`, AN9d's, with
+// Enforcement.swift's rules of when the lock is on (`shieldedUntil`) and when the student's unlock takes the
+// last run's off (`unlockedLast`, AN7a's), which the enforcer follows (Enforcer.kt).
 
 /**
  * What the engine knows, for the screens and the lock ([SyncEngine.updates]). A value, as Swift's
@@ -71,8 +71,8 @@ data class SyncState(
     /** How long a tap not yet answered is locked for: decision 7's [TAP_CAP], or a Debug build's shorter one ([SyncEngine.setTapCap]). */
     val cap: Duration = TAP_CAP,
     /**
-     * Who the student is and their classes, as `GET /v1/me` last answered, for Home and the router
-     * (C3); none until a read answers.
+     * Who the student is and their classes, as `GET /v1/me` last answered, with a class the phone joined
+     * since at once ([SyncEngine.join]), for Home and the router (C3); none until a read answers.
      */
     val me: MeResponse? = null,
     /**
@@ -80,6 +80,12 @@ data class SyncState(
      * reads) until one does: said where its classes would be (rule 5), never read as none.
      */
     val meFailed: SendResult? = null,
+    /**
+     * How many times [me] has been forgotten for another student's sign-in ([SyncEngine.forgetMe]): a
+     * state counting fewer forgets than the app asked for was sent before the last one, so its [me] is
+     * the last student's (#160's review).
+     */
+    val forgets: Int = 0,
     /**
      * How many reads of `GET /v1/me` have given [me]: a later count is a read the server answered since
      * (L8c: a lesson refused is followed again once a later read lists its session).

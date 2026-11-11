@@ -10,8 +10,13 @@ import com.bali.core.CheckInResponse
 import com.bali.core.DeleteMeRequest
 import com.bali.core.DeleteMeResponse
 import com.bali.core.DisplayState
+import com.bali.core.EndEnrollmentRequest
+import com.bali.core.EndEnrollmentResponse
+import com.bali.core.EnrollmentJoinRequest
+import com.bali.core.EnrollmentJoinResponse
 import com.bali.core.EventId
 import com.bali.core.HttpTransport
+import com.bali.core.JoinCodePreviewResponse
 import com.bali.core.MeResponse
 import com.bali.core.NoAnswer
 import com.bali.core.OkHttpTransport
@@ -27,6 +32,8 @@ import com.bali.core.UnlockDisposition
 import com.bali.core.UnlockReason
 import com.bali.core.UnlockReasonRequest
 import com.bali.core.UnlockReasonResponse
+import com.bali.core.UpdateMeRequest
+import com.bali.core.UpdateMeResponse
 import com.bali.core.readMayReconcile
 import java.net.URI
 import java.time.Duration
@@ -58,8 +65,9 @@ import kotlinx.coroutines.withContext
 // The sync engine, BaliOutbox's SyncEngine.swift: its frame, AN5a's, its drain, AN5b's, its read loop,
 // AN5c's, its wait for the Start, AN5d's, Emergency Unlock, AN5e's: where it is filed, its reason and the
 // late unlock, the phone check's cap, AN7a's, Delete account, AN9b's, and the 13+ check's read, ask and yes,
-// AN9c's, the deletion's sends and the check's each under one account's token alone, AN9h's. Swift's actor is a
-// lock each stretch holds (docs/PLAN-ANDROID.md).
+// AN9c's, the deletion's sends and the check's each under one account's token alone, AN9h's, and the account's
+// calls, Join, Leave, Your name and forget me, AN9d's. Swift's actor is a lock each stretch holds
+// (docs/PLAN-ANDROID.md).
 
 /** The engine's clock: the time records are stamped with, the zone its days end in, and waiting on it: a test's own there. */
 interface SyncClock {
@@ -149,6 +157,14 @@ class SyncEngine private constructor(
 
     /** Whether the truth is to be read again ([reread]): at the read loop's next wake, and each after till one answers. */
     private var rereading = false
+
+    /**
+     * The changes the phone has made to [SyncState.me] (a join, a rename, a leave, a sign-in forgetting the last student's),
+     * each counted in the stretch that applies it: a read of `GET /v1/me` takes the count in the stretch that sends it
+     * ([reading]) and applies its `me` only while that is the count in the stretch that applies its answer ([readMe]), so
+     * one sent before such a change never applies its `me`, older than it.
+     */
+    private var meChanges = 0
 
     /** Whether a fresh token was already tried since the last answer that wasn't a 401 ([heard]). */
     private var refreshed = false
@@ -459,7 +475,7 @@ class SyncEngine private constructor(
                                 val me = client.me()
                                 alone {
                                     request.land()
-                                    readMe(read.sent, me)
+                                    readMe(read, me)
                                 }
                             }
                             else -> {
@@ -505,7 +521,7 @@ class SyncEngine private constructor(
                 if (held) {
                     null
                 } else {
-                    renewing({ renewed(account) }) { client.forAccount(account).recordAgeCheck(RecordAgeCheckRequest(yes)) }
+                    Joining.send({ renewed(account) }) { client.forAccount(account).recordAgeCheck(RecordAgeCheckRequest(yes)) }
                         .also { alone { request.land() } }
                 }
             } ?: return
@@ -516,8 +532,11 @@ class SyncEngine private constructor(
     /** What a wake does, taken at its top: reads the truth, checks in, and whether that is the screen's own check-in. */
     private class Wake(val reads: Boolean, val checks: Boolean, val screen: Boolean)
 
-    /** A read a wake sends, made [at] under the stamp [sent]: [session]'s check-in, or, none, `GET /v1/me`. */
-    private class Read(val sent: ReconcileStamp, val at: Instant, val session: String? = null)
+    /**
+     * A read a wake sends, made [at] under the stamp [sent] and the changes to `me` then, [meChanges]: [session]'s check-in,
+     * or, none, `GET /v1/me`.
+     */
+    private class Read(val sent: ReconcileStamp, val at: Instant, val meChanges: Int, val session: String? = null)
 
     /**
      * The top of a pass, which answers every ring made before it and takes what each rang for: where the
@@ -572,25 +591,27 @@ class SyncEngine private constructor(
         }
         val session = (state.standing as? Standing.InSession)?.session?.id
         return when {
-            wake.screen && checked && session != null -> Read(sent, clock.now(), session).also { if (wake.reads) reread() }
-            wake.reads -> Read(sent, clock.now())
-            checked && session != null -> Read(sent, clock.now(), session)
+            wake.screen && checked && session != null -> Read(sent, clock.now(), meChanges, session).also { if (wake.reads) reread() }
+            wake.reads -> Read(sent, clock.now(), meChanges)
+            checked && session != null -> Read(sent, clock.now(), meChanges, session)
             else -> null
         }?.also { request.count() }
     }
 
     /**
-     * `GET /v1/me`'s answer: the truth reconciled, its classes in the same step; none says why (rule 5),
-     * and is read again at the next wake.
+     * `GET /v1/me`'s answer: the truth reconciled, its classes in the same step, unless the phone changed `me` since [read]
+     * was sent ([meChanges]), which this `me` is older than, and which counts as no read ([SyncState.meReads]); none says
+     * why (rule 5), and is read again at the next wake.
      */
-    private suspend fun readMe(sent: ReconcileStamp, response: ApiResponse<MeResponse>): Deferred<Unit>? {
+    private suspend fun readMe(read: Read, response: ApiResponse<MeResponse>): Deferred<Unit>? {
         val refreshing = heard(response.result, response.noAnswer)
         val me = response.answer
         if (me == null) {
             rereading = true
             update { it.copy(meFailed = response.result) }
         } else {
-            reconcile(sent, standing(me)) { it.copy(me = me, meReads = it.meReads + 1, meFailed = null) }
+            val current = meChanges == read.meChanges
+            reconcile(read.sent, standing(me)) { if (current) it.copy(me = me, meReads = it.meReads + 1, meFailed = null) else it.copy(meFailed = null) }
         }
         return refreshing
     }
@@ -788,7 +809,7 @@ class SyncEngine private constructor(
         scope.async {
             when (val pick = alone { pick(reason) }) {
                 is Pick.Done -> pick.failure
-                is Pick.Change -> renewing { client.changeReason(pick.unlock, pick.request) }.let { alone { changed(pick, it) } }
+                is Pick.Change -> Joining.send(refresh) { client.changeReason(pick.unlock, pick.request) }.let { alone { changed(pick, it) } }
             }
         }.await()
 
@@ -850,7 +871,105 @@ class SyncEngine private constructor(
      * Uncounted, as on iOS: landing after a deletion's `DELETE /v1/me`, a read that makes no account reads `false`.
      */
     suspend fun ageCheck(account: String?): ApiResponse<AgeCheckResponse> =
-        renewing({ renewed(account) }) { client.forDeletion(account).ageCheck() }
+        Joining.send({ renewed(account) }) { client.forDeletion(account).ageCheck() }
+
+    /**
+     * What a join code opens (`GET /v1/join-codes/{code}`): the Join screen's own call (C2b), under whoever is signed in, as
+     * on iOS, its token renewed once on a 401 by the engine's own [refresh] ([Joining.send]). It applies nothing, so it
+     * runs in its caller's coroutine: a caller cancelled stops it, and nothing else.
+     */
+    suspend fun lookUp(code: String): ApiResponse<JoinCodePreviewResponse> = Joining.send(refresh) { client.previewJoinCode(code) }
+
+    /**
+     * Joins the class a code opens (`POST /v1/enrollments`): the Join screen's own call (C2b), under whoever is signed in,
+     * its token renewed once on a 401 ([Joining.send]). Once in, the class is in [SyncState.me] at once where a read has
+     * answered, so the router moves on, else the read it asks for brings it, as it brings its teacher's name; a read sent
+     * before the join never takes the class away (C3; #110's review). Never into the `me` of a student who signed in since:
+     * `me` forgotten meanwhile ([SyncState.forgets]), the class is the last student's (F11a-1). It runs in the engine's
+     * scope, its answer applied in a stretch of its own: its caller cancelled stops waiting, and the class the server
+     * joined still comes into `me`.
+     */
+    suspend fun join(request: EnrollmentJoinRequest): ApiResponse<EnrollmentJoinResponse> =
+        scope.async {
+            val forgets = alone { state.forgets }
+            Joining.send(refresh) { client.join(request) }.also { answer ->
+                val joined = answer.answer?.schoolClass ?: return@also
+                alone {
+                    meChanges += 1
+                    val me = state.me
+                    if (state.forgets == forgets && me != null && me.classes.none { it.id == joined.id }) {
+                        update { it.copy(me = MeResponse(me.user, me.classes + joined, me.session)) }
+                    }
+                    reread()
+                }
+            }
+        }.await()
+
+    /**
+     * Sets the student's own name (`PATCH /v1/me`, A8): the Me screen's own call (C6b), under whoever is signed in, its token
+     * renewed once on a 401 ([Joining.send]). Once set, applied or a replay's name now, it is `me`'s at once, for Home's
+     * greeting and Me's card, unless `me` changed meanwhile (a join, a leave, a sign-in forgetting it: [meChanges]); and, as
+     * after a join, the truth is read again: a read sent before it, which never applies its `me`, would otherwise leave the
+     * classes as old as the last one (santa's round 1). In the engine's scope, as [join]: its caller cancelled, it goes on.
+     */
+    suspend fun rename(request: UpdateMeRequest): ApiResponse<UpdateMeResponse> =
+        scope.async {
+            val changesThen = alone { meChanges }
+            Joining.send(refresh) { client.updateMe(request) }.also { answer ->
+                val user = answer.answer?.user ?: return@also
+                alone {
+                    val me = state.me
+                    if (meChanges == changesThen && me != null) update { it.copy(me = MeResponse(user, me.classes, me.session)) }
+                    meChanges += 1
+                    reread()
+                }
+            }
+        }.await()
+
+    /**
+     * Leaves a class (`DELETE /v1/enrollments/{id}`, A19): the Me screen's own call (C6c), under whoever is signed in, its
+     * token renewed once on a 401 ([Joining.send]). Out (it ended, or they were out already), the class leaves `me` at
+     * once; and with any answer the truth is read again, which a read sent before it never overrides: a refusal says why,
+     * and a class the server doesn't know is read away. Never from the `me` of a student who signed in since, as a join
+     * never adds to it (#164's review): `me` forgotten meanwhile, the enrollment was the last student's. In the engine's
+     * scope, as [join]: its caller cancelled, it goes on.
+     */
+    suspend fun leave(enrollment: String, request: EndEnrollmentRequest): ApiResponse<EndEnrollmentResponse> =
+        scope.async {
+            val forgets = alone { state.forgets }
+            Joining.send(refresh) { client.leave(enrollment, request) }.also { answer ->
+                if (answer.result !is SendResult.Status) return@also
+                alone {
+                    val me = state.me
+                    if (answer.answer != null && state.forgets == forgets && me != null) {
+                        val left = MeResponse(me.user, me.classes.filter { it.enrollmentId != enrollment }, me.session)
+                        update { it.copy(me = left) }
+                    }
+                    meChanges += 1
+                    reread()
+                }
+            }
+        }.await()
+
+    /**
+     * Whether an Emergency Unlock waits unsent in the outbox's file, Sign out's rule (C6b): read from the file itself
+     * ([Outbox.records]), so one a failed read left out of [SyncState.queued] counts too (santa's round 1); none when the
+     * file can't be read now, for the caller to say. Its caller is AN9f's and AS7's.
+     */
+    suspend fun unlockUnsent(): Boolean? = alone { tried { outbox.records() }.getOrNull()?.any { it.change.isUnlock } }
+
+    /**
+     * Someone signs in where someone signed out (C6b): the last student's [SyncState.me], their name and classes, another
+     * student's on a shared phone, is forgotten, a read on its way with it ([meChanges]), and read again; counted in
+     * [SyncState.forgets], so the app knows a state sent before it. Nothing else: where the phone stands and its queue are
+     * the phone's (B4), so an Emergency Unlock queued stays, and goes. Its caller cancelled, it goes on all the same.
+     */
+    suspend fun forgetMe() =
+        call {
+            meChanges += 1
+            update { it.copy(me = null, meFailed = null, forgets = it.forgets + 1) }
+            reread()
+        }
 
     /**
      * Me's Delete account (C4): the one call the screen makes, answered with where the deletion stands, a press
@@ -999,7 +1118,7 @@ class SyncEngine private constructor(
      */
     private suspend fun deleteMe(signIn: SignIn, account: String): ApiResponse<DeleteMeResponse> {
         val eventId = alone { deletionId ?: EventId.mint(clock.now()).also { deletionId = it } }
-        return renewing({ signIn.refresh(account) }) { client.forDeletion(account).deleteMe(DeleteMeRequest(eventId)) }
+        return Joining.send({ signIn.refresh(account) }) { client.forDeletion(account).deleteMe(DeleteMeRequest(eventId)) }
     }
 
     /** What the deleted account still had queued let go, but every Emergency Unlock ([Outbox.accountDeleted]), and the queue read again. */
@@ -1189,32 +1308,6 @@ class SyncEngine private constructor(
         }.also { reauth = it }
     }
 
-    /**
-     * What a hook of the app's gives ([refresh], rule 3's check), or [none] when it throws or ends in a
-     * cancel of its own (a timeout in it), though each promises not to: no hook ends a loop or leaves a
-     * refresh under way for good. Its caller's own cancel still ends it.
-     */
-    private suspend fun <T> hooked(none: T, hook: suspend () -> T): T =
-        try {
-            hook()
-        } catch (cancelled: CancellationException) {
-            currentCoroutineContext().ensureActive()
-            none
-        } catch (error: Exception) {
-            none
-        }
-
-    /**
-     * A screen's own call, [send]: sent once more when the API refused its token and [renew] renewed it, the engine's
-     * [refresh], or for a call of one account's, that account's sign-in alone ([renewed]), as the loops do for their
-     * own; a refresh that gives none leaves the 401, said. iOS's `Joining.send(renewing:)`, the engine's own until AN9
-     * gives it to `Joining`.
-     */
-    private suspend fun <A> renewing(renew: suspend () -> Boolean = refresh, send: suspend () -> ApiResponse<A>): ApiResponse<A> {
-        val answer = send()
-        return if (answer.result == SendResult.Status(401) && hooked(false) { renew() }) send() else answer
-    }
-
     /** [account]'s sign-in renewed after a 401 to a call for that account alone (AN9h); none for an engine with no sign-in. */
     private suspend fun renewed(account: String?): Boolean = signIn?.refresh(account) == true
 
@@ -1378,6 +1471,21 @@ sealed interface ReasonFailure {
 
 /** Why Back to focus didn't go through (C5a; rule 5): the outbox refused to keep the refocus. The words are AN10's. */
 enum class RefocusFailure { NotSaved }
+
+/**
+ * What a hook of the app's gives (a refresh or a renewal, rule 3's check, the 13+ ask), or [none] when it throws or ends in
+ * a cancel of its own (a timeout in it), though each promises not to: no hook ends a loop, leaves a refresh under way for
+ * good or ends a screen's call ([Joining.send]). Its caller's own cancel still ends it.
+ */
+internal suspend fun <T> hooked(none: T, hook: suspend () -> T): T =
+    try {
+        hook()
+    } catch (cancelled: CancellationException) {
+        currentCoroutineContext().ensureActive()
+        none
+    } catch (error: Exception) {
+        none
+    }
 
 /**
  * A loop's rings, Swift's `ring` and `pause`, as a conflated channel: a ring ends the loop's pause, or,

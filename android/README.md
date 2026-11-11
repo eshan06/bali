@@ -251,7 +251,12 @@ too, goes under the token of the account it began with alone, and another accoun
 server's yes of the account the app names, under that account's deletion token (`ageCheck`), and runs the
 app's ask (`askAgeAtEachWake`) and sends the yes its sign-in keeps (`PUT /v1/me/age-check`), under its own
 account's token, at each wake, neither during a deletion, the yes
-counted as the loops' requests are; each with the engine let go, so none holds an Emergency Unlock back.
+counted as the loops' requests are; each with the engine let go, so none holds an Emergency Unlock back. Its
+account calls (AN9d): Join's look-up and join, and Me's rename and leave, under whoever is signed in as on iOS,
+each renewed once on a 401 through `Joining.send` by the renewal its caller names, a join, a rename or a leave
+applied however its caller ends; a read's `me` applied only while the phone hasn't changed `me` since the read
+went (`meChanges`); Sign out's read of the outbox's file itself (`unlockUnsent`); and `forgetMe`, which forgets
+the last student's `me` and nothing else, the queue and where the phone stands left as they are.
 Its tests run on a rig of their own (`EngineSupport.kt`, BaliOutbox's `EngineSupport.swift`): a clock the test moves,
 in a zone of the test's own, since coroutines-test's virtual time can't drive Room's queries, a
 server answered by hand, and the bundled driver watched, which sees each commit as GRDB's
@@ -262,6 +267,11 @@ server answered by hand, and the bundled driver watched, which sees each commit 
 (`Birth`), counted by java.time's ISO calendar in the phone's zone whatever calendar its locale asks for,
 the month names in its language. An answer is a value kept nowhere: the phone keeps that the account
 passed, with its sign-in, never the date or an age (C7).
+
+**Join's rules** (`outbox`'s `Join.kt`, BaliOutbox's `Join.swift`, AN9d): the code kept as codes are written,
+ASCII letters and digits in upper case, each whole character a BreakIterator's grapheme cluster as Swift's
+`Character` is; what it opens, for the preview the consent list sits beside; an answer for a code typed over
+dropped; and why a look or a join gave no class, as its result and reason, the words AN10's.
 
 **The lock's rules** (`outbox`'s `Enforcer.kt` and `Lock.kt`, BaliOutbox's `Enforcement`, AN7a): the
 enforcer follows the engine's state and keeps the lock where it says, through a seam of the lock's own
