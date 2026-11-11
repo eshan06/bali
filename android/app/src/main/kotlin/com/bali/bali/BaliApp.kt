@@ -25,7 +25,7 @@ import kotlinx.coroutines.flow.dropWhile
 import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.launch
 
-/** The app's process, and what lives as long as it does: the engine, the lock (AN7) and the account (AN9e), which the screens (AN10) take from here. */
+/** The app's process, and what lives as long as it does: the engine, the lock (AN7) and the account (AN9i), which the screens (AN10) take from here. */
 class BaliApp : Application() {
     /** The app's scope: never a screen's, a ViewModel's or a service's, in which no renewal starts again once ended (AN6b). */
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -117,7 +117,8 @@ class BaliApp : Application() {
      * of switched-on services, so a switch turned off and on again between two check-ins is reported
      * (AN7b). The service's connect and unbind run it too ([check]), and Bali's own screen coming to the
      * front ([front]), after the truth is asked for, as iOS's coming back has both. And the account over the
-     * engine's sign-in, one a run: its 13+ check's ask at each wake, and the sign-in followed (AN9e).
+     * engine's sign-in, one a run (AN9e's `Account`): its 13+ check's ask hooked at each wake, and each sign-in
+     * followed (AN9i).
      */
     fun start(engine: SyncEngine, scope: CoroutineScope = this.scope) {
         val job = SupervisorJob(scope.coroutineContext[Job])

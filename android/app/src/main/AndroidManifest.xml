@@ -13,12 +13,14 @@
     <uses-permission android:name="android.permission.INTERNET" />
 
     <!-- A Bali block read over NFC (BlockReader.kt, AN8). Required, so Play offers Bali to phones with NFC alone, as the
-         App Store offers it to iPhones (the owner, 2026-11-10: docs/DECISIONS.md). Play's filter alone: an adb install
-         still goes on a phone with none, which reads as one that can't tap in. -->
+         App Store offers it to iPhones (the owner, 2026-11-10: docs/DECISIONS.md), which answers lint's question
+         (UnnecessaryRequiredFeature). Play's filter alone: an adb install still goes on a phone with none, which reads
+         as one that can't tap in. -->
     <uses-permission android:name="android.permission.NFC" />
     <uses-feature
         android:name="android.hardware.nfc"
-        android:required="true" />
+        android:required="true"
+        tools:ignore="UnnecessaryRequiredFeature" />
 
     <!-- Which browser opens the hosted UI's tab, and what it offers: hidden from Android 11 without this. -->
     <queries>

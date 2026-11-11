@@ -54,9 +54,9 @@ import kotlinx.coroutines.withTimeoutOrNull
  * (DECISIONS 2026-09-25, B4c; 2026-11-05, AN7d). Plain Views: today's Compose needs compileSdk 37. In front,
  * it tells the app ([BaliApp.front]), which reads the truth and runs rule 3's check. Its Scan reads a block over
  * NFC and taps it, and Read block code only reads one, for registering it (AN8). Its Join joins a typed code,
- * and History reads the last five moments (AN9e); its Signed in line names the 13+ check (Q3), which has no
- * button before AS2's question, and Delete account isn't here: AS7's. Not here: iOS's marker, asks and
- * monitor, which have no twin.
+ * and History reads the last five moments (AN9i); its Signed in line reads the run's account and names the 13+
+ * check (Q3), which has no button before AS2's question, and Delete account isn't here: AS7's. Not here: iOS's
+ * marker, asks and monitor, which have no twin.
  */
 // Lint's SetTextI18n guards the words a student reads and a translator translates: these are a developer's alone.
 @SuppressLint("SetTextI18n")
@@ -141,7 +141,7 @@ class ReadoutActivity : ComponentActivity() {
         lines.text =
             listOf(
                 "Debug readout — temporary",
-                "Engine: ${engine(run != null)}",
+                "Engine: ${engine(run)}",
                 "Link: ${state?.link ?: "no exchange yet"}",
                 "Server last answered: ${state?.heardAt?.let(::time) ?: "never"}",
                 "Signed in: ${signedIn(run?.account?.state?.value)}",
@@ -174,10 +174,11 @@ class ReadoutActivity : ComponentActivity() {
         }
     }
 
-    private fun engine(running: Boolean): String =
+    // The run's own: an engine with no sign-in has no account.
+    private fun engine(run: BaliApp.Running?): String =
         when {
-            !running -> app.startFailed.value?.let { "start failed: $it" } ?: "not running"
-            app.signIn == null -> "over no token, as a signed-out phone: sign-in isn't set up, so nothing is sent"
+            run == null -> app.startFailed.value?.let { "start failed: $it" } ?: "not running"
+            run.account == null -> "over no token, as a signed-out phone: sign-in isn't set up, so nothing is sent"
             else -> "over the sign-in"
         }
 
