@@ -8,6 +8,86 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-11** — **AN9f, Me's rules: Your name, Leave and Sign out's hold: BaliOutbox's `Naming`, `Leaving` and
+  `SignOutWords.held` in Kotlin, on the JVM, every failure a type (the conductor's calls in the step's brief, and this
+  step's own, marked, each the conductor's while the owner is away, awaiting the owner's look; AN9f, #560).** The rules
+  Me's screens will follow, AS2's Your name and AS7's Me, with no screen and no word.
+
+  **Where it lives:** `outbox`'s new `Me.kt`: `Naming` (`edit`, `type`, `complete`, `save`, `saved`, and its own
+  `printable` and `tidy`), `Leaving` (`ask`, `asks`, `cancel`, `send`, `left`, `held`), `SignOutHold` (`held`, `asked`)
+  and the blank test's two tables; `Join.kt`'s `characters`, the BreakIterator's whole characters `Joining` judged a code
+  by, now shared. Nothing calls them yet; the calls they make are AN9d's `rename`, `leave` and `unlockUnsent`. Where
+  Kotlin differs, said plainly:
+  - **Values whose every step gives the next,** as `Joining` and `Deleting` are: `save` gives the next and the request to
+    send, `saved` the next and whether the name is set, `send` the next and the leave to send (its enrollment and
+    request, kept as the last leave sent, where Swift keeps a private pair), `left` the next and whether the student is out.
+  - **Every failure a type, never words:** `Naming.Failure` is `Blank`, or `NotSaved` with the answer's result and its
+    error's reason; `Leaving.Failure` the answer's result and reason, as `Joining.Failure` is; `SignOutHold`
+    `UnlockUnsent` or `Unread`; `Leaving.held` says whether. A rename or a leave refused `409 account_deleted` (C3d) is one
+    such failure, with its reason, tested.
+  - **`save` holds a save under way and a blank name itself (this step's call):** iOS's app checks both before its `save`
+    (`Phone.saveName`), setting `Naming.blank`'s words; here `save` sends nothing for either, a blank name's failure
+    `Blank`, so no screen can send one.
+  - **Sign out's hold at the press is the rule's too (this step's call):** `SignOutHold.asked` is BaliApp.swift's `unsent`,
+    the file's own answer (`unlockUnsent`) typed: an unlock it holds, or a file that can't say. `held` reads the state, as
+    `SignOutWords.held` does: every queued unlock, of any kind, tried and stuck or not; a refused tap, kept for good (B3a),
+    holds nothing.
+  - **A lone surrogate half,** which a Kotlin string can hold and a Swift one can't, is left out as typed, as the API
+    refuses it.
+
+  **The blank test (Q6), and its pin (this step's call):** two tables in `Me.kt`, Unicode's White_Space, which the JDK's
+  `Character.isWhitespace` isn't (it leaves out U+0085 and the no-break spaces, and takes in U+001C to U+001F), and
+  Default_Ignorable_Code_Point, its 17 ranges and 4,174 code points as Node 22's ICU (Unicode 17) gives them. The JVM can't
+  run the API's regex, so the API's own suite holds the phone's tables: `apps/api/test/display-name.test.ts` reads both
+  from `Me.kt` and tries `INVISIBLE` itself on every code point of each range, each range a test of its own, and on every
+  code point outside them, so neither table can drift from the API's blank test without failing there, on every PR but a
+  docs-only one. The JVM tests pin `INVISIBLE`'s, `UNPRINTABLE`'s and `tidyDisplayName`'s text, as iOS's do (outbox's test
+  task reads `apps/api/src/display-name.ts` now, as `bali.names`), and each Default_Ignorable range's ends. A code point a
+  later Unicode adds is the API's to refuse, said as its refusal (`display_name_invalid`), and so is a format character
+  newer than the phone's own Unicode, which `printable` judges by (`Character.getType`).
+
+  **Whole characters on an older Android (the brief's question):** on the phone `java.text.BreakIterator` is ICU's, by its
+  Android version's Unicode: Android 10's ICU 63 is Unicode 11, where the tests' JDK 21 has Unicode 15.0 and UAX #29's
+  extended grapheme clusters (since JDK 20). Both join every case the twin's tests and these use: a skin tone, a ZWJ
+  sequence, a keycap, a flag, a combining accent. They part only on a character newer than the phone's Unicode, a mark
+  added since standing alone, and on Unicode 15.1's Indic conjuncts, one character from Android 15 (ICU 74), two before
+  it. **For the name's length:** the cut at 64 code points falls between whole characters by the phone's own rules, so an
+  older phone can cut through what a newer one joins and keep its first part; never inside a code point, so no cut name
+  is refused, and the field shows the name as kept, so what's saved is what the student sees. **For its tidy:** it splits
+  on whole characters all blank, as Swift's does, so only a blank beside a mark newer than the phone's Unicode is tidied
+  differently; the API tidies the name again as it stores it and answers what it stored, which the engine puts in `me`,
+  so after a save every phone shows the server's name.
+
+  **LeaveTests' `sending` is ported too (this step's call):** the split's list leaves it out, but it is where the brief's
+  "a leave sent twice under two event ids for one enrollment" fails.
+
+  **For AN10, AS2 and AS7:** AN10 words each failure and hold (iOS's `Naming.words` and `blank`, `Leaving.words`,
+  `question`, `consequence` and `inSession`, `SignOutWords`), says a phone whose engine hasn't started
+  (`Joining.notStarted`, no type here), and starts `Naming()` and `Leaving()` afresh when the sign-in changes, as iOS's
+  `signed` does, so an answer to the last student's save or leave is dropped. AS2 and AS7 send what `save` and `send`
+  give through the engine, hand each answer to `saved` and `left`, and hold Sign out while `held` says so, asking `asked`
+  at the press. Nothing here closes, wipes or empties the outbox's file.
+
+  **The tests:** MeTests' `typing`, `printable`, `saving`, `answers` and `signOutHeld`, and LeaveTests' `asking`, `asks`,
+  `sending`, `answers` and `held`, over A8's and A19's fixtures; `signedInAs` and both suites' word tests are AN10's.
+  MeEngineTest's two Sign out tests ask `SignOutHold.asked` too: none, an unlock pressed, none once recorded; a file that
+  can't say, then the unlock a failed read left out of the state. New: whole characters beyond the twin's skin tone (a
+  combining accent, a keycap, a ZWJ sequence, a flag); each Default_Ignorable range's ends; a lone surrogate half; a save
+  one at a time, a name changed and typed back, and one of nothing; Cancel and the same class's Leave again, its replay
+  still; C3d's 409 for both; an unlock tried and stuck, and one tried with no answer, each holding Sign out, and a refused
+  tap holding nothing; and the standing not known, holding no Leave. Tried, each failing by name, then reverted: a new
+  event id while the name stays the same, and the same one after it changed (`saving`'s, each); a blank name let
+  through, U+3164 left out of the table (`printable`'s, the ranges', `saving`'s, and the API's two: the table's count and
+  the code points between ranges); a name over 64 code points (`typing`'s); a leave sent under two event ids for one
+  enrollment (`sending`'s); Sign out not held by a tried-and-stuck unlock (`signOutHeld`'s); and a failure kept as a
+  string, the server's message or iOS's words for a blank name (`Naming`: `typing`'s, `answers`' and `saving`'s;
+  `Leaving`: `sending`'s and `answers`'). One check is an `assertIs` so that last break fails by name: Kotlin refuses an
+  `assertEquals` between unrelated types as it compiles.
+
+  **Santa's review:** SANTA-TBD
+
+  **The proof:** PROOF-TBD
+
 - **2026-11-11** — **AN9i, the account's flows in the app, and the readout's Join and History: `BaliApp`'s one
   `Account` a run, and the Debug readout's Join, History and Signed in line, on the emulators (AN9e's app half; this
   step's calls marked, awaiting the owner's look; AN9i, #559).** The conductor split AN9e for its size; this PR is its

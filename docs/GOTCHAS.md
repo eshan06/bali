@@ -102,6 +102,11 @@ the clone is `C:\Users\Eshan Shah\Downloads\github\bali`. Its path has a space: 
   the clone sets `core.autocrlf=input` (its worktrees share it). A clone made before the setting
   keeps CRLF files on disk though `git status` is clean: check `git ls-files --eol`, and re-checkout
   (`git rm -rq --cached . && git reset --hard`) when it shows `w/crlf`.
+- **Claude Code's Write and Edit tools turn a typed `\uXXXX` escape into its character.** A Kotlin, Swift or
+  TypeScript escape for a printable character lands in the file as the character itself, an invisible one too (a
+  zero-width space, a direction override, a byte-order mark), with no error; `\\uXXXX` stays as typed, two backslashes,
+  and the Bash tool's text makes `\\u` one. Write such escapes from a script that builds the backslash (Python's
+  `chr(92)`), then check the file for non-ASCII characters (AN9f, 2026-11-11).
 - **Headless Chrome lays a page out 500 px wide at least.** `--window-size=390,…` renders at 500 and
   crops the shot to 390, a layout no phone has, with no error. For a phone-width shot, emulate the
   width over DevTools: start it with `--remote-debugging-port`, then `Emulation.setDeviceMetricsOverride`
