@@ -94,9 +94,11 @@ private val ApiResponse<*>.failure: Joining.Failure get() = Joining.Failure(resu
 /**
  * [text]'s whole characters, as Swift's `Character`s are: a BreakIterator's grapheme clusters, by the rules of the phone's own
  * Unicode, so a combining mark, a variation selector or a skin tone joins the character before it and an emoji sequence is
- * one (`docs/DECISIONS.md`, AN9f's entry, says what an older Android's rules change).
+ * one (`docs/DECISIONS.md`, AN9f's entry, says what an older Android's rules change). Read once: the BreakIterator under it
+ * moves as it is read, so a second read throws rather than giving nothing.
  */
 internal fun characters(text: String): Sequence<String> {
     val breaks = BreakIterator.getCharacterInstance(Locale.ROOT).apply { setText(text) }
     return generateSequence(breaks.first()) { breaks.next().takeIf { it != BreakIterator.DONE } }.zipWithNext(text::substring)
+        .constrainOnce()
 }

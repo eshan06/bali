@@ -84,7 +84,15 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `Leaving`: `sending`'s and `answers`'). One check is an `assertIs` so that last break fails by name: Kotlin refuses an
   `assertEquals` between unrelated types as it compiles.
 
-  **Santa's review:** SANTA-TBD
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so
+  context isolation holds and model diversity doesn't): 0 blockers. Their WARNs: this entry's placeholders (both;
+  filled); `characters()` readable once only, its BreakIterator moving as it is read, so a second read would be silently
+  empty (reviewer A; taken: `constrainOnce`, so one throws); the API's test holding only the two tables' union to
+  `INVISIBLE`, while typing and tidying read `whiteSpace` alone, so a range moved from one table to the other with both
+  counts kept would pass (reviewer A; taken: each table held to its own Unicode property too, and that very move tried,
+  failing both new tests by name); and the escape trap's harmful half, an invisible or direction character landing in
+  source unseen, fitting a CI check before a GOTCHAS line (reviewer B; left for a step of its own, in the PR's review
+  notes).
 
   **The proof:** PROOF-TBD
 

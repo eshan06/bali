@@ -60,4 +60,19 @@ describe("The API's blank test, as Android's Me.kt holds it (Q6)", () => {
     }
     expect(unseen).toEqual([]);
   });
+
+  // Me.kt's typing and tidying read whiteSpace alone, so each table is held to its own
+  // property too: a range moved from one table to the other leaves the blank test as it was.
+  it.each([
+    { name: 'whiteSpace', property: /^\p{White_Space}$/u },
+    { name: 'ignorable', property: /^\p{Default_Ignorable_Code_Point}$/u },
+  ])('holds $name to its own Unicode property, code point by code point', ({ name, property }) => {
+    const own = table(name);
+    const disagree: string[] = [];
+    for (let codePoint = 0; codePoint <= 0x10ffff; codePoint++) {
+      const listed = own.some(({ from, to }) => codePoint >= from && codePoint <= to);
+      if (listed !== property.test(String.fromCodePoint(codePoint))) disagree.push(hex(codePoint));
+    }
+    expect(disagree).toEqual([]);
+  });
 });
