@@ -9,8 +9,8 @@ touching before changing how something works. A pointer of the form
 a real decision? Add a dated entry at the top: what was decided and why.
 
 - **2026-11-11** — **AN9f, Me's rules: Your name, Leave and Sign out's hold: BaliOutbox's `Naming`, `Leaving` and
-  `SignOutWords.held` in Kotlin, on the JVM, every failure a type (the conductor's calls in the step's brief, and this
-  step's own, marked, each the conductor's while the owner is away, awaiting the owner's look; AN9f, #560).** The rules
+  `SignOutWords.held` in Kotlin, on the JVM, every failure a type (the conductor's calls, those in the step's brief and
+  this step's own, marked, each awaiting the owner's look; AN9f, #560).** The rules
   Me's screens will follow, AS2's Your name and AS7's Me, with no screen and no word.
 
   **Where it lives:** `outbox`'s new `Me.kt`: `Naming` (`edit`, `type`, `complete`, `save`, `saved`, and its own
@@ -40,7 +40,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   Default_Ignorable_Code_Point, its 17 ranges and 4,174 code points as Node 22's ICU (Unicode 17) gives them. The JVM can't
   run the API's regex, so the API's own suite holds the phone's tables: `apps/api/test/display-name.test.ts` reads both
   from `Me.kt` and tries `INVISIBLE` itself on every code point of each range, each range a test of its own, and on every
-  code point outside them, so neither table can drift from the API's blank test without failing there, on every PR but a
+  code point outside them, and holds each table to its own Unicode property too, since typing and tidying read
+  White_Space's alone, so neither table can drift from the API's blank test without failing there, on every PR but a
   docs-only one. The JVM tests pin `INVISIBLE`'s, `UNPRINTABLE`'s and `tidyDisplayName`'s text, as iOS's do (outbox's test
   task reads `apps/api/src/display-name.ts` now, as `bali.names`), and each Default_Ignorable range's ends. A code point a
   later Unicode adds is the API's to refuse, said as its refusal (`display_name_invalid`), and so is a format character
@@ -94,7 +95,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   source unseen, fitting a CI check before a GOTCHAS line (reviewer B; left for a step of its own, in the PR's review
   notes).
 
-  **The proof:** PROOF-TBD
+  **The proof:** `android/app` is unchanged, so the JVM tests are the proof and no emulator ran: `./gradlew assemble
+  :app:lint check` green on the final code, Android 10's API check with it and no compiler warning, and the core and
+  outbox suites run five times more on the final code, their 545 tests green every time, AN9h's AgeFallbackTest
+  `aYesForOneAccountTakenAtAWake…` among them; `npm run typecheck && npm run lint && npm test` green before santa's WARNs
+  and again after, the portal's suite whole. Nothing was added to the PC's SDK: its folders were compared before and
+  after.
 
 - **2026-11-11** — **AN9i, the account's flows in the app, and the readout's Join and History: `BaliApp`'s one
   `Account` a run, and the Debug readout's Join, History and Signed in line, on the emulators (AN9e's app half; this

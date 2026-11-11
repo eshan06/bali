@@ -129,6 +129,10 @@ The PC whose clone is `C:\dev\bali` holds Android's SDK and its test emulators
   system-images/android-36/google_apis/x86_64`, with slashes. Make an AVD through the JBR's `java`
   with `-classpath <cmdline-tools>/lib/avdmanager-classpath.jar com.android.sdklib.tool.AvdManagerCli
   create avd …`, where a quoted argument keeps its semicolons.
+- **A worktree has no `android/local.properties`.** It is gitignored, so a fresh worktree's
+  `./gradlew assemble` stops at "SDK location not found" (`:core:test` and `:outbox:test` run
+  without it). Export `ANDROID_HOME` as the SDK's folder (Android Studio's SDK Manager shows it)
+  with `JAVA_HOME`, rather than copying the main checkout's file.
 - **`android emulator start` never ends behind a pipe.** It returns once the emulator has booted,
   but the emulator keeps the command's output open, so `android emulator start … | tail` waits
   until the emulator stops (the Bash tool's 10 minutes, then the background). Send its output to a
