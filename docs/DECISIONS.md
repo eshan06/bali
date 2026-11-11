@@ -129,7 +129,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   both ways, `signInDeleted`'s three); an unlock refused (both unlock tests); its row left live (both "born removed"
   checks); the finish deleting the row (6), keeping the username (3), or ignoring a re-queue (the guard's own test); a
   finished row left finished at a new deletion (both re-queue tests); the sweep not forgetting (the mark's day); and
-  the mark read before the lookup, on CI's real-Postgres lane in a commit reverted after it (RACE_BREAK).
+  the mark read before the lookup, on CI's real-Postgres lane in a commit reverted after it (the staged race test,
+  its lookup made to wait out the commit, got back the fresh account the hole makes: a new row holding the sub).
 
   **The proof:** `npm run typecheck && npm run lint && npm test` green, the portal's suite whole; `npm run demo`
   green; the real-Postgres suite on CI's lane (this PC runs no Postgres). Santa: NICE in one round, two Claude Opus
