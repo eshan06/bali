@@ -262,7 +262,8 @@ account calls (AN9d): Join's look-up and join, and Me's rename and leave, under 
 each renewed once on a 401 through `Joining.send` by the renewal its caller names, a join, a rename or a leave
 applied however its caller ends; a read's `me` applied only while the phone hasn't changed `me` since the read
 went (`meChanges`); Sign out's read of the outbox's file itself (`unlockUnsent`); and `forgetMe`, which forgets
-the last student's `me` and nothing else, the queue and where the phone stands left as they are.
+the last student's `me` and nothing else, the queue and where the phone stands left as they are. History's page
+(`history`, AN9g) goes the same way, in its caller's coroutine, and applies nothing.
 Its tests run on a rig of their own (`EngineSupport.kt`, BaliOutbox's `EngineSupport.swift`): a clock the test moves,
 in a zone of the test's own, since coroutines-test's virtual time can't drive Room's queries, a
 server answered by hand, and the bundled driver watched, which sees each commit as GRDB's
@@ -278,6 +279,12 @@ passed, with its sign-in, never the date or an age (C7).
 ASCII letters and digits in upper case, each whole character a BreakIterator's grapheme cluster as Swift's
 `Character` is; what it opens, for the preview the consent list sits beside; an answer for a code typed over
 dropped; and why a look or a join gave no class, as its result and reason, the words AN10's.
+
+**History's rules** (`outbox`'s `History.kt`, BaliOutbox's `History.swift`, AN9g): the pages as they came, from
+the top or Show earlier's, each moment once, and the cursor each read sends; Show earlier's cursor the server doesn't
+hold read again from the top; days in the phone's zone, whole at a daylight-saving change, in cards of one class's
+moments in a row, each card's id kept as moments join it; a kind this build doesn't know left out of the days and kept
+in the page. Every failure and day title is a type; the words, the date and time formats are AN10's.
 
 **The account** (`outbox`'s `Account.kt`, BaliApp.swift's `Phone`'s account half, AN9e): one a run over the
 engine's sign-in (`Account.of`), its state what AN10's router will read. It follows the sign-in as each sign-in
